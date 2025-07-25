@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "Prompt Library",
+  "version": "1.0.0",
+  "description": "Store, organize, and quickly access your personal collection of text prompts with categories and search functionality.",
+  "author": "Your Name",
+  "homepage_url": "https://github.com/yourusername/prompt-library-extension",
+  "permissions": [
+    "storage"
+  ],
+  "action": {
+    "default_popup": "src/popup.html",
+    "default_title": "Prompt Library - Manage your prompts"
+  },
+  "icons": {
+    "16": "public/icons/icon-16.png",
+    "32": "public/icons/icon-32.png",
+    "48": "public/icons/icon-48.png",
+    "128": "public/icons/icon-128.png"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
+  "short_name": "Prompt Library",
+  "minimum_chrome_version": "88"
+}
