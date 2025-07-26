@@ -8,7 +8,12 @@
       "Bash(npm run:*)",
       "Bash(mv:*)",
       "Bash(git init:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(find:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(npm audit:*)",
+      "Bash(npm test)",
+      "Bash(rm:*)"
     ],
     "deny": []
   }

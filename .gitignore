@@ -136,3 +136,6 @@ temp/
 # Uncomment if you don't want to commit these
 # manifest.json (only if generated)
 # public/icons/ (only if generated automatically)
+
+# Claude
+.claude/settings.local.json
