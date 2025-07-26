@@ -129,13 +129,13 @@ const PromptCard: React.FC<PromptCardProps> = ({
                   onClick={handleEditClick}
                   className="block w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 font-medium transition-colors"
                 >
-                  ✏️ Edit
+                  Edit
                 </button>
                 <button
                   onClick={handleDeleteClick}
                   className="block w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-red-50 font-medium transition-colors"
                 >
-                  🗑️ Delete
+                  Delete
                 </button>
               </div>
             </>
