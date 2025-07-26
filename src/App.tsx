@@ -8,14 +8,13 @@ import StorageWarning from './components/StorageWarning';
 import ToastContainer from './components/ToastContainer';
 import { Prompt, ErrorType } from './types';
 
-type ViewType = 'library' | 'add' | 'edit';
+type ViewType = 'library' | 'add' | 'edit' | 'categories';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewType>('library');
   const [selectedPrompt, setSelectedPrompt] = useState<Prompt | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [showCategoryManager, setShowCategoryManager] = useState<boolean>(false);
   const [showStorageWarning, setShowStorageWarning] = useState<boolean>(false);
 
   const { 
@@ -152,7 +151,7 @@ const App: React.FC = () => {
           onCopyPrompt={handleCopyPrompt}
           onSearchChange={setSearchQuery}
           onCategoryChange={setSelectedCategory}
-          onManageCategories={() => setShowCategoryManager(true)}
+          onManageCategories={() => setCurrentView('categories')}
           loading={loading}
         />
       )}
@@ -176,14 +175,16 @@ const App: React.FC = () => {
         />
       )}
 
-      <CategoryManager
-        categories={categories}
-        onCreateCategory={handleCreateCategory}
-        onUpdateCategory={handleUpdateCategory}
-        onDeleteCategory={handleDeleteCategory}
-        isOpen={showCategoryManager}
-        onClose={() => setShowCategoryManager(false)}
-      />
+      {currentView === 'categories' && (
+        <CategoryManager
+          categories={categories}
+          onCreateCategory={handleCreateCategory}
+          onUpdateCategory={handleUpdateCategory}
+          onDeleteCategory={handleDeleteCategory}
+          isOpen={true}
+          onClose={() => setCurrentView('library')}
+        />
+      )}
 
       {showStorageWarning && (
         <StorageWarning onClose={() => setShowStorageWarning(false)} />

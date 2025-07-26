@@ -94,10 +94,10 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-hidden border border-purple-200">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 bg-gradient-to-r from-purple-50 to-indigo-50 border-b border-purple-100">
+    <div className="h-full flex flex-col bg-gradient-to-br from-purple-50 via-white to-blue-50">
+      {/* Header */}
+      <div className="flex-shrink-0 p-6 bg-white/80 backdrop-blur-sm border-b border-purple-100">
+        <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center">
               <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -119,9 +119,10 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({
             </svg>
           </button>
         </div>
+      </div>
 
-        {/* Content */}
-        <div className="p-6 space-y-6 max-h-96 overflow-y-auto">
+      {/* Content */}
+      <div className="flex-1 overflow-auto p-6 space-y-6">
           {/* Error Display */}
           {error && (
             <div className="p-4 text-sm text-red-600 bg-red-50/80 backdrop-blur-sm border border-red-200 rounded-xl font-medium">
@@ -133,42 +134,52 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({
           <div className="bg-white/50 backdrop-blur-sm rounded-2xl p-5 border border-purple-100">
             <form onSubmit={handleCreateCategory} className="space-y-4">
               <h3 className="font-bold text-gray-900 flex items-center space-x-2">
-                <span>✨ Add New Category</span>
+                <span>Add New Category</span>
               </h3>
               
-              <div className="flex space-x-3">
-                <input
-                  type="text"
-                  value={newCategoryName}
-                  onChange={(e) => {
-                    setNewCategoryName(e.target.value);
-                    setError(null);
-                  }}
-                  placeholder="Category name"
-                  className="flex-1 px-4 py-3 border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm bg-white/60 backdrop-blur-sm transition-all duration-200"
-                  disabled={loading}
-                  maxLength={50}
-                />
+              <div className="space-y-4">
+                <div className="flex items-center space-x-3">
+                  <input
+                    type="text"
+                    value={newCategoryName}
+                    onChange={(e) => {
+                      setNewCategoryName(e.target.value);
+                      setError(null);
+                    }}
+                    placeholder="Category name"
+                    className="flex-1 px-4 py-3 h-12 border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm bg-white/60 backdrop-blur-sm transition-all duration-200"
+                    disabled={loading}
+                    maxLength={50}
+                  />
+                  
+                  <button
+                    type="submit"
+                    className="px-6 py-3 h-12 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-xl hover:from-purple-600 hover:to-indigo-700 transition-all duration-200 text-sm font-semibold shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transform hover:scale-105 disabled:opacity-50 disabled:transform-none flex items-center justify-center flex-shrink-0"
+                    disabled={loading || !newCategoryName.trim()}
+                  >
+                    {loading ? (
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    ) : (
+                      'Add'
+                    )}
+                  </button>
+                </div>
                 
-                <input
-                  type="color"
-                  value={newCategoryColor}
-                  onChange={(e) => setNewCategoryColor(e.target.value)}
-                  className="w-14 h-12 border border-purple-200 rounded-xl cursor-pointer bg-white/60"
-                  disabled={loading}
-                />
-                
-                <button
-                  type="submit"
-                  className="px-6 py-3 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-xl hover:from-purple-600 hover:to-indigo-700 transition-all duration-200 text-sm font-semibold shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transform hover:scale-105 disabled:opacity-50 disabled:transform-none"
-                  disabled={loading || !newCategoryName.trim()}
-                >
-                  {loading ? (
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                  ) : (
-                    'Add'
-                  )}
-                </button>
+                <div className="flex items-center space-x-3">
+                  <label className="text-sm font-medium text-gray-700">Category Color:</label>
+                  <input
+                    type="color"
+                    value={newCategoryColor}
+                    onChange={(e) => setNewCategoryColor(e.target.value)}
+                    className="w-10 h-10 border border-purple-200 rounded-lg cursor-pointer bg-white/60"
+                    disabled={loading}
+                  />
+                  <div 
+                    className="w-6 h-6 rounded-full border-2 border-white shadow-sm"
+                    style={{ backgroundColor: newCategoryColor }}
+                  />
+                  <span className="text-xs text-gray-500">{newCategoryColor}</span>
+                </div>
               </div>
             </form>
           </div>
@@ -176,7 +187,7 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({
           {/* Category List */}
           <div className="space-y-3">
             <h3 className="font-bold text-gray-900 flex items-center space-x-2">
-              <span>📁 Your Categories</span>
+              <span>Your Categories</span>
             </h3>
             
             {categories.map((category) => (
@@ -243,18 +254,17 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({
               </div>
             ))}
           </div>
-        </div>
+      </div>
 
-        {/* Footer */}
-        <div className="p-6 bg-gradient-to-r from-purple-50 to-indigo-50 border-t border-purple-100">
-          <button
-            onClick={onClose}
-            className="w-full px-6 py-3 text-sm font-semibold text-gray-700 bg-white/60 backdrop-blur-sm border border-purple-200 rounded-xl hover:bg-white/80 transition-all duration-200"
-            disabled={loading}
-          >
-            ✨ All Set
-          </button>
-        </div>
+      {/* Footer */}
+      <div className="flex-shrink-0 p-6 bg-white/80 backdrop-blur-sm border-t border-purple-100">
+        <button
+          onClick={onClose}
+          className="w-full px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-purple-500 to-indigo-600 rounded-xl hover:from-purple-600 hover:to-indigo-700 transition-all duration-200 shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transform hover:scale-105"
+          disabled={loading}
+        >
+          Back to Library
+        </button>
       </div>
     </div>
   );
