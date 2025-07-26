@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
+import DOMPurify from 'dompurify';
 import { PromptCardProps } from '../types/components';
+import { Category } from '../types';
 
 const PromptCard: React.FC<PromptCardProps> = ({
   prompt,
@@ -20,8 +22,12 @@ const PromptCard: React.FC<PromptCardProps> = ({
   const highlightText = (text: string, query: string) => {
     if (!query.trim()) return text;
     
-    const searchTerm = query.toLowerCase();
-    const lowerText = text.toLowerCase();
+    // Sanitize both text and query to prevent XSS
+    const sanitizedText = DOMPurify.sanitize(text, { ALLOWED_TAGS: [] });
+    const sanitizedQuery = DOMPurify.sanitize(query, { ALLOWED_TAGS: [] });
+    
+    const searchTerm = sanitizedQuery.toLowerCase().trim();
+    const lowerText = sanitizedText.toLowerCase();
     const parts = [];
     let lastIndex = 0;
     let index = lowerText.indexOf(searchTerm);
@@ -29,13 +35,13 @@ const PromptCard: React.FC<PromptCardProps> = ({
     while (index !== -1) {
       // Add text before the match
       if (index > lastIndex) {
-        parts.push(text.substring(lastIndex, index));
+        parts.push(sanitizedText.substring(lastIndex, index));
       }
       
-      // Add highlighted match
+      // Add highlighted match - using key with unique identifier
       parts.push(
-        <mark key={`${index}-${searchTerm}`} className="bg-yellow-200 px-1 rounded">
-          {text.substring(index, index + searchTerm.length)}
+        <mark key={`highlight-${index}-${Date.now()}`} className="bg-yellow-200 px-1 rounded">
+          {sanitizedText.substring(index, index + searchTerm.length)}
         </mark>
       );
       
@@ -44,8 +50,8 @@ const PromptCard: React.FC<PromptCardProps> = ({
     }
     
     // Add remaining text
-    if (lastIndex < text.length) {
-      parts.push(text.substring(lastIndex));
+    if (lastIndex < sanitizedText.length) {
+      parts.push(sanitizedText.substring(lastIndex));
     }
     
     return parts;
@@ -75,7 +81,7 @@ const PromptCard: React.FC<PromptCardProps> = ({
   };
 
   const getCategoryColor = (categoryName: string) => {
-    const category = categories.find(cat => cat.name === categoryName);
+    const category = categories.find((cat: Category) => cat.name === categoryName);
     return category?.color || '#6B7280'; // Default gray color if category not found
   };
 
