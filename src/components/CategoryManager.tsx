@@ -147,7 +147,7 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({
                       setError(null);
                     }}
                     placeholder="Category name"
-                    className="flex-1 px-4 py-3 h-12 border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm bg-white/60 backdrop-blur-sm transition-all duration-200"
+                    className="flex-1 px-4 py-3 h-12 border border-purple-200 rounded-xl focus:outline-none focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-purple-500 text-sm bg-white/60 backdrop-blur-sm transition-all duration-200"
                     disabled={loading}
                     maxLength={50}
                   />
@@ -203,7 +203,7 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({
                       type="text"
                       value={editingCategory.name}
                       onChange={(e) => setEditingCategory({ ...editingCategory, name: e.target.value })}
-                      className="text-sm border border-purple-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white/80 backdrop-blur-sm font-medium"
+                      className="text-sm border border-purple-200 rounded-lg px-3 py-2 focus:outline-none focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-purple-500 bg-white/80 backdrop-blur-sm font-medium"
                       onBlur={() => {
                         if (editingCategory.name.trim() && editingCategory.name !== category.name) {
                           handleUpdateCategory(category, { name: editingCategory.name.trim() });

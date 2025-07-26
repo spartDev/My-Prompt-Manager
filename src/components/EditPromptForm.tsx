@@ -109,8 +109,8 @@ const EditPromptForm: React.FC<EditPromptFormProps> = ({
               value={formData.title}
               onChange={(e) => handleInputChange('title', e.target.value)}
               placeholder="Enter a descriptive title"
-              className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white/60 backdrop-blur-sm transition-all duration-200 text-sm ${
-                errors.title ? 'border-red-300 focus:ring-red-500' : 'border-purple-200'
+              className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-purple-500 bg-white/60 backdrop-blur-sm transition-all duration-200 text-sm ${
+                errors.title ? 'border-red-300 focus-within:ring-red-500' : 'border-purple-200'
               }`}
               disabled={isLoading}
             />
@@ -134,7 +134,7 @@ const EditPromptForm: React.FC<EditPromptFormProps> = ({
                 id="category"
                 value={formData.category}
                 onChange={(e) => handleInputChange('category', e.target.value)}
-                className="w-full px-4 py-3 pr-10 border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white/60 backdrop-blur-sm transition-all duration-200 text-sm appearance-none cursor-pointer"
+                className="w-full px-4 py-3 pr-10 border border-purple-200 rounded-xl focus:outline-none focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-purple-500 bg-white/60 backdrop-blur-sm transition-all duration-200 text-sm appearance-none cursor-pointer"
                 disabled={isLoading}
               >
                 {categories.map((category) => (
@@ -164,8 +164,8 @@ const EditPromptForm: React.FC<EditPromptFormProps> = ({
               onChange={(e) => handleInputChange('content', e.target.value)}
               placeholder="Enter your prompt content here..."
               rows={10}
-              className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 resize-none bg-white/60 backdrop-blur-sm transition-all duration-200 text-sm ${
-                errors.content ? 'border-red-300 focus:ring-red-500' : 'border-purple-200'
+              className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-purple-500 resize-none bg-white/60 backdrop-blur-sm transition-all duration-200 text-sm ${
+                errors.content ? 'border-red-300 focus-within:ring-red-500' : 'border-purple-200'
               }`}
               disabled={isLoading}
             />
