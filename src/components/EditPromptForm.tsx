@@ -96,11 +96,11 @@ const EditPromptForm: React.FC<EditPromptFormProps> = ({
         <div className="mt-4 p-3 bg-white/50 backdrop-blur-sm rounded-xl border border-purple-100">
           <div className="text-xs text-gray-600 space-y-1 font-medium">
             <div className="flex items-center space-x-2">
-              <span>📅 Created:</span>
+              <span>Created:</span>
               <span>{formatDate(prompt.createdAt)}</span>
             </div>
             <div className="flex items-center space-x-2">
-              <span>⏰ Last modified:</span>
+              <span>Last modified:</span>
               <span>{formatDate(prompt.updatedAt)}</span>
             </div>
           </div>
@@ -113,7 +113,6 @@ const EditPromptForm: React.FC<EditPromptFormProps> = ({
           {/* Title Section */}
           <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-5 border border-purple-100">
             <div className="flex items-center space-x-2 mb-4">
-              <span className="text-lg">📝</span>
               <label htmlFor="title" className="block text-sm font-bold text-gray-900">
                 Title
               </label>
@@ -140,7 +139,6 @@ const EditPromptForm: React.FC<EditPromptFormProps> = ({
           {/* Category Section */}
           <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-5 border border-purple-100">
             <div className="flex items-center space-x-2 mb-4">
-              <span className="text-lg">📁</span>
               <label htmlFor="category" className="block text-sm font-bold text-gray-900">
                 Category
               </label>
@@ -170,7 +168,6 @@ const EditPromptForm: React.FC<EditPromptFormProps> = ({
           {/* Content Section */}
           <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-5 border border-purple-100">
             <div className="flex items-center space-x-2 mb-4">
-              <span className="text-lg">✨</span>
               <label htmlFor="content" className="block text-sm font-bold text-gray-900">
                 Content *
               </label>
@@ -228,7 +225,7 @@ const EditPromptForm: React.FC<EditPromptFormProps> = ({
                 <span>Saving...</span>
               </div>
             ) : (
-              'Save Changes ✨'
+              'Save Changes'
             )}
           </button>
         </div>

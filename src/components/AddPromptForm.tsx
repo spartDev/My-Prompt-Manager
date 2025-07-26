@@ -88,7 +88,7 @@ const AddPromptForm: React.FC<AddPromptFormProps> = ({
             {/* Title */}
             <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-5 border border-purple-100">
               <label htmlFor="title" className="block text-sm font-semibold text-gray-700 mb-3">
-                ✏️ Title (optional)
+                Title (optional)
               </label>
               <input
                 type="text"
@@ -112,7 +112,7 @@ const AddPromptForm: React.FC<AddPromptFormProps> = ({
             {/* Category */}
             <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-5 border border-purple-100">
               <label htmlFor="category" className="block text-sm font-semibold text-gray-700 mb-3">
-                📁 Category
+                Category
               </label>
               <div className="relative">
                 <select
@@ -139,7 +139,7 @@ const AddPromptForm: React.FC<AddPromptFormProps> = ({
             {/* Content */}
             <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-5 border border-purple-100">
               <label htmlFor="content" className="block text-sm font-semibold text-gray-700 mb-3">
-                💬 Content *
+                Content *
               </label>
               <textarea
                 id="content"
