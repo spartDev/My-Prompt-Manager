@@ -91,20 +91,6 @@ const EditPromptForm: React.FC<EditPromptFormProps> = ({
             </svg>
           </button>
         </div>
-        
-        {/* Metadata */}
-        <div className="mt-4 p-3 bg-white/50 backdrop-blur-sm rounded-xl border border-purple-100">
-          <div className="text-xs text-gray-600 space-y-1 font-medium">
-            <div className="flex items-center space-x-2">
-              <span>Created:</span>
-              <span>{formatDate(prompt.createdAt)}</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <span>Last modified:</span>
-              <span>{formatDate(prompt.updatedAt)}</span>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Form */}
@@ -191,6 +177,21 @@ const EditPromptForm: React.FC<EditPromptFormProps> = ({
             </p>
           </div>
         </form>
+        
+        {/* Metadata */}
+        <div className="mt-6 p-4 bg-white/50 backdrop-blur-sm rounded-xl border border-purple-100">
+          <h4 className="text-sm font-semibold text-gray-700 mb-3">Prompt Information</h4>
+          <div className="text-xs text-gray-600 space-y-2 font-medium">
+            <div className="flex items-center space-x-2">
+              <span>Created:</span>
+              <span>{formatDate(prompt.createdAt)}</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <span>Last modified:</span>
+              <span>{formatDate(prompt.updatedAt)}</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Footer */}
