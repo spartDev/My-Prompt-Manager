@@ -94,14 +94,24 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[80vh] overflow-hidden">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-hidden border border-purple-200">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Manage Categories</h2>
+        <div className="flex items-center justify-between p-6 bg-gradient-to-r from-purple-50 to-indigo-50 border-b border-purple-100">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center">
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Manage Categories</h2>
+              <p className="text-sm text-gray-500">Organize your prompt collection</p>
+            </div>
+          </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 p-1"
+            className="text-gray-400 hover:text-purple-600 p-2 rounded-lg hover:bg-purple-50 transition-colors"
             disabled={loading}
           >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -111,59 +121,69 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({
         </div>
 
         {/* Content */}
-        <div className="p-4 space-y-4 max-h-96 overflow-y-auto">
+        <div className="p-6 space-y-6 max-h-96 overflow-y-auto">
           {/* Error Display */}
           {error && (
-            <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg">
-              {error}
+            <div className="p-4 text-sm text-red-600 bg-red-50/80 backdrop-blur-sm border border-red-200 rounded-xl font-medium">
+              ⚠️ {error}
             </div>
           )}
 
           {/* Add New Category Form */}
-          <form onSubmit={handleCreateCategory} className="space-y-3">
-            <h3 className="font-medium text-gray-900">Add New Category</h3>
-            
-            <div className="flex space-x-2">
-              <input
-                type="text"
-                value={newCategoryName}
-                onChange={(e) => {
-                  setNewCategoryName(e.target.value);
-                  setError(null);
-                }}
-                placeholder="Category name"
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm"
-                disabled={loading}
-                maxLength={50}
-              />
+          <div className="bg-white/50 backdrop-blur-sm rounded-2xl p-5 border border-purple-100">
+            <form onSubmit={handleCreateCategory} className="space-y-4">
+              <h3 className="font-bold text-gray-900 flex items-center space-x-2">
+                <span>✨ Add New Category</span>
+              </h3>
               
-              <input
-                type="color"
-                value={newCategoryColor}
-                onChange={(e) => setNewCategoryColor(e.target.value)}
-                className="w-12 h-10 border border-gray-300 rounded cursor-pointer"
-                disabled={loading}
-              />
-              
-              <button
-                type="submit"
-                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm font-medium disabled:opacity-50"
-                disabled={loading || !newCategoryName.trim()}
-              >
-                Add
-              </button>
-            </div>
-          </form>
+              <div className="flex space-x-3">
+                <input
+                  type="text"
+                  value={newCategoryName}
+                  onChange={(e) => {
+                    setNewCategoryName(e.target.value);
+                    setError(null);
+                  }}
+                  placeholder="Category name"
+                  className="flex-1 px-4 py-3 border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm bg-white/60 backdrop-blur-sm transition-all duration-200"
+                  disabled={loading}
+                  maxLength={50}
+                />
+                
+                <input
+                  type="color"
+                  value={newCategoryColor}
+                  onChange={(e) => setNewCategoryColor(e.target.value)}
+                  className="w-14 h-12 border border-purple-200 rounded-xl cursor-pointer bg-white/60"
+                  disabled={loading}
+                />
+                
+                <button
+                  type="submit"
+                  className="px-6 py-3 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-xl hover:from-purple-600 hover:to-indigo-700 transition-all duration-200 text-sm font-semibold shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transform hover:scale-105 disabled:opacity-50 disabled:transform-none"
+                  disabled={loading || !newCategoryName.trim()}
+                >
+                  {loading ? (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  ) : (
+                    'Add'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
 
           {/* Category List */}
-          <div className="space-y-2">
-            <h3 className="font-medium text-gray-900">Existing Categories</h3>
+          <div className="space-y-3">
+            <h3 className="font-bold text-gray-900 flex items-center space-x-2">
+              <span>📁 Your Categories</span>
+            </h3>
             
             {categories.map((category) => (
-              <div key={category.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div className="flex items-center space-x-3">
+              <div key={category.id} className="flex items-center justify-between p-4 bg-white/60 backdrop-blur-sm rounded-xl border border-purple-100 hover:bg-white/80 transition-all duration-200">
+                <div className="flex items-center space-x-4">
                   <div
-                    className="w-4 h-4 rounded-full border border-gray-300"
+                    className="w-5 h-5 rounded-full border-2 border-white shadow-sm"
                     style={{ backgroundColor: category.color || '#6B7280' }}
                   />
                   
@@ -172,7 +192,7 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({
                       type="text"
                       value={editingCategory.name}
                       onChange={(e) => setEditingCategory({ ...editingCategory, name: e.target.value })}
-                      className="text-sm border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                      className="text-sm border border-purple-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white/80 backdrop-blur-sm font-medium"
                       onBlur={() => {
                         if (editingCategory.name.trim() && editingCategory.name !== category.name) {
                           handleUpdateCategory(category, { name: editingCategory.name.trim() });
@@ -191,16 +211,16 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({
                       maxLength={50}
                     />
                   ) : (
-                    <span className="text-sm font-medium text-gray-900">{category.name}</span>
+                    <span className="text-sm font-semibold text-gray-900">{category.name}</span>
                   )}
                 </div>
 
-                <div className="flex items-center space-x-1">
+                <div className="flex items-center space-x-2">
                   {category.name !== 'Uncategorized' && (
                     <>
                       <button
                         onClick={() => setEditingCategory(category)}
-                        className="p-1 text-gray-400 hover:text-gray-600 rounded"
+                        className="p-2 text-gray-400 hover:text-purple-600 rounded-lg hover:bg-purple-50 transition-colors"
                         disabled={loading}
                       >
                         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -210,7 +230,7 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({
                       
                       <button
                         onClick={() => handleDeleteCategory(category)}
-                        className="p-1 text-gray-400 hover:text-red-600 rounded"
+                        className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
                         disabled={loading}
                       >
                         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -226,13 +246,13 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-gray-200">
+        <div className="p-6 bg-gradient-to-r from-purple-50 to-indigo-50 border-t border-purple-100">
           <button
             onClick={onClose}
-            className="w-full px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            className="w-full px-6 py-3 text-sm font-semibold text-gray-700 bg-white/60 backdrop-blur-sm border border-purple-200 rounded-xl hover:bg-white/80 transition-all duration-200"
             disabled={loading}
           >
-            Close
+            ✨ All Set
           </button>
         </div>
       </div>

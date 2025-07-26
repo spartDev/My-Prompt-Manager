@@ -21,12 +21,12 @@ const ToastItem: React.FC<{ toast: Toast }> = ({ toast }) => {
   const getToastStyles = () => {
     switch (toast.type) {
       case 'success':
-        return 'bg-green-500 text-white';
+        return 'bg-gradient-to-r from-green-500 to-emerald-600 text-white';
       case 'error':
-        return 'bg-red-500 text-white';
+        return 'bg-gradient-to-r from-red-500 to-pink-600 text-white';
       case 'info':
       default:
-        return 'bg-blue-500 text-white';
+        return 'bg-gradient-to-r from-purple-500 to-indigo-600 text-white';
     }
   };
 
@@ -70,9 +70,10 @@ const ToastItem: React.FC<{ toast: Toast }> = ({ toast }) => {
     <div
       className={`
         ${getToastStyles()}
-        px-4 py-3 rounded-lg shadow-lg max-w-sm
-        flex items-center space-x-2
+        px-5 py-4 rounded-xl shadow-xl max-w-sm
+        flex items-center space-x-3
         animate-in slide-in-from-top-2 duration-300
+        backdrop-blur-sm border border-white/20
       `}
     >
       <div className="flex-shrink-0">

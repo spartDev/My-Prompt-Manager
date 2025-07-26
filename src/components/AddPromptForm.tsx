@@ -54,14 +54,24 @@ const AddPromptForm: React.FC<AddPromptFormProps> = ({
   };
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col bg-gradient-to-br from-purple-50 via-white to-blue-50">
       {/* Header */}
-      <div className="flex-shrink-0 p-4 bg-white border-b border-gray-200">
+      <div className="flex-shrink-0 p-6 bg-white/80 backdrop-blur-sm border-b border-purple-100">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">Add New Prompt</h2>
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center">
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Add New Prompt</h2>
+              <p className="text-sm text-gray-500">Create a reusable text snippet</p>
+            </div>
+          </div>
           <button
             onClick={onCancel}
-            className="text-gray-400 hover:text-gray-600 p-1"
+            className="text-gray-400 hover:text-purple-600 p-2 rounded-lg hover:bg-purple-50 transition-colors"
             disabled={isLoading}
           >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -72,85 +82,87 @@ const AddPromptForm: React.FC<AddPromptFormProps> = ({
       </div>
 
       {/* Form */}
-      <div className="flex-1 overflow-auto p-4">
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Title */}
-          <div>
-            <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">
-              Title (optional)
-            </label>
-            <input
-              type="text"
-              id="title"
-              value={formData.title}
-              onChange={(e) => handleInputChange('title', e.target.value)}
-              placeholder="Enter a descriptive title or leave blank to auto-generate"
-              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 ${
-                errors.title ? 'border-red-300' : 'border-gray-300'
-              }`}
-              disabled={isLoading}
-            />
-            {errors.title && (
-              <p className="mt-1 text-sm text-red-600">{errors.title}</p>
-            )}
-            <p className="mt-1 text-xs text-gray-500">
-              {formData.title.length}/100 characters
-            </p>
-          </div>
+      <div className="flex-1 overflow-auto p-6">
+        <div className="max-w-lg mx-auto">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Title */}
+            <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-5 border border-purple-100">
+              <label htmlFor="title" className="block text-sm font-semibold text-gray-700 mb-3">
+                ✏️ Title (optional)
+              </label>
+              <input
+                type="text"
+                id="title"
+                value={formData.title}
+                onChange={(e) => handleInputChange('title', e.target.value)}
+                placeholder="Enter a descriptive title or leave blank to auto-generate"
+                className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white/60 backdrop-blur-sm transition-all duration-200 ${
+                  errors.title ? 'border-red-300' : 'border-purple-200'
+                }`}
+                disabled={isLoading}
+              />
+              {errors.title && (
+                <p className="mt-2 text-sm text-red-600 font-medium">{errors.title}</p>
+              )}
+              <p className="mt-2 text-xs text-gray-500 font-medium">
+                {formData.title.length}/100 characters
+              </p>
+            </div>
 
-          {/* Category */}
-          <div>
-            <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">
-              Category
-            </label>
-            <select
-              id="category"
-              value={formData.category}
-              onChange={(e) => handleInputChange('category', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              disabled={isLoading}
-            >
-              {categories.map((category) => (
-                <option key={category.id} value={category.name}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
-          </div>
+            {/* Category */}
+            <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-5 border border-purple-100">
+              <label htmlFor="category" className="block text-sm font-semibold text-gray-700 mb-3">
+                📁 Category
+              </label>
+              <select
+                id="category"
+                value={formData.category}
+                onChange={(e) => handleInputChange('category', e.target.value)}
+                className="w-full px-4 py-3 border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white/60 backdrop-blur-sm transition-all duration-200 font-medium"
+                disabled={isLoading}
+              >
+                {categories.map((category) => (
+                  <option key={category.id} value={category.name}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-          {/* Content */}
-          <div>
-            <label htmlFor="content" className="block text-sm font-medium text-gray-700 mb-1">
-              Content *
-            </label>
-            <textarea
-              id="content"
-              value={formData.content}
-              onChange={(e) => handleInputChange('content', e.target.value)}
-              placeholder="Enter your prompt content here..."
-              rows={10}
-              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 resize-none ${
-                errors.content ? 'border-red-300' : 'border-gray-300'
-              }`}
-              disabled={isLoading}
-            />
-            {errors.content && (
-              <p className="mt-1 text-sm text-red-600">{errors.content}</p>
-            )}
-            <p className="mt-1 text-xs text-gray-500">
-              {formData.content.length}/5000 characters
-            </p>
-          </div>
-        </form>
+            {/* Content */}
+            <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-5 border border-purple-100">
+              <label htmlFor="content" className="block text-sm font-semibold text-gray-700 mb-3">
+                💬 Content *
+              </label>
+              <textarea
+                id="content"
+                value={formData.content}
+                onChange={(e) => handleInputChange('content', e.target.value)}
+                placeholder="Enter your prompt content here..."
+                rows={8}
+                className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 resize-none bg-white/60 backdrop-blur-sm transition-all duration-200 ${
+                  errors.content ? 'border-red-300' : 'border-purple-200'
+                }`}
+                disabled={isLoading}
+              />
+              {errors.content && (
+                <p className="mt-2 text-sm text-red-600 font-medium">{errors.content}</p>
+              )}
+              <p className="mt-2 text-xs text-gray-500 font-medium">
+                {formData.content.length}/5000 characters
+              </p>
+            </div>
+          </form>
+        </div>
       </div>
 
       {/* Footer */}
-      <div className="flex-shrink-0 p-4 bg-gray-50 border-t border-gray-200">
-        <div className="flex justify-end space-x-3">
+      <div className="flex-shrink-0 p-6 bg-white/80 backdrop-blur-sm border-t border-purple-100">
+        <div className="max-w-lg mx-auto flex justify-end space-x-4">
           <button
             type="button"
             onClick={onCancel}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            className="px-6 py-3 text-sm font-semibold text-gray-700 bg-white/60 backdrop-blur-sm border border-purple-200 rounded-xl hover:bg-white/80 transition-all duration-200"
             disabled={isLoading}
           >
             Cancel
@@ -158,10 +170,17 @@ const AddPromptForm: React.FC<AddPromptFormProps> = ({
           <button
             type="submit"
             onClick={handleSubmit}
-            className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
+            className="px-8 py-3 text-sm font-semibold text-white bg-gradient-to-r from-purple-500 to-indigo-600 rounded-xl hover:from-purple-600 hover:to-indigo-700 transition-all duration-200 shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transform hover:scale-105 disabled:opacity-50 disabled:transform-none"
             disabled={isLoading || !formData.content.trim()}
           >
-            {isLoading ? 'Saving...' : 'Save Prompt'}
+            {isLoading ? (
+              <span className="flex items-center space-x-2">
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                <span>Saving...</span>
+              </span>
+            ) : (
+              'Save Prompt'
+            )}
           </button>
         </div>
       </div>

@@ -78,31 +78,31 @@ const PromptCard: React.FC<PromptCardProps> = ({
     : truncateText(prompt.content, 150);
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow relative">
+    <div className="bg-white/70 backdrop-blur-sm border border-purple-100 rounded-2xl p-5 hover:shadow-xl hover:shadow-purple-500/10 transition-all duration-300 relative group hover:bg-white/90">
       {/* Header */}
-      <div className="flex items-start justify-between mb-2">
+      <div className="flex items-start justify-between mb-3">
         <div className="flex-1 min-w-0">
-          <h3 className="font-medium text-gray-900 truncate">
+          <h3 className="font-semibold text-gray-900 truncate text-base">
             {highlightText(prompt.title, searchQuery)}
           </h3>
-          <div className="flex items-center space-x-2 mt-1">
-            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+          <div className="flex items-center space-x-3 mt-2">
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-purple-100 to-indigo-100 text-purple-700 border border-purple-200">
               {prompt.category}
             </span>
-            <span className="text-xs text-gray-500">
+            <span className="text-xs text-gray-500 font-medium">
               {formatDate(prompt.updatedAt)}
             </span>
           </div>
         </div>
         
         {/* Actions Menu */}
-        <div className="relative ml-2">
+        <div className="relative ml-3">
           <button
             onClick={(e) => {
               e.stopPropagation();
               setShowMenu(!showMenu);
             }}
-            className="p-1 text-gray-400 hover:text-gray-600 rounded"
+            className="p-2 text-gray-400 hover:text-purple-600 rounded-lg hover:bg-purple-50 opacity-0 group-hover:opacity-100 transition-all duration-200"
           >
             <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
               <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
@@ -115,18 +115,18 @@ const PromptCard: React.FC<PromptCardProps> = ({
                 className="fixed inset-0 z-10"
                 onClick={() => setShowMenu(false)}
               />
-              <div className="absolute right-0 mt-1 w-24 bg-white rounded-md shadow-lg z-20 border border-gray-200">
+              <div className="absolute right-0 mt-2 w-28 bg-white/90 backdrop-blur-sm rounded-xl shadow-xl z-20 border border-purple-200 overflow-hidden">
                 <button
                   onClick={handleEditClick}
-                  className="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                  className="block w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 font-medium transition-colors"
                 >
-                  Edit
+                  ✏️ Edit
                 </button>
                 <button
                   onClick={handleDeleteClick}
-                  className="block w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-gray-100"
+                  className="block w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-red-50 font-medium transition-colors"
                 >
-                  Delete
+                  🗑️ Delete
                 </button>
               </div>
             </>
@@ -135,8 +135,8 @@ const PromptCard: React.FC<PromptCardProps> = ({
       </div>
 
       {/* Content */}
-      <div className="mb-3">
-        <p className="text-sm text-gray-700 whitespace-pre-wrap">
+      <div className="mb-4">
+        <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
           {highlightText(contentToShow, searchQuery)}
         </p>
         
@@ -146,9 +146,9 @@ const PromptCard: React.FC<PromptCardProps> = ({
               e.stopPropagation();
               setShowFullContent(!showFullContent);
             }}
-            className="text-xs text-primary-600 hover:text-primary-700 mt-1"
+            className="text-xs text-purple-600 hover:text-purple-700 mt-2 font-semibold"
           >
-            {showFullContent ? 'Show less' : 'Show more'}
+            {showFullContent ? '↑ Show less' : '↓ Show more'}
           </button>
         )}
       </div>
@@ -157,9 +157,9 @@ const PromptCard: React.FC<PromptCardProps> = ({
       <div className="flex justify-end">
         <button
           onClick={handleCopyClick}
-          className="inline-flex items-center px-3 py-1 border border-gray-300 rounded text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+          className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-lg hover:from-purple-600 hover:to-indigo-700 transition-all duration-200 text-xs font-semibold shadow-md hover:shadow-lg transform hover:scale-105"
         >
-          <svg className="h-3 w-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="h-3 w-3 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -167,7 +167,7 @@ const PromptCard: React.FC<PromptCardProps> = ({
               d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
             />
           </svg>
-          Copy
+          Copy Prompt
         </button>
       </div>
     </div>
