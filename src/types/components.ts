@@ -3,6 +3,7 @@ import { Prompt, Category } from './index';
 // Component prop interfaces
 export interface PromptCardProps {
   prompt: Prompt;
+  categories: Category[];
   onEdit: (prompt: Prompt) => void;
   onDelete: (id: string) => void;
   onCopy: (content: string) => void;

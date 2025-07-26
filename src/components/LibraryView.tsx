@@ -133,6 +133,7 @@ const LibraryView: React.FC<LibraryViewProps> = ({
               <PromptCard
                 key={prompt.id}
                 prompt={prompt}
+                categories={categories}
                 onEdit={onEditPrompt}
                 onDelete={onDeletePrompt}
                 onCopy={onCopyPrompt}

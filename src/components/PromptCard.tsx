@@ -3,6 +3,7 @@ import { PromptCardProps } from '../types/components';
 
 const PromptCard: React.FC<PromptCardProps> = ({
   prompt,
+  categories,
   onEdit,
   onDelete,
   onCopy,
@@ -73,6 +74,11 @@ const PromptCard: React.FC<PromptCardProps> = ({
     return new Date(timestamp).toLocaleDateString();
   };
 
+  const getCategoryColor = (categoryName: string) => {
+    const category = categories.find(cat => cat.name === categoryName);
+    return category?.color || '#6B7280'; // Default gray color if category not found
+  };
+
   const contentToShow = showFullContent 
     ? prompt.content 
     : truncateText(prompt.content, 150);
@@ -86,7 +92,10 @@ const PromptCard: React.FC<PromptCardProps> = ({
             {highlightText(prompt.title, searchQuery)}
           </h3>
           <div className="flex items-center space-x-3 mt-2">
-            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-purple-100 to-indigo-100 text-purple-700 border border-purple-200">
+            <span 
+              className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold text-white border-2 border-white shadow-sm"
+              style={{ backgroundColor: getCategoryColor(prompt.category) }}
+            >
               {prompt.category}
             </span>
             <span className="text-xs text-gray-500 font-medium">
