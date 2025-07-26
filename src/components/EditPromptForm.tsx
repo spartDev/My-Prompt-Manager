@@ -22,8 +22,8 @@ const EditPromptForm: React.FC<EditPromptFormProps> = ({
       newErrors.content = 'Content is required';
     }
 
-    if (formData.content.length > 5000) {
-      newErrors.content = 'Content cannot exceed 5000 characters';
+    if (formData.content.length > 10000) {
+      newErrors.content = 'Content cannot exceed 10000 characters';
     }
 
     if (formData.title.length > 100) {
@@ -173,7 +173,7 @@ const EditPromptForm: React.FC<EditPromptFormProps> = ({
               <p className="mt-2 text-sm text-red-600 font-medium">⚠️ {errors.content}</p>
             )}
             <p className="mt-2 text-xs text-gray-500 font-medium">
-              {formData.content.length}/5000 characters
+              {formData.content.length}/10000 characters
             </p>
           </div>
         </form>

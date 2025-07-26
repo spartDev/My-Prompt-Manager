@@ -1,7 +1,7 @@
 export interface Prompt {
   id: string; // uuid-v4-string
   title: string; // max 100 chars
-  content: string; // max 5000 chars
+  content: string; // max 10000 chars
   category: string; // default: 'Uncategorized'
   createdAt: number; // timestamp
   updatedAt: number; // timestamp
@@ -68,7 +68,7 @@ export interface AppError {
 // Validation constants
 export const VALIDATION_LIMITS = {
   PROMPT_TITLE_MAX: 100,
-  PROMPT_CONTENT_MAX: 5000,
+  PROMPT_CONTENT_MAX: 10000,
   CATEGORY_NAME_MAX: 50,
   TITLE_GENERATION_LENGTH: 50
 } as const;
