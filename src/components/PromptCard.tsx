@@ -86,12 +86,21 @@ const PromptCard: React.FC<PromptCardProps> = ({
   return (
     <div className="bg-white/70 backdrop-blur-sm border border-purple-100 rounded-2xl p-5 hover:shadow-xl hover:shadow-purple-500/10 transition-all duration-300 relative group hover:bg-white/90">
       {/* Header */}
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-gray-900 truncate text-base">
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex-1 min-w-0 pr-2">
+          <h3 className="font-semibold text-gray-900 text-base leading-tight" 
+              style={{
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+                wordBreak: 'break-word'
+              }}
+              title={prompt.title} // Show full title on hover
+          >
             {highlightText(prompt.title, searchQuery)}
           </h3>
-          <div className="flex items-center space-x-3 mt-2">
+          <div className="flex items-center space-x-3 mt-3">
             <span 
               className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold text-white border-2 border-white shadow-sm"
               style={{ backgroundColor: getCategoryColor(prompt.category) }}
@@ -105,13 +114,13 @@ const PromptCard: React.FC<PromptCardProps> = ({
         </div>
         
         {/* Actions Menu */}
-        <div className="relative ml-3">
+        <div className="relative flex-shrink-0">
           <button
             onClick={(e) => {
               e.stopPropagation();
               setShowMenu(!showMenu);
             }}
-            className="p-2 text-gray-400 hover:text-purple-600 rounded-lg hover:bg-purple-50 opacity-0 group-hover:opacity-100 transition-all duration-200"
+            className="p-1.5 text-gray-400 hover:text-purple-600 rounded-lg hover:bg-purple-50 opacity-0 group-hover:opacity-100 transition-all duration-200"
           >
             <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
               <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
@@ -124,7 +133,7 @@ const PromptCard: React.FC<PromptCardProps> = ({
                 className="fixed inset-0 z-10"
                 onClick={() => setShowMenu(false)}
               />
-              <div className="absolute right-0 mt-2 w-28 bg-white/90 backdrop-blur-sm rounded-xl shadow-xl z-20 border border-purple-200 overflow-hidden">
+              <div className="absolute right-0 top-full mt-1 w-28 bg-white/90 backdrop-blur-sm rounded-xl shadow-xl z-20 border border-purple-200 overflow-hidden">
                 <button
                   onClick={handleEditClick}
                   className="block w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 font-medium transition-colors"
