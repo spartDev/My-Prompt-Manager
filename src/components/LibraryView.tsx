@@ -84,7 +84,7 @@ const LibraryView: React.FC<LibraryViewProps> = ({
               className="text-xs text-purple-600 hover:text-purple-700 font-semibold px-3 py-2 rounded-lg hover:bg-purple-50 transition-colors"
               disabled={loading}
             >
-              ⚙️ Manage Categories
+              Manage Categories
             </button>
           </div>
         </div>
