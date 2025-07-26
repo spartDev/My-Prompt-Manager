@@ -18,6 +18,9 @@ export class StorageManager {
     SETTINGS: 'settings'
   } as const;
 
+  // Mutex for preventing concurrent storage operations
+  private operationLocks = new Map<string, Promise<any>>();
+
   private constructor() {}
 
   static getInstance(): StorageManager {
@@ -29,22 +32,24 @@ export class StorageManager {
 
   // Prompt operations
   async savePrompt(prompt: Omit<Prompt, 'id' | 'createdAt' | 'updatedAt'>): Promise<Prompt> {
-    try {
-      const newPrompt: Prompt = {
-        ...prompt,
-        id: uuidv4(),
-        createdAt: Date.now(),
-        updatedAt: Date.now()
-      };
+    return this.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
+      try {
+        const newPrompt: Prompt = {
+          ...prompt,
+          id: uuidv4(),
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        };
 
-      const existingPrompts = await this.getPrompts();
-      const updatedPrompts = [...existingPrompts, newPrompt];
-      
-      await this.setStorageData(this.STORAGE_KEYS.PROMPTS, updatedPrompts);
-      return newPrompt;
-    } catch (error) {
-      throw this.handleStorageError(error);
-    }
+        const existingPrompts = await this.getPrompts();
+        const updatedPrompts = [...existingPrompts, newPrompt];
+        
+        await this.setStorageData(this.STORAGE_KEYS.PROMPTS, updatedPrompts);
+        return newPrompt;
+      } catch (error) {
+        throw this.handleStorageError(error);
+      }
+    });
   }
 
   async getPrompts(): Promise<Prompt[]> {
@@ -57,42 +62,46 @@ export class StorageManager {
   }
 
   async updatePrompt(id: string, updates: Partial<Omit<Prompt, 'id' | 'createdAt'>>): Promise<Prompt> {
-    try {
-      const existingPrompts = await this.getPrompts();
-      const promptIndex = existingPrompts.findIndex(p => p.id === id);
-      
-      if (promptIndex === -1) {
-        throw new Error(`Prompt with id ${id} not found`);
+    return this.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
+      try {
+        const existingPrompts = await this.getPrompts();
+        const promptIndex = existingPrompts.findIndex(p => p.id === id);
+        
+        if (promptIndex === -1) {
+          throw new Error(`Prompt with id ${id} not found`);
+        }
+
+        const updatedPrompt: Prompt = {
+          ...existingPrompts[promptIndex],
+          ...updates,
+          updatedAt: Date.now()
+        };
+
+        existingPrompts[promptIndex] = updatedPrompt;
+        await this.setStorageData(this.STORAGE_KEYS.PROMPTS, existingPrompts);
+        
+        return updatedPrompt;
+      } catch (error) {
+        throw this.handleStorageError(error);
       }
-
-      const updatedPrompt: Prompt = {
-        ...existingPrompts[promptIndex],
-        ...updates,
-        updatedAt: Date.now()
-      };
-
-      existingPrompts[promptIndex] = updatedPrompt;
-      await this.setStorageData(this.STORAGE_KEYS.PROMPTS, existingPrompts);
-      
-      return updatedPrompt;
-    } catch (error) {
-      throw this.handleStorageError(error);
-    }
+    });
   }
 
   async deletePrompt(id: string): Promise<void> {
-    try {
-      const existingPrompts = await this.getPrompts();
-      const filteredPrompts = existingPrompts.filter(p => p.id !== id);
-      
-      if (filteredPrompts.length === existingPrompts.length) {
-        throw new Error(`Prompt with id ${id} not found`);
-      }
+    return this.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
+      try {
+        const existingPrompts = await this.getPrompts();
+        const filteredPrompts = existingPrompts.filter(p => p.id !== id);
+        
+        if (filteredPrompts.length === existingPrompts.length) {
+          throw new Error(`Prompt with id ${id} not found`);
+        }
 
-      await this.setStorageData(this.STORAGE_KEYS.PROMPTS, filteredPrompts);
-    } catch (error) {
-      throw this.handleStorageError(error);
-    }
+        await this.setStorageData(this.STORAGE_KEYS.PROMPTS, filteredPrompts);
+      } catch (error) {
+        throw this.handleStorageError(error);
+      }
+    });
   }
 
   // Category operations
@@ -176,38 +185,48 @@ export class StorageManager {
   }
 
   async deleteCategory(id: string): Promise<void> {
-    try {
-      const existingCategories = await this.getCategories();
-      const categoryToDelete = existingCategories.find(c => c.id === id);
-      
-      if (!categoryToDelete) {
-        throw new Error(`Category with id ${id} not found`);
-      }
+    return this.withLock(`deleteCategory-${id}`, async () => {
+      try {
+        const existingCategories = await this.getCategories();
+        const categoryToDelete = existingCategories.find(c => c.id === id);
+        
+        if (!categoryToDelete) {
+          throw new Error(`Category with id ${id} not found`);
+        }
 
-      // Prevent deletion of default category
-      if (categoryToDelete.name === DEFAULT_CATEGORY) {
-        throw new Error('Cannot delete the default category');
-      }
+        // Prevent deletion of default category
+        if (categoryToDelete.name === DEFAULT_CATEGORY) {
+          throw new Error('Cannot delete the default category');
+        }
 
-      // Update all prompts using this category to use default category
-      const prompts = await this.getPrompts();
-      const updatedPrompts = prompts.map(prompt => 
-        prompt.category === categoryToDelete.name 
-          ? { ...prompt, category: DEFAULT_CATEGORY, updatedAt: Date.now() }
-          : prompt
-      );
-      
-      if (updatedPrompts.length !== prompts.length || 
-          updatedPrompts.some((p, i) => p.category !== prompts[i].category)) {
-        await this.setStorageData(this.STORAGE_KEYS.PROMPTS, updatedPrompts);
-      }
+        // Atomic operation: Update both prompts and categories together
+        const [prompts] = await Promise.all([
+          this.getPrompts()
+        ]);
 
-      // Remove the category
-      const filteredCategories = existingCategories.filter(c => c.id !== id);
-      await this.setStorageData(this.STORAGE_KEYS.CATEGORIES, filteredCategories);
-    } catch (error) {
-      throw this.handleStorageError(error);
-    }
+        const updatedPrompts = prompts.map(prompt => 
+          prompt.category === categoryToDelete.name 
+            ? { ...prompt, category: DEFAULT_CATEGORY, updatedAt: Date.now() }
+            : prompt
+        );
+        
+        const filteredCategories = existingCategories.filter(c => c.id !== id);
+
+        // Perform both updates atomically using Promise.all
+        const hasPromptsToUpdate = updatedPrompts.some((p, i) => p.category !== prompts[i].category);
+        
+        if (hasPromptsToUpdate) {
+          await Promise.all([
+            this.setStorageData(this.STORAGE_KEYS.PROMPTS, updatedPrompts),
+            this.setStorageData(this.STORAGE_KEYS.CATEGORIES, filteredCategories)
+          ]);
+        } else {
+          await this.setStorageData(this.STORAGE_KEYS.CATEGORIES, filteredCategories);
+        }
+      } catch (error) {
+        throw this.handleStorageError(error);
+      }
+    });
   }
 
   // Settings operations
@@ -308,6 +327,29 @@ export class StorageManager {
 
   private async setStorageData<T>(key: string, data: T): Promise<void> {
     await chrome.storage.local.set({ [key]: data });
+  }
+
+  // Mutex implementation for preventing race conditions
+  private async withLock<T>(lockKey: string, operation: () => Promise<T>): Promise<T> {
+    // Wait for any existing operation with the same key
+    const existingLock = this.operationLocks.get(lockKey);
+    if (existingLock) {
+      await existingLock.catch(() => {}); // Ignore errors from previous operations
+    }
+
+    // Create new operation promise
+    const operationPromise = operation();
+    this.operationLocks.set(lockKey, operationPromise);
+
+    try {
+      const result = await operationPromise;
+      return result;
+    } finally {
+      // Clean up the lock if this was the current operation
+      if (this.operationLocks.get(lockKey) === operationPromise) {
+        this.operationLocks.delete(lockKey);
+      }
+    }
   }
 
   private handleStorageError(error: any): AppError {
