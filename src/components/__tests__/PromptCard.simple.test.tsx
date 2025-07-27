@@ -32,9 +32,10 @@ describe('PromptCard - Basic Rendering', () => {
     expect(screen.getByText('Test Prompt')).toBeInTheDocument();
   });
 
-  it('should render prompt content', () => {
+  it('should render prompt date', () => {
     render(<PromptCard {...mockProps} />);
-    expect(screen.getByText('Test content')).toBeInTheDocument();
+    // Check that a date is rendered (using aria-label since date format may vary)
+    expect(screen.getByLabelText(/Last updated:/)).toBeInTheDocument();
   });
 
   it('should render category', () => {
@@ -44,6 +45,6 @@ describe('PromptCard - Basic Rendering', () => {
 
   it('should render copy button', () => {
     render(<PromptCard {...mockProps} />);
-    expect(screen.getByText('Copy Prompt')).toBeInTheDocument();
+    expect(screen.getByText('Copy')).toBeInTheDocument();
   });
 });

@@ -130,21 +130,18 @@ const LibraryView: FC<LibraryViewProps> = ({
             )}
           </div>
         ) : (
-          <div className="p-6">
-            <div className="grid gap-4" role="list" aria-label={`${String(finalFilteredPrompts.length)} prompt${finalFilteredPrompts.length !== 1 ? 's' : ''} found`}>
-              {finalFilteredPrompts.map((prompt: Prompt) => (
-                <div key={prompt.id} role="listitem">
-                  <PromptCard
-                    prompt={prompt}
-                    categories={categories}
-                    onEdit={onEditPrompt as (prompt: Prompt) => void}
-                    onDelete={onDeletePrompt as (id: string) => void}
-                    onCopy={onCopyPrompt as (content: string) => void}
-                    searchQuery={searchQuery}
-                  />
-                </div>
-              ))}
-            </div>
+          <div className="grid" role="list" aria-label={`${String(finalFilteredPrompts.length)} prompt${finalFilteredPrompts.length !== 1 ? 's' : ''} found`}>
+            {finalFilteredPrompts.map((prompt: Prompt) => (
+              <PromptCard
+                key={prompt.id}
+                prompt={prompt}
+                categories={categories}
+                onEdit={onEditPrompt as (prompt: Prompt) => void}
+                onDelete={onDeletePrompt as (id: string) => void}
+                onCopy={onCopyPrompt as (content: string) => void}
+                searchQuery={searchQuery}
+              />
+            ))}
           </div>
         )}
       </main>
