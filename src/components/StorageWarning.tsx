@@ -23,7 +23,7 @@ const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
       }
     };
 
-    loadStorageInfo();
+    void loadStorageInfo();
   }, []);
 
   const handleClearData = async () => {
@@ -56,7 +56,7 @@ const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    return String(parseFloat((bytes / Math.pow(k, i)).toFixed(2))) + ' ' + sizes[i];
   };
 
   const usagePercentage = getUsagePercentage();
@@ -103,7 +103,7 @@ const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
                 className={`h-2.5 rounded-full ${
                   isAtLimit ? 'bg-red-500' : isNearLimit ? 'bg-yellow-500' : 'bg-green-500'
                 }`}
-                style={{ width: `${Math.min(usagePercentage, 100)}%` }}
+                style={{ width: `${String(Math.min(usagePercentage, 100))}%` }}
               />
             </div>
             
@@ -143,7 +143,7 @@ const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
           
           {isAtLimit && (
             <button
-              onClick={handleClearData}
+              onClick={() => { void handleClearData(); }}
               className="flex-1 px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
               disabled={isLoading}
             >
