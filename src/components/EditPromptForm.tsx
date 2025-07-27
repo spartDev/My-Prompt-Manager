@@ -99,7 +99,7 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
 
       {/* Form */}
       <div className="flex-1 overflow-auto p-6 space-y-6">
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form id="edit-prompt-form" onSubmit={handleSubmit} className="space-y-6">
           {/* Title Section */}
           <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-5 border border-purple-100">
             <div className="flex items-center space-x-2 mb-4">
@@ -180,32 +180,6 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
               {formData.content.length}/10000 characters
             </p>
           </div>
-
-          {/* Form Actions */}
-          <div className="flex space-x-3">
-            <button
-              type="button"
-              onClick={onCancel as () => void}
-              className="flex-1 px-6 py-3 text-sm font-semibold text-gray-700 bg-white/60 backdrop-blur-sm border border-purple-200 rounded-xl hover:bg-white/80 transition-all duration-200"
-              disabled={isLoading}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="flex-1 px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-purple-500 to-indigo-600 rounded-xl hover:from-purple-600 hover:to-indigo-700 transition-all duration-200 shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transform hover:scale-105 disabled:opacity-50 disabled:transform-none"
-              disabled={isLoading || !formData.content.trim() || !hasChanges()}
-            >
-              {isLoading ? (
-                <div className="flex items-center justify-center space-x-2">
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                  <span>Saving...</span>
-                </div>
-              ) : (
-                'Save Changes'
-              )}
-            </button>
-          </div>
         </form>
         
         {/* Metadata */}
@@ -228,11 +202,38 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
       <div className="flex-shrink-0 p-6 bg-white/80 backdrop-blur-sm border-t border-purple-100">
         {/* Status indicator - only show when there are changes */}
         {hasChanges() && (
-          <div className="text-xs text-amber-600 font-medium flex items-center space-x-2 bg-amber-50/80 backdrop-blur-sm border border-amber-200 rounded-lg px-3 py-2">
+          <div className="mb-4 text-xs text-amber-600 font-medium flex items-center space-x-2 bg-amber-50/80 backdrop-blur-sm border border-amber-200 rounded-lg px-3 py-2">
             <span>⚡</span>
             <span>You have unsaved changes</span>
           </div>
         )}
+        
+        {/* Action buttons - full width for better spacing */}
+        <div className="flex space-x-3">
+          <button
+            type="button"
+            onClick={onCancel as () => void}
+            className="flex-1 px-6 py-3 text-sm font-semibold text-gray-700 bg-white/60 backdrop-blur-sm border border-purple-200 rounded-xl hover:bg-white/80 transition-all duration-200"
+            disabled={isLoading}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            form="edit-prompt-form"
+            className="flex-1 px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-purple-500 to-indigo-600 rounded-xl hover:from-purple-600 hover:to-indigo-700 transition-all duration-200 shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transform hover:scale-105 disabled:opacity-50 disabled:transform-none"
+            disabled={isLoading || !formData.content.trim() || !hasChanges()}
+          >
+            {isLoading ? (
+              <div className="flex items-center justify-center space-x-2">
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                <span>Saving...</span>
+              </div>
+            ) : (
+              'Save Changes'
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );
