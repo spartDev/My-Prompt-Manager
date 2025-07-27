@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { FC, FormEvent } from 'react';
 
-import { Category, Prompt } from '../types';
+import { Category } from '../types';
 import { EditPromptFormProps } from '../types/components';
 
 const EditPromptForm: FC<EditPromptFormProps> = ({

@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import type { FC } from 'react';
 
 import { useSearch } from '../hooks';
-import { Prompt, Category } from '../types';
+import { Prompt } from '../types';
 import { LibraryViewProps } from '../types/components';
 
 import CategoryFilter from './CategoryFilter';
