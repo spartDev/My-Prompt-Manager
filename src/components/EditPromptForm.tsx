@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-import { Category } from '../types';
+import { Category, Prompt } from '../types';
 import { EditPromptFormProps } from '../types/components';
 
 const EditPromptForm: React.FC<EditPromptFormProps> = ({
@@ -11,9 +11,9 @@ const EditPromptForm: React.FC<EditPromptFormProps> = ({
   isLoading = false
 }) => {
   const [formData, setFormData] = useState({
-    title: prompt.title,
-    content: prompt.content,
-    category: prompt.category
+    title: (prompt as Prompt).title,
+    content: (prompt as Prompt).content,
+    category: (prompt as Prompt).category
   });
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
@@ -37,13 +37,14 @@ const EditPromptForm: React.FC<EditPromptFormProps> = ({
   };
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     e.preventDefault();
     
     if (!validateForm()) {
       return;
     }
 
-    onSubmit(formData);
+    (onSubmit as (data: typeof formData) => void)(formData);
   };
 
   const handleInputChange = (field: string, value: string) => {
@@ -57,9 +58,9 @@ const EditPromptForm: React.FC<EditPromptFormProps> = ({
 
   const hasChanges = () => {
     return (
-      formData.title !== prompt.title ||
-      formData.content !== prompt.content ||
-      formData.category !== prompt.category
+      formData.title !== (prompt as Prompt).title ||
+      formData.content !== (prompt as Prompt).content ||
+      formData.category !== (prompt as Prompt).category
     );
   };
 
@@ -84,7 +85,7 @@ const EditPromptForm: React.FC<EditPromptFormProps> = ({
             </div>
           </div>
           <button
-            onClick={onCancel}
+            onClick={onCancel as () => void}
             className="text-gray-400 hover:text-purple-600 p-2 rounded-lg hover:bg-purple-50 transition-colors"
             disabled={isLoading}
           >
@@ -139,7 +140,7 @@ const EditPromptForm: React.FC<EditPromptFormProps> = ({
                 className="w-full px-4 py-3 pr-10 border border-purple-200 rounded-xl focus:outline-none focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-purple-500 bg-white/60 backdrop-blur-sm transition-all duration-200 text-sm appearance-none cursor-pointer"
                 disabled={isLoading}
               >
-                {categories.map((category: Category) => (
+                {(categories as Category[]).map((category: Category) => (
                   <option key={category.id} value={category.name}>
                     {category.name}
                   </option>
@@ -186,11 +187,11 @@ const EditPromptForm: React.FC<EditPromptFormProps> = ({
           <div className="text-xs text-gray-600 space-y-2 font-medium">
             <div className="flex items-center space-x-2">
               <span>Created:</span>
-              <span>{formatDate(prompt.createdAt)}</span>
+              <span>{formatDate((prompt as Prompt).createdAt)}</span>
             </div>
             <div className="flex items-center space-x-2">
               <span>Last modified:</span>
-              <span>{formatDate(prompt.updatedAt)}</span>
+              <span>{formatDate((prompt as Prompt).updatedAt)}</span>
             </div>
           </div>
         </div>
@@ -210,7 +211,7 @@ const EditPromptForm: React.FC<EditPromptFormProps> = ({
         <div className="flex space-x-3">
           <button
             type="button"
-            onClick={onCancel}
+            onClick={onCancel as () => void}
             className="flex-1 px-6 py-3 text-sm font-semibold text-gray-700 bg-white/60 backdrop-blur-sm border border-purple-200 rounded-xl hover:bg-white/80 transition-all duration-200"
             disabled={isLoading}
           >
