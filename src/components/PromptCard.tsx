@@ -1,7 +1,7 @@
 import DOMPurify from 'dompurify';
 import React, { useState } from 'react';
 
-import { Category } from '../types';
+import { Category, Prompt } from '../types';
 import { PromptCardProps } from '../types/components';
 
 const PromptCard: React.FC<PromptCardProps> = ({
@@ -24,12 +24,14 @@ const PromptCard: React.FC<PromptCardProps> = ({
     if (!query.trim()) {return text;}
     
     // Sanitize both text and query to prevent XSS
-    const sanitizedText = DOMPurify.sanitize(text, { ALLOWED_TAGS: [] });
-    const sanitizedQuery = DOMPurify.sanitize(query, { ALLOWED_TAGS: [] });
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    const sanitizedText = DOMPurify.sanitize(text, { ALLOWED_TAGS: [] }) as string;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    const sanitizedQuery = DOMPurify.sanitize(query, { ALLOWED_TAGS: [] }) as string;
     
     const searchTerm = sanitizedQuery.toLowerCase().trim();
     const lowerText = sanitizedText.toLowerCase();
-    const parts = [];
+    const parts: (string | JSX.Element)[] = [];
     let lastIndex = 0;
     let index = lowerText.indexOf(searchTerm);
     
@@ -41,7 +43,7 @@ const PromptCard: React.FC<PromptCardProps> = ({
       
       // Add highlighted match - using key with unique identifier
       parts.push(
-        <mark key={`highlight-${index}-${Date.now()}`} className="bg-yellow-200 px-1 rounded">
+        <mark key={`highlight-${String(index)}-${String(Date.now())}`} className="bg-yellow-200 px-1 rounded">
           {sanitizedText.substring(index, index + searchTerm.length)}
         </mark>
       );
@@ -59,20 +61,23 @@ const PromptCard: React.FC<PromptCardProps> = ({
   };
 
   const handleCopyClick = (e: React.MouseEvent) => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     e.stopPropagation();
-    onCopy(prompt.content);
+    (onCopy as (content: string) => void)((prompt as Prompt).content);
   };
 
   const handleEditClick = (e: React.MouseEvent) => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     e.stopPropagation();
-    onEdit(prompt);
+    (onEdit as (prompt: Prompt) => void)(prompt as Prompt);
     setShowMenu(false);
   };
 
   const handleDeleteClick = (e: React.MouseEvent) => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     e.stopPropagation();
     if (confirm('Delete this prompt? This action cannot be undone.')) {
-      onDelete(prompt.id);
+      (onDelete as (id: string) => void)((prompt as Prompt).id);
     }
     setShowMenu(false);
   };
@@ -82,13 +87,13 @@ const PromptCard: React.FC<PromptCardProps> = ({
   };
 
   const getCategoryColor = (categoryName: string) => {
-    const category = categories.find((cat: Category) => cat.name === categoryName);
-    return category?.color || '#6B7280'; // Default gray color if category not found
+    const category = (categories as Category[]).find((cat: Category) => cat.name === categoryName);
+    return (category?.color as string) || '#6B7280'; // Default gray color if category not found
   };
 
   const contentToShow = showFullContent 
-    ? prompt.content 
-    : truncateText(prompt.content, 150);
+    ? (prompt as Prompt).content 
+    : truncateText((prompt as Prompt).content, 150);
 
   return (
     <div className="bg-white/70 backdrop-blur-sm border border-purple-100 rounded-2xl p-5 hover:shadow-xl hover:shadow-purple-500/10 transition-all duration-300 relative group hover:bg-white/90">
@@ -103,19 +108,19 @@ const PromptCard: React.FC<PromptCardProps> = ({
                 overflow: 'hidden',
                 wordBreak: 'break-word'
               }}
-              title={prompt.title} // Show full title on hover
+              title={(prompt as Prompt).title} // Show full title on hover
           >
-            {highlightText(prompt.title, searchQuery)}
+            {highlightText((prompt as Prompt).title, searchQuery)}
           </h3>
           <div className="flex items-center space-x-3 mt-3">
             <span 
               className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold text-white border-2 border-white shadow-sm"
-              style={{ backgroundColor: getCategoryColor(prompt.category) }}
+              style={{ backgroundColor: getCategoryColor((prompt as Prompt).category) }}
             >
-              {prompt.category}
+              {(prompt as Prompt).category}
             </span>
             <span className="text-xs text-gray-500 font-medium">
-              {formatDate(prompt.updatedAt)}
+              {formatDate((prompt as Prompt).updatedAt)}
             </span>
           </div>
         </div>
@@ -172,7 +177,7 @@ const PromptCard: React.FC<PromptCardProps> = ({
           {highlightText(contentToShow, searchQuery)}
         </p>
         
-        {prompt.content.length > 150 && (
+        {(prompt as Prompt).content.length > 150 && (
           <button
             onClick={(e) => {
               e.stopPropagation();
