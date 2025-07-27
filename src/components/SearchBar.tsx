@@ -16,6 +16,7 @@ const SearchBar: FC<SearchBarProps> = ({
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
+          aria-hidden="true"
         >
           <path
             strokeLinecap="round"
@@ -31,19 +32,30 @@ const SearchBar: FC<SearchBarProps> = ({
         value={value}
         onChange={(e) => { onChange(e.target.value); }}
         placeholder={placeholder}
-        className="w-full pl-12 pr-12 py-3 bg-white/60 backdrop-blur-sm border border-purple-200 rounded-xl focus:outline-none focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-purple-500 text-sm placeholder-gray-500 shadow-sm hover:bg-white/80 transition-all duration-200"
+        className="w-full pl-12 pr-12 py-3 bg-white/60 backdrop-blur-sm border border-purple-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm placeholder-gray-500 shadow-sm hover:bg-white/80 transition-all duration-200"
+        aria-label="Search prompts"
+        role="searchbox"
       />
       
       {value && (
         <button
           onClick={onClear as () => void}
-          className="absolute inset-y-0 right-0 pr-4 flex items-center hover:text-purple-600 transition-colors"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              (onClear as () => void)();
+            }
+          }}
+          className="absolute inset-y-0 right-0 pr-4 flex items-center hover:text-purple-600 transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-1 rounded"
+          aria-label="Clear search"
+          title="Clear search"
         >
           <svg
             className="h-4 w-4 text-gray-400 hover:text-purple-600"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
+            aria-hidden="true"
           >
             <path
               strokeLinecap="round"
