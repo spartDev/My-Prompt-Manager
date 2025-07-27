@@ -23,6 +23,7 @@ Object.defineProperty(global, 'chrome', {
 });
 
 // Reset mocks before each test
+// eslint-disable-next-line @typescript-eslint/no-unsafe-call
 beforeEach(() => {
   vi.clearAllMocks();
   mockChrome.runtime.lastError = null;

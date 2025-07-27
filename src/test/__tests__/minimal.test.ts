@@ -30,7 +30,7 @@ describe('Minimal Test Suite', () => {
 
     it('should handle mock return values', () => {
       const mockFn = vi.fn().mockReturnValue('mocked');
-      const result = mockFn();
+      const result = mockFn() as string;
       expect(result).toBe('mocked');
     });
   });
@@ -43,6 +43,7 @@ describe('Minimal Test Suite', () => {
     });
 
     it('should handle chrome storage mocks', async () => {
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       vi.mocked(chrome.storage.local.get).mockResolvedValue({ test: 'value' });
       
       const result = await chrome.storage.local.get(['test']);
@@ -60,8 +61,8 @@ describe('Minimal Test Suite', () => {
     });
 
     it('should handle async errors', async () => {
-      const asyncError = async () => {
-        throw new Error('async error');
+      const asyncError = () => {
+        return Promise.reject(new Error('async error'));
       };
 
       await expect(asyncError()).rejects.toThrow('async error');
