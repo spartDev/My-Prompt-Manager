@@ -1,5 +1,3 @@
-import React from 'react';
-
 import { SearchBarProps } from '../types/components';
 
 const SearchBar: React.FC<SearchBarProps> = ({
@@ -29,14 +27,14 @@ const SearchBar: React.FC<SearchBarProps> = ({
       <input
         type="text"
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => { onChange(e.target.value); }}
         placeholder={placeholder}
         className="w-full pl-12 pr-12 py-3 bg-white/60 backdrop-blur-sm border border-purple-200 rounded-xl focus:outline-none focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-purple-500 text-sm placeholder-gray-500 shadow-sm hover:bg-white/80 transition-all duration-200"
       />
       
       {value && (
         <button
-          onClick={onClear}
+          onClick={onClear as () => void}
           className="absolute inset-y-0 right-0 pr-4 flex items-center hover:text-purple-600 transition-colors"
         >
           <svg
