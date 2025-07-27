@@ -15,8 +15,11 @@ export const useTheme = (): UseThemeReturn => {
   const [theme, setThemeState] = useState<Theme>(() => {
     if (typeof window === 'undefined') {return 'system';}
     
-    const stored = localStorage.getItem(THEME_STORAGE_KEY) as Theme;
-    return stored || 'system';
+    const stored = localStorage.getItem(THEME_STORAGE_KEY);
+    if (stored && ['light', 'dark', 'system'].includes(stored)) {
+      return stored as Theme;
+    }
+    return 'system';
   });
 
   const getSystemTheme = useCallback((): 'light' | 'dark' => {
