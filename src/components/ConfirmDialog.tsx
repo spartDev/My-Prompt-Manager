@@ -77,7 +77,7 @@ const ConfirmDialog: FC<ConfirmDialogProps> = ({
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
         </svg>
       ),
-      confirmButton: 'bg-red-600 hover:bg-red-700 focus:ring-red-500',
+      confirmButton: 'bg-red-600 hover:bg-red-700',
       iconBg: 'bg-red-100'
     },
     warning: {
@@ -86,7 +86,7 @@ const ConfirmDialog: FC<ConfirmDialogProps> = ({
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
         </svg>
       ),
-      confirmButton: 'bg-yellow-600 hover:bg-yellow-700 focus:ring-yellow-500',
+      confirmButton: 'bg-yellow-600 hover:bg-yellow-700',
       iconBg: 'bg-yellow-100'
     },
     info: {
@@ -95,7 +95,7 @@ const ConfirmDialog: FC<ConfirmDialogProps> = ({
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
       ),
-      confirmButton: 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500',
+      confirmButton: 'bg-blue-600 hover:bg-blue-700',
       iconBg: 'bg-blue-100'
     }
   };
@@ -159,7 +159,7 @@ const ConfirmDialog: FC<ConfirmDialogProps> = ({
             ref={confirmButtonRef}
             type="button"
             onClick={onConfirm}
-            className={`inline-flex justify-center rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-1 transition-colors ${styles.confirmButton}`}
+            className={`inline-flex justify-center rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-sm focus-secondary transition-colors ${styles.confirmButton}`}
           >
             {confirmText}
           </button>
@@ -167,7 +167,7 @@ const ConfirmDialog: FC<ConfirmDialogProps> = ({
             ref={cancelButtonRef}
             type="button"
             onClick={onCancel}
-            className="inline-flex justify-center rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-1 transition-colors"
+            className="inline-flex justify-center rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-50 focus-secondary transition-colors"
           >
             {cancelText}
           </button>

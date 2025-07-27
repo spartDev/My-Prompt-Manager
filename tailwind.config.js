@@ -16,5 +16,27 @@ export default {
       }
     },
   },
-  plugins: [],
+  plugins: [
+    function({ addComponents }) {
+      addComponents({
+        // Standard focus states for different button types
+        '.focus-primary': {
+          '@apply focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2': {},
+        },
+        '.focus-secondary': {
+          '@apply focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-1': {},
+        },
+        '.focus-danger': {
+          '@apply focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2': {},
+        },
+        '.focus-input': {
+          '@apply focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500': {},
+        },
+        // Interactive element base focus
+        '.focus-interactive': {
+          '@apply focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-1': {},
+        }
+      })
+    }
+  ],
 }

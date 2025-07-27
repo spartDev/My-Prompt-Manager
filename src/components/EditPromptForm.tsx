@@ -93,7 +93,7 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
                 (onCancel as () => void)();
               }
             }}
-            className="text-gray-400 hover:text-purple-600 p-2 rounded-lg hover:bg-purple-50 transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-1 disabled:opacity-50"
+            className="text-gray-400 hover:text-purple-600 p-2 rounded-lg hover:bg-purple-50 transition-colors focus-interactive disabled:opacity-50"
             disabled={isLoading}
             aria-label="Cancel and close form"
           >
@@ -120,8 +120,8 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
               value={formData.title}
               onChange={(e) => { handleInputChange('title', e.target.value); }}
               placeholder="Enter a descriptive title"
-              className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-purple-500 bg-white/60 backdrop-blur-sm transition-all duration-200 text-sm ${
-                errors.title ? 'border-red-300 focus-within:ring-red-500' : 'border-purple-200'
+              className={`w-full px-4 py-3 border rounded-xl focus-input bg-white/60 backdrop-blur-sm transition-all duration-200 text-sm ${
+                errors.title ? 'border-red-300' : 'border-purple-200'
               }`}
               disabled={isLoading}
             />
@@ -145,7 +145,7 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
                 id="category"
                 value={formData.category}
                 onChange={(e) => { handleInputChange('category', e.target.value); }}
-                className="w-full px-4 py-3 pr-10 border border-purple-200 rounded-xl focus:outline-none focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-purple-500 bg-white/60 backdrop-blur-sm transition-all duration-200 text-sm appearance-none cursor-pointer"
+                className="w-full px-4 py-3 pr-10 border border-purple-200 rounded-xl focus-input bg-white/60 backdrop-blur-sm transition-all duration-200 text-sm appearance-none cursor-pointer"
                 disabled={isLoading}
               >
                 {(categories).map((category: Category) => (
@@ -175,8 +175,8 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
               onChange={(e) => { handleInputChange('content', e.target.value); }}
               placeholder="Enter your prompt content here..."
               rows={10}
-              className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-purple-500 resize-none bg-white/60 backdrop-blur-sm transition-all duration-200 text-sm ${
-                errors.content ? 'border-red-300 focus-within:ring-red-500' : 'border-purple-200'
+              className={`w-full px-4 py-3 border rounded-xl focus-input resize-none bg-white/60 backdrop-blur-sm transition-all duration-200 text-sm ${
+                errors.content ? 'border-red-300' : 'border-purple-200'
               }`}
               disabled={isLoading}
             />
@@ -220,7 +220,7 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
           <button
             type="button"
             onClick={onCancel as () => void}
-            className="flex-1 px-6 py-3 text-sm font-semibold text-gray-700 bg-white/60 backdrop-blur-sm border border-purple-200 rounded-xl hover:bg-white/80 transition-all duration-200"
+            className="flex-1 px-6 py-3 text-sm font-semibold text-gray-700 bg-white/60 backdrop-blur-sm border border-purple-200 rounded-xl hover:bg-white/80 transition-all duration-200 focus-secondary"
             disabled={isLoading}
           >
             Cancel
@@ -228,7 +228,7 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
           <button
             type="submit"
             form="edit-prompt-form"
-            className="flex-1 px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-purple-500 to-indigo-600 rounded-xl hover:from-purple-600 hover:to-indigo-700 transition-all duration-200 shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transform hover:scale-105 disabled:opacity-50 disabled:transform-none"
+            className="flex-1 px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-purple-500 to-indigo-600 rounded-xl hover:from-purple-600 hover:to-indigo-700 transition-all duration-200 shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transform hover:scale-105 disabled:opacity-50 disabled:transform-none focus-primary"
             disabled={isLoading || !formData.content.trim() || !hasChanges()}
           >
             {isLoading ? (

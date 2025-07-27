@@ -205,7 +205,7 @@ const PromptCard: FC<PromptCardProps> = ({
                 }
               }
             }}
-            className="p-1.5 text-gray-400 hover:text-purple-600 rounded-lg hover:bg-purple-50 opacity-0 group-hover:opacity-100 transition-all duration-200 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-1"
+            className="p-1.5 text-gray-400 hover:text-purple-600 rounded-lg hover:bg-purple-50 opacity-0 group-hover:opacity-100 transition-all duration-200 focus:opacity-100 focus-interactive"
             aria-label={`More actions for ${prompt.title}`}
             aria-expanded={showMenu}
             aria-haspopup="menu"
@@ -255,7 +255,7 @@ const PromptCard: FC<PromptCardProps> = ({
                       menuButtonRef.current?.focus();
                     }
                   }}
-                  className="block w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 font-medium transition-colors focus:outline-none focus:bg-purple-50 focus:text-purple-700"
+                  className="block w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 font-medium transition-colors focus-secondary focus:bg-purple-50 focus:text-purple-700"
                   role="menuitem"
                   aria-label={`Edit ${prompt.title}`}
                 >
@@ -281,7 +281,7 @@ const PromptCard: FC<PromptCardProps> = ({
                       menuButtonRef.current?.focus();
                     }
                   }}
-                  className="block w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-red-50 font-medium transition-colors focus:outline-none focus:bg-red-50 focus:text-red-700"
+                  className="block w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-red-50 font-medium transition-colors focus-danger focus:bg-red-50 focus:text-red-700"
                   role="menuitem"
                   aria-label={`Delete ${prompt.title}`}
                 >
@@ -312,7 +312,7 @@ const PromptCard: FC<PromptCardProps> = ({
                 setShowFullContent(!showFullContent);
               }
             }}
-            className="text-xs text-purple-600 hover:text-purple-700 mt-2 font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-1 rounded"
+            className="text-xs text-purple-600 hover:text-purple-700 mt-2 font-semibold focus-interactive rounded"
             aria-label={showFullContent ? 'Show less content' : 'Show more content'}
             aria-expanded={showFullContent}
           >
@@ -331,7 +331,7 @@ const PromptCard: FC<PromptCardProps> = ({
               handleCopyClick(e);
             }
           }}
-          className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-lg hover:from-purple-600 hover:to-indigo-700 transition-all duration-200 text-xs font-semibold shadow-md hover:shadow-lg transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2"
+          className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-lg hover:from-purple-600 hover:to-indigo-700 transition-all duration-200 text-xs font-semibold shadow-md hover:shadow-lg transform hover:scale-105 focus-primary"
           aria-label={`Copy content of ${prompt.title} to clipboard`}
         >
           <svg className="h-3 w-3 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">

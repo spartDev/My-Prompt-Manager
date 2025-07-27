@@ -81,7 +81,7 @@ const LibraryView: FC<LibraryViewProps> = ({
                   (onManageCategories as () => void)();
                 }
               }}
-              className="text-xs text-purple-600 hover:text-purple-700 font-semibold px-3 py-2 rounded-lg hover:bg-purple-50 transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="text-xs text-purple-600 hover:text-purple-700 font-semibold px-3 py-2 rounded-lg hover:bg-purple-50 transition-colors focus-interactive disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={loading as boolean}
               aria-label="Manage categories"
             >
@@ -111,7 +111,7 @@ const LibraryView: FC<LibraryViewProps> = ({
                 <p className="text-gray-500 mb-4 text-sm leading-relaxed">Create your first prompt to start building your personal collection of reusable content.</p>
                 <button
                   onClick={onAddNew as () => void}
-                  className="px-6 py-2.5 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-xl hover:from-purple-600 hover:to-indigo-700 transition-all duration-200 font-semibold shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2"
+                  className="px-6 py-2.5 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-xl hover:from-purple-600 hover:to-indigo-700 transition-all duration-200 font-semibold shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transform hover:scale-105 focus-primary"
                   aria-label="Create your first prompt"
                 >
                   Create First Prompt
@@ -171,7 +171,7 @@ const LibraryView: FC<LibraryViewProps> = ({
             (onAddNew as () => void)();
           }
         }}
-        className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-full hover:from-purple-600 hover:to-indigo-700 transition-all duration-200 shadow-2xl shadow-purple-500/30 hover:shadow-purple-500/50 transform hover:scale-110 z-50 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+        className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-full hover:from-purple-600 hover:to-indigo-700 transition-all duration-200 shadow-2xl shadow-purple-500/30 hover:shadow-purple-500/50 transform hover:scale-110 z-50 flex items-center justify-center focus-primary disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
         disabled={loading as boolean}
         aria-label="Add new prompt"
         title="Add New Prompt"

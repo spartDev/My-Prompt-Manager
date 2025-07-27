@@ -80,7 +80,7 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
                 (onCancel as () => void)();
               }
             }}
-            className="text-gray-400 hover:text-purple-600 p-2 rounded-lg hover:bg-purple-50 transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-1 disabled:opacity-50"
+            className="text-gray-400 hover:text-purple-600 p-2 rounded-lg hover:bg-purple-50 transition-colors focus-interactive disabled:opacity-50"
             disabled={isLoading}
             aria-label="Cancel and close form"
           >
@@ -106,7 +106,7 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
                 value={formData.title}
                 onChange={(e) => { handleInputChange('title', e.target.value); }}
                 placeholder="Enter a descriptive title or leave blank to auto-generate"
-                className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-purple-500 bg-white/60 backdrop-blur-sm transition-all duration-200 ${
+                className={`w-full px-4 py-3 border rounded-xl focus-input bg-white/60 backdrop-blur-sm transition-all duration-200 ${
                   errors.title ? 'border-red-300' : 'border-purple-200'
                 }`}
                 disabled={isLoading}
@@ -129,7 +129,7 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
                   id="category"
                   value={formData.category}
                   onChange={(e) => { handleInputChange('category', e.target.value); }}
-                  className="w-full px-4 py-3 pr-10 border border-purple-200 rounded-xl focus:outline-none focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-purple-500 bg-white/60 backdrop-blur-sm transition-all duration-200 font-medium appearance-none cursor-pointer"
+                  className="w-full px-4 py-3 pr-10 border border-purple-200 rounded-xl focus-input bg-white/60 backdrop-blur-sm transition-all duration-200 font-medium appearance-none cursor-pointer"
                   disabled={isLoading}
                 >
                   {(categories).map((category: Category) => (
@@ -157,7 +157,7 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
                 onChange={(e) => { handleInputChange('content', e.target.value); }}
                 placeholder="Enter your prompt content here..."
                 rows={8}
-                className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-purple-500 resize-none bg-white/60 backdrop-blur-sm transition-all duration-200 ${
+                className={`w-full px-4 py-3 border rounded-xl focus-input resize-none bg-white/60 backdrop-blur-sm transition-all duration-200 ${
                   errors.content ? 'border-red-300' : 'border-purple-200'
                 }`}
                 disabled={isLoading}
@@ -175,14 +175,14 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
               <button
                 type="button"
                 onClick={onCancel as () => void}
-                className="px-6 py-3 text-sm font-semibold text-gray-700 bg-white/60 backdrop-blur-sm border border-purple-200 rounded-xl hover:bg-white/80 transition-all duration-200"
+                className="px-6 py-3 text-sm font-semibold text-gray-700 bg-white/60 backdrop-blur-sm border border-purple-200 rounded-xl hover:bg-white/80 transition-all duration-200 focus-secondary"
                 disabled={isLoading}
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-8 py-3 text-sm font-semibold text-white bg-gradient-to-r from-purple-500 to-indigo-600 rounded-xl hover:from-purple-600 hover:to-indigo-700 transition-all duration-200 shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transform hover:scale-105 disabled:opacity-50 disabled:transform-none"
+                className="px-8 py-3 text-sm font-semibold text-white bg-gradient-to-r from-purple-500 to-indigo-600 rounded-xl hover:from-purple-600 hover:to-indigo-700 transition-all duration-200 shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transform hover:scale-105 disabled:opacity-50 disabled:transform-none focus-primary"
                 disabled={isLoading || !formData.content.trim()}
               >
                 {isLoading ? (
