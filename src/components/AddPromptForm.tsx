@@ -92,7 +92,7 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
       </div>
 
       {/* Form */}
-      <div className="flex-1 overflow-auto p-6">
+      <div className="flex-1 overflow-auto custom-scrollbar p-6">
         <div className="max-w-lg mx-auto">
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Title */}

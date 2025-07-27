@@ -105,7 +105,7 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
       </div>
 
       {/* Form */}
-      <div className="flex-1 overflow-auto p-6 space-y-6">
+      <div className="flex-1 overflow-auto custom-scrollbar p-6 space-y-6">
         <form id="edit-prompt-form" onSubmit={handleSubmit} className="space-y-6">
           {/* Title Section */}
           <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-5 border border-purple-100">
