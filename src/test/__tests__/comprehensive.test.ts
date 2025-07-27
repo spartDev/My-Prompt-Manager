@@ -3,9 +3,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { StorageManager } from '../../services/storage';
 import { DEFAULT_CATEGORY, VALIDATION_LIMITS, ErrorType } from '../../types';
 
+interface MockStorage {
+  prompts: any[];
+  categories: any[];
+  settings: any;
+  [key: string]: unknown;
+}
+
 describe('Comprehensive Test Suite', () => {
   let storageManager: StorageManager;
-  let mockStorage: any;
+  let mockStorage: MockStorage;
 
   beforeEach(() => {
     storageManager = StorageManager.getInstance();
@@ -15,25 +22,36 @@ describe('Comprehensive Test Suite', () => {
       settings: { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt', viewMode: 'grid' }
     };
 
-    vi.mocked(chrome.storage.local.get).mockImplementation(async (keys) => {
+    // eslint-disable-next-line @typescript-eslint/unbound-method, @typescript-eslint/no-misused-promises
+    vi.mocked(chrome.storage.local.get).mockImplementation((keys) => {
       if (Array.isArray(keys)) {
-        const result: any = {};
+        const result: Record<string, unknown> = {};
         keys.forEach(key => {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
           result[key] = mockStorage[key] || null;
         });
-        return result;
+        return Promise.resolve(result);
       }
-      return { [keys as string]: mockStorage[keys as string] || null };
+       
+      return Promise.resolve({ [keys as string]: mockStorage[keys as string] || null });
     });
 
-    vi.mocked(chrome.storage.local.set).mockImplementation(async (data) => {
+    // eslint-disable-next-line @typescript-eslint/unbound-method, @typescript-eslint/no-misused-promises
+    vi.mocked(chrome.storage.local.set).mockImplementation((data) => {
       Object.assign(mockStorage, data);
+      return Promise.resolve();
     });
 
-    vi.mocked(chrome.storage.local.clear).mockImplementation(async () => {
-      Object.keys(mockStorage).forEach(key => delete mockStorage[key]);
+    // eslint-disable-next-line @typescript-eslint/unbound-method, @typescript-eslint/no-misused-promises
+    vi.mocked(chrome.storage.local.clear).mockImplementation(() => {
+      Object.keys(mockStorage).forEach(key => {
+        // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+        delete mockStorage[key];
+      });
+      return Promise.resolve();
     });
 
+    // eslint-disable-next-line @typescript-eslint/unbound-method
     vi.mocked(chrome.storage.local.getBytesInUse).mockResolvedValue(1024);
   });
 
@@ -160,6 +178,7 @@ describe('Comprehensive Test Suite', () => {
 
   describe('Error Handling', () => {
     it('should handle storage quota exceeded errors', async () => {
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       vi.mocked(chrome.storage.local.set).mockRejectedValue(
         new Error('QUOTA_EXCEEDED: Storage quota exceeded')
       );
@@ -177,6 +196,7 @@ describe('Comprehensive Test Suite', () => {
     });
 
     it('should handle storage API unavailable errors', async () => {
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       vi.mocked(chrome.storage.local.get).mockRejectedValue(
         new Error('storage API unavailable')
       );
@@ -215,11 +235,12 @@ describe('Comprehensive Test Suite', () => {
 
       // Export data
       const exportedData = await storageManager.exportData();
-      const parsedData = JSON.parse(exportedData);
+      const parsedData = JSON.parse(exportedData) as Record<string, unknown>;
 
       expect(parsedData).toHaveProperty('prompts');
       expect(parsedData).toHaveProperty('categories');
       expect(parsedData).toHaveProperty('settings');
+       
       expect(parsedData.prompts).toHaveLength(1);
 
       // Clear and import
