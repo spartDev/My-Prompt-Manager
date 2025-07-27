@@ -1,6 +1,8 @@
+import type { FC } from 'react';
+
 import { SearchBarProps } from '../types/components';
 
-const SearchBar: React.FC<SearchBarProps> = ({
+const SearchBar: FC<SearchBarProps> = ({
   value,
   onChange,
   onClear,

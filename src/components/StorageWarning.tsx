@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import type { FC } from 'react';
 
 import { StorageManager } from '../services/storage';
 
@@ -6,7 +7,7 @@ interface StorageWarningProps {
   onClose: () => void;
 }
 
-const StorageWarning: React.FC<StorageWarningProps> = ({ onClose }) => {
+const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
   const [storageInfo, setStorageInfo] = useState<{ used: number; total: number } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 

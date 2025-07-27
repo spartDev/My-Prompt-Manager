@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { FC, FormEvent } from 'react';
 
 import { Category } from '../types';
 
@@ -11,7 +12,7 @@ interface CategoryManagerProps {
   onClose: () => void;
 }
 
-const CategoryManager: React.FC<CategoryManagerProps> = ({
+const CategoryManager: FC<CategoryManagerProps> = ({
   categories,
   onCreateCategory,
   onUpdateCategory,
@@ -25,7 +26,7 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleCreateCategory = async (e: React.FormEvent) => {
+  const handleCreateCategory = async (e: FormEvent) => {
     e.preventDefault();
     
     if (!newCategoryName.trim()) {

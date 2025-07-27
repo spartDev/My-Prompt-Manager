@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { FC } from 'react';
 
 import AddPromptForm from './components/AddPromptForm';
 import CategoryManager from './components/CategoryManager';
@@ -11,7 +12,7 @@ import { Prompt, ErrorType, AppError } from './types';
 
 type ViewType = 'library' | 'add' | 'edit' | 'categories';
 
-const App: React.FC = () => {
+const App: FC = () => {
   const [currentView, setCurrentView] = useState<ViewType>('library');
   const [selectedPrompt, setSelectedPrompt] = useState<Prompt | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');

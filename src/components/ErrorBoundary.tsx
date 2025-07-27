@@ -1,4 +1,5 @@
-import { Component, ReactNode } from 'react';
+import { Component } from 'react';
+import type { ReactNode, ErrorInfo } from 'react';
 
 interface Props {
   children: ReactNode;
@@ -8,7 +9,7 @@ interface Props {
 interface State {
   hasError: boolean;
   error: Error | null;
-  errorInfo: React.ErrorInfo | null;
+  errorInfo: ErrorInfo | null;
 }
 
 class ErrorBoundary extends Component<Props, State> {
@@ -29,7 +30,7 @@ class ErrorBoundary extends Component<Props, State> {
     };
   }
 
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     this.setState({
       error,
       errorInfo
@@ -42,7 +43,7 @@ class ErrorBoundary extends Component<Props, State> {
     this.reportError(error, errorInfo);
   }
 
-  private reportError(error: Error, errorInfo: React.ErrorInfo) {
+  private reportError(error: Error, errorInfo: ErrorInfo) {
     // Here you could send error data to a logging service
     const errorData = {
       message: error.message,

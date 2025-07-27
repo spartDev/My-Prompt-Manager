@@ -1,4 +1,5 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
+import type { FC } from 'react';
 
 import { useSearch } from '../hooks';
 import { Prompt, Category } from '../types';
@@ -8,7 +9,7 @@ import CategoryFilter from './CategoryFilter';
 import PromptCard from './PromptCard';
 import SearchBar from './SearchBar';
 
-const LibraryView: React.FC<LibraryViewProps> = ({
+const LibraryView: FC<LibraryViewProps> = ({
   prompts,
   categories,
   searchQuery,
@@ -22,14 +23,14 @@ const LibraryView: React.FC<LibraryViewProps> = ({
   onManageCategories,
   loading
 }) => {
-  const { filteredPrompts } = useSearch(prompts as Prompt[]);
+  const { filteredPrompts } = useSearch(prompts);
 
   const finalFilteredPrompts = useMemo(() => {
     let filtered: Prompt[] = filteredPrompts;
     
     // Apply search filter
-    if ((searchQuery as string).trim()) {
-      const searchTerm = (searchQuery as string).toLowerCase().trim();
+    if ((searchQuery).trim()) {
+      const searchTerm = (searchQuery).toLowerCase().trim();
       filtered = filtered.filter((prompt: Prompt) => 
         prompt.title.toLowerCase().includes(searchTerm) ||
         prompt.content.toLowerCase().includes(searchTerm) ||
@@ -67,7 +68,7 @@ const LibraryView: React.FC<LibraryViewProps> = ({
         <div className="space-y-4">
           <div className="relative">
             <SearchBar
-              value={searchQuery as string}
+              value={searchQuery}
               onChange={onSearchChange as (value: string) => void}
               onClear={() => { (onSearchChange as (value: string) => void)(''); }}
               placeholder="Search your prompts..."
@@ -76,8 +77,8 @@ const LibraryView: React.FC<LibraryViewProps> = ({
           
           <div className="flex items-center justify-between">
             <CategoryFilter
-              categories={categories as Category[]}
-              selectedCategory={selectedCategory as string | null}
+              categories={categories}
+              selectedCategory={selectedCategory}
               onChange={onCategoryChange as (category: string | null) => void}
               showAll={true}
             />
@@ -102,7 +103,7 @@ const LibraryView: React.FC<LibraryViewProps> = ({
           </div>
         ) : finalFilteredPrompts.length === 0 ? (
           <div className="flex items-center justify-center h-full">
-            {(prompts as Prompt[]).length === 0 ? (
+            {(prompts).length === 0 ? (
               <div className="max-w-md mx-auto text-center px-6">
                 <div className="w-20 h-20 bg-gradient-to-br from-purple-100 to-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <svg className="w-10 h-10 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -137,11 +138,11 @@ const LibraryView: React.FC<LibraryViewProps> = ({
                 <PromptCard
                   key={prompt.id}
                   prompt={prompt}
-                  categories={categories as Category[]}
+                  categories={categories}
                   onEdit={onEditPrompt as (prompt: Prompt) => void}
                   onDelete={onDeletePrompt as (id: string) => void}
                   onCopy={onCopyPrompt as (content: string) => void}
-                  searchQuery={searchQuery as string}
+                  searchQuery={searchQuery}
                 />
               ))}
             </div>
@@ -150,12 +151,12 @@ const LibraryView: React.FC<LibraryViewProps> = ({
       </div>
 
       {/* Footer with stats */}
-      {!loading && (prompts as Prompt[]).length > 0 && (
+      {!loading && (prompts).length > 0 && (
         <div className="flex-shrink-0 px-4 py-2 bg-gray-100 border-t border-gray-200 text-xs text-gray-600">
-          {finalFilteredPrompts.length === (prompts as Prompt[]).length ? (
-            `${String((prompts as Prompt[]).length)} prompt${(prompts as Prompt[]).length !== 1 ? 's' : ''}`
+          {finalFilteredPrompts.length === (prompts).length ? (
+            `${String((prompts).length)} prompt${(prompts).length !== 1 ? 's' : ''}`
           ) : (
-            `${String(finalFilteredPrompts.length)} of ${String((prompts as Prompt[]).length)} prompt${(prompts as Prompt[]).length !== 1 ? 's' : ''}`
+            `${String(finalFilteredPrompts.length)} of ${String((prompts).length)} prompt${(prompts).length !== 1 ? 's' : ''}`
           )}
         </div>
       )}

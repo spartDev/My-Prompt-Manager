@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
+import type { FC, FormEvent } from 'react';
 
 import { DEFAULT_CATEGORY, Category } from '../types';
 import { AddPromptFormProps } from '../types/components';
 
-const AddPromptForm: React.FC<AddPromptFormProps> = ({
+const AddPromptForm: FC<AddPromptFormProps> = ({
   categories,
   onSubmit,
   onCancel,
@@ -35,8 +36,8 @@ const AddPromptForm: React.FC<AddPromptFormProps> = ({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+     
     e.preventDefault();
     
     if (!validateForm()) {
@@ -124,7 +125,7 @@ const AddPromptForm: React.FC<AddPromptFormProps> = ({
                   className="w-full px-4 py-3 pr-10 border border-purple-200 rounded-xl focus:outline-none focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-purple-500 bg-white/60 backdrop-blur-sm transition-all duration-200 font-medium appearance-none cursor-pointer"
                   disabled={isLoading}
                 >
-                  {(categories as Category[]).map((category: Category) => (
+                  {(categories).map((category: Category) => (
                     <option key={category.id} value={category.name}>
                       {category.name}
                     </option>
@@ -178,7 +179,6 @@ const AddPromptForm: React.FC<AddPromptFormProps> = ({
           </button>
           <button
             type="submit"
-            onClick={handleSubmit}
             className="px-8 py-3 text-sm font-semibold text-white bg-gradient-to-r from-purple-500 to-indigo-600 rounded-xl hover:from-purple-600 hover:to-indigo-700 transition-all duration-200 shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transform hover:scale-105 disabled:opacity-50 disabled:transform-none"
             disabled={isLoading || !formData.content.trim()}
           >

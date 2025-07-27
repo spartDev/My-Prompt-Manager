@@ -1,10 +1,11 @@
 import DOMPurify from 'dompurify';
-import React, { useState } from 'react';
+import { useState } from 'react';
+import type { FC, MouseEvent } from 'react';
 
 import { Category, Prompt } from '../types';
 import { PromptCardProps } from '../types/components';
 
-const PromptCard: React.FC<PromptCardProps> = ({
+const PromptCard: FC<PromptCardProps> = ({
   prompt,
   categories,
   onEdit,
@@ -60,24 +61,24 @@ const PromptCard: React.FC<PromptCardProps> = ({
     return parts;
   };
 
-  const handleCopyClick = (e: React.MouseEvent) => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+  const handleCopyClick = (e: MouseEvent) => {
+     
     e.stopPropagation();
-    (onCopy as (content: string) => void)((prompt as Prompt).content);
+    (onCopy as (content: string) => void)((prompt).content);
   };
 
-  const handleEditClick = (e: React.MouseEvent) => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+  const handleEditClick = (e: MouseEvent) => {
+     
     e.stopPropagation();
-    (onEdit as (prompt: Prompt) => void)(prompt as Prompt);
+    (onEdit as (prompt: Prompt) => void)(prompt);
     setShowMenu(false);
   };
 
-  const handleDeleteClick = (e: React.MouseEvent) => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+  const handleDeleteClick = (e: MouseEvent) => {
+     
     e.stopPropagation();
     if (confirm('Delete this prompt? This action cannot be undone.')) {
-      (onDelete as (id: string) => void)((prompt as Prompt).id);
+      (onDelete as (id: string) => void)((prompt).id);
     }
     setShowMenu(false);
   };
@@ -87,13 +88,13 @@ const PromptCard: React.FC<PromptCardProps> = ({
   };
 
   const getCategoryColor = (categoryName: string) => {
-    const category = (categories as Category[]).find((cat: Category) => cat.name === categoryName);
+    const category = (categories).find((cat: Category) => cat.name === categoryName);
     return (category?.color as string) || '#6B7280'; // Default gray color if category not found
   };
 
   const contentToShow = showFullContent 
-    ? (prompt as Prompt).content 
-    : truncateText((prompt as Prompt).content, 150);
+    ? (prompt).content 
+    : truncateText((prompt).content, 150);
 
   return (
     <div className="bg-white/70 backdrop-blur-sm border border-purple-100 rounded-2xl p-5 hover:shadow-xl hover:shadow-purple-500/10 transition-all duration-300 relative group hover:bg-white/90">
@@ -108,19 +109,19 @@ const PromptCard: React.FC<PromptCardProps> = ({
                 overflow: 'hidden',
                 wordBreak: 'break-word'
               }}
-              title={(prompt as Prompt).title} // Show full title on hover
+              title={(prompt).title} // Show full title on hover
           >
-            {highlightText((prompt as Prompt).title, searchQuery)}
+            {highlightText((prompt).title, searchQuery)}
           </h3>
           <div className="flex items-center space-x-3 mt-3">
             <span 
               className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold text-white border-2 border-white shadow-sm"
-              style={{ backgroundColor: getCategoryColor((prompt as Prompt).category) }}
+              style={{ backgroundColor: getCategoryColor((prompt).category) }}
             >
-              {(prompt as Prompt).category}
+              {(prompt).category}
             </span>
             <span className="text-xs text-gray-500 font-medium">
-              {formatDate((prompt as Prompt).updatedAt)}
+              {formatDate((prompt).updatedAt)}
             </span>
           </div>
         </div>
@@ -177,7 +178,7 @@ const PromptCard: React.FC<PromptCardProps> = ({
           {highlightText(contentToShow, searchQuery)}
         </p>
         
-        {(prompt as Prompt).content.length > 150 && (
+        {(prompt).content.length > 150 && (
           <button
             onClick={(e) => {
               e.stopPropagation();

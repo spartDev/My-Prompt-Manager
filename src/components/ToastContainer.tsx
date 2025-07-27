@@ -1,4 +1,4 @@
-import React from 'react';
+import type { FC } from 'react';
 
 import { Toast } from '../types/hooks';
 
@@ -6,7 +6,7 @@ interface ToastContainerProps {
   toasts: Toast[];
 }
 
-const ToastContainer: React.FC<ToastContainerProps> = ({ toasts }) => {
+const ToastContainer: FC<ToastContainerProps> = ({ toasts }) => {
   if (toasts.length === 0) {return null;}
 
   return (
@@ -18,7 +18,7 @@ const ToastContainer: React.FC<ToastContainerProps> = ({ toasts }) => {
   );
 };
 
-const ToastItem: React.FC<{ toast: Toast }> = ({ toast }) => {
+const ToastItem: FC<{ toast: Toast }> = ({ toast }) => {
   const getToastStyles = () => {
     switch (toast.type) {
       case 'success':
