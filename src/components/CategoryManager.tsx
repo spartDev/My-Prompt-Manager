@@ -137,16 +137,16 @@ const CategoryManager: FC<CategoryManagerProps> = ({
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto p-6 space-y-6">
+      <div className="flex-1 overflow-auto">
           {/* Error Display */}
           {error && (
-            <div className="p-4 text-sm text-red-600 dark:text-red-400 bg-red-50/80 dark:bg-red-900/20 backdrop-blur-sm border border-red-200 dark:border-red-700 rounded-xl font-medium">
+            <div className="p-5 text-sm text-red-600 dark:text-red-400 bg-red-50/80 dark:bg-red-900/20 backdrop-blur-sm border-b border-red-200 dark:border-red-700 font-medium">
               ⚠️ {error}
             </div>
           )}
 
           {/* Add New Category Form */}
-          <div className="bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl p-5 border border-purple-100 dark:border-gray-700">
+          <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5">
             <form onSubmit={(e) => { void handleCreateCategory(e); }} className="space-y-4">
               <h3 className="font-bold text-gray-900 dark:text-gray-100 flex items-center space-x-2">
                 <span>Add New Category</span>
@@ -201,13 +201,13 @@ const CategoryManager: FC<CategoryManagerProps> = ({
           </div>
 
           {/* Category List */}
-          <div className="space-y-3">
-            <h3 className="font-bold text-gray-900 dark:text-gray-100 flex items-center space-x-2">
+          <div>
+            <h3 className="font-bold text-gray-900 dark:text-gray-100 flex items-center space-x-2 p-5 bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700">
               <span>Your Categories</span>
             </h3>
             
             {categories.map((category) => (
-              <div key={category.id} className="flex items-center justify-between p-4 bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm rounded-xl border border-purple-100 hover:bg-white/80 dark:hover:bg-gray-700/80 transition-all duration-200">
+              <div key={category.id} className="flex items-center justify-between p-5 bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 hover:bg-white/90 dark:hover:bg-gray-800/90 transition-all duration-200">
                 <div className="flex items-center space-x-4">
                   <div
                     className="w-5 h-5 rounded-full border-2 border-white shadow-sm"

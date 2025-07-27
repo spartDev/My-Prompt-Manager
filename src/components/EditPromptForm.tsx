@@ -105,10 +105,10 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
       </div>
 
       {/* Form */}
-      <div className="flex-1 overflow-auto custom-scrollbar p-6 space-y-6">
-        <form id="edit-prompt-form" onSubmit={handleSubmit} className="space-y-6">
+      <div className="flex-1 overflow-auto custom-scrollbar">
+        <form id="edit-prompt-form" onSubmit={handleSubmit}>
           {/* Title Section */}
-          <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-2xl p-5 border border-purple-100 dark:border-gray-700">
+          <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5">
             <div className="flex items-center space-x-2 mb-4">
               <label htmlFor="title" className="block text-sm font-bold text-gray-900 dark:text-gray-100">
                 Title
@@ -134,7 +134,7 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
           </div>
 
           {/* Category Section */}
-          <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-2xl p-5 border border-purple-100 dark:border-gray-700">
+          <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5">
             <div className="flex items-center space-x-2 mb-4">
               <label htmlFor="category" className="block text-sm font-bold text-gray-900 dark:text-gray-100">
                 Category
@@ -163,7 +163,7 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
           </div>
 
           {/* Content Section */}
-          <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-2xl p-5 border border-purple-100 dark:border-gray-700">
+          <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5">
             <div className="flex items-center space-x-2 mb-4">
               <label htmlFor="content" className="block text-sm font-bold text-gray-900 dark:text-gray-100">
                 Content *
@@ -190,7 +190,7 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
         </form>
         
         {/* Metadata */}
-        <div className="mt-6 p-4 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm rounded-xl border border-purple-100 dark:border-gray-700">
+        <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5">
           <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Prompt Information</h4>
           <div className="text-xs text-gray-600 dark:text-gray-400 space-y-2 font-medium">
             <div className="flex items-center space-x-2">

@@ -92,11 +92,10 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
       </div>
 
       {/* Form */}
-      <div className="flex-1 overflow-auto custom-scrollbar p-6">
-        <div className="max-w-lg mx-auto">
-          <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="flex-1 overflow-auto custom-scrollbar">
+          <form id="add-prompt-form" onSubmit={handleSubmit}>
             {/* Title */}
-            <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-2xl p-5 border border-purple-100 dark:border-gray-700">
+            <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5">
               <label htmlFor="title" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
                 Title (optional)
               </label>
@@ -120,7 +119,7 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
             </div>
 
             {/* Category */}
-            <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-2xl p-5 border border-purple-100 dark:border-gray-700">
+            <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5">
               <label htmlFor="category" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
                 Category
               </label>
@@ -147,7 +146,7 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
             </div>
 
             {/* Content */}
-            <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-2xl p-5 border border-purple-100 dark:border-gray-700">
+            <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5">
               <label htmlFor="content" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
                 Content *
               </label>
@@ -170,32 +169,35 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
               </p>
             </div>
 
-            {/* Form Actions */}
-            <div className="flex justify-end space-x-4 pt-4">
-              <button
-                type="button"
-                onClick={onCancel as () => void}
-                className="px-6 py-3 text-sm font-semibold text-gray-700 dark:text-gray-300 bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm border border-purple-200 dark:border-gray-600 rounded-xl hover:bg-white/80 dark:hover:bg-gray-700/80 transition-all duration-200 focus-secondary"
-                disabled={isLoading}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-8 py-3 text-sm font-semibold text-white bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 focus-primary"
-                disabled={isLoading || !formData.content.trim()}
-              >
-                {isLoading ? (
-                  <span className="flex items-center space-x-2">
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                    <span>Saving...</span>
-                  </span>
-                ) : (
-                  'Save Prompt'
-                )}
-              </button>
-            </div>
           </form>
+      </div>
+
+      {/* Footer */}
+      <div className="flex-shrink-0 p-6 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-t border-purple-100 dark:border-gray-700">
+        <div className="flex space-x-3">
+          <button
+            type="button"
+            onClick={onCancel as () => void}
+            className="flex-1 px-6 py-3 text-sm font-semibold text-gray-700 dark:text-gray-300 bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm border border-purple-200 dark:border-gray-600 rounded-xl hover:bg-white/80 dark:hover:bg-gray-700/80 transition-all duration-200 focus-secondary"
+            disabled={isLoading}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            form="add-prompt-form"
+            className="flex-1 px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 focus-primary"
+            disabled={isLoading || !formData.content.trim()}
+          >
+            {isLoading ? (
+              <div className="flex items-center justify-center space-x-2">
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                <span>Saving...</span>
+              </div>
+            ) : (
+              'Save Prompt'
+            )}
+          </button>
         </div>
       </div>
 
