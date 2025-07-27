@@ -3,6 +3,8 @@ import type { FC } from 'react';
 
 import { StorageManager } from '../services/storage';
 
+import ConfirmDialog from './ConfirmDialog';
+
 interface StorageWarningProps {
   onClose: () => void;
 }
@@ -10,6 +12,7 @@ interface StorageWarningProps {
 const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
   const [storageInfo, setStorageInfo] = useState<{ used: number; total: number } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   useEffect(() => {
     const loadStorageInfo = async () => {
@@ -26,24 +29,31 @@ const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
     void loadStorageInfo();
   }, []);
 
-  const handleClearData = async () => {
-    if (!confirm('Are you sure you want to clear all data? This action cannot be undone.')) {
-      return;
-    }
+  const handleClearData = () => {
+    setShowClearConfirm(true);
+  };
 
-    try {
-      setIsLoading(true);
-      const storageManager = StorageManager.getInstance();
-      await storageManager.clearAllData();
-      onClose();
-      // Reload the extension
-      window.location.reload();
-    } catch (error) {
-       
-      console.error('Failed to clear data:', error);
-    } finally {
-      setIsLoading(false);
-    }
+  const handleConfirmClear = () => {
+    setShowClearConfirm(false);
+    void (async () => {
+      try {
+        setIsLoading(true);
+        const storageManager = StorageManager.getInstance();
+        await storageManager.clearAllData();
+        onClose();
+        // Reload the extension
+        window.location.reload();
+      } catch (error) {
+         
+        console.error('Failed to clear data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+  };
+
+  const handleCancelClear = () => {
+    setShowClearConfirm(false);
   };
 
   const getUsagePercentage = () => {
@@ -143,7 +153,7 @@ const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
           
           {isAtLimit && (
             <button
-              onClick={() => { void handleClearData(); }}
+              onClick={() => { handleClearData(); }}
               className="flex-1 px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
               disabled={isLoading}
             >
@@ -159,6 +169,18 @@ const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
           </p>
         </div>
       </div>
+
+      {/* Clear Data Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showClearConfirm}
+        onConfirm={handleConfirmClear}
+        onCancel={handleCancelClear}
+        title="Clear All Data"
+        message="Are you sure you want to clear all data? This will permanently delete all your prompts and categories. This action cannot be undone."
+        confirmText="Clear All Data"
+        cancelText="Cancel"
+        variant="danger"
+      />
     </div>
   );
 };

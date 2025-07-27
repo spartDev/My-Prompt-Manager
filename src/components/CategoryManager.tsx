@@ -3,6 +3,8 @@ import type { FC, FormEvent } from 'react';
 
 import { Category } from '../types';
 
+import ConfirmDialog from './ConfirmDialog';
+
 interface CategoryManagerProps {
   categories: Category[];
   onCreateCategory: (category: { name: string; color?: string }) => Promise<void>;
@@ -25,6 +27,10 @@ const CategoryManager: FC<CategoryManagerProps> = ({
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; category: Category | null }>({
+    isOpen: false,
+    category: null
+  });
 
   const handleCreateCategory = async (e: FormEvent) => {
     e.preventDefault();
@@ -71,26 +77,33 @@ const CategoryManager: FC<CategoryManagerProps> = ({
     }
   };
 
-  const handleDeleteCategory = async (category: Category) => {
+  const handleDeleteCategory = (category: Category) => {
     if (category.name === 'Uncategorized') {
       setError('Cannot delete the default category');
       return;
     }
 
-    if (!confirm(`Delete category "${category.name}"? All prompts in this category will be moved to "Uncategorized".`)) {
-      return;
-    }
+    setDeleteConfirm({ isOpen: true, category });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteConfirm.category) {return;}
 
     try {
       setLoading(true);
       setError(null);
       
-      await onDeleteCategory(category.id);
+      await onDeleteCategory(deleteConfirm.category.id);
+      setDeleteConfirm({ isOpen: false, category: null });
     } catch {
       setError('Failed to delete category');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCancelDelete = () => {
+    setDeleteConfirm({ isOpen: false, category: null });
   };
 
   if (!isOpen) {return null;}
@@ -242,7 +255,7 @@ const CategoryManager: FC<CategoryManagerProps> = ({
                       </button>
                       
                       <button
-                        onClick={() => { void handleDeleteCategory(category); }}
+                        onClick={() => { handleDeleteCategory(category); }}
                         className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
                         disabled={loading}
                       >
@@ -268,6 +281,21 @@ const CategoryManager: FC<CategoryManagerProps> = ({
           Back to Library
         </button>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={deleteConfirm.isOpen}
+        onConfirm={() => { handleConfirmDelete().catch(console.error); }}
+        onCancel={handleCancelDelete}
+        title="Delete Category"
+        message={deleteConfirm.category ? 
+          `Delete category "${deleteConfirm.category.name}"? All prompts in this category will be moved to "Uncategorized".` : 
+          'Are you sure you want to delete this category?'
+        }
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="warning"
+      />
     </div>
   );
 };

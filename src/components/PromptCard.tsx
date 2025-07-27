@@ -5,6 +5,8 @@ import type { FC, MouseEvent } from 'react';
 import { Category, Prompt } from '../types';
 import { PromptCardProps } from '../types/components';
 
+import ConfirmDialog from './ConfirmDialog';
+
 const PromptCard: FC<PromptCardProps> = ({
   prompt,
   categories,
@@ -15,6 +17,7 @@ const PromptCard: FC<PromptCardProps> = ({
 }) => {
   const [showFullContent, setShowFullContent] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const firstMenuItemRef = useRef<HTMLButtonElement>(null);
@@ -80,10 +83,17 @@ const PromptCard: FC<PromptCardProps> = ({
   const handleDeleteClick = (e: MouseEvent) => {
      
     e.stopPropagation();
-    if (confirm('Delete this prompt? This action cannot be undone.')) {
-      (onDelete as (id: string) => void)((prompt).id);
-    }
+    setShowDeleteConfirm(true);
     setShowMenu(false);
+  };
+
+  const handleConfirmDelete = () => {
+    (onDelete as (id: string) => void)((prompt).id);
+    setShowDeleteConfirm(false);
+  };
+
+  const handleCancelDelete = () => {
+    setShowDeleteConfirm(false);
   };
 
   const formatDate = (timestamp: number) => {
@@ -335,6 +345,18 @@ const PromptCard: FC<PromptCardProps> = ({
           Copy Prompt
         </button>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        onConfirm={handleConfirmDelete}
+        onCancel={handleCancelDelete}
+        title="Delete Prompt"
+        message={`Are you sure you want to delete "${prompt.title}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+      />
     </article>
   );
 };
