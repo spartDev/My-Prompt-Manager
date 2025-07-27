@@ -151,8 +151,8 @@ const App: FC = () => {
           selectedCategory={selectedCategory}
           onAddNew={handleAddNew}
           onEditPrompt={handleEditPrompt}
-          onDeletePrompt={handleDeletePrompt}
-          onCopyPrompt={handleCopyPrompt}
+          onDeletePrompt={(id: string) => { void handleDeletePrompt(id); }}
+          onCopyPrompt={(content: string) => { void handleCopyPrompt(content); }}
           onSearchChange={setSearchQuery}
           onCategoryChange={setSelectedCategory}
           onManageCategories={() => {
@@ -165,7 +165,7 @@ const App: FC = () => {
       {currentView === 'add' && (
         <AddPromptForm
           categories={categories}
-          onSubmit={handleFormSubmit}
+          onSubmit={(data) => { void handleFormSubmit(data); }}
           onCancel={handleFormCancel}
           isLoading={loading}
         />
@@ -175,7 +175,7 @@ const App: FC = () => {
         <EditPromptForm
           prompt={selectedPrompt}
           categories={categories}
-          onSubmit={handleFormSubmit}
+          onSubmit={(data) => { void handleFormSubmit(data); }}
           onCancel={handleFormCancel}
           isLoading={loading}
         />
