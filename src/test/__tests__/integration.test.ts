@@ -14,16 +14,14 @@ describe('Integration Tests', () => {
     vi.clearAllMocks();
 
     // Mock chrome storage
-    vi.mocked(chrome.storage.local.get).mockImplementation(() => 
-      Promise.resolve({ 
-        categories: [{ id: '1', name: DEFAULT_CATEGORY }],
-        prompts: [],
-        settings: { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt', viewMode: 'grid' }
-      })
-    );
+    vi.mocked(chrome.storage.local.get).mockImplementation(async () => ({ 
+      categories: [{ id: '1', name: DEFAULT_CATEGORY }],
+      prompts: [],
+      settings: { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt', viewMode: 'grid' }
+    }));
 
-    vi.mocked(chrome.storage.local.set).mockResolvedValue();
-    vi.mocked(chrome.storage.local.getBytesInUse).mockResolvedValue(1024);
+    vi.mocked(chrome.storage.local.set).mockImplementation(async () => {});
+    vi.mocked(chrome.storage.local.getBytesInUse).mockImplementation(async () => 1024);
   });
 
   describe('End-to-End Prompt Management', () => {
@@ -37,11 +35,9 @@ describe('Integration Tests', () => {
       expect(chrome.storage.local.set).toHaveBeenCalled();
 
       // Mock updated storage state
-      vi.mocked(chrome.storage.local.get).mockImplementation(() => 
-        Promise.resolve({ 
-          prompts: [prompt]
-        })
-      );
+      vi.mocked(chrome.storage.local.get).mockImplementation(async () => ({ 
+        prompts: [prompt]
+      }));
 
       // Get prompts
       const prompts = await storageManager.getPrompts();

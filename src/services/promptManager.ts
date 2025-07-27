@@ -9,8 +9,20 @@ import { HighlightedPrompt, TextHighlight } from '../types/hooks';
 
 import { StorageManager } from './storage';
 
+class PromptManagerError extends Error implements AppError {
+  public type: ErrorType;
+  public details?: unknown;
+
+  constructor(appError: AppError) {
+    super(appError.message);
+    this.name = 'PromptManagerError';
+    this.type = appError.type;
+    this.details = appError.details;
+  }
+}
+
 export class PromptManager {
-  private static instance: PromptManager;
+  private static instance: PromptManager | undefined;
   private storageManager: StorageManager;
 
   private constructor() {
@@ -205,72 +217,72 @@ export class PromptManager {
   }
 
   // Validation
-  validatePromptData(data: { title?: string; content?: string; category?: string }): AppError | null {
+  validatePromptData(data: { title?: string; content?: string; category?: string }): PromptManagerError | null {
     const { title, content, category } = data;
 
     if (title !== undefined) {
       if (title.length > VALIDATION_LIMITS.PROMPT_TITLE_MAX) {
-        return {
+        return new PromptManagerError({
           type: ErrorType.VALIDATION_ERROR,
-          message: `Title cannot exceed ${VALIDATION_LIMITS.PROMPT_TITLE_MAX} characters`
-        };
+          message: `Title cannot exceed ${String(VALIDATION_LIMITS.PROMPT_TITLE_MAX)} characters`
+        });
       }
     }
 
     if (content !== undefined) {
       if (!content.trim()) {
-        return {
+        return new PromptManagerError({
           type: ErrorType.VALIDATION_ERROR,
           message: 'Prompt content cannot be empty'
-        };
+        });
       }
 
       if (content.length > VALIDATION_LIMITS.PROMPT_CONTENT_MAX) {
-        return {
+        return new PromptManagerError({
           type: ErrorType.VALIDATION_ERROR,
-          message: `Content cannot exceed ${VALIDATION_LIMITS.PROMPT_CONTENT_MAX} characters`
-        };
+          message: `Content cannot exceed ${String(VALIDATION_LIMITS.PROMPT_CONTENT_MAX)} characters`
+        });
       }
     }
 
     if (category !== undefined) {
       if (category.length > VALIDATION_LIMITS.CATEGORY_NAME_MAX) {
-        return {
+        return new PromptManagerError({
           type: ErrorType.VALIDATION_ERROR,
-          message: `Category name cannot exceed ${VALIDATION_LIMITS.CATEGORY_NAME_MAX} characters`
-        };
+          message: `Category name cannot exceed ${String(VALIDATION_LIMITS.CATEGORY_NAME_MAX)} characters`
+        });
       }
     }
 
     return null;
   }
 
-  validateCategoryData(data: { name?: string; color?: string }): AppError | null {
+  validateCategoryData(data: { name?: string; color?: string }): PromptManagerError | null {
     const { name, color } = data;
 
     if (name !== undefined) {
       if (!name.trim()) {
-        return {
+        return new PromptManagerError({
           type: ErrorType.VALIDATION_ERROR,
           message: 'Category name cannot be empty'
-        };
+        });
       }
 
       if (name.length > VALIDATION_LIMITS.CATEGORY_NAME_MAX) {
-        return {
+        return new PromptManagerError({
           type: ErrorType.VALIDATION_ERROR,
-          message: `Category name cannot exceed ${VALIDATION_LIMITS.CATEGORY_NAME_MAX} characters`
-        };
+          message: `Category name cannot exceed ${String(VALIDATION_LIMITS.CATEGORY_NAME_MAX)} characters`
+        });
       }
     }
 
     if (color !== undefined && color) {
       const hexColorRegex = /^#[0-9A-F]{6}$/i;
       if (!hexColorRegex.test(color)) {
-        return {
+        return new PromptManagerError({
           type: ErrorType.VALIDATION_ERROR,
           message: 'Color must be a valid hex color code (e.g., #FF0000)'
-        };
+        });
       }
     }
 
@@ -403,10 +415,16 @@ export class PromptManager {
   }
 
   private levenshteinDistance(str1: string, str2: string): number {
-    const matrix = Array(str2.length + 1).fill(null).map(() => Array(str1.length + 1).fill(null));
+    const matrix: number[][] = Array.from({ length: str2.length + 1 }, () => 
+      Array.from({ length: str1.length + 1 }, () => 0)
+    );
     
-    for (let i = 0; i <= str1.length; i++) {matrix[0][i] = i;}
-    for (let j = 0; j <= str2.length; j++) {matrix[j][0] = j;}
+    for (let i = 0; i <= str1.length; i++) {
+      matrix[0][i] = i;
+    }
+    for (let j = 0; j <= str2.length; j++) {
+      matrix[j][0] = j;
+    }
     
     for (let j = 1; j <= str2.length; j++) {
       for (let i = 1; i <= str1.length; i++) {
@@ -422,15 +440,17 @@ export class PromptManager {
     return matrix[str2.length][str1.length];
   }
 
-  private handleError(error: any): AppError {
-    if (error.type && Object.values(ErrorType).includes(error.type)) {
-      return error as AppError;
+  private handleError(error: unknown): PromptManagerError {
+    // If it's already a PromptManagerError or StorageError, re-throw it
+    if (error instanceof PromptManagerError || (error instanceof Error && 'type' in error)) {
+      return error as PromptManagerError;
     }
 
-    return {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return new PromptManagerError({
       type: ErrorType.VALIDATION_ERROR,
-      message: error.message || 'An unknown error occurred in PromptManager',
+      message: errorMessage || 'An unknown error occurred in PromptManager',
       details: error
-    };
+    });
   }
 }

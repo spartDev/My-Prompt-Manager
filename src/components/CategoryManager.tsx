@@ -133,7 +133,7 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({
 
           {/* Add New Category Form */}
           <div className="bg-white/50 backdrop-blur-sm rounded-2xl p-5 border border-purple-100">
-            <form onSubmit={handleCreateCategory} className="space-y-4">
+            <form onSubmit={(e) => { void handleCreateCategory(e); }} className="space-y-4">
               <h3 className="font-bold text-gray-900 flex items-center space-x-2">
                 <span>Add New Category</span>
               </h3>
@@ -172,7 +172,7 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({
                     id="category-color"
                     type="color"
                     value={newCategoryColor}
-                    onChange={(e) => setNewCategoryColor(e.target.value)}
+                    onChange={(e) => { setNewCategoryColor(e.target.value); }}
                     className="w-10 h-10 border border-purple-200 rounded-lg cursor-pointer bg-white/60"
                     disabled={loading}
                   />
@@ -204,11 +204,11 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({
                     <input
                       type="text"
                       value={editingCategory.name}
-                      onChange={(e) => setEditingCategory({ ...editingCategory, name: e.target.value })}
+                      onChange={(e) => { setEditingCategory({ ...editingCategory, name: e.target.value }); }}
                       className="text-sm border border-purple-200 rounded-lg px-3 py-2 focus:outline-none focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-purple-500 bg-white/80 backdrop-blur-sm font-medium"
                       onBlur={() => {
                         if (editingCategory.name.trim() && editingCategory.name !== category.name) {
-                          handleUpdateCategory(category, { name: editingCategory.name.trim() });
+                          void handleUpdateCategory(category, { name: editingCategory.name.trim() });
                         } else {
                           setEditingCategory(null);
                         }
@@ -231,7 +231,7 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({
                   {category.name !== 'Uncategorized' && (
                     <>
                       <button
-                        onClick={() => setEditingCategory(category)}
+                        onClick={() => { setEditingCategory(category); }}
                         className="p-2 text-gray-400 hover:text-purple-600 rounded-lg hover:bg-purple-50 transition-colors"
                         disabled={loading}
                       >
@@ -241,7 +241,7 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({
                       </button>
                       
                       <button
-                        onClick={() => handleDeleteCategory(category)}
+                        onClick={() => { void handleDeleteCategory(category); }}
                         className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
                         disabled={loading}
                       >

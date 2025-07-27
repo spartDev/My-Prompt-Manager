@@ -15,25 +15,23 @@ describe('Comprehensive Test Suite', () => {
       settings: { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt', viewMode: 'grid' }
     };
 
-    vi.mocked(chrome.storage.local.get).mockImplementation((keys) => {
+    vi.mocked(chrome.storage.local.get).mockImplementation(async (keys) => {
       if (Array.isArray(keys)) {
         const result: any = {};
         keys.forEach(key => {
           result[key] = mockStorage[key] || null;
         });
-        return Promise.resolve(result);
+        return result;
       }
-      return Promise.resolve({ [keys as string]: mockStorage[keys as string] || null });
+      return { [keys as string]: mockStorage[keys as string] || null };
     });
 
-    vi.mocked(chrome.storage.local.set).mockImplementation((data) => {
+    vi.mocked(chrome.storage.local.set).mockImplementation(async (data) => {
       Object.assign(mockStorage, data);
-      return Promise.resolve();
     });
 
-    vi.mocked(chrome.storage.local.clear).mockImplementation(() => {
+    vi.mocked(chrome.storage.local.clear).mockImplementation(async () => {
       Object.keys(mockStorage).forEach(key => delete mockStorage[key]);
-      return Promise.resolve();
     });
 
     vi.mocked(chrome.storage.local.getBytesInUse).mockResolvedValue(1024);

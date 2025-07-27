@@ -139,7 +139,7 @@ const PromptCard: React.FC<PromptCardProps> = ({
               <button
                 type="button"
                 className="fixed inset-0 z-10 bg-transparent border-0 cursor-default"
-                onClick={() => setShowMenu(false)}
+                onClick={() => { setShowMenu(false); }}
                 onKeyDown={(e) => {
                   if (e.key === 'Escape') {
                     setShowMenu(false);

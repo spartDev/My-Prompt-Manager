@@ -11,8 +11,20 @@ import {
   AppError 
 } from '../types';
 
+class StorageError extends Error implements AppError {
+  public type: ErrorType;
+  public details?: unknown;
+
+  constructor(appError: AppError) {
+    super(appError.message);
+    this.name = 'StorageError';
+    this.type = appError.type;
+    this.details = appError.details;
+  }
+}
+
 export class StorageManager {
-  private static instance: StorageManager;
+  private static instance: StorageManager | undefined;
   private readonly STORAGE_KEYS = {
     PROMPTS: 'prompts',
     CATEGORIES: 'categories',
@@ -20,7 +32,7 @@ export class StorageManager {
   } as const;
 
   // Mutex for preventing concurrent storage operations
-  private operationLocks = new Map<string, Promise<any>>();
+  private operationLocks = new Map<string, Promise<unknown>>();
 
   private constructor() {}
 
@@ -163,7 +175,7 @@ export class StorageManager {
       if (updates.name) {
         const duplicateCategory = existingCategories.find(
           (c, index) => index !== categoryIndex && 
-          c.name.toLowerCase() === updates.name!.toLowerCase()
+          c.name.toLowerCase() === updates.name.toLowerCase()
         );
         
         if (duplicateCategory) {
@@ -300,7 +312,7 @@ export class StorageManager {
 
   async importData(jsonData: string): Promise<void> {
     try {
-      const data: StorageData = JSON.parse(jsonData);
+      const data = JSON.parse(jsonData) as unknown;
       
       // Validate imported data structure
       if (!this.validateImportedData(data)) {
@@ -323,10 +335,10 @@ export class StorageManager {
   // Private helper methods
   private async getStorageData<T>(key: string): Promise<T | null> {
     const result = await chrome.storage.local.get([key]);
-    return result[key] || null;
+    return (result[key] as T) || null;
   }
 
-  private async setStorageData<T>(key: string, data: T): Promise<void> {
+  private async setStorageData(key: string, data: unknown): Promise<void> {
     await chrome.storage.local.set({ [key]: data });
   }
 
@@ -353,45 +365,54 @@ export class StorageManager {
     }
   }
 
-  private handleStorageError(error: any): AppError {
-    if (error.message?.includes('QUOTA_EXCEEDED')) {
-      return {
+  private handleStorageError(error: unknown): StorageError {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    
+    if (errorMessage.includes('QUOTA_EXCEEDED')) {
+      return new StorageError({
         type: ErrorType.STORAGE_QUOTA_EXCEEDED,
         message: 'Storage quota exceeded. Please delete some prompts to free up space.',
         details: error
-      };
+      });
     }
 
-    if (error.message?.includes('storage API')) {
-      return {
+    if (errorMessage.includes('storage API')) {
+      return new StorageError({
         type: ErrorType.STORAGE_UNAVAILABLE,
         message: 'Storage API is unavailable. Please try again later.',
         details: error
-      };
+      });
     }
 
     if (error instanceof SyntaxError) {
-      return {
+      return new StorageError({
         type: ErrorType.DATA_CORRUPTION,
         message: 'Data corruption detected. Some data may need to be recovered.',
         details: error
-      };
+      });
     }
 
-    return {
+    return new StorageError({
       type: ErrorType.VALIDATION_ERROR,
-      message: error.message || 'An unknown storage error occurred.',
+      message: errorMessage || 'An unknown storage error occurred.',
       details: error
-    };
+    });
   }
 
-  private validateImportedData(data: any): data is StorageData {
+  private validateImportedData(data: unknown): data is StorageData {
+    if (!data || typeof data !== 'object') {
+      return false;
+    }
+    
+    const obj = data as Record<string, unknown>;
     return (
-      data &&
-      typeof data === 'object' &&
-      Array.isArray(data.prompts) &&
-      Array.isArray(data.categories) &&
-      typeof data.settings === 'object'
+      'prompts' in obj &&
+      'categories' in obj &&
+      'settings' in obj &&
+      Array.isArray(obj.prompts) &&
+      Array.isArray(obj.categories) &&
+      typeof obj.settings === 'object' &&
+      obj.settings !== null
     );
   }
 }

@@ -5,15 +5,29 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import importPlugin from 'eslint-plugin-import';
 import jsxA11y from 'eslint-plugin-jsx-a11y';
 
-export default tseslint.config(
+export default [
+  // Base JavaScript configuration for all files
   js.configs.recommended,
-  ...tseslint.configs.recommended,
+  
+  // TypeScript configuration for .ts and .tsx files only
+  ...tseslint.configs.recommendedTypeChecked.map(config => ({
+    ...config,
+    files: ['**/*.{ts,tsx}'],
+  })),
+  ...tseslint.configs.strictTypeChecked.map(config => ({
+    ...config,
+    files: ['**/*.{ts,tsx}'],
+  })),
+  
+  // Main configuration for TypeScript and React files
   {
-    files: ['**/*.{js,jsx,ts,tsx}'],
+    files: ['**/*.{ts,tsx}'],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',
       parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
         ecmaFeatures: {
           jsx: true,
         },
@@ -75,19 +89,25 @@ export default tseslint.config(
       'no-var': 'error',
       'eqeqeq': ['error', 'always'],
       'curly': ['error', 'all'],
+      
+      // Chrome Extension specific - disable Chrome Apps deprecation warnings
+      '@typescript-eslint/no-deprecated': 'off',
     },
   },
+  
+  // Configuration for JavaScript files
   {
     files: ['**/*.{js,jsx}'],
     rules: {
       '@typescript-eslint/no-var-requires': 'off',
     },
   },
+  
+  // Configuration for CommonJS files (.cjs)
   {
     files: ['**/*.cjs'],
     languageOptions: {
       globals: {
-        ...js.configs.recommended.languageOptions?.globals,
         require: 'readonly',
         module: 'readonly',
         exports: 'readonly',
@@ -101,11 +121,11 @@ export default tseslint.config(
       sourceType: 'commonjs',
     },
     rules: {
-      '@typescript-eslint/no-require-imports': 'off',
-      '@typescript-eslint/no-var-requires': 'off',
       'no-console': 'off',
     },
   },
+  
+  // Test files configuration
   {
     files: ['**/*.test.{js,jsx,ts,tsx}', '**/*.spec.{js,jsx,ts,tsx}'],
     rules: {
@@ -113,6 +133,8 @@ export default tseslint.config(
       '@typescript-eslint/no-explicit-any': 'off',
     },
   },
+  
+  // Global ignores
   {
     ignores: [
       'node_modules/**',
@@ -123,4 +145,4 @@ export default tseslint.config(
       'coverage/**',
     ],
   },
-);
+];

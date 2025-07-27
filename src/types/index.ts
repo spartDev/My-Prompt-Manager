@@ -62,7 +62,7 @@ export enum ErrorType {
 export interface AppError {
   type: ErrorType;
   message: string;
-  details?: any;
+  details?: unknown;
 }
 
 // Validation constants

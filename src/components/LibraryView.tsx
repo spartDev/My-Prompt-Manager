@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 
 import { useSearch } from '../hooks';
+import { Prompt, Category } from '../types';
 import { LibraryViewProps } from '../types/components';
 
 import CategoryFilter from './CategoryFilter';
@@ -21,15 +22,15 @@ const LibraryView: React.FC<LibraryViewProps> = ({
   onManageCategories,
   loading
 }) => {
-  const { filteredPrompts } = useSearch(prompts);
+  const { filteredPrompts } = useSearch(prompts as Prompt[]);
 
   const finalFilteredPrompts = useMemo(() => {
-    let filtered = filteredPrompts;
+    let filtered: Prompt[] = filteredPrompts;
     
     // Apply search filter
-    if (searchQuery.trim()) {
-      const searchTerm = searchQuery.toLowerCase().trim();
-      filtered = filtered.filter(prompt => 
+    if ((searchQuery as string).trim()) {
+      const searchTerm = (searchQuery as string).toLowerCase().trim();
+      filtered = filtered.filter((prompt: Prompt) => 
         prompt.title.toLowerCase().includes(searchTerm) ||
         prompt.content.toLowerCase().includes(searchTerm) ||
         prompt.category.toLowerCase().includes(searchTerm)
@@ -38,7 +39,7 @@ const LibraryView: React.FC<LibraryViewProps> = ({
     
     // Apply category filter
     if (selectedCategory) {
-      filtered = filtered.filter(prompt => prompt.category === selectedCategory);
+      filtered = filtered.filter((prompt: Prompt) => prompt.category === selectedCategory);
     }
     
     return filtered;
@@ -66,16 +67,16 @@ const LibraryView: React.FC<LibraryViewProps> = ({
         <div className="space-y-4">
           <div className="relative">
             <SearchBar
-              value={searchQuery}
+              value={searchQuery as string}
               onChange={onSearchChange}
-              onClear={() => onSearchChange('')}
+              onClear={() => { onSearchChange(''); }}
               placeholder="Search your prompts..."
             />
           </div>
           
           <div className="flex items-center justify-between">
             <CategoryFilter
-              categories={categories}
+              categories={categories as Category[]}
               selectedCategory={selectedCategory}
               onChange={onCategoryChange}
               showAll={true}
@@ -84,7 +85,7 @@ const LibraryView: React.FC<LibraryViewProps> = ({
             <button
               onClick={onManageCategories}
               className="text-xs text-purple-600 hover:text-purple-700 font-semibold px-3 py-2 rounded-lg hover:bg-purple-50 transition-colors"
-              disabled={loading}
+              disabled={loading as boolean}
             >
               Manage Categories
             </button>
@@ -94,7 +95,7 @@ const LibraryView: React.FC<LibraryViewProps> = ({
 
       {/* Content */}
       <div className="flex-1 overflow-auto">
-        {loading ? (
+        {(loading as boolean) ? (
           <div className="flex flex-col items-center justify-center h-full space-y-4">
             <div className="w-8 h-8 border-4 border-purple-200 border-t-purple-500 rounded-full animate-spin"></div>
             <div className="text-gray-600 font-medium">Loading your prompts...</div>
@@ -132,7 +133,7 @@ const LibraryView: React.FC<LibraryViewProps> = ({
         ) : (
           <div className="p-6">
             <div className="grid gap-4">
-              {finalFilteredPrompts.map((prompt) => (
+              {finalFilteredPrompts.map((prompt: Prompt) => (
                 <PromptCard
                   key={prompt.id}
                   prompt={prompt}
@@ -152,9 +153,9 @@ const LibraryView: React.FC<LibraryViewProps> = ({
       {!loading && prompts.length > 0 && (
         <div className="flex-shrink-0 px-4 py-2 bg-gray-100 border-t border-gray-200 text-xs text-gray-600">
           {finalFilteredPrompts.length === prompts.length ? (
-            `${prompts.length} prompt${prompts.length !== 1 ? 's' : ''}`
+            `${String(prompts.length)} prompt${prompts.length !== 1 ? 's' : ''}`
           ) : (
-            `${finalFilteredPrompts.length} of ${prompts.length} prompt${prompts.length !== 1 ? 's' : ''}`
+            `${String(finalFilteredPrompts.length)} of ${String(prompts.length)} prompt${prompts.length !== 1 ? 's' : ''}`
           )}
         </div>
       )}
@@ -163,7 +164,7 @@ const LibraryView: React.FC<LibraryViewProps> = ({
       <button
         onClick={onAddNew}
         className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-full hover:from-purple-600 hover:to-indigo-700 transition-all duration-200 shadow-2xl shadow-purple-500/30 hover:shadow-purple-500/50 transform hover:scale-110 z-50 flex items-center justify-center"
-        disabled={loading}
+        disabled={loading as boolean}
         title="Add New Prompt"
       >
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

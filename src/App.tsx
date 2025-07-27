@@ -103,7 +103,7 @@ const App: React.FC = () => {
       } else {
         showToast(appError.message || 'Failed to create category', 'error');
       }
-      throw appError;
+      throw new Error(appError.message || 'Failed to create category');
     }
   };
 
@@ -154,7 +154,9 @@ const App: React.FC = () => {
           onCopyPrompt={handleCopyPrompt}
           onSearchChange={setSearchQuery}
           onCategoryChange={setSelectedCategory}
-          onManageCategories={() => setCurrentView('categories')}
+          onManageCategories={() => {
+            setCurrentView('categories');
+          }}
           loading={loading}
         />
       )}
@@ -185,12 +187,16 @@ const App: React.FC = () => {
           onUpdateCategory={handleUpdateCategory}
           onDeleteCategory={handleDeleteCategory}
           isOpen={true}
-          onClose={() => setCurrentView('library')}
+          onClose={() => {
+            setCurrentView('library');
+          }}
         />
       )}
 
       {showStorageWarning && (
-        <StorageWarning onClose={() => setShowStorageWarning(false)} />
+        <StorageWarning onClose={() => {
+          setShowStorageWarning(false);
+        }} />
       )}
 
       <ToastContainer toasts={toasts} />

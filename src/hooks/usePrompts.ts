@@ -102,7 +102,7 @@ export const usePrompts = (): UsePromptsReturn => {
 
   // Initial load
   useEffect(() => {
-    refreshPrompts();
+    void refreshPrompts();
   }, [refreshPrompts]);
 
   return {

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-import { DEFAULT_CATEGORY } from '../types';
+import { DEFAULT_CATEGORY, Category } from '../types';
 import { AddPromptFormProps } from '../types/components';
 
 const AddPromptForm: React.FC<AddPromptFormProps> = ({
@@ -35,7 +35,7 @@ const AddPromptForm: React.FC<AddPromptFormProps> = ({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     
     if (!validateForm()) {
@@ -95,7 +95,7 @@ const AddPromptForm: React.FC<AddPromptFormProps> = ({
                 type="text"
                 id="title"
                 value={formData.title}
-                onChange={(e) => handleInputChange('title', e.target.value)}
+                onChange={(e) => { handleInputChange('title', e.target.value); }}
                 placeholder="Enter a descriptive title or leave blank to auto-generate"
                 className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-purple-500 bg-white/60 backdrop-blur-sm transition-all duration-200 ${
                   errors.title ? 'border-red-300' : 'border-purple-200'
@@ -119,11 +119,11 @@ const AddPromptForm: React.FC<AddPromptFormProps> = ({
                 <select
                   id="category"
                   value={formData.category}
-                  onChange={(e) => handleInputChange('category', e.target.value)}
+                  onChange={(e) => { handleInputChange('category', e.target.value); }}
                   className="w-full px-4 py-3 pr-10 border border-purple-200 rounded-xl focus:outline-none focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-purple-500 bg-white/60 backdrop-blur-sm transition-all duration-200 font-medium appearance-none cursor-pointer"
                   disabled={isLoading}
                 >
-                  {categories.map((category) => (
+                  {categories.map((category: Category) => (
                     <option key={category.id} value={category.name}>
                       {category.name}
                     </option>
@@ -145,7 +145,7 @@ const AddPromptForm: React.FC<AddPromptFormProps> = ({
               <textarea
                 id="content"
                 value={formData.content}
-                onChange={(e) => handleInputChange('content', e.target.value)}
+                onChange={(e) => { handleInputChange('content', e.target.value); }}
                 placeholder="Enter your prompt content here..."
                 rows={8}
                 className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-purple-500 resize-none bg-white/60 backdrop-blur-sm transition-all duration-200 ${

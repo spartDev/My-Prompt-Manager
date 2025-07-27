@@ -90,7 +90,7 @@ export const useCategories = (): UseCategoriesReturn => {
 
   // Initial load
   useEffect(() => {
-    refreshCategories();
+    void refreshCategories();
   }, [refreshCategories]);
 
   return {

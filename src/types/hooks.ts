@@ -38,7 +38,7 @@ export interface UseSearchReturn {
 }
 
 export interface UseStorageReturn {
-  saveData: <T>(key: string, data: T) => Promise<void>;
+  saveData: (key: string, data: unknown) => Promise<void>;
   loadData: <T>(key: string) => Promise<T | null>;
   removeData: (key: string) => Promise<void>;
   clearAll: () => Promise<void>;

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 
+import { Category } from '../types';
 import { EditPromptFormProps } from '../types/components';
 
 const EditPromptForm: React.FC<EditPromptFormProps> = ({
@@ -35,7 +36,7 @@ const EditPromptForm: React.FC<EditPromptFormProps> = ({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     
     if (!validateForm()) {
@@ -108,7 +109,7 @@ const EditPromptForm: React.FC<EditPromptFormProps> = ({
               type="text"
               id="title"
               value={formData.title}
-              onChange={(e) => handleInputChange('title', e.target.value)}
+              onChange={(e) => { handleInputChange('title', e.target.value); }}
               placeholder="Enter a descriptive title"
               className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-purple-500 bg-white/60 backdrop-blur-sm transition-all duration-200 text-sm ${
                 errors.title ? 'border-red-300 focus-within:ring-red-500' : 'border-purple-200'
@@ -134,11 +135,11 @@ const EditPromptForm: React.FC<EditPromptFormProps> = ({
               <select
                 id="category"
                 value={formData.category}
-                onChange={(e) => handleInputChange('category', e.target.value)}
+                onChange={(e) => { handleInputChange('category', e.target.value); }}
                 className="w-full px-4 py-3 pr-10 border border-purple-200 rounded-xl focus:outline-none focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-purple-500 bg-white/60 backdrop-blur-sm transition-all duration-200 text-sm appearance-none cursor-pointer"
                 disabled={isLoading}
               >
-                {categories.map((category) => (
+                {categories.map((category: Category) => (
                   <option key={category.id} value={category.name}>
                     {category.name}
                   </option>
@@ -162,7 +163,7 @@ const EditPromptForm: React.FC<EditPromptFormProps> = ({
             <textarea
               id="content"
               value={formData.content}
-              onChange={(e) => handleInputChange('content', e.target.value)}
+              onChange={(e) => { handleInputChange('content', e.target.value); }}
               placeholder="Enter your prompt content here..."
               rows={10}
               className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-purple-500 resize-none bg-white/60 backdrop-blur-sm transition-all duration-200 text-sm ${
