@@ -162,37 +162,36 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
                 {formData.content.length}/10000 characters
               </p>
             </div>
+
+            {/* Form Actions */}
+            <div className="flex justify-end space-x-4 pt-4">
+              <button
+                type="button"
+                onClick={onCancel as () => void}
+                className="px-6 py-3 text-sm font-semibold text-gray-700 bg-white/60 backdrop-blur-sm border border-purple-200 rounded-xl hover:bg-white/80 transition-all duration-200"
+                disabled={isLoading}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-8 py-3 text-sm font-semibold text-white bg-gradient-to-r from-purple-500 to-indigo-600 rounded-xl hover:from-purple-600 hover:to-indigo-700 transition-all duration-200 shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transform hover:scale-105 disabled:opacity-50 disabled:transform-none"
+                disabled={isLoading || !formData.content.trim()}
+              >
+                {isLoading ? (
+                  <span className="flex items-center space-x-2">
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    <span>Saving...</span>
+                  </span>
+                ) : (
+                  'Save Prompt'
+                )}
+              </button>
+            </div>
           </form>
         </div>
       </div>
 
-      {/* Footer */}
-      <div className="flex-shrink-0 p-6 bg-white/80 backdrop-blur-sm border-t border-purple-100">
-        <div className="max-w-lg mx-auto flex justify-end space-x-4">
-          <button
-            type="button"
-            onClick={onCancel as () => void}
-            className="px-6 py-3 text-sm font-semibold text-gray-700 bg-white/60 backdrop-blur-sm border border-purple-200 rounded-xl hover:bg-white/80 transition-all duration-200"
-            disabled={isLoading}
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            className="px-8 py-3 text-sm font-semibold text-white bg-gradient-to-r from-purple-500 to-indigo-600 rounded-xl hover:from-purple-600 hover:to-indigo-700 transition-all duration-200 shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transform hover:scale-105 disabled:opacity-50 disabled:transform-none"
-            disabled={isLoading || !formData.content.trim()}
-          >
-            {isLoading ? (
-              <span className="flex items-center space-x-2">
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                <span>Saving...</span>
-              </span>
-            ) : (
-              'Save Prompt'
-            )}
-          </button>
-        </div>
-      </div>
     </div>
   );
 };
