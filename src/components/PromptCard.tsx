@@ -137,13 +137,13 @@ const PromptCard: FC<PromptCardProps> = ({
 
 
   return (
-    <article className="bg-white/70 backdrop-blur-sm border-b border-purple-100 p-5 hover:bg-white/90 transition-all duration-200 relative group" style={{ zIndex: showMenu ? 1000 : 'auto' }} aria-labelledby={`prompt-title-${prompt.id}`}>
+    <article className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5 hover:bg-white/90 dark:hover:bg-gray-800/90 transition-all duration-200 relative group" style={{ zIndex: showMenu ? 1000 : 'auto' }} aria-labelledby={`prompt-title-${prompt.id}`}>
       <div className="flex items-center justify-between">
         {/* Title and metadata */}
         <div className="flex-1 min-w-0 pr-3">
           <h3 
             id={`prompt-title-${prompt.id}`}
-            className="font-semibold text-gray-900 text-sm leading-tight truncate" 
+            className="font-semibold text-gray-900 dark:text-gray-100 text-sm leading-tight truncate" 
             title={(prompt).title}
           >
             {highlightText((prompt).title, searchQuery)}
@@ -157,7 +157,7 @@ const PromptCard: FC<PromptCardProps> = ({
               {(prompt).category}
             </span>
             <time 
-              className="text-xs text-gray-500"
+              className="text-xs text-gray-500 dark:text-gray-400"
               dateTime={new Date((prompt).updatedAt).toISOString()}
               aria-label={`Last updated: ${formatDate((prompt).updatedAt)}`}
             >
@@ -177,7 +177,7 @@ const PromptCard: FC<PromptCardProps> = ({
                 handleCopyClick(e);
               }
             }}
-            className="inline-flex items-center px-2 py-1 bg-purple-500 text-white rounded-md hover:bg-purple-600 transition-colors text-xs font-medium focus-primary"
+            className="inline-flex items-center px-2 py-1 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-md hover:from-purple-600 hover:to-indigo-600 transition-all duration-200 text-xs font-medium focus-primary"
             aria-label={`Copy content of ${prompt.title} to clipboard`}
           >
             <svg className="h-3 w-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -213,7 +213,7 @@ const PromptCard: FC<PromptCardProps> = ({
                   }
                 }
               }}
-              className="p-1 text-gray-400 hover:text-purple-600 rounded-md hover:bg-purple-50 transition-colors focus-interactive"
+              className="p-1 text-gray-400 dark:text-gray-500 hover:text-purple-600 dark:hover:text-purple-400 rounded-md hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors focus-interactive"
               aria-label={`More actions for ${prompt.title}`}
               aria-expanded={showMenu}
               aria-haspopup="menu"
@@ -238,7 +238,7 @@ const PromptCard: FC<PromptCardProps> = ({
                 />
                 <div 
                   ref={menuRef}
-                  className="absolute right-0 top-full mt-1 w-28 bg-white backdrop-blur-sm rounded-xl shadow-xl border border-purple-200 overflow-hidden"
+                  className="absolute right-0 top-full mt-1 w-28 bg-white dark:bg-gray-800 backdrop-blur-sm rounded-xl shadow-xl border border-purple-200 dark:border-gray-700 overflow-hidden"
                   style={{ zIndex: 1001 }}
                   role="menu"
                   aria-label="Prompt actions"
@@ -265,7 +265,7 @@ const PromptCard: FC<PromptCardProps> = ({
                         menuButtonRef.current?.focus();
                       }
                     }}
-                    className="block w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 font-medium transition-colors focus-secondary focus:bg-purple-50 focus:text-purple-700"
+                    className="block w-full text-left px-4 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:text-purple-700 dark:hover:text-purple-400 font-medium transition-colors focus-secondary focus:bg-purple-50 dark:focus:bg-purple-900/20 focus:text-purple-700 dark:focus:text-purple-400"
                     role="menuitem"
                     aria-label={`Edit ${prompt.title}`}
                   >
@@ -292,7 +292,7 @@ const PromptCard: FC<PromptCardProps> = ({
                         menuButtonRef.current?.focus();
                       }
                     }}
-                    className="block w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-red-50 font-medium transition-colors focus-danger focus:bg-red-50 focus:text-red-700"
+                    className="block w-full text-left px-4 py-3 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 font-medium transition-colors focus-danger focus:bg-red-50 dark:focus:bg-red-900/20 focus:text-red-700 dark:focus:text-red-400"
                     role="menuitem"
                     aria-label={`Delete ${prompt.title}`}
                   >

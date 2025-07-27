@@ -70,19 +70,19 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
   };
 
   return (
-    <div className="h-full flex flex-col bg-gradient-to-br from-purple-50 via-white to-blue-50">
+    <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900">
       {/* Header */}
-      <div className="flex-shrink-0 p-6 bg-white/80 backdrop-blur-sm border-b border-purple-100">
+      <div className="flex-shrink-0 p-6 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center">
+            <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center">
               <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
               </svg>
             </div>
             <div>
-              <h2 className="text-xl font-bold text-gray-900">Edit Prompt</h2>
-              <p className="text-sm text-gray-500">Update your text snippet</p>
+              <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Edit Prompt</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 dark:text-gray-400">Update your text snippet</p>
             </div>
           </div>
           <button
@@ -93,7 +93,7 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
                 (onCancel as () => void)();
               }
             }}
-            className="text-gray-400 hover:text-purple-600 p-2 rounded-lg hover:bg-purple-50 transition-colors focus-interactive disabled:opacity-50"
+            className="text-gray-400 dark:text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 p-2 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors focus-interactive disabled:opacity-50"
             disabled={isLoading}
             aria-label="Cancel and close form"
           >
@@ -108,9 +108,9 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
       <div className="flex-1 overflow-auto custom-scrollbar p-6 space-y-6">
         <form id="edit-prompt-form" onSubmit={handleSubmit} className="space-y-6">
           {/* Title Section */}
-          <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-5 border border-purple-100">
+          <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-2xl p-5 border border-purple-100 dark:border-gray-700">
             <div className="flex items-center space-x-2 mb-4">
-              <label htmlFor="title" className="block text-sm font-bold text-gray-900">
+              <label htmlFor="title" className="block text-sm font-bold text-gray-900 dark:text-gray-100">
                 Title
               </label>
             </div>
@@ -120,23 +120,23 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
               value={formData.title}
               onChange={(e) => { handleInputChange('title', e.target.value); }}
               placeholder="Enter a descriptive title"
-              className={`w-full px-4 py-3 border rounded-xl focus-input bg-white/60 backdrop-blur-sm transition-all duration-200 text-sm ${
-                errors.title ? 'border-red-300' : 'border-purple-200'
+              className={`w-full px-4 py-3 border rounded-xl focus-input bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 text-sm text-gray-900 dark:text-gray-100 ${
+                errors.title ? 'border-red-300 dark:border-red-500' : 'border-purple-200 dark:border-gray-600'
               }`}
               disabled={isLoading}
             />
             {errors.title && (
-              <p className="mt-2 text-sm text-red-600 font-medium">⚠️ {errors.title}</p>
+              <p className="mt-2 text-sm text-red-600 dark:text-red-400 font-medium">⚠️ {errors.title}</p>
             )}
-            <p className="mt-2 text-xs text-gray-500 font-medium">
+            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
               {formData.title.length}/100 characters
             </p>
           </div>
 
           {/* Category Section */}
-          <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-5 border border-purple-100">
+          <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-2xl p-5 border border-purple-100 dark:border-gray-700">
             <div className="flex items-center space-x-2 mb-4">
-              <label htmlFor="category" className="block text-sm font-bold text-gray-900">
+              <label htmlFor="category" className="block text-sm font-bold text-gray-900 dark:text-gray-100">
                 Category
               </label>
             </div>
@@ -145,7 +145,7 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
                 id="category"
                 value={formData.category}
                 onChange={(e) => { handleInputChange('category', e.target.value); }}
-                className="w-full px-4 py-3 pr-10 border border-purple-200 rounded-xl focus-input bg-white/60 backdrop-blur-sm transition-all duration-200 text-sm appearance-none cursor-pointer"
+                className="w-full px-4 py-3 pr-10 border border-purple-200 dark:border-gray-600 rounded-xl focus-input bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 text-sm text-gray-900 dark:text-gray-100 appearance-none cursor-pointer"
                 disabled={isLoading}
               >
                 {(categories).map((category: Category) => (
@@ -163,9 +163,9 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
           </div>
 
           {/* Content Section */}
-          <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-5 border border-purple-100">
+          <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-2xl p-5 border border-purple-100 dark:border-gray-700">
             <div className="flex items-center space-x-2 mb-4">
-              <label htmlFor="content" className="block text-sm font-bold text-gray-900">
+              <label htmlFor="content" className="block text-sm font-bold text-gray-900 dark:text-gray-100">
                 Content *
               </label>
             </div>
@@ -175,24 +175,24 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
               onChange={(e) => { handleInputChange('content', e.target.value); }}
               placeholder="Enter your prompt content here..."
               rows={10}
-              className={`w-full px-4 py-3 border rounded-xl focus-input resize-none bg-white/60 backdrop-blur-sm transition-all duration-200 text-sm ${
-                errors.content ? 'border-red-300' : 'border-purple-200'
+              className={`w-full px-4 py-3 border rounded-xl focus-input resize-none bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 text-sm text-gray-900 dark:text-gray-100 ${
+                errors.content ? 'border-red-300 dark:border-red-500' : 'border-purple-200 dark:border-gray-600'
               }`}
               disabled={isLoading}
             />
             {errors.content && (
-              <p className="mt-2 text-sm text-red-600 font-medium">⚠️ {errors.content}</p>
+              <p className="mt-2 text-sm text-red-600 dark:text-red-400 font-medium">⚠️ {errors.content}</p>
             )}
-            <p className="mt-2 text-xs text-gray-500 font-medium">
+            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
               {formData.content.length}/10000 characters
             </p>
           </div>
         </form>
         
         {/* Metadata */}
-        <div className="mt-6 p-4 bg-white/50 backdrop-blur-sm rounded-xl border border-purple-100">
-          <h4 className="text-sm font-semibold text-gray-700 mb-3">Prompt Information</h4>
-          <div className="text-xs text-gray-600 space-y-2 font-medium">
+        <div className="mt-6 p-4 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm rounded-xl border border-purple-100 dark:border-gray-700">
+          <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Prompt Information</h4>
+          <div className="text-xs text-gray-600 dark:text-gray-400 space-y-2 font-medium">
             <div className="flex items-center space-x-2">
               <span>Created:</span>
               <span>{formatDate((prompt).createdAt)}</span>
@@ -206,10 +206,10 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
       </div>
 
       {/* Footer */}
-      <div className="flex-shrink-0 p-6 bg-white/80 backdrop-blur-sm border-t border-purple-100">
+      <div className="flex-shrink-0 p-6 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-t border-purple-100 dark:border-gray-700">
         {/* Status indicator - only show when there are changes */}
         {hasChanges() && (
-          <div className="mb-4 text-xs text-amber-600 font-medium flex items-center space-x-2 bg-amber-50/80 backdrop-blur-sm border border-amber-200 rounded-lg px-3 py-2">
+          <div className="mb-4 text-xs text-amber-600 dark:text-amber-400 font-medium flex items-center space-x-2 bg-amber-50/80 dark:bg-amber-900/20 backdrop-blur-sm border border-amber-200 dark:border-amber-700 rounded-lg px-3 py-2">
             <span>⚡</span>
             <span>You have unsaved changes</span>
           </div>
@@ -220,7 +220,7 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
           <button
             type="button"
             onClick={onCancel as () => void}
-            className="flex-1 px-6 py-3 text-sm font-semibold text-gray-700 bg-white/60 backdrop-blur-sm border border-purple-200 rounded-xl hover:bg-white/80 transition-all duration-200 focus-secondary"
+            className="flex-1 px-6 py-3 text-sm font-semibold text-gray-700 dark:text-gray-300 bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm border border-purple-200 dark:border-gray-600 rounded-xl hover:bg-white/80 dark:hover:bg-gray-700/80 transition-all duration-200 focus-secondary"
             disabled={isLoading}
           >
             Cancel
@@ -228,7 +228,7 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
           <button
             type="submit"
             form="edit-prompt-form"
-            className="flex-1 px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-purple-500 to-indigo-600 rounded-xl hover:from-purple-600 hover:to-indigo-700 transition-all duration-200 shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transform hover:scale-105 disabled:opacity-50 disabled:transform-none focus-primary"
+            className="flex-1 px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 focus-primary"
             disabled={isLoading || !formData.content.trim() || !hasChanges()}
           >
             {isLoading ? (

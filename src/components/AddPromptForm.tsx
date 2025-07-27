@@ -57,19 +57,19 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
   };
 
   return (
-    <div className="h-full flex flex-col bg-gradient-to-br from-purple-50 via-white to-blue-50">
+    <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900">
       {/* Header */}
-      <div className="flex-shrink-0 p-6 bg-white/80 backdrop-blur-sm border-b border-purple-100">
+      <div className="flex-shrink-0 p-6 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center">
+            <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center">
               <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
             </div>
             <div>
-              <h2 className="text-xl font-bold text-gray-900">Add New Prompt</h2>
-              <p className="text-sm text-gray-500">Create a reusable text snippet</p>
+              <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Add New Prompt</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Create a reusable text snippet</p>
             </div>
           </div>
           <button
@@ -80,7 +80,7 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
                 (onCancel as () => void)();
               }
             }}
-            className="text-gray-400 hover:text-purple-600 p-2 rounded-lg hover:bg-purple-50 transition-colors focus-interactive disabled:opacity-50"
+            className="text-gray-400 dark:text-gray-500 hover:text-purple-600 dark:hover:text-purple-400 p-2 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors focus-interactive disabled:opacity-50"
             disabled={isLoading}
             aria-label="Cancel and close form"
           >
@@ -96,8 +96,8 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
         <div className="max-w-lg mx-auto">
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Title */}
-            <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-5 border border-purple-100">
-              <label htmlFor="title" className="block text-sm font-semibold text-gray-700 mb-3">
+            <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-2xl p-5 border border-purple-100 dark:border-gray-700">
+              <label htmlFor="title" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
                 Title (optional)
               </label>
               <input
@@ -106,22 +106,22 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
                 value={formData.title}
                 onChange={(e) => { handleInputChange('title', e.target.value); }}
                 placeholder="Enter a descriptive title or leave blank to auto-generate"
-                className={`w-full px-4 py-3 border rounded-xl focus-input bg-white/60 backdrop-blur-sm transition-all duration-200 ${
-                  errors.title ? 'border-red-300' : 'border-purple-200'
+                className={`w-full px-4 py-3 border rounded-xl focus-input bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 text-gray-900 dark:text-gray-100 ${
+                  errors.title ? 'border-red-300 dark:border-red-500' : 'border-purple-200 dark:border-gray-600'
                 }`}
                 disabled={isLoading}
               />
               {errors.title && (
-                <p className="mt-2 text-sm text-red-600 font-medium">{errors.title}</p>
+                <p className="mt-2 text-sm text-red-600 dark:text-red-400 font-medium">{errors.title}</p>
               )}
-              <p className="mt-2 text-xs text-gray-500 font-medium">
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
                 {formData.title.length}/100 characters
               </p>
             </div>
 
             {/* Category */}
-            <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-5 border border-purple-100">
-              <label htmlFor="category" className="block text-sm font-semibold text-gray-700 mb-3">
+            <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-2xl p-5 border border-purple-100 dark:border-gray-700">
+              <label htmlFor="category" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
                 Category
               </label>
               <div className="relative">
@@ -129,7 +129,7 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
                   id="category"
                   value={formData.category}
                   onChange={(e) => { handleInputChange('category', e.target.value); }}
-                  className="w-full px-4 py-3 pr-10 border border-purple-200 rounded-xl focus-input bg-white/60 backdrop-blur-sm transition-all duration-200 font-medium appearance-none cursor-pointer"
+                  className="w-full px-4 py-3 pr-10 border border-purple-200 dark:border-gray-600 rounded-xl focus-input bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 font-medium appearance-none cursor-pointer text-gray-900 dark:text-gray-100"
                   disabled={isLoading}
                 >
                   {(categories).map((category: Category) => (
@@ -139,7 +139,7 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
                   ))}
                 </select>
                 <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                  <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 text-purple-400 dark:text-purple-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </div>
@@ -147,8 +147,8 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
             </div>
 
             {/* Content */}
-            <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-5 border border-purple-100">
-              <label htmlFor="content" className="block text-sm font-semibold text-gray-700 mb-3">
+            <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-2xl p-5 border border-purple-100 dark:border-gray-700">
+              <label htmlFor="content" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
                 Content *
               </label>
               <textarea
@@ -157,15 +157,15 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
                 onChange={(e) => { handleInputChange('content', e.target.value); }}
                 placeholder="Enter your prompt content here..."
                 rows={8}
-                className={`w-full px-4 py-3 border rounded-xl focus-input resize-none bg-white/60 backdrop-blur-sm transition-all duration-200 ${
-                  errors.content ? 'border-red-300' : 'border-purple-200'
+                className={`w-full px-4 py-3 border rounded-xl focus-input resize-none bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 text-gray-900 dark:text-gray-100 ${
+                  errors.content ? 'border-red-300 dark:border-red-500' : 'border-purple-200 dark:border-gray-600'
                 }`}
                 disabled={isLoading}
               />
               {errors.content && (
-                <p className="mt-2 text-sm text-red-600 font-medium">{errors.content}</p>
+                <p className="mt-2 text-sm text-red-600 dark:text-red-400 font-medium">{errors.content}</p>
               )}
-              <p className="mt-2 text-xs text-gray-500 font-medium">
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
                 {formData.content.length}/10000 characters
               </p>
             </div>
@@ -175,14 +175,14 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
               <button
                 type="button"
                 onClick={onCancel as () => void}
-                className="px-6 py-3 text-sm font-semibold text-gray-700 bg-white/60 backdrop-blur-sm border border-purple-200 rounded-xl hover:bg-white/80 transition-all duration-200 focus-secondary"
+                className="px-6 py-3 text-sm font-semibold text-gray-700 dark:text-gray-300 bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm border border-purple-200 dark:border-gray-600 rounded-xl hover:bg-white/80 dark:hover:bg-gray-700/80 transition-all duration-200 focus-secondary"
                 disabled={isLoading}
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-8 py-3 text-sm font-semibold text-white bg-gradient-to-r from-purple-500 to-indigo-600 rounded-xl hover:from-purple-600 hover:to-indigo-700 transition-all duration-200 shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transform hover:scale-105 disabled:opacity-50 disabled:transform-none focus-primary"
+                className="px-8 py-3 text-sm font-semibold text-white bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 focus-primary"
                 disabled={isLoading || !formData.content.trim()}
               >
                 {isLoading ? (

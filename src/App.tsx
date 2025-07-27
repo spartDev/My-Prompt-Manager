@@ -7,6 +7,7 @@ import EditPromptForm from './components/EditPromptForm';
 import LibraryView from './components/LibraryView';
 import StorageWarning from './components/StorageWarning';
 import ToastContainer from './components/ToastContainer';
+import { ThemeProvider } from './contexts/ThemeContext';
 import { usePrompts, useCategories, useClipboard, useToast } from './hooks';
 import { Prompt, ErrorType, AppError } from './types';
 
@@ -132,17 +133,20 @@ const App: FC = () => {
 
   if (promptsError) {
     return (
-      <div className="h-full w-full p-4 bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold text-red-600 mb-2">Error Loading Data</h2>
-          <p className="text-gray-600">{promptsError.message}</p>
+      <ThemeProvider>
+        <div className="h-full w-full p-4 bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+          <div className="text-center">
+            <h2 className="text-xl font-semibold text-red-600 dark:text-red-400 mb-2">Error Loading Data</h2>
+            <p className="text-gray-600 dark:text-gray-400">{promptsError.message}</p>
+          </div>
         </div>
-      </div>
+      </ThemeProvider>
     );
   }
 
   return (
-    <div className="h-full w-full bg-gray-50 relative">
+    <ThemeProvider>
+      <div className="h-full w-full bg-gray-50 dark:bg-gray-900 relative">
       {currentView === 'library' && (
         <LibraryView
           prompts={prompts}
@@ -201,7 +205,8 @@ const App: FC = () => {
       )}
 
       <ToastContainer toasts={toasts} />
-    </div>
+      </div>
+    </ThemeProvider>
   );
 };
 

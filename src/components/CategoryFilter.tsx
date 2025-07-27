@@ -11,12 +11,12 @@ const CategoryFilter: FC<CategoryFilterProps> = ({
 }) => {
   return (
     <div className="flex items-center space-x-3">
-      <span className="text-sm font-semibold text-gray-700">Filter:</span>
+      <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Filter:</span>
       <div className="relative">
         <select
           value={(selectedCategory) || ''}
           onChange={(e) => { (onChange as (value: string | null) => void)(e.target.value || null); }}
-          className="text-sm border border-purple-200 rounded-lg px-4 py-2 pr-10 bg-white/60 backdrop-blur-sm focus:outline-none focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-purple-500 hover:bg-white/80 transition-all duration-200 font-medium appearance-none cursor-pointer"
+          className="text-sm border border-purple-200 dark:border-gray-600 rounded-lg px-4 py-2 pr-10 bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm focus:outline-none focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-purple-500 hover:bg-white/80 dark:hover:bg-gray-700/80 transition-all duration-200 font-medium appearance-none cursor-pointer text-gray-900 dark:text-gray-100"
         >
           {showAll && <option value="">All Categories</option>}
           {(categories).map((category: Category) => (
@@ -26,7 +26,7 @@ const CategoryFilter: FC<CategoryFilterProps> = ({
           ))}
         </select>
         <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-          <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4 text-purple-400 dark:text-purple-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
         </div>

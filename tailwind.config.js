@@ -4,6 +4,7 @@ export default {
     "./src/**/*.{js,jsx,ts,tsx}",
     "./src/*.html"
   ],
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {
@@ -21,20 +22,20 @@ export default {
       addComponents({
         // Standard focus states for different button types
         '.focus-primary': {
-          '@apply focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2': {},
+          '@apply focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-900': {},
         },
         '.focus-secondary': {
-          '@apply focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-1': {},
+          '@apply focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-1 focus:ring-offset-white dark:focus:ring-offset-gray-800': {},
         },
         '.focus-danger': {
-          '@apply focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2': {},
+          '@apply focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-900': {},
         },
         '.focus-input': {
-          '@apply focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500': {},
+          '@apply focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 dark:focus:ring-purple-400 dark:focus:border-purple-400': {},
         },
         // Interactive element base focus
         '.focus-interactive': {
-          '@apply focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-1': {},
+          '@apply focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-1 focus:ring-offset-white dark:focus:ring-offset-gray-800 dark:focus:ring-purple-400': {},
         }
       })
     }
