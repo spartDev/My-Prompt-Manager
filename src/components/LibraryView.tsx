@@ -68,8 +68,8 @@ const LibraryView: React.FC<LibraryViewProps> = ({
           <div className="relative">
             <SearchBar
               value={searchQuery as string}
-              onChange={onSearchChange}
-              onClear={() => { onSearchChange(''); }}
+              onChange={onSearchChange as (value: string) => void}
+              onClear={() => { (onSearchChange as (value: string) => void)(''); }}
               placeholder="Search your prompts..."
             />
           </div>
@@ -77,13 +77,13 @@ const LibraryView: React.FC<LibraryViewProps> = ({
           <div className="flex items-center justify-between">
             <CategoryFilter
               categories={categories as Category[]}
-              selectedCategory={selectedCategory}
-              onChange={onCategoryChange}
+              selectedCategory={selectedCategory as string | null}
+              onChange={onCategoryChange as (category: string | null) => void}
               showAll={true}
             />
             
             <button
-              onClick={onManageCategories}
+              onClick={onManageCategories as () => void}
               className="text-xs text-purple-600 hover:text-purple-700 font-semibold px-3 py-2 rounded-lg hover:bg-purple-50 transition-colors"
               disabled={loading as boolean}
             >
@@ -102,7 +102,7 @@ const LibraryView: React.FC<LibraryViewProps> = ({
           </div>
         ) : finalFilteredPrompts.length === 0 ? (
           <div className="flex items-center justify-center h-full">
-            {prompts.length === 0 ? (
+            {(prompts as Prompt[]).length === 0 ? (
               <div className="max-w-md mx-auto text-center px-6">
                 <div className="w-20 h-20 bg-gradient-to-br from-purple-100 to-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <svg className="w-10 h-10 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -112,7 +112,7 @@ const LibraryView: React.FC<LibraryViewProps> = ({
                 <h3 className="text-lg font-bold text-gray-900 mb-2">You&apos;re ready to go</h3>
                 <p className="text-gray-500 mb-4 text-sm leading-relaxed">Create your first prompt to start building your personal collection of reusable content.</p>
                 <button
-                  onClick={onAddNew}
+                  onClick={onAddNew as () => void}
                   className="px-6 py-2.5 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-xl hover:from-purple-600 hover:to-indigo-700 transition-all duration-200 font-semibold shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transform hover:scale-105"
                 >
                   Create First Prompt
@@ -137,11 +137,11 @@ const LibraryView: React.FC<LibraryViewProps> = ({
                 <PromptCard
                   key={prompt.id}
                   prompt={prompt}
-                  categories={categories}
-                  onEdit={onEditPrompt}
-                  onDelete={onDeletePrompt}
-                  onCopy={onCopyPrompt}
-                  searchQuery={searchQuery}
+                  categories={categories as Category[]}
+                  onEdit={onEditPrompt as (prompt: Prompt) => void}
+                  onDelete={onDeletePrompt as (id: string) => void}
+                  onCopy={onCopyPrompt as (content: string) => void}
+                  searchQuery={searchQuery as string}
                 />
               ))}
             </div>
@@ -150,19 +150,19 @@ const LibraryView: React.FC<LibraryViewProps> = ({
       </div>
 
       {/* Footer with stats */}
-      {!loading && prompts.length > 0 && (
+      {!loading && (prompts as Prompt[]).length > 0 && (
         <div className="flex-shrink-0 px-4 py-2 bg-gray-100 border-t border-gray-200 text-xs text-gray-600">
-          {finalFilteredPrompts.length === prompts.length ? (
-            `${String(prompts.length)} prompt${prompts.length !== 1 ? 's' : ''}`
+          {finalFilteredPrompts.length === (prompts as Prompt[]).length ? (
+            `${String((prompts as Prompt[]).length)} prompt${(prompts as Prompt[]).length !== 1 ? 's' : ''}`
           ) : (
-            `${String(finalFilteredPrompts.length)} of ${String(prompts.length)} prompt${prompts.length !== 1 ? 's' : ''}`
+            `${String(finalFilteredPrompts.length)} of ${String((prompts as Prompt[]).length)} prompt${(prompts as Prompt[]).length !== 1 ? 's' : ''}`
           )}
         </div>
       )}
 
       {/* Floating Add Button */}
       <button
-        onClick={onAddNew}
+        onClick={onAddNew as () => void}
         className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-full hover:from-purple-600 hover:to-indigo-700 transition-all duration-200 shadow-2xl shadow-purple-500/30 hover:shadow-purple-500/50 transform hover:scale-110 z-50 flex items-center justify-center"
         disabled={loading as boolean}
         title="Add New Prompt"
