@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { AddPromptFormProps } from '../types/components';
+
 import { DEFAULT_CATEGORY } from '../types';
+import { AddPromptFormProps } from '../types/components';
 
 const AddPromptForm: React.FC<AddPromptFormProps> = ({
   categories,

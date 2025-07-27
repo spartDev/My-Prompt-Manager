@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo } from 'react';
+
 import { Prompt } from '../types';
-import { UseSearchReturn, HighlightedPrompt, TextHighlight } from '../types/hooks';
+import { UseSearchReturn, TextHighlight } from '../types/hooks';
 
 export const useSearch = (prompts: Prompt[]): UseSearchReturn => {
   const [query, setQuery] = useState<string>('');

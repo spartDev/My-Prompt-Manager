@@ -1,7 +1,8 @@
-import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import PromptCard from '../PromptCard';
+import { describe, it, expect, vi } from 'vitest';
+
 import { Prompt, Category } from '../../types';
+import PromptCard from '../PromptCard';
 
 describe('PromptCard - Basic Rendering', () => {
   const mockPrompt: Prompt = {

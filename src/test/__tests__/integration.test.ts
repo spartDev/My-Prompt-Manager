@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { StorageManager } from '../../services/storage';
+
 import { PromptManager } from '../../services/promptManager';
+import { StorageManager } from '../../services/storage';
 import { DEFAULT_CATEGORY } from '../../types';
 
 describe('Integration Tests', () => {

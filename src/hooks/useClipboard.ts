@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+
 import { UseClipboardReturn } from '../types/hooks';
 
 export const useClipboard = (): UseClipboardReturn => {

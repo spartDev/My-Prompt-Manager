@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+import { DEFAULT_CATEGORY, VALIDATION_LIMITS, ErrorType } from '../../types';
 import { PromptManager } from '../promptManager';
 import { StorageManager } from '../storage';
-import { DEFAULT_CATEGORY, VALIDATION_LIMITS, ErrorType } from '../../types';
 
 // Mock StorageManager
 vi.mock('../storage');

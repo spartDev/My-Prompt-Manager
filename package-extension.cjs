@@ -35,7 +35,7 @@ function checkPrerequisites() {
     execSync('node --version', { stdio: 'ignore' });
     execSync('npm --version', { stdio: 'ignore' });
   } catch (error) {
-    log('❌ Node.js or npm not found. Please install Node.js.', 'error');
+    log(`❌ Node.js or npm not found. Please install Node.js. Error: ${error.message}`, 'error');
     process.exit(1);
   }
   
@@ -94,7 +94,7 @@ function installDependencies() {
     execSync('npm install', { stdio: 'inherit' });
     log('✅ Dependencies installed successfully', 'success');
   } catch (error) {
-    log('❌ Failed to install dependencies', 'error');
+    log(`❌ Failed to install dependencies: ${error.message}`, 'error');
     process.exit(1);
   }
 }
@@ -112,7 +112,7 @@ function buildExtension() {
     execSync('npm run build', { stdio: 'inherit' });
     log('✅ Build completed successfully', 'success');
   } catch (error) {
-    log('❌ Build failed', 'error');
+    log(`❌ Build failed: ${error.message}`, 'error');
     process.exit(1);
   }
 }
@@ -171,7 +171,7 @@ function createPackage(manifest) {
     log(`✅ Package created: ${packageName} (${sizeMB} MB)`, 'success');
     return packageName;
   } catch (error) {
-    log('❌ Failed to create package', 'error');
+    log(`❌ Failed to create package: ${error.message}`, 'error');
     process.exit(1);
   }
 }

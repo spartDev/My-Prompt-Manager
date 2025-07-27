@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+
 import { StorageManager } from '../services/storage';
 
 interface StorageWarningProps {
@@ -16,6 +17,7 @@ const StorageWarning: React.FC<StorageWarningProps> = ({ onClose }) => {
         const info = await storageManager.getStorageUsage();
         setStorageInfo(info);
       } catch (error) {
+         
         console.error('Failed to load storage info:', error);
       }
     };
@@ -36,6 +38,7 @@ const StorageWarning: React.FC<StorageWarningProps> = ({ onClose }) => {
       // Reload the extension
       window.location.reload();
     } catch (error) {
+       
       console.error('Failed to clear data:', error);
     } finally {
       setIsLoading(false);
@@ -43,12 +46,12 @@ const StorageWarning: React.FC<StorageWarningProps> = ({ onClose }) => {
   };
 
   const getUsagePercentage = () => {
-    if (!storageInfo) return 0;
+    if (!storageInfo) {return 0;}
     return Math.round((storageInfo.used / storageInfo.total) * 100);
   };
 
   const formatBytes = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
+    if (bytes === 0) {return '0 Bytes';}
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -115,7 +118,7 @@ const StorageWarning: React.FC<StorageWarningProps> = ({ onClose }) => {
           <p className="text-sm text-gray-700">
             {isAtLimit ? (
               <>
-                Your storage is full. You won't be able to save new prompts until you free up space.
+                Your storage is full. You won&apos;t be able to save new prompts until you free up space.
                 Consider deleting old prompts or clearing all data.
               </>
             ) : (

@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
+
 import { Category } from '../types';
 
 interface CategoryManagerProps {
@@ -48,7 +49,7 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({
       
       setNewCategoryName('');
       setNewCategoryColor('#3B82F6');
-    } catch (err) {
+    } catch {
       setError('Failed to create category');
     } finally {
       setLoading(false);
@@ -62,7 +63,7 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({
       
       await onUpdateCategory(category.id, updates);
       setEditingCategory(null);
-    } catch (err) {
+    } catch {
       setError('Failed to update category');
     } finally {
       setLoading(false);
@@ -84,14 +85,14 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({
       setError(null);
       
       await onDeleteCategory(category.id);
-    } catch (err) {
+    } catch {
       setError('Failed to delete category');
     } finally {
       setLoading(false);
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen) {return null;}
 
   return (
     <div className="h-full flex flex-col bg-gradient-to-br from-purple-50 via-white to-blue-50">
@@ -166,8 +167,9 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({
                 </div>
                 
                 <div className="flex items-center space-x-3">
-                  <label className="text-sm font-medium text-gray-700">Category Color:</label>
+                  <label htmlFor="category-color" className="text-sm font-medium text-gray-700">Category Color:</label>
                   <input
+                    id="category-color"
                     type="color"
                     value={newCategoryColor}
                     onChange={(e) => setNewCategoryColor(e.target.value)}
@@ -218,7 +220,6 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({
                           setEditingCategory(null);
                         }
                       }}
-                      autoFocus
                       maxLength={50}
                     />
                   ) : (

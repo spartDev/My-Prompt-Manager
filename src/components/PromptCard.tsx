@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
 import DOMPurify from 'dompurify';
-import { PromptCardProps } from '../types/components';
+import React, { useState } from 'react';
+
 import { Category } from '../types';
+import { PromptCardProps } from '../types/components';
 
 const PromptCard: React.FC<PromptCardProps> = ({
   prompt,
@@ -15,12 +16,12 @@ const PromptCard: React.FC<PromptCardProps> = ({
   const [showMenu, setShowMenu] = useState(false);
 
   const truncateText = (text: string, maxLength: number) => {
-    if (text.length <= maxLength) return text;
+    if (text.length <= maxLength) {return text;}
     return text.substring(0, maxLength) + '...';
   };
 
   const highlightText = (text: string, query: string) => {
-    if (!query.trim()) return text;
+    if (!query.trim()) {return text;}
     
     // Sanitize both text and query to prevent XSS
     const sanitizedText = DOMPurify.sanitize(text, { ALLOWED_TAGS: [] });
@@ -135,9 +136,16 @@ const PromptCard: React.FC<PromptCardProps> = ({
           
           {showMenu && (
             <>
-              <div
-                className="fixed inset-0 z-10"
+              <button
+                type="button"
+                className="fixed inset-0 z-10 bg-transparent border-0 cursor-default"
                 onClick={() => setShowMenu(false)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    setShowMenu(false);
+                  }
+                }}
+                aria-label="Close menu"
               />
               <div className="absolute right-0 top-full mt-1 w-28 bg-white/90 backdrop-blur-sm rounded-xl shadow-xl z-20 border border-purple-200 overflow-hidden">
                 <button

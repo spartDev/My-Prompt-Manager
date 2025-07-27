@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
-import { usePrompts, useCategories, useClipboard, useToast } from './hooks';
-import LibraryView from './components/LibraryView';
+import { useState } from 'react';
+
 import AddPromptForm from './components/AddPromptForm';
-import EditPromptForm from './components/EditPromptForm';
 import CategoryManager from './components/CategoryManager';
+import EditPromptForm from './components/EditPromptForm';
+import LibraryView from './components/LibraryView';
 import StorageWarning from './components/StorageWarning';
 import ToastContainer from './components/ToastContainer';
-import { Prompt, ErrorType } from './types';
+import { usePrompts, useCategories, useClipboard, useToast } from './hooks';
+import { Prompt, ErrorType, AppError } from './types';
 
 type ViewType = 'library' | 'add' | 'edit' | 'categories';
 
@@ -34,7 +35,7 @@ const App: React.FC = () => {
     deleteCategory 
   } = useCategories();
 
-  const { copyToClipboard, copyStatus } = useClipboard();
+  const { copyToClipboard } = useClipboard();
   const { toasts, showToast } = useToast();
 
   const handleAddNew = () => {
@@ -51,7 +52,7 @@ const App: React.FC = () => {
     try {
       await deletePrompt(id);
       showToast('Prompt deleted successfully', 'success');
-    } catch (error) {
+    } catch {
       showToast('Failed to delete prompt', 'error');
     }
   };
@@ -76,11 +77,12 @@ const App: React.FC = () => {
       }
       setCurrentView('library');
       setSelectedPrompt(null);
-    } catch (error: any) {
-      if (error.type === ErrorType.STORAGE_QUOTA_EXCEEDED) {
+    } catch (error: unknown) {
+      const appError = error as AppError;
+      if (appError.type === ErrorType.STORAGE_QUOTA_EXCEEDED) {
         setShowStorageWarning(true);
       } else {
-        showToast(error.message || 'Failed to save prompt', 'error');
+        showToast(appError.message || 'Failed to save prompt', 'error');
       }
     }
   };
@@ -94,13 +96,14 @@ const App: React.FC = () => {
     try {
       await createCategory(categoryData);
       showToast('Category created successfully', 'success');
-    } catch (error: any) {
-      if (error.type === ErrorType.STORAGE_QUOTA_EXCEEDED) {
+    } catch (error: unknown) {
+      const appError = error as AppError;
+      if (appError.type === ErrorType.STORAGE_QUOTA_EXCEEDED) {
         setShowStorageWarning(true);
       } else {
-        showToast(error.message || 'Failed to create category', 'error');
+        showToast(appError.message || 'Failed to create category', 'error');
       }
-      throw error;
+      throw appError;
     }
   };
 

@@ -1,5 +1,4 @@
-import React, { Component, ReactNode } from 'react';
-import { AppError, ErrorType } from '../types';
+import { Component, ReactNode } from 'react';
 
 interface Props {
   children: ReactNode;
