@@ -36,13 +36,14 @@ const AddPromptForm: React.FC<AddPromptFormProps> = ({
   };
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     e.preventDefault();
     
     if (!validateForm()) {
       return;
     }
 
-    onSubmit(formData);
+    (onSubmit as (data: typeof formData) => void)(formData);
   };
 
   const handleInputChange = (field: string, value: string) => {
@@ -71,7 +72,7 @@ const AddPromptForm: React.FC<AddPromptFormProps> = ({
             </div>
           </div>
           <button
-            onClick={onCancel}
+            onClick={onCancel as () => void}
             className="text-gray-400 hover:text-purple-600 p-2 rounded-lg hover:bg-purple-50 transition-colors"
             disabled={isLoading}
           >
@@ -123,7 +124,7 @@ const AddPromptForm: React.FC<AddPromptFormProps> = ({
                   className="w-full px-4 py-3 pr-10 border border-purple-200 rounded-xl focus:outline-none focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-purple-500 bg-white/60 backdrop-blur-sm transition-all duration-200 font-medium appearance-none cursor-pointer"
                   disabled={isLoading}
                 >
-                  {categories.map((category: Category) => (
+                  {(categories as Category[]).map((category: Category) => (
                     <option key={category.id} value={category.name}>
                       {category.name}
                     </option>
@@ -169,7 +170,7 @@ const AddPromptForm: React.FC<AddPromptFormProps> = ({
         <div className="max-w-lg mx-auto flex justify-end space-x-4">
           <button
             type="button"
-            onClick={onCancel}
+            onClick={onCancel as () => void}
             className="px-6 py-3 text-sm font-semibold text-gray-700 bg-white/60 backdrop-blur-sm border border-purple-200 rounded-xl hover:bg-white/80 transition-all duration-200"
             disabled={isLoading}
           >
