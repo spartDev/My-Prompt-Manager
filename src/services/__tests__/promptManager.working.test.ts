@@ -9,7 +9,7 @@ vi.mock('../storage');
 
 describe('PromptManager - Working Tests', () => {
   let promptManager: PromptManager;
-  let mockStorageManager: any;
+  let mockStorageManager: Partial<StorageManager>;
 
   const mockCategories = [
     { id: '1', name: DEFAULT_CATEGORY },
@@ -44,7 +44,8 @@ describe('PromptManager - Working Tests', () => {
       deletePrompt: vi.fn()
     };
 
-    vi.mocked(StorageManager.getInstance).mockReturnValue(mockStorageManager);
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    vi.mocked(StorageManager.getInstance).mockReturnValue(mockStorageManager as StorageManager);
     promptManager = PromptManager.getInstance();
     vi.clearAllMocks();
   });
@@ -79,7 +80,7 @@ describe('PromptManager - Working Tests', () => {
       });
 
       expect(error).toBeDefined();
-      expect(error?.message).toBe(`Title cannot exceed ${VALIDATION_LIMITS.PROMPT_TITLE_MAX} characters`);
+      expect(error?.message).toBe(`Title cannot exceed ${String(VALIDATION_LIMITS.PROMPT_TITLE_MAX)} characters`);
     });
 
     it('should validate content length', () => {
@@ -91,7 +92,7 @@ describe('PromptManager - Working Tests', () => {
       });
 
       expect(error).toBeDefined();
-      expect(error?.message).toBe(`Content cannot exceed ${VALIDATION_LIMITS.PROMPT_CONTENT_MAX} characters`);
+      expect(error?.message).toBe(`Content cannot exceed ${String(VALIDATION_LIMITS.PROMPT_CONTENT_MAX)} characters`);
     });
 
     it('should return null for valid data', () => {
@@ -211,7 +212,7 @@ describe('PromptManager - Working Tests', () => {
   });
 
   describe('Prompt Creation', () => {
-    it('should validate and prepare prompt data correctly', async () => {
+    it('should validate and prepare prompt data correctly', () => {
       // Test that the createPrompt method validates and prepares data
       const result = promptManager.validatePromptData({
         title: 'Test Title',
@@ -255,7 +256,8 @@ describe('PromptManager - Working Tests', () => {
 
     it('should throw error for invalid category', async () => {
       // Mock categories without the requested category
-      mockStorageManager.getCategories.mockResolvedValue([
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      (mockStorageManager.getCategories as any).mockResolvedValue([
         { id: '1', name: DEFAULT_CATEGORY }
       ]);
 
@@ -292,7 +294,8 @@ describe('PromptManager - Working Tests', () => {
 
     it('should return empty results gracefully when storage fails', async () => {
       // Test that methods handle storage errors gracefully
-      mockStorageManager.getPrompts.mockRejectedValue(new Error('Storage error'));
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      (mockStorageManager.getPrompts as any).mockRejectedValue(new Error('Storage error'));
 
       // These methods should handle errors gracefully, not throw
       try {
