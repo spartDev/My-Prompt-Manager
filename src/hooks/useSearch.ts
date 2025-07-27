@@ -1,11 +1,9 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 
 import { Prompt } from '../types';
 import { UseSearchReturn, TextHighlight } from '../types/hooks';
 
-export const useSearch = (prompts: Prompt[]): UseSearchReturn => {
-  const [query, setQuery] = useState<string>('');
-
+export const useSearch = (prompts: Prompt[], query: string): UseSearchReturn => {
   const filteredPrompts = useMemo(() => {
     if (!query.trim()) {
       return prompts;
@@ -38,12 +36,11 @@ export const useSearch = (prompts: Prompt[]): UseSearchReturn => {
   }, [filteredPrompts, query]);
 
   const clearSearch = useCallback(() => {
-    setQuery('');
+    // This will be handled by the parent component
   }, []);
 
   return {
     query,
-    setQuery,
     filteredPrompts,
     highlightedResults,
     clearSearch

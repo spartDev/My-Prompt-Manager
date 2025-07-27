@@ -23,28 +23,16 @@ const LibraryView: FC<LibraryViewProps> = ({
   onManageCategories,
   loading
 }) => {
-  const { filteredPrompts } = useSearch(prompts);
+  const { filteredPrompts } = useSearch(prompts, searchQuery);
 
   const finalFilteredPrompts = useMemo(() => {
-    let filtered: Prompt[] = filteredPrompts;
-    
-    // Apply search filter
-    if ((searchQuery).trim()) {
-      const searchTerm = (searchQuery).toLowerCase().trim();
-      filtered = filtered.filter((prompt: Prompt) => 
-        prompt.title.toLowerCase().includes(searchTerm) ||
-        prompt.content.toLowerCase().includes(searchTerm) ||
-        prompt.category.toLowerCase().includes(searchTerm)
-      );
-    }
-    
-    // Apply category filter
+    // Apply category filter to search-filtered prompts
     if (selectedCategory) {
-      filtered = filtered.filter((prompt: Prompt) => prompt.category === selectedCategory);
+      return filteredPrompts.filter((prompt: Prompt) => prompt.category === selectedCategory);
     }
     
-    return filtered;
-  }, [filteredPrompts, searchQuery, selectedCategory]);
+    return filteredPrompts;
+  }, [filteredPrompts, selectedCategory]);
 
   return (
     <div className="h-full flex flex-col bg-gradient-to-br from-purple-50 via-white to-blue-50">

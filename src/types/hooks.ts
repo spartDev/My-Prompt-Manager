@@ -31,7 +31,6 @@ export interface UseClipboardReturn {
 
 export interface UseSearchReturn {
   query: string;
-  setQuery: (query: string) => void;
   filteredPrompts: Prompt[];
   highlightedResults: HighlightedPrompt[];
   clearSearch: () => void;
