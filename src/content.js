@@ -1,5 +1,5 @@
 /* eslint-env browser, webextensions */
-// Content script for injecting prompt library icon into LLM websites
+// Content script for injecting prompt library icon into Sanofi Concierge
 
 // Inject CSS styles
 function injectCSS() {
@@ -288,7 +288,7 @@ class PromptLibraryInjector {
     // Initial detection
     this.detectAndInjectIcon();
     
-    // For ChatGPT and other dynamic sites, retry detection periodically
+    // For dynamic content loading, retry detection periodically
     let retryCount = 0;
     const maxRetries = 20;
     const retryInterval = setInterval(() => {
@@ -316,7 +316,7 @@ class PromptLibraryInjector {
       attributeFilter: ['class', 'id', 'placeholder']
     });
     
-    // Also detect on focus events for input elements
+    // Also detect on focus events for Sanofi Concierge input elements
     document.addEventListener('focusin', (e) => {
       if (e.target.matches('textarea, div[contenteditable="true"]')) {
         setTimeout(() => this.detectAndInjectIcon(), 100);
