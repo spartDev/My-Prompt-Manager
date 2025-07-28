@@ -902,16 +902,7 @@ class PromptLibraryInjector {
     }
     
     // Remove prompt selector if it exists
-    if (this.promptSelector) {
-      try {
-        this.promptSelector.remove();
-        Logger.info('Successfully removed prompt selector');
-      } catch (error) {
-        Logger.warn('Failed to remove prompt selector', {
-          error: error.message
-        });
-      }
-    }
+    this.closePromptSelector();
     
     // Remove any existing prompt selectors from this instance
     const existingSelectors = document.querySelectorAll('.prompt-library-selector');
@@ -1471,14 +1462,7 @@ class PromptLibraryInjector {
       });
       
       // Remove existing selector
-      if (this.promptSelector) {
-        try {
-          this.promptSelector.remove();
-          Logger.info('Removed existing prompt selector');
-        } catch (error) {
-          Logger.warn('Failed to remove existing prompt selector', { error: error.message });
-        }
-      }
+      this.closePromptSelector();
       
       // Get prompts from storage
       prompts = await StorageManager.getPrompts();
@@ -1582,7 +1566,7 @@ class PromptLibraryInjector {
     
     // Add event listeners
     this.promptSelector.querySelector('.close-selector').addEventListener('click', () => {
-      this.promptSelector.remove();
+      this.closePromptSelector();
     });
     
     this.promptSelector.querySelectorAll('.prompt-item').forEach(item => {
@@ -1591,7 +1575,7 @@ class PromptLibraryInjector {
         const prompt = prompts.find(p => p.id === promptId);
         if (prompt) {
           this.insertPrompt(textarea, prompt.content);
-          this.promptSelector.remove();
+          this.closePromptSelector();
         }
       });
     });
@@ -1612,19 +1596,17 @@ class PromptLibraryInjector {
       promptCount: prompts.length
     });
     
-    // Close on outside click
+    // Close on outside click - using EventManager for proper cleanup
     setTimeout(() => {
       const outsideClickHandler = (e) => {
         if (this.promptSelector && 
             !this.promptSelector.contains(e.target) && 
             this.icon && 
             !this.icon.contains(e.target)) {
-          this.promptSelector.remove();
-          this.promptSelector = null;
-          document.removeEventListener('click', outsideClickHandler);
+          this.closePromptSelector();
         }
       };
-      document.addEventListener('click', outsideClickHandler);
+      this.eventManager.addTrackedEventListener(document, 'click', outsideClickHandler);
     }, 100);
     
     } catch (error) {
@@ -1634,14 +1616,7 @@ class PromptLibraryInjector {
       });
       
       // Clean up any partially created selector
-      if (this.promptSelector) {
-        try {
-          this.promptSelector.remove();
-        } catch (cleanupError) {
-          Logger.warn('Failed to cleanup broken prompt selector', { error: cleanupError.message });
-        }
-        this.promptSelector = null;
-      }
+      this.closePromptSelector();
     }
   }
 
@@ -1685,10 +1660,31 @@ class PromptLibraryInjector {
         const prompt = filteredPrompts.find(p => p.id === promptId);
         if (prompt) {
           this.insertPrompt(this.currentTextarea, prompt.content);
-          this.promptSelector.remove();
+          this.closePromptSelector();
         }
       });
     });
+  }
+
+  closePromptSelector() {
+    if (this.promptSelector) {
+      try {
+        this.promptSelector.remove();
+        Logger.info('Prompt selector closed and removed from DOM');
+      } catch (error) {
+        Logger.warn('Failed to remove prompt selector', { error: error.message });
+      }
+      this.promptSelector = null;
+    }
+    
+    // Cleanup keyboard navigation
+    if (this.keyboardNav) {
+      this.keyboardNav.destroy();
+      this.keyboardNav = null;
+    }
+    
+    // Note: EventManager.cleanup() will handle all tracked event listeners
+    // including the outside click handler when the component is destroyed
   }
 
   insertPrompt(textarea, content) {
