@@ -52,6 +52,7 @@ export interface LibraryViewProps {
   onSearchChange: (query: string) => void;
   onCategoryChange: (category: string | null) => void;
   onManageCategories: () => void;
+  onSettings: () => void;
   loading?: boolean;
 }
 

@@ -323,7 +323,7 @@ class Logger {
       };
     }
     
-    console.error('[PromptLibrary]', logData);
+    console.error('[PromptLibrary]', message, logData);
     
     // In debug mode, also show user-friendly notifications
     if (this.isDebugMode()) {
@@ -340,7 +340,7 @@ class Logger {
       url: window.location.href
     };
     
-    console.warn('[PromptLibrary]', logData);
+    console.warn('[PromptLibrary]', message, logData);
     
     if (this.isDebugMode()) {
       this.showDebugNotification('Warning: ' + message, 'warn');
@@ -357,7 +357,7 @@ class Logger {
         url: window.location.href
       };
       
-      console.info('[PromptLibrary]', logData);
+      console.info('[PromptLibrary]', message, logData);
     }
   }
   
@@ -994,7 +994,12 @@ class PromptLibraryInjector {
     
     // Clear mutation observer performance tracking
     if (this.mutationStats) {
-      Logger.info('Final mutation observer stats', this.mutationStats);
+      Logger.info('Final mutation observer stats', {
+        totalMutations: this.mutationStats.totalMutations,
+        relevantMutations: this.mutationStats.relevantMutations,
+        throttledCalls: this.mutationStats.throttledCalls,
+        lastResetTime: this.mutationStats.lastResetTime
+      });
       this.mutationStats = {
         totalMutations: 0,
         relevantMutations: 0,
@@ -1045,16 +1050,25 @@ class PromptLibraryInjector {
     this.lastCacheTime = 0;
   }
 
-  init() {
+  async init() {
     if (this.isInitialized) return;
     
     // Only initialize if we have a config for this site
     const config = this.siteConfigs[this.hostname];
     if (!config) {
+      Logger.info('No site configuration found for hostname', { hostname: this.hostname });
+      return;
+    }
+    
+    // Check if this site is enabled in user settings
+    const isEnabled = await this.checkSiteEnabled();
+    if (!isEnabled) {
+      Logger.info('Site disabled in user settings', { hostname: this.hostname });
       return;
     }
     
     this.isInitialized = true;
+    Logger.info('Initializing prompt library for enabled site', { hostname: this.hostname });
     
     // Inject CSS styles
     injectCSS();
@@ -1065,6 +1079,37 @@ class PromptLibraryInjector {
     } else {
       this.startDetection();
     }
+  }
+  
+  async checkSiteEnabled() {
+    return new Promise((resolve) => {
+      try {
+        chrome.storage.local.get(['promptLibrarySettings'], (result) => {
+          if (chrome.runtime.lastError) {
+            Logger.warn('Failed to retrieve settings, defaulting to enabled', {
+              error: chrome.runtime.lastError.message
+            });
+            resolve(true); // Default to enabled if can't read settings
+            return;
+          }
+          
+          const settings = result.promptLibrarySettings || {};
+          const enabledSites = settings.enabledSites || Object.keys(this.siteConfigs);
+          const isEnabled = enabledSites.includes(this.hostname);
+          
+          Logger.info('Site enabled check completed', {
+            hostname: this.hostname,
+            isEnabled,
+            enabledSitesCount: enabledSites.length
+          });
+          
+          resolve(isEnabled);
+        });
+      } catch (error) {
+        Logger.error('Error checking if site is enabled', error);
+        resolve(true); // Default to enabled on error
+      }
+    });
   }
 
   startDetection() {
@@ -2418,5 +2463,45 @@ window.addEventListener('blur', () => {
     } catch {
       // Silent cleanup
     }
+  }
+});
+
+// Listen for settings updates from the settings page
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message.action === 'settingsUpdated') {
+    Logger.info('Settings updated, reinitializing prompt library', {
+      newSettings: message.settings
+    });
+    
+    // Check if current site is now disabled
+    const enabledSites = message.settings.enabledSites || [];
+    const currentHostname = window.location.hostname;
+    const isCurrentSiteEnabled = enabledSites.includes(currentHostname);
+    
+    if (!isCurrentSiteEnabled && promptLibraryInstance) {
+      // Site was disabled - cleanup current instance
+      Logger.info('Current site disabled, cleaning up');
+      promptLibraryInstance.cleanup();
+      promptLibraryInstance = null;
+    } else if (isCurrentSiteEnabled && !promptLibraryInstance) {
+      // Site was enabled - initialize new instance
+      Logger.info('Current site enabled, initializing');
+      initializePromptLibrary();
+    } else if (isCurrentSiteEnabled && promptLibraryInstance) {
+      // Site still enabled - just refresh detection
+      Logger.info('Current site still enabled, refreshing detection');
+      promptLibraryInstance.detectAndInjectIcon();
+    }
+    
+    // Update debug mode in localStorage if changed
+    if (message.settings.debugMode !== undefined) {
+      if (message.settings.debugMode) {
+        localStorage.setItem('prompt-library-debug', 'true');
+      } else {
+        localStorage.removeItem('prompt-library-debug');
+      }
+    }
+    
+    sendResponse({ success: true });
   }
 });

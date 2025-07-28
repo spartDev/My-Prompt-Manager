@@ -7,7 +7,8 @@
   "homepage_url": "https://github.com/yourusername/prompt-library-extension",
   "permissions": [
     "storage",
-    "activeTab"
+    "activeTab",
+    "tabs"
   ],
   "content_scripts": [
     {

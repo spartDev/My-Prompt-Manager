@@ -5,13 +5,14 @@ import AddPromptForm from './components/AddPromptForm';
 import CategoryManager from './components/CategoryManager';
 import EditPromptForm from './components/EditPromptForm';
 import LibraryView from './components/LibraryView';
+import SettingsView from './components/SettingsView';
 import StorageWarning from './components/StorageWarning';
 import ToastContainer from './components/ToastContainer';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { usePrompts, useCategories, useClipboard, useToast } from './hooks';
 import { Prompt, ErrorType, AppError } from './types';
 
-type ViewType = 'library' | 'add' | 'edit' | 'categories';
+type ViewType = 'library' | 'add' | 'edit' | 'categories' | 'settings';
 
 const App: FC = () => {
   const [currentView, setCurrentView] = useState<ViewType>('library');
@@ -162,6 +163,9 @@ const App: FC = () => {
           onManageCategories={() => {
             setCurrentView('categories');
           }}
+          onSettings={() => {
+            setCurrentView('settings');
+          }}
           loading={loading}
         />
       )}
@@ -193,6 +197,14 @@ const App: FC = () => {
           onDeleteCategory={handleDeleteCategory}
           isOpen={true}
           onClose={() => {
+            setCurrentView('library');
+          }}
+        />
+      )}
+
+      {currentView === 'settings' && (
+        <SettingsView
+          onBack={() => {
             setCurrentView('library');
           }}
         />
