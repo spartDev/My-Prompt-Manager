@@ -252,6 +252,7 @@ class PromptLibraryInjector {
     this.promptSelector = null;
     this.isInitialized = false;
     this.detectionTimeout = null;
+    this.mutationObserver = null;
     this.hostname = window.location.hostname;
     
     // Add unique identifier to prevent cross-tab interference
@@ -299,6 +300,20 @@ class PromptLibraryInjector {
         ],
         buttonContainerSelector: '.relative.flex-1.flex.items-center.gap-2.shrink.min-w-0',
         name: 'Claude'
+      },
+      'chatgpt.com': {
+        selectors: [
+          'textarea[data-testid="chat-input"]',
+          'textarea[placeholder*="Message"]',
+          'textarea',
+          'div[contenteditable="true"]',
+          '[role="textbox"]',
+          'input[type="text"]',
+          '[data-testid*="input"]',
+          '[class*="input"]'
+        ],
+        buttonContainerSelector: 'div[data-testid="composer-trailing-actions"] .ms-auto.flex.items-center',
+        name: 'ChatGPT'
       }
     };
     
@@ -306,14 +321,15 @@ class PromptLibraryInjector {
   }
   
   cleanup() {
-    // Remove icon if it exists
-    if (this.icon) {
+    // Remove all existing instances of our icons (in case of duplicates)
+    const existingIcons = document.querySelectorAll(`[class*="prompt-library-integrated-icon-${this.instanceId}"], [class*="prompt-library-icon-${this.instanceId}"]`);
+    existingIcons.forEach(icon => {
       try {
-        this.icon.remove();
+        icon.remove();
       } catch (e) {
         // Silent cleanup
       }
-    }
+    });
     
     // Remove prompt selector if it exists
     if (this.promptSelector) {
@@ -324,9 +340,28 @@ class PromptLibraryInjector {
       }
     }
     
-    // Clear timeouts
+    // Remove any existing prompt selectors from this instance
+    const existingSelectors = document.querySelectorAll('.prompt-library-selector');
+    existingSelectors.forEach(selector => {
+      try {
+        selector.remove();
+      } catch (e) {
+        // Silent cleanup
+      }
+    });
+    
+    // Clear timeouts and intervals
     if (this.detectionTimeout) {
       clearTimeout(this.detectionTimeout);
+    }
+    
+    // Remove any mutation observers (if we stored them)
+    if (this.mutationObserver) {
+      try {
+        this.mutationObserver.disconnect();
+      } catch (e) {
+        // Silent cleanup
+      }
     }
     
     // Reset state
@@ -334,6 +369,7 @@ class PromptLibraryInjector {
     this.currentTextarea = null;
     this.promptSelector = null;
     this.isInitialized = false;
+    this.mutationObserver = null;
   }
 
   init() {
@@ -375,7 +411,7 @@ class PromptLibraryInjector {
     }, 500);
     
     // Watch for dynamic content changes
-    const observer = new MutationObserver(() => {
+    this.mutationObserver = new MutationObserver(() => {
       // Debounce the detection to avoid excessive calls
       clearTimeout(this.detectionTimeout);
       this.detectionTimeout = setTimeout(() => {
@@ -383,7 +419,7 @@ class PromptLibraryInjector {
       }, 100);
     });
     
-    observer.observe(document.body, {
+    this.mutationObserver.observe(document.body, {
       childList: true,
       subtree: true,
       attributes: true,
@@ -478,7 +514,7 @@ class PromptLibraryInjector {
       if (!config) return;
     
     // For supported sites, try integrated button approach
-    if (hostname === 'concierge.sanofi.com' || hostname === 'claude.ai' || hostname === 'www.perplexity.ai') {
+    if (hostname === 'concierge.sanofi.com' || hostname === 'claude.ai' || hostname === 'www.perplexity.ai' || hostname === 'chatgpt.com') {
       // Find the button container using configured selector or fallback selectors
       let buttonContainer = null;
       
@@ -508,6 +544,26 @@ class PromptLibraryInjector {
             'div:has(button):has(button + button)',
             'div[class*="flex"]:has(button[aria-label])'
           ];
+        } else if (hostname === 'chatgpt.com') {
+          // ChatGPT-specific fallbacks
+          fallbackSelectors = [
+            // Primary structure-based selectors
+            'div[data-testid="composer-trailing-actions"] .ms-auto.flex.items-center',
+            'div[data-testid="composer-trailing-actions"] div.ms-auto',
+            'div[data-testid="composer-trailing-actions"] .ms-auto',
+            '[data-testid="composer-trailing-actions"] div[class*="ms-auto"]',
+            // Alternative selectors
+            '.ms-auto.flex.items-center',
+            'div[class*="ms-auto"][class*="flex"][class*="items-center"]',
+            // Generic button container fallbacks
+            'div[class*="flex"][class*="items-center"]:has(button[data-testid*="speech"])',
+            'div[class*="flex"][class*="items-center"]:has(button[aria-label*="Dictate"])',
+            'div[class*="flex"][class*="items-center"]:has(button.composer-btn)',
+            '.flex.items-center:has(button)',
+            // Last resort
+            'div:has(button):has(button + button)',
+            'div[class*="flex"]:has(button[aria-label])'
+          ];
         } else {
           // Default fallbacks for other sites
           fallbackSelectors = [
@@ -529,6 +585,7 @@ class PromptLibraryInjector {
           }
         }
       }
+      
       
       if (buttonContainer && !buttonContainer.querySelector(`.prompt-library-integrated-icon-${this.instanceId}`)) {
         if (hostname === 'claude.ai') {
@@ -657,6 +714,52 @@ class PromptLibraryInjector {
           } else {
             // Fallback: insert at the end
             buttonContainer.appendChild(this.icon);
+          }
+          
+        } else if (hostname === 'chatgpt.com') {
+          // ChatGPT specific styling
+          this.icon = document.createElement('button');
+          this.icon.className = `prompt-library-integrated-icon-${this.instanceId} composer-btn`;
+          this.icon.setAttribute('type', 'button');
+          this.icon.setAttribute('aria-label', 'Open prompt library');
+          this.icon.setAttribute('title', 'Prompt Library - Access your saved prompts');
+          this.icon.setAttribute('data-dashlane-label', 'true');
+          
+          this.icon.innerHTML = `
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-label="" class="icon" font-size="inherit">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14,2 14,8 20,8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/>
+              <line x1="16" y1="17" x2="8" y2="17"/>
+              <polyline points="10,9 9,9 8,9"/>
+            </svg>
+          `;
+          
+          // Insert before the voice mode button (last button in container)
+          const voiceButton = buttonContainer.querySelector('button[data-testid="composer-speech-button"]') ||
+                             buttonContainer.querySelector('button[aria-label*="voice"]') ||
+                             buttonContainer.querySelector('button:last-child');
+          
+          if (voiceButton && voiceButton.parentElement) {
+            // Create span wrapper like other buttons
+            const spanWrapper = document.createElement('span');
+            spanWrapper.className = '';
+            spanWrapper.setAttribute('data-state', 'closed');
+            spanWrapper.appendChild(this.icon);
+            
+            try {
+              buttonContainer.insertBefore(spanWrapper, voiceButton.parentElement);
+            } catch (insertError) {
+              buttonContainer.appendChild(spanWrapper);
+            }
+          } else {
+            // Fallback: create span wrapper and append
+            const spanWrapper = document.createElement('span');
+            spanWrapper.className = '';
+            spanWrapper.setAttribute('data-state', 'closed');
+            spanWrapper.appendChild(this.icon);
+            
+            buttonContainer.appendChild(spanWrapper);
           }
           
         } else {
@@ -1005,27 +1108,80 @@ class PromptLibraryInjector {
   }
 }
 
-// Initialize the injector with proper cleanup
-const promptLibraryInstance = new PromptLibraryInjector();
+// Enhanced cross-tab interference prevention
+let promptLibraryInstance = null;
+
+// Initialize with proper cleanup and cross-tab prevention
+function initializePromptLibrary() {
+  // Cleanup any existing instance first
+  if (promptLibraryInstance) {
+    promptLibraryInstance.cleanup();
+    promptLibraryInstance = null;
+  }
+  
+  // Create new instance
+  promptLibraryInstance = new PromptLibraryInjector();
+}
+
+// Initialize on load
+initializePromptLibrary();
 
 // Cleanup on page unload to prevent cross-tab interference
 window.addEventListener('beforeunload', () => {
   if (promptLibraryInstance) {
     promptLibraryInstance.cleanup();
+    promptLibraryInstance = null;
   }
 });
 
-// Also cleanup on page hide (when switching tabs)
+// Enhanced visibility change handling
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden && promptLibraryInstance) {
-    // Don't fully cleanup, just remove UI elements
-    if (promptLibraryInstance.promptSelector) {
-      try {
-        promptLibraryInstance.promptSelector.remove();
-        promptLibraryInstance.promptSelector = null;
-      } catch (e) {
-        // Silent cleanup
+  if (document.hidden) {
+    // Page is hidden (tab switched away) - cleanup UI elements
+    if (promptLibraryInstance) {
+      if (promptLibraryInstance.promptSelector) {
+        try {
+          promptLibraryInstance.promptSelector.remove();
+          promptLibraryInstance.promptSelector = null;
+        } catch (e) {
+          // Silent cleanup
+        }
       }
+    }
+  } else {
+    // Page is visible again - reinitialize if needed
+    setTimeout(() => {
+      if (!promptLibraryInstance || !promptLibraryInstance.isInitialized) {
+        initializePromptLibrary();
+      } else {
+        // Just re-detect and inject if needed
+        promptLibraryInstance.detectAndInjectIcon();
+      }
+    }, 100);
+  }
+});
+
+// Additional focus/blur handling for better cross-tab prevention
+window.addEventListener('focus', () => {
+  // Window regained focus - ensure we have a working instance
+  setTimeout(() => {
+    if (!promptLibraryInstance || !promptLibraryInstance.isInitialized) {
+      initializePromptLibrary();
+    } else {
+      // Re-detect in case DOM changed while we were away
+      promptLibraryInstance.detectAndInjectIcon();
+    }
+  }, 200);
+});
+
+window.addEventListener('blur', () => {
+  // Window lost focus - cleanup UI elements to prevent interference
+  if (promptLibraryInstance && promptLibraryInstance.promptSelector) {
+    try {
+      promptLibraryInstance.promptSelector.remove();
+      promptLibraryInstance.promptSelector = null;
+    } catch (e) {
+      // Silent cleanup
     }
   }
 });

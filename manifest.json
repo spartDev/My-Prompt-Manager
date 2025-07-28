@@ -14,7 +14,8 @@
       "matches": [
         "https://concierge.sanofi.com/*",
         "https://www.perplexity.ai/*",
-        "https://claude.ai/*"
+        "https://claude.ai/*",
+        "https://chatgpt.com/*"
       ],
       "js": ["src/content.js"],
       "run_at": "document_end"
