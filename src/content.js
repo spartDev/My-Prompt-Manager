@@ -1,4 +1,5 @@
 /* eslint-env browser, webextensions */
+/* global localStorage, navigator, Node, HTMLTextAreaElement */
 // Content script for injecting prompt library icon into AI chat platforms
 
 // Inject CSS styles
@@ -633,7 +634,7 @@ class KeyboardNavigationManager {
         case 'Tab':
           // Allow natural tab navigation within the modal
           break;
-        default:
+        default: {
           // For other keys, focus the search input if it's not already focused
           const searchInput = this.selector.querySelector('.search-input');
           if (searchInput && document.activeElement !== searchInput && 
@@ -641,6 +642,7 @@ class KeyboardNavigationManager {
             searchInput.focus();
           }
           break;
+        }
       }
     };
     
@@ -733,7 +735,7 @@ class KeyboardNavigationManager {
 
 class StorageManager {
   static async getPrompts() {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       try {
         chrome.storage.local.get(['prompts'], (result) => {
           if (chrome.runtime.lastError) {
@@ -1290,7 +1292,7 @@ class PromptLibraryInjector {
                 if (insertionPoint) {
                   break;
                 }
-              } catch (selectorError) {
+              } catch {
                 // Continue with next selector
               }
             }
@@ -1334,7 +1336,7 @@ class PromptLibraryInjector {
               if (insertPosition) {
                 break;
               }
-            } catch (e) {
+            } catch {
               // Continue with next selector
             }
           }
@@ -1342,7 +1344,7 @@ class PromptLibraryInjector {
           if (insertPosition) {
             try {
               buttonContainer.insertBefore(this.icon, insertPosition);
-            } catch (e) {
+            } catch {
               buttonContainer.appendChild(this.icon);
             }
           } else {
@@ -1368,7 +1370,7 @@ class PromptLibraryInjector {
             
             try {
               buttonContainer.insertBefore(spanWrapper, voiceButton.parentElement);
-            } catch (insertError) {
+            } catch {
               buttonContainer.appendChild(spanWrapper);
             }
           } else {
@@ -1828,7 +1830,7 @@ document.addEventListener('visibilitychange', () => {
         try {
           promptLibraryInstance.promptSelector.remove();
           promptLibraryInstance.promptSelector = null;
-        } catch (e) {
+        } catch {
           // Silent cleanup
         }
       }
@@ -1865,7 +1867,7 @@ window.addEventListener('blur', () => {
     try {
       promptLibraryInstance.promptSelector.remove();
       promptLibraryInstance.promptSelector = null;
-    } catch (e) {
+    } catch {
       // Silent cleanup
     }
   }
