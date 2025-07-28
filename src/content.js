@@ -22,12 +22,19 @@ function injectCSS() {
       transition: all 0.2s ease;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
       z-index: 999999;
+      border: 2px solid transparent;
     }
 
     .prompt-library-icon:hover {
       background: #4338ca;
       transform: scale(1.05);
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .prompt-library-icon:focus-visible {
+      outline: none;
+      border-color: #60a5fa;
+      box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.4);
     }
 
     .prompt-library-icon svg {
@@ -50,6 +57,11 @@ function injectCSS() {
       overflow: hidden;
       backdrop-filter: blur(8px);
       animation: promptSelectorFadeIn 0.2s ease-out;
+    }
+
+    .prompt-library-selector:focus-within {
+      border-color: #4f46e5;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15), 0 8px 16px rgba(0, 0, 0, 0.1), 0 0 0 3px rgba(79, 70, 229, 0.1);
     }
 
     @keyframes promptSelectorFadeIn {
@@ -128,10 +140,25 @@ function injectCSS() {
       border-bottom: 1px solid #f3f4f6;
       cursor: pointer;
       transition: background-color 0.15s ease;
+      border-radius: 4px;
+      margin: 2px 8px;
+      position: relative;
     }
 
-    .prompt-item:hover {
+    .prompt-item:hover,
+    .prompt-item:focus-visible {
       background: #f9fafb;
+      outline: none;
+    }
+
+    .prompt-item:focus-visible {
+      box-shadow: 0 0 0 2px #4f46e5;
+      background: #f0f0f3;
+    }
+
+    .prompt-item.keyboard-selected {
+      background: #f0f0f3;
+      box-shadow: 0 0 0 2px #4f46e5;
     }
 
     .prompt-item:last-child {
@@ -214,6 +241,16 @@ function injectCSS() {
       .prompt-item:hover {
         background: #374151;
       }
+
+      .prompt-item:focus-visible {
+        box-shadow: 0 0 0 2px #6366f1;
+        background: #374151;
+      }
+
+      .prompt-item.keyboard-selected {
+        background: #374151;
+        box-shadow: 0 0 0 2px #6366f1;
+      }
       
       .prompt-title {
         color: #f9fafb;
@@ -240,9 +277,501 @@ function injectCSS() {
         right: 20px !important;
       }
     }
+
+    /* Screen reader only content */
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
   `;
   
   document.head.appendChild(style);
+}
+
+// Specialized classes for better architecture
+
+class Logger {
+  static isDebugMode() {
+    // Enable debug mode in development or via localStorage flag
+    return localStorage.getItem('prompt-library-debug') === 'true' || 
+           window.location.hostname === 'localhost';
+  }
+  
+  static error(message, error = null, context = {}) {
+    const logData = {
+      timestamp: new Date().toISOString(),
+      level: 'ERROR',
+      message,
+      context,
+      url: window.location.href,
+      userAgent: navigator.userAgent.substring(0, 100) // Truncate for privacy
+    };
+    
+    if (error) {
+      logData.error = {
+        name: error.name,
+        message: error.message,
+        stack: error.stack?.substring(0, 500) // Truncate stack trace
+      };
+    }
+    
+    console.error('[PromptLibrary]', logData);
+    
+    // In debug mode, also show user-friendly notifications
+    if (this.isDebugMode()) {
+      this.showDebugNotification('Error: ' + message, 'error');
+    }
+  }
+  
+  static warn(message, context = {}) {
+    const logData = {
+      timestamp: new Date().toISOString(),
+      level: 'WARN',
+      message,
+      context,
+      url: window.location.href
+    };
+    
+    console.warn('[PromptLibrary]', logData);
+    
+    if (this.isDebugMode()) {
+      this.showDebugNotification('Warning: ' + message, 'warn');
+    }
+  }
+  
+  static info(message, context = {}) {
+    if (this.isDebugMode()) {
+      const logData = {
+        timestamp: new Date().toISOString(),
+        level: 'INFO',
+        message,
+        context,
+        url: window.location.href
+      };
+      
+      console.info('[PromptLibrary]', logData);
+    }
+  }
+  
+  static showDebugNotification(message, type = 'info') {
+    // Only show in debug mode and avoid spam
+    if (!this.isDebugMode() || this._lastNotification === message) return;
+    this._lastNotification = message;
+    
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 10000000;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-family: monospace;
+      font-size: 12px;
+      max-width: 300px;
+      word-wrap: break-word;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      ${type === 'error' ? 'background: #fee; border-left: 4px solid #f56565; color: #742a2a;' :
+        type === 'warn' ? 'background: #fef5e7; border-left: 4px solid #ed8936; color: #744210;' :
+        'background: #e6fffa; border-left: 4px solid #38b2ac; color: #234e52;'}
+    `;
+    notification.textContent = message;
+    
+    document.body.appendChild(notification);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+      if (notification.parentNode) {
+        notification.remove();
+      }
+    }, 5000);
+    
+    // Clear the spam prevention after 10 seconds
+    setTimeout(() => {
+      if (this._lastNotification === message) {
+        this._lastNotification = null;
+      }
+    }, 10000);
+  }
+}
+
+class EventManager {
+  constructor() {
+    this.listeners = new Map();
+  }
+  
+  addTrackedEventListener(element, event, handler) {
+    element.addEventListener(event, handler);
+    
+    if (!this.listeners.has(element)) {
+      this.listeners.set(element, []);
+    }
+    this.listeners.get(element).push({ event, handler });
+  }
+  
+  cleanup() {
+    let removedCount = 0;
+    let errorCount = 0;
+    
+    this.listeners.forEach((listeners, element) => {
+      listeners.forEach(({ event, handler }) => {
+        try {
+          element.removeEventListener(event, handler);
+          removedCount++;
+        } catch (error) {
+          errorCount++;
+          Logger.warn('Failed to remove event listener', {
+            error: error.message,
+            event,
+            elementTag: element.tagName,
+            elementId: element.id,
+            elementClass: element.className
+          });
+        }
+      });
+    });
+    
+    this.listeners.clear();
+    
+    Logger.info('EventManager cleanup completed', {
+      removedListeners: removedCount,
+      errors: errorCount
+    });
+  }
+}
+
+class UIElementFactory {
+  constructor(instanceId) {
+    this.instanceId = instanceId;
+  }
+  
+  createClaudeIcon() {
+    const iconContainer = document.createElement('div');
+    iconContainer.className = 'relative shrink-0';
+    
+    const innerDiv = document.createElement('div');
+    const flexDiv = document.createElement('div');
+    flexDiv.className = 'flex items-center';
+    
+    const shrinkDiv = document.createElement('div');
+    shrinkDiv.className = 'flex shrink-0';
+    shrinkDiv.setAttribute('data-state', 'closed');
+    shrinkDiv.style.opacity = '1';
+    shrinkDiv.style.transform = 'none';
+    
+    const icon = document.createElement('button');
+    icon.className = `prompt-library-integrated-icon inline-flex items-center justify-center relative shrink-0 can-focus select-none disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none disabled:drop-shadow-none border-0.5 transition-all h-8 min-w-8 rounded-lg flex items-center px-[7.5px] group !pointer-events-auto !outline-offset-1 text-text-300 border-border-300 active:scale-[0.98] hover:text-text-200/90 hover:bg-bg-100`;
+    icon.setAttribute('type', 'button');
+    icon.setAttribute('aria-label', 'Open prompt library - Access your saved prompts');
+    icon.setAttribute('title', 'Prompt Library - Access your saved prompts');
+    icon.setAttribute('data-instance-id', this.instanceId);
+    icon.setAttribute('tabindex', '0');
+    
+    icon.innerHTML = `
+      <div class="flex flex-row items-center justify-center gap-1">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256" aria-hidden="true">
+          <path d="M224,48H32A16,16,0,0,0,16,64V192a16,16,0,0,0,16,16H224a16,16,0,0,0,16-16V64A16,16,0,0,0,224,48ZM208,192H48a8,8,0,0,1-8-8V72H216V184A8,8,0,0,1,208,192ZM64,96a8,8,0,0,1,8-8H184a8,8,0,0,1,0,16H72A8,8,0,0,1,64,96Zm0,32a8,8,0,0,1,8-8H184a8,8,0,0,1,0,16H72A8,8,0,0,1,64,128Zm0,32a8,8,0,0,1,8-8h64a8,8,0,0,1,0,16H72A8,8,0,0,1,64,160Z"/>
+        </svg>
+      </div>
+    `;
+    
+    shrinkDiv.appendChild(icon);
+    flexDiv.appendChild(shrinkDiv);
+    innerDiv.appendChild(flexDiv);
+    iconContainer.appendChild(innerDiv);
+    
+    return { container: iconContainer, icon };
+  }
+  
+  createPerplexityIcon() {
+    const icon = document.createElement('button');
+    icon.className = `prompt-library-integrated-icon focus-visible:bg-offsetPlus hover:bg-offsetPlus text-textOff hover:text-textMain dark:hover:bg-offsetPlus dark:hover:text-textMainDark font-sans focus:outline-none outline-none outline-transparent transition duration-300 ease-out font-sans select-none items-center relative group/button justify-center text-center items-center rounded-lg cursor-pointer active:scale-[0.97] active:duration-150 active:ease-outExpo origin-center whitespace-nowrap inline-flex text-sm h-8 aspect-[9/8]`;
+    icon.setAttribute('type', 'button');
+    icon.setAttribute('aria-label', 'Open prompt library - Access your saved prompts');
+    icon.setAttribute('title', 'Prompt Library - Access your saved prompts');
+    icon.setAttribute('data-state', 'closed');
+    icon.setAttribute('data-instance-id', this.instanceId);
+    icon.setAttribute('tabindex', '0');
+    
+    icon.innerHTML = `
+      <div class="flex items-center min-w-0 font-medium gap-1.5 justify-center">
+        <div class="flex shrink-0 items-center justify-center size-4">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14,2 14,8 20,8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/>
+            <line x1="16" y1="17" x2="8" y2="17"/>
+            <polyline points="10,9 9,9 8,9"/>
+          </svg>
+        </div>
+      </div>
+    `;
+    
+    return icon;
+  }
+  
+  createChatGPTIcon() {
+    const icon = document.createElement('button');
+    icon.className = `prompt-library-integrated-icon composer-btn`;
+    icon.setAttribute('type', 'button');
+    icon.setAttribute('aria-label', 'Open prompt library - Access your saved prompts');
+    icon.setAttribute('title', 'Prompt Library - Access your saved prompts');
+    icon.setAttribute('data-dashlane-label', 'true');
+    icon.setAttribute('data-instance-id', this.instanceId);
+    icon.setAttribute('tabindex', '0');
+    
+    icon.innerHTML = `
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" class="icon" font-size="inherit">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14,2 14,8 20,8"/>
+        <line x1="16" y1="13" x2="8" y2="13"/>
+        <line x1="16" y1="17" x2="8" y2="17"/>
+        <polyline points="10,9 9,9 8,9"/>
+      </svg>
+    `;
+    
+    return icon;
+  }
+  
+  createSanofiIcon() {
+    const icon = document.createElement('button');
+    icon.className = `prompt-library-integrated-icon text-pulse-text-subtle hover:bg-elements-neutrals-100 hover:dark:bg-elements-neutrals-700 flex h-8 w-8 flex-col items-center justify-center px-1 hover:rounded-lg cursor-pointer border-0 bg-transparent`;
+    icon.setAttribute('type', 'button');
+    icon.setAttribute('aria-label', 'Open prompt library - Access your saved prompts');
+    icon.setAttribute('title', 'Prompt Library - Access your saved prompts');
+    icon.setAttribute('data-instance-id', this.instanceId);
+    icon.setAttribute('tabindex', '0');
+    icon.innerHTML = `
+      <span class="material-icons-round _icon_mqc2e_1" style="font-size: 1.5rem;" aria-hidden="true">
+        <span aria-hidden="true">library_books</span>
+      </span>
+    `;
+    
+    return icon;
+  }
+  
+  createFloatingIcon() {
+    const icon = document.createElement('button');
+    icon.className = `prompt-library-icon`;
+    icon.setAttribute('data-instance-id', this.instanceId);
+    icon.setAttribute('type', 'button');
+    icon.setAttribute('aria-label', 'Open prompt library - Access your saved prompts');
+    icon.setAttribute('title', 'Prompt Library - Access your saved prompts');
+    icon.setAttribute('tabindex', '0');
+    icon.innerHTML = `
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14,2 14,8 20,8"/>
+        <line x1="16" y1="13" x2="8" y2="13"/>
+        <line x1="16" y1="17" x2="8" y2="17"/>
+        <polyline points="10,9 9,9 8,9"/>
+      </svg>
+    `;
+    
+    return icon;
+  }
+}
+
+class KeyboardNavigationManager {
+  constructor(selectorElement, eventManager) {
+    this.selector = selectorElement;
+    this.eventManager = eventManager;
+    this.selectedIndex = -1;
+    this.items = [];
+    this.isActive = false;
+  }
+  
+  initialize() {
+    this.updateItems();
+    this.setupKeyboardHandlers();
+    this.isActive = true;
+    
+    // Focus the search input initially
+    const searchInput = this.selector.querySelector('.search-input');
+    if (searchInput) {
+      setTimeout(() => {
+        searchInput.focus();
+        Logger.info('Focused search input for keyboard navigation');
+      }, 100);
+    }
+  }
+  
+  updateItems() {
+    this.items = Array.from(this.selector.querySelectorAll('.prompt-item'));
+    this.selectedIndex = -1;
+    this.clearSelection();
+  }
+  
+  setupKeyboardHandlers() {
+    const keyboardHandler = (e) => {
+      if (!this.isActive) return;
+      
+      switch (e.key) {
+        case 'ArrowDown':
+          e.preventDefault();
+          this.selectNext();
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          this.selectPrevious();
+          break;
+        case 'Enter':
+          e.preventDefault();
+          this.activateSelected();
+          break;
+        case 'Escape':
+          e.preventDefault();
+          this.close();
+          break;
+        case 'Tab':
+          // Allow natural tab navigation within the modal
+          break;
+        default:
+          // For other keys, focus the search input if it's not already focused
+          const searchInput = this.selector.querySelector('.search-input');
+          if (searchInput && document.activeElement !== searchInput && 
+              e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+            searchInput.focus();
+          }
+          break;
+      }
+    };
+    
+    this.eventManager.addTrackedEventListener(document, 'keydown', keyboardHandler);
+    
+    Logger.info('Keyboard navigation handlers setup');
+  }
+  
+  selectNext() {
+    if (this.items.length === 0) return;
+    
+    this.selectedIndex = (this.selectedIndex + 1) % this.items.length;
+    this.updateSelection();
+    this.scrollToSelected();
+  }
+  
+  selectPrevious() {
+    if (this.items.length === 0) return;
+    
+    this.selectedIndex = this.selectedIndex <= 0 ? this.items.length - 1 : this.selectedIndex - 1;
+    this.updateSelection();
+    this.scrollToSelected();
+  }
+  
+  updateSelection() {
+    this.clearSelection();
+    
+    if (this.selectedIndex >= 0 && this.selectedIndex < this.items.length) {
+      const selectedItem = this.items[this.selectedIndex];
+      selectedItem.classList.add('keyboard-selected');
+      selectedItem.setAttribute('aria-selected', 'true');
+      
+      Logger.info('Updated keyboard selection', { 
+        index: this.selectedIndex, 
+        itemId: selectedItem.dataset.promptId 
+      });
+    }
+  }
+  
+  clearSelection() {
+    this.items.forEach(item => {
+      item.classList.remove('keyboard-selected');
+      item.removeAttribute('aria-selected');
+    });
+  }
+  
+  scrollToSelected() {
+    if (this.selectedIndex >= 0 && this.selectedIndex < this.items.length) {
+      const selectedItem = this.items[this.selectedIndex];
+      const container = this.selector.querySelector('.prompt-list');
+      
+      if (container) {
+        const containerRect = container.getBoundingClientRect();
+        const itemRect = selectedItem.getBoundingClientRect();
+        
+        if (itemRect.bottom > containerRect.bottom) {
+          selectedItem.scrollIntoView({ block: 'end', behavior: 'smooth' });
+        } else if (itemRect.top < containerRect.top) {
+          selectedItem.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        }
+      }
+    }
+  }
+  
+  activateSelected() {
+    if (this.selectedIndex >= 0 && this.selectedIndex < this.items.length) {
+      const selectedItem = this.items[this.selectedIndex];
+      Logger.info('Activating selected item via keyboard', { 
+        index: this.selectedIndex, 
+        itemId: selectedItem.dataset.promptId 
+      });
+      selectedItem.click();
+    }
+  }
+  
+  close() {
+    const closeButton = this.selector.querySelector('.close-selector');
+    if (closeButton) {
+      Logger.info('Closing prompt selector via keyboard');
+      closeButton.click();
+    }
+  }
+  
+  destroy() {
+    this.isActive = false;
+    this.clearSelection();
+    Logger.info('Keyboard navigation manager destroyed');
+  }
+}
+
+class StorageManager {
+  static async getPrompts() {
+    return new Promise((resolve, reject) => {
+      try {
+        chrome.storage.local.get(['prompts'], (result) => {
+          if (chrome.runtime.lastError) {
+            const error = new Error(`Chrome storage error: ${chrome.runtime.lastError.message}`);
+            Logger.error('Failed to retrieve prompts from storage', error);
+            resolve([]); // Graceful fallback to empty array
+            return;
+          }
+          
+          const prompts = result.prompts || [];
+          Logger.info('Retrieved prompts from storage', { count: prompts.length });
+          resolve(prompts);
+        });
+      } catch (error) {
+        Logger.error('Unexpected error accessing chrome storage', error);
+        resolve([]); // Graceful fallback
+      }
+    });
+  }
+  
+  static escapeHtml(text) {
+    try {
+      if (typeof text !== 'string') {
+        Logger.warn('escapeHtml received non-string input', { 
+          type: typeof text, 
+          value: text 
+        });
+        return String(text);
+      }
+      
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    } catch (error) {
+      Logger.error('Failed to escape HTML', error, { text });
+      return ''; // Safe fallback
+    }
+  }
 }
 
 class PromptLibraryInjector {
@@ -257,6 +786,11 @@ class PromptLibraryInjector {
     
     // Add unique identifier to prevent cross-tab interference
     this.instanceId = `prompt-lib-${this.hostname}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Initialize specialized components
+    this.eventManager = new EventManager();
+    this.uiFactory = new UIElementFactory(this.instanceId);
+    this.keyboardNav = null;
     
     // Site-specific selectors for text input areas
     this.siteConfigs = {
@@ -321,48 +855,114 @@ class PromptLibraryInjector {
   }
   
   cleanup() {
-    // Remove all existing instances of our icons (in case of duplicates)
-    const existingIcons = document.querySelectorAll(`[class*="prompt-library-integrated-icon-${this.instanceId}"], [class*="prompt-library-icon-${this.instanceId}"]`);
+    Logger.info('Starting cleanup', { instanceId: this.instanceId });
+    
+    // Remove current icon reference first (more efficient)
+    if (this.icon) {
+      try {
+        this.icon.remove();
+        Logger.info('Successfully removed current icon');
+      } catch (error) {
+        Logger.warn('Failed to remove current icon', {
+          error: error.message,
+          iconTag: this.icon.tagName,
+          iconClass: this.icon.className
+        });
+      }
+      this.icon = null;
+    }
+    
+    // Fallback: Remove any remaining instances using data attributes
+    const existingIcons = document.querySelectorAll(`[data-instance-id="${this.instanceId}"]`);
+    let removedIcons = 0;
+    let iconErrors = 0;
+    
     existingIcons.forEach(icon => {
       try {
         icon.remove();
-      } catch (e) {
-        // Silent cleanup
+        removedIcons++;
+      } catch (error) {
+        iconErrors++;
+        Logger.warn('Failed to remove icon during cleanup', {
+          error: error.message,
+          iconTag: icon.tagName,
+          iconId: icon.id,
+          iconClass: icon.className
+        });
       }
     });
+    
+    if (removedIcons > 0 || iconErrors > 0) {
+      Logger.info('Icon cleanup completed', { 
+        removed: removedIcons, 
+        errors: iconErrors 
+      });
+    }
     
     // Remove prompt selector if it exists
     if (this.promptSelector) {
       try {
         this.promptSelector.remove();
-      } catch (e) {
-        // Silent cleanup
+        Logger.info('Successfully removed prompt selector');
+      } catch (error) {
+        Logger.warn('Failed to remove prompt selector', {
+          error: error.message
+        });
       }
     }
     
     // Remove any existing prompt selectors from this instance
     const existingSelectors = document.querySelectorAll('.prompt-library-selector');
+    let removedSelectors = 0;
+    let selectorErrors = 0;
+    
     existingSelectors.forEach(selector => {
       try {
         selector.remove();
-      } catch (e) {
-        // Silent cleanup
+        removedSelectors++;
+      } catch (error) {
+        selectorErrors++;
+        Logger.warn('Failed to remove prompt selector during cleanup', {
+          error: error.message
+        });
       }
     });
     
-    // Clear timeouts and intervals
-    if (this.detectionTimeout) {
-      clearTimeout(this.detectionTimeout);
+    if (removedSelectors > 0 || selectorErrors > 0) {
+      Logger.info('Selector cleanup completed', { 
+        removed: removedSelectors, 
+        errors: selectorErrors 
+      });
     }
     
-    // Remove any mutation observers (if we stored them)
+    // Clear timeouts and intervals
+    if (this.detectionTimeout) {
+      try {
+        clearTimeout(this.detectionTimeout);
+        Logger.info('Detection timeout cleared');
+      } catch (error) {
+        Logger.warn('Failed to clear detection timeout', { error: error.message });
+      }
+    }
+    
+    // Remove any mutation observers
     if (this.mutationObserver) {
       try {
         this.mutationObserver.disconnect();
-      } catch (e) {
-        // Silent cleanup
+        Logger.info('Mutation observer disconnected');
+      } catch (error) {
+        Logger.warn('Failed to disconnect mutation observer', { error: error.message });
       }
     }
+    
+    // Clean up keyboard navigation
+    if (this.keyboardNav) {
+      this.keyboardNav.destroy();
+      this.keyboardNav = null;
+    }
+    
+    // Clean up all tracked event listeners using event manager
+    this.eventManager.cleanup();
     
     // Reset state
     this.icon = null;
@@ -410,28 +1010,72 @@ class PromptLibraryInjector {
       retryCount++;
     }, 500);
     
-    // Watch for dynamic content changes
-    this.mutationObserver = new MutationObserver(() => {
-      // Debounce the detection to avoid excessive calls
-      clearTimeout(this.detectionTimeout);
-      this.detectionTimeout = setTimeout(() => {
-        this.detectAndInjectIcon();
-      }, 100);
+    // Watch for dynamic content changes - optimized for performance
+    this.mutationObserver = new MutationObserver((mutations) => {
+      // Only trigger if relevant changes occurred
+      let shouldDetect = false;
+      
+      for (const mutation of mutations) {
+        if (mutation.type === 'childList') {
+          // Check if added nodes contain input elements
+          for (const node of mutation.addedNodes) {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              if (node.matches && (node.matches('textarea, [contenteditable], [role="textbox"]') ||
+                  node.querySelector && node.querySelector('textarea, [contenteditable="true"], [role="textbox"]'))) {
+                shouldDetect = true;
+                break;
+              }
+            }
+          }
+        } else if (mutation.type === 'attributes') {
+          // Only care about attribute changes on input elements
+          const target = mutation.target;
+          if (target.matches && target.matches('textarea, [contenteditable], [role="textbox"]')) {
+            shouldDetect = true;
+          }
+        }
+        
+        if (shouldDetect) break;
+      }
+      
+      if (shouldDetect) {
+        // Debounce the detection to avoid excessive calls
+        clearTimeout(this.detectionTimeout);
+        this.detectionTimeout = setTimeout(() => {
+          this.detectAndInjectIcon();
+        }, 100);
+      }
     });
     
-    this.mutationObserver.observe(document.body, {
+    // Observe more targeted containers instead of entire document.body
+    const observeTargets = [
+      'main', '[role="main"]', '.chat-container', '.input-container', 
+      '[class*="chat"]', '[class*="input"]', '[class*="compose"]'
+    ];
+    
+    let observeTarget = document.body; // fallback
+    for (const selector of observeTargets) {
+      const target = document.querySelector(selector);
+      if (target) {
+        observeTarget = target;
+        break;
+      }
+    }
+    
+    this.mutationObserver.observe(observeTarget, {
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ['class', 'id', 'placeholder']
+      attributeFilter: ['class', 'id', 'placeholder', 'contenteditable', 'role']
     });
     
     // Also detect on focus events for Sanofi Concierge input elements
-    document.addEventListener('focusin', (e) => {
+    const focusHandler = (e) => {
       if (e.target.matches('textarea, div[contenteditable="true"]')) {
         setTimeout(() => this.detectAndInjectIcon(), 100);
       }
-    });
+    };
+    this.eventManager.addTrackedEventListener(document, 'focusin', focusHandler);
   }
 
   detectAndInjectIcon() {
@@ -499,19 +1143,30 @@ class PromptLibraryInjector {
 
   injectIcon(textarea) {
     try {
+      Logger.info('Starting icon injection', { 
+        hostname: this.hostname,
+        textareaTag: textarea.tagName,
+        textareaId: textarea.id,
+        textareaClass: textarea.className 
+      });
+      
       // Remove existing icon if any
       if (this.icon) {
         try {
           this.icon.remove();
+          Logger.info('Removed existing icon before injection');
         } catch (removeError) {
-          // Silent cleanup
+          Logger.warn('Failed to remove existing icon', { error: removeError.message });
         }
       }
       
       const hostname = window.location.hostname;
       const config = this.siteConfigs[hostname];
       
-      if (!config) return;
+      if (!config) {
+        Logger.warn('No site configuration found for hostname', { hostname });
+        return;
+      }
     
     // For supported sites, try integrated button approach
     if (hostname === 'concierge.sanofi.com' || hostname === 'claude.ai' || hostname === 'www.perplexity.ai' || hostname === 'chatgpt.com') {
@@ -519,7 +1174,19 @@ class PromptLibraryInjector {
       let buttonContainer = null;
       
       if (config.buttonContainerSelector) {
-        buttonContainer = document.querySelector(config.buttonContainerSelector);
+        try {
+          buttonContainer = document.querySelector(config.buttonContainerSelector);
+          if (buttonContainer) {
+            Logger.info('Found button container using primary selector', {
+              selector: config.buttonContainerSelector
+            });
+          }
+        } catch (error) {
+          Logger.warn('Primary button container selector failed', {
+            selector: config.buttonContainerSelector,
+            error: error.message
+          });
+        }
       }
       
       // Try fallback selectors if primary one fails
@@ -578,52 +1245,34 @@ class PromptLibraryInjector {
           try {
             buttonContainer = document.querySelector(selector);
             if (buttonContainer) {
+              Logger.info('Found button container using fallback selector', { selector });
               break;
             }
-          } catch (e) {
-            // Continue with next selector
+          } catch (error) {
+            Logger.warn('Fallback selector failed', {
+              selector,
+              error: error.message
+            });
           }
+        }
+        
+        if (!buttonContainer) {
+          Logger.warn('No button container found with any selector', {
+            hostname,
+            primarySelector: config.buttonContainerSelector,
+            fallbackCount: fallbackSelectors.length
+          });
         }
       }
       
       
-      if (buttonContainer && !buttonContainer.querySelector(`.prompt-library-integrated-icon-${this.instanceId}`)) {
+      if (buttonContainer && !buttonContainer.querySelector(`[data-instance-id="${this.instanceId}"]`)) {
         if (hostname === 'claude.ai') {
           try {
             // Claude.ai specific - create wrapped container like other buttons
-            const iconContainer = document.createElement('div');
-            iconContainer.className = 'relative shrink-0';
-            
-            const innerDiv = document.createElement('div');
-            
-            const flexDiv = document.createElement('div');
-            flexDiv.className = 'flex items-center';
-            
-            const shrinkDiv = document.createElement('div');
-            shrinkDiv.className = 'flex shrink-0';
-            shrinkDiv.setAttribute('data-state', 'closed');
-            shrinkDiv.style.opacity = '1';
-            shrinkDiv.style.transform = 'none';
-            
-            this.icon = document.createElement('button');
-            this.icon.className = `prompt-library-integrated-icon-${this.instanceId} inline-flex items-center justify-center relative shrink-0 can-focus select-none disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none disabled:drop-shadow-none border-0.5 transition-all h-8 min-w-8 rounded-lg flex items-center px-[7.5px] group !pointer-events-auto !outline-offset-1 text-text-300 border-border-300 active:scale-[0.98] hover:text-text-200/90 hover:bg-bg-100`;
-            this.icon.setAttribute('type', 'button');
-            this.icon.setAttribute('aria-label', 'Open prompt library');
-            this.icon.setAttribute('title', 'Prompt Library - Access your saved prompts');
-            
-            this.icon.innerHTML = `
-              <div class="flex flex-row items-center justify-center gap-1">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256">
-                  <path d="M224,48H32A16,16,0,0,0,16,64V192a16,16,0,0,0,16,16H224a16,16,0,0,0,16-16V64A16,16,0,0,0,224,48ZM208,192H48a8,8,0,0,1-8-8V72H216V184A8,8,0,0,1,208,192ZM64,96a8,8,0,0,1,8-8H184a8,8,0,0,1,0,16H72A8,8,0,0,1,64,96Zm0,32a8,8,0,0,1,8-8H184a8,8,0,0,1,0,16H72A8,8,0,0,1,64,128Zm0,32a8,8,0,0,1,8-8h64a8,8,0,0,1,0,16H72A8,8,0,0,1,64,160Z"/>
-                </svg>
-              </div>
-            `;
-            
-            // Build the hierarchy safely
-            shrinkDiv.appendChild(this.icon);
-            flexDiv.appendChild(shrinkDiv);
-            innerDiv.appendChild(flexDiv);
-            iconContainer.appendChild(innerDiv);
+            const result = this.uiFactory.createClaudeIcon();
+            const iconContainer = result.container;
+            this.icon = result.icon;
             
             // Find the research button container and insert before it
             let insertionPoint = null;
@@ -654,6 +1303,10 @@ class PromptLibraryInjector {
             }
             
           } catch (claudeError) {
+            Logger.error('Failed to create Claude.ai integrated icon', claudeError, {
+              hostname: 'claude.ai',
+              containerFound: !!buttonContainer
+            });
             // Fall back to floating icon
             this.createFloatingIcon(textarea);
             return;
@@ -661,26 +1314,7 @@ class PromptLibraryInjector {
           
         } else if (hostname === 'www.perplexity.ai') {
           // Perplexity specific styling
-          this.icon = document.createElement('button');
-          this.icon.className = `prompt-library-integrated-icon-${this.instanceId} focus-visible:bg-offsetPlus hover:bg-offsetPlus text-textOff hover:text-textMain dark:hover:bg-offsetPlus dark:hover:text-textMainDark font-sans focus:outline-none outline-none outline-transparent transition duration-300 ease-out font-sans select-none items-center relative group/button justify-center text-center items-center rounded-lg cursor-pointer active:scale-[0.97] active:duration-150 active:ease-outExpo origin-center whitespace-nowrap inline-flex text-sm h-8 aspect-[9/8]`;
-          this.icon.setAttribute('type', 'button');
-          this.icon.setAttribute('aria-label', 'Open prompt library');
-          this.icon.setAttribute('title', 'Prompt Library - Access your saved prompts');
-          this.icon.setAttribute('data-state', 'closed');
-          
-          this.icon.innerHTML = `
-            <div class="flex items-center min-w-0 font-medium gap-1.5 justify-center">
-              <div class="flex shrink-0 items-center justify-center size-4">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                  <polyline points="14,2 14,8 20,8"/>
-                  <line x1="16" y1="13" x2="8" y2="13"/>
-                  <line x1="16" y1="17" x2="8" y2="17"/>
-                  <polyline points="10,9 9,9 8,9"/>
-                </svg>
-              </div>
-            </div>
-          `;
+          this.icon = this.uiFactory.createPerplexityIcon();
           
           // Insert before the voice mode button or at appropriate position
           let insertPosition = null;
@@ -718,22 +1352,7 @@ class PromptLibraryInjector {
           
         } else if (hostname === 'chatgpt.com') {
           // ChatGPT specific styling
-          this.icon = document.createElement('button');
-          this.icon.className = `prompt-library-integrated-icon-${this.instanceId} composer-btn`;
-          this.icon.setAttribute('type', 'button');
-          this.icon.setAttribute('aria-label', 'Open prompt library');
-          this.icon.setAttribute('title', 'Prompt Library - Access your saved prompts');
-          this.icon.setAttribute('data-dashlane-label', 'true');
-          
-          this.icon.innerHTML = `
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-label="" class="icon" font-size="inherit">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-              <polyline points="14,2 14,8 20,8"/>
-              <line x1="16" y1="13" x2="8" y2="13"/>
-              <line x1="16" y1="17" x2="8" y2="17"/>
-              <polyline points="10,9 9,9 8,9"/>
-            </svg>
-          `;
+          this.icon = this.uiFactory.createChatGPTIcon();
           
           // Insert before the voice mode button (last button in container)
           const voiceButton = buttonContainer.querySelector('button[data-testid="composer-speech-button"]') ||
@@ -764,14 +1383,7 @@ class PromptLibraryInjector {
           
         } else {
           // Sanofi Concierge styling
-          this.icon = document.createElement('div');
-          this.icon.className = `prompt-library-integrated-icon-${this.instanceId} text-pulse-text-subtle hover:bg-elements-neutrals-100 hover:dark:bg-elements-neutrals-700 flex h-8 w-8 flex-col items-center justify-center px-1 hover:rounded-lg cursor-pointer`;
-          this.icon.innerHTML = `
-            <span class="material-icons-round _icon_mqc2e_1" style="font-size: 1.5rem;">
-              <span aria-hidden="true">library_books</span>
-            </span>
-          `;
-          this.icon.setAttribute('title', 'Prompt Library - Access your saved prompts');
+          this.icon = this.uiFactory.createSanofiIcon();
           
           const sendButton = buttonContainer.lastElementChild;
           buttonContainer.insertBefore(this.icon, sendButton);
@@ -791,28 +1403,26 @@ class PromptLibraryInjector {
     // For all other sites or if integrated approach fails, use floating icon
     this.createFloatingIcon(textarea);
     } catch (mainError) {
+      Logger.error('Icon injection failed completely', mainError, {
+        hostname: this.hostname,
+        textareaTag: textarea?.tagName,
+        hasConfig: !!this.siteConfigs[this.hostname]
+      });
+      
       // Last resort: try creating a simple floating icon
       try {
+        Logger.info('Attempting fallback to floating icon');
         this.createFloatingIcon(textarea);
       } catch (fallbackError) {
-        // Silent failure
+        Logger.error('Fallback floating icon creation failed', fallbackError);
+        // Complete failure - no icon will be shown
       }
     }
   }
 
   createFloatingIcon(textarea) {
-    // Create icon element
-    this.icon = document.createElement('div');
-    this.icon.className = `prompt-library-icon-${this.instanceId}`;
-    this.icon.innerHTML = `
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-        <polyline points="14,2 14,8 20,8"/>
-        <line x1="16" y1="13" x2="8" y2="13"/>
-        <line x1="16" y1="17" x2="8" y2="17"/>
-        <polyline points="10,9 9,9 8,9"/>
-      </svg>
-    `;
+    // Create icon element using UI factory
+    this.icon = this.uiFactory.createFloatingIcon();
     
     // Position icon relative to textarea
     this.positionIcon(textarea);
@@ -845,41 +1455,78 @@ class PromptLibraryInjector {
       this.icon.style.top = (newRect.top + newScrollTop + 8) + 'px';
     };
     
-    window.addEventListener('scroll', updatePosition);
-    window.addEventListener('resize', updatePosition);
+    this.eventManager.addTrackedEventListener(window, 'scroll', updatePosition);
+    this.eventManager.addTrackedEventListener(window, 'resize', updatePosition);
   }
 
   async showPromptSelector(textarea) {
-    // Remove existing selector
-    if (this.promptSelector) {
-      this.promptSelector.remove();
-    }
+    let prompts = [];
     
-    // Get prompts from storage
-    const prompts = await this.getPrompts();
+    try {
+      Logger.info('Showing prompt selector', {
+        textareaTag: textarea.tagName,
+        hasExistingSelector: !!this.promptSelector
+      });
+      
+      // Remove existing selector
+      if (this.promptSelector) {
+        try {
+          this.promptSelector.remove();
+          Logger.info('Removed existing prompt selector');
+        } catch (error) {
+          Logger.warn('Failed to remove existing prompt selector', { error: error.message });
+        }
+      }
+      
+      // Get prompts from storage
+      prompts = await StorageManager.getPrompts();
+      Logger.info('Retrieved prompts for selector', { count: prompts.length });
     
-    // Create selector UI
+    // Create selector UI with accessibility attributes
     this.promptSelector = document.createElement('div');
     this.promptSelector.className = 'prompt-library-selector';
+    this.promptSelector.setAttribute('role', 'dialog');
+    this.promptSelector.setAttribute('aria-modal', 'true');
+    this.promptSelector.setAttribute('aria-labelledby', 'prompt-selector-title');
+    this.promptSelector.setAttribute('aria-describedby', 'prompt-selector-description');
     
-    const promptsHtml = prompts.map(prompt => `
-      <div class="prompt-item" data-prompt-id="${prompt.id}">
-        <div class="prompt-title">${this.escapeHtml(prompt.title)}</div>
-        <div class="prompt-category">${this.escapeHtml(prompt.category)}</div>
-        <div class="prompt-preview">${this.escapeHtml(prompt.content.substring(0, 100))}${prompt.content.length > 100 ? '...' : ''}</div>
+    const promptsHtml = prompts.map((prompt, index) => `
+      <div class="prompt-item" 
+           data-prompt-id="${StorageManager.escapeHtml(prompt.id)}"
+           role="option" 
+           aria-describedby="prompt-item-${index}-desc"
+           tabindex="-1">
+        <div class="prompt-title">${StorageManager.escapeHtml(prompt.title)}</div>
+        <div class="prompt-category">${StorageManager.escapeHtml(prompt.category)}</div>
+        <div class="prompt-preview" id="prompt-item-${index}-desc">${StorageManager.escapeHtml(prompt.content.substring(0, 100))}${prompt.content.length > 100 ? '...' : ''}</div>
       </div>
     `).join('');
     
     this.promptSelector.innerHTML = `
       <div class="prompt-selector-header">
-        <h3>Select a Prompt</h3>
-        <button class="close-selector">×</button>
+        <h3 id="prompt-selector-title">Select a Prompt</h3>
+        <button class="close-selector" 
+                type="button" 
+                aria-label="Close prompt selector" 
+                title="Close prompt selector">×</button>
       </div>
       <div class="prompt-search">
-        <input type="text" placeholder="Search prompts..." class="search-input">
+        <label for="prompt-search-input" class="sr-only">Search prompts</label>
+        <input type="text" 
+               id="prompt-search-input"
+               placeholder="Search prompts..." 
+               class="search-input"
+               aria-describedby="prompt-selector-description"
+               autocomplete="off">
       </div>
-      <div class="prompt-list">
-        ${promptsHtml || '<div class="no-prompts">No prompts found. Add some in the extension popup!</div>'}
+      <div id="prompt-selector-description" class="sr-only">
+        Use arrow keys to navigate, Enter to select, Escape to close
+      </div>
+      <div class="prompt-list" 
+           role="listbox" 
+           aria-label="Available prompts"
+           aria-multiselectable="false">
+        ${promptsHtml || '<div class="no-prompts" role="status" aria-live="polite">No prompts found. Add some in the extension popup!</div>'}
       </div>
     `;
     
@@ -955,6 +1602,14 @@ class PromptLibraryInjector {
     
     document.body.appendChild(this.promptSelector);
     
+    // Initialize keyboard navigation
+    this.keyboardNav = new KeyboardNavigationManager(this.promptSelector, this.eventManager);
+    this.keyboardNav.initialize();
+    
+    Logger.info('Prompt selector created and keyboard navigation initialized', {
+      promptCount: prompts.length
+    });
+    
     // Close on outside click
     setTimeout(() => {
       const outsideClickHandler = (e) => {
@@ -969,6 +1624,23 @@ class PromptLibraryInjector {
       };
       document.addEventListener('click', outsideClickHandler);
     }, 100);
+    
+    } catch (error) {
+      Logger.error('Failed to show prompt selector', error, {
+        textareaTag: textarea?.tagName,
+        promptCount: prompts?.length || 0
+      });
+      
+      // Clean up any partially created selector
+      if (this.promptSelector) {
+        try {
+          this.promptSelector.remove();
+        } catch (cleanupError) {
+          Logger.warn('Failed to cleanup broken prompt selector', { error: cleanupError.message });
+        }
+        this.promptSelector = null;
+      }
+    }
   }
 
   filterPrompts(searchTerm, prompts) {
@@ -978,16 +1650,31 @@ class PromptLibraryInjector {
       prompt.category.toLowerCase().includes(searchTerm.toLowerCase())
     );
     
-    const promptsHtml = filteredPrompts.map(prompt => `
-      <div class="prompt-item" data-prompt-id="${prompt.id}">
-        <div class="prompt-title">${this.escapeHtml(prompt.title)}</div>
-        <div class="prompt-category">${this.escapeHtml(prompt.category)}</div>
-        <div class="prompt-preview">${this.escapeHtml(prompt.content.substring(0, 100))}${prompt.content.length > 100 ? '...' : ''}</div>
+    Logger.info('Filtered prompts', { 
+      searchTerm, 
+      originalCount: prompts.length, 
+      filteredCount: filteredPrompts.length 
+    });
+    
+    const promptsHtml = filteredPrompts.map((prompt, index) => `
+      <div class="prompt-item" 
+           data-prompt-id="${StorageManager.escapeHtml(prompt.id)}"
+           role="option" 
+           aria-describedby="filtered-prompt-item-${index}-desc"
+           tabindex="-1">
+        <div class="prompt-title">${StorageManager.escapeHtml(prompt.title)}</div>
+        <div class="prompt-category">${StorageManager.escapeHtml(prompt.category)}</div>
+        <div class="prompt-preview" id="filtered-prompt-item-${index}-desc">${StorageManager.escapeHtml(prompt.content.substring(0, 100))}${prompt.content.length > 100 ? '...' : ''}</div>
       </div>
     `).join('');
     
     this.promptSelector.querySelector('.prompt-list').innerHTML = 
-      promptsHtml || '<div class="no-prompts">No matching prompts found.</div>';
+      promptsHtml || '<div class="no-prompts" role="status" aria-live="polite">No matching prompts found.</div>';
+    
+    // Update keyboard navigation with new items
+    if (this.keyboardNav) {
+      this.keyboardNav.updateItems();
+    }
     
     // Re-add click listeners
     this.promptSelector.querySelectorAll('.prompt-item').forEach(item => {
@@ -1057,11 +1744,22 @@ class PromptLibraryInjector {
         textarea.dispatchEvent(new Event('input', { bubbles: true }));
       }
       
-      // Try manual typing simulation
+      // Try manual typing simulation using modern approach
       setTimeout(() => {
         textarea.focus();
-        document.execCommand('selectAll');
-        document.execCommand('insertText', false, content);
+        
+        // Modern replacement for execCommand
+        if (textarea.tagName === 'TEXTAREA') {
+          textarea.select(); // Select all content
+          textarea.setRangeText(content, 0, textarea.value.length, 'end');
+          textarea.dispatchEvent(new Event('input', { bubbles: true }));
+        } else {
+          // For contenteditable elements
+          const selection = window.getSelection();
+          selection.selectAllChildren(textarea);
+          selection.deleteFromDocument();
+          selection.getRangeAt(0).insertNode(document.createTextNode(content));
+        }
       }, 100);
       
       // Perplexity insertion complete
@@ -1093,19 +1791,6 @@ class PromptLibraryInjector {
     }
   }
 
-  async getPrompts() {
-    return new Promise((resolve) => {
-      chrome.storage.local.get(['prompts'], (result) => {
-        resolve(result.prompts || []);
-      });
-    });
-  }
-
-  escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  }
 }
 
 // Enhanced cross-tab interference prevention
