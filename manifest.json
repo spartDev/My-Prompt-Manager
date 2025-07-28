@@ -6,7 +6,17 @@
   "author": "Your Name",
   "homepage_url": "https://github.com/yourusername/prompt-library-extension",
   "permissions": [
-    "storage"
+    "storage",
+    "activeTab"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://concierge.sanofi.com/*"
+      ],
+      "js": ["src/content.js"],
+      "run_at": "document_end"
+    }
   ],
   "action": {
     "default_popup": "src/popup.html",
