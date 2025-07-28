@@ -1,5 +1,5 @@
 /* eslint-env browser, webextensions */
-/* global localStorage, navigator, Node, HTMLTextAreaElement */
+/* global localStorage, navigator, Node, HTMLTextAreaElement, requestAnimationFrame, cancelAnimationFrame, IntersectionObserver */
 // Content script for injecting prompt library icon into AI chat platforms
 
 // Inject CSS styles
@@ -811,6 +811,16 @@ class PromptLibraryInjector {
     this.mutationBurst = [];
     this.isObserverThrottled = false;
     
+    // Floating icon performance optimization
+    this.iconPositionCache = {
+      lastTop: null,
+      lastLeft: null,
+      isVisible: false,
+      animationFrameId: null,
+      updatePending: false
+    };
+    this.intersectionObserver = null;
+    
     // Site-specific selectors for text input areas
     this.siteConfigs = {
       'concierge.sanofi.com': {
@@ -996,6 +1006,35 @@ class PromptLibraryInjector {
     // Clear mutation throttling state
     this.mutationBurst = [];
     this.isObserverThrottled = false;
+    
+    // Clean up floating icon performance optimization resources
+    if (this.iconPositionCache) {
+      // Cancel any pending animation frames
+      if (this.iconPositionCache.animationFrameId) {
+        cancelAnimationFrame(this.iconPositionCache.animationFrameId);
+        Logger.info('Cancelled pending animation frame');
+      }
+      
+      // Reset position cache
+      this.iconPositionCache = {
+        lastTop: null,
+        lastLeft: null,
+        isVisible: false,
+        animationFrameId: null,
+        updatePending: false
+      };
+    }
+    
+    // Clean up intersection observer
+    if (this.intersectionObserver) {
+      try {
+        this.intersectionObserver.disconnect();
+        Logger.info('Intersection observer disconnected');
+      } catch (error) {
+        Logger.warn('Failed to disconnect intersection observer', { error: error.message });
+      }
+      this.intersectionObserver = null;
+    }
     
     // Reset state
     this.icon = null;
@@ -1383,9 +1422,18 @@ class PromptLibraryInjector {
     // Add site-specific targets based on configuration
     if (config && config.buttonContainerSelector) {
       // Try to observe near the button container area
-      const containerParent = config.buttonContainerSelector.split('.').slice(0, -1).join('.');
-      if (containerParent) {
-        observeTargets.unshift(`.${containerParent}`);
+      // Remove leading dot and split, then take all but last class
+      const selectorWithoutDot = config.buttonContainerSelector.startsWith('.') 
+        ? config.buttonContainerSelector.substring(1) 
+        : config.buttonContainerSelector;
+      const classParts = selectorWithoutDot.split('.');
+      
+      if (classParts.length > 1) {
+        // Take all but the last class to get a broader container
+        const containerParent = classParts.slice(0, -1).join('.');
+        if (containerParent && containerParent.length > 0) {
+          observeTargets.unshift(`.${containerParent}`);
+        }
       }
     }
     
@@ -1795,25 +1843,144 @@ class PromptLibraryInjector {
     document.body.appendChild(this.icon);
   }
 
+  // Optimized icon positioning with performance enhancements
   positionIcon(textarea) {
+    // Set initial position
+    this.updateIconPosition(textarea, true);
+    
+    // Set up optimized position tracking
+    this.setupIconPositionTracking(textarea);
+  }
+  
+  // Initial position setup and caching
+  updateIconPosition(textarea, isInitial = false) {
+    if (!textarea || !this.icon) return;
+    
     const rect = textarea.getBoundingClientRect();
     const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+    const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
     
-    this.icon.style.position = 'absolute';
-    this.icon.style.top = (rect.top + scrollTop + 8) + 'px';
-    this.icon.style.right = '20px';
-    this.icon.style.zIndex = '999999';
+    // Calculate new position
+    const newTop = rect.top + scrollTop + 8;
+    const newLeft = rect.right + scrollLeft - 52; // 32px icon + 20px margin
     
-    // Update position on scroll/resize
-    const updatePosition = () => {
-      if (!textarea || !this.icon) return;
-      const newRect = textarea.getBoundingClientRect();
-      const newScrollTop = window.pageYOffset || document.documentElement.scrollTop;
-      this.icon.style.top = (newRect.top + newScrollTop + 8) + 'px';
+    // Check if position actually changed (avoid unnecessary DOM updates)
+    if (!isInitial && 
+        Math.abs(newTop - this.iconPositionCache.lastTop) < 1 &&
+        Math.abs(newLeft - this.iconPositionCache.lastLeft) < 1) {
+      return; // Skip update if position hasn't changed significantly
+    }
+    
+    // Cache the new position
+    this.iconPositionCache.lastTop = newTop;
+    this.iconPositionCache.lastLeft = newLeft;
+    
+    // Apply styles efficiently
+    const iconStyle = this.icon.style;
+    iconStyle.position = 'absolute';
+    iconStyle.top = newTop + 'px';
+    iconStyle.left = newLeft + 'px';
+    iconStyle.zIndex = '999999';
+    
+    if (isInitial) {
+      Logger.info('Initial floating icon positioned', {
+        top: newTop,
+        left: newLeft,
+        textareaTag: textarea.tagName
+      });
+    }
+  }
+  
+  // Set up optimized position tracking with modern performance techniques
+  setupIconPositionTracking(textarea) {
+    // Create throttled update function using requestAnimationFrame
+    const throttledUpdatePosition = this.createThrottledPositionUpdate(textarea);
+    
+    // Set up intersection observer for visibility detection
+    this.setupIconVisibilityTracking();
+    
+    // Add optimized event listeners
+    this.eventManager.addTrackedEventListener(window, 'scroll', throttledUpdatePosition, { passive: true });
+    this.eventManager.addTrackedEventListener(window, 'resize', throttledUpdatePosition, { passive: true });
+    
+    Logger.info('Optimized icon position tracking enabled');
+  }
+  
+  // Create throttled position update using requestAnimationFrame
+  createThrottledPositionUpdate(textarea) {
+    return () => {
+      // Skip if update already pending or icon not visible
+      if (this.iconPositionCache.updatePending || !this.iconPositionCache.isVisible) {
+        return;
+      }
+      
+      this.iconPositionCache.updatePending = true;
+      
+      // Cancel any existing animation frame
+      if (this.iconPositionCache.animationFrameId) {
+        cancelAnimationFrame(this.iconPositionCache.animationFrameId);
+      }
+      
+      // Schedule update for next frame
+      this.iconPositionCache.animationFrameId = requestAnimationFrame(() => {
+        this.updateIconPosition(textarea);
+        this.iconPositionCache.updatePending = false;
+        this.iconPositionCache.animationFrameId = null;
+      });
     };
+  }
+  
+  // Set up intersection observer for efficient visibility tracking
+  setupIconVisibilityTracking() {
+    if (!this.icon) return;
     
-    this.eventManager.addTrackedEventListener(window, 'scroll', updatePosition);
-    this.eventManager.addTrackedEventListener(window, 'resize', updatePosition);
+    // Clean up existing observer
+    if (this.intersectionObserver) {
+      this.intersectionObserver.disconnect();
+    }
+    
+    try {
+      // Create intersection observer with optimized settings
+      this.intersectionObserver = new IntersectionObserver(
+        (entries) => {
+          const entry = entries[0];
+          const wasVisible = this.iconPositionCache.isVisible;
+          this.iconPositionCache.isVisible = entry.isIntersecting;
+          
+          // Log visibility changes for debugging
+          if (wasVisible !== this.iconPositionCache.isVisible) {
+            Logger.info('Icon visibility changed', {
+              isVisible: this.iconPositionCache.isVisible,
+              intersectionRatio: entry.intersectionRatio
+            });
+          }
+        },
+        {
+          // Use viewport as root for better performance
+          root: null,
+          // Small margin to start updates slightly before icon becomes visible
+          rootMargin: '50px',
+          // Single threshold - we only care about visibility, not specific ratios
+          threshold: 0
+        }
+      );
+      
+      // Start observing the icon
+      this.intersectionObserver.observe(this.icon);
+      
+      // Initially assume visible (will be corrected by observer)
+      this.iconPositionCache.isVisible = true;
+      
+      Logger.info('Icon intersection observer initialized');
+      
+    } catch (error) {
+      Logger.warn('Failed to create intersection observer, falling back to always-update mode', {
+        error: error.message
+      });
+      
+      // Fallback: assume always visible
+      this.iconPositionCache.isVisible = true;
+    }
   }
 
   async showPromptSelector(textarea) {
@@ -1840,45 +2007,46 @@ class PromptLibraryInjector {
     this.promptSelector.setAttribute('aria-labelledby', 'prompt-selector-title');
     this.promptSelector.setAttribute('aria-describedby', 'prompt-selector-description');
     
-    const promptsHtml = prompts.map((prompt, index) => `
-      <div class="prompt-item" 
-           data-prompt-id="${StorageManager.escapeHtml(prompt.id)}"
-           role="option" 
-           aria-describedby="prompt-item-${index}-desc"
-           tabindex="-1">
-        <div class="prompt-title">${StorageManager.escapeHtml(prompt.title)}</div>
-        <div class="prompt-category">${StorageManager.escapeHtml(prompt.category)}</div>
-        <div class="prompt-preview" id="prompt-item-${index}-desc">${StorageManager.escapeHtml(prompt.content.substring(0, 100))}${prompt.content.length > 100 ? '...' : ''}</div>
-      </div>
-    `).join('');
+    const promptsHtml = prompts.map((prompt, index) => {
+      return '<div class="prompt-item" ' +
+             'data-prompt-id="' + StorageManager.escapeHtml(prompt.id) + '" ' +
+             'role="option" ' +
+             'aria-describedby="prompt-item-' + index + '-desc" ' +
+             'tabindex="-1">' +
+        '<div class="prompt-title">' + StorageManager.escapeHtml(prompt.title) + '</div>' +
+        '<div class="prompt-category">' + StorageManager.escapeHtml(prompt.category) + '</div>' +
+        '<div class="prompt-preview" id="prompt-item-' + index + '-desc">' + 
+        StorageManager.escapeHtml(prompt.content.substring(0, 100)) + 
+        (prompt.content.length > 100 ? '...' : '') + '</div>' +
+      '</div>';
+    }).join('');
     
-    this.promptSelector.innerHTML = `
-      <div class="prompt-selector-header">
-        <h3 id="prompt-selector-title">Select a Prompt</h3>
-        <button class="close-selector" 
-                type="button" 
-                aria-label="Close prompt selector" 
-                title="Close prompt selector">×</button>
-      </div>
-      <div class="prompt-search">
-        <label for="prompt-search-input" class="sr-only">Search prompts</label>
-        <input type="text" 
-               id="prompt-search-input"
-               placeholder="Search prompts..." 
-               class="search-input"
-               aria-describedby="prompt-selector-description"
-               autocomplete="off">
-      </div>
-      <div id="prompt-selector-description" class="sr-only">
-        Use arrow keys to navigate, Enter to select, Escape to close
-      </div>
-      <div class="prompt-list" 
-           role="listbox" 
-           aria-label="Available prompts"
-           aria-multiselectable="false">
-        ${promptsHtml || '<div class="no-prompts" role="status" aria-live="polite">No prompts found. Add some in the extension popup!</div>'}
-      </div>
-    `;
+    this.promptSelector.innerHTML = 
+      '<div class="prompt-selector-header">' +
+        '<h3 id="prompt-selector-title">Select a Prompt</h3>' +
+        '<button class="close-selector" ' +
+                'type="button" ' +
+                'aria-label="Close prompt selector" ' +
+                'title="Close prompt selector">×</button>' +
+      '</div>' +
+      '<div class="prompt-search">' +
+        '<label for="prompt-search-input" class="sr-only">Search prompts</label>' +
+        '<input type="text" ' +
+               'id="prompt-search-input" ' +
+               'placeholder="Search prompts..." ' +
+               'class="search-input" ' +
+               'aria-describedby="prompt-selector-description" ' +
+               'autocomplete="off">' +
+      '</div>' +
+      '<div id="prompt-selector-description" class="sr-only">' +
+        'Use arrow keys to navigate, Enter to select, Escape to close' +
+      '</div>' +
+      '<div class="prompt-list" ' +
+           'role="listbox" ' +
+           'aria-label="Available prompts" ' +
+           'aria-multiselectable="false">' +
+        (promptsHtml || '<div class="no-prompts" role="status" aria-live="polite">No prompts found. Add some in the extension popup!</div>') +
+      '</div>';
     
     // Position selector relative to the icon if it exists, otherwise relative to textarea
     let rect, scrollTop;
@@ -1997,17 +2165,19 @@ class PromptLibraryInjector {
       filteredCount: filteredPrompts.length 
     });
     
-    const promptsHtml = filteredPrompts.map((prompt, index) => `
-      <div class="prompt-item" 
-           data-prompt-id="${StorageManager.escapeHtml(prompt.id)}"
-           role="option" 
-           aria-describedby="filtered-prompt-item-${index}-desc"
-           tabindex="-1">
-        <div class="prompt-title">${StorageManager.escapeHtml(prompt.title)}</div>
-        <div class="prompt-category">${StorageManager.escapeHtml(prompt.category)}</div>
-        <div class="prompt-preview" id="filtered-prompt-item-${index}-desc">${StorageManager.escapeHtml(prompt.content.substring(0, 100))}${prompt.content.length > 100 ? '...' : ''}</div>
-      </div>
-    `).join('');
+    const promptsHtml = filteredPrompts.map((prompt, index) => {
+      return '<div class="prompt-item" ' +
+             'data-prompt-id="' + StorageManager.escapeHtml(prompt.id) + '" ' +
+             'role="option" ' +
+             'aria-describedby="filtered-prompt-item-' + index + '-desc" ' +
+             'tabindex="-1">' +
+        '<div class="prompt-title">' + StorageManager.escapeHtml(prompt.title) + '</div>' +
+        '<div class="prompt-category">' + StorageManager.escapeHtml(prompt.category) + '</div>' +
+        '<div class="prompt-preview" id="filtered-prompt-item-' + index + '-desc">' + 
+        StorageManager.escapeHtml(prompt.content.substring(0, 100)) + 
+        (prompt.content.length > 100 ? '...' : '') + '</div>' +
+      '</div>';
+    }).join('');
     
     this.promptSelector.querySelector('.prompt-list').innerHTML = 
       promptsHtml || '<div class="no-prompts" role="status" aria-live="polite">No matching prompts found.</div>';
