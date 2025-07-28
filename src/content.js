@@ -1736,14 +1736,32 @@ class PromptLibraryInjector {
         }
       }
       
-      // Try setting React input value directly
-      const valueSetter = Object.getOwnPropertyDescriptor(textarea, 'value')?.set || 
-                         Object.getOwnPropertyDescriptor(Object.getPrototypeOf(textarea), 'value')?.set ||
-                         Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
-      
-      if (valueSetter && textarea.tagName === 'TEXTAREA') {
-        valueSetter.call(textarea, content);
-        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+      // Try setting React input value directly - secure approach
+      if (textarea.tagName === 'TEXTAREA' && textarea instanceof HTMLTextAreaElement) {
+        try {
+          // Use the native property setter safely
+          const originalDescriptor = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value');
+          if (originalDescriptor && typeof originalDescriptor.set === 'function') {
+            // Validate that we're calling the original native setter
+            const nativeSetterString = originalDescriptor.set.toString();
+            if (nativeSetterString.includes('[native code]')) {
+              originalDescriptor.set.call(textarea, content);
+              textarea.dispatchEvent(new Event('input', { bubbles: true }));
+            } else {
+              Logger.warn('Suspicious value setter detected, falling back to direct assignment');
+              textarea.value = content;
+              textarea.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+          } else {
+            // Fallback to direct assignment if descriptor is unavailable
+            textarea.value = content;
+            textarea.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        } catch (error) {
+          Logger.warn('Failed to use property descriptor, using direct assignment', { error: error.message });
+          textarea.value = content;
+          textarea.dispatchEvent(new Event('input', { bubbles: true }));
+        }
       }
       
       // Try manual typing simulation using modern approach
