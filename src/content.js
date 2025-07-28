@@ -794,6 +794,11 @@ class PromptLibraryInjector {
     this.uiFactory = new UIElementFactory(this.instanceId);
     this.keyboardNav = null;
     
+    // Performance optimization: caching for DOM queries
+    this.selectorCache = new Map();
+    this.lastCacheTime = 0;
+    this.cacheTimeout = 2000; // Cache results for 2 seconds
+    
     // Site-specific selectors for text input areas
     this.siteConfigs = {
       'concierge.sanofi.com': {
@@ -957,12 +962,21 @@ class PromptLibraryInjector {
     // Clean up all tracked event listeners using event manager
     this.eventManager.cleanup();
     
+    // Clear selector cache for performance optimization
+    if (this.selectorCache) {
+      this.selectorCache.clear();
+      Logger.info('Selector cache cleared', { 
+        previousCacheSize: this.selectorCache.size 
+      });
+    }
+    
     // Reset state
     this.icon = null;
     this.currentTextarea = null;
     this.promptSelector = null;
     this.isInitialized = false;
     this.mutationObserver = null;
+    this.lastCacheTime = 0;
   }
 
   init() {
@@ -1071,39 +1085,161 @@ class PromptLibraryInjector {
     this.eventManager.addTrackedEventListener(document, 'focusin', focusHandler);
   }
 
+  // Optimized DOM query method with caching and efficient visibility checking
+  findTextareaWithCaching(selectors, useCache = true) {
+    const now = Date.now();
+    const cacheKey = selectors.join('|');
+    
+    // Check cache if enabled and not expired
+    if (useCache && this.selectorCache.has(cacheKey) && 
+        (now - this.lastCacheTime) < this.cacheTimeout) {
+      const cachedResult = this.selectorCache.get(cacheKey);
+      
+      // Verify cached element is still valid and visible
+      if (cachedResult && this.isElementVisible(cachedResult)) {
+        Logger.info('Using cached textarea element', { 
+          selector: cacheKey.substring(0, 50) + '...',
+          elementTag: cachedResult.tagName 
+        });
+        return cachedResult;
+      } else {
+        // Remove invalid cache entry
+        this.selectorCache.delete(cacheKey);
+      }
+    }
+    
+    // Perform optimized DOM search
+    const foundElement = this.performOptimizedSearch(selectors);
+    
+    // Cache the result if found
+    if (foundElement && useCache) {
+      this.selectorCache.set(cacheKey, foundElement);
+      this.lastCacheTime = now;
+      
+      // Prevent cache from growing too large
+      if (this.selectorCache.size > 10) {
+        const oldestKey = this.selectorCache.keys().next().value;
+        this.selectorCache.delete(oldestKey);
+      }
+    }
+    
+    return foundElement;
+  }
+  
+  // Optimized search implementation
+  performOptimizedSearch(selectors) {
+    // Combine all selectors into a single query for better performance
+    const combinedSelector = selectors.join(', ');
+    
+    try {
+      // Single DOM query instead of multiple loops
+      const allElements = document.querySelectorAll(combinedSelector);
+      
+      if (allElements.length === 0) return null;
+      
+      // Fast visibility check - only check elements that might be visible
+      let bestElement = null;
+      let bestScore = -1;
+      
+      for (const element of allElements) {
+        // Quick visibility pre-check before expensive operations
+        if (element.offsetHeight === 0 || element.offsetWidth === 0) continue;
+        if (element.disabled || element.readOnly) continue;
+        
+        // Only do expensive getComputedStyle if element passes basic checks
+        if (!this.isElementVisible(element)) continue;
+        
+        // Score elements based on preference (later selectors have higher priority)
+        const selectorIndex = selectors.findIndex(sel => {
+          try {
+            return element.matches(sel);
+          } catch {
+            return false;
+          }
+        });
+        
+        if (selectorIndex > bestScore) {
+          bestScore = selectorIndex;
+          bestElement = element;
+        }
+      }
+      
+      return bestElement;
+      
+    } catch (error) {
+      Logger.warn('Combined selector query failed, falling back to individual queries', {
+        error: error.message,
+        combinedSelector: combinedSelector.substring(0, 100) + '...'
+      });
+      
+      // Fallback to individual queries if combined query fails
+      return this.fallbackIndividualSearch(selectors);
+    }
+  }
+  
+  // Fallback method for individual selector queries
+  fallbackIndividualSearch(selectors) {
+    for (const selector of selectors) {
+      try {
+        const elements = document.querySelectorAll(selector);
+        
+        for (const element of elements) {
+          if (this.isElementVisible(element)) {
+            return element;
+          }
+        }
+      } catch (error) {
+        Logger.warn('Individual selector query failed', {
+          selector,
+          error: error.message
+        });
+        continue;
+      }
+    }
+    
+    return null;
+  }
+  
+  // Optimized visibility check with minimal getComputedStyle calls
+  isElementVisible(element) {
+    // Quick checks first
+    if (!element || element.offsetHeight === 0 || element.offsetWidth === 0) {
+      return false;
+    }
+    
+    if (element.disabled || element.readOnly) {
+      return false;
+    }
+    
+    // Only call getComputedStyle once and cache the result
+    try {
+      const style = getComputedStyle(element);
+      return style.display !== 'none' && style.visibility !== 'hidden';
+    } catch (error) {
+      Logger.warn('Failed to get computed style', { 
+        error: error.message,
+        elementTag: element.tagName 
+      });
+      return false;
+    }
+  }
+
   detectAndInjectIcon() {
     const hostname = window.location.hostname;
     const config = this.siteConfigs[hostname];
     
     if (!config) return;
     
-    // Find text input element
-    let textarea = null;
+    Logger.info('Starting optimized textarea detection', { 
+      hostname,
+      selectorCount: config.selectors.length 
+    });
     
-    for (const selector of config.selectors) {
-      const elements = document.querySelectorAll(selector);
-      
-      if (elements.length > 0) {
-        // Get visible, enabled elements
-        const visibleElements = Array.from(elements).filter(el => {
-          return el.offsetHeight > 0 && 
-            el.offsetWidth > 0 && 
-            !el.disabled &&
-            !el.readOnly &&
-            getComputedStyle(el).display !== 'none' &&
-            getComputedStyle(el).visibility !== 'hidden';
-        });
-        
-        if (visibleElements.length > 0) {
-          // Prefer the last (most recent) visible element
-          textarea = visibleElements[visibleElements.length - 1];
-          break;
-        }
-      }
-    }
+    // Use optimized cached search for primary selectors
+    let textarea = this.findTextareaWithCaching(config.selectors);
     
     if (!textarea) {
-      // Fallback: try to find any input-like element
+      // Fallback: try to find any input-like element (without caching to avoid stale results)
       const fallbackSelectors = [
         'textarea',
         'div[contenteditable="true"]',
@@ -1114,21 +1250,25 @@ class PromptLibraryInjector {
         '[class*="input"]'
       ];
       
-      for (const fallbackSelector of fallbackSelectors) {
-        const elements = document.querySelectorAll(fallbackSelector);
-        if (elements.length > 0) {
-          const visibleEl = Array.from(elements).find(el => el.offsetHeight > 0 && el.offsetWidth > 0);
-          if (visibleEl) {
-            textarea = visibleEl;
-            break;
-          }
-        }
-      }
+      Logger.info('Primary selectors failed, trying fallback selectors');
+      textarea = this.findTextareaWithCaching(fallbackSelectors, false); // No caching for fallbacks
       
-      if (!textarea) return;
+      if (!textarea) {
+        Logger.info('No suitable textarea found');
+        return;
+      }
     }
     
-    if (textarea === this.currentTextarea) return;
+    if (textarea === this.currentTextarea) {
+      Logger.info('Textarea unchanged, skipping injection');
+      return;
+    }
+    
+    Logger.info('Found new textarea, proceeding with injection', {
+      elementTag: textarea.tagName,
+      elementId: textarea.id,
+      elementClass: textarea.className?.substring(0, 50) + '...'
+    });
     
     this.currentTextarea = textarea;
     this.injectIcon(textarea);
