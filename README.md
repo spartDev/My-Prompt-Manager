@@ -1,9 +1,10 @@
-# Chrome Extension Prompt Library
+# Sanofi Concierge Prompt Library Extension
 
-A Chrome extension for storing, organizing, and managing personal text prompts with an intuitive popup interface.
+A Chrome extension that provides seamless access to your personal prompt library directly within the Sanofi Concierge interface. Features both a popup interface for managing prompts and native integration with the Sanofi Concierge chat interface.
 
 ## Features
 
+### Popup Interface (Prompt Management)
 ✅ **Save Prompts:** Store frequently used text prompts with custom titles  
 ✅ **Organize by Categories:** Create and manage categories with custom colors  
 ✅ **Quick Copy:** One-click copying to clipboard with visual confirmation  
@@ -11,15 +12,25 @@ A Chrome extension for storing, organizing, and managing personal text prompts w
 ✅ **CRUD Operations:** Edit and delete prompts with confirmation dialogs  
 ✅ **Data Persistence:** Automatic saving using Chrome's storage API  
 ✅ **Error Handling:** Graceful handling of storage quotas and data corruption  
-✅ **Responsive UI:** Clean, modern interface built with React and Tailwind CSS  
+✅ **Responsive UI:** Clean, modern interface built with React and Tailwind CSS
+
+### Sanofi Concierge Integration
+✅ **Native Integration:** Library books icon appears in the Sanofi Concierge button bar  
+✅ **Smart Positioning:** Popup appears adjacent to the trigger button for intuitive UX  
+✅ **Dynamic Detection:** Automatically detects and integrates with Sanofi Concierge input fields  
+✅ **Seamless Insertion:** Direct prompt insertion into both textarea and contenteditable elements  
+✅ **Material Design:** Icon styling matches the native Sanofi Concierge interface  
+✅ **Fallback Support:** Graceful fallback for different page layouts  
 
 ## Tech Stack
 
 - **Frontend:** React 18 + TypeScript
-- **Styling:** Tailwind CSS
+- **Styling:** Tailwind CSS  
+- **Content Script:** Vanilla JavaScript with CSS injection
 - **Build Tool:** Vite with @crxjs/vite-plugin
 - **Storage:** Chrome Storage API
 - **Extension:** Manifest V3
+- **Target Site:** https://concierge.sanofi.com/*
 
 ## Development Setup
 
@@ -57,18 +68,25 @@ A Chrome extension for storing, organizing, and managing personal text prompts w
 3. Click "Load unpacked" and select the `dist` folder
 4. The extension icon should appear in the toolbar
 
+### Testing the Integration
+
+1. Visit `https://concierge.sanofi.com`
+2. Look for the library books icon in the button bar next to the attachment and send buttons
+3. Click the icon to access your prompt library
+4. Select a prompt to insert it directly into the chat input
+
 ### Development Workflow
 
 1. Make changes to source code
 2. The extension auto-reloads in development mode
 3. For major changes, manually reload the extension in `chrome://extensions/`
-4. Test functionality in the popup
+4. Test functionality in both the popup and Sanofi Concierge integration
 
 ## Project Structure
 
 ```
 src/
-├── components/          # React components
+├── components/          # React components (Popup Interface)
 │   ├── App.tsx         # Main app component
 │   ├── LibraryView.tsx # Main library interface
 │   ├── PromptCard.tsx  # Individual prompt display
@@ -94,6 +112,7 @@ src/
 │   ├── components.ts  # Component prop types
 │   ├── hooks.ts       # Hook return types
 │   └── context.ts     # Context types
+├── content.js         # Content script for Sanofi Concierge integration
 ├── popup.html         # Extension popup HTML
 ├── popup.tsx          # React entry point
 └── popup.css          # Global styles
@@ -101,19 +120,32 @@ src/
 
 ## Architecture Overview
 
+### Dual Interface Architecture
+The extension provides two complementary interfaces:
+
+1. **Popup Interface** (React-based): For managing prompts, categories, and settings
+2. **Content Script Integration**: For seamless prompt access within Sanofi Concierge
+
 ### Data Flow
 1. **Storage Layer:** `StorageManager` handles Chrome storage API operations
 2. **Business Logic:** `PromptManager` handles validation, search, and data processing
-3. **React Hooks:** Custom hooks provide data and operations to components
-4. **Components:** React components handle UI rendering and user interactions
+3. **React Hooks:** Custom hooks provide data and operations to popup components
+4. **Content Script:** `content.js` handles Sanofi Concierge integration and prompt insertion
 
 ### Key Components
 
+**Popup Interface:**
 - **App:** Main orchestrator, manages global state and routing
 - **LibraryView:** Primary interface showing prompts, search, and filters
 - **PromptCard:** Individual prompt display with actions (copy, edit, delete)
 - **Forms:** Add/Edit forms with validation and error handling
 - **CategoryManager:** Modal for creating and managing categories
+
+**Content Script Integration:**
+- **PromptLibraryInjector:** Main class handling Sanofi Concierge integration
+- **Icon Injection:** Dynamically creates and positions the library books icon
+- **Input Detection:** Automatically detects and monitors text input fields
+- **Prompt Selector UI:** Popup interface for selecting and inserting prompts
 
 ### Error Handling
 
@@ -124,30 +156,51 @@ src/
 
 ## Usage Guide
 
-### Creating Prompts
+### Managing Prompts (Popup Interface)
+
+**Creating Prompts:**
 1. Click the extension icon to open the popup
 2. Click "Add Prompt" button
 3. Enter content (required) and optional title
 4. Select or create a category
 5. Click "Save Prompt"
 
-### Managing Categories
+**Managing Categories:**  
 1. In the library view, click "Manage Categories"
 2. Add new categories with custom names and colors
 3. Edit existing categories by clicking the edit icon
 4. Delete categories (prompts move to "Uncategorized")
 
-### Searching and Filtering
+**Searching and Filtering:**
 - Use the search bar for real-time filtering
 - Search matches titles, content, and categories
 - Use category dropdown to filter by specific category
 - Matching text is highlighted in search results
 
-### Copying Prompts
+**Copying Prompts:**
 - Click the "Copy" button on any prompt card
 - Content is copied to clipboard
 - Success notification confirms the copy operation
 - Use copied text in any application
+
+### Using Prompts in Sanofi Concierge
+
+**Accessing Your Library:**
+1. Visit `https://concierge.sanofi.com`
+2. Look for the library books icon in the button bar (next to attachment/send buttons)
+3. Click the icon to open your prompt library
+
+**Inserting Prompts:**
+1. Select a prompt from the searchable list
+2. The prompt is automatically inserted into the chat input
+3. The popup closes automatically after selection
+4. Continue typing or send the message as normal
+
+**Smart Features:**
+- Popup appears adjacent to the trigger button for intuitive UX
+- Search functionality available within the integrated popup
+- Works with both regular text areas and rich text editors
+- Automatic input field detection and integration
 
 ## Data Storage
 
@@ -160,13 +213,14 @@ The extension uses Chrome's `chrome.storage.local` API for data persistence:
 
 ## Testing
 
-See [TESTING.md](./TESTING.md) for comprehensive testing procedures.
+See [ai/TESTING.md](./ai/TESTING.md) for comprehensive testing procedures.
 
 ### Quick Test
 1. Build and load the extension
-2. Create a few test prompts
-3. Restart browser and verify data persists
-4. Test search, categories, and copy functionality
+2. Create a few test prompts in the popup
+3. Visit `https://concierge.sanofi.com` and test the integration
+4. Restart browser and verify data persists
+5. Test search, categories, copy functionality, and prompt insertion
 
 ## Building for Production
 
@@ -218,11 +272,19 @@ For issues and feature requests, please use the GitHub issues tracker.
 
 ## Roadmap
 
+### Completed Features
+- [x] Sanofi Concierge native integration
+- [x] Smart popup positioning
+- [x] Material Design icon integration
+- [x] Dark mode theme support
+- [x] Responsive design
+
 ### Future Enhancements
+- [ ] Support for additional sites beyond Sanofi Concierge
 - [ ] Import/Export functionality
 - [ ] Prompt templates and variables
-- [ ] Keyboard shortcuts
+- [ ] Keyboard shortcuts for quick access
 - [ ] Prompt usage analytics
 - [ ] Cloud sync (optional)
-- [ ] Dark mode theme
 - [ ] Prompt sharing capabilities
+- [ ] Custom hotkeys for frequent prompts
