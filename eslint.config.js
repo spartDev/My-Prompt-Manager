@@ -102,6 +102,32 @@ export default [
       '@typescript-eslint/no-var-requires': 'off',
     },
   },
+
+  // Configuration for content scripts
+  {
+    files: ['src/content.js'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: {
+        window: 'readonly',
+        document: 'readonly',
+        chrome: 'readonly',
+        console: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearInterval: 'readonly',
+        MutationObserver: 'readonly',
+        getComputedStyle: 'readonly',
+        Event: 'readonly',
+        Array: 'readonly',
+      },
+    },
+    rules: {
+      'no-console': 'off', // Allow console in content scripts for debugging
+    },
+  },
   
   // Configuration for CommonJS files (.cjs)
   {

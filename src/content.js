@@ -1,3 +1,4 @@
+/* eslint-env browser, webextensions */
 // Content script for injecting prompt library icon into LLM websites
 
 // Inject CSS styles
@@ -300,7 +301,7 @@ class PromptLibraryInjector {
     }, 500);
     
     // Watch for dynamic content changes
-    const observer = new MutationObserver((mutations) => {
+    const observer = new MutationObserver(() => {
       // Debounce the detection to avoid excessive calls
       clearTimeout(this.detectionTimeout);
       this.detectionTimeout = setTimeout(() => {
@@ -331,7 +332,6 @@ class PromptLibraryInjector {
     
     // Find text input element
     let textarea = null;
-    let foundSelector = null;
     
     for (const selector of config.selectors) {
       const elements = document.querySelectorAll(selector);
@@ -350,7 +350,6 @@ class PromptLibraryInjector {
         if (visibleElements.length > 0) {
           // Prefer the last (most recent) visible element
           textarea = visibleElements[visibleElements.length - 1];
-          foundSelector = selector;
           break;
         }
       }
@@ -372,7 +371,6 @@ class PromptLibraryInjector {
           const visibleEl = Array.from(elements).find(el => el.offsetHeight > 0 && el.offsetWidth > 0);
           if (visibleEl) {
             textarea = visibleEl;
-            foundSelector = `fallback: ${fallbackSelector}`;
             break;
           }
         }
@@ -476,7 +474,6 @@ class PromptLibraryInjector {
   positionIcon(textarea) {
     const rect = textarea.getBoundingClientRect();
     const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-    const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
     
     this.icon.style.position = 'absolute';
     this.icon.style.top = (rect.top + scrollTop + 8) + 'px';
@@ -530,13 +527,13 @@ class PromptLibraryInjector {
     `;
     
     // Position selector relative to the icon if it's integrated, otherwise relative to textarea
-    let rect, scrollTop, scrollLeft;
+    let rect, scrollTop;
     
     if (this.icon && this.icon.classList.contains('prompt-library-integrated-icon')) {
       // Position relative to the integrated icon button
       rect = this.icon.getBoundingClientRect();
       scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-      scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+      const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
       
       const selectorWidth = 400;
       const selectorHeight = 500;
