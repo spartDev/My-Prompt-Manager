@@ -1,5 +1,5 @@
 /* eslint-env browser, webextensions */
-// Content script for injecting prompt library icon into Sanofi Concierge
+// Content script for injecting prompt library icon into AI chat platforms
 
 // Inject CSS styles
 function injectCSS() {
@@ -251,6 +251,11 @@ class PromptLibraryInjector {
     this.currentTextarea = null;
     this.promptSelector = null;
     this.isInitialized = false;
+    this.detectionTimeout = null;
+    this.hostname = window.location.hostname;
+    
+    // Add unique identifier to prevent cross-tab interference
+    this.instanceId = `prompt-lib-${this.hostname}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
     // Site-specific selectors for text input areas
     this.siteConfigs = {
@@ -263,14 +268,83 @@ class PromptLibraryInjector {
         ],
         buttonContainerSelector: '.absolute.bottom-2.right-2\\.5.flex.gap-2.self-end',
         name: 'Sanofi Concierge'
+      },
+      'www.perplexity.ai': {
+        selectors: [
+          'textarea[placeholder*="Ask"]',
+          'textarea[placeholder*="follow"]',
+          'textarea[data-testid="searchbox"]',
+          'textarea[class*="search"]',
+          'textarea',
+          'div[contenteditable="true"]',
+          '[role="textbox"]',
+          'input[type="text"]',
+          '[data-testid*="input"]',
+          '[class*="input"]',
+          '[placeholder*="Ask"]',
+          '[placeholder*="follow"]'
+        ],
+        buttonContainerSelector: '.bg-background-50.dark\\:bg-offsetDark.flex.items-center.justify-self-end.rounded-full.col-start-3.row-start-2',
+        name: 'Perplexity'
+      },
+      'claude.ai': {
+        selectors: [
+          'div[contenteditable="true"]',
+          'textarea',
+          '[role="textbox"]',
+          'input[type="text"]',
+          '[data-testid*="input"]',
+          '[class*="input"]',
+          'div[data-value]'
+        ],
+        buttonContainerSelector: '.relative.flex-1.flex.items-center.gap-2.shrink.min-w-0',
+        name: 'Claude'
       }
     };
     
     this.init();
   }
+  
+  cleanup() {
+    // Remove icon if it exists
+    if (this.icon) {
+      try {
+        this.icon.remove();
+      } catch (e) {
+        // Silent cleanup
+      }
+    }
+    
+    // Remove prompt selector if it exists
+    if (this.promptSelector) {
+      try {
+        this.promptSelector.remove();
+      } catch (e) {
+        // Silent cleanup
+      }
+    }
+    
+    // Clear timeouts
+    if (this.detectionTimeout) {
+      clearTimeout(this.detectionTimeout);
+    }
+    
+    // Reset state
+    this.icon = null;
+    this.currentTextarea = null;
+    this.promptSelector = null;
+    this.isInitialized = false;
+  }
 
   init() {
     if (this.isInitialized) return;
+    
+    // Only initialize if we have a config for this site
+    const config = this.siteConfigs[this.hostname];
+    if (!config) {
+      return;
+    }
+    
     this.isInitialized = true;
     
     // Inject CSS styles
@@ -362,7 +436,9 @@ class PromptLibraryInjector {
         'div[contenteditable="true"]',
         'input[type="text"]',
         '[role="textbox"]',
-        '[contenteditable]'
+        '[contenteditable]',
+        '[data-testid*="input"]',
+        '[class*="input"]'
       ];
       
       for (const fallbackSelector of fallbackSelectors) {
@@ -386,67 +462,245 @@ class PromptLibraryInjector {
   }
 
   injectIcon(textarea) {
-    // Remove existing icon if any
-    if (this.icon) {
-      this.icon.remove();
-    }
-    
-    const hostname = window.location.hostname;
-    const config = this.siteConfigs[hostname];
-    
-    // Find the button container using configured selector or fallback selectors
-    let buttonContainer = null;
-    
-    if (config.buttonContainerSelector) {
-      buttonContainer = document.querySelector(config.buttonContainerSelector);
-    }
-    
-    // Try fallback selectors if primary one fails
-    if (!buttonContainer) {
-      const fallbackSelectors = [
-        '[class*="bottom-2"][class*="right-2"][class*="flex"]',
-        '[class*="absolute"][class*="bottom"][class*="right"][class*="flex"]',
-        '.flex.gap-2.self-end',
-        '[class*="gap-2"][class*="self-end"]'
-      ];
+    try {
+      // Remove existing icon if any
+      if (this.icon) {
+        try {
+          this.icon.remove();
+        } catch (removeError) {
+          // Silent cleanup
+        }
+      }
       
-      for (const selector of fallbackSelectors) {
-        buttonContainer = document.querySelector(selector);
-        if (buttonContainer) break;
+      const hostname = window.location.hostname;
+      const config = this.siteConfigs[hostname];
+      
+      if (!config) return;
+    
+    // For supported sites, try integrated button approach
+    if (hostname === 'concierge.sanofi.com' || hostname === 'claude.ai' || hostname === 'www.perplexity.ai') {
+      // Find the button container using configured selector or fallback selectors
+      let buttonContainer = null;
+      
+      if (config.buttonContainerSelector) {
+        buttonContainer = document.querySelector(config.buttonContainerSelector);
+      }
+      
+      // Try fallback selectors if primary one fails
+      if (!buttonContainer) {
+        let fallbackSelectors = [];
+        
+        if (hostname === 'www.perplexity.ai') {
+          // Perplexity-specific fallbacks for different page types
+          fallbackSelectors = [
+            // Original selector for main page
+            '.bg-background-50.dark\\:bg-offsetDark.flex.items-center.justify-self-end.rounded-full.col-start-3.row-start-2',
+            // Alternative selectors for search pages and different layouts
+            '.bg-background-50[class*="flex"][class*="items-center"][class*="rounded-full"]',
+            'div[class*="bg-background-50"][class*="flex"][class*="items-center"]',
+            '.flex.items-center.justify-self-end.rounded-full',
+            '[class*="col-start-3"][class*="row-start-2"]',
+            // Generic button container fallbacks
+            'div[class*="flex"][class*="items-center"]:has(button[aria-label*="Attach"])',
+            'div[class*="flex"][class*="items-center"]:has(button[type="button"])',
+            '.flex.items-center:has(button)',
+            // Last resort - find any container with multiple buttons
+            'div:has(button):has(button + button)',
+            'div[class*="flex"]:has(button[aria-label])'
+          ];
+        } else {
+          // Default fallbacks for other sites
+          fallbackSelectors = [
+            '[class*="bottom-2"][class*="right-2"][class*="flex"]',
+            '[class*="absolute"][class*="bottom"][class*="right"][class*="flex"]',
+            '.flex.gap-2.self-end',
+            '[class*="gap-2"][class*="self-end"]'
+          ];
+        }
+        
+        for (const selector of fallbackSelectors) {
+          try {
+            buttonContainer = document.querySelector(selector);
+            if (buttonContainer) {
+              break;
+            }
+          } catch (e) {
+            // Continue with next selector
+          }
+        }
+      }
+      
+      if (buttonContainer && !buttonContainer.querySelector(`.prompt-library-integrated-icon-${this.instanceId}`)) {
+        if (hostname === 'claude.ai') {
+          try {
+            // Claude.ai specific - create wrapped container like other buttons
+            const iconContainer = document.createElement('div');
+            iconContainer.className = 'relative shrink-0';
+            
+            const innerDiv = document.createElement('div');
+            
+            const flexDiv = document.createElement('div');
+            flexDiv.className = 'flex items-center';
+            
+            const shrinkDiv = document.createElement('div');
+            shrinkDiv.className = 'flex shrink-0';
+            shrinkDiv.setAttribute('data-state', 'closed');
+            shrinkDiv.style.opacity = '1';
+            shrinkDiv.style.transform = 'none';
+            
+            this.icon = document.createElement('button');
+            this.icon.className = `prompt-library-integrated-icon-${this.instanceId} inline-flex items-center justify-center relative shrink-0 can-focus select-none disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none disabled:drop-shadow-none border-0.5 transition-all h-8 min-w-8 rounded-lg flex items-center px-[7.5px] group !pointer-events-auto !outline-offset-1 text-text-300 border-border-300 active:scale-[0.98] hover:text-text-200/90 hover:bg-bg-100`;
+            this.icon.setAttribute('type', 'button');
+            this.icon.setAttribute('aria-label', 'Open prompt library');
+            this.icon.setAttribute('title', 'Prompt Library - Access your saved prompts');
+            
+            this.icon.innerHTML = `
+              <div class="flex flex-row items-center justify-center gap-1">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256">
+                  <path d="M224,48H32A16,16,0,0,0,16,64V192a16,16,0,0,0,16,16H224a16,16,0,0,0,16-16V64A16,16,0,0,0,224,48ZM208,192H48a8,8,0,0,1-8-8V72H216V184A8,8,0,0,1,208,192ZM64,96a8,8,0,0,1,8-8H184a8,8,0,0,1,0,16H72A8,8,0,0,1,64,96Zm0,32a8,8,0,0,1,8-8H184a8,8,0,0,1,0,16H72A8,8,0,0,1,64,128Zm0,32a8,8,0,0,1,8-8h64a8,8,0,0,1,0,16H72A8,8,0,0,1,64,160Z"/>
+                </svg>
+              </div>
+            `;
+            
+            // Build the hierarchy safely
+            shrinkDiv.appendChild(this.icon);
+            flexDiv.appendChild(shrinkDiv);
+            innerDiv.appendChild(flexDiv);
+            iconContainer.appendChild(innerDiv);
+            
+            // Find the research button container and insert before it
+            let insertionPoint = null;
+            const insertionSelectors = [
+              'div.flex.shrink.min-w-8',                    // Research button container
+              '[class*="flex"][class*="shrink"][class*="min-w"]', // Alternative research container
+              'div:has(button[aria-label*="Research"])',     // Container with research button
+              'div.flex:last-child',                        // Last flex container
+              ':last-child'                                 // Last child as final fallback
+            ];
+            
+            for (const selector of insertionSelectors) {
+              try {
+                insertionPoint = buttonContainer.querySelector(selector);
+                if (insertionPoint) {
+                  break;
+                }
+              } catch (selectorError) {
+                // Continue with next selector
+              }
+            }
+            
+            // Insert the icon
+            if (insertionPoint) {
+              buttonContainer.insertBefore(iconContainer, insertionPoint);
+            } else {
+              buttonContainer.appendChild(iconContainer);
+            }
+            
+          } catch (claudeError) {
+            // Fall back to floating icon
+            this.createFloatingIcon(textarea);
+            return;
+          }
+          
+        } else if (hostname === 'www.perplexity.ai') {
+          // Perplexity specific styling
+          this.icon = document.createElement('button');
+          this.icon.className = `prompt-library-integrated-icon-${this.instanceId} focus-visible:bg-offsetPlus hover:bg-offsetPlus text-textOff hover:text-textMain dark:hover:bg-offsetPlus dark:hover:text-textMainDark font-sans focus:outline-none outline-none outline-transparent transition duration-300 ease-out font-sans select-none items-center relative group/button justify-center text-center items-center rounded-lg cursor-pointer active:scale-[0.97] active:duration-150 active:ease-outExpo origin-center whitespace-nowrap inline-flex text-sm h-8 aspect-[9/8]`;
+          this.icon.setAttribute('type', 'button');
+          this.icon.setAttribute('aria-label', 'Open prompt library');
+          this.icon.setAttribute('title', 'Prompt Library - Access your saved prompts');
+          this.icon.setAttribute('data-state', 'closed');
+          
+          this.icon.innerHTML = `
+            <div class="flex items-center min-w-0 font-medium gap-1.5 justify-center">
+              <div class="flex shrink-0 items-center justify-center size-4">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14,2 14,8 20,8"/>
+                  <line x1="16" y1="13" x2="8" y2="13"/>
+                  <line x1="16" y1="17" x2="8" y2="17"/>
+                  <polyline points="10,9 9,9 8,9"/>
+                </svg>
+              </div>
+            </div>
+          `;
+          
+          // Insert before the voice mode button or at appropriate position
+          let insertPosition = null;
+          
+          // Try multiple selectors to find a good insertion point
+          const insertionSelectors = [
+            'button.bg-super',           // Voice mode button
+            '.ml-2',                     // Voice button container
+            'button[aria-label*="Voice"]', // Voice button by aria-label
+            'button[aria-label*="Dictation"]', // Dictation button
+            'button:last-child'          // Last button as fallback
+          ];
+          
+          for (const selector of insertionSelectors) {
+            try {
+              insertPosition = buttonContainer.querySelector(selector);
+              if (insertPosition) {
+                break;
+              }
+            } catch (e) {
+              // Continue with next selector
+            }
+          }
+          
+          if (insertPosition) {
+            try {
+              buttonContainer.insertBefore(this.icon, insertPosition);
+            } catch (e) {
+              buttonContainer.appendChild(this.icon);
+            }
+          } else {
+            // Fallback: insert at the end
+            buttonContainer.appendChild(this.icon);
+          }
+          
+        } else {
+          // Sanofi Concierge styling
+          this.icon = document.createElement('div');
+          this.icon.className = `prompt-library-integrated-icon-${this.instanceId} text-pulse-text-subtle hover:bg-elements-neutrals-100 hover:dark:bg-elements-neutrals-700 flex h-8 w-8 flex-col items-center justify-center px-1 hover:rounded-lg cursor-pointer`;
+          this.icon.innerHTML = `
+            <span class="material-icons-round _icon_mqc2e_1" style="font-size: 1.5rem;">
+              <span aria-hidden="true">library_books</span>
+            </span>
+          `;
+          this.icon.setAttribute('title', 'Prompt Library - Access your saved prompts');
+          
+          const sendButton = buttonContainer.lastElementChild;
+          buttonContainer.insertBefore(this.icon, sendButton);
+        }
+        
+        // Add click handler
+        this.icon.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          this.showPromptSelector(textarea);
+        });
+        
+        return;
       }
     }
     
-    if (buttonContainer && !buttonContainer.querySelector('.prompt-library-integrated-icon')) {
-      // Create icon element styled to match existing buttons
-      this.icon = document.createElement('div');
-      this.icon.className = 'prompt-library-integrated-icon text-pulse-text-subtle hover:bg-elements-neutrals-100 hover:dark:bg-elements-neutrals-700 flex h-8 w-8 flex-col items-center justify-center px-1 hover:rounded-lg cursor-pointer';
-      this.icon.setAttribute('title', 'Prompt Library - Access your saved prompts');
-      this.icon.innerHTML = `
-        <span class="material-icons-round _icon_mqc2e_1" style="font-size: 1.5rem;">
-          <span aria-hidden="true">library_books</span>
-        </span>
-      `;
-      
-      // Insert before the send button (last element)
-      const sendButton = buttonContainer.lastElementChild;
-      buttonContainer.insertBefore(this.icon, sendButton);
-      
-      // Add click handler
-      this.icon.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        this.showPromptSelector(textarea);
-      });
-    } else {
-      // Fallback to original positioning if container not found
-      this.createFloatingIcon(textarea);
+    // For all other sites or if integrated approach fails, use floating icon
+    this.createFloatingIcon(textarea);
+    } catch (mainError) {
+      // Last resort: try creating a simple floating icon
+      try {
+        this.createFloatingIcon(textarea);
+      } catch (fallbackError) {
+        // Silent failure
+      }
     }
   }
 
   createFloatingIcon(textarea) {
     // Create icon element
     this.icon = document.createElement('div');
-    this.icon.className = 'prompt-library-icon';
+    this.icon.className = `prompt-library-icon-${this.instanceId}`;
     this.icon.innerHTML = `
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -526,11 +780,11 @@ class PromptLibraryInjector {
       </div>
     `;
     
-    // Position selector relative to the icon if it's integrated, otherwise relative to textarea
+    // Position selector relative to the icon if it exists, otherwise relative to textarea
     let rect, scrollTop;
     
-    if (this.icon && this.icon.classList.contains('prompt-library-integrated-icon')) {
-      // Position relative to the integrated icon button
+    if (this.icon) {
+      // Position relative to the actual icon button
       rect = this.icon.getBoundingClientRect();
       scrollTop = window.pageYOffset || document.documentElement.scrollTop;
       const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
@@ -600,11 +854,17 @@ class PromptLibraryInjector {
     
     // Close on outside click
     setTimeout(() => {
-      document.addEventListener('click', (e) => {
-        if (!this.promptSelector.contains(e.target) && !this.icon.contains(e.target)) {
+      const outsideClickHandler = (e) => {
+        if (this.promptSelector && 
+            !this.promptSelector.contains(e.target) && 
+            this.icon && 
+            !this.icon.contains(e.target)) {
           this.promptSelector.remove();
+          this.promptSelector = null;
+          document.removeEventListener('click', outsideClickHandler);
         }
-      }, { once: true });
+      };
+      document.addEventListener('click', outsideClickHandler);
     }, 100);
   }
 
@@ -640,28 +900,94 @@ class PromptLibraryInjector {
   }
 
   insertPrompt(textarea, content) {
-    if (textarea.contentEditable === 'true') {
-      // For contenteditable divs
-      textarea.focus();
-      const selection = window.getSelection();
-      const range = selection.getRangeAt(0);
-      range.deleteContents();
-      range.insertNode(document.createTextNode(content));
-      range.collapse(false);
-      selection.removeAllRanges();
-      selection.addRange(range);
-    } else {
-      // For textarea elements
-      textarea.focus();
-      const start = textarea.selectionStart;
-      const end = textarea.selectionEnd;
-      const text = textarea.value;
-      textarea.value = text.substring(0, start) + content + text.substring(end);
-      textarea.selectionStart = textarea.selectionEnd = start + content.length;
-    }
+    const hostname = window.location.hostname;
     
-    // Trigger input event
-    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    // Site-specific insertion logic
+    if (hostname === 'www.perplexity.ai') {
+      // Perplexity specific insertion
+      textarea.focus();
+      
+      // Try multiple approaches for Perplexity
+      if (textarea.contentEditable === 'true') {
+        // Method 1: Direct content insertion
+        textarea.textContent = content;
+        
+        // Method 2: Try innerHTML if textContent doesn't work
+        if (!textarea.textContent) {
+          textarea.innerHTML = content;
+        }
+        
+        // Method 3: Try using selection API
+        if (!textarea.textContent && !textarea.innerHTML) {
+          textarea.focus();
+          const selection = window.getSelection();
+          selection.selectAllChildren(textarea);
+          selection.deleteFromDocument();
+          selection.getRangeAt(0).insertNode(document.createTextNode(content));
+        }
+      } else if (textarea.tagName === 'TEXTAREA') {
+        textarea.value = content;
+      }
+      
+      // Trigger multiple events for Perplexity
+      const events = ['input', 'change', 'keyup', 'paste'];
+      events.forEach(eventType => {
+        textarea.dispatchEvent(new Event(eventType, { bubbles: true }));
+      });
+      
+      // Try React-style updates
+      const reactKeys = Object.keys(textarea).find(key => key.startsWith('__reactInternalInstance') || key.startsWith('__reactFiber'));
+      if (reactKeys) {
+        const reactInstance = textarea[reactKeys];
+        if (reactInstance && reactInstance.memoizedProps && reactInstance.memoizedProps.onChange) {
+          reactInstance.memoizedProps.onChange({ target: { value: content } });
+        }
+      }
+      
+      // Try setting React input value directly
+      const valueSetter = Object.getOwnPropertyDescriptor(textarea, 'value')?.set || 
+                         Object.getOwnPropertyDescriptor(Object.getPrototypeOf(textarea), 'value')?.set ||
+                         Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+      
+      if (valueSetter && textarea.tagName === 'TEXTAREA') {
+        valueSetter.call(textarea, content);
+        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      
+      // Try manual typing simulation
+      setTimeout(() => {
+        textarea.focus();
+        document.execCommand('selectAll');
+        document.execCommand('insertText', false, content);
+      }, 100);
+      
+      // Perplexity insertion complete
+      
+    } else {
+      // Default insertion for other sites
+      if (textarea.contentEditable === 'true') {
+        // For contenteditable divs
+        textarea.focus();
+        const selection = window.getSelection();
+        const range = selection.getRangeAt(0);
+        range.deleteContents();
+        range.insertNode(document.createTextNode(content));
+        range.collapse(false);
+        selection.removeAllRanges();
+        selection.addRange(range);
+      } else {
+        // For textarea elements
+        textarea.focus();
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const text = textarea.value;
+        textarea.value = text.substring(0, start) + content + text.substring(end);
+        textarea.selectionStart = textarea.selectionEnd = start + content.length;
+      }
+      
+      // Trigger input event
+      textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    }
   }
 
   async getPrompts() {
@@ -679,5 +1005,27 @@ class PromptLibraryInjector {
   }
 }
 
-// Initialize the injector
-new PromptLibraryInjector();
+// Initialize the injector with proper cleanup
+const promptLibraryInstance = new PromptLibraryInjector();
+
+// Cleanup on page unload to prevent cross-tab interference
+window.addEventListener('beforeunload', () => {
+  if (promptLibraryInstance) {
+    promptLibraryInstance.cleanup();
+  }
+});
+
+// Also cleanup on page hide (when switching tabs)
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && promptLibraryInstance) {
+    // Don't fully cleanup, just remove UI elements
+    if (promptLibraryInstance.promptSelector) {
+      try {
+        promptLibraryInstance.promptSelector.remove();
+        promptLibraryInstance.promptSelector = null;
+      } catch (e) {
+        // Silent cleanup
+      }
+    }
+  }
+});
