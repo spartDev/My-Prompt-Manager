@@ -1095,7 +1095,16 @@ class PromptLibraryInjector {
           
           const settings = result.promptLibrarySettings || {};
           const enabledSites = settings.enabledSites || Object.keys(this.siteConfigs);
-          const isEnabled = enabledSites.includes(this.hostname);
+          const customSites = settings.customSites || [];
+          
+          // Check if enabled in built-in sites
+          const isBuiltInEnabled = enabledSites.includes(this.hostname);
+          
+          // Check if enabled in custom sites
+          const customSite = customSites.find(site => site.hostname === this.hostname);
+          const isCustomEnabled = customSite ? customSite.enabled : false;
+          
+          const isEnabled = isBuiltInEnabled || isCustomEnabled;
           
           Logger.info('Site enabled check completed', {
             hostname: this.hostname,
@@ -2468,6 +2477,16 @@ window.addEventListener('blur', () => {
 
 // Listen for settings updates from the settings page
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message.action === 'cleanup') {
+    // Handle cleanup request from settings when custom site is disabled
+    if (promptLibraryInstance) {
+      promptLibraryInstance.cleanup();
+      promptLibraryInstance = null;
+    }
+    sendResponse({ success: true });
+    return;
+  }
+  
   if (message.action === 'settingsUpdated') {
     Logger.info('Settings updated, reinitializing prompt library', {
       newSettings: message.settings
@@ -2475,8 +2494,14 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     
     // Check if current site is now disabled
     const enabledSites = message.settings.enabledSites || [];
+    const customSites = message.settings.customSites || [];
     const currentHostname = window.location.hostname;
-    const isCurrentSiteEnabled = enabledSites.includes(currentHostname);
+    
+    // Check if enabled in built-in sites or custom sites
+    const isBuiltInEnabled = enabledSites.includes(currentHostname);
+    const customSite = customSites.find(site => site.hostname === currentHostname);
+    const isCustomEnabled = customSite ? customSite.enabled : false;
+    const isCurrentSiteEnabled = isBuiltInEnabled || isCustomEnabled;
     
     if (!isCurrentSiteEnabled && promptLibraryInstance) {
       // Site was disabled - cleanup current instance
