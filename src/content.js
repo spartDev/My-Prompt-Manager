@@ -799,6 +799,18 @@ class PromptLibraryInjector {
     this.lastCacheTime = 0;
     this.cacheTimeout = 2000; // Cache results for 2 seconds
     
+    // Mutation observer performance optimization
+    this.mutationStats = {
+      totalMutations: 0,
+      relevantMutations: 0,
+      throttledCalls: 0,
+      lastResetTime: Date.now()
+    };
+    this.mutationThrottleDelay = 100; // Base throttle delay
+    this.maxThrottleDelay = 2000; // Maximum throttle delay under load
+    this.mutationBurst = [];
+    this.isObserverThrottled = false;
+    
     // Site-specific selectors for text input areas
     this.siteConfigs = {
       'concierge.sanofi.com': {
@@ -970,6 +982,21 @@ class PromptLibraryInjector {
       });
     }
     
+    // Clear mutation observer performance tracking
+    if (this.mutationStats) {
+      Logger.info('Final mutation observer stats', this.mutationStats);
+      this.mutationStats = {
+        totalMutations: 0,
+        relevantMutations: 0,
+        throttledCalls: 0,
+        lastResetTime: Date.now()
+      };
+    }
+    
+    // Clear mutation throttling state
+    this.mutationBurst = [];
+    this.isObserverThrottled = false;
+    
     // Reset state
     this.icon = null;
     this.currentTextarea = null;
@@ -1017,64 +1044,11 @@ class PromptLibraryInjector {
       retryCount++;
     }, 500);
     
-    // Watch for dynamic content changes - optimized for performance
-    this.mutationObserver = new MutationObserver((mutations) => {
-      // Only trigger if relevant changes occurred
-      let shouldDetect = false;
-      
-      for (const mutation of mutations) {
-        if (mutation.type === 'childList') {
-          // Check if added nodes contain input elements
-          for (const node of mutation.addedNodes) {
-            if (node.nodeType === Node.ELEMENT_NODE) {
-              if (node.matches && (node.matches('textarea, [contenteditable], [role="textbox"]') ||
-                  node.querySelector && node.querySelector('textarea, [contenteditable="true"], [role="textbox"]'))) {
-                shouldDetect = true;
-                break;
-              }
-            }
-          }
-        } else if (mutation.type === 'attributes') {
-          // Only care about attribute changes on input elements
-          const target = mutation.target;
-          if (target.matches && target.matches('textarea, [contenteditable], [role="textbox"]')) {
-            shouldDetect = true;
-          }
-        }
-        
-        if (shouldDetect) break;
-      }
-      
-      if (shouldDetect) {
-        // Debounce the detection to avoid excessive calls
-        clearTimeout(this.detectionTimeout);
-        this.detectionTimeout = setTimeout(() => {
-          this.detectAndInjectIcon();
-        }, 100);
-      }
-    });
+    // Create optimized mutation observer with advanced throttling
+    this.mutationObserver = this.createOptimizedMutationObserver();
     
-    // Observe more targeted containers instead of entire document.body
-    const observeTargets = [
-      'main', '[role="main"]', '.chat-container', '.input-container', 
-      '[class*="chat"]', '[class*="input"]', '[class*="compose"]'
-    ];
-    
-    let observeTarget = document.body; // fallback
-    for (const selector of observeTargets) {
-      const target = document.querySelector(selector);
-      if (target) {
-        observeTarget = target;
-        break;
-      }
-    }
-    
-    this.mutationObserver.observe(observeTarget, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['class', 'id', 'placeholder', 'contenteditable', 'role']
-    });
+    // Set up optimized observation with multiple targeted scopes
+    this.setupOptimizedObservation();
     
     // Also detect on focus events for Sanofi Concierge input elements
     const focusHandler = (e) => {
@@ -1221,6 +1195,256 @@ class PromptLibraryInjector {
         elementTag: element.tagName 
       });
       return false;
+    }
+  }
+
+  // Create optimized mutation observer with intelligent throttling and filtering
+  createOptimizedMutationObserver() {
+    return new MutationObserver((mutations) => {
+      this.handleMutations(mutations);
+    });
+  }
+  
+  // Advanced mutation handling with performance optimization
+  handleMutations(mutations) {
+    const now = Date.now();
+    this.mutationStats.totalMutations += mutations.length;
+    
+    // Reset stats every 30 seconds for monitoring
+    if (now - this.mutationStats.lastResetTime > 30000) {
+      Logger.info('Mutation observer performance stats', {
+        totalMutations: this.mutationStats.totalMutations,
+        relevantMutations: this.mutationStats.relevantMutations,
+        throttledCalls: this.mutationStats.throttledCalls,
+        efficiency: this.mutationStats.totalMutations > 0 
+          ? (this.mutationStats.relevantMutations / this.mutationStats.totalMutations * 100).toFixed(1) + '%'
+          : '0%'
+      });
+      
+      this.mutationStats = {
+        totalMutations: 0,
+        relevantMutations: 0,
+        throttledCalls: 0,
+        lastResetTime: now
+      };
+    }
+    
+    // Quick exit if already throttled
+    if (this.isObserverThrottled) {
+      this.mutationStats.throttledCalls++;
+      return;
+    }
+    
+    // Intelligent mutation filtering
+    const relevantMutation = this.filterRelevantMutations(mutations);
+    
+    if (relevantMutation) {
+      this.mutationStats.relevantMutations++;
+      this.scheduleThrottledDetection();
+    }
+  }
+  
+  // Intelligent filtering to only process relevant mutations
+  filterRelevantMutations(mutations) {
+    for (const mutation of mutations) {
+      // Quick type check
+      if (mutation.type === 'childList') {
+        // Check for added input-related nodes
+        if (this.hasRelevantChildListChanges(mutation)) {
+          return mutation;
+        }
+      } else if (mutation.type === 'attributes') {
+        // Check for attribute changes on input elements
+        if (this.hasRelevantAttributeChanges(mutation)) {
+          return mutation;
+        }
+      }
+    }
+    return null;
+  }
+  
+  // Check if childList mutations contain relevant input elements
+  hasRelevantChildListChanges(mutation) {
+    // Early exit for mutations without added nodes
+    if (!mutation.addedNodes || mutation.addedNodes.length === 0) {
+      return false;
+    }
+    
+    // Check added nodes efficiently
+    for (const node of mutation.addedNodes) {
+      if (node.nodeType !== Node.ELEMENT_NODE) continue;
+      
+      try {
+        // Direct match check first (most common case)
+        if (node.matches && node.matches('textarea, [contenteditable], [role="textbox"]')) {
+          return true;
+        }
+        
+        // Only do expensive querySelector if node could contain input elements
+        if (this.couldContainInputElements(node)) {
+          if (node.querySelector && node.querySelector('textarea, [contenteditable="true"], [role="textbox"]')) {
+            return true;
+          }
+        }
+      } catch (error) {
+        // Log but don't break on selector errors
+        Logger.warn('Error checking mutation node', { 
+          error: error.message,
+          nodeTag: node.tagName 
+        });
+        continue;
+      }
+    }
+    
+    return false;
+  }
+  
+  // Quick heuristic to avoid expensive querySelector calls
+  couldContainInputElements(node) {
+    if (!node.tagName) return false;
+    
+    // Common containers that might have input elements
+    const potentialContainers = ['DIV', 'FORM', 'SECTION', 'MAIN', 'ARTICLE', 'ASIDE'];
+    return potentialContainers.includes(node.tagName);
+  }
+  
+  // Check if attribute mutations are on relevant elements
+  hasRelevantAttributeChanges(mutation) {
+    try {
+      const target = mutation.target;
+      if (!target || !target.matches) return false;
+      
+      return target.matches('textarea, [contenteditable], [role="textbox"]');
+    } catch (error) {
+      Logger.warn('Error checking attribute mutation', { 
+        error: error.message,
+        targetTag: mutation.target?.tagName 
+      });
+      return false;
+    }
+  }
+  
+  // Advanced throttling system that adapts to mutation load
+  scheduleThrottledDetection() {
+    // Clear any existing timeout
+    clearTimeout(this.detectionTimeout);
+    
+    // Track mutation burst for adaptive throttling
+    const now = Date.now();
+    this.mutationBurst.push(now);
+    
+    // Keep only recent mutations (last 2 seconds)
+    this.mutationBurst = this.mutationBurst.filter(time => now - time < 2000);
+    
+    // Calculate adaptive throttle delay based on mutation frequency
+    let throttleDelay = this.mutationThrottleDelay;
+    
+    if (this.mutationBurst.length > 10) {
+      // High mutation rate - increase throttling
+      throttleDelay = Math.min(this.maxThrottleDelay, this.mutationThrottleDelay * 2);
+      Logger.info('High mutation rate detected, increasing throttle delay', {
+        burstSize: this.mutationBurst.length,
+        newDelay: throttleDelay
+      });
+    } else if (this.mutationBurst.length > 20) {
+      // Extreme mutation rate - temporarily disable observer
+      this.isObserverThrottled = true;
+      Logger.warn('Extreme mutation rate, temporarily throttling observer', {
+        burstSize: this.mutationBurst.length
+      });
+      
+      // Re-enable after cooldown period
+      setTimeout(() => {
+        this.isObserverThrottled = false;
+        this.mutationBurst = [];
+        Logger.info('Mutation observer throttling released');
+      }, 5000);
+      
+      return;
+    }
+    
+    // Schedule detection with adaptive delay
+    this.detectionTimeout = setTimeout(() => {
+      this.detectAndInjectIcon();
+    }, throttleDelay);
+  }
+  
+  // Set up optimized observation with site-specific targeting
+  setupOptimizedObservation() {
+    const hostname = window.location.hostname;
+    const config = this.siteConfigs[hostname];
+    
+    // Get site-specific observation targets
+    let observeTargets = [
+      'main', '[role="main"]', '.chat-container', '.input-container', 
+      '[class*="chat"]', '[class*="input"]', '[class*="compose"]'
+    ];
+    
+    // Add site-specific targets based on configuration
+    if (config && config.buttonContainerSelector) {
+      // Try to observe near the button container area
+      const containerParent = config.buttonContainerSelector.split('.').slice(0, -1).join('.');
+      if (containerParent) {
+        observeTargets.unshift(`.${containerParent}`);
+      }
+    }
+    
+    // Find the most specific target available
+    let observeTarget = document.body; // Ultimate fallback
+    let targetSpecificity = 0;
+    
+    for (let i = 0; i < observeTargets.length; i++) {
+      const selector = observeTargets[i];
+      try {
+        const target = document.querySelector(selector);
+        if (target && target !== document.body) {
+          // Prefer more specific targets (later in array = more specific)
+          observeTarget = target;
+          targetSpecificity = i;
+        }
+      } catch (error) {
+        Logger.warn('Invalid observation target selector', { selector, error: error.message });
+        continue;
+      }
+    }
+    
+    Logger.info('Setting up mutation observer', {
+      target: observeTarget.tagName,
+      targetId: observeTarget.id || 'none',
+      targetClass: observeTarget.className?.substring(0, 50) || 'none',
+      specificity: targetSpecificity,
+      hostname
+    });
+    
+    // Use optimized observation configuration
+    const observerConfig = {
+      childList: true,
+      // Only use subtree if we're observing a large container
+      subtree: targetSpecificity < 2, // More specific targets don't need subtree
+      attributes: true,
+      // Minimal attribute filter for better performance
+      attributeFilter: ['contenteditable', 'role', 'placeholder']
+    };
+    
+    Logger.info('Mutation observer configuration', observerConfig);
+    
+    try {
+      this.mutationObserver.observe(observeTarget, observerConfig);
+      Logger.info('Mutation observer started successfully');
+    } catch (error) {
+      Logger.error('Failed to start mutation observer', error);
+      
+      // Fallback to document.body with minimal config
+      try {
+        this.mutationObserver.observe(document.body, {
+          childList: true,
+          subtree: false, // Reduced scope for fallback
+          attributes: false // Disable attributes for fallback
+        });
+        Logger.info('Fallback mutation observer started on document.body');
+      } catch (fallbackError) {
+        Logger.error('Failed to start fallback mutation observer', fallbackError);
+      }
     }
   }
 
