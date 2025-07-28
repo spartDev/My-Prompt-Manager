@@ -94,7 +94,7 @@ const LibraryView: FC<LibraryViewProps> = ({
       </header>
 
       {/* Content */}
-      <main className="flex-1 overflow-auto custom-scrollbar" aria-label="Prompt library content">
+      <main className="flex-1 overflow-auto custom-scrollbar pb-24" aria-label="Prompt library content">
         {(loading as boolean) ? (
           <div className="flex flex-col items-center justify-center h-full space-y-4" role="status" aria-live="polite">
             <div className="w-8 h-8 border-4 border-purple-200 dark:border-purple-800 border-t-purple-500 dark:border-t-purple-400 rounded-full animate-spin" aria-hidden="true"></div>

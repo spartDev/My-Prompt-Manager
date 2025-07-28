@@ -99,6 +99,7 @@ const PromptCard: FC<PromptCardProps> = ({
     return (category?.color as string) || '#6B7280'; // Default gray color if category not found
   };
 
+
   // Focus management for dropdown menu
   useEffect(() => {
     if (showMenu && firstMenuItemRef.current) {
