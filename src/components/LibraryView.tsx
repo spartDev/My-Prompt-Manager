@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 import type { FC } from 'react';
 
-import { useSearch } from '../hooks';
 import { Prompt } from '../types';
 import { LibraryViewProps } from '../types/components';
 
@@ -12,19 +11,18 @@ import SearchBar from './SearchBar';
 const LibraryView: FC<LibraryViewProps> = ({
   prompts,
   categories,
-  searchQuery,
+  searchWithDebounce,
   selectedCategory,
   onAddNew,
   onEditPrompt,
   onDeletePrompt,
   onCopyPrompt,
-  onSearchChange,
   onCategoryChange,
   onManageCategories,
   onSettings,
   loading
 }) => {
-  const { filteredPrompts } = useSearch(prompts, searchQuery);
+  const { query, debouncedQuery, filteredPrompts, isSearching } = searchWithDebounce;
 
   const finalFilteredPrompts = useMemo(() => {
     // Apply category filter to search-filtered prompts
@@ -70,11 +68,16 @@ const LibraryView: FC<LibraryViewProps> = ({
         <div className="space-y-4" role="search" aria-label="Search and filter prompts">
           <div className="relative">
             <SearchBar
-              value={searchQuery}
-              onChange={onSearchChange as (value: string) => void}
-              onClear={() => { (onSearchChange as (value: string) => void)(''); }}
+              value={query}
+              onChange={searchWithDebounce.setQuery}
+              onClear={searchWithDebounce.clearSearch}
               placeholder="Search your prompts..."
             />
+            {isSearching && (
+              <div className="absolute top-1/2 right-12 transform -translate-y-1/2 z-10">
+                <div className="w-4 h-4 border-2 border-purple-200 dark:border-purple-800 border-t-purple-500 dark:border-t-purple-400 rounded-full animate-spin" aria-hidden="true"></div>
+              </div>
+            )}
           </div>
           
           <div className="flex items-center justify-between">
@@ -153,7 +156,7 @@ const LibraryView: FC<LibraryViewProps> = ({
                 onEdit={onEditPrompt as (prompt: Prompt) => void}
                 onDelete={onDeletePrompt as (id: string) => void}
                 onCopy={onCopyPrompt as (content: string) => void}
-                searchQuery={searchQuery}
+                searchQuery={debouncedQuery}
               />
             ))}
           </div>

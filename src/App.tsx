@@ -9,7 +9,7 @@ import SettingsView from './components/SettingsView';
 import StorageWarning from './components/StorageWarning';
 import ToastContainer from './components/ToastContainer';
 import { ThemeProvider } from './contexts/ThemeContext';
-import { usePrompts, useCategories, useClipboard, useToast } from './hooks';
+import { usePrompts, useCategories, useClipboard, useToast, useSearchWithDebounce } from './hooks';
 import { Prompt, ErrorType, AppError } from './types';
 
 type ViewType = 'library' | 'add' | 'edit' | 'categories' | 'settings';
@@ -17,7 +17,6 @@ type ViewType = 'library' | 'add' | 'edit' | 'categories' | 'settings';
 const App: FC = () => {
   const [currentView, setCurrentView] = useState<ViewType>('library');
   const [selectedPrompt, setSelectedPrompt] = useState<Prompt | null>(null);
-  const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [showStorageWarning, setShowStorageWarning] = useState<boolean>(false);
 
@@ -40,6 +39,9 @@ const App: FC = () => {
 
   const { copyToClipboard } = useClipboard();
   const { toasts, showToast } = useToast();
+  
+  // Initialize search with debounce functionality
+  const searchWithDebounce = useSearchWithDebounce(prompts);
 
   const handleAddNew = () => {
     setCurrentView('add');
@@ -152,13 +154,12 @@ const App: FC = () => {
         <LibraryView
           prompts={prompts}
           categories={categories}
-          searchQuery={searchQuery}
+          searchWithDebounce={searchWithDebounce}
           selectedCategory={selectedCategory}
           onAddNew={handleAddNew}
           onEditPrompt={handleEditPrompt}
           onDeletePrompt={(id: string) => { void handleDeletePrompt(id); }}
           onCopyPrompt={(content: string) => { void handleCopyPrompt(content); }}
-          onSearchChange={setSearchQuery}
           onCategoryChange={setSelectedCategory}
           onManageCategories={() => {
             setCurrentView('categories');

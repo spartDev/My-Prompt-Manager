@@ -36,6 +36,16 @@ export interface UseSearchReturn {
   clearSearch: () => void;
 }
 
+export interface UseSearchWithDebounceReturn {
+  query: string;
+  debouncedQuery: string;
+  filteredPrompts: Prompt[];
+  highlightedResults: HighlightedPrompt[];
+  isSearching: boolean;
+  setQuery: (query: string) => void;
+  clearSearch: () => void;
+}
+
 export interface UseStorageReturn {
   saveData: (key: string, data: unknown) => Promise<void>;
   loadData: <T>(key: string) => Promise<T | null>;

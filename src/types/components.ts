@@ -1,3 +1,5 @@
+import { UseSearchWithDebounceReturn } from './hooks';
+
 import { Prompt, Category } from './index';
 
 // Component prop interfaces
@@ -43,13 +45,12 @@ export interface EditPromptFormProps {
 export interface LibraryViewProps {
   prompts: Prompt[];
   categories: Category[];
-  searchQuery: string;
+  searchWithDebounce: UseSearchWithDebounceReturn;
   selectedCategory: string | null;
   onAddNew: () => void;
   onEditPrompt: (prompt: Prompt) => void;
   onDeletePrompt: (id: string) => void;
   onCopyPrompt: (content: string) => void;
-  onSearchChange: (query: string) => void;
   onCategoryChange: (category: string | null) => void;
   onManageCategories: () => void;
   onSettings: () => void;
