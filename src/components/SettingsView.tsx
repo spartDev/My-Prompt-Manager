@@ -921,7 +921,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
           <div className="mb-4">
             <button
               type="button"
-              onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+              onClick={() => { setShowAdvancedOptions(!showAdvancedOptions); }}
               className="flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-gray-100 hover:text-purple-600 dark:hover:text-purple-400 transition-colors group"
               aria-expanded={showAdvancedOptions}
               aria-controls="advanced-options-content"
@@ -1010,7 +1010,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
           <div className="mb-4">
             <button
               type="button"
-              onClick={() => setShowResetSection(!showResetSection)}
+              onClick={() => { setShowResetSection(!showResetSection); }}
               className="flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-gray-100 hover:text-red-600 dark:hover:text-red-400 transition-colors group"
               aria-expanded={showResetSection}
               aria-controls="reset-section-content"
