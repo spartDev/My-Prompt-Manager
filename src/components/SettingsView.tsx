@@ -689,6 +689,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
           </div>
         </section>
 
+        <SectionSeparator />
 
         {/* Advanced Options */}
         <section>
