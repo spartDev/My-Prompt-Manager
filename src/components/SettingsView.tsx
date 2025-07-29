@@ -37,6 +37,22 @@ interface SettingsViewProps {
   onBack: () => void;
 }
 
+// Visual separator component for section breaks
+const SectionSeparator: FC = () => (
+  <div className="relative py-6" role="separator" aria-hidden="true">
+    <div className="absolute inset-0 flex items-center">
+      <div className="w-full border-t border-gray-200 dark:border-gray-700"></div>
+    </div>
+    <div className="relative flex justify-center">
+      <div className="flex items-center space-x-1 bg-gray-50 dark:bg-gray-900 px-3">
+        <div className="w-1.5 h-1.5 bg-purple-300 dark:bg-purple-600 rounded-full"></div>
+        <div className="w-1 h-1 bg-purple-200 dark:bg-purple-700 rounded-full"></div>
+        <div className="w-1.5 h-1.5 bg-purple-300 dark:bg-purple-600 rounded-full"></div>
+      </div>
+    </div>
+  </div>
+);
+
 const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
   const [settings, setSettings] = useState<Settings>({
     enabledSites: [],
@@ -515,7 +531,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
       </header>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-8">
+      <div className="flex-1 overflow-y-auto p-6 space-y-6">
         {/* Site Integration */}
         <section>
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
@@ -564,6 +580,8 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
             })}
           </div>
         </section>
+
+        <SectionSeparator />
 
         {/* Custom Sites */}
         <section>
@@ -896,6 +914,8 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
           </div>
         </section>
 
+        <SectionSeparator />
+
         {/* Advanced Options */}
         <section>
           <div className="mb-4">
@@ -982,6 +1002,8 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
             </div>
           )}
         </section>
+
+        <SectionSeparator />
 
         {/* Reset */}
         <section>
