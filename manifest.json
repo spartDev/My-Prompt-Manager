@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "Store, organize, and quickly access your personal collection of text prompts with categories and search functionality.",
   "author": "Thomas Roux",
-  "homepage_url": "https://github.com/yourusername/prompt-library-extension",
+  "homepage_url": "https://github.com/spartDev/My-Prompt-Manager",
   "permissions": [
     "storage",
     "activeTab",
