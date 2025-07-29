@@ -623,7 +623,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
             </button>
             <div>
               <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">Settings</h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Configure your prompt library</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Configure your prompt manager</p>
             </div>
           </div>
           <ThemeToggle />
@@ -638,7 +638,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
             Site Integration
           </h2>
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            Choose which AI chat platforms should display the prompt library icon. This includes both built-in sites and your custom sites.
+            Choose which AI chat platforms should display my prompt manager icon. This includes both built-in sites and your custom sites.
           </p>
           
           <div className="space-y-3">
@@ -682,7 +682,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
             {settings.customSites.length === 0 && Object.keys(siteConfigs).length > 0 && (
               <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                 <p className="text-sm text-blue-700 dark:text-blue-300">
-                  <strong>Want to add more sites?</strong> Use the &quot;Custom Sites&quot; feature in Advanced Options below to add the prompt library to any website.
+                  <strong>Want to add more sites?</strong> Use the &quot;Custom Sites&quot; feature in Advanced Options below to add my prompt manager to any website.
                 </p>
               </div>
             )}
@@ -781,7 +781,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
                   Custom Sites
                 </h3>
                 <p className="text-xs text-gray-600 dark:text-gray-400 mb-4">
-                  Add your own websites where you want the prompt library to appear. Added sites will appear in the Site Integration section above.
+                  Add your own websites where you want my prompt manager to appear. Added sites will appear in the Site Integration section above.
                 </p>
                 
                 {/* Add New Site Form */}
@@ -1038,7 +1038,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
                       <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
                     </svg>
                     <p className="text-sm">No custom sites added yet</p>
-                    <p className="text-xs mt-1">Use the form above to add websites where you want the prompt library to appear</p>
+                    <p className="text-xs mt-1">Use the form above to add websites where you want my prompt manager to appear</p>
                   </div>
                 )}
               </div>

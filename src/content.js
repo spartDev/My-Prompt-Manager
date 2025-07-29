@@ -1,6 +1,6 @@
 /* eslint-env browser, webextensions */
 /* global localStorage, navigator, Node, HTMLTextAreaElement, requestAnimationFrame, cancelAnimationFrame, IntersectionObserver */
-// Content script for injecting prompt library icon into AI chat platforms
+// Content script for injecting my prompt manager icon into AI chat platforms
 
 // Inject CSS styles
 function injectCSS() {
@@ -9,7 +9,7 @@ function injectCSS() {
   const style = document.createElement('style');
   style.id = 'prompt-library-styles';
   style.textContent = `
-    /* Prompt Library Icon */
+    /* Prompt Manager Icon */
     .prompt-library-icon {
       position: absolute;
       width: 32px;
@@ -484,8 +484,8 @@ class UIElementFactory {
     const icon = document.createElement('button');
     icon.className = `prompt-library-integrated-icon inline-flex items-center justify-center relative shrink-0 can-focus select-none disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none disabled:drop-shadow-none border-0.5 transition-all h-8 min-w-8 rounded-lg flex items-center px-[7.5px] group !pointer-events-auto !outline-offset-1 text-text-300 border-border-300 active:scale-[0.98] hover:text-text-200/90 hover:bg-bg-100`;
     icon.setAttribute('type', 'button');
-    icon.setAttribute('aria-label', 'Open prompt library - Access your saved prompts');
-    icon.setAttribute('title', 'Prompt Library - Access your saved prompts');
+    icon.setAttribute('aria-label', 'Open my prompt manager - Access your saved prompts');
+    icon.setAttribute('title', 'My Prompt Manager - Access your saved prompts');
     icon.setAttribute('data-instance-id', this.instanceId);
     icon.setAttribute('tabindex', '0');
     
@@ -509,8 +509,8 @@ class UIElementFactory {
     const icon = document.createElement('button');
     icon.className = `prompt-library-integrated-icon focus-visible:bg-offsetPlus hover:bg-offsetPlus text-textOff hover:text-textMain dark:hover:bg-offsetPlus dark:hover:text-textMainDark font-sans focus:outline-none outline-none outline-transparent transition duration-300 ease-out font-sans select-none items-center relative group/button justify-center text-center items-center rounded-lg cursor-pointer active:scale-[0.97] active:duration-150 active:ease-outExpo origin-center whitespace-nowrap inline-flex text-sm h-8 aspect-[9/8]`;
     icon.setAttribute('type', 'button');
-    icon.setAttribute('aria-label', 'Open prompt library - Access your saved prompts');
-    icon.setAttribute('title', 'Prompt Library - Access your saved prompts');
+    icon.setAttribute('aria-label', 'Open my prompt manager - Access your saved prompts');
+    icon.setAttribute('title', 'My Prompt Manager - Access your saved prompts');
     icon.setAttribute('data-state', 'closed');
     icon.setAttribute('data-instance-id', this.instanceId);
     icon.setAttribute('tabindex', '0');
@@ -536,8 +536,8 @@ class UIElementFactory {
     const icon = document.createElement('button');
     icon.className = `prompt-library-integrated-icon composer-btn`;
     icon.setAttribute('type', 'button');
-    icon.setAttribute('aria-label', 'Open prompt library - Access your saved prompts');
-    icon.setAttribute('title', 'Prompt Library - Access your saved prompts');
+    icon.setAttribute('aria-label', 'Open my prompt manager - Access your saved prompts');
+    icon.setAttribute('title', 'My Prompt Manager - Access your saved prompts');
     icon.setAttribute('data-dashlane-label', 'true');
     icon.setAttribute('data-instance-id', this.instanceId);
     icon.setAttribute('tabindex', '0');
@@ -561,8 +561,8 @@ class UIElementFactory {
     icon.className = `prompt-library-icon`;
     icon.setAttribute('data-instance-id', this.instanceId);
     icon.setAttribute('type', 'button');
-    icon.setAttribute('aria-label', 'Open prompt library - Access your saved prompts');
-    icon.setAttribute('title', 'Prompt Library - Access your saved prompts');
+    icon.setAttribute('aria-label', 'Open my prompt manager - Access your saved prompts');
+    icon.setAttribute('title', 'My Prompt Manager - Access your saved prompts');
     icon.setAttribute('tabindex', '0');
     icon.innerHTML = `
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -1072,7 +1072,7 @@ class PromptLibraryInjector {
   async init() {
     if (this.isInitialized) return;
     
-    Logger.info('Initializing prompt library for site', { hostname: this.hostname });
+    Logger.info('Initializing my prompt manager for site', { hostname: this.hostname });
     
     this.isInitialized = true;
     

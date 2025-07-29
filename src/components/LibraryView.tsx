@@ -41,7 +41,7 @@ const LibraryView: FC<LibraryViewProps> = ({
       <header className="flex-shrink-0 p-6 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center" role="img" aria-label="Prompt library icon">
+            <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center" role="img" aria-label="My Prompt Manager icon">
               <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                 <polyline points="14,2 14,8 20,8"/>
@@ -51,7 +51,7 @@ const LibraryView: FC<LibraryViewProps> = ({
               </svg>
             </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">Prompt Library</h1>
+              <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">My Prompt Manager</h1>
               <p className="text-sm text-gray-500 dark:text-gray-400">Organize your creative prompts</p>
             </div>
           </div>
@@ -110,7 +110,7 @@ const LibraryView: FC<LibraryViewProps> = ({
       </header>
 
       {/* Content */}
-      <main className={`flex-1 overflow-auto custom-scrollbar ${finalFilteredPrompts.length > 0 ? 'pb-24' : ''}`} aria-label="Prompt library content">
+      <main className={`flex-1 overflow-auto custom-scrollbar ${finalFilteredPrompts.length > 0 ? 'pb-24' : ''}`} aria-label="My Prompt Manager content">
         {(loading as boolean) ? (
           <div className="flex flex-col items-center justify-center h-full space-y-4" role="status" aria-live="polite">
             <div className="w-8 h-8 border-4 border-purple-200 dark:border-purple-800 border-t-purple-500 dark:border-t-purple-400 rounded-full animate-spin" aria-hidden="true"></div>

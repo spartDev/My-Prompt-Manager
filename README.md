@@ -1,4 +1,4 @@
-# Prompt Library Extension
+# My Prompt Manager Extension
 
 A Chrome extension that provides seamless access to your personal prompt library directly within popular AI chat interfaces. Features both a popup interface for managing prompts and native integration with supported AI platforms including Claude, ChatGPT, and Perplexity.
 
