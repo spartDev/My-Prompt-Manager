@@ -63,6 +63,10 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
   const [positioningDescription, setPositioningDescription] = useState('');
   const [selectorError, setSelectorError] = useState('');
 
+  // Expandable sections state
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
+  const [showResetSection, setShowResetSection] = useState(false);
+
   const siteConfigs: Record<string, SiteConfig> = useMemo(() => ({
     'concierge.sanofi.com': {
       name: 'Sanofi Concierge',
@@ -894,71 +898,159 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
 
         {/* Advanced Options */}
         <section>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-            Advanced Options
-          </h2>
-          
-          <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-              <div>
-                <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm">
-                  Debug Mode
-                </h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Enable console logging for troubleshooting
-                </p>
-              </div>
-              
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={settings.debugMode}
-                  onChange={(e) => void handleAdvancedSetting('debugMode', e.target.checked)}
-                  disabled={saving}
-                  className="sr-only peer"
-                  aria-label="Enable debug mode"
-                />
-                <div className="w-11 h-6 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600"></div>
-              </label>
-            </div>
-
-            <div className="flex items-center justify-between p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-              <div>
-                <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm">
-                  Floating Icon Fallback
-                </h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Show floating icon when integrated button fails
-                </p>
-              </div>
-              
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={settings.floatingFallback}
-                  onChange={(e) => void handleAdvancedSetting('floatingFallback', e.target.checked)}
-                  disabled={saving}
-                  className="sr-only peer"
-                  aria-label="Enable floating icon fallback"
-                />
-                <div className="w-11 h-6 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600"></div>
-              </label>
-            </div>
+          <div className="mb-4">
+            <button
+              type="button"
+              onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+              className="flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-gray-100 hover:text-purple-600 dark:hover:text-purple-400 transition-colors group"
+              aria-expanded={showAdvancedOptions}
+              aria-controls="advanced-options-content"
+            >
+              <svg 
+                className={`w-5 h-5 transition-transform ${showAdvancedOptions ? 'rotate-90' : ''}`} 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth={2} 
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path d="M9 18l6-6-6-6"/>
+              </svg>
+              Advanced Options
+              <svg 
+                className="w-4 h-4 text-amber-500 dark:text-amber-400 opacity-70 group-hover:opacity-100 transition-opacity" 
+                fill="currentColor" 
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                title="Expert feature"
+              >
+                <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
+              </svg>
+            </button>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 ml-7">
+              Expert settings for debugging and troubleshooting
+            </p>
           </div>
+          
+          {showAdvancedOptions && (
+            <div id="advanced-options-content" className="space-y-4 animate-in slide-in-from-top-2 duration-200">
+              <div className="flex items-center justify-between p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                <div>
+                  <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm">
+                    Debug Mode
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Enable console logging for troubleshooting
+                  </p>
+                </div>
+                
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={settings.debugMode}
+                    onChange={(e) => void handleAdvancedSetting('debugMode', e.target.checked)}
+                    disabled={saving}
+                    className="sr-only peer"
+                    aria-label="Enable debug mode"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600"></div>
+                </label>
+              </div>
+
+              <div className="flex items-center justify-between p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                <div>
+                  <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm">
+                    Floating Icon Fallback
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Show floating icon when integrated button fails
+                  </p>
+                </div>
+                
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={settings.floatingFallback}
+                    onChange={(e) => void handleAdvancedSetting('floatingFallback', e.target.checked)}
+                    disabled={saving}
+                    className="sr-only peer"
+                    aria-label="Enable floating icon fallback"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600"></div>
+                </label>
+              </div>
+            </div>
+          )}
         </section>
 
         {/* Reset */}
         <section>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-            Reset
-          </h2>
-          <button
-            onClick={() => void handleReset()}
-            disabled={saving}
-            className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white text-sm font-medium rounded-lg transition-colors focus-interactive"
-          >
-            {saving ? 'Resetting...' : 'Reset All Settings to Default'}
-          </button>
+          <div className="mb-4">
+            <button
+              type="button"
+              onClick={() => setShowResetSection(!showResetSection)}
+              className="flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-gray-100 hover:text-red-600 dark:hover:text-red-400 transition-colors group"
+              aria-expanded={showResetSection}
+              aria-controls="reset-section-content"
+            >
+              <svg 
+                className={`w-5 h-5 transition-transform ${showResetSection ? 'rotate-90' : ''}`} 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth={2} 
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path d="M9 18l6-6-6-6"/>
+              </svg>
+              Reset Settings
+              <svg 
+                className="w-4 h-4 text-red-500 dark:text-red-400 opacity-70 group-hover:opacity-100 transition-opacity" 
+                fill="currentColor" 
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                title="Destructive action"
+              >
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
+              </svg>
+            </button>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 ml-7">
+              Dangerous action - restores all settings to factory defaults
+            </p>
+          </div>
+          
+          {showResetSection && (
+            <div id="reset-section-content" className="animate-in slide-in-from-top-2 duration-200">
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <svg 
+                    className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" 
+                    fill="currentColor" 
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
+                  </svg>
+                  <div className="flex-1">
+                    <h3 className="text-sm font-medium text-red-800 dark:text-red-300 mb-1">
+                      Warning: This action cannot be undone
+                    </h3>
+                    <p className="text-sm text-red-700 dark:text-red-400 mb-3">
+                      This will reset all your settings including site configurations, custom sites, and preferences to their default values. 
+                      All your custom sites will be removed.
+                    </p>
+                    <button
+                      onClick={() => void handleReset()}
+                      disabled={saving}
+                      className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white text-sm font-medium rounded-lg transition-colors focus:ring-2 focus:ring-red-500 focus:ring-offset-1"
+                    >
+                      {saving ? 'Resetting...' : 'Reset All Settings to Default'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </section>
       </div>
 
