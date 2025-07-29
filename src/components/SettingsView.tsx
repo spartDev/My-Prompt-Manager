@@ -13,6 +13,17 @@ interface CustomSite {
   icon?: string;
   enabled: boolean;
   dateAdded: number;
+  positioning?: {
+    mode: 'auto' | 'custom';
+    selector?: string;
+    placement: 'before' | 'after' | 'inside-start' | 'inside-end';
+    offset?: {
+      x: number;
+      y: number;
+    };
+    zIndex?: number;
+    description?: string;
+  };
 }
 
 interface Settings {
@@ -40,6 +51,17 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
   const [newSiteUrl, setNewSiteUrl] = useState('');
   const [newSiteName, setNewSiteName] = useState('');
   const [urlError, setUrlError] = useState('');
+  
+  // Custom positioning state
+  const [showAdvancedPositioning, setShowAdvancedPositioning] = useState(false);
+  const [positioningMode, setPositioningMode] = useState<'auto' | 'custom'>('auto');
+  const [customSelector, setCustomSelector] = useState('');
+  const [placement, setPlacement] = useState<'before' | 'after' | 'inside-start' | 'inside-end'>('after');
+  const [offsetX, setOffsetX] = useState(0);
+  const [offsetY, setOffsetY] = useState(0);
+  const [customZIndex, setCustomZIndex] = useState(999999);
+  const [positioningDescription, setPositioningDescription] = useState('');
+  const [selectorError, setSelectorError] = useState('');
 
   const siteConfigs: Record<string, SiteConfig> = useMemo(() => ({
     'concierge.sanofi.com': {
@@ -98,6 +120,63 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
       setUrlError('');
     }
   }, [newSiteUrl, urlError]);
+
+  // Clear selector error when user types
+  useEffect(() => {
+    if (selectorError && customSelector) {
+      setSelectorError('');
+    }
+  }, [customSelector, selectorError]);
+
+  // Reset positioning form
+  const resetPositioningForm = () => {
+    setShowAdvancedPositioning(false);
+    setPositioningMode('auto');
+    setCustomSelector('');
+    setPlacement('after');
+    setOffsetX(0);
+    setOffsetY(0);
+    setCustomZIndex(999999);
+    setPositioningDescription('');
+    setSelectorError('');
+  };
+
+  // Test selector and show preview
+  const testSelector = async () => {
+    if (!customSelector.trim()) {
+      setSelectorError('Please enter a selector to test');
+      return;
+    }
+
+    const validation = validateSelector(customSelector);
+    if (!validation.isValid) {
+      setSelectorError(validation.error || 'Invalid selector');
+      return;
+    }
+
+    try {
+      // Send test message to current tab
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tabs[0] && tabs[0].id) {
+        const response = await chrome.tabs.sendMessage(tabs[0].id, {
+          action: 'testSelector',
+          selector: customSelector,
+          placement,
+          offset: { x: offsetX, y: offsetY },
+          zIndex: customZIndex
+        });
+        
+        if (response.success) {
+          setSelectorError(''); // Clear any previous errors
+          // You could add a success message here if desired
+        } else {
+          setSelectorError(response.error || 'Selector test failed');
+        }
+      }
+    } catch (error) {
+      setSelectorError('Failed to test selector. Make sure you\'re on the target website.');
+    }
+  };
 
   const saveSettings = async (newSettings: Settings) => {
     setSaving(true);
@@ -211,6 +290,70 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
     }
   };
 
+  // Enhanced CSS selector validation
+  const validateSelector = (selector: string): { isValid: boolean; error?: string } => {
+    if (!selector || selector.trim() === '') {
+      return { isValid: false, error: 'Selector is required for custom positioning' };
+    }
+
+    const trimmedSelector = selector.trim();
+
+    // Length validation
+    if (trimmedSelector.length > 500) {
+      return { isValid: false, error: 'Selector is too long (max 500 characters)' };
+    }
+
+    // Security checks for potentially dangerous selectors
+    const dangerousPatterns = [
+      /script/i,
+      /iframe/i,
+      /object/i,
+      /embed/i,
+      /javascript:/i,
+      /data:/i,
+      /vbscript:/i
+    ];
+
+    for (const pattern of dangerousPatterns) {
+      if (pattern.test(trimmedSelector)) {
+        return { isValid: false, error: 'Security: This selector type is not allowed' };
+      }
+    }
+
+    // Check for overly complex selectors that might cause performance issues
+    const complexityIndicators = [
+      { pattern: /\s/g, limit: 10, message: 'Too many descendant selectors (max 10 spaces)' },
+      { pattern: />/g, limit: 5, message: 'Too many child selectors (max 5)' },
+      { pattern: /\+/g, limit: 3, message: 'Too many adjacent sibling selectors (max 3)' },
+      { pattern: /~/g, limit: 3, message: 'Too many general sibling selectors (max 3)' },
+      { pattern: /\[/g, limit: 5, message: 'Too many attribute selectors (max 5)' },
+      { pattern: /:/g, limit: 5, message: 'Too many pseudo selectors (max 5)' }
+    ];
+
+    for (const { pattern, limit, message } of complexityIndicators) {
+      const matches = trimmedSelector.match(pattern) || [];
+      if (matches.length > limit) {
+        return { isValid: false, error: `Complexity: ${message}` };
+      }
+    }
+
+    try {
+      // Test if selector is valid by trying to query it
+      document.querySelector(trimmedSelector);
+      return { isValid: true };
+    } catch (error) {
+      // Provide more specific error messages for common mistakes
+      const errorMessage = error.message || '';
+      if (errorMessage.includes('Unexpected token')) {
+        return { isValid: false, error: 'Syntax error: Check for typos in selector' };
+      } else if (errorMessage.includes('Invalid selector')) {
+        return { isValid: false, error: 'Invalid CSS selector syntax' };
+      } else {
+        return { isValid: false, error: `Selector error: ${errorMessage}` };
+      }
+    }
+  };
+
   const handleAddCustomSite = async () => {
     const validation = validateAndProcessUrl(newSiteUrl);
     
@@ -223,11 +366,31 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
       return;
     }
 
+    // Validate custom selector if custom positioning is enabled
+    if (positioningMode === 'custom') {
+      const selectorValidation = validateSelector(customSelector);
+      if (!selectorValidation.isValid) {
+        setSelectorError(selectorValidation.error || 'Invalid selector');
+        return;
+      }
+    }
+
     const newSite: CustomSite = {
       hostname: validation.hostname,
       displayName: newSiteName.trim() || validation.hostname,
       enabled: true,
-      dateAdded: Date.now()
+      dateAdded: Date.now(),
+      positioning: positioningMode === 'custom' ? {
+        mode: 'custom',
+        selector: customSelector.trim(),
+        placement,
+        offset: { x: offsetX, y: offsetY },
+        zIndex: customZIndex,
+        description: positioningDescription.trim() || undefined
+      } : {
+        mode: 'auto',
+        placement: 'after'
+      }
     };
 
     const newSettings = {
@@ -242,6 +405,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
     setNewSiteUrl('');
     setNewSiteName('');
     setUrlError('');
+    resetPositioningForm();
     
     // Notify any open tabs to reinitialize
     await notifyCustomSiteChange(validation.hostname);
@@ -431,11 +595,178 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
                 disabled={saving}
               />
               
+              {/* Advanced Positioning Toggle */}
+              <div className="border-t border-gray-200 dark:border-gray-600 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowAdvancedPositioning(!showAdvancedPositioning)}
+                  className="flex items-center gap-2 text-sm text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-medium"
+                >
+                  <svg 
+                    className={`w-4 h-4 transition-transform ${showAdvancedPositioning ? 'rotate-90' : ''}`} 
+                    fill="none" 
+                    stroke="currentColor" 
+                    strokeWidth={2} 
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M9 18l6-6-6-6"/>
+                  </svg>
+                  Advanced Icon Positioning
+                </button>
+                
+                {showAdvancedPositioning && (
+                  <div className="mt-3 space-y-3 bg-white dark:bg-gray-700 rounded-lg p-3 border border-gray-200 dark:border-gray-600">
+                    {/* Positioning Mode */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Positioning Mode
+                      </label>
+                      <select
+                        value={positioningMode}
+                        onChange={(e) => setPositioningMode(e.target.value as 'auto' | 'custom')}
+                        className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100"
+                        disabled={saving}
+                      >
+                        <option value="auto">Auto (Use default fallback selectors)</option>
+                        <option value="custom">Custom (Specify exact placement)</option>
+                      </select>
+                    </div>
+
+                    {positioningMode === 'custom' && (
+                      <>
+                        {/* Custom Selector */}
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            CSS Selector <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            placeholder=".submit-button, #send-btn, textarea[data-id='root']"
+                            value={customSelector}
+                            onChange={(e) => setCustomSelector(e.target.value)}
+                            className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100 font-mono"
+                            disabled={saving}
+                          />
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            Target element where the icon should be positioned
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => void testSelector()}
+                            disabled={!customSelector.trim() || saving}
+                            className="mt-2 px-3 py-1 text-xs bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
+                          >
+                            Test Selector
+                          </button>
+                        </div>
+
+                        {/* Placement Options */}
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Placement
+                          </label>
+                          <select
+                            value={placement}
+                            onChange={(e) => setPlacement(e.target.value as 'before' | 'after' | 'inside-start' | 'inside-end')}
+                            className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100"
+                            disabled={saving}
+                          >
+                            <option value="before">Before element</option>
+                            <option value="after">After element</option>
+                            <option value="inside-start">Inside element (start)</option>
+                            <option value="inside-end">Inside element (end)</option>
+                          </select>
+                        </div>
+
+                        {/* Offset Controls */}
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                              X Offset (px)
+                            </label>
+                            <input
+                              type="number"
+                              value={offsetX}
+                              onChange={(e) => setOffsetX(parseInt(e.target.value) || 0)}
+                              className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100"
+                              disabled={saving}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                              Y Offset (px)
+                            </label>
+                            <input
+                              type="number"
+                              value={offsetY}
+                              onChange={(e) => setOffsetY(parseInt(e.target.value) || 0)}
+                              className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100"
+                              disabled={saving}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Z-Index Control */}
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Z-Index
+                          </label>
+                          <input
+                            type="number"
+                            value={customZIndex}
+                            onChange={(e) => setCustomZIndex(parseInt(e.target.value) || 999999)}
+                            className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100"
+                            disabled={saving}
+                          />
+                        </div>
+
+                        {/* Description */}
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Description (Optional)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="E.g., 'Next to send button on contact form'"
+                            value={positioningDescription}
+                            onChange={(e) => setPositioningDescription(e.target.value)}
+                            className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100"
+                            disabled={saving}
+                          />
+                        </div>
+
+                        {/* Selector Error */}
+                        {selectorError && (
+                          <div className="p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded">
+                            <p className="text-xs text-red-600 dark:text-red-400">
+                              {selectorError}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Helpful Tips */}
+                        <div className="p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded">
+                          <p className="text-xs text-blue-700 dark:text-blue-300 font-medium mb-1">Tips & Examples:</p>
+                          <ul className="text-xs text-blue-600 dark:text-blue-400 space-y-1">
+                            <li>• <strong>Basic:</strong> <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">.send-button</code> or <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">#submit-btn</code></li>
+                            <li>• <strong>Attributes:</strong> <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">button[type="submit"]</code></li>
+                            <li>• <strong>Multiple:</strong> <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">button, .send-btn, #submit</code></li>
+                            <li>• <strong>DevTools:</strong> Right-click → Inspect → Copy selector</li>
+                            <li>• <strong>Test in console:</strong> <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">document.querySelector("your-selector")</code></li>
+                            <li>• <strong>Placement:</strong> Use "inside-end" for button containers</li>
+                          </ul>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+              
               <button
                 onClick={() => void handleAddCustomSite()}
-                disabled={!isValidUrl(newSiteUrl) || saving}
+                disabled={!isValidUrl(newSiteUrl) || saving || (positioningMode === 'custom' && !customSelector.trim())}
                 className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
-                title={!isValidUrl(newSiteUrl) ? `Validation error: ${validateAndProcessUrl(newSiteUrl).error || 'Invalid URL'}` : ''}
+                title={!isValidUrl(newSiteUrl) ? `Validation error: ${validateAndProcessUrl(newSiteUrl).error || 'Invalid URL'}` : positioningMode === 'custom' && !customSelector.trim() ? 'Custom positioning requires a CSS selector' : ''}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M12 4v16m8-8H4"/>
@@ -488,6 +819,27 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
                     <p className="text-xs text-gray-500 dark:text-gray-400">
                       {site.hostname}
                     </p>
+                    {site.positioning && (
+                      <div className="mt-1 flex items-center gap-2 text-xs">
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                          site.positioning.mode === 'custom' 
+                            ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300' 
+                            : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                        }`}>
+                          {site.positioning.mode === 'custom' ? 'Custom' : 'Auto'}
+                        </span>
+                        {site.positioning.mode === 'custom' && site.positioning.selector && (
+                          <span className="text-gray-500 dark:text-gray-400 font-mono truncate max-w-32" title={site.positioning.selector}>
+                            {site.positioning.selector}
+                          </span>
+                        )}
+                        {site.positioning.description && (
+                          <span className="text-gray-500 dark:text-gray-400" title={site.positioning.description}>
+                            ({site.positioning.description})
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
                 

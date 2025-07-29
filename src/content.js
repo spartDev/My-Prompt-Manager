@@ -361,6 +361,20 @@ class Logger {
     }
   }
   
+  static debug(message, context = {}) {
+    if (this.isDebugMode()) {
+      const logData = {
+        timestamp: new Date().toISOString(),
+        level: 'DEBUG',
+        message,
+        context,
+        url: window.location.href
+      };
+      
+      console.debug('[PromptLibrary]', message, logData);
+    }
+  }
+  
   static showDebugNotification(message, type = 'info') {
     // Only show in debug mode and avoid spam
     if (!this.isDebugMode() || this._lastNotification === message) return;
@@ -1071,7 +1085,7 @@ class PromptLibraryInjector {
 
   startDetection() {
     // Initial detection
-    this.detectAndInjectIcon();
+    void this.detectAndInjectIcon();
     
     // For dynamic content loading, retry detection periodically
     let retryCount = 0;
@@ -1081,7 +1095,7 @@ class PromptLibraryInjector {
         clearInterval(retryInterval);
         return;
       }
-      this.detectAndInjectIcon();
+      void this.detectAndInjectIcon();
       retryCount++;
     }, 500);
     
@@ -1094,7 +1108,7 @@ class PromptLibraryInjector {
     // Also detect on focus events for Sanofi Concierge input elements
     const focusHandler = (e) => {
       if (e.target.matches('textarea, div[contenteditable="true"]')) {
-        setTimeout(() => this.detectAndInjectIcon(), 100);
+        setTimeout(() => void this.detectAndInjectIcon(), 100);
       }
     };
     this.eventManager.addTrackedEventListener(document, 'focusin', focusHandler);
@@ -1468,7 +1482,7 @@ class PromptLibraryInjector {
     
     // Schedule detection with adaptive delay
     this.detectionTimeout = setTimeout(() => {
-      this.detectAndInjectIcon();
+      void this.detectAndInjectIcon();
     }, throttleDelay);
   }
   
@@ -1560,9 +1574,393 @@ class PromptLibraryInjector {
     }
   }
 
-  detectAndInjectIcon() {
+  // Get custom site positioning configuration from settings
+  async getCustomSiteConfig(hostname) {
+    try {
+      const result = await chrome.storage.local.get(['promptLibrarySettings']);
+      const settings = result.promptLibrarySettings || {};
+      const customSites = settings.customSites || [];
+      
+      const customSite = customSites.find(site => site.hostname === hostname);
+      if (customSite && customSite.enabled && customSite.positioning) {
+        Logger.info('Found custom site positioning config', {
+          hostname,
+          mode: customSite.positioning.mode,
+          selector: customSite.positioning.selector,
+          placement: customSite.positioning.placement
+        });
+        return customSite.positioning;
+      }
+    } catch (error) {
+      Logger.error('Failed to get custom site config', error);
+    }
+    return null;
+  }
+
+  // Create icon with custom positioning
+  async createCustomPositionedIcon(positioning) {
+    if (!positioning || positioning.mode !== 'custom' || !positioning.selector) {
+      return false;
+    }
+
+    try {
+      // Find target elements using the custom selector
+      const targetElements = document.querySelectorAll(positioning.selector);
+      
+      if (targetElements.length === 0) {
+        Logger.warn('Custom selector found no elements', { 
+          selector: positioning.selector 
+        });
+        return false;
+      }
+
+      // Use the first matching element
+      const targetElement = targetElements[0];
+      
+      // Enhanced validation for target element
+      if (!document.body.contains(targetElement)) {
+        Logger.warn('Target element is not in DOM', { 
+          selector: positioning.selector 
+        });
+        return false;
+      }
+
+      // Check if element is visible (more comprehensive check)
+      const isVisible = targetElement.offsetParent !== null || 
+                       targetElement.getBoundingClientRect().width > 0 ||
+                       targetElement.getBoundingClientRect().height > 0 ||
+                       getComputedStyle(targetElement).display !== 'none';
+      
+      if (!isVisible) {
+        Logger.warn('Target element is not visible', { 
+          selector: positioning.selector,
+          offsetParent: targetElement.offsetParent,
+          display: getComputedStyle(targetElement).display,
+          rect: targetElement.getBoundingClientRect()
+        });
+        return false;
+      }
+
+      // Remove any existing icon
+      if (this.icon) {
+        this.icon.remove();
+        this.icon = null;
+      }
+
+      // Create the icon
+      this.icon = this.uiFactory.createFloatingIcon();
+      
+      // Apply custom styling
+      if (positioning.zIndex) {
+        this.icon.style.zIndex = positioning.zIndex.toString();
+      }
+
+      // Add click handler
+      this.icon.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        // For custom positioned icons, we still need to find the closest textarea for the prompt selector
+        const textarea = this.findClosestTextarea(targetElement) || targetElement;
+        this.showPromptSelector(textarea);
+      });
+
+      // Position the icon based on placement mode
+      this.positionCustomIcon(targetElement, positioning);
+      
+      // Add to DOM
+      document.body.appendChild(this.icon);
+      
+      Logger.info('Custom positioned icon created successfully', {
+        selector: positioning.selector,
+        placement: positioning.placement,
+        targetElement: targetElement.tagName
+      });
+      
+      return true;
+    } catch (error) {
+      Logger.error('Failed to create custom positioned icon', error, {
+        selector: positioning.selector,
+        error: error.message
+      });
+      return false;
+    }
+  }
+
+  // Find the closest textarea to a target element for prompt insertion
+  findClosestTextarea(targetElement) {
+    // First, check if the target element itself is a textarea
+    if (targetElement.matches('textarea, div[contenteditable="true"], [role="textbox"]')) {
+      return targetElement;
+    }
+
+    // Look for textarea in the same container
+    const commonSelectors = [
+      'textarea',
+      'div[contenteditable="true"]',
+      '[role="textbox"]',
+      'input[type="text"]'
+    ];
+
+    // Search within the parent containers
+    let currentElement = targetElement;
+    for (let i = 0; i < 5; i++) { // Limit traversal depth
+      if (!currentElement || !currentElement.parentElement) break;
+      
+      const parent = currentElement.parentElement;
+      for (const selector of commonSelectors) {
+        const textarea = parent.querySelector(selector);
+        if (textarea && this.isValidTextarea(textarea)) {
+          return textarea;
+        }
+      }
+      currentElement = parent;
+    }
+
+    // Fallback: search the entire document
+    for (const selector of commonSelectors) {
+      const textareas = document.querySelectorAll(selector);
+      for (const textarea of textareas) {
+        if (this.isValidTextarea(textarea)) {
+          return textarea;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  // Position icon based on custom positioning configuration
+  positionCustomIcon(targetElement, positioning) {
+    try {
+      // Validate inputs
+      if (!targetElement || !positioning) {
+        Logger.error('Invalid parameters for positionCustomIcon', {
+          hasTargetElement: !!targetElement,
+          hasPositioning: !!positioning
+        });
+        return;
+      }
+
+      const rect = targetElement.getBoundingClientRect();
+      
+      // Check if element has valid dimensions
+      if (rect.width === 0 && rect.height === 0) {
+        Logger.warn('Target element has zero dimensions', {
+          selector: positioning.selector,
+          rect: rect
+        });
+      }
+
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+
+      let top, left;
+      
+      const offsetX = positioning.offset?.x || 0;
+      const offsetY = positioning.offset?.y || 0;
+
+      // Validate offsets
+      if (Math.abs(offsetX) > 1000 || Math.abs(offsetY) > 1000) {
+        Logger.warn('Large offset values detected, may cause positioning issues', {
+          offsetX,
+          offsetY
+        });
+      }
+
+    switch (positioning.placement) {
+      case 'before':
+        top = rect.top + scrollTop + offsetY;
+        left = rect.left + scrollLeft - 40 + offsetX; // Icon width + margin
+        break;
+      case 'after':
+        top = rect.top + scrollTop + offsetY;
+        left = rect.right + scrollLeft + 8 + offsetX;
+        break;
+      case 'inside-start':
+        top = rect.top + scrollTop + 8 + offsetY;
+        left = rect.left + scrollLeft + 8 + offsetX;
+        break;
+      case 'inside-end':
+        top = rect.top + scrollTop + 8 + offsetY;
+        left = rect.right + scrollLeft - 40 + offsetX; // Icon width + margin
+        break;
+      default:
+        // Default to 'after'
+        top = rect.top + scrollTop + offsetY;
+        left = rect.right + scrollLeft + 8 + offsetX;
+    }
+
+      // Validate calculated positions
+      if (isNaN(top) || isNaN(left)) {
+        Logger.error('Invalid position calculated', {
+          top,
+          left,
+          placement: positioning.placement,
+          rect: rect
+        });
+        return;
+      }
+
+      // Check if position is within reasonable viewport bounds
+      const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+      const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+      
+      if (left < -100 || left > viewportWidth + 100 || top < -100 || top > viewportHeight + scrollTop + 100) {
+        Logger.warn('Icon positioned outside reasonable viewport bounds', {
+          position: { top, left },
+          viewport: { width: viewportWidth, height: viewportHeight },
+          placement: positioning.placement
+        });
+      }
+
+      // Apply position with error handling
+      if (this.icon) {
+        this.icon.style.position = 'absolute';
+        this.icon.style.top = Math.round(top) + 'px';
+        this.icon.style.left = Math.round(left) + 'px';
+        
+        Logger.debug('Custom icon positioned', {
+          position: { top: Math.round(top), left: Math.round(left) },
+          placement: positioning.placement,
+          selector: positioning.selector
+        });
+      } else {
+        Logger.error('Icon element is null during positioning');
+        return;
+      }
+      
+      // Store current textarea reference for the icon
+      this.currentTextarea = this.findClosestTextarea(targetElement);
+      
+      // Set up position tracking for responsive updates
+      this.setupCustomIconPositionTracking(targetElement, positioning);
+      
+    } catch (error) {
+      Logger.error('Error in positionCustomIcon', error, {
+        selector: positioning.selector,
+        placement: positioning.placement,
+        hasIcon: !!this.icon,
+        error: error.message
+      });
+    }
+  }
+
+  // Set up position tracking for custom positioned icons
+  setupCustomIconPositionTracking(targetElement, positioning) {
+    // Create throttled update function that doesn't re-setup event listeners
+    const throttledUpdate = () => {
+      if (this.iconPositionCache.updatePending) return;
+      
+      this.iconPositionCache.updatePending = true;
+      
+      requestAnimationFrame(() => {
+        if (this.icon && targetElement) {
+          this.updateCustomIconPosition(targetElement, positioning);
+        }
+        this.iconPositionCache.updatePending = false;
+      });
+    };
+
+    // Add optimized event listeners
+    this.eventManager.addTrackedEventListener(window, 'scroll', throttledUpdate, { passive: true });
+    this.eventManager.addTrackedEventListener(window, 'resize', throttledUpdate, { passive: true });
+  }
+
+  // Update icon position without setting up new event listeners
+  updateCustomIconPosition(targetElement, positioning) {
+    try {
+      // Validate inputs
+      if (!targetElement || !positioning) {
+        return;
+      }
+      
+      const rect = targetElement.getBoundingClientRect();
+      
+      // Check if element has valid dimensions
+      if (rect.width === 0 && rect.height === 0) {
+        return;
+      }
+      
+      // Calculate position based on placement mode
+      let top, left;
+      const iconWidth = 30;
+      const iconHeight = 30;
+      const offset = positioning.offset || { x: 0, y: 0 };
+      
+      switch (positioning.placement) {
+        case 'before':
+          top = rect.top + window.scrollY + (rect.height - iconHeight) / 2;
+          left = rect.left + window.scrollX - iconWidth - 8;
+          break;
+        case 'after':
+          top = rect.top + window.scrollY + (rect.height - iconHeight) / 2;
+          left = rect.right + window.scrollX + 8;
+          break;
+        case 'inside-start':
+          top = rect.top + window.scrollY + 8;
+          left = rect.left + window.scrollX + 8;
+          break;
+        case 'inside-end':
+          top = rect.top + window.scrollY + 8;
+          left = rect.right + window.scrollX - iconWidth - 8;
+          break;
+        default:
+          // Default to 'after' placement
+          top = rect.top + window.scrollY + (rect.height - iconHeight) / 2;
+          left = rect.right + window.scrollX + 8;
+      }
+      
+      // Apply user offsets
+      top += offset.y;
+      left += offset.x;
+      
+      // Ensure icon stays within viewport bounds
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const scrollTop = window.scrollY;
+      const scrollLeft = window.scrollX;
+      
+      // Constrain to viewport
+      left = Math.max(scrollLeft + 10, Math.min(left, scrollLeft + viewportWidth - iconWidth - 10));
+      top = Math.max(scrollTop + 10, Math.min(top, scrollTop + viewportHeight - iconHeight - 10));
+      
+      // Apply positioning to icon
+      if (this.icon) {
+        this.icon.style.position = 'absolute';
+        this.icon.style.zIndex = positioning.zIndex || '10000000';
+        this.icon.style.top = Math.round(top) + 'px';
+        this.icon.style.left = Math.round(left) + 'px';
+        
+        Logger.debug('Custom icon position updated', {
+          position: { top: Math.round(top), left: Math.round(left) },
+          placement: positioning.placement,
+          selector: positioning.selector
+        });
+      }
+    } catch (error) {
+      Logger.error('Error updating custom icon position', error, {
+        selector: positioning.selector,
+        placement: positioning.placement
+      });
+    }
+  }
+
+  async detectAndInjectIcon() {
     const hostname = String(window.location.hostname || '');
     const config = this.siteConfigs[hostname];
+    
+    // First, check for custom site positioning configuration
+    const customPositioning = await this.getCustomSiteConfig(hostname);
+    if (customPositioning && customPositioning.mode === 'custom') {
+      Logger.info('Attempting custom positioning for site', { hostname });
+      const success = await this.createCustomPositionedIcon(customPositioning);
+      if (success) {
+        Logger.info('Custom positioning successful, skipping default injection');
+        return;
+      } else {
+        Logger.warn('Custom positioning failed, falling back to default behavior');
+      }
+    }
     
     // Define fallback selectors for custom sites
     const fallbackSelectors = [
@@ -2632,7 +3030,7 @@ document.addEventListener('visibilitychange', () => {
         initializePromptLibrary();
       } else {
         // Just re-detect and inject if needed
-        promptLibraryInstance.detectAndInjectIcon();
+        void promptLibraryInstance.detectAndInjectIcon();
       }
     }, 100);
   }
@@ -2646,7 +3044,7 @@ window.addEventListener('focus', () => {
       initializePromptLibrary();
     } else {
       // Re-detect in case DOM changed while we were away
-      promptLibraryInstance.detectAndInjectIcon();
+      void promptLibraryInstance.detectAndInjectIcon();
     }
   }, 200);
 });
@@ -2704,5 +3102,137 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     }
     
     sendResponse({ success: true });
+  }
+  
+  if (message.action === 'testSelector') {
+    // Handle selector testing for position preview
+    Logger.info('Testing selector for position preview', { 
+      selector: message.selector,
+      placement: message.placement
+    });
+    
+    try {
+      // Remove any existing test icon
+      const existingTestIcon = document.querySelector('.prompt-library-test-icon');
+      if (existingTestIcon) {
+        existingTestIcon.remove();
+      }
+      
+      // Find elements using the test selector
+      const targetElements = document.querySelectorAll(message.selector);
+      
+      if (targetElements.length === 0) {
+        sendResponse({ 
+          success: false, 
+          error: `No elements found for selector: ${message.selector}` 
+        });
+        return;
+      }
+      
+      // Use the first matching element
+      const targetElement = targetElements[0];
+      
+      // Create a test icon
+      const testIcon = document.createElement('div');
+      testIcon.className = 'prompt-library-test-icon';
+      testIcon.style.cssText = `
+        position: absolute;
+        width: 32px;
+        height: 32px;
+        background: #ff6b35;
+        border: 3px solid #fff;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: ${message.zIndex || 999999};
+        box-shadow: 0 4px 12px rgba(255, 107, 53, 0.4);
+        animation: testIconPulse 1s ease-in-out infinite alternate;
+        color: white;
+        font-weight: bold;
+        font-size: 14px;
+      `;
+      testIcon.innerHTML = '?';
+      
+      // Add pulse animation
+      if (!document.querySelector('#test-icon-animation')) {
+        const style = document.createElement('style');
+        style.id = 'test-icon-animation';
+        style.textContent = `
+          @keyframes testIconPulse {
+            from { transform: scale(1); opacity: 0.8; }
+            to { transform: scale(1.1); opacity: 1; }
+          }
+        `;
+        document.head.appendChild(style);
+      }
+      
+      // Position the test icon
+      const rect = targetElement.getBoundingClientRect();
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+      
+      const offsetX = message.offset?.x || 0;
+      const offsetY = message.offset?.y || 0;
+      
+      let top, left;
+      
+      switch (message.placement) {
+        case 'before':
+          top = rect.top + scrollTop + offsetY;
+          left = rect.left + scrollLeft - 40 + offsetX;
+          break;
+        case 'after':
+          top = rect.top + scrollTop + offsetY;
+          left = rect.right + scrollLeft + 8 + offsetX;
+          break;
+        case 'inside-start':
+          top = rect.top + scrollTop + 8 + offsetY;
+          left = rect.left + scrollLeft + 8 + offsetX;
+          break;
+        case 'inside-end':
+          top = rect.top + scrollTop + 8 + offsetY;
+          left = rect.right + scrollLeft - 40 + offsetX;
+          break;
+        default:
+          top = rect.top + scrollTop + offsetY;
+          left = rect.right + scrollLeft + 8 + offsetX;
+      }
+      
+      testIcon.style.top = top + 'px';
+      testIcon.style.left = left + 'px';
+      
+      // Add to DOM
+      document.body.appendChild(testIcon);
+      
+      // Highlight the target element temporarily
+      const originalStyle = targetElement.style.cssText;
+      targetElement.style.cssText += `
+        outline: 2px dashed #ff6b35 !important;
+        outline-offset: 2px !important;
+      `;
+      
+      // Remove test icon and highlight after 3 seconds
+      setTimeout(() => {
+        if (testIcon) {
+          testIcon.remove();
+        }
+        targetElement.style.cssText = originalStyle;
+      }, 3000);
+      
+      sendResponse({ 
+        success: true, 
+        elementsFound: targetElements.length,
+        targetElement: targetElement.tagName,
+        message: `Found ${targetElements.length} element(s). Test icon will disappear in 3 seconds.`
+      });
+      
+    } catch (error) {
+      sendResponse({ 
+        success: false, 
+        error: `Selector test failed: ${error.message}` 
+      });
+    }
+    return;
   }
 });
