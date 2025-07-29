@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { FC } from 'react';
 
+import ThemeToggle from './ThemeToggle';
+
 interface SiteConfig {
   name: string;
   description: string;
@@ -508,20 +510,23 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
     <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900">
       {/* Header */}
       <header className="flex-shrink-0 p-6 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700">
-        <div className="flex items-center gap-4 mb-6">
-          <button
-            onClick={onBack}
-            className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors focus-interactive"
-            title="Back to library"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path d="M19 12H5M12 19l-7-7 7-7"/>
-            </svg>
-          </button>
-          <div>
-            <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">Settings</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Configure your prompt library</p>
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={onBack}
+              className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors focus-interactive"
+              title="Back to library"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path d="M19 12H5M12 19l-7-7 7-7"/>
+              </svg>
+            </button>
+            <div>
+              <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">Settings</h1>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Configure your prompt library</p>
+            </div>
           </div>
+          <ThemeToggle />
         </div>
       </header>
 
@@ -576,340 +581,6 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
           </div>
         </section>
 
-        <SectionSeparator />
-
-        {/* Custom Sites */}
-        <section>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-            Custom Sites
-          </h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            Add your own websites where you want the prompt library to appear
-          </p>
-          
-          {/* Add New Site Form */}
-          <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 mb-4">
-            <div className="space-y-3">
-              <input
-                type="url"
-                placeholder="https://example.com"
-                value={newSiteUrl}
-                onChange={(e) => {
-                  setNewSiteUrl(e.target.value);
-                }}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-100"
-                disabled={saving}
-              />
-              
-              <input
-                type="text"
-                placeholder="Site Name (optional)"
-                value={newSiteName}
-                onChange={(e) => {
-                  setNewSiteName(e.target.value);
-                }}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-100"
-                disabled={saving}
-              />
-              
-              {/* Advanced Positioning Toggle */}
-              <div className="border-t border-gray-200 dark:border-gray-600 pt-3">
-                <button
-                  type="button"
-                  onClick={() => { setShowAdvancedPositioning(!showAdvancedPositioning); }}
-                  className="flex items-center gap-2 text-sm text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-medium"
-                >
-                  <svg 
-                    className={`w-4 h-4 transition-transform ${showAdvancedPositioning ? 'rotate-90' : ''}`} 
-                    fill="none" 
-                    stroke="currentColor" 
-                    strokeWidth={2} 
-                    viewBox="0 0 24 24"
-                  >
-                    <path d="M9 18l6-6-6-6"/>
-                  </svg>
-                  Advanced Icon Positioning
-                </button>
-                
-                {showAdvancedPositioning && (
-                  <div className="mt-3 space-y-3 bg-white dark:bg-gray-700 rounded-lg p-3 border border-gray-200 dark:border-gray-600">
-                    {/* Positioning Mode */}
-                    <div>
-                      <label htmlFor="positioning-mode" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Positioning Mode
-                      </label>
-                      <select
-                        id="positioning-mode"
-                        value={positioningMode}
-                        onChange={(e) => { setPositioningMode(e.target.value as 'auto' | 'custom'); }}
-                        className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100"
-                        disabled={saving}
-                      >
-                        <option value="auto">Auto (Use default fallback selectors)</option>
-                        <option value="custom">Custom (Specify exact placement)</option>
-                      </select>
-                    </div>
-
-                    {positioningMode === 'custom' && (
-                      <>
-                        {/* Custom Selector */}
-                        <div>
-                          <label htmlFor="custom-selector" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            CSS Selector <span className="text-red-500">*</span>
-                          </label>
-                          <input
-                            id="custom-selector"
-                            type="text"
-                            placeholder=".submit-button, #send-btn, textarea[data-id='root']"
-                            value={customSelector}
-                            onChange={(e) => { setCustomSelector(e.target.value); }}
-                            className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100 font-mono"
-                            disabled={saving}
-                          />
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                            Target element where the icon should be positioned
-                          </p>
-                          <button
-                            type="button"
-                            onClick={() => void testSelector()}
-                            disabled={!customSelector.trim() || saving}
-                            className="mt-2 px-3 py-1 text-xs bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
-                          >
-                            Test Selector
-                          </button>
-                        </div>
-
-                        {/* Placement Options */}
-                        <div>
-                          <label htmlFor="placement-select" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            Placement
-                          </label>
-                          <select
-                            id="placement-select"
-                            value={placement}
-                            onChange={(e) => { setPlacement(e.target.value as 'before' | 'after' | 'inside-start' | 'inside-end'); }}
-                            className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100"
-                            disabled={saving}
-                          >
-                            <option value="before">Before element</option>
-                            <option value="after">After element</option>
-                            <option value="inside-start">Inside element (start)</option>
-                            <option value="inside-end">Inside element (end)</option>
-                          </select>
-                        </div>
-
-                        {/* Offset Controls */}
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <label htmlFor="offset-x" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                              X Offset (px)
-                            </label>
-                            <input
-                              id="offset-x"
-                              type="number"
-                              value={offsetX}
-                              onChange={(e) => { setOffsetX(parseInt(e.target.value) || 0); }}
-                              className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100"
-                              disabled={saving}
-                            />
-                          </div>
-                          <div>
-                            <label htmlFor="offset-y" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                              Y Offset (px)
-                            </label>
-                            <input
-                              id="offset-y"
-                              type="number"
-                              value={offsetY}
-                              onChange={(e) => { setOffsetY(parseInt(e.target.value) || 0); }}
-                              className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100"
-                              disabled={saving}
-                            />
-                          </div>
-                        </div>
-
-                        {/* Z-Index Control */}
-                        <div>
-                          <label htmlFor="z-index" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            Z-Index
-                          </label>
-                          <input
-                            id="z-index"
-                            type="number"
-                            value={customZIndex}
-                            onChange={(e) => { setCustomZIndex(parseInt(e.target.value) || 999999); }}
-                            className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100"
-                            disabled={saving}
-                          />
-                        </div>
-
-                        {/* Description */}
-                        <div>
-                          <label htmlFor="positioning-description" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            Description (Optional)
-                          </label>
-                          <input
-                            id="positioning-description"
-                            type="text"
-                            placeholder="E.g., 'Next to send button on contact form'"
-                            value={positioningDescription}
-                            onChange={(e) => { setPositioningDescription(e.target.value); }}
-                            className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100"
-                            disabled={saving}
-                          />
-                        </div>
-
-                        {/* Selector Error */}
-                        {selectorError && (
-                          <div className="p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded">
-                            <p className="text-xs text-red-600 dark:text-red-400">
-                              {selectorError}
-                            </p>
-                          </div>
-                        )}
-
-                        {/* Helpful Tips */}
-                        <div className="p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded">
-                          <p className="text-xs text-blue-700 dark:text-blue-300 font-medium mb-1">Tips & Examples:</p>
-                          <ul className="text-xs text-blue-600 dark:text-blue-400 space-y-1">
-                            <li>• <strong>Basic:</strong> <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">.send-button</code> or <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">#submit-btn</code></li>
-                            <li>• <strong>Attributes:</strong> <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">button[type=&quot;submit&quot;]</code></li>
-                            <li>• <strong>Multiple:</strong> <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">button, .send-btn, #submit</code></li>
-                            <li>• <strong>DevTools:</strong> Right-click → Inspect → Copy selector</li>
-                            <li>• <strong>Test in console:</strong> <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">document.querySelector(&quot;your-selector&quot;)</code></li>
-                            <li>• <strong>Placement:</strong> Use &quot;inside-end&quot; for button containers</li>
-                          </ul>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-              
-              <button
-                onClick={() => void handleAddCustomSite()}
-                disabled={!isValidUrl(newSiteUrl) || saving || (positioningMode === 'custom' && !customSelector.trim())}
-                className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
-                title={!isValidUrl(newSiteUrl) ? `Validation error: ${validateAndProcessUrl(newSiteUrl).error || 'Invalid URL'}` : positioningMode === 'custom' && !customSelector.trim() ? 'Custom positioning requires a CSS selector' : ''}
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M12 4v16m8-8H4"/>
-                </svg>
-                Add Custom Site
-              </button>
-            </div>
-            
-            {/* Validation Messages & Preview */}
-            {urlError && (
-              <div className="mt-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-                <p className="text-sm text-red-600 dark:text-red-400">
-                  {urlError}
-                </p>
-              </div>
-            )}
-            
-            {newSiteUrl && !urlError && !isValidUrl(newSiteUrl) && (
-              <div className="mt-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
-                <p className="text-sm text-yellow-600 dark:text-yellow-400">
-                  {validateAndProcessUrl(newSiteUrl).error || 'Invalid URL'}
-                </p>
-              </div>
-            )}
-            
-            {newSiteUrl && isValidUrl(newSiteUrl) && (
-              <div className="mt-2 p-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md">
-                <p className="text-xs text-green-700 dark:text-green-300">
-                  ✓ Will inject on: <code className="bg-green-100 dark:bg-green-800 px-1 rounded font-mono">{extractHostname(newSiteUrl)}</code>
-                </p>
-              </div>
-            )}
-          </div>
-          
-          {/* Custom Sites List */}
-          <div className="space-y-2">
-            {settings.customSites.map((site) => (
-              <div 
-                key={site.hostname}
-                className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-teal-600 rounded-lg flex items-center justify-center text-white font-semibold text-sm">
-                    {site.icon || site.displayName.charAt(0).toUpperCase()}
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm">
-                      {site.displayName}
-                    </h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {site.hostname}
-                    </p>
-                    {site.positioning && (
-                      <div className="mt-1 flex items-center gap-2 text-xs">
-                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                          site.positioning.mode === 'custom' 
-                            ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300' 
-                            : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
-                        }`}>
-                          {site.positioning.mode === 'custom' ? 'Custom' : 'Auto'}
-                        </span>
-                        {site.positioning.mode === 'custom' && site.positioning.selector && (
-                          <span className="text-gray-500 dark:text-gray-400 font-mono truncate max-w-32" title={site.positioning.selector}>
-                            {site.positioning.selector}
-                          </span>
-                        )}
-                        {site.positioning.description && (
-                          <span className="text-gray-500 dark:text-gray-400" title={site.positioning.description}>
-                            ({site.positioning.description})
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  {/* Toggle for custom site */}
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={site.enabled}
-                      onChange={(e) => void handleCustomSiteToggle(site.hostname, e.target.checked)}
-                      disabled={saving}
-                      className="sr-only peer"
-                      aria-label={`Enable ${site.displayName}`}
-                    />
-                    <div className="w-11 h-6 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600"></div>
-                  </label>
-                  
-                  {/* Remove button */}
-                  <button
-                    onClick={() => void handleRemoveCustomSite(site.hostname)}
-                    disabled={saving}
-                    className="p-1 text-gray-400 hover:text-red-600 transition-colors"
-                    title="Remove site"
-                    aria-label={`Remove ${site.displayName}`}
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            ))}
-            
-            {settings.customSites.length === 0 && (
-              <div className="text-center py-6 text-gray-500 dark:text-gray-400">
-                <svg className="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" strokeWidth={1} viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
-                </svg>
-                <p className="text-sm">No custom sites added yet</p>
-                <p className="text-xs mt-1">Add websites where you want the prompt library to appear</p>
-              </div>
-            )}
-          </div>
-        </section>
-
-        <SectionSeparator />
 
         {/* Advanced Options */}
         <section>
@@ -993,6 +664,337 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
                   />
                   <div className="w-11 h-6 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600"></div>
                 </label>
+              </div>
+
+              {/* Custom Sites */}
+              <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm mb-2">
+                  Custom Sites
+                </h3>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mb-4">
+                  Add your own websites where you want the prompt library to appear
+                </p>
+                
+                {/* Add New Site Form */}
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-4 mb-4 border border-gray-200 dark:border-gray-600">
+                  <div className="space-y-3">
+                    <input
+                      type="url"
+                      placeholder="https://example.com"
+                      value={newSiteUrl}
+                      onChange={(e) => {
+                        setNewSiteUrl(e.target.value);
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-100"
+                      disabled={saving}
+                    />
+                    
+                    <input
+                      type="text"
+                      placeholder="Site Name (optional)"
+                      value={newSiteName}
+                      onChange={(e) => {
+                        setNewSiteName(e.target.value);
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-100"
+                      disabled={saving}
+                    />
+                    
+                    {/* Advanced Positioning Toggle */}
+                    <div className="border-t border-gray-200 dark:border-gray-600 pt-3">
+                      <button
+                        type="button"
+                        onClick={() => { setShowAdvancedPositioning(!showAdvancedPositioning); }}
+                        className="flex items-center gap-2 text-sm text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-medium"
+                      >
+                        <svg 
+                          className={`w-4 h-4 transition-transform ${showAdvancedPositioning ? 'rotate-90' : ''}`} 
+                          fill="none" 
+                          stroke="currentColor" 
+                          strokeWidth={2} 
+                          viewBox="0 0 24 24"
+                        >
+                          <path d="M9 18l6-6-6-6"/>
+                        </svg>
+                        Advanced Icon Positioning
+                      </button>
+                      
+                      {showAdvancedPositioning && (
+                        <div className="mt-3 space-y-3 bg-gray-50 dark:bg-gray-700 rounded-lg p-3 border border-gray-200 dark:border-gray-600">
+                          {/* Positioning Mode */}
+                          <div>
+                            <label htmlFor="positioning-mode" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                              Positioning Mode
+                            </label>
+                            <select
+                              id="positioning-mode"
+                              value={positioningMode}
+                              onChange={(e) => { setPositioningMode(e.target.value as 'auto' | 'custom'); }}
+                              className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100"
+                              disabled={saving}
+                            >
+                              <option value="auto">Auto (Use default fallback selectors)</option>
+                              <option value="custom">Custom (Specify exact placement)</option>
+                            </select>
+                          </div>
+
+                          {positioningMode === 'custom' && (
+                            <>
+                              {/* Custom Selector */}
+                              <div>
+                                <label htmlFor="custom-selector" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                  CSS Selector <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                  id="custom-selector"
+                                  type="text"
+                                  placeholder=".submit-button, #send-btn, textarea[data-id='root']"
+                                  value={customSelector}
+                                  onChange={(e) => { setCustomSelector(e.target.value); }}
+                                  className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100 font-mono"
+                                  disabled={saving}
+                                />
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                  Target element where the icon should be positioned
+                                </p>
+                                <button
+                                  type="button"
+                                  onClick={() => void testSelector()}
+                                  disabled={!customSelector.trim() || saving}
+                                  className="mt-2 px-3 py-1 text-xs bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
+                                >
+                                  Test Selector
+                                </button>
+                              </div>
+
+                              {/* Placement Options */}
+                              <div>
+                                <label htmlFor="placement-select" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                  Placement
+                                </label>
+                                <select
+                                  id="placement-select"
+                                  value={placement}
+                                  onChange={(e) => { setPlacement(e.target.value as 'before' | 'after' | 'inside-start' | 'inside-end'); }}
+                                  className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100"
+                                  disabled={saving}
+                                >
+                                  <option value="before">Before element</option>
+                                  <option value="after">After element</option>
+                                  <option value="inside-start">Inside element (start)</option>
+                                  <option value="inside-end">Inside element (end)</option>
+                                </select>
+                              </div>
+
+                              {/* Offset Controls */}
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <label htmlFor="offset-x" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    X Offset (px)
+                                  </label>
+                                  <input
+                                    id="offset-x"
+                                    type="number"
+                                    value={offsetX}
+                                    onChange={(e) => { setOffsetX(parseInt(e.target.value) || 0); }}
+                                    className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100"
+                                    disabled={saving}
+                                  />
+                                </div>
+                                <div>
+                                  <label htmlFor="offset-y" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Y Offset (px)
+                                  </label>
+                                  <input
+                                    id="offset-y"
+                                    type="number"
+                                    value={offsetY}
+                                    onChange={(e) => { setOffsetY(parseInt(e.target.value) || 0); }}
+                                    className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100"
+                                    disabled={saving}
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Z-Index Control */}
+                              <div>
+                                <label htmlFor="z-index" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                  Z-Index
+                                </label>
+                                <input
+                                  id="z-index"
+                                  type="number"
+                                  value={customZIndex}
+                                  onChange={(e) => { setCustomZIndex(parseInt(e.target.value) || 999999); }}
+                                  className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100"
+                                  disabled={saving}
+                                />
+                              </div>
+
+                              {/* Description */}
+                              <div>
+                                <label htmlFor="positioning-description" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                  Description (Optional)
+                                </label>
+                                <input
+                                  id="positioning-description"
+                                  type="text"
+                                  placeholder="E.g., 'Next to send button on contact form'"
+                                  value={positioningDescription}
+                                  onChange={(e) => { setPositioningDescription(e.target.value); }}
+                                  className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100"
+                                  disabled={saving}
+                                />
+                              </div>
+
+                              {/* Selector Error */}
+                              {selectorError && (
+                                <div className="p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded">
+                                  <p className="text-xs text-red-600 dark:text-red-400">
+                                    {selectorError}
+                                  </p>
+                                </div>
+                              )}
+
+                              {/* Helpful Tips */}
+                              <div className="p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded">
+                                <p className="text-xs text-blue-700 dark:text-blue-300 font-medium mb-1">Tips & Examples:</p>
+                                <ul className="text-xs text-blue-600 dark:text-blue-400 space-y-1">
+                                  <li>• <strong>Basic:</strong> <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">.send-button</code> or <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">#submit-btn</code></li>
+                                  <li>• <strong>Attributes:</strong> <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">button[type=&quot;submit&quot;]</code></li>
+                                  <li>• <strong>Multiple:</strong> <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">button, .send-btn, #submit</code></li>
+                                  <li>• <strong>DevTools:</strong> Right-click → Inspect → Copy selector</li>
+                                  <li>• <strong>Test in console:</strong> <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">document.querySelector(&quot;your-selector&quot;)</code></li>
+                                  <li>• <strong>Placement:</strong> Use &quot;inside-end&quot; for button containers</li>
+                                </ul>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    
+                    <button
+                      onClick={() => void handleAddCustomSite()}
+                      disabled={!isValidUrl(newSiteUrl) || saving || (positioningMode === 'custom' && !customSelector.trim())}
+                      className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                      title={!isValidUrl(newSiteUrl) ? `Validation error: ${validateAndProcessUrl(newSiteUrl).error || 'Invalid URL'}` : positioningMode === 'custom' && !customSelector.trim() ? 'Custom positioning requires a CSS selector' : ''}
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M12 4v16m8-8H4"/>
+                      </svg>
+                      Add Custom Site
+                    </button>
+                  </div>
+                  
+                  {/* Validation Messages & Preview */}
+                  {urlError && (
+                    <div className="mt-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+                      <p className="text-sm text-red-600 dark:text-red-400">
+                        {urlError}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {newSiteUrl && !urlError && !isValidUrl(newSiteUrl) && (
+                    <div className="mt-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
+                      <p className="text-sm text-yellow-600 dark:text-yellow-400">
+                        {validateAndProcessUrl(newSiteUrl).error || 'Invalid URL'}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {newSiteUrl && isValidUrl(newSiteUrl) && (
+                    <div className="mt-2 p-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md">
+                      <p className="text-xs text-green-700 dark:text-green-300">
+                        ✓ Will inject on: <code className="bg-green-100 dark:bg-green-800 px-1 rounded font-mono">{extractHostname(newSiteUrl)}</code>
+                      </p>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Custom Sites List */}
+                <div className="space-y-2">
+                  {settings.customSites.map((site) => (
+                    <div 
+                      key={site.hostname}
+                      className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-teal-600 rounded-lg flex items-center justify-center text-white font-semibold text-sm">
+                          {site.icon || site.displayName.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm">
+                            {site.displayName}
+                          </h3>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            {site.hostname}
+                          </p>
+                          {site.positioning && (
+                            <div className="mt-1 flex items-center gap-2 text-xs">
+                              <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                                site.positioning.mode === 'custom' 
+                                  ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300' 
+                                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                              }`}>
+                                {site.positioning.mode === 'custom' ? 'Custom' : 'Auto'}
+                              </span>
+                              {site.positioning.mode === 'custom' && site.positioning.selector && (
+                                <span className="text-gray-500 dark:text-gray-400 font-mono truncate max-w-32" title={site.positioning.selector}>
+                                  {site.positioning.selector}
+                                </span>
+                              )}
+                              {site.positioning.description && (
+                                <span className="text-gray-500 dark:text-gray-400" title={site.positioning.description}>
+                                  ({site.positioning.description})
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        {/* Toggle for custom site */}
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={site.enabled}
+                            onChange={(e) => void handleCustomSiteToggle(site.hostname, e.target.checked)}
+                            disabled={saving}
+                            className="sr-only peer"
+                            aria-label={`Enable ${site.displayName}`}
+                          />
+                          <div className="w-11 h-6 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600"></div>
+                        </label>
+                        
+                        {/* Remove button */}
+                        <button
+                          onClick={() => void handleRemoveCustomSite(site.hostname)}
+                          disabled={saving}
+                          className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                          title="Remove site"
+                          aria-label={`Remove ${site.displayName}`}
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {settings.customSites.length === 0 && (
+                    <div className="text-center py-6 text-gray-500 dark:text-gray-400">
+                      <svg className="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" strokeWidth={1} viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                      </svg>
+                      <p className="text-sm">No custom sites added yet</p>
+                      <p className="text-xs mt-1">Add websites where you want the prompt library to appear</p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}

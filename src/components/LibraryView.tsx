@@ -8,7 +8,6 @@ import { LibraryViewProps } from '../types/components';
 import CategoryFilter from './CategoryFilter';
 import PromptCard from './PromptCard';
 import SearchBar from './SearchBar';
-import ThemeToggle from './ThemeToggle';
 
 const LibraryView: FC<LibraryViewProps> = ({
   prompts,
@@ -68,7 +67,6 @@ const LibraryView: FC<LibraryViewProps> = ({
                 <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
               </svg>
             </button>
-            <ThemeToggle />
           </div>
         </div>
 
