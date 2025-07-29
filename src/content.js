@@ -555,22 +555,6 @@ class UIElementFactory {
     return icon;
   }
   
-  createSanofiIcon() {
-    const icon = document.createElement('button');
-    icon.className = `prompt-library-integrated-icon text-pulse-text-subtle hover:bg-elements-neutrals-100 hover:dark:bg-elements-neutrals-700 flex h-8 w-8 flex-col items-center justify-center px-1 hover:rounded-lg cursor-pointer border-0 bg-transparent`;
-    icon.setAttribute('type', 'button');
-    icon.setAttribute('aria-label', 'Open prompt library - Access your saved prompts');
-    icon.setAttribute('title', 'Prompt Library - Access your saved prompts');
-    icon.setAttribute('data-instance-id', this.instanceId);
-    icon.setAttribute('tabindex', '0');
-    icon.innerHTML = `
-      <span class="material-icons-round _icon_mqc2e_1" style="font-size: 1.5rem;" aria-hidden="true">
-        <span aria-hidden="true">library_books</span>
-      </span>
-    `;
-    
-    return icon;
-  }
   
   createFloatingIcon() {
     const icon = document.createElement('button');
@@ -856,16 +840,6 @@ class PromptLibraryInjector {
     
     // Site-specific selectors for text input areas
     this.siteConfigs = {
-      'concierge.sanofi.com': {
-        selectors: [
-          'textarea',
-          'div[contenteditable="true"]',
-          'input[type="text"]',
-          '[role="textbox"]'
-        ],
-        buttonContainerSelector: '.absolute.bottom-2.right-2\\.5.flex.gap-2.self-end',
-        name: 'Sanofi Concierge'
-      },
       'www.perplexity.ai': {
         selectors: [
           'textarea[placeholder*="Ask"]',
@@ -1139,7 +1113,7 @@ class PromptLibraryInjector {
     // Set up optimized observation with multiple targeted scopes
     this.setupOptimizedObservation();
     
-    // Also detect on focus events for Sanofi Concierge input elements
+    // Also detect on focus events for input elements
     const focusHandler = (e) => {
       if (e.target.matches('textarea, div[contenteditable="true"]')) {
         setTimeout(() => void this.detectAndInjectIcon(), 100);
@@ -2331,7 +2305,7 @@ class PromptLibraryInjector {
       }
     
     // For supported sites, try integrated button approach
-    if (hostname === 'concierge.sanofi.com' || hostname === 'claude.ai' || hostname === 'www.perplexity.ai' || hostname === 'chatgpt.com') {
+    if (hostname === 'claude.ai' || hostname === 'www.perplexity.ai' || hostname === 'chatgpt.com') {
       // Find the button container using configured selector or fallback selectors
       let buttonContainer = null;
       
@@ -2543,12 +2517,6 @@ class PromptLibraryInjector {
             buttonContainer.appendChild(spanWrapper);
           }
           
-        } else {
-          // Sanofi Concierge styling
-          this.icon = this.uiFactory.createSanofiIcon();
-          
-          const sendButton = buttonContainer.lastElementChild;
-          buttonContainer.insertBefore(this.icon, sendButton);
         }
         
         // Add click handler

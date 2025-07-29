@@ -1,6 +1,6 @@
-# Sanofi Concierge Prompt Library Extension
+# Prompt Library Extension
 
-A Chrome extension that provides seamless access to your personal prompt library directly within the Sanofi Concierge interface. Features both a popup interface for managing prompts and native integration with the Sanofi Concierge chat interface.
+A Chrome extension that provides seamless access to your personal prompt library directly within popular AI chat interfaces. Features both a popup interface for managing prompts and native integration with supported AI platforms including Claude, ChatGPT, and Perplexity.
 
 ## Features
 
@@ -14,13 +14,20 @@ A Chrome extension that provides seamless access to your personal prompt library
 ✅ **Error Handling:** Graceful handling of storage quotas and data corruption  
 ✅ **Responsive UI:** Clean, modern interface built with React and Tailwind CSS
 
-### Sanofi Concierge Integration
-✅ **Native Integration:** Library books icon appears in the Sanofi Concierge button bar  
+### AI Platform Integration
+✅ **Native Integration:** Library icon appears in supported AI chat interfaces  
 ✅ **Smart Positioning:** Popup appears adjacent to the trigger button for intuitive UX  
-✅ **Dynamic Detection:** Automatically detects and integrates with Sanofi Concierge input fields  
+✅ **Dynamic Detection:** Automatically detects and integrates with AI chat input fields  
 ✅ **Seamless Insertion:** Direct prompt insertion into both textarea and contenteditable elements  
-✅ **Material Design:** Icon styling matches the native Sanofi Concierge interface  
+✅ **Multi-Platform Support:** Works with Claude, ChatGPT, Perplexity, and custom sites  
 ✅ **Fallback Support:** Graceful fallback for different page layouts  
+
+## Supported Platforms
+
+- **Claude** (claude.ai)
+- **ChatGPT** (chatgpt.com)  
+- **Perplexity** (www.perplexity.ai)
+- **Custom Sites** (configurable through settings)
 
 ## Tech Stack
 
@@ -30,7 +37,6 @@ A Chrome extension that provides seamless access to your personal prompt library
 - **Build Tool:** Vite with @crxjs/vite-plugin
 - **Storage:** Chrome Storage API
 - **Extension:** Manifest V3
-- **Target Site:** https://concierge.sanofi.com/*
 
 ## Development Setup
 
@@ -70,8 +76,8 @@ A Chrome extension that provides seamless access to your personal prompt library
 
 ### Testing the Integration
 
-1. Visit `https://concierge.sanofi.com`
-2. Look for the library books icon in the button bar next to the attachment and send buttons
+1. Visit any supported AI platform (Claude, ChatGPT, Perplexity)
+2. Look for the library icon in the input area
 3. Click the icon to access your prompt library
 4. Select a prompt to insert it directly into the chat input
 
@@ -80,7 +86,7 @@ A Chrome extension that provides seamless access to your personal prompt library
 1. Make changes to source code
 2. The extension auto-reloads in development mode
 3. For major changes, manually reload the extension in `chrome://extensions/`
-4. Test functionality in both the popup and Sanofi Concierge integration
+4. Test functionality in both the popup and platform integrations
 
 ## Project Structure
 
@@ -97,7 +103,8 @@ src/
 │   ├── CategoryManager.tsx # Category management
 │   ├── ToastContainer.tsx  # Notifications
 │   ├── ErrorBoundary.tsx   # Error handling
-│   └── StorageWarning.tsx  # Storage quota warnings
+│   ├── StorageWarning.tsx  # Storage quota warnings
+│   └── SettingsView.tsx    # Settings configuration
 ├── hooks/              # Custom React hooks
 │   ├── usePrompts.ts   # Prompt management
 │   ├── useCategories.ts # Category management
@@ -112,7 +119,7 @@ src/
 │   ├── components.ts  # Component prop types
 │   ├── hooks.ts       # Hook return types
 │   └── context.ts     # Context types
-├── content.js         # Content script for Sanofi Concierge integration
+├── content.js         # Content script for AI platform integration
 ├── popup.html         # Extension popup HTML
 ├── popup.tsx          # React entry point
 └── popup.css          # Global styles
@@ -124,13 +131,13 @@ src/
 The extension provides two complementary interfaces:
 
 1. **Popup Interface** (React-based): For managing prompts, categories, and settings
-2. **Content Script Integration**: For seamless prompt access within Sanofi Concierge
+2. **Content Script Integration**: For seamless prompt access within AI platforms
 
 ### Data Flow
 1. **Storage Layer:** `StorageManager` handles Chrome storage API operations
 2. **Business Logic:** `PromptManager` handles validation, search, and data processing
 3. **React Hooks:** Custom hooks provide data and operations to popup components
-4. **Content Script:** `content.js` handles Sanofi Concierge integration and prompt insertion
+4. **Content Script:** `content.js` handles AI platform integration and prompt insertion
 
 ### Key Components
 
@@ -140,10 +147,11 @@ The extension provides two complementary interfaces:
 - **PromptCard:** Individual prompt display with actions (copy, edit, delete)
 - **Forms:** Add/Edit forms with validation and error handling
 - **CategoryManager:** Modal for creating and managing categories
+- **SettingsView:** Configuration for supported sites and custom platforms
 
 **Content Script Integration:**
-- **PromptLibraryInjector:** Main class handling Sanofi Concierge integration
-- **Icon Injection:** Dynamically creates and positions the library books icon
+- **PromptLibraryInjector:** Main class handling AI platform integration
+- **Icon Injection:** Dynamically creates and positions the library icon
 - **Input Detection:** Automatically detects and monitors text input fields
 - **Prompt Selector UI:** Popup interface for selecting and inserting prompts
 
@@ -183,11 +191,11 @@ The extension provides two complementary interfaces:
 - Success notification confirms the copy operation
 - Use copied text in any application
 
-### Using Prompts in Sanofi Concierge
+### Using Prompts in AI Platforms
 
 **Accessing Your Library:**
-1. Visit `https://concierge.sanofi.com`
-2. Look for the library books icon in the button bar (next to attachment/send buttons)
+1. Visit any supported AI platform (Claude, ChatGPT, Perplexity)
+2. Look for the library icon in the input area
 3. Click the icon to open your prompt library
 
 **Inserting Prompts:**
@@ -202,23 +210,33 @@ The extension provides two complementary interfaces:
 - Works with both regular text areas and rich text editors
 - Automatic input field detection and integration
 
+### Configuring Sites (Settings)
+
+**Built-in Sites:**
+- Toggle support for Claude, ChatGPT, and Perplexity individually
+- Sites are pre-configured with optimal selectors
+
+**Custom Sites:**
+1. Click settings icon in the popup
+2. Add new sites by entering URL
+3. Configure advanced positioning if needed
+4. Test selectors before adding
+
 ## Data Storage
 
 The extension uses Chrome's `chrome.storage.local` API for data persistence:
 
 - **Prompts:** Stored as array with metadata (id, timestamps, etc.)
 - **Categories:** Stored separately with colors and settings
-- **Settings:** User preferences and configuration
+- **Settings:** User preferences and site configurations
 - **Quota Management:** Automatic monitoring and warnings
 
 ## Testing
 
-See [ai/TESTING.md](./ai/TESTING.md) for comprehensive testing procedures.
-
 ### Quick Test
 1. Build and load the extension
 2. Create a few test prompts in the popup
-3. Visit `https://concierge.sanofi.com` and test the integration
+3. Visit supported AI platforms and test the integration
 4. Restart browser and verify data persists
 5. Test search, categories, copy functionality, and prompt insertion
 
@@ -273,14 +291,13 @@ For issues and feature requests, please use the GitHub issues tracker.
 ## Roadmap
 
 ### Completed Features
-- [x] Sanofi Concierge native integration
+- [x] Multi-platform AI integration (Claude, ChatGPT, Perplexity)
 - [x] Smart popup positioning
-- [x] Material Design icon integration
+- [x] Custom site configuration
 - [x] Dark mode theme support
 - [x] Responsive design
 
 ### Future Enhancements
-- [ ] Support for additional sites beyond Sanofi Concierge
 - [ ] Import/Export functionality
 - [ ] Prompt templates and variables
 - [ ] Keyboard shortcuts for quick access

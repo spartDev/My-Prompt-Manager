@@ -84,11 +84,6 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
   const [showResetSection, setShowResetSection] = useState(false);
 
   const siteConfigs: Record<string, SiteConfig> = useMemo(() => ({
-    'concierge.sanofi.com': {
-      name: 'Sanofi Concierge',
-      description: 'Sanofi AI assistant platform',
-      icon: 'S'
-    },
     'www.perplexity.ai': {
       name: 'Perplexity',
       description: 'AI-powered search and chat',
