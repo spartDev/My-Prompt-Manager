@@ -1,5 +1,5 @@
 import DOMPurify from 'dompurify';
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, memo } from 'react';
 import type { FC, MouseEvent } from 'react';
 
 import { Category, Prompt } from '../types';
@@ -321,4 +321,39 @@ const PromptCard: FC<PromptCardProps> = ({
   );
 };
 
-export default PromptCard;
+// Custom comparison function for React.memo optimization
+// Only re-render when essential props change that affect the UI
+const arePropsEqual = (prevProps: PromptCardProps, nextProps: PromptCardProps): boolean => {
+  // Check if prompt data has changed (most critical for performance)
+  if (prevProps.prompt.id !== nextProps.prompt.id) {return false;}
+  if (prevProps.prompt.title !== nextProps.prompt.title) {return false;}
+  if (prevProps.prompt.content !== nextProps.prompt.content) {return false;}
+  if (prevProps.prompt.category !== nextProps.prompt.category) {return false;}
+  if (prevProps.prompt.updatedAt !== nextProps.prompt.updatedAt) {return false;}
+  
+  // Check search query changes (affects highlighting)
+  if (prevProps.searchQuery !== nextProps.searchQuery) {return false;}
+  
+  // Check isSelected prop if it exists
+  if (prevProps.isSelected !== nextProps.isSelected) {return false;}
+  
+  // Check categories array length and relevant category data
+  // We only need to check if the current prompt's category changed in the categories array
+  if (prevProps.categories.length !== nextProps.categories.length) {return false;}
+  
+  const prevCategory = prevProps.categories.find(cat => cat.name === prevProps.prompt.category);
+  const nextCategory = nextProps.categories.find(cat => cat.name === nextProps.prompt.category);
+  
+  // If category color changed, we need to re-render
+  if (prevCategory?.color !== nextCategory?.color) {return false;}
+  
+  // Function references comparison - these should be stable from parent
+  // but we'll do a shallow check to be safe
+  if (prevProps.onEdit !== nextProps.onEdit) {return false;}
+  if (prevProps.onDelete !== nextProps.onDelete) {return false;}
+  if (prevProps.onCopy !== nextProps.onCopy) {return false;}
+  
+  return true;
+};
+
+export default memo(PromptCard, arePropsEqual);

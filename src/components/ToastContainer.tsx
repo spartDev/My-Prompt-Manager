@@ -1,3 +1,4 @@
+import React, { memo } from 'react';
 import type { FC } from 'react';
 
 import { Toast } from '../types/hooks';
@@ -6,17 +7,7 @@ interface ToastContainerProps {
   toasts: Toast[];
 }
 
-const ToastContainer: FC<ToastContainerProps> = ({ toasts }) => {
-  if (toasts.length === 0) {return null;}
-
-  return (
-    <div className="fixed top-4 right-4 z-50 space-y-2">
-      {toasts.map((toast) => (
-        <ToastItem key={toast.id} toast={toast} />
-      ))}
-    </div>
-  );
-};
+// Original ToastContainer implementation - will be replaced by memoized version
 
 const ToastItem: FC<{ toast: Toast }> = ({ toast }) => {
   const getToastStyles = () => {
@@ -85,4 +76,54 @@ const ToastItem: FC<{ toast: Toast }> = ({ toast }) => {
   );
 };
 
-export default ToastContainer;
+// Custom comparison function for ToastContainer
+// Re-render only when toasts array content changes
+const areToastContainerPropsEqual = (prevProps: ToastContainerProps, nextProps: ToastContainerProps): boolean => {
+  // Check if arrays have different lengths
+  if (prevProps.toasts.length !== nextProps.toasts.length) {return false;}
+  
+  // Deep comparison of toast array content
+  for (let i = 0; i < prevProps.toasts.length; i++) {
+    const prevToast = prevProps.toasts[i];
+    const nextToast = nextProps.toasts[i];
+    
+    if (prevToast.id !== nextToast.id) {return false;}
+    if (prevToast.message !== nextToast.message) {return false;}
+    if (prevToast.type !== nextToast.type) {return false;}
+    if (prevToast.duration !== nextToast.duration) {return false;}
+  }
+  
+  return true;
+};
+
+// Custom comparison function for individual ToastItem
+// Re-render only when the specific toast data changes
+const areToastItemPropsEqual = (prevProps: { toast: Toast }, nextProps: { toast: Toast }): boolean => {
+  const { toast: prevToast } = prevProps;
+  const { toast: nextToast } = nextProps;
+  
+  if (prevToast.id !== nextToast.id) {return false;}
+  if (prevToast.message !== nextToast.message) {return false;}
+  if (prevToast.type !== nextToast.type) {return false;}
+  if (prevToast.duration !== nextToast.duration) {return false;}
+  
+  return true;
+};
+
+// Memoize the ToastItem component to prevent unnecessary re-renders
+const MemoizedToastItem = memo(ToastItem, areToastItemPropsEqual);
+
+// Update the ToastContainer to use the memoized ToastItem
+const MemoizedToastContainer: FC<ToastContainerProps> = ({ toasts }) => {
+  if (toasts.length === 0) {return null;}
+
+  return (
+    <div className="fixed top-4 right-4 z-50 space-y-2">
+      {toasts.map((toast) => (
+        <MemoizedToastItem key={toast.id} toast={toast} />
+      ))}
+    </div>
+  );
+};
+
+export default memo(MemoizedToastContainer, areToastContainerPropsEqual);

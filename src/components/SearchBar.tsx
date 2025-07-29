@@ -1,3 +1,4 @@
+import React, { memo } from 'react';
 import type { FC } from 'react';
 
 import { SearchBarProps } from '../types/components';
@@ -70,4 +71,20 @@ const SearchBar: FC<SearchBarProps> = ({
   );
 };
 
-export default SearchBar;
+// Custom comparison function for React.memo optimization
+// Re-render only when value, placeholder changes, or function references change
+const arePropsEqual = (prevProps: SearchBarProps, nextProps: SearchBarProps): boolean => {
+  // Check if search value changed
+  if (prevProps.value !== nextProps.value) {return false;}
+  
+  // Check if placeholder changed
+  if (prevProps.placeholder !== nextProps.placeholder) {return false;}
+  
+  // Function reference comparison - these should be stable from parent
+  if (prevProps.onChange !== nextProps.onChange) {return false;}
+  if (prevProps.onClear !== nextProps.onClear) {return false;}
+  
+  return true;
+};
+
+export default memo(SearchBar, arePropsEqual);

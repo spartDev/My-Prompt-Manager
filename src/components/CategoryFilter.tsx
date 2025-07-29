@@ -1,3 +1,4 @@
+import React, { memo } from 'react';
 import type { FC } from 'react';
 
 import { Category } from '../types';
@@ -35,4 +36,32 @@ const CategoryFilter: FC<CategoryFilterProps> = ({
   );
 };
 
-export default CategoryFilter;
+// Custom comparison function for React.memo optimization
+// Re-render only when categories array content or selected category changes
+const arePropsEqual = (prevProps: CategoryFilterProps, nextProps: CategoryFilterProps): boolean => {
+  // Check if selected category changed
+  if (prevProps.selectedCategory !== nextProps.selectedCategory) {return false;}
+  
+  // Check if showAll flag changed
+  if (prevProps.showAll !== nextProps.showAll) {return false;}
+  
+  // Check categories array length
+  if (prevProps.categories.length !== nextProps.categories.length) {return false;}
+  
+  // Deep comparison of categories array - check if any category data changed
+  for (let i = 0; i < prevProps.categories.length; i++) {
+    const prevCategory = prevProps.categories[i];
+    const nextCategory = nextProps.categories[i];
+    
+    if (prevCategory.id !== nextCategory.id) {return false;}
+    if (prevCategory.name !== nextCategory.name) {return false;}
+    // Note: We don't need to check color here as it doesn't affect the CategoryFilter UI
+  }
+  
+  // Function reference comparison - should be stable from parent
+  if (prevProps.onChange !== nextProps.onChange) {return false;}
+  
+  return true;
+};
+
+export default memo(CategoryFilter, arePropsEqual);
