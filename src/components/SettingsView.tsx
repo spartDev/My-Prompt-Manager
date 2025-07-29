@@ -164,7 +164,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
           placement,
           offset: { x: offsetX, y: offsetY },
           zIndex: customZIndex
-        });
+        }) as unknown as { success: boolean; error?: string };
         
         if (response.success) {
           setSelectorError(''); // Clear any previous errors
@@ -173,7 +173,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
           setSelectorError(response.error || 'Selector test failed');
         }
       }
-    } catch (error) {
+    } catch {
       setSelectorError('Failed to test selector. Make sure you\'re on the target website.');
     }
   };
@@ -343,7 +343,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
       return { isValid: true };
     } catch (error) {
       // Provide more specific error messages for common mistakes
-      const errorMessage = error.message || '';
+      const errorMessage = error instanceof Error ? error.message : String(error);
       if (errorMessage.includes('Unexpected token')) {
         return { isValid: false, error: 'Syntax error: Check for typos in selector' };
       } else if (errorMessage.includes('Invalid selector')) {
@@ -599,7 +599,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
               <div className="border-t border-gray-200 dark:border-gray-600 pt-3">
                 <button
                   type="button"
-                  onClick={() => setShowAdvancedPositioning(!showAdvancedPositioning)}
+                  onClick={() => { setShowAdvancedPositioning(!showAdvancedPositioning); }}
                   className="flex items-center gap-2 text-sm text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-medium"
                 >
                   <svg 
@@ -618,12 +618,13 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
                   <div className="mt-3 space-y-3 bg-white dark:bg-gray-700 rounded-lg p-3 border border-gray-200 dark:border-gray-600">
                     {/* Positioning Mode */}
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      <label htmlFor="positioning-mode" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Positioning Mode
                       </label>
                       <select
+                        id="positioning-mode"
                         value={positioningMode}
-                        onChange={(e) => setPositioningMode(e.target.value as 'auto' | 'custom')}
+                        onChange={(e) => { setPositioningMode(e.target.value as 'auto' | 'custom'); }}
                         className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100"
                         disabled={saving}
                       >
@@ -636,14 +637,15 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
                       <>
                         {/* Custom Selector */}
                         <div>
-                          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          <label htmlFor="custom-selector" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                             CSS Selector <span className="text-red-500">*</span>
                           </label>
                           <input
+                            id="custom-selector"
                             type="text"
                             placeholder=".submit-button, #send-btn, textarea[data-id='root']"
                             value={customSelector}
-                            onChange={(e) => setCustomSelector(e.target.value)}
+                            onChange={(e) => { setCustomSelector(e.target.value); }}
                             className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100 font-mono"
                             disabled={saving}
                           />
@@ -662,12 +664,13 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
 
                         {/* Placement Options */}
                         <div>
-                          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          <label htmlFor="placement-select" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                             Placement
                           </label>
                           <select
+                            id="placement-select"
                             value={placement}
-                            onChange={(e) => setPlacement(e.target.value as 'before' | 'after' | 'inside-start' | 'inside-end')}
+                            onChange={(e) => { setPlacement(e.target.value as 'before' | 'after' | 'inside-start' | 'inside-end'); }}
                             className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100"
                             disabled={saving}
                           >
@@ -681,25 +684,27 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
                         {/* Offset Controls */}
                         <div className="grid grid-cols-2 gap-2">
                           <div>
-                            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            <label htmlFor="offset-x" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                               X Offset (px)
                             </label>
                             <input
+                              id="offset-x"
                               type="number"
                               value={offsetX}
-                              onChange={(e) => setOffsetX(parseInt(e.target.value) || 0)}
+                              onChange={(e) => { setOffsetX(parseInt(e.target.value) || 0); }}
                               className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100"
                               disabled={saving}
                             />
                           </div>
                           <div>
-                            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            <label htmlFor="offset-y" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                               Y Offset (px)
                             </label>
                             <input
+                              id="offset-y"
                               type="number"
                               value={offsetY}
-                              onChange={(e) => setOffsetY(parseInt(e.target.value) || 0)}
+                              onChange={(e) => { setOffsetY(parseInt(e.target.value) || 0); }}
                               className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100"
                               disabled={saving}
                             />
@@ -708,13 +713,14 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
 
                         {/* Z-Index Control */}
                         <div>
-                          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          <label htmlFor="z-index" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                             Z-Index
                           </label>
                           <input
+                            id="z-index"
                             type="number"
                             value={customZIndex}
-                            onChange={(e) => setCustomZIndex(parseInt(e.target.value) || 999999)}
+                            onChange={(e) => { setCustomZIndex(parseInt(e.target.value) || 999999); }}
                             className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100"
                             disabled={saving}
                           />
@@ -722,14 +728,15 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
 
                         {/* Description */}
                         <div>
-                          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          <label htmlFor="positioning-description" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                             Description (Optional)
                           </label>
                           <input
+                            id="positioning-description"
                             type="text"
                             placeholder="E.g., 'Next to send button on contact form'"
                             value={positioningDescription}
-                            onChange={(e) => setPositioningDescription(e.target.value)}
+                            onChange={(e) => { setPositioningDescription(e.target.value); }}
                             className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100"
                             disabled={saving}
                           />
@@ -749,11 +756,11 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
                           <p className="text-xs text-blue-700 dark:text-blue-300 font-medium mb-1">Tips & Examples:</p>
                           <ul className="text-xs text-blue-600 dark:text-blue-400 space-y-1">
                             <li>• <strong>Basic:</strong> <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">.send-button</code> or <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">#submit-btn</code></li>
-                            <li>• <strong>Attributes:</strong> <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">button[type="submit"]</code></li>
+                            <li>• <strong>Attributes:</strong> <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">button[type=&quot;submit&quot;]</code></li>
                             <li>• <strong>Multiple:</strong> <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">button, .send-btn, #submit</code></li>
                             <li>• <strong>DevTools:</strong> Right-click → Inspect → Copy selector</li>
-                            <li>• <strong>Test in console:</strong> <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">document.querySelector("your-selector")</code></li>
-                            <li>• <strong>Placement:</strong> Use "inside-end" for button containers</li>
+                            <li>• <strong>Test in console:</strong> <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">document.querySelector(&quot;your-selector&quot;)</code></li>
+                            <li>• <strong>Placement:</strong> Use &quot;inside-end&quot; for button containers</li>
                           </ul>
                         </div>
                       </>
