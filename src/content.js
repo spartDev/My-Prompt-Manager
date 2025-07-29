@@ -784,7 +784,7 @@ class PromptLibraryInjector {
     this.isInitialized = false;
     this.detectionTimeout = null;
     this.mutationObserver = null;
-    this.hostname = window.location.hostname;
+    this.hostname = String(window.location.hostname || '');
     
     // Add unique identifier to prevent cross-tab interference
     this.instanceId = `prompt-lib-${this.hostname}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -1053,22 +1053,9 @@ class PromptLibraryInjector {
   async init() {
     if (this.isInitialized) return;
     
-    // Only initialize if we have a config for this site
-    const config = this.siteConfigs[this.hostname];
-    if (!config) {
-      Logger.info('No site configuration found for hostname', { hostname: this.hostname });
-      return;
-    }
-    
-    // Check if this site is enabled in user settings
-    const isEnabled = await this.checkSiteEnabled();
-    if (!isEnabled) {
-      Logger.info('Site disabled in user settings', { hostname: this.hostname });
-      return;
-    }
+    Logger.info('Initializing prompt library for site', { hostname: this.hostname });
     
     this.isInitialized = true;
-    Logger.info('Initializing prompt library for enabled site', { hostname: this.hostname });
     
     // Inject CSS styles
     injectCSS();
@@ -1081,45 +1068,6 @@ class PromptLibraryInjector {
     }
   }
   
-  async checkSiteEnabled() {
-    return new Promise((resolve) => {
-      try {
-        chrome.storage.local.get(['promptLibrarySettings'], (result) => {
-          if (chrome.runtime.lastError) {
-            Logger.warn('Failed to retrieve settings, defaulting to enabled', {
-              error: chrome.runtime.lastError.message
-            });
-            resolve(true); // Default to enabled if can't read settings
-            return;
-          }
-          
-          const settings = result.promptLibrarySettings || {};
-          const enabledSites = settings.enabledSites || Object.keys(this.siteConfigs);
-          const customSites = settings.customSites || [];
-          
-          // Check if enabled in built-in sites
-          const isBuiltInEnabled = enabledSites.includes(this.hostname);
-          
-          // Check if enabled in custom sites
-          const customSite = customSites.find(site => site.hostname === this.hostname);
-          const isCustomEnabled = customSite ? customSite.enabled : false;
-          
-          const isEnabled = isBuiltInEnabled || isCustomEnabled;
-          
-          Logger.info('Site enabled check completed', {
-            hostname: this.hostname,
-            isEnabled,
-            enabledSitesCount: enabledSites.length
-          });
-          
-          resolve(isEnabled);
-        });
-      } catch (error) {
-        Logger.error('Error checking if site is enabled', error);
-        resolve(true); // Default to enabled on error
-      }
-    });
-  }
 
   startDetection() {
     // Initial detection
@@ -1289,6 +1237,68 @@ class PromptLibraryInjector {
       });
       return false;
     }
+  }
+
+  isValidTextarea(element) {
+    // Basic element validation
+    if (!element) {
+      return false;
+    }
+
+    // Check if element is visible and interactive
+    if (!this.isElementVisible(element)) {
+      return false;
+    }
+
+    // Check for common textarea types
+    const tagName = element.tagName.toLowerCase();
+    
+    // Accept actual textareas
+    if (tagName === 'textarea') {
+      return true;
+    }
+
+    // Accept contenteditable divs
+    if (tagName === 'div' && element.contentEditable === 'true') {
+      return true;
+    }
+
+    // Accept text inputs
+    if (tagName === 'input' && element.type === 'text') {
+      return true;
+    }
+
+    // Accept elements with textbox role
+    if (element.getAttribute('role') === 'textbox') {
+      return true;
+    }
+
+    // Additional checks for custom implementations
+    const placeholder = element.getAttribute('placeholder');
+    
+    // Check for common input-related classes or attributes
+    if (placeholder && (
+      placeholder.toLowerCase().includes('type') ||
+      placeholder.toLowerCase().includes('ask') ||
+      placeholder.toLowerCase().includes('message') ||
+      placeholder.toLowerCase().includes('chat') ||
+      placeholder.toLowerCase().includes('search')
+    )) {
+      return true;
+    }
+
+    // Check for data attributes that suggest it's an input
+    const dataTestId = element.getAttribute('data-testid');
+    if (dataTestId && (
+      dataTestId.includes('input') ||
+      dataTestId.includes('textbox') ||
+      dataTestId.includes('chat') ||
+      dataTestId.includes('search')
+    )) {
+      return true;
+    }
+
+    return false;
   }
 
   // Create optimized mutation observer with intelligent throttling and filtering
@@ -1464,7 +1474,7 @@ class PromptLibraryInjector {
   
   // Set up optimized observation with site-specific targeting
   setupOptimizedObservation() {
-    const hostname = window.location.hostname;
+    const hostname = String(window.location.hostname || '');
     const config = this.siteConfigs[hostname];
     
     // Get site-specific observation targets
@@ -1551,10 +1561,68 @@ class PromptLibraryInjector {
   }
 
   detectAndInjectIcon() {
-    const hostname = window.location.hostname;
+    const hostname = String(window.location.hostname || '');
     const config = this.siteConfigs[hostname];
     
-    if (!config) return;
+    // Define fallback selectors for custom sites
+    const fallbackSelectors = [
+      'textarea',
+      'div[contenteditable="true"]',
+      'input[type="text"]',
+      '[role="textbox"]',
+      '[data-testid*="input"]',
+      '[class*="input"]',
+      '[placeholder*="message"]',
+      '[placeholder*="chat"]',
+      '[placeholder*="ask"]',
+      '[placeholder*="type"]',
+      '[placeholder*="enter"]'
+    ];
+    
+    if (!config) {
+      
+      Logger.info('No predefined config, using fallback selectors for custom site', { 
+        hostname,
+        fallbackSelectorCount: fallbackSelectors.length 
+      });
+      
+      // For custom sites, use fallback selectors without caching
+      let textarea = null;
+      const foundElements = [];
+      
+      for (const selector of fallbackSelectors) {
+        try {
+          const elements = document.querySelectorAll(selector);
+          foundElements.push({ selector, count: elements.length });
+          
+          if (elements.length > 0) {
+            for (const element of elements) {
+              if (this.isValidTextarea(element)) {
+                textarea = element;
+                break;
+              }
+            }
+            if (textarea) break;
+          }
+        } catch (error) {
+          console.error('[PromptLibrary] Error with selector:', selector, error);
+        }
+      }
+      
+      
+      if (textarea) {
+        // Check if we already have an icon for this textarea to prevent duplicates
+        if (textarea === this.currentTextarea && this.icon) {
+          return;
+        }
+        
+        this.currentTextarea = textarea;
+        this.createFloatingIcon(textarea);
+      } else {
+        Logger.info('No valid textarea found with fallback selectors', { hostname });
+      }
+      return;
+    }
     
     Logger.info('Starting optimized textarea detection', { 
       hostname,
@@ -1602,8 +1670,11 @@ class PromptLibraryInjector {
 
   injectIcon(textarea) {
     try {
+      // Ensure hostname is always a string
+      const hostnameStr = String(this.hostname || '');
+      
       Logger.info('Starting icon injection', { 
-        hostname: this.hostname,
+        hostname: hostnameStr,
         textareaTag: textarea.tagName,
         textareaId: textarea.id,
         textareaClass: textarea.className 
@@ -1619,11 +1690,11 @@ class PromptLibraryInjector {
         }
       }
       
-      const hostname = window.location.hostname;
+      const hostname = String(window.location.hostname || '');
       const config = this.siteConfigs[hostname];
       
       if (!config) {
-        Logger.warn('No site configuration found for hostname', { hostname });
+        Logger.warn('No site configuration found for hostname', { hostname: hostnameStr });
         return;
       }
     
@@ -1880,6 +1951,16 @@ class PromptLibraryInjector {
   }
 
   createFloatingIcon(textarea) {
+    // Remove any existing icon first to prevent duplicates
+    if (this.icon) {
+      try {
+        this.icon.remove();
+        Logger.info('Removed existing floating icon before creating new one');
+      } catch (error) {
+        Logger.warn('Failed to remove existing floating icon', { error: error.message });
+      }
+    }
+    
     // Create icon element using UI factory
     this.icon = this.uiFactory.createFloatingIcon();
     
@@ -2276,7 +2357,7 @@ class PromptLibraryInjector {
   }
 
   insertPrompt(textarea, content) {
-    const hostname = window.location.hostname;
+    const hostname = String(window.location.hostname || '');
     
     // Site-specific insertion logic
     if (hostname === 'www.perplexity.ai') {
@@ -2400,20 +2481,127 @@ class PromptLibraryInjector {
 // Enhanced cross-tab interference prevention
 let promptLibraryInstance = null;
 
+// Expose to global scope for dynamic injection
+window.promptLibraryInstance = promptLibraryInstance;
+
 // Initialize with proper cleanup and cross-tab prevention
-function initializePromptLibrary() {
+async function initializePromptLibrary() {
   // Cleanup any existing instance first
   if (promptLibraryInstance) {
     promptLibraryInstance.cleanup();
     promptLibraryInstance = null;
   }
   
+  // Check if this site should be activated
+  const shouldActivate = await checkIfSiteIsEnabled();
+  
+  if (!shouldActivate) {
+    Logger.info('Site not enabled, skipping initialization', { 
+      hostname: String(window.location.hostname || '') 
+    });
+    return;
+  }
+  
+  
   // Create new instance
   promptLibraryInstance = new PromptLibraryInjector();
+  
+  // Update global reference
+  window.promptLibraryInstance = promptLibraryInstance;
+  
 }
 
+// Universal site activation check
+async function checkIfSiteIsEnabled() {
+  const hostname = String(window.location.hostname || '');
+  
+  return new Promise((resolve) => {
+    try {
+      // Skip for local/internal pages
+      if (!hostname || hostname === 'localhost' || hostname.startsWith('127.0.0.1') || 
+          hostname === 'chrome-extension' || hostname === 'moz-extension') {
+        resolve(false);
+        return;
+      }
+      
+      // Check Chrome APIs availability
+      if (typeof chrome === 'undefined' || !chrome.storage || !chrome.runtime) {
+        Logger.info('Chrome extension APIs not available, skipping', { 
+          hostname,
+          hasChrome: typeof chrome !== 'undefined',
+          hasStorage: !!(chrome && chrome.storage),
+          hasRuntime: !!(chrome && chrome.runtime)
+        });
+        resolve(false);
+        return;
+      }
+      
+      // Additional check for extension context
+      try {
+        chrome.runtime.id; // This will throw if not in proper extension context
+      } catch {
+        Logger.info('Not in extension context, skipping', { hostname });
+        resolve(false);
+        return;
+      }
+
+      try {
+        chrome.storage.local.get(['promptLibrarySettings'], (result) => {
+          if (chrome.runtime.lastError) {
+            Logger.warn('Failed to retrieve settings for activation check', {
+              error: chrome.runtime.lastError.message,
+              hostname
+            });
+            resolve(false);
+            return;
+          }
+        
+        const settings = result.promptLibrarySettings || {};
+        const enabledSites = settings.enabledSites || [];
+        const customSites = settings.customSites || [];
+        
+        // Check if enabled in built-in sites
+        const isBuiltInEnabled = enabledSites.includes(hostname);
+        
+        // Check if enabled in custom sites
+        const customSite = customSites.find(site => site.hostname === hostname);
+        const isCustomEnabled = customSite ? customSite.enabled : false;
+        
+        const shouldActivate = isBuiltInEnabled || isCustomEnabled;
+        
+        
+        Logger.info('Site activation check completed', {
+          hostname,
+          isBuiltInEnabled,
+          isCustomEnabled,
+          shouldActivate
+        });
+        
+        resolve(shouldActivate);
+        });
+      } catch (storageError) {
+        Logger.error('Unexpected error accessing chrome storage', storageError, {
+          hostname,
+          errorMessage: storageError.message,
+          errorName: storageError.name
+        });
+        resolve(false);
+      }
+    } catch (error) {
+      Logger.error('Error in site activation check', error, {
+        hostname,
+        errorMessage: error.message
+      });
+      resolve(false);
+    }
+  });
+}
+
+// Expose function to global scope
+window.initializePromptLibrary = initializePromptLibrary;
+
 // Initialize on load
-initializePromptLibrary();
+void initializePromptLibrary();
 
 // Cleanup on page unload to prevent cross-tab interference
 window.addEventListener('beforeunload', () => {
@@ -2487,36 +2675,24 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return;
   }
   
+  if (message.action === 'reinitialize') {
+    // Handle reinitialize request (e.g., when custom site is added/toggled)
+    Logger.info('Received reinitialize request', { 
+      reason: message.reason,
+      hostname: String(window.location.hostname || '') 
+    });
+    void initializePromptLibrary();
+    sendResponse({ success: true });
+    return;
+  }
+  
   if (message.action === 'settingsUpdated') {
-    Logger.info('Settings updated, reinitializing prompt library', {
-      newSettings: message.settings
+    Logger.info('Settings updated, reinitializing', {
+      hostname: String(window.location.hostname || '')
     });
     
-    // Check if current site is now disabled
-    const enabledSites = message.settings.enabledSites || [];
-    const customSites = message.settings.customSites || [];
-    const currentHostname = window.location.hostname;
-    
-    // Check if enabled in built-in sites or custom sites
-    const isBuiltInEnabled = enabledSites.includes(currentHostname);
-    const customSite = customSites.find(site => site.hostname === currentHostname);
-    const isCustomEnabled = customSite ? customSite.enabled : false;
-    const isCurrentSiteEnabled = isBuiltInEnabled || isCustomEnabled;
-    
-    if (!isCurrentSiteEnabled && promptLibraryInstance) {
-      // Site was disabled - cleanup current instance
-      Logger.info('Current site disabled, cleaning up');
-      promptLibraryInstance.cleanup();
-      promptLibraryInstance = null;
-    } else if (isCurrentSiteEnabled && !promptLibraryInstance) {
-      // Site was enabled - initialize new instance
-      Logger.info('Current site enabled, initializing');
-      initializePromptLibrary();
-    } else if (isCurrentSiteEnabled && promptLibraryInstance) {
-      // Site still enabled - just refresh detection
-      Logger.info('Current site still enabled, refreshing detection');
-      promptLibraryInstance.detectAndInjectIcon();
-    }
+    // Simply reinitialize - the activation check will handle enabling/disabling
+    void initializePromptLibrary();
     
     // Update debug mode in localStorage if changed
     if (message.settings.debugMode !== undefined) {

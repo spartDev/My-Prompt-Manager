@@ -243,8 +243,8 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
     setNewSiteName('');
     setUrlError('');
     
-    // Inject script into any open tabs matching this hostname
-    await injectCustomSite(validation.hostname);
+    // Notify any open tabs to reinitialize
+    await notifyCustomSiteChange(validation.hostname);
   };
 
   const handleCustomSiteToggle = async (hostname: string, enabled: boolean) => {
@@ -260,12 +260,8 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
     setSettings(newSettings);
     await saveSettings(newSettings);
 
-    // Handle script injection/removal
-    if (enabled) {
-      await injectCustomSite(hostname);
-    } else {
-      await removeCustomSiteScript(hostname);
-    }
+    // Notify tabs about the change
+    await notifyCustomSiteChange(hostname);
   };
 
   const handleRemoveCustomSite = async (hostname: string) => {
@@ -283,51 +279,33 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
     setSettings(newSettings);
     await saveSettings(newSettings);
     
-    // Remove script from tabs
-    await removeCustomSiteScript(hostname);
+    // Notify tabs about the removal
+    await notifyCustomSiteChange(hostname);
   };
 
-  const injectCustomSite = async (hostname: string) => {
+  const notifyCustomSiteChange = async (hostname: string) => {
     try {
+      // Since we're using universal content script, just notify existing tabs
       const tabs = await chrome.tabs.query({ url: `*://${hostname}/*` });
       
       for (const tab of tabs) {
         if (tab.id) {
           try {
-            await chrome.scripting.executeScript({
-              target: { tabId: tab.id },
-              files: ['src/content.js']
-            });
-          } catch (error) {
-            console.error(`Could not inject into tab ${String(tab.id)}:`, error);
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Failed to inject custom site script:', error);
-    }
-  };
-
-  const removeCustomSiteScript = async (hostname: string) => {
-    try {
-      const tabs = await chrome.tabs.query({ url: `*://${hostname}/*` });
-      
-      for (const tab of tabs) {
-        if (tab.id) {
-          try {
-            // Send message to content script to clean up
+            // Notify the content script to reinitialize
             await chrome.tabs.sendMessage(tab.id, {
-              action: 'cleanup'
+              action: 'reinitialize',
+              reason: 'custom_site_added'
             });
           } catch {
-            // Tab might not have content script, ignore error
+            // Tab might not have content script loaded yet, ignore error
           }
         }
       }
     } catch (error) {
-      console.error('Failed to remove custom site script:', error);
+      console.error('Failed to notify custom site change:', error);
     }
   };
+
 
   const handleReset = async () => {
     if (confirm('Are you sure you want to reset all settings to default? This action cannot be undone.')) {
