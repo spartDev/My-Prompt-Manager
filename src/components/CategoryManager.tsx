@@ -271,17 +271,6 @@ const CategoryManager: FC<CategoryManagerProps> = ({
           </div>
       </div>
 
-      {/* Footer */}
-      <div className="flex-shrink-0 p-6 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-t border-purple-100 dark:border-gray-700">
-        <button
-          onClick={onClose}
-          className="w-full px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl"
-          disabled={loading}
-        >
-          Back to Library
-        </button>
-      </div>
-
       {/* Delete Confirmation Dialog */}
       <ConfirmDialog
         isOpen={deleteConfirm.isOpen}
