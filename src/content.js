@@ -2186,8 +2186,16 @@ class PromptLibraryInjector {
     ];
     
     if (!config) {
+      // Check if this site is enabled as a custom site before proceeding with fallback logic
+      const customPositioning = await this.getCustomSiteConfig(hostname);
+      if (!customPositioning) {
+        Logger.info('No predefined config and site not enabled as custom site, skipping', { 
+          hostname 
+        });
+        return;
+      }
       
-      Logger.info('No predefined config, using fallback selectors for custom site', { 
+      Logger.info('No predefined config, using fallback selectors for enabled custom site', { 
         hostname,
         fallbackSelectorCount: fallbackSelectors.length 
       });
