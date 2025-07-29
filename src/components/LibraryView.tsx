@@ -42,12 +42,8 @@ const LibraryView: FC<LibraryViewProps> = ({
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center" role="img" aria-label="My Prompt Manager icon">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                <polyline points="14,2 14,8 20,8"/>
-                <line x1="16" y1="13" x2="8" y2="13"/>
-                <line x1="16" y1="17" x2="8" y2="17"/>
-                <polyline points="10,9 9,9 8,9"/>
+              <svg className="w-6 h-6 text-white" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+                <path fill="currentColor" d="M5.085 8.476a.848.848 0 0 0 .641-.273.946.946 0 0 0 .259-.676.946.946 0 0 0-.259-.677.848.848 0 0 0-.641-.273.848.848 0 0 0-.641.273.946.946 0 0 0-.259.677c0 .269.086.494.259.676a.848.848 0 0 0 .641.273Zm3.983 0a.848.848 0 0 0 .64-.273.946.946 0 0 0 .26-.676.946.946 0 0 0-.26-.677.848.848 0 0 0-.64-.273.848.848 0 0 0-.642.273.946.946 0 0 0-.258.677c0 .269.086.494.258.676a.848.848 0 0 0 .642.273Zm3.825 0a.848.848 0 0 0 .64-.273.945.945 0 0 0 .26-.676.945.945 0 0 0-.26-.677.848.848 0 0 0-.64-.273.848.848 0 0 0-.642.273.945.945 0 0 0-.258.677c0 .269.086.494.258.676a.848.848 0 0 0 .642.273ZM0 17.285V1.425C0 1.06.135.732.405.439.675.146.99 0 1.35 0h15.3c.345 0 .656.146.934.44.277.292.416.62.416.985V13.77c0 .364-.139.692-.416.985-.278.293-.589.44-.934.44H3.6l-2.453 2.588c-.21.221-.453.273-.73.154-.278-.119-.417-.336-.417-.653Zm1.35-1.733 1.688-1.781H16.65V1.425H1.35v14.127Zm0-14.127V15.55 1.426Z"/>
               </svg>
             </div>
             <div>
