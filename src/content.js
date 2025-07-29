@@ -808,6 +808,25 @@ class PromptLibraryInjector {
     this.uiFactory = new UIElementFactory(this.instanceId);
     this.keyboardNav = null;
     
+    // Enhanced retry system for custom selectors
+    this.customSelectorRetry = {
+      attempts: 0,
+      maxAttempts: 30, // Increased for SPAs
+      baseDelay: 250,  // Start with shorter delay
+      maxDelay: 2000,  // Cap at 2 seconds
+      currentDelay: 250,
+      timeoutId: null,
+      selector: null,
+      positioning: null
+    };
+    
+    // SPA navigation detection
+    this.spaState = {
+      lastUrl: window.location.href,
+      navigationDetected: false,
+      routeChangeTimeout: null
+    };
+    
     // Performance optimization: caching for DOM queries
     this.selectorCache = new Map();
     this.lastCacheTime = 0;
@@ -899,6 +918,18 @@ class PromptLibraryInjector {
   
   cleanup() {
     Logger.info('Starting cleanup', { instanceId: this.instanceId });
+    
+    // Clear custom selector retry timeout
+    if (this.customSelectorRetry.timeoutId) {
+      clearTimeout(this.customSelectorRetry.timeoutId);
+      this.customSelectorRetry.timeoutId = null;
+    }
+    
+    // Clear SPA route change timeout
+    if (this.spaState.routeChangeTimeout) {
+      clearTimeout(this.spaState.routeChangeTimeout);
+      this.spaState.routeChangeTimeout = null;
+    }
     
     // Remove current icon reference first (more efficient)
     if (this.icon) {
@@ -1073,6 +1104,9 @@ class PromptLibraryInjector {
     
     // Inject CSS styles
     injectCSS();
+    
+    // Setup SPA monitoring for dynamic navigation detection
+    this.setupSPAMonitoring();
     
     // Wait for page to be ready
     if (document.readyState === 'loading') {
@@ -1482,6 +1516,12 @@ class PromptLibraryInjector {
     
     // Schedule detection with adaptive delay
     this.detectionTimeout = setTimeout(() => {
+      // Reset custom selector retry if mutation triggered new detection
+      // This allows custom selectors to retry if DOM changes
+      if (this.customSelectorRetry.selector && !this.icon) {
+        Logger.debug('Mutation detected, resetting custom selector retry for DOM changes');
+        this.customSelectorRetry.attempts = Math.max(0, this.customSelectorRetry.attempts - 2); // Reduce attempts slightly
+      }
       void this.detectAndInjectIcon();
     }, throttleDelay);
   }
@@ -1609,7 +1649,7 @@ class PromptLibraryInjector {
       
       if (targetElements.length === 0) {
         Logger.warn('Custom selector found no elements', { 
-          selector: positioning.selector 
+          context: { selector: positioning.selector }
         });
         return false;
       }
@@ -1620,23 +1660,23 @@ class PromptLibraryInjector {
       // Enhanced validation for target element
       if (!document.body.contains(targetElement)) {
         Logger.warn('Target element is not in DOM', { 
-          selector: positioning.selector 
+          context: { selector: positioning.selector }
         });
         return false;
       }
 
-      // Check if element is visible (more comprehensive check)
-      const isVisible = targetElement.offsetParent !== null || 
-                       targetElement.getBoundingClientRect().width > 0 ||
-                       targetElement.getBoundingClientRect().height > 0 ||
-                       getComputedStyle(targetElement).display !== 'none';
-      
-      if (!isVisible) {
-        Logger.warn('Target element is not visible', { 
-          selector: positioning.selector,
-          offsetParent: targetElement.offsetParent,
-          display: getComputedStyle(targetElement).display,
-          rect: targetElement.getBoundingClientRect()
+      // Use enhanced visibility checking
+      if (!this.isElementTrulyVisible(targetElement)) {
+        Logger.warn('Target element is not truly visible', { 
+          context: { 
+            selector: positioning.selector,
+            rect: targetElement.getBoundingClientRect(),
+            style: {
+              display: getComputedStyle(targetElement).display,
+              visibility: getComputedStyle(targetElement).visibility,
+              opacity: getComputedStyle(targetElement).opacity
+            }
+          }
         });
         return false;
       }
@@ -1945,6 +1985,182 @@ class PromptLibraryInjector {
     }
   }
 
+  // Enhanced custom selector retry with SPA awareness
+  async retryCustomSelector(positioning) {
+    // Reset retry state if this is a new selector
+    if (this.customSelectorRetry.selector !== positioning.selector) {
+      this.customSelectorRetry.attempts = 0;
+      this.customSelectorRetry.currentDelay = this.customSelectorRetry.baseDelay;
+      this.customSelectorRetry.selector = positioning.selector;
+      this.customSelectorRetry.positioning = positioning;
+    }
+    
+    // Clear any existing timeout
+    if (this.customSelectorRetry.timeoutId) {
+      clearTimeout(this.customSelectorRetry.timeoutId);
+      this.customSelectorRetry.timeoutId = null;
+    }
+    
+    // Check if we've exceeded max attempts
+    if (this.customSelectorRetry.attempts >= this.customSelectorRetry.maxAttempts) {
+      Logger.warn('Custom selector retry exhausted', {
+        selector: positioning.selector,
+        attempts: this.customSelectorRetry.attempts,
+        totalTime: (this.customSelectorRetry.attempts * this.customSelectorRetry.baseDelay) / 1000 + 's'
+      });
+      return false;
+    }
+    
+    this.customSelectorRetry.attempts++;
+    
+    // Exponential backoff with jitter
+    const backoffMultiplier = Math.min(2, 1 + (this.customSelectorRetry.attempts * 0.1));
+    const jitter = Math.random() * 0.3 + 0.85; // 0.85 to 1.15
+    this.customSelectorRetry.currentDelay = Math.min(
+      this.customSelectorRetry.maxDelay,
+      this.customSelectorRetry.baseDelay * backoffMultiplier * jitter
+    );
+    
+    Logger.debug('Retrying custom selector', {
+      selector: positioning.selector,
+      attempt: this.customSelectorRetry.attempts,
+      delay: Math.round(this.customSelectorRetry.currentDelay),
+      nextBackoff: Math.round(this.customSelectorRetry.currentDelay * backoffMultiplier)
+    });
+    
+    return new Promise((resolve) => {
+      this.customSelectorRetry.timeoutId = setTimeout(async () => {
+        const success = await this.createCustomPositionedIcon(positioning);
+        if (success) {
+          Logger.info('Custom selector retry succeeded', {
+            selector: positioning.selector,
+            attempt: this.customSelectorRetry.attempts,
+            totalTime: (this.customSelectorRetry.attempts * this.customSelectorRetry.baseDelay) / 1000 + 's'
+          });
+          resolve(true);
+        } else {
+          // Continue retrying
+          const nextAttempt = await this.retryCustomSelector(positioning);
+          resolve(nextAttempt);
+        }
+      }, this.customSelectorRetry.currentDelay);
+    });
+  }
+
+  // Enhanced visibility check for elements
+  isElementTrulyVisible(element) {
+    if (!element || !document.body.contains(element)) {
+      return false;
+    }
+    
+    const rect = element.getBoundingClientRect();
+    const style = getComputedStyle(element);
+    
+    // Check basic visibility conditions
+    if (rect.width === 0 || rect.height === 0 ||
+        style.display === 'none' ||
+        style.visibility === 'hidden' ||
+        style.opacity === '0') {
+      return false;
+    }
+    
+    // Check if element is in viewport (at least partially visible)
+    const isInViewport = rect.top < window.innerHeight && 
+                        rect.bottom > 0 && 
+                        rect.left < window.innerWidth && 
+                        rect.right > 0;
+    
+    if (!isInViewport) {
+      return false;
+    }
+    
+    // Check if element is not covered by other elements (sample center point)
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const elementAtPoint = document.elementFromPoint(centerX, centerY);
+    
+    // Element is visible if it's the element at the point or contains it
+    return elementAtPoint === element || element.contains(elementAtPoint);
+  }
+
+  // SPA navigation detection and handling
+  detectSPANavigation() {
+    const currentUrl = window.location.href;
+    if (this.spaState.lastUrl !== currentUrl) {
+      Logger.info('SPA navigation detected', {
+        from: this.spaState.lastUrl,
+        to: currentUrl
+      });
+      
+      this.spaState.lastUrl = currentUrl;
+      this.spaState.navigationDetected = true;
+      
+      // Reset retry state on navigation
+      this.customSelectorRetry.attempts = 0;
+      this.customSelectorRetry.currentDelay = this.customSelectorRetry.baseDelay;
+      
+      // Debounce re-injection after route change
+      if (this.spaState.routeChangeTimeout) {
+        clearTimeout(this.spaState.routeChangeTimeout);
+      }
+      
+      this.spaState.routeChangeTimeout = setTimeout(() => {
+        Logger.info('Re-detecting after SPA navigation');
+        void this.detectAndInjectIcon();
+        this.spaState.navigationDetected = false;
+      }, 300); // Give the SPA time to render new content
+      
+      return true;
+    }
+    return false;
+  }
+
+  // Setup SPA monitoring
+  setupSPAMonitoring() {
+    let originalPushState = null;
+    let originalReplaceState = null;
+    
+    // Monitor for pushState/replaceState changes
+    if (typeof window !== 'undefined' && window.history) {
+      originalPushState = window.history.pushState;
+      originalReplaceState = window.history.replaceState;
+      
+      window.history.pushState = (...args) => {
+        originalPushState.apply(window.history, args);
+        this.detectSPANavigation();
+      };
+      
+      window.history.replaceState = (...args) => {
+        originalReplaceState.apply(window.history, args);
+        this.detectSPANavigation();
+      };
+    }
+    
+    // Monitor for popstate events (back/forward navigation)
+    this.eventManager.addTrackedEventListener(window, 'popstate', () => {
+      setTimeout(() => this.detectSPANavigation(), 50);
+    });
+    
+    // Periodically check for URL changes (fallback for some SPAs)
+    const urlCheckInterval = setInterval(() => {
+      this.detectSPANavigation();
+    }, 1000);
+    
+    // Clean up interval on cleanup
+    const originalCleanup = this.cleanup.bind(this);
+    this.cleanup = () => {
+      clearInterval(urlCheckInterval);
+      // Restore original history methods
+      if (typeof window !== 'undefined' && window.history) {
+        if (originalPushState) window.history.pushState = originalPushState;
+        if (originalReplaceState) window.history.replaceState = originalReplaceState;
+      }
+      originalCleanup();
+    };
+    
+    Logger.info('SPA monitoring enabled');
+  }
+
   async detectAndInjectIcon() {
     const hostname = String(window.location.hostname || '');
     const config = this.siteConfigs[hostname];
@@ -1958,7 +2174,25 @@ class PromptLibraryInjector {
         Logger.info('Custom positioning successful, skipping default injection');
         return;
       } else {
-        Logger.warn('Custom positioning failed, falling back to default behavior');
+        // Use enhanced retry system for custom selectors
+        Logger.info('Custom positioning failed, starting enhanced retry', {
+          selector: customPositioning.selector,
+          attempts: this.customSelectorRetry.attempts
+        });
+        
+        const retrySuccess = await this.retryCustomSelector(customPositioning);
+        if (retrySuccess) {
+          Logger.info('Custom positioning retry successful, skipping default injection');
+          return;
+        } else {
+          Logger.warn('Custom positioning failed, falling back to default behavior', {
+          context: { 
+            selector: customPositioning.selector,
+            totalAttempts: this.customSelectorRetry.attempts,
+            hostname: hostname
+          }
+        });
+        }
       }
     }
     
