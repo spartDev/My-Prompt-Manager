@@ -55,6 +55,106 @@ const SectionSeparator: FC = () => (
   </div>
 );
 
+// Site tile component for consistent display of both built-in and custom sites
+interface SiteTileProps {
+  hostname: string;
+  name: string;
+  description: string;
+  icon: string;
+  isEnabled: boolean;
+  onToggle: (hostname: string, enabled: boolean) => void;
+  saving: boolean;
+  isCustom?: boolean;
+  customSite?: CustomSite;
+  onRemove?: (hostname: string) => void;
+}
+
+const SiteTile: FC<SiteTileProps> = ({ 
+  hostname, 
+  name, 
+  description, 
+  icon, 
+  isEnabled, 
+  onToggle, 
+  saving, 
+  isCustom = false,
+  customSite,
+  onRemove 
+}) => {
+  // Create enhanced description for custom sites
+  const getEnhancedDescription = () => {
+    if (!isCustom || !customSite) {return description;}
+    
+    // For custom sites, show positioning mode instead of hostname duplication
+    if (customSite.positioning?.mode === 'custom') {
+      return customSite.positioning.description || 'Custom positioning';
+    } else {
+      return 'Auto positioning';
+    }
+  };
+
+  return (
+    <div 
+      className="flex items-center justify-between p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-purple-200 dark:hover:border-purple-700 transition-colors"
+    >
+      <div className="flex items-center gap-3 flex-1">
+        <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white font-semibold text-sm ${
+          isCustom 
+            ? 'bg-gradient-to-br from-green-500 to-teal-600' 
+            : 'bg-gradient-to-br from-purple-600 to-indigo-600'
+        }`}>
+          {icon}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm truncate">
+              {name}
+            </h3>
+          </div>
+          <div className="flex items-center gap-2">
+            {isCustom && (
+              <span className="px-1.5 py-0.5 text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-md flex-shrink-0">
+                Custom
+              </span>
+            )}
+            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+              {getEnhancedDescription()}
+            </p>
+          </div>
+        </div>
+      </div>
+      
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <label className="relative inline-flex items-center cursor-pointer">
+          <input
+            type="checkbox"
+            checked={isEnabled}
+            onChange={(e) => { onToggle(hostname, e.target.checked); }}
+            disabled={saving}
+            className="sr-only peer"
+            aria-label={`Enable ${name}`}
+          />
+          <div className="w-11 h-6 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600"></div>
+        </label>
+        
+        {isCustom && onRemove && (
+          <button
+            onClick={() => { onRemove(hostname); }}
+            disabled={saving}
+            className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+            title="Remove site"
+            aria-label={`Remove ${name}`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+            </svg>
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
   const [settings, setSettings] = useState<Settings>({
     enabledSites: [],
@@ -538,46 +638,54 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
             Site Integration
           </h2>
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            Choose which AI chat platforms should display the prompt library icon
+            Choose which AI chat platforms should display the prompt library icon. This includes both built-in sites and your custom sites.
           </p>
           
           <div className="space-y-3">
+            {/* Built-in Sites */}
             {Object.entries(siteConfigs).map(([hostname, config]) => {
               const isEnabled = settings.enabledSites.includes(hostname);
               
               return (
-                <div 
+                <SiteTile
                   key={hostname}
-                  className="flex items-center justify-between p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-purple-200 dark:hover:border-purple-700 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-lg flex items-center justify-center text-white font-semibold text-sm">
-                      {config.icon}
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm">
-                        {config.name}
-                      </h3>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        {config.description}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={isEnabled}
-                      onChange={(e) => void handleSiteToggle(hostname, e.target.checked)}
-                      disabled={saving}
-                      className="sr-only peer"
-                      aria-label={`Enable ${config.name}`}
-                    />
-                    <div className="w-11 h-6 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600"></div>
-                  </label>
-                </div>
+                  hostname={hostname}
+                  name={config.name}
+                  description={config.description}
+                  icon={config.icon}
+                  isEnabled={isEnabled}
+                  onToggle={(hostname, enabled) => void handleSiteToggle(hostname, enabled)}
+                  saving={saving}
+                  isCustom={false}
+                />
               );
             })}
+            
+            {/* Custom Sites */}
+            {settings.customSites.map((site) => (
+              <SiteTile
+                key={site.hostname}
+                hostname={site.hostname}
+                name={site.displayName}
+                description={site.hostname}
+                icon={site.icon || site.displayName.charAt(0).toUpperCase()}
+                isEnabled={site.enabled}
+                onToggle={(hostname, enabled) => void handleCustomSiteToggle(hostname, enabled)}
+                saving={saving}
+                isCustom={true}
+                customSite={site}
+                onRemove={(hostname) => void handleRemoveCustomSite(hostname)}
+              />
+            ))}
+            
+            {/* Empty state when no custom sites exist */}
+            {settings.customSites.length === 0 && Object.keys(siteConfigs).length > 0 && (
+              <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <p className="text-sm text-blue-700 dark:text-blue-300">
+                  <strong>Want to add more sites?</strong> Use the &quot;Custom Sites&quot; feature in Advanced Options below to add the prompt library to any website.
+                </p>
+              </div>
+            )}
           </div>
         </section>
 
@@ -672,7 +780,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
                   Custom Sites
                 </h3>
                 <p className="text-xs text-gray-600 dark:text-gray-400 mb-4">
-                  Add your own websites where you want the prompt library to appear
+                  Add your own websites where you want the prompt library to appear. Added sites will appear in the Site Integration section above.
                 </p>
                 
                 {/* Add New Site Form */}
@@ -913,88 +1021,25 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
                   )}
                 </div>
                 
-                {/* Custom Sites List */}
-                <div className="space-y-2">
-                  {settings.customSites.map((site) => (
-                    <div 
-                      key={site.hostname}
-                      className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-teal-600 rounded-lg flex items-center justify-center text-white font-semibold text-sm">
-                          {site.icon || site.displayName.charAt(0).toUpperCase()}
-                        </div>
-                        <div>
-                          <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm">
-                            {site.displayName}
-                          </h3>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            {site.hostname}
-                          </p>
-                          {site.positioning && (
-                            <div className="mt-1 flex items-center gap-2 text-xs">
-                              <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                                site.positioning.mode === 'custom' 
-                                  ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300' 
-                                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
-                              }`}>
-                                {site.positioning.mode === 'custom' ? 'Custom' : 'Auto'}
-                              </span>
-                              {site.positioning.mode === 'custom' && site.positioning.selector && (
-                                <span className="text-gray-500 dark:text-gray-400 font-mono truncate max-w-32" title={site.positioning.selector}>
-                                  {site.positioning.selector}
-                                </span>
-                              )}
-                              {site.positioning.description && (
-                                <span className="text-gray-500 dark:text-gray-400" title={site.positioning.description}>
-                                  ({site.positioning.description})
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-2">
-                        {/* Toggle for custom site */}
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={site.enabled}
-                            onChange={(e) => void handleCustomSiteToggle(site.hostname, e.target.checked)}
-                            disabled={saving}
-                            className="sr-only peer"
-                            aria-label={`Enable ${site.displayName}`}
-                          />
-                          <div className="w-11 h-6 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600"></div>
-                        </label>
-                        
-                        {/* Remove button */}
-                        <button
-                          onClick={() => void handleRemoveCustomSite(site.hostname)}
-                          disabled={saving}
-                          className="p-1 text-gray-400 hover:text-red-600 transition-colors"
-                          title="Remove site"
-                          aria-label={`Remove ${site.displayName}`}
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                  
-                  {settings.customSites.length === 0 && (
-                    <div className="text-center py-6 text-gray-500 dark:text-gray-400">
-                      <svg className="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" strokeWidth={1} viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
-                      </svg>
-                      <p className="text-sm">No custom sites added yet</p>
-                      <p className="text-xs mt-1">Add websites where you want the prompt library to appear</p>
-                    </div>
-                  )}
-                </div>
+                {/* Status/Summary of Custom Sites */}
+                {settings.customSites.length > 0 && (
+                  <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
+                    <p className="text-sm text-green-700 dark:text-green-300">
+                      <strong>{settings.customSites.length}</strong> custom {settings.customSites.length === 1 ? 'site' : 'sites'} configured. 
+                      You can manage them in the Site Integration section above.
+                    </p>
+                  </div>
+                )}
+                
+                {settings.customSites.length === 0 && (
+                  <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+                    <svg className="w-8 h-8 mx-auto mb-2 opacity-50" fill="none" stroke="currentColor" strokeWidth={1} viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                    </svg>
+                    <p className="text-sm">No custom sites added yet</p>
+                    <p className="text-xs mt-1">Use the form above to add websites where you want the prompt library to appear</p>
+                  </div>
+                )}
               </div>
             </div>
           )}
