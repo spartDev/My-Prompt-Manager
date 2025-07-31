@@ -1296,21 +1296,7 @@ class ClaudeStrategy extends PlatformStrategy {
       return false;
     }
     
-    // Check if element is or contains ProseMirror
-    const isProseMirror = element.classList.contains('ProseMirror') ||
-                         element.closest('.ProseMirror') !== null ||
-                         element.querySelector('.ProseMirror') !== null;
-    
-    this._debug('canHandle check', {
-      hostname: this.hostname,
-      isProseMirror,
-      elementTag: element.tagName,
-      elementClasses: element.className,
-      isContentEditable: element.contentEditable === 'true'
-    });
-    
     // For Claude, we want to handle any element that is or is related to ProseMirror
-    // or any contentEditable element on claude.ai
     return true; // Always return true for claude.ai to ensure we use Claude strategy
   }
   
@@ -1319,21 +1305,8 @@ class ClaudeStrategy extends PlatformStrategy {
    * Tries ProseMirror transaction API, then execCommand, then DOM manipulation
    */
   async insert(element, content) {
-    this._debug('Attempting insertion', {
-      hasProseMirrorClass: element.classList.contains('ProseMirror'),
-      isContentEditable: element.contentEditable === 'true',
-      elementTag: element.tagName,
-      elementClass: element.className
-    });
-    
     // Try to find ProseMirror element
     const proseMirrorElement = this._findProseMirrorElement(element);
-    
-    this._debug('ProseMirror element search result', {
-      foundProseMirror: proseMirrorElement.classList.contains('ProseMirror'),
-      elementTag: proseMirrorElement.tagName,
-      elementClass: proseMirrorElement.className
-    });
     
     // Method 1: Try ProseMirror transaction API
     const transactionResult = await this._tryProseMirrorTransaction(proseMirrorElement, content);
@@ -1370,53 +1343,30 @@ class ClaudeStrategy extends PlatformStrategy {
    * @private
    */
   _findProseMirrorElement(element) {
-    this._debug('_findProseMirrorElement called', {
-      elementTag: element?.tagName,
-      elementId: element?.id,
-      elementClass: element?.className?.substring(0, 100),
-      isProseMirror: element?.classList?.contains('ProseMirror'),
-      isContentEditable: element?.contentEditable === 'true',
-      hasRole: element?.getAttribute('role')
-    });
-
     // If element is already ProseMirror, use it
     if (element.classList.contains('ProseMirror')) {
-      this._debug('Element is already ProseMirror, using it directly');
       return element;
     }
     
     // First check if ProseMirror is a parent
     const parentProseMirror = element.closest('.ProseMirror');
     if (parentProseMirror) {
-      this._debug('Found parent ProseMirror element', {
-        parentTag: parentProseMirror.tagName,
-        parentClass: parentProseMirror.className?.substring(0, 100)
-      });
       return parentProseMirror;
     }
     
     // Then check if ProseMirror is a child
     const childProseMirror = element.querySelector('.ProseMirror');
     if (childProseMirror) {
-      this._debug('Found child ProseMirror element', {
-        childTag: childProseMirror.tagName,
-        childClass: childProseMirror.className?.substring(0, 100)
-      });
       return childProseMirror;
     }
     
     // Last resort: find any ProseMirror element on the page for Claude.ai
     const anyProseMirror = document.querySelector('div[contenteditable="true"][role="textbox"].ProseMirror');
     if (anyProseMirror) {
-      this._debug('Found ProseMirror element via document query as fallback', {
-        fallbackTag: anyProseMirror.tagName,
-        fallbackClass: anyProseMirror.className?.substring(0, 100)
-      });
       return anyProseMirror;
     }
     
     // Return original element as final fallback
-    this._debug('No ProseMirror found, returning original element as fallback');
     return element;
   }
   
@@ -1434,8 +1384,6 @@ class ClaudeStrategy extends PlatformStrategy {
                   window.ProseMirror?.view;
       
       if (view && view.state && view.dispatch) {
-        this._debug('Found ProseMirror view, using transaction API');
-        
         const { state } = view;
         const { selection } = state;
         const transaction = state.tr.insertText(content, selection.from, selection.to);
@@ -1485,8 +1433,6 @@ class ClaudeStrategy extends PlatformStrategy {
         const inserted = document.execCommand('insertText', false, content);
         
         if (inserted) {
-          this._debug('execCommand insertion successful');
-          
           // Trigger Claude-specific events
           const inputEvent = new InputEvent('input', {
             bubbles: true,
@@ -1600,7 +1546,6 @@ class ChatGPTStrategy extends PlatformStrategy {
       element.dispatchEvent(new Event('input', { bubbles: true }));
       element.dispatchEvent(new Event('change', { bubbles: true }));
       
-      this._debug('React-compatible insertion successful');
       return { success: true, method: 'chatgpt-react' };
     } catch (error) {
       this._error('React insertion failed', error);
@@ -1820,8 +1765,8 @@ class PlatformManager {
     // Sort strategies by priority (highest first)
     this.strategies.sort((a, b) => b.priority - a.priority);
     
-    Logger.debug('Strategy initialization complete', {
-      strategiesLoaded: this.strategies.map(s => ({ name: s.name, priority: s.priority }))
+    Logger.info('Strategy initialization complete', {
+      strategiesLoaded: this.strategies.length
     });
   }
   
@@ -1887,16 +1832,6 @@ class PlatformManager {
       };
     }
     
-    Logger.debug('PlatformManager: Starting insertion', {
-      hostname: this.hostname,
-      elementTag: targetElement.tagName,
-      elementClass: targetElement.className,
-      elementId: targetElement.id,
-      isContentEditable: targetElement.contentEditable,
-      hasProseMirrorClass: targetElement.classList.contains('ProseMirror'),
-      closestProseMirror: targetElement.closest('.ProseMirror') ? 'found' : 'not found'
-    });
-    
     // Find compatible strategies
     const compatibleStrategies = this.strategies.filter(strategy => {
       try {
@@ -1905,10 +1840,6 @@ class PlatformManager {
         Logger.warn(`Strategy ${strategy.name} canHandle() failed`, error);
         return false;
       }
-    });
-    
-    Logger.debug('PlatformManager: Compatible strategies found', {
-      strategies: compatibleStrategies.map(s => ({ name: s.name, priority: s.priority }))
     });
     
     if (compatibleStrategies.length === 0) {
@@ -1921,7 +1852,6 @@ class PlatformManager {
     // Try strategies in priority order
     for (const strategy of compatibleStrategies) {
       try {
-        Logger.debug(`PlatformManager: Trying ${strategy.name} strategy`);
         const result = await strategy.insert(targetElement, content);
         
         if (result.success) {
@@ -1931,8 +1861,6 @@ class PlatformManager {
           });
           this.activeStrategy = strategy;
           return result;
-        } else {
-          Logger.debug(`PlatformManager: ${strategy.name} strategy returned failure`, result);
         }
       } catch (error) {
         Logger.warn(`PlatformManager: ${strategy.name} strategy threw error`, error);
@@ -2167,24 +2095,13 @@ class PromptLibraryInjector {
    * @returns {HTMLElement} Platform-specific icon
    */
   createPlatformIcon() {
-    Logger.debug('createPlatformIcon called', {
-      hasPlatformManager: !!this.platformManager,
-      hasUIFactory: !!this.uiFactory,
-      hostname: this.hostname
-    });
     
     if (!this.platformManager) {
       Logger.warn('Platform manager not initialized, using default icon');
       return this.uiFactory.createFloatingIcon();
     }
     
-    Logger.debug('About to call platformManager.createIcon');
     const icon = this.platformManager.createIcon(this.uiFactory);
-    
-    Logger.debug('platformManager.createIcon result', {
-      iconCreated: !!icon,
-      activeStrategy: this.platformManager.getActiveStrategy()?.name
-    });
     
     if (icon && this.platformManager.getActiveStrategy()) {
       Logger.info('Created platform-specific icon', {
@@ -2207,9 +2124,7 @@ class PromptLibraryInjector {
       
       Logger.info('Icon clicked', {
         strategy: this.platformManager?.getActiveStrategy()?.name || 'unknown',
-        hasTextarea: !!this.currentTextarea,
-        currentTextareaTag: this.currentTextarea?.tagName,
-        currentTextareaClass: this.currentTextarea?.className?.substring(0, 50)
+        hasTextarea: !!this.currentTextarea
       });
       
       try {
@@ -2257,18 +2172,14 @@ class PromptLibraryInjector {
     const retryDelay = 300; // 300ms between retries
     
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      Logger.debug(`Attempt ${attempt}/${maxRetries} to find Research button`);
-      
       const researchButton = this.findResearchButtonContainer(buttonContainer);
       if (researchButton) {
-        Logger.debug('Research button found, inserting icon after it');
         researchButton.insertAdjacentElement('afterend', iconElement);
         return; // Success!
       }
       
       // If not found and we have more attempts, wait and try again
       if (attempt < maxRetries) {
-        Logger.debug(`Research button not found, waiting ${retryDelay}ms before retry ${attempt + 1}`);
         await new Promise(resolve => setTimeout(resolve, retryDelay));
       }
     }
@@ -2284,24 +2195,17 @@ class PromptLibraryInjector {
    * @returns {HTMLElement|null} The Research button container or null
    */
   findResearchButtonContainer(parentContainer) {
-    Logger.debug('Searching for Research button', {
-      containerChildren: parentContainer.children.length,
-      containerHTML: parentContainer.innerHTML.substring(0, 200) + '...'
-    });
     
     // Method 1: Look for Research button by text content
     const allButtons = parentContainer.querySelectorAll('button');
-    Logger.debug(`Found ${allButtons.length} buttons in container`);
     
     for (const button of allButtons) {
       const textElement = button.querySelector('p');
       if (textElement) {
         const text = textElement.textContent.trim();
-        Logger.debug(`Button text: "${text}"`);
         if (text === 'Research') {
           const container = button.closest('div[class*="flex"][class*="shrink"]');
           if (container) {
-            Logger.debug('Found Research button container via text search');
             return container;
           }
         }
@@ -3301,10 +3205,6 @@ class PromptLibraryInjector {
       const proseMirrorSelector = 'div[contenteditable="true"][role="textbox"].ProseMirror';
       const proseMirrorEditor = document.querySelector(proseMirrorSelector);
       if (proseMirrorEditor && this.isValidTextarea(proseMirrorEditor)) {
-        Logger.debug('Found ProseMirror editor for Claude.ai in findClosestTextarea', {
-          elementTag: proseMirrorEditor.tagName,
-          elementClass: proseMirrorEditor.className?.substring(0, 100)
-        });
         return proseMirrorEditor;
       }
     }
@@ -3330,11 +3230,6 @@ class PromptLibraryInjector {
       for (const selector of commonSelectors) {
         const textarea = parent.querySelector(selector);
         if (textarea && this.isValidTextarea(textarea)) {
-          Logger.debug('Found textarea in parent container', {
-            selector,
-            elementTag: textarea.tagName,
-            elementClass: textarea.className?.substring(0, 50)
-          });
           return textarea;
         }
       }
@@ -3346,19 +3241,12 @@ class PromptLibraryInjector {
       const textareas = document.querySelectorAll(selector);
       for (const textarea of textareas) {
         if (this.isValidTextarea(textarea)) {
-          Logger.debug('Found textarea via document search fallback', {
-            selector,
-            elementTag: textarea.tagName,
-            elementClass: textarea.className?.substring(0, 50)
-          });
           return textarea;
         }
       }
     }
 
     Logger.warn('No valid textarea found in findClosestTextarea', {
-      targetElementTag: targetElement.tagName,
-      targetElementClass: targetElement.className?.substring(0, 50),
       hostname: this.hostname
     });
     
@@ -3455,27 +3343,12 @@ class PromptLibraryInjector {
         this.icon.style.top = Math.round(top) + 'px';
         this.icon.style.left = Math.round(left) + 'px';
         
-        Logger.debug('Custom icon positioned', {
-          position: { top: Math.round(top), left: Math.round(left) },
-          placement: positioning.placement,
-          selector: positioning.selector
-        });
       } else {
         Logger.error('Icon element is null during positioning');
         return;
       }
       
       // Store current textarea reference for the icon
-      Logger.debug('About to set currentTextarea in positionCustomIcon', {
-        targetElementTag: targetElement.tagName,
-        targetElementId: targetElement.id,
-        targetElementClass: targetElement.className?.substring(0, 100),
-        hostname: this.hostname,
-        existingCurrentTextarea: !!this.currentTextarea,
-        existingCurrentTextareaTag: this.currentTextarea?.tagName,
-        existingCurrentTextareaClass: this.currentTextarea?.className?.substring(0, 50)
-      });
-      
       // For Claude.ai, preserve the existing currentTextarea if it's valid
       // since it was likely set correctly by detectAndInjectIcon
       if (this.hostname === 'claude.ai' && this.currentTextarea) {
@@ -3483,30 +3356,13 @@ class PromptLibraryInjector {
                                   this.currentTextarea.getAttribute('contenteditable') === 'true' &&
                                   this.currentTextarea.getAttribute('role') === 'textbox';
         
-        if (isValidProseMirror) {
-          Logger.debug('Preserving existing valid currentTextarea for Claude.ai', {
-            currentTextareaTag: this.currentTextarea.tagName,
-            currentTextareaClass: this.currentTextarea.className?.substring(0, 100)
-          });
-          // Don't overwrite the existing valid currentTextarea
-        } else {
-          Logger.debug('Existing currentTextarea is invalid, finding new one');
+        if (!isValidProseMirror) {
           this.currentTextarea = this.findClosestTextarea(targetElement);
         }
       } else {
         // For other sites or when no existing currentTextarea, find it
         this.currentTextarea = this.findClosestTextarea(targetElement);
       }
-      
-      Logger.debug('Final currentTextarea in positionCustomIcon', {
-        found: !!this.currentTextarea,
-        currentTextareaTag: this.currentTextarea?.tagName,
-        currentTextareaId: this.currentTextarea?.id,
-        currentTextareaClass: this.currentTextarea?.className?.substring(0, 100),
-        isProseMirror: this.currentTextarea?.classList?.contains('ProseMirror'),
-        isContentEditable: this.currentTextarea?.contentEditable === 'true',
-        hasRole: this.currentTextarea?.getAttribute('role')
-      });
       
       // Set up position tracking for responsive updates
       this.setupCustomIconPositionTracking(targetElement, positioning);
@@ -3914,18 +3770,7 @@ class PromptLibraryInjector {
       }
       
       // Create platform-specific icon
-      Logger.debug('About to create platform icon', {
-        hasPlatformManager: !!this.platformManager,
-        hostname: this.hostname
-      });
-      
       const iconElement = this.createPlatformIcon();
-      
-      Logger.debug('Platform icon creation result', {
-        iconCreated: !!iconElement,
-        iconType: iconElement?.tagName,
-        iconClass: iconElement?.className
-      });
       
       if (!iconElement) {
         Logger.warn('Failed to create platform icon');
@@ -3940,7 +3785,7 @@ class PromptLibraryInjector {
         try {
           buttonContainer = document.querySelector(containerSelector);
           if (buttonContainer) {
-            Logger.debug('Using platform-specific container', { containerSelector });
+            // Platform-specific container found
           }
         } catch (error) {
           Logger.warn('Platform button container selector failed', {
@@ -4423,12 +4268,7 @@ class PromptLibraryInjector {
         if (prompt) {
           Logger.info('Prompt selected for insertion', {
             promptId,
-            promptTitle: prompt.title?.substring(0, 50),
-            currentTextareaTag: this.currentTextarea?.tagName,
-            currentTextareaId: this.currentTextarea?.id,
-            currentTextareaClass: this.currentTextarea?.className?.substring(0, 100),
-            currentTextareaExists: document.contains(this.currentTextarea),
-            hostname: this.hostname
+            promptTitle: prompt.title?.substring(0, 50)
           });
 
           // For Claude.ai, double-check we have the correct target
@@ -4477,16 +4317,8 @@ class PromptLibraryInjector {
       const sanitizedContent = StorageManager.sanitizeUserInput(content);
       
       Logger.info('Starting prompt insertion', { 
-        originalLength: content.length, 
-        sanitizedLength: sanitizedContent.length,
         hostname: this.hostname,
-        targetElement: textarea?.tagName,
-        targetElementId: textarea?.id,
-        targetElementClass: textarea?.className?.substring(0, 100),
-        isTextarea: textarea?.tagName === 'TEXTAREA',
-        isContentEditable: textarea?.contentEditable === 'true',
-        isProseMirror: textarea?.classList?.contains('ProseMirror'),
-        currentTextareaMatches: this.currentTextarea === textarea
+        targetElement: textarea?.tagName
       });
 
       // Additional validation for Claude.ai - ensure we're targeting the correct element
