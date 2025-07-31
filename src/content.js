@@ -1,6 +1,9 @@
 /* eslint-env browser, webextensions */
 /* global localStorage, navigator, Node, HTMLTextAreaElement, requestAnimationFrame, cancelAnimationFrame, IntersectionObserver */
 
+// Platform insertion manager - implemented inline due to content script limitations
+// Note: ES6 imports don't work in content scripts, so we implement the strategy pattern directly here
+
 /**
  * Content Script for My Prompt Manager Chrome Extension
  * 
@@ -307,6 +310,61 @@ function injectCSS() {
       clip: rect(0, 0, 0, 0);
       white-space: nowrap;
       border: 0;
+    }
+
+    /* Insertion Feedback Styles */
+    .insertion-feedback {
+      position: absolute;
+      top: -40px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      color: white;
+      z-index: 1000001;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      backdrop-filter: blur(8px);
+    }
+
+    .insertion-feedback.success {
+      background: linear-gradient(135deg, #10b981, #059669);
+    }
+
+    .insertion-feedback.error {
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+    }
+
+    .insertion-feedback.show {
+      opacity: 1;
+    }
+
+    /* Platform-specific insertion debugging styles */
+    .insertion-debug {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 12px;
+      border-radius: 8px;
+      font-family: monospace;
+      font-size: 11px;
+      z-index: 1000002;
+      max-width: 300px;
+      backdrop-filter: blur(8px);
+    }
+
+    .insertion-debug.success {
+      border-left: 4px solid #10b981;
+    }
+
+    .insertion-debug.error {
+      border-left: 4px solid #ef4444;
     }
   `;
   
@@ -1058,6 +1116,326 @@ class StorageManager {
   }
 }
 
+// Platform Insertion Manager Implementation
+// Since ES6 imports don't work in content scripts, we implement the strategy pattern inline
+class PlatformInsertionManager {
+  constructor(options = {}) {
+    this.strategies = new Map();
+    this.options = {
+      enableDebugLogging: options.enableDebugLogging || false,
+      maxRetries: options.maxRetries || 3,
+      timeout: options.timeout || 5000
+    };
+    
+    // Initialize default strategies
+    this.initializeStrategies();
+  }
+  
+  initializeStrategies() {
+    // Claude Strategy - handles ProseMirror editor
+    this.strategies.set('claude', {
+      name: 'claude',
+      priority: 100,
+      canHandle: (element) => {
+        const hostname = window.location.hostname;
+        // Claude uses ProseMirror editor, which might be in a parent element
+        if (hostname !== 'claude.ai') return false;
+        
+        // Check if element is or contains ProseMirror
+        const isProseMirror = element.classList.contains('ProseMirror') ||
+                             element.closest('.ProseMirror') !== null ||
+                             element.querySelector('.ProseMirror') !== null;
+        
+        // Log for debugging
+        Logger.debug('[Claude] canHandle check', {
+          hostname,
+          isProseMirror,
+          elementTag: element.tagName,
+          elementClasses: element.className,
+          isContentEditable: element.contentEditable === 'true'
+        });
+        
+        // For Claude, we want to handle any element that is or is related to ProseMirror
+        // or any contentEditable element on claude.ai
+        return true; // Always return true for claude.ai to ensure we use Claude strategy
+      },
+      insert: async (element, content) => {
+        Logger.debug('[Claude] Attempting ProseMirror insertion', {
+          hasProseMirrorClass: element.classList.contains('ProseMirror'),
+          isContentEditable: element.contentEditable === 'true',
+          elementTag: element.tagName,
+          elementClass: element.className
+        });
+        
+        // Try to find ProseMirror view - Claude's editor is usually inside the contenteditable
+        let proseMirrorElement = element;
+        
+        // If element is not ProseMirror, try to find it
+        if (!element.classList.contains('ProseMirror')) {
+          // First check if ProseMirror is a parent
+          const parentProseMirror = element.closest('.ProseMirror');
+          if (parentProseMirror) {
+            proseMirrorElement = parentProseMirror;
+          } else {
+            // Then check if ProseMirror is a child
+            const childProseMirror = element.querySelector('.ProseMirror');
+            if (childProseMirror) {
+              proseMirrorElement = childProseMirror;
+            }
+          }
+        }
+        
+        Logger.debug('[Claude] ProseMirror element search result', {
+          foundProseMirror: proseMirrorElement.classList.contains('ProseMirror'),
+          elementTag: proseMirrorElement.tagName,
+          elementClass: proseMirrorElement.className
+        });
+        
+        // Method 1: Try to access ProseMirror view directly
+        const view = proseMirrorElement.pmViewDesc?.view || 
+                    proseMirrorElement._pmViewDesc?.view ||
+                    window.ProseMirror?.view;
+        
+        if (view && view.state && view.dispatch) {
+          try {
+            Logger.debug('[Claude] Found ProseMirror view, using transaction API');
+            const { state } = view;
+            const { selection } = state;
+            const transaction = state.tr.insertText(content, selection.from, selection.to);
+            view.dispatch(transaction);
+            
+            // Trigger events for Claude
+            proseMirrorElement.dispatchEvent(new Event('input', { bubbles: true }));
+            proseMirrorElement.dispatchEvent(new Event('compositionend', { bubbles: true }));
+            
+            return { success: true, method: 'prosemirror-transaction' };
+          } catch (error) {
+            Logger.warn('[Claude] ProseMirror transaction failed', error);
+          }
+        }
+        
+        // Method 2: Use execCommand for contentEditable
+        if (proseMirrorElement.contentEditable === 'true' || element.contentEditable === 'true') {
+          try {
+            const targetEl = proseMirrorElement.contentEditable === 'true' ? proseMirrorElement : element;
+            targetEl.focus();
+            
+            // For Claude, we need to ensure the editor is ready
+            // First click to focus
+            targetEl.click();
+            
+            // Wait a tiny bit for focus
+            await new Promise(resolve => setTimeout(resolve, 50));
+            
+            // Clear existing content if it's placeholder text
+            const selection = window.getSelection();
+            const range = document.createRange();
+            range.selectNodeContents(targetEl);
+            selection.removeAllRanges();
+            selection.addRange(range);
+            
+            // Insert new content using execCommand
+            const inserted = document.execCommand('insertText', false, content);
+            
+            if (inserted) {
+              Logger.debug('[Claude] execCommand insertion successful');
+              
+              // Trigger Claude-specific events
+              const inputEvent = new InputEvent('input', {
+                bubbles: true,
+                cancelable: true,
+                inputType: 'insertText',
+                data: content
+              });
+              targetEl.dispatchEvent(inputEvent);
+              targetEl.dispatchEvent(new Event('compositionend', { bubbles: true }));
+              
+              // For Claude, also trigger these events on the parent contenteditable if different
+              if (targetEl !== element) {
+                element.dispatchEvent(inputEvent);
+                element.dispatchEvent(new Event('compositionend', { bubbles: true }));
+              }
+              
+              return { success: true, method: 'execCommand' };
+            }
+          } catch (error) {
+            Logger.warn('[Claude] execCommand failed', error);
+          }
+        }
+        
+        // Method 3: Direct DOM manipulation with event triggering
+        try {
+          element.focus();
+          element.textContent = content;
+          
+          // Create and dispatch a more comprehensive set of events
+          const inputEvent = new InputEvent('input', {
+            bubbles: true,
+            cancelable: true,
+            inputType: 'insertText',
+            data: content
+          });
+          element.dispatchEvent(inputEvent);
+          
+          // Additional events that Claude might listen to
+          element.dispatchEvent(new Event('change', { bubbles: true }));
+          element.dispatchEvent(new Event('blur', { bubbles: true }));
+          element.dispatchEvent(new Event('focus', { bubbles: true }));
+          
+          return { success: true, method: 'dom-manipulation' };
+        } catch (error) {
+          Logger.error('[Claude] All insertion methods failed', error);
+          return { success: false, error: error.message };
+        }
+      }
+    });
+    
+    // ChatGPT Strategy
+    this.strategies.set('chatgpt', {
+      name: 'chatgpt',
+      priority: 90,
+      canHandle: (element) => {
+        const hostname = window.location.hostname;
+        return hostname === 'chatgpt.com' && element.tagName === 'TEXTAREA';
+      },
+      insert: async (element, content) => {
+        try {
+          element.focus();
+          element.value = content;
+          
+          // Trigger React events for ChatGPT
+          const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+            window.HTMLTextAreaElement.prototype,
+            'value'
+          ).set;
+          nativeInputValueSetter.call(element, content);
+          
+          element.dispatchEvent(new Event('input', { bubbles: true }));
+          element.dispatchEvent(new Event('change', { bubbles: true }));
+          
+          return { success: true, method: 'chatgpt-react' };
+        } catch (error) {
+          return { success: false, error: error.message };
+        }
+      }
+    });
+    
+    // Perplexity Strategy
+    this.strategies.set('perplexity', {
+      name: 'perplexity',
+      priority: 80,
+      canHandle: (element) => {
+        const hostname = window.location.hostname;
+        return hostname === 'www.perplexity.ai';
+      },
+      insert: async (element, content) => {
+        try {
+          element.focus();
+          
+          if (element.contentEditable === 'true') {
+            element.textContent = content;
+          } else if (element.tagName === 'TEXTAREA') {
+            element.value = content;
+          }
+          
+          // Trigger Perplexity events
+          const events = ['input', 'change', 'keyup', 'paste'];
+          events.forEach(eventType => {
+            element.dispatchEvent(new Event(eventType, { bubbles: true }));
+          });
+          
+          return { success: true, method: 'perplexity-events' };
+        } catch (error) {
+          return { success: false, error: error.message };
+        }
+      }
+    });
+    
+    // Default Strategy
+    this.strategies.set('default', {
+      name: 'default',
+      priority: 0,
+      canHandle: () => true, // Always can handle as fallback
+      insert: async (element, content) => {
+        try {
+          element.focus();
+          
+          if (element.tagName === 'TEXTAREA' || element.tagName === 'INPUT') {
+            element.value = content;
+            element.dispatchEvent(new Event('input', { bubbles: true }));
+            element.dispatchEvent(new Event('change', { bubbles: true }));
+          } else if (element.contentEditable === 'true') {
+            element.textContent = content;
+            element.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+          
+          return { success: true, method: 'default' };
+        } catch (error) {
+          return { success: false, error: error.message };
+        }
+      }
+    });
+  }
+  
+  async insertContent(content, options = {}) {
+    const targetElement = options.targetElement || document.activeElement;
+    
+    if (!targetElement) {
+      return {
+        success: false,
+        error: 'No target element found'
+      };
+    }
+    
+    Logger.debug('PlatformInsertionManager: Starting insertion', {
+      hostname: window.location.hostname,
+      elementTag: targetElement.tagName,
+      elementClass: targetElement.className,
+      elementId: targetElement.id,
+      isContentEditable: targetElement.contentEditable,
+      hasProseMirrorClass: targetElement.classList.contains('ProseMirror'),
+      closestProseMirror: targetElement.closest('.ProseMirror') ? 'found' : 'not found'
+    });
+    
+    // Find the best strategy
+    const sortedStrategies = Array.from(this.strategies.values())
+      .filter(strategy => strategy.canHandle(targetElement))
+      .sort((a, b) => b.priority - a.priority);
+    
+    Logger.debug('PlatformInsertionManager: Available strategies', {
+      strategies: sortedStrategies.map(s => ({ name: s.name, priority: s.priority }))
+    });
+    
+    // Try strategies in order
+    for (const strategy of sortedStrategies) {
+      try {
+        Logger.debug(`PlatformInsertionManager: Trying ${strategy.name} strategy`);
+        const result = await strategy.insert(targetElement, content);
+        
+        if (result.success) {
+          Logger.info('PlatformInsertionManager: Insertion successful', {
+            strategy: strategy.name,
+            method: result.method
+          });
+          return result;
+        }
+      } catch (error) {
+        Logger.warn(`PlatformInsertionManager: ${strategy.name} strategy failed`, error);
+      }
+    }
+    
+    return {
+      success: false,
+      error: 'All insertion strategies failed'
+    };
+  }
+}
+
+// Helper function to create insertion manager
+function createInsertionManager(options = {}) {
+  return new PlatformInsertionManager(options);
+}
+
 class PromptLibraryInjector {
   constructor() {
     this.icon = null;
@@ -1126,31 +1504,14 @@ class PromptLibraryInjector {
     this.siteConfigs = {
       'www.perplexity.ai': {
         selectors: [
-          'textarea[placeholder*="Ask"]',
-          'textarea[placeholder*="follow"]',
-          'textarea[data-testid="searchbox"]',
-          'textarea[class*="search"]',
-          'textarea',
-          'div[contenteditable="true"]',
-          '[role="textbox"]',
-          'input[type="text"]',
-          '[data-testid*="input"]',
-          '[class*="input"]',
-          '[placeholder*="Ask"]',
-          '[placeholder*="follow"]'
+          'div[contenteditable="true"][role="textbox"]#ask-input',
         ],
         buttonContainerSelector: '.bg-background-50.dark\\:bg-offsetDark.flex.items-center.justify-self-end.rounded-full.col-start-3.row-start-2',
         name: 'Perplexity'
       },
       'claude.ai': {
         selectors: [
-          'div[contenteditable="true"]',
-          'textarea',
-          '[role="textbox"]',
-          'input[type="text"]',
-          '[data-testid*="input"]',
-          '[class*="input"]',
-          'div[data-value]'
+          'div[contenteditable="true"][role="textbox"].ProseMirror',
         ],
         buttonContainerSelector: '.relative.flex-1.flex.items-center.gap-2.shrink.min-w-0',
         name: 'Claude'
@@ -1168,7 +1529,7 @@ class PromptLibraryInjector {
         ],
         buttonContainerSelector: 'div[data-testid="composer-trailing-actions"] .ms-auto.flex.items-center',
         name: 'ChatGPT'
-      }
+      },
     };
     
     this.init();
@@ -3325,135 +3686,258 @@ class PromptLibraryInjector {
     // including the outside click handler when the component is destroyed
   }
 
-  insertPrompt(textarea, content) {
-    // Sanitize content before insertion
-    const sanitizedContent = StorageManager.sanitizeUserInput(content);
-    const hostname = String(window.location.hostname || '');
-    
-    Logger.info('Inserting sanitized prompt content', { 
-      originalLength: content.length, 
-      sanitizedLength: sanitizedContent.length 
-    });
-    
-    // Site-specific insertion logic
-    if (hostname === 'www.perplexity.ai') {
-      // Perplexity specific insertion
-      textarea.focus();
+  async insertPrompt(textarea, content) {
+    try {
+      // Sanitize content before insertion
+      const sanitizedContent = StorageManager.sanitizeUserInput(content);
       
-      // Use secure content insertion methods
-      if (textarea.contentEditable === 'true') {
-        // Method 1: Direct content insertion with textContent (secure)
-        textarea.textContent = sanitizedContent;
-        
-        // Method 2: Use selection API with secure text node creation
-        if (!textarea.textContent) {
-          textarea.focus();
-          const selection = window.getSelection();
-          selection.selectAllChildren(textarea);
-          selection.deleteFromDocument();
-          // Always use createTextNode for safety
-          selection.getRangeAt(0).insertNode(document.createTextNode(sanitizedContent));
-        }
-        
-        // Method 3: Try direct focus and type simulation as fallback
-        if (!textarea.textContent) {
-          textarea.focus();
-          // Clear existing content first
-          textarea.textContent = '';
-          // Insert content securely
-          textarea.textContent = sanitizedContent;
-        }
-      } else if (textarea.tagName === 'TEXTAREA') {
-        textarea.value = sanitizedContent;
-      }
-      
-      // Trigger multiple events for Perplexity
-      const events = ['input', 'change', 'keyup', 'paste'];
-      events.forEach(eventType => {
-        textarea.dispatchEvent(new Event(eventType, { bubbles: true }));
+      Logger.info('Starting prompt insertion with new strategy system', { 
+        originalLength: content.length, 
+        sanitizedLength: sanitizedContent.length,
+        hostname: window.location.hostname,
+        targetElement: textarea.tagName
       });
-      
-      // Try React-style updates
-      const reactKeys = Object.keys(textarea).find(key => key.startsWith('__reactInternalInstance') || key.startsWith('__reactFiber'));
-      if (reactKeys) {
-        const reactInstance = textarea[reactKeys];
-        if (reactInstance && reactInstance.memoizedProps && reactInstance.memoizedProps.onChange) {
-          reactInstance.memoizedProps.onChange({ target: { value: sanitizedContent } });
-        }
+
+      // Create insertion manager with debug logging in development
+      const insertionManager = createInsertionManager({
+        enableDebugLogging: true, // Enable for debugging - can be disabled in production
+        maxRetries: 3,
+        timeout: 5000
+      });
+
+      Logger.debug('Attempting insertion with strategy system', {
+        textareaTag: textarea.tagName,
+        textareaClass: textarea.className || 'none',
+        textareaId: textarea.id || 'none',
+        isContentEditable: textarea.contentEditable,
+        hostname: window.location.hostname
+      });
+
+      // Use the new strategy-based insertion system
+      const result = await insertionManager.insertContent(sanitizedContent, {
+        targetElement: textarea,
+        clearExisting: true,
+        focusAfter: true,
+        timeout: 5000,
+        triggerEvents: true
+      });
+
+      if (result.success) {
+        Logger.info('Prompt insertion successful', {
+          method: result.method,
+          usedFallback: result.usedFallback,
+          platform: window.location.hostname
+        });
+
+        // Show user feedback for successful insertion
+        this.showInsertionFeedback(true, result.method);
+      } else {
+        Logger.warn('Prompt insertion failed', {
+          error: result.error,
+          platform: window.location.hostname,
+          attempted: result.attemptedMethods || 'unknown',
+          usedFallback: result.usedFallback
+        });
+
+        // Show user feedback for failed insertion with more details
+        const errorDetails = result.error ? `: ${result.error}` : '';
+        this.showInsertionFeedback(false, `Strategy failed${errorDetails}`);
+
+        // Fallback to legacy insertion method if the new system fails
+        Logger.info('Attempting legacy fallback insertion', {
+          reason: 'Strategy system failed',
+          errorSummary: result.error
+        });
+        this.legacyInsertPrompt(textarea, sanitizedContent);
       }
+
+    } catch (error) {
+      Logger.error('Prompt insertion error', error, {
+        platform: window.location.hostname
+      });
+
+      // Show error feedback to user
+      this.showInsertionFeedback(false, 'Insertion system error');
+
+      // Fallback to legacy insertion method
+      Logger.info('Attempting legacy fallback insertion due to error');
+      this.legacyInsertPrompt(textarea, StorageManager.sanitizeUserInput(content));
+    }
+  }
+
+  /**
+   * Shows user feedback for insertion attempts
+   */
+  showInsertionFeedback(success, details) {
+    try {
+      // Only show feedback if there's a visible prompt selector
+      if (!this.promptSelector || !document.body.contains(this.promptSelector)) {
+        return;
+      }
+
+      // Create feedback element
+      const feedback = document.createElement('div');
+      feedback.className = `insertion-feedback ${success ? 'success' : 'error'}`;
+      feedback.style.cssText = `
+        position: absolute;
+        top: -40px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 8px 16px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 500;
+        color: white;
+        z-index: 1000001;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+        ${success 
+          ? 'background: linear-gradient(135deg, #10b981, #059669);' 
+          : 'background: linear-gradient(135deg, #ef4444, #dc2626);'
+        }
+      `;
       
-      // Try setting React input value directly - secure approach
-      if (textarea.tagName === 'TEXTAREA' && textarea instanceof HTMLTextAreaElement) {
-        try {
-          // Use the native property setter safely
-          const originalDescriptor = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value');
-          if (originalDescriptor && typeof originalDescriptor.set === 'function') {
-            // Validate that we're calling the original native setter
-            const nativeSetterString = originalDescriptor.set.toString();
-            if (nativeSetterString.includes('[native code]')) {
-              originalDescriptor.set.call(textarea, sanitizedContent);
-              textarea.dispatchEvent(new Event('input', { bubbles: true }));
-            } else {
-              Logger.warn('Suspicious value setter detected, falling back to direct assignment');
-              textarea.value = sanitizedContent;
-              textarea.dispatchEvent(new Event('input', { bubbles: true }));
-            }
-          } else {
-            // Fallback to direct assignment if descriptor is unavailable
-            textarea.value = sanitizedContent;
-            textarea.dispatchEvent(new Event('input', { bubbles: true }));
+      feedback.textContent = success 
+        ? `Inserted successfully${details ? ` (${details})` : ''}` 
+        : `Insertion failed${details ? `: ${details}` : ''}`;
+
+      // Add to prompt selector
+      this.promptSelector.appendChild(feedback);
+
+      // Animate in
+      requestAnimationFrame(() => {
+        feedback.style.opacity = '1';
+      });
+
+      // Remove after delay
+      setTimeout(() => {
+        feedback.style.opacity = '0';
+        setTimeout(() => {
+          if (feedback.parentNode) {
+            feedback.parentNode.removeChild(feedback);
           }
-        } catch (error) {
-          Logger.warn('Failed to use property descriptor, using direct assignment', { error: error.message });
+        }, 200);
+      }, success ? 2000 : 3000);
+
+    } catch (feedbackError) {
+      Logger.warn('Failed to show insertion feedback', { error: feedbackError.message });
+    }
+  }
+
+  /**
+   * Legacy insertion method as fallback
+   * Maintains compatibility with the original implementation
+   */
+  legacyInsertPrompt(textarea, sanitizedContent) {
+    try {
+      const hostname = String(window.location.hostname || '');
+      
+      Logger.info('Using legacy insertion method', { hostname, targetElement: textarea.tagName });
+      
+      // Site-specific insertion logic (original implementation)
+      if (hostname === 'www.perplexity.ai') {
+        // Perplexity specific insertion
+        textarea.focus();
+        
+        if (textarea.contentEditable === 'true') {
+          textarea.textContent = sanitizedContent;
+        } else if (textarea.tagName === 'TEXTAREA') {
+          textarea.value = sanitizedContent;
+        }
+        
+        // Trigger Perplexity events
+        const events = ['input', 'change', 'keyup', 'paste'];
+        events.forEach(eventType => {
+          textarea.dispatchEvent(new Event(eventType, { bubbles: true }));
+        });
+        
+      } else if (hostname === 'claude.ai') {
+        // Claude specific insertion with enhanced compatibility
+        Logger.debug('Legacy Claude insertion attempt', { 
+          isContentEditable: textarea.contentEditable,
+          hasTextContent: !!textarea.textContent,
+          tagName: textarea.tagName
+        });
+        
+        textarea.focus();
+        
+        if (textarea.contentEditable === 'true') {
+          // For Claude's ProseMirror editor, try multiple approaches
+          
+          // Method 1: Direct textContent assignment
+          try {
+            textarea.textContent = sanitizedContent;
+            Logger.debug('Legacy Claude: textContent assignment completed');
+          } catch (textError) {
+            Logger.warn('Legacy Claude: textContent assignment failed', textError);
+          }
+          
+          // Method 2: Selection-based insertion for better compatibility
+          try {
+            const selection = window.getSelection();
+            if (selection) {
+              selection.selectAllChildren(textarea);
+              selection.deleteFromDocument();
+              selection.getRangeAt(0).insertNode(document.createTextNode(sanitizedContent));
+              Logger.debug('Legacy Claude: Selection-based insertion completed');
+            }
+          } catch (selectionError) {
+            Logger.warn('Legacy Claude: Selection insertion failed', selectionError);
+          }
+          
+          // Trigger Claude-specific events
+          const claudeEvents = ['input', 'change', 'keyup', 'compositionend', 'blur', 'focus'];
+          claudeEvents.forEach(eventType => {
+            try {
+              textarea.dispatchEvent(new Event(eventType, { bubbles: true }));
+            } catch (eventError) {
+              Logger.warn(`Legacy Claude: Event ${eventType} failed`, eventError);
+            }
+          });
+          
+        } else if (textarea.tagName === 'TEXTAREA') {
+          // Standard textarea handling for Claude
           textarea.value = sanitizedContent;
           textarea.dispatchEvent(new Event('input', { bubbles: true }));
+          textarea.dispatchEvent(new Event('change', { bubbles: true }));
         }
-      }
-      
-      // Try manual typing simulation using modern approach
-      setTimeout(() => {
-        textarea.focus();
         
-        // Modern replacement for execCommand
-        if (textarea.tagName === 'TEXTAREA') {
-          textarea.select(); // Select all content
-          textarea.setRangeText(sanitizedContent, 0, textarea.value.length, 'end');
-          textarea.dispatchEvent(new Event('input', { bubbles: true }));
-        } else {
-          // For contenteditable elements
-          const selection = window.getSelection();
-          selection.selectAllChildren(textarea);
-          selection.deleteFromDocument();
-          selection.getRangeAt(0).insertNode(document.createTextNode(sanitizedContent));
-        }
-      }, 100);
-      
-      // Perplexity insertion complete
-      
-    } else {
-      // Default insertion for other sites
-      if (textarea.contentEditable === 'true') {
-        // For contenteditable divs - SECURITY: Use sanitized content
-        textarea.focus();
-        const selection = window.getSelection();
-        const range = selection.getRangeAt(0);
-        range.deleteContents();
-        range.insertNode(document.createTextNode(sanitizedContent));
-        range.collapse(false);
-        selection.removeAllRanges();
-        selection.addRange(range);
       } else {
-        // For textarea elements - SECURITY: Use sanitized content
-        textarea.focus();
-        const start = textarea.selectionStart;
-        const end = textarea.selectionEnd;
-        const text = textarea.value;
-        textarea.value = text.substring(0, start) + sanitizedContent + text.substring(end);
-        textarea.selectionStart = textarea.selectionEnd = start + sanitizedContent.length;
+        // Default insertion for other sites
+        if (textarea.contentEditable === 'true') {
+          textarea.focus();
+          const selection = window.getSelection();
+          if (selection && selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0);
+            range.deleteContents();
+            range.insertNode(document.createTextNode(sanitizedContent));
+            range.collapse(false);
+            selection.removeAllRanges();
+            selection.addRange(range);
+          } else {
+            textarea.textContent = sanitizedContent;
+          }
+        } else {
+          textarea.focus();
+          const start = textarea.selectionStart || 0;
+          const end = textarea.selectionEnd || 0;
+          const text = textarea.value || '';
+          textarea.value = text.substring(0, start) + sanitizedContent + text.substring(end);
+          textarea.selectionStart = textarea.selectionEnd = start + sanitizedContent.length;
+        }
+        
+        // Trigger input event
+        textarea.dispatchEvent(new Event('input', { bubbles: true }));
       }
+
+      Logger.info('Legacy insertion completed');
       
-      // Trigger input event
-      textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    } catch (error) {
+      Logger.error('Legacy insertion failed', error, { 
+        hostname: hostname,
+        targetElement: textarea.tagName 
+      });
     }
   }
 
