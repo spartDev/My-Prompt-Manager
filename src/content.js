@@ -1,6 +1,23 @@
 /* eslint-env browser, webextensions */
 /* global localStorage, navigator, Node, HTMLTextAreaElement, requestAnimationFrame, cancelAnimationFrame, IntersectionObserver */
-// Content script for injecting my prompt manager icon into AI chat platforms
+
+/**
+ * Content Script for My Prompt Manager Chrome Extension
+ * 
+ * This script enables seamless integration of the prompt library with AI chat platforms
+ * by injecting an accessible icon that allows users to insert saved prompts directly
+ * into chat interfaces.
+ * 
+ * Key Features:
+ * - Dynamic icon injection into supported AI platforms
+ * - Secure prompt content handling and insertion
+ * - Keyboard navigation support for accessibility
+ * - Performance optimizations for smooth user experience
+ * - Cross-platform compatibility (Claude, ChatGPT, Perplexity)
+ * - Custom site support with flexible positioning
+ * 
+ * For detailed documentation, see: ai/doc/content-script.md
+ */
 
 // Inject CSS styles
 function injectCSS() {
@@ -12,24 +29,24 @@ function injectCSS() {
     /* Prompt Manager Icon */
     .prompt-library-icon {
       position: absolute;
-      width: 32px;
-      height: 32px;  
-      background: #4f46e5;
-      border-radius: 6px;
+      width: 50px;
+      height: 50px;  
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
       transition: all 0.2s ease;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
       z-index: 999999;
       border: 2px solid transparent;
     }
 
     .prompt-library-icon:hover {
-      background: #4338ca;
+      background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
       transform: scale(1.05);
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
     }
 
     .prompt-library-icon:focus-visible {
@@ -40,8 +57,8 @@ function injectCSS() {
 
     .prompt-library-icon svg {
       color: white;
-      width: 18px;
-      height: 18px;
+      width: 24px;
+      height: 24px;
     }
 
     /* Prompt Selector Modal */
@@ -489,13 +506,24 @@ class UIElementFactory {
     icon.setAttribute('data-instance-id', this.instanceId);
     icon.setAttribute('tabindex', '0');
     
-    icon.innerHTML = `
-      <div class="flex flex-row items-center justify-center gap-1">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256" aria-hidden="true">
-          <path d="M224,48H32A16,16,0,0,0,16,64V192a16,16,0,0,0,16,16H224a16,16,0,0,0,16-16V64A16,16,0,0,0,224,48ZM208,192H48a8,8,0,0,1-8-8V72H216V184A8,8,0,0,1,208,192ZM64,96a8,8,0,0,1,8-8H184a8,8,0,0,1,0,16H72A8,8,0,0,1,64,96Zm0,32a8,8,0,0,1,8-8H184a8,8,0,0,1,0,16H72A8,8,0,0,1,64,128Zm0,32a8,8,0,0,1,8-8h64a8,8,0,0,1,0,16H72A8,8,0,0,1,64,160Z"/>
-        </svg>
-      </div>
-    `;
+    // Use secure DOM construction
+    const iconContentDiv = StorageManager.createElement('div', { 
+      class: 'flex flex-row items-center justify-center gap-1' 
+    });
+    const svg = StorageManager.createSVGElement('svg', {
+      xmlns: 'http://www.w3.org/2000/svg',
+      width: '16',
+      height: '16',
+      fill: 'currentColor',
+      viewBox: '0 0 256 256',
+      'aria-hidden': 'true'
+    });
+    const path = StorageManager.createSVGElement('path', {
+      d: 'M224,48H32A16,16,0,0,0,16,64V192a16,16,0,0,0,16,16H224a16,16,0,0,0,16-16V64A16,16,0,0,0,224,48ZM208,192H48a8,8,0,0,1-8-8V72H216V184A8,8,0,0,1,208,192ZM64,96a8,8,0,0,1,8-8H184a8,8,0,0,1,0,16H72A8,8,0,0,1,64,96Zm0,32a8,8,0,0,1,8-8H184a8,8,0,0,1,0,16H72A8,8,0,0,1,64,128Zm0,32a8,8,0,0,1,8-8h64a8,8,0,0,1,0,16H72A8,8,0,0,1,64,160Z'
+    });
+    svg.appendChild(path);
+    iconContentDiv.appendChild(svg);
+    icon.appendChild(iconContentDiv);
     
     shrinkDiv.appendChild(icon);
     flexDiv.appendChild(shrinkDiv);
@@ -515,19 +543,49 @@ class UIElementFactory {
     icon.setAttribute('data-instance-id', this.instanceId);
     icon.setAttribute('tabindex', '0');
     
-    icon.innerHTML = `
-      <div class="flex items-center min-w-0 font-medium gap-1.5 justify-center">
-        <div class="flex shrink-0 items-center justify-center size-4">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-            <polyline points="14,2 14,8 20,8"/>
-            <line x1="16" y1="13" x2="8" y2="13"/>
-            <line x1="16" y1="17" x2="8" y2="17"/>
-            <polyline points="10,9 9,9 8,9"/>
-          </svg>
-        </div>
-      </div>
-    `;
+    // Use secure DOM construction
+    const outerDiv = StorageManager.createElement('div', { 
+      class: 'flex items-center min-w-0 font-medium gap-1.5 justify-center' 
+    });
+    const innerDiv = StorageManager.createElement('div', { 
+      class: 'flex shrink-0 items-center justify-center size-4' 
+    });
+    const svg = StorageManager.createSVGElement('svg', {
+      xmlns: 'http://www.w3.org/2000/svg',
+      width: '16',
+      height: '16',
+      viewBox: '0 0 24 24',
+      fill: 'none',
+      stroke: 'currentColor',
+      'stroke-width': '1.8',
+      'stroke-linecap': 'round',
+      'stroke-linejoin': 'round',
+      'aria-hidden': 'true'
+    });
+    const path = StorageManager.createSVGElement('path', {
+      d: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'
+    });
+    const polyline1 = StorageManager.createSVGElement('polyline', {
+      points: '14,2 14,8 20,8'
+    });
+    const line1 = StorageManager.createSVGElement('line', {
+      x1: '16', y1: '13', x2: '8', y2: '13'
+    });
+    const line2 = StorageManager.createSVGElement('line', {
+      x1: '16', y1: '17', x2: '8', y2: '17'
+    });
+    const polyline2 = StorageManager.createSVGElement('polyline', {
+      points: '10,9 9,9 8,9'
+    });
+    
+    svg.appendChild(path);
+    svg.appendChild(polyline1);
+    svg.appendChild(line1);
+    svg.appendChild(line2);
+    svg.appendChild(polyline2);
+    innerDiv.appendChild(svg);
+    outerDiv.appendChild(innerDiv);
+    icon.appendChild(outerDiv);
     
     return icon;
   }
@@ -542,15 +600,39 @@ class UIElementFactory {
     icon.setAttribute('data-instance-id', this.instanceId);
     icon.setAttribute('tabindex', '0');
     
-    icon.innerHTML = `
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" class="icon" font-size="inherit">
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-        <polyline points="14,2 14,8 20,8"/>
-        <line x1="16" y1="13" x2="8" y2="13"/>
-        <line x1="16" y1="17" x2="8" y2="17"/>
-        <polyline points="10,9 9,9 8,9"/>
-      </svg>
-    `;
+    // Use secure DOM construction
+    const svg = StorageManager.createSVGElement('svg', {
+      width: '20',
+      height: '20',
+      viewBox: '0 0 24 24',
+      fill: 'currentColor',
+      xmlns: 'http://www.w3.org/2000/svg',
+      'aria-hidden': 'true',
+      class: 'icon',
+      'font-size': 'inherit'
+    });
+    const path = StorageManager.createSVGElement('path', {
+      d: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'
+    });
+    const polyline1 = StorageManager.createSVGElement('polyline', {
+      points: '14,2 14,8 20,8'
+    });
+    const line1 = StorageManager.createSVGElement('line', {
+      x1: '16', y1: '13', x2: '8', y2: '13'
+    });
+    const line2 = StorageManager.createSVGElement('line', {
+      x1: '16', y1: '17', x2: '8', y2: '17'
+    });
+    const polyline2 = StorageManager.createSVGElement('polyline', {
+      points: '10,9 9,9 8,9'
+    });
+    
+    svg.appendChild(path);
+    svg.appendChild(polyline1);
+    svg.appendChild(line1);
+    svg.appendChild(line2);
+    svg.appendChild(polyline2);
+    icon.appendChild(svg);
     
     return icon;
   }
@@ -564,15 +646,38 @@ class UIElementFactory {
     icon.setAttribute('aria-label', 'Open my prompt manager - Access your saved prompts');
     icon.setAttribute('title', 'My Prompt Manager - Access your saved prompts');
     icon.setAttribute('tabindex', '0');
-    icon.innerHTML = `
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-        <polyline points="14,2 14,8 20,8"/>
-        <line x1="16" y1="13" x2="8" y2="13"/>
-        <line x1="16" y1="17" x2="8" y2="17"/>
-        <polyline points="10,9 9,9 8,9"/>
-      </svg>
-    `;
+    // Use secure DOM construction
+    const svg = StorageManager.createSVGElement('svg', {
+      width: '20',
+      height: '20',
+      viewBox: '0 0 24 24',
+      fill: 'none',
+      stroke: 'currentColor',
+      'stroke-width': '2',
+      'aria-hidden': 'true'
+    });
+    const path = StorageManager.createSVGElement('path', {
+      d: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'
+    });
+    const polyline1 = StorageManager.createSVGElement('polyline', {
+      points: '14,2 14,8 20,8'
+    });
+    const line1 = StorageManager.createSVGElement('line', {
+      x1: '16', y1: '13', x2: '8', y2: '13'
+    });
+    const line2 = StorageManager.createSVGElement('line', {
+      x1: '16', y1: '17', x2: '8', y2: '17'
+    });
+    const polyline2 = StorageManager.createSVGElement('polyline', {
+      points: '10,9 9,9 8,9'
+    });
+    
+    svg.appendChild(path);
+    svg.appendChild(polyline1);
+    svg.appendChild(line1);
+    svg.appendChild(line2);
+    svg.appendChild(polyline2);
+    icon.appendChild(svg);
     
     return icon;
   }
@@ -732,6 +837,7 @@ class KeyboardNavigationManager {
 }
 
 class StorageManager {
+  // Get prompts with validation and sanitization
   static async getPrompts() {
     return new Promise((resolve) => {
       try {
@@ -743,9 +849,26 @@ class StorageManager {
             return;
           }
           
-          const prompts = result.prompts || [];
-          Logger.info('Retrieved prompts from storage', { count: prompts.length });
-          resolve(prompts);
+          const rawPrompts = result.prompts || [];
+          
+          // Validate and sanitize each prompt
+          const validatedPrompts = rawPrompts
+            .map(prompt => StorageManager.validatePromptData(prompt))
+            .filter(prompt => prompt !== null); // Remove invalid prompts
+          
+          const invalidCount = rawPrompts.length - validatedPrompts.length;
+          if (invalidCount > 0) {
+            Logger.warn('Filtered out invalid prompts', { 
+              originalCount: rawPrompts.length, 
+              validCount: validatedPrompts.length,
+              invalidCount 
+            });
+          }
+          
+          Logger.info('Retrieved and validated prompts from storage', { 
+            count: validatedPrompts.length 
+          });
+          resolve(validatedPrompts);
         });
       } catch (error) {
         Logger.error('Unexpected error accessing chrome storage', error);
@@ -754,6 +877,7 @@ class StorageManager {
     });
   }
   
+  // Escape HTML to ensure user-generated content is displayed safely
   static escapeHtml(text) {
     try {
       if (typeof text !== 'string') {
@@ -764,12 +888,172 @@ class StorageManager {
         return String(text);
       }
       
-      const div = document.createElement('div');
-      div.textContent = text;
-      return div.innerHTML;
+      // Use explicit character replacement for safety
+      return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#x27;')
+        .replace(/\//g, '&#x2F;');
     } catch (error) {
       Logger.error('Failed to escape HTML', error, { text });
       return ''; // Safe fallback
+    }
+  }
+
+  // Helper function to safely create DOM elements with text content
+  static createElement(tag, attributes = {}, textContent = '') {
+    try {
+      const element = document.createElement(tag);
+      
+      // Set attributes safely
+      Object.entries(attributes).forEach(([key, value]) => {
+        if (typeof value === 'string' || typeof value === 'number') {
+          element.setAttribute(key, String(value));
+        }
+      });
+      
+      // Set text content safely (never innerHTML)
+      if (textContent) {
+        element.textContent = textContent;
+      }
+      
+      return element;
+    } catch (error) {
+      Logger.error('Failed to create DOM element', error, { tag, attributes, textContent });
+      return document.createElement('div'); // Safe fallback
+    }
+  }
+
+  // Helper function to create SVG elements with proper namespace
+  static createSVGElement(tag, attributes = {}) {
+    try {
+      const element = document.createElementNS('http://www.w3.org/2000/svg', tag);
+      
+      // Set attributes safely for SVG
+      Object.entries(attributes).forEach(([key, value]) => {
+        if (typeof value === 'string' || typeof value === 'number') {
+          element.setAttribute(key, String(value));
+        }
+      });
+      
+      return element;
+    } catch (error) {
+      Logger.error('Failed to create SVG element', error, { tag, attributes });
+      return document.createElementNS('http://www.w3.org/2000/svg', 'g'); // Safe fallback
+    }
+  }
+
+  // Comprehensive input sanitization for user-generated content
+  static sanitizeUserInput(input) {
+    try {
+      if (typeof input !== 'string') {
+        Logger.warn('sanitizeUserInput received non-string input', { 
+          type: typeof input, 
+          value: input 
+        });
+        return '';
+      }
+      
+      // Remove null characters and control characters (except \n, \r, \t)
+      let sanitized = input.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+      
+      // Remove potentially dangerous Unicode characters
+      sanitized = sanitized.replace(/[\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/g, '');
+      
+      // Remove HTML/XML tags completely (more aggressive than escaping)
+      sanitized = sanitized.replace(/<[^>]*>/g, '');
+      
+      // Remove javascript: and data: URLs
+      sanitized = sanitized.replace(/javascript\s*:/gi, '');
+      sanitized = sanitized.replace(/data\s*:/gi, '');
+      
+      // Remove vbscript: URLs
+      sanitized = sanitized.replace(/vbscript\s*:/gi, '');
+      
+      // Remove on* event handlers
+      sanitized = sanitized.replace(/\bon\w+\s*=/gi, '');
+      
+      // Limit length to prevent DoS attacks
+      const MAX_INPUT_LENGTH = 50000; // 50KB limit
+      if (sanitized.length > MAX_INPUT_LENGTH) {
+        Logger.warn('Input truncated due to length limit', { 
+          originalLength: sanitized.length, 
+          maxLength: MAX_INPUT_LENGTH 
+        });
+        sanitized = sanitized.substring(0, MAX_INPUT_LENGTH) + '...';
+      }
+      
+      return sanitized;
+    } catch (error) {
+      Logger.error('Failed to sanitize user input', error, { input });
+      return ''; // Safe fallback
+    }
+  }
+
+  // Validate prompt data structure to ensure expected properties
+  static validatePromptData(prompt) {
+    try {
+      if (!prompt || typeof prompt !== 'object') {
+        Logger.warn('Invalid prompt data structure', { prompt });
+        return null;
+      }
+      
+      const validatedPrompt = {
+        id: StorageManager.sanitizeUserInput(String(prompt.id || '')),
+        title: StorageManager.sanitizeUserInput(String(prompt.title || 'Untitled')),
+        content: StorageManager.sanitizeUserInput(String(prompt.content || '')),
+        category: StorageManager.sanitizeUserInput(String(prompt.category || 'General')),
+        createdAt: prompt.createdAt || Date.now()
+      };
+      
+      // Ensure required fields are not empty after sanitization
+      if (!validatedPrompt.id || !validatedPrompt.title || !validatedPrompt.content) {
+        Logger.warn('Prompt failed validation - empty required fields', { validatedPrompt });
+        return null;
+      }
+      
+      return validatedPrompt;
+    } catch (error) {
+      Logger.error('Failed to validate prompt data', error, { prompt });
+      return null;
+    }
+  }
+
+  // Helper function to safely create prompt list items
+  static createPromptListItem(prompt, index, idPrefix = 'prompt-item') {
+    try {
+      const promptItem = StorageManager.createElement('div', {
+        class: 'prompt-item',
+        'data-prompt-id': StorageManager.escapeHtml(prompt.id),
+        role: 'option',
+        'aria-describedby': `${idPrefix}-${index}-desc`,
+        tabindex: '-1'
+      });
+      
+      const promptTitle = StorageManager.createElement('div', {
+        class: 'prompt-title'
+      }, StorageManager.escapeHtml(prompt.title));
+      
+      const promptCategory = StorageManager.createElement('div', {
+        class: 'prompt-category'
+      }, StorageManager.escapeHtml(prompt.category));
+      
+      const promptPreview = StorageManager.createElement('div', {
+        class: 'prompt-preview',
+        id: `${idPrefix}-${index}-desc`
+      }, StorageManager.escapeHtml(prompt.content.substring(0, 100)) + 
+         (prompt.content.length > 100 ? '...' : ''));
+      
+      promptItem.appendChild(promptTitle);
+      promptItem.appendChild(promptCategory);
+      promptItem.appendChild(promptPreview);
+      
+      return promptItem;
+    } catch (error) {
+      Logger.error('Failed to create prompt list item', error, { prompt, index });
+      return StorageManager.createElement('div', { class: 'prompt-item-error' }, 'Error loading prompt');
     }
   }
 }
@@ -1591,14 +1875,17 @@ class PromptLibraryInjector {
   // Get custom site positioning configuration from settings
   async getCustomSiteConfig(hostname) {
     try {
+      // Ensure hostname is a string
+      const normalizedHostname = String(hostname || '');
+      
       const result = await chrome.storage.local.get(['promptLibrarySettings']);
       const settings = result.promptLibrarySettings || {};
       const customSites = settings.customSites || [];
       
-      const customSite = customSites.find(site => site.hostname === hostname);
+      const customSite = customSites.find(site => site.hostname === normalizedHostname);
       if (customSite && customSite.enabled && customSite.positioning) {
         Logger.info('Found custom site positioning config', {
-          hostname,
+          hostname: normalizedHostname,
           mode: customSite.positioning.mode,
           selector: customSite.positioning.selector,
           placement: customSite.positioning.placement
@@ -1606,7 +1893,10 @@ class PromptLibraryInjector {
         return customSite.positioning;
       }
     } catch (error) {
-      Logger.error('Failed to get custom site config', error);
+      Logger.error('Failed to get custom site config', { 
+        error: error.message,
+        hostname: String(hostname || '')
+      });
     }
     return null;
   }
@@ -1660,6 +1950,17 @@ class PromptLibraryInjector {
         this.icon.remove();
         this.icon = null;
       }
+      
+      // Also remove any other prompt library icons that might exist
+      const existingIcons = document.querySelectorAll('.prompt-library-icon');
+      existingIcons.forEach(icon => {
+        try {
+          icon.remove();
+          Logger.info('Removed duplicate prompt library icon during custom positioning');
+        } catch (error) {
+          Logger.warn('Failed to remove duplicate icon during custom positioning', { error: error.message });
+        }
+      });
 
       // Create the icon
       this.icon = this.uiFactory.createFloatingIcon();
@@ -2139,6 +2440,22 @@ class PromptLibraryInjector {
     const hostname = String(window.location.hostname || '');
     const config = this.siteConfigs[hostname];
     
+    // Check for existing icons and remove them to prevent duplicates
+    const existingIcons = document.querySelectorAll('.prompt-library-icon');
+    if (existingIcons.length > 0) {
+      Logger.info('Found existing icons, removing them to prevent duplicates', { count: existingIcons.length });
+      existingIcons.forEach(icon => {
+        try {
+          icon.remove();
+        } catch (error) {
+          Logger.warn('Failed to remove existing icon', { error: error.message });
+        }
+      });
+    }
+    
+    // Reset icon reference
+    this.icon = null;
+    
     // First, check for custom site positioning configuration
     const customPositioning = await this.getCustomSiteConfig(hostname);
     if (customPositioning && customPositioning.mode === 'custom') {
@@ -2569,6 +2886,19 @@ class PromptLibraryInjector {
       }
     }
     
+    // Also remove any other prompt library icons that might exist
+    const existingIcons = document.querySelectorAll('.prompt-library-icon');
+    existingIcons.forEach(icon => {
+      if (icon !== this.icon) {
+        try {
+          icon.remove();
+          Logger.info('Removed duplicate prompt library icon');
+        } catch (error) {
+          Logger.warn('Failed to remove duplicate icon', { error: error.message });
+        }
+      }
+    });
+    
     // Create icon element using UI factory
     this.icon = this.uiFactory.createFloatingIcon();
     
@@ -2750,46 +3080,72 @@ class PromptLibraryInjector {
     this.promptSelector.setAttribute('aria-labelledby', 'prompt-selector-title');
     this.promptSelector.setAttribute('aria-describedby', 'prompt-selector-description');
     
-    const promptsHtml = prompts.map((prompt, index) => {
-      return '<div class="prompt-item" ' +
-             'data-prompt-id="' + StorageManager.escapeHtml(prompt.id) + '" ' +
-             'role="option" ' +
-             'aria-describedby="prompt-item-' + index + '-desc" ' +
-             'tabindex="-1">' +
-        '<div class="prompt-title">' + StorageManager.escapeHtml(prompt.title) + '</div>' +
-        '<div class="prompt-category">' + StorageManager.escapeHtml(prompt.category) + '</div>' +
-        '<div class="prompt-preview" id="prompt-item-' + index + '-desc">' + 
-        StorageManager.escapeHtml(prompt.content.substring(0, 100)) + 
-        (prompt.content.length > 100 ? '...' : '') + '</div>' +
-      '</div>';
-    }).join('');
+    // Use secure DOM construction
+    // Create header section
+    const header = StorageManager.createElement('div', { class: 'prompt-selector-header' });
+    const headerTitle = StorageManager.createElement('h3', { 
+      id: 'prompt-selector-title' 
+    }, 'Select a Prompt');
+    const closeButton = StorageManager.createElement('button', {
+      class: 'close-selector',
+      type: 'button',
+      'aria-label': 'Close prompt selector',
+      title: 'Close prompt selector'
+    }, '×');
+    header.appendChild(headerTitle);
+    header.appendChild(closeButton);
     
-    this.promptSelector.innerHTML = 
-      '<div class="prompt-selector-header">' +
-        '<h3 id="prompt-selector-title">Select a Prompt</h3>' +
-        '<button class="close-selector" ' +
-                'type="button" ' +
-                'aria-label="Close prompt selector" ' +
-                'title="Close prompt selector">×</button>' +
-      '</div>' +
-      '<div class="prompt-search">' +
-        '<label for="prompt-search-input" class="sr-only">Search prompts</label>' +
-        '<input type="text" ' +
-               'id="prompt-search-input" ' +
-               'placeholder="Search prompts..." ' +
-               'class="search-input" ' +
-               'aria-describedby="prompt-selector-description" ' +
-               'autocomplete="off">' +
-      '</div>' +
-      '<div id="prompt-selector-description" class="sr-only">' +
-        'Use arrow keys to navigate, Enter to select, Escape to close' +
-      '</div>' +
-      '<div class="prompt-list" ' +
-           'role="listbox" ' +
-           'aria-label="Available prompts" ' +
-           'aria-multiselectable="false">' +
-        (promptsHtml || '<div class="no-prompts" role="status" aria-live="polite">No prompts found. Add some in the extension popup!</div>') +
-      '</div>';
+    // Create search section
+    const searchDiv = StorageManager.createElement('div', { class: 'prompt-search' });
+    const searchLabel = StorageManager.createElement('label', {
+      for: 'prompt-search-input',
+      class: 'sr-only'
+    }, 'Search prompts');
+    const searchInput = StorageManager.createElement('input', {
+      type: 'text',
+      id: 'prompt-search-input',
+      placeholder: 'Search prompts...',
+      class: 'search-input',
+      'aria-describedby': 'prompt-selector-description',
+      autocomplete: 'off'
+    });
+    searchDiv.appendChild(searchLabel);
+    searchDiv.appendChild(searchInput);
+    
+    // Create description section
+    const description = StorageManager.createElement('div', {
+      id: 'prompt-selector-description',
+      class: 'sr-only'
+    }, 'Use arrow keys to navigate, Enter to select, Escape to close');
+    
+    // Create prompt list section
+    const promptList = StorageManager.createElement('div', {
+      class: 'prompt-list',
+      role: 'listbox',
+      'aria-label': 'Available prompts',
+      'aria-multiselectable': 'false'
+    });
+    
+    // Add prompt items securely
+    if (prompts.length > 0) {
+      prompts.forEach((prompt, index) => {
+        const promptItem = StorageManager.createPromptListItem(prompt, index, 'prompt-item');
+        promptList.appendChild(promptItem);
+      });
+    } else {
+      const noPrompts = StorageManager.createElement('div', {
+        class: 'no-prompts',
+        role: 'status',
+        'aria-live': 'polite'
+      }, 'No prompts found. Add some in the extension popup!');
+      promptList.appendChild(noPrompts);
+    }
+    
+    // Assemble the complete selector
+    this.promptSelector.appendChild(header);
+    this.promptSelector.appendChild(searchDiv);
+    this.promptSelector.appendChild(description);
+    this.promptSelector.appendChild(promptList);
     
     // Position selector relative to the icon if it exists, otherwise relative to textarea
     let rect, scrollTop;
@@ -2856,7 +3212,6 @@ class PromptLibraryInjector {
     });
     
     // Add search functionality
-    const searchInput = this.promptSelector.querySelector('.search-input');
     searchInput.addEventListener('input', (e) => {
       this.filterPrompts(e.target.value, prompts);
     });
@@ -2908,22 +3263,28 @@ class PromptLibraryInjector {
       filteredCount: filteredPrompts.length 
     });
     
-    const promptsHtml = filteredPrompts.map((prompt, index) => {
-      return '<div class="prompt-item" ' +
-             'data-prompt-id="' + StorageManager.escapeHtml(prompt.id) + '" ' +
-             'role="option" ' +
-             'aria-describedby="filtered-prompt-item-' + index + '-desc" ' +
-             'tabindex="-1">' +
-        '<div class="prompt-title">' + StorageManager.escapeHtml(prompt.title) + '</div>' +
-        '<div class="prompt-category">' + StorageManager.escapeHtml(prompt.category) + '</div>' +
-        '<div class="prompt-preview" id="filtered-prompt-item-' + index + '-desc">' + 
-        StorageManager.escapeHtml(prompt.content.substring(0, 100)) + 
-        (prompt.content.length > 100 ? '...' : '') + '</div>' +
-      '</div>';
-    }).join('');
+    // Use secure DOM construction
+    const promptList = this.promptSelector.querySelector('.prompt-list');
     
-    this.promptSelector.querySelector('.prompt-list').innerHTML = 
-      promptsHtml || '<div class="no-prompts" role="status" aria-live="polite">No matching prompts found.</div>';
+    // Clear existing content safely
+    while (promptList.firstChild) {
+      promptList.removeChild(promptList.firstChild);
+    }
+    
+    // Add filtered prompt items securely
+    if (filteredPrompts.length > 0) {
+      filteredPrompts.forEach((prompt, index) => {
+        const promptItem = StorageManager.createPromptListItem(prompt, index, 'filtered-prompt-item');
+        promptList.appendChild(promptItem);
+      });
+    } else {
+      const noPrompts = StorageManager.createElement('div', {
+        class: 'no-prompts',
+        role: 'status',
+        'aria-live': 'polite'
+      }, 'No matching prompts found.');
+      promptList.appendChild(noPrompts);
+    }
     
     // Update keyboard navigation with new items
     if (this.keyboardNav) {
@@ -2965,33 +3326,45 @@ class PromptLibraryInjector {
   }
 
   insertPrompt(textarea, content) {
+    // Sanitize content before insertion
+    const sanitizedContent = StorageManager.sanitizeUserInput(content);
     const hostname = String(window.location.hostname || '');
+    
+    Logger.info('Inserting sanitized prompt content', { 
+      originalLength: content.length, 
+      sanitizedLength: sanitizedContent.length 
+    });
     
     // Site-specific insertion logic
     if (hostname === 'www.perplexity.ai') {
       // Perplexity specific insertion
       textarea.focus();
       
-      // Try multiple approaches for Perplexity
+      // Use secure content insertion methods
       if (textarea.contentEditable === 'true') {
-        // Method 1: Direct content insertion
-        textarea.textContent = content;
+        // Method 1: Direct content insertion with textContent (secure)
+        textarea.textContent = sanitizedContent;
         
-        // Method 2: Try innerHTML if textContent doesn't work
+        // Method 2: Use selection API with secure text node creation
         if (!textarea.textContent) {
-          textarea.innerHTML = content;
-        }
-        
-        // Method 3: Try using selection API
-        if (!textarea.textContent && !textarea.innerHTML) {
           textarea.focus();
           const selection = window.getSelection();
           selection.selectAllChildren(textarea);
           selection.deleteFromDocument();
-          selection.getRangeAt(0).insertNode(document.createTextNode(content));
+          // Always use createTextNode for safety
+          selection.getRangeAt(0).insertNode(document.createTextNode(sanitizedContent));
+        }
+        
+        // Method 3: Try direct focus and type simulation as fallback
+        if (!textarea.textContent) {
+          textarea.focus();
+          // Clear existing content first
+          textarea.textContent = '';
+          // Insert content securely
+          textarea.textContent = sanitizedContent;
         }
       } else if (textarea.tagName === 'TEXTAREA') {
-        textarea.value = content;
+        textarea.value = sanitizedContent;
       }
       
       // Trigger multiple events for Perplexity
@@ -3005,7 +3378,7 @@ class PromptLibraryInjector {
       if (reactKeys) {
         const reactInstance = textarea[reactKeys];
         if (reactInstance && reactInstance.memoizedProps && reactInstance.memoizedProps.onChange) {
-          reactInstance.memoizedProps.onChange({ target: { value: content } });
+          reactInstance.memoizedProps.onChange({ target: { value: sanitizedContent } });
         }
       }
       
@@ -3018,21 +3391,21 @@ class PromptLibraryInjector {
             // Validate that we're calling the original native setter
             const nativeSetterString = originalDescriptor.set.toString();
             if (nativeSetterString.includes('[native code]')) {
-              originalDescriptor.set.call(textarea, content);
+              originalDescriptor.set.call(textarea, sanitizedContent);
               textarea.dispatchEvent(new Event('input', { bubbles: true }));
             } else {
               Logger.warn('Suspicious value setter detected, falling back to direct assignment');
-              textarea.value = content;
+              textarea.value = sanitizedContent;
               textarea.dispatchEvent(new Event('input', { bubbles: true }));
             }
           } else {
             // Fallback to direct assignment if descriptor is unavailable
-            textarea.value = content;
+            textarea.value = sanitizedContent;
             textarea.dispatchEvent(new Event('input', { bubbles: true }));
           }
         } catch (error) {
           Logger.warn('Failed to use property descriptor, using direct assignment', { error: error.message });
-          textarea.value = content;
+          textarea.value = sanitizedContent;
           textarea.dispatchEvent(new Event('input', { bubbles: true }));
         }
       }
@@ -3044,14 +3417,14 @@ class PromptLibraryInjector {
         // Modern replacement for execCommand
         if (textarea.tagName === 'TEXTAREA') {
           textarea.select(); // Select all content
-          textarea.setRangeText(content, 0, textarea.value.length, 'end');
+          textarea.setRangeText(sanitizedContent, 0, textarea.value.length, 'end');
           textarea.dispatchEvent(new Event('input', { bubbles: true }));
         } else {
           // For contenteditable elements
           const selection = window.getSelection();
           selection.selectAllChildren(textarea);
           selection.deleteFromDocument();
-          selection.getRangeAt(0).insertNode(document.createTextNode(content));
+          selection.getRangeAt(0).insertNode(document.createTextNode(sanitizedContent));
         }
       }, 100);
       
@@ -3060,23 +3433,23 @@ class PromptLibraryInjector {
     } else {
       // Default insertion for other sites
       if (textarea.contentEditable === 'true') {
-        // For contenteditable divs
+        // For contenteditable divs - SECURITY: Use sanitized content
         textarea.focus();
         const selection = window.getSelection();
         const range = selection.getRangeAt(0);
         range.deleteContents();
-        range.insertNode(document.createTextNode(content));
+        range.insertNode(document.createTextNode(sanitizedContent));
         range.collapse(false);
         selection.removeAllRanges();
         selection.addRange(range);
       } else {
-        // For textarea elements
+        // For textarea elements - SECURITY: Use sanitized content
         textarea.focus();
         const start = textarea.selectionStart;
         const end = textarea.selectionEnd;
         const text = textarea.value;
-        textarea.value = text.substring(0, start) + content + text.substring(end);
-        textarea.selectionStart = textarea.selectionEnd = start + content.length;
+        textarea.value = text.substring(0, start) + sanitizedContent + text.substring(end);
+        textarea.selectionStart = textarea.selectionEnd = start + sanitizedContent.length;
       }
       
       // Trigger input event
@@ -3362,7 +3735,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         font-weight: bold;
         font-size: 14px;
       `;
-      testIcon.innerHTML = '?';
+      // Use textContent for safety
+      testIcon.textContent = '?';
       
       // Add pulse animation
       if (!document.querySelector('#test-icon-animation')) {
