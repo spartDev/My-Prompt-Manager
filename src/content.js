@@ -1,5 +1,5 @@
 /* eslint-env browser, webextensions */
-/* global localStorage, navigator, Node, HTMLTextAreaElement, requestAnimationFrame, cancelAnimationFrame, IntersectionObserver */
+/* global localStorage, navigator, Node, requestAnimationFrame, cancelAnimationFrame, IntersectionObserver */
 
 // Platform insertion manager - implemented inline due to content script limitations
 // Note: ES6 imports don't work in content scripts, so we implement the strategy pattern directly here
@@ -564,9 +564,10 @@ class UIElementFactory {
     icon.setAttribute('data-instance-id', this.instanceId);
     icon.setAttribute('tabindex', '0');
     
-    // Use secure DOM construction
+    // Create icon content with SVG and text (like Research button)
     const iconContentDiv = StorageManager.createElement('div', { 
-      class: 'flex flex-row items-center justify-center gap-1' 
+      class: 'flex items-center justify-center',
+      style: 'width: 16px; height: 16px;'
     });
     const svg = StorageManager.createSVGElement('svg', {
       xmlns: 'http://www.w3.org/2000/svg',
@@ -581,7 +582,20 @@ class UIElementFactory {
     });
     svg.appendChild(path);
     iconContentDiv.appendChild(svg);
+    
+    // Add text container like Research button
+    const textContainer = StorageManager.createElement('div', {
+      class: 'min-w-0 flex items-center'
+    });
+    const textElement = StorageManager.createElement('p', {
+      class: 'min-w-0 pl-1 text-xs tracking-tight text-ellipsis whitespace-nowrap break-words overflow-hidden shrink'
+    });
+    textElement.textContent = 'My Prompts';
+    textContainer.appendChild(textElement);
+    
+    // Append both icon and text to button
     icon.appendChild(iconContentDiv);
+    icon.appendChild(textContainer);
     
     shrinkDiv.appendChild(icon);
     flexDiv.appendChild(shrinkDiv);
@@ -1116,267 +1130,753 @@ class StorageManager {
   }
 }
 
-// Platform Insertion Manager Implementation
-// Since ES6 imports don't work in content scripts, we implement the strategy pattern inline
-class PlatformInsertionManager {
-  constructor(options = {}) {
-    this.strategies = new Map();
-    this.options = {
-      enableDebugLogging: options.enableDebugLogging || false,
-      maxRetries: options.maxRetries || 3,
-      timeout: options.timeout || 5000
-    };
+// ================================================================================================
+// INSERTION RESULT INTERFACE
+// ================================================================================================
+
+/**
+ * @typedef {Object} InsertionResult
+ * @property {boolean} success - Whether the insertion was successful
+ * @property {string} [method] - The method used for insertion
+ * @property {string} [error] - Error message if insertion failed
+ */
+
+// ================================================================================================
+// ABSTRACT BASE STRATEGY CLASS
+// ================================================================================================
+
+/**
+ * Abstract base class defining the contract for platform-specific insertion strategies
+ * Each platform must implement all abstract methods to ensure consistent behavior
+ */
+class PlatformStrategy {
+  /**
+   * @param {string} name - Platform name (e.g., 'claude', 'chatgpt')
+   * @param {number} priority - Priority for strategy selection (higher = preferred)
+   * @param {Object} config - Platform-specific configuration
+   */
+  constructor(name, priority, config = {}) {
+    if (this.constructor === PlatformStrategy) {
+      throw new Error('PlatformStrategy is abstract and cannot be instantiated');
+    }
     
-    // Initialize default strategies
-    this.initializeStrategies();
+    this.name = name;
+    this.priority = priority;
+    this.config = config;
+    this.hostname = window.location.hostname;
+    
+    // Validate required methods are implemented
+    this._validateImplementation();
   }
   
-  initializeStrategies() {
-    // Claude Strategy - handles ProseMirror editor
-    this.strategies.set('claude', {
-      name: 'claude',
-      priority: 100,
-      canHandle: (element) => {
-        const hostname = window.location.hostname;
-        // Claude uses ProseMirror editor, which might be in a parent element
-        if (hostname !== 'claude.ai') return false;
+  /**
+   * Validates that all abstract methods are implemented by concrete classes
+   * @private
+   */
+  _validateImplementation() {
+    const requiredMethods = ['canHandle', 'insert', 'getSelectors'];
+    for (const method of requiredMethods) {
+      if (typeof this[method] !== 'function') {
+        throw new Error(`Strategy ${this.name} must implement ${method}() method`);
+      }
+    }
+  }
+  
+  /**
+   * Determines if this strategy can handle the given element
+   * @param {HTMLElement} element - The target element
+   * @returns {boolean} True if this strategy can handle the element
+   * @abstract
+   */
+  canHandle(element) {
+    throw new Error(`${this.name} strategy must implement canHandle() method`);
+  }
+  
+  /**
+   * Inserts content into the target element using platform-specific logic
+   * @param {HTMLElement} element - The target element
+   * @param {string} content - The content to insert
+   * @returns {Promise<InsertionResult>} Result of the insertion attempt
+   * @abstract
+   */
+  async insert(element, content) {
+    throw new Error(`${this.name} strategy must implement insert() method`);
+  }
+  
+  /**
+   * Gets the CSS selectors used to find input elements for this platform
+   * @returns {string[]} Array of CSS selectors
+   * @abstract
+   */
+  getSelectors() {
+    throw new Error(`${this.name} strategy must implement getSelectors() method`);
+  }
+  
+  /**
+   * Gets the button container selector for icon placement (optional)
+   * @returns {string|null} CSS selector for button container
+   */
+  getButtonContainerSelector() {
+    return this.config.buttonContainerSelector || null;
+  }
+  
+  /**
+   * Creates a platform-specific icon (optional override)
+   * @param {UIElementFactory} uiFactory - Factory for creating UI elements
+   * @returns {HTMLElement|null} Platform-specific icon or null to use default
+   */
+  createIcon(uiFactory) {
+    return null; // Use default icon by default
+  }
+  
+  /**
+   * Cleans up any platform-specific resources (optional override)
+   */
+  cleanup() {
+    // Default: no cleanup needed
+  }
+  
+  /**
+   * Logs debug information with platform prefix
+   * @param {string} message - Debug message
+   * @param {Object} context - Additional context
+   * @protected
+   */
+  _debug(message, context = {}) {
+    Logger.debug(`[${this.name}] ${message}`, context);
+  }
+  
+  /**
+   * Logs warning with platform prefix
+   * @param {string} message - Warning message
+   * @param {Error|Object} errorOrContext - Error object or context
+   * @protected
+   */
+  _warn(message, errorOrContext = {}) {
+    Logger.warn(`[${this.name}] ${message}`, errorOrContext);
+  }
+  
+  /**
+   * Logs error with platform prefix
+   * @param {string} message - Error message
+   * @param {Error} error - Error object
+   * @param {Object} context - Additional context
+   * @protected
+   */
+  _error(message, error, context = {}) {
+    Logger.error(`[${this.name}] ${message}`, error, context);
+  }
+}
+
+// ================================================================================================
+// CLAUDE STRATEGY IMPLEMENTATION
+// ================================================================================================
+
+/**
+ * Strategy for handling Claude.ai's ProseMirror editor
+ * Supports multiple insertion methods with fallbacks
+ */
+class ClaudeStrategy extends PlatformStrategy {
+  constructor() {
+    super('claude', 100, {
+      selectors: [
+        'div[contenteditable="true"][role="textbox"].ProseMirror'
+      ],
+      buttonContainerSelector: '.relative.flex-1.flex.items-center.gap-2.shrink.min-w-0'
+    });
+  }
+  
+  /**
+   * Determines if this strategy can handle the element
+   * Always returns true for claude.ai to ensure Claude strategy is used
+   */
+  canHandle(element) {
+    // Only handle elements on Claude
+    if (this.hostname !== 'claude.ai') {
+      return false;
+    }
+    
+    // Check if element is or contains ProseMirror
+    const isProseMirror = element.classList.contains('ProseMirror') ||
+                         element.closest('.ProseMirror') !== null ||
+                         element.querySelector('.ProseMirror') !== null;
+    
+    this._debug('canHandle check', {
+      hostname: this.hostname,
+      isProseMirror,
+      elementTag: element.tagName,
+      elementClasses: element.className,
+      isContentEditable: element.contentEditable === 'true'
+    });
+    
+    // For Claude, we want to handle any element that is or is related to ProseMirror
+    // or any contentEditable element on claude.ai
+    return true; // Always return true for claude.ai to ensure we use Claude strategy
+  }
+  
+  /**
+   * Inserts content using Claude-specific methods
+   * Tries ProseMirror transaction API, then execCommand, then DOM manipulation
+   */
+  async insert(element, content) {
+    this._debug('Attempting insertion', {
+      hasProseMirrorClass: element.classList.contains('ProseMirror'),
+      isContentEditable: element.contentEditable === 'true',
+      elementTag: element.tagName,
+      elementClass: element.className
+    });
+    
+    // Try to find ProseMirror element
+    const proseMirrorElement = this._findProseMirrorElement(element);
+    
+    this._debug('ProseMirror element search result', {
+      foundProseMirror: proseMirrorElement.classList.contains('ProseMirror'),
+      elementTag: proseMirrorElement.tagName,
+      elementClass: proseMirrorElement.className
+    });
+    
+    // Method 1: Try ProseMirror transaction API
+    const transactionResult = await this._tryProseMirrorTransaction(proseMirrorElement, content);
+    if (transactionResult.success) return transactionResult;
+    
+    // Method 2: Try execCommand for contentEditable
+    const execCommandResult = await this._tryExecCommand(proseMirrorElement, element, content);
+    if (execCommandResult.success) return execCommandResult;
+    
+    // Method 3: Direct DOM manipulation
+    return this._tryDOMManipulation(element, content);
+  }
+  
+  /**
+   * Gets selectors for finding Claude input elements
+   */
+  getSelectors() {
+    return this.config.selectors;
+  }
+  
+  /**
+   * Creates Claude-specific icon using the UI factory
+   */
+  createIcon(uiFactory) {
+    const result = uiFactory.createClaudeIcon();
+    // createClaudeIcon returns { container, icon }, we want the container for Claude
+    return result.container;
+  }
+  
+  /**
+   * Finds the ProseMirror element from the given element
+   * @param {HTMLElement} element - Starting element
+   * @returns {HTMLElement} ProseMirror element or original element
+   * @private
+   */
+  _findProseMirrorElement(element) {
+    this._debug('_findProseMirrorElement called', {
+      elementTag: element?.tagName,
+      elementId: element?.id,
+      elementClass: element?.className?.substring(0, 100),
+      isProseMirror: element?.classList?.contains('ProseMirror'),
+      isContentEditable: element?.contentEditable === 'true',
+      hasRole: element?.getAttribute('role')
+    });
+
+    // If element is already ProseMirror, use it
+    if (element.classList.contains('ProseMirror')) {
+      this._debug('Element is already ProseMirror, using it directly');
+      return element;
+    }
+    
+    // First check if ProseMirror is a parent
+    const parentProseMirror = element.closest('.ProseMirror');
+    if (parentProseMirror) {
+      this._debug('Found parent ProseMirror element', {
+        parentTag: parentProseMirror.tagName,
+        parentClass: parentProseMirror.className?.substring(0, 100)
+      });
+      return parentProseMirror;
+    }
+    
+    // Then check if ProseMirror is a child
+    const childProseMirror = element.querySelector('.ProseMirror');
+    if (childProseMirror) {
+      this._debug('Found child ProseMirror element', {
+        childTag: childProseMirror.tagName,
+        childClass: childProseMirror.className?.substring(0, 100)
+      });
+      return childProseMirror;
+    }
+    
+    // Last resort: find any ProseMirror element on the page for Claude.ai
+    const anyProseMirror = document.querySelector('div[contenteditable="true"][role="textbox"].ProseMirror');
+    if (anyProseMirror) {
+      this._debug('Found ProseMirror element via document query as fallback', {
+        fallbackTag: anyProseMirror.tagName,
+        fallbackClass: anyProseMirror.className?.substring(0, 100)
+      });
+      return anyProseMirror;
+    }
+    
+    // Return original element as final fallback
+    this._debug('No ProseMirror found, returning original element as fallback');
+    return element;
+  }
+  
+  /**
+   * Attempts insertion using ProseMirror transaction API
+   * @param {HTMLElement} proseMirrorElement - ProseMirror element
+   * @param {string} content - Content to insert
+   * @returns {Promise<InsertionResult>} Result of insertion attempt
+   * @private
+   */
+  async _tryProseMirrorTransaction(proseMirrorElement, content) {
+    try {
+      const view = proseMirrorElement.pmViewDesc?.view || 
+                  proseMirrorElement._pmViewDesc?.view ||
+                  window.ProseMirror?.view;
+      
+      if (view && view.state && view.dispatch) {
+        this._debug('Found ProseMirror view, using transaction API');
         
-        // Check if element is or contains ProseMirror
-        const isProseMirror = element.classList.contains('ProseMirror') ||
-                             element.closest('.ProseMirror') !== null ||
-                             element.querySelector('.ProseMirror') !== null;
+        const { state } = view;
+        const { selection } = state;
+        const transaction = state.tr.insertText(content, selection.from, selection.to);
+        view.dispatch(transaction);
         
-        // Log for debugging
-        Logger.debug('[Claude] canHandle check', {
-          hostname,
-          isProseMirror,
-          elementTag: element.tagName,
-          elementClasses: element.className,
-          isContentEditable: element.contentEditable === 'true'
-        });
+        // Trigger events for Claude
+        proseMirrorElement.dispatchEvent(new Event('input', { bubbles: true }));
+        proseMirrorElement.dispatchEvent(new Event('compositionend', { bubbles: true }));
         
-        // For Claude, we want to handle any element that is or is related to ProseMirror
-        // or any contentEditable element on claude.ai
-        return true; // Always return true for claude.ai to ensure we use Claude strategy
-      },
-      insert: async (element, content) => {
-        Logger.debug('[Claude] Attempting ProseMirror insertion', {
-          hasProseMirrorClass: element.classList.contains('ProseMirror'),
-          isContentEditable: element.contentEditable === 'true',
-          elementTag: element.tagName,
-          elementClass: element.className
-        });
+        return { success: true, method: 'prosemirror-transaction' };
+      }
+    } catch (error) {
+      this._warn('ProseMirror transaction failed', error);
+    }
+    
+    return { success: false };
+  }
+  
+  /**
+   * Attempts insertion using execCommand
+   * @param {HTMLElement} proseMirrorElement - ProseMirror element
+   * @param {HTMLElement} element - Original element
+   * @param {string} content - Content to insert
+   * @returns {Promise<InsertionResult>} Result of insertion attempt
+   * @private
+   */
+  async _tryExecCommand(proseMirrorElement, element, content) {
+    if (proseMirrorElement.contentEditable === 'true' || element.contentEditable === 'true') {
+      try {
+        const targetEl = proseMirrorElement.contentEditable === 'true' ? proseMirrorElement : element;
+        targetEl.focus();
         
-        // Try to find ProseMirror view - Claude's editor is usually inside the contenteditable
-        let proseMirrorElement = element;
+        // For Claude, we need to ensure the editor is ready
+        targetEl.click();
         
-        // If element is not ProseMirror, try to find it
-        if (!element.classList.contains('ProseMirror')) {
-          // First check if ProseMirror is a parent
-          const parentProseMirror = element.closest('.ProseMirror');
-          if (parentProseMirror) {
-            proseMirrorElement = parentProseMirror;
-          } else {
-            // Then check if ProseMirror is a child
-            const childProseMirror = element.querySelector('.ProseMirror');
-            if (childProseMirror) {
-              proseMirrorElement = childProseMirror;
-            }
-          }
-        }
+        // Wait a tiny bit for focus
+        await new Promise(resolve => setTimeout(resolve, 50));
         
-        Logger.debug('[Claude] ProseMirror element search result', {
-          foundProseMirror: proseMirrorElement.classList.contains('ProseMirror'),
-          elementTag: proseMirrorElement.tagName,
-          elementClass: proseMirrorElement.className
-        });
+        // Clear existing content if it's placeholder text
+        const selection = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(targetEl);
+        selection.removeAllRanges();
+        selection.addRange(range);
         
-        // Method 1: Try to access ProseMirror view directly
-        const view = proseMirrorElement.pmViewDesc?.view || 
-                    proseMirrorElement._pmViewDesc?.view ||
-                    window.ProseMirror?.view;
+        // Insert new content using execCommand
+        const inserted = document.execCommand('insertText', false, content);
         
-        if (view && view.state && view.dispatch) {
-          try {
-            Logger.debug('[Claude] Found ProseMirror view, using transaction API');
-            const { state } = view;
-            const { selection } = state;
-            const transaction = state.tr.insertText(content, selection.from, selection.to);
-            view.dispatch(transaction);
-            
-            // Trigger events for Claude
-            proseMirrorElement.dispatchEvent(new Event('input', { bubbles: true }));
-            proseMirrorElement.dispatchEvent(new Event('compositionend', { bubbles: true }));
-            
-            return { success: true, method: 'prosemirror-transaction' };
-          } catch (error) {
-            Logger.warn('[Claude] ProseMirror transaction failed', error);
-          }
-        }
-        
-        // Method 2: Use execCommand for contentEditable
-        if (proseMirrorElement.contentEditable === 'true' || element.contentEditable === 'true') {
-          try {
-            const targetEl = proseMirrorElement.contentEditable === 'true' ? proseMirrorElement : element;
-            targetEl.focus();
-            
-            // For Claude, we need to ensure the editor is ready
-            // First click to focus
-            targetEl.click();
-            
-            // Wait a tiny bit for focus
-            await new Promise(resolve => setTimeout(resolve, 50));
-            
-            // Clear existing content if it's placeholder text
-            const selection = window.getSelection();
-            const range = document.createRange();
-            range.selectNodeContents(targetEl);
-            selection.removeAllRanges();
-            selection.addRange(range);
-            
-            // Insert new content using execCommand
-            const inserted = document.execCommand('insertText', false, content);
-            
-            if (inserted) {
-              Logger.debug('[Claude] execCommand insertion successful');
-              
-              // Trigger Claude-specific events
-              const inputEvent = new InputEvent('input', {
-                bubbles: true,
-                cancelable: true,
-                inputType: 'insertText',
-                data: content
-              });
-              targetEl.dispatchEvent(inputEvent);
-              targetEl.dispatchEvent(new Event('compositionend', { bubbles: true }));
-              
-              // For Claude, also trigger these events on the parent contenteditable if different
-              if (targetEl !== element) {
-                element.dispatchEvent(inputEvent);
-                element.dispatchEvent(new Event('compositionend', { bubbles: true }));
-              }
-              
-              return { success: true, method: 'execCommand' };
-            }
-          } catch (error) {
-            Logger.warn('[Claude] execCommand failed', error);
-          }
-        }
-        
-        // Method 3: Direct DOM manipulation with event triggering
-        try {
-          element.focus();
-          element.textContent = content;
+        if (inserted) {
+          this._debug('execCommand insertion successful');
           
-          // Create and dispatch a more comprehensive set of events
+          // Trigger Claude-specific events
           const inputEvent = new InputEvent('input', {
             bubbles: true,
             cancelable: true,
             inputType: 'insertText',
             data: content
           });
-          element.dispatchEvent(inputEvent);
+          targetEl.dispatchEvent(inputEvent);
+          targetEl.dispatchEvent(new Event('compositionend', { bubbles: true }));
           
-          // Additional events that Claude might listen to
-          element.dispatchEvent(new Event('change', { bubbles: true }));
-          element.dispatchEvent(new Event('blur', { bubbles: true }));
-          element.dispatchEvent(new Event('focus', { bubbles: true }));
-          
-          return { success: true, method: 'dom-manipulation' };
-        } catch (error) {
-          Logger.error('[Claude] All insertion methods failed', error);
-          return { success: false, error: error.message };
-        }
-      }
-    });
-    
-    // ChatGPT Strategy
-    this.strategies.set('chatgpt', {
-      name: 'chatgpt',
-      priority: 90,
-      canHandle: (element) => {
-        const hostname = window.location.hostname;
-        return hostname === 'chatgpt.com' && element.tagName === 'TEXTAREA';
-      },
-      insert: async (element, content) => {
-        try {
-          element.focus();
-          element.value = content;
-          
-          // Trigger React events for ChatGPT
-          const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-            window.HTMLTextAreaElement.prototype,
-            'value'
-          ).set;
-          nativeInputValueSetter.call(element, content);
-          
-          element.dispatchEvent(new Event('input', { bubbles: true }));
-          element.dispatchEvent(new Event('change', { bubbles: true }));
-          
-          return { success: true, method: 'chatgpt-react' };
-        } catch (error) {
-          return { success: false, error: error.message };
-        }
-      }
-    });
-    
-    // Perplexity Strategy
-    this.strategies.set('perplexity', {
-      name: 'perplexity',
-      priority: 80,
-      canHandle: (element) => {
-        const hostname = window.location.hostname;
-        return hostname === 'www.perplexity.ai';
-      },
-      insert: async (element, content) => {
-        try {
-          element.focus();
-          
-          if (element.contentEditable === 'true') {
-            element.textContent = content;
-          } else if (element.tagName === 'TEXTAREA') {
-            element.value = content;
+          // For Claude, also trigger these events on the parent contenteditable if different
+          if (targetEl !== element) {
+            element.dispatchEvent(inputEvent);
+            element.dispatchEvent(new Event('compositionend', { bubbles: true }));
           }
           
-          // Trigger Perplexity events
-          const events = ['input', 'change', 'keyup', 'paste'];
-          events.forEach(eventType => {
-            element.dispatchEvent(new Event(eventType, { bubbles: true }));
-          });
-          
-          return { success: true, method: 'perplexity-events' };
-        } catch (error) {
-          return { success: false, error: error.message };
+          return { success: true, method: 'execCommand' };
         }
+      } catch (error) {
+        this._warn('execCommand failed', error);
       }
-    });
+    }
     
-    // Default Strategy
-    this.strategies.set('default', {
-      name: 'default',
-      priority: 0,
-      canHandle: () => true, // Always can handle as fallback
-      insert: async (element, content) => {
-        try {
-          element.focus();
-          
-          if (element.tagName === 'TEXTAREA' || element.tagName === 'INPUT') {
-            element.value = content;
-            element.dispatchEvent(new Event('input', { bubbles: true }));
-            element.dispatchEvent(new Event('change', { bubbles: true }));
-          } else if (element.contentEditable === 'true') {
-            element.textContent = content;
-            element.dispatchEvent(new Event('input', { bubbles: true }));
-          }
-          
-          return { success: true, method: 'default' };
-        } catch (error) {
-          return { success: false, error: error.message };
-        }
-      }
+    return { success: false };
+  }
+  
+  /**
+   * Attempts insertion using direct DOM manipulation
+   * @param {HTMLElement} element - Target element
+   * @param {string} content - Content to insert
+   * @returns {InsertionResult} Result of insertion attempt
+   * @private
+   */
+  _tryDOMManipulation(element, content) {
+    try {
+      element.focus();
+      element.textContent = content;
+      
+      // Create and dispatch a comprehensive set of events
+      const inputEvent = new InputEvent('input', {
+        bubbles: true,
+        cancelable: true,
+        inputType: 'insertText',
+        data: content
+      });
+      element.dispatchEvent(inputEvent);
+      
+      // Additional events that Claude might listen to
+      element.dispatchEvent(new Event('change', { bubbles: true }));
+      element.dispatchEvent(new Event('blur', { bubbles: true }));
+      element.dispatchEvent(new Event('focus', { bubbles: true }));
+      
+      return { success: true, method: 'dom-manipulation' };
+    } catch (error) {
+      this._error('All insertion methods failed', error);
+      return { success: false, error: error.message };
+    }
+  }
+}
+
+// ================================================================================================
+// CHATGPT STRATEGY IMPLEMENTATION
+// ================================================================================================
+
+/**
+ * Strategy for handling ChatGPT's React-based textarea inputs
+ * Uses React-specific event triggering for proper state updates
+ */
+class ChatGPTStrategy extends PlatformStrategy {
+  constructor() {
+    super('chatgpt', 90, {
+      selectors: [
+        'textarea[data-testid="chat-input"]',
+        'textarea[placeholder*="Message"]',
+        'textarea',
+        'div[contenteditable="true"]',
+        '[role="textbox"]',
+        'input[type="text"]',
+        '[data-testid*="input"]',
+        '[class*="input"]'
+      ],
+      buttonContainerSelector: 'div[data-testid="composer-trailing-actions"] .ms-auto.flex.items-center'
     });
   }
   
+  /**
+   * Determines if this strategy can handle the element
+   * Only handles textarea elements on chatgpt.com
+   */
+  canHandle(element) {
+    return this.hostname === 'chatgpt.com' && element.tagName === 'TEXTAREA';
+  }
+  
+  /**
+   * Inserts content using React-compatible methods
+   * Uses native property setter to trigger React state updates
+   */
+  async insert(element, content) {
+    try {
+      element.focus();
+      element.value = content;
+      
+      // Trigger React events for ChatGPT - this is crucial for React state updates
+      const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+        window.HTMLTextAreaElement.prototype,
+        'value'
+      ).set;
+      nativeInputValueSetter.call(element, content);
+      
+      // Dispatch events that React expects
+      element.dispatchEvent(new Event('input', { bubbles: true }));
+      element.dispatchEvent(new Event('change', { bubbles: true }));
+      
+      this._debug('React-compatible insertion successful');
+      return { success: true, method: 'chatgpt-react' };
+    } catch (error) {
+      this._error('React insertion failed', error);
+      return { success: false, error: error.message };
+    }
+  }
+  
+  /**
+   * Gets selectors for finding ChatGPT input elements
+   */
+  getSelectors() {
+    return this.config.selectors;
+  }
+  
+  /**
+   * Creates ChatGPT-specific icon using the UI factory
+   */
+  createIcon(uiFactory) {
+    return uiFactory.createChatGPTIcon();
+  }
+}
+
+// ================================================================================================
+// PERPLEXITY STRATEGY IMPLEMENTATION
+// ================================================================================================
+
+/**
+ * Strategy for handling Perplexity.ai's contenteditable inputs
+ * Uses comprehensive event triggering for various input types
+ */
+class PerplexityStrategy extends PlatformStrategy {
+  constructor() {
+    super('perplexity', 80, {
+      selectors: [
+        'div[contenteditable="true"][role="textbox"]#ask-input'
+      ],
+      buttonContainerSelector: '.bg-background-50.dark\\:bg-offsetDark.flex.items-center.justify-self-end.rounded-full.col-start-3.row-start-2'
+    });
+  }
+  
+  /**
+   * Determines if this strategy can handle the element
+   * Handles any element on www.perplexity.ai
+   */
+  canHandle(element) {
+    return this.hostname === 'www.perplexity.ai';
+  }
+  
+  /**
+   * Inserts content using Perplexity-compatible methods
+   * Handles both contenteditable divs and textarea elements
+   */
+  async insert(element, content) {
+    try {
+      element.focus();
+      
+      // Handle different element types
+      if (element.contentEditable === 'true') {
+        element.textContent = content;
+      } else if (element.tagName === 'TEXTAREA') {
+        element.value = content;
+      }
+      
+      // Trigger comprehensive event set that Perplexity expects
+      const events = ['input', 'change', 'keyup', 'paste'];
+      events.forEach(eventType => {
+        element.dispatchEvent(new Event(eventType, { bubbles: true }));
+      });
+      
+      this._debug('Perplexity insertion successful');
+      return { success: true, method: 'perplexity-events' };
+    } catch (error) {
+      this._error('Perplexity insertion failed', error);
+      return { success: false, error: error.message };
+    }
+  }
+  
+  /**
+   * Gets selectors for finding Perplexity input elements
+   */
+  getSelectors() {
+    return this.config.selectors;
+  }
+  
+  /**
+   * Creates Perplexity-specific icon using the UI factory
+   */
+  createIcon(uiFactory) {
+    return uiFactory.createPerplexityIcon();
+  }
+}
+
+// ================================================================================================
+// DEFAULT STRATEGY IMPLEMENTATION
+// ================================================================================================
+
+/**
+ * Fallback strategy for unknown platforms or generic input elements
+ * Provides basic insertion functionality that works with most standard inputs
+ */
+class DefaultStrategy extends PlatformStrategy {
+  constructor() {
+    super('default', 0, {
+      selectors: [
+        'textarea',
+        'input[type="text"]',
+        'div[contenteditable="true"]',
+        '[role="textbox"]'
+      ],
+      buttonContainerSelector: null // No specific container for default
+    });
+  }
+  
+  /**
+   * Always returns true as this is the fallback strategy
+   */
+  canHandle(element) {
+    return true; // Always can handle as fallback
+  }
+  
+  /**
+   * Inserts content using generic methods
+   * Works with standard textarea, input, and contenteditable elements
+   */
+  async insert(element, content) {
+    try {
+      element.focus();
+      
+      // Handle different element types with basic insertion
+      if (element.tagName === 'TEXTAREA' || element.tagName === 'INPUT') {
+        element.value = content;
+        element.dispatchEvent(new Event('input', { bubbles: true }));
+        element.dispatchEvent(new Event('change', { bubbles: true }));
+      } else if (element.contentEditable === 'true') {
+        element.textContent = content;
+        element.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      
+      this._debug('Default insertion successful');
+      return { success: true, method: 'default' };
+    } catch (error) {
+      this._error('Default insertion failed', error);
+      return { success: false, error: error.message };
+    }
+  }
+  
+  /**
+   * Gets generic selectors for finding input elements
+   */
+  getSelectors() {
+    return this.config.selectors;
+  }
+  
+  /**
+   * Uses default floating icon
+   */
+  createIcon(uiFactory) {
+    return uiFactory.createFloatingIcon();
+  }
+}
+
+// ================================================================================================
+// PLATFORM MANAGER CLASS
+// ================================================================================================
+
+/**
+ * Manages platform strategies and coordinates insertion attempts
+ * Provides isolation between strategies and handles strategy selection logic
+ */
+class PlatformManager {
+  constructor(options = {}) {
+    this.options = {
+      enableDebugLogging: options.enableDebugLogging || false,
+      maxRetries: options.maxRetries || 3,
+      timeout: options.timeout || 5000
+    };
+    
+    this.strategies = [];
+    this.activeStrategy = null;
+    this.hostname = window.location.hostname;
+    
+    this._initializeStrategies();
+  }
+  
+  /**
+   * Initializes platform strategies based on current hostname
+   * Only loads strategies relevant to the current platform for performance
+   * @private
+   */
+  _initializeStrategies() {
+    Logger.info('Initializing platform strategies', { hostname: this.hostname });
+    
+    // Always add default strategy as fallback
+    this.strategies.push(new DefaultStrategy());
+    
+    // Add platform-specific strategies based on hostname
+    switch (this.hostname) {
+      case 'claude.ai':
+        this.strategies.push(new ClaudeStrategy());
+        Logger.info('Loaded Claude strategy for claude.ai');
+        break;
+        
+      case 'chatgpt.com':
+        this.strategies.push(new ChatGPTStrategy());
+        Logger.info('Loaded ChatGPT strategy for chatgpt.com');
+        break;
+        
+      case 'www.perplexity.ai':
+        this.strategies.push(new PerplexityStrategy());
+        Logger.info('Loaded Perplexity strategy for www.perplexity.ai');
+        break;
+        
+      default:
+        Logger.info(`Using default strategy for unknown hostname: ${this.hostname}`);
+    }
+    
+    // Sort strategies by priority (highest first)
+    this.strategies.sort((a, b) => b.priority - a.priority);
+    
+    Logger.debug('Strategy initialization complete', {
+      strategiesLoaded: this.strategies.map(s => ({ name: s.name, priority: s.priority }))
+    });
+  }
+  
+  /**
+   * Gets all available selectors from loaded strategies
+   * @returns {string[]} Combined array of all selectors
+   */
+  getAllSelectors() {
+    const allSelectors = [];
+    for (const strategy of this.strategies) {
+      allSelectors.push(...strategy.getSelectors());
+    }
+    return [...new Set(allSelectors)]; // Remove duplicates
+  }
+  
+  /**
+   * Gets button container selector for the active platform
+   * @returns {string|null} Button container selector or null
+   */
+  getButtonContainerSelector() {
+    // Use the highest priority strategy that has a button container selector
+    for (const strategy of this.strategies) {
+      const selector = strategy.getButtonContainerSelector();
+      if (selector) {
+        return selector;
+      }
+    }
+    return null;
+  }
+  
+  /**
+   * Creates platform-specific icon
+   * @param {UIElementFactory} uiFactory - UI factory instance
+   * @returns {HTMLElement} Platform-specific icon
+   */
+  createIcon(uiFactory) {
+    // Use the highest priority strategy to create the icon
+    for (const strategy of this.strategies) {
+      const icon = strategy.createIcon(uiFactory);
+      if (icon) {
+        this.activeStrategy = strategy;
+        return icon;
+      }
+    }
+    
+    // Fallback to default floating icon
+    return uiFactory.createFloatingIcon();
+  }
+  
+  /**
+   * Attempts to insert content using appropriate strategy
+   * @param {string} content - Content to insert
+   * @param {Object} options - Insertion options
+   * @returns {Promise<InsertionResult>} Result of insertion attempt
+   */
   async insertContent(content, options = {}) {
     const targetElement = options.targetElement || document.activeElement;
     
@@ -1387,8 +1887,8 @@ class PlatformInsertionManager {
       };
     }
     
-    Logger.debug('PlatformInsertionManager: Starting insertion', {
-      hostname: window.location.hostname,
+    Logger.debug('PlatformManager: Starting insertion', {
+      hostname: this.hostname,
       elementTag: targetElement.tagName,
       elementClass: targetElement.className,
       elementId: targetElement.id,
@@ -1397,44 +1897,168 @@ class PlatformInsertionManager {
       closestProseMirror: targetElement.closest('.ProseMirror') ? 'found' : 'not found'
     });
     
-    // Find the best strategy
-    const sortedStrategies = Array.from(this.strategies.values())
-      .filter(strategy => strategy.canHandle(targetElement))
-      .sort((a, b) => b.priority - a.priority);
-    
-    Logger.debug('PlatformInsertionManager: Available strategies', {
-      strategies: sortedStrategies.map(s => ({ name: s.name, priority: s.priority }))
+    // Find compatible strategies
+    const compatibleStrategies = this.strategies.filter(strategy => {
+      try {
+        return strategy.canHandle(targetElement);
+      } catch (error) {
+        Logger.warn(`Strategy ${strategy.name} canHandle() failed`, error);
+        return false;
+      }
     });
     
-    // Try strategies in order
-    for (const strategy of sortedStrategies) {
+    Logger.debug('PlatformManager: Compatible strategies found', {
+      strategies: compatibleStrategies.map(s => ({ name: s.name, priority: s.priority }))
+    });
+    
+    if (compatibleStrategies.length === 0) {
+      return {
+        success: false,
+        error: 'No compatible strategies found for target element'
+      };
+    }
+    
+    // Try strategies in priority order
+    for (const strategy of compatibleStrategies) {
       try {
-        Logger.debug(`PlatformInsertionManager: Trying ${strategy.name} strategy`);
+        Logger.debug(`PlatformManager: Trying ${strategy.name} strategy`);
         const result = await strategy.insert(targetElement, content);
         
         if (result.success) {
-          Logger.info('PlatformInsertionManager: Insertion successful', {
+          Logger.info('PlatformManager: Insertion successful', {
             strategy: strategy.name,
             method: result.method
           });
+          this.activeStrategy = strategy;
           return result;
+        } else {
+          Logger.debug(`PlatformManager: ${strategy.name} strategy returned failure`, result);
         }
       } catch (error) {
-        Logger.warn(`PlatformInsertionManager: ${strategy.name} strategy failed`, error);
+        Logger.warn(`PlatformManager: ${strategy.name} strategy threw error`, error);
       }
     }
     
     return {
       success: false,
-      error: 'All insertion strategies failed'
+      error: 'All compatible strategies failed'
     };
+  }
+  
+  /**
+   * Gets the currently active strategy
+   * @returns {PlatformStrategy|null} Active strategy or null
+   */
+  getActiveStrategy() {
+    return this.activeStrategy;
+  }
+  
+  /**
+   * Gets all loaded strategies
+   * @returns {PlatformStrategy[]} Array of loaded strategies
+   */
+  getStrategies() {
+    return [...this.strategies];
+  }
+  
+  /**
+   * Cleans up all strategies
+   */
+  cleanup() {
+    Logger.info('PlatformManager: Starting cleanup');
+    
+    for (const strategy of this.strategies) {
+      try {
+        strategy.cleanup();
+      } catch (error) {
+        Logger.warn(`Failed to cleanup strategy ${strategy.name}`, error);
+      }
+    }
+    
+    this.strategies = [];
+    this.activeStrategy = null;
+    
+    Logger.info('PlatformManager: Cleanup complete');
   }
 }
 
-// Helper function to create insertion manager
-function createInsertionManager(options = {}) {
-  return new PlatformInsertionManager(options);
+// ================================================================================================
+// UPDATED PLATFORM INSERTION MANAGER
+// ================================================================================================
+
+/**
+ * Updated PlatformInsertionManager that uses the new strategy pattern
+ * Maintains backward compatibility while using the improved architecture
+ */
+class PlatformInsertionManager {
+  constructor(options = {}) {
+    this.options = {
+      enableDebugLogging: options.enableDebugLogging || false,
+      maxRetries: options.maxRetries || 3,
+      timeout: options.timeout || 5000
+    };
+    
+    // Use the new PlatformManager
+    this.platformManager = new PlatformManager(this.options);
+    
+    Logger.info('PlatformInsertionManager initialized with strategy pattern');
+  }
+  
+  /**
+   * Inserts content using the strategy pattern
+   * @param {string} content - Content to insert
+   * @param {Object} options - Insertion options
+   * @returns {Promise<InsertionResult>} Result of insertion attempt
+   */
+  async insertContent(content, options = {}) {
+    return this.platformManager.insertContent(content, options);
+  }
+  
+  /**
+   * Gets all available selectors
+   * @returns {string[]} Array of CSS selectors
+   */
+  getAllSelectors() {
+    return this.platformManager.getAllSelectors();
+  }
+  
+  /**
+   * Gets button container selector
+   * @returns {string|null} Button container selector
+   */
+  getButtonContainerSelector() {
+    return this.platformManager.getButtonContainerSelector();
+  }
+  
+  /**
+   * Creates platform-specific icon
+   * @param {UIElementFactory} uiFactory - UI factory
+   * @returns {HTMLElement} Platform icon
+   */
+  createIcon(uiFactory) {
+    return this.platformManager.createIcon(uiFactory);
+  }
+  
+  /**
+   * Gets the active strategy
+   * @returns {PlatformStrategy|null} Active strategy
+   */
+  getActiveStrategy() {
+    return this.platformManager.getActiveStrategy();
+  }
+  
+  /**
+   * Cleans up resources
+   */
+  cleanup() {
+    if (this.platformManager) {
+      this.platformManager.cleanup();
+      this.platformManager = null;
+    }
+  }
 }
+
+// Helper function removed - no longer needed since PromptLibraryInjector uses its own platformManager
 
 class PromptLibraryInjector {
   constructor() {
@@ -1453,6 +2077,13 @@ class PromptLibraryInjector {
     this.eventManager = new EventManager();
     this.uiFactory = new UIElementFactory(this.instanceId);
     this.keyboardNav = null;
+    
+    // Initialize platform manager using the new strategy pattern
+    this.platformManager = new PlatformInsertionManager({
+      enableDebugLogging: Logger.isDebugMode(),
+      maxRetries: 3,
+      timeout: 5000
+    });
     
     // Enhanced retry system for custom selectors
     this.customSelectorRetry = {
@@ -1500,43 +2131,336 @@ class PromptLibraryInjector {
     };
     this.intersectionObserver = null;
     
-    // Site-specific selectors for text input areas
-    this.siteConfigs = {
-      'www.perplexity.ai': {
-        selectors: [
-          'div[contenteditable="true"][role="textbox"]#ask-input',
-        ],
-        buttonContainerSelector: '.bg-background-50.dark\\:bg-offsetDark.flex.items-center.justify-self-end.rounded-full.col-start-3.row-start-2',
-        name: 'Perplexity'
-      },
-      'claude.ai': {
-        selectors: [
-          'div[contenteditable="true"][role="textbox"].ProseMirror',
-        ],
-        buttonContainerSelector: '.relative.flex-1.flex.items-center.gap-2.shrink.min-w-0',
-        name: 'Claude'
-      },
-      'chatgpt.com': {
-        selectors: [
-          'textarea[data-testid="chat-input"]',
-          'textarea[placeholder*="Message"]',
-          'textarea',
-          'div[contenteditable="true"]',
-          '[role="textbox"]',
-          'input[type="text"]',
-          '[data-testid*="input"]',
-          '[class*="input"]'
-        ],
-        buttonContainerSelector: 'div[data-testid="composer-trailing-actions"] .ms-auto.flex.items-center',
-        name: 'ChatGPT'
-      },
-    };
+    // Platform configurations are now handled by the strategy pattern
+    // Each strategy contains its own selectors and platform-specific logic
     
     this.init();
   }
   
+  /**
+   * Gets all available selectors from the platform manager
+   * @returns {string[]} Array of CSS selectors
+   */
+  getAvailableSelectors() {
+    if (!this.platformManager) {
+      Logger.warn('Platform manager not initialized');
+      return [];
+    }
+    
+    return this.platformManager.getAllSelectors();
+  }
+  
+  /**
+   * Gets button container selector for the current platform
+   * @returns {string|null} Button container selector or null
+   */
+  getButtonContainerSelector() {
+    if (!this.platformManager) {
+      return null;
+    }
+    
+    return this.platformManager.getButtonContainerSelector();
+  }
+  
+  /**
+   * Creates platform-specific icon using the platform manager
+   * @returns {HTMLElement} Platform-specific icon
+   */
+  createPlatformIcon() {
+    Logger.debug('createPlatformIcon called', {
+      hasPlatformManager: !!this.platformManager,
+      hasUIFactory: !!this.uiFactory,
+      hostname: this.hostname
+    });
+    
+    if (!this.platformManager) {
+      Logger.warn('Platform manager not initialized, using default icon');
+      return this.uiFactory.createFloatingIcon();
+    }
+    
+    Logger.debug('About to call platformManager.createIcon');
+    const icon = this.platformManager.createIcon(this.uiFactory);
+    
+    Logger.debug('platformManager.createIcon result', {
+      iconCreated: !!icon,
+      activeStrategy: this.platformManager.getActiveStrategy()?.name
+    });
+    
+    if (icon && this.platformManager.getActiveStrategy()) {
+      Logger.info('Created platform-specific icon', {
+        strategy: this.platformManager.getActiveStrategy().name,
+        hostname: this.hostname
+      });
+    }
+    
+    return icon;
+  }
+  
+  /**
+   * Sets up click handler for the icon element
+   * @param {HTMLElement} iconElement - The icon element
+   */
+  setupIconClickHandler(iconElement) {
+    const clickHandler = async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      
+      Logger.info('Icon clicked', {
+        strategy: this.platformManager?.getActiveStrategy()?.name || 'unknown',
+        hasTextarea: !!this.currentTextarea,
+        currentTextareaTag: this.currentTextarea?.tagName,
+        currentTextareaClass: this.currentTextarea?.className?.substring(0, 50)
+      });
+      
+      try {
+        // For platform-specific icons, use the stored currentTextarea instead of the icon element
+        if (this.currentTextarea) {
+          await this.showPromptSelector(this.currentTextarea);
+        } else {
+          Logger.error('No currentTextarea available for prompt selector');
+        }
+      } catch (error) {
+        Logger.error('Failed to show prompt selector', error);
+      }
+    };
+    
+    this.eventManager.addTrackedEventListener(iconElement, 'click', clickHandler);
+    
+    // Add keyboard support
+    const keyHandler = (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        clickHandler(event);
+      }
+    };
+    
+    this.eventManager.addTrackedEventListener(iconElement, 'keydown', keyHandler);
+  }
+  
+  /**
+   * Positions icon near textarea as fallback when no container is found
+   * @param {HTMLElement} iconElement - The icon element
+   * @param {HTMLElement} textarea - The textarea element
+   */
+  positionIconNearTextarea(iconElement, textarea) {
+    // Use the createFloatingIcon approach as fallback
+    this.createFloatingIcon(textarea);
+  }
+  
+  /**
+   * Inserts icon after Research button with retry logic for Claude.ai
+   * @param {HTMLElement} buttonContainer - The button container
+   * @param {HTMLElement} iconElement - The icon element to insert
+   */
+  async insertIconAfterResearchButton(buttonContainer, iconElement) {
+    const maxRetries = 10;
+    const retryDelay = 300; // 300ms between retries
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      Logger.debug(`Attempt ${attempt}/${maxRetries} to find Research button`);
+      
+      const researchButton = this.findResearchButtonContainer(buttonContainer);
+      if (researchButton) {
+        Logger.debug('Research button found, inserting icon after it');
+        researchButton.insertAdjacentElement('afterend', iconElement);
+        return; // Success!
+      }
+      
+      // If not found and we have more attempts, wait and try again
+      if (attempt < maxRetries) {
+        Logger.debug(`Research button not found, waiting ${retryDelay}ms before retry ${attempt + 1}`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+      }
+    }
+    
+    // If we get here, all retries failed
+    Logger.warn('Research button not found after all retries, appending to end of container');
+    buttonContainer.appendChild(iconElement);
+  }
+
+  /**
+   * Finds the Research button container in Claude.ai
+   * @param {HTMLElement} parentContainer - The parent button container
+   * @returns {HTMLElement|null} The Research button container or null
+   */
+  findResearchButtonContainer(parentContainer) {
+    Logger.debug('Searching for Research button', {
+      containerChildren: parentContainer.children.length,
+      containerHTML: parentContainer.innerHTML.substring(0, 200) + '...'
+    });
+    
+    // Method 1: Look for Research button by text content
+    const allButtons = parentContainer.querySelectorAll('button');
+    Logger.debug(`Found ${allButtons.length} buttons in container`);
+    
+    for (const button of allButtons) {
+      const textElement = button.querySelector('p');
+      if (textElement) {
+        const text = textElement.textContent.trim();
+        Logger.debug(`Button text: "${text}"`);
+        if (text === 'Research') {
+          const container = button.closest('div[class*="flex"][class*="shrink"]');
+          if (container) {
+            Logger.debug('Found Research button container via text search');
+            return container;
+          }
+        }
+      }
+    }
+    
+    // Method 2: Look for the specific Research button structure
+    const flexDivs = parentContainer.querySelectorAll('div.flex.shrink');
+    Logger.debug(`Found ${flexDivs.length} flex shrink divs`);
+    
+    for (const div of flexDivs) {
+      // Check if this div has the Research button characteristics
+      const hasMinWidthClass = div.classList.contains('min-w-8');
+      const hasShrinkClass = div.classList.contains('!shrink-0');
+      const hasButton = div.querySelector('button');
+      const hasResearchText = div.querySelector('p')?.textContent.trim() === 'Research';
+      
+      if (hasButton && (hasMinWidthClass || hasShrinkClass || hasResearchText)) {
+        Logger.debug('Found Research button container via structure search', {
+          hasMinWidthClass,
+          hasShrinkClass, 
+          hasResearchText
+        });
+        return div;
+      }
+    }
+    
+    // Method 3: Look for the SVG icon that matches Research (search icon)
+    const searchSVGs = parentContainer.querySelectorAll('svg[viewBox="0 0 20 20"]');
+    for (const svg of searchSVGs) {
+      const path = svg.querySelector('path[d*="M8.5 2C12.0899"]');
+      if (path) {
+        const container = svg.closest('div[class*="flex"][class*="shrink"]');
+        if (container) {
+          Logger.debug('Found Research button container via SVG search');
+          return container;
+        }
+      }
+    }
+    
+    Logger.debug('Research button not found with any method');
+    return null;
+  }
+  
+  /**
+   * Removes the current icon if it exists
+   */
+  removeIcon() {
+    if (this.icon) {
+      try {
+        this.icon.remove();
+        Logger.info('Successfully removed current icon');
+      } catch (error) {
+        Logger.warn('Failed to remove current icon', {
+          error: error.message,
+          iconTag: this.icon.tagName,
+          iconClass: this.icon.className
+        });
+      }
+      this.icon = null;
+    }
+  }
+  
+  /**
+   * Inserts prompt content using the platform manager
+   * @param {string} content - Content to insert
+   * @param {HTMLElement} targetElement - Target element (optional)
+   * @returns {Promise<Object>} Result of insertion attempt
+   */
+  async insertPromptContent(content, targetElement = null) {
+    if (!this.platformManager) {
+      Logger.error('Platform manager not available for content insertion');
+      return { success: false, error: 'Platform manager not initialized' };
+    }
+    
+    Logger.info('Attempting prompt insertion', {
+      contentLength: content.length,
+      hasTargetElement: !!targetElement,
+      hostname: this.hostname
+    });
+    
+    try {
+      // Ensure we have the correct target element for insertion
+      let insertTarget = targetElement;
+      
+      if (!insertTarget) {
+        // Use current textarea if available
+        insertTarget = this.currentTextarea;
+      }
+      
+      if (!insertTarget && this.hostname === 'claude.ai') {
+        // For Claude.ai, find the ProseMirror editor specifically
+        insertTarget = document.querySelector('div[contenteditable="true"][role="textbox"].ProseMirror');
+        Logger.debug('Found ProseMirror target for Claude.ai', { 
+          found: !!insertTarget,
+          targetTag: insertTarget?.tagName,
+          targetClass: insertTarget?.className
+        });
+      }
+      
+      if (!insertTarget) {
+        // Last resort: use document.activeElement only if it's a valid input
+        const activeEl = document.activeElement;
+        if (activeEl && (activeEl.tagName === 'TEXTAREA' || activeEl.contentEditable === 'true')) {
+          insertTarget = activeEl;
+        }
+      }
+      
+      if (!insertTarget) {
+        Logger.error('No valid target element found for content insertion');
+        return { success: false, error: 'No target element found' };
+      }
+      
+      Logger.debug('Using target element for insertion', {
+        targetTag: insertTarget.tagName,
+        targetId: insertTarget.id,
+        targetClass: insertTarget.className.substring(0, 50),
+        isContentEditable: insertTarget.contentEditable,
+        isProseMirror: insertTarget.classList.contains('ProseMirror')
+      });
+      
+      const result = await this.platformManager.insertContent(content, {
+        targetElement: insertTarget
+      });
+      
+      if (result.success) {
+        Logger.info('Prompt insertion successful', {
+          method: result.method,
+          strategy: this.platformManager.getActiveStrategy()?.name || 'unknown'
+        });
+        
+        // Show success feedback
+        this.showInsertionFeedback(true, result.method);
+      } else {
+        Logger.warn('Prompt insertion failed', result);
+        this.showInsertionFeedback(false, result.error);
+      }
+      
+      return result;
+    } catch (error) {
+      Logger.error('Error during prompt insertion', error);
+      this.showInsertionFeedback(false, 'Insertion error');
+      return { success: false, error: error.message };
+    }
+  }
+
   cleanup() {
     Logger.info('Starting cleanup', { instanceId: this.instanceId });
+    
+    // Clean up platform manager
+    if (this.platformManager) {
+      try {
+        this.platformManager.cleanup();
+        this.platformManager = null;
+        Logger.info('Platform manager cleaned up successfully');
+      } catch (error) {
+        Logger.warn('Failed to cleanup platform manager', error);
+      }
+    }
     
     // Clear custom selector retry timeout
     if (this.customSelectorRetry.timeoutId) {
@@ -2148,7 +3072,7 @@ class PromptLibraryInjector {
   // Set up optimized observation with site-specific targeting
   setupOptimizedObservation() {
     const hostname = String(window.location.hostname || '');
-    const config = this.siteConfigs[hostname];
+    // Use platform manager instead of hardcoded config
     
     // Get site-specific observation targets
     let observeTargets = [
@@ -2156,20 +3080,23 @@ class PromptLibraryInjector {
       '[class*="chat"]', '[class*="input"]', '[class*="compose"]'
     ];
     
-    // Add site-specific targets based on configuration
-    if (config && config.buttonContainerSelector) {
-      // Try to observe near the button container area
-      // Remove leading dot and split, then take all but last class
-      const selectorWithoutDot = config.buttonContainerSelector.startsWith('.') 
-        ? config.buttonContainerSelector.substring(1) 
-        : config.buttonContainerSelector;
-      const classParts = selectorWithoutDot.split('.');
-      
-      if (classParts.length > 1) {
-        // Take all but the last class to get a broader container
-        const containerParent = classParts.slice(0, -1).join('.');
-        if (containerParent && containerParent.length > 0) {
-          observeTargets.unshift(`.${containerParent}`);
+    // Add site-specific targets based on platform manager
+    if (this.platformManager) {
+      const buttonContainerSelector = this.platformManager.getButtonContainerSelector();
+      if (buttonContainerSelector) {
+        // Try to observe near the button container area
+        // Remove leading dot and split, then take all but last class
+        const selectorWithoutDot = buttonContainerSelector.startsWith('.') 
+          ? buttonContainerSelector.substring(1) 
+          : buttonContainerSelector;
+        const classParts = selectorWithoutDot.split('.');
+        
+        if (classParts.length > 1) {
+          // Take all but the last class to get a broader container
+          const containerParent = classParts.slice(0, -1).join('.');
+          if (containerParent && containerParent.length > 0) {
+            observeTargets.unshift(`.${containerParent}`);
+          }
         }
       }
     }
@@ -2369,8 +3296,25 @@ class PromptLibraryInjector {
       return targetElement;
     }
 
-    // Look for textarea in the same container
+    // For Claude.ai, prioritize the specific ProseMirror selector
+    if (this.hostname === 'claude.ai') {
+      const proseMirrorSelector = 'div[contenteditable="true"][role="textbox"].ProseMirror';
+      const proseMirrorEditor = document.querySelector(proseMirrorSelector);
+      if (proseMirrorEditor && this.isValidTextarea(proseMirrorEditor)) {
+        Logger.debug('Found ProseMirror editor for Claude.ai in findClosestTextarea', {
+          elementTag: proseMirrorEditor.tagName,
+          elementClass: proseMirrorEditor.className?.substring(0, 100)
+        });
+        return proseMirrorEditor;
+      }
+    }
+
+    // Use platform manager selectors if available
+    const platformSelectors = this.platformManager ? this.platformManager.getAllSelectors() : [];
+    
+    // Look for textarea in the same container using platform-specific selectors first
     const commonSelectors = [
+      ...platformSelectors,
       'textarea',
       'div[contenteditable="true"]',
       '[role="textbox"]',
@@ -2386,6 +3330,11 @@ class PromptLibraryInjector {
       for (const selector of commonSelectors) {
         const textarea = parent.querySelector(selector);
         if (textarea && this.isValidTextarea(textarea)) {
+          Logger.debug('Found textarea in parent container', {
+            selector,
+            elementTag: textarea.tagName,
+            elementClass: textarea.className?.substring(0, 50)
+          });
           return textarea;
         }
       }
@@ -2397,11 +3346,22 @@ class PromptLibraryInjector {
       const textareas = document.querySelectorAll(selector);
       for (const textarea of textareas) {
         if (this.isValidTextarea(textarea)) {
+          Logger.debug('Found textarea via document search fallback', {
+            selector,
+            elementTag: textarea.tagName,
+            elementClass: textarea.className?.substring(0, 50)
+          });
           return textarea;
         }
       }
     }
 
+    Logger.warn('No valid textarea found in findClosestTextarea', {
+      targetElementTag: targetElement.tagName,
+      targetElementClass: targetElement.className?.substring(0, 50),
+      hostname: this.hostname
+    });
+    
     return null;
   }
 
@@ -2506,7 +3466,47 @@ class PromptLibraryInjector {
       }
       
       // Store current textarea reference for the icon
-      this.currentTextarea = this.findClosestTextarea(targetElement);
+      Logger.debug('About to set currentTextarea in positionCustomIcon', {
+        targetElementTag: targetElement.tagName,
+        targetElementId: targetElement.id,
+        targetElementClass: targetElement.className?.substring(0, 100),
+        hostname: this.hostname,
+        existingCurrentTextarea: !!this.currentTextarea,
+        existingCurrentTextareaTag: this.currentTextarea?.tagName,
+        existingCurrentTextareaClass: this.currentTextarea?.className?.substring(0, 50)
+      });
+      
+      // For Claude.ai, preserve the existing currentTextarea if it's valid
+      // since it was likely set correctly by detectAndInjectIcon
+      if (this.hostname === 'claude.ai' && this.currentTextarea) {
+        const isValidProseMirror = this.currentTextarea.classList?.contains('ProseMirror') &&
+                                  this.currentTextarea.getAttribute('contenteditable') === 'true' &&
+                                  this.currentTextarea.getAttribute('role') === 'textbox';
+        
+        if (isValidProseMirror) {
+          Logger.debug('Preserving existing valid currentTextarea for Claude.ai', {
+            currentTextareaTag: this.currentTextarea.tagName,
+            currentTextareaClass: this.currentTextarea.className?.substring(0, 100)
+          });
+          // Don't overwrite the existing valid currentTextarea
+        } else {
+          Logger.debug('Existing currentTextarea is invalid, finding new one');
+          this.currentTextarea = this.findClosestTextarea(targetElement);
+        }
+      } else {
+        // For other sites or when no existing currentTextarea, find it
+        this.currentTextarea = this.findClosestTextarea(targetElement);
+      }
+      
+      Logger.debug('Final currentTextarea in positionCustomIcon', {
+        found: !!this.currentTextarea,
+        currentTextareaTag: this.currentTextarea?.tagName,
+        currentTextareaId: this.currentTextarea?.id,
+        currentTextareaClass: this.currentTextarea?.className?.substring(0, 100),
+        isProseMirror: this.currentTextarea?.classList?.contains('ProseMirror'),
+        isContentEditable: this.currentTextarea?.contentEditable === 'true',
+        hasRole: this.currentTextarea?.getAttribute('role')
+      });
       
       // Set up position tracking for responsive updates
       this.setupCustomIconPositionTracking(targetElement, positioning);
@@ -2798,8 +3798,19 @@ class PromptLibraryInjector {
   }
 
   async detectAndInjectIcon() {
-    const hostname = String(window.location.hostname || '');
-    const config = this.siteConfigs[hostname];
+    // Use platform manager to get available selectors
+    const selectors = this.getAvailableSelectors();
+    
+    if (selectors.length === 0) {
+      Logger.debug('No selectors available for current platform');
+      return;
+    }
+    
+    Logger.debug('Detecting input elements', {
+      hostname: this.hostname,
+      selectorsCount: selectors.length,
+      sampleSelectors: selectors.slice(0, 3)
+    });
     
     // Check for existing icons and remove them to prevent duplicates
     const existingIcons = document.querySelectorAll('.prompt-library-icon');
@@ -2818,9 +3829,9 @@ class PromptLibraryInjector {
     this.icon = null;
     
     // First, check for custom site positioning configuration
-    const customPositioning = await this.getCustomSiteConfig(hostname);
+    const customPositioning = await this.getCustomSiteConfig(this.hostname);
     if (customPositioning && customPositioning.mode === 'custom') {
-      Logger.info('Attempting custom positioning for site', { hostname });
+      Logger.info('Attempting custom positioning for site', { hostname: this.hostname });
       const success = await this.createCustomPositionedIcon(customPositioning);
       if (success) {
         Logger.info('Custom positioning successful, skipping default injection');
@@ -2837,136 +3848,56 @@ class PromptLibraryInjector {
           Logger.info('Custom positioning retry successful, skipping default injection');
           return;
         } else {
-          Logger.warn('Custom positioning failed, falling back to default behavior', {
-          context: { 
-            selector: customPositioning.selector,
-            totalAttempts: this.customSelectorRetry.attempts,
-            hostname: hostname
-          }
-        });
-        }
-      }
-    }
-    
-    // Define fallback selectors for custom sites
-    const fallbackSelectors = [
-      'textarea',
-      'div[contenteditable="true"]',
-      'input[type="text"]',
-      '[role="textbox"]',
-      '[data-testid*="input"]',
-      '[class*="input"]',
-      '[placeholder*="message"]',
-      '[placeholder*="chat"]',
-      '[placeholder*="ask"]',
-      '[placeholder*="type"]',
-      '[placeholder*="enter"]'
-    ];
-    
-    if (!config) {
-      // Check if this site is enabled as a custom site before proceeding with fallback logic
-      const customPositioning = await this.getCustomSiteConfig(hostname);
-      if (!customPositioning) {
-        Logger.info('No predefined config and site not enabled as custom site, skipping', { 
-          hostname 
-        });
-        return;
-      }
-      
-      Logger.info('No predefined config, using fallback selectors for enabled custom site', { 
-        hostname,
-        fallbackSelectorCount: fallbackSelectors.length 
-      });
-      
-      // For custom sites, use fallback selectors without caching
-      let textarea = null;
-      const foundElements = [];
-      
-      for (const selector of fallbackSelectors) {
-        try {
-          const elements = document.querySelectorAll(selector);
-          foundElements.push({ selector, count: elements.length });
-          
-          if (elements.length > 0) {
-            for (const element of elements) {
-              if (this.isValidTextarea(element)) {
-                textarea = element;
-                break;
-              }
+          Logger.warn('Custom positioning failed, falling back to platform strategy behavior', {
+            context: { 
+              selector: customPositioning.selector,
+              totalAttempts: this.customSelectorRetry.attempts,
+              hostname: this.hostname
             }
-            if (textarea) break;
-          }
-        } catch (error) {
-          console.error('[PromptLibrary] Error with selector:', selector, error);
+          });
         }
       }
-      
-      
-      if (textarea) {
-        // Check if we already have an icon for this textarea to prevent duplicates
-        if (textarea === this.currentTextarea && this.icon) {
-          return;
-        }
+    }
+    
+    // Find textarea using optimized search with strategy selectors
+    const foundTextarea = this.findTextareaWithCaching(selectors);
+    
+    if (foundTextarea && this.isValidTextarea(foundTextarea)) {
+      if (this.currentTextarea !== foundTextarea) {
+        Logger.info('New input element detected', {
+          elementTag: foundTextarea.tagName,
+          elementId: foundTextarea.id,
+          elementClass: foundTextarea.className.substring(0, 50),
+          strategy: this.platformManager?.getActiveStrategy()?.name || 'unknown'
+        });
         
-        this.currentTextarea = textarea;
-        this.createFloatingIcon(textarea);
-      } else {
-        Logger.info('No valid textarea found with fallback selectors', { hostname });
+        // Remove existing icon if different textarea
+        this.removeIcon();
+        
+        this.currentTextarea = foundTextarea;
+        await this.injectIcon(foundTextarea);
+      } else if (this.currentTextarea && !this.icon) {
+        // Current textarea exists but no icon - inject it
+        Logger.debug('Current textarea exists but no icon found, re-injecting');
+        await this.injectIcon(this.currentTextarea);
       }
-      return;
+    } else if (this.currentTextarea && !document.contains(this.currentTextarea)) {
+      // Current textarea no longer exists in DOM
+      Logger.info('Current textarea no longer in DOM, cleaning up');
+      this.removeIcon();
+      this.currentTextarea = null;
+    } else {
+      Logger.debug('No valid textarea found with platform selectors', {
+        hostname: this.hostname,
+        selectorsChecked: selectors.length
+      });
     }
-    
-    Logger.info('Starting optimized textarea detection', { 
-      hostname,
-      selectorCount: config.selectors.length 
-    });
-    
-    // Use optimized cached search for primary selectors
-    let textarea = this.findTextareaWithCaching(config.selectors);
-    
-    if (!textarea) {
-      // Fallback: try to find any input-like element (without caching to avoid stale results)
-      const fallbackSelectors = [
-        'textarea',
-        'div[contenteditable="true"]',
-        'input[type="text"]',
-        '[role="textbox"]',
-        '[contenteditable]',
-        '[data-testid*="input"]',
-        '[class*="input"]'
-      ];
-      
-      Logger.info('Primary selectors failed, trying fallback selectors');
-      textarea = this.findTextareaWithCaching(fallbackSelectors, false); // No caching for fallbacks
-      
-      if (!textarea) {
-        Logger.info('No suitable textarea found');
-        return;
-      }
-    }
-    
-    if (textarea === this.currentTextarea) {
-      Logger.info('Textarea unchanged, skipping injection');
-      return;
-    }
-    
-    Logger.info('Found new textarea, proceeding with injection', {
-      elementTag: textarea.tagName,
-      elementId: textarea.id,
-      elementClass: textarea.className?.substring(0, 50) + '...'
-    });
-    
-    this.currentTextarea = textarea;
-    this.injectIcon(textarea);
   }
 
-  injectIcon(textarea) {
+  async injectIcon(textarea) {
     try {
-      // Ensure hostname is always a string
-      const hostnameStr = String(this.hostname || '');
-      
       Logger.info('Starting icon injection', { 
-        hostname: hostnameStr,
+        hostname: this.hostname,
         textareaTag: textarea.tagName,
         textareaId: textarea.id,
         textareaClass: textarea.className 
@@ -2982,247 +3913,79 @@ class PromptLibraryInjector {
         }
       }
       
-      const hostname = String(window.location.hostname || '');
-      const config = this.siteConfigs[hostname];
+      // Create platform-specific icon
+      Logger.debug('About to create platform icon', {
+        hasPlatformManager: !!this.platformManager,
+        hostname: this.hostname
+      });
       
-      if (!config) {
-        Logger.warn('No site configuration found for hostname', { hostname: hostnameStr });
+      const iconElement = this.createPlatformIcon();
+      
+      Logger.debug('Platform icon creation result', {
+        iconCreated: !!iconElement,
+        iconType: iconElement?.tagName,
+        iconClass: iconElement?.className
+      });
+      
+      if (!iconElement) {
+        Logger.warn('Failed to create platform icon');
         return;
       }
-    
-    // For supported sites, try integrated button approach
-    if (hostname === 'claude.ai' || hostname === 'www.perplexity.ai' || hostname === 'chatgpt.com') {
-      // Find the button container using configured selector or fallback selectors
+      
+      // Try to place icon in platform-specific container
+      const containerSelector = this.getButtonContainerSelector();
       let buttonContainer = null;
       
-      if (config.buttonContainerSelector) {
+      if (containerSelector) {
         try {
-          buttonContainer = document.querySelector(config.buttonContainerSelector);
+          buttonContainer = document.querySelector(containerSelector);
           if (buttonContainer) {
-            Logger.info('Found button container using primary selector', {
-              selector: config.buttonContainerSelector
-            });
+            Logger.debug('Using platform-specific container', { containerSelector });
           }
         } catch (error) {
-          Logger.warn('Primary button container selector failed', {
-            selector: config.buttonContainerSelector,
+          Logger.warn('Platform button container selector failed', {
+            selector: containerSelector,
             error: error.message
           });
         }
       }
       
-      // Try fallback selectors if primary one fails
+      // Fallback to positioning near textarea if no container found
       if (!buttonContainer) {
-        let fallbackSelectors = [];
+        Logger.debug('Using fallback positioning near textarea');
+        this.positionIconNearTextarea(iconElement, textarea);
+      } else {
+        // Check for existing prompt library icons to prevent duplicates
+        const existingIcon = buttonContainer.querySelector('.prompt-library-integrated-icon, .prompt-library-icon');
+        if (existingIcon) {
+          Logger.debug('Icon already exists in container, skipping injection');
+          return;
+        }
         
-        if (hostname === 'www.perplexity.ai') {
-          // Perplexity-specific fallbacks for different page types
-          fallbackSelectors = [
-            // Original selector for main page
-            '.bg-background-50.dark\\:bg-offsetDark.flex.items-center.justify-self-end.rounded-full.col-start-3.row-start-2',
-            // Alternative selectors for search pages and different layouts
-            '.bg-background-50[class*="flex"][class*="items-center"][class*="rounded-full"]',
-            'div[class*="bg-background-50"][class*="flex"][class*="items-center"]',
-            '.flex.items-center.justify-self-end.rounded-full',
-            '[class*="col-start-3"][class*="row-start-2"]',
-            // Generic button container fallbacks
-            'div[class*="flex"][class*="items-center"]:has(button[aria-label*="Attach"])',
-            'div[class*="flex"][class*="items-center"]:has(button[type="button"])',
-            '.flex.items-center:has(button)',
-            // Last resort - find any container with multiple buttons
-            'div:has(button):has(button + button)',
-            'div[class*="flex"]:has(button[aria-label])'
-          ];
-        } else if (hostname === 'chatgpt.com') {
-          // ChatGPT-specific fallbacks
-          fallbackSelectors = [
-            // Primary structure-based selectors
-            'div[data-testid="composer-trailing-actions"] .ms-auto.flex.items-center',
-            'div[data-testid="composer-trailing-actions"] div.ms-auto',
-            'div[data-testid="composer-trailing-actions"] .ms-auto',
-            '[data-testid="composer-trailing-actions"] div[class*="ms-auto"]',
-            // Alternative selectors
-            '.ms-auto.flex.items-center',
-            'div[class*="ms-auto"][class*="flex"][class*="items-center"]',
-            // Generic button container fallbacks
-            'div[class*="flex"][class*="items-center"]:has(button[data-testid*="speech"])',
-            'div[class*="flex"][class*="items-center"]:has(button[aria-label*="Dictate"])',
-            'div[class*="flex"][class*="items-center"]:has(button.composer-btn)',
-            '.flex.items-center:has(button)',
-            // Last resort
-            'div:has(button):has(button + button)',
-            'div[class*="flex"]:has(button[aria-label])'
-          ];
+        // For Claude.ai, try to insert after the Research button for better positioning
+        if (this.hostname === 'claude.ai') {
+          await this.insertIconAfterResearchButton(buttonContainer, iconElement);
         } else {
-          // Default fallbacks for other sites
-          fallbackSelectors = [
-            '[class*="bottom-2"][class*="right-2"][class*="flex"]',
-            '[class*="absolute"][class*="bottom"][class*="right"][class*="flex"]',
-            '.flex.gap-2.self-end',
-            '[class*="gap-2"][class*="self-end"]'
-          ];
-        }
-        
-        for (const selector of fallbackSelectors) {
-          try {
-            buttonContainer = document.querySelector(selector);
-            if (buttonContainer) {
-              Logger.info('Found button container using fallback selector', { selector });
-              break;
-            }
-          } catch (error) {
-            Logger.warn('Fallback selector failed', {
-              selector,
-              error: error.message
-            });
-          }
-        }
-        
-        if (!buttonContainer) {
-          Logger.warn('No button container found with any selector', {
-            hostname,
-            primarySelector: config.buttonContainerSelector,
-            fallbackCount: fallbackSelectors.length
-          });
+          // For other platforms, append to container
+          buttonContainer.appendChild(iconElement);
         }
       }
       
+      // Set up icon click handler
+      this.setupIconClickHandler(iconElement);
       
-      if (buttonContainer && !buttonContainer.querySelector(`[data-instance-id="${this.instanceId}"]`)) {
-        if (hostname === 'claude.ai') {
-          try {
-            // Claude.ai specific - create wrapped container like other buttons
-            const result = this.uiFactory.createClaudeIcon();
-            const iconContainer = result.container;
-            this.icon = result.icon;
-            
-            // Find the research button container and insert before it
-            let insertionPoint = null;
-            const insertionSelectors = [
-              'div.flex.shrink.min-w-8',                    // Research button container
-              '[class*="flex"][class*="shrink"][class*="min-w"]', // Alternative research container
-              'div:has(button[aria-label*="Research"])',     // Container with research button
-              'div.flex:last-child',                        // Last flex container
-              ':last-child'                                 // Last child as final fallback
-            ];
-            
-            for (const selector of insertionSelectors) {
-              try {
-                insertionPoint = buttonContainer.querySelector(selector);
-                if (insertionPoint) {
-                  break;
-                }
-              } catch {
-                // Continue with next selector
-              }
-            }
-            
-            // Insert the icon
-            if (insertionPoint) {
-              buttonContainer.insertBefore(iconContainer, insertionPoint);
-            } else {
-              buttonContainer.appendChild(iconContainer);
-            }
-            
-          } catch (claudeError) {
-            Logger.error('Failed to create Claude.ai integrated icon', claudeError, {
-              hostname: 'claude.ai',
-              containerFound: !!buttonContainer
-            });
-            // Fall back to floating icon
-            this.createFloatingIcon(textarea);
-            return;
-          }
-          
-        } else if (hostname === 'www.perplexity.ai') {
-          // Perplexity specific styling
-          this.icon = this.uiFactory.createPerplexityIcon();
-          
-          // Insert before the voice mode button or at appropriate position
-          let insertPosition = null;
-          
-          // Try multiple selectors to find a good insertion point
-          const insertionSelectors = [
-            'button.bg-super',           // Voice mode button
-            '.ml-2',                     // Voice button container
-            'button[aria-label*="Voice"]', // Voice button by aria-label
-            'button[aria-label*="Dictation"]', // Dictation button
-            'button:last-child'          // Last button as fallback
-          ];
-          
-          for (const selector of insertionSelectors) {
-            try {
-              insertPosition = buttonContainer.querySelector(selector);
-              if (insertPosition) {
-                break;
-              }
-            } catch {
-              // Continue with next selector
-            }
-          }
-          
-          if (insertPosition) {
-            try {
-              buttonContainer.insertBefore(this.icon, insertPosition);
-            } catch {
-              buttonContainer.appendChild(this.icon);
-            }
-          } else {
-            // Fallback: insert at the end
-            buttonContainer.appendChild(this.icon);
-          }
-          
-        } else if (hostname === 'chatgpt.com') {
-          // ChatGPT specific styling
-          this.icon = this.uiFactory.createChatGPTIcon();
-          
-          // Insert before the voice mode button (last button in container)
-          const voiceButton = buttonContainer.querySelector('button[data-testid="composer-speech-button"]') ||
-                             buttonContainer.querySelector('button[aria-label*="voice"]') ||
-                             buttonContainer.querySelector('button:last-child');
-          
-          if (voiceButton && voiceButton.parentElement) {
-            // Create span wrapper like other buttons
-            const spanWrapper = document.createElement('span');
-            spanWrapper.className = '';
-            spanWrapper.setAttribute('data-state', 'closed');
-            spanWrapper.appendChild(this.icon);
-            
-            try {
-              buttonContainer.insertBefore(spanWrapper, voiceButton.parentElement);
-            } catch {
-              buttonContainer.appendChild(spanWrapper);
-            }
-          } else {
-            // Fallback: create span wrapper and append
-            const spanWrapper = document.createElement('span');
-            spanWrapper.className = '';
-            spanWrapper.setAttribute('data-state', 'closed');
-            spanWrapper.appendChild(this.icon);
-            
-            buttonContainer.appendChild(spanWrapper);
-          }
-          
-        }
-        
-        // Add click handler
-        this.icon.addEventListener('click', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          this.showPromptSelector(textarea);
-        });
-        
-        return;
-      }
-    }
-    
-    // For all other sites or if integrated approach fails, use floating icon
-    this.createFloatingIcon(textarea);
+      this.icon = iconElement;
+      
+      Logger.info('Icon injection successful', {
+        iconType: iconElement.className.includes('integrated') ? 'integrated' : 'floating',
+        hasContainer: !!buttonContainer,
+        strategy: this.platformManager?.getActiveStrategy()?.name || 'unknown'
+      });
     } catch (mainError) {
       Logger.error('Icon injection failed completely', mainError, {
         hostname: this.hostname,
         textareaTag: textarea?.tagName,
-        hasConfig: !!this.siteConfigs[this.hostname]
+        hasPlatformManager: !!this.platformManager
       });
       
       // Last resort: try creating a simple floating icon
@@ -3658,7 +4421,29 @@ class PromptLibraryInjector {
         const promptId = item.dataset.promptId;
         const prompt = filteredPrompts.find(p => p.id === promptId);
         if (prompt) {
-          this.insertPrompt(this.currentTextarea, prompt.content);
+          Logger.info('Prompt selected for insertion', {
+            promptId,
+            promptTitle: prompt.title?.substring(0, 50),
+            currentTextareaTag: this.currentTextarea?.tagName,
+            currentTextareaId: this.currentTextarea?.id,
+            currentTextareaClass: this.currentTextarea?.className?.substring(0, 100),
+            currentTextareaExists: document.contains(this.currentTextarea),
+            hostname: this.hostname
+          });
+
+          // For Claude.ai, double-check we have the correct target
+          let targetElement = this.currentTextarea;
+          if (this.hostname === 'claude.ai') {
+            const proseMirrorEditor = document.querySelector('div[contenteditable="true"][role="textbox"].ProseMirror');
+            if (proseMirrorEditor && proseMirrorEditor !== this.currentTextarea) {
+              Logger.info('Using fresh ProseMirror target instead of cached currentTextarea');
+              targetElement = proseMirrorEditor;
+              // Update cached reference
+              this.currentTextarea = proseMirrorEditor;
+            }
+          }
+
+          this.insertPrompt(targetElement, prompt.content);
           this.closePromptSelector();
         }
       });
@@ -3691,58 +4476,45 @@ class PromptLibraryInjector {
       // Sanitize content before insertion
       const sanitizedContent = StorageManager.sanitizeUserInput(content);
       
-      Logger.info('Starting prompt insertion with new strategy system', { 
+      Logger.info('Starting prompt insertion', { 
         originalLength: content.length, 
         sanitizedLength: sanitizedContent.length,
-        hostname: window.location.hostname,
-        targetElement: textarea.tagName
+        hostname: this.hostname,
+        targetElement: textarea?.tagName,
+        targetElementId: textarea?.id,
+        targetElementClass: textarea?.className?.substring(0, 100),
+        isTextarea: textarea?.tagName === 'TEXTAREA',
+        isContentEditable: textarea?.contentEditable === 'true',
+        isProseMirror: textarea?.classList?.contains('ProseMirror'),
+        currentTextareaMatches: this.currentTextarea === textarea
       });
 
-      // Create insertion manager with debug logging in development
-      const insertionManager = createInsertionManager({
-        enableDebugLogging: true, // Enable for debugging - can be disabled in production
-        maxRetries: 3,
-        timeout: 5000
-      });
+      // Additional validation for Claude.ai - ensure we're targeting the correct element
+      if (this.hostname === 'claude.ai' && textarea) {
+        const isProseMirrorEditor = textarea.classList?.contains('ProseMirror') && 
+                                   textarea.getAttribute('contenteditable') === 'true' &&
+                                   textarea.getAttribute('role') === 'textbox';
+        
+        if (!isProseMirrorEditor) {
+          Logger.warn('Target element is not a valid ProseMirror editor for Claude.ai', {
+            classList: Array.from(textarea.classList || []),
+            contentEditable: textarea.getAttribute('contenteditable'),
+            role: textarea.getAttribute('role')
+          });
+          
+          // Try to find the correct ProseMirror editor
+          const correctEditor = document.querySelector('div[contenteditable="true"][role="textbox"].ProseMirror');
+          if (correctEditor) {
+            Logger.info('Found correct ProseMirror editor, switching target');
+            textarea = correctEditor;
+          }
+        }
+      }
 
-      Logger.debug('Attempting insertion with strategy system', {
-        textareaTag: textarea.tagName,
-        textareaClass: textarea.className || 'none',
-        textareaId: textarea.id || 'none',
-        isContentEditable: textarea.contentEditable,
-        hostname: window.location.hostname
-      });
+      // Use the new insertPromptContent method
+      const result = await this.insertPromptContent(sanitizedContent, textarea);
 
-      // Use the new strategy-based insertion system
-      const result = await insertionManager.insertContent(sanitizedContent, {
-        targetElement: textarea,
-        clearExisting: true,
-        focusAfter: true,
-        timeout: 5000,
-        triggerEvents: true
-      });
-
-      if (result.success) {
-        Logger.info('Prompt insertion successful', {
-          method: result.method,
-          usedFallback: result.usedFallback,
-          platform: window.location.hostname
-        });
-
-        // Show user feedback for successful insertion
-        this.showInsertionFeedback(true, result.method);
-      } else {
-        Logger.warn('Prompt insertion failed', {
-          error: result.error,
-          platform: window.location.hostname,
-          attempted: result.attemptedMethods || 'unknown',
-          usedFallback: result.usedFallback
-        });
-
-        // Show user feedback for failed insertion with more details
-        const errorDetails = result.error ? `: ${result.error}` : '';
-        this.showInsertionFeedback(false, `Strategy failed${errorDetails}`);
-
+      if (!result.success) {
         // Fallback to legacy insertion method if the new system fails
         Logger.info('Attempting legacy fallback insertion', {
           reason: 'Strategy system failed',
@@ -3753,11 +4525,8 @@ class PromptLibraryInjector {
 
     } catch (error) {
       Logger.error('Prompt insertion error', error, {
-        platform: window.location.hostname
+        platform: this.hostname
       });
-
-      // Show error feedback to user
-      this.showInsertionFeedback(false, 'Insertion system error');
 
       // Fallback to legacy insertion method
       Logger.info('Attempting legacy fallback insertion due to error');
@@ -3935,7 +4704,7 @@ class PromptLibraryInjector {
       
     } catch (error) {
       Logger.error('Legacy insertion failed', error, { 
-        hostname: hostname,
+        hostname: this.hostname,
         targetElement: textarea.tagName 
       });
     }
