@@ -3,6 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
 import { DOMUtils } from '../dom';
 import { Logger } from '../logger';
 

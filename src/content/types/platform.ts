@@ -2,8 +2,9 @@
  * Platform-specific type definitions
  */
 
-import type { InsertionResult } from './index';
 import type { UIElementFactory } from '../ui/element-factory';
+
+import type { InsertionResult } from './index';
 
 export interface PlatformConfig {
   selectors: string[];
@@ -26,14 +27,14 @@ export interface PlatformManagerOptions {
   enableDebugLogging?: boolean;
   maxRetries?: number;
   timeout?: number;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface InsertionManagerOptions {
   debug?: boolean;
   timeout?: number;
   retries?: number;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export type PlatformName = 'claude' | 'chatgpt' | 'perplexity' | 'default';
@@ -45,7 +46,7 @@ export interface PlatformDetectionResult {
 }
 
 export interface StorageData {
-  prompts: any[];
+  prompts: unknown[];
   categories?: string[];
 }
 

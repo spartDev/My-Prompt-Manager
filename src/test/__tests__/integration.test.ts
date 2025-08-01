@@ -14,16 +14,16 @@ describe('Integration Tests', () => {
     vi.clearAllMocks();
 
     // Mock chrome storage
-    // eslint-disable-next-line @typescript-eslint/unbound-method, @typescript-eslint/no-misused-promises
+     
     vi.mocked(chrome.storage.local.get).mockImplementation(() => Promise.resolve({ 
       categories: [{ id: '1', name: DEFAULT_CATEGORY }],
       prompts: [],
       settings: { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt', viewMode: 'grid' }
     }));
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method, @typescript-eslint/no-misused-promises
+     
     vi.mocked(chrome.storage.local.set).mockImplementation(() => Promise.resolve());
-    // eslint-disable-next-line @typescript-eslint/unbound-method, @typescript-eslint/no-misused-promises
+     
     vi.mocked(chrome.storage.local.getBytesInUse).mockImplementation(() => Promise.resolve(1024));
   });
 
@@ -35,11 +35,11 @@ describe('Integration Tests', () => {
       expect(prompt.content).toBe('Test Content');
 
       // Verify it was saved
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(chrome.storage.local.set).toHaveBeenCalled();
 
       // Mock updated storage state
-      // eslint-disable-next-line @typescript-eslint/unbound-method, @typescript-eslint/no-misused-promises
+       
       vi.mocked(chrome.storage.local.get).mockImplementation(() => Promise.resolve({ 
         prompts: [prompt]
       }));
@@ -61,7 +61,7 @@ describe('Integration Tests', () => {
       expect(results).toHaveLength(3);
       expect(results.every(result => result.id)).toBe(true);
       // The storage operations are serialized by our mutex, so we expect 3 calls minimum
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(chrome.storage.local.set).toHaveBeenCalledTimes(3);
     });
   });
@@ -80,7 +80,7 @@ describe('Integration Tests', () => {
     });
 
     it('should handle storage quota gracefully', async () => {
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       vi.mocked(chrome.storage.local.set).mockRejectedValue(
         new Error('QUOTA_EXCEEDED: Storage quota exceeded')
       );
@@ -94,7 +94,7 @@ describe('Integration Tests', () => {
   describe('Error Recovery', () => {
     it('should recover from storage failures', async () => {
       // Simulate storage failure
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       vi.mocked(chrome.storage.local.get).mockRejectedValueOnce(
         new Error('Storage unavailable')
       );
@@ -104,7 +104,7 @@ describe('Integration Tests', () => {
       });
 
       // Verify it can recover on next call
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       vi.mocked(chrome.storage.local.get).mockResolvedValueOnce({ prompts: [] });
       const prompts = await storageManager.getPrompts();
       expect(Array.isArray(prompts)).toBe(true);

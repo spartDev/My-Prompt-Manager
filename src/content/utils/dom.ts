@@ -3,8 +3,9 @@
  * Provides safe DOM element creation and manipulation utilities
  */
 
-import { Logger } from './logger';
+import { warn, error as logError } from './logger';
 
+// eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class DOMUtils {
   /**
    * Helper function to safely create DOM elements with text content
@@ -30,8 +31,8 @@ export class DOMUtils {
       }
 
       return element;
-    } catch (error) {
-      Logger.error('Failed to create DOM element', error as Error, { tag, attributes, textContent });
+    } catch (err) {
+      logError('Failed to create DOM element', err as Error, { tag, attributes, textContent });
       return document.createElement('div'); // Safe fallback
     }
   }
@@ -51,8 +52,8 @@ export class DOMUtils {
       });
 
       return element;
-    } catch (error) {
-      Logger.error('Failed to create SVG element', error as Error, { tag, attributes });
+    } catch (err) {
+      logError('Failed to create SVG element', err as Error, { tag, attributes });
       return document.createElementNS('http://www.w3.org/2000/svg', 'g'); // Safe fallback
     }
   }
@@ -63,8 +64,8 @@ export class DOMUtils {
   static querySelector(selector: string, context: Document | Element = document): Element | null {
     try {
       return context.querySelector(selector);
-    } catch (error) {
-      Logger.error('Failed to query selector', error as Error, { selector });
+    } catch (err) {
+      logError('Failed to query selector', err as Error, { selector });
       return null;
     }
   }
@@ -75,8 +76,8 @@ export class DOMUtils {
   static querySelectorAll(selector: string, context: Document | Element = document): Element[] {
     try {
       return Array.from(context.querySelectorAll(selector));
-    } catch (error) {
-      Logger.error('Failed to query selector all', error as Error, { selector });
+    } catch (err) {
+      logError('Failed to query selector all', err as Error, { selector });
       return [];
     }
   }
@@ -87,8 +88,8 @@ export class DOMUtils {
   static getElementById(id: string): HTMLElement | null {
     try {
       return document.getElementById(id);
-    } catch (error) {
-      Logger.error('Failed to get element by ID', error as Error, { id });
+    } catch (err) {
+      logError('Failed to get element by ID', err as Error, { id });
       return null;
     }
   }
@@ -105,8 +106,8 @@ export class DOMUtils {
     try {
       element.addEventListener(event, handler, options);
       return true;
-    } catch (error) {
-      Logger.error('Failed to add event listener', error as Error, { event });
+    } catch (err) {
+      logError('Failed to add event listener', err as Error, { event });
       return false;
     }
   }
@@ -123,8 +124,8 @@ export class DOMUtils {
     try {
       element.removeEventListener(event, handler, options);
       return true;
-    } catch (error) {
-      Logger.error('Failed to remove event listener', error as Error, { event });
+    } catch (err) {
+      logError('Failed to remove event listener', err as Error, { event });
       return false;
     }
   }
@@ -136,8 +137,8 @@ export class DOMUtils {
     try {
       parent.appendChild(child);
       return true;
-    } catch (error) {
-      Logger.error('Failed to append child', error as Error, {
+    } catch (err) {
+      logError('Failed to append child', err as Error, {
         parentTag: parent.tagName,
         childTag: child.tagName
       });
@@ -156,8 +157,8 @@ export class DOMUtils {
         element.remove();
       }
       return true;
-    } catch (error) {
-      Logger.error('Failed to remove element', error as Error, {
+    } catch (err) {
+      logError('Failed to remove element', err as Error, {
         elementTag: element.tagName,
         elementId: element.id,
         elementClass: element.className
@@ -181,8 +182,8 @@ export class DOMUtils {
         rect.bottom <= windowHeight &&
         rect.right <= windowWidth
       );
-    } catch (error) {
-      Logger.error('Failed to check element visibility', error as Error);
+    } catch (err) {
+      logError('Failed to check element visibility', err as Error);
       return false;
     }
   }
@@ -194,8 +195,8 @@ export class DOMUtils {
     try {
       const computedStyle = window.getComputedStyle(element);
       return computedStyle.getPropertyValue(property);
-    } catch (error) {
-      Logger.error('Failed to get computed style', error as Error, { property });
+    } catch (err) {
+      logError('Failed to get computed style', err as Error, { property });
       return null;
     }
   }
@@ -211,8 +212,8 @@ export class DOMUtils {
         }
       });
       return true;
-    } catch (error) {
-      Logger.error('Failed to set attributes', error as Error, { attributes });
+    } catch (err) {
+      logError('Failed to set attributes', err as Error, { attributes });
       return false;
     }
   }
@@ -223,7 +224,7 @@ export class DOMUtils {
   static escapeHtml(text: string): string {
     try {
       if (typeof text !== 'string') {
-        Logger.warn('escapeHtml received non-string input', {
+        warn('escapeHtml received non-string input', {
           type: typeof text,
           value: text
         });
@@ -238,8 +239,8 @@ export class DOMUtils {
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#x27;')
         .replace(/\//g, '&#x2F;');
-    } catch (error) {
-      Logger.error('Failed to escape HTML', error as Error, { text });
+    } catch (err) {
+      logError('Failed to escape HTML', err as Error, { text });
       return ''; // Safe fallback
     }
   }

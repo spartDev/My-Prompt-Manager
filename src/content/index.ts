@@ -13,9 +13,9 @@
  * - Maintain backward compatibility
  */
 
-import { StylesManager } from './utils/styles';
 import { PromptLibraryInjector } from './core/injector';
-import { Logger } from './utils/logger';
+import { error, warn, info, debug } from './utils/logger';
+import { injectCSS } from './utils/styles';
 
 // Global instance management with proper typing
 let promptLibraryInstance: PromptLibraryInjector | null = null;
@@ -24,22 +24,22 @@ let isInitialized = false;
 /**
  * Initialize the extension with proper error handling
  */
-async function initializeExtension(): Promise<void> {
+function initializeExtension(): void {
   try {
     // Prevent multiple initializations
     if (isInitialized) {
-      Logger.debug('Extension already initialized, skipping');
+      debug('Extension already initialized, skipping');
       return;
     }
 
-    Logger.info('Starting My Prompt Manager content script initialization', {
+    info('Starting My Prompt Manager content script initialization', {
       url: window.location.href,
       hostname: window.location.hostname,
       userAgent: navigator.userAgent
     });
 
     // Initialize CSS styles first
-    StylesManager.injectCSS();
+    injectCSS();
 
     // Clean up any existing instance
     if (promptLibraryInstance) {
@@ -53,10 +53,10 @@ async function initializeExtension(): Promise<void> {
     // Mark as initialized
     isInitialized = true;
 
-    Logger.info('My Prompt Manager content script initialized successfully');
+    info('My Prompt Manager content script initialized successfully');
 
   } catch (error) {
-    Logger.error('Failed to initialize My Prompt Manager content script', error as Error, {
+    error('Failed to initialize My Prompt Manager content script', error as Error, {
       url: window.location.href,
       hostname: window.location.hostname
     });
@@ -69,7 +69,7 @@ async function initializeExtension(): Promise<void> {
       try {
         promptLibraryInstance.cleanup();
       } catch (cleanupError) {
-        Logger.error('Error during cleanup after initialization failure', cleanupError as Error);
+        error('Error during cleanup after initialization failure', cleanupError as Error);
       }
       promptLibraryInstance = null;
     }
@@ -81,7 +81,7 @@ async function initializeExtension(): Promise<void> {
  */
 function cleanupExtension(): void {
   try {
-    Logger.info('Starting My Prompt Manager content script cleanup');
+    info('Starting My Prompt Manager content script cleanup');
 
     if (promptLibraryInstance) {
       promptLibraryInstance.cleanup();
@@ -91,10 +91,10 @@ function cleanupExtension(): void {
     // Reset initialization flag
     isInitialized = false;
 
-    Logger.info('My Prompt Manager content script cleanup completed');
+    info('My Prompt Manager content script cleanup completed');
 
   } catch (error) {
-    Logger.error('Error during content script cleanup', error as Error);
+    error('Error during content script cleanup', error as Error);
   }
 }
 
@@ -104,15 +104,15 @@ function cleanupExtension(): void {
 function handleVisibilityChange(): void {
   if (document.hidden) {
     // Page is hidden, we could pause some operations if needed
-    Logger.debug('Page hidden, content script entering background mode');
+    debug('Page hidden, content script entering background mode');
   } else {
     // Page is visible again
-    Logger.debug('Page visible, content script resuming active mode');
+    debug('Page visible, content script resuming active mode');
     
     // Re-initialize if needed (e.g., after long periods of inactivity)
     if (!isInitialized && !promptLibraryInstance) {
       setTimeout(() => {
-        void initializeExtension();
+        initializeExtension();
       }, 100);
     }
   }
@@ -124,11 +124,12 @@ function handleVisibilityChange(): void {
 function handleGlobalError(event: ErrorEvent): void {
   // Only handle errors related to our extension
   if (event.error && (
-    event.filename?.includes('content') ||
-    event.error.stack?.includes('PromptLibrary') ||
-    event.error.stack?.includes('prompt-library')
+    (event.filename && event.filename.includes('content')) ||
+    (event.error && typeof event.error === 'object' && 'stack' in event.error && 
+     typeof (event.error as Record<string, unknown>).stack === 'string' && 
+     (((event.error as Record<string, unknown>).stack as string).includes('PromptLibrary') || ((event.error as Record<string, unknown>).stack as string).includes('prompt-library')))
   )) {
-    Logger.error('Global error caught in content script', event.error, {
+    error('Global error caught in content script', event.error as Error, {
       filename: event.filename,
       lineno: event.lineno,
       colno: event.colno,
@@ -143,11 +144,11 @@ function handleGlobalError(event: ErrorEvent): void {
 function handleUnhandledRejection(event: PromiseRejectionEvent): void {
   // Only handle rejections related to our extension
   if (event.reason && (
-    event.reason.stack?.includes('PromptLibrary') ||
-    event.reason.stack?.includes('prompt-library') ||
-    event.reason.message?.includes('prompt')
+    (event.reason as Error).stack?.includes('PromptLibrary') ||
+    (event.reason as Error).stack?.includes('prompt-library') ||
+    (event.reason as Error).message.includes('prompt')
   )) {
-    Logger.error('Unhandled promise rejection in content script', event.reason, {
+    error('Unhandled promise rejection in content script', event.reason as Error, {
       url: window.location.href
     });
   }
@@ -167,29 +168,29 @@ document.addEventListener('visibilitychange', handleVisibilityChange);
 // Initialize when DOM is ready
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
-    void initializeExtension();
+    initializeExtension();
   });
 } else {
   // DOM is already ready
-  void initializeExtension();
+  initializeExtension();
 }
 
 // Export for potential external access (debugging, testing)
 if (typeof window !== 'undefined') {
-  (window as any).__promptLibraryDebug = {
+  (window as Record<string, unknown>).__promptLibraryDebug = {
     getInstance: () => promptLibraryInstance,
     isInitialized: () => isInitialized,
     reinitialize: () => {
       cleanupExtension();
-      return initializeExtension();
+      initializeExtension();
     },
     cleanup: cleanupExtension,
-    getLogger: () => Logger
+    getLogger: () => ({ error, warn, info, debug })
   };
 }
 
 // For development/debugging - log when script loads
-Logger.info('My Prompt Manager content script loaded', {
+info('My Prompt Manager content script loaded', {
   timestamp: new Date().toISOString(),
   url: window.location.href,
   readyState: document.readyState

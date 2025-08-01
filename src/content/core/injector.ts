@@ -7,13 +7,14 @@
  */
 
 import type { Prompt, InsertionResult } from '../types/index';
-import { PlatformInsertionManager } from './insertion-manager';
-import { EventManager } from '../ui/event-manager';
 import { UIElementFactory } from '../ui/element-factory';
+import { EventManager } from '../ui/event-manager';
 import { KeyboardNavigationManager } from '../ui/keyboard-navigation';
-import { StorageManager } from '../utils/storage';
-import { StylesManager } from '../utils/styles';
-import { Logger } from '../utils/logger';
+import { warn, info, isDebugMode } from '../utils/logger';
+import { getPrompts, createPromptListItem } from '../utils/storage';
+import { injectCSS } from '../utils/styles';
+
+import { PlatformInsertionManager } from './insertion-manager';
 
 export interface InjectorState {
   icon: HTMLElement | null;
@@ -64,7 +65,7 @@ export class PromptLibraryInjector {
       detectionTimeout: null,
       mutationObserver: null,
       hostname: String(window.location.hostname || ''),
-      instanceId: `prompt-lib-${window.location.hostname}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      instanceId: `prompt-lib-${window.location.hostname}-${String(Date.now())}-${Math.random().toString(36).substr(2, 9)}`
     };
 
     // Initialize specialized components
@@ -74,7 +75,7 @@ export class PromptLibraryInjector {
 
     // Initialize platform manager
     this.platformManager = new PlatformInsertionManager({
-      debug: Logger.isDebugMode(),
+      debug: isDebugMode(),
       maxRetries: 3,
       timeout: 5000
     });
@@ -102,34 +103,34 @@ export class PromptLibraryInjector {
     this.selectorCache = new Map();
     this.lastCacheTime = 0;
 
-    void this.initialize();
+    this.initialize();
   }
 
   /**
    * Initializes the prompt library injector
    */
-  async initialize(): Promise<void> {
-    if (this.state.isInitialized) return;
+  initialize(): void {
+    if (this.state.isInitialized) {return;}
 
     try {
-      Logger.info('Initializing my prompt manager for site', { hostname: this.state.hostname });
+      info('Initializing my prompt manager for site', { hostname: this.state.hostname });
 
       this.state.isInitialized = true;
 
       // Inject CSS styles
-      StylesManager.injectCSS();
+      injectCSS();
 
       // Setup SPA monitoring for dynamic navigation detection
       this.setupSPAMonitoring();
 
       // Wait for page to be ready
       if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => this.startDetection());
+        document.addEventListener('DOMContentLoaded', () => { this.startDetection(); });
       } else {
         this.startDetection();
       }
     } catch (error) {
-      Logger.error('Error during initialization', error as Error);
+      error('Error during initialization', error as Error);
       this.state.isInitialized = false;
     }
   }
@@ -139,7 +140,7 @@ export class PromptLibraryInjector {
    */
   private startDetection(): void {
     // Initial detection
-    void this.detectAndInjectIcon();
+    this.detectAndInjectIcon();
 
     // For dynamic content loading, retry detection periodically
     let retryCount = 0;
@@ -149,7 +150,7 @@ export class PromptLibraryInjector {
         clearInterval(retryInterval);
         return;
       }
-      void this.detectAndInjectIcon();
+      this.detectAndInjectIcon();
       retryCount++;
     }, 500);
 
@@ -163,7 +164,9 @@ export class PromptLibraryInjector {
         }
       }
       if (shouldRedetect) {
-        setTimeout(() => void this.detectAndInjectIcon(), 100);
+        setTimeout(() => {
+          this.detectAndInjectIcon();
+        }, 100);
       }
     });
 
@@ -177,10 +180,12 @@ export class PromptLibraryInjector {
     const focusHandler = (e: Event) => {
       const target = e.target as HTMLElement;
       if (target.matches('textarea, div[contenteditable="true"]')) {
-        setTimeout(() => void this.detectAndInjectIcon(), 100);
+        setTimeout(() => {
+          this.detectAndInjectIcon();
+        }, 100);
       }
     };
-    this.eventManager.addTrackedEventListener(document as any, 'focusin', focusHandler);
+    this.eventManager.addTrackedEventListener(document, 'focusin', focusHandler);
   }
 
   /**
@@ -197,7 +202,7 @@ export class PromptLibraryInjector {
         // Re-initialize after navigation
         setTimeout(() => {
           this.cleanup();
-          void this.initialize();
+          this.initialize();
         }, 1000);
       }
     };
@@ -206,23 +211,23 @@ export class PromptLibraryInjector {
     setInterval(checkUrlChange, 1000);
 
     // Also listen for popstate events
-    this.eventManager.addTrackedEventListener(window as any, 'popstate', checkUrlChange);
+    this.eventManager.addTrackedEventListener(window, 'popstate', checkUrlChange);
   }
 
   /**
    * Detects text areas and injects icons
    */
-  private async detectAndInjectIcon(): Promise<void> {
+  private detectAndInjectIcon(): void {
     try {
       const selectors = this.platformManager.getAllSelectors();
       const textarea = this.findTextareaWithCaching(selectors);
 
       if (textarea && textarea !== this.state.currentTextarea) {
         this.state.currentTextarea = textarea;
-        await this.injectIcon(textarea);
+        this.injectIcon(textarea);
       }
     } catch (error) {
-      Logger.error('Error during icon detection and injection', error as Error);
+      error('Error during icon detection and injection', error as Error);
     }
   }
 
@@ -250,10 +255,10 @@ export class PromptLibraryInjector {
     const elements: HTMLElement[] = [];
     for (const selector of selectors) {
       try {
-        const found = Array.from(document.querySelectorAll(selector)) as HTMLElement[];
+        const found = Array.from(document.querySelectorAll(selector));
         elements.push(...found);
       } catch (error) {
-        Logger.warn(`Invalid selector: ${selector}`, { error });
+        warn(`Invalid selector: ${selector}`, { error });
       }
     }
 
@@ -282,7 +287,7 @@ export class PromptLibraryInjector {
   /**
    * Injects the icon near the textarea
    */
-  private async injectIcon(textarea: HTMLElement): Promise<void> {
+  private injectIcon(textarea: HTMLElement): void {
     try {
       // Remove existing icon
       if (this.state.icon) {
@@ -293,29 +298,29 @@ export class PromptLibraryInjector {
       // Create platform-specific icon
       const icon = this.platformManager.createIcon(this.uiFactory);
       if (!icon) {
-        Logger.warn('Failed to create platform icon');
+        warn('Failed to create platform icon');
         return;
       }
 
       this.state.icon = icon;
 
       // Add click handler
-      this.eventManager.addTrackedEventListener(icon, 'click', async (e: Event) => {
+      this.eventManager.addTrackedEventListener(icon, 'click', (e: Event) => {
         e.preventDefault();
         e.stopPropagation();
-        await this.showPromptSelector(textarea);
+        void this.showPromptSelector(textarea);
       });
 
       // Position and inject the icon
       this.positionIcon(icon, textarea);
       document.body.appendChild(icon);
 
-      Logger.info('Icon injected successfully', {
+      info('Icon injected successfully', {
         textareaTag: textarea.tagName,
         iconType: 'platform-specific'
       });
     } catch (error) {
-      Logger.error('Failed to inject icon', error as Error);
+      error('Failed to inject icon', error as Error);
     }
   }
 
@@ -329,8 +334,8 @@ export class PromptLibraryInjector {
 
     // Position icon to the right of the textarea
     icon.style.position = 'absolute';
-    icon.style.top = (rect.top + scrollTop + 10) + 'px';
-    icon.style.left = (rect.right + scrollLeft + 10) + 'px';
+    icon.style.top = `${String(rect.top + scrollTop + 10)}px`;
+    icon.style.left = `${String(rect.right + scrollLeft + 10)}px`;
     icon.style.zIndex = '999999';
   }
 
@@ -339,7 +344,7 @@ export class PromptLibraryInjector {
    */
   async showPromptSelector(targetElement: HTMLElement): Promise<void> {
     try {
-      Logger.info('Showing prompt selector', {
+      info('Showing prompt selector', {
         textareaTag: targetElement.tagName,
         hasExistingSelector: !!this.state.promptSelector
       });
@@ -348,8 +353,8 @@ export class PromptLibraryInjector {
       this.closePromptSelector();
 
       // Get prompts from storage
-      const prompts = await StorageManager.getPrompts();
-      Logger.info('Retrieved prompts for selector', { count: prompts.length });
+      const prompts = await getPrompts();
+      info('Retrieved prompts for selector', { count: prompts.length });
 
       // Create selector UI
       this.state.promptSelector = this.createPromptSelectorUI(prompts);
@@ -367,12 +372,12 @@ export class PromptLibraryInjector {
       this.keyboardNav = new KeyboardNavigationManager(this.state.promptSelector, this.eventManager);
       this.keyboardNav.initialize();
 
-      Logger.info('Prompt selector created and keyboard navigation initialized', {
+      info('Prompt selector created and keyboard navigation initialized', {
         promptCount: prompts.length
       });
 
     } catch (error) {
-      Logger.error('Failed to show prompt selector', error as Error);
+      error('Failed to show prompt selector', error as Error);
       this.closePromptSelector();
     }
   }
@@ -424,7 +429,7 @@ export class PromptLibraryInjector {
     // Add prompt items
     if (prompts.length > 0) {
       prompts.forEach((prompt, index) => {
-        const promptItem = StorageManager.createPromptListItem(prompt, index, 'prompt-item');
+        const promptItem = createPromptListItem(prompt, index, 'prompt-item');
         promptList.appendChild(promptItem);
       });
     } else {
@@ -451,8 +456,8 @@ export class PromptLibraryInjector {
     const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
 
     selector.style.position = 'absolute';
-    selector.style.top = (rect.bottom + scrollTop + 5) + 'px';
-    selector.style.left = (rect.left + scrollLeft) + 'px';
+    selector.style.top = `${String(rect.bottom + scrollTop + 5)}px`;
+    selector.style.left = `${String(rect.left + scrollLeft)}px`;
     selector.style.zIndex = '1000000';
   }
 
@@ -461,9 +466,9 @@ export class PromptLibraryInjector {
    */
   private setupPromptSelectorEvents(selector: HTMLElement, prompts: Prompt[], targetElement: HTMLElement): void {
     // Close button
-    const closeButton = selector.querySelector('.close-selector') as HTMLElement;
+    const closeButton = selector.querySelector('.close-selector');
     if (closeButton) {
-      this.eventManager.addTrackedEventListener(closeButton, 'click', () => {
+      this.eventManager.addTrackedEventListener(closeButton as HTMLElement, 'click', () => {
         this.closePromptSelector();
       });
     }
@@ -471,20 +476,20 @@ export class PromptLibraryInjector {
     // Prompt item clicks
     const promptItems = selector.querySelectorAll('.prompt-item');
     promptItems.forEach(item => {
-      this.eventManager.addTrackedEventListener(item as HTMLElement, 'click', async () => {
+      this.eventManager.addTrackedEventListener(item as HTMLElement, 'click', () => {
         const promptId = (item as HTMLElement).dataset.promptId;
         const prompt = prompts.find(p => p.id === promptId);
         if (prompt) {
-          await this.insertPrompt(targetElement, prompt.content);
+          void this.insertPrompt(targetElement, prompt.content);
           this.closePromptSelector();
         }
       });
     });
 
     // Search functionality
-    const searchInput = selector.querySelector('.search-input') as HTMLInputElement;
+    const searchInput = selector.querySelector('.search-input');
     if (searchInput) {
-      this.eventManager.addTrackedEventListener(searchInput, 'input', (e: Event) => {
+      this.eventManager.addTrackedEventListener(searchInput as HTMLInputElement, 'input', (e: Event) => {
         const target = e.target as HTMLInputElement;
         this.filterPrompts(target.value, prompts, selector);
       });
@@ -501,7 +506,7 @@ export class PromptLibraryInjector {
           this.closePromptSelector();
         }
       };
-      this.eventManager.addTrackedEventListener(document as any, 'click', outsideClickHandler);
+      this.eventManager.addTrackedEventListener(document, 'click', outsideClickHandler);
     }, 100);
   }
 
@@ -516,7 +521,7 @@ export class PromptLibraryInjector {
     );
 
     const promptList = selector.querySelector('.prompt-list');
-    if (!promptList) return;
+    if (!promptList) {return;}
 
     // Clear existing content
     while (promptList.firstChild) {
@@ -526,7 +531,7 @@ export class PromptLibraryInjector {
     // Add filtered items
     if (filteredPrompts.length > 0) {
       filteredPrompts.forEach((prompt, index) => {
-        const promptItem = StorageManager.createPromptListItem(prompt, index, 'filtered-prompt-item');
+        const promptItem = createPromptListItem(prompt, index, 'filtered-prompt-item');
         promptList.appendChild(promptItem);
       });
     } else {
@@ -550,17 +555,17 @@ export class PromptLibraryInjector {
       const result = await this.platformManager.insertPrompt(element, content);
       
       if (result.success) {
-        Logger.info('Prompt inserted successfully', {
+        info('Prompt inserted successfully', {
           method: result.method,
           contentLength: content.length
         });
       } else {
-        Logger.warn('Prompt insertion failed', { error: result.error });
+        warn('Prompt insertion failed', { error: result.error });
       }
       
       return result;
     } catch (error) {
-      Logger.error('Error inserting prompt', error as Error);
+      error('Error inserting prompt', error as Error);
       return {
         success: false,
         error: 'Insertion failed due to error'
@@ -587,7 +592,7 @@ export class PromptLibraryInjector {
    * Cleans up all resources
    */
   cleanup(): void {
-    Logger.info('Starting cleanup', { instanceId: this.state.instanceId });
+    info('Starting cleanup', { instanceId: this.state.instanceId });
 
     // Clear timeouts
     if (this.state.detectionTimeout) {
@@ -620,13 +625,8 @@ export class PromptLibraryInjector {
     this.closePromptSelector();
 
     // Clean up managers
-    if (this.eventManager) {
-      this.eventManager.cleanup();
-    }
-
-    if (this.platformManager) {
-      this.platformManager.cleanup();
-    }
+    this.eventManager.cleanup();
+    this.platformManager.cleanup();
 
     // Clear caches
     this.selectorCache.clear();
@@ -635,6 +635,6 @@ export class PromptLibraryInjector {
     this.state.isInitialized = false;
     this.state.currentTextarea = null;
 
-    Logger.info('Cleanup completed', { instanceId: this.state.instanceId });
+    info('Cleanup completed', { instanceId: this.state.instanceId });
   }
 }

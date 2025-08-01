@@ -4,7 +4,7 @@
  */
 
 import type { EventListenerEntry } from '../types/index';
-import { Logger } from '../utils/logger';
+import { warn, info } from '../utils/logger';
 
 export class EventManager {
   private listeners: Map<HTMLElement, EventListenerEntry[]>;
@@ -19,7 +19,10 @@ export class EventManager {
     if (!this.listeners.has(element)) {
       this.listeners.set(element, []);
     }
-    this.listeners.get(element)!.push({ event, handler });
+    const elementListeners = this.listeners.get(element);
+    if (elementListeners) {
+      elementListeners.push({ event, handler });
+    }
   }
 
   cleanup(): void {
@@ -31,10 +34,10 @@ export class EventManager {
         try {
           element.removeEventListener(event, handler);
           removedCount++;
-        } catch (error) {
+        } catch (err) {
           errorCount++;
-          Logger.warn('Failed to remove event listener', {
-            error: error instanceof Error ? error.message : String(error),
+          warn('Failed to remove event listener', {
+            error: err instanceof Error ? err.message : String(err),
             event,
             elementTag: element.tagName,
             elementId: element.id,
@@ -46,7 +49,7 @@ export class EventManager {
     
     this.listeners.clear();
     
-    Logger.info('EventManager cleanup completed', {
+    info('EventManager cleanup completed', {
       removedListeners: removedCount,
       errors: errorCount
     });

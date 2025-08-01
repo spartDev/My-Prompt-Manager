@@ -5,22 +5,23 @@
  * Supports multiple insertion methods with fallbacks
  */
 
-import { PlatformStrategy } from './base-strategy';
 import type { InsertionResult } from '../types/index';
 import type { UIElementFactory } from '../ui/element-factory';
+
+import { PlatformStrategy } from './base-strategy';
 
 // ProseMirror view interface for TypeScript
 interface ProseMirrorView {
   state: {
     tr: {
-      insertText(text: string, from?: number, to?: number): any;
+      insertText(text: string, from?: number, to?: number): unknown;
     };
     selection: {
       from: number;
       to: number;
     };
   };
-  dispatch(transaction: any): void;
+  dispatch(transaction: unknown): void;
 }
 
 // Extended HTMLElement interface for ProseMirror elements
@@ -72,12 +73,12 @@ export class ClaudeStrategy extends PlatformStrategy {
     const proseMirrorElement = this._findProseMirrorElement(element);
     
     // Method 1: Try ProseMirror transaction API
-    const transactionResult = await this._tryProseMirrorTransaction(proseMirrorElement, content);
-    if (transactionResult.success) return transactionResult;
+    const transactionResult = this._tryProseMirrorTransaction(proseMirrorElement, content);
+    if (transactionResult.success) {return transactionResult;}
     
     // Method 2: Try execCommand for contentEditable
     const execCommandResult = await this._tryExecCommand(proseMirrorElement, element, content);
-    if (execCommandResult.success) return execCommandResult;
+    if (execCommandResult.success) {return execCommandResult;}
     
     // Method 3: Direct DOM manipulation
     return this._tryDOMManipulation(element, content);
@@ -112,19 +113,19 @@ export class ClaudeStrategy extends PlatformStrategy {
     }
     
     // First check if ProseMirror is a parent
-    const parentProseMirror = element.closest('.ProseMirror') as HTMLElement;
+    const parentProseMirror = element.closest('.ProseMirror');
     if (parentProseMirror) {
       return parentProseMirror;
     }
     
     // Then check if ProseMirror is a child
-    const childProseMirror = element.querySelector('.ProseMirror') as HTMLElement;
+    const childProseMirror = element.querySelector('.ProseMirror');
     if (childProseMirror) {
       return childProseMirror;
     }
     
     // Last resort: find any ProseMirror element on the page for Claude.ai
-    const anyProseMirror = document.querySelector('div[contenteditable="true"][role="textbox"].ProseMirror') as HTMLElement;
+    const anyProseMirror = document.querySelector('div[contenteditable="true"][role="textbox"].ProseMirror');
     if (anyProseMirror) {
       return anyProseMirror;
     }
@@ -140,14 +141,14 @@ export class ClaudeStrategy extends PlatformStrategy {
    * @returns Result of insertion attempt
    * @private
    */
-  private async _tryProseMirrorTransaction(proseMirrorElement: HTMLElement, content: string): Promise<InsertionResult> {
+  private _tryProseMirrorTransaction(proseMirrorElement: HTMLElement, content: string): InsertionResult {
     try {
       const pmElement = proseMirrorElement as ProseMirrorElement;
       const view = pmElement.pmViewDesc?.view || 
                   pmElement._pmViewDesc?.view ||
                   window.ProseMirror?.view;
       
-      if (view && view.state && view.dispatch) {
+      if (view) {
         const { state } = view;
         const { selection } = state;
         const transaction = state.tr.insertText(content, selection.from, selection.to);

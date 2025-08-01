@@ -2,9 +2,15 @@
  * Unit tests for PlatformInsertionManager
  */
 
+ 
+ 
+ 
+ 
+
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { PlatformInsertionManager } from '../insertion-manager';
+
 import type { InsertionResult } from '../../types/index';
+import { PlatformInsertionManager } from '../insertion-manager';
 
 // Mock the PlatformManager
 vi.mock('../../platforms/platform-manager', () => ({
@@ -223,7 +229,7 @@ describe('PlatformInsertionManager', () => {
     it('should handle cleanup when platform manager is null', () => {
       (insertionManager as any).platformManager = null;
       
-      expect(() => insertionManager.cleanup()).not.toThrow();
+      expect(() => { insertionManager.cleanup(); }).not.toThrow();
     });
 
     it('should handle platform manager cleanup errors', () => {
@@ -231,7 +237,7 @@ describe('PlatformInsertionManager', () => {
         throw new Error('Cleanup error');
       });
       
-      expect(() => insertionManager.cleanup()).not.toThrow();
+      expect(() => { insertionManager.cleanup(); }).not.toThrow();
     });
   });
 

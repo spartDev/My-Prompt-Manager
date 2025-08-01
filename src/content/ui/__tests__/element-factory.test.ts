@@ -3,13 +3,13 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { UIElementFactory } from '../element-factory';
-import { StorageManager } from '../../utils/storage';
 
-// Mock StorageManager
+import { createSVGElement } from '../../utils/storage';
+import { UIElementFactory } from '../element-factory';
+
+// Mock storage functions
 vi.mock('../../utils/storage', () => ({
-  StorageManager: {
-    createElement: vi.fn((tag: string, attributes: Record<string, any> = {}, textContent = '') => {
+  createElement: vi.fn((tag: string, attributes: Record<string, unknown> = {}, textContent = '') => {
       const element = document.createElement(tag);
       Object.entries(attributes).forEach(([key, value]) => {
         element.setAttribute(key, String(value));
@@ -19,14 +19,13 @@ vi.mock('../../utils/storage', () => ({
       }
       return element;
     }),
-    createSVGElement: vi.fn((tag: string, attributes: Record<string, any> = {}) => {
-      const element = document.createElementNS('http://www.w3.org/2000/svg', tag);
-      Object.entries(attributes).forEach(([key, value]) => {
-        element.setAttribute(key, String(value));
-      });
-      return element;
-    })
-  }
+  createSVGElement: vi.fn((tag: string, attributes: Record<string, any> = {}) => {
+    const element = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    Object.entries(attributes).forEach(([key, value]) => {
+      element.setAttribute(key, String(value));
+    });
+    return element;
+  })
 }));
 
 describe('UIElementFactory', () => {

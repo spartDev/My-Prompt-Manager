@@ -3,8 +3,9 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { StorageManager } from '../storage';
+
 import { Logger } from '../logger';
+import { getPrompts, sanitizeUserInput, validatePromptData, createPromptListItem } from '../storage';
 
 // Mock Logger
 vi.mock('../logger', () => ({
@@ -69,7 +70,7 @@ describe('StorageManager', () => {
         callback({ prompts: mockPrompts });
       });
 
-      const result = await StorageManager.getPrompts();
+      const result = await getPrompts();
 
       expect(result).toEqual(mockPrompts);
       expect(chromeMock.storage.local.get).toHaveBeenCalledWith(['prompts'], expect.any(Function));
@@ -85,7 +86,7 @@ describe('StorageManager', () => {
         callback({});
       });
 
-      const result = await StorageManager.getPrompts();
+      const result = await getPrompts();
 
       expect(result).toEqual([]);
       expect(Logger.error).toHaveBeenCalledWith(
@@ -116,7 +117,7 @@ describe('StorageManager', () => {
         callback({ prompts: mockPrompts });
       });
 
-      const result = await StorageManager.getPrompts();
+      const result = await getPrompts();
 
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe('valid-1');
@@ -135,7 +136,7 @@ describe('StorageManager', () => {
         throw new Error('Unexpected error');
       });
 
-      const result = await StorageManager.getPrompts();
+      const result = await getPrompts();
 
       expect(result).toEqual([]);
       expect(Logger.error).toHaveBeenCalledWith(
@@ -150,11 +151,11 @@ describe('StorageManager', () => {
       const input = '<script>alert("xss")</script>';
       const expected = '&lt;script&gt;alert(&quot;xss&quot;)&lt;&#x2F;script&gt;';
       
-      expect(StorageManager.escapeHtml(input)).toBe(expected);
+      expect(escapeHtml(input)).toBe(expected);
     });
 
     it('should handle non-string input', () => {
-      expect(StorageManager.escapeHtml(123 as any)).toBe('123');
+      expect(escapeHtml(123 as any)).toBe('123');
       expect(Logger.warn).toHaveBeenCalledWith(
         'escapeHtml received non-string input',
         expect.objectContaining({ type: 'number', value: 123 })
@@ -163,7 +164,7 @@ describe('StorageManager', () => {
 
     it('should handle errors gracefully', () => {
       // Test with a problematic input that could cause errors
-      const result = StorageManager.escapeHtml('test');
+      const result = escapeHtml('test');
       expect(result).toBe('test');
     });
   });
@@ -176,7 +177,7 @@ describe('StorageManager', () => {
       };
       documentMock.createElement.mockReturnValue(mockElement);
 
-      const result = StorageManager.createElement('div', { class: 'test', id: 'test-id' }, 'Test content');
+      const result = createElement('div', { class: 'test', id: 'test-id' }, 'Test content');
 
       expect(documentMock.createElement).toHaveBeenCalledWith('div');
       expect(mockElement.setAttribute).toHaveBeenCalledWith('class', 'test');
@@ -193,7 +194,7 @@ describe('StorageManager', () => {
         return { setAttribute: vi.fn(), textContent: '' };
       });
 
-      const result = StorageManager.createElement('invalid');
+      const result = createElement('invalid');
       
       expect(Logger.error).toHaveBeenCalledWith(
         'Failed to create DOM element',
@@ -211,7 +212,7 @@ describe('StorageManager', () => {
       };
       documentMock.createElementNS.mockReturnValue(mockElement);
 
-      const result = StorageManager.createSVGElement('path', { d: 'M0,0 L10,10', fill: 'red' });
+      const result = createSVGElement('path', { d: 'M0,0 L10,10', fill: 'red' });
 
       expect(documentMock.createElementNS).toHaveBeenCalledWith('http://www.w3.org/2000/svg', 'path');
       expect(mockElement.setAttribute).toHaveBeenCalledWith('d', 'M0,0 L10,10');
@@ -228,7 +229,7 @@ describe('StorageManager', () => {
         return { setAttribute: vi.fn() }; // Fallback for 'g' element
       });
 
-      const result = StorageManager.createSVGElement('path');
+      const result = createSVGElement('path');
       
       expect(Logger.error).toHaveBeenCalledWith(
         'Failed to create SVG element',
@@ -242,7 +243,7 @@ describe('StorageManager', () => {
   describe('sanitizeUserInput', () => {
     it('should remove dangerous content', () => {
       const input = '<script>alert("xss")</script>javascript:void(0)';
-      const result = StorageManager.sanitizeUserInput(input);
+      const result = sanitizeUserInput(input);
       
       expect(result).not.toContain('<script>');
       expect(result).not.toContain('javascript:');
@@ -250,14 +251,14 @@ describe('StorageManager', () => {
 
     it('should remove control characters', () => {
       const input = 'test\x00\x01\x02content';
-      const result = StorageManager.sanitizeUserInput(input);
+      const result = sanitizeUserInput(input);
       
       expect(result).toBe('testcontent');
     });
 
     it('should truncate long input', () => {
       const longInput = 'a'.repeat(60000);
-      const result = StorageManager.sanitizeUserInput(longInput);
+      const result = sanitizeUserInput(longInput);
       
       expect(result.length).toBeLessThan(longInput.length);
       expect(result.endsWith('...')).toBe(true);
@@ -271,7 +272,7 @@ describe('StorageManager', () => {
     });
 
     it('should handle non-string input', () => {
-      expect(StorageManager.sanitizeUserInput(123 as any)).toBe('');
+      expect(sanitizeUserInput(123 as any)).toBe('');
       expect(Logger.warn).toHaveBeenCalledWith(
         'sanitizeUserInput received non-string input',
         expect.objectContaining({ type: 'number', value: 123 })
@@ -289,7 +290,7 @@ describe('StorageManager', () => {
         createdAt: 1234567890,
       };
 
-      const result = StorageManager.validatePromptData(input);
+      const result = validatePromptData(input);
 
       expect(result).toEqual(input);
     });
@@ -300,7 +301,7 @@ describe('StorageManager', () => {
         content: 'Test content',
       };
 
-      const result = StorageManager.validatePromptData(input);
+      const result = validatePromptData(input);
 
       expect(result).toEqual({
         id: 'test-id',
@@ -312,9 +313,9 @@ describe('StorageManager', () => {
     });
 
     it('should return null for invalid data', () => {
-      expect(StorageManager.validatePromptData(null)).toBeNull();
-      expect(StorageManager.validatePromptData('invalid')).toBeNull();
-      expect(StorageManager.validatePromptData({})).toBeNull(); // Missing required fields
+      expect(validatePromptData(null)).toBeNull();
+      expect(validatePromptData('invalid')).toBeNull();
+      expect(validatePromptData({})).toBeNull(); // Missing required fields
     });
 
     it('should return null when required fields are empty after sanitization', () => {
@@ -324,7 +325,7 @@ describe('StorageManager', () => {
         content: 'Test content',
       };
 
-      const result = StorageManager.validatePromptData(input);
+      const result = validatePromptData(input);
       expect(result).toBeNull();
       expect(Logger.warn).toHaveBeenCalledWith(
         'Prompt failed validation - empty required fields',
@@ -352,7 +353,7 @@ describe('StorageManager', () => {
         createdAt: 1234567890,
       };
 
-      const result = StorageManager.createPromptListItem(prompt, 0);
+      const result = createPromptListItem(prompt, 0);
 
       expect(documentMock.createElement).toHaveBeenCalledWith('div');
       expect(result.appendChild).toHaveBeenCalledTimes(3); // title, category, preview
@@ -381,7 +382,7 @@ describe('StorageManager', () => {
         createdAt: 1234567890,
       };
 
-      const result = StorageManager.createPromptListItem(prompt, 0);
+      const result = createPromptListItem(prompt, 0);
 
       // The error is caught by createElement, not createPromptListItem
       expect(Logger.error).toHaveBeenCalledWith(

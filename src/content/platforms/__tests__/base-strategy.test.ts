@@ -2,10 +2,18 @@
  * Unit tests for PlatformStrategy base class
  */
 
+ 
+ 
+ 
+ 
+ 
+ 
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { PlatformStrategy } from '../base-strategy';
+
 import type { InsertionResult, PlatformConfig } from '../../types/index';
 import type { UIElementFactory } from '../../ui/element-factory';
+import { PlatformStrategy } from '../base-strategy';
 
 // Mock Logger
 vi.mock('../../utils/logger', () => ({

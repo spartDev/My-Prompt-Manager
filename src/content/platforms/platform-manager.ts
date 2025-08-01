@@ -5,15 +5,16 @@
  * Provides isolation between strategies and handles strategy selection logic
  */
 
-import type { PlatformStrategy } from './base-strategy';
-import type { PlatformManagerOptions } from '../types/platform';
 import type { InsertionResult } from '../types/index';
+import type { PlatformManagerOptions } from '../types/platform';
 import type { UIElementFactory } from '../ui/element-factory';
-import { Logger } from '../utils/logger';
-import { ClaudeStrategy } from './claude-strategy';
+import { debug, warn, info } from '../utils/logger';
+
+import type { PlatformStrategy } from './base-strategy';
 import { ChatGPTStrategy } from './chatgpt-strategy';
-import { PerplexityStrategy } from './perplexity-strategy';
+import { ClaudeStrategy } from './claude-strategy';
 import { DefaultStrategy } from './default-strategy';
+import { PerplexityStrategy } from './perplexity-strategy';
 
 export class PlatformManager {
   private strategies: PlatformStrategy[];
@@ -42,7 +43,7 @@ export class PlatformManager {
    * @private
    */
   private _initializeStrategies(): void {
-    Logger.info('Initializing platform strategies', { hostname: this.hostname });
+    info('Initializing platform strategies', { hostname: this.hostname });
     
     // Always add default strategy as fallback
     this.strategies.push(new DefaultStrategy());
@@ -51,27 +52,27 @@ export class PlatformManager {
     switch (this.hostname) {
       case 'claude.ai':
         this.strategies.push(new ClaudeStrategy());
-        Logger.info('Loaded Claude strategy for claude.ai');
+        info('Loaded Claude strategy for claude.ai');
         break;
         
       case 'chatgpt.com':
         this.strategies.push(new ChatGPTStrategy());
-        Logger.info('Loaded ChatGPT strategy for chatgpt.com');
+        info('Loaded ChatGPT strategy for chatgpt.com');
         break;
         
       case 'www.perplexity.ai':
         this.strategies.push(new PerplexityStrategy());
-        Logger.info('Loaded Perplexity strategy for www.perplexity.ai');
+        info('Loaded Perplexity strategy for www.perplexity.ai');
         break;
         
       default:
-        Logger.info(`Using default strategy for unknown hostname: ${this.hostname}`);
+        info(`Using default strategy for unknown hostname: ${this.hostname}`);
     }
     
     // Sort strategies by priority (highest first)
     this.strategies.sort((a, b) => b.priority - a.priority);
     
-    Logger.info('Strategy initialization complete', {
+    info('Strategy initialization complete', {
       strategiesLoaded: this.strategies.length
     });
   }
@@ -85,7 +86,7 @@ export class PlatformManager {
     // Re-sort strategies by priority
     this.strategies.sort((a, b) => b.priority - a.priority);
     
-    Logger.info('Registered new strategy', { 
+    info('Registered new strategy', { 
       name: strategy.name, 
       priority: strategy.priority 
     });
@@ -102,13 +103,13 @@ export class PlatformManager {
       try {
         return strategy.canHandle(element);
       } catch (error) {
-        Logger.warn(`Strategy ${strategy.name} canHandle() failed`, { error });
+        warn(`Strategy ${strategy.name} canHandle() failed`, { error });
         return false;
       }
     });
 
     if (compatibleStrategies.length === 0) {
-      Logger.warn('No compatible strategies found for element', {
+      warn('No compatible strategies found for element', {
         tagName: element.tagName,
         className: element.className,
         id: element.id
@@ -118,7 +119,7 @@ export class PlatformManager {
 
     // Return the highest priority compatible strategy
     const bestStrategy = compatibleStrategies[0];
-    Logger.debug('Found best strategy', { 
+    debug('Found best strategy', { 
       strategy: bestStrategy.name, 
       priority: bestStrategy.priority 
     });
@@ -179,12 +180,6 @@ export class PlatformManager {
    * @returns Result of insertion attempt
    */
   async insertContent(element: HTMLElement, content: string): Promise<InsertionResult> {
-    if (!element) {
-      return {
-        success: false,
-        error: 'No target element provided'
-      };
-    }
 
     const bestStrategy = this.findBestStrategy(element);
     if (!bestStrategy) {
@@ -199,20 +194,20 @@ export class PlatformManager {
       const result = await bestStrategy.insert(element, content);
       
       if (result.success) {
-        Logger.info('PlatformManager: Insertion successful', {
+        info('PlatformManager: Insertion successful', {
           strategy: bestStrategy.name,
           method: result.method
         });
         this.activeStrategy = bestStrategy;
         return result;
       } else {
-        Logger.warn('PlatformManager: Strategy failed', {
+        warn('PlatformManager: Strategy failed', {
           strategy: bestStrategy.name,
           error: result.error
         });
       }
     } catch (error) {
-      Logger.warn(`PlatformManager: ${bestStrategy.name} strategy threw error`, { error });
+      warn(`PlatformManager: ${bestStrategy.name} strategy threw error`, { error });
     }
 
     return {
@@ -241,19 +236,19 @@ export class PlatformManager {
    * Cleans up all strategies
    */
   cleanup(): void {
-    Logger.info('PlatformManager: Starting cleanup');
+    info('PlatformManager: Starting cleanup');
     
     for (const strategy of this.strategies) {
       try {
         strategy.cleanup?.();
       } catch (error) {
-        Logger.warn(`Failed to cleanup strategy ${strategy.name}`, { error });
+        warn(`Failed to cleanup strategy ${strategy.name}`, { error });
       }
     }
     
     this.strategies = [];
     this.activeStrategy = null;
     
-    Logger.info('PlatformManager: Cleanup complete');
+    info('PlatformManager: Cleanup complete');
   }
 }

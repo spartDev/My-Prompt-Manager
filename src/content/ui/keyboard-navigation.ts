@@ -4,8 +4,9 @@
  */
 
 // import type { KeyboardNavigationState } from '../types/ui';
+import { info } from '../utils/logger';
+
 import type { EventManager } from './event-manager';
-import { Logger } from '../utils/logger';
 
 export class KeyboardNavigationManager {
   private selector: HTMLElement;
@@ -28,11 +29,11 @@ export class KeyboardNavigationManager {
     this.isActive = true;
     
     // Focus the search input initially
-    const searchInput = this.selector.querySelector('.search-input') as HTMLInputElement;
+    const searchInput = this.selector.querySelector('.search-input');
     if (searchInput) {
       setTimeout(() => {
-        searchInput.focus();
-        Logger.info('Focused search input for keyboard navigation');
+        (searchInput as HTMLInputElement).focus();
+        info('Focused search input for keyboard navigation');
       }, 100);
     }
   }
@@ -69,19 +70,19 @@ export class KeyboardNavigationManager {
           break;
         default: {
           // For other keys, focus the search input if it's not already focused
-          const searchInput = this.selector.querySelector('.search-input') as HTMLInputElement;
+          const searchInput = this.selector.querySelector('.search-input');
           if (searchInput && document.activeElement !== searchInput && 
               e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
-            searchInput.focus();
+            (searchInput as HTMLInputElement).focus();
           }
           break;
         }
       }
     };
     
-    this.eventManager.addTrackedEventListener(document as any, 'keydown', keyboardHandler as EventListener);
+    this.eventManager.addTrackedEventListener(document.documentElement, 'keydown', keyboardHandler as EventListener);
     
-    Logger.info('Keyboard navigation handlers setup');
+    info('Keyboard navigation handlers setup');
   }
 
   private selectNext(): void {
@@ -108,7 +109,7 @@ export class KeyboardNavigationManager {
       selectedItem.classList.add('keyboard-selected');
       selectedItem.setAttribute('aria-selected', 'true');
       
-      Logger.info('Updated keyboard selection', { 
+      info('Updated keyboard selection', { 
         index: this.selectedIndex, 
         itemId: selectedItem.dataset.promptId 
       });
@@ -143,7 +144,7 @@ export class KeyboardNavigationManager {
   private activateSelected(): void {
     if (this.selectedIndex >= 0 && this.selectedIndex < this.items.length) {
       const selectedItem = this.items[this.selectedIndex];
-      Logger.info('Activating selected item via keyboard', { 
+      info('Activating selected item via keyboard', { 
         index: this.selectedIndex, 
         itemId: selectedItem.dataset.promptId 
       });
@@ -152,16 +153,16 @@ export class KeyboardNavigationManager {
   }
 
   private close(): void {
-    const closeButton = this.selector.querySelector('.close-selector') as HTMLButtonElement;
+    const closeButton = this.selector.querySelector('.close-selector');
     if (closeButton) {
-      Logger.info('Closing prompt selector via keyboard');
-      closeButton.click();
+      info('Closing prompt selector via keyboard');
+      (closeButton as HTMLButtonElement).click();
     }
   }
 
   destroy(): void {
     this.isActive = false;
     this.clearSelection();
-    Logger.info('Keyboard navigation manager destroyed');
+    info('Keyboard navigation manager destroyed');
   }
 }

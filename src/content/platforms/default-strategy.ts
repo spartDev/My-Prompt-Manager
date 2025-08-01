@@ -5,9 +5,10 @@
  * Provides basic insertion functionality that works with most standard inputs
  */
 
-import { PlatformStrategy } from './base-strategy';
 import type { InsertionResult } from '../types/index';
 import type { UIElementFactory } from '../ui/element-factory';
+
+import { PlatformStrategy } from './base-strategy';
 
 export class DefaultStrategy extends PlatformStrategy {
   constructor() {
@@ -34,7 +35,7 @@ export class DefaultStrategy extends PlatformStrategy {
    * Inserts content using generic methods
    * Works with standard textarea, input, and contenteditable elements
    */
-  async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
+  insert(element: HTMLElement, content: string): InsertionResult {
     try {
       element.focus();
       

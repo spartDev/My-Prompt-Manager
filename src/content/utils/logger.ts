@@ -5,27 +5,26 @@
 
 import type { DebugInfo, NotificationType } from '../types/index';
 
-export class Logger {
-  private static _lastNotification: string | null = null;
+let _lastNotification: string | null = null;
 
-  /**
-   * Check if debug mode is enabled
-   * Debug mode is enabled in development or via localStorage flag
-   */
-  static isDebugMode(): boolean {
-    try {
-      return localStorage.getItem('prompt-library-debug') === 'true' || 
-             window.location.hostname === 'localhost';
-    } catch (error) {
-      // Fallback if localStorage is not available
-      return window.location.hostname === 'localhost';
-    }
+/**
+ * Check if debug mode is enabled
+ * Debug mode is enabled in development or via localStorage flag
+ */
+export function isDebugMode(): boolean {
+  try {
+    return localStorage.getItem('prompt-library-debug') === 'true' || 
+           window.location.hostname === 'localhost';
+  } catch {
+    // Fallback if localStorage is not available
+    return window.location.hostname === 'localhost';
   }
+}
 
-  /**
-   * Log error messages with optional error object and context
-   */
-  static error(message: string, error: Error | null = null, context: Record<string, any> = {}): void {
+/**
+ * Log error messages with optional error object and context
+ */
+export function error(message: string, errorObj: Error | null = null, context: Record<string, unknown> = {}): void {
     const logData: DebugInfo = {
       timestamp: new Date().toISOString(),
       level: 'ERROR',
@@ -35,26 +34,26 @@ export class Logger {
       userAgent: navigator.userAgent.substring(0, 100) // Truncate for privacy
     };
 
-    if (error) {
+    if (errorObj) {
       logData.error = {
-        name: error.name,
-        message: error.message,
-        stack: error.stack?.substring(0, 500) // Truncate stack trace
+        name: errorObj.name,
+        message: errorObj.message,
+        stack: errorObj.stack?.substring(0, 500) // Truncate stack trace
       };
     }
 
     console.error('[PromptLibrary]', message, logData);
 
     // In debug mode, also show user-friendly notifications
-    if (this.isDebugMode()) {
-      this.showDebugNotification('Error: ' + message, 'error');
+    if (isDebugMode()) {
+      showDebugNotification('Error: ' + message, 'error');
     }
-  }
+}
 
-  /**
-   * Log warning messages with optional context
-   */
-  static warn(message: string, context: Record<string, any> = {}): void {
+/**
+ * Log warning messages with optional context
+ */
+export function warn(message: string, context: Record<string, unknown> = {}): void {
     const logData: DebugInfo = {
       timestamp: new Date().toISOString(),
       level: 'WARN',
@@ -65,16 +64,16 @@ export class Logger {
 
     console.warn('[PromptLibrary]', message, logData);
 
-    if (this.isDebugMode()) {
-      this.showDebugNotification('Warning: ' + message, 'warn');
+    if (isDebugMode()) {
+      showDebugNotification('Warning: ' + message, 'warn');
     }
-  }
+}
 
-  /**
-   * Log info messages (only in debug mode)
-   */
-  static info(message: string, context: Record<string, any> = {}): void {
-    if (this.isDebugMode()) {
+/**
+ * Log info messages (only in debug mode)
+ */
+export function info(message: string, context: Record<string, unknown> = {}): void {
+    if (isDebugMode()) {
       const logData: DebugInfo = {
         timestamp: new Date().toISOString(),
         level: 'INFO',
@@ -85,13 +84,13 @@ export class Logger {
 
       console.info('[PromptLibrary]', message, logData);
     }
-  }
+}
 
-  /**
-   * Log debug messages (only in debug mode)
-   */
-  static debug(message: string, context: Record<string, unknown> = {}): void {
-    if (this.isDebugMode()) {
+/**
+ * Log debug messages (only in debug mode)
+ */
+export function debug(message: string, context: Record<string, unknown> = {}): void {
+    if (isDebugMode()) {
       const logData: DebugInfo = {
         timestamp: new Date().toISOString(),
         level: 'DEBUG',
@@ -102,16 +101,16 @@ export class Logger {
 
       console.debug('[PromptLibrary]', message, logData);
     }
-  }
+}
 
-  /**
-   * Show debug notification to user (only in debug mode)
-   * Includes spam prevention to avoid duplicate notifications
-   */
-  static showDebugNotification(message: string, type: NotificationType = 'info'): void {
+/**
+ * Show debug notification to user (only in debug mode)
+ * Includes spam prevention to avoid duplicate notifications
+ */
+export function showDebugNotification(message: string, type: NotificationType = 'info'): void {
     // Only show in debug mode and avoid spam
-    if (!this.isDebugMode() || this._lastNotification === message) return;
-    this._lastNotification = message;
+    if (!isDebugMode() || _lastNotification === message) {return;}
+    _lastNotification = message;
 
     const notification = document.createElement('div');
     notification.style.cssText = `
@@ -143,9 +142,8 @@ export class Logger {
 
     // Clear the spam prevention after 10 seconds
     setTimeout(() => {
-      if (this._lastNotification === message) {
-        this._lastNotification = null;
+      if (_lastNotification === message) {
+        _lastNotification = null;
       }
     }, 10000);
-  }
 }

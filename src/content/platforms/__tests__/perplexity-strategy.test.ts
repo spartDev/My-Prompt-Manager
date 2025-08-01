@@ -3,8 +3,9 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { PerplexityStrategy } from '../perplexity-strategy';
+
 import type { UIElementFactory } from '../../ui/element-factory';
+import { PerplexityStrategy } from '../perplexity-strategy';
 
 // Mock Logger
 vi.mock('../../utils/logger', () => ({

@@ -3,6 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
 import { Logger } from '../logger';
 
 // Mock localStorage

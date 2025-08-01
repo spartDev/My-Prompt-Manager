@@ -2,9 +2,19 @@
  * Unit tests for PromptLibraryInjector
  */
 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { PromptLibraryInjector } from '../injector';
+
 import type { Prompt } from '../../types/index';
+import { PromptLibraryInjector } from '../injector';
 
 // Mock all dependencies
 vi.mock('../insertion-manager', () => ({
@@ -38,22 +48,19 @@ vi.mock('../../ui/keyboard-navigation', () => ({
 }));
 
 vi.mock('../../utils/storage', () => ({
-  StorageManager: {
-    getPrompts: vi.fn().mockResolvedValue([]),
-    createPromptListItem: vi.fn().mockImplementation((prompt, index, className) => {
-      const item = document.createElement('div');
-      item.className = className;
-      item.dataset.promptId = prompt.id;
-      item.textContent = prompt.title;
-      return item;
-    })
-  }
+  getPrompts: vi.fn().mockResolvedValue([]),
+  createPromptListItem: vi.fn().mockImplementation((prompt, index, className) => {
+    const item = document.createElement('div');
+    item.className = className;
+    item.dataset.promptId = prompt.id;
+    item.textContent = prompt.title;
+    return item;
+  })
 }));
 
 vi.mock('../../utils/styles', () => ({
-  StylesManager: {
-    injectCSS: vi.fn()
-  }
+  injectCSS: vi.fn(),
+  isInjected: vi.fn()
 }));
 
 vi.mock('../../utils/logger', () => ({
@@ -151,9 +158,9 @@ describe('PromptLibraryInjector', () => {
     });
 
     it('should inject CSS styles', async () => {
-      const { StylesManager } = await import('../../utils/styles');
+      const { injectCSS } = await import('../../utils/styles');
       await injector.initialize();
-      expect(StylesManager.injectCSS).toHaveBeenCalled();
+      expect(injectCSS).toHaveBeenCalled();
     });
   });
 
@@ -176,8 +183,8 @@ describe('PromptLibraryInjector', () => {
     ];
 
     beforeEach(async () => {
-      const { StorageManager } = await import('../../utils/storage');
-      StorageManager.getPrompts.mockResolvedValue(mockPrompts);
+      const { getPrompts } = await import('../../utils/storage');
+      getPrompts.mockResolvedValue(mockPrompts);
     });
 
     it('should create and display prompt selector', async () => {
@@ -188,17 +195,17 @@ describe('PromptLibraryInjector', () => {
     });
 
     it('should retrieve prompts from storage', async () => {
-      const { StorageManager } = await import('../../utils/storage');
+      const { getPrompts, createPromptListItem } = await import('../../utils/storage');
       await injector.showPromptSelector(mockTextarea);
       
-      expect(StorageManager.getPrompts).toHaveBeenCalled();
+      expect(getPrompts).toHaveBeenCalled();
     });
 
     it('should create prompt items for each prompt', async () => {
-      const { StorageManager } = await import('../../utils/storage');
+      const { getPrompts, createPromptListItem } = await import('../../utils/storage');
       await injector.showPromptSelector(mockTextarea);
       
-      expect(StorageManager.createPromptListItem).toHaveBeenCalledTimes(mockPrompts.length);
+      expect(createPromptListItem).toHaveBeenCalledTimes(mockPrompts.length);
     });
 
     it('should initialize keyboard navigation', async () => {
@@ -209,8 +216,8 @@ describe('PromptLibraryInjector', () => {
     });
 
     it('should handle empty prompts array', async () => {
-      const { StorageManager } = await import('../../utils/storage');
-      StorageManager.getPrompts.mockResolvedValue([]);
+      const { getPrompts } = await import('../../utils/storage');
+      getPrompts.mockResolvedValue([]);
       
       await injector.showPromptSelector(mockTextarea);
       
@@ -222,10 +229,10 @@ describe('PromptLibraryInjector', () => {
     });
 
     it('should handle storage errors gracefully', async () => {
-      const { StorageManager } = await import('../../utils/storage');
+      const { getPrompts, createPromptListItem } = await import('../../utils/storage');
       const { Logger } = await import('../../utils/logger');
       
-      StorageManager.getPrompts.mockRejectedValue(new Error('Storage error'));
+      getPrompts.mockRejectedValue(new Error('Storage error'));
       
       await injector.showPromptSelector(mockTextarea);
       

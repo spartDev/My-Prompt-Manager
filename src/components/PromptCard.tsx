@@ -25,10 +25,10 @@ const PromptCard: FC<PromptCardProps> = ({
     if (!query.trim()) {return text;}
     
     // Sanitize both text and query to prevent XSS
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-    const sanitizedText = DOMPurify.sanitize(text, { ALLOWED_TAGS: [] }) as string;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-    const sanitizedQuery = DOMPurify.sanitize(query, { ALLOWED_TAGS: [] }) as string;
+     
+    const sanitizedText = DOMPurify.sanitize(text, { ALLOWED_TAGS: [] });
+     
+    const sanitizedQuery = DOMPurify.sanitize(query, { ALLOWED_TAGS: [] });
     
     const searchTerm = sanitizedQuery.toLowerCase().trim();
     const lowerText = sanitizedText.toLowerCase();

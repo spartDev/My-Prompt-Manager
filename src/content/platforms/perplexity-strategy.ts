@@ -5,9 +5,10 @@
  * Uses comprehensive event triggering for various input types
  */
 
-import { PlatformStrategy } from './base-strategy';
 import type { InsertionResult } from '../types/index';
 import type { UIElementFactory } from '../ui/element-factory';
+
+import { PlatformStrategy } from './base-strategy';
 
 export class PerplexityStrategy extends PlatformStrategy {
   constructor() {
@@ -32,7 +33,7 @@ export class PerplexityStrategy extends PlatformStrategy {
    * Inserts content using Perplexity-compatible methods
    * Handles both contenteditable divs and textarea elements
    */
-  async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
+  insert(element: HTMLElement, content: string): InsertionResult {
     try {
       element.focus();
       

@@ -5,9 +5,10 @@
  * Uses React-specific event triggering for proper state updates
  */
 
-import { PlatformStrategy } from './base-strategy';
 import type { InsertionResult } from '../types/index';
 import type { UIElementFactory } from '../ui/element-factory';
+
+import { PlatformStrategy } from './base-strategy';
 
 // Extended HTMLTextAreaElement interface for React property setter
 interface ReactTextAreaElement extends HTMLTextAreaElement {
@@ -46,7 +47,7 @@ export class ChatGPTStrategy extends PlatformStrategy {
    * Inserts content using React-compatible methods
    * Uses native property setter to trigger React state updates
    */
-  async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
+  insert(element: HTMLElement, content: string): InsertionResult {
     try {
       const textareaElement = element as ReactTextAreaElement;
       
@@ -57,13 +58,14 @@ export class ChatGPTStrategy extends PlatformStrategy {
       textareaElement.value = content;
       
       // Trigger React events for ChatGPT - this is crucial for React state updates
-      const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+      const descriptor = Object.getOwnPropertyDescriptor(
         window.HTMLTextAreaElement.prototype,
         'value'
-      )?.set;
+      );
+      const nativeInputValueSetter = descriptor?.set?.bind(textareaElement) as ((value: string) => void) | undefined;
       
       if (nativeInputValueSetter) {
-        nativeInputValueSetter.call(textareaElement, content);
+        nativeInputValueSetter(content);
       }
       
       // Dispatch events that React expects
@@ -73,7 +75,7 @@ export class ChatGPTStrategy extends PlatformStrategy {
       this._debug('ChatGPT React insertion successful');
       return { success: true, method: 'chatgpt-react' };
     } catch (error) {
-      this._error('React insertion failed', error as Error);
+      this._warn('React insertion failed', error as Error);
       return { success: false, error: (error as Error).message };
     }
   }

@@ -5,11 +5,19 @@
  * performance and maintains compatibility across different environments.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
 import { JSDOM } from 'jsdom';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+
 import { PromptLibraryInjector } from '../core/injector';
-import { StylesManager } from '../utils/styles';
-import { Logger } from '../utils/logger';
+import { injectCSS } from '../utils/styles';
 
 // Mock Chrome APIs
 const mockChrome = {
@@ -81,7 +89,7 @@ describe('Content Script Performance Tests', () => {
       
       const startTime = performance.now();
       
-      StylesManager.injectCSS();
+      injectCSS();
       injector = new PromptLibraryInjector();
       
       // Wait for initialization to complete
@@ -111,7 +119,7 @@ describe('Content Script Performance Tests', () => {
       
       const startTime = performance.now();
       
-      StylesManager.injectCSS();
+      injectCSS();
       injector = new PromptLibraryInjector();
       
       await new Promise(resolve => setTimeout(resolve, 200));
@@ -135,7 +143,7 @@ describe('Content Script Performance Tests', () => {
       
       checkMainThread();
       
-      StylesManager.injectCSS();
+      injectCSS();
       injector = new PromptLibraryInjector();
       
       await new Promise(resolve => setTimeout(resolve, 50));
@@ -149,7 +157,7 @@ describe('Content Script Performance Tests', () => {
     it('should clean up event listeners properly', async () => {
       setupDOMForPlatform('https://example.com/');
       
-      StylesManager.injectCSS();
+      injectCSS();
       injector = new PromptLibraryInjector();
       
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -175,7 +183,7 @@ describe('Content Script Performance Tests', () => {
       
       // Run multiple cycles
       for (let i = 0; i < 10; i++) {
-        StylesManager.injectCSS();
+        injectCSS();
         const tempInjector = new PromptLibraryInjector();
         
         await new Promise(resolve => setTimeout(resolve, 10));
@@ -193,7 +201,7 @@ describe('Content Script Performance Tests', () => {
     it('should not leak memory with DOM mutations', async () => {
       setupDOMForPlatform('https://example.com/');
       
-      StylesManager.injectCSS();
+      injectCSS();
       injector = new PromptLibraryInjector();
       
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -238,7 +246,7 @@ describe('Content Script Performance Tests', () => {
           configurable: true
         });
         
-        StylesManager.injectCSS();
+        injectCSS();
         injector = new PromptLibraryInjector();
         
         await new Promise(resolve => setTimeout(resolve, 100));
@@ -270,7 +278,7 @@ describe('Content Script Performance Tests', () => {
         dom.window.document.body.appendChild(element);
       });
       
-      StylesManager.injectCSS();
+      injectCSS();
       injector = new PromptLibraryInjector();
       
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -311,7 +319,7 @@ describe('Content Script Performance Tests', () => {
           }
         }
         
-        StylesManager.injectCSS();
+        injectCSS();
         injector = new PromptLibraryInjector();
         
         await new Promise(resolve => setTimeout(resolve, 100));
@@ -327,7 +335,7 @@ describe('Content Script Performance Tests', () => {
     it('should handle dynamic content loading', async () => {
       setupDOMForPlatform('https://spa-example.com/');
       
-      StylesManager.injectCSS();
+      injectCSS();
       injector = new PromptLibraryInjector();
       
       await new Promise(resolve => setTimeout(resolve, 50));
@@ -368,7 +376,7 @@ describe('Content Script Performance Tests', () => {
         return originalQuerySelector.call(dom.window.document, selector);
       });
       
-      StylesManager.injectCSS();
+      injectCSS();
       injector = new PromptLibraryInjector();
       
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -386,7 +394,7 @@ describe('Content Script Performance Tests', () => {
       // Mock storage to fail
       mockChrome.storage.local.get.mockRejectedValueOnce(new Error('Storage unavailable'));
       
-      StylesManager.injectCSS();
+      injectCSS();
       injector = new PromptLibraryInjector();
       
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -402,7 +410,7 @@ describe('Content Script Performance Tests', () => {
       const originalChrome = (global as any).chrome;
       (global as any).chrome = undefined;
       
-      StylesManager.injectCSS();
+      injectCSS();
       injector = new PromptLibraryInjector();
       
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -428,7 +436,7 @@ describe('Content Script Performance Tests', () => {
       
       const startTime = performance.now();
       
-      StylesManager.injectCSS();
+      injectCSS();
       injector = new PromptLibraryInjector();
       
       await new Promise(resolve => setTimeout(resolve, 200));
@@ -447,7 +455,7 @@ describe('Content Script Performance Tests', () => {
     it('should maintain performance with frequent DOM changes', async () => {
       setupDOMForPlatform('https://example.com/');
       
-      StylesManager.injectCSS();
+      injectCSS();
       injector = new PromptLibraryInjector();
       
       await new Promise(resolve => setTimeout(resolve, 100));

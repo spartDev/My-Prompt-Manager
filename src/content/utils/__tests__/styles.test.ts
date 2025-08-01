@@ -2,9 +2,12 @@
  * Unit tests for StylesManager utility module
  */
 
+ 
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { StylesManager } from '../styles';
+
 import { Logger } from '../logger';
+import { injectCSS, getCSS, removeCSS, isInjected } from '../styles';
 
 // Mock Logger
 vi.mock('../logger', () => ({
@@ -45,7 +48,7 @@ describe('StylesManager', () => {
       };
       documentMock.createElement.mockReturnValue(mockStyleElement);
 
-      StylesManager.injectCSS();
+      injectCSS();
 
       expect(documentMock.getElementById).toHaveBeenCalledWith('prompt-library-styles');
       expect(documentMock.createElement).toHaveBeenCalledWith('style');
@@ -59,7 +62,7 @@ describe('StylesManager', () => {
       const existingStyleElement = { id: 'prompt-library-styles' };
       documentMock.getElementById.mockReturnValue(existingStyleElement);
 
-      StylesManager.injectCSS();
+      injectCSS();
 
       expect(documentMock.getElementById).toHaveBeenCalledWith('prompt-library-styles');
       expect(documentMock.createElement).not.toHaveBeenCalled();
@@ -73,7 +76,7 @@ describe('StylesManager', () => {
         throw new Error('DOM error');
       });
 
-      StylesManager.injectCSS();
+      injectCSS();
 
       expect(Logger.error).toHaveBeenCalledWith(
         'Failed to inject CSS styles',
@@ -84,7 +87,7 @@ describe('StylesManager', () => {
 
   describe('getCSS', () => {
     it('should return CSS string with all required classes', () => {
-      const css = StylesManager.getCSS();
+      const css = getCSS();
 
       expect(css).toContain('.prompt-library-icon');
       expect(css).toContain('.prompt-library-selector');
@@ -102,25 +105,25 @@ describe('StylesManager', () => {
     });
 
     it('should include dark mode styles', () => {
-      const css = StylesManager.getCSS();
+      const css = getCSS();
 
       expect(css).toContain('@media (prefers-color-scheme: dark)');
     });
 
     it('should include responsive design styles', () => {
-      const css = StylesManager.getCSS();
+      const css = getCSS();
 
       expect(css).toContain('@media (max-width: 480px)');
     });
 
     it('should include animations', () => {
-      const css = StylesManager.getCSS();
+      const css = getCSS();
 
       expect(css).toContain('@keyframes promptSelectorFadeIn');
     });
 
     it('should include accessibility styles', () => {
-      const css = StylesManager.getCSS();
+      const css = getCSS();
 
       expect(css).toContain('.sr-only');
       expect(css).toContain('focus-visible');
@@ -134,7 +137,7 @@ describe('StylesManager', () => {
       };
       documentMock.getElementById.mockReturnValue(mockStyleElement);
 
-      StylesManager.removeCSS();
+      removeCSS();
 
       expect(documentMock.getElementById).toHaveBeenCalledWith('prompt-library-styles');
       expect(mockStyleElement.remove).toHaveBeenCalled();
@@ -144,7 +147,7 @@ describe('StylesManager', () => {
     it('should handle case when no styles exist', () => {
       documentMock.getElementById.mockReturnValue(null);
 
-      StylesManager.removeCSS();
+      removeCSS();
 
       expect(documentMock.getElementById).toHaveBeenCalledWith('prompt-library-styles');
       expect(Logger.info).not.toHaveBeenCalled();
@@ -158,7 +161,7 @@ describe('StylesManager', () => {
       };
       documentMock.getElementById.mockReturnValue(mockStyleElement);
 
-      StylesManager.removeCSS();
+      removeCSS();
 
       expect(Logger.error).toHaveBeenCalledWith(
         'Failed to remove CSS styles',
@@ -172,7 +175,7 @@ describe('StylesManager', () => {
       const mockStyleElement = { id: 'prompt-library-styles' };
       documentMock.getElementById.mockReturnValue(mockStyleElement);
 
-      const result = StylesManager.isInjected();
+      const result = isInjected();
 
       expect(result).toBe(true);
       expect(documentMock.getElementById).toHaveBeenCalledWith('prompt-library-styles');
@@ -181,7 +184,7 @@ describe('StylesManager', () => {
     it('should return false when styles are not injected', () => {
       documentMock.getElementById.mockReturnValue(null);
 
-      const result = StylesManager.isInjected();
+      const result = isInjected();
 
       expect(result).toBe(false);
       expect(documentMock.getElementById).toHaveBeenCalledWith('prompt-library-styles');
@@ -190,7 +193,7 @@ describe('StylesManager', () => {
 
   describe('CSS content validation', () => {
     it('should have consistent CSS structure', () => {
-      const css = StylesManager.getCSS();
+      const css = getCSS();
 
       // Check for proper CSS syntax
       expect(css).not.toContain('undefined');
@@ -203,7 +206,7 @@ describe('StylesManager', () => {
     });
 
     it('should include all essential UI components', () => {
-      const css = StylesManager.getCSS();
+      const css = getCSS();
 
       // Essential components for functionality
       const requiredClasses = [
@@ -220,7 +223,7 @@ describe('StylesManager', () => {
     });
 
     it('should include proper z-index values for layering', () => {
-      const css = StylesManager.getCSS();
+      const css = getCSS();
 
       expect(css).toContain('z-index: 999999'); // Icon
       expect(css).toContain('z-index: 1000000'); // Selector

@@ -3,8 +3,9 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ClaudeStrategy } from '../claude-strategy';
+
 import type { UIElementFactory } from '../../ui/element-factory';
+import { ClaudeStrategy } from '../claude-strategy';
 
 // Mock Logger
 vi.mock('../../utils/logger', () => ({

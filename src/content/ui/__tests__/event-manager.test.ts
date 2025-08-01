@@ -3,8 +3,9 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { EventManager } from '../event-manager';
+
 import { Logger } from '../../utils/logger';
+import { EventManager } from '../event-manager';
 
 // Mock Logger
 vi.mock('../../utils/logger', () => ({
@@ -172,7 +173,7 @@ describe('EventManager', () => {
     it('should handle non-Error objects in cleanup', () => {
       const removeEventListenerSpy = vi.spyOn(mockElement, 'removeEventListener');
       removeEventListenerSpy.mockImplementation(() => {
-        throw 'String error';
+        throw new Error('String error');
       });
       
       mockElement.id = 'test-id';

@@ -4,9 +4,9 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
+import { Logger } from '../../utils/logger';
 import { EventManager } from '../event-manager';
 import { KeyboardNavigationManager } from '../keyboard-navigation';
-import { Logger } from '../../utils/logger';
 
 // Mock Logger
 vi.mock('../../utils/logger', () => ({

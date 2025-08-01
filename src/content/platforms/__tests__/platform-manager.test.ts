@@ -3,10 +3,11 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { PlatformManager } from '../platform-manager';
-import { PlatformStrategy } from '../base-strategy';
-import type { UIElementFactory } from '../../ui/element-factory';
+
 import type { InsertionResult } from '../../types/index';
+import type { UIElementFactory } from '../../ui/element-factory';
+import { PlatformStrategy } from '../base-strategy';
+import { PlatformManager } from '../platform-manager';
 
 // Mock Logger
 vi.mock('../../utils/logger', () => ({
@@ -411,7 +412,7 @@ describe('PlatformManager', () => {
       });
       manager.registerStrategy(errorStrategy);
       
-      expect(() => manager.cleanup()).not.toThrow();
+      expect(() => { manager.cleanup(); }).not.toThrow();
       
       const { Logger } = await import('../../utils/logger');
       expect(Logger.warn).toHaveBeenCalledWith('Failed to cleanup strategy error', expect.any(Error));

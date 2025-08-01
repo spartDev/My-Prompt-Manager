@@ -5,10 +5,18 @@
  * with the original implementation and works across different environments.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+ 
+ 
+ 
+ 
+ 
+ 
+
 import { JSDOM } from 'jsdom';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+
 import { PromptLibraryInjector } from '../core/injector';
-import { StylesManager } from '../utils/styles';
+import { injectCSS } from '../utils/styles';
 
 // Mock Chrome APIs
 const mockChrome = {
@@ -30,7 +38,7 @@ const mockChrome = {
   }
 };
 
-(global as any).chrome = mockChrome;
+(globalThis as any).chrome = mockChrome;
 
 describe('Content Script Compatibility Tests', () => {
   let dom: JSDOM;
@@ -55,11 +63,13 @@ describe('Content Script Compatibility Tests', () => {
       resources: 'usable'
     });
 
-    global.document = dom.window.document;
-    global.window = dom.window as any;
-    global.HTMLElement = dom.window.HTMLElement;
-    global.Element = dom.window.Element;
-    global.Node = dom.window.Node;
+    // Type-safe global assignments
+    const domWindow = dom.window as any;
+    (globalThis as any).document = domWindow.document;
+    (globalThis as any).window = domWindow;
+    (globalThis as any).HTMLElement = domWindow.HTMLElement;
+    (globalThis as any).Element = domWindow.Element;
+    (globalThis as any).Node = domWindow.Node;
   };
 
   beforeEach(() => {
@@ -70,8 +80,10 @@ describe('Content Script Compatibility Tests', () => {
   });
 
   afterEach(() => {
-    if (injector) {
-      injector.cleanup();
+    try {
+      injector?.cleanup();
+    } catch {
+      // Ignore cleanup errors in tests
     }
     vi.restoreAllMocks();
   });
@@ -81,31 +93,33 @@ describe('Content Script Compatibility Tests', () => {
       setupDOMForPlatform('https://example.com/');
       
       // Mock Chrome-specific features
-      (global as any).chrome = mockChrome;
-      Object.defineProperty(dom.window.navigator, 'userAgent', {
+      (globalThis as any).chrome = mockChrome;
+      const domWindow = dom.window as any;
+      Object.defineProperty(domWindow.navigator, 'userAgent', {
         value: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
         configurable: true
       });
 
-      StylesManager.injectCSS();
+      injectCSS();
       injector = new PromptLibraryInjector();
 
       await new Promise(resolve => setTimeout(resolve, 100));
 
       expect(injector).toBeDefined();
-      const styles = dom.window.document.querySelectorAll('style');
+      const styles = domWindow.document.querySelectorAll('style');
       expect(styles.length).toBeGreaterThan(0);
     });
 
     it('should work in Edge-like environments', async () => {
       setupDOMForPlatform('https://example.com/');
       
-      Object.defineProperty(dom.window.navigator, 'userAgent', {
+      const domWindow = dom.window as any;
+      Object.defineProperty(domWindow.navigator, 'userAgent', {
         value: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36 Edg/91.0.864.59',
         configurable: true
       });
 
-      StylesManager.injectCSS();
+      injectCSS();
       injector = new PromptLibraryInjector();
 
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -125,10 +139,11 @@ describe('Content Script Compatibility Tests', () => {
         setupDOMForPlatform('https://example.com/');
         
         // Mock viewport size
-        Object.defineProperty(dom.window, 'innerWidth', { value: viewport.width, configurable: true });
-        Object.defineProperty(dom.window, 'innerHeight', { value: viewport.height, configurable: true });
+        const domWindow = dom.window as any;
+        Object.defineProperty(domWindow, 'innerWidth', { value: viewport.width, configurable: true });
+        Object.defineProperty(domWindow, 'innerHeight', { value: viewport.height, configurable: true });
 
-        StylesManager.injectCSS();
+        injectCSS();
         const tempInjector = new PromptLibraryInjector();
 
         await new Promise(resolve => setTimeout(resolve, 50));
@@ -158,7 +173,7 @@ describe('Content Script Compatibility Tests', () => {
 
       setupDOMForPlatform('https://claude.ai/chat', claudeHTML);
 
-      StylesManager.injectCSS();
+      injectCSS();
       injector = new PromptLibraryInjector();
 
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -166,8 +181,9 @@ describe('Content Script Compatibility Tests', () => {
       expect(injector).toBeDefined();
       
       // Verify ProseMirror element is detected
-      const proseMirror = dom.window.document.querySelector('.ProseMirror');
-      expect(proseMirror).toBeDefined();
+      const domWindow = dom.window as any;
+      const proseMirror = domWindow.document.querySelector('.ProseMirror');
+      expect(proseMirror).not.toBeNull();
     });
 
     it('should work on ChatGPT with React-based input', async () => {
@@ -190,7 +206,7 @@ describe('Content Script Compatibility Tests', () => {
 
       setupDOMForPlatform('https://chatgpt.com/', chatgptHTML);
 
-      StylesManager.injectCSS();
+      injectCSS();
       injector = new PromptLibraryInjector();
 
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -198,8 +214,9 @@ describe('Content Script Compatibility Tests', () => {
       expect(injector).toBeDefined();
       
       // Verify ChatGPT input is detected
-      const chatInput = dom.window.document.querySelector('#prompt-textarea');
-      expect(chatInput).toBeDefined();
+      const domWindow = dom.window as any;
+      const chatInput = domWindow.document.querySelector('#prompt-textarea');
+      expect(chatInput).not.toBeNull();
     });
 
     it('should work on Perplexity with textarea input', async () => {
@@ -220,7 +237,7 @@ describe('Content Script Compatibility Tests', () => {
 
       setupDOMForPlatform('https://www.perplexity.ai/', perplexityHTML);
 
-      StylesManager.injectCSS();
+      injectCSS();
       injector = new PromptLibraryInjector();
 
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -228,8 +245,9 @@ describe('Content Script Compatibility Tests', () => {
       expect(injector).toBeDefined();
       
       // Verify Perplexity input is detected
-      const perplexityInput = dom.window.document.querySelector('textarea[placeholder="Ask anything..."]');
-      expect(perplexityInput).toBeDefined();
+      const domWindow = dom.window as any;
+      const perplexityInput = domWindow.document.querySelector('textarea[placeholder="Ask anything..."]');
+      expect(perplexityInput).not.toBeNull();
     });
 
     it('should work on generic websites with standard inputs', async () => {
@@ -250,7 +268,7 @@ describe('Content Script Compatibility Tests', () => {
 
       setupDOMForPlatform('https://example.com/', genericHTML);
 
-      StylesManager.injectCSS();
+      injectCSS();
       injector = new PromptLibraryInjector();
 
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -258,13 +276,14 @@ describe('Content Script Compatibility Tests', () => {
       expect(injector).toBeDefined();
       
       // Verify generic inputs are detected
-      const textarea = dom.window.document.querySelector('textarea');
-      const textInput = dom.window.document.querySelector('input[type="text"]');
-      const editableDiv = dom.window.document.querySelector('[contenteditable="true"]');
+      const domWindow = dom.window as any;
+      const textarea = domWindow.document.querySelector('textarea');
+      const textInput = domWindow.document.querySelector('input[type="text"]');
+      const editableDiv = domWindow.document.querySelector('[contenteditable="true"]');
       
-      expect(textarea).toBeDefined();
-      expect(textInput).toBeDefined();
-      expect(editableDiv).toBeDefined();
+      expect(textarea).not.toBeNull();
+      expect(textInput).not.toBeNull();
+      expect(editableDiv).not.toBeNull();
     });
   });
 
@@ -272,24 +291,25 @@ describe('Content Script Compatibility Tests', () => {
     it('should handle Single Page Application (SPA) navigation', async () => {
       setupDOMForPlatform('https://spa-example.com/');
 
-      StylesManager.injectCSS();
+      injectCSS();
       injector = new PromptLibraryInjector();
 
       await new Promise(resolve => setTimeout(resolve, 100));
 
       // Simulate SPA route change
-      const newContent = dom.window.document.createElement('div');
+      const domWindow = dom.window as any;
+      const newContent = domWindow.document.createElement('div');
       newContent.innerHTML = `
         <h1>New Page</h1>
         <textarea placeholder="New page input"></textarea>
       `;
       
-      dom.window.document.body.innerHTML = '';
-      dom.window.document.body.appendChild(newContent);
+      domWindow.document.body.innerHTML = '';
+      domWindow.document.body.appendChild(newContent);
 
       // Trigger popstate event (SPA navigation)
-      const popstateEvent = new dom.window.Event('popstate');
-      dom.window.dispatchEvent(popstateEvent);
+      const popstateEvent = new domWindow.Event('popstate');
+      domWindow.dispatchEvent(popstateEvent);
 
       await new Promise(resolve => setTimeout(resolve, 100));
 
@@ -299,20 +319,21 @@ describe('Content Script Compatibility Tests', () => {
     it('should handle dynamically added inputs', async () => {
       setupDOMForPlatform('https://example.com/');
 
-      StylesManager.injectCSS();
+      injectCSS();
       injector = new PromptLibraryInjector();
 
       await new Promise(resolve => setTimeout(resolve, 100));
 
       // Add inputs dynamically
+      const domWindow = dom.window as any;
       for (let i = 0; i < 5; i++) {
-        const newInput = dom.window.document.createElement('textarea');
+        const newInput = domWindow.document.createElement('textarea');
         newInput.id = `dynamic-input-${i}`;
         newInput.placeholder = `Dynamic input ${i}`;
-        dom.window.document.body.appendChild(newInput);
+        domWindow.document.body.appendChild(newInput);
 
         // Trigger focus event to simulate user interaction
-        const focusEvent = new dom.window.Event('focusin', { bubbles: true });
+        const focusEvent = new domWindow.Event('focusin', { bubbles: true });
         newInput.dispatchEvent(focusEvent);
 
         await new Promise(resolve => setTimeout(resolve, 20));
@@ -335,7 +356,7 @@ describe('Content Script Compatibility Tests', () => {
 
       setupDOMForPlatform('https://example.com/', iframeHTML);
 
-      StylesManager.injectCSS();
+      injectCSS();
       injector = new PromptLibraryInjector();
 
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -343,8 +364,9 @@ describe('Content Script Compatibility Tests', () => {
       expect(injector).toBeDefined();
       
       // Verify iframe doesn't break the extension
-      const iframe = dom.window.document.querySelector('#test-iframe');
-      expect(iframe).toBeDefined();
+      const domWindow = dom.window as any;
+      const iframe = domWindow.document.querySelector('#test-iframe');
+      expect(iframe).not.toBeNull();
     });
   });
 
@@ -369,7 +391,7 @@ describe('Content Script Compatibility Tests', () => {
 
       setupDOMForPlatform('https://example.com/', malformedHTML);
 
-      StylesManager.injectCSS();
+      injectCSS();
       injector = new PromptLibraryInjector();
 
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -382,10 +404,11 @@ describe('Content Script Compatibility Tests', () => {
       setupDOMForPlatform('https://example.com/');
 
       // Mock missing methods
-      const originalQuerySelectorAll = dom.window.document.querySelectorAll;
-      dom.window.document.querySelectorAll = undefined as any;
+      const domWindow = dom.window as any;
+      const originalQuerySelectorAll = domWindow.document.querySelectorAll;
+      domWindow.document.querySelectorAll = undefined;
 
-      StylesManager.injectCSS();
+      injectCSS();
       injector = new PromptLibraryInjector();
 
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -394,16 +417,17 @@ describe('Content Script Compatibility Tests', () => {
       expect(injector).toBeDefined();
 
       // Restore method
-      dom.window.document.querySelectorAll = originalQuerySelectorAll;
+      domWindow.document.querySelectorAll = originalQuerySelectorAll;
     });
 
     it('should handle CSP (Content Security Policy) restrictions', async () => {
       setupDOMForPlatform('https://example.com/');
 
       // Mock CSP error for inline styles
-      const originalCreateElement = dom.window.document.createElement;
-      dom.window.document.createElement = vi.fn().mockImplementation((tagName) => {
-        const element = originalCreateElement.call(dom.window.document, tagName);
+      const domWindow = dom.window as any;
+      const originalCreateElement = domWindow.document.createElement;
+      domWindow.document.createElement = vi.fn().mockImplementation((tagName: string) => {
+        const element = originalCreateElement.call(domWindow.document, tagName);
         if (tagName === 'style') {
           // Simulate CSP blocking inline styles
           Object.defineProperty(element, 'textContent', {
@@ -416,7 +440,7 @@ describe('Content Script Compatibility Tests', () => {
         return element;
       });
 
-      StylesManager.injectCSS();
+      injectCSS();
       injector = new PromptLibraryInjector();
 
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -425,7 +449,7 @@ describe('Content Script Compatibility Tests', () => {
       expect(injector).toBeDefined();
 
       // Restore method
-      dom.window.document.createElement = originalCreateElement;
+      domWindow.document.createElement = originalCreateElement;
     });
   });
 
@@ -435,7 +459,7 @@ describe('Content Script Compatibility Tests', () => {
 
       const startTime = performance.now();
 
-      StylesManager.injectCSS();
+      injectCSS();
       injector = new PromptLibraryInjector();
 
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -451,14 +475,15 @@ describe('Content Script Compatibility Tests', () => {
       setupDOMForPlatform('https://example.com/');
 
       // Get baseline memory usage (approximate)
-      const initialElements = dom.window.document.querySelectorAll('*').length;
+      const domWindow = dom.window as any;
+      const initialElements = domWindow.document.querySelectorAll('*').length;
 
-      StylesManager.injectCSS();
+      injectCSS();
       injector = new PromptLibraryInjector();
 
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      const finalElements = dom.window.document.querySelectorAll('*').length;
+      const finalElements = domWindow.document.querySelectorAll('*').length;
       const addedElements = finalElements - initialElements;
 
       // Should not add excessive DOM elements
@@ -468,7 +493,7 @@ describe('Content Script Compatibility Tests', () => {
     it('should clean up resources completely', async () => {
       setupDOMForPlatform('https://example.com/');
 
-      StylesManager.injectCSS();
+      injectCSS();
       injector = new PromptLibraryInjector();
 
       await new Promise(resolve => setTimeout(resolve, 100));

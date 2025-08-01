@@ -6,16 +6,20 @@
  * compatibility with the original implementation.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
 import { JSDOM } from 'jsdom';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+
 import { PromptLibraryInjector } from '../core/injector';
-import { StylesManager } from '../utils/styles';
-import { Logger } from '../utils/logger';
-import { PlatformManager } from '../platforms/platform-manager';
-import { ClaudeStrategy } from '../platforms/claude-strategy';
-import { ChatGPTStrategy } from '../platforms/chatgpt-strategy';
-import { PerplexityStrategy } from '../platforms/perplexity-strategy';
-import { DefaultStrategy } from '../platforms/default-strategy';
+import { injectCSS } from '../utils/styles';
 
 // Mock Chrome APIs
 const mockChrome = {
@@ -45,7 +49,7 @@ const mockChrome = {
 };
 
 // Setup global Chrome API mock
-(global as any).chrome = mockChrome;
+(globalThis as any).chrome = mockChrome;
 
 describe('Content Script Integration Tests', () => {
   let dom: JSDOM;
@@ -111,7 +115,7 @@ describe('Content Script Integration Tests', () => {
       `;
 
       // Initialize injector
-      StylesManager.injectCSS();
+      injectCSS();
       injector = new PromptLibraryInjector();
 
       // Wait for initialization
@@ -140,7 +144,7 @@ describe('Content Script Integration Tests', () => {
       `;
 
       // Initialize injector
-      StylesManager.injectCSS();
+      injectCSS();
       injector = new PromptLibraryInjector();
 
       // Wait for initialization
@@ -167,7 +171,7 @@ describe('Content Script Integration Tests', () => {
       `;
 
       // Initialize injector
-      StylesManager.injectCSS();
+      injectCSS();
       injector = new PromptLibraryInjector();
 
       // Wait for initialization
@@ -193,7 +197,7 @@ describe('Content Script Integration Tests', () => {
       `;
 
       // Initialize injector
-      StylesManager.injectCSS();
+      injectCSS();
       injector = new PromptLibraryInjector();
 
       // Wait for initialization
@@ -218,7 +222,7 @@ describe('Content Script Integration Tests', () => {
         <textarea id="test-input" placeholder="Test input"></textarea>
       `;
 
-      StylesManager.injectCSS();
+      injectCSS();
       injector = new PromptLibraryInjector();
     });
 
@@ -283,7 +287,7 @@ describe('Content Script Integration Tests', () => {
         </div>
       `;
 
-      StylesManager.injectCSS();
+      injectCSS();
       injector = new PromptLibraryInjector();
     });
 
@@ -295,7 +299,7 @@ describe('Content Script Integration Tests', () => {
       promptSelector.style.display = 'block';
 
       // Simulate arrow key navigation
-      let currentIndex = 0;
+      const currentIndex = 0;
       const firstItem = promptItems[currentIndex] as HTMLElement;
       firstItem.focus();
 
@@ -454,7 +458,7 @@ describe('Content Script Integration Tests', () => {
         }
 
         // Initialize injector
-        StylesManager.injectCSS();
+        injectCSS();
         injector = new PromptLibraryInjector();
 
         // Wait for initialization

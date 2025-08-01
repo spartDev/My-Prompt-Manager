@@ -7,7 +7,7 @@
 
 import type { PlatformStrategyInterface, PlatformConfig, InsertionResult } from '../types/index';
 import type { UIElementFactory } from '../ui/element-factory';
-import { Logger } from '../utils/logger';
+import { debug, warn , error as logError } from '../utils/logger';
 
 export abstract class PlatformStrategy implements PlatformStrategyInterface {
   public readonly name: string;
@@ -36,7 +36,7 @@ export abstract class PlatformStrategy implements PlatformStrategyInterface {
   private _validateImplementation(): void {
     const requiredMethods = ['canHandle', 'insert', 'getSelectors'];
     for (const method of requiredMethods) {
-      if (typeof (this as any)[method] !== 'function') {
+      if (typeof (this as Record<string, unknown>)[method] !== 'function') {
         throw new Error(`Strategy ${this.name} must implement ${method}() method`);
       }
     }
@@ -96,8 +96,8 @@ export abstract class PlatformStrategy implements PlatformStrategyInterface {
    * @param context - Additional context
    * @protected
    */
-  protected _debug(message: string, context: Record<string, any> = {}): void {
-    Logger.debug(`[${this.name}] ${message}`, context);
+  protected _debug(message: string, context: Record<string, unknown> = {}): void {
+    debug(`[${this.name}] ${message}`, context);
   }
 
   /**
@@ -106,8 +106,8 @@ export abstract class PlatformStrategy implements PlatformStrategyInterface {
    * @param errorOrContext - Error object or context
    * @protected
    */
-  protected _warn(message: string, errorOrContext: any = {}): void {
-    Logger.warn(`[${this.name}] ${message}`, errorOrContext);
+  protected _warn(message: string, errorOrContext: Record<string, unknown> | Error = {}): void {
+    warn(`[${this.name}] ${message}`, errorOrContext);
   }
 
   /**
@@ -117,7 +117,7 @@ export abstract class PlatformStrategy implements PlatformStrategyInterface {
    * @param context - Additional context
    * @protected
    */
-  protected _error(message: string, error: Error, context: Record<string, any> = {}): void {
-    Logger.error(`[${this.name}] ${message}`, error, context);
+  protected _error(message: string, errorObj: Error, context: Record<string, unknown> = {}): void {
+    logError(`[${this.name}] ${message}`, errorObj, context);
   }
 }

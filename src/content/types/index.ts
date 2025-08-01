@@ -20,7 +20,7 @@ export interface DebugInfo {
   timestamp: string;
   level: 'ERROR' | 'WARN' | 'INFO' | 'DEBUG';
   message: string;
-  context: Record<string, any>;
+  context: Record<string, unknown>;
   url: string;
   userAgent?: string;
   error?: {

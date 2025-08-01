@@ -3,8 +3,9 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ChatGPTStrategy } from '../chatgpt-strategy';
+
 import type { UIElementFactory } from '../../ui/element-factory';
+import { ChatGPTStrategy } from '../chatgpt-strategy';
 
 // Mock Logger
 vi.mock('../../utils/logger', () => ({

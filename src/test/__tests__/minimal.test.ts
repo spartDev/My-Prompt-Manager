@@ -43,7 +43,7 @@ describe('Minimal Test Suite', () => {
     });
 
     it('should handle chrome storage mocks', async () => {
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       vi.mocked(chrome.storage.local.get).mockResolvedValue({ test: 'value' });
       
       const result = await chrome.storage.local.get(['test']);

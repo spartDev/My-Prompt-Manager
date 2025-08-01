@@ -3,39 +3,38 @@
  * Handles CSS injection and style management
  */
 
-import { Logger } from './logger';
+import { debug, info, error as logError } from './logger';
 
-export class StylesManager {
-  private static readonly STYLE_ID = 'prompt-library-styles';
+const STYLE_ID = 'prompt-library-styles';
 
-  /**
-   * Inject CSS styles into the document head
-   * Only injects once per page load
-   */
-  static injectCSS(): void {
+/**
+ * Inject CSS styles into the document head
+ * Only injects once per page load
+ */
+export function injectCSS(): void {
     try {
       // Check if styles are already injected
-      if (document.getElementById(this.STYLE_ID)) {
-        Logger.debug('CSS styles already injected, skipping');
+      if (document.getElementById(STYLE_ID)) {
+        debug('CSS styles already injected, skipping');
         return;
       }
 
       const style = document.createElement('style');
-      style.id = this.STYLE_ID;
-      style.textContent = this.getCSS();
+      style.id = STYLE_ID;
+      style.textContent = getCSS();
 
       document.head.appendChild(style);
-      Logger.info('CSS styles injected successfully');
-    } catch (error) {
-      Logger.error('Failed to inject CSS styles', error as Error);
+      info('CSS styles injected successfully');
+    } catch (err) {
+      logError('Failed to inject CSS styles', err as Error);
     }
   }
 
-  /**
-   * Get the CSS string for the prompt library
-   * @returns The complete CSS string
-   */
-  static getCSS(): string {
+/**
+ * Get the CSS string for the prompt library
+ * @returns The complete CSS string
+ */
+export function getCSS(): string {
     return `
     /* Prompt Manager Icon */
     .prompt-library-icon {
@@ -375,29 +374,28 @@ export class StylesManager {
       border-left: 4px solid #ef4444;
     }
   `;
-  }
+}
 
-  /**
-   * Remove injected styles from the document
-   * Useful for cleanup or testing
-   */
-  static removeCSS(): void {
-    try {
-      const existingStyle = document.getElementById(this.STYLE_ID);
-      if (existingStyle) {
-        existingStyle.remove();
-        Logger.info('CSS styles removed successfully');
-      }
-    } catch (error) {
-      Logger.error('Failed to remove CSS styles', error as Error);
+/**
+ * Remove injected styles from the document
+ * Useful for cleanup or testing
+ */
+export function removeCSS(): void {
+  try {
+    const existingStyle = document.getElementById(STYLE_ID);
+    if (existingStyle) {
+      existingStyle.remove();
+      info('CSS styles removed successfully');
     }
+  } catch (err) {
+    logError('Failed to remove CSS styles', err as Error);
   }
+}
 
-  /**
-   * Check if styles are already injected
-   * @returns True if styles are already present
-   */
-  static isInjected(): boolean {
-    return document.getElementById(this.STYLE_ID) !== null;
-  }
+/**
+ * Check if styles are already injected
+ * @returns True if styles are already present
+ */
+export function isInjected(): boolean {
+  return document.getElementById(STYLE_ID) !== null;
 }

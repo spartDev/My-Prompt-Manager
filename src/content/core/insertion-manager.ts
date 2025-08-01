@@ -6,20 +6,24 @@
  * by the legacy code while using the improved modular architecture.
  */
 
+import { PlatformManager } from '../platforms/platform-manager';
 import type { InsertionResult } from '../types/index';
 import type { UIElementFactory } from '../ui/element-factory';
-import { PlatformManager } from '../platforms/platform-manager';
-import { Logger } from '../utils/logger';
+import { warn, info } from '../utils/logger';
 
 export class PlatformInsertionManager {
-  private options: Required<Record<string, any>>;
+  private options: Required<Record<string, unknown>>;
   private platformManager: PlatformManager;
 
-  constructor(options: Record<string, any> = {}) {
+  constructor(options: Record<string, unknown> = {}) {
+    const debug = typeof options.debug === 'boolean' ? options.debug : false;
+    const timeout = typeof options.timeout === 'number' ? options.timeout : 5000;
+    const retries = typeof options.retries === 'number' ? options.retries : 3;
+    
     this.options = {
-      debug: options.debug || false,
-      timeout: options.timeout || 5000,
-      retries: options.retries || 3,
+      debug,
+      timeout,
+      retries,
       ...options
     };
     
@@ -30,7 +34,7 @@ export class PlatformInsertionManager {
       timeout: this.options.timeout
     });
     
-    Logger.info('PlatformInsertionManager initialized with strategy pattern');
+    info('PlatformInsertionManager initialized with strategy pattern');
   }
 
   /**
@@ -97,14 +101,12 @@ export class PlatformInsertionManager {
    * Cleans up resources and platform manager
    */
   cleanup(): void {
-    if (this.platformManager) {
-      try {
-        this.platformManager.cleanup();
-      } catch (error) {
-        Logger.warn('Error during platform manager cleanup', { error });
-      }
+    try {
+      this.platformManager.cleanup();
+    } catch (error) {
+      warn('Error during platform manager cleanup', { error });
     }
     
-    Logger.info('PlatformInsertionManager cleanup completed');
+    info('PlatformInsertionManager cleanup completed');
   }
 }

@@ -22,12 +22,12 @@ describe('Comprehensive Test Suite', () => {
       settings: { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt', viewMode: 'grid' }
     };
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method, @typescript-eslint/no-misused-promises
+     
     vi.mocked(chrome.storage.local.get).mockImplementation((keys) => {
       if (Array.isArray(keys)) {
         const result: Record<string, unknown> = {};
         keys.forEach(key => {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+           
           result[key] = mockStorage[key] || null;
         });
         return Promise.resolve(result);
@@ -36,13 +36,13 @@ describe('Comprehensive Test Suite', () => {
       return Promise.resolve({ [keys as string]: mockStorage[keys as string] || null });
     });
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method, @typescript-eslint/no-misused-promises
+     
     vi.mocked(chrome.storage.local.set).mockImplementation((data) => {
       Object.assign(mockStorage, data);
       return Promise.resolve();
     });
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method, @typescript-eslint/no-misused-promises
+     
     vi.mocked(chrome.storage.local.clear).mockImplementation(() => {
       Object.keys(mockStorage).forEach(key => {
         // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
@@ -51,7 +51,7 @@ describe('Comprehensive Test Suite', () => {
       return Promise.resolve();
     });
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
+     
     vi.mocked(chrome.storage.local.getBytesInUse).mockResolvedValue(1024);
   });
 
@@ -178,7 +178,7 @@ describe('Comprehensive Test Suite', () => {
 
   describe('Error Handling', () => {
     it('should handle storage quota exceeded errors', async () => {
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       vi.mocked(chrome.storage.local.set).mockRejectedValue(
         new Error('QUOTA_EXCEEDED: Storage quota exceeded')
       );
@@ -196,7 +196,7 @@ describe('Comprehensive Test Suite', () => {
     });
 
     it('should handle storage API unavailable errors', async () => {
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       vi.mocked(chrome.storage.local.get).mockRejectedValue(
         new Error('storage API unavailable')
       );
