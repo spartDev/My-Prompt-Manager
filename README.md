@@ -359,6 +359,19 @@ The extension uses Chrome's `chrome.storage.local` API for data persistence:
 4. Test thoroughly using the testing guide
 5. Submit a pull request
 
+### Adding New LLM Platforms
+
+Want to add support for a new AI platform like Gemini, Mistral.ai, or others? It's easy! 
+
+📖 **[Platform Integration Guide](docs/PLATFORM_INTEGRATION.md)** - Complete guide for developers
+
+The modular architecture makes adding new platforms straightforward - typically taking just 30-60 minutes. The guide includes:
+
+- Step-by-step instructions
+- Code examples for different platform types  
+- Testing and debugging workflows
+- Best practices and troubleshooting tips
+
 ## License
 
 [MIT License](LICENSE)
