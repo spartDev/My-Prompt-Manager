@@ -39,34 +39,36 @@ export class PlatformManager {
 
   /**
    * Initializes platform strategies based on current hostname
-   * Only loads strategies relevant to the current platform for performance
+   * Only loads strategies for supported AI platforms
    * @private
    */
   private _initializeStrategies(): void {
     info('Initializing platform strategies', { hostname: this.hostname });
     
-    // Always add default strategy as fallback
-    this.strategies.push(new DefaultStrategy());
-    
-    // Add platform-specific strategies based on hostname
+    // Only add strategies for supported AI platforms
     switch (this.hostname) {
       case 'claude.ai':
         this.strategies.push(new ClaudeStrategy());
+        this.strategies.push(new DefaultStrategy()); // Fallback for Claude
         info('Loaded Claude strategy for claude.ai');
         break;
         
       case 'chatgpt.com':
         this.strategies.push(new ChatGPTStrategy());
+        this.strategies.push(new DefaultStrategy()); // Fallback for ChatGPT
         info('Loaded ChatGPT strategy for chatgpt.com');
         break;
         
       case 'www.perplexity.ai':
         this.strategies.push(new PerplexityStrategy());
+        this.strategies.push(new DefaultStrategy()); // Fallback for Perplexity
         info('Loaded Perplexity strategy for www.perplexity.ai');
         break;
         
       default:
-        info(`Using default strategy for unknown hostname: ${this.hostname}`);
+        info(`Unsupported hostname: ${this.hostname} - no strategies loaded`);
+        // No strategies loaded for unsupported sites
+        return;
     }
     
     // Sort strategies by priority (highest first)
@@ -129,9 +131,14 @@ export class PlatformManager {
 
   /**
    * Gets all available selectors from loaded strategies
-   * @returns Combined array of all selectors
+   * @returns Combined array of all selectors, empty if no strategies loaded
    */
   getAllSelectors(): string[] {
+    // Return empty array if no strategies loaded (unsupported site)
+    if (this.strategies.length === 0) {
+      return [];
+    }
+    
     const allSelectors: string[] = [];
     for (const strategy of this.strategies) {
       allSelectors.push(...strategy.getSelectors());
