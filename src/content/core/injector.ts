@@ -350,6 +350,21 @@ export class PromptLibraryInjector {
           }
         }
         
+        // For Perplexity, find the toolbar container and inject as first child
+        if (this.state.hostname === 'www.perplexity.ai' && !injected) {
+          // Look for the toolbar container with class pattern matching
+          const toolbarContainer = document.querySelector('div.bg-raised[class*="flex"][class*="items-center"][class*="rounded-full"]');
+          if (toolbarContainer) {
+            // Insert as the first child in the container
+            toolbarContainer.insertBefore(icon, toolbarContainer.firstChild);
+            injected = true;
+            info('Icon injected as first button in Perplexity toolbar', {
+              textareaTag: textarea.tagName,
+              iconType: 'perplexity-integrated'
+            });
+          }
+        }
+        
         // Fallback to generic container selector
         if (!injected) {
           const container = document.querySelector(containerSelector);
