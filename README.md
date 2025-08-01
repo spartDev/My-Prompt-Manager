@@ -88,6 +88,58 @@ A Chrome extension that provides seamless access to your personal prompt library
 3. For major changes, manually reload the extension in `chrome://extensions/`
 4. Test functionality in both the popup and platform integrations
 
+### Content Script Development
+
+The modular TypeScript content script provides a robust foundation for development:
+
+#### Adding New Platform Support
+
+1. **Create Platform Strategy:**
+   ```typescript
+   // src/content/platforms/new-platform-strategy.ts
+   import { PlatformStrategy } from './base-strategy';
+   
+   export class NewPlatformStrategy extends PlatformStrategy {
+     constructor() {
+       super('NewPlatform', 100, {
+         selectors: ['textarea[data-platform="new"]'],
+         buttonContainerSelector: '.button-container',
+         priority: 100
+       });
+     }
+     
+     canHandle(element: HTMLElement): boolean {
+       // Implementation
+     }
+     
+     async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
+       // Implementation
+     }
+   }
+   ```
+
+2. **Register Strategy in Platform Manager**
+3. **Add Tests in `__tests__` directory**
+4. **Update TypeScript types if needed**
+
+#### Testing Commands
+
+```bash
+npm test             # Run test suite
+npm run test:ui      # Run tests with UI
+npm run test:coverage # Run tests with coverage report
+npm run lint         # Run ESLint
+npm run lint:fix     # Fix ESLint issues automatically
+```
+
+#### Build Process
+
+The TypeScript modules are bundled using Vite:
+- Strict TypeScript compilation
+- Source map generation for debugging
+- Tree-shaking for optimal bundle size
+- Chrome extension context compatibility
+
 ## Project Structure
 
 ```
@@ -119,7 +171,13 @@ src/
 │   ├── components.ts  # Component prop types
 │   ├── hooks.ts       # Hook return types
 │   └── context.ts     # Context types
-├── content.js         # Content script for AI platform integration
+├── content/           # Modular TypeScript content script for AI platform integration
+│   ├── index.ts        # Main entry point
+│   ├── types/          # TypeScript type definitions
+│   ├── utils/          # Utility modules (logger, storage, DOM, styles)
+│   ├── ui/             # UI components (element factory, keyboard nav, events)
+│   ├── platforms/      # Platform strategies (Claude, ChatGPT, Perplexity, etc.)
+│   └── core/           # Core components (injector, insertion manager)
 ├── popup.html         # Extension popup HTML
 ├── popup.tsx          # React entry point
 └── popup.css          # Global styles
@@ -137,7 +195,28 @@ The extension provides two complementary interfaces:
 1. **Storage Layer:** `StorageManager` handles Chrome storage API operations
 2. **Business Logic:** `PromptManager` handles validation, search, and data processing
 3. **React Hooks:** Custom hooks provide data and operations to popup components
-4. **Content Script:** `content.js` handles AI platform integration and prompt insertion
+4. **Content Script:** `src/content/` modular TypeScript handles AI platform integration and prompt insertion
+
+### Content Script Modular Architecture
+
+The content script has been refactored from a monolithic JavaScript file into a well-organized TypeScript module structure:
+
+```
+src/content/
+├── index.ts                    # Main entry point
+├── types/                      # TypeScript type definitions
+├── utils/                      # Utility modules (logger, storage, DOM, styles)
+├── ui/                         # UI components (element factory, keyboard nav, events)
+├── platforms/                  # Platform strategies (Claude, ChatGPT, Perplexity, etc.)
+└── core/                       # Core components (injector, insertion manager)
+```
+
+**Key Benefits:**
+- **Maintainability**: Clear separation of concerns with single-responsibility modules
+- **Type Safety**: Comprehensive TypeScript types for better development experience
+- **Testability**: Each module can be tested independently with full test coverage
+- **Extensibility**: Easy to add new platform support through strategy pattern
+- **Performance**: Optimized build process with tree-shaking and source maps
 
 ### Key Components
 

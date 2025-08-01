@@ -20,6 +20,24 @@ export default defineConfig({
       input: {
         popup: 'src/popup.html'
       }
+    },
+    // Generate source maps for debugging
+    sourcemap: true,
+    // Use esbuild for minification (faster and included by default)
+    minify: 'esbuild'
+  },
+  // Ensure TypeScript is properly configured
+  esbuild: {
+    // Keep original names for better debugging
+    keepNames: true,
+    // Generate source maps
+    sourcemap: true
+  },
+  // Resolve configuration for better module resolution
+  resolve: {
+    alias: {
+      // Add alias for content script modules if needed
+      '@content': '/src/content'
     }
   }
 });

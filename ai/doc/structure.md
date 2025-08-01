@@ -17,7 +17,7 @@
 - **popup.html**: HTML template for extension popup
 - **popup.css**: Global styles and Tailwind imports
 - **background.ts**: Chrome extension background service worker
-- **content.js**: Content script for AI platform integration
+- **content/**: Modular TypeScript content script for AI platform integration
 
 ### Components (`src/components/`)
 React components organized by functionality:

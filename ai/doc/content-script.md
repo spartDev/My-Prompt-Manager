@@ -2,13 +2,52 @@
 
 ## Overview
 
-The `content.js` file is the core content script that enables seamless integration of the My Prompt Manager extension with AI chat platforms. It dynamically injects a prompt library icon into supported websites, allowing users to access and insert their saved prompts directly into chat interfaces.
+The `src/content/` directory contains the modular TypeScript content script that enables seamless integration of the My Prompt Manager extension with AI chat platforms. It dynamically injects a prompt library icon into supported websites, allowing users to access and insert their saved prompts directly into chat interfaces.
 
-## Architecture
+## Modular Architecture
 
-### Core Components
+The content script has been refactored from a monolithic JavaScript file into a well-organized TypeScript module structure:
 
-#### 1. **PromptLibraryInjector** (Main Class)
+```
+src/content/
+├── index.ts                    # Main entry point
+├── types/
+│   ├── index.ts               # Core type definitions
+│   ├── platform.ts            # Platform-specific types
+│   └── ui.ts                  # UI-related types
+├── utils/
+│   ├── logger.ts              # Logging utilities
+│   ├── dom.ts                 # DOM manipulation utilities
+│   ├── storage.ts             # Storage management utilities
+│   └── styles.ts              # CSS injection utilities
+├── ui/
+│   ├── element-factory.ts     # UI element creation
+│   ├── keyboard-navigation.ts # Keyboard navigation manager
+│   └── event-manager.ts       # Event management
+├── platforms/
+│   ├── base-strategy.ts       # Abstract base strategy
+│   ├── claude-strategy.ts     # Claude.ai implementation
+│   ├── chatgpt-strategy.ts    # ChatGPT implementation
+│   ├── perplexity-strategy.ts # Perplexity implementation
+│   ├── default-strategy.ts    # Default/fallback implementation
+│   └── platform-manager.ts    # Platform management
+└── core/
+    ├── injector.ts           # Main prompt library injector
+    └── insertion-manager.ts   # Platform insertion manager
+```
+
+## Core Components
+
+### Entry Point (`src/content/index.ts`)
+The main entry point that:
+- Initializes CSS injection
+- Creates and starts the main injector
+- Sets up cleanup handlers
+- Maintains backward compatibility
+
+### Core Components (`src/content/core/`)
+
+#### **PromptLibraryInjector** (`core/injector.ts`)
 The primary orchestrator that manages the entire lifecycle of prompt library integration.
 
 **Key Responsibilities:**
@@ -17,16 +56,12 @@ The primary orchestrator that manages the entire lifecycle of prompt library int
 - Handles prompt selector UI creation and interaction
 - Implements performance optimizations and cleanup routines
 
-**Properties:**
-- `icon`: Reference to the injected prompt library icon
-- `currentTextarea`: Currently active text input element
-- `promptSelector`: Prompt selection modal UI
-- `instanceId`: Unique identifier to prevent cross-tab interference
-- `eventManager`: Centralized event listener management
-- `uiFactory`: Factory for creating platform-specific UI elements
-- `keyboardNav`: Keyboard navigation handler for accessibility
+#### **PlatformInsertionManager** (`core/insertion-manager.ts`)
+Manages the insertion of prompts into different AI platforms using the strategy pattern.
 
-#### 2. **StorageManager** (Static Utility Class)
+### Utility Modules (`src/content/utils/`)
+
+#### **StorageManager** (`utils/storage.ts`)
 Handles all Chrome storage operations and data security.
 
 **Key Methods:**
@@ -44,7 +79,7 @@ Handles all Chrome storage operations and data security.
 - HTML entity escaping for all user-generated content
 - Validation of all prompt data before processing
 
-#### 3. **Logger** (Static Utility Class)
+#### **Logger** (`utils/logger.ts`)
 Provides structured logging with debug mode support.
 
 **Log Levels:**
@@ -59,7 +94,19 @@ Provides structured logging with debug mode support.
 - Visual debug notifications in development
 - Privacy-conscious data truncation
 
-#### 4. **EventManager** (Event Lifecycle Management)
+#### **StylesManager** (`utils/styles.ts`)
+Manages CSS injection for the content script UI.
+
+**Key Methods:**
+- `injectCSS()`: Injects the content script styles
+- `getCSS()`: Returns the CSS string
+
+#### **DOM Utilities** (`utils/dom.ts`)
+Provides safe DOM manipulation utilities with proper TypeScript typing.
+
+### UI Components (`src/content/ui/`)
+
+#### **EventManager** (`ui/event-manager.ts`)
 Centralizes event listener management for proper cleanup.
 
 **Key Features:**
@@ -68,7 +115,7 @@ Centralizes event listener management for proper cleanup.
 - Prevents memory leaks from orphaned listeners
 - Error handling for listener removal
 
-#### 5. **UIElementFactory** (Platform-Specific UI Creation)
+#### **UIElementFactory** (`ui/element-factory.ts`)
 Creates platform-specific UI elements with consistent security practices.
 
 **Platform Support:**
@@ -77,7 +124,7 @@ Creates platform-specific UI elements with consistent security practices.
 - `createChatGPTIcon()`: ChatGPT specific styling
 - `createFloatingIcon()`: Generic floating icon for custom sites
 
-#### 6. **KeyboardNavigationManager** (Accessibility)
+#### **KeyboardNavigationManager** (`ui/keyboard-navigation.ts`)
 Implements comprehensive keyboard navigation for the prompt selector.
 
 **Features:**
@@ -86,6 +133,47 @@ Implements comprehensive keyboard navigation for the prompt selector.
 - Tab key support for focus management
 - Auto-focus search input on open
 - Smooth scrolling to selected items
+
+### Platform Strategy System (`src/content/platforms/`)
+
+#### **PlatformStrategy** (`platforms/base-strategy.ts`)
+Abstract base class that defines the interface for platform-specific implementations.
+
+**Key Methods:**
+- `canHandle(element)`: Determines if the strategy can handle a given element
+- `insert(element, content)`: Inserts content into the element
+- `getSelectors()`: Returns CSS selectors for the platform
+- `getButtonContainerSelector()`: Returns selector for button container
+- `createIcon()`: Creates platform-specific icon (optional)
+
+#### **Platform Implementations:**
+- **ClaudeStrategy** (`platforms/claude-strategy.ts`): Claude.ai specific implementation
+- **ChatGPTStrategy** (`platforms/chatgpt-strategy.ts`): ChatGPT specific implementation  
+- **PerplexityStrategy** (`platforms/perplexity-strategy.ts`): Perplexity.ai specific implementation
+- **DefaultStrategy** (`platforms/default-strategy.ts`): Fallback implementation for generic sites
+
+#### **PlatformManager** (`platforms/platform-manager.ts`)
+Manages platform strategies and handles strategy selection.
+
+**Key Features:**
+- Strategy registration and management
+- Automatic strategy selection based on element compatibility
+- Fallback handling for unsupported platforms
+
+### Type Definitions (`src/content/types/`)
+
+#### **Core Types** (`types/index.ts`)
+- `Prompt`: Prompt data structure
+- `InsertionResult`: Result of content insertion
+- `DebugInfo`: Debug logging information
+
+#### **Platform Types** (`types/platform.ts`)
+- `PlatformConfig`: Platform configuration
+- `PlatformStrategyInterface`: Strategy interface definition
+
+#### **UI Types** (`types/ui.ts`)
+- `KeyboardNavigationOptions`: Keyboard navigation configuration
+- `UIElementFactoryOptions`: UI factory options
 
 ### Performance Optimizations
 
@@ -202,14 +290,148 @@ The content script responds to:
 - `settingsUpdated`: Apply new settings
 - `testSelector`: Preview custom positioning
 
+## Build Process and TypeScript Configuration
+
+### Build System Integration
+
+The modular TypeScript content script is built using Vite with the CRX plugin:
+
+**Key Configuration (`vite.config.ts`):**
+- TypeScript compilation with strict mode
+- Source map generation for debugging
+- Module bundling for content script context
+- Chrome extension manifest integration
+
+**Build Commands:**
+```bash
+npm run build          # Production build
+npm run dev            # Development with HMR
+npm test -- --run      # Run test suite
+npm run lint           # Code linting
+```
+
+### TypeScript Configuration
+
+The content script uses strict TypeScript configuration:
+- Strict type checking enabled
+- Proper module resolution
+- Chrome extension API types
+- DOM API types for content script context
+
+### Testing Strategy
+
+Each module can be tested independently:
+- **Unit Tests**: Individual module functionality
+- **Integration Tests**: Cross-module interactions
+- **Platform Tests**: Platform-specific strategy testing
+- **Performance Tests**: Memory usage and performance benchmarks
+
+**Test Structure:**
+```
+src/content/
+├── __tests__/              # Integration tests
+├── core/__tests__/         # Core component tests
+├── platforms/__tests__/    # Platform strategy tests
+├── ui/__tests__/           # UI component tests
+└── utils/__tests__/        # Utility tests
+```
+
+## Developer Guide
+
+### Adding New Platform Support
+
+1. **Create Platform Strategy:**
+   ```typescript
+   // src/content/platforms/new-platform-strategy.ts
+   import { PlatformStrategy } from './base-strategy';
+   
+   export class NewPlatformStrategy extends PlatformStrategy {
+     constructor() {
+       super('NewPlatform', 100, {
+         selectors: ['textarea[data-platform="new"]'],
+         buttonContainerSelector: '.button-container',
+         priority: 100
+       });
+     }
+     
+     canHandle(element: HTMLElement): boolean {
+       // Implementation
+     }
+     
+     async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
+       // Implementation
+     }
+   }
+   ```
+
+2. **Register Strategy:**
+   ```typescript
+   // In platform manager initialization
+   platformManager.registerStrategy(new NewPlatformStrategy());
+   ```
+
+3. **Add Platform-Specific Icon (Optional):**
+   ```typescript
+   // In UIElementFactory
+   createNewPlatformIcon(): HTMLElement {
+     // Platform-specific icon creation
+   }
+   ```
+
+4. **Write Tests:**
+   ```typescript
+   // src/content/platforms/__tests__/new-platform-strategy.test.ts
+   describe('NewPlatformStrategy', () => {
+     // Test implementation
+   });
+   ```
+
+### Extending Platform Strategies
+
+**Example: Adding Custom Insertion Logic**
+```typescript
+export class CustomStrategy extends PlatformStrategy {
+  async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
+    try {
+      // Custom insertion logic
+      const sanitizedContent = StorageManager.sanitizeUserInput(content);
+      
+      // Platform-specific insertion
+      if (element.contentEditable === 'true') {
+        // ContentEditable handling
+        const textNode = document.createTextNode(sanitizedContent);
+        element.appendChild(textNode);
+      } else {
+        // Input/textarea handling
+        element.value = sanitizedContent;
+        element.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      
+      return { success: true, method: 'custom' };
+    } catch (error) {
+      this._error('Custom insertion failed', error);
+      return { success: false, error: error.message };
+    }
+  }
+}
+```
+
 ### Best Practices for Developers
 
+#### Module Development
+1. **Single Responsibility**: Each module should have a clear, focused purpose
+2. **Type Safety**: Use proper TypeScript types for all interfaces
+3. **Error Handling**: Implement comprehensive error handling with logging
+4. **Testing**: Write unit tests for all public methods
+5. **Documentation**: Document complex logic and public APIs
+
 #### Adding New Platform Support
-1. Add platform configuration to `siteConfigs`
+1. Extend `PlatformStrategy` base class
 2. Define appropriate selectors for text inputs
 3. Specify button container selector for inline integration
-4. Create platform-specific icon in `UIElementFactory`
+4. Create platform-specific icon in `UIElementFactory` if needed
 5. Test with various page states and layouts
+6. Add comprehensive test coverage
 
 #### Security Considerations
 1. **Always sanitize user input** before any DOM operation

@@ -105,7 +105,7 @@ export default [
 
   // Configuration for content scripts
   {
-    files: ['src/content.js'],
+    files: ['src/content/**/*.ts'],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',

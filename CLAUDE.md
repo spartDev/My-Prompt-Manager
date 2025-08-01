@@ -31,7 +31,7 @@ This is a Chrome extension for managing personal prompt libraries with dual inte
 
 ### Dual Interface System
 - **Popup**: React 18 + TypeScript with Tailwind CSS for prompt management
-- **Content Script**: Vanilla JavaScript for AI platform integration via `content.js`
+- **Content Script**: Modular TypeScript for AI platform integration via `src/content/index.ts`
 
 ### Key Architectural Components
 
@@ -45,7 +45,7 @@ This is a Chrome extension for managing personal prompt libraries with dual inte
 - Components follow atomic design principles
 
 **Integration Layer:**
-- `content.js` handles AI platform detection and prompt injection
+- `src/content/` modular TypeScript handles AI platform detection and prompt injection
 - Supports Claude, ChatGPT, Perplexity, and custom sites
 
 ### File Structure Highlights
@@ -56,7 +56,7 @@ src/
 ├── services/          # Storage and business logic
 ├── types/             # TypeScript definitions
 ├── contexts/          # React contexts
-├── content.js         # Content script for AI integration
+├── content/           # Modular TypeScript content script
 └── popup.tsx          # React entry point
 ```
 
