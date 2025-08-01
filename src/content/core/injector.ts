@@ -311,14 +311,70 @@ export class PromptLibraryInjector {
         void this.showPromptSelector(textarea);
       });
 
-      // Position and inject the icon
-      this.positionIcon(icon, textarea);
-      document.body.appendChild(icon);
+      // Try to inject into platform-specific container first
+      const containerSelector = this.platformManager.getButtonContainerSelector();
+      let injected = false;
 
-      info('Icon injected successfully', {
-        textareaTag: textarea.tagName,
-        iconType: 'platform-specific'
-      });
+      if (containerSelector) {
+        // For Claude, find the Research button and inject after it
+        if (this.state.hostname === 'claude.ai') {
+          // Look for Research button by its text content
+          const buttons = document.querySelectorAll('button');
+          let researchButtonContainer = null;
+          
+          for (const button of buttons) {
+            const textElement = button.querySelector('p');
+            if (textElement && textElement.textContent?.trim() === 'Research') {
+              // Found the Research button, get its parent container
+              researchButtonContainer = button.closest('div.flex.shrink.min-w-8');
+              break;
+            }
+          }
+          
+          if (researchButtonContainer && researchButtonContainer.parentElement) {
+            // Create a similar wrapper div structure for our button
+            const buttonWrapper = document.createElement('div');
+            buttonWrapper.className = 'flex shrink min-w-8 !shrink-0';
+            buttonWrapper.setAttribute('data-state', 'closed');
+            buttonWrapper.style.opacity = '1';
+            buttonWrapper.style.transform = 'none';
+            buttonWrapper.appendChild(icon);
+            
+            // Insert after the Research button container
+            researchButtonContainer.parentElement.insertBefore(buttonWrapper, researchButtonContainer.nextSibling);
+            injected = true;
+            info('Icon injected after Research button in Claude toolbar', {
+              textareaTag: textarea.tagName,
+              iconType: 'claude-integrated'
+            });
+          }
+        }
+        
+        // Fallback to generic container selector
+        if (!injected) {
+          const container = document.querySelector(containerSelector);
+          if (container) {
+            container.appendChild(icon);
+            injected = true;
+            info('Icon injected into platform container', {
+              textareaTag: textarea.tagName,
+              containerSelector,
+              iconType: 'platform-integrated'
+            });
+          }
+        }
+      }
+
+      // Fallback to floating positioning if container injection failed
+      if (!injected) {
+        this.positionIcon(icon, textarea);
+        document.body.appendChild(icon);
+        info('Icon injected with floating position', {
+          textareaTag: textarea.tagName,
+          iconType: 'platform-floating'
+        });
+      }
+
     } catch (error) {
       error('Failed to inject icon', error as Error);
     }
