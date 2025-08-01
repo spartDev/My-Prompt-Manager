@@ -78,10 +78,10 @@ export class UIElementFactory {
 
   createPerplexityIcon(): HTMLElement {
     const icon = document.createElement('button');
-    icon.className = `prompt-library-integrated-icon focus-visible:bg-offsetPlus hover:bg-offsetPlus text-textOff hover:text-textMain dark:hover:bg-offsetPlus dark:hover:text-textMainDark font-sans focus:outline-none outline-none outline-transparent transition duration-300 ease-out font-sans select-none items-center relative group/button justify-center text-center items-center rounded-lg cursor-pointer active:scale-[0.97] active:duration-150 active:ease-outExpo origin-center whitespace-nowrap inline-flex text-sm h-8 aspect-[9/8]`;
+    icon.className = `prompt-library-integrated-icon focus-visible:bg-offsetPlus hover:bg-offsetPlus text-textOff hover:text-textMain dark:hover:bg-offsetPlus dark:hover:text-textMainDark font-sans focus:outline-none outline-none outline-transparent transition duration-300 ease-out font-sans select-none items-center relative group/button justify-center text-center items-center rounded-lg cursor-pointer active:scale-[0.97] active:duration-150 active:ease-outExpo origin-center whitespace-nowrap inline-flex text-sm h-8 px-3`;
     icon.setAttribute('type', 'button');
-    icon.setAttribute('aria-label', 'Open my prompt manager - Access your saved prompts');
-    icon.setAttribute('title', 'My Prompt Manager - Access your saved prompts');
+    icon.setAttribute('aria-label', 'Open prompt library - Access your saved prompts');
+    icon.setAttribute('title', 'Prompt Library - Access your saved prompts');
     icon.setAttribute('data-state', 'closed');
     icon.setAttribute('data-instance-id', this.instanceId);
     icon.setAttribute('tabindex', '0');
@@ -100,34 +100,56 @@ export class UIElementFactory {
       viewBox: '0 0 24 24',
       fill: 'none',
       stroke: 'currentColor',
-      'stroke-width': '1.8',
+      'stroke-width': '2',
       'stroke-linecap': 'round',
       'stroke-linejoin': 'round',
       'aria-hidden': 'true'
     });
-    const path = createSVGElement('path', {
-      d: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'
-    });
-    const polyline1 = createSVGElement('polyline', {
-      points: '14,2 14,8 20,8'
-    });
-    const line1 = createSVGElement('line', {
-      x1: '16', y1: '13', x2: '8', y2: '13'
-    });
-    const line2 = createSVGElement('line', {
-      x1: '16', y1: '17', x2: '8', y2: '17'
-    });
-    const polyline2 = createSVGElement('polyline', {
-      points: '10,9 9,9 8,9'
+    
+    // Simplified prompt library icon optimized for 16x16 rendering
+    // Main document with subtle stack indicator - clean and instantly recognizable
+    // Uses bolder strokes and fewer elements for crisp small-size display
+    
+    // Main document (primary element)
+    const mainDoc = createSVGElement('rect', {
+      x: '4', y: '4', width: '14', height: '16', rx: '2'
     });
     
-    svg.appendChild(path);
-    svg.appendChild(polyline1);
-    svg.appendChild(line1);
-    svg.appendChild(line2);
-    svg.appendChild(polyline2);
+    // Stack indicator - minimal corner accent showing multiple items
+    const stackIndicator1 = createSVGElement('path', {
+      d: 'M6 2h12a2 2 0 0 1 2 2v1'
+    });
+    const stackIndicator2 = createSVGElement('path', {
+      d: 'M8 2h10a2 2 0 0 1 2 2v2'
+    });
+    
+    // Simple text lines on main document (larger, more visible)
+    const textLine1 = createSVGElement('line', {
+      x1: '8', y1: '8', x2: '14', y2: '8'
+    });
+    const textLine2 = createSVGElement('line', {
+      x1: '8', y1: '12', x2: '16', y2: '12'
+    });
+    const textLine3 = createSVGElement('line', {
+      x1: '8', y1: '16', x2: '13', y2: '16'
+    });
+    
+    svg.appendChild(stackIndicator1);
+    svg.appendChild(stackIndicator2);
+    svg.appendChild(mainDoc);
+    svg.appendChild(textLine1);
+    svg.appendChild(textLine2);
+    svg.appendChild(textLine3);
     innerDiv.appendChild(svg);
     outerDiv.appendChild(innerDiv);
+    
+    // Add "My Prompts" text to match Perplexity's button pattern
+    const textElement = createElement('span', {
+      class: 'text-textOff hover:text-textMain dark:hover:text-textMainDark font-medium text-sm'
+    });
+    textElement.textContent = 'My Prompts';
+    outerDiv.appendChild(textElement);
+    
     icon.appendChild(outerDiv);
     
     return icon;
