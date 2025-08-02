@@ -112,9 +112,9 @@ export class PlatformManager {
 
     if (compatibleStrategies.length === 0) {
       warn('No compatible strategies found for element', {
-        tagName: element.tagName,
-        className: element.className,
-        id: element.id
+        tagName: element?.tagName || 'unknown',
+        className: element?.className || '',
+        id: element?.id || ''
       });
       return null;
     }
@@ -186,7 +186,13 @@ export class PlatformManager {
    * @param content - Content to insert
    * @returns Result of insertion attempt
    */
-  async insertContent(element: HTMLElement, content: string): Promise<InsertionResult> {
+  async insertContent(element: HTMLElement | null, content: string): Promise<InsertionResult> {
+    if (!element) {
+      return {
+        success: false,
+        error: 'No target element provided'
+      };
+    }
 
     const bestStrategy = this.findBestStrategy(element);
     if (!bestStrategy) {

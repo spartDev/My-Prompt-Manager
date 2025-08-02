@@ -26,12 +26,12 @@ vi.mock('../../platforms/platform-manager', () => ({
 
 // Mock the Logger
 vi.mock('../../utils/logger', () => ({
-  Logger: {
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-    debug: vi.fn()
-  }
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+  isDebugMode: vi.fn().mockReturnValue(false),
+  showDebugNotification: vi.fn()
 }));
 
 describe('PlatformInsertionManager', () => {

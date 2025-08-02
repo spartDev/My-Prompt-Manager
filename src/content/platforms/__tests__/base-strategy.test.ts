@@ -17,11 +17,12 @@ import { PlatformStrategy } from '../base-strategy';
 
 // Mock Logger
 vi.mock('../../utils/logger', () => ({
-  Logger: {
-    debug: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn()
-  }
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+  isDebugMode: vi.fn().mockReturnValue(false),
+  showDebugNotification: vi.fn()
 }));
 
 // Concrete implementation for testing
@@ -154,7 +155,7 @@ describe('PlatformStrategy', () => {
     });
 
     it('should log debug messages with platform prefix', async () => {
-      const { Logger } = await import('../../utils/logger');
+      const Logger = await import('../../utils/logger');
       
       (strategy as any)._debug('test message', { key: 'value' });
       
@@ -162,7 +163,7 @@ describe('PlatformStrategy', () => {
     });
 
     it('should log warnings with platform prefix', async () => {
-      const { Logger } = await import('../../utils/logger');
+      const Logger = await import('../../utils/logger');
       
       (strategy as any)._warn('test warning', { error: 'details' });
       
@@ -170,7 +171,7 @@ describe('PlatformStrategy', () => {
     });
 
     it('should log errors with platform prefix', async () => {
-      const { Logger } = await import('../../utils/logger');
+      const Logger = await import('../../utils/logger');
       const error = new Error('test error');
       
       (strategy as any)._error('test error message', error, { context: 'test' });

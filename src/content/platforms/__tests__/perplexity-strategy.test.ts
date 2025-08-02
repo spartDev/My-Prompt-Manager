@@ -9,12 +9,14 @@ import { PerplexityStrategy } from '../perplexity-strategy';
 
 // Mock Logger
 vi.mock('../../utils/logger', () => ({
-  Logger: {
-    debug: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn()
-  }
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+  isDebugMode: vi.fn().mockReturnValue(false),
+  showDebugNotification: vi.fn()
 }));
+
 
 // Mock window.location.hostname
 const mockLocation = {
@@ -107,7 +109,7 @@ describe('PerplexityStrategy', () => {
       const result = await strategy.insert(mockContentEditableDiv, 'test content');
       
       expect(result.success).toBe(true);
-      expect(result.method).toBe('perplexity-events');
+      expect(result.method).toBe('perplexity-selection');
       expect(mockContentEditableDiv.textContent).toBe('test content');
       expect(mockContentEditableDiv.focus).toHaveBeenCalled();
     });
@@ -116,7 +118,7 @@ describe('PerplexityStrategy', () => {
       const result = await strategy.insert(mockTextarea, 'test content');
       
       expect(result.success).toBe(true);
-      expect(result.method).toBe('perplexity-events');
+      expect(result.method).toBe('perplexity-selection');
       expect(mockTextarea.value).toBe('test content');
       expect(mockTextarea.focus).toHaveBeenCalled();
     });
@@ -124,7 +126,7 @@ describe('PerplexityStrategy', () => {
     it('should dispatch comprehensive event set', async () => {
       await strategy.insert(mockContentEditableDiv, 'test content');
       
-      const expectedEvents = ['input', 'change', 'keyup', 'paste'];
+      const expectedEvents = ['input', 'change', 'keyup', 'compositionend', 'blur', 'focus'];
       expectedEvents.forEach(eventType => {
         expect(mockContentEditableDiv.dispatchEvent).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -147,15 +149,15 @@ describe('PerplexityStrategy', () => {
     });
 
     it('should log debug message on successful insertion', async () => {
-      const { Logger } = await import('../../utils/logger');
+      const Logger = await import('../../utils/logger');
       
       await strategy.insert(mockContentEditableDiv, 'test content');
       
-      expect(Logger.debug).toHaveBeenCalledWith('[perplexity] Perplexity insertion successful', {});
+      expect(Logger.debug).toHaveBeenCalledWith('[perplexity] Perplexity selection replacement successful', {});
     });
 
     it('should log error message on failed insertion', async () => {
-      const { Logger } = await import('../../utils/logger');
+      const Logger = await import('../../utils/logger');
       const error = new Error('Test error');
       
       vi.spyOn(mockContentEditableDiv, 'focus').mockImplementation(() => {
@@ -208,8 +210,8 @@ describe('PerplexityStrategy', () => {
       expect(eventTypes).toContain('input');
       expect(eventTypes).toContain('change');
       expect(eventTypes).toContain('keyup');
-      expect(eventTypes).toContain('paste');
-      expect(calls.length).toBe(4); // Exactly 4 events
+      expect(eventTypes).toContain('compositionend');
+      expect(calls.length).toBe(6); // Exactly 6 events
     });
 
     it('should handle elements without specific type gracefully', async () => {
@@ -220,8 +222,8 @@ describe('PerplexityStrategy', () => {
       const result = await strategy.insert(genericDiv, 'test content');
       
       expect(result.success).toBe(true);
-      // Should not set textContent or value since it's neither contenteditable nor textarea
-      expect(genericDiv.textContent).toBe('');
+      // Should set textContent as fallback method
+      expect(genericDiv.textContent).toBe('test content');
     });
   });
 
@@ -244,7 +246,7 @@ describe('PerplexityStrategy', () => {
       await strategy.insert(mockContentEditableDiv, 'test content');
       
       const eventTypes = eventSpy.mock.calls.map(call => call[0].type);
-      expect(eventTypes).toEqual(['input', 'change', 'keyup', 'paste']);
+      expect(eventTypes).toEqual(['input', 'change', 'keyup', 'compositionend', 'blur', 'focus']);
     });
   });
 });

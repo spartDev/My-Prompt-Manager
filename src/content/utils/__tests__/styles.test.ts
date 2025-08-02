@@ -6,18 +6,19 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-import { Logger } from '../logger';
+import * as Logger from '../logger';
 import { injectCSS, getCSS, removeCSS, isInjected } from '../styles';
 
 // Mock Logger
 vi.mock('../logger', () => ({
-  Logger: {
-    error: vi.fn(),
-    warn: vi.fn(),
-    info: vi.fn(),
-    debug: vi.fn(),
-  },
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+  isDebugMode: vi.fn().mockReturnValue(false),
+  showDebugNotification: vi.fn()
 }));
+
 
 // Mock DOM methods
 const documentMock = {

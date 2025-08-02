@@ -9,12 +9,14 @@ import { DefaultStrategy } from '../default-strategy';
 
 // Mock Logger
 vi.mock('../../utils/logger', () => ({
-  Logger: {
-    debug: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn()
-  }
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+  isDebugMode: vi.fn().mockReturnValue(false),
+  showDebugNotification: vi.fn()
 }));
+
 
 describe('DefaultStrategy', () => {
   let strategy: DefaultStrategy;
@@ -198,7 +200,7 @@ describe('DefaultStrategy', () => {
     });
 
     it('should log debug message on successful insertion', async () => {
-      const { Logger } = await import('../../utils/logger');
+      const Logger = await import('../../utils/logger');
       
       await strategy.insert(mockTextarea, 'test content');
       
@@ -206,7 +208,7 @@ describe('DefaultStrategy', () => {
     });
 
     it('should log error message on failed insertion', async () => {
-      const { Logger } = await import('../../utils/logger');
+      const Logger = await import('../../utils/logger');
       const error = new Error('Test error');
       
       vi.spyOn(mockTextarea, 'focus').mockImplementation(() => {

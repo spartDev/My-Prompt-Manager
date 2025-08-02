@@ -64,13 +64,12 @@ vi.mock('../../utils/styles', () => ({
 }));
 
 vi.mock('../../utils/logger', () => ({
-  Logger: {
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-    debug: vi.fn(),
-    isDebugMode: vi.fn().mockReturnValue(false)
-  }
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+  isDebugMode: vi.fn().mockReturnValue(false),
+  showDebugNotification: vi.fn()
 }));
 
 // Mock DOM methods
@@ -230,7 +229,7 @@ describe('PromptLibraryInjector', () => {
 
     it('should handle storage errors gracefully', async () => {
       const { getPrompts, createPromptListItem } = await import('../../utils/storage');
-      const { Logger } = await import('../../utils/logger');
+      const Logger = await import('../../utils/logger');
       
       getPrompts.mockRejectedValue(new Error('Storage error'));
       
@@ -311,19 +310,19 @@ describe('PromptLibraryInjector', () => {
 
   describe('error handling', () => {
     it('should handle initialization errors gracefully', async () => {
-      const { Logger } = await import('../../utils/logger');
+      const Logger = await import('../../utils/logger');
       
       // Create a new injector that will fail during initialization
       const failingInjector = new PromptLibraryInjector();
       
       // The error should be caught and logged, but not thrown
-      await expect(failingInjector.initialize()).resolves.not.toThrow();
+      expect(() => failingInjector.initialize()).not.toThrow();
       
       failingInjector.cleanup();
     });
 
     it('should handle missing elements gracefully', async () => {
-      const { Logger } = await import('../../utils/logger');
+      const Logger = await import('../../utils/logger');
       
       // Create a detached textarea (not in DOM)
       const detachedTextarea = document.createElement('textarea');

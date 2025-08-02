@@ -4,18 +4,19 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-import { Logger } from '../logger';
-import { getPrompts, sanitizeUserInput, validatePromptData, createPromptListItem } from '../storage';
+import * as Logger from '../logger';
+import { getPrompts, sanitizeUserInput, validatePromptData, createPromptListItem, escapeHtml, createElement, createSVGElement } from '../storage';
 
 // Mock Logger
 vi.mock('../logger', () => ({
-  Logger: {
-    error: vi.fn(),
-    warn: vi.fn(),
-    info: vi.fn(),
-    debug: vi.fn(),
-  },
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+  isDebugMode: vi.fn().mockReturnValue(false),
+  showDebugNotification: vi.fn()
 }));
+
 
 // Mock Chrome storage API
 const chromeMock = {

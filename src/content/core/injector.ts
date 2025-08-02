@@ -10,7 +10,7 @@ import type { Prompt, InsertionResult } from '../types/index';
 import { UIElementFactory } from '../ui/element-factory';
 import { EventManager } from '../ui/event-manager';
 import { KeyboardNavigationManager } from '../ui/keyboard-navigation';
-import { warn, info, isDebugMode } from '../utils/logger';
+import { warn, info, error, isDebugMode } from '../utils/logger';
 import { getPrompts, createPromptListItem } from '../utils/storage';
 import { injectCSS } from '../utils/styles';
 
@@ -129,8 +129,8 @@ export class PromptLibraryInjector {
       } else {
         this.startDetection();
       }
-    } catch (error) {
-      error('Error during initialization', error as Error);
+    } catch (err) {
+      error('Error during initialization', err as Error);
       this.state.isInitialized = false;
     }
   }
@@ -447,8 +447,8 @@ export class PromptLibraryInjector {
         promptCount: prompts.length
       });
 
-    } catch (error) {
-      error('Failed to show prompt selector', error as Error);
+    } catch (err) {
+      error('Failed to show prompt selector', err as Error);
       this.closePromptSelector();
     }
   }

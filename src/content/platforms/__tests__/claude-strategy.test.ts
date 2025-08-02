@@ -9,12 +9,14 @@ import { ClaudeStrategy } from '../claude-strategy';
 
 // Mock Logger
 vi.mock('../../utils/logger', () => ({
-  Logger: {
-    debug: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn()
-  }
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+  isDebugMode: vi.fn().mockReturnValue(false),
+  showDebugNotification: vi.fn()
 }));
+
 
 // Mock window.location.hostname
 const mockLocation = {

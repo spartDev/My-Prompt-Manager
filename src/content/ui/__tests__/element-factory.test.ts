@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-import { createSVGElement } from '../../utils/storage';
+import { createElement, createSVGElement } from '../../utils/storage';
 import { UIElementFactory } from '../element-factory';
 
 // Mock storage functions
@@ -198,17 +198,17 @@ describe('UIElementFactory', () => {
     });
   });
 
-  describe('StorageManager integration', () => {
-    it('should use StorageManager.createElement for creating elements', () => {
+  describe('Storage integration', () => {
+    it('should use createElement for creating elements', () => {
       factory.createPerplexityIcon();
       
-      expect(StorageManager.createElement).toHaveBeenCalled();
+      expect(createElement).toHaveBeenCalled();
     });
 
-    it('should use StorageManager.createSVGElement for creating SVG elements', () => {
+    it('should use createSVGElement for creating SVG elements', () => {
       factory.createPerplexityIcon();
       
-      expect(StorageManager.createSVGElement).toHaveBeenCalled();
+      expect(createSVGElement).toHaveBeenCalled();
     });
   });
 });

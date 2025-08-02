@@ -11,13 +11,14 @@ import { PlatformManager } from '../platform-manager';
 
 // Mock Logger
 vi.mock('../../utils/logger', () => ({
-  Logger: {
-    debug: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn()
-  }
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+  isDebugMode: vi.fn().mockReturnValue(false),
+  showDebugNotification: vi.fn()
 }));
+
 
 // Mock all strategy modules
 vi.mock('../claude-strategy', () => ({
@@ -126,7 +127,12 @@ describe('PlatformManager', () => {
     });
 
     it('should initialize strategies based on hostname', async () => {
-      const { Logger } = await import('../../utils/logger');
+      const Logger = await import('../../utils/logger');
+      vi.clearAllMocks();
+      
+      // Create a new manager to capture fresh log calls
+      new PlatformManager();
+      
       expect(Logger.info).toHaveBeenCalledWith('Initializing platform strategies', { hostname: 'example.com' });
     });
 
@@ -134,7 +140,7 @@ describe('PlatformManager', () => {
       mockLocation.hostname = 'claude.ai';
       const claudeManager = new PlatformManager();
       
-      const { Logger } = await import('../../utils/logger');
+      const Logger = await import('../../utils/logger');
       expect(Logger.info).toHaveBeenCalledWith('Loaded Claude strategy for claude.ai');
     });
 
@@ -142,7 +148,7 @@ describe('PlatformManager', () => {
       mockLocation.hostname = 'chatgpt.com';
       const chatgptManager = new PlatformManager();
       
-      const { Logger } = await import('../../utils/logger');
+      const Logger = await import('../../utils/logger');
       expect(Logger.info).toHaveBeenCalledWith('Loaded ChatGPT strategy for chatgpt.com');
     });
 
@@ -150,7 +156,7 @@ describe('PlatformManager', () => {
       mockLocation.hostname = 'www.perplexity.ai';
       const perplexityManager = new PlatformManager();
       
-      const { Logger } = await import('../../utils/logger');
+      const Logger = await import('../../utils/logger');
       expect(Logger.info).toHaveBeenCalledWith('Loaded Perplexity strategy for www.perplexity.ai');
     });
   });
@@ -163,7 +169,7 @@ describe('PlatformManager', () => {
       const strategies = manager.getStrategies();
       expect(strategies).toContain(testStrategy);
       
-      const { Logger } = await import('../../utils/logger');
+      const Logger = await import('../../utils/logger');
       expect(Logger.info).toHaveBeenCalledWith('Registered new strategy', { 
         name: 'test', 
         priority: 50 
@@ -219,8 +225,8 @@ describe('PlatformManager', () => {
       
       const bestStrategy = manager.findBestStrategy(mockElement);
       
-      const { Logger } = await import('../../utils/logger');
-      expect(Logger.warn).toHaveBeenCalledWith('Strategy error canHandle() failed', expect.any(Error));
+      const Logger = await import('../../utils/logger');
+      expect(Logger.warn).toHaveBeenCalledWith('Strategy error canHandle() failed', { error: expect.any(Error) });
     });
 
     it('should return highest priority compatible strategy', () => {
@@ -356,7 +362,7 @@ describe('PlatformManager', () => {
       const divElement = document.createElement('div');
       await manager.insertContent(divElement, 'test content');
       
-      const { Logger } = await import('../../utils/logger');
+      const Logger = await import('../../utils/logger');
       expect(Logger.info).toHaveBeenCalledWith('PlatformManager: Insertion successful', {
         strategy: 'test',
         method: 'test'
@@ -414,14 +420,14 @@ describe('PlatformManager', () => {
       
       expect(() => { manager.cleanup(); }).not.toThrow();
       
-      const { Logger } = await import('../../utils/logger');
-      expect(Logger.warn).toHaveBeenCalledWith('Failed to cleanup strategy error', expect.any(Error));
+      const Logger = await import('../../utils/logger');
+      expect(Logger.warn).toHaveBeenCalledWith('Failed to cleanup strategy error', { error: expect.any(Error) });
     });
 
     it('should log cleanup process', async () => {
       manager.cleanup();
       
-      const { Logger } = await import('../../utils/logger');
+      const Logger = await import('../../utils/logger');
       expect(Logger.info).toHaveBeenCalledWith('PlatformManager: Starting cleanup');
       expect(Logger.info).toHaveBeenCalledWith('PlatformManager: Cleanup complete');
     });

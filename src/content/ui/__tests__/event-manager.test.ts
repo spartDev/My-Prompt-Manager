@@ -4,16 +4,19 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-import { Logger } from '../../utils/logger';
+import * as Logger from '../../utils/logger';
 import { EventManager } from '../event-manager';
 
 // Mock Logger
 vi.mock('../../utils/logger', () => ({
-  Logger: {
-    warn: vi.fn(),
-    info: vi.fn()
-  }
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+  isDebugMode: vi.fn().mockReturnValue(false),
+  showDebugNotification: vi.fn()
 }));
+
 
 describe('EventManager', () => {
   let eventManager: EventManager;

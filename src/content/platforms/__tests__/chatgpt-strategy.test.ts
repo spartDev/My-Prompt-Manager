@@ -9,11 +9,12 @@ import { ChatGPTStrategy } from '../chatgpt-strategy';
 
 // Mock Logger
 vi.mock('../../utils/logger', () => ({
-  Logger: {
-    debug: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn()
-  }
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+  isDebugMode: vi.fn().mockReturnValue(false),
+  showDebugNotification: vi.fn()
 }));
 
 // Mock window.location.hostname
@@ -170,15 +171,15 @@ describe('ChatGPTStrategy', () => {
     });
 
     it('should log debug message on successful insertion', async () => {
-      const { Logger } = await import('../../utils/logger');
+      const Logger = await import('../../utils/logger');
       
       await strategy.insert(mockTextarea, 'test content');
       
       expect(Logger.debug).toHaveBeenCalledWith('[chatgpt] ChatGPT React insertion successful', {});
     });
 
-    it('should log error message on failed insertion', async () => {
-      const { Logger } = await import('../../utils/logger');
+    it('should log warning message on failed insertion', async () => {
+      const Logger = await import('../../utils/logger');
       const error = new Error('Test error');
       
       vi.spyOn(mockTextarea, 'focus').mockImplementation(() => {
@@ -187,7 +188,7 @@ describe('ChatGPTStrategy', () => {
       
       await strategy.insert(mockTextarea, 'test content');
       
-      expect(Logger.error).toHaveBeenCalledWith('[chatgpt] React insertion failed', error, {});
+      expect(Logger.warn).toHaveBeenCalledWith('[chatgpt] React insertion failed', error);
     });
   });
 

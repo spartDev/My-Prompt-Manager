@@ -4,7 +4,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-import { Logger } from '../logger';
+import * as Logger from '../logger';
 
 // Mock localStorage
 const localStorageMock = {
@@ -262,17 +262,24 @@ describe('Logger', () => {
     });
 
     it('should prevent spam notifications', () => {
+      // Clear any previous calls and reset state
+      vi.clearAllMocks();
       localStorageMock.getItem.mockReturnValue('true');
-      const message = 'Test notification';
+      
+      // Use a unique message to avoid contamination from other tests
+      const uniqueMessage = 'Unique spam test message ' + Date.now();
 
-      Logger.showDebugNotification(message);
-      Logger.showDebugNotification(message); // Second call should be ignored
+      Logger.showDebugNotification(uniqueMessage);
+      Logger.showDebugNotification(uniqueMessage); // Second call should be ignored
 
       expect(documentMock.createElement).toHaveBeenCalledTimes(1);
     });
 
     it('should auto-remove notification after timeout', () => {
+      // Clear any previous calls
+      vi.clearAllMocks();
       localStorageMock.getItem.mockReturnValue('true');
+      
       const mockElement = { 
         style: { cssText: '' }, 
         textContent: '',

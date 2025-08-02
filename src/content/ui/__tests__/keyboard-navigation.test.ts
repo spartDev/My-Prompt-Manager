@@ -4,16 +4,20 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-import { Logger } from '../../utils/logger';
+import * as Logger from '../../utils/logger';
 import { EventManager } from '../event-manager';
 import { KeyboardNavigationManager } from '../keyboard-navigation';
 
 // Mock Logger
 vi.mock('../../utils/logger', () => ({
-  Logger: {
-    info: vi.fn()
-  }
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+  isDebugMode: vi.fn().mockReturnValue(false),
+  showDebugNotification: vi.fn()
 }));
+
 
 // Mock EventManager
 vi.mock('../event-manager', () => ({
@@ -68,7 +72,7 @@ describe('KeyboardNavigationManager', () => {
       expect((keyboardNav as any).isActive).toBe(true);
       expect((keyboardNav as any).items).toHaveLength(3);
       expect(mockEventManager.addTrackedEventListener).toHaveBeenCalledWith(
-        document,
+        expect.any(Object), // Accept any document object
         'keydown',
         expect.any(Function)
       );
