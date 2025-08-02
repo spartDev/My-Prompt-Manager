@@ -223,79 +223,150 @@ export function getCSS(): string {
       font-style: italic;
     }
 
-    /* Dark mode support */
-    @media (prefers-color-scheme: dark) {
-      .prompt-library-selector {
-        background: #1f2937;
-        border-color: #374151;
-      }
-      
-      .prompt-selector-header {
-        background: #111827;
-        border-color: #374151;
-      }
-      
-      .prompt-selector-header h3 {
-        color: #f9fafb;
-      }
-      
-      .close-selector {
-        color: #9ca3af;
-      }
-      
-      .close-selector:hover {
-        background: #374151;
-        color: #f3f4f6;
-      }
-      
-      .prompt-search {
-        border-color: #374151;
-      }
-      
-      .search-input {
-        background: #374151;
-        border-color: #4b5563;
-        color: #f9fafb;
-      }
-      
-      .search-input:focus {
-        border-color: #6366f1;
-      }
-      
-      .prompt-item {
-        border-color: #374151;
-      }
-      
-      .prompt-item:hover {
-        background: #374151;
-      }
+    /* Dark theme support */
+    .prompt-library-selector.dark-theme {
+      background: #1f2937;
+      border-color: #374151;
+    }
+    
+    .prompt-library-selector.dark-theme .prompt-selector-header {
+      background: #111827;
+      border-color: #374151;
+    }
+    
+    .prompt-library-selector.dark-theme .prompt-selector-header h3 {
+      color: #f9fafb;
+    }
+    
+    .prompt-library-selector.dark-theme .close-selector {
+      color: #9ca3af;
+    }
+    
+    .prompt-library-selector.dark-theme .close-selector:hover {
+      background: #374151;
+      color: #f3f4f6;
+    }
+    
+    .prompt-library-selector.dark-theme .prompt-search {
+      border-color: #374151;
+    }
+    
+    .prompt-library-selector.dark-theme .search-input {
+      background: #374151;
+      border-color: #4b5563;
+      color: #f9fafb;
+    }
+    
+    .prompt-library-selector.dark-theme .search-input:focus {
+      border-color: #6366f1;
+    }
+    
+    .prompt-library-selector.dark-theme .prompt-item {
+      border-color: #374151;
+    }
+    
+    .prompt-library-selector.dark-theme .prompt-item:hover {
+      background: #374151;
+    }
 
-      .prompt-item:focus-visible {
-        box-shadow: 0 0 0 2px #6366f1;
-        background: #374151;
-      }
+    .prompt-library-selector.dark-theme .prompt-item:focus-visible {
+      box-shadow: 0 0 0 2px #6366f1;
+      background: #374151;
+    }
 
-      .prompt-item.keyboard-selected {
-        background: #374151;
-        box-shadow: 0 0 0 2px #6366f1;
-      }
-      
-      .prompt-title {
-        color: #f9fafb;
-      }
-      
-      .prompt-category {
-        background: #312e81;
-        color: #c7d2fe;
-      }
-      
-      .prompt-preview {
-        color: #9ca3af;
-      }
-      
-      .no-prompts {
-        color: #9ca3af;
-      }
+    .prompt-library-selector.dark-theme .prompt-item.keyboard-selected {
+      background: #374151;
+      box-shadow: 0 0 0 2px #6366f1;
+    }
+    
+    .prompt-library-selector.dark-theme .prompt-title {
+      color: #f9fafb;
+    }
+    
+    .prompt-library-selector.dark-theme .prompt-category {
+      background: #312e81;
+      color: #c7d2fe;
+    }
+    
+    .prompt-library-selector.dark-theme .prompt-preview {
+      color: #9ca3af;
+    }
+    
+    .prompt-library-selector.dark-theme .no-prompts {
+      color: #9ca3af;
+    }
+
+    /* Light theme support (explicit for clarity) */
+    .prompt-library-selector.light-theme {
+      background: white;
+      border-color: #e5e7eb;
+    }
+    
+    .prompt-library-selector.light-theme .prompt-selector-header {
+      background: #f9fafb;
+      border-color: #e5e7eb;
+    }
+    
+    .prompt-library-selector.light-theme .prompt-selector-header h3 {
+      color: #111827;
+    }
+    
+    .prompt-library-selector.light-theme .close-selector {
+      color: #6b7280;
+    }
+    
+    .prompt-library-selector.light-theme .close-selector:hover {
+      background: #e5e7eb;
+      color: #374151;
+    }
+    
+    .prompt-library-selector.light-theme .prompt-search {
+      border-color: #e5e7eb;
+    }
+    
+    .prompt-library-selector.light-theme .search-input {
+      background: white;
+      border-color: #d1d5db;
+      color: #111827;
+    }
+    
+    .prompt-library-selector.light-theme .search-input:focus {
+      border-color: #4f46e5;
+    }
+    
+    .prompt-library-selector.light-theme .prompt-item {
+      border-color: #f3f4f6;
+    }
+    
+    .prompt-library-selector.light-theme .prompt-item:hover {
+      background: #f9fafb;
+    }
+
+    .prompt-library-selector.light-theme .prompt-item:focus-visible {
+      box-shadow: 0 0 0 2px #4f46e5;
+      background: #f0f0f3;
+    }
+
+    .prompt-library-selector.light-theme .prompt-item.keyboard-selected {
+      background: #f0f0f3;
+      box-shadow: 0 0 0 2px #4f46e5;
+    }
+    
+    .prompt-library-selector.light-theme .prompt-title {
+      color: #111827;
+    }
+    
+    .prompt-library-selector.light-theme .prompt-category {
+      background: #eef2ff;
+      color: #4f46e5;
+    }
+    
+    .prompt-library-selector.light-theme .prompt-preview {
+      color: #6b7280;
+    }
+    
+    .prompt-library-selector.light-theme .no-prompts {
+      color: #6b7280;
     }
 
     /* Responsive design */

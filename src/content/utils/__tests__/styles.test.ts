@@ -108,7 +108,8 @@ describe('StylesManager', () => {
     it('should include dark mode styles', () => {
       const css = getCSS();
 
-      expect(css).toContain('@media (prefers-color-scheme: dark)');
+      expect(css).toContain('.prompt-library-selector.dark-theme');
+      expect(css).toContain('.prompt-library-selector.light-theme');
     });
 
     it('should include responsive design styles', () => {

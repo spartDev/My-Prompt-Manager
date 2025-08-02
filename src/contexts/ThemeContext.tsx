@@ -6,8 +6,8 @@ import { useTheme, Theme } from '../hooks/useTheme';
 interface ThemeContextType {
   theme: Theme;
   resolvedTheme: 'light' | 'dark';
-  setTheme: (theme: Theme) => void;
-  toggleTheme: () => void;
+  setTheme: (theme: Theme) => Promise<void>;
+  toggleTheme: () => Promise<void>;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);

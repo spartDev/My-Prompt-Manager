@@ -13,6 +13,7 @@ import { KeyboardNavigationManager } from '../ui/keyboard-navigation';
 import { warn, info, error, isDebugMode } from '../utils/logger';
 import { getPrompts, createPromptListItem } from '../utils/storage';
 import { injectCSS } from '../utils/styles';
+import { ThemeManager } from '../utils/theme-manager';
 
 import { PlatformInsertionManager } from './insertion-manager';
 
@@ -476,6 +477,11 @@ export class PromptLibraryInjector {
     selector.setAttribute('role', 'dialog');
     selector.setAttribute('aria-modal', 'true');
     selector.setAttribute('aria-labelledby', 'prompt-selector-title');
+
+    // Apply current theme
+    const themeManager = ThemeManager.getInstance();
+    const currentTheme = themeManager.getCurrentTheme();
+    selector.classList.add(`${currentTheme}-theme`);
 
     // Create header
     const header = document.createElement('div');

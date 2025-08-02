@@ -1,26 +1,49 @@
 import { useState, useEffect, useCallback } from 'react';
 
+import { StorageManager } from '../services/storage';
+
 export type Theme = 'light' | 'dark' | 'system';
 
 interface UseThemeReturn {
   theme: Theme;
   resolvedTheme: 'light' | 'dark';
-  setTheme: (theme: Theme) => void;
-  toggleTheme: () => void;
+  setTheme: (theme: Theme) => Promise<void>;
+  toggleTheme: () => Promise<void>;
 }
 
 const THEME_STORAGE_KEY = 'prompt-library-theme';
 
 export const useTheme = (): UseThemeReturn => {
-  const [theme, setThemeState] = useState<Theme>(() => {
-    if (typeof window === 'undefined') {return 'system';}
-    
-    const stored = localStorage.getItem(THEME_STORAGE_KEY);
-    if (stored && ['light', 'dark', 'system'].includes(stored)) {
-      return stored as Theme;
-    }
-    return 'system';
-  });
+  const [theme, setThemeState] = useState<Theme>('system');
+
+  // Initialize theme from Chrome storage or migrate from localStorage
+  useEffect(() => {
+    const initializeTheme = async () => {
+      try {
+        const storageManager = StorageManager.getInstance();
+        const settings = await storageManager.getSettings();
+        
+        // Check if we need to migrate from localStorage
+        if (settings.theme === 'system') {
+          const localStorageTheme = localStorage.getItem(THEME_STORAGE_KEY);
+          if (localStorageTheme && ['light', 'dark', 'system'].includes(localStorageTheme)) {
+            const migratedTheme = localStorageTheme as Theme;
+            await storageManager.updateSettings({ theme: migratedTheme });
+            localStorage.removeItem(THEME_STORAGE_KEY); // Clean up old storage
+            setThemeState(migratedTheme);
+            return;
+          }
+        }
+        
+        setThemeState(settings.theme);
+      } catch (error) {
+        console.error('Failed to initialize theme:', error);
+        setThemeState('system');
+      }
+    };
+
+    void initializeTheme();
+  }, []);
 
   const getSystemTheme = useCallback((): 'light' | 'dark' => {
     if (typeof window === 'undefined') {return 'light';}
@@ -29,16 +52,37 @@ export const useTheme = (): UseThemeReturn => {
 
   const resolvedTheme = theme === 'system' ? getSystemTheme() : theme;
 
-  const setTheme = useCallback((newTheme: Theme) => {
-    setThemeState(newTheme);
-    localStorage.setItem(THEME_STORAGE_KEY, newTheme);
+  const setTheme = useCallback(async (newTheme: Theme) => {
+    try {
+      const storageManager = StorageManager.getInstance();
+      await storageManager.updateSettings({ theme: newTheme });
+      setThemeState(newTheme);
+      
+      // Notify content scripts about theme change
+      if (typeof chrome !== 'undefined') {
+        chrome.tabs.query({}, (tabs) => {
+          tabs.forEach((tab) => {
+            if (tab.id) {
+              void chrome.tabs.sendMessage(tab.id, {
+                type: 'themeChanged',
+                theme: newTheme
+              }).catch(() => {
+                // Ignore errors for tabs without content script
+              });
+            }
+          });
+        });
+      }
+    } catch (error) {
+      console.error('Failed to update theme:', error);
+    }
   }, []);
 
-  const toggleTheme = useCallback(() => {
+  const toggleTheme = useCallback(async () => {
     if (theme === 'system') {
-      setTheme(getSystemTheme() === 'light' ? 'dark' : 'light');
+      await setTheme(getSystemTheme() === 'light' ? 'dark' : 'light');
     } else {
-      setTheme(theme === 'light' ? 'dark' : 'light');
+      await setTheme(theme === 'light' ? 'dark' : 'light');
     }
   }, [theme, getSystemTheme, setTheme]);
 

@@ -5,17 +5,21 @@ import { useThemeContext } from '../contexts/ThemeContext';
 const ThemeToggle: FC = () => {
   const { theme, resolvedTheme, setTheme } = useThemeContext();
 
-  const handleThemeChange = () => {
-    if (theme === 'system') {
-      setTheme(resolvedTheme === 'light' ? 'dark' : 'light');
-    } else {
-      setTheme(theme === 'light' ? 'dark' : 'light');
+  const handleThemeChange = async () => {
+    try {
+      if (theme === 'system') {
+        await setTheme(resolvedTheme === 'light' ? 'dark' : 'light');
+      } else {
+        await setTheme(theme === 'light' ? 'dark' : 'light');
+      }
+    } catch (error) {
+      console.error('Failed to change theme:', error);
     }
   };
 
   return (
     <button
-      onClick={handleThemeChange}
+      onClick={() => { void handleThemeChange(); }}
       className="p-2 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 focus-interactive"
       aria-label={`Switch to ${resolvedTheme === 'light' ? 'dark' : 'light'} theme`}
       title={`Switch to ${resolvedTheme === 'light' ? 'dark' : 'light'} theme`}

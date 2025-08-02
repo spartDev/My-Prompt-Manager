@@ -17,6 +17,7 @@ export interface Settings {
   defaultCategory: string;
   sortOrder: 'createdAt' | 'updatedAt' | 'title';
   viewMode: 'grid' | 'list';
+  theme: 'light' | 'dark' | 'system';
 }
 
 export interface StorageData {
@@ -78,5 +79,6 @@ export const DEFAULT_CATEGORY = 'Uncategorized';
 export const DEFAULT_SETTINGS: Settings = {
   defaultCategory: DEFAULT_CATEGORY,
   sortOrder: 'updatedAt',
-  viewMode: 'grid'
+  viewMode: 'grid',
+  theme: 'system'
 };

@@ -17,7 +17,8 @@ describe('Type Definitions', () => {
       expect(DEFAULT_SETTINGS).toEqual({
         defaultCategory: 'Uncategorized',
         sortOrder: 'updatedAt',
-        viewMode: 'grid'
+        viewMode: 'grid',
+        theme: 'system'
       });
     });
 

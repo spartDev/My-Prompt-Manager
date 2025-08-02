@@ -39,7 +39,7 @@ export interface AppContextType {
 // Theme Context types (for future extension)
 export interface ThemeContextType {
   theme: 'light' | 'dark';
-  toggleTheme: () => void;
+  toggleTheme: () => Promise<void>;
   colors: {
     primary: string;
     secondary: string;

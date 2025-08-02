@@ -16,6 +16,7 @@
 import { PromptLibraryInjector } from './core/injector';
 import { error, warn, info, debug } from './utils/logger';
 import { injectCSS } from './utils/styles';
+import { ThemeManager } from './utils/theme-manager';
 
 // Global instance management with proper typing
 let promptLibraryInstance: PromptLibraryInjector | null = null;
@@ -40,6 +41,9 @@ function initializeExtension(): void {
 
     // Initialize CSS styles first
     injectCSS();
+
+    // Initialize theme manager
+    ThemeManager.getInstance();
 
     // Clean up any existing instance
     if (promptLibraryInstance) {
@@ -86,6 +90,13 @@ function cleanupExtension(): void {
     if (promptLibraryInstance) {
       promptLibraryInstance.cleanup();
       promptLibraryInstance = null;
+    }
+
+    // Cleanup theme manager
+    try {
+      ThemeManager.getInstance().cleanup();
+    } catch (themeError) {
+      warn('Error cleaning up theme manager', themeError as Error);
     }
 
     // Reset initialization flag
