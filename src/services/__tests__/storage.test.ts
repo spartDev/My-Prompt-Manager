@@ -27,12 +27,12 @@ describe('StorageManager', () => {
     };
 
     // Mock chrome storage API
-    // eslint-disable-next-line @typescript-eslint/unbound-method, @typescript-eslint/no-misused-promises
+     
     vi.mocked(chrome.storage.local.get).mockImplementation((keys) => {
       if (Array.isArray(keys)) {
         const result: Record<string, unknown> = {};
         keys.forEach(key => {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+           
           result[key] = mockStorage[key] || null;
         });
         return Promise.resolve(result);
@@ -40,13 +40,13 @@ describe('StorageManager', () => {
       return Promise.resolve({ [keys as string]: mockStorage[keys as string] || null });
     });
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method, @typescript-eslint/no-misused-promises
+     
     vi.mocked(chrome.storage.local.set).mockImplementation((data) => {
       Object.assign(mockStorage, data);
       return Promise.resolve();
     });
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method, @typescript-eslint/no-misused-promises
+     
     vi.mocked(chrome.storage.local.clear).mockImplementation(() => {
       Object.keys(mockStorage).forEach(key => {
         // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
@@ -55,7 +55,7 @@ describe('StorageManager', () => {
       return Promise.resolve();
     });
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
+     
     vi.mocked(chrome.storage.local.getBytesInUse).mockResolvedValue(1024);
   });
 
@@ -287,7 +287,7 @@ describe('StorageManager', () => {
 
   describe('Error Handling', () => {
     it('should handle storage quota exceeded error', async () => {
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       vi.mocked(chrome.storage.local.set).mockRejectedValue(
         new Error('QUOTA_EXCEEDED: Storage quota exceeded')
       );
@@ -303,7 +303,7 @@ describe('StorageManager', () => {
     });
 
     it('should handle storage API unavailable error', async () => {
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       vi.mocked(chrome.storage.local.get).mockRejectedValue(
         new Error('storage API unavailable')
       );
@@ -315,7 +315,7 @@ describe('StorageManager', () => {
     });
 
     it('should handle data corruption error', async () => {
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       vi.mocked(chrome.storage.local.get).mockResolvedValue({
         prompts: null // Invalid data should return empty array
       });
@@ -361,9 +361,9 @@ describe('StorageManager', () => {
 
       await storageManager.importData(JSON.stringify(importData));
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(chrome.storage.local.clear).toHaveBeenCalled();
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(chrome.storage.local.set).toHaveBeenCalledWith({ prompts: importData.prompts });
     });
 

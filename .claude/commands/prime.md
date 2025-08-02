@@ -20,3 +20,4 @@ This command loads essential context for a new agent session by examining the co
     - @ai/doc/product.md
     - @ai/doc/tech.md
     - @ai/doc/tech.md
+    - @ai/doc/content-script.md

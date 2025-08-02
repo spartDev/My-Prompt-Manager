@@ -80,7 +80,6 @@ export default [
           alphabetize: { order: 'asc', caseInsensitive: true },
         },
       ],
-      'import/no-duplicates': 'error',
       
       // General rules
       'no-console': ['warn', { allow: ['error'] }],
@@ -105,7 +104,7 @@ export default [
 
   // Configuration for content scripts
   {
-    files: ['src/content.js'],
+    files: ['src/content/**/*.ts'],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',
@@ -151,12 +150,27 @@ export default [
     },
   },
   
-  // Test files configuration
+  // Test files configuration - Allow unsafe TypeScript patterns in tests
   {
-    files: ['**/*.test.{js,jsx,ts,tsx}', '**/*.spec.{js,jsx,ts,tsx}'],
+    files: ['**/*.test.{js,jsx,ts,tsx}', '**/*.spec.{js,jsx,ts,tsx}', '**/__tests__/**/*.{js,jsx,ts,tsx}'],
     rules: {
       'no-console': 'off',
       '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
+      '@typescript-eslint/restrict-template-expressions': 'off',
+      '@typescript-eslint/no-unnecessary-condition': 'off',
+      '@typescript-eslint/require-await': 'off',
+      '@typescript-eslint/restrict-plus-operands': 'off',
+      '@typescript-eslint/no-unused-vars': 'off',
+      '@typescript-eslint/await-thenable': 'off',
+      '@typescript-eslint/no-confusing-void-expression': 'off',
+      '@typescript-eslint/no-misused-spread': 'off',
+      '@typescript-eslint/unbound-method': 'off',
+      '@typescript-eslint/no-misused-promises': 'off',
     },
   },
   

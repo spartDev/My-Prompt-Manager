@@ -31,13 +31,13 @@ This is a Chrome extension for managing personal prompt libraries with dual inte
 
 ### Dual Interface System
 - **Popup**: React 18 + TypeScript with Tailwind CSS for prompt management
-- **Content Script**: Vanilla JavaScript for AI platform integration via `content.js`
+- **Content Script**: Modular TypeScript for AI platform integration via `src/content/index.ts`
 
 ### Key Architectural Components
 
 **Data Layer:**
-- `services/storage.ts` - Chrome storage API wrapper
-- `services/promptManager.ts` - Business logic and validation
+- `services/storage.ts` - Chrome storage API wrapper with mutex locking for concurrent operations
+- `services/promptManager.ts` - Business logic and validation with search/highlighting capabilities
 
 **React Layer:**
 - Custom hooks in `hooks/` provide data and operations to components
@@ -45,7 +45,7 @@ This is a Chrome extension for managing personal prompt libraries with dual inte
 - Components follow atomic design principles
 
 **Integration Layer:**
-- `content.js` handles AI platform detection and prompt injection
+- `src/content/` modular TypeScript handles AI platform detection and prompt injection
 - Supports Claude, ChatGPT, Perplexity, and custom sites
 
 ### File Structure Highlights
@@ -56,7 +56,7 @@ src/
 ├── services/          # Storage and business logic
 ├── types/             # TypeScript definitions
 ├── contexts/          # React contexts
-├── content.js         # Content script for AI integration
+├── content/           # Modular TypeScript content script
 └── popup.tsx          # React entry point
 ```
 
@@ -103,3 +103,50 @@ After building:
 2. Enable "Developer mode"
 3. Click "Load unpacked" and select `dist/` folder
 4. Extension appears in toolbar and integrates with AI platforms
+
+## Content Script Architecture
+
+The content script uses a modular TypeScript architecture:
+
+### Core Components
+- `core/injector.ts` - Main orchestration class (PromptLibraryInjector)
+- `core/insertion-manager.ts` - Handles platform-specific text insertion
+- `platforms/` - Strategy pattern for different AI platforms (Claude, ChatGPT, Perplexity)
+- `ui/` - UI components (element factory, keyboard navigation, event management)
+- `utils/` - Utilities (logger, storage, DOM manipulation, styles)
+
+### Platform Strategy Pattern
+Each AI platform has its own strategy class extending `base-strategy.ts`:
+- `claude-strategy.ts` - Handles Claude.ai integration
+- `chatgpt-strategy.ts` - Handles ChatGPT integration  
+- `perplexity-strategy.ts` - Handles Perplexity integration
+- `default-strategy.ts` - Fallback for unknown platforms
+
+### Key Technical Details
+- Uses singleton pattern for storage and prompt managers
+- Implements mutex locking to prevent concurrent storage operations
+- CSS injection happens early in `index.ts` via StylesManager
+- Global error handling and cleanup on page unload
+- Debug interface available at `window.__promptLibraryDebug`
+
+## Data Management
+
+### Storage Layer
+- `StorageManager` singleton with Chrome storage API wrapper
+- Atomic operations for concurrent access safety
+- Built-in validation and error handling
+- Import/export functionality for data portability
+
+### Business Logic
+- `PromptManager` handles search, validation, and data processing
+- Text highlighting for search results
+- Duplicate detection with Levenshtein distance algorithm
+- Statistics and analytics capabilities
+
+## Important Implementation Notes
+
+- Always use the singleton instances: `StorageManager.getInstance()` and `PromptManager.getInstance()`
+- Content script modules are bundled separately from popup React app
+- Test setup mocks Chrome APIs in `src/test/setup.ts`
+- Vite config includes alias `@content` for content script imports
+- Extension uses host permissions for `<all_urls>` to work on any site

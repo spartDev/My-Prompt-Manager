@@ -44,7 +44,7 @@ describe('PromptManager - Working Tests', () => {
       deletePrompt: vi.fn()
     };
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
+     
     vi.mocked(StorageManager.getInstance).mockReturnValue(mockStorageManager as StorageManager);
     promptManager = PromptManager.getInstance();
     vi.clearAllMocks();
@@ -256,7 +256,7 @@ describe('PromptManager - Working Tests', () => {
 
     it('should throw error for invalid category', async () => {
       // Mock categories without the requested category
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+       
       (mockStorageManager.getCategories as any).mockResolvedValue([
         { id: '1', name: DEFAULT_CATEGORY }
       ]);
@@ -294,7 +294,7 @@ describe('PromptManager - Working Tests', () => {
 
     it('should return empty results gracefully when storage fails', async () => {
       // Test that methods handle storage errors gracefully
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+       
       (mockStorageManager.getPrompts as any).mockRejectedValue(new Error('Storage error'));
 
       // These methods should handle errors gracefully, not throw
