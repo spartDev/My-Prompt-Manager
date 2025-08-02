@@ -112,9 +112,9 @@ export class PlatformManager {
 
     if (compatibleStrategies.length === 0) {
       warn('No compatible strategies found for element', {
-        tagName: element?.tagName || 'unknown',
-        className: element?.className || '',
-        id: element?.id || ''
+        tagName: element.tagName || 'unknown',
+        className: element.className || '',
+        id: element.id || ''
       });
       return null;
     }
