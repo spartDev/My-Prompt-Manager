@@ -3,7 +3,7 @@
  * Handles theme synchronization between extension settings and content script UI
  */
 
-import { debug, info, error as logError } from './logger';
+import { debug, error as logError } from './logger';
 
 export type Theme = 'light' | 'dark' | 'system';
 
@@ -68,7 +68,7 @@ class ThemeManager {
     this.updateUITheme(resolvedTheme);
     this.notifyObservers(resolvedTheme);
     
-    info(`Theme applied: ${resolvedTheme}`);
+    debug(`Theme applied: ${resolvedTheme}`);
   }
 
   /**

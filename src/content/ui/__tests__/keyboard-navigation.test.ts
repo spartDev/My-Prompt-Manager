@@ -76,7 +76,7 @@ describe('KeyboardNavigationManager', () => {
         'keydown',
         expect.any(Function)
       );
-      expect(Logger.info).toHaveBeenCalledWith('Keyboard navigation handlers setup');
+      expect(Logger.debug).toHaveBeenCalledWith('Keyboard navigation handlers setup');
     });
 
     it('should focus search input after initialization', (done) => {
@@ -88,7 +88,7 @@ describe('KeyboardNavigationManager', () => {
       // Wait for setTimeout to execute
       setTimeout(() => {
         expect(focusSpy).toHaveBeenCalled();
-        expect(Logger.info).toHaveBeenCalledWith('Focused search input for keyboard navigation');
+        expect(Logger.debug).toHaveBeenCalledWith('Focused search input for keyboard navigation');
         done();
       }, 150);
     });
@@ -200,7 +200,7 @@ describe('KeyboardNavigationManager', () => {
         
         expect(preventDefaultSpy).toHaveBeenCalled();
         expect(clickSpy).toHaveBeenCalled();
-        expect(Logger.info).toHaveBeenCalledWith('Activating selected item via keyboard', {
+        expect(Logger.debug).toHaveBeenCalledWith('Activating selected item via keyboard', {
           index: 0,
           itemId: '1'
         });
@@ -226,7 +226,7 @@ describe('KeyboardNavigationManager', () => {
         
         expect(preventDefaultSpy).toHaveBeenCalled();
         expect(clickSpy).toHaveBeenCalled();
-        expect(Logger.info).toHaveBeenCalledWith('Closing prompt selector via keyboard');
+        expect(Logger.debug).toHaveBeenCalledWith('Closing prompt selector via keyboard');
       });
     });
 
@@ -303,7 +303,7 @@ describe('KeyboardNavigationManager', () => {
       keyboardNav.destroy();
       
       expect((keyboardNav as any).isActive).toBe(false);
-      expect(Logger.info).toHaveBeenCalledWith('Keyboard navigation manager destroyed');
+      expect(Logger.debug).toHaveBeenCalledWith('Keyboard navigation manager destroyed');
     });
 
     it('should clear selection', () => {

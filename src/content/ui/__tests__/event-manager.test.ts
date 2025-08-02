@@ -116,7 +116,7 @@ describe('EventManager', () => {
       eventManager.addTrackedEventListener(mockElement, 'click', mockHandler);
       eventManager.cleanup();
       
-      expect(Logger.info).toHaveBeenCalledWith('EventManager cleanup completed', {
+      expect(Logger.debug).toHaveBeenCalledWith('EventManager cleanup completed', {
         removedListeners: 1,
         errors: 0
       });
@@ -143,7 +143,7 @@ describe('EventManager', () => {
         elementClass: 'test-class'
       });
       
-      expect(Logger.info).toHaveBeenCalledWith('EventManager cleanup completed', {
+      expect(Logger.debug).toHaveBeenCalledWith('EventManager cleanup completed', {
         removedListeners: 0,
         errors: 1
       });
@@ -165,7 +165,7 @@ describe('EventManager', () => {
     it('should handle cleanup when no listeners are tracked', () => {
       eventManager.cleanup();
       
-      expect(Logger.info).toHaveBeenCalledWith('EventManager cleanup completed', {
+      expect(Logger.debug).toHaveBeenCalledWith('EventManager cleanup completed', {
         removedListeners: 0,
         errors: 0
       });

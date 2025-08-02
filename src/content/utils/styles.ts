@@ -3,7 +3,7 @@
  * Handles CSS injection and style management
  */
 
-import { debug, info, error as logError } from './logger';
+import { debug, error as logError } from './logger';
 
 const STYLE_ID = 'prompt-library-styles';
 
@@ -24,7 +24,7 @@ export function injectCSS(): void {
       style.textContent = getCSS();
 
       document.head.appendChild(style);
-      info('CSS styles injected successfully');
+      debug('CSS styles injected successfully');
     } catch (err) {
       logError('Failed to inject CSS styles', err as Error);
     }
@@ -456,7 +456,7 @@ export function removeCSS(): void {
     const existingStyle = document.getElementById(STYLE_ID);
     if (existingStyle) {
       existingStyle.remove();
-      info('CSS styles removed successfully');
+      debug('CSS styles removed successfully');
     }
   } catch (err) {
     logError('Failed to remove CSS styles', err as Error);

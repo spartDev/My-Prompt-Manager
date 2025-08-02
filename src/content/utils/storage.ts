@@ -6,7 +6,159 @@
 import type { Prompt } from '../types/index';
 
 import { DOMUtils } from './dom';
-import { warn, info, error as logError } from './logger';
+import { warn, debug, error as logError } from './logger';
+
+/**
+ * Interface for extension settings
+ */
+export interface ExtensionSettings {
+  enabledSites: string[];
+  customSites: CustomSite[];
+  debugMode: boolean;
+  floatingFallback: boolean;
+}
+
+/**
+ * Interface for custom site configuration
+ */
+export interface CustomSite {
+  hostname: string;
+  displayName: string;
+  icon?: string;
+  enabled: boolean;
+  dateAdded: number;
+  positioning?: {
+    mode: 'auto' | 'custom';
+    selector?: string;
+    placement: 'before' | 'after' | 'inside-start' | 'inside-end';
+    offset?: {
+      x: number;
+      y: number;
+    };
+    zIndex?: number;
+    description?: string;
+  };
+}
+
+/**
+ * Get extension settings with validation and defaults
+ */
+export async function getSettings(): Promise<ExtensionSettings> {
+  return new Promise((resolve) => {
+    try {
+      chrome.storage.local.get(['promptLibrarySettings'], (result) => {
+        if (chrome.runtime.lastError) {
+          const storageError = new Error(`Chrome storage error: ${chrome.runtime.lastError.message ?? 'Unknown error'}`);
+          logError('Failed to retrieve settings from storage', storageError);
+          resolve(getDefaultSettings()); // Graceful fallback to defaults
+          return;
+        }
+
+        const rawSettings = result.promptLibrarySettings as Partial<ExtensionSettings> | undefined;
+        const validatedSettings = validateSettingsData(rawSettings);
+
+        debug('Retrieved and validated settings from storage', {
+          enabledSitesCount: validatedSettings.enabledSites.length,
+          customSitesCount: validatedSettings.customSites.length,
+          debugMode: validatedSettings.debugMode
+        });
+
+        resolve(validatedSettings);
+      });
+    } catch (err) {
+      logError('Unexpected error accessing chrome storage for settings', err as Error);
+      resolve(getDefaultSettings()); // Graceful fallback
+    }
+  });
+}
+
+/**
+ * Get default extension settings
+ */
+export function getDefaultSettings(): ExtensionSettings {
+  return {
+    enabledSites: ['www.perplexity.ai', 'claude.ai', 'chatgpt.com'],
+    customSites: [],
+    debugMode: false,
+    floatingFallback: true
+  };
+}
+
+/**
+ * Validate settings data structure
+ */
+export function validateSettingsData(settings: Partial<ExtensionSettings> | undefined): ExtensionSettings {
+  const defaults = getDefaultSettings();
+  
+  if (!settings || typeof settings !== 'object') {
+    warn('Invalid settings data structure, using defaults', { settings });
+    return defaults;
+  }
+
+  try {
+    const validatedSettings: ExtensionSettings = {
+      enabledSites: Array.isArray(settings.enabledSites) ? 
+        settings.enabledSites.filter(site => typeof site === 'string' && site.length > 0) : 
+        defaults.enabledSites,
+      customSites: Array.isArray(settings.customSites) ? 
+        settings.customSites.filter(site => validateCustomSite(site)) : 
+        defaults.customSites,
+      debugMode: typeof settings.debugMode === 'boolean' ? settings.debugMode : defaults.debugMode,
+      floatingFallback: typeof settings.floatingFallback === 'boolean' ? settings.floatingFallback : defaults.floatingFallback
+    };
+
+    return validatedSettings;
+  } catch (err) {
+    logError('Failed to validate settings data', err as Error, { settings });
+    return defaults;
+  }
+}
+
+/**
+ * Validate custom site data structure
+ */
+export function validateCustomSite(site: unknown): site is CustomSite {
+  if (!site || typeof site !== 'object') {
+    return false;
+  }
+
+  const siteObj = site as Record<string, unknown>;
+  
+  return (
+    typeof siteObj.hostname === 'string' &&
+    typeof siteObj.displayName === 'string' &&
+    typeof siteObj.enabled === 'boolean' &&
+    typeof siteObj.dateAdded === 'number' &&
+    siteObj.hostname.length > 0 &&
+    siteObj.displayName.length > 0
+  );
+}
+
+/**
+ * Check if the current site is enabled
+ */
+export async function isSiteEnabled(hostname: string): Promise<boolean> {
+  try {
+    const settings = await getSettings();
+    
+    // Check if site is in enabled sites list
+    if (settings.enabledSites.includes(hostname)) {
+      return true;
+    }
+    
+    // Check if site is an enabled custom site
+    const customSite = settings.customSites.find(site => site.hostname === hostname);
+    if (customSite && customSite.enabled) {
+      return true;
+    }
+    
+    return false;
+  } catch (err) {
+    logError('Failed to check if site is enabled', err as Error, { hostname });
+    // Default to enabled on error for better user experience
+    return true;
+  }
+}
 
 /**
  * Get prompts with validation and sanitization
@@ -38,7 +190,7 @@ export async function getPrompts(): Promise<Prompt[]> {
             });
           }
 
-          info('Retrieved and validated prompts from storage', {
+          debug('Retrieved and validated prompts from storage', {
             count: validatedPrompts.length
           });
           resolve(validatedPrompts);

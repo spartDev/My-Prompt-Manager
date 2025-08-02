@@ -75,7 +75,7 @@ describe('StorageManager', () => {
 
       expect(result).toEqual(mockPrompts);
       expect(chromeMock.storage.local.get).toHaveBeenCalledWith(['prompts'], expect.any(Function));
-      expect(Logger.info).toHaveBeenCalledWith(
+      expect(Logger.debug).toHaveBeenCalledWith(
         'Retrieved and validated prompts from storage',
         { count: 1 }
       );

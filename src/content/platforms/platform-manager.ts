@@ -8,7 +8,7 @@
 import type { InsertionResult } from '../types/index';
 import type { PlatformManagerOptions } from '../types/platform';
 import type { UIElementFactory } from '../ui/element-factory';
-import { debug, warn, info } from '../utils/logger';
+import { debug, warn } from '../utils/logger';
 
 import type { PlatformStrategy } from './base-strategy';
 import { ChatGPTStrategy } from './chatgpt-strategy';
@@ -43,30 +43,27 @@ export class PlatformManager {
    * @private
    */
   private _initializeStrategies(): void {
-    info('Initializing platform strategies', { hostname: this.hostname });
+    debug('Initializing platform strategies', { hostname: this.hostname });
     
     // Only add strategies for supported AI platforms
     switch (this.hostname) {
       case 'claude.ai':
         this.strategies.push(new ClaudeStrategy());
         this.strategies.push(new DefaultStrategy()); // Fallback for Claude
-        info('Loaded Claude strategy for claude.ai');
         break;
         
       case 'chatgpt.com':
         this.strategies.push(new ChatGPTStrategy());
         this.strategies.push(new DefaultStrategy()); // Fallback for ChatGPT
-        info('Loaded ChatGPT strategy for chatgpt.com');
         break;
         
       case 'www.perplexity.ai':
         this.strategies.push(new PerplexityStrategy());
         this.strategies.push(new DefaultStrategy()); // Fallback for Perplexity
-        info('Loaded Perplexity strategy for www.perplexity.ai');
         break;
         
       default:
-        info(`Unsupported hostname: ${this.hostname} - no strategies loaded`);
+        debug(`Unsupported hostname: ${this.hostname} - no strategies loaded`);
         // No strategies loaded for unsupported sites
         return;
     }
@@ -74,9 +71,7 @@ export class PlatformManager {
     // Sort strategies by priority (highest first)
     this.strategies.sort((a, b) => b.priority - a.priority);
     
-    info('Strategy initialization complete', {
-      strategiesLoaded: this.strategies.length
-    });
+    debug('Strategy initialization complete', { strategiesLoaded: this.strategies.length });
   }
 
   /**
@@ -88,10 +83,7 @@ export class PlatformManager {
     // Re-sort strategies by priority
     this.strategies.sort((a, b) => b.priority - a.priority);
     
-    info('Registered new strategy', { 
-      name: strategy.name, 
-      priority: strategy.priority 
-    });
+    debug('Registered new strategy', { name: strategy.name });
   }
 
   /**
@@ -207,20 +199,14 @@ export class PlatformManager {
       const result = await bestStrategy.insert(element, content);
       
       if (result.success) {
-        info('PlatformManager: Insertion successful', {
-          strategy: bestStrategy.name,
-          method: result.method
-        });
+        debug('Insertion successful', { strategy: bestStrategy.name });
         this.activeStrategy = bestStrategy;
         return result;
       } else {
-        warn('PlatformManager: Strategy failed', {
-          strategy: bestStrategy.name,
-          error: result.error
-        });
+        warn('Strategy failed', { strategy: bestStrategy.name, error: result.error });
       }
     } catch (error) {
-      warn(`PlatformManager: ${bestStrategy.name} strategy threw error`, { error });
+      warn(`${bestStrategy.name} strategy threw error`, { error });
     }
 
     return {
@@ -246,10 +232,24 @@ export class PlatformManager {
   }
 
   /**
+   * Re-initializes strategies (useful after cleanup when re-enabling a site)
+   */
+  reinitialize(): void {
+    debug('Re-initializing strategies', { hostname: this.hostname });
+    
+    // Clear existing strategies
+    this.strategies = [];
+    this.activeStrategy = null;
+    
+    // Re-initialize with current hostname
+    this._initializeStrategies();
+  }
+
+  /**
    * Cleans up all strategies
    */
   cleanup(): void {
-    info('PlatformManager: Starting cleanup');
+    debug('Starting cleanup');
     
     for (const strategy of this.strategies) {
       try {
@@ -262,6 +262,6 @@ export class PlatformManager {
     this.strategies = [];
     this.activeStrategy = null;
     
-    info('PlatformManager: Cleanup complete');
+    debug('Cleanup complete');
   }
 }

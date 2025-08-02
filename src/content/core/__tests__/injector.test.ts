@@ -55,6 +55,22 @@ vi.mock('../../utils/storage', () => ({
     item.dataset.promptId = prompt.id;
     item.textContent = prompt.title;
     return item;
+  }),
+  isSiteEnabled: vi.fn().mockImplementation((hostname) => {
+    // Make sure localhost is enabled for tests
+    return Promise.resolve(hostname === 'localhost' || hostname === 'test.com');
+  }),
+  getSettings: vi.fn().mockResolvedValue({
+    enabledSites: ['test.com', 'localhost'],
+    customSites: [],
+    debugMode: false,
+    floatingFallback: true
+  }),
+  getDefaultSettings: vi.fn().mockReturnValue({
+    enabledSites: ['test.com', 'localhost'],
+    customSites: [],
+    debugMode: false,
+    floatingFallback: true
   })
 }));
 
@@ -84,6 +100,46 @@ Object.defineProperty(window, 'location', {
 Object.defineProperty(document, 'readyState', {
   value: 'complete',
   writable: true
+});
+
+// Mock hostname to match enabled sites
+Object.defineProperty(window, 'location', {
+  value: {
+    hostname: 'localhost',
+    href: 'http://localhost:3000'
+  },
+  writable: true
+});
+
+// Mock chrome runtime for message handling
+Object.defineProperty(global, 'chrome', {
+  value: {
+    ...global.chrome,
+    runtime: {
+      ...global.chrome?.runtime,
+      onMessage: {
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        hasListener: vi.fn()
+      }
+    }
+  },
+  writable: true
+});
+
+// Mock matchMedia for theme manager
+Object.defineProperty(window, 'matchMedia', {
+  writable: true,
+  value: vi.fn().mockImplementation(query => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: vi.fn(), // deprecated
+    removeListener: vi.fn(), // deprecated
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  })),
 });
 
 describe('PromptLibraryInjector', () => {
@@ -143,17 +199,52 @@ describe('PromptLibraryInjector', () => {
   });
 
   describe('initialize', () => {
-    it('should set isInitialized to true', async () => {
+    it('should set isInitialized to true when site is enabled', async () => {
+      // Mock site as enabled
+      const { isSiteEnabled } = await import('../../utils/storage');
+      vi.mocked(isSiteEnabled).mockResolvedValueOnce(true);
+      
+      // Mock internal methods to prevent test environment issues
+      const setupSPAMonitoringSpy = vi.spyOn(injector as any, 'setupSPAMonitoring').mockImplementation(() => {});
+      const startDetectionSpy = vi.spyOn(injector as any, 'startDetection').mockImplementation(() => {});
+      
       await injector.initialize();
+      expect((injector as any).state.isSiteEnabled).toBe(true);
       expect((injector as any).state.isInitialized).toBe(true);
+      
+      setupSPAMonitoringSpy.mockRestore();
+      startDetectionSpy.mockRestore();
     });
 
-    it('should not initialize twice', async () => {
+    it('should perform minimal initialization when site is disabled (preserve message listener)', async () => {
+      // Mock site as disabled
+      const { isSiteEnabled } = await import('../../utils/storage');
+      vi.mocked(isSiteEnabled).mockResolvedValueOnce(false);
+      
+      await injector.initialize();
+      expect((injector as any).state.isSiteEnabled).toBe(false);
+      expect((injector as any).state.isInitialized).toBe(true); // Should be true to maintain message listener
+    });
+
+    it('should not initialize twice when site is enabled', async () => {
+      // Mock site as enabled for both calls
+      const { isSiteEnabled } = await import('../../utils/storage');
+      vi.mocked(isSiteEnabled).mockResolvedValue(true);
+      
+      // Mock internal methods to prevent test environment issues
+      const setupSPAMonitoringSpy = vi.spyOn(injector as any, 'setupSPAMonitoring').mockImplementation(() => {});
+      const startDetectionSpy = vi.spyOn(injector as any, 'startDetection').mockImplementation(() => {});
+      
       await injector.initialize();
       const firstInitState = (injector as any).state.isInitialized;
+      expect(firstInitState).toBe(true); // First initialization should set to true
       
       await injector.initialize();
       expect((injector as any).state.isInitialized).toBe(firstInitState);
+      expect((injector as any).state.isInitialized).toBe(true);
+      
+      setupSPAMonitoringSpy.mockRestore();
+      startDetectionSpy.mockRestore();
     });
 
     it('should inject CSS styles', async () => {
@@ -330,7 +421,7 @@ describe('PromptLibraryInjector', () => {
       await injector.showPromptSelector(detachedTextarea);
       
       // Should not throw and should log appropriate messages
-      expect(Logger.info).toHaveBeenCalled();
+      expect(Logger.debug).toHaveBeenCalled();
     });
   });
 

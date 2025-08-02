@@ -14,6 +14,14 @@ const localStorageMock = {
   clear: vi.fn(),
 };
 
+// Mock Chrome storage
+const chromeStorageMock = {
+  local: {
+    get: vi.fn(),
+    set: vi.fn(),
+  },
+};
+
 // Mock console methods
 const consoleMock = {
   error: vi.fn(),
@@ -60,6 +68,17 @@ describe('Logger', () => {
       value: documentMock,
       writable: true,
     });
+    
+    Object.defineProperty(global, 'chrome', {
+      value: { storage: chromeStorageMock },
+      writable: true,
+    });
+    
+    // Default Chrome storage mock to return empty settings
+    chromeStorageMock.local.get.mockResolvedValue({ promptLibrarySettings: { debugMode: false } });
+    
+    // Reset debug cache before each test
+    Logger._resetDebugCacheForTesting();
     
     // Mock setTimeout
     vi.useFakeTimers();
@@ -180,9 +199,11 @@ describe('Logger', () => {
   });
 
   describe('info', () => {
-    it('should log info only in debug mode', () => {
-      localStorageMock.getItem.mockReturnValue('true');
-      const message = 'Test info message';
+    it('should log critical messages even when debug mode is off', () => {
+      localStorageMock.getItem.mockReturnValue(null);
+      chromeStorageMock.local.get.mockResolvedValue({ promptLibrarySettings: { debugMode: false } });
+      
+      const message = 'Extension initialized successfully';
       const context = { testKey: 'testValue' };
 
       Logger.info(message, context);
@@ -198,10 +219,48 @@ describe('Logger', () => {
       );
     });
 
-    it('should not log info when not in debug mode', () => {
+    it('should log all info messages when debug mode is enabled via localStorage', () => {
+      localStorageMock.getItem.mockReturnValue('true');
+      const message = 'Non-critical info message';
+      const context = { testKey: 'testValue' };
+
+      Logger.info(message, context);
+
+      expect(consoleMock.info).toHaveBeenCalledWith(
+        '[PromptLibrary]',
+        message,
+        expect.objectContaining({
+          level: 'INFO',
+          message,
+          context,
+        })
+      );
+    });
+
+    it('should not log non-critical info when debug mode is off', () => {
       localStorageMock.getItem.mockReturnValue(null);
-      Logger.info('Test info message');
+      chromeStorageMock.local.get.mockResolvedValue({ promptLibrarySettings: { debugMode: false } });
+      
+      Logger.info('Non-critical info message');
       expect(consoleMock.info).not.toHaveBeenCalled();
+    });
+
+    it('should log cleanup critical messages', () => {
+      localStorageMock.getItem.mockReturnValue(null);
+      chromeStorageMock.local.get.mockResolvedValue({ promptLibrarySettings: { debugMode: false } });
+      
+      const message = 'Extension cleanup completed';
+
+      Logger.info(message);
+
+      expect(consoleMock.info).toHaveBeenCalledWith(
+        '[PromptLibrary]',
+        message,
+        expect.objectContaining({
+          level: 'INFO',
+          message,
+        })
+      );
     });
   });
 
@@ -226,7 +285,19 @@ describe('Logger', () => {
 
     it('should not log debug when not in debug mode', () => {
       localStorageMock.getItem.mockReturnValue(null);
+      chromeStorageMock.local.get.mockResolvedValue({ promptLibrarySettings: { debugMode: false } });
       Logger.debug('Test debug message');
+      expect(consoleMock.debug).not.toHaveBeenCalled();
+    });
+
+    it('should use cached debug mode value initially', () => {
+      localStorageMock.getItem.mockReturnValue(null);
+      // The cache should be empty initially, so debug should return false
+      const message = 'Test debug message';
+      
+      Logger.debug(message);
+      
+      // Should not log when cache is null/false
       expect(consoleMock.debug).not.toHaveBeenCalled();
     });
   });

@@ -56,7 +56,7 @@ describe('StylesManager', () => {
       expect(mockStyleElement.id).toBe('prompt-library-styles');
       expect(mockStyleElement.textContent).toContain('.prompt-library-icon');
       expect(documentMock.head.appendChild).toHaveBeenCalledWith(mockStyleElement);
-      expect(Logger.info).toHaveBeenCalledWith('CSS styles injected successfully');
+      expect(Logger.debug).toHaveBeenCalledWith('CSS styles injected successfully');
     });
 
     it('should skip injection when styles already exist', () => {
@@ -143,7 +143,7 @@ describe('StylesManager', () => {
 
       expect(documentMock.getElementById).toHaveBeenCalledWith('prompt-library-styles');
       expect(mockStyleElement.remove).toHaveBeenCalled();
-      expect(Logger.info).toHaveBeenCalledWith('CSS styles removed successfully');
+      expect(Logger.debug).toHaveBeenCalledWith('CSS styles removed successfully');
     });
 
     it('should handle case when no styles exist', () => {

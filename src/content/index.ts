@@ -25,7 +25,7 @@ let isInitialized = false;
 /**
  * Initialize the extension with proper error handling
  */
-function initializeExtension(): void {
+async function initializeExtension(): Promise<void> {
   try {
     // Prevent multiple initializations
     if (isInitialized) {
@@ -33,7 +33,7 @@ function initializeExtension(): void {
       return;
     }
 
-    info('Starting My Prompt Manager content script initialization', {
+    debug('Starting My Prompt Manager content script initialization', {
       url: window.location.href,
       hostname: window.location.hostname,
       userAgent: navigator.userAgent
@@ -54,10 +54,13 @@ function initializeExtension(): void {
     // Create new injector instance
     promptLibraryInstance = new PromptLibraryInjector();
     
+    // Initialize with async site enablement checking
+    await promptLibraryInstance.initialize();
+    
     // Mark as initialized
     isInitialized = true;
 
-    info('My Prompt Manager content script initialized successfully');
+    info('Extension initialized');
 
   } catch (error) {
     error('Failed to initialize My Prompt Manager content script', error as Error, {
@@ -85,7 +88,7 @@ function initializeExtension(): void {
  */
 function cleanupExtension(): void {
   try {
-    info('Starting My Prompt Manager content script cleanup');
+    debug('Starting My Prompt Manager content script cleanup');
 
     if (promptLibraryInstance) {
       promptLibraryInstance.cleanup();
@@ -102,7 +105,7 @@ function cleanupExtension(): void {
     // Reset initialization flag
     isInitialized = false;
 
-    info('My Prompt Manager content script cleanup completed');
+    info('Extension cleanup completed');
 
   } catch (error) {
     error('Error during content script cleanup', error as Error);
@@ -123,7 +126,7 @@ function handleVisibilityChange(): void {
     // Re-initialize if needed (e.g., after long periods of inactivity)
     if (!isInitialized && !promptLibraryInstance) {
       setTimeout(() => {
-        initializeExtension();
+        void initializeExtension();
       }, 100);
     }
   }
@@ -179,11 +182,11 @@ document.addEventListener('visibilitychange', handleVisibilityChange);
 // Initialize when DOM is ready
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
-    initializeExtension();
+    void initializeExtension();
   });
 } else {
   // DOM is already ready
-  initializeExtension();
+  void initializeExtension();
 }
 
 // Export for potential external access (debugging, testing)
@@ -193,7 +196,7 @@ if (typeof window !== 'undefined') {
     isInitialized: () => isInitialized,
     reinitialize: () => {
       cleanupExtension();
-      initializeExtension();
+      void initializeExtension();
     },
     cleanup: cleanupExtension,
     getLogger: () => ({ error, warn, info, debug })
@@ -201,7 +204,7 @@ if (typeof window !== 'undefined') {
 }
 
 // For development/debugging - log when script loads
-info('My Prompt Manager content script loaded', {
+debug('My Prompt Manager content script loaded', {
   timestamp: new Date().toISOString(),
   url: window.location.href,
   readyState: document.readyState

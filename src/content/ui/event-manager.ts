@@ -4,7 +4,7 @@
  */
 
 import type { EventListenerEntry } from '../types/index';
-import { warn, info } from '../utils/logger';
+import { warn, debug } from '../utils/logger';
 
 export class EventManager {
   private listeners: Map<HTMLElement, EventListenerEntry[]>;
@@ -49,7 +49,7 @@ export class EventManager {
     
     this.listeners.clear();
     
-    info('EventManager cleanup completed', {
+    debug('EventManager cleanup completed', {
       removedListeners: removedCount,
       errors: errorCount
     });

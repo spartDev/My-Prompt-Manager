@@ -10,8 +10,8 @@ import type { Prompt, InsertionResult } from '../types/index';
 import { UIElementFactory } from '../ui/element-factory';
 import { EventManager } from '../ui/event-manager';
 import { KeyboardNavigationManager } from '../ui/keyboard-navigation';
-import { warn, info, error, isDebugMode } from '../utils/logger';
-import { getPrompts, createPromptListItem } from '../utils/storage';
+import { warn, error, debug, isDebugMode, refreshDebugMode } from '../utils/logger';
+import { getPrompts, createPromptListItem, isSiteEnabled, getSettings, type ExtensionSettings } from '../utils/storage';
 import { injectCSS } from '../utils/styles';
 import { ThemeManager } from '../utils/theme-manager';
 
@@ -22,10 +22,12 @@ export interface InjectorState {
   currentTextarea: HTMLElement | null;
   promptSelector: HTMLElement | null;
   isInitialized: boolean;
+  isSiteEnabled: boolean;
   detectionTimeout: number | null;
   mutationObserver: MutationObserver | null;
   hostname: string;
   instanceId: string;
+  settings: ExtensionSettings | null;
 }
 
 export interface CustomSelectorRetry {
@@ -63,10 +65,12 @@ export class PromptLibraryInjector {
       currentTextarea: null,
       promptSelector: null,
       isInitialized: false,
+      isSiteEnabled: false,
       detectionTimeout: null,
       mutationObserver: null,
       hostname: String(window.location.hostname || ''),
-      instanceId: `prompt-lib-${window.location.hostname}-${String(Date.now())}-${Math.random().toString(36).substr(2, 9)}`
+      instanceId: `prompt-lib-${window.location.hostname}-${String(Date.now())}-${Math.random().toString(36).substr(2, 9)}`,
+      settings: null
     };
 
     // Initialize specialized components
@@ -104,19 +108,65 @@ export class PromptLibraryInjector {
     this.selectorCache = new Map();
     this.lastCacheTime = 0;
 
-    this.initialize();
+    // Note: initialize() is now called externally to handle async site enablement checking
   }
 
   /**
    * Initializes the prompt library injector
    */
-  initialize(): void {
+  async initialize(): Promise<void> {
     if (this.state.isInitialized) {return;}
 
     try {
-      info('Initializing my prompt manager for site', { hostname: this.state.hostname });
+      debug('Initializing my prompt manager for site', { hostname: this.state.hostname });
 
-      this.state.isInitialized = true;
+      // Load settings and check if site is enabled
+      this.state.settings = await getSettings();
+      this.state.isSiteEnabled = await isSiteEnabled(this.state.hostname);
+
+      debug('Site enablement check completed', { 
+        hostname: this.state.hostname,
+        isSiteEnabled: this.state.isSiteEnabled,
+        enabledSites: this.state.settings.enabledSites
+      });
+
+      // ALWAYS setup message listener first - even for disabled sites
+      // This ensures we can respond to settings updates when sites are re-enabled
+      this.setupMessageListener();
+
+      // If site is disabled, stop here but keep the message listener active
+      if (!this.state.isSiteEnabled) {
+        debug('Site is disabled, minimal initialization only (message listener active)', { hostname: this.state.hostname });
+        this.state.isInitialized = true; // Mark as initialized to prevent re-initialization
+        return;
+      }
+
+      // Full initialization for enabled sites
+      try {
+        this.initializeForEnabledSite();
+        // Set initialization flag after full setup is complete
+        this.state.isInitialized = true;
+      } catch (enabledSiteErr) {
+        error('Error during full initialization for enabled site', enabledSiteErr as Error);
+        // Don't reset isInitialized to false, as we still want message listener active
+        throw enabledSiteErr;
+      }
+
+    } catch (err) {
+      error('Error during initialization', err as Error);
+      // Only reset isInitialized to false if we haven't set up the message listener
+      if (this.state.isSiteEnabled) {
+        this.state.isInitialized = false;
+      }
+    }
+  }
+
+  /**
+   * Performs full initialization for enabled sites
+   */
+  private initializeForEnabledSite(): void {
+    try {
+      debug('Performing full initialization for enabled site', { hostname: this.state.hostname });
 
       // Inject CSS styles
       injectCSS();
@@ -130,9 +180,12 @@ export class PromptLibraryInjector {
       } else {
         this.startDetection();
       }
+
+      debug('Full initialization completed for enabled site', { hostname: this.state.hostname });
+
     } catch (err) {
-      error('Error during initialization', err as Error);
-      this.state.isInitialized = false;
+      error('Error during full initialization', err as Error);
+      throw err;
     }
   }
 
@@ -190,6 +243,167 @@ export class PromptLibraryInjector {
   }
 
   /**
+   * Sets up message listener for settings updates from popup
+   */
+  private setupMessageListener(): void {
+    debug('Setting up message listener', { hostname: this.state.hostname });
+
+    chrome.runtime.onMessage.addListener((message: Record<string, unknown>, sender, sendResponse) => {
+      debug('Received message', { action: message.action });
+
+      if (message.action === 'settingsUpdated' && message.settings) {
+        void this.handleSettingsUpdate(message.settings as ExtensionSettings);
+        sendResponse({ success: true });
+      } else if (message.action === 'reinitialize' && message.reason) {
+        void this.handleReinitialize(message.reason as string);
+        sendResponse({ success: true });
+      } else if (message.action === 'testSelector') {
+        this.handleSelectorTest(message as { selector: string; placement: string; offset: { x: number; y: number }; zIndex: number });
+        sendResponse({ success: true });
+      } else {
+        debug('Ignoring unrecognized message', { action: message.action });
+      }
+      return true; // Keep message channel open for async response
+    });
+
+    debug('Message listener setup completed');
+  }
+
+  /**
+   * Handle settings update from popup
+   */
+  private async handleSettingsUpdate(newSettings: ExtensionSettings): Promise<void> {
+    try {
+      debug('Received settings update', { hostname: this.state.hostname });
+
+      // Refresh debug mode cache when settings are updated
+      refreshDebugMode();
+
+      this.state.settings = newSettings;
+      const wasSiteEnabled = this.state.isSiteEnabled;
+      this.state.isSiteEnabled = await isSiteEnabled(this.state.hostname);
+
+      debug('Site enablement status changed', {
+        hostname: this.state.hostname,
+        enabled: this.state.isSiteEnabled
+      });
+
+      if (wasSiteEnabled && !this.state.isSiteEnabled) {
+        // Site was disabled - partial cleanup but keep message listener
+        debug('Site disabled, performing partial cleanup', { hostname: this.state.hostname });
+        this.partialCleanup();
+      } else if (!wasSiteEnabled && this.state.isSiteEnabled) {
+        // Site was enabled - perform full initialization
+        debug('Site re-enabled, performing full initialization', { hostname: this.state.hostname });
+        
+        // Clear the cache to ensure fresh detection
+        this.selectorCache.clear();
+        this.lastCacheTime = 0;
+        
+        // Re-initialize the platform manager to restore strategies that were cleared during cleanup
+        this.platformManager.reinitialize();
+        
+        // Perform full initialization for the newly enabled site
+        this.initializeForEnabledSite();
+        
+        // Force immediate detection after a short delay to ensure DOM is ready
+        setTimeout(() => {
+          this.detectAndInjectIcon();
+        }, 100);
+        
+        // Also try after a longer delay as fallback
+        setTimeout(() => {
+          if (!this.state.icon) {
+            this.detectAndInjectIcon();
+          }
+        }, 500);
+      } else {
+        debug('No site enablement change, updating settings only');
+      }
+    } catch (err) {
+      error('Error handling settings update', err as Error);
+    }
+  }
+
+  /**
+   * Handle reinitialize request
+   */
+  private async handleReinitialize(reason: string): Promise<void> {
+    try {
+      debug('Received reinitialize request', { reason, hostname: this.state.hostname });
+      this.cleanup();
+      await this.initialize();
+    } catch (err) {
+      error('Error handling reinitialize request', err as Error);
+    }
+  }
+
+  /**
+   * Handle selector test request
+   */
+  private handleSelectorTest(message: { selector: string; placement: string; offset: { x: number; y: number }; zIndex: number }): void {
+    try {
+      const element = document.querySelector(message.selector);
+      if (!element) {
+        warn('Selector test failed - element not found', { selector: message.selector });
+        return;
+      }
+
+      // Create temporary test element
+      const testElement = document.createElement('div');
+      testElement.textContent = '🎯 Test Icon';
+      testElement.style.cssText = `
+        position: absolute;
+        background: #10b981;
+        color: white;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        z-index: ${String(message.zIndex)};
+        pointer-events: none;
+        border: 2px solid #059669;
+      `;
+
+      // Position based on placement
+      const rect = element.getBoundingClientRect();
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+
+      switch (message.placement) {
+        case 'before':
+          testElement.style.top = `${String(rect.top + scrollTop + message.offset.y)}px`;
+          testElement.style.left = `${String(rect.left + scrollLeft - testElement.offsetWidth + message.offset.x)}px`;
+          break;
+        case 'after':
+          testElement.style.top = `${String(rect.top + scrollTop + message.offset.y)}px`;
+          testElement.style.left = `${String(rect.right + scrollLeft + message.offset.x)}px`;
+          break;
+        case 'inside-start':
+          testElement.style.top = `${String(rect.top + scrollTop + message.offset.y)}px`;
+          testElement.style.left = `${String(rect.left + scrollLeft + message.offset.x)}px`;
+          break;
+        case 'inside-end':
+          testElement.style.top = `${String(rect.top + scrollTop + message.offset.y)}px`;
+          testElement.style.left = `${String(rect.right + scrollLeft - testElement.offsetWidth + message.offset.x)}px`;
+          break;
+      }
+
+      document.body.appendChild(testElement);
+
+      // Remove after 3 seconds
+      setTimeout(() => {
+        if (testElement.parentNode) {
+          testElement.parentNode.removeChild(testElement);
+        }
+      }, 3000);
+
+      debug('Selector test successful', { selector: message.selector });
+    } catch (err) {
+      error('Selector test failed', err as Error, { selector: message.selector });
+    }
+  }
+
+  /**
    * Sets up SPA monitoring for navigation detection
    */
   private setupSPAMonitoring(): void {
@@ -203,7 +417,7 @@ export class PromptLibraryInjector {
         // Re-initialize after navigation
         setTimeout(() => {
           this.cleanup();
-          this.initialize();
+          void this.initialize();
         }, 1000);
       }
     };
@@ -220,15 +434,29 @@ export class PromptLibraryInjector {
    */
   private detectAndInjectIcon(): void {
     try {
+      if (!this.state.isSiteEnabled) {
+        return;
+      }
+
+      debug('Starting icon detection');
+
       const selectors = this.platformManager.getAllSelectors();
+      debug('Using selectors for detection', { totalSelectors: selectors.length });
+
       const textarea = this.findTextareaWithCaching(selectors);
 
-      if (textarea && textarea !== this.state.currentTextarea) {
-        this.state.currentTextarea = textarea;
-        this.injectIcon(textarea);
+      if (textarea) {
+        debug('Textarea found', { tagName: textarea.tagName, id: textarea.id });
+
+        if (textarea !== this.state.currentTextarea) {
+          this.state.currentTextarea = textarea;
+          this.injectIcon(textarea);
+        }
+      } else {
+        debug('No textarea found', { selectorsChecked: selectors.length });
       }
-    } catch (error) {
-      error('Error during icon detection and injection', error as Error);
+    } catch (err) {
+      error('Error during icon detection and injection', err as Error);
     }
   }
 
@@ -257,11 +485,17 @@ export class PromptLibraryInjector {
     for (const selector of selectors) {
       try {
         const found = Array.from(document.querySelectorAll(selector));
-        elements.push(...found);
+        // Elements found, continuing search
+        elements.push(...(found as HTMLElement[]));
       } catch (error) {
         warn(`Invalid selector: ${selector}`, { error });
       }
     }
+
+    debug('DOM search completed', {
+      selectorsChecked: selectors.length,
+      elementsFound: elements.length
+    });
 
     this.selectorCache.set(cacheKey, elements);
     this.lastCacheTime = now;
@@ -269,9 +503,12 @@ export class PromptLibraryInjector {
     // Return the first visible element
     for (const element of elements) {
       if (this.isElementVisible(element)) {
+        debug('Found visible textarea element', { tagName: element.tagName });
         return element;
       }
     }
+
+    debug('No visible textarea elements found', { totalElementsFound: elements.length });
 
     return null;
   }
@@ -290,6 +527,8 @@ export class PromptLibraryInjector {
    */
   private injectIcon(textarea: HTMLElement): void {
     try {
+      debug('Starting icon injection', { textareaTag: textarea.tagName });
+
       // Remove existing icon
       if (this.state.icon) {
         this.state.icon.remove();
@@ -304,6 +543,7 @@ export class PromptLibraryInjector {
       }
 
       this.state.icon = icon;
+      debug('Icon created successfully');
 
       // Add click handler
       this.eventManager.addTrackedEventListener(icon, 'click', (e: Event) => {
@@ -344,10 +584,7 @@ export class PromptLibraryInjector {
             // Insert after the Research button container
             researchButtonContainer.parentElement.insertBefore(buttonWrapper, researchButtonContainer.nextSibling);
             injected = true;
-            info('Icon injected after Research button in Claude toolbar', {
-              textareaTag: textarea.tagName,
-              iconType: 'claude-integrated'
-            });
+            debug('Icon injected after Research button in Claude toolbar');
           }
         }
         
@@ -359,10 +596,7 @@ export class PromptLibraryInjector {
             // Insert as the first child in the container
             toolbarContainer.insertBefore(icon, toolbarContainer.firstChild);
             injected = true;
-            info('Icon injected as first button in Perplexity toolbar', {
-              textareaTag: textarea.tagName,
-              iconType: 'perplexity-integrated'
-            });
+            debug('Icon injected as first button in Perplexity toolbar');
           }
         }
         
@@ -373,10 +607,7 @@ export class PromptLibraryInjector {
             // Insert as the first child in the container
             container.insertBefore(icon, container.firstChild);
             injected = true;
-            info('Icon injected as first button in ChatGPT toolbar', {
-              textareaTag: textarea.tagName,
-              iconType: 'chatgpt-integrated'
-            });
+            debug('Icon injected as first button in ChatGPT toolbar');
           }
         }
         
@@ -386,11 +617,7 @@ export class PromptLibraryInjector {
           if (container) {
             container.appendChild(icon);
             injected = true;
-            info('Icon injected into platform container', {
-              textareaTag: textarea.tagName,
-              containerSelector,
-              iconType: 'platform-integrated'
-            });
+            debug('Icon injected into platform container');
           }
         }
       }
@@ -399,14 +626,13 @@ export class PromptLibraryInjector {
       if (!injected) {
         this.positionIcon(icon, textarea);
         document.body.appendChild(icon);
-        info('Icon injected with floating position', {
-          textareaTag: textarea.tagName,
-          iconType: 'platform-floating'
-        });
+        debug('Icon injected with floating position (fallback)');
       }
 
-    } catch (error) {
-      error('Failed to inject icon', error as Error);
+      debug('Icon injection completed', { injected });
+
+    } catch (err) {
+      error('Failed to inject icon', err as Error);
     }
   }
 
@@ -430,7 +656,7 @@ export class PromptLibraryInjector {
    */
   async showPromptSelector(targetElement: HTMLElement): Promise<void> {
     try {
-      info('Showing prompt selector', {
+      debug('Showing prompt selector', {
         textareaTag: targetElement.tagName,
         hasExistingSelector: !!this.state.promptSelector
       });
@@ -440,7 +666,7 @@ export class PromptLibraryInjector {
 
       // Get prompts from storage
       const prompts = await getPrompts();
-      info('Retrieved prompts for selector', { count: prompts.length });
+      debug('Retrieved prompts for selector', { count: prompts.length });
 
       // Create selector UI
       this.state.promptSelector = this.createPromptSelectorUI(prompts);
@@ -458,7 +684,7 @@ export class PromptLibraryInjector {
       this.keyboardNav = new KeyboardNavigationManager(this.state.promptSelector, this.eventManager);
       this.keyboardNav.initialize();
 
-      info('Prompt selector created and keyboard navigation initialized', {
+      debug('Prompt selector created and keyboard navigation initialized', {
         promptCount: prompts.length
       });
 
@@ -646,7 +872,7 @@ export class PromptLibraryInjector {
       const result = await this.platformManager.insertPrompt(element, content);
       
       if (result.success) {
-        info('Prompt inserted successfully', {
+        debug('Prompt inserted successfully', {
           method: result.method,
           contentLength: content.length
         });
@@ -680,10 +906,59 @@ export class PromptLibraryInjector {
   }
 
   /**
+   * Partial cleanup - removes UI elements but preserves message listener for re-enabling
+   */
+  private partialCleanup(): void {
+    debug('Starting partial cleanup (preserving message listener)', { instanceId: this.state.instanceId });
+
+    // Clear timeouts
+    if (this.state.detectionTimeout) {
+      clearTimeout(this.state.detectionTimeout);
+      this.state.detectionTimeout = null;
+    }
+
+    if (this.customSelectorRetry.timeoutId) {
+      clearTimeout(this.customSelectorRetry.timeoutId);
+      this.customSelectorRetry.timeoutId = null;
+    }
+
+    if (this.spaState.routeChangeTimeout) {
+      clearTimeout(this.spaState.routeChangeTimeout);
+      this.spaState.routeChangeTimeout = null;
+    }
+
+    // Disconnect mutation observer
+    if (this.state.mutationObserver) {
+      this.state.mutationObserver.disconnect();
+      this.state.mutationObserver = null;
+    }
+
+    // Clean up UI elements
+    if (this.state.icon) {
+      this.state.icon.remove();
+      this.state.icon = null;
+    }
+
+    this.closePromptSelector();
+
+    // Clean up managers (but not message listeners)
+    this.eventManager.cleanup();
+    this.platformManager.cleanup();
+
+    // Clear caches
+    this.selectorCache.clear();
+
+    // Reset state but keep isInitialized true to maintain message listener
+    this.state.currentTextarea = null;
+
+    debug('Partial cleanup completed (message listener preserved)', { instanceId: this.state.instanceId });
+  }
+
+  /**
    * Cleans up all resources
    */
   cleanup(): void {
-    info('Starting cleanup', { instanceId: this.state.instanceId });
+    debug('Starting full cleanup', { instanceId: this.state.instanceId });
 
     // Clear timeouts
     if (this.state.detectionTimeout) {
@@ -726,6 +1001,6 @@ export class PromptLibraryInjector {
     this.state.isInitialized = false;
     this.state.currentTextarea = null;
 
-    info('Cleanup completed', { instanceId: this.state.instanceId });
+    debug('Full cleanup completed', { instanceId: this.state.instanceId });
   }
 }

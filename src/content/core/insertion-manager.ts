@@ -9,19 +9,19 @@
 import { PlatformManager } from '../platforms/platform-manager';
 import type { InsertionResult } from '../types/index';
 import type { UIElementFactory } from '../ui/element-factory';
-import { warn, info } from '../utils/logger';
+import { warn, debug } from '../utils/logger';
 
 export class PlatformInsertionManager {
   private options: Required<Record<string, unknown>>;
   private platformManager: PlatformManager;
 
   constructor(options: Record<string, unknown> = {}) {
-    const debug = typeof options.debug === 'boolean' ? options.debug : false;
+    const debugMode = typeof options.debug === 'boolean' ? options.debug : false;
     const timeout = typeof options.timeout === 'number' ? options.timeout : 5000;
     const retries = typeof options.retries === 'number' ? options.retries : 3;
     
     this.options = {
-      debug,
+      debug: debugMode,
       timeout,
       retries,
       ...options
@@ -34,7 +34,7 @@ export class PlatformInsertionManager {
       timeout: this.options.timeout
     });
     
-    info('PlatformInsertionManager initialized with strategy pattern');
+    debug('PlatformInsertionManager initialized with strategy pattern');
   }
 
   /**
@@ -98,6 +98,26 @@ export class PlatformInsertionManager {
   }
 
   /**
+   * Gets all loaded strategies from the platform manager
+   * @returns Array of loaded strategies
+   */
+  getStrategies() {
+    return this.platformManager.getStrategies();
+  }
+
+  /**
+   * Re-initializes the platform manager (useful when re-enabling a site)
+   */
+  reinitialize(): void {
+    try {
+      this.platformManager.reinitialize();
+      debug('PlatformInsertionManager re-initialization completed');
+    } catch (error) {
+      warn('Error during platform manager re-initialization', { error });
+    }
+  }
+
+  /**
    * Cleans up resources and platform manager
    */
   cleanup(): void {
@@ -107,6 +127,6 @@ export class PlatformInsertionManager {
       warn('Error during platform manager cleanup', { error });
     }
     
-    info('PlatformInsertionManager cleanup completed');
+    debug('PlatformInsertionManager cleanup completed');
   }
 }

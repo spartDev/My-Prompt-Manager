@@ -4,7 +4,7 @@
  */
 
 // import type { KeyboardNavigationState } from '../types/ui';
-import { info } from '../utils/logger';
+import { debug } from '../utils/logger';
 
 import type { EventManager } from './event-manager';
 
@@ -33,7 +33,7 @@ export class KeyboardNavigationManager {
     if (searchInput) {
       setTimeout(() => {
         (searchInput as HTMLInputElement).focus();
-        info('Focused search input for keyboard navigation');
+        debug('Focused search input for keyboard navigation');
       }, 100);
     }
   }
@@ -82,7 +82,7 @@ export class KeyboardNavigationManager {
     
     this.eventManager.addTrackedEventListener(document.documentElement, 'keydown', keyboardHandler as EventListener);
     
-    info('Keyboard navigation handlers setup');
+    debug('Keyboard navigation handlers setup');
   }
 
   private selectNext(): void {
@@ -109,7 +109,7 @@ export class KeyboardNavigationManager {
       selectedItem.classList.add('keyboard-selected');
       selectedItem.setAttribute('aria-selected', 'true');
       
-      info('Updated keyboard selection', { 
+      debug('Updated keyboard selection', { 
         index: this.selectedIndex, 
         itemId: selectedItem.dataset.promptId 
       });
@@ -144,7 +144,7 @@ export class KeyboardNavigationManager {
   private activateSelected(): void {
     if (this.selectedIndex >= 0 && this.selectedIndex < this.items.length) {
       const selectedItem = this.items[this.selectedIndex];
-      info('Activating selected item via keyboard', { 
+      debug('Activating selected item via keyboard', { 
         index: this.selectedIndex, 
         itemId: selectedItem.dataset.promptId 
       });
@@ -155,7 +155,7 @@ export class KeyboardNavigationManager {
   private close(): void {
     const closeButton = this.selector.querySelector('.close-selector');
     if (closeButton) {
-      info('Closing prompt selector via keyboard');
+      debug('Closing prompt selector via keyboard');
       (closeButton as HTMLButtonElement).click();
     }
   }
@@ -163,6 +163,6 @@ export class KeyboardNavigationManager {
   destroy(): void {
     this.isActive = false;
     this.clearSelection();
-    info('Keyboard navigation manager destroyed');
+    debug('Keyboard navigation manager destroyed');
   }
 }

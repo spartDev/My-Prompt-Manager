@@ -27,6 +27,33 @@ This is a Chrome extension for managing personal prompt libraries with dual inte
 ### Extension Packaging
 - `npm run package` - Package extension for Chrome Web Store
 
+## 🚨 MANDATORY WORKFLOW - NO EXCEPTIONS 🚨
+
+**CRITICAL**: After EVERY single code change, you MUST run both test and quality scripts. This is NON-NEGOTIABLE.
+
+### Required Commands After Every Change
+
+```bash
+# 1. ALWAYS run tests first - NO EXCEPTIONS
+npm test
+
+# 2. ALWAYS run quality checks - NO EXCEPTIONS
+npm run lint
+```
+
+### Workflow Enforcement Rules
+
+1. **NEVER proceed to the next task** until both `npm test` and `npm run lint` pass
+2. **NEVER skip this workflow** - even for "small changes" or "quick fixes"
+3. **ALWAYS run the full test suite** - no selective testing
+4. **ALWAYS verify quality standards** - no exceptions for any file type
+
+### Quality Gates - ALL Must Pass
+
+- ✅ **All tests pass**: `npm test` returns success
+- ✅ **No linting errors**: ESLint finds no issues
+- ✅ **No console warnings**: All console usage is intentional
+
 ## Architecture
 
 ### Dual Interface System

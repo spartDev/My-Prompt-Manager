@@ -303,7 +303,9 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
       });
       
       // Notify content scripts of changes
+      
       const tabs = await chrome.tabs.query({});
+      
       for (const tab of tabs) {
         if (tab.id && tab.url && (tab.url.startsWith('http://') || tab.url.startsWith('https://'))) {
           try {
@@ -312,7 +314,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
               settings: newSettings
             });
           } catch {
-            // Ignore errors for tabs without content script
+            // Tab might not have content script loaded, ignore error
           }
         }
       }
@@ -345,15 +347,6 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
 
     setSettings(newSettings);
     await saveSettings(newSettings);
-
-    // Handle debug mode localStorage
-    if (key === 'debugMode') {
-      if (value) {
-        localStorage.setItem('prompt-library-debug', 'true');
-      } else {
-        localStorage.removeItem('prompt-library-debug');
-      }
-    }
   };
 
   // URL validation helper
