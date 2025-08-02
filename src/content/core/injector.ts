@@ -365,6 +365,20 @@ export class PromptLibraryInjector {
           }
         }
         
+        // For ChatGPT, find the container and inject as first child
+        if (this.state.hostname === 'chatgpt.com' && !injected) {
+          const container = document.querySelector(containerSelector);
+          if (container) {
+            // Insert as the first child in the container
+            container.insertBefore(icon, container.firstChild);
+            injected = true;
+            info('Icon injected as first button in ChatGPT toolbar', {
+              textareaTag: textarea.tagName,
+              iconType: 'chatgpt-integrated'
+            });
+          }
+        }
+        
         // Fallback to generic container selector
         if (!injected) {
           const container = document.querySelector(containerSelector);

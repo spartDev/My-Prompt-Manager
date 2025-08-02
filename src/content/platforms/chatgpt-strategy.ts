@@ -30,7 +30,7 @@ export class ChatGPTStrategy extends PlatformStrategy {
         '[data-testid*="input"]',
         '[class*="input"]'
       ],
-      buttonContainerSelector: 'div[data-testid="composer-trailing-actions"] .ms-auto.flex.items-center',
+      buttonContainerSelector: '.ms-auto.flex.items-center.gap-1\\.5',
       priority: 90
     });
   }
