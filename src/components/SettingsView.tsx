@@ -705,15 +705,6 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
                 <path d="M9 18l6-6-6-6"/>
               </svg>
               Advanced Options
-              <svg 
-                className="w-4 h-4 text-amber-500 dark:text-amber-400 opacity-70 group-hover:opacity-100 transition-opacity" 
-                fill="currentColor" 
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-                title="Expert feature"
-              >
-                <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
-              </svg>
             </button>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 ml-7">
               Expert settings for debugging and troubleshooting
@@ -1062,15 +1053,6 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
                 <path d="M9 18l6-6-6-6"/>
               </svg>
               Reset Settings
-              <svg 
-                className="w-4 h-4 text-red-500 dark:text-red-400 opacity-70 group-hover:opacity-100 transition-opacity" 
-                fill="currentColor" 
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-                title="Destructive action"
-              >
-                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
-              </svg>
             </button>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 ml-7">
               Dangerous action - restores all settings to factory defaults
