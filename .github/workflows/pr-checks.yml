@@ -227,8 +227,6 @@ jobs:
         run: |
           echo "📦 Testing Chrome extension packaging..."
           npm run package
-        env:
-          NODE_ENV: production
 
       - name: 📤 Upload Build Artifacts
         uses: actions/upload-artifact@v4
