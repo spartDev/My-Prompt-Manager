@@ -26,7 +26,7 @@ All workflows enforce the **MANDATORY** requirements from `CLAUDE.md`:
 
 **Features**:
 - Parallel job execution for speed
-- Matrix testing (Node.js 18.x, 20.x)
+- Matrix testing (Node.js 22.x LTS, 24.x latest)
 - Smart caching (dependencies, builds, ESLint)
 - Fail-fast strategy
 - Chrome extension validation
@@ -161,7 +161,8 @@ main:
 ## 📝 Maintenance
 
 **Regular Updates**:
-- Node.js version updates in `env.NODE_VERSION`
+- Node.js version updates in `env.NODE_VERSION` (currently 22.x LTS)
+- Matrix testing versions (currently 22.x LTS + 24.x latest)
 - Action version updates (`@v4`, `@v3`)
 - Security policy adjustments
 - Performance optimizations

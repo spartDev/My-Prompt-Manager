@@ -24,7 +24,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  NODE_VERSION: '18.x'
+  NODE_VERSION: '22.x'
   CI: true
 
 jobs:
