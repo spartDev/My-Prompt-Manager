@@ -79,18 +79,17 @@ describe('KeyboardNavigationManager', () => {
       expect(Logger.debug).toHaveBeenCalledWith('Keyboard navigation handlers setup');
     });
 
-    it('should focus search input after initialization', (done) => {
+    it('should focus search input after initialization', async () => {
       const searchInput = mockSelector.querySelector('.search-input') as HTMLInputElement;
       const focusSpy = vi.spyOn(searchInput, 'focus');
       
       keyboardNav.initialize();
       
       // Wait for setTimeout to execute
-      setTimeout(() => {
-        expect(focusSpy).toHaveBeenCalled();
-        expect(Logger.debug).toHaveBeenCalledWith('Focused search input for keyboard navigation');
-        done();
-      }, 150);
+      await new Promise(resolve => setTimeout(resolve, 150));
+      
+      expect(focusSpy).toHaveBeenCalled();
+      expect(Logger.debug).toHaveBeenCalledWith('Focused search input for keyboard navigation');
     });
   });
 
