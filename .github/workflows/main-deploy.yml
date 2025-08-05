@@ -32,7 +32,7 @@ jobs:
           cache: 'npm'
 
       - name: 📦 Cache Dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.npm
@@ -101,7 +101,7 @@ jobs:
           cache: 'npm'
 
       - name: 📦 Restore Dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.npm
@@ -163,7 +163,7 @@ jobs:
           cache: 'npm'
 
       - name: 📦 Restore Dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.npm
@@ -204,7 +204,7 @@ jobs:
           cat build-info.json
 
       - name: 📤 Upload Production Artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: production-chrome-extension-${{ github.sha }}
           path: |
@@ -316,7 +316,7 @@ jobs:
 
       - name: 💾 Store Release Artifacts
         if: steps.version-check.outputs.version_bump == 'true'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: release-ready-${{ steps.version-check.outputs.current_version }}
           path: |
