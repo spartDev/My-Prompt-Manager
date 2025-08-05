@@ -1,0 +1,325 @@
+name: 🚀 Main Branch Deployment
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: # Allow manual triggering
+
+# Ensure only one deployment runs at a time
+concurrency:
+  group: main-deployment
+  cancel-in-progress: false # Don't cancel main branch deployments
+
+env:
+  NODE_VERSION: '18.x'
+  CI: true
+
+jobs:
+  # Extended validation for main branch
+  validate:
+    name: 🔍 Extended Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🛎️ Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Full history for better analysis
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📦 Cache Dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.npm
+            node_modules
+          key: ${{ runner.os }}-node-main-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: 🔧 Install Dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      - name: 🧹 Code Quality Check
+        run: |
+          echo "🧹 Running comprehensive code quality checks..."
+          npm run lint
+
+      - name: 🧪 Full Test Suite
+        run: |
+          echo "🧪 Running complete test suite with coverage..."
+          npm run test:coverage
+        env:
+          NODE_ENV: test
+
+      - name: 🏗️ Production Build
+        run: |
+          echo "🏗️ Creating production build..."
+          npm run build
+        env:
+          NODE_ENV: production
+
+      - name: 📦 Extension Packaging
+        run: |
+          echo "📦 Packaging Chrome extension..."
+          npm run package
+
+      - name: 🔒 Security Audit
+        run: |
+          echo "🔒 Running security audit..."
+          npm audit --audit-level=moderate
+
+      - name: 📊 Build Analysis
+        run: |
+          echo "📊 Analyzing build output..."
+          echo "Build size:"
+          du -sh dist/
+          echo ""
+          echo "JavaScript bundle sizes:"
+          find dist/ -name "*.js" -exec sh -c 'echo "$(basename "$1"): $(wc -c < "$1") bytes"' _ {} \;
+          echo ""
+          echo "Extension package:"
+          ls -lh *.zip 2>/dev/null || echo "No extension package found"
+
+  # Performance and extended testing
+  performance:
+    name: 📈 Performance Testing
+    runs-on: ubuntu-latest
+    needs: validate
+    steps:
+      - name: 🛎️ Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📦 Restore Dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.npm
+            node_modules
+          key: ${{ runner.os }}-node-main-${{ hashFiles('**/package-lock.json') }}
+
+      - name: 🔧 Install Dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      - name: ⚡ Performance Tests
+        run: |
+          echo "⚡ Running performance tests..."
+          
+          # Test build performance
+          echo "📊 Build performance test:"
+          time npm run build
+          
+          # Test extension startup performance (if applicable)
+          echo "🚀 Extension performance validation:"
+          if [ -f "dist/manifest.json" ]; then
+            echo "✅ Extension manifest is ready"
+            echo "📋 Manifest size: $(wc -c < dist/manifest.json) bytes"
+          fi
+          
+          # Memory usage during tests
+          echo "🧠 Memory usage during test execution:"
+          /usr/bin/time -v npm test 2>&1 | grep -E "(Maximum resident set size|User time|System time)" || true
+
+      - name: 📊 Bundle Size Tracking
+        run: |
+          echo "📊 Bundle size analysis for main branch:"
+          
+          # Create bundle size report
+          if [ -d "dist" ]; then
+            echo "Bundle Analysis:" > bundle-report.txt
+            echo "================" >> bundle-report.txt
+            find dist/ -name "*.js" -o -name "*.css" | while read file; do
+              size=$(wc -c < "$file")
+              echo "$(basename "$file"): ${size} bytes" >> bundle-report.txt
+            done
+            
+            echo "📋 Bundle Report:"
+            cat bundle-report.txt
+          fi
+
+  # Prepare production artifacts
+  artifacts:
+    name: 📦 Production Artifacts
+    runs-on: ubuntu-latest
+    needs: [validate, performance]
+    steps:
+      - name: 🛎️ Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📦 Restore Dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.npm
+            node_modules
+          key: ${{ runner.os }}-node-main-${{ hashFiles('**/package-lock.json') }}
+
+      - name: 🔧 Install Dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      - name: 🏗️ Production Build
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: 📦 Package Extension
+        run: npm run package
+
+      - name: 📋 Generate Build Metadata
+        run: |
+          echo "📋 Generating build metadata..."
+          
+          # Create build info
+          cat > build-info.json << EOF
+          {
+            "build_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "commit_sha": "${{ github.sha }}",
+            "branch": "main",
+            "node_version": "${{ env.NODE_VERSION }}",
+            "workflow_run": "${{ github.run_number }}",
+            "build_size": {
+              "dist_total": "$(du -sb dist/ | cut -f1)",
+              "package_size": "$(ls -l *.zip 2>/dev/null | awk '{print $5}' || echo 0)"
+            }
+          }
+          EOF
+          
+          echo "Build metadata:"
+          cat build-info.json
+
+      - name: 📤 Upload Production Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: production-chrome-extension-${{ github.sha }}
+          path: |
+            dist/
+            *.zip
+            build-info.json
+            coverage/
+          retention-days: 30
+
+      - name: 📊 Upload Coverage to GitHub
+        if: always()
+        run: |
+          if [ -d "coverage" ]; then
+            echo "📊 Coverage reports available for analysis"
+            # Could integrate with CodeCov or similar service here
+          fi
+
+  # Health check and monitoring
+  health-check:
+    name: 🏥 Health Check & Monitoring
+    runs-on: ubuntu-latest
+    needs: [validate, performance, artifacts]
+    if: always()
+    steps:
+      - name: 📊 Deployment Health Summary
+        run: |
+          echo "🏥 Main Branch Deployment Health Check"
+          echo "======================================"
+          echo "🕐 Deployment Time: $(date -u)"
+          echo "📝 Commit: ${{ github.sha }}"
+          echo "🌿 Branch: main"
+          echo "🏃 Run Number: ${{ github.run_number }}"
+          echo ""
+          
+          # Check job statuses
+          validate_status="${{ needs.validate.result }}"
+          performance_status="${{ needs.performance.result }}"
+          artifacts_status="${{ needs.artifacts.result }}"
+          
+          echo "Job Results:"
+          echo "🔍 Validation: $validate_status"
+          echo "📈 Performance: $performance_status"
+          echo "📦 Artifacts: $artifacts_status"
+          echo ""
+          
+          if [[ "$validate_status" == "success" && "$performance_status" == "success" && "$artifacts_status" == "success" ]]; then
+            echo "✅ 🎉 MAIN BRANCH DEPLOYMENT SUCCESSFUL!"
+            echo "🚀 All systems operational - Chrome extension is ready"
+          else
+            echo "❌ 🚨 MAIN BRANCH DEPLOYMENT ISSUES DETECTED!"
+            echo "🔧 Please investigate failed jobs immediately"
+            exit 1
+          fi
+
+      - name: 📨 Notify on Failure
+        if: failure()
+        run: |
+          echo "🚨 Main branch deployment failed!"
+          echo "This requires immediate attention as it affects the main branch."
+          # Here you could add Slack/Discord notifications or other alerting
+          
+  # Optional: Auto-create release preparation
+  release-prep:
+    name: 🏷️ Release Preparation
+    runs-on: ubuntu-latest
+    needs: [validate, performance, artifacts]
+    if: success()
+    steps:
+      - name: 🛎️ Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 📋 Check Version Changes
+        id: version-check
+        run: |
+          echo "📋 Checking for version changes..."
+          
+          # Get current version from package.json
+          current_version=$(node -p "require('./package.json').version")
+          echo "current_version=$current_version" >> $GITHUB_OUTPUT
+          echo "📦 Current version: $current_version"
+          
+          # Check if this is a version bump commit
+          if git log -1 --pretty=format:"%s" | grep -E "(bump|version|release)" > /dev/null; then
+            echo "version_bump=true" >> $GITHUB_OUTPUT
+            echo "🏷️ Version bump detected in latest commit"
+          else
+            echo "version_bump=false" >> $GITHUB_OUTPUT
+            echo "📝 No version bump detected"
+          fi
+
+      - name: 🏷️ Prepare Release Notes
+        if: steps.version-check.outputs.version_bump == 'true'
+        run: |
+          echo "🏷️ Preparing release notes for version ${{ steps.version-check.outputs.current_version }}"
+          
+          # Generate changelog since last tag
+          last_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -n "$last_tag" ]; then
+            echo "📝 Changes since $last_tag:"
+            git log $last_tag..HEAD --pretty=format:"- %s (%h)" --no-merges
+          else
+            echo "📝 Initial release preparation"
+          fi
+          
+          echo ""
+          echo "🎯 Ready for release creation when needed"
+
+      - name: 💾 Store Release Artifacts
+        if: steps.version-check.outputs.version_bump == 'true'
+        uses: actions/upload-artifact@v3
+        with:
+          name: release-ready-${{ steps.version-check.outputs.current_version }}
+          path: |
+            dist/
+            *.zip
+          retention-days: 90

@@ -1,0 +1,400 @@
+name: 🔍 Pull Request Checks
+
+on:
+  pull_request:
+    branches: [ main ]
+    types: [ opened, synchronize, reopened, ready_for_review ]
+  pull_request_target:
+    types: [ opened, synchronize, reopened ]
+
+# Cancel in-progress runs when a new commit is pushed
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '18.x'
+  # Fail fast - stop immediately on any quality gate failure
+  CI: true
+
+jobs:
+  # Job 1: Setup dependencies and cache for all subsequent jobs
+  setup:
+    name: 📦 Dependencies & Setup
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    outputs:
+      cache-hit: ${{ steps.cache-deps.outputs.cache-hit }}
+      node-version: ${{ env.NODE_VERSION }}
+    steps:
+      - name: 🛎️ Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          # Fetch full history for better caching and analysis
+          fetch-depth: 0
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📦 Cache Dependencies
+        id: cache-deps
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.npm
+            node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: 🔧 Install Dependencies
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        run: npm ci --prefer-offline --no-audit
+
+      - name: 🔍 Verify Installation
+        run: |
+          npm ls --depth=0
+          node --version
+          npm --version
+
+  # Job 2: Linting with zero tolerance policy
+  lint:
+    name: 🧹 Code Quality & Linting
+    runs-on: ubuntu-latest
+    needs: setup
+    if: github.event.pull_request.draft == false
+    steps:
+      - name: 🛎️ Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ needs.setup.outputs.node-version }}
+          cache: 'npm'
+
+      - name: 📦 Restore Dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.npm
+            node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+
+      - name: 🔧 Install Dependencies
+        if: needs.setup.outputs.cache-hit != 'true'
+        run: npm ci --prefer-offline --no-audit
+
+      - name: 📋 Cache ESLint Results
+        uses: actions/cache@v3
+        with:
+          path: .eslintcache
+          key: ${{ runner.os }}-eslint-${{ hashFiles('.eslintrc.*', 'eslint.config.*', 'src/**/*.{ts,tsx}') }}
+
+      - name: 🧹 Run ESLint (MANDATORY - ZERO TOLERANCE)
+        run: |
+          echo "🚨 MANDATORY: Running ESLint with zero tolerance policy"
+          echo "❌ Any linting errors will fail this check - NO EXCEPTIONS"
+          npm run lint
+        env:
+          # Ensure ESLint failures cause workflow failure
+          NODE_ENV: test
+
+      - name: 📊 ESLint Report
+        if: always()
+        run: |
+          echo "📋 ESLint Summary:"
+          npx eslint . --format=compact --max-warnings=0 || echo "⚠️ Linting issues found above"
+
+  # Job 3: Comprehensive testing with coverage
+  test:
+    name: 🧪 Test Suite & Coverage
+    runs-on: ubuntu-latest
+    needs: setup
+    if: github.event.pull_request.draft == false
+    strategy:
+      matrix:
+        node-version: ['18.x', '20.x']
+      fail-fast: true # Stop immediately on first failure
+    steps:
+      - name: 🛎️ Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: 📦 Restore Dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.npm
+            node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+
+      - name: 🔧 Install Dependencies
+        if: needs.setup.outputs.cache-hit != 'true'
+        run: npm ci --prefer-offline --no-audit
+
+      - name: 🧪 Run Test Suite (MANDATORY - ALL MUST PASS)
+        run: |
+          echo "🚨 MANDATORY: Running full test suite"
+          echo "❌ Any test failures will fail this check - NO EXCEPTIONS"
+          npm test
+        env:
+          NODE_ENV: test
+          CI: true
+
+      - name: 📊 Generate Coverage Report
+        if: matrix.node-version == '18.x'
+        run: npm run test:coverage
+
+      - name: 📈 Upload Coverage Reports
+        if: matrix.node-version == '18.x'
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-reports
+          path: coverage/
+          retention-days: 7
+
+      - name: 📋 Coverage Summary
+        if: matrix.node-version == '18.x'
+        run: |
+          echo "📊 Test Coverage Summary:"
+          if [ -f coverage/coverage-summary.json ]; then
+            cat coverage/coverage-summary.json
+          fi
+
+  # Job 4: Build verification for both dev and production
+  build:
+    name: 🏗️ Build Verification
+    runs-on: ubuntu-latest
+    needs: [setup, lint, test]
+    if: github.event.pull_request.draft == false
+    steps:
+      - name: 🛎️ Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ needs.setup.outputs.node-version }}
+          cache: 'npm'
+
+      - name: 📦 Restore Dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.npm
+            node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+
+      - name: 🔧 Install Dependencies
+        if: needs.setup.outputs.cache-hit != 'true'
+        run: npm ci --prefer-offline --no-audit
+
+      - name: 📋 Cache Build Assets
+        uses: actions/cache@v3
+        with:
+          path: |
+            dist
+            .vite
+          key: ${{ runner.os }}-build-${{ hashFiles('src/**/*', 'public/**/*', 'manifest.json') }}
+
+      - name: 🏗️ Production Build
+        run: |
+          echo "🏗️ Building Chrome extension for production..."
+          npm run build
+        env:
+          NODE_ENV: production
+
+      - name: 🔍 Verify Build Output
+        run: |
+          echo "🔍 Verifying build artifacts..."
+          ls -la dist/
+          if [ ! -f "dist/manifest.json" ]; then
+            echo "❌ Missing manifest.json in build output"
+            exit 1
+          fi
+          echo "✅ Build verification passed"
+
+      - name: 📦 Chrome Extension Packaging
+        run: |
+          echo "📦 Testing Chrome extension packaging..."
+          npm run package
+        env:
+          NODE_ENV: production
+
+      - name: 📤 Upload Build Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: chrome-extension-build
+          path: |
+            dist/
+            *.zip
+          retention-days: 7
+
+      - name: 📊 Build Size Analysis
+        run: |
+          echo "📊 Build Size Analysis:"
+          du -sh dist/
+          find dist/ -name "*.js" -exec wc -c {} + | sort -n
+          echo "📦 Extension package size:"
+          ls -lh *.zip 2>/dev/null || echo "No zip files found"
+
+  # Job 5: Security and dependency scanning
+  security:
+    name: 🔒 Security & Dependencies
+    runs-on: ubuntu-latest
+    needs: setup
+    if: github.event.pull_request.draft == false
+    steps:
+      - name: 🛎️ Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ needs.setup.outputs.node-version }}
+          cache: 'npm'
+
+      - name: 📦 Restore Dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.npm
+            node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+
+      - name: 🔧 Install Dependencies
+        if: needs.setup.outputs.cache-hit != 'true'
+        run: npm ci --prefer-offline --no-audit
+
+      - name: 🔒 Security Audit
+        run: |
+          echo "🔒 Running npm security audit..."
+          npm audit --audit-level=moderate
+        continue-on-error: false # Fail on security vulnerabilities
+
+      - name: 🔍 Dependency Review
+        uses: actions/dependency-review-action@v3
+        with:
+          fail-on-severity: moderate
+          allow-licenses: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC
+
+      - name: 📋 Chrome Extension Manifest Validation
+        run: |
+          echo "📋 Validating Chrome extension manifest..."
+          if [ ! -f "manifest.json" ]; then
+            echo "❌ Missing manifest.json"
+            exit 1
+          fi
+          
+          # Check for Manifest V3 compliance
+          if ! grep -q '"manifest_version": 3' manifest.json; then
+            echo "⚠️ Warning: Not using Manifest V3"
+          else
+            echo "✅ Using Manifest V3"
+          fi
+          
+          # Validate required fields
+          required_fields=("name" "version" "description" "permissions")
+          for field in "${required_fields[@]}"; do
+            if ! grep -q "\"$field\"" manifest.json; then
+              echo "❌ Missing required field: $field"
+              exit 1
+            fi
+          done
+          
+          echo "✅ Manifest validation passed"
+
+  # Job 6: Final quality gate summary
+  quality-gate:
+    name: ✅ Quality Gate Summary
+    runs-on: ubuntu-latest
+    needs: [setup, lint, test, build, security]
+    if: always() && github.event.pull_request.draft == false
+    steps:
+      - name: 📋 Quality Gate Results
+        run: |
+          echo "📋 Quality Gate Summary for PR #${{ github.event.pull_request.number }}"
+          echo "=================================="
+          
+          # Check each job status
+          setup_status="${{ needs.setup.result }}"
+          lint_status="${{ needs.lint.result }}"
+          test_status="${{ needs.test.result }}"
+          build_status="${{ needs.build.result }}"
+          security_status="${{ needs.security.result }}"
+          
+          echo "📦 Dependencies & Setup: $setup_status"
+          echo "🧹 Code Quality & Linting: $lint_status"
+          echo "🧪 Test Suite & Coverage: $test_status"
+          echo "🏗️ Build Verification: $build_status"
+          echo "🔒 Security & Dependencies: $security_status"
+          
+          # Determine overall status
+          if [[ "$setup_status" == "success" && "$lint_status" == "success" && "$test_status" == "success" && "$build_status" == "success" && "$security_status" == "success" ]]; then
+            echo ""
+            echo "🎉 ✅ ALL QUALITY GATES PASSED!"
+            echo "🚀 This PR meets all mandatory requirements and is ready for review."
+          else
+            echo ""
+            echo "❌ 🚨 QUALITY GATES FAILED!"
+            echo "🛑 This PR does not meet the mandatory requirements."
+            echo "📋 Please fix all issues before requesting review."
+            exit 1
+          fi
+
+      - name: 📊 Add PR Comment with Results
+        if: always()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const results = {
+              setup: "${{ needs.setup.result }}",
+              lint: "${{ needs.lint.result }}",
+              test: "${{ needs.test.result }}",
+              build: "${{ needs.build.result }}",
+              security: "${{ needs.security.result }}"
+            };
+            
+            const allPassed = Object.values(results).every(result => result === 'success');
+            const status = allPassed ? '✅ PASSED' : '❌ FAILED';
+            const emoji = allPassed ? '🎉' : '🚨';
+            
+            const comment = `## ${emoji} Quality Gate Results ${status}
+            
+            | Check | Status |
+            |-------|---------|
+            | 📦 Dependencies & Setup | ${results.setup === 'success' ? '✅' : '❌'} ${results.setup} |
+            | 🧹 Code Quality & Linting | ${results.lint === 'success' ? '✅' : '❌'} ${results.lint} |
+            | 🧪 Test Suite & Coverage | ${results.test === 'success' ? '✅' : '❌'} ${results.test} |
+            | 🏗️ Build Verification | ${results.build === 'success' ? '✅' : '❌'} ${results.build} |
+            | 🔒 Security & Dependencies | ${results.security === 'success' ? '✅' : '❌'} ${results.security} |
+            
+            ${allPassed 
+              ? '🚀 **All mandatory quality requirements have been met!** This PR is ready for review.' 
+              : '🛑 **Quality gates failed.** Please address all issues before requesting review.'}
+            
+            ---
+            
+            ### 🚨 Mandatory Requirements Enforced:
+            - ✅ **Zero tolerance** for linting errors (\`npm run lint\`)
+            - ✅ **All tests must pass** (\`npm test\`)
+            - ✅ **Build must succeed** for Chrome extension
+            - ✅ **No security vulnerabilities** above moderate level
+            - ✅ **Manifest V3 compliance** for Chrome extension
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
