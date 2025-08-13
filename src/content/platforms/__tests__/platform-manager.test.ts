@@ -19,6 +19,22 @@ vi.mock('../../utils/logger', () => ({
   showDebugNotification: vi.fn()
 }));
 
+// Mock Storage utilities
+vi.mock('../../utils/storage', () => ({
+  getSettings: vi.fn().mockResolvedValue({
+    enabledSites: ['example.com'],
+    customSites: [],
+    debugMode: false,
+    floatingFallback: true
+  }),
+  getDefaultSettings: vi.fn().mockReturnValue({
+    enabledSites: ['example.com'],
+    customSites: [],
+    debugMode: false,
+    floatingFallback: true
+  })
+}));
+
 
 // Mock all strategy modules
 vi.mock('../claude-strategy', () => ({
@@ -255,26 +271,26 @@ describe('PlatformManager', () => {
       expect(freshManager.createIcon(mockUIFactory)).toBeNull();
     });
 
-    it('should initialize strategies when explicitly called', () => {
+    it('should initialize strategies when explicitly called', async () => {
       const freshManager = new PlatformManager();
-      freshManager.initializeStrategies();
+      await freshManager.initializeStrategies();
       expect(freshManager.getAllSelectors().length).toBeGreaterThan(0);
     });
 
-    it('should prevent duplicate initialization', () => {
+    it('should prevent duplicate initialization', async () => {
       const freshManager = new PlatformManager();
       const spy = vi.spyOn(freshManager as any, '_initializeStrategies');
-      freshManager.initializeStrategies();
-      freshManager.initializeStrategies(); // Second call
+      await freshManager.initializeStrategies();
+      await freshManager.initializeStrategies(); // Second call
       expect(spy).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('getAllSelectors', () => {
-    it('should return combined selectors from all strategies', () => {
+    it('should return combined selectors from all strategies', async () => {
       // Create a fresh manager to avoid test interference
       const freshManager = new PlatformManager();
-      freshManager.initializeStrategies(); // Initialize strategies for testing
+      await freshManager.initializeStrategies(); // Initialize strategies for testing
       const testStrategy = new TestStrategy();
       freshManager.registerStrategy(testStrategy);
       
@@ -286,10 +302,10 @@ describe('PlatformManager', () => {
       expect(selectors).toContain('input');
     });
 
-    it('should remove duplicate selectors', () => {
+    it('should remove duplicate selectors', async () => {
       // Create a fresh manager to avoid test interference
       const freshManager = new PlatformManager();
-      freshManager.initializeStrategies(); // Initialize strategies for testing
+      await freshManager.initializeStrategies(); // Initialize strategies for testing
       const strategy1 = new TestStrategy('test1', 10);
       const strategy2 = new TestStrategy('test2', 20);
       
@@ -307,10 +323,10 @@ describe('PlatformManager', () => {
   });
 
   describe('getButtonContainerSelector', () => {
-    it('should return button container selector from highest priority strategy', () => {
+    it('should return button container selector from highest priority strategy', async () => {
       // Create a fresh manager to avoid test interference
       const freshManager = new PlatformManager();
-      freshManager.initializeStrategies(); // Initialize strategies for testing
+      await freshManager.initializeStrategies(); // Initialize strategies for testing
       const testStrategy = new TestStrategy();
       vi.spyOn(testStrategy, 'getButtonContainerSelector').mockReturnValue('.test-container');
       freshManager.registerStrategy(testStrategy);
@@ -328,8 +344,8 @@ describe('PlatformManager', () => {
   });
 
   describe('createIcon', () => {
-    it('should create icon using highest priority strategy', () => {
-      manager.initializeStrategies(); // Initialize strategies for testing
+    it('should create icon using highest priority strategy', async () => {
+      await manager.initializeStrategies(); // Initialize strategies for testing
       const testStrategy = new TestStrategy();
       const mockIcon = document.createElement('div');
       vi.spyOn(testStrategy, 'createIcon').mockReturnValue(mockIcon);
@@ -340,8 +356,8 @@ describe('PlatformManager', () => {
       expect(manager.getActiveStrategy()).toBe(testStrategy);
     });
 
-    it('should fallback to floating icon when no strategy creates icon', () => {
-      manager.initializeStrategies(); // Initialize strategies for testing
+    it('should fallback to floating icon when no strategy creates icon', async () => {
+      await manager.initializeStrategies(); // Initialize strategies for testing
       const icon = manager.createIcon(mockUIFactory);
       expect(mockUIFactory.createFloatingIcon).toHaveBeenCalled();
       expect(icon).toBeInstanceOf(HTMLElement);

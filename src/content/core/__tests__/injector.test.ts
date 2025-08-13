@@ -498,4 +498,35 @@ describe('PromptLibraryInjector', () => {
       expect(promptList?.getAttribute('role')).toBe('listbox');
     });
   });
+
+  describe('selector testing functionality', () => {
+    it('should have handleSelectorTest method', () => {
+      expect(typeof (injector as any).handleSelectorTest).toBe('function');
+    });
+
+    it('should return error when element is not found', () => {
+      const result = (injector as any).handleSelectorTest({
+        selector: '#non-existent-element-that-definitely-does-not-exist',
+        placement: 'after',
+        offset: { x: 0, y: 0 },
+        zIndex: 999999
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('No elements found matching selector "#non-existent-element-that-definitely-does-not-exist"');
+      expect(result.elementCount).toBeUndefined();
+    });
+
+    it('should handle invalid selectors gracefully', () => {
+      const result = (injector as any).handleSelectorTest({
+        selector: ':::invalid:::selector',
+        placement: 'after',
+        offset: { x: 0, y: 0 },
+        zIndex: 999999
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Selector test failed:');
+    });
+  });
 });

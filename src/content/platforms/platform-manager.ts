@@ -9,6 +9,7 @@ import type { InsertionResult } from '../types/index';
 import type { PlatformManagerOptions } from '../types/platform';
 import type { UIElementFactory } from '../ui/element-factory';
 import { debug, warn } from '../utils/logger';
+import { getSettings, type CustomSite } from '../utils/storage';
 
 import type { PlatformStrategy } from './base-strategy';
 import { ChatGPTStrategy } from './chatgpt-strategy';
@@ -22,6 +23,7 @@ export class PlatformManager {
   private hostname: string;
   private _options: Required<PlatformManagerOptions>;
   private isInitialized: boolean;
+  private customSiteConfig: CustomSite | null;
 
   constructor(options: PlatformManagerOptions = {}) {
     this._options = {
@@ -35,6 +37,7 @@ export class PlatformManager {
     this.activeStrategy = null;
     this.hostname = window.location.hostname;
     this.isInitialized = false;
+    this.customSiteConfig = null;
     
     // Strategies are now loaded lazily via initializeStrategies()
     debug('PlatformManager created (lazy loading mode)', { hostname: this.hostname });
@@ -44,15 +47,43 @@ export class PlatformManager {
    * Initializes platform strategies - called only for enabled sites
    * @public
    */
-  initializeStrategies(): void {
+  async initializeStrategies(): Promise<void> {
     if (this.isInitialized) {
       debug('Strategies already initialized, skipping');
       return;
     }
     
+    // Load custom site configuration if available
+    await this._loadCustomSiteConfig();
+    
     this._initializeStrategies();
     this.isInitialized = true;
-    debug('Strategy initialization complete', { strategiesLoaded: this.strategies.length });
+    debug('Strategy initialization complete', { 
+      strategiesLoaded: this.strategies.length,
+      hasCustomConfig: !!this.customSiteConfig
+    });
+  }
+
+  /**
+   * Loads custom site configuration for the current hostname
+   * @private
+   */
+  private async _loadCustomSiteConfig(): Promise<void> {
+    try {
+      const settings = await getSettings();
+      const customSite = settings.customSites.find(site => site.hostname === this.hostname);
+      
+      if (customSite && customSite.enabled) {
+        this.customSiteConfig = customSite;
+        debug('Custom site configuration loaded', { 
+          hostname: this.hostname,
+          hasPositioning: !!customSite.positioning,
+          mode: customSite.positioning?.mode
+        });
+      }
+    } catch (error) {
+      warn('Failed to load custom site configuration', { error, hostname: this.hostname });
+    }
   }
 
   /**
@@ -138,7 +169,7 @@ export class PlatformManager {
   }
 
   /**
-   * Gets all available selectors from loaded strategies
+   * Gets all available selectors from loaded strategies, including custom selectors
    * @returns Combined array of all selectors, empty if not initialized
    */
   getAllSelectors(): string[] {
@@ -148,6 +179,8 @@ export class PlatformManager {
     }
     
     const allSelectors: string[] = [];
+    
+    // Add selectors from strategies
     for (const strategy of this.strategies) {
       // Safety check for strategy methods - helps with test mocking issues
       if (typeof strategy.getSelectors === 'function') {
@@ -160,6 +193,15 @@ export class PlatformManager {
         });
       }
     }
+    
+    // Add custom selectors from custom site configuration
+    if (this.customSiteConfig?.positioning?.mode === 'custom' && this.customSiteConfig.positioning.selector) {
+      allSelectors.push(this.customSiteConfig.positioning.selector);
+      debug('Added custom selector to detection list', { 
+        selector: this.customSiteConfig.positioning.selector 
+      });
+    }
+    
     return [...new Set(allSelectors)]; // Remove duplicates
   }
 
@@ -277,18 +319,27 @@ export class PlatformManager {
   }
 
   /**
+   * Gets the custom site configuration for the current hostname
+   * @returns Custom site configuration or null if not found
+   */
+  getCustomSiteConfig(): CustomSite | null {
+    return this.customSiteConfig;
+  }
+
+  /**
    * Re-initializes strategies (useful after cleanup when re-enabling a site)
    */
-  reinitialize(): void {
+  async reinitialize(): Promise<void> {
     debug('Re-initializing strategies', { hostname: this.hostname });
     
     // Clear existing strategies and reset initialization flag
     this.strategies = [];
     this.activeStrategy = null;
+    this.customSiteConfig = null;
     this.isInitialized = false;
     
     // Re-initialize with current hostname
-    this.initializeStrategies();
+    await this.initializeStrategies();
   }
 
   /**
@@ -307,6 +358,7 @@ export class PlatformManager {
     
     this.strategies = [];
     this.activeStrategy = null;
+    this.customSiteConfig = null;
     this.isInitialized = false;
     
     debug('Cleanup complete');

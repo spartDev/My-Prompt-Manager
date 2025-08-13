@@ -10,6 +10,7 @@ import { PlatformManager } from '../platforms/platform-manager';
 import type { InsertionResult } from '../types/index';
 import type { UIElementFactory } from '../ui/element-factory';
 import { warn, debug } from '../utils/logger';
+import type { CustomSite } from '../utils/storage';
 
 export class PlatformInsertionManager {
   private options: Required<Record<string, unknown>>;
@@ -108,20 +109,28 @@ export class PlatformInsertionManager {
   /**
    * Initialize platform strategies (lazy loading)
    */
-  initializeStrategies(): void {
-    this.platformManager.initializeStrategies();
+  async initializeStrategies(): Promise<void> {
+    await this.platformManager.initializeStrategies();
   }
 
   /**
    * Re-initializes the platform manager (useful when re-enabling a site)
    */
-  reinitialize(): void {
+  async reinitialize(): Promise<void> {
     try {
-      this.platformManager.reinitialize();
+      await this.platformManager.reinitialize();
       debug('PlatformInsertionManager re-initialization completed');
     } catch (error) {
       warn('Error during platform manager re-initialization', { error });
     }
+  }
+
+  /**
+   * Gets the custom site configuration from platform manager
+   * @returns Custom site configuration or null if not found
+   */
+  getCustomSiteConfig(): CustomSite | null {
+    return this.platformManager.getCustomSiteConfig();
   }
 
   /**

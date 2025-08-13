@@ -78,7 +78,8 @@ describe('UIElementFactory', () => {
       const svg = result.icon.querySelector('svg');
       
       expect(svg).toBeTruthy();
-      expect(svg?.getAttribute('viewBox')).toBe('0 0 256 256');
+      expect(svg?.getAttribute('viewBox')).toBe('0 0 24 24');
+      expect(svg?.getAttribute('fill')).toBe('currentColor');
     });
 
     it('should contain text element with "My Prompts"', () => {
@@ -123,7 +124,7 @@ describe('UIElementFactory', () => {
       
       expect(svg).toBeTruthy();
       expect(svg?.getAttribute('viewBox')).toBe('0 0 24 24');
-      expect(svg?.getAttribute('stroke')).toBe('currentColor');
+      expect(svg?.getAttribute('fill')).toBe('currentColor');
     });
   });
 
@@ -193,8 +194,7 @@ describe('UIElementFactory', () => {
       
       expect(svg).toBeTruthy();
       expect(svg?.getAttribute('viewBox')).toBe('0 0 24 24');
-      expect(svg?.getAttribute('stroke')).toBe('currentColor');
-      expect(svg?.getAttribute('stroke-width')).toBe('2');
+      expect(svg?.getAttribute('fill')).toBe('currentColor');
     });
   });
 

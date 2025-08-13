@@ -35,24 +35,20 @@ export class UIElementFactory {
     icon.setAttribute('data-instance-id', this.instanceId);
     icon.setAttribute('tabindex', '0');
     
-    // Create icon content with SVG and text (like Research button)
-    const iconContentDiv = createElement('div', { 
-      class: 'flex items-center justify-center',
-      style: 'width: 16px; height: 16px;'
-    });
+    // Create centered SVG container - no wrapper divs needed for centering
     const svg = createSVGElement('svg', {
       xmlns: 'http://www.w3.org/2000/svg',
-      width: '16',
-      height: '16',
+      width: '18',
+      height: '18',
       fill: 'currentColor',
-      viewBox: '0 0 256 256',
-      'aria-hidden': 'true'
+      viewBox: '0 0 24 24',
+      'aria-hidden': 'true',
+      style: 'flex-shrink: 0;'
     });
     const path = createSVGElement('path', {
-      d: 'M224,48H32A16,16,0,0,0,16,64V192a16,16,0,0,0,16,16H224a16,16,0,0,0,16-16V64A16,16,0,0,0,224,48ZM208,192H48a8,8,0,0,1-8-8V72H216V184A8,8,0,0,1,208,192ZM64,96a8,8,0,0,1,8-8H184a8,8,0,0,1,0,16H72A8,8,0,0,1,64,96Zm0,32a8,8,0,0,1,8-8H184a8,8,0,0,1,0,16H72A8,8,0,0,1,64,128Zm0,32a8,8,0,0,1,8-8h64a8,8,0,0,1,0,16H72A8,8,0,0,1,64,160Z'
+      d: 'M5.65 9.42C5.93 9.42 6.17 9.32 6.36 9.13C6.55 8.94 6.65 8.69 6.65 8.4C6.65 8.1 6.55 7.85 6.36 7.66C6.17 7.47 5.93 7.37 5.65 7.37C5.37 7.37 5.13 7.47 4.94 7.66C4.75 7.85 4.65 8.1 4.65 8.4C4.65 8.69 4.75 8.94 4.94 9.13C5.13 9.32 5.37 9.42 5.65 9.42ZM10.08 9.42C10.36 9.42 10.6 9.32 10.79 9.13C10.98 8.94 11.08 8.69 11.08 8.4C11.08 8.1 10.98 7.85 10.79 7.66C10.6 7.47 10.36 7.37 10.08 7.37C9.8 7.37 9.56 7.47 9.37 7.66C9.18 7.85 9.08 8.1 9.08 8.4C9.08 8.69 9.18 8.94 9.37 9.13C9.56 9.32 9.8 9.42 10.08 9.42ZM14.32 9.42C14.6 9.42 14.84 9.32 15.03 9.13C15.22 8.94 15.32 8.69 15.32 8.4C15.32 8.1 15.22 7.85 15.03 7.66C14.84 7.47 14.6 7.37 14.32 7.37C14.04 7.37 13.8 7.47 13.61 7.66C13.42 7.85 13.32 8.1 13.32 8.4C13.32 8.69 13.42 8.94 13.61 9.13C13.8 9.32 14.04 9.42 14.32 9.42ZM0 19.21V1.58C0 1.18 0.15 0.81 0.45 0.49C0.75 0.16 1.1 0 1.5 0H18.5C18.88 0 19.23 0.16 19.54 0.49C19.85 0.81 20 1.18 20 1.58V15.3C20 15.7 19.85 16.07 19.54 16.39C19.23 16.72 18.88 16.88 18.5 16.88H4L1.28 19.76C1.04 20.01 0.77 20.06 0.46 19.93C0.15 19.8 0 19.56 0 19.21ZM1.5 17.28L3.37 15.3H18.5V1.58H1.5V17.28ZM1.5 1.58V15.3V17.28V1.58Z'
     });
     svg.appendChild(path);
-    iconContentDiv.appendChild(svg);
     
     // Add text container like Research button
     const textContainer = createElement('div', {
@@ -65,7 +61,7 @@ export class UIElementFactory {
     textContainer.appendChild(textElement);
     
     // Append both icon and text to button
-    icon.appendChild(iconContentDiv);
+    icon.appendChild(svg);
     icon.appendChild(textContainer);
     
     shrinkDiv.appendChild(icon);
@@ -86,62 +82,29 @@ export class UIElementFactory {
     icon.setAttribute('data-instance-id', this.instanceId);
     icon.setAttribute('tabindex', '0');
     
-    // Use secure DOM construction
+    // Use secure DOM construction with consistent sizing
     const outerDiv = createElement('div', { 
       class: 'flex items-center min-w-0 font-medium gap-1.5 justify-center' 
     });
-    const innerDiv = createElement('div', { 
-      class: 'flex shrink-0 items-center justify-center size-4' 
-    });
+    
+    // Create centered SVG without wrapper div complications
     const svg = createSVGElement('svg', {
       xmlns: 'http://www.w3.org/2000/svg',
-      width: '16',
-      height: '16',
+      width: '18',
+      height: '18',
       viewBox: '0 0 24 24',
-      fill: 'none',
-      stroke: 'currentColor',
-      'stroke-width': '2',
-      'stroke-linecap': 'round',
-      'stroke-linejoin': 'round',
-      'aria-hidden': 'true'
+      fill: 'currentColor',
+      'aria-hidden': 'true',
+      style: 'flex-shrink: 0;'
     });
     
-    // Simplified prompt library icon optimized for 16x16 rendering
-    // Main document with subtle stack indicator - clean and instantly recognizable
-    // Uses bolder strokes and fewer elements for crisp small-size display
-    
-    // Main document (primary element)
-    const mainDoc = createSVGElement('rect', {
-      x: '4', y: '4', width: '14', height: '16', rx: '2'
+    // Chat bubble icon with three dots - consistent with ChatGPT integration
+    const path = createSVGElement('path', {
+      d: 'M5.65 9.42C5.93 9.42 6.17 9.32 6.36 9.13C6.55 8.94 6.65 8.69 6.65 8.4C6.65 8.1 6.55 7.85 6.36 7.66C6.17 7.47 5.93 7.37 5.65 7.37C5.37 7.37 5.13 7.47 4.94 7.66C4.75 7.85 4.65 8.1 4.65 8.4C4.65 8.69 4.75 8.94 4.94 9.13C5.13 9.32 5.37 9.42 5.65 9.42ZM10.08 9.42C10.36 9.42 10.6 9.32 10.79 9.13C10.98 8.94 11.08 8.69 11.08 8.4C11.08 8.1 10.98 7.85 10.79 7.66C10.6 7.47 10.36 7.37 10.08 7.37C9.8 7.37 9.56 7.47 9.37 7.66C9.18 7.85 9.08 8.1 9.08 8.4C9.08 8.69 9.18 8.94 9.37 9.13C9.56 9.32 9.8 9.42 10.08 9.42ZM14.32 9.42C14.6 9.42 14.84 9.32 15.03 9.13C15.22 8.94 15.32 8.69 15.32 8.4C15.32 8.1 15.22 7.85 15.03 7.66C14.84 7.47 14.6 7.37 14.32 7.37C14.04 7.37 13.8 7.47 13.61 7.66C13.42 7.85 13.32 8.1 13.32 8.4C13.32 8.69 13.42 8.94 13.61 9.13C13.8 9.32 14.04 9.42 14.32 9.42ZM0 19.21V1.58C0 1.18 0.15 0.81 0.45 0.49C0.75 0.16 1.1 0 1.5 0H18.5C18.88 0 19.23 0.16 19.54 0.49C19.85 0.81 20 1.18 20 1.58V15.3C20 15.7 19.85 16.07 19.54 16.39C19.23 16.72 18.88 16.88 18.5 16.88H4L1.28 19.76C1.04 20.01 0.77 20.06 0.46 19.93C0.15 19.8 0 19.56 0 19.21ZM1.5 17.28L3.37 15.3H18.5V1.58H1.5V17.28ZM1.5 1.58V15.3V17.28V1.58Z'
     });
     
-    // Stack indicator - minimal corner accent showing multiple items
-    const stackIndicator1 = createSVGElement('path', {
-      d: 'M6 2h12a2 2 0 0 1 2 2v1'
-    });
-    const stackIndicator2 = createSVGElement('path', {
-      d: 'M8 2h10a2 2 0 0 1 2 2v2'
-    });
-    
-    // Simple text lines on main document (larger, more visible)
-    const textLine1 = createSVGElement('line', {
-      x1: '8', y1: '8', x2: '14', y2: '8'
-    });
-    const textLine2 = createSVGElement('line', {
-      x1: '8', y1: '12', x2: '16', y2: '12'
-    });
-    const textLine3 = createSVGElement('line', {
-      x1: '8', y1: '16', x2: '13', y2: '16'
-    });
-    
-    svg.appendChild(stackIndicator1);
-    svg.appendChild(stackIndicator2);
-    svg.appendChild(mainDoc);
-    svg.appendChild(textLine1);
-    svg.appendChild(textLine2);
-    svg.appendChild(textLine3);
-    innerDiv.appendChild(svg);
-    outerDiv.appendChild(innerDiv);
+    svg.appendChild(path);
+    outerDiv.appendChild(svg);
     
     // Add "My Prompts" text to match Perplexity's button pattern
     const textElement = createElement('span', {
@@ -165,19 +128,20 @@ export class UIElementFactory {
     icon.setAttribute('data-instance-id', this.instanceId);
     icon.setAttribute('tabindex', '0');
     
-    // Use secure DOM construction
+    // Use secure DOM construction with consistent 18px sizing
     const svg = createSVGElement('svg', {
-      width: '20',
-      height: '20',
+      width: '18',
+      height: '18',
       viewBox: '0 0 24 24',
       fill: 'currentColor',
       xmlns: 'http://www.w3.org/2000/svg',
       'aria-hidden': 'true',
       class: 'icon',
-      'font-size': 'inherit'
+      'font-size': 'inherit',
+      style: 'flex-shrink: 0;'
     });
     
-    // Chat bubble icon with three dots (scaled to 20x20 viewBox)
+    // Chat bubble icon with three dots - consistent sizing
     const path = createSVGElement('path', {
       d: 'M5.65 9.42C5.93 9.42 6.17 9.32 6.36 9.13C6.55 8.94 6.65 8.69 6.65 8.4C6.65 8.1 6.55 7.85 6.36 7.66C6.17 7.47 5.93 7.37 5.65 7.37C5.37 7.37 5.13 7.47 4.94 7.66C4.75 7.85 4.65 8.1 4.65 8.4C4.65 8.69 4.75 8.94 4.94 9.13C5.13 9.32 5.37 9.42 5.65 9.42ZM10.08 9.42C10.36 9.42 10.6 9.32 10.79 9.13C10.98 8.94 11.08 8.69 11.08 8.4C11.08 8.1 10.98 7.85 10.79 7.66C10.6 7.47 10.36 7.37 10.08 7.37C9.8 7.37 9.56 7.47 9.37 7.66C9.18 7.85 9.08 8.1 9.08 8.4C9.08 8.69 9.18 8.94 9.37 9.13C9.56 9.32 9.8 9.42 10.08 9.42ZM14.32 9.42C14.6 9.42 14.84 9.32 15.03 9.13C15.22 8.94 15.32 8.69 15.32 8.4C15.32 8.1 15.22 7.85 15.03 7.66C14.84 7.47 14.6 7.37 14.32 7.37C14.04 7.37 13.8 7.47 13.61 7.66C13.42 7.85 13.32 8.1 13.32 8.4C13.32 8.69 13.42 8.94 13.61 9.13C13.8 9.32 14.04 9.42 14.32 9.42ZM0 19.21V1.58C0 1.18 0.15 0.81 0.45 0.49C0.75 0.16 1.1 0 1.5 0H18.5C18.88 0 19.23 0.16 19.54 0.49C19.85 0.81 20 1.18 20 1.58V15.3C20 15.7 19.85 16.07 19.54 16.39C19.23 16.72 18.88 16.88 18.5 16.88H4L1.28 19.76C1.04 20.01 0.77 20.06 0.46 19.93C0.15 19.8 0 19.56 0 19.21ZM1.5 17.28L3.37 15.3H18.5V1.58H1.5V17.28ZM1.5 1.58V15.3V17.28V1.58Z',
       fill: 'currentColor'
@@ -189,48 +153,71 @@ export class UIElementFactory {
     return icon;
   }
 
-  createFloatingIcon(): HTMLElement {
+  createFloatingIcon(positioning: 'absolute' | 'relative' = 'absolute'): HTMLElement {
     const icon = document.createElement('button');
-    icon.className = `prompt-library-icon`;
+    const baseClasses = 'prompt-library-icon-base';
+    const positioningClass = positioning === 'absolute' ? 'prompt-library-icon-absolute' : 'prompt-library-icon-relative';
+    icon.className = `${baseClasses} ${positioningClass}`;
     icon.setAttribute('data-instance-id', this.instanceId);
     icon.setAttribute('type', 'button');
     icon.setAttribute('aria-label', 'Open my prompt manager - Access your saved prompts');
     icon.setAttribute('title', 'My Prompt Manager - Access your saved prompts');
     icon.setAttribute('tabindex', '0');
     
-    // Use secure DOM construction
+    // Use secure DOM construction with consistent 18px sizing
     const svg = createSVGElement('svg', {
-      width: '20',
-      height: '20',
+      width: '18',
+      height: '18',
       viewBox: '0 0 24 24',
-      fill: 'none',
-      stroke: 'currentColor',
-      'stroke-width': '2',
-      'aria-hidden': 'true'
+      fill: 'currentColor',
+      'aria-hidden': 'true',
+      style: 'flex-shrink: 0;'
     });
+    
+    // Chat bubble icon with three dots - consistent with ChatGPT integration
     const path = createSVGElement('path', {
-      d: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'
-    });
-    const polyline1 = createSVGElement('polyline', {
-      points: '14,2 14,8 20,8'
-    });
-    const line1 = createSVGElement('line', {
-      x1: '16', y1: '13', x2: '8', y2: '13'
-    });
-    const line2 = createSVGElement('line', {
-      x1: '16', y1: '17', x2: '8', y2: '17'
-    });
-    const polyline2 = createSVGElement('polyline', {
-      points: '10,9 9,9 8,9'
+      d: 'M5.65 9.42C5.93 9.42 6.17 9.32 6.36 9.13C6.55 8.94 6.65 8.69 6.65 8.4C6.65 8.1 6.55 7.85 6.36 7.66C6.17 7.47 5.93 7.37 5.65 7.37C5.37 7.37 5.13 7.47 4.94 7.66C4.75 7.85 4.65 8.1 4.65 8.4C4.65 8.69 4.75 8.94 4.94 9.13C5.13 9.32 5.37 9.42 5.65 9.42ZM10.08 9.42C10.36 9.42 10.6 9.32 10.79 9.13C10.98 8.94 11.08 8.69 11.08 8.4C11.08 8.1 10.98 7.85 10.79 7.66C10.6 7.47 10.36 7.37 10.08 7.37C9.8 7.37 9.56 7.47 9.37 7.66C9.18 7.85 9.08 8.1 9.08 8.4C9.08 8.69 9.18 8.94 9.37 9.13C9.56 9.32 9.8 9.42 10.08 9.42ZM14.32 9.42C14.6 9.42 14.84 9.32 15.03 9.13C15.22 8.94 15.32 8.69 15.32 8.4C15.32 8.1 15.22 7.85 15.03 7.66C14.84 7.47 14.6 7.37 14.32 7.37C14.04 7.37 13.8 7.47 13.61 7.66C13.42 7.85 13.32 8.1 13.32 8.4C13.32 8.69 13.42 8.94 13.61 9.13C13.8 9.32 14.04 9.42 14.32 9.42ZM0 19.21V1.58C0 1.18 0.15 0.81 0.45 0.49C0.75 0.16 1.1 0 1.5 0H18.5C18.88 0 19.23 0.16 19.54 0.49C19.85 0.81 20 1.18 20 1.58V15.3C20 15.7 19.85 16.07 19.54 16.39C19.23 16.72 18.88 16.88 18.5 16.88H4L1.28 19.76C1.04 20.01 0.77 20.06 0.46 19.93C0.15 19.8 0 19.56 0 19.21ZM1.5 17.28L3.37 15.3H18.5V1.58H1.5V17.28ZM1.5 1.58V15.3V17.28V1.58Z'
     });
     
     svg.appendChild(path);
-    svg.appendChild(polyline1);
-    svg.appendChild(line1);
-    svg.appendChild(line2);
-    svg.appendChild(polyline2);
     icon.appendChild(svg);
     
     return icon;
+  }
+
+  /**
+   * Creates a floating icon for DOM insertion (relative positioning)
+   * This is used when icons are inserted into the DOM structure using before/after/inside placement
+   */
+  createRelativeIcon(): HTMLElement {
+    return this.createFloatingIcon('relative');
+  }
+
+  /**
+   * Creates a floating icon for absolute positioning (fallback)
+   * This is used when icons need to be positioned absolutely as a fallback
+   */
+  createAbsoluteIcon(): HTMLElement {
+    return this.createFloatingIcon('absolute');
+  }
+
+  /**
+   * Converts an existing icon from absolute to relative positioning
+   * This is used when an icon created for absolute positioning needs to be used with DOM insertion
+   */
+  static convertToRelativePositioning(icon: HTMLElement): void {
+    // Remove absolute positioning classes and add relative positioning classes
+    icon.classList.remove('prompt-library-icon-absolute', 'prompt-library-icon');
+    icon.classList.add('prompt-library-icon-base', 'prompt-library-icon-relative');
+  }
+
+  /**
+   * Converts an existing icon from relative to absolute positioning
+   * This is used when an icon created for DOM insertion needs to be used with absolute positioning as fallback
+   */
+  static convertToAbsolutePositioning(icon: HTMLElement): void {
+    // Remove relative positioning classes and add absolute positioning classes
+    icon.classList.remove('prompt-library-icon-relative');
+    icon.classList.add('prompt-library-icon-base', 'prompt-library-icon-absolute');
   }
 }

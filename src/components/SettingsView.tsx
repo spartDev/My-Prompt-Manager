@@ -281,17 +281,32 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
           placement,
           offset: { x: offsetX, y: offsetY },
           zIndex: customZIndex
-        }) as unknown as { success: boolean; error?: string };
+        }) as unknown as { success: boolean; error?: string; elementCount?: number };
         
         if (response.success) {
           setSelectorError(''); // Clear any previous errors
-          // You could add a success message here if desired
+          // Show success message with element count
+          const elementCount = response.elementCount ?? 0;
+          const elementText = elementCount === 1 ? 'element' : 'elements';
+          setSelectorError(`✓ Success! Found ${String(elementCount)} ${elementText}. Check the page for visual feedback.`);
+          
+          // Change the error styling to success styling temporarily
+          setTimeout(() => {
+            setSelectorError('');
+          }, 5000);
         } else {
           setSelectorError(response.error || 'Selector test failed');
         }
+      } else {
+        setSelectorError('No active tab found. Please make sure you have a webpage open.');
       }
-    } catch {
-      setSelectorError('Failed to test selector. Make sure you\'re on the target website.');
+    } catch (err) {
+      console.error('Selector test error:', err);
+      if (err instanceof Error && err.message.includes('Could not establish connection')) {
+        setSelectorError('Extension not loaded on this page. Try refreshing the page or navigate to the target website.');
+      } else {
+        setSelectorError('Failed to test selector. Make sure the extension is loaded on the current page.');
+      }
     }
   };
 
@@ -940,10 +955,18 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
                                 />
                               </div>
 
-                              {/* Selector Error */}
+                              {/* Selector Error/Success */}
                               {selectorError && (
-                                <div className="p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded">
-                                  <p className="text-xs text-red-600 dark:text-red-400">
+                                <div className={`p-2 border rounded ${
+                                  selectorError.startsWith('✓') 
+                                    ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+                                    : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+                                }`}>
+                                  <p className={`text-xs ${
+                                    selectorError.startsWith('✓')
+                                      ? 'text-green-600 dark:text-green-400'
+                                      : 'text-red-600 dark:text-red-400'
+                                  }`}>
                                     {selectorError}
                                   </p>
                                 </div>

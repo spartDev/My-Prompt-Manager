@@ -36,13 +36,40 @@ export function injectCSS(): void {
  */
 export function getCSS(): string {
     return `
-    /* Prompt Manager Icon */
+    /* Base Prompt Manager Icon Styles */
+    .prompt-library-icon-base {
+      width: 32px;
+      height: 32px;  
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      border: 2px solid transparent;
+    }
+
+    /* Absolute positioned prompt library icon (for fallback absolute positioning) */
+    .prompt-library-icon-absolute {
+      position: absolute;
+      z-index: 999999;
+    }
+
+    /* Relative positioned prompt library icon (for DOM-inserted icons) */
+    .prompt-library-icon-relative {
+      position: relative;
+      z-index: 10;
+    }
+
+    /* Legacy class for backward compatibility */
     .prompt-library-icon {
       position: absolute;
-      width: 50px;
-      height: 50px;  
+      width: 32px;
+      height: 32px;  
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      border-radius: 50%;
+      border-radius: 8px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -53,22 +80,29 @@ export function getCSS(): string {
       border: 2px solid transparent;
     }
 
+    /* Hover and focus styles for all prompt library icons */
+    .prompt-library-icon-base:hover,
     .prompt-library-icon:hover {
       background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
       transform: scale(1.05);
       box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
     }
 
+    .prompt-library-icon-base:focus-visible,
     .prompt-library-icon:focus-visible {
       outline: none;
       border-color: #60a5fa;
       box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.4);
     }
 
+    .prompt-library-icon-base svg,
     .prompt-library-icon svg {
       color: white;
-      width: 24px;
-      height: 24px;
+      width: 18px;
+      height: 18px;
+      /* Ensure perfect centering within the 32px container */
+      display: block;
+      margin: auto;
     }
 
     /* Prompt Selector Modal */
