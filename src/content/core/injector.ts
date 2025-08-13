@@ -144,6 +144,7 @@ export class PromptLibraryInjector {
       // Full initialization for enabled sites
       try {
         this.initializeForEnabledSite();
+        debug('Full initialization completed, setting isInitialized = true');
         // Set initialization flag after full setup is complete
         this.state.isInitialized = true;
       } catch (enabledSiteErr) {
@@ -158,6 +159,7 @@ export class PromptLibraryInjector {
       if (this.state.isSiteEnabled) {
         this.state.isInitialized = false;
       }
+      throw err; // Re-throw the error so tests can catch it if needed
     }
   }
 
@@ -170,6 +172,10 @@ export class PromptLibraryInjector {
 
       // Inject CSS styles
       injectCSS();
+
+      // Initialize platform strategies for enabled sites only
+      debug('Initializing platform strategies for enabled site');
+      this.platformManager.initializeStrategies();
 
       // Setup SPA monitoring for dynamic navigation detection
       this.setupSPAMonitoring();
@@ -300,10 +306,7 @@ export class PromptLibraryInjector {
         this.selectorCache.clear();
         this.lastCacheTime = 0;
         
-        // Re-initialize the platform manager to restore strategies that were cleared during cleanup
-        this.platformManager.reinitialize();
-        
-        // Perform full initialization for the newly enabled site
+        // Perform full initialization for the newly enabled site (includes strategy initialization)
         this.initializeForEnabledSite();
         
         // Force immediate detection after a short delay to ensure DOM is ready

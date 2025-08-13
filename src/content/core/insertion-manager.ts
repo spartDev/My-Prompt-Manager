@@ -106,6 +106,13 @@ export class PlatformInsertionManager {
   }
 
   /**
+   * Initialize platform strategies (lazy loading)
+   */
+  initializeStrategies(): void {
+    this.platformManager.initializeStrategies();
+  }
+
+  /**
    * Re-initializes the platform manager (useful when re-enabling a site)
    */
   reinitialize(): void {

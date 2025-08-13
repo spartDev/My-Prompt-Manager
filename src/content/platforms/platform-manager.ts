@@ -21,6 +21,7 @@ export class PlatformManager {
   private activeStrategy: PlatformStrategy | null;
   private hostname: string;
   private _options: Required<PlatformManagerOptions>;
+  private isInitialized: boolean;
 
   constructor(options: PlatformManagerOptions = {}) {
     this._options = {
@@ -33,19 +34,36 @@ export class PlatformManager {
     this.strategies = [];
     this.activeStrategy = null;
     this.hostname = window.location.hostname;
+    this.isInitialized = false;
+    
+    // Strategies are now loaded lazily via initializeStrategies()
+    debug('PlatformManager created (lazy loading mode)', { hostname: this.hostname });
+  }
+
+  /**
+   * Initializes platform strategies - called only for enabled sites
+   * @public
+   */
+  initializeStrategies(): void {
+    if (this.isInitialized) {
+      debug('Strategies already initialized, skipping');
+      return;
+    }
     
     this._initializeStrategies();
+    this.isInitialized = true;
+    debug('Strategy initialization complete', { strategiesLoaded: this.strategies.length });
   }
 
   /**
    * Initializes platform strategies based on current hostname
-   * Only loads strategies for supported AI platforms
+   * Loads specialized strategies for known AI platforms, DefaultStrategy for others
    * @private
    */
   private _initializeStrategies(): void {
     debug('Initializing platform strategies', { hostname: this.hostname });
     
-    // Only add strategies for supported AI platforms
+    // Add specialized strategies for known AI platforms, DefaultStrategy for others
     switch (this.hostname) {
       case 'claude.ai':
         this.strategies.push(new ClaudeStrategy());
@@ -63,15 +81,13 @@ export class PlatformManager {
         break;
         
       default:
-        debug(`Unsupported hostname: ${this.hostname} - no strategies loaded`);
-        // No strategies loaded for unsupported sites
-        return;
+        debug(`Unknown hostname: ${this.hostname} - loading DefaultStrategy`);
+        this.strategies.push(new DefaultStrategy());
+        break;
     }
     
     // Sort strategies by priority (highest first)
     this.strategies.sort((a, b) => b.priority - a.priority);
-    
-    debug('Strategy initialization complete', { strategiesLoaded: this.strategies.length });
   }
 
   /**
@@ -123,17 +139,26 @@ export class PlatformManager {
 
   /**
    * Gets all available selectors from loaded strategies
-   * @returns Combined array of all selectors, empty if no strategies loaded
+   * @returns Combined array of all selectors, empty if not initialized
    */
   getAllSelectors(): string[] {
-    // Return empty array if no strategies loaded (unsupported site)
-    if (this.strategies.length === 0) {
+    // Return empty array if not initialized (disabled site) or no strategies loaded
+    if (!this.isInitialized || this.strategies.length === 0) {
       return [];
     }
     
     const allSelectors: string[] = [];
     for (const strategy of this.strategies) {
-      allSelectors.push(...strategy.getSelectors());
+      // Safety check for strategy methods - helps with test mocking issues
+      if (typeof strategy.getSelectors === 'function') {
+        allSelectors.push(...strategy.getSelectors());
+      } else {
+        debug('Strategy missing getSelectors method', { 
+          strategy: strategy.name || 'unnamed',
+          type: typeof strategy,
+          methods: Object.keys(strategy)
+        });
+      }
     }
     return [...new Set(allSelectors)]; // Remove duplicates
   }
@@ -143,22 +168,42 @@ export class PlatformManager {
    * @returns Button container selector or null
    */
   getButtonContainerSelector(): string | null {
+    // Return null if not initialized (disabled site) or no strategies loaded
+    if (!this.isInitialized || this.strategies.length === 0) {
+      return null;
+    }
+    
     // Use the highest priority strategy that has a button container selector
     for (const strategy of this.strategies) {
-      const selector = strategy.getButtonContainerSelector();
-      if (selector) {
-        return selector;
+      // Safety check for strategy methods - helps with test mocking issues
+      if (typeof strategy.getButtonContainerSelector === 'function') {
+        const selector = strategy.getButtonContainerSelector();
+        if (selector) {
+          return selector;
+        }
+      } else {
+        debug('Strategy missing getButtonContainerSelector method', { 
+          strategy: strategy.name || 'unnamed',
+          type: typeof strategy,
+          methods: Object.keys(strategy)
+        });
       }
     }
+    
     return null;
   }
 
   /**
    * Creates platform-specific icon
    * @param uiFactory - UI factory instance
-   * @returns Platform-specific icon
+   * @returns Platform-specific icon or null if not initialized
    */
   createIcon(uiFactory: UIElementFactory): HTMLElement | null {
+    // Return null if not initialized (disabled site)
+    if (!this.isInitialized) {
+      return null;
+    }
+    
     // Use the highest priority strategy to create the icon
     for (const strategy of this.strategies) {
       const icon = strategy.createIcon?.(uiFactory);
@@ -237,12 +282,13 @@ export class PlatformManager {
   reinitialize(): void {
     debug('Re-initializing strategies', { hostname: this.hostname });
     
-    // Clear existing strategies
+    // Clear existing strategies and reset initialization flag
     this.strategies = [];
     this.activeStrategy = null;
+    this.isInitialized = false;
     
     // Re-initialize with current hostname
-    this._initializeStrategies();
+    this.initializeStrategies();
   }
 
   /**
@@ -261,6 +307,7 @@ export class PlatformManager {
     
     this.strategies = [];
     this.activeStrategy = null;
+    this.isInitialized = false;
     
     debug('Cleanup complete');
   }

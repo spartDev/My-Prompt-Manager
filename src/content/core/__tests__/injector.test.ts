@@ -22,6 +22,7 @@ vi.mock('../insertion-manager', () => ({
     getAllSelectors: vi.fn().mockReturnValue(['textarea', 'div[contenteditable="true"]']),
     createIcon: vi.fn().mockReturnValue(document.createElement('button')),
     insertPrompt: vi.fn().mockResolvedValue({ success: true, method: 'direct' }),
+    initializeStrategies: vi.fn(),
     cleanup: vi.fn()
   }))
 }));
