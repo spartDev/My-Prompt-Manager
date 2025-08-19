@@ -38,17 +38,13 @@ export function getCSS(): string {
     return `
     /* Base Prompt Manager Icon Styles */
     .prompt-library-icon-base {
-      width: 32px;
-      height: 32px;  
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      border-radius: 8px;
+      min-width: 32px;
+      border-radius: .5rem;
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
       transition: all 0.2s ease;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-      border: 2px solid transparent;
     }
 
     /* Absolute positioned prompt library icon (for fallback absolute positioning) */
