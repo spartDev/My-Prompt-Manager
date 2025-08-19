@@ -181,6 +181,17 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
   const [positioningDescription, setPositioningDescription] = useState('');
   const [selectorError, setSelectorError] = useState('');
 
+  // Element picker state
+  const [isPickingElement, setIsPickingElement] = useState(false);
+  const [pickedElementInfo, setPickedElementInfo] = useState<{
+    selector: string;
+    elementType: string;
+  } | null>(null);
+
+  // Check if we're in picker mode
+  const urlParams = new URLSearchParams(window.location.search);
+  const isPickerWindow = urlParams.get('picker') === 'true';
+
   // Expandable sections state
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
   const [showResetSection, setShowResetSection] = useState(false);
@@ -229,7 +240,48 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
 
   useEffect(() => {
     void loadSettings();
+
+    // Check if we're in picker mode and auto-expand settings
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('picker') === 'true') {
+      setShowAdvancedOptions(true);  // Show the Advanced Options section which contains Custom Sites
+      setShowAdvancedPositioning(true);
+      setPositioningMode('custom');
+    }
   }, [loadSettings]);
+
+  // Listen for element picker results
+  useEffect(() => {
+    const handleMessage = (message: any) => {
+      if (message.type === 'ELEMENT_PICKER_RESULT') {
+        const { selector, elementType } = message.data;
+        setCustomSelector(selector);
+        setPickedElementInfo({ selector, elementType });
+        setIsPickingElement(false);
+        setSelectorError('');
+
+        // Auto-set to custom positioning mode
+        if (positioningMode !== 'custom') {
+          setPositioningMode('custom');
+        }
+      }
+    };
+
+    chrome.runtime.onMessage.addListener(handleMessage);
+
+    // Keep popup alive during element picking
+    let port: chrome.runtime.Port | null = null;
+    if (isPickingElement) {
+      port = chrome.runtime.connect({ name: 'popup-keep-alive' });
+    }
+
+    return () => {
+      chrome.runtime.onMessage.removeListener(handleMessage);
+      if (port) {
+        port.disconnect();
+      }
+    };
+  }, [isPickingElement, positioningMode]);
 
   // Clear URL error when user types
   useEffect(() => {
@@ -258,10 +310,71 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
     setSelectorError('');
   };
 
+  // Start element picker mode
+  const startElementPicker = async () => {
+    try {
+      setIsPickingElement(true);
+      setSelectorError('');
+
+      // Check if we're in picker mode (opened in a window)
+      const urlParams = new URLSearchParams(window.location.search);
+      const isPickerWindow = urlParams.get('picker') === 'true';
+
+      if (isPickerWindow) {
+        // We're in a picker window, directly start the picker
+        const response = await chrome.runtime.sendMessage({
+          type: 'START_ELEMENT_PICKER'
+        });
+
+        if (!response?.success) {
+          setIsPickingElement(false);
+          setSelectorError(response?.error || 'Failed to start element picker');
+        }
+      } else {
+        // We're in a regular popup, need to open a new window
+        const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+        // Check if we're on a valid webpage
+        if (!activeTab?.url || activeTab.url.startsWith('chrome://') || activeTab.url.startsWith('chrome-extension://')) {
+          setIsPickingElement(false);
+          setSelectorError('Please navigate to a webpage first, then try again');
+          return;
+        }
+
+        // Open picker in a new window to prevent popup from closing
+        const response = await chrome.runtime.sendMessage({
+          type: 'OPEN_PICKER_WINDOW',
+          data: { tabId: activeTab.id }
+        });
+
+        if (response?.success) {
+          // Close the current popup
+          window.close();
+        } else {
+          setIsPickingElement(false);
+          setSelectorError(response?.error || 'Failed to open element picker');
+        }
+      }
+    } catch (error) {
+      console.error('Error starting element picker:', error);
+      setIsPickingElement(false);
+      setSelectorError('Failed to start element picker. Make sure you have a webpage open.');
+    }
+  };
+
   // Test selector and show preview
   const testSelector = async () => {
     if (!customSelector.trim()) {
       setSelectorError('Please enter a selector to test');
+      return;
+    }
+
+    // First try to validate the selector syntax
+    try {
+      // Test if the selector is valid by trying to use it
+      document.createElement('div').querySelector(customSelector);
+    } catch (e) {
+      setSelectorError('Invalid CSS selector syntax. Please check for special characters that need escaping.');
       return;
     }
 
@@ -853,22 +966,59 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
                                 <label htmlFor="custom-selector" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                                   CSS Selector <span className="text-red-500">*</span>
                                 </label>
-                                <input
-                                  id="custom-selector"
-                                  type="text"
-                                  placeholder=".submit-button, #send-btn, textarea[data-id='root']"
-                                  value={customSelector}
-                                  onChange={(e) => { setCustomSelector(e.target.value); }}
-                                  className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100 font-mono"
-                                  disabled={saving}
-                                />
+                                <div className="flex gap-2 mb-1">
+                                  <input
+                                    id="custom-selector"
+                                    type="text"
+                                    placeholder=".submit-button, #send-btn, textarea[data-id='root']"
+                                    value={customSelector}
+                                    onChange={(e) => { setCustomSelector(e.target.value); }}
+                                    className="flex-1 px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100 font-mono"
+                                    disabled={saving || isPickingElement}
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => void startElementPicker()}
+                                    disabled={saving || isPickingElement}
+                                    className="px-3 py-1 text-xs bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white rounded focus:ring-2 focus:ring-purple-500 focus:ring-offset-1 whitespace-nowrap flex items-center gap-1"
+                                    title="Visually select an element on the webpage"
+                                  >
+                                    {isPickingElement ? (
+                                      <>
+                                        <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        Picking...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                                          <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                          <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                        </svg>
+                                        Pick Element
+                                      </>
+                                    )}
+                                  </button>
+                                </div>
                                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                  Target element where the icon should be positioned
+                                  {pickedElementInfo ?
+                                    `Selected: ${pickedElementInfo.elementType} element with selector` :
+                                    isPickingElement ?
+                                    'Switch to the target tab and click on the desired element...' :
+                                    'Target element where the icon should be positioned'
+                                  }
                                 </p>
+                                {!isPickingElement && !isPickerWindow && (
+                                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                                    Note: Clicking "Pick Element" will open settings in a new window
+                                  </p>
+                                )}
                                 <button
                                   type="button"
                                   onClick={() => void testSelector()}
-                                  disabled={!customSelector.trim() || saving}
+                                  disabled={!customSelector.trim() || saving || isPickingElement}
                                   className="mt-2 px-3 py-1 text-xs bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
                                 >
                                   Test Selector
