@@ -16,8 +16,8 @@ interface CustomSite {
   enabled: boolean;
   dateAdded: number;
   positioning?: {
-    mode: 'auto' | 'custom';
-    selector?: string;
+    mode: 'custom';
+    selector: string;
     placement: 'before' | 'after' | 'inside-start' | 'inside-end';
     offset?: {
       x: number;
@@ -85,12 +85,11 @@ const SiteTile: FC<SiteTileProps> = ({
   const getEnhancedDescription = () => {
     if (!isCustom || !customSite) {return description;}
     
-    // For custom sites, show positioning mode instead of hostname duplication
-    if (customSite.positioning?.mode === 'custom') {
+    // For custom sites, show positioning description
+    if (customSite.positioning) {
       return customSite.positioning.description || 'Custom positioning';
-    } else {
-      return 'Auto positioning';
     }
+    return description;
   };
 
   return (
@@ -170,9 +169,9 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
   const [newSiteName, setNewSiteName] = useState('');
   const [urlError, setUrlError] = useState('');
   
-  // Custom positioning state
-  const [showAdvancedPositioning, setShowAdvancedPositioning] = useState(false);
-  const [positioningMode, setPositioningMode] = useState<'auto' | 'custom'>('auto');
+  // Custom positioning state (always required now)
+  const [showAdvancedPositioning, setShowAdvancedPositioning] = useState(true);
+  const [positioningMode, setPositioningMode] = useState<'custom'>('custom');
   const [customSelector, setCustomSelector] = useState('');
   const [placement, setPlacement] = useState<'before' | 'after' | 'inside-start' | 'inside-end'>('after');
   const [offsetX, setOffsetX] = useState(0);
@@ -245,8 +244,6 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('picker') === 'true') {
       setShowAdvancedOptions(true);  // Show the Advanced Options section which contains Custom Sites
-      setShowAdvancedPositioning(true);
-      setPositioningMode('custom');
     }
   }, [loadSettings]);
 
@@ -260,10 +257,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
         setIsPickingElement(false);
         setSelectorError('');
 
-        // Auto-set to custom positioning mode
-        if (positioningMode !== 'custom') {
-          setPositioningMode('custom');
-        }
+        // Custom positioning mode is always enabled
       }
     };
 
@@ -299,8 +293,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
 
   // Reset positioning form
   const resetPositioningForm = () => {
-    setShowAdvancedPositioning(false);
-    setPositioningMode('auto');
+    setShowAdvancedPositioning(true);  // Keep it expanded since it's required
     setCustomSelector('');
     setPlacement('after');
     setOffsetX(0);
@@ -604,13 +597,11 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
       return;
     }
 
-    // Validate custom selector if custom positioning is enabled
-    if (positioningMode === 'custom') {
-      const selectorValidation = validateSelector(customSelector);
-      if (!selectorValidation.isValid) {
-        setSelectorError(selectorValidation.error || 'Invalid selector');
-        return;
-      }
+    // Validate custom selector (always required for custom sites)
+    const selectorValidation = validateSelector(customSelector);
+    if (!selectorValidation.isValid) {
+      setSelectorError(selectorValidation.error || 'Invalid selector');
+      return;
     }
 
     const newSite: CustomSite = {
@@ -618,16 +609,13 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
       displayName: newSiteName.trim() || validation.hostname,
       enabled: true,
       dateAdded: Date.now(),
-      positioning: positioningMode === 'custom' ? {
+      positioning: {
         mode: 'custom',
         selector: customSelector.trim(),
         placement,
         offset: { x: offsetX, y: offsetY },
         zIndex: customZIndex,
         description: positioningDescription.trim() || undefined
-      } : {
-        mode: 'auto',
-        placement: 'after'
       }
     };
 
@@ -897,36 +885,42 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
                 </p>
                 
                 {/* Add New Site Form */}
-                <div className="bg-white dark:bg-gray-800 rounded-lg p-4 mb-4 border border-gray-200 dark:border-gray-600">
-                  <div className="space-y-3">
-                    <input
-                      type="url"
-                      placeholder="https://example.com"
-                      value={newSiteUrl}
-                      onChange={(e) => {
-                        setNewSiteUrl(e.target.value);
-                      }}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-100"
-                      disabled={saving}
-                    />
-                    
-                    <input
-                      type="text"
-                      placeholder="Site Name (optional)"
-                      value={newSiteName}
-                      onChange={(e) => {
-                        setNewSiteName(e.target.value);
-                      }}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-100"
-                      disabled={saving}
-                    />
-                    
-                    {/* Advanced Positioning Toggle */}
-                    <div className="border-t border-gray-200 dark:border-gray-600 pt-3">
+                <div className="space-y-4">
+                  {/* Basic Site Information */}
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
+                    <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">Site Information</h4>
+                    <div className="space-y-3">
+                      <input
+                        type="url"
+                        placeholder="https://example.com"
+                        value={newSiteUrl}
+                        onChange={(e) => {
+                          setNewSiteUrl(e.target.value);
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-100"
+                        disabled={saving}
+                      />
+
+                      <input
+                        type="text"
+                        placeholder="Site Name (optional)"
+                        value={newSiteName}
+                        onChange={(e) => {
+                          setNewSiteName(e.target.value);
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-100"
+                        disabled={saving}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Icon Positioning */}
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
+                    <div className="mb-3">
                       <button
                         type="button"
                         onClick={() => { setShowAdvancedPositioning(!showAdvancedPositioning); }}
-                        className="flex items-center gap-2 text-sm text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-medium"
+                        className="flex items-center gap-2 text-sm font-medium text-gray-900 dark:text-gray-100 hover:text-purple-600 dark:hover:text-purple-400"
                       >
                         <svg 
                           className={`w-4 h-4 transition-transform ${showAdvancedPositioning ? 'rotate-90' : ''}`} 
@@ -937,31 +931,18 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
                         >
                           <path d="M9 18l6-6-6-6"/>
                         </svg>
-                        Advanced Icon Positioning
+                        Icon Positioning
+                        <span className="text-xs text-red-500">*</span>
                       </button>
-                      
-                      {showAdvancedPositioning && (
-                        <div className="mt-3 space-y-3 bg-gray-50 dark:bg-gray-700 rounded-lg p-3 border border-gray-200 dark:border-gray-600">
-                          {/* Positioning Mode */}
-                          <div>
-                            <label htmlFor="positioning-mode" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                              Positioning Mode
-                            </label>
-                            <select
-                              id="positioning-mode"
-                              value={positioningMode}
-                              onChange={(e) => { setPositioningMode(e.target.value as 'auto' | 'custom'); }}
-                              className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100"
-                              disabled={saving}
-                            >
-                              <option value="auto">Auto (Use default fallback selectors)</option>
-                              <option value="custom">Custom (Specify exact placement)</option>
-                            </select>
-                          </div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-6">
+                        Configure where the prompt library icon appears
+                      </p>
+                    </div>
 
-                          {positioningMode === 'custom' && (
-                            <>
-                              {/* Custom Selector */}
+                    {showAdvancedPositioning && (
+                      <div className="space-y-3">
+                        <>
+                            {/* Custom Selector */}
                               <div>
                                 <label htmlFor="custom-selector" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                                   CSS Selector <span className="text-red-500">*</span>
@@ -1134,25 +1115,24 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
                                   <li>• <strong>Placement:</strong> Use &quot;inside-end&quot; for button containers</li>
                                 </ul>
                               </div>
-                            </>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    
-                    <button
-                      onClick={() => void handleAddCustomSite()}
-                      disabled={!isValidUrl(newSiteUrl) || saving || (positioningMode === 'custom' && !customSelector.trim())}
-                      className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
-                      title={!isValidUrl(newSiteUrl) ? `Validation error: ${validateAndProcessUrl(newSiteUrl).error || 'Invalid URL'}` : positioningMode === 'custom' && !customSelector.trim() ? 'Custom positioning requires a CSS selector' : ''}
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M12 4v16m8-8H4"/>
-                      </svg>
-                      Add Custom Site
-                    </button>
+                        </>
+                      </div>
+                    )}
                   </div>
                   
+                  {/* Add Site Button */}
+                  <button
+                    onClick={() => void handleAddCustomSite()}
+                    disabled={!isValidUrl(newSiteUrl) || saving || !customSelector.trim()}
+                    className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                    title={!isValidUrl(newSiteUrl) ? `Validation error: ${validateAndProcessUrl(newSiteUrl).error || 'Invalid URL'}` : !customSelector.trim() ? 'Icon positioning is required' : ''}
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M12 4v16m8-8H4"/>
+                    </svg>
+                    Add Custom Site
+                  </button>
+
                   {/* Validation Messages & Preview */}
                   {urlError && (
                     <div className="mt-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">

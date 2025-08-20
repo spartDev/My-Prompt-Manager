@@ -679,7 +679,7 @@ export class PromptLibraryInjector {
       if (!injected) {
         let customPositioned = false;
 
-        if (customConfig?.positioning?.mode === 'custom' && customConfig.positioning.selector) {
+        if (customConfig?.positioning && customConfig.positioning.selector) {
           // Check if the current textarea matches the custom selector
           const customSelector = customConfig.positioning.selector;
           try {
@@ -720,7 +720,7 @@ export class PromptLibraryInjector {
         }
 
         // If custom positioning failed or wasn't used, try absolute positioning fallback for custom configs
-        if (customConfig?.positioning?.mode === 'custom' && customConfig.positioning.selector && !customPositioned) {
+        if (customConfig?.positioning && customConfig.positioning.selector && !customPositioned) {
           warn('DOM insertion failed, using absolute positioning fallback', { 
             placement: customConfig.positioning.placement,
             selector: customConfig.positioning.selector

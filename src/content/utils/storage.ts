@@ -28,8 +28,8 @@ export interface CustomSite {
   enabled: boolean;
   dateAdded: number;
   positioning?: {
-    mode: 'auto' | 'custom';
-    selector?: string;
+    mode: 'custom';
+    selector: string;
     placement: 'before' | 'after' | 'inside-start' | 'inside-end';
     offset?: {
       x: number;

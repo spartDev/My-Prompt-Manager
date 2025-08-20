@@ -195,7 +195,7 @@ export class PlatformManager {
     }
     
     // Add custom selectors from custom site configuration
-    if (this.customSiteConfig?.positioning?.mode === 'custom' && this.customSiteConfig.positioning.selector) {
+    if (this.customSiteConfig?.positioning && this.customSiteConfig.positioning.selector) {
       allSelectors.push(this.customSiteConfig.positioning.selector);
       debug('Added custom selector to detection list', { 
         selector: this.customSiteConfig.positioning.selector 
