@@ -26,7 +26,7 @@ interface ElementPickerMessage {
 chrome.runtime.onMessage.addListener((message: ElementPickerMessage, sender, sendResponse) => {
   switch (message.type) {
     case 'START_ELEMENT_PICKER':
-      void handleStartElementPicker(sender, sendResponse);
+      void handleStartElementPicker(message.data?.tabId, sender, sendResponse);
       break;
 
     case 'OPEN_PICKER_WINDOW':
@@ -39,7 +39,7 @@ chrome.runtime.onMessage.addListener((message: ElementPickerMessage, sender, sen
 
     case 'STOP_ELEMENT_PICKER':
     case 'PICKER_CANCELLED':
-      void handleStopElementPicker(sender, sendResponse);
+      void handleStopElementPicker(undefined, sender, sendResponse);
       break;
 
     default:
@@ -56,16 +56,46 @@ chrome.runtime.onMessage.addListener((message: ElementPickerMessage, sender, sen
 async function handleOpenPickerWindow(targetTabId: number | undefined, sendResponse: (response?: { success: boolean; error?: string }) => void) {
   try {
     // Store the original tab that we're picking from
+    let originalUrl = '';
+    let originalHostname = '';
+
     if (targetTabId) {
       originalTabId = targetTabId;
+      const tab = await chrome.tabs.get(targetTabId);
+      if (tab.url) {
+        originalUrl = tab.url;
+        try {
+          const url = new URL(tab.url);
+          originalHostname = url.hostname;
+        } catch {
+          // Invalid URL, keep empty
+        }
+      }
     } else {
       const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      originalTabId = activeTab?.id || null;
+      originalTabId = activeTab && activeTab.id ? activeTab.id : null;
+      if (activeTab && activeTab.url) {
+        originalUrl = activeTab.url;
+        try {
+          const url = new URL(activeTab.url);
+          originalHostname = url.hostname;
+        } catch {
+          // Invalid URL, keep empty
+        }
+      }
     }
 
-    // Create a new window with the popup HTML
+    // Create URL with original tab info as parameters
+    const params = new URLSearchParams({
+      picker: 'true',
+      originalUrl: originalUrl,
+      originalHostname: originalHostname,
+      originalTabId: String(originalTabId || '')
+    });
+
+    // Create a new window with the popup HTML and original tab info
     const window = await chrome.windows.create({
-      url: chrome.runtime.getURL('src/popup.html?picker=true'),
+      url: chrome.runtime.getURL(`src/popup.html?${params.toString()}`),
       type: 'popup',
       width: 400,
       height: 600,
@@ -84,20 +114,24 @@ async function handleOpenPickerWindow(targetTabId: number | undefined, sendRespo
 /**
  * Start element picker mode
  */
-async function handleStartElementPicker(sender: chrome.runtime.MessageSender, sendResponse: (response?: { success: boolean; error?: string; tabId?: number }) => void) {
+async function handleStartElementPicker(passedTabId: number | undefined, sender: chrome.runtime.MessageSender, sendResponse: (response?: { success: boolean; error?: string; tabId?: number }) => void) {
   try {
     // Determine which tab to activate picker on
     let targetTabId: number | null = null;
 
-    // If we have an original tab stored (from picker window), use that
-    if (originalTabId) {
+    // First priority: Use the explicitly passed tab ID (from picker window)
+    if (passedTabId) {
+      targetTabId = passedTabId;
+    }
+    // Second priority: Use the original tab stored (from picker window), if any
+    else if (originalTabId) {
       targetTabId = originalTabId;
     } else {
       // Otherwise, get the active tab (but not the popup itself)
       const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
       // Don't activate on extension pages
-      if (activeTab?.url && !activeTab.url.startsWith('chrome-extension://')) {
+      if (activeTab && activeTab.url && !activeTab.url.startsWith('chrome-extension://')) {
         targetTabId = activeTab.id || null;
       }
     }
@@ -165,7 +199,7 @@ async function handleElementSelected(data: ElementPickerMessage['data'], sender:
     if (pickerWindowId) {
       try {
         await chrome.windows.update(pickerWindowId, { focused: true });
-      } catch (e) {
+      } catch {
         // Window might be closed, ignore
         pickerWindowId = null;
       }
@@ -184,7 +218,7 @@ async function handleElementSelected(data: ElementPickerMessage['data'], sender:
 /**
  * Stop element picker mode
  */
-async function handleStopElementPicker(sender: chrome.runtime.MessageSender, sendResponse: (response?: { success: boolean; error?: string }) => void) {
+async function handleStopElementPicker(passedTabId: number | undefined, sender: chrome.runtime.MessageSender, sendResponse: (response?: { success: boolean; error?: string }) => void) {
   try {
     // Clear all active sessions
     for (const [tabId] of activePickerSessions) {
@@ -217,7 +251,7 @@ chrome.windows.onRemoved.addListener((windowId) => {
     pickerWindowId = null;
     originalTabId = null;
     // Stop any active picker sessions
-    void handleStopElementPicker({ tab: undefined } as chrome.runtime.MessageSender, () => undefined);
+    void handleStopElementPicker(undefined, { tab: undefined } as chrome.runtime.MessageSender, () => undefined);
   }
 });
 
@@ -226,7 +260,7 @@ chrome.runtime.onConnect.addListener((port) => {
   if (port.name === 'popup-keep-alive') {
     port.onDisconnect.addListener(() => {
       // Cleanup any active picker sessions when popup closes
-      void handleStopElementPicker({ tab: undefined } as chrome.runtime.MessageSender, () => undefined);
+      void handleStopElementPicker(undefined, { tab: undefined } as chrome.runtime.MessageSender, () => undefined);
     });
   }
 });
