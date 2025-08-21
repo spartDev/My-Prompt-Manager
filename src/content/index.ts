@@ -14,9 +14,9 @@
  */
 
 import { PromptLibraryInjector } from './core/injector';
+import { getElementPicker } from './modules/element-picker';
 import { error, warn, info, debug } from './utils/logger';
 import { ThemeManager } from './utils/theme-manager';
-import { getElementPicker } from './modules/element-picker';
 
 // Global instance management with proper typing
 let promptLibraryInstance: PromptLibraryInjector | null = null;
@@ -41,7 +41,7 @@ async function initializeExtension(): Promise<void> {
 
     // Initialize theme manager first (needed for all sites)
     ThemeManager.getInstance();
-
+    
     // Initialize element picker (available on all sites for custom positioning)
     getElementPicker();
 

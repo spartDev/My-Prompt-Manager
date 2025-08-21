@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import type { FC } from 'react';
 
 import AddPromptForm from './components/AddPromptForm';
@@ -18,7 +18,7 @@ const App: FC = () => {
   // Check if we're in picker mode
   const urlParams = new URLSearchParams(window.location.search);
   const isPickerMode = urlParams.get('picker') === 'true';
-
+  
   const [currentView, setCurrentView] = useState<ViewType>(isPickerMode ? 'settings' : 'library');
   const [selectedPrompt, setSelectedPrompt] = useState<Prompt | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);

@@ -28,7 +28,7 @@ chrome.runtime.onMessage.addListener((message: ElementPickerMessage, sender, sen
     case 'START_ELEMENT_PICKER':
       void handleStartElementPicker(message.data?.tabId, sender, sendResponse);
       break;
-
+      
     case 'OPEN_PICKER_WINDOW':
       void handleOpenPickerWindow(message.data?.tabId, sendResponse);
       break;
@@ -58,7 +58,7 @@ async function handleOpenPickerWindow(targetTabId: number | undefined, sendRespo
     // Store the original tab that we're picking from
     let originalUrl = '';
     let originalHostname = '';
-
+    
     if (targetTabId) {
       originalTabId = targetTabId;
       const tab = await chrome.tabs.get(targetTabId);
@@ -72,19 +72,22 @@ async function handleOpenPickerWindow(targetTabId: number | undefined, sendRespo
         }
       }
     } else {
-      const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      originalTabId = activeTab && activeTab.id ? activeTab.id : null;
-      if (activeTab && activeTab.url) {
-        originalUrl = activeTab.url;
-        try {
-          const url = new URL(activeTab.url);
-          originalHostname = url.hostname;
-        } catch {
-          // Invalid URL, keep empty
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tabs.length > 0 && tabs[0]) {
+        const activeTab = tabs[0];
+        originalTabId = activeTab.id || null;
+        if (activeTab.url) {
+          originalUrl = activeTab.url;
+          try {
+            const url = new URL(activeTab.url);
+            originalHostname = url.hostname;
+          } catch {
+            // Invalid URL, keep empty
+          }
         }
       }
     }
-
+    
     // Create URL with original tab info as parameters
     const params = new URLSearchParams({
       picker: 'true',
@@ -92,7 +95,7 @@ async function handleOpenPickerWindow(targetTabId: number | undefined, sendRespo
       originalHostname: originalHostname,
       originalTabId: String(originalTabId || '')
     });
-
+    
     // Create a new window with the popup HTML and original tab info
     const window = await chrome.windows.create({
       url: chrome.runtime.getURL(`src/popup.html?${params.toString()}`),
@@ -102,7 +105,7 @@ async function handleOpenPickerWindow(targetTabId: number | undefined, sendRespo
       left: 100,
       top: 100
     });
-
+    
     pickerWindowId = window.id || null;
     sendResponse({ success: true });
   } catch (error) {
@@ -118,7 +121,7 @@ async function handleStartElementPicker(passedTabId: number | undefined, sender:
   try {
     // Determine which tab to activate picker on
     let targetTabId: number | null = null;
-
+    
     // First priority: Use the explicitly passed tab ID (from picker window)
     if (passedTabId) {
       targetTabId = passedTabId;
@@ -128,14 +131,16 @@ async function handleStartElementPicker(passedTabId: number | undefined, sender:
       targetTabId = originalTabId;
     } else {
       // Otherwise, get the active tab (but not the popup itself)
-      const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-
-      // Don't activate on extension pages
-      if (activeTab && activeTab.url && !activeTab.url.startsWith('chrome-extension://')) {
-        targetTabId = activeTab.id || null;
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tabs.length > 0 && tabs[0]) {
+        const activeTab = tabs[0];
+        // Don't activate on extension pages
+        if (activeTab.url && !activeTab.url.startsWith('chrome-extension://')) {
+          targetTabId = activeTab.id || null;
+        }
       }
     }
-
+    
     if (!targetTabId) {
       sendResponse({ success: false, error: 'No valid tab found for element picking' });
       return;
@@ -149,7 +154,7 @@ async function handleStartElementPicker(passedTabId: number | undefined, sender:
 
     // Switch to the target tab
     await chrome.tabs.update(targetTabId, { active: true });
-
+    
     // Focus on the tab's window
     const tab = await chrome.tabs.get(targetTabId);
     if (tab.windowId) {
@@ -175,7 +180,7 @@ async function handleStartElementPicker(passedTabId: number | undefined, sender:
 async function handleElementSelected(data: ElementPickerMessage['data'], sender: chrome.runtime.MessageSender, sendResponse: (response?: { success: boolean; error?: string }) => void) {
   try {
     const tabId = sender.tab?.id;
-
+    
     if (!tabId || !activePickerSessions.has(tabId)) {
       sendResponse({ success: false, error: 'No active picker session' });
       return;
@@ -194,7 +199,7 @@ async function handleElementSelected(data: ElementPickerMessage['data'], sender:
         hostname: data?.hostname
       }
     });
-
+    
     // If we have a picker window, focus it
     if (pickerWindowId) {
       try {
@@ -204,7 +209,7 @@ async function handleElementSelected(data: ElementPickerMessage['data'], sender:
         pickerWindowId = null;
       }
     }
-
+    
     // Clear the original tab reference
     originalTabId = null;
 
@@ -229,7 +234,7 @@ async function handleStopElementPicker(passedTabId: number | undefined, sender: 
         // Tab might be closed, ignore error
       });
     }
-
+    
     activePickerSessions.clear();
     sendResponse({ success: true });
   } catch (error) {

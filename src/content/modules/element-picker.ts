@@ -3,7 +3,7 @@
  * Provides visual element selection functionality for custom positioning
  */
 
-import { debug, info, warn } from '../utils/logger';
+import { debug, info } from '../utils/logger';
 
 export class ElementPicker {
   private isActive = false;
@@ -25,22 +25,22 @@ export class ElementPicker {
    * Activate the element picker
    */
   activate(): void {
-    if (this.isActive) return;
-
+    if (this.isActive) {return;}
+    
     info('[ElementPicker] Activating element picker mode');
     this.isActive = true;
-
+    
     // Store original cursor
     this.originalCursor = document.body.style.cursor;
-
+    
     // Create UI elements
     this.createOverlay();
     this.createHighlightBox();
     this.createInfoBox();
-
+    
     // Add event listeners
     this.attachEventListeners();
-
+    
     // Set cursor style
     document.body.style.cursor = 'crosshair';
   }
@@ -49,20 +49,20 @@ export class ElementPicker {
    * Deactivate the element picker
    */
   deactivate(): void {
-    if (!this.isActive) return;
-
+    if (!this.isActive) {return;}
+    
     info('[ElementPicker] Deactivating element picker mode');
     this.isActive = false;
-
+    
     // Remove UI elements
     this.removeUI();
-
+    
     // Remove event listeners
     this.detachEventListeners();
-
+    
     // Restore cursor
     document.body.style.cursor = this.originalCursor;
-
+    
     // Clear current element
     this.currentElement = null;
   }
@@ -100,7 +100,7 @@ export class ElementPicker {
       z-index: 2147483647;
       box-shadow: 0 0 0 1px rgba(124, 58, 237, 0.3);
     `;
-
+    
     if (this.overlay) {
       this.overlay.appendChild(this.highlightBox);
     }
@@ -128,12 +128,12 @@ export class ElementPicker {
       z-index: 2147483647;
       pointer-events: none;
     `;
-
+    
     this.infoBox.innerHTML = `
       <div style="font-weight: 600; margin-bottom: 4px; color: #a78bfa;">Select an element</div>
       <div style="color: #9ca3af; font-size: 12px;">Click to select • ESC to cancel</div>
     `;
-
+    
     document.body.appendChild(this.infoBox);
   }
 
@@ -145,11 +145,11 @@ export class ElementPicker {
       this.overlay.remove();
       this.overlay = null;
     }
-
+    
     if (this.highlightBox) {
       this.highlightBox = null;
     }
-
+    
     if (this.infoBox) {
       this.infoBox.remove();
       this.infoBox = null;
@@ -161,25 +161,37 @@ export class ElementPicker {
    */
   private attachEventListeners(): void {
     // Use capture phase to intercept events before page handlers
-    document.addEventListener('mousemove', this.handleMouseMove, true);
-    document.addEventListener('click', this.handleClick, true);
-    document.addEventListener('keydown', this.handleKeyDown, true);
-    chrome.runtime.onMessage.addListener(this.handleMessage);
-
+    const boundHandleMouseMove = (e: MouseEvent) => { this.handleMouseMove(e); };
+    const boundHandleClick = (e: MouseEvent) => { this.handleClick(e); };
+    const boundHandleKeyDown = (e: KeyboardEvent) => { this.handleKeyDown(e); };
+    const boundHandleMessage = (message: { source?: string; type?: string }, sender: chrome.runtime.MessageSender, sendResponse: (response?: unknown) => void) => { this.handleMessage(message, sender, sendResponse); };
+    
+    document.addEventListener('mousemove', boundHandleMouseMove, true);
+    document.addEventListener('click', boundHandleClick, true);
+    document.addEventListener('keydown', boundHandleKeyDown, true);
+    chrome.runtime.onMessage.addListener(boundHandleMessage);
+    
     // Store listeners for cleanup
-    this.listeners.set('mousemove', this.handleMouseMove);
-    this.listeners.set('click', this.handleClick);
-    this.listeners.set('keydown', this.handleKeyDown);
+    this.listeners.set('mousemove', boundHandleMouseMove);
+    this.listeners.set('click', boundHandleClick);
+    this.listeners.set('keydown', boundHandleKeyDown);
+    this.listeners.set('message', boundHandleMessage);
   }
 
   /**
    * Detach event listeners
    */
   private detachEventListeners(): void {
-    document.removeEventListener('mousemove', this.handleMouseMove, true);
-    document.removeEventListener('click', this.handleClick, true);
-    document.removeEventListener('keydown', this.handleKeyDown, true);
-    chrome.runtime.onMessage.removeListener(this.handleMessage);
+    const mouseMoveListener = this.listeners.get('mousemove');
+    const clickListener = this.listeners.get('click');
+    const keyDownListener = this.listeners.get('keydown');
+    const messageListener = this.listeners.get('message');
+    
+    if (mouseMoveListener) {document.removeEventListener('mousemove', mouseMoveListener, true);}
+    if (clickListener) {document.removeEventListener('click', clickListener, true);}
+    if (keyDownListener) {document.removeEventListener('keydown', keyDownListener, true);}
+    if (messageListener) {chrome.runtime.onMessage.removeListener(messageListener as (message: { source?: string; type?: string }, sender: chrome.runtime.MessageSender, sendResponse: (response?: unknown) => void) => void);}
+    
     this.listeners.clear();
   }
 
@@ -187,13 +199,13 @@ export class ElementPicker {
    * Handle mouse movement
    */
   private handleMouseMove(event: MouseEvent): void {
-    if (!this.isActive) return;
-
+    if (!this.isActive) {return;}
+    
     // Prevent default to avoid interference
     event.stopPropagation();
-
+    
     const element = document.elementFromPoint(event.clientX, event.clientY);
-
+    
     if (element && element !== this.currentElement) {
       this.currentElement = element;
       this.highlightElement(element);
@@ -205,21 +217,21 @@ export class ElementPicker {
    * Handle click to select element
    */
   private handleClick(event: MouseEvent): void {
-    if (!this.isActive) return;
-
+    if (!this.isActive) {return;}
+    
     // Prevent default and stop propagation
     event.preventDefault();
     event.stopPropagation();
     event.stopImmediatePropagation();
-
+    
     if (this.currentElement) {
       const selector = this.generateSelector(this.currentElement);
       const elementInfo = this.getElementInfo(this.currentElement);
-
+      
       debug('[ElementPicker] Element selected:', { selector, elementInfo });
-
+      
       // Send selection to background script
-      chrome.runtime.sendMessage({
+      void chrome.runtime.sendMessage({
         type: 'ELEMENT_SELECTED',
         data: {
           selector,
@@ -228,7 +240,7 @@ export class ElementPicker {
           hostname: window.location.hostname
         }
       });
-
+      
       // Deactivate picker
       this.deactivate();
     }
@@ -238,14 +250,14 @@ export class ElementPicker {
    * Handle keyboard events
    */
   private handleKeyDown(event: KeyboardEvent): void {
-    if (!this.isActive) return;
-
+    if (!this.isActive) {return;}
+    
     // ESC to cancel
     if (event.key === 'Escape') {
       event.preventDefault();
       event.stopPropagation();
-
-      chrome.runtime.sendMessage({ type: 'PICKER_CANCELLED' });
+      
+      void chrome.runtime.sendMessage({ type: 'PICKER_CANCELLED' });
       this.deactivate();
     }
   }
@@ -254,8 +266,8 @@ export class ElementPicker {
    * Handle messages from background script
    */
   private handleMessage(message: { source?: string; type?: string }): void {
-    if (message.source !== 'background') return;
-
+    if (message.source !== 'background') {return;}
+    
     switch (message.type) {
       case 'ACTIVATE_ELEMENT_PICKER':
         this.activate();
@@ -270,41 +282,41 @@ export class ElementPicker {
    * Highlight the given element
    */
   private highlightElement(element: Element): void {
-    if (!this.highlightBox) return;
-
+    if (!this.highlightBox) {return;}
+    
     const rect = element.getBoundingClientRect();
-
-    this.highlightBox.style.left = `${rect.left + window.scrollX}px`;
-    this.highlightBox.style.top = `${rect.top + window.scrollY}px`;
-    this.highlightBox.style.width = `${rect.width}px`;
-    this.highlightBox.style.height = `${rect.height}px`;
+    
+    this.highlightBox.style.left = `${String(rect.left + window.scrollX)}px`;
+    this.highlightBox.style.top = `${String(rect.top + window.scrollY)}px`;
+    this.highlightBox.style.width = `${String(rect.width)}px`;
+    this.highlightBox.style.height = `${String(rect.height)}px`;
   }
 
   /**
    * Update info box with element details
    */
   private updateInfoBox(element: Element): void {
-    if (!this.infoBox) return;
-
+    if (!this.infoBox) {return;}
+    
     const selector = this.generateSelector(element);
     const tagName = element.tagName.toLowerCase();
     const className = element.className ? `.${element.className.split(' ').join('.')}` : '';
     const id = element.id ? `#${element.id}` : '';
-
+    
     this.infoBox.innerHTML = `
       <div style="font-weight: 600; margin-bottom: 4px; color: #a78bfa;">Element Info</div>
       <div style="margin-bottom: 2px;">
-        <span style="color: #6b7280;">Type:</span>
+        <span style="color: #6b7280;">Type:</span> 
         <span style="color: #fbbf24; font-family: monospace;">${tagName}</span>
       </div>
       ${id ? `
       <div style="margin-bottom: 2px;">
-        <span style="color: #6b7280;">ID:</span>
+        <span style="color: #6b7280;">ID:</span> 
         <span style="color: #34d399; font-family: monospace;">${id}</span>
       </div>` : ''}
       ${className ? `
       <div style="margin-bottom: 2px;">
-        <span style="color: #6b7280;">Class:</span>
+        <span style="color: #6b7280;">Class:</span> 
         <span style="color: #60a5fa; font-family: monospace; word-break: break-all;">${className}</span>
       </div>` : ''}
       <div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #374151;">
@@ -322,7 +334,7 @@ export class ElementPicker {
    */
   private escapeCSSIdentifier(identifier: string): string {
     // CSS identifier escape rules
-    return identifier.replace(/([!"#$%&'()*+,.\/:;<=>?@[\\\]^`{|}~])/g, '\\$1');
+    return identifier.replace(/([!"#$%&'()*+,./:;<=>?@[\\\]^`{|}~])/g, '\\$1');
   }
 
   /**
@@ -334,12 +346,12 @@ export class ElementPicker {
       // Escape special characters in ID
       return `#${this.escapeCSSIdentifier(element.id)}`;
     }
-
+    
     // Try data attributes as they're often more stable
     const dataAttrs = Array.from(element.attributes)
       .filter(attr => attr.name.startsWith('data-'))
       .map(attr => `[${attr.name}="${attr.value}"]`);
-
+    
     if (dataAttrs.length > 0) {
       const dataSelector = `${element.tagName.toLowerCase()}${dataAttrs[0]}`;
       try {
@@ -347,17 +359,17 @@ export class ElementPicker {
         if (matches.length === 1) {
           return dataSelector;
         }
-      } catch (e) {
+      } catch {
         // Invalid selector, continue
       }
     }
-
+    
     // Try simple class names (avoid complex ones with special characters)
     if (element.className && typeof element.className === 'string') {
       const classes = element.className.trim().split(/\s+/)
         .filter(c => c && /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(c)) // Only simple class names
         .slice(0, 2); // Limit to first 2 classes to avoid overly complex selectors
-
+      
       if (classes.length > 0) {
         const classSelector = `${element.tagName.toLowerCase()}.${classes.join('.')}`;
         try {
@@ -365,26 +377,26 @@ export class ElementPicker {
           if (matches.length === 1) {
             return classSelector;
           }
-        } catch (e) {
+        } catch {
           // Invalid selector, continue
         }
       }
     }
-
+    
     // Generate path-based selector with nth-child
     const path: string[] = [];
     let current: Element | null = element;
-
+    
     while (current && current !== document.body && path.length < 5) { // Limit depth
       let selector = current.tagName.toLowerCase();
-
+      
       if (current.id && /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(current.id)) {
         // Only use ID if it's a simple identifier
         selector = `#${this.escapeCSSIdentifier(current.id)}`;
         path.unshift(selector);
         break;
       }
-
+      
       // Add nth-child for specificity
       const parent = current.parentElement;
       if (parent) {
@@ -394,11 +406,11 @@ export class ElementPicker {
           selector += `:nth-of-type(${String(index)})`;
         }
       }
-
+      
       path.unshift(selector);
       current = current.parentElement;
     }
-
+    
     // If path is too generic, add more specificity
     if (path.length === 1 && path[0] === element.tagName.toLowerCase()) {
       const parent = element.parentElement;
@@ -408,22 +420,22 @@ export class ElementPicker {
         path[0] += `:nth-child(${String(index)})`;
       }
     }
-
+    
     return path.join(' > ');
   }
 
   /**
    * Get detailed information about an element
    */
-  private getElementInfo(element: Element): Record<string, any> {
+  private getElementInfo(element: Element): Record<string, unknown> {
     const rect = element.getBoundingClientRect();
     const computedStyle = window.getComputedStyle(element);
-
+    
     return {
       tagName: element.tagName.toLowerCase(),
       id: element.id || null,
       className: element.className || null,
-      innerText: (element as HTMLElement).innerText?.substring(0, 100) || null,
+      innerText: (element as HTMLElement).innerText ? (element as HTMLElement).innerText.substring(0, 100) : null,
       position: {
         x: rect.left,
         y: rect.top,
@@ -453,7 +465,7 @@ export function getElementPicker(): ElementPicker {
 chrome.runtime.onMessage.addListener((message: { source?: string; type?: string }) => {
   if (message.source === 'background') {
     const picker = getElementPicker();
-
+    
     switch (message.type) {
       case 'ACTIVATE_ELEMENT_PICKER':
         picker.activate();

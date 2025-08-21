@@ -44,9 +44,9 @@ Instead of trying to keep the popup open (which Chrome doesn't allow), we open t
 
 ### 4. **Message Flow**
 ```
-User clicks "Pick Element"
-→ Opens new window
-→ Window sends START_ELEMENT_PICKER
+User clicks "Pick Element" 
+→ Opens new window 
+→ Window sends START_ELEMENT_PICKER 
 → Background activates picker on target tab
 → User selects element
 → Content script sends selection to background

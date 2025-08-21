@@ -181,7 +181,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
   const [customZIndex, setCustomZIndex] = useState(999999);
   const [positioningDescription, setPositioningDescription] = useState('');
   const [selectorError, setSelectorError] = useState('');
-
+  
   // Element picker state
   const [isPickingElement, setIsPickingElement] = useState(false);
   const [pickedElementInfo, setPickedElementInfo] = useState<{
@@ -189,7 +189,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
     elementType: string;
   } | null>(null);
   const [originalTabId, setOriginalTabId] = useState<number | null>(null);
-
+  
   // Check if we're in picker mode
   const urlParams = new URLSearchParams(window.location.search);
   const isPickerWindow = urlParams.get('picker') === 'true';
@@ -242,23 +242,23 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
 
   useEffect(() => {
     void loadSettings();
-
+    
     // Check if we're in picker mode and auto-expand settings
     const urlParams = new URLSearchParams(window.location.search);
     const isPickerMode = urlParams.get('picker') === 'true';
-
+    
     if (isPickerMode) {
       setShowAdvancedOptions(true);  // Show the Advanced Options section which contains Custom Sites
-
+      
       // In picker mode, get the original URL and tab ID from URL parameters
       const originalUrl = urlParams.get('originalUrl');
       const originalHostname = urlParams.get('originalHostname');
       const originalTabIdStr = urlParams.get('originalTabId');
-
+      
       if (originalUrl && originalHostname) {
         // Use the passed URL information
         setCurrentTabUrl(originalUrl);
-
+        
         // Store the original tab ID if available
         if (originalTabIdStr) {
           const tabId = parseInt(originalTabIdStr, 10);
@@ -266,7 +266,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
             setOriginalTabId(tabId);
           }
         }
-
+        
         // Check if the original site is already integrated
         const isBuiltIn = Object.keys(siteConfigs).includes(originalHostname);
         void (async () => {
@@ -274,7 +274,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
           const savedSettings = result.promptLibrarySettings as Partial<Settings> | undefined;
           const customSites = savedSettings?.customSites || [];
           const isCustom = customSites.some(site => site.hostname === originalHostname);
-
+          
           setIsCurrentSiteIntegrated(isBuiltIn || isCustom);
         })();
       }
@@ -282,21 +282,22 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
       // Not in picker mode, get current tab URL normally
       void (async () => {
         try {
-          const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-          if (activeTab?.url) {
+          const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+          if (tabs.length > 0 && tabs[0]?.url) {
+            const activeTab = tabs[0];
             const url = new URL(activeTab.url);
             const hostname = url.hostname;
-
+            
             // Set current tab URL for auto-population
             setCurrentTabUrl(activeTab.url);
-
+            
             // Check if the current site is already integrated
             const isBuiltIn = Object.keys(siteConfigs).includes(hostname);
             const result = await chrome.storage.local.get(['promptLibrarySettings']);
             const savedSettings = result.promptLibrarySettings as Partial<Settings> | undefined;
             const customSites = savedSettings?.customSites || [];
             const isCustom = customSites.some(site => site.hostname === hostname);
-
+            
             setIsCurrentSiteIntegrated(isBuiltIn || isCustom);
           }
         } catch (error) {
@@ -315,13 +316,13 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
         setPickedElementInfo({ selector, elementType });
         setIsPickingElement(false);
         setSelectorError('');
-
+        
         // Custom positioning mode is always enabled
       }
     };
 
     chrome.runtime.onMessage.addListener(handleMessage);
-
+    
     // Keep popup alive during element picking
     let port: chrome.runtime.Port | null = null;
     if (isPickingElement) {
@@ -355,7 +356,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
     if (currentTabUrl && !isCurrentSiteIntegrated && !newSiteUrl) {
       // Only auto-populate if the field is empty and the site isn't already integrated
       setNewSiteUrl(currentTabUrl);
-
+      
       // Also try to set a friendly name based on the hostname
       try {
         const url = new URL(currentTabUrl);
@@ -365,7 +366,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
           .replace(/^www\./, '')
           .replace(/\.(com|org|net|io|ai|app|dev)$/, '')
           .split('.').pop() || hostname;
-
+        
         // Capitalize first letter
         const friendlyName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
         setNewSiteName(friendlyName);
@@ -392,46 +393,48 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
     try {
       setIsPickingElement(true);
       setSelectorError('');
-
+      
       // Check if we're in picker mode (opened in a window)
       const urlParams = new URLSearchParams(window.location.search);
       const isPickerWindow = urlParams.get('picker') === 'true';
-
+      
       if (isPickerWindow) {
         // We're in a picker window, directly start the picker with the original tab ID
-        const response = await chrome.runtime.sendMessage({
+        const response = await chrome.runtime.sendMessage({ 
           type: 'START_ELEMENT_PICKER',
           data: { tabId: originalTabId }
-        }) as { success: boolean; error?: string };
-
-        if (!response.success) {
+        }) as unknown as { success: boolean; error?: string } | undefined;
+        
+        if (!response?.success) {
           setIsPickingElement(false);
-          setSelectorError(response.error || 'Failed to start element picker');
+          setSelectorError(response?.error || 'Failed to start element picker');
         }
       } else {
         // We're in a regular popup, need to open a new window
-        const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-
+        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+        
         // Check if we're on a valid webpage
-        if (!activeTab || !activeTab.url || activeTab.url.startsWith('chrome://') || activeTab.url.startsWith('chrome-extension://')) {
+        if (tabs.length === 0 || !tabs[0] || !tabs[0].url || tabs[0].url.startsWith('chrome://') || tabs[0].url.startsWith('chrome-extension://')) {
           setIsPickingElement(false);
           setSelectorError('Please navigate to a webpage first, then try again');
           return;
         }
-
+        
+        const activeTab = tabs[0];
+        
         // Open picker in a new window to prevent popup from closing
         // The background script will handle getting the tab URL and passing it
-        const response = await chrome.runtime.sendMessage({
+        const response = await chrome.runtime.sendMessage({ 
           type: 'OPEN_PICKER_WINDOW',
           data: { tabId: activeTab.id }
-        }) as { success: boolean; error?: string };
-
-        if (response.success) {
+        }) as unknown as { success?: boolean; error?: string } | undefined;
+        
+        if (response && response.success) {
           // Close the current popup
           window.close();
         } else {
           setIsPickingElement(false);
-          setSelectorError(response.error || 'Failed to open element picker');
+          setSelectorError(response?.error || 'Failed to open element picker');
         }
       }
     } catch (error) {
@@ -978,7 +981,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
                     </p>
                   </div>
                 )}
-
+                
                 {/* Add New Site Form */}
                 <div className={`space-y-4 ${isCurrentSiteIntegrated ? 'opacity-50 pointer-events-none' : ''}`}>
                   {/* Basic Site Information */}
@@ -995,7 +998,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-100"
                         disabled={saving}
                       />
-
+                      
                       <input
                         type="text"
                         placeholder="Site Name (optional)"
@@ -1033,7 +1036,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
                         Configure where the prompt library icon appears
                       </p>
                     </div>
-
+                    
                     {showAdvancedPositioning && (
                       <div className="space-y-3">
                         <>
@@ -1079,8 +1082,8 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
                                   </button>
                                 </div>
                                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                  {pickedElementInfo ?
-                                    `Selected: ${pickedElementInfo.elementType} element with selector` :
+                                  {pickedElementInfo ? 
+                                    `Selected: ${pickedElementInfo.elementType} element with selector` : 
                                     isPickingElement ?
                                     'Switch to the target tab and click on the desired element...' :
                                     'Target element where the icon should be positioned'
@@ -1227,7 +1230,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
                     </svg>
                     {isCurrentSiteIntegrated ? 'Site Already Integrated' : 'Add Custom Site'}
                   </button>
-
+                  
                   {/* Validation Messages & Preview */}
                   {urlError && (
                     <div className="mt-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
