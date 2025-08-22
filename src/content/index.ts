@@ -14,8 +14,8 @@
  */
 
 import { PromptLibraryInjector } from './core/injector';
+import { getElementPicker } from './modules/element-picker';
 import { error, warn, info, debug } from './utils/logger';
-import { injectCSS } from './utils/styles';
 import { ThemeManager } from './utils/theme-manager';
 
 // Global instance management with proper typing
@@ -39,11 +39,11 @@ async function initializeExtension(): Promise<void> {
       userAgent: navigator.userAgent
     });
 
-    // Initialize CSS styles first
-    injectCSS();
-
-    // Initialize theme manager
+    // Initialize theme manager first (needed for all sites)
     ThemeManager.getInstance();
+    
+    // Initialize element picker (available on all sites for custom positioning)
+    getElementPicker();
 
     // Clean up any existing instance
     if (promptLibraryInstance) {
@@ -55,12 +55,13 @@ async function initializeExtension(): Promise<void> {
     promptLibraryInstance = new PromptLibraryInjector();
     
     // Initialize with async site enablement checking
+    // CSS injection now happens ONLY for enabled sites inside the injector
     await promptLibraryInstance.initialize();
     
     // Mark as initialized
     isInitialized = true;
 
-    info('Extension initialized');
+    debug('Extension initialized');
 
   } catch (error) {
     error('Failed to initialize My Prompt Manager content script', error as Error, {

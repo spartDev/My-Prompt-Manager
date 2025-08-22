@@ -19,6 +19,22 @@ vi.mock('../../utils/logger', () => ({
   showDebugNotification: vi.fn()
 }));
 
+// Mock Storage utilities
+vi.mock('../../utils/storage', () => ({
+  getSettings: vi.fn().mockResolvedValue({
+    enabledSites: ['example.com'],
+    customSites: [],
+    debugMode: false,
+    floatingFallback: true
+  }),
+  getDefaultSettings: vi.fn().mockReturnValue({
+    enabledSites: ['example.com'],
+    customSites: [],
+    debugMode: false,
+    floatingFallback: true
+  })
+}));
+
 
 // Mock all strategy modules
 vi.mock('../claude-strategy', () => ({
@@ -61,16 +77,17 @@ vi.mock('../perplexity-strategy', () => ({
 }));
 
 vi.mock('../default-strategy', () => ({
-  DefaultStrategy: vi.fn().mockImplementation(() => ({
-    name: 'default',
-    priority: 0,
-    canHandle: vi.fn().mockReturnValue(true),
-    insert: vi.fn().mockResolvedValue({ success: true, method: 'default' }),
-    getSelectors: vi.fn().mockReturnValue(['textarea', 'input']),
-    getButtonContainerSelector: vi.fn().mockReturnValue(null),
-    createIcon: vi.fn().mockReturnValue(null),
-    cleanup: vi.fn()
-  }))
+  DefaultStrategy: class MockDefaultStrategy {
+    name = 'default';
+    priority = 0;
+    
+    canHandle = vi.fn().mockReturnValue(true);
+    insert = vi.fn().mockResolvedValue({ success: true, method: 'default' });
+    getSelectors = vi.fn().mockReturnValue(['textarea', 'input']);
+    getButtonContainerSelector = vi.fn().mockReturnValue(null);
+    createIcon = vi.fn().mockReturnValue(null);
+    cleanup = vi.fn();
+  }
 }));
 
 // Mock window.location.hostname
@@ -99,6 +116,10 @@ class TestStrategy extends PlatformStrategy {
   getSelectors(): string[] {
     return ['div.test'];
   }
+
+  getButtonContainerSelector(): string | null {
+    return '.test-container';
+  }
 }
 
 describe('PlatformManager', () => {
@@ -107,6 +128,8 @@ describe('PlatformManager', () => {
   let mockUIFactory: UIElementFactory;
 
   beforeEach(() => {
+    // Use a hostname that should not load any strategies by default
+    // We'll change the behavior per test as needed
     mockLocation.hostname = 'example.com';
     manager = new PlatformManager();
     mockElement = document.createElement('div');
@@ -133,7 +156,7 @@ describe('PlatformManager', () => {
       // Create a new manager to capture fresh log calls
       new PlatformManager();
       
-      expect(Logger.debug).toHaveBeenCalledWith('Initializing platform strategies', { hostname: 'example.com' });
+      expect(Logger.debug).toHaveBeenCalledWith('PlatformManager created (lazy loading mode)', { hostname: 'example.com' });
     });
 
     it('should load Claude strategy for claude.ai', async () => {
@@ -240,17 +263,49 @@ describe('PlatformManager', () => {
     });
   });
 
-  describe('getAllSelectors', () => {
-    it('should return combined selectors from all strategies', () => {
-      const testStrategy = new TestStrategy();
-      manager.registerStrategy(testStrategy);
-      
-      const selectors = manager.getAllSelectors();
-      expect(selectors).toContain('div.test');
-      expect(Array.isArray(selectors)).toBe(true);
+  describe('Lazy Loading Behavior', () => {
+    it('should not initialize strategies automatically in constructor', () => {
+      const freshManager = new PlatformManager();
+      expect(freshManager.getAllSelectors()).toEqual([]);
+      expect(freshManager.getButtonContainerSelector()).toBeNull();
+      expect(freshManager.createIcon(mockUIFactory)).toBeNull();
     });
 
-    it('should remove duplicate selectors', () => {
+    it('should initialize strategies when explicitly called', async () => {
+      const freshManager = new PlatformManager();
+      await freshManager.initializeStrategies();
+      expect(freshManager.getAllSelectors().length).toBeGreaterThan(0);
+    });
+
+    it('should prevent duplicate initialization', async () => {
+      const freshManager = new PlatformManager();
+      const spy = vi.spyOn(freshManager as any, '_initializeStrategies');
+      await freshManager.initializeStrategies();
+      await freshManager.initializeStrategies(); // Second call
+      expect(spy).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('getAllSelectors', () => {
+    it('should return combined selectors from all strategies', async () => {
+      // Create a fresh manager to avoid test interference
+      const freshManager = new PlatformManager();
+      await freshManager.initializeStrategies(); // Initialize strategies for testing
+      const testStrategy = new TestStrategy();
+      freshManager.registerStrategy(testStrategy);
+      
+      const selectors = freshManager.getAllSelectors();
+      expect(selectors).toContain('div.test');
+      expect(Array.isArray(selectors)).toBe(true);
+      // Should also contain selectors from DefaultStrategy that was loaded for example.com
+      expect(selectors).toContain('textarea');
+      expect(selectors).toContain('input');
+    });
+
+    it('should remove duplicate selectors', async () => {
+      // Create a fresh manager to avoid test interference
+      const freshManager = new PlatformManager();
+      await freshManager.initializeStrategies(); // Initialize strategies for testing
       const strategy1 = new TestStrategy('test1', 10);
       const strategy2 = new TestStrategy('test2', 20);
       
@@ -258,22 +313,25 @@ describe('PlatformManager', () => {
       vi.spyOn(strategy1, 'getSelectors').mockReturnValue(['div.common']);
       vi.spyOn(strategy2, 'getSelectors').mockReturnValue(['div.common']);
       
-      manager.registerStrategy(strategy1);
-      manager.registerStrategy(strategy2);
+      freshManager.registerStrategy(strategy1);
+      freshManager.registerStrategy(strategy2);
       
-      const selectors = manager.getAllSelectors();
+      const selectors = freshManager.getAllSelectors();
       const commonSelectors = selectors.filter(s => s === 'div.common');
       expect(commonSelectors).toHaveLength(1);
     });
   });
 
   describe('getButtonContainerSelector', () => {
-    it('should return button container selector from highest priority strategy', () => {
+    it('should return button container selector from highest priority strategy', async () => {
+      // Create a fresh manager to avoid test interference
+      const freshManager = new PlatformManager();
+      await freshManager.initializeStrategies(); // Initialize strategies for testing
       const testStrategy = new TestStrategy();
       vi.spyOn(testStrategy, 'getButtonContainerSelector').mockReturnValue('.test-container');
-      manager.registerStrategy(testStrategy);
+      freshManager.registerStrategy(testStrategy);
       
-      const selector = manager.getButtonContainerSelector();
+      const selector = freshManager.getButtonContainerSelector();
       expect(selector).toBe('.test-container');
     });
 
@@ -286,7 +344,8 @@ describe('PlatformManager', () => {
   });
 
   describe('createIcon', () => {
-    it('should create icon using highest priority strategy', () => {
+    it('should create icon using highest priority strategy', async () => {
+      await manager.initializeStrategies(); // Initialize strategies for testing
       const testStrategy = new TestStrategy();
       const mockIcon = document.createElement('div');
       vi.spyOn(testStrategy, 'createIcon').mockReturnValue(mockIcon);
@@ -297,7 +356,8 @@ describe('PlatformManager', () => {
       expect(manager.getActiveStrategy()).toBe(testStrategy);
     });
 
-    it('should fallback to floating icon when no strategy creates icon', () => {
+    it('should fallback to floating icon when no strategy creates icon', async () => {
+      await manager.initializeStrategies(); // Initialize strategies for testing
       const icon = manager.createIcon(mockUIFactory);
       expect(mockUIFactory.createFloatingIcon).toHaveBeenCalled();
       expect(icon).toBeInstanceOf(HTMLElement);

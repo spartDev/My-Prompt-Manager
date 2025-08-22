@@ -147,6 +147,74 @@ export class DOMUtils {
   }
 
   /**
+   * Safely insert element before reference element
+   */
+  static insertBefore(newElement: Element, referenceElement: Element): boolean {
+    try {
+      if (!referenceElement.parentNode) {
+        logError('Cannot insert before element without parent', new Error('No parent node'), {
+          referenceTag: referenceElement.tagName,
+          referenceId: referenceElement.id
+        });
+        return false;
+      }
+
+      referenceElement.parentNode.insertBefore(newElement, referenceElement);
+      return true;
+    } catch (err) {
+      logError('Failed to insert element before reference', err as Error, {
+        newElementTag: newElement.tagName,
+        referenceTag: referenceElement.tagName
+      });
+      return false;
+    }
+  }
+
+  /**
+   * Safely insert element after reference element
+   */
+  static insertAfter(newElement: Element, referenceElement: Element): boolean {
+    try {
+      if (!referenceElement.parentNode) {
+        logError('Cannot insert after element without parent', new Error('No parent node'), {
+          referenceTag: referenceElement.tagName,
+          referenceId: referenceElement.id
+        });
+        return false;
+      }
+
+      referenceElement.parentNode.insertBefore(newElement, referenceElement.nextSibling);
+      return true;
+    } catch (err) {
+      logError('Failed to insert element after reference', err as Error, {
+        newElementTag: newElement.tagName,
+        referenceTag: referenceElement.tagName
+      });
+      return false;
+    }
+  }
+
+  /**
+   * Safely prepend child element to parent (insert at beginning)
+   */
+  static prependChild(parent: Element, child: Element): boolean {
+    try {
+      if (parent.firstChild) {
+        parent.insertBefore(child, parent.firstChild);
+      } else {
+        parent.appendChild(child);
+      }
+      return true;
+    } catch (err) {
+      logError('Failed to prepend child', err as Error, {
+        parentTag: parent.tagName,
+        childTag: child.tagName
+      });
+      return false;
+    }
+  }
+
+  /**
    * Safely remove element from DOM
    */
   static removeElement(element: Element): boolean {

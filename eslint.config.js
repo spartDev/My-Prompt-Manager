@@ -183,6 +183,7 @@ export default [
       '*.config.js',
       '*.config.ts',
       'coverage/**',
+      '.claude/**',
     ],
   },
 ];

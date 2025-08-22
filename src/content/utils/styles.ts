@@ -36,13 +36,36 @@ export function injectCSS(): void {
  */
 export function getCSS(): string {
     return `
-    /* Prompt Manager Icon */
+    /* Base Prompt Manager Icon Styles */
+    .prompt-library-icon-base {
+      min-width: 32px;
+      border-radius: .5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    /* Absolute positioned prompt library icon (for fallback absolute positioning) */
+    .prompt-library-icon-absolute {
+      position: absolute;
+      z-index: 999999;
+    }
+
+    /* Relative positioned prompt library icon (for DOM-inserted icons) */
+    .prompt-library-icon-relative {
+      position: relative;
+      z-index: 10;
+    }
+
+    /* Legacy class for backward compatibility */
     .prompt-library-icon {
       position: absolute;
-      width: 50px;
-      height: 50px;  
+      width: 32px;
+      height: 32px;  
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      border-radius: 50%;
+      border-radius: 8px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -53,22 +76,29 @@ export function getCSS(): string {
       border: 2px solid transparent;
     }
 
+    /* Hover and focus styles for all prompt library icons */
+    .prompt-library-icon-base:hover,
     .prompt-library-icon:hover {
       background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
       transform: scale(1.05);
       box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
     }
 
+    .prompt-library-icon-base:focus-visible,
     .prompt-library-icon:focus-visible {
       outline: none;
       border-color: #60a5fa;
       box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.4);
     }
 
+    .prompt-library-icon-base svg,
     .prompt-library-icon svg {
       color: white;
-      width: 24px;
-      height: 24px;
+      width: 18px;
+      height: 18px;
+      /* Ensure perfect centering within the 32px container */
+      display: block;
+      margin: auto;
     }
 
     /* Prompt Selector Modal */
@@ -85,6 +115,7 @@ export function getCSS(): string {
       overflow: hidden;
       backdrop-filter: blur(8px);
       animation: promptSelectorFadeIn 0.2s ease-out;
+      transition: top 0.15s ease-out, left 0.15s ease-out;
     }
 
     .prompt-library-selector:focus-within {
@@ -96,6 +127,30 @@ export function getCSS(): string {
       from {
         opacity: 0;
         transform: translateY(-8px) scale(0.96);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    /* Positioning classes for adaptive popup placement */
+    .prompt-library-selector.positioned-above {
+      transform-origin: bottom center;
+    }
+
+    .prompt-library-selector.positioned-below {
+      transform-origin: top center;
+    }
+
+    .prompt-library-selector.positioned-above {
+      animation: promptSelectorFadeInAbove 0.2s ease-out;
+    }
+
+    @keyframes promptSelectorFadeInAbove {
+      from {
+        opacity: 0;
+        transform: translateY(8px) scale(0.96);
       }
       to {
         opacity: 1;

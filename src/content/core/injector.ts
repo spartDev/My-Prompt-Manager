@@ -10,8 +10,9 @@ import type { Prompt, InsertionResult } from '../types/index';
 import { UIElementFactory } from '../ui/element-factory';
 import { EventManager } from '../ui/event-manager';
 import { KeyboardNavigationManager } from '../ui/keyboard-navigation';
+import { DOMUtils } from '../utils/dom';
 import { warn, error, debug, isDebugMode, refreshDebugMode } from '../utils/logger';
-import { getPrompts, createPromptListItem, isSiteEnabled, getSettings, type ExtensionSettings } from '../utils/storage';
+import { getPrompts, createPromptListItem, isSiteEnabled, getSettings, type ExtensionSettings, type CustomSite } from '../utils/storage';
 import { injectCSS } from '../utils/styles';
 import { ThemeManager } from '../utils/theme-manager';
 
@@ -143,7 +144,8 @@ export class PromptLibraryInjector {
 
       // Full initialization for enabled sites
       try {
-        this.initializeForEnabledSite();
+        await this.initializeForEnabledSite();
+        debug('Full initialization completed, setting isInitialized = true');
         // Set initialization flag after full setup is complete
         this.state.isInitialized = true;
       } catch (enabledSiteErr) {
@@ -158,18 +160,23 @@ export class PromptLibraryInjector {
       if (this.state.isSiteEnabled) {
         this.state.isInitialized = false;
       }
+      throw err; // Re-throw the error so tests can catch it if needed
     }
   }
 
   /**
    * Performs full initialization for enabled sites
    */
-  private initializeForEnabledSite(): void {
+  private async initializeForEnabledSite(): Promise<void> {
     try {
       debug('Performing full initialization for enabled site', { hostname: this.state.hostname });
 
       // Inject CSS styles
       injectCSS();
+
+      // Initialize platform strategies for enabled sites only
+      debug('Initializing platform strategies for enabled site');
+      await this.platformManager.initializeStrategies();
 
       // Setup SPA monitoring for dynamic navigation detection
       this.setupSPAMonitoring();
@@ -258,10 +265,11 @@ export class PromptLibraryInjector {
         void this.handleReinitialize(message.reason as string);
         sendResponse({ success: true });
       } else if (message.action === 'testSelector') {
-        this.handleSelectorTest(message as { selector: string; placement: string; offset: { x: number; y: number }; zIndex: number });
-        sendResponse({ success: true });
+        const result = this.handleSelectorTest(message as { selector: string; placement: string; offset: { x: number; y: number }; zIndex: number });
+        sendResponse(result);
       } else {
         debug('Ignoring unrecognized message', { action: message.action });
+        sendResponse({ success: false, error: 'Unknown message action' });
       }
       return true; // Keep message channel open for async response
     });
@@ -300,11 +308,8 @@ export class PromptLibraryInjector {
         this.selectorCache.clear();
         this.lastCacheTime = 0;
         
-        // Re-initialize the platform manager to restore strategies that were cleared during cleanup
-        this.platformManager.reinitialize();
-        
-        // Perform full initialization for the newly enabled site
-        this.initializeForEnabledSite();
+        // Perform full initialization for the newly enabled site (includes strategy initialization)
+        await this.initializeForEnabledSite();
         
         // Force immediate detection after a short delay to ensure DOM is ready
         setTimeout(() => {
@@ -341,38 +346,60 @@ export class PromptLibraryInjector {
   /**
    * Handle selector test request
    */
-  private handleSelectorTest(message: { selector: string; placement: string; offset: { x: number; y: number }; zIndex: number }): void {
+  private handleSelectorTest(message: { selector: string; placement: string; offset: { x: number; y: number }; zIndex: number }): { success: boolean; error?: string; elementCount?: number } {
     try {
-      const element = document.querySelector(message.selector);
-      if (!element) {
-        warn('Selector test failed - element not found', { selector: message.selector });
-        return;
+      debug('Testing selector', { selector: message.selector, placement: message.placement });
+
+      // Find all matching elements
+      const elements = document.querySelectorAll(message.selector);
+      if (elements.length === 0) {
+        const errorMsg = `No elements found matching selector "${message.selector}"`;
+        warn('Selector test failed - no elements found', { selector: message.selector });
+        return { success: false, error: errorMsg };
       }
 
-      // Create temporary test element
+      // Use the first matching element for positioning test
+      const element = elements[0] as HTMLElement;
+      const rect = element.getBoundingClientRect();
+
+      // Check if element is visible
+      if (rect.width === 0 && rect.height === 0) {
+        const errorMsg = `Element found but has zero dimensions (may be hidden)`;
+        warn('Selector test - element has zero dimensions', { selector: message.selector });
+        return { success: false, error: errorMsg };
+      }
+
+      // Create temporary test element to show positioning
       const testElement = document.createElement('div');
-      testElement.textContent = '🎯 Test Icon';
+      testElement.textContent = `🎯 Test (${String(elements.length)} found)`;
       testElement.style.cssText = `
         position: absolute;
         background: #10b981;
         color: white;
-        padding: 4px 8px;
-        border-radius: 4px;
-        font-size: 12px;
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 13px;
+        font-weight: 600;
         z-index: ${String(message.zIndex)};
         pointer-events: none;
         border: 2px solid #059669;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        white-space: nowrap;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
       `;
 
-      // Position based on placement
-      const rect = element.getBoundingClientRect();
+      // Add the element to DOM first to get proper dimensions
+      document.body.appendChild(testElement);
+
+      // Calculate position after element is in DOM
       const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
       const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+      const testElementRect = testElement.getBoundingClientRect();
 
       switch (message.placement) {
         case 'before':
           testElement.style.top = `${String(rect.top + scrollTop + message.offset.y)}px`;
-          testElement.style.left = `${String(rect.left + scrollLeft - testElement.offsetWidth + message.offset.x)}px`;
+          testElement.style.left = `${String(rect.left + scrollLeft - testElementRect.width + message.offset.x)}px`;
           break;
         case 'after':
           testElement.style.top = `${String(rect.top + scrollTop + message.offset.y)}px`;
@@ -384,22 +411,45 @@ export class PromptLibraryInjector {
           break;
         case 'inside-end':
           testElement.style.top = `${String(rect.top + scrollTop + message.offset.y)}px`;
-          testElement.style.left = `${String(rect.right + scrollLeft - testElement.offsetWidth + message.offset.x)}px`;
+          testElement.style.left = `${String(rect.right + scrollLeft - testElementRect.width + message.offset.x)}px`;
+          break;
+        default:
+          testElement.style.top = `${String(rect.top + scrollTop + message.offset.y)}px`;
+          testElement.style.left = `${String(rect.right + scrollLeft + message.offset.x)}px`;
           break;
       }
 
-      document.body.appendChild(testElement);
+      // Highlight the target element temporarily
+      const originalOutline = element.style.outline;
+      const originalTransition = element.style.transition;
+      element.style.transition = 'outline 0.2s ease';
+      element.style.outline = '3px solid #10b981';
 
-      // Remove after 3 seconds
+      // Remove highlights after 3 seconds
       setTimeout(() => {
         if (testElement.parentNode) {
           testElement.parentNode.removeChild(testElement);
         }
+        // Restore original outline
+        element.style.outline = originalOutline;
+        element.style.transition = originalTransition;
       }, 3000);
 
-      debug('Selector test successful', { selector: message.selector });
+      debug('Selector test successful', { 
+        selector: message.selector, 
+        elementCount: elements.length,
+        placement: message.placement 
+      });
+
+      return { 
+        success: true, 
+        elementCount: elements.length 
+      };
+
     } catch (err) {
+      const errorMsg = `Selector test failed: ${err instanceof Error ? err.message : String(err)}`;
       error('Selector test failed', err as Error, { selector: message.selector });
+      return { success: false, error: errorMsg };
     }
   }
 
@@ -622,14 +672,87 @@ export class PromptLibraryInjector {
         }
       }
 
-      // Fallback to floating positioning if container injection failed
+      // Check if we have custom positioning configuration (declare outside if block for scope)
+      const customConfig = this.platformManager.getCustomSiteConfig();
+
+      // If not injected into container, handle custom positioning or fallback to floating
       if (!injected) {
+        let customPositioned = false;
+
+        if (customConfig?.positioning && customConfig.positioning.selector) {
+          // Check if the current textarea matches the custom selector
+          const customSelector = customConfig.positioning.selector;
+          try {
+            let referenceElement: HTMLElement | null = null;
+            
+            if (textarea.matches(customSelector)) {
+              // Use custom positioning for the textarea itself
+              referenceElement = textarea;
+              debug('Using textarea as custom positioning reference element');
+            } else {
+              // Try to find the custom reference element
+              const foundElement = document.querySelector(customSelector);
+              if (foundElement) {
+                referenceElement = foundElement as HTMLElement;
+                debug('Found custom positioning reference element', { 
+                  selector: customSelector,
+                  tag: referenceElement.tagName,
+                  id: referenceElement.id
+                });
+              } else {
+                debug('Custom reference element not found', { selector: customSelector });
+              }
+            }
+            
+            // If we have a reference element, try custom DOM positioning
+            if (referenceElement) {
+              customPositioned = this.positionCustomIcon(icon, referenceElement, customConfig);
+              if (customPositioned) {
+                debug('Icon positioned successfully with custom DOM insertion');
+                return; // Exit here - positioning is complete
+              } else {
+                debug('Custom DOM positioning failed, will try absolute positioning fallback');
+              }
+            }
+          } catch (selectorError) {
+            warn('Invalid custom selector', { selector: customSelector, error: selectorError });
+          }
+        }
+
+        // If custom positioning failed or wasn't used, try absolute positioning fallback for custom configs
+        if (customConfig?.positioning && customConfig.positioning.selector && !customPositioned) {
+          warn('DOM insertion failed, using absolute positioning fallback', { 
+            placement: customConfig.positioning.placement,
+            selector: customConfig.positioning.selector
+          });
+          
+          // Try to find the reference element again for absolute positioning fallback
+          const fallbackSelector = customConfig.positioning.selector;
+          try {
+            const referenceElement = textarea.matches(fallbackSelector) ? 
+              textarea : document.querySelector(fallbackSelector);
+            
+            if (referenceElement) {
+              this.positionIconAbsolute(icon, referenceElement as HTMLElement, customConfig);
+              document.body.appendChild(icon);
+              debug('Icon positioned with absolute fallback');
+              return; // Exit here - positioning is complete
+            }
+          } catch (fallbackError) {
+            warn('Absolute positioning fallback also failed', { error: fallbackError });
+          }
+        }
+
+        // Ultimate fallback: default floating positioning
         this.positionIcon(icon, textarea);
         document.body.appendChild(icon);
-        debug('Icon injected with floating position (fallback)');
+        debug('Icon positioned with default floating position (final fallback)');
       }
 
-      debug('Icon injection completed', { injected });
+      debug('Icon injection completed', { 
+        injected, 
+        hasCustomConfig: !!(customConfig?.positioning)
+      });
 
     } catch (err) {
       error('Failed to inject icon', err as Error);
@@ -640,6 +763,9 @@ export class PromptLibraryInjector {
    * Positions the icon relative to the textarea
    */
   private positionIcon(icon: HTMLElement, textarea: HTMLElement): void {
+    // Convert icon to use absolute positioning for default fallback
+    UIElementFactory.convertToAbsolutePositioning(icon);
+    
     const rect = textarea.getBoundingClientRect();
     const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
     const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
@@ -649,6 +775,160 @@ export class PromptLibraryInjector {
     icon.style.top = `${String(rect.top + scrollTop + 10)}px`;
     icon.style.left = `${String(rect.right + scrollLeft + 10)}px`;
     icon.style.zIndex = '999999';
+  }
+
+  /**
+   * Positions icon using absolute positioning as fallback for custom configs
+   */
+  private positionIconAbsolute(icon: HTMLElement, referenceElement: HTMLElement, customConfig: CustomSite): void {
+    try {
+      if (!customConfig.positioning) {
+        return;
+      }
+      
+      const { placement, offset = { x: 0, y: 0 }, zIndex = 999999 } = customConfig.positioning;
+      
+      // Convert icon to use absolute positioning for fallback
+      UIElementFactory.convertToAbsolutePositioning(icon);
+      
+      const rect = referenceElement.getBoundingClientRect();
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+
+      icon.style.position = 'absolute';
+      icon.style.zIndex = String(zIndex);
+
+      // Calculate position based on placement (original absolute positioning logic)
+      let top = rect.top + scrollTop + offset.y;
+      let left = rect.left + scrollLeft + offset.x;
+
+      switch (placement) {
+        case 'before':
+          // Position before (left of) the reference element
+          left = rect.left + scrollLeft - icon.offsetWidth + offset.x;
+          top = rect.top + scrollTop + offset.y;
+          break;
+        case 'after':
+          // Position after (right of) the reference element
+          left = rect.right + scrollLeft + offset.x;
+          top = rect.top + scrollTop + offset.y;
+          break;
+        case 'inside-start':
+          // Position at the start (left side) inside the reference element
+          left = rect.left + scrollLeft + offset.x;
+          top = rect.top + scrollTop + offset.y;
+          break;
+        case 'inside-end':
+          // Position at the end (right side) inside the reference element
+          left = rect.right + scrollLeft - icon.offsetWidth + offset.x;
+          top = rect.top + scrollTop + offset.y;
+          break;
+        default:
+          warn('Invalid placement value for absolute positioning fallback', { placement });
+          return;
+      }
+
+      icon.style.top = `${String(top)}px`;
+      icon.style.left = `${String(left)}px`;
+
+      debug('Absolute positioning fallback applied', { 
+        placement, 
+        offset, 
+        zIndex,
+        calculatedPosition: { top, left }
+      });
+
+    } catch (err) {
+      error('Failed to apply absolute positioning fallback', err as Error);
+    }
+  }
+
+  /**
+   * Positions icon using custom positioning configuration
+   */
+  private positionCustomIcon(icon: HTMLElement, referenceElement: HTMLElement, customConfig: CustomSite): boolean {
+    try {
+      if (!customConfig.positioning) {
+        return false;
+      }
+      
+      const { placement, offset = { x: 0, y: 0 }, zIndex = 999999 } = customConfig.positioning;
+      
+      // Convert icon to use relative positioning for DOM insertion
+      UIElementFactory.convertToRelativePositioning(icon);
+      
+      // Apply z-index if needed for layering
+      icon.style.zIndex = String(zIndex);
+      
+      // Apply offset styles if specified
+      if (offset.x !== 0 || offset.y !== 0) {
+        // Add margin-based offset for DOM-inserted elements
+        const marginLeft = offset.x !== 0 ? `${String(offset.x)}px` : '';
+        const marginTop = offset.y !== 0 ? `${String(offset.y)}px` : '';
+        
+        if (marginLeft) {
+          icon.style.marginLeft = marginLeft;
+        }
+        if (marginTop) {
+          icon.style.marginTop = marginTop;
+        }
+      }
+
+      // Insert the icon into the DOM based on placement
+      let inserted = false;
+      
+      switch (placement) {
+        case 'before':
+          // Insert element before the reference element in the DOM
+          inserted = DOMUtils.insertBefore(icon, referenceElement);
+          break;
+          
+        case 'after':
+          // Insert element after the reference element in the DOM
+          inserted = DOMUtils.insertAfter(icon, referenceElement);
+          break;
+          
+        case 'inside-start':
+          // Insert element inside the reference element at the beginning
+          inserted = DOMUtils.prependChild(referenceElement, icon);
+          break;
+          
+        case 'inside-end':
+          // Insert element inside the reference element at the end
+          inserted = DOMUtils.appendChild(referenceElement, icon);
+          break;
+          
+        default:
+          warn('Invalid placement value for DOM insertion', { placement });
+          return false;
+      }
+
+      if (!inserted) {
+        warn('Failed to insert icon into DOM with custom positioning', { 
+          placement, 
+          referenceTag: referenceElement.tagName,
+          referenceId: referenceElement.id,
+          referenceClass: referenceElement.className
+        });
+        return false;
+      }
+
+      debug('Custom DOM insertion completed successfully', { 
+        placement, 
+        offset, 
+        zIndex,
+        referenceElement: {
+          tag: referenceElement.tagName,
+          id: referenceElement.id,
+          class: referenceElement.className
+        }
+      });
+
+      return true;
+    } catch (err) {
+      error('Failed to apply custom DOM insertion', err as Error);
+      return false;
+    }
   }
 
   /**
@@ -765,17 +1045,90 @@ export class PromptLibraryInjector {
   }
 
   /**
-   * Positions the prompt selector
+   * Positions the prompt selector with adaptive positioning
    */
   private positionPromptSelector(selector: HTMLElement, targetElement: HTMLElement): void {
     const rect = targetElement.getBoundingClientRect();
     const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
     const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
-
+    
+    // Temporarily add selector to DOM to measure its dimensions
+    selector.style.visibility = 'hidden';
     selector.style.position = 'absolute';
-    selector.style.top = `${String(rect.bottom + scrollTop + 5)}px`;
-    selector.style.left = `${String(rect.left + scrollLeft)}px`;
     selector.style.zIndex = '1000000';
+    document.body.appendChild(selector);
+    
+    const selectorRect = selector.getBoundingClientRect();
+    const selectorHeight = selectorRect.height;
+    const selectorWidth = selectorRect.width;
+    
+    // Remove from DOM temporarily
+    document.body.removeChild(selector);
+    selector.style.visibility = 'visible';
+    
+    // Calculate available space
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+    const spaceBelow = viewportHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    
+    // Handle small viewports - adjust selector size if needed
+    const isMobile = viewportWidth <= 480;
+    if (isMobile) {
+      selector.style.width = `${String(Math.min(400, viewportWidth - 40))}px`;
+      selector.style.maxHeight = `${String(Math.min(500, viewportHeight * 0.7))}px`;
+    }
+    
+    // Determine vertical position
+    let top: number;
+    const verticalOffset = 5;
+    
+    if (spaceBelow >= selectorHeight + verticalOffset || spaceBelow > spaceAbove) {
+      // Position below if there's enough space or more space than above
+      top = rect.bottom + scrollTop + verticalOffset;
+      selector.classList.remove('positioned-above');
+      selector.classList.add('positioned-below');
+    } else {
+      // Position above if not enough space below
+      top = rect.top + scrollTop - selectorHeight - verticalOffset;
+      selector.classList.remove('positioned-below');
+      selector.classList.add('positioned-above');
+    }
+    
+    // Determine horizontal position
+    let left = rect.left + scrollLeft;
+    
+    // Adjust if selector would overflow right edge
+    if (left + selectorWidth > viewportWidth + scrollLeft) {
+      // Align with right edge of viewport or textarea, whichever is smaller
+      const rightAlignLeft = Math.min(
+        viewportWidth + scrollLeft - selectorWidth - 10,
+        rect.right + scrollLeft - selectorWidth
+      );
+      left = Math.max(scrollLeft + 10, rightAlignLeft); // Ensure minimum padding from left
+    }
+    
+    // Ensure selector doesn't go below viewport bottom when positioned below
+    if (top + selectorHeight - scrollTop > viewportHeight && spaceAbove > spaceBelow) {
+      // Recalculate to position above if it would overflow
+      top = rect.top + scrollTop - selectorHeight - verticalOffset;
+      selector.classList.remove('positioned-below');
+      selector.classList.add('positioned-above');
+    }
+    
+    // Apply final positioning
+    selector.style.position = 'absolute';
+    selector.style.top = `${String(Math.max(scrollTop + 10, top))}px`; // Ensure minimum padding from top
+    selector.style.left = `${String(left)}px`;
+    selector.style.zIndex = '1000000';
+    
+    debug('Prompt selector positioned adaptively', {
+      targetRect: { top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right },
+      selectorSize: { width: selectorWidth, height: selectorHeight },
+      viewport: { width: viewportWidth, height: viewportHeight },
+      position: { top, left },
+      placement: selector.classList.contains('positioned-above') ? 'above' : 'below'
+    });
   }
 
   /**
@@ -825,6 +1178,28 @@ export class PromptLibraryInjector {
       };
       this.eventManager.addTrackedEventListener(document, 'click', outsideClickHandler);
     }, 100);
+    
+    // Add scroll and resize handlers for dynamic repositioning
+    const repositionHandler = () => {
+      if (this.state.promptSelector) {
+        this.positionPromptSelector(this.state.promptSelector, targetElement);
+      }
+    };
+    
+    // Throttle repositioning for performance
+    let repositionTimeout: number | null = null;
+    const throttledReposition = () => {
+      if (repositionTimeout !== null) {
+        return;
+      }
+      repositionTimeout = window.setTimeout(() => {
+        repositionHandler();
+        repositionTimeout = null;
+      }, 16); // ~60fps
+    };
+    
+    this.eventManager.addTrackedEventListener(window, 'scroll', throttledReposition);
+    this.eventManager.addTrackedEventListener(window, 'resize', throttledReposition);
   }
 
   /**

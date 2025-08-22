@@ -28,8 +28,8 @@ export interface CustomSite {
   enabled: boolean;
   dateAdded: number;
   positioning?: {
-    mode: 'auto' | 'custom';
-    selector?: string;
+    mode: 'custom';
+    selector: string;
     placement: 'before' | 'after' | 'inside-start' | 'inside-end';
     offset?: {
       x: number;
@@ -155,8 +155,10 @@ export async function isSiteEnabled(hostname: string): Promise<boolean> {
     return false;
   } catch (err) {
     logError('Failed to check if site is enabled', err as Error, { hostname });
-    // Default to enabled on error for better user experience
-    return true;
+    debug('ERROR in isSiteEnabled - defaulting to DISABLED', { hostname, error: err });
+    // Default to DISABLED on error to prevent unwanted icon appearance
+    // This is safer than defaulting to enabled for security/privacy
+    return false;
   }
 }
 
