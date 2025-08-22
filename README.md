@@ -1,399 +1,427 @@
-# My Prompt Manager Extension
+# My Prompt Manager - Chrome Extension
 
-A Chrome extension that provides seamless access to your personal prompt library directly within popular AI chat interfaces. Features both a popup interface for managing prompts and native integration with supported AI platforms including Claude, ChatGPT, and Perplexity.
+[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/spartDev/My-Prompt-Manager)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Chrome](https://img.shields.io/badge/Chrome-88%2B-yellow.svg)](https://www.google.com/chrome/)
+[![Tests](https://img.shields.io/badge/tests-470%20passing-brightgreen.svg)](https://github.com/spartDev/My-Prompt-Manager)
 
-## Features
+A powerful Chrome extension that provides seamless access to your personal prompt library directly within popular AI chat interfaces. Features both a popup interface for managing prompts and native integration with Claude, ChatGPT, Perplexity, and more.
+
+**Author:** Thomas Roux  
+**Repository:** [github.com/spartDev/My-Prompt-Manager](https://github.com/spartDev/My-Prompt-Manager)
+
+## 🚀 Features
 
 ### Popup Interface (Prompt Management)
-✅ **Save Prompts:** Store frequently used text prompts with custom titles  
-✅ **Organize by Categories:** Create and manage categories with custom colors  
-✅ **Quick Copy:** One-click copying to clipboard with visual confirmation  
-✅ **Search & Filter:** Real-time search with text highlighting  
-✅ **CRUD Operations:** Edit and delete prompts with confirmation dialogs  
-✅ **Data Persistence:** Automatic saving using Chrome's storage API  
-✅ **Error Handling:** Graceful handling of storage quotas and data corruption  
-✅ **Responsive UI:** Clean, modern interface built with React and Tailwind CSS
+✅ **Smart Prompt Management:** Store, organize, and search your prompts with custom categories  
+✅ **Rich Categorization:** Create unlimited categories with custom colors and icons  
+✅ **Instant Search:** Real-time filtering with text highlighting across titles and content  
+✅ **Quick Actions:** One-click copy to clipboard, edit in-place, and bulk operations  
+✅ **Dark Mode Support:** Beautiful dark theme with automatic system preference detection  
+✅ **Data Persistence:** Automatic saving using Chrome's storage API with quota monitoring  
+✅ **Security First:** DOMPurify sanitization for XSS protection
 
 ### AI Platform Integration
-✅ **Native Integration:** Library icon appears in supported AI chat interfaces  
-✅ **Smart Positioning:** Popup appears adjacent to the trigger button for intuitive UX  
-✅ **Dynamic Detection:** Automatically detects and integrates with AI chat input fields  
-✅ **Seamless Insertion:** Direct prompt insertion into both textarea and contenteditable elements  
-✅ **Multi-Platform Support:** Works with Claude, ChatGPT, Perplexity, and custom sites  
-✅ **Fallback Support:** Graceful fallback for different page layouts  
+✅ **Native Integration:** Library icon appears seamlessly in AI chat interfaces  
+✅ **Smart Positioning:** Context-aware popup placement for optimal UX  
+✅ **Universal Compatibility:** Works with textarea and contenteditable elements  
+✅ **Keyboard Navigation:** Full keyboard support for accessibility  
+✅ **Custom Sites:** Add support for any AI platform through settings  
+✅ **Theme Synchronization:** Matches the host platform's theme automatically
 
-## Supported Platforms
+## 🎯 Supported Platforms
 
-- **Claude** (claude.ai)
-- **ChatGPT** (chatgpt.com)  
-- **Perplexity** (www.perplexity.ai)
-- **Custom Sites** (configurable through settings)
+| Platform | Status | Domain | Priority |
+|----------|--------|--------|----------|
+| Claude | ✅ Fully Supported | claude.ai | 100 |
+| ChatGPT | ✅ Fully Supported | chatgpt.com | 90 |
+| Perplexity | ✅ Fully Supported | www.perplexity.ai | 80 |
+| Custom Sites | ✅ Configurable | User-defined | Variable |
 
-## Tech Stack
+**Coming Soon:** Gemini, Mistral.ai, and more! See our [Platform Integration Guide](docs/PLATFORM_INTEGRATION.md) to add your own.
 
-- **Frontend:** React 18 + TypeScript
-- **Styling:** Tailwind CSS  
-- **Content Script:** Vanilla JavaScript with CSS injection
-- **Build Tool:** Vite with @crxjs/vite-plugin
-- **Storage:** Chrome Storage API
-- **Extension:** Manifest V3
+## 💻 Tech Stack
 
-## Development Setup
+| Technology | Purpose | Version |
+|------------|---------|---------|
+| **React** | UI Framework | 18.3.1 |
+| **TypeScript** | Type Safety | 5.5.3 |
+| **Tailwind CSS** | Styling | 3.4.4 |
+| **Vite** | Build Tool | 6.3.5 |
+| **Vitest** | Testing Framework | 3.2.4 |
+| **DOMPurify** | XSS Protection | 3.2.6 |
+| **Husky** | Git Hooks | 9.1.7 |
+| **@crxjs/vite-plugin** | Chrome Extension Support | 2.0.3 |
+
+## 📦 Installation
 
 ### Prerequisites
 
-- Node.js 18+ 
-- Chrome browser
-- Basic knowledge of Chrome extensions
+- [Node.js](https://nodejs.org/) 18+ (LTS recommended)
+- [Chrome Browser](https://www.google.com/chrome/) 88+
+- [Git](https://git-scm.com/) for cloning the repository
 
-### Installation
+### Development Setup
 
-1. **Clone and install dependencies:**
+1. **Clone the repository:**
    ```bash
-   git clone <repository-url>
-   cd claude-ui
+   git clone https://github.com/spartDev/My-Prompt-Manager.git
+   cd My-Prompt-Manager
+   ```
+
+2. **Install dependencies:**
+   ```bash
    npm install
    ```
 
-2. **Development build:**
+3. **Start development server:**
    ```bash
    npm run dev
    ```
-   This starts the development server with hot module replacement.
+   This starts Vite with hot module replacement (HMR) enabled.
 
-3. **Production build:**
+4. **Build for production:**
    ```bash
    npm run build
    ```
-   Creates optimized build in `dist/` folder.
+   Creates an optimized build in the `dist/` folder.
 
 ### Loading in Chrome
 
-1. Open `chrome://extensions/`
-2. Enable "Developer mode" (toggle in top right)
-3. Click "Load unpacked" and select the `dist` folder
-4. The extension icon should appear in the toolbar
+1. Open Chrome and navigate to `chrome://extensions/`
+2. Enable **"Developer mode"** (toggle in top right corner)
+3. Click **"Load unpacked"** button
+4. Select the `dist` folder from the project
+5. The extension icon should appear in your toolbar
+6. Pin the extension for easy access (optional)
 
-### Testing the Integration
+### Verify Installation
 
-1. Visit any supported AI platform (Claude, ChatGPT, Perplexity)
-2. Look for the library icon in the input area
-3. Click the icon to access your prompt library
-4. Select a prompt to insert it directly into the chat input
+1. Click the extension icon - the popup should open
+2. Visit [claude.ai](https://claude.ai) - look for the library icon
+3. Try adding a test prompt and using it in an AI chat
 
-### Development Workflow
+## 🛠️ Available Scripts
 
-1. Make changes to source code
-2. The extension auto-reloads in development mode
-3. For major changes, manually reload the extension in `chrome://extensions/`
-4. Test functionality in both the popup and platform integrations
+| Command | Description | Usage |
+|---------|-------------|--------|
+| `npm run dev` | Start development server with HMR | Development |
+| `npm run build` | Create production build | Deployment |
+| `npm test` | Run test suite (470+ tests) | Testing |
+| `npm run test:ui` | Run tests with Vitest UI | Interactive Testing |
+| `npm run test:coverage` | Generate coverage report | Code Coverage |
+| `npm run lint` | Run ESLint checks | Code Quality |
+| `npm run lint:fix` | Auto-fix ESLint issues | Code Formatting |
+| `npm run package` | Package extension for distribution | Chrome Web Store |
 
-### Content Script Development
+## 🏗️ Architecture
 
-The modular TypeScript content script provides a robust foundation for development:
+### System Overview
 
-#### Adding New Platform Support
-
-1. **Create Platform Strategy:**
-   ```typescript
-   // src/content/platforms/new-platform-strategy.ts
-   import { PlatformStrategy } from './base-strategy';
-   
-   export class NewPlatformStrategy extends PlatformStrategy {
-     constructor() {
-       super('NewPlatform', 100, {
-         selectors: ['textarea[data-platform="new"]'],
-         buttonContainerSelector: '.button-container',
-         priority: 100
-       });
-     }
-     
-     canHandle(element: HTMLElement): boolean {
-       // Implementation
-     }
-     
-     async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
-       // Implementation
-     }
-   }
-   ```
-
-2. **Register Strategy in Platform Manager**
-3. **Add Tests in `__tests__` directory**
-4. **Update TypeScript types if needed**
-
-#### Testing Commands
-
-```bash
-npm test             # Run test suite
-npm run test:ui      # Run tests with UI
-npm run test:coverage # Run tests with coverage report
-npm run lint         # Run ESLint
-npm run lint:fix     # Fix ESLint issues automatically
+```mermaid
+graph TD
+    A[Chrome Extension] --> B[Popup Interface]
+    A --> C[Content Script]
+    A --> D[Background Service Worker]
+    
+    B --> E[React Components]
+    B --> F[Chrome Storage API]
+    
+    C --> G[Platform Strategies]
+    C --> H[UI Injection]
+    C --> I[Event Management]
+    
+    G --> J[Claude Strategy]
+    G --> K[ChatGPT Strategy]
+    G --> L[Perplexity Strategy]
 ```
 
-#### Build Process
-
-The TypeScript modules are bundled using Vite:
-- Strict TypeScript compilation
-- Source map generation for debugging
-- Tree-shaking for optimal bundle size
-- Chrome extension context compatibility
-
-## Project Structure
-
-```
-src/
-├── components/          # React components (Popup Interface)
-│   ├── App.tsx         # Main app component
-│   ├── LibraryView.tsx # Main library interface
-│   ├── PromptCard.tsx  # Individual prompt display
-│   ├── SearchBar.tsx   # Search functionality
-│   ├── CategoryFilter.tsx # Category filtering
-│   ├── AddPromptForm.tsx  # Add prompt form
-│   ├── EditPromptForm.tsx # Edit prompt form
-│   ├── CategoryManager.tsx # Category management
-│   ├── ToastContainer.tsx  # Notifications
-│   ├── ErrorBoundary.tsx   # Error handling
-│   ├── StorageWarning.tsx  # Storage quota warnings
-│   └── SettingsView.tsx    # Settings configuration
-├── hooks/              # Custom React hooks
-│   ├── usePrompts.ts   # Prompt management
-│   ├── useCategories.ts # Category management
-│   ├── useClipboard.ts # Clipboard operations
-│   ├── useSearch.ts    # Search functionality
-│   └── useToast.ts     # Toast notifications
-├── services/           # Business logic
-│   ├── storage.ts      # Chrome storage operations
-│   └── promptManager.ts # Prompt business logic
-├── types/             # TypeScript type definitions
-│   ├── index.ts       # Core types
-│   ├── components.ts  # Component prop types
-│   ├── hooks.ts       # Hook return types
-│   └── context.ts     # Context types
-├── content/           # Modular TypeScript content script for AI platform integration
-│   ├── index.ts        # Main entry point
-│   ├── types/          # TypeScript type definitions
-│   ├── utils/          # Utility modules (logger, storage, DOM, styles)
-│   ├── ui/             # UI components (element factory, keyboard nav, events)
-│   ├── platforms/      # Platform strategies (Claude, ChatGPT, Perplexity, etc.)
-│   └── core/           # Core components (injector, insertion manager)
-├── popup.html         # Extension popup HTML
-├── popup.tsx          # React entry point
-└── popup.css          # Global styles
-```
-
-## Architecture Overview
-
-### Dual Interface Architecture
-The extension provides two complementary interfaces:
-
-1. **Popup Interface** (React-based): For managing prompts, categories, and settings
-2. **Content Script Integration**: For seamless prompt access within AI platforms
-
-### Data Flow
-1. **Storage Layer:** `StorageManager` handles Chrome storage API operations
-2. **Business Logic:** `PromptManager` handles validation, search, and data processing
-3. **React Hooks:** Custom hooks provide data and operations to popup components
-4. **Content Script:** `src/content/` modular TypeScript handles AI platform integration and prompt insertion
-
-### Content Script Modular Architecture
-
-The content script has been refactored from a monolithic JavaScript file into a well-organized TypeScript module structure:
+### Content Script Architecture (TypeScript Modules)
 
 ```
 src/content/
 ├── index.ts                    # Main entry point
-├── types/                      # TypeScript type definitions
-├── utils/                      # Utility modules (logger, storage, DOM, styles)
-├── ui/                         # UI components (element factory, keyboard nav, events)
-├── platforms/                  # Platform strategies (Claude, ChatGPT, Perplexity, etc.)
-└── core/                       # Core components (injector, insertion manager)
+├── types/                      # TypeScript definitions
+│   ├── platform.ts            # Platform interfaces
+│   └── ui.ts                  # UI component types
+├── utils/                      # Utility modules
+│   ├── logger.ts              # Debug logging
+│   ├── storage.ts             # Chrome storage wrapper
+│   ├── dom.ts                 # DOM utilities
+│   ├── styles.ts              # Style injection
+│   └── theme-manager.ts       # Theme synchronization
+├── ui/                         # UI components
+│   ├── element-factory.ts     # Element creation
+│   ├── keyboard-navigation.ts # Keyboard support
+│   └── event-manager.ts       # Event handling
+├── platforms/                  # Platform-specific strategies
+│   ├── base-strategy.ts       # Abstract base class
+│   ├── claude-strategy.ts     # Claude.ai implementation
+│   ├── chatgpt-strategy.ts    # ChatGPT implementation
+│   ├── perplexity-strategy.ts # Perplexity implementation
+│   └── platform-manager.ts    # Strategy coordinator
+└── core/                       # Core functionality
+    ├── injector.ts            # Icon injection logic
+    └── insertion-manager.ts   # Content insertion handler
 ```
 
-**Key Benefits:**
-- **Maintainability**: Clear separation of concerns with single-responsibility modules
-- **Type Safety**: Comprehensive TypeScript types for better development experience
-- **Testability**: Each module can be tested independently with full test coverage
-- **Extensibility**: Easy to add new platform support through strategy pattern
-- **Performance**: Optimized build process with tree-shaking and source maps
+### Design Patterns
 
-### Key Components
+- **Strategy Pattern:** Platform-specific implementations
+- **Factory Pattern:** UI element creation
+- **Observer Pattern:** Event management and state synchronization
+- **Module Pattern:** TypeScript module organization
+- **Singleton Pattern:** Platform manager instance
 
-**Popup Interface:**
-- **App:** Main orchestrator, manages global state and routing
-- **LibraryView:** Primary interface showing prompts, search, and filters
-- **PromptCard:** Individual prompt display with actions (copy, edit, delete)
-- **Forms:** Add/Edit forms with validation and error handling
-- **CategoryManager:** Modal for creating and managing categories
-- **SettingsView:** Configuration for supported sites and custom platforms
+## 📖 User Guide
 
-**Content Script Integration:**
-- **PromptLibraryInjector:** Main class handling AI platform integration
-- **Icon Injection:** Dynamically creates and positions the library icon
-- **Input Detection:** Automatically detects and monitors text input fields
-- **Prompt Selector UI:** Popup interface for selecting and inserting prompts
+### Getting Started
 
-### Error Handling
+1. **First Time Setup:**
+   - Install the extension following the installation guide
+   - Click the extension icon to open the popup
+   - Create your first category (e.g., "Coding", "Writing", "Research")
+   - Add your frequently used prompts
 
-- **ErrorBoundary:** Catches React errors and provides recovery interface
-- **StorageWarning:** Handles storage quota exceeded scenarios
-- **Toast Notifications:** User feedback for all operations
-- **Validation:** Input validation with helpful error messages
+2. **Managing Prompts:**
+   - **Add:** Click "Add Prompt" and fill in the form
+   - **Edit:** Click the edit icon on any prompt card
+   - **Delete:** Click the trash icon with confirmation
+   - **Copy:** Click the copy button for clipboard access
+   - **Search:** Use the search bar for instant filtering
 
-## Usage Guide
+3. **Using in AI Platforms:**
+   - Visit any supported AI platform
+   - Look for the prompt library icon near the input field
+   - Click to open your prompt selector
+   - Search or browse your prompts
+   - Click a prompt to insert it instantly
 
-### Managing Prompts (Popup Interface)
+### Advanced Features
 
-**Creating Prompts:**
-1. Click the extension icon to open the popup
-2. Click "Add Prompt" button
-3. Enter content (required) and optional title
-4. Select or create a category
-5. Click "Save Prompt"
+#### Dark Mode
+The extension automatically detects your system theme preference. You can also toggle it manually using the theme switcher in the popup.
 
-**Managing Categories:**  
-1. In the library view, click "Manage Categories"
-2. Add new categories with custom names and colors
-3. Edit existing categories by clicking the edit icon
-4. Delete categories (prompts move to "Uncategorized")
+#### Custom Sites
+1. Click the settings icon in the popup
+2. Navigate to "Custom Sites"
+3. Enter the domain of your AI platform
+4. Configure selectors if needed (advanced)
+5. Test and save
 
-**Searching and Filtering:**
-- Use the search bar for real-time filtering
-- Search matches titles, content, and categories
-- Use category dropdown to filter by specific category
-- Matching text is highlighted in search results
+#### Keyboard Shortcuts
+- `Esc` - Close prompt selector
+- `Tab` - Navigate through prompts
+- `Enter` - Select highlighted prompt
+- `Ctrl+K` / `Cmd+K` - Focus search (in popup)
 
-**Copying Prompts:**
-- Click the "Copy" button on any prompt card
-- Content is copied to clipboard
-- Success notification confirms the copy operation
-- Use copied text in any application
+## 🧪 Testing
 
-### Using Prompts in AI Platforms
+The project includes a comprehensive test suite with 470+ tests across 26 test files.
 
-**Accessing Your Library:**
-1. Visit any supported AI platform (Claude, ChatGPT, Perplexity)
-2. Look for the library icon in the input area
-3. Click the icon to open your prompt library
+### Running Tests
 
-**Inserting Prompts:**
-1. Select a prompt from the searchable list
-2. The prompt is automatically inserted into the chat input
-3. The popup closes automatically after selection
-4. Continue typing or send the message as normal
+```bash
+# Run all tests
+npm test
 
-**Smart Features:**
-- Popup appears adjacent to the trigger button for intuitive UX
-- Search functionality available within the integrated popup
-- Works with both regular text areas and rich text editors
-- Automatic input field detection and integration
+# Run with UI
+npm run test:ui
 
-### Configuring Sites (Settings)
+# Generate coverage report
+npm run test:coverage
 
-**Built-in Sites:**
-- Toggle support for Claude, ChatGPT, and Perplexity individually
-- Sites are pre-configured with optimal selectors
+# Run specific test file
+npm test -- src/content/platforms/__tests__/claude-strategy.test.ts
+```
 
-**Custom Sites:**
-1. Click settings icon in the popup
-2. Add new sites by entering URL
-3. Configure advanced positioning if needed
-4. Test selectors before adding
+### Test Coverage
 
-## Data Storage
+- **Unit Tests:** All core modules and utilities
+- **Integration Tests:** Platform strategies and UI components
+- **Component Tests:** React components with Testing Library
+- **Performance Tests:** Bundle size and runtime performance
 
-The extension uses Chrome's `chrome.storage.local` API for data persistence:
+## 🚢 Production Deployment
 
-- **Prompts:** Stored as array with metadata (id, timestamps, etc.)
-- **Categories:** Stored separately with colors and settings
-- **Settings:** User preferences and site configurations
-- **Quota Management:** Automatic monitoring and warnings
+### Building for Chrome Web Store
 
-## Testing
+1. **Update version** in `manifest.json` and `package.json`
 
-### Quick Test
-1. Build and load the extension
-2. Create a few test prompts in the popup
-3. Visit supported AI platforms and test the integration
-4. Restart browser and verify data persists
-5. Test search, categories, copy functionality, and prompt insertion
-
-## Building for Production
-
-1. **Build optimized version:**
+2. **Run production build:**
    ```bash
    npm run build
    ```
 
-2. **Package for Chrome Web Store:**
-   - Zip the entire `dist/` folder
-   - Upload to Chrome Web Store Developer Dashboard
-   - Follow Chrome Web Store publishing guidelines
+3. **Package the extension:**
+   ```bash
+   npm run package
+   ```
+   This creates `prompt-library-extension-v1.0.0.zip`
 
-## Performance Considerations
+4. **Upload to Chrome Web Store:**
+   - Go to [Chrome Web Store Developer Dashboard](https://chrome.google.com/webstore/developer/dashboard)
+   - Upload the generated ZIP file
+   - Fill in store listing details
+   - Submit for review
 
-- **Storage Efficiency:** Prompts are stored efficiently with minimal metadata
-- **Search Performance:** Client-side search with optimized filtering
-- **Memory Usage:** Components are optimized for minimal re-renders
-- **Bundle Size:** Tree-shaking and code splitting for optimal loading
+### Performance Optimizations
 
-## Security
+- **Code Splitting:** Separate bundles for popup and content script
+- **Tree Shaking:** Removes unused code automatically
+- **Minification:** Optimized production builds
+- **Lazy Loading:** Platform strategies load on-demand
+- **Source Maps:** Available in development, excluded in production
 
-- **Content Security Policy:** Strict CSP prevents XSS attacks
-- **Input Sanitization:** User content is properly sanitized
-- **Minimal Permissions:** Only requests necessary storage permissions
-- **Local Storage:** All data stays on user's device
+## 🔒 Security & Privacy
 
-## Browser Compatibility
+### Security Features
 
-- **Chrome:** Version 88+ (Manifest V3 support)
-- **Storage API:** Uses chrome.storage.local for reliability
-- **Modern Features:** Built with modern web standards
+- **Content Security Policy (CSP):** Strict CSP prevents XSS attacks
+- **DOMPurify Integration:** All user content is sanitized
+- **Minimal Permissions:** Only essential Chrome APIs requested
+- **Local Storage Only:** No data leaves your device
+- **No Analytics:** Zero tracking or telemetry
 
-## Contributing
+### Privacy Commitment
 
-1. Fork the repository
-2. Create a feature branch
-3. Make changes with proper TypeScript typing
-4. Test thoroughly using the testing guide
-5. Submit a pull request
+- All data stored locally on your device
+- No external servers or cloud storage
+- No user tracking or analytics
+- Open source for transparency
+- Regular security updates
 
-### Adding New LLM Platforms
+## 🌐 Browser Compatibility
 
-Want to add support for a new AI platform like Gemini, Mistral.ai, or others? It's easy! 
+| Browser | Minimum Version | Status |
+|---------|----------------|---------|
+| Chrome | 88+ | ✅ Fully Supported |
+| Edge | 88+ | ✅ Fully Supported |
+| Brave | 1.36+ | ✅ Fully Supported |
+| Opera | 74+ | ⚠️ Should work (untested) |
+| Firefox | - | ❌ Not supported (Manifest V3) |
 
-📖 **[Platform Integration Guide](docs/PLATFORM_INTEGRATION.md)** - Complete guide for developers
+## 🤝 Contributing
 
-The modular architecture makes adding new platforms straightforward - typically taking just 30-60 minutes. The guide includes:
+We welcome contributions! Please follow these guidelines:
 
-- Step-by-step instructions
-- Code examples for different platform types  
-- Testing and debugging workflows
-- Best practices and troubleshooting tips
+### Development Process
 
-## License
+1. **Fork the repository**
+2. **Create a feature branch:**
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
 
-[MIT License](LICENSE)
+3. **Make your changes:**
+   - Follow existing code style
+   - Add tests for new features
+   - Update documentation
 
-## Support
+4. **Run quality checks:**
+   ```bash
+   npm run lint
+   npm test
+   npm run build
+   ```
 
-For issues and feature requests, please use the GitHub issues tracker.
+5. **Commit with conventional commits:**
+   ```bash
+   git commit -m "feat: add new feature"
+   ```
 
-## Roadmap
+6. **Push and create PR:**
+   ```bash
+   git push origin feature/your-feature-name
+   ```
 
-### Completed Features
-- [x] Multi-platform AI integration (Claude, ChatGPT, Perplexity)
-- [x] Smart popup positioning
+### Code Style Guidelines
+
+- Use TypeScript for all new code
+- Follow ESLint configuration
+- Write comprehensive tests
+- Document complex logic
+- Use meaningful variable names
+
+### Adding New Platforms
+
+See our comprehensive [Platform Integration Guide](docs/PLATFORM_INTEGRATION.md) for step-by-step instructions on adding support for new AI platforms.
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+#### Extension doesn't appear in toolbar
+- Ensure extension is enabled in `chrome://extensions/`
+- Try reloading the extension
+- Check for conflicting extensions
+
+#### Prompts don't insert on a platform
+- Verify the platform is supported
+- Check browser console for errors
+- Try refreshing the page
+- Report issue with platform details
+
+#### Storage quota exceeded
+- Delete unused prompts
+- Export important prompts first
+- Clear categories you don't use
+
+### Debug Mode
+
+Enable debug logging:
+```javascript
+// In browser console
+localStorage.setItem('prompt-library-debug', 'true');
+location.reload();
+```
+
+View debug information:
+```javascript
+// Check active strategy
+window.__promptLibraryDebug?.activeStrategy
+
+// View found input elements
+window.__promptLibraryDebug?.foundElements
+
+// Test insertion manually
+window.__promptLibraryDebug?.testInsertion?.('test content')
+```
+
+## 📈 Roadmap
+
+### Version 1.0 (Current)
+- [x] Core prompt management
+- [x] Multi-platform AI integration
+- [x] Dark mode support
 - [x] Custom site configuration
-- [x] Dark mode theme support
-- [x] Responsive design
+- [x] Comprehensive testing
 
-### Future Enhancements
-- [ ] Import/Export functionality
-- [ ] Prompt templates and variables
-- [ ] Keyboard shortcuts for quick access
+### Version 1.1 (Planned)
+- [ ] Import/Export functionality (JSON, CSV)
+- [ ] Prompt templates with variables
+- [ ] Keyboard shortcuts customization
 - [ ] Prompt usage analytics
-- [ ] Cloud sync (optional)
-- [ ] Prompt sharing capabilities
-- [ ] Custom hotkeys for frequent prompts
+- [ ] Backup and restore
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- Chrome Extension documentation and examples
+- React and TypeScript communities
+- Contributors and testers
+- Open source libraries used in this project
+
+## 📞 Support
+
+- **Issues:** [GitHub Issues](https://github.com/spartDev/My-Prompt-Manager/issues)
+- **Email:** Contact through GitHub profile
+
+---
+
+**Made with ❤️ by Thomas Roux**
+
+*If you find this extension helpful, please consider starring the repository and sharing it with others!*
