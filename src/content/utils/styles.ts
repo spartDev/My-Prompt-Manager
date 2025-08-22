@@ -115,6 +115,7 @@ export function getCSS(): string {
       overflow: hidden;
       backdrop-filter: blur(8px);
       animation: promptSelectorFadeIn 0.2s ease-out;
+      transition: top 0.15s ease-out, left 0.15s ease-out;
     }
 
     .prompt-library-selector:focus-within {
@@ -126,6 +127,30 @@ export function getCSS(): string {
       from {
         opacity: 0;
         transform: translateY(-8px) scale(0.96);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    /* Positioning classes for adaptive popup placement */
+    .prompt-library-selector.positioned-above {
+      transform-origin: bottom center;
+    }
+
+    .prompt-library-selector.positioned-below {
+      transform-origin: top center;
+    }
+
+    .prompt-library-selector.positioned-above {
+      animation: promptSelectorFadeInAbove 0.2s ease-out;
+    }
+
+    @keyframes promptSelectorFadeInAbove {
+      from {
+        opacity: 0;
+        transform: translateY(8px) scale(0.96);
       }
       to {
         opacity: 1;

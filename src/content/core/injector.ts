@@ -1045,17 +1045,90 @@ export class PromptLibraryInjector {
   }
 
   /**
-   * Positions the prompt selector
+   * Positions the prompt selector with adaptive positioning
    */
   private positionPromptSelector(selector: HTMLElement, targetElement: HTMLElement): void {
     const rect = targetElement.getBoundingClientRect();
     const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
     const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
-
+    
+    // Temporarily add selector to DOM to measure its dimensions
+    selector.style.visibility = 'hidden';
     selector.style.position = 'absolute';
-    selector.style.top = `${String(rect.bottom + scrollTop + 5)}px`;
-    selector.style.left = `${String(rect.left + scrollLeft)}px`;
     selector.style.zIndex = '1000000';
+    document.body.appendChild(selector);
+    
+    const selectorRect = selector.getBoundingClientRect();
+    const selectorHeight = selectorRect.height;
+    const selectorWidth = selectorRect.width;
+    
+    // Remove from DOM temporarily
+    document.body.removeChild(selector);
+    selector.style.visibility = 'visible';
+    
+    // Calculate available space
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+    const spaceBelow = viewportHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    
+    // Handle small viewports - adjust selector size if needed
+    const isMobile = viewportWidth <= 480;
+    if (isMobile) {
+      selector.style.width = `${String(Math.min(400, viewportWidth - 40))}px`;
+      selector.style.maxHeight = `${String(Math.min(500, viewportHeight * 0.7))}px`;
+    }
+    
+    // Determine vertical position
+    let top: number;
+    const verticalOffset = 5;
+    
+    if (spaceBelow >= selectorHeight + verticalOffset || spaceBelow > spaceAbove) {
+      // Position below if there's enough space or more space than above
+      top = rect.bottom + scrollTop + verticalOffset;
+      selector.classList.remove('positioned-above');
+      selector.classList.add('positioned-below');
+    } else {
+      // Position above if not enough space below
+      top = rect.top + scrollTop - selectorHeight - verticalOffset;
+      selector.classList.remove('positioned-below');
+      selector.classList.add('positioned-above');
+    }
+    
+    // Determine horizontal position
+    let left = rect.left + scrollLeft;
+    
+    // Adjust if selector would overflow right edge
+    if (left + selectorWidth > viewportWidth + scrollLeft) {
+      // Align with right edge of viewport or textarea, whichever is smaller
+      const rightAlignLeft = Math.min(
+        viewportWidth + scrollLeft - selectorWidth - 10,
+        rect.right + scrollLeft - selectorWidth
+      );
+      left = Math.max(scrollLeft + 10, rightAlignLeft); // Ensure minimum padding from left
+    }
+    
+    // Ensure selector doesn't go below viewport bottom when positioned below
+    if (top + selectorHeight - scrollTop > viewportHeight && spaceAbove > spaceBelow) {
+      // Recalculate to position above if it would overflow
+      top = rect.top + scrollTop - selectorHeight - verticalOffset;
+      selector.classList.remove('positioned-below');
+      selector.classList.add('positioned-above');
+    }
+    
+    // Apply final positioning
+    selector.style.position = 'absolute';
+    selector.style.top = `${String(Math.max(scrollTop + 10, top))}px`; // Ensure minimum padding from top
+    selector.style.left = `${String(left)}px`;
+    selector.style.zIndex = '1000000';
+    
+    debug('Prompt selector positioned adaptively', {
+      targetRect: { top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right },
+      selectorSize: { width: selectorWidth, height: selectorHeight },
+      viewport: { width: viewportWidth, height: viewportHeight },
+      position: { top, left },
+      placement: selector.classList.contains('positioned-above') ? 'above' : 'below'
+    });
   }
 
   /**
@@ -1105,6 +1178,28 @@ export class PromptLibraryInjector {
       };
       this.eventManager.addTrackedEventListener(document, 'click', outsideClickHandler);
     }, 100);
+    
+    // Add scroll and resize handlers for dynamic repositioning
+    const repositionHandler = () => {
+      if (this.state.promptSelector) {
+        this.positionPromptSelector(this.state.promptSelector, targetElement);
+      }
+    };
+    
+    // Throttle repositioning for performance
+    let repositionTimeout: number | null = null;
+    const throttledReposition = () => {
+      if (repositionTimeout !== null) {
+        return;
+      }
+      repositionTimeout = window.setTimeout(() => {
+        repositionHandler();
+        repositionTimeout = null;
+      }, 16); // ~60fps
+    };
+    
+    this.eventManager.addTrackedEventListener(window, 'scroll', throttledReposition);
+    this.eventManager.addTrackedEventListener(window, 'resize', throttledReposition);
   }
 
   /**
