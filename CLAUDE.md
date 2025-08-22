@@ -1,272 +1,179 @@
-# Claude Code Configuration - SPARC Development Environment
+# CLAUDE.md
 
-## 🚨 CRITICAL: CONCURRENT EXECUTION & FILE MANAGEMENT
-
-**ABSOLUTE RULES**:
-1. ALL operations MUST be concurrent/parallel in a single message
-2. **NEVER save working files, text/mds and tests to the root folder**
-3. ALWAYS organize files in appropriate subdirectories
-
-### ⚡ GOLDEN RULE: "1 MESSAGE = ALL RELATED OPERATIONS"
-
-**MANDATORY PATTERNS:**
-- **TodoWrite**: ALWAYS batch ALL todos in ONE call (5-10+ todos minimum)
-- **Task tool**: ALWAYS spawn ALL agents in ONE message with full instructions
-- **File operations**: ALWAYS batch ALL reads/writes/edits in ONE message
-- **Bash commands**: ALWAYS batch ALL terminal operations in ONE message
-- **Memory operations**: ALWAYS batch ALL memory store/retrieve in ONE message
-
-### 📁 File Organization Rules
-
-**NEVER save to root folder. Use these directories:**
-- `/src` - Source code files
-- `/tests` - Test files
-- `/docs` - Documentation and markdown files
-- `/config` - Configuration files
-- `/scripts` - Utility scripts
-- `/examples` - Example code
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
 
-This project uses SPARC (Specification, Pseudocode, Architecture, Refinement, Completion) methodology with Claude-Flow orchestration for systematic Test-Driven Development.
+This is a Chrome extension for managing personal prompt libraries with dual interfaces:
+1. **Popup Interface**: React-based prompt management system
+2. **Content Script Integration**: Native integration with AI platforms (Claude, ChatGPT, Perplexity)
 
-## SPARC Commands
+## Essential Commands
 
-### Core Commands
-- `npx claude-flow sparc modes` - List available modes
-- `npx claude-flow sparc run <mode> "<task>"` - Execute specific mode
-- `npx claude-flow sparc tdd "<feature>"` - Run complete TDD workflow
-- `npx claude-flow sparc info <mode>` - Get mode details
+### Development
+- `npm run dev` - Start development server with hot reload
+- `npm run build` - Production build (creates `dist/` folder)
+- `npm run preview` - Preview production build
 
-### Batchtools Commands
-- `npx claude-flow sparc batch <modes> "<task>"` - Parallel execution
-- `npx claude-flow sparc pipeline "<task>"` - Full pipeline processing
-- `npx claude-flow sparc concurrent <mode> "<tasks-file>"` - Multi-task processing
+### Testing
+- `npm test` - Run all tests with Vitest
+- `npm run test:ui` - Run tests with UI interface
+- `npm run test:coverage` - Generate test coverage report
 
-### Build Commands
-- `npm run build` - Build project
-- `npm run test` - Run tests
-- `npm run lint` - Linting
-- `npm run typecheck` - Type checking
+### Code Quality
+- `npm run lint` - Run ESLint checks
+- `npm run lint:fix` - Fix ESLint issues automatically
 
-## SPARC Workflow Phases
+### Extension Packaging
+- `npm run package` - Package extension for Chrome Web Store
 
-1. **Specification** - Requirements analysis (`sparc run spec-pseudocode`)
-2. **Pseudocode** - Algorithm design (`sparc run spec-pseudocode`)
-3. **Architecture** - System design (`sparc run architect`)
-4. **Refinement** - TDD implementation (`sparc tdd`)
-5. **Completion** - Integration (`sparc run integration`)
+## 🚨 MANDATORY WORKFLOW - NO EXCEPTIONS 🚨
 
-## Code Style & Best Practices
+**CRITICAL**: After EVERY single code change, you MUST run both test and quality scripts. This is NON-NEGOTIABLE.
 
-- **Modular Design**: Files under 500 lines
-- **Environment Safety**: Never hardcode secrets
-- **Test-First**: Write tests before implementation
-- **Clean Architecture**: Separate concerns
-- **Documentation**: Keep updated
-
-## 🚀 Available Agents (54 Total)
-
-### Core Development
-`coder`, `reviewer`, `tester`, `planner`, `researcher`
-
-### Swarm Coordination
-`hierarchical-coordinator`, `mesh-coordinator`, `adaptive-coordinator`, `collective-intelligence-coordinator`, `swarm-memory-manager`
-
-### Consensus & Distributed
-`byzantine-coordinator`, `raft-manager`, `gossip-coordinator`, `consensus-builder`, `crdt-synchronizer`, `quorum-manager`, `security-manager`
-
-### Performance & Optimization
-`perf-analyzer`, `performance-benchmarker`, `task-orchestrator`, `memory-coordinator`, `smart-agent`
-
-### GitHub & Repository
-`github-modes`, `pr-manager`, `code-review-swarm`, `issue-tracker`, `release-manager`, `workflow-automation`, `project-board-sync`, `repo-architect`, `multi-repo-swarm`
-
-### SPARC Methodology
-`sparc-coord`, `sparc-coder`, `specification`, `pseudocode`, `architecture`, `refinement`
-
-### Specialized Development
-`backend-dev`, `mobile-dev`, `ml-developer`, `cicd-engineer`, `api-docs`, `system-architect`, `code-analyzer`, `base-template-generator`
-
-### Testing & Validation
-`tdd-london-swarm`, `production-validator`
-
-### Migration & Planning
-`migration-planner`, `swarm-init`
-
-## 🎯 Claude Code vs MCP Tools
-
-### Claude Code Handles ALL:
-- File operations (Read, Write, Edit, MultiEdit, Glob, Grep)
-- Code generation and programming
-- Bash commands and system operations
-- Implementation work
-- Project navigation and analysis
-- TodoWrite and task management
-- Git operations
-- Package management
-- Testing and debugging
-
-### MCP Tools ONLY:
-- Coordination and planning
-- Memory management
-- Neural features
-- Performance tracking
-- Swarm orchestration
-- GitHub integration
-
-**KEY**: MCP coordinates, Claude Code executes.
-
-## 🚀 Quick Setup
+### Required Commands After Every Change
 
 ```bash
-# Add Claude Flow MCP server
-claude mcp add claude-flow npx claude-flow@alpha mcp start
+# 1. ALWAYS run tests first - NO EXCEPTIONS
+npm test
+
+# 2. ALWAYS run quality checks - NO EXCEPTIONS
+npm run lint
 ```
 
-## MCP Tool Categories
+### Workflow Enforcement Rules
 
-### Coordination
-`swarm_init`, `agent_spawn`, `task_orchestrate`
+1. **NEVER proceed to the next task** until both `npm test` and `npm run lint` pass
+2. **NEVER skip this workflow** - even for "small changes" or "quick fixes"
+3. **ALWAYS run the full test suite** - no selective testing
+4. **ALWAYS verify quality standards** - no exceptions for any file type
 
-### Monitoring
-`swarm_status`, `agent_list`, `agent_metrics`, `task_status`, `task_results`
+### Quality Gates - ALL Must Pass
 
-### Memory & Neural
-`memory_usage`, `neural_status`, `neural_train`, `neural_patterns`
+- ✅ **All tests pass**: `npm test` returns success
+- ✅ **No linting errors**: ESLint finds no issues
+- ✅ **No console warnings**: All console usage is intentional
 
-### GitHub Integration
-`github_swarm`, `repo_analyze`, `pr_enhance`, `issue_triage`, `code_review`
+## Architecture
 
-### System
-`benchmark_run`, `features_detect`, `swarm_monitor`
+### Dual Interface System
+- **Popup**: React 18 + TypeScript with Tailwind CSS for prompt management
+- **Content Script**: Modular TypeScript for AI platform integration via `src/content/index.ts`
 
-## 📋 Agent Coordination Protocol
+### Key Architectural Components
 
-### Every Agent MUST:
+**Data Layer:**
+- `services/storage.ts` - Chrome storage API wrapper with mutex locking for concurrent operations
+- `services/promptManager.ts` - Business logic and validation with search/highlighting capabilities
 
-**1️⃣ BEFORE Work:**
-```bash
-npx claude-flow@alpha hooks pre-task --description "[task]"
-npx claude-flow@alpha hooks session-restore --session-id "swarm-[id]"
+**React Layer:**
+- Custom hooks in `hooks/` provide data and operations to components
+- `contexts/ThemeContext.tsx` manages dark/light theme state
+- Components follow atomic design principles
+
+**Integration Layer:**
+- `src/content/` modular TypeScript handles AI platform detection and prompt injection
+- Supports Claude, ChatGPT, Perplexity, and custom sites
+
+### File Structure Highlights
+```
+src/
+├── components/         # React UI components
+├── hooks/             # Custom React hooks for data operations
+├── services/          # Storage and business logic
+├── types/             # TypeScript definitions
+├── contexts/          # React contexts
+├── content/           # Modular TypeScript content script
+└── popup.tsx          # React entry point
 ```
 
-**2️⃣ DURING Work:**
-```bash
-npx claude-flow@alpha hooks post-edit --file "[file]" --memory-key "swarm/[agent]/[step]"
-npx claude-flow@alpha hooks notify --message "[what was done]"
-```
+## Extension-Specific Considerations
 
-**3️⃣ AFTER Work:**
-```bash
-npx claude-flow@alpha hooks post-task --task-id "[task]"
-npx claude-flow@alpha hooks session-end --export-metrics true
-```
+### Chrome Extension Development
+- Uses Manifest V3 with `@crxjs/vite-plugin`
+- Build output goes to `dist/` folder for Chrome loading
+- Content script injection handled by manifest configuration
 
-## 🎯 Concurrent Execution Examples
+### Platform Integration
+- Content script detects input fields on AI platforms
+- Uses CSS selectors to identify and inject library icons
+- Supports both textarea and contenteditable elements
 
-### ✅ CORRECT (Single Message):
-```javascript
-[BatchTool]:
-  // Initialize swarm
-  mcp__claude-flow__swarm_init { topology: "mesh", maxAgents: 6 }
-  mcp__claude-flow__agent_spawn { type: "researcher" }
-  mcp__claude-flow__agent_spawn { type: "coder" }
-  mcp__claude-flow__agent_spawn { type: "tester" }
-  
-  // Spawn agents with Task tool
-  Task("Research agent: Analyze requirements...")
-  Task("Coder agent: Implement features...")
-  Task("Tester agent: Create test suite...")
-  
-  // Batch todos
-  TodoWrite { todos: [
-    {id: "1", content: "Research", status: "in_progress", priority: "high"},
-    {id: "2", content: "Design", status: "pending", priority: "high"},
-    {id: "3", content: "Implement", status: "pending", priority: "high"},
-    {id: "4", content: "Test", status: "pending", priority: "medium"},
-    {id: "5", content: "Document", status: "pending", priority: "low"}
-  ]}
-  
-  // File operations
-  Bash "mkdir -p app/{src,tests,docs}"
-  Write "app/src/index.js"
-  Write "app/tests/index.test.js"
-  Write "app/docs/README.md"
-```
+### Storage Management
+- Uses `chrome.storage.local` API for data persistence
+- Implements quota monitoring and storage warnings
+- Data includes prompts, categories, and user settings
 
-### ❌ WRONG (Multiple Messages):
-```javascript
-Message 1: mcp__claude-flow__swarm_init
-Message 2: Task("agent 1")
-Message 3: TodoWrite { todos: [single todo] }
-Message 4: Write "file.js"
-// This breaks parallel coordination!
-```
+## Testing Strategy
 
-## Performance Benefits
+### Test Structure
+- Unit tests for hooks, services, and utilities
+- Component tests using React Testing Library
+- Integration tests for storage operations
+- Test setup configured in `src/test/setup.ts`
 
-- **84.8% SWE-Bench solve rate**
-- **32.3% token reduction**
-- **2.8-4.4x speed improvement**
-- **27+ neural models**
+### Coverage Requirements
+- Excludes build files, configs, and test utilities from coverage
+- Focus on business logic and component behavior
 
-## Hooks Integration
+## Development Workflow
 
-### Pre-Operation
-- Auto-assign agents by file type
-- Validate commands for safety
-- Prepare resources automatically
-- Optimize topology by complexity
-- Cache searches
+1. Load extension in Chrome via `chrome://extensions/` (Developer mode)
+2. Use `npm run dev` for development with auto-reload
+3. Test in popup interface and on supported AI platforms
+4. Run lint and tests before committing changes
 
-### Post-Operation
-- Auto-format code
-- Train neural patterns
-- Update memory
-- Analyze performance
-- Track token usage
+## Chrome Extension Loading
 
-### Session Management
-- Generate summaries
-- Persist state
-- Track metrics
-- Restore context
-- Export workflows
+After building:
+1. Open `chrome://extensions/`
+2. Enable "Developer mode"
+3. Click "Load unpacked" and select `dist/` folder
+4. Extension appears in toolbar and integrates with AI platforms
 
-## Advanced Features (v2.0.0)
+## Content Script Architecture
 
-- 🚀 Automatic Topology Selection
-- ⚡ Parallel Execution (2.8-4.4x speed)
-- 🧠 Neural Training
-- 📊 Bottleneck Analysis
-- 🤖 Smart Auto-Spawning
-- 🛡️ Self-Healing Workflows
-- 💾 Cross-Session Memory
-- 🔗 GitHub Integration
+The content script uses a modular TypeScript architecture:
 
-## Integration Tips
+### Core Components
+- `core/injector.ts` - Main orchestration class (PromptLibraryInjector)
+- `core/insertion-manager.ts` - Handles platform-specific text insertion
+- `platforms/` - Strategy pattern for different AI platforms (Claude, ChatGPT, Perplexity)
+- `ui/` - UI components (element factory, keyboard navigation, event management)
+- `utils/` - Utilities (logger, storage, DOM manipulation, styles)
 
-1. Start with basic swarm init
-2. Scale agents gradually
-3. Use memory for context
-4. Monitor progress regularly
-5. Train patterns from success
-6. Enable hooks automation
-7. Use GitHub tools first
+### Platform Strategy Pattern
+Each AI platform has its own strategy class extending `base-strategy.ts`:
+- `claude-strategy.ts` - Handles Claude.ai integration
+- `chatgpt-strategy.ts` - Handles ChatGPT integration  
+- `perplexity-strategy.ts` - Handles Perplexity integration
+- `default-strategy.ts` - Fallback for unknown platforms
 
-## Support
+### Key Technical Details
+- Uses singleton pattern for storage and prompt managers
+- Implements mutex locking to prevent concurrent storage operations
+- CSS injection happens early in `index.ts` via StylesManager
+- Global error handling and cleanup on page unload
+- Debug interface available at `window.__promptLibraryDebug`
 
-- Documentation: https://github.com/ruvnet/claude-flow
-- Issues: https://github.com/ruvnet/claude-flow/issues
+## Data Management
 
----
+### Storage Layer
+- `StorageManager` singleton with Chrome storage API wrapper
+- Atomic operations for concurrent access safety
+- Built-in validation and error handling
+- Import/export functionality for data portability
 
-Remember: **Claude Flow coordinates, Claude Code creates!**
+### Business Logic
+- `PromptManager` handles search, validation, and data processing
+- Text highlighting for search results
+- Duplicate detection with Levenshtein distance algorithm
+- Statistics and analytics capabilities
 
-# important-instruction-reminders
-Do what has been asked; nothing more, nothing less.
-NEVER create files unless they're absolutely necessary for achieving your goal.
-ALWAYS prefer editing an existing file to creating a new one.
-NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
-Never save working files, text/mds and tests to the root folder.
+## Important Implementation Notes
+
+- Always use the singleton instances: `StorageManager.getInstance()` and `PromptManager.getInstance()`
+- Content script modules are bundled separately from popup React app
+- Test setup mocks Chrome APIs in `src/test/setup.ts`
+- Vite config includes alias `@content` for content script imports
+- Extension uses host permissions for `<all_urls>` to work on any site
