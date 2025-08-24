@@ -1,7 +1,7 @@
 # Privacy Policy for My Prompt Manager
 
-**Effective Date:** [INSERT DATE]  
-**Last Updated:** [INSERT DATE]
+**Effective Date:** 24/08/2025  
+**Last Updated:** 24/08/2025
 
 ## Introduction
 
@@ -161,9 +161,9 @@ For transparency, here's how we implement privacy-by-design:
 If you have any questions about this Privacy Policy or our privacy practices:
 
 **Developer:** Thomas Roux  
-**Email:** [INSERT CONTACT EMAIL]  
-**GitHub:** [INSERT GITHUB URL]  
-**Chrome Web Store:** [INSERT STORE URL]
+**Email:** thomas.roux@gmail.com  
+**GitHub:** https://github.com/spartDev  
+**Chrome Web Store:** https://chromewebstore.google.com/detail/my-prompt-manager
 
 ## Verification
 
