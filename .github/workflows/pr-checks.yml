@@ -316,6 +316,7 @@ jobs:
     name: ✅ Quality Gate Summary
     runs-on: ubuntu-latest
     needs: [setup, lint, test, build, security]
+    # Run even if jobs are cancelled or fail, but not for draft PRs
     if: always() && github.event.pull_request.draft == false
     steps:
       - name: 📋 Quality Gate Results
@@ -336,11 +337,20 @@ jobs:
           echo "🏗️ Build Verification: $build_status"
           echo "🔒 Security & Dependencies: $security_status"
           
-          # Determine overall status
-          if [[ "$setup_status" == "success" && "$lint_status" == "success" && "$test_status" == "success" && "$build_status" == "success" && "$security_status" == "success" ]]; then
+          # Check if workflow was cancelled (new commit pushed)
+          if [[ "$setup_status" == "cancelled" || "$lint_status" == "cancelled" || "$test_status" == "cancelled" || "$build_status" == "cancelled" || "$security_status" == "cancelled" ]]; then
+            echo ""
+            echo "⚠️ WORKFLOW CANCELLED"
+            echo "A new commit was pushed, cancelling this workflow run."
+            echo "The latest commit will be checked in a new workflow run."
+            # Don't fail on cancelled - it's expected behavior
+            exit 0
+          # Check if all succeeded
+          elif [[ "$setup_status" == "success" && "$lint_status" == "success" && "$test_status" == "success" && "$build_status" == "success" && "$security_status" == "success" ]]; then
             echo ""
             echo "🎉 ✅ ALL QUALITY GATES PASSED!"
             echo "🚀 This PR meets all mandatory requirements and is ready for review."
+            exit 0
           else
             echo ""
             echo "❌ 🚨 QUALITY GATES FAILED!"
@@ -362,35 +372,101 @@ jobs:
               security: "${{ needs.security.result }}"
             };
             
+            // Check workflow status
+            const anyCancelled = Object.values(results).some(result => result === 'cancelled');
             const allPassed = Object.values(results).every(result => result === 'success');
-            const status = allPassed ? '✅ PASSED' : '❌ FAILED';
-            const emoji = allPassed ? '🎉' : '🚨';
+            const allSkipped = Object.values(results).every(result => result === 'skipped');
             
+            // Skip comment for cancelled workflows - they're superseded by new commits
+            if (anyCancelled) {
+              console.log('Workflow cancelled - skipping comment to reduce noise');
+              return;
+            }
+            
+            // Skip comment for fully skipped workflows (e.g., draft PRs)
+            if (allSkipped) {
+              console.log('All checks skipped - no comment needed');
+              return;
+            }
+            
+            // Determine status for meaningful results only
+            let status, emoji, message;
+            
+            if (allPassed) {
+              status = '✅ PASSED';
+              emoji = '🎉';
+              message = '🚀 **All mandatory quality requirements have been met!** This PR is ready for review.';
+            } else {
+              status = '❌ FAILED';
+              emoji = '🚨';
+              message = '🛑 **Quality gates failed.** Please address all issues before requesting review.';
+            }
+            
+            // Helper function to get status icon
+            const getStatusIcon = (result) => {
+              switch(result) {
+                case 'success': return '✅';
+                case 'failure': return '❌';
+                case 'cancelled': return '⚠️';
+                case 'skipped': return '⏭️';
+                default: return '❓';
+              }
+            };
+            
+            // Find and delete previous bot comments to keep PR clean
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number
+            });
+            
+            const botComments = comments.filter(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('Quality Gate Results')
+            );
+            
+            // Delete old quality gate comments (keep only the latest)
+            for (const comment of botComments) {
+              try {
+                await github.rest.issues.deleteComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: comment.id
+                });
+                console.log(`Deleted old quality gate comment ${comment.id}`);
+              } catch (error) {
+                console.log(`Could not delete comment ${comment.id}: ${error.message}`);
+              }
+            }
+            
+            // Create the new comment with meaningful results
             const comment = `## ${emoji} Quality Gate Results ${status}
+            
+            **Commit:** \`${context.sha.substring(0, 7)}\` | **Run:** [#${context.runNumber}](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})
             
             | Check | Status |
             |-------|---------|
-            | 📦 Dependencies & Setup | ${results.setup === 'success' ? '✅' : '❌'} ${results.setup} |
-            | 🧹 Code Quality & Linting | ${results.lint === 'success' ? '✅' : '❌'} ${results.lint} |
-            | 🧪 Test Suite & Coverage | ${results.test === 'success' ? '✅' : '❌'} ${results.test} |
-            | 🏗️ Build Verification | ${results.build === 'success' ? '✅' : '❌'} ${results.build} |
-            | 🔒 Security & Dependencies | ${results.security === 'success' ? '✅' : '❌'} ${results.security} |
+            | 📦 Dependencies & Setup | ${getStatusIcon(results.setup)} ${results.setup} |
+            | 🧹 Code Quality & Linting | ${getStatusIcon(results.lint)} ${results.lint} |
+            | 🧪 Test Suite & Coverage | ${getStatusIcon(results.test)} ${results.test} |
+            | 🏗️ Build Verification | ${getStatusIcon(results.build)} ${results.build} |
+            | 🔒 Security & Dependencies | ${getStatusIcon(results.security)} ${results.security} |
             
-            ${allPassed 
-              ? '🚀 **All mandatory quality requirements have been met!** This PR is ready for review.' 
-              : '🛑 **Quality gates failed.** Please address all issues before requesting review.'}
+            ${message}
             
             ---
             
-            ### 🚨 Mandatory Requirements Enforced:
+            ### 📋 Mandatory Requirements:
             - ✅ **Zero tolerance** for linting errors (\`npm run lint\`)
             - ✅ **All tests must pass** (\`npm test\`)
             - ✅ **Build must succeed** for Chrome extension
             - ✅ **No security vulnerabilities** above moderate level
             - ✅ **Manifest V3 compliance** for Chrome extension
+            
+            <sub>💡 This comment updates automatically with each workflow run. Previous results are replaced to keep the PR clean.</sub>
             `;
             
-            github.rest.issues.createComment({
+            await github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
