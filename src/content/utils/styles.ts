@@ -77,11 +77,18 @@ export function getCSS(): string {
     }
 
     /* Hover and focus styles for all prompt library icons */
-    .prompt-library-icon-base:hover,
-    .prompt-library-icon:hover {
-      background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
-      transform: scale(1.05);
-      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+    /* Light mode hover (default) */
+    .prompt-library-icon-base:hover:is(.light *):hover,
+    .prompt-library-icon:hover:is(.light *):hover {
+      background: #e4e4e4;
+    }
+    
+    /* Dark mode hover */
+    @media (prefers-color-scheme: dark) {
+      .prompt-library-icon-base:hover,
+      .prompt-library-icon:hover {
+        background: #434343;
+      }
     }
 
     .prompt-library-icon-base:focus-visible,
@@ -93,7 +100,7 @@ export function getCSS(): string {
 
     .prompt-library-icon-base svg,
     .prompt-library-icon svg {
-      color: white;
+      color: currentColor;
       width: 18px;
       height: 18px;
       /* Ensure perfect centering within the 32px container */
