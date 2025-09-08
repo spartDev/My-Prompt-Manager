@@ -197,6 +197,10 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
   // Expandable sections state
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
   const [showResetSection, setShowResetSection] = useState(false);
+  
+  // Interface mode state
+  const [interfaceMode, setInterfaceMode] = useState<'popup' | 'sidepanel'>('popup');
+  const [interfaceModeChanging, setInterfaceModeChanging] = useState(false);
 
   const siteConfigs: Record<string, SiteConfig> = useMemo(() => ({
     'www.perplexity.ai': {
@@ -225,16 +229,21 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
 
   const loadSettings = useCallback(async () => {
     try {
-      const result = await chrome.storage.local.get(['promptLibrarySettings']);
+      const result = await chrome.storage.local.get(['promptLibrarySettings', 'interfaceMode']);
       const savedSettings = result.promptLibrarySettings as Partial<Settings> | undefined;
       const loadedSettings: Settings = {
         ...defaultSettings,
         ...(savedSettings ?? {})
       };
       setSettings(loadedSettings);
+      
+      // Load interface mode
+      const savedInterfaceMode = result.interfaceMode as 'popup' | 'sidepanel' | undefined;
+      setInterfaceMode(savedInterfaceMode || 'popup');
     } catch (error) {
       console.error('Failed to load settings:', error);
       setSettings(defaultSettings);
+      setInterfaceMode('popup');
     } finally {
       setLoading(false);
     }
@@ -398,12 +407,40 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
       const urlParams = new URLSearchParams(window.location.search);
       const isPickerWindow = urlParams.get('picker') === 'true';
       
+      // Check if we're in side panel mode
+      const interfaceModeResult = await chrome.storage.local.get('interfaceMode');
+      const currentInterfaceMode = interfaceModeResult.interfaceMode as 'popup' | 'sidepanel' | undefined;
+      const isSidePanel = currentInterfaceMode === 'sidepanel';
+      
       if (isPickerWindow) {
         // We're in a picker window, directly start the picker with the original tab ID
         const response = await chrome.runtime.sendMessage({ 
           type: 'START_ELEMENT_PICKER',
           data: { tabId: originalTabId }
         }) as unknown as { success: boolean; error?: string } | undefined;
+        
+        if (!response?.success) {
+          setIsPickingElement(false);
+          setSelectorError(response?.error || 'Failed to start element picker');
+        }
+      } else if (isSidePanel) {
+        // We're in side panel mode, directly start the picker
+        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+        
+        // Check if we're on a valid webpage
+        if (tabs.length === 0 || !tabs[0] || !tabs[0].url || tabs[0].url.startsWith('chrome://') || tabs[0].url.startsWith('chrome-extension://')) {
+          setIsPickingElement(false);
+          setSelectorError('Please navigate to a webpage first, then try again');
+          return;
+        }
+        
+        const activeTab = tabs[0];
+        
+        // In side panel mode, directly start the element picker
+        const response = await chrome.runtime.sendMessage({ 
+          type: 'START_ELEMENT_PICKER',
+          data: { tabId: activeTab.id }
+        }) as unknown as { success: boolean; error?: string; tabId?: number } | undefined;
         
         if (!response?.success) {
           setIsPickingElement(false);
@@ -557,6 +594,26 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
 
     setSettings(newSettings);
     await saveSettings(newSettings);
+  };
+
+  const handleInterfaceModeChange = async (mode: 'popup' | 'sidepanel') => {
+    try {
+      setSaving(true);
+      setInterfaceModeChanging(true);
+      
+      // Save to storage
+      await chrome.storage.local.set({ interfaceMode: mode });
+      setInterfaceMode(mode);
+      
+      // Show the notification for a few seconds
+      setTimeout(() => {
+        setInterfaceModeChanging(false);
+      }, 3000);
+    } catch (error) {
+      console.error('Failed to save interface mode:', error);
+    } finally {
+      setSaving(false);
+    }
   };
 
   // URL validation helper
@@ -830,6 +887,82 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        {/* General Settings */}
+        <section>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+            General Settings
+          </h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            Configure how you interact with the extension
+          </p>
+          
+          <div className="space-y-3">
+            {/* Interface Mode Setting */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+              <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm mb-2">
+                Interface Mode
+              </h3>
+              <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
+                Choose how the extension opens when you click the toolbar icon
+              </p>
+              
+              <div className="space-y-2">
+                <label className="flex items-start gap-3 cursor-pointer group" aria-label="Select popup window interface mode">
+                  <input
+                    type="radio"
+                    name="interfaceMode"
+                    value="popup"
+                    checked={interfaceMode === 'popup'}
+                    onChange={(e) => void handleInterfaceModeChange(e.target.value as 'popup' | 'sidepanel')}
+                    className="mt-1 text-purple-600 focus:ring-purple-500"
+                    disabled={saving}
+                    aria-label="Popup window mode"
+                  />
+                  <div className="flex-1">
+                    <div className="font-medium text-sm text-gray-900 dark:text-gray-100 group-hover:text-purple-600 dark:group-hover:text-purple-400">
+                      Popup Window
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                      Opens as a compact popup - quick access, closes when you click outside
+                    </div>
+                  </div>
+                </label>
+                
+                <label className="flex items-start gap-3 cursor-pointer group" aria-label="Select side panel interface mode">
+                  <input
+                    type="radio"
+                    name="interfaceMode"
+                    value="sidepanel"
+                    checked={interfaceMode === 'sidepanel'}
+                    onChange={(e) => void handleInterfaceModeChange(e.target.value as 'popup' | 'sidepanel')}
+                    className="mt-1 text-purple-600 focus:ring-purple-500"
+                    disabled={saving}
+                    aria-label="Side panel mode"
+                  />
+                  <div className="flex-1">
+                    <div className="font-medium text-sm text-gray-900 dark:text-gray-100 group-hover:text-purple-600 dark:group-hover:text-purple-400">
+                      Side Panel
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                      Opens as a side panel - stays open while you browse, better for multitasking
+                    </div>
+                  </div>
+                </label>
+              </div>
+              
+              {interfaceModeChanging && (
+                <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded">
+                  <p className="text-xs text-blue-700 dark:text-blue-300">
+                    Interface mode updated. The change will take effect the next time you open the extension.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+
+        <SectionSeparator />
+
         {/* Site Integration */}
         <section>
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">

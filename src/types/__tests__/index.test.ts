@@ -18,7 +18,8 @@ describe('Type Definitions', () => {
         defaultCategory: 'Uncategorized',
         sortOrder: 'updatedAt',
         viewMode: 'grid',
-        theme: 'system'
+        theme: 'system',
+        interfaceMode: 'popup'
       });
     });
 

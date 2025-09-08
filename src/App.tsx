@@ -14,7 +14,11 @@ import { Prompt, ErrorType, AppError } from './types';
 
 type ViewType = 'library' | 'add' | 'edit' | 'categories' | 'settings';
 
-const App: FC = () => {
+interface AppProps {
+  context?: 'popup' | 'sidepanel';
+}
+
+const App: FC<AppProps> = ({ context = 'popup' }) => {
   // Check if we're in picker mode
   const urlParams = new URLSearchParams(window.location.search);
   const isPickerMode = urlParams.get('picker') === 'true';
@@ -153,7 +157,7 @@ const App: FC = () => {
 
   return (
     <ThemeProvider>
-      <div className="h-full w-full bg-gray-50 dark:bg-gray-900 relative">
+      <div className={`h-full w-full bg-gray-50 dark:bg-gray-900 relative ${context === 'sidepanel' ? 'sidepanel' : ''}`}>
       {currentView === 'library' && (
         <LibraryView
           prompts={prompts}
@@ -172,6 +176,7 @@ const App: FC = () => {
             setCurrentView('settings');
           }}
           loading={loading}
+          context={context}
         />
       )}
 

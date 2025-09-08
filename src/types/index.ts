@@ -18,6 +18,7 @@ export interface Settings {
   sortOrder: 'createdAt' | 'updatedAt' | 'title';
   viewMode: 'grid' | 'list';
   theme: 'light' | 'dark' | 'system';
+  interfaceMode?: 'popup' | 'sidepanel';
 }
 
 export interface StorageData {
@@ -80,5 +81,6 @@ export const DEFAULT_SETTINGS: Settings = {
   defaultCategory: DEFAULT_CATEGORY,
   sortOrder: 'updatedAt',
   viewMode: 'grid',
-  theme: 'system'
+  theme: 'system',
+  interfaceMode: 'popup'
 };

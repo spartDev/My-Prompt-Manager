@@ -12,7 +12,9 @@
   "permissions": [
     "storage",
     "activeTab",
-    "tabs"
+    "tabs",
+    "sidePanel",
+    "scripting"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -25,8 +27,10 @@
     }
   ],
   "action": {
-    "default_popup": "src/popup.html",
     "default_title": "My Prompt Manager - Manage your prompts"
+  },
+  "side_panel": {
+    "default_path": "src/sidepanel.html"
   },
   "icons": {
     "16": "public/icons/icon-16.png",
@@ -38,5 +42,5 @@
     "extension_pages": "script-src 'self'; object-src 'self'"
   },
   "short_name": "My Prompt Manager",
-  "minimum_chrome_version": "88"
+  "minimum_chrome_version": "114"
 }

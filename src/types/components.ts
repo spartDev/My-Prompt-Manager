@@ -55,6 +55,7 @@ export interface LibraryViewProps {
   onManageCategories: () => void;
   onSettings: () => void;
   loading?: boolean;
+  context?: 'popup' | 'sidepanel';
 }
 
 export interface ModalProps {
