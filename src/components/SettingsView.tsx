@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { FC } from 'react';
 
+import InterfaceModeSelector from './InterfaceModeSelector';
 import ThemeToggle from './ThemeToggle';
 
 interface SiteConfig {
@@ -899,60 +900,16 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
           <div className="space-y-3">
             {/* Interface Mode Setting */}
             <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-              <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm mb-2">
-                Interface Mode
-              </h3>
-              <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
-                Choose how the extension opens when you click the toolbar icon
-              </p>
-              
-              <div className="space-y-2">
-                <label className="flex items-start gap-3 cursor-pointer group" aria-label="Select popup window interface mode">
-                  <input
-                    type="radio"
-                    name="interfaceMode"
-                    value="popup"
-                    checked={interfaceMode === 'popup'}
-                    onChange={(e) => void handleInterfaceModeChange(e.target.value as 'popup' | 'sidepanel')}
-                    className="mt-1 text-purple-600 focus:ring-purple-500"
-                    disabled={saving}
-                    aria-label="Popup window mode"
-                  />
-                  <div className="flex-1">
-                    <div className="font-medium text-sm text-gray-900 dark:text-gray-100 group-hover:text-purple-600 dark:group-hover:text-purple-400">
-                      Popup Window
-                    </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">
-                      Opens as a compact popup - quick access, closes when you click outside
-                    </div>
-                  </div>
-                </label>
-                
-                <label className="flex items-start gap-3 cursor-pointer group" aria-label="Select side panel interface mode">
-                  <input
-                    type="radio"
-                    name="interfaceMode"
-                    value="sidepanel"
-                    checked={interfaceMode === 'sidepanel'}
-                    onChange={(e) => void handleInterfaceModeChange(e.target.value as 'popup' | 'sidepanel')}
-                    className="mt-1 text-purple-600 focus:ring-purple-500"
-                    disabled={saving}
-                    aria-label="Side panel mode"
-                  />
-                  <div className="flex-1">
-                    <div className="font-medium text-sm text-gray-900 dark:text-gray-100 group-hover:text-purple-600 dark:group-hover:text-purple-400">
-                      Side Panel
-                    </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">
-                      Opens as a side panel - stays open while you browse, better for multitasking
-                    </div>
-                  </div>
-                </label>
-              </div>
+              <InterfaceModeSelector
+                value={interfaceMode}
+                onChange={(mode) => void handleInterfaceModeChange(mode)}
+                disabled={saving}
+                loading={interfaceModeChanging}
+              />
               
               {interfaceModeChanging && (
-                <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded">
-                  <p className="text-xs text-blue-700 dark:text-blue-300">
+                <div className="mt-3 p-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded">
+                  <p className="text-xs text-amber-700 dark:text-amber-300">
                     Interface mode updated. The change will take effect the next time you open the extension.
                   </p>
                 </div>
