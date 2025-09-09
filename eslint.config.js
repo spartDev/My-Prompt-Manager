@@ -184,6 +184,7 @@ export default [
       '*.config.ts',
       'coverage/**',
       '.claude/**',
+      '.conductor/**'
     ],
   },
 ];

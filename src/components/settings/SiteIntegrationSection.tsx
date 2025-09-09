@@ -1,6 +1,7 @@
-import { FC, useState, useEffect } from 'react';
+import { FC, useState, useEffect, ReactNode } from 'react';
 
 import { CustomSite } from '../../types';
+import { CustomSiteIcon } from '../icons/SiteIcons';
 
 import SettingsSection from './SettingsSection';
 import SiteCard from './SiteCard';
@@ -8,7 +9,7 @@ import SiteCard from './SiteCard';
 interface SiteIntegrationSectionProps {
   enabledSites: string[];
   customSites: CustomSite[];
-  siteConfigs: Record<string, { name: string; description: string; icon: string }>;
+  siteConfigs: Record<string, { name: string; description: string; icon: ReactNode }>;
   onSiteToggle: (hostname: string, enabled: boolean) => void;
   onCustomSiteToggle: (hostname: string, enabled: boolean) => void;
   onRemoveCustomSite: (hostname: string) => void;
@@ -607,7 +608,7 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
                   key={site.hostname}
                   hostname={site.hostname}
                   name={site.displayName}
-                  icon={site.icon || site.displayName.charAt(0).toUpperCase()}
+                  icon={site.icon || <CustomSiteIcon letter={site.displayName.charAt(0)} />}
                   isEnabled={site.enabled}
                   isCustom={true}
                   onToggle={onCustomSiteToggle}
