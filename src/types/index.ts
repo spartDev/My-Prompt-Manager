@@ -16,8 +16,8 @@ export interface Category {
 export interface Settings {
   defaultCategory: string;
   sortOrder: 'createdAt' | 'updatedAt' | 'title';
-  viewMode: 'grid' | 'list';
   theme: 'light' | 'dark' | 'system';
+  interfaceMode?: 'popup' | 'sidepanel';
 }
 
 export interface StorageData {
@@ -36,6 +36,23 @@ export interface PromptFormData {
 export interface CategoryFormData {
   name: string;
   color?: string;
+}
+
+// Custom site interface for site integration
+export interface CustomSite {
+  hostname: string;
+  displayName: string;
+  icon?: string;
+  enabled: boolean;
+  dateAdded: number;
+  positioning?: {
+    mode: 'custom';
+    selector: string;
+    placement: 'before' | 'after' | 'inside-start' | 'inside-end';
+    offset?: { x: number; y: number };
+    zIndex?: number;
+    description?: string;
+  };
 }
 
 // UI state interfaces
@@ -79,6 +96,6 @@ export const DEFAULT_CATEGORY = 'Uncategorized';
 export const DEFAULT_SETTINGS: Settings = {
   defaultCategory: DEFAULT_CATEGORY,
   sortOrder: 'updatedAt',
-  viewMode: 'grid',
-  theme: 'system'
+  theme: 'system',
+  interfaceMode: 'popup'
 };

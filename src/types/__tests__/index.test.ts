@@ -17,8 +17,8 @@ describe('Type Definitions', () => {
       expect(DEFAULT_SETTINGS).toEqual({
         defaultCategory: 'Uncategorized',
         sortOrder: 'updatedAt',
-        viewMode: 'grid',
-        theme: 'system'
+        theme: 'system',
+        interfaceMode: 'popup'
       });
     });
 
@@ -76,13 +76,11 @@ describe('Type Definitions', () => {
     it('should validate settings structure', () => {
       const validSettings = {
         defaultCategory: 'Test Category',
-        sortOrder: 'updatedAt' as const,
-        viewMode: 'grid' as const
+        sortOrder: 'updatedAt' as const
       };
 
       expect(typeof validSettings.defaultCategory).toBe('string');
       expect(['createdAt', 'updatedAt', 'title']).toContain(validSettings.sortOrder);
-      expect(['grid', 'list']).toContain(validSettings.viewMode);
     });
   });
 });

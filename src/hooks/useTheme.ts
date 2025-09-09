@@ -45,6 +45,23 @@ export const useTheme = (): UseThemeReturn => {
     void initializeTheme();
   }, []);
 
+  // Listen for storage changes to update theme when changed from settings
+  useEffect(() => {
+    const handleStorageChange = (changes: { [key: string]: chrome.storage.StorageChange }, areaName: string) => {
+      if (areaName === 'local' && 'settings' in changes) {
+        const newSettings = changes.settings.newValue as { theme?: Theme } | undefined;
+        if (newSettings?.theme && newSettings.theme !== theme) {
+          setThemeState(newSettings.theme);
+        }
+      }
+    };
+
+    chrome.storage.onChanged.addListener(handleStorageChange);
+    return () => {
+      chrome.storage.onChanged.removeListener(handleStorageChange);
+    };
+  }, [theme]);
+
   const getSystemTheme = useCallback((): 'light' | 'dark' => {
     if (typeof window === 'undefined') {return 'light';}
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';

@@ -18,7 +18,7 @@ describe('Integration Tests', () => {
     vi.mocked(chrome.storage.local.get).mockImplementation(() => Promise.resolve({ 
       categories: [{ id: '1', name: DEFAULT_CATEGORY }],
       prompts: [],
-      settings: { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt', viewMode: 'grid' }
+      settings: { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt' }
     }));
 
      

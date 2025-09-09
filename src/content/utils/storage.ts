@@ -54,7 +54,7 @@ export async function getSettings(): Promise<ExtensionSettings> {
           return;
         }
 
-        const rawSettings = result.promptLibrarySettings as Partial<ExtensionSettings> | undefined;
+        const rawSettings = result.promptLibrarySettings as unknown;
         const validatedSettings = validateSettingsData(rawSettings);
 
         debug('Retrieved and validated settings from storage', {
@@ -87,24 +87,30 @@ export function getDefaultSettings(): ExtensionSettings {
 /**
  * Validate settings data structure
  */
-export function validateSettingsData(settings: Partial<ExtensionSettings> | undefined): ExtensionSettings {
+export function validateSettingsData(settings: unknown): ExtensionSettings {
   const defaults = getDefaultSettings();
   
-  if (!settings || typeof settings !== 'object') {
-    warn('Invalid settings data structure, using defaults', { settings });
+  // Handle null, undefined, or non-object values
+  if (!settings || typeof settings !== 'object' || Array.isArray(settings)) {
+    if (settings !== undefined && settings !== null) {
+      warn('Invalid settings data structure, using defaults');
+    }
     return defaults;
   }
+  
+  // Cast to record type for property access
+  const settingsObj = settings as Record<string, unknown>;
 
   try {
     const validatedSettings: ExtensionSettings = {
-      enabledSites: Array.isArray(settings.enabledSites) ? 
-        settings.enabledSites.filter(site => typeof site === 'string' && site.length > 0) : 
+      enabledSites: Array.isArray(settingsObj.enabledSites) ? 
+        (settingsObj.enabledSites as unknown[]).filter(site => typeof site === 'string' && site.length > 0) as string[] : 
         defaults.enabledSites,
-      customSites: Array.isArray(settings.customSites) ? 
-        settings.customSites.filter(site => validateCustomSite(site)) : 
+      customSites: Array.isArray(settingsObj.customSites) ? 
+        (settingsObj.customSites as unknown[]).filter(site => validateCustomSite(site)) : 
         defaults.customSites,
-      debugMode: typeof settings.debugMode === 'boolean' ? settings.debugMode : defaults.debugMode,
-      floatingFallback: typeof settings.floatingFallback === 'boolean' ? settings.floatingFallback : defaults.floatingFallback
+      debugMode: typeof settingsObj.debugMode === 'boolean' ? settingsObj.debugMode : defaults.debugMode,
+      floatingFallback: typeof settingsObj.floatingFallback === 'boolean' ? settingsObj.floatingFallback : defaults.floatingFallback
     };
 
     return validatedSettings;
