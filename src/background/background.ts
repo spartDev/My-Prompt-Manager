@@ -214,20 +214,14 @@ async function handleStartElementPicker(passedTabId: number | undefined, sender:
       // First, try to ping the content script
       await chrome.tabs.sendMessage(targetTabId, { type: 'PING' });
     } catch {
-      // Content script not injected, inject it now
-      try {
-        await chrome.scripting.executeScript({
-          target: { tabId: targetTabId },
-          files: ['assets/index.ts-Do1Z669-.js']  // The bundled content script
-        });
-        
-        // Wait a bit for the script to initialize
-        await new Promise(resolve => setTimeout(resolve, 100));
-      } catch (injectError) {
-        console.error('[Background] Failed to inject content script:', injectError);
-        sendResponse({ success: false, error: 'Failed to inject content script. Please refresh the page and try again.' });
-        return;
-      }
+      // Content script not injected, try to inject it programmatically
+      // Note: The content script should be auto-injected via manifest for new pages
+      // This is only for pages that were already open before the extension was installed
+      sendResponse({ 
+        success: false, 
+        error: 'Content script not loaded on this page. Please refresh the page and try again.' 
+      });
+      return;
     }
 
     // Now send the message to activate element picker

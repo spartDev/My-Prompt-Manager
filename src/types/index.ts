@@ -38,6 +38,23 @@ export interface CategoryFormData {
   color?: string;
 }
 
+// Custom site interface for site integration
+export interface CustomSite {
+  hostname: string;
+  displayName: string;
+  icon?: string;
+  enabled: boolean;
+  dateAdded: number;
+  positioning?: {
+    mode: 'custom';
+    selector: string;
+    placement: 'before' | 'after' | 'inside-start' | 'inside-end';
+    offset?: { x: number; y: number };
+    zIndex?: number;
+    description?: string;
+  };
+}
+
 // UI state interfaces
 export interface AppState {
   prompts: Prompt[];

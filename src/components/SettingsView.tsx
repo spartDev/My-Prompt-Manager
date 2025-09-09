@@ -152,6 +152,22 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
       await chrome.storage.local.set({ 
         promptLibrarySettings: newSettings 
       });
+      
+      // Notify content scripts of changes
+      const tabs = await chrome.tabs.query({});
+      
+      for (const tab of tabs) {
+        if (tab.id && tab.url && (tab.url.startsWith('http://') || tab.url.startsWith('https://'))) {
+          try {
+            await chrome.tabs.sendMessage(tab.id, {
+              action: 'settingsUpdated',
+              settings: newSettings
+            });
+          } catch {
+            // Tab might not have content script loaded, ignore error
+          }
+        }
+      }
     } catch (error) {
       console.error('Failed to save settings:', error instanceof Error ? error.message : 'Unknown error');
     } finally {
@@ -207,6 +223,9 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
     
     setSettings(newSettings);
     await saveSettings(newSettings);
+    
+    // Notify tabs about the change
+    await notifyCustomSiteChange(hostname);
   };
 
   // Handle remove custom site
@@ -220,6 +239,52 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
     
     setSettings(newSettings);
     await saveSettings(newSettings);
+    
+    // Notify tabs about the removal
+    await notifyCustomSiteChange(hostname);
+  };
+
+  // Notify custom site change
+  const notifyCustomSiteChange = async (hostname: string) => {
+    try {
+      // Since we're using universal content script, just notify existing tabs
+      const tabs = await chrome.tabs.query({ url: `*://${hostname}/*` });
+      
+      for (const tab of tabs) {
+        if (tab.id) {
+          try {
+            // Notify the content script to reinitialize
+            await chrome.tabs.sendMessage(tab.id, {
+              action: 'reinitialize',
+              reason: 'custom_site_added'
+            });
+          } catch {
+            // Tab might not have content script loaded yet, ignore error
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to notify custom site change:', error instanceof Error ? error.message : 'Unknown error');
+    }
+  };
+
+  // Handle add custom site
+  const handleAddCustomSite = async (siteData: Omit<CustomSite, 'dateAdded'>) => {
+    const newSite: CustomSite = {
+      ...siteData,
+      dateAdded: Date.now()
+    };
+
+    const newSettings = {
+      ...settings,
+      customSites: [...settings.customSites, newSite]
+    };
+
+    setSettings(newSettings);
+    await saveSettings(newSettings);
+    
+    // Notify any open tabs to reinitialize
+    await notifyCustomSiteChange(newSite.hostname);
   };
 
   // Handle import data
@@ -336,9 +401,11 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
             enabledSites={settings.enabledSites}
             customSites={settings.customSites}
             siteConfigs={siteConfigs}
+            interfaceMode={interfaceMode}
             onSiteToggle={(hostname, enabled) => void handleSiteToggle(hostname, enabled)}
             onCustomSiteToggle={(hostname, enabled) => void handleCustomSiteToggle(hostname, enabled)}
             onRemoveCustomSite={(hostname) => void handleRemoveCustomSite(hostname)}
+            onAddCustomSite={(siteData) => void handleAddCustomSite(siteData)}
             saving={saving}
           />
 
