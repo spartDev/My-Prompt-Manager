@@ -7,18 +7,14 @@ import SettingsSection from './SettingsSection';
 
 interface AppearanceSectionProps {
   interfaceMode: 'popup' | 'sidepanel';
-  viewMode?: 'grid' | 'list';
   onInterfaceModeChange: (mode: 'popup' | 'sidepanel') => void;
-  onViewModeChange?: (mode: 'grid' | 'list') => void;
   saving?: boolean;
   interfaceModeChanging?: boolean;
 }
 
 const AppearanceSection: FC<AppearanceSectionProps> = ({
   interfaceMode,
-  viewMode = 'grid',
   onInterfaceModeChange,
-  onViewModeChange,
   saving = false,
   interfaceModeChanging = false
 }) => {
@@ -87,46 +83,6 @@ const AppearanceSection: FC<AppearanceSectionProps> = ({
             loading={interfaceModeChanging}
           />
         </div>
-
-        {/* View Mode */}
-        {onViewModeChange && (
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-            <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm mb-3">
-              Library View
-            </h3>
-            <div className="flex gap-2">
-              {[
-                { value: 'grid' as const, label: 'Grid View', icon: (
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                  </svg>
-                )},
-                { value: 'list' as const, label: 'List View', icon: (
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-                  </svg>
-                )}
-              ].map((option) => (
-                <button
-                  key={option.value}
-                  onClick={() => { onViewModeChange(option.value); }}
-                  disabled={saving}
-                  className={`
-                    flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg border-2 transition-all duration-200
-                    ${viewMode === option.value
-                      ? 'border-purple-500 dark:border-purple-400 bg-purple-50/50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300'
-                      : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:border-purple-300 dark:hover:border-purple-600'
-                    }
-                    ${saving ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
-                  `}
-                >
-                  {option.icon}
-                  <span className="text-sm font-medium">{option.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     </SettingsSection>
   );

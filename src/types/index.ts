@@ -16,7 +16,6 @@ export interface Category {
 export interface Settings {
   defaultCategory: string;
   sortOrder: 'createdAt' | 'updatedAt' | 'title';
-  viewMode: 'grid' | 'list';
   theme: 'light' | 'dark' | 'system';
   interfaceMode?: 'popup' | 'sidepanel';
 }
@@ -80,7 +79,6 @@ export const DEFAULT_CATEGORY = 'Uncategorized';
 export const DEFAULT_SETTINGS: Settings = {
   defaultCategory: DEFAULT_CATEGORY,
   sortOrder: 'updatedAt',
-  viewMode: 'grid',
   theme: 'system',
   interfaceMode: 'popup'
 };

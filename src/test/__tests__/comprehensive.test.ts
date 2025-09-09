@@ -19,7 +19,7 @@ describe('Comprehensive Test Suite', () => {
     mockStorage = {
       prompts: [],
       categories: [{ id: 'default', name: DEFAULT_CATEGORY }],
-      settings: { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt', viewMode: 'grid' }
+      settings: { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt' }
     };
 
      

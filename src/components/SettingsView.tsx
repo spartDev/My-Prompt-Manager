@@ -175,22 +175,6 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
     }
   };
 
-  // Handle view mode change
-  const handleViewModeChange = async (viewMode: 'grid' | 'list') => {
-    if (!userSettings) {
-      return;
-    }
-    
-    const newUserSettings = { ...userSettings, viewMode };
-    setUserSettings(newUserSettings);
-    
-    try {
-      await storageManager.updateSettings(newUserSettings);
-    } catch (error) {
-      console.error('Failed to save view mode:', error instanceof Error ? error.message : 'Unknown error');
-    }
-  };
-
   // Handle site toggle
   const handleSiteToggle = async (hostname: string, enabled: boolean) => {
     const newEnabledSites = enabled 
@@ -281,7 +265,6 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
         const defaultUserSettings: UserSettings = {
           ...userSettings,
           theme: 'system',
-          viewMode: 'grid',
           sortOrder: 'updatedAt',
           defaultCategory: 'Uncategorized'
         };
@@ -337,9 +320,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
           {/* Appearance Section */}
           <AppearanceSection
             interfaceMode={interfaceMode}
-            viewMode={userSettings?.viewMode || 'grid'}
             onInterfaceModeChange={(mode) => void handleInterfaceModeChange(mode)}
-            onViewModeChange={(viewMode) => void handleViewModeChange(viewMode)}
             saving={saving}
             interfaceModeChanging={interfaceModeChanging}
           />

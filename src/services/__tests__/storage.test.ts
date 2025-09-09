@@ -9,7 +9,6 @@ interface MockStorage {
   settings: {
     defaultCategory: string;
     sortOrder: string;
-    viewMode: string;
   };
   [key: string]: unknown;
 }
@@ -23,7 +22,7 @@ describe('StorageManager', () => {
     mockStorage = {
       prompts: [],
       categories: [{ id: 'default', name: DEFAULT_CATEGORY }],
-      settings: { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt', viewMode: 'grid' }
+      settings: { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt' }
     };
 
     // Mock chrome storage API
@@ -356,7 +355,7 @@ describe('StorageManager', () => {
       const importData = {
         prompts: [],
         categories: [{ id: '1', name: DEFAULT_CATEGORY }],
-        settings: { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt', viewMode: 'grid' }
+        settings: { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt' }
       };
 
       await storageManager.importData(JSON.stringify(importData));
