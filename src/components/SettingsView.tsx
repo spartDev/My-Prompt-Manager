@@ -5,6 +5,7 @@ import { StorageManager } from '../services/storage';
 import type { Prompt, Category, Settings as UserSettings } from '../types';
 
 import AboutSection from './settings/AboutSection';
+import AdvancedSection from './settings/AdvancedSection';
 import AppearanceSection from './settings/AppearanceSection';
 import DataStorageSection from './settings/DataStorageSection';
 import SiteIntegrationSection from './settings/SiteIntegrationSection';
@@ -287,6 +288,24 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
     await notifyCustomSiteChange(newSite.hostname);
   };
 
+  // Handle debug mode toggle
+  const handleDebugModeChange = async (enabled: boolean) => {
+    const newSettings = {
+      ...settings,
+      debugMode: enabled
+    };
+
+    setSettings(newSettings);
+    await saveSettings(newSettings);
+
+    // Update localStorage for immediate effect
+    if (enabled) {
+      localStorage.setItem('prompt-library-debug', 'true');
+    } else {
+      localStorage.removeItem('prompt-library-debug');
+    }
+  };
+
   // Handle import data
   const handleImportData = async (data: { prompts: Prompt[]; categories: Category[] }) => {
     try {
@@ -420,6 +439,13 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
           />
 
           <SectionSeparator />
+
+          {/* Advanced Section */}
+          <AdvancedSection
+            debugMode={settings.debugMode}
+            onDebugModeChange={(enabled) => void handleDebugModeChange(enabled)}
+            saving={saving}
+          />
 
           {/* About & Reset Section */}
           <AboutSection
