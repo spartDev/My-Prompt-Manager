@@ -27,18 +27,18 @@ const SiteCard: FC<SiteCardProps> = ({
 }) => {
   return (
     <div className={`
-      relative p-4 rounded-xl border-2 transition-all duration-200
+      relative p-4 rounded-xl border transition-all duration-200
       ${isEnabled 
-        ? 'border-purple-200 dark:border-purple-800 bg-purple-50/50 dark:bg-purple-900/10' 
-        : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'
+        ? 'border-gray-200 dark:border-gray-700 bg-green-50/30 dark:bg-green-900/10 shadow-sm' 
+        : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:shadow-sm'
       }
     `}>
       {/* Site Icon and Info */}
       <div className="flex items-start gap-3">
         <div className={`
-          w-10 h-10 rounded-lg flex items-center justify-center text-lg font-semibold flex-shrink-0
+          w-10 h-10 rounded-lg flex items-center justify-center text-lg font-semibold flex-shrink-0 transition-all duration-200
           ${isEnabled 
-            ? 'bg-gradient-to-br from-purple-600 to-indigo-600 text-white' 
+            ? 'bg-gradient-to-br from-green-500 to-emerald-600 text-white shadow-sm' 
             : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
           }
         `}>
@@ -46,9 +46,16 @@ const SiteCard: FC<SiteCardProps> = ({
         </div>
         
         <div className="flex-1 min-w-0">
-          <h4 className="font-medium text-sm text-gray-900 dark:text-gray-100">
-            {name}
-          </h4>
+          <div className="flex items-center gap-2">
+            <h4 className="font-medium text-sm text-gray-900 dark:text-gray-100">
+              {name}
+            </h4>
+            {isEnabled && (
+              <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+            )}
+          </div>
           <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
             {hostname}
           </p>
@@ -100,16 +107,6 @@ const SiteCard: FC<SiteCardProps> = ({
               Remove
             </button>
           )}
-        </div>
-      )}
-
-      {/* Status Badge */}
-      {isEnabled && (
-        <div className="absolute -top-1 -right-1">
-          <span className="flex h-3 w-3">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-purple-500"></span>
-          </span>
         </div>
       )}
     </div>

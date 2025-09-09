@@ -1,14 +1,13 @@
 import { FC } from 'react';
 
+import { useThemeContext } from '../../contexts/ThemeContext';
 import InterfaceModeSelector from '../InterfaceModeSelector';
 
 import SettingsSection from './SettingsSection';
 
 interface AppearanceSectionProps {
-  theme: 'light' | 'dark' | 'system';
   interfaceMode: 'popup' | 'sidepanel';
   viewMode?: 'grid' | 'list';
-  onThemeChange: (theme: 'light' | 'dark' | 'system') => void;
   onInterfaceModeChange: (mode: 'popup' | 'sidepanel') => void;
   onViewModeChange?: (mode: 'grid' | 'list') => void;
   saving?: boolean;
@@ -16,15 +15,14 @@ interface AppearanceSectionProps {
 }
 
 const AppearanceSection: FC<AppearanceSectionProps> = ({
-  theme,
   interfaceMode,
   viewMode = 'grid',
-  onThemeChange,
   onInterfaceModeChange,
   onViewModeChange,
   saving = false,
   interfaceModeChanging = false
 }) => {
+  const { theme, setTheme } = useThemeContext();
   const icon = (
     <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
@@ -51,7 +49,7 @@ const AppearanceSection: FC<AppearanceSectionProps> = ({
             ].map((option) => (
               <button
                 key={option.value}
-                onClick={() => { onThemeChange(option.value); }}
+                onClick={() => { void setTheme(option.value); }}
                 disabled={saving}
                 className={`
                   relative p-3 rounded-lg border-2 transition-all duration-200
