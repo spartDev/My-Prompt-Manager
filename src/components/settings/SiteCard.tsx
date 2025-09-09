@@ -1,10 +1,37 @@
-import { FC } from 'react';
+import { FC, ReactNode } from 'react';
+
+// Function to get brand-specific background colors
+const getBrandColors = (hostname: string) => {
+  switch (hostname) {
+    case 'www.perplexity.ai':
+      return {
+        enabled: 'bg-[#2d808c] text-white shadow-sm',
+        disabled: 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+      };
+    case 'claude.ai':
+      return {
+        enabled: 'bg-[#d37354] text-white shadow-sm',
+        disabled: 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+      };
+    case 'chatgpt.com':
+      return {
+        enabled: 'bg-white text-gray-800 shadow-sm border border-gray-200',
+        disabled: 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+      };
+    default:
+      // Fallback for custom sites - use the original green gradient
+      return {
+        enabled: 'bg-gradient-to-br from-green-500 to-emerald-600 text-white shadow-sm',
+        disabled: 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+      };
+  }
+};
 
 interface SiteCardProps {
   hostname: string;
   name: string;
   description?: string;
-  icon: string;
+  icon: ReactNode;
   isEnabled: boolean;
   isCustom?: boolean;
   onToggle: (hostname: string, enabled: boolean) => void;
@@ -25,6 +52,8 @@ const SiteCard: FC<SiteCardProps> = ({
   onEdit,
   saving = false
 }) => {
+  const brandColors = getBrandColors(hostname);
+  
   return (
     <div className={`
       relative p-4 rounded-xl border transition-all duration-200
@@ -38,8 +67,8 @@ const SiteCard: FC<SiteCardProps> = ({
         <div className={`
           w-10 h-10 rounded-lg flex items-center justify-center text-lg font-semibold flex-shrink-0 transition-all duration-200
           ${isEnabled 
-            ? 'bg-gradient-to-br from-green-500 to-emerald-600 text-white shadow-sm' 
-            : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+            ? brandColors.enabled
+            : brandColors.disabled
           }
         `}>
           {icon}
