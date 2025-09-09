@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import type { FC } from 'react';
+import type { FC, ReactNode } from 'react';
 
 import { StorageManager } from '../services/storage';
 import type { Prompt, Category, Settings as UserSettings } from '../types';
 
+import { ClaudeIcon, ChatGPTIcon, PerplexityIcon } from './icons/SiteIcons';
 import AboutSection from './settings/AboutSection';
 import AdvancedSection from './settings/AdvancedSection';
 import AppearanceSection from './settings/AppearanceSection';
@@ -13,7 +14,7 @@ import SiteIntegrationSection from './settings/SiteIntegrationSection';
 interface SiteConfig {
   name: string;
   description: string;
-  icon: string;
+  icon: ReactNode;
 }
 
 interface CustomSite {
@@ -83,17 +84,17 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
     'www.perplexity.ai': {
       name: 'Perplexity',
       description: 'AI-powered search engine',
-      icon: '🔮'
+      icon: <PerplexityIcon />
     },
     'claude.ai': {
       name: 'Claude',
       description: 'Anthropic\'s AI assistant',
-      icon: '🤖'
+      icon: <ClaudeIcon />
     },
     'chatgpt.com': {
       name: 'ChatGPT',
       description: 'OpenAI\'s conversational AI',
-      icon: '💬'
+      icon: <ChatGPTIcon />
     }
   }), []);
 
