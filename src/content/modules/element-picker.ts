@@ -323,7 +323,7 @@ export class ElementPicker {
         const url = new URL(String(details.url));
         sanitized.protocol = url.protocol;
         sanitized.hasSensitivePath = /login|signin|checkout|payment|account|profile|banking|financial/i.test(url.pathname);
-      } catch (e) {
+      } catch {
         sanitized.protocol = 'invalid';
         sanitized.hasSensitivePath = false;
       }
