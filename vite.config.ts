@@ -19,7 +19,8 @@ export default defineConfig({
     rollupOptions: {
       input: {
         popup: 'src/popup.html',
-        sidepanel: 'src/sidepanel.html'
+        sidepanel: 'src/sidepanel.html',
+        content: 'src/content/index.ts'
       }
     },
     // Generate source maps for debugging

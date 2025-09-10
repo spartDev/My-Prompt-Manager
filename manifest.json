@@ -17,14 +17,25 @@
     "scripting"
   ],
   "host_permissions": [
-    "<all_urls>"
+    "https://claude.ai/*",
+    "https://chatgpt.com/*",
+    "https://www.perplexity.ai/*"
   ],
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
+      "matches": [
+        "https://claude.ai/*",
+        "https://chatgpt.com/*",
+        "https://www.perplexity.ai/*"
+      ],
       "js": ["src/content/index.ts"],
-      "run_at": "document_idle"
+      "run_at": "document_idle",
+      "all_frames": false
     }
+  ],
+  "optional_host_permissions": [
+    "https://*/*",
+    "http://*/*"
   ],
   "action": {
     "default_title": "My Prompt Manager - Manage your prompts"

@@ -178,56 +178,103 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
     setPickerError(null);
     
     try {
+      let targetTabId: number | null = null;
+      let targetTab: chrome.tabs.Tab | undefined;
+
       if (isPickerWindow) {
-        // We're in a picker window, directly start the picker with the original tab ID
+        // We're in a picker window, use the original tab ID
         if (originalTabId) {
-          const response = await chrome.runtime.sendMessage({
-            type: 'START_ELEMENT_PICKER',
-            data: { tabId: originalTabId }
-          }) as unknown as { success?: boolean; error?: string } | undefined;
-          
-          if (!response?.success) {
-            throw new Error(response?.error || 'Failed to start element picker');
+          targetTabId = originalTabId;
+          try {
+            targetTab = await chrome.tabs.get(originalTabId);
+          } catch {
+            throw new Error('Original tab is no longer available');
           }
         } else {
           throw new Error('No original tab ID found');
         }
+      } else {
+        // Get the current active tab
+        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+        targetTab = tabs[0] as chrome.tabs.Tab | undefined;
+        targetTabId = targetTab?.id || null;
+        
+        if (!targetTabId || !targetTab?.url) {
+          throw new Error('No active tab found');
+        }
+      }
+
+      // Check if we need permission for this tab's URL
+      if (targetTab.url) {
+        const url = new URL(targetTab.url);
+        const origin = `${url.protocol}//${url.hostname}/*`;
+        
+        // Skip permission check for already allowed origins
+        const isAllowedOrigin = targetTab.url.startsWith('https://claude.ai/') ||
+                               targetTab.url.startsWith('https://chatgpt.com/') ||
+                               targetTab.url.startsWith('https://www.perplexity.ai/');
+        
+        if (!isAllowedOrigin) {
+          // Check if we have permission
+          const hasPermission = await chrome.permissions.contains({
+            origins: [origin]
+          });
+          
+          if (!hasPermission) {
+            // Request permission directly from user gesture context
+            try {
+              const granted = await chrome.permissions.request({
+                origins: [origin]
+              });
+              
+              if (!granted) {
+                throw new Error('Permission denied. Please grant access to use the element picker on this site.');
+              }
+            } catch (permissionError) {
+              // Handle both permission denial and any other permission request errors
+              if (permissionError instanceof Error) {
+                throw permissionError;
+              } else {
+                throw new Error('Permission request failed. Please try again.');
+              }
+            }
+          }
+        }
+      }
+
+      // Now that permission is handled, start the element picker
+      if (isPickerWindow) {
+        // We're in a picker window, directly start the picker with the original tab ID
+        const response = await chrome.runtime.sendMessage({
+          type: 'START_ELEMENT_PICKER',
+          data: { tabId: targetTabId }
+        }) as unknown as { success?: boolean; error?: string } | undefined;
+        
+        if (!response?.success) {
+          throw new Error(response?.error || 'Failed to start element picker');
+        }
       } else if (interfaceMode === 'sidepanel') {
         // In sidepanel mode, directly activate picker
-        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-        const activeTab = tabs[0] as chrome.tabs.Tab | undefined;
+        const response = await chrome.runtime.sendMessage({
+          type: 'START_ELEMENT_PICKER',
+          data: { tabId: targetTabId }
+        }) as unknown as { success?: boolean; error?: string } | undefined;
         
-        if (activeTab?.id) {
-          const response = await chrome.runtime.sendMessage({
-            type: 'START_ELEMENT_PICKER',
-            data: { tabId: activeTab.id }
-          }) as unknown as { success?: boolean; error?: string } | undefined;
-          
-          if (!response?.success) {
-            throw new Error(response?.error || 'Failed to start element picker');
-          }
-        } else {
-          throw new Error('No active tab found');
+        if (!response?.success) {
+          throw new Error(response?.error || 'Failed to start element picker');
         }
       } else {
         // In popup mode, open new window for picker
-        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-        const activeTab = tabs[0] as chrome.tabs.Tab | undefined;
+        const response = await chrome.runtime.sendMessage({
+          type: 'OPEN_PICKER_WINDOW',
+          data: { tabId: targetTabId }
+        }) as unknown as { success?: boolean; error?: string } | undefined;
         
-        if (activeTab?.id) {
-          const response = await chrome.runtime.sendMessage({
-            type: 'OPEN_PICKER_WINDOW',
-            data: { tabId: activeTab.id }
-          }) as unknown as { success?: boolean; error?: string } | undefined;
-          
-          if (response?.success) {
-            // Close the current popup
-            window.close();
-          } else {
-            throw new Error(response?.error || 'Failed to open picker window');
-          }
+        if (response?.success) {
+          // Close the current popup
+          window.close();
         } else {
-          throw new Error('No active tab found');
+          throw new Error(response?.error || 'Failed to open picker window');
         }
       }
     } catch (error) {
@@ -238,7 +285,7 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
     }
   };
 
-  const handleAddSite = () => {
+  const handleAddSite = async () => {
     if (!newSiteUrl.trim()) {
       setUrlError('Please enter a URL');
       return;
@@ -255,6 +302,31 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
       }
 
       setAdding(true);
+
+      // Request permission for the new site
+      const origin = `https://${hostname}/*`;
+      
+      try {
+        const granted = await chrome.permissions.request({
+          origins: [origin]
+        });
+
+        if (!granted) {
+          setUrlError('Permission denied. Cannot add custom site without permission.');
+          return;
+        }
+
+        // Send a message to background script to notify about permission grant
+        await chrome.runtime.sendMessage({
+          type: 'REQUEST_PERMISSION',
+          data: { origins: [origin] }
+        });
+
+      } catch (permissionError) {
+        console.error('Failed to request permission:', permissionError);
+        setUrlError('Failed to request permission. Please try again.');
+        return;
+      }
 
       const siteData: Omit<CustomSite, 'dateAdded'> = {
         hostname,
@@ -274,6 +346,21 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
 
       if (onAddCustomSite) {
         onAddCustomSite(siteData);
+      }
+
+      // Inject content script immediately if tabs are open with this hostname
+      try {
+        const tabs = await chrome.tabs.query({ url: `*://${hostname}/*` });
+        for (const tab of tabs) {
+          if (tab.id) {
+            await chrome.runtime.sendMessage({
+              type: 'REQUEST_INJECTION',
+              data: { tabId: tab.id }
+            });
+          }
+        }
+      } catch {
+        // Failed to inject content script into existing tabs - not critical, continue
       }
 
       // Reset form
@@ -576,7 +663,7 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
 
                 <div className="flex gap-2">
                   <button
-                    onClick={handleAddSite}
+                    onClick={() => { void handleAddSite(); }}
                     disabled={adding}
                     className="flex-1 px-3 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-sm font-medium rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
