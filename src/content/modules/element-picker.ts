@@ -5,6 +5,18 @@
 
 import { debug, info } from '../utils/logger';
 
+// Interface for audit log details
+interface AuditDetails {
+  reason?: string;
+  selector?: string;
+  domain?: string;
+  elementType?: string;
+  secure?: boolean;
+  url?: string;
+  timestamp?: string;
+  [key: string]: unknown; // Allow additional properties while maintaining type safety
+}
+
 // Sensitive field selectors that should be blocked
 const BLOCKED_SELECTORS = [
   'input[type="password"]',
@@ -65,7 +77,7 @@ export class ElementPicker {
   private auditLog: Array<{
     timestamp: number;
     action: string;
-    details: unknown;
+    details: AuditDetails;
   }> = [];
 
   constructor() {
@@ -223,12 +235,12 @@ export class ElementPicker {
   /**
    * Log audit events for security monitoring
    */
-  private logAudit(action: string, details: unknown): void {
+  private logAudit(action: string, details: AuditDetails): void {
     const entry = {
       timestamp: Date.now(),
       action,
       details: {
-        ...details as Record<string, unknown>,
+        ...details,
         url: window.location.href,
         timestamp: new Date().toISOString()
       }
