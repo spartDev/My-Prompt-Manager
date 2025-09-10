@@ -270,10 +270,61 @@ export class ElementPicker {
       debug('[ElementPicker] Audit log storage failed:', error);
     }
 
-    // Log to console in debug mode
+    // Log to console in debug mode (sanitized for security)
     if (localStorage.getItem('prompt-library-debug') === 'true') {
-      console.log(`[ElementPicker Audit] ${action}:`, details);
+      const sanitizedDetails = this.sanitizeAuditDetailsForLogging(details);
+      console.log(`[ElementPicker Audit] ${action}:`, sanitizedDetails);
     }
+  }
+
+  /**
+   * Sanitize audit details for safe console logging
+   */
+  private sanitizeAuditDetailsForLogging(details: AuditDetails): Record<string, unknown> {
+    const sanitized: Record<string, unknown> = {};
+    
+    // Safe fields that don't contain sensitive information
+    const safeFields = ['elementType', 'secure', 'timestamp'];
+    
+    for (const field of safeFields) {
+      if (details[field] !== undefined) {
+        sanitized[field] = details[field];
+      }
+    }
+    
+    // Sanitize potentially sensitive fields
+    if (details.reason) {
+      // Only log generic reason categories, not specific values
+      sanitized.reasonType = details.reason.includes('password') ? 'password_field' :
+                           details.reason.includes('credit') ? 'payment_field' :
+                           details.reason.includes('sensitive') ? 'sensitive_field' :
+                           details.reason.includes('attribute') ? 'sensitive_attribute' :
+                           'other';
+    }
+    
+    if (details.selector) {
+      // Only log selector type, not the actual selector
+      sanitized.selectorType = details.selector.startsWith('#') ? 'id_selector' :
+                              details.selector.includes('.') ? 'class_selector' :
+                              details.selector.includes('[') ? 'attribute_selector' :
+                              'path_selector';
+    }
+    
+    if (details.domain) {
+      // Only log domain classification, not actual domain
+      const domain = String(details.domain);
+      sanitized.domainType = SENSITIVE_DOMAINS.some(pattern => pattern.test(domain)) 
+        ? 'sensitive_domain' : 'regular_domain';
+    }
+    
+    if (details.url) {
+      // Only log URL protocol and whether it contains sensitive indicators
+      const url = new URL(String(details.url));
+      sanitized.protocol = url.protocol;
+      sanitized.hasSensitivePath = /login|signin|checkout|payment|account|profile|banking|financial/i.test(url.pathname);
+    }
+    
+    return sanitized;
   }
 
   /**
