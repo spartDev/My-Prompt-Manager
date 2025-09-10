@@ -22,6 +22,16 @@ import { ThemeManager } from './utils/theme-manager';
 let promptLibraryInstance: PromptLibraryInjector | null = null;
 let isInitialized = false;
 
+// Mark that content script is injected (for programmatic injection detection)
+(window as { __promptLibraryInjected?: boolean }).__promptLibraryInjected = true;
+
+// Add types for the injection marker
+declare global {
+  interface Window {
+    __promptLibraryInjected?: boolean;
+  }
+}
+
 /**
  * Initialize the extension with proper error handling
  */
