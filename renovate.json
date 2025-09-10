@@ -8,91 +8,163 @@
     "abandonments:recommended"
   ],
   "timezone": "Europe/Paris",
-  "schedule": ["before 3am on Monday"],
-  "labels": ["dependencies", "renovate"],
-  "assignees": ["spartDev"],
-  "reviewers": ["spartDev"],
+  "schedule": [
+    "before 3am on Monday"
+  ],
+  "labels": [
+    "dependencies",
+    "renovate"
+  ],
+  "assignees": [
+    "spartDev"
+  ],
+  "reviewers": [
+    "spartDev"
+  ],
   "packageRules": [
     {
       "description": "Group all non-major React updates",
-      "matchPackagePatterns": ["^react", "^@types/react"],
       "groupName": "react packages",
       "groupSlug": "react",
-      "matchUpdateTypes": ["patch", "minor"]
+      "matchUpdateTypes": [
+        "patch",
+        "minor"
+      ],
+      "matchPackageNames": [
+        "/^react/",
+        "/^@types/react/"
+      ]
     },
     {
       "description": "Group all TypeScript and ESLint updates",
-      "matchPackagePatterns": ["typescript", "eslint", "@typescript-eslint"],
       "groupName": "typescript and linting",
       "groupSlug": "typescript-linting",
-      "matchUpdateTypes": ["patch", "minor"]
+      "matchUpdateTypes": [
+        "patch",
+        "minor"
+      ],
+      "matchPackageNames": [
+        "/typescript/",
+        "/eslint/",
+        "/@typescript-eslint/"
+      ]
     },
     {
       "description": "Group all Vite and build tool updates",
-      "matchPackagePatterns": ["vite", "@vitejs", "@crxjs"],
       "groupName": "build tools",
       "groupSlug": "build-tools",
-      "matchUpdateTypes": ["patch", "minor"]
+      "matchUpdateTypes": [
+        "patch",
+        "minor"
+      ],
+      "matchPackageNames": [
+        "/vite/",
+        "/@vitejs/",
+        "/@crxjs/"
+      ]
     },
     {
       "description": "Group all testing library updates",
-      "matchPackagePatterns": ["vitest", "@testing-library", "jsdom"],
       "groupName": "testing libraries",
       "groupSlug": "testing",
-      "matchUpdateTypes": ["patch", "minor"]
+      "matchUpdateTypes": [
+        "patch",
+        "minor"
+      ],
+      "matchPackageNames": [
+        "/vitest/",
+        "/@testing-library/",
+        "/jsdom/"
+      ]
     },
     {
       "description": "Group Tailwind CSS updates",
-      "matchPackagePatterns": ["tailwind", "autoprefixer", "postcss"],
       "groupName": "tailwind and css",
       "groupSlug": "tailwind-css",
-      "matchUpdateTypes": ["patch", "minor"]
+      "matchUpdateTypes": [
+        "patch",
+        "minor"
+      ],
+      "matchPackageNames": [
+        "/tailwind/",
+        "/autoprefixer/",
+        "/postcss/"
+      ]
     },
     {
       "description": "Handle Chrome extension types carefully",
-      "matchPackageNames": ["@types/chrome"],
+      "matchPackageNames": [
+        "@types/chrome"
+      ],
       "groupName": "chrome types",
       "automerge": false,
       "prPriority": 5
     },
     {
       "description": "Security updates - high priority",
-      "matchDatasources": ["npm"],
-      "matchUpdateTypes": ["patch"],
-      "matchPackageNames": ["dompurify"],
+      "matchDatasources": [
+        "npm"
+      ],
+      "matchUpdateTypes": [
+        "patch"
+      ],
+      "matchPackageNames": [
+        "dompurify"
+      ],
       "prPriority": 10,
-      "labels": ["security", "dependencies", "renovate"]
+      "labels": [
+        "security",
+        "dependencies",
+        "renovate"
+      ]
     },
     {
       "description": "Pin Chrome extension critical deps",
-      "matchPackageNames": ["@crxjs/vite-plugin"],
+      "matchPackageNames": [
+        "@crxjs/vite-plugin"
+      ],
       "automerge": false
     },
     {
       "description": "Major updates - require manual review",
-      "matchUpdateTypes": ["major"],
-      "labels": ["major-update", "dependencies", "renovate"],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "labels": [
+        "major-update",
+        "dependencies",
+        "renovate"
+      ],
       "automerge": false,
       "prPriority": -1
     },
     {
       "description": "Automerge dev dependencies patches",
-      "matchDepTypes": ["devDependencies"],
-      "matchUpdateTypes": ["patch"],
+      "matchDepTypes": [
+        "devDependencies"
+      ],
+      "matchUpdateTypes": [
+        "patch"
+      ],
       "automerge": true,
       "automergeType": "pr",
       "platformAutomerge": true
     },
     {
       "description": "Group GitHub Actions updates",
-      "matchManagers": ["github-actions"],
+      "matchManagers": [
+        "github-actions"
+      ],
       "groupName": "github actions",
       "automerge": true,
       "automergeType": "pr"
     },
     {
       "description": "Separate Husky and Git hooks",
-      "matchPackageNames": ["husky", "lint-staged"],
+      "matchPackageNames": [
+        "husky",
+        "lint-staged"
+      ],
       "groupName": "git hooks",
       "automerge": false
     }
@@ -108,18 +180,25 @@
   "commitMessageExtra": "to {{newVersion}}",
   "vulnerabilityAlerts": {
     "enabled": true,
-    "labels": ["security", "urgent"],
-    "assignees": ["spartDev"]
+    "labels": [
+      "security",
+      "urgent"
+    ],
+    "assignees": [
+      "spartDev"
+    ]
   },
   "postUpdateOptions": [
     "npmDedupe"
   ],
   "npm": {
     "minimumReleaseAge": "3 days",
-    "stabilityDays": 3,
     "packageRules": [
       {
-        "matchPackageNames": ["react", "react-dom"],
+        "matchPackageNames": [
+          "react",
+          "react-dom"
+        ],
         "minimumReleaseAge": "7 days"
       }
     ]
@@ -132,9 +211,14 @@
   ],
   "dependencyDashboard": true,
   "dependencyDashboardTitle": "🔄 Dependency Updates Dashboard",
-  "dependencyDashboardLabels": ["dependencies", "renovate-dashboard"],
+  "dependencyDashboardLabels": [
+    "dependencies",
+    "renovate-dashboard"
+  ],
   "dependencyDashboardFooter": "View [Renovate documentation](https://docs.renovatebot.com/) for more information.",
-  "suppressNotifications": ["prIgnoreNotification"],
+  "suppressNotifications": [
+    "prIgnoreNotification"
+  ],
   "prBodyNotes": [
     "**Important**: Please test the extension after merging dependency updates:",
     "1. Run `npm test` to ensure all tests pass",
