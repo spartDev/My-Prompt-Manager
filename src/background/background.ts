@@ -59,7 +59,7 @@ class ContentScriptInjector {
         await this.injectContentScript(tabId);
         this.injectedTabs.add(tabId);
       } else {
-        // Debug: Injection skipped for debugging purposes
+        // Injection skipped: site not enabled in settings or does not meet injection criteria
       }
     } catch {
       // Silently skip injection failures - they're handled gracefully by the caller
@@ -190,8 +190,7 @@ class ContentScriptInjector {
       if (!hasPermission) {
         // This is expected for most sites - log at debug level only
         const errorMessage = `No permission to inject into ${hostname}`;
-        // Permission check failed - this is expected for most websites
-        // Debug logging removed to avoid console statement linting warnings
+
         throw new Error(errorMessage);
       }
       
@@ -515,14 +514,43 @@ async function handleRequestInjection(tabId: number | undefined, sendResponse: (
  */
 async function handleSettingsUpdated(settings: unknown, sendResponse: (response?: { success: boolean }) => void) {
   try {
-    // Re-evaluate all tabs for injection after settings change
     const tabs = await chrome.tabs.query({});
     
-    for (const tab of tabs) {
-      if (tab.id && tab.url && !await injector.isContentScriptInjected(tab.id)) {
-        await injector.injectIfNeeded(tab.id);
+    // Filter tabs that might need injection to avoid unnecessary checks
+    const relevantTabs = tabs.filter(tab => {
+      if (!tab.id || !tab.url) {
+        return false;
       }
-    }
+      
+      try {
+        const url = new URL(tab.url);
+        const hostname = url.hostname;
+        
+        // Quick hostname check - only process tabs that could potentially need injection
+        return ['claude.ai', 'chatgpt.com', 'www.perplexity.ai'].includes(hostname) ||
+               hostname.includes('claude') || hostname.includes('openai') || hostname.includes('perplexity');
+      } catch {
+        return false; // Invalid URL
+      }
+    });
+    
+    // Process relevant tabs concurrently for better performance
+    await Promise.all(
+      relevantTabs.map(async (tab) => {
+        try {
+          if (tab.id && tab.url) {
+            const isInjected = await injector.isContentScriptInjected(tab.id);
+            if (!isInjected) {
+              await injector.injectIfNeeded(tab.id);
+            }
+          }
+        } catch (error) {
+          // Log error but don't fail the entire operation for individual tab failures
+          const tabId = tab.id?.toString() || 'unknown';
+          console.error(`[Background] Failed to process tab ${tabId} during settings update:`, error);
+        }
+      })
+    );
     
     sendResponse({ success: true });
   } catch (error) {
@@ -606,7 +634,6 @@ async function handleExtensionUpdate(): Promise<void> {
           
           if (allEnabledHosts.includes(hostname)) {
             await injector.forceInjectContentScript(tab.id);
-            // Re-injected content script successfully
           }
         } catch {
           // Invalid URL, skip
