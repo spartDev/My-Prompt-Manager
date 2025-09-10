@@ -319,9 +319,14 @@ export class ElementPicker {
     
     if (details.url) {
       // Only log URL protocol and whether it contains sensitive indicators
-      const url = new URL(String(details.url));
-      sanitized.protocol = url.protocol;
-      sanitized.hasSensitivePath = /login|signin|checkout|payment|account|profile|banking|financial/i.test(url.pathname);
+      try {
+        const url = new URL(String(details.url));
+        sanitized.protocol = url.protocol;
+        sanitized.hasSensitivePath = /login|signin|checkout|payment|account|profile|banking|financial/i.test(url.pathname);
+      } catch (e) {
+        sanitized.protocol = 'invalid';
+        sanitized.hasSensitivePath = false;
+      }
     }
     
     return sanitized;
