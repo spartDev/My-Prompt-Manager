@@ -5,6 +5,55 @@
 
 import { debug, info } from '../utils/logger';
 
+// Sensitive field selectors that should be blocked
+const BLOCKED_SELECTORS = [
+  'input[type="password"]',
+  'input[type="hidden"]',
+  'input[type="tel"]',
+  'input[type="email"]',
+  'input[type="ssn"]',
+  'input[data-sensitive]',
+  'input[data-private]',
+  '[autocomplete*="cc-"]',           // Credit card fields
+  '[autocomplete*="password"]',       // Password managers
+  '[autocomplete*="transaction-"]',   // Payment fields
+  '[autocomplete*="one-time-code"]',  // 2FA codes
+  '.sensitive',                        // Custom sensitive class
+  '[data-testid*="password"]',        // Common test IDs
+  '[id*="cvv"]',                      // CVV fields
+  '[id*="pin"]',                      // PIN fields
+  '[name*="creditcard"]',             // Credit card by name
+  '[name*="ssn"]',                    // SSN by name
+  '[aria-label*="password"]',         // Accessibility labels
+  'iframe'                             // Prevent iframe interaction
+];
+
+// Sensitive domain patterns
+const SENSITIVE_DOMAINS = [
+  /\.bank/i,
+  /banking\./i,
+  /\.gov/i,
+  /healthcare/i,
+  /medical/i,
+  /paypal\./i,
+  /stripe\./i,
+  /square\./i,
+  /venmo\./i,
+  /coinbase\./i,
+  /kraken\./i,
+  /binance\./i,
+  /\.tax/i,
+  /irs\./i,
+  /insurance/i,
+  /fidelity\./i,
+  /vanguard\./i,
+  /schwab\./i,
+  /wellsfargo\./i,
+  /chase\./i,
+  /bankofamerica\./i,
+  /citibank\./i
+];
+
 export class ElementPicker {
   private isActive = false;
   private overlay: HTMLDivElement | null = null;
@@ -13,12 +62,228 @@ export class ElementPicker {
   private currentElement: Element | null = null;
   private originalCursor: string = '';
   private listeners: Map<string, EventListener> = new Map();
+  private auditLog: Array<{
+    timestamp: number;
+    action: string;
+    details: unknown;
+  }> = [];
 
   constructor() {
     this.handleMouseMove = this.handleMouseMove.bind(this);
     this.handleClick = this.handleClick.bind(this);
     this.handleKeyDown = this.handleKeyDown.bind(this);
     this.handleMessage = this.handleMessage.bind(this);
+  }
+
+  /**
+   * Check if an element is blocked for security reasons
+   */
+  private isElementBlocked(element: Element): { blocked: boolean; reason?: string } {
+    // Check if element matches blocked selectors
+    for (const selector of BLOCKED_SELECTORS) {
+      try {
+        if (element.matches(selector)) {
+          return {
+            blocked: true,
+            reason: `Sensitive field detected: ${selector}`
+          };
+        }
+      } catch (error) {
+        // Invalid selector, skip
+        debug('[ElementPicker] Invalid selector:', selector, error);
+        continue;
+      }
+    }
+
+    // Check if element is within a blocked container
+    try {
+      const sensitiveParent = element.closest(BLOCKED_SELECTORS.join(','));
+      if (sensitiveParent) {
+        return {
+          blocked: true,
+          reason: 'Element is within a sensitive container'
+        };
+      }
+    } catch (error) {
+      // Invalid selector combination, continue with individual checks
+      debug('[ElementPicker] Error checking parent containers:', error);
+    }
+
+    // Check element attributes for sensitive patterns
+    const attributes = element.getAttributeNames();
+    const sensitivePatterns = /password|secret|token|key|credential|private|ssn|credit|card|cvv|pin|bank|account/i;
+    
+    for (const attr of attributes) {
+      if (sensitivePatterns.test(attr)) {
+        return {
+          blocked: true,
+          reason: `Sensitive attribute detected: ${attr}`
+        };
+      }
+      
+      const attrValue = element.getAttribute(attr);
+      if (attrValue && sensitivePatterns.test(attrValue)) {
+        return {
+          blocked: true,
+          reason: `Sensitive attribute value detected: ${attr}="${attrValue}"`
+        };
+      }
+    }
+
+    // Check placeholder text for sensitive patterns
+    const placeholder = element.getAttribute('placeholder');
+    if (placeholder && sensitivePatterns.test(placeholder)) {
+      return {
+        blocked: true,
+        reason: 'Sensitive placeholder text detected'
+      };
+    }
+
+    // Check ARIA labels for sensitive patterns
+    const ariaLabel = element.getAttribute('aria-label');
+    if (ariaLabel && sensitivePatterns.test(ariaLabel)) {
+      return {
+        blocked: true,
+        reason: 'Sensitive ARIA label detected'
+      };
+    }
+
+    return { blocked: false };
+  }
+
+  /**
+   * Check if current domain is sensitive or requires confirmation
+   */
+  private isDomainSensitive(): { sensitive: boolean; requiresConfirmation: boolean } {
+    const hostname = window.location.hostname;
+    const href = window.location.href;
+
+    // Check against sensitive domain patterns
+    for (const pattern of SENSITIVE_DOMAINS) {
+      if (pattern.test(hostname) || pattern.test(href)) {
+        return { sensitive: true, requiresConfirmation: true };
+      }
+    }
+
+    // Check for HTTPS and common sensitive indicators
+    if (window.location.protocol === 'https:') {
+      const sensitiveIndicators = /login|signin|checkout|payment|account|profile|banking|financial/i;
+      if (sensitiveIndicators.test(href)) {
+        return { sensitive: false, requiresConfirmation: true };
+      }
+    }
+
+    return { sensitive: false, requiresConfirmation: false };
+  }
+
+  /**
+   * Show warning message for blocked elements
+   */
+  private showWarning(message: string, element: Element): boolean {
+    // Create warning overlay
+    const warning = document.createElement('div');
+    warning.id = 'mpm-security-warning';
+    warning.style.cssText = `
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #dc2626;
+      color: white;
+      padding: 16px 24px;
+      border-radius: 8px;
+      z-index: 2147483647;
+      font-size: 14px;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+      max-width: 400px;
+      text-align: center;
+      border: 2px solid #b91c1c;
+    `;
+    warning.textContent = message;
+    document.body.appendChild(warning);
+
+    // Auto-remove after 3 seconds
+    setTimeout(() => {
+      if (warning.parentNode) {
+        warning.remove();
+      }
+    }, 3000);
+
+    // Log attempt for audit
+    this.logAudit('blocked_selection', {
+      reason: message,
+      selector: this.generateSelector(element),
+      domain: window.location.hostname
+    });
+
+    return false; // Prevent selection
+  }
+
+  /**
+   * Log audit events for security monitoring
+   */
+  private logAudit(action: string, details: unknown): void {
+    const entry = {
+      timestamp: Date.now(),
+      action,
+      details: {
+        ...details as Record<string, unknown>,
+        url: window.location.href,
+        timestamp: new Date().toISOString()
+      }
+    };
+
+    this.auditLog.push(entry);
+
+    // Store last 50 entries in session storage for debugging
+    if (this.auditLog.length > 50) {
+      this.auditLog.shift();
+    }
+
+    try {
+      sessionStorage.setItem(
+        'element-picker-audit',
+        JSON.stringify(this.auditLog)
+      );
+    } catch (error) {
+      // Session storage might be full or disabled
+      debug('[ElementPicker] Audit log storage failed:', error);
+    }
+
+    // Log to console in debug mode
+    if (localStorage.getItem('prompt-library-debug') === 'true') {
+      console.log(`[ElementPicker Audit] ${action}:`, details);
+    }
+  }
+
+  /**
+   * Get element depth in DOM tree
+   */
+  private getElementDepth(element: Element): number {
+    let depth = 0;
+    let current = element.parentElement;
+    while (current && depth < 50) { // Prevent infinite loops
+      depth++;
+      current = current.parentElement;
+    }
+    return depth;
+  }
+
+  /**
+   * Check if element is visible
+   */
+  private isElementVisible(element: Element): boolean {
+    const rect = element.getBoundingClientRect();
+    const style = window.getComputedStyle(element);
+    
+    return (
+      rect.width > 0 &&
+      rect.height > 0 &&
+      style.display !== 'none' &&
+      style.visibility !== 'hidden' &&
+      style.opacity !== '0'
+    );
   }
 
   /**
@@ -208,8 +473,12 @@ export class ElementPicker {
     
     if (element && element !== this.currentElement) {
       this.currentElement = element;
-      this.highlightElement(element);
-      this.updateInfoBox(element);
+      
+      // Check if element is blocked for visual feedback
+      const blockCheck = this.isElementBlocked(element);
+      
+      this.highlightElement(element, blockCheck.blocked);
+      this.updateInfoBox(element, blockCheck);
     }
   }
 
@@ -225,10 +494,51 @@ export class ElementPicker {
     event.stopImmediatePropagation();
     
     if (this.currentElement) {
+      // Check if element is blocked
+      const blockCheck = this.isElementBlocked(this.currentElement);
+      if (blockCheck.blocked) {
+        this.showWarning(
+          `Cannot select this element: ${blockCheck.reason ?? 'Unknown reason'}. ` +
+          `For security reasons, sensitive fields cannot be selected.`,
+          this.currentElement
+        );
+        return;
+      }
+
+      // Check if domain requires special handling
+      const domainCheck = this.isDomainSensitive();
+      if (domainCheck.sensitive) {
+        this.showWarning(
+          'Warning: You are on a sensitive website. ' +
+          'Element picker has been disabled for security reasons.',
+          this.currentElement
+        );
+        this.deactivate();
+        return;
+      }
+
+      if (domainCheck.requiresConfirmation) {
+        // Show confirmation but allow if user has explicitly triggered picker
+        this.showWarning(
+          'Caution: This appears to be a sensitive page. ' +
+          'Please ensure you are not selecting private information.',
+          this.currentElement
+        );
+      }
+
+      // Proceed with safe selection
       const selector = this.generateSelector(this.currentElement);
       const elementInfo = this.getElementInfo(this.currentElement);
       
       debug('[ElementPicker] Element selected:', { selector, elementInfo });
+      
+      // Log successful selection
+      this.logAudit('element_selected', {
+        selector,
+        elementType: this.currentElement.tagName.toLowerCase(),
+        domain: window.location.hostname,
+        secure: !domainCheck.requiresConfirmation && !domainCheck.sensitive
+      });
       
       // Send selection to background script
       void chrome.runtime.sendMessage({
@@ -281,7 +591,7 @@ export class ElementPicker {
   /**
    * Highlight the given element
    */
-  private highlightElement(element: Element): void {
+  private highlightElement(element: Element, isBlocked = false): void {
     if (!this.highlightBox) {return;}
     
     const rect = element.getBoundingClientRect();
@@ -290,12 +600,25 @@ export class ElementPicker {
     this.highlightBox.style.top = `${String(rect.top + window.scrollY)}px`;
     this.highlightBox.style.width = `${String(rect.width)}px`;
     this.highlightBox.style.height = `${String(rect.height)}px`;
+    
+    // Update highlight style based on block status
+    if (isBlocked) {
+      this.highlightBox.style.backgroundColor = 'rgba(239, 68, 68, 0.3)'; // Red for blocked
+      this.highlightBox.style.borderColor = '#dc2626';
+      this.highlightBox.style.cursor = 'not-allowed';
+      this.highlightBox.style.boxShadow = '0 0 0 1px rgba(220, 38, 38, 0.5)';
+    } else {
+      this.highlightBox.style.backgroundColor = 'rgba(124, 58, 237, 0.1)'; // Purple for allowed
+      this.highlightBox.style.borderColor = '#7c3aed';
+      this.highlightBox.style.cursor = 'pointer';
+      this.highlightBox.style.boxShadow = '0 0 0 1px rgba(124, 58, 237, 0.3)';
+    }
   }
 
   /**
    * Update info box with element details
    */
-  private updateInfoBox(element: Element): void {
+  private updateInfoBox(element: Element, blockCheck?: { blocked: boolean; reason?: string }): void {
     if (!this.infoBox) {return;}
     
     const selector = this.generateSelector(element);
@@ -303,8 +626,25 @@ export class ElementPicker {
     const className = element.className ? `.${element.className.split(' ').join('.')}` : '';
     const id = element.id ? `#${element.id}` : '';
     
+    // Clear any existing warning
+    const existingWarning = this.infoBox.querySelector('.warning');
+    if (existingWarning) {
+      existingWarning.remove();
+    }
+    
+    let warningSection = '';
+    if (blockCheck?.blocked) {
+      warningSection = `
+        <div class="warning" style="color: #ef4444; font-size: 12px; margin-bottom: 8px; padding: 6px; background: rgba(239, 68, 68, 0.1); border-radius: 4px; border: 1px solid #dc2626;">
+          <span style="font-weight: 600;">⚠️ Sensitive Field</span><br>
+          <span style="font-size: 11px;">${blockCheck.reason || 'Cannot select this element'}</span>
+        </div>
+      `;
+    }
+    
     this.infoBox.innerHTML = `
       <div style="font-weight: 600; margin-bottom: 4px; color: #a78bfa;">Element Info</div>
+      ${warningSection}
       <div style="margin-bottom: 2px;">
         <span style="color: #6b7280;">Type:</span> 
         <span style="color: #fbbf24; font-family: monospace;">${tagName}</span>
@@ -325,7 +665,9 @@ export class ElementPicker {
           ${selector}
         </div>
       </div>
-      <div style="color: #9ca3af; font-size: 11px; margin-top: 8px;">Click to select • ESC to cancel</div>
+      <div style="color: #9ca3af; font-size: 11px; margin-top: 8px;">
+        ${blockCheck?.blocked ? 'Element blocked for security • ESC to cancel' : 'Click to select • ESC to cancel'}
+      </div>
     `;
   }
 
@@ -425,28 +767,30 @@ export class ElementPicker {
   }
 
   /**
-   * Get detailed information about an element
+   * Get minimal information about an element (no sensitive data extraction)
    */
   private getElementInfo(element: Element): Record<string, unknown> {
     const rect = element.getBoundingClientRect();
-    const computedStyle = window.getComputedStyle(element);
     
     return {
+      // Only structural information, no content
       tagName: element.tagName.toLowerCase(),
-      id: element.id || null,
-      className: element.className || null,
-      innerText: (element as HTMLElement).innerText ? (element as HTMLElement).innerText.substring(0, 100) : null,
+      selector: this.generateSelector(element),
       position: {
         x: rect.left,
         y: rect.top,
         width: rect.width,
         height: rect.height
       },
-      style: {
-        display: computedStyle.display,
-        position: computedStyle.position,
-        zIndex: computedStyle.zIndex
-      }
+      // Add safe metadata only
+      hasId: !!element.id,
+      hasClasses: !!element.className,
+      depth: this.getElementDepth(element),
+      isVisible: this.isElementVisible(element),
+      // Security context
+      blocked: this.isElementBlocked(element).blocked,
+      securityLevel: this.isDomainSensitive().sensitive ? 'high' : 
+                    this.isDomainSensitive().requiresConfirmation ? 'medium' : 'low'
     };
   }
 }
