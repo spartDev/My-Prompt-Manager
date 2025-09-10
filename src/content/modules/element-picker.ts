@@ -763,10 +763,10 @@ export class ElementPicker {
     const dataAttrs = Array.from(element.attributes)
       .filter(attr => attr.name.startsWith('data-'))
       .filter(attr => {
-        // Skip data attributes that might contain sensitive information
-        const sensitiveDataPattern = /token|key|secret|password|credential|private|session|auth/i;
-        return !sensitiveDataPattern.test(attr.name) && 
-               !sensitiveDataPattern.test(attr.value || '');
+        // Skip data attributes that might contain sensitive information based on name only
+        // This avoids reading potentially sensitive values into memory
+        const sensitiveDataPattern = /token|key|secret|password|credential|private|session|auth|api|csrf|nonce/i;
+        return !sensitiveDataPattern.test(attr.name);
       })
       .map(attr => `[${attr.name}="${attr.value}"]`);
     
