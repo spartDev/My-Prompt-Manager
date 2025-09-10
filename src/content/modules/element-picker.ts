@@ -771,6 +771,7 @@ export class ElementPicker {
    */
   private getElementInfo(element: Element): Record<string, unknown> {
     const rect = element.getBoundingClientRect();
+    const domainSecurity = this.isDomainSensitive();
     
     return {
       // Only structural information, no content
@@ -789,8 +790,8 @@ export class ElementPicker {
       isVisible: this.isElementVisible(element),
       // Security context
       blocked: this.isElementBlocked(element).blocked,
-      securityLevel: this.isDomainSensitive().sensitive ? 'high' : 
-                    this.isDomainSensitive().requiresConfirmation ? 'medium' : 'low'
+      securityLevel: domainSecurity.sensitive ? 'high' : 
+                    domainSecurity.requiresConfirmation ? 'medium' : 'low'
     };
   }
 }
