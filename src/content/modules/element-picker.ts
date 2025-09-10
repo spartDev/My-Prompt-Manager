@@ -17,6 +17,13 @@ interface AuditDetails {
   [key: string]: unknown; // Allow additional properties while maintaining type safety
 }
 
+// Constants for element picker configuration
+const MAX_DOM_DEPTH = 50; // Maximum depth to prevent infinite loops when traversing DOM
+const MAX_AUDIT_ENTRIES = 50; // Maximum audit log entries to store in memory
+const WARNING_DISMISS_TIMEOUT = 3000; // Auto-dismiss timeout for warning messages (ms)
+const MAX_SELECTOR_PATH_DEPTH = 5; // Maximum depth for CSS selector path generation
+const MAX_CLASS_NAMES = 2; // Maximum number of class names to use in selectors
+
 // Sensitive field selectors that should be blocked
 const BLOCKED_SELECTORS = [
   'input[type="password"]',
@@ -220,7 +227,7 @@ export class ElementPicker {
       if (warning.parentNode) {
         warning.remove();
       }
-    }, 3000);
+    }, WARNING_DISMISS_TIMEOUT);
 
     // Log attempt for audit
     this.logAudit('blocked_selection', {
@@ -249,7 +256,7 @@ export class ElementPicker {
     this.auditLog.push(entry);
 
     // Store last 50 entries in session storage for debugging
-    if (this.auditLog.length > 50) {
+    if (this.auditLog.length > MAX_AUDIT_ENTRIES) {
       this.auditLog.shift();
     }
 
@@ -275,7 +282,7 @@ export class ElementPicker {
   private getElementDepth(element: Element): number {
     let depth = 0;
     let current = element.parentElement;
-    while (current && depth < 50) { // Prevent infinite loops
+    while (current && depth < MAX_DOM_DEPTH) { // Prevent infinite loops
       depth++;
       current = current.parentElement;
     }
@@ -722,7 +729,7 @@ export class ElementPicker {
     if (element.className && typeof element.className === 'string') {
       const classes = element.className.trim().split(/\s+/)
         .filter(c => c && /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(c)) // Only simple class names
-        .slice(0, 2); // Limit to first 2 classes to avoid overly complex selectors
+        .slice(0, MAX_CLASS_NAMES); // Limit to first 2 classes to avoid overly complex selectors
       
       if (classes.length > 0) {
         const classSelector = `${element.tagName.toLowerCase()}.${classes.join('.')}`;
@@ -741,7 +748,7 @@ export class ElementPicker {
     const path: string[] = [];
     let current: Element | null = element;
     
-    while (current && current !== document.body && path.length < 5) { // Limit depth
+    while (current && current !== document.body && path.length < MAX_SELECTOR_PATH_DEPTH) { // Limit depth
       let selector = current.tagName.toLowerCase();
       
       if (current.id && /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(current.id)) {
