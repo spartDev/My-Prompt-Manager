@@ -144,7 +144,7 @@ export class ElementPicker {
       if (attrValue && sensitivePatterns.test(attrValue)) {
         return {
           blocked: true,
-          reason: `Sensitive attribute value detected: ${attr}="${attrValue}"`
+          reason: `Sensitive attribute value detected: ${attr}="[REDACTED]"`
         };
       }
     }
@@ -762,6 +762,12 @@ export class ElementPicker {
     // Try data attributes as they're often more stable
     const dataAttrs = Array.from(element.attributes)
       .filter(attr => attr.name.startsWith('data-'))
+      .filter(attr => {
+        // Skip data attributes that might contain sensitive information
+        const sensitiveDataPattern = /token|key|secret|password|credential|private|session|auth/i;
+        return !sensitiveDataPattern.test(attr.name) && 
+               !sensitiveDataPattern.test(attr.value || '');
+      })
       .map(attr => `[${attr.name}="${attr.value}"]`);
     
     if (dataAttrs.length > 0) {
