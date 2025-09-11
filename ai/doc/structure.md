@@ -1,88 +1,99 @@
-# Project Structure
+# Project Structure & Organization
 
-## Root Directory
+## Root Structure
 
-- **manifest.json**: Chrome extension manifest (Manifest V3)
-- **package.json**: Dependencies and npm scripts
-- **vite.config.ts**: Build configuration with CRX plugin
-- **tsconfig.json**: TypeScript configuration with strict mode
-- **eslint.config.js**: ESLint configuration for TypeScript/React
-- **tailwind.config.js**: Tailwind CSS configuration with dark mode
+```
+├── src/                    # Source code
+├── public/                 # Static assets (icons)
+├── dist/                   # Build output (generated)
+├── docs/                   # Documentation
+├── ai/                     # AI assistant context and requirements
+├── coverage/               # Test coverage reports (generated)
+├── manifest.json           # Chrome extension manifest
+├── package.json            # Dependencies and scripts
+└── vite.config.ts          # Build configuration
+```
 
 ## Source Code Organization (`src/`)
 
-### Core Application
-- **App.tsx**: Main React application component with view routing
-- **popup.tsx**: React entry point for extension popup
-- **popup.html**: HTML template for extension popup
-- **popup.css**: Global styles and Tailwind imports
-- **background.ts**: Chrome extension background service worker
-- **content/**: Modular TypeScript content script for AI platform integration
+### React Components (`src/components/`)
+- **Main Components**: App.tsx, LibraryView.tsx, PromptCard.tsx
+- **Forms**: AddPromptForm.tsx, EditPromptForm.tsx
+- **UI Elements**: SearchBar.tsx, CategoryFilter.tsx, ThemeToggle.tsx
+- **Settings**: `settings/` subfolder for settings-related components
+- **Icons**: `icons/` subfolder for icon components
+- **Tests**: `__tests__/` subfolders for component tests
 
-### Components (`src/components/`)
-React components organized by functionality:
-- **LibraryView.tsx**: Main prompt library interface
-- **PromptCard.tsx**: Individual prompt display component
-- **AddPromptForm.tsx** / **EditPromptForm.tsx**: Form components
-- **CategoryManager.tsx**: Category management modal
-- **SearchBar.tsx** / **CategoryFilter.tsx**: Filtering components
-- **SettingsView.tsx**: Extension settings interface
-- **ErrorBoundary.tsx**: Error handling wrapper
-- **ToastContainer.tsx**: Notification system
-- **StorageWarning.tsx**: Storage quota warnings
+### Content Script Architecture (`src/content/`)
+```
+src/content/
+├── index.ts                # Main entry point
+├── core/                   # Core functionality
+│   ├── injector.ts         # Main orchestration class
+│   └── insertion-manager.ts # Platform insertion coordination
+├── platforms/              # Platform-specific strategies
+│   ├── base-strategy.ts    # Abstract base class
+│   ├── claude-strategy.ts  # Claude.ai implementation
+│   ├── chatgpt-strategy.ts # ChatGPT implementation
+│   ├── perplexity-strategy.ts # Perplexity implementation
+│   └── platform-manager.ts # Strategy coordinator
+├── ui/                     # UI components for content script
+│   ├── element-factory.ts  # Element creation
+│   ├── event-manager.ts    # Event handling
+│   └── keyboard-navigation.ts # Keyboard support
+├── utils/                  # Utility modules
+│   ├── dom.ts             # DOM utilities
+│   ├── logger.ts          # Debug logging
+│   ├── storage.ts         # Chrome storage wrapper
+│   ├── styles.ts          # Style injection
+│   └── theme-manager.ts   # Theme synchronization
+└── types/                  # TypeScript definitions
+    ├── platform.ts        # Platform interfaces
+    └── ui.ts              # UI component types
+```
 
-### Business Logic (`src/services/`)
-- **storage.ts**: StorageManager singleton for Chrome storage operations
-- **promptManager.ts**: PromptManager singleton for business logic
-- **permissions.ts**: Chrome permissions handling
-- **scriptInjection.ts**: Content script injection utilities
-- **pendingSites.ts**: Site configuration management
+### Supporting Modules
+- **`src/hooks/`**: Custom React hooks (usePrompts, useCategories, useClipboard)
+- **`src/contexts/`**: React context providers (ThemeContext)
+- **`src/services/`**: Business logic (promptManager, storage)
+- **`src/types/`**: TypeScript type definitions
+- **`src/utils/`**: Shared utilities (debounce)
+- **`src/background/`**: Background service worker
 
-### Custom Hooks (`src/hooks/`)
-- **usePrompts.ts**: Prompt CRUD operations and state management
-- **useCategories.ts**: Category management
-- **useSearch.ts** / **useSearchWithDebounce.ts**: Search functionality
-- **useClipboard.ts**: Clipboard operations
-- **useToast.ts**: Toast notification system
-- **useTheme.ts**: Dark/light theme management
+## File Naming Conventions
 
-### Type Definitions (`src/types/`)
-- **index.ts**: Core data types (Prompt, Category, Settings)
-- **components.ts**: Component prop types
-- **hooks.ts**: Hook return types
-- **context.ts**: React context types
+- **React Components**: PascalCase (e.g., `PromptCard.tsx`)
+- **Hooks**: camelCase with `use` prefix (e.g., `usePrompts.ts`)
+- **Utilities**: camelCase (e.g., `debounce.ts`)
+- **Types**: camelCase (e.g., `index.ts`)
+- **Tests**: Same as source file + `.test.ts` suffix
+- **Strategies**: kebab-case + `-strategy.ts` suffix
 
-### Contexts (`src/contexts/`)
-- **ThemeContext.tsx**: Theme provider for dark/light mode
+## Import/Export Patterns
 
-### Utilities (`src/utils/`)
-- **debounce.ts**: Debounce utility function
-- **index.ts**: Utility exports
+- Use barrel exports in `index.ts` files for clean imports
+- Prefer named exports over default exports
+- Group imports: external libraries, internal modules, types
+- Use absolute imports from `src/` root when beneficial
 
-### Testing (`src/test/` and `__tests__/`)
-- **setup.ts**: Vitest test setup configuration
-- Component tests in `src/components/__tests__/`
-- Service tests in `src/services/__tests__/`
-- Integration tests in `src/test/__tests__/`
+## Testing Structure
 
-## Static Assets (`public/`)
-- **icons/**: Extension icons (16px, 32px, 48px, 128px)
+- **Unit Tests**: Alongside source files in `__tests__/` folders
+- **Integration Tests**: In `src/test/` for cross-module testing
+- **Coverage**: Comprehensive coverage with 470+ tests across 26 test files
+- **Test Files**: Mirror source structure with `.test.ts` suffix
 
-## Build Output (`dist/`)
-Generated by Vite build process, contains packaged extension files.
+## Configuration Files Location
 
-## Naming Conventions
+- **Root Level**: Build and project configuration (vite.config.ts, tsconfig.json)
+- **Package Management**: package.json, package-lock.json
+- **Code Quality**: eslint.config.js, .gitignore
+- **Styling**: tailwind.config.js, postcss.config.js
+- **Extension**: manifest.json (Chrome extension configuration)
 
-- **Components**: PascalCase (e.g., `PromptCard.tsx`)
-- **Hooks**: camelCase with "use" prefix (e.g., `usePrompts.ts`)
-- **Services**: camelCase (e.g., `storage.ts`)
-- **Types**: PascalCase interfaces (e.g., `Prompt`, `Category`)
-- **Constants**: UPPER_SNAKE_CASE (e.g., `DEFAULT_CATEGORY`)
+## Documentation Structure (`docs/`)
 
-## File Organization Principles
-
-1. **Feature-based grouping**: Related functionality grouped together
-2. **Clear separation**: UI components, business logic, and utilities separated
-3. **Co-location**: Tests placed near the code they test
-4. **Single responsibility**: Each file has a clear, focused purpose
-5. **Consistent naming**: Predictable file and directory naming patterns
+- **Implementation Guides**: PLATFORM_INTEGRATION.md, ELEMENT_PICKER_IMPLEMENTATION.md
+- **Workflow Docs**: RELEASE_WORKFLOW.md, GITHUB_ENVIRONMENTS.md
+- **Security**: ELEMENT_PICKER_SECURITY.md
+- **Configuration**: RENOVATE_CONFIGURATION.md

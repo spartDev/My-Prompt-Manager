@@ -1,22 +1,26 @@
 # Product Overview
 
-**My Prompt Manager** is a Chrome extension that provides seamless access to a personal prompt library directly within popular AI chat interfaces.
+## My Prompt Manager - Chrome Extension
 
-## Core Features
+A Chrome extension that provides seamless access to a personal prompt library directly within popular AI chat interfaces. The extension offers both a popup interface for managing prompts and native integration with Claude, ChatGPT, Perplexity, and other AI platforms.
 
-- **Prompt Management**: Store, organize, and manage text prompts with titles and categories
-- **AI Platform Integration**: Native integration with Claude, ChatGPT, and Perplexity
-- **Category System**: Organize prompts with custom categories and colors
-- **Search & Filter**: Real-time search with text highlighting and category filtering
-- **Quick Access**: One-click copying and direct insertion into AI chat interfaces
+### Core Features
 
-## Target Users
+- **Smart Prompt Management**: Store, organize, and search prompts with custom categories
+- **AI Platform Integration**: Native library icon appears in AI chat interfaces (Claude, ChatGPT, Perplexity)
+- **Universal Compatibility**: Works with textarea and contenteditable elements
+- **Dark Mode Support**: Automatic theme detection with manual toggle
+- **Security First**: DOMPurify sanitization, local storage only, no external data transmission
+- **Custom Sites**: Configurable support for any AI platform through settings
 
-Developers, content creators, and AI power users who frequently use text prompts across multiple AI platforms and need organized, quick access to their prompt library.
+### Target Users
 
-## Key Value Propositions
+Developers, writers, researchers, and AI power users who frequently use text prompts across multiple AI platforms and want to maintain a personal, organized library of reusable prompts.
 
-1. **Seamless Integration**: Library icon appears directly in AI chat interfaces
-2. **Cross-Platform**: Works across multiple AI platforms with consistent UX
-3. **Local Storage**: All data stays on user's device using Chrome's storage API
-4. **Intuitive UX**: Clean, modern interface with smart positioning and visual feedback
+### Key Value Propositions
+
+1. **Efficiency**: Quick access to frequently used prompts without retyping
+2. **Organization**: Category-based organization with search functionality
+3. **Cross-Platform**: Works across multiple AI chat interfaces
+4. **Privacy**: All data stored locally on user's device
+5. **Extensibility**: Easy to add support for new AI platforms
