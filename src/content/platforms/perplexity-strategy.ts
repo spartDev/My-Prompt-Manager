@@ -16,7 +16,7 @@ export class PerplexityStrategy extends PlatformStrategy {
       selectors: [
         'div[contenteditable="true"][role="textbox"]#ask-input'
       ],
-      buttonContainerSelector: '.bg-raised.flex.items-center.justify-self-end.rounded-full',
+      buttonContainerSelector: '.flex.items-center.justify-self-end.col-start-3.row-start-2',
       priority: 80
     });
   }
