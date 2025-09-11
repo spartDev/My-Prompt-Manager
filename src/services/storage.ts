@@ -176,40 +176,42 @@ export class StorageManager {
   }
 
   async importCategory(category: Category): Promise<Category> {
-    try {
-      const existingCategories = await this.getCategories();
-      const existingIndex = existingCategories.findIndex(c => c.id === category.id);
-      
-      if (existingIndex >= 0) {
-        // Update existing category
-        existingCategories[existingIndex] = category;
-        await this.setStorageData(this.STORAGE_KEYS.CATEGORIES, existingCategories);
-        return category;
-      } else {
-        // Check for duplicate names before adding new category
-        const duplicateNameIndex = existingCategories.findIndex(
-          c => c.name.toLowerCase() === category.name.toLowerCase()
-        );
+    return this.withLock(this.STORAGE_KEYS.CATEGORIES, async () => {
+      try {
+        const existingCategories = await this.getCategories();
+        const existingIndex = existingCategories.findIndex(c => c.id === category.id);
         
-        if (duplicateNameIndex >= 0) {
-          // Update the existing category with the same name, preserving the existing ID
-          const updatedCategory: Category = {
-            ...category,
-            id: existingCategories[duplicateNameIndex].id // Keep existing ID
-          };
-          existingCategories[duplicateNameIndex] = updatedCategory;
+        if (existingIndex >= 0) {
+          // Update existing category
+          existingCategories[existingIndex] = category;
           await this.setStorageData(this.STORAGE_KEYS.CATEGORIES, existingCategories);
-          return updatedCategory;
-        } else {
-          // Add new category
-          const updatedCategories = [...existingCategories, category];
-          await this.setStorageData(this.STORAGE_KEYS.CATEGORIES, updatedCategories);
           return category;
+        } else {
+          // Check for duplicate names before adding new category
+          const duplicateNameIndex = existingCategories.findIndex(
+            c => c.name.toLowerCase() === category.name.toLowerCase()
+          );
+          
+          if (duplicateNameIndex >= 0) {
+            // Update the existing category with the same name, preserving the existing ID
+            const updatedCategory: Category = {
+              ...category,
+              id: existingCategories[duplicateNameIndex].id // Keep existing ID
+            };
+            existingCategories[duplicateNameIndex] = updatedCategory;
+            await this.setStorageData(this.STORAGE_KEYS.CATEGORIES, existingCategories);
+            return updatedCategory;
+          } else {
+            // Add new category
+            const updatedCategories = [...existingCategories, category];
+            await this.setStorageData(this.STORAGE_KEYS.CATEGORIES, updatedCategories);
+            return category;
+          }
         }
+      } catch (error) {
+        throw this.handleStorageError(error);
       }
-    } catch (error) {
-      throw this.handleStorageError(error);
-    }
+    });
   }
 
   async getCategories(): Promise<Category[]> {
