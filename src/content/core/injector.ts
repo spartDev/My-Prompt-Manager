@@ -727,8 +727,8 @@ export class PromptLibraryInjector {
         
         // For Perplexity, find the toolbar container and inject as first child
         if (this.state.hostname === 'www.perplexity.ai' && !injected) {
-          // Look for the toolbar container with class pattern matching
-          const toolbarContainer = document.querySelector('div.bg-raised[class*="flex"][class*="items-center"][class*="rounded-full"]');
+          // Use the strategy's button container selector
+          const toolbarContainer = document.querySelector(containerSelector);
           if (toolbarContainer) {
             // Insert as the first child in the container
             toolbarContainer.insertBefore(icon, toolbarContainer.firstChild);
