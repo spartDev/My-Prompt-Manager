@@ -60,15 +60,71 @@ const DataStorageSection: FC<DataStorageSectionProps> = ({
     setImporting(true);
     try {
       const text = await file.text();
-      const data = JSON.parse(text) as { prompts?: Prompt[]; categories?: Category[] };
       
-      if (!data.prompts || !Array.isArray(data.prompts)) {
-        throw new Error('Invalid backup file: missing prompts data');
+      // Parse JSON with better error handling
+      let data: unknown;
+      try {
+        data = JSON.parse(text) as unknown;
+      } catch {
+        throw new Error('Invalid JSON format. Please select a valid backup file.');
+      }
+      
+      // Validate the basic structure
+      if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+        throw new Error('Invalid backup file: file does not contain valid data structure.');
+      }
+
+      // Cast to expected type after basic validation
+      const typedData = data as { prompts?: Prompt[]; categories?: Category[]; version?: string; exportDate?: string };
+
+      if (!typedData.prompts || !Array.isArray(typedData.prompts)) {
+        throw new Error('Invalid backup file: missing or invalid prompts data.');
+      }
+
+      if (typedData.categories && !Array.isArray(typedData.categories)) {
+        throw new Error('Invalid backup file: categories data is not in valid format.');
+      }
+
+      // Validate prompt structure
+      const invalidPrompt = (typedData.prompts as unknown[]).find((prompt) => {
+        if (typeof prompt !== 'object' || prompt === null || Array.isArray(prompt)) {
+          return true;
+        }
+        const p = prompt as Record<string, unknown>;
+        if (typeof p.title !== 'string' || typeof p.content !== 'string') {
+          return true;
+        }
+        if (typeof p.category !== 'string') {
+          return true;
+        }
+        return false;
+      });
+
+      if (invalidPrompt) {
+        throw new Error('Invalid backup file: one or more prompts have invalid structure.');
+      }
+
+      // Validate category structure if present
+      if (typedData.categories && typedData.categories.length > 0) {
+        const invalidCategory = (typedData.categories as unknown[]).find(category => {
+          if (typeof category !== 'object' || category === null || Array.isArray(category)) {
+            return true;
+          }
+          const c = category as Record<string, unknown>;
+          if (typeof c.name !== 'string') {
+            return true;
+          }
+          return false;
+        });
+
+        if (invalidCategory) {
+          throw new Error('Invalid backup file: one or more categories have invalid structure.');
+        }
       }
 
       await onImport({
-        prompts: data.prompts,
-        categories: data.categories || []
+        prompts: typedData.prompts,
+        categories: typedData.categories || []
       });
 
       // Reset file input
@@ -77,7 +133,10 @@ const DataStorageSection: FC<DataStorageSectionProps> = ({
       }
     } catch (error) {
       console.error('Import failed:', error);
-      alert('Failed to import data. Please check the file format.');
+      
+      // Show more specific error messages
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      alert(`Import failed: ${errorMessage}\n\nPlease ensure you are selecting a valid backup file exported from this extension.`);
     } finally {
       setImporting(false);
     }

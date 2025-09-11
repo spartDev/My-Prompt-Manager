@@ -34,7 +34,8 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
     error: promptsError,
     createPrompt, 
     updatePrompt, 
-    deletePrompt 
+    deletePrompt,
+    refreshPrompts
   } = usePrompts();
 
   const { 
@@ -42,7 +43,8 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
     loading: categoriesLoading,
     createCategory,
     updateCategory,
-    deleteCategory 
+    deleteCategory,
+    refreshCategories 
   } = useCategories();
 
   const { copyToClipboard } = useClipboard();
@@ -216,6 +218,9 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
         <SettingsView
           onBack={() => {
             setCurrentView('library');
+            // Refresh data to ensure imported prompts/categories are visible
+            void refreshPrompts();
+            void refreshCategories();
           }}
         />
       )}

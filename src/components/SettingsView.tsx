@@ -310,14 +310,14 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
   // Handle import data
   const handleImportData = async (data: { prompts: Prompt[]; categories: Category[] }) => {
     try {
-      // Import categories first
+      // Import categories first (prompts reference categories)
       for (const category of data.categories) {
-        await storageManager.saveCategory(category);
+        await storageManager.importCategory(category);
       }
       
       // Import prompts
       for (const prompt of data.prompts) {
-        await storageManager.savePrompt(prompt);
+        await storageManager.importPrompt(prompt);
       }
       
       // Reload data
