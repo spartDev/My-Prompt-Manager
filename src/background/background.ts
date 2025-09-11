@@ -6,6 +6,9 @@
 // Track active element picker sessions
 const activePickerSessions = new Map<number, { tabId: number; windowId: number }>();
 
+// Configuration constants
+const ORPHANED_TAB_DETECTION_WINDOW_MS = 10000; // 10 seconds after extension start
+
 /**
  * Content script injection controller
  * Handles programmatic injection of content scripts based on site enablement
@@ -13,6 +16,8 @@ const activePickerSessions = new Map<number, { tabId: number; windowId: number }
 class ContentScriptInjector {
   private injectedTabs: Set<number> = new Set();
   private injectionPromises: Map<number, Promise<void>> = new Map();
+  private extensionStartTime: number = Date.now();
+  private orphanedTabs: Set<number> = new Set();
 
   /**
    * Inject content script if needed for the given tab
@@ -161,6 +166,18 @@ class ContentScriptInjector {
    */
   private async canInjectIntoTab(tabId: number): Promise<boolean> {
     try {
+      const tab = await chrome.tabs.get(tabId);
+      
+      // Check if tab is in a valid state
+      if (!tab.url || tab.status !== 'complete') {
+        return false;
+      }
+      
+      // Don't try to inject into restricted URLs
+      if (this.isRestrictedUrl(tab.url)) {
+        return false;
+      }
+      
       // Try to execute a minimal script to test access
       await chrome.scripting.executeScript({
         target: { tabId },
@@ -170,6 +187,45 @@ class ContentScriptInjector {
     } catch {
       return false;
     }
+  }
+
+  /**
+   * Classify injection error types for appropriate handling
+   */
+  private classifyInjectionError(error: Error, tabId: number): 'permission' | 'tab_access_denied' | 'orphaned_tab' | 'network' | 'tab_closed' | 'security' | 'unknown' {
+    const message = error.message;
+    
+    // Check if this is an orphaned tab from before extension reload
+    if (this.isLikelyOrphanedTab(tabId) && message.includes('tab access denied')) {
+      return 'orphaned_tab';
+    }
+    
+    if (message.includes('No permission to inject into')) {
+      return 'permission';
+    }
+    if (message.includes('tab access denied')) {
+      return 'tab_access_denied';
+    }
+    if (message.includes('interrupted by user')) {
+      return 'network';
+    }
+    if (message.includes('No tab with id')) {
+      return 'tab_closed';
+    }
+    if (message.includes('violates CSP')) {
+      return 'security';
+    }
+    
+    return 'unknown';
+  }
+
+  /**
+   * Check if a tab is likely orphaned from before extension reload
+   */
+  private isLikelyOrphanedTab(_tabId: number): boolean {
+    // If tab was created before extension started, it might be orphaned
+    const timeSinceExtensionStart = Date.now() - this.extensionStartTime;
+    return timeSinceExtensionStart < ORPHANED_TAB_DETECTION_WINDOW_MS;
   }
 
   /**
@@ -188,10 +244,7 @@ class ContentScriptInjector {
       // Double-check permissions right before injection
       const hasPermission = await this.hasPermissionForHostname(hostname);
       if (!hasPermission) {
-        // This is expected for most sites - log at debug level only
-        const errorMessage = `No permission to inject into ${hostname}`;
-
-        throw new Error(errorMessage);
+        throw new Error(`No permission to inject into ${hostname}`);
       }
       
       // More robust check: test if we can actually inject into this specific tab
@@ -217,13 +270,33 @@ class ContentScriptInjector {
     } catch (error) {
       const hostname = await this.getTabHostname(tabId);
       
-      // Classify error types
-      if (error instanceof Error && error.message.includes('No permission to inject into')) {
-        // This is expected for most sites - suppress error logging
-        // Debug logging removed to avoid console statement linting warnings
-      } else {
-        // This is an unexpected injection failure - always log as error
-        console.error('[ContentScriptInjector] Unexpected injection failure for tab', tabId, 'hostname:', hostname, ':', error);
+      // Classify error and handle appropriately
+      const errorType = this.classifyInjectionError(error as Error, tabId);
+      
+      switch (errorType) {
+        case 'permission':
+          // Expected for most sites - suppress logging for cleaner console
+          break;
+        case 'orphaned_tab':
+          // Expected after extension reload - suppress logging and mark as orphaned
+          this.orphanedTabs.add(tabId);
+          break;
+        case 'tab_access_denied':
+          // Log warning for unexpected access issues (not orphaned tabs)
+          if (!this.isLikelyOrphanedTab(tabId)) {
+            console.error('[ContentScriptInjector] Tab access denied for tab', tabId, 'hostname:', hostname);
+          }
+          break;
+        case 'network':
+        case 'tab_closed':
+          // Transient errors - suppress logging
+          break;
+        case 'security':
+        case 'unknown':
+        default:
+          // Unexpected errors - always log
+          console.error('[ContentScriptInjector] Unexpected injection failure for tab', tabId, 'hostname:', hostname, 'error type:', errorType, ':', error);
+          break;
       }
       
       throw error;
@@ -232,16 +305,63 @@ class ContentScriptInjector {
 
   /**
    * Check if content script is already injected in the tab
+   * Also performs cleanup of orphaned DOM elements from previous injections
    */
   async isContentScriptInjected(tabId: number): Promise<boolean> {
     try {
       const [result] = await chrome.scripting.executeScript({
         target: { tabId },
         func: () => {
-          return (window as { __promptLibraryInjected?: boolean }).__promptLibraryInjected === true;
+          const isInjected = (window as { __promptLibraryInjected?: boolean }).__promptLibraryInjected === true;
+          
+          // If not injected, clean up any orphaned DOM elements from previous extension versions
+          if (!isInjected) {
+            try {
+              // Remove any orphaned icons
+              const orphanedIcons = document.querySelectorAll('.prompt-library-cleanup-target, [data-prompt-library-icon]');
+              orphanedIcons.forEach(icon => {
+                try {
+                  icon.remove();
+                } catch {
+                  // Element might already be removed
+                }
+              });
+              
+              // Remove any orphaned selectors
+              const orphanedSelectors = document.querySelectorAll('.prompt-library-selector');
+              orphanedSelectors.forEach(selector => {
+                try {
+                  selector.remove();
+                } catch {
+                  // Element might already be removed
+                }
+              });
+              
+              // Return cleanup info along with injection status
+              return {
+                isInjected: false,
+                orphanedElements: orphanedIcons.length + orphanedSelectors.length
+              };
+            } catch {
+              return { isInjected: false, orphanedElements: 0 };
+            }
+          }
+          
+          return { isInjected: true, orphanedElements: 0 };
         }
       });
-      return result.result === true;
+      
+      if (typeof result.result === 'boolean') {
+        // Legacy response format
+        return result.result;
+      } else if (result.result && typeof result.result === 'object') {
+        // New response format with cleanup info
+        const { isInjected } = result.result as { isInjected: boolean; orphanedElements: number };
+        // Silent cleanup - no logging needed for expected orphaned element removal
+        return isInjected;
+      }
+      
+      return false;
     } catch {
       return false;
     }
@@ -252,28 +372,45 @@ class ContentScriptInjector {
    */
   async forceInjectContentScript(tabId: number): Promise<{ success: boolean; error?: string }> {
     try {
-      // Remove from injected tabs to force re-injection
+      // Remove from injected and orphaned tabs to force re-injection
       this.injectedTabs.delete(tabId);
+      this.orphanedTabs.delete(tabId);
       await this.injectContentScript(tabId);
       this.injectedTabs.add(tabId);
       return { success: true };
     } catch (error) {
       const hostname = await this.getTabHostname(tabId);
+      const errorType = this.classifyInjectionError(error as Error, tabId);
       
       // Handle different error types appropriately
-      if (error instanceof Error && error.message.includes('No permission to inject into')) {
-        // Permission error - this might be expected, suppress debug logging
-        return { 
-          success: false, 
-          error: `Permission required for ${hostname}. Please grant permission to use the extension on this site.`
-        };
-      } else {
-        // Unexpected error - always log
-        console.error('[ContentScriptInjector] Force injection failed for tab', tabId, 'hostname:', hostname, ':', error);
-        return { 
-          success: false, 
-          error: error instanceof Error ? error.message : 'Failed to inject content script'
-        };
+      switch (errorType) {
+        case 'permission':
+          return { 
+            success: false, 
+            error: `Permission required for ${hostname}. Please grant permission to use the extension on this site.`
+          };
+        case 'orphaned_tab':
+          return {
+            success: false,
+            error: `Please refresh this tab and try again. The extension was recently reloaded.`
+          };
+        case 'tab_access_denied':
+          return {
+            success: false,
+            error: `Cannot access this tab. Please refresh the page and try again.`
+          };
+        case 'tab_closed':
+          return {
+            success: false,
+            error: `Tab is no longer available.`
+          };
+        default:
+          // Log unexpected errors
+          console.error('[ContentScriptInjector] Force injection failed for tab', tabId, 'hostname:', hostname, 'error type:', errorType, ':', error);
+          return { 
+            success: false, 
+            error: error instanceof Error ? error.message : 'Failed to inject content script'
+          };
       }
     }
   }
@@ -284,6 +421,7 @@ class ContentScriptInjector {
   cleanup(tabId: number): void {
     this.injectedTabs.delete(tabId);
     this.injectionPromises.delete(tabId);
+    this.orphanedTabs.delete(tabId);
   }
 
   /**
@@ -339,10 +477,12 @@ class ContentScriptInjector {
   /**
    * Get injection status for debugging
    */
-  getInjectionStatus(): { injectedTabs: number[]; activePromises: number[] } {
+  getInjectionStatus(): { injectedTabs: number[]; activePromises: number[]; orphanedTabs: number[]; extensionUptime: number } {
     return {
       injectedTabs: Array.from(this.injectedTabs),
-      activePromises: Array.from(this.injectionPromises.keys())
+      activePromises: Array.from(this.injectionPromises.keys()),
+      orphanedTabs: Array.from(this.orphanedTabs),
+      extensionUptime: Date.now() - this.extensionStartTime
     };
   }
 
@@ -607,6 +747,7 @@ async function handleRequestPermission(origins: string[], sendResponse: (respons
 
 /**
  * Handle extension updates by re-injecting content scripts
+ * This method gracefully handles existing tabs that may have orphaned content scripts
  */
 async function handleExtensionUpdate(): Promise<void> {
   try {
@@ -623,8 +764,9 @@ async function handleExtensionUpdate(): Promise<void> {
       ...customSites.filter((s) => s.enabled).map((s) => s.hostname)
     ];
 
-    // Get all tabs and re-inject where appropriate
+    // Get all tabs and identify those that need re-injection
     const tabs = await chrome.tabs.query({});
+    const reinjectionResults: Array<{ tabId: number; hostname: string; success: boolean }> = [];
     
     for (const tab of tabs) {
       if (tab.id && tab.url) {
@@ -633,7 +775,13 @@ async function handleExtensionUpdate(): Promise<void> {
           const hostname = url.hostname;
           
           if (allEnabledHosts.includes(hostname)) {
-            await injector.forceInjectContentScript(tab.id);
+            // Try to inject - this will be handled gracefully for orphaned tabs
+            const result = await injector.forceInjectContentScript(tab.id);
+            reinjectionResults.push({ 
+              tabId: tab.id, 
+              hostname, 
+              success: result.success 
+            });
           }
         } catch {
           // Invalid URL, skip
@@ -642,7 +790,14 @@ async function handleExtensionUpdate(): Promise<void> {
       }
     }
     
-    // Extension update injection complete
+    // Only log if there were actual issues during re-injection
+    const failedReinjections = reinjectionResults.filter(r => !r.success);
+    if (failedReinjections.length > 0) {
+      console.error(`[ContentScriptInjector] Failed to re-inject content scripts into ${String(failedReinjections.length)} tabs after extension update`);
+    }
+    
+    // Silent success for cleaner console output
+    // Successfully processed extension update for [N] tabs
   } catch (error) {
     console.error('[Background] Error handling extension update:', error);
   }
