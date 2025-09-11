@@ -583,8 +583,14 @@ export class PromptLibraryInjector {
       existingIcons.forEach(icon => {
         try {
           icon.remove();
-        } catch {
-          // Icon might have already been removed, continue
+        } catch (error) {
+          // Expected errors: InvalidStateError (already removed), NotFoundError (parent changed)
+          if (error instanceof DOMException && 
+              (error.name === 'InvalidStateError' || error.name === 'NotFoundError')) {
+            // Element was already removed or parent structure changed - continue silently
+          } else {
+            warn('Unexpected error removing existing icon', error as Error);
+          }
         }
       });
 
@@ -593,8 +599,14 @@ export class PromptLibraryInjector {
       dataIcons.forEach(icon => {
         try {
           icon.remove();
-        } catch {
-          // Icon might have already been removed, continue
+        } catch (error) {
+          // Expected errors: InvalidStateError (already removed), NotFoundError (parent changed)
+          if (error instanceof DOMException && 
+              (error.name === 'InvalidStateError' || error.name === 'NotFoundError')) {
+            // Element was already removed or parent structure changed - continue silently
+          } else {
+            warn('Unexpected error removing data icon', error as Error);
+          }
         }
       });
 
@@ -603,8 +615,14 @@ export class PromptLibraryInjector {
       floatingIcons.forEach(icon => {
         try {
           icon.remove();
-        } catch {
-          // Icon might have already been removed, continue
+        } catch (error) {
+          // Expected errors: InvalidStateError (already removed), NotFoundError (parent changed)
+          if (error instanceof DOMException && 
+              (error.name === 'InvalidStateError' || error.name === 'NotFoundError')) {
+            // Element was already removed or parent structure changed - continue silently
+          } else {
+            warn('Unexpected error removing floating icon', error as Error);
+          }
         }
       });
 
@@ -613,8 +631,14 @@ export class PromptLibraryInjector {
       existingSelectors.forEach(selector => {
         try {
           selector.remove();
-        } catch {
-          // Selector might have already been removed, continue
+        } catch (error) {
+          // Expected errors: InvalidStateError (already removed), NotFoundError (parent changed)
+          if (error instanceof DOMException && 
+              (error.name === 'InvalidStateError' || error.name === 'NotFoundError')) {
+            // Element was already removed or parent structure changed - continue silently
+          } else {
+            warn('Unexpected error removing selector', error as Error);
+          }
         }
       });
 

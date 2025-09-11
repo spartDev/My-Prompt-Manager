@@ -6,6 +6,9 @@
 // Track active element picker sessions
 const activePickerSessions = new Map<number, { tabId: number; windowId: number }>();
 
+// Configuration constants
+const ORPHANED_TAB_DETECTION_WINDOW_MS = 10000; // 10 seconds after extension start
+
 /**
  * Content script injection controller
  * Handles programmatic injection of content scripts based on site enablement
@@ -222,7 +225,7 @@ class ContentScriptInjector {
   private isLikelyOrphanedTab(_tabId: number): boolean {
     // If tab was created before extension started, it might be orphaned
     const timeSinceExtensionStart = Date.now() - this.extensionStartTime;
-    return timeSinceExtensionStart < 10000; // Within 10 seconds of extension start
+    return timeSinceExtensionStart < ORPHANED_TAB_DETECTION_WINDOW_MS;
   }
 
   /**
@@ -794,7 +797,7 @@ async function handleExtensionUpdate(): Promise<void> {
     }
     
     // Silent success for cleaner console output
-    // Successfully processed extension update for ${successfulReinjections.length} tabs
+    // Successfully processed extension update for [N] tabs
   } catch (error) {
     console.error('[Background] Error handling extension update:', error);
   }
