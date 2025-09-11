@@ -573,17 +573,75 @@ export class PromptLibraryInjector {
   }
 
   /**
+   * Removes all existing prompt library icons from the DOM
+   * This prevents duplicate icons after extension reloads
+   */
+  private removeAllExistingIcons(): void {
+    try {
+      // Remove icons by cleanup class selector (covers all instances)
+      const existingIcons = document.querySelectorAll('.prompt-library-cleanup-target');
+      existingIcons.forEach(icon => {
+        try {
+          icon.remove();
+        } catch {
+          // Icon might have already been removed, continue
+        }
+      });
+
+      // Remove icons by data attribute (additional safety)
+      const dataIcons = document.querySelectorAll('[data-prompt-library-icon]');
+      dataIcons.forEach(icon => {
+        try {
+          icon.remove();
+        } catch {
+          // Icon might have already been removed, continue
+        }
+      });
+
+      // Remove any floating icons (absolute positioned ones)
+      const floatingIcons = document.querySelectorAll('[data-prompt-library-floating]');
+      floatingIcons.forEach(icon => {
+        try {
+          icon.remove();
+        } catch {
+          // Icon might have already been removed, continue
+        }
+      });
+
+      // Also remove any prompt selectors that might be open
+      const existingSelectors = document.querySelectorAll('.prompt-library-selector');
+      existingSelectors.forEach(selector => {
+        try {
+          selector.remove();
+        } catch {
+          // Selector might have already been removed, continue
+        }
+      });
+
+      debug('Removed all existing extension elements from DOM', {
+        iconsRemoved: existingIcons.length,
+        dataIconsRemoved: dataIcons.length,
+        floatingIconsRemoved: floatingIcons.length,
+        selectorsRemoved: existingSelectors.length
+      });
+    } catch (error) {
+      warn('Error during global icon cleanup', error as Error);
+    }
+  }
+
+  /**
    * Injects the icon near the textarea
    */
   private injectIcon(textarea: HTMLElement): void {
     try {
       debug('Starting icon injection', { textareaTag: textarea.tagName });
 
-      // Remove existing icon
-      if (this.state.icon) {
-        this.state.icon.remove();
-        this.state.icon = null;
-      }
+      // Remove ALL existing icons from the DOM (not just current instance)
+      // This prevents duplicates after extension reloads
+      this.removeAllExistingIcons();
+
+      // Clear current instance icon reference
+      this.state.icon = null;
 
       // Create platform-specific icon
       const icon = this.platformManager.createIcon(this.uiFactory);
@@ -594,6 +652,11 @@ export class PromptLibraryInjector {
 
       this.state.icon = icon;
       debug('Icon created successfully');
+
+      // Mark icon with identifying attributes for cleanup (using non-conflicting class)
+      icon.classList.add('prompt-library-cleanup-target');
+      icon.setAttribute('data-prompt-library-icon', 'true');
+      icon.setAttribute('data-instance-id', this.state.instanceId);
 
       // Add click handler
       this.eventManager.addTrackedEventListener(icon, 'click', (e: Event) => {
@@ -745,6 +808,8 @@ export class PromptLibraryInjector {
 
         // Ultimate fallback: default floating positioning
         this.positionIcon(icon, textarea);
+        // Mark floating icons for easier cleanup
+        icon.setAttribute('data-prompt-library-floating', 'true');
         document.body.appendChild(icon);
         debug('Icon positioned with default floating position (final fallback)');
       }
