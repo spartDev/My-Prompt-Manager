@@ -19,7 +19,8 @@ src/content/
 │   ├── logger.ts              # Logging utilities
 │   ├── dom.ts                 # DOM manipulation utilities
 │   ├── storage.ts             # Storage management utilities
-│   └── styles.ts              # CSS injection utilities
+│   ├── styles.ts              # CSS injection utilities
+│   └── theme-manager.ts       # Theme synchronization utilities
 ├── ui/
 │   ├── element-factory.ts     # UI element creation
 │   ├── keyboard-navigation.ts # Keyboard navigation manager
@@ -31,6 +32,8 @@ src/content/
 │   ├── perplexity-strategy.ts # Perplexity implementation
 │   ├── default-strategy.ts    # Default/fallback implementation
 │   └── platform-manager.ts    # Platform management
+├── modules/
+│   └── element-picker.ts      # Security-focused element picker with audit logging
 └── core/
     ├── injector.ts           # Main prompt library injector
     └── insertion-manager.ts   # Platform insertion manager
@@ -104,6 +107,15 @@ Manages CSS injection for the content script UI.
 #### **DOM Utilities** (`utils/dom.ts`)
 Provides safe DOM manipulation utilities with proper TypeScript typing.
 
+#### **ThemeManager** (`utils/theme-manager.ts`)
+Handles theme synchronization between the extension and host platforms.
+
+**Key Features:**
+- Automatic theme detection from host platform
+- Synchronization with extension popup theme
+- Support for light/dark mode switching
+- CSS custom property management
+
 ### UI Components (`src/content/ui/`)
 
 #### **EventManager** (`ui/event-manager.ts`)
@@ -159,6 +171,31 @@ Manages platform strategies and handles strategy selection.
 - Strategy registration and management
 - Automatic strategy selection based on element compatibility
 - Fallback handling for unsupported platforms
+
+### Security Modules (`src/content/modules/`)
+
+#### **ElementPicker** (`modules/element-picker.ts`)
+Provides secure element selection functionality with comprehensive security safeguards.
+
+**Security Features:**
+- **Blocked Selectors**: 20+ patterns preventing interaction with sensitive fields
+- **Domain Sensitivity Detection**: Pattern-based identification of financial, government, and healthcare sites
+- **Audit Logging**: Session storage-based security incident tracking
+- **Visual Security Feedback**: Color-coded highlighting (red for blocked, purple for allowed)
+- **Data Minimization**: Zero extraction of sensitive field content
+
+**Key Constants:**
+- `BLOCKED_SELECTORS`: Array of security-focused CSS selectors
+- `SENSITIVE_DOMAINS`: Pattern-based domain classification
+- `MAX_AUDIT_ENTRIES`: Audit log size management
+- `WARNING_DISMISS_TIMEOUT`: User notification timing
+
+**Core Methods:**
+- `startPicking()`: Initiates secure element selection mode
+- `stopPicking()`: Cleanly exits selection mode with cleanup
+- `auditLog()`: Records security events for compliance
+- `isElementBlocked()`: Multi-layer security validation
+- `showSecurityWarning()`: User-facing security notifications
 
 ### Type Definitions (`src/content/types/`)
 
@@ -227,6 +264,14 @@ Manages platform strategies and handles strategy selection.
 - Z-index customization
 
 ### Security Implementation
+
+#### Element Picker Security (New in v1.1)
+- **Multi-Layer Validation**: Direct selector matching, parent container analysis, attribute pattern matching
+- **Sensitive Field Detection**: 20+ blocked selector patterns for passwords, payments, SSNs, etc.
+- **Domain Classification**: Automatic detection of financial, government, and healthcare sites
+- **Audit Logging System**: Comprehensive security event tracking with session storage
+- **Visual Security Feedback**: Color-coded element highlighting for user awareness
+- **Zero Data Extraction**: Complete elimination of sensitive content extraction
 
 #### DOM Construction Security
 - **No innerHTML Usage**: All dynamic content uses `textContent` or `createTextNode()`
@@ -301,13 +346,15 @@ The modular TypeScript content script is built using Vite with the CRX plugin:
 - Source map generation for debugging
 - Module bundling for content script context
 - Chrome extension manifest integration
+- Side panel and multi-entry point support
 
 **Build Commands:**
 ```bash
 npm run build          # Production build
 npm run dev            # Development with HMR
-npm test -- --run      # Run test suite
+npm test               # Run test suite (470+ tests)
 npm run lint           # Code linting
+npm run package        # Package for Chrome Web Store
 ```
 
 ### TypeScript Configuration
@@ -333,6 +380,7 @@ src/content/
 ├── core/__tests__/         # Core component tests
 ├── platforms/__tests__/    # Platform strategy tests
 ├── ui/__tests__/           # UI component tests
+├── modules/__tests__/      # Security module tests
 └── utils/__tests__/        # Utility tests
 ```
 

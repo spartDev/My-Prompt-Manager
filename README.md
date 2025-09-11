@@ -1,8 +1,8 @@
 # My Prompt Manager - Chrome Extension
 
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/spartDev/My-Prompt-Manager)
+[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/spartDev/My-Prompt-Manager)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Chrome](https://img.shields.io/badge/Chrome-88%2B-yellow.svg)](https://www.google.com/chrome/)
+[![Chrome](https://img.shields.io/badge/Chrome-114%2B-yellow.svg)](https://www.google.com/chrome/)
 [![Tests](https://img.shields.io/badge/tests-470%20passing-brightgreen.svg)](https://github.com/spartDev/My-Prompt-Manager)
 
 A powerful Chrome extension that provides seamless access to your personal prompt library directly within popular AI chat interfaces. Features both a popup interface for managing prompts and native integration with Claude, ChatGPT, Perplexity, and more.
@@ -19,7 +19,8 @@ A powerful Chrome extension that provides seamless access to your personal promp
 ✅ **Quick Actions:** One-click copy to clipboard, edit in-place, and bulk operations  
 ✅ **Dark Mode Support:** Beautiful dark theme with automatic system preference detection  
 ✅ **Data Persistence:** Automatic saving using Chrome's storage API with quota monitoring  
-✅ **Security First:** DOMPurify sanitization for XSS protection
+✅ **Security First:** DOMPurify sanitization for XSS protection  
+✅ **Import/Export:** JSON backup and restore functionality with data portability
 
 ### AI Platform Integration
 ✅ **Native Integration:** Library icon appears seamlessly in AI chat interfaces  
@@ -27,7 +28,8 @@ A powerful Chrome extension that provides seamless access to your personal promp
 ✅ **Universal Compatibility:** Works with textarea and contenteditable elements  
 ✅ **Keyboard Navigation:** Full keyboard support for accessibility  
 ✅ **Custom Sites:** Add support for any AI platform through settings  
-✅ **Theme Synchronization:** Matches the host platform's theme automatically
+✅ **Theme Synchronization:** Matches the host platform's theme automatically  
+✅ **Side Panel Support:** Chrome 114+ dual interface mode (popup or side panel)
 
 ## 🎯 Supported Platforms
 
@@ -58,7 +60,7 @@ A powerful Chrome extension that provides seamless access to your personal promp
 ### Prerequisites
 
 - [Node.js](https://nodejs.org/) 18+ (LTS recommended)
-- [Chrome Browser](https://www.google.com/chrome/) 88+
+- [Chrome Browser](https://www.google.com/chrome/) 114+
 - [Git](https://git-scm.com/) for cloning the repository
 
 ### Development Setup
@@ -280,8 +282,11 @@ npm test -- src/content/platforms/__tests__/claude-strategy.test.ts
 - **Content Security Policy (CSP):** Strict CSP prevents XSS attacks
 - **DOMPurify Integration:** All user content is sanitized
 - **Minimal Permissions:** Only essential Chrome APIs requested
+- **Restricted Host Access:** No code execution on unrelated sites
+- **Chrome Web Store Compliance:** Follows security best practices
 - **Local Storage Only:** No data leaves your device
 - **No Analytics:** Zero tracking or telemetry
+- **Element Picker Security:** Comprehensive safeguards for sensitive fields
 
 ### Privacy Commitment
 
@@ -295,10 +300,10 @@ npm test -- src/content/platforms/__tests__/claude-strategy.test.ts
 
 | Browser | Minimum Version | Status |
 |---------|----------------|---------|
-| Chrome | 88+ | ✅ Fully Supported |
-| Edge | 88+ | ✅ Fully Supported |
-| Brave | 1.36+ | ✅ Fully Supported |
-| Opera | 74+ | ⚠️ Should work (untested) |
+| Chrome | 114+ | ✅ Fully Supported |
+| Edge | 114+ | ✅ Fully Supported |
+| Brave | 1.58+ | ✅ Fully Supported |
+| Opera | 100+ | ⚠️ Should work (untested) |
 | Firefox | - | ❌ Not supported (Manifest V3) |
 
 ## 🤝 Contributing
@@ -390,19 +395,23 @@ window.__promptLibraryDebug?.testInsertion?.('test content')
 
 ## 📈 Roadmap
 
-### Version 1.0 (Current)
+### Version 1.1 (Current)
 - [x] Core prompt management
 - [x] Multi-platform AI integration
 - [x] Dark mode support
 - [x] Custom site configuration
 - [x] Comprehensive testing
+- [x] Side Panel Support (Chrome 114+)
+- [x] Enhanced Security Architecture
+- [x] Import/Export functionality (JSON)
+- [x] Programmatic Content Script Injection
 
-### Version 1.1 (Planned)
-- [ ] Import/Export functionality (JSON, CSV)
+### Version 1.2 (Planned)
 - [ ] Prompt templates with variables
 - [ ] Keyboard shortcuts customization
 - [ ] Prompt usage analytics
-- [ ] Backup and restore
+- [ ] Enhanced CSV export options
+- [ ] Prompt sharing and synchronization
 
 ## 📄 License
 
