@@ -1,6 +1,6 @@
 # My Prompt Manager - Chrome Extension
 
-[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/spartDev/My-Prompt-Manager)
+[![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)](https://github.com/spartDev/My-Prompt-Manager)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Chrome](https://img.shields.io/badge/Chrome-114%2B-yellow.svg)](https://www.google.com/chrome/)
 [![Tests](https://img.shields.io/badge/tests-470%20passing-brightgreen.svg)](https://github.com/spartDev/My-Prompt-Manager)

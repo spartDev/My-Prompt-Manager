@@ -450,7 +450,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
 
           {/* About & Reset Section */}
           <AboutSection
-            version="1.1.0"
+            version="1.2.0"
             onReset={handleResetSettings}
           />
         </div>
