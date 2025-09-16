@@ -26,20 +26,20 @@ jobs:
       node-version: ${{ env.NODE_VERSION }}
     steps:
       - name: 🛎️ Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
         with:
           # Fetch full history for better caching and analysis
           fetch-depth: 0
 
       - name: 🟢 Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
       - name: 📦 Cache Dependencies
         id: cache-deps
-        uses: actions/cache@v4
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4
         with:
           path: |
             ~/.npm
@@ -66,16 +66,16 @@ jobs:
     if: github.event.pull_request.draft == false
     steps:
       - name: 🛎️ Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
 
       - name: 🟢 Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ needs.setup.outputs.node-version }}
           cache: 'npm'
 
       - name: 📦 Restore Dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4
         with:
           path: |
             ~/.npm
@@ -87,7 +87,7 @@ jobs:
         run: npm ci --prefer-offline --no-audit
 
       - name: 📋 Cache ESLint Results
-        uses: actions/cache@v4
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4
         with:
           path: .eslintcache
           key: ${{ runner.os }}-eslint-${{ hashFiles('.eslintrc.*', 'eslint.config.*', 'src/**/*.{ts,tsx}') }}
@@ -119,16 +119,16 @@ jobs:
       fail-fast: true # Stop immediately on first failure
     steps:
       - name: 🛎️ Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
 
       - name: 🟢 Setup Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
 
       - name: 📦 Restore Dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4
         with:
           path: |
             ~/.npm
@@ -154,7 +154,7 @@ jobs:
 
       - name: 📈 Upload Coverage Reports
         if: matrix.node-version == '22.x'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: coverage-reports
           path: coverage/
@@ -176,16 +176,16 @@ jobs:
     if: github.event.pull_request.draft == false
     steps:
       - name: 🛎️ Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
 
       - name: 🟢 Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ needs.setup.outputs.node-version }}
           cache: 'npm'
 
       - name: 📦 Restore Dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4
         with:
           path: |
             ~/.npm
@@ -197,7 +197,7 @@ jobs:
         run: npm ci --prefer-offline --no-audit
 
       - name: 📋 Cache Build Assets
-        uses: actions/cache@v4
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4
         with:
           path: |
             dist
@@ -227,7 +227,7 @@ jobs:
           npm run package
 
       - name: 📤 Upload Build Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: chrome-extension-build
           path: |
@@ -251,16 +251,16 @@ jobs:
     if: github.event.pull_request.draft == false
     steps:
       - name: 🛎️ Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
 
       - name: 🟢 Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ needs.setup.outputs.node-version }}
           cache: 'npm'
 
       - name: 📦 Restore Dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4
         with:
           path: |
             ~/.npm
@@ -278,7 +278,7 @@ jobs:
         continue-on-error: false # Fail on security vulnerabilities
 
       - name: 🔍 Dependency Review
-        uses: actions/dependency-review-action@v4
+        uses: actions/dependency-review-action@595b5aeba73380359d98a5e087f648dbb0edce1b # v4
         with:
           fail-on-severity: moderate
           allow-licenses: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC
@@ -359,7 +359,7 @@ jobs:
 
       - name: 📊 Add PR Comment with Results
         if: always()
-        uses: actions/github-script@v6
+        uses: actions/github-script@d7906e4ad0b1822421a7e6a35d5ca353c962f410 # v6
         with:
           script: |
             const results = {
