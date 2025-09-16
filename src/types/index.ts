@@ -97,5 +97,5 @@ export const DEFAULT_SETTINGS: Settings = {
   defaultCategory: DEFAULT_CATEGORY,
   sortOrder: 'updatedAt',
   theme: 'system',
-  interfaceMode: 'popup'
+  interfaceMode: 'sidepanel'
 };

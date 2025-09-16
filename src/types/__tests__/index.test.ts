@@ -18,7 +18,7 @@ describe('Type Definitions', () => {
         defaultCategory: 'Uncategorized',
         sortOrder: 'updatedAt',
         theme: 'system',
-        interfaceMode: 'popup'
+        interfaceMode: 'sidepanel'
       });
     });
 
