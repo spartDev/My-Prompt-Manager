@@ -808,7 +808,7 @@ async function handleExtensionUpdate(): Promise<void> {
  */
 async function getInterfaceMode(): Promise<InterfaceMode> {
   const result = await chrome.storage.local.get('interfaceMode');
-  return (result.interfaceMode as InterfaceMode | undefined) || 'popup';
+  return (result.interfaceMode as InterfaceMode | undefined) || 'sidepanel';
 }
 
 
