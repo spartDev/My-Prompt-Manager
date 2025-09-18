@@ -3,6 +3,7 @@ import type { FC, ReactNode } from 'react';
 
 import { StorageManager } from '../services/storage';
 import type { Prompt, Category, Settings as UserSettings } from '../types';
+import { DEFAULT_SETTINGS } from '../types';
 
 import { ClaudeIcon, ChatGPTIcon, PerplexityIcon } from './icons/SiteIcons';
 import AboutSection from './settings/AboutSection';
@@ -71,7 +72,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
   const [saving, setSaving] = useState(false);
   
   // Interface mode states
-  const [interfaceMode, setInterfaceMode] = useState<'popup' | 'sidepanel'>('popup');
+  const [interfaceMode, setInterfaceMode] = useState<'popup' | 'sidepanel'>(DEFAULT_SETTINGS.interfaceMode);
   const [interfaceModeChanging, setInterfaceModeChanging] = useState(false);
   
   // Data for import/export
@@ -119,7 +120,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
       
       // Load interface mode
       const savedInterfaceMode = result.interfaceMode as 'popup' | 'sidepanel' | undefined;
-      setInterfaceMode(savedInterfaceMode || 'popup');
+      setInterfaceMode(savedInterfaceMode || DEFAULT_SETTINGS.interfaceMode);
       
       // Load user settings (theme, view mode, etc.)
       const savedUserSettings = result.settings as UserSettings | undefined;
@@ -137,7 +138,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
     } catch (error) {
       console.error('Failed to load settings:', error instanceof Error ? error.message : 'Unknown error');
       setSettings(defaultSettings);
-      setInterfaceMode('popup');
+      setInterfaceMode(DEFAULT_SETTINGS.interfaceMode);
     } finally {
       setLoading(false);
     }
