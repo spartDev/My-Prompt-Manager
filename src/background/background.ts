@@ -425,53 +425,96 @@ class ContentScriptInjector {
   }
 
   /**
-   * Get the correct content script filename from the build manifest
+   * Get the correct content script filename from the extension manifest
    */
   private async getContentScriptFilename(): Promise<string> {
     try {
-      // Try to fetch the build manifest to get the correct filename
-      const manifestResponse = await fetch(chrome.runtime.getURL('.vite/manifest.json'));
-      const manifest = await manifestResponse.json() as Record<string, { file?: string } | undefined>;
-      
-      // Look for the content script entry
-      const contentEntry = manifest['src/content/index.ts'];
-      if (contentEntry?.file) {
-        return contentEntry.file;
+      // Primary: Use Chrome's official API to get content script path
+      const manifest = chrome.runtime.getManifest();
+      const contentScripts = manifest.content_scripts;
+
+      if (contentScripts && contentScripts[0]?.js?.[0]) {
+        const contentScriptPath = contentScripts[0].js[0];
+
+        // Verify the file exists before returning
+        try {
+          await fetch(chrome.runtime.getURL(contentScriptPath));
+          return contentScriptPath;
+        } catch {
+          // File doesn't exist, continue to fallbacks
+          if (this.isDebugMode()) {
+            console.warn('[ContentScriptInjector] Manifest content script path not accessible:', contentScriptPath);
+          }
+        }
       }
-      
-      // Fallback: try to find any file matching content-*.js pattern
-      const contentFiles = Object.values(manifest)
-        .filter((entry): entry is { file: string } => 
+    } catch (error) {
+      if (this.isDebugMode()) {
+        console.warn('[ContentScriptInjector] Failed to read manifest:', error);
+      }
+    }
+
+    try {
+      // Secondary: Try to fetch the build manifest (works in development/local builds)
+      const manifestResponse = await fetch(chrome.runtime.getURL('.vite/manifest.json'));
+      const buildManifest = await manifestResponse.json() as Record<string, { file?: string } | undefined>;
+
+      // Look for the content script entry
+      const contentEntry = buildManifest['src/content/index.ts'];
+      if (contentEntry?.file) {
+        // Verify the file exists
+        try {
+          await fetch(chrome.runtime.getURL(contentEntry.file));
+          return contentEntry.file;
+        } catch {
+          if (this.isDebugMode()) {
+            console.warn('[ContentScriptInjector] Build manifest content script not accessible:', contentEntry.file);
+          }
+        }
+      }
+
+      // Fallback: try to find any file matching content-*.js pattern in build manifest
+      const contentFiles = Object.values(buildManifest)
+        .filter((entry): entry is { file: string } =>
           Boolean(entry?.file && entry.file.includes('content-') && entry.file.endsWith('.js'))
         )
         .map(entry => entry.file);
-      
+
       if (contentFiles.length > 0) {
-        return contentFiles[0];
-      }
-      
-      throw new Error('Content script file not found in build manifest');
-    } catch {
-      // Ultimate fallback - try common patterns
-      const fallbackFiles = [
-        'assets/content.js',
-        'src/content/index.js',
-        'content.js'
-      ];
-      
-      // Try each fallback in order
-      for (const file of fallbackFiles) {
         try {
-          await fetch(chrome.runtime.getURL(file));
-          return file;
+          await fetch(chrome.runtime.getURL(contentFiles[0]));
+          return contentFiles[0];
         } catch {
-          // File doesn't exist, try next
-          continue;
+          if (this.isDebugMode()) {
+            console.warn('[ContentScriptInjector] Build manifest content file not accessible:', contentFiles[0]);
+          }
         }
       }
-      
-      throw new Error('Unable to locate content script file');
+    } catch {
+      // .vite/manifest.json doesn't exist (expected in Chrome Web Store builds)
+      if (this.isDebugMode()) {
+        console.info('[ContentScriptInjector] Build manifest not available, trying direct file discovery');
+      }
     }
+
+    // Tertiary: Ultimate fallback - try common patterns
+    const fallbackFiles = [
+      'assets/content.js',
+      'src/content/index.js',
+      'content.js'
+    ];
+
+    // Try each fallback in order
+    for (const file of fallbackFiles) {
+      try {
+        await fetch(chrome.runtime.getURL(file));
+        return file;
+      } catch {
+        // File doesn't exist, try next
+        continue;
+      }
+    }
+
+    throw new Error('Unable to locate content script file');
   }
 
   /**
