@@ -26,9 +26,6 @@ const ImportSection: FC<ImportSectionProps> = ({
       <div className="flex items-center justify-between">
         <div>
           <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">Import Configuration</h4>
-          <p className="mt-0.5 text-xs text-gray-600 dark:text-gray-400">
-            Paste a configuration code shared by another user to preview before importing.
-          </p>
         </div>
         {value && (
           <button

@@ -66,7 +66,7 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
   const [confirmingImport, setConfirmingImport] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
-  const [showImportSection, setShowImportSection] = useState(false);
+  const [showImportDrawer, setShowImportDrawer] = useState(false);
 
   const notify = useCallback((message: string, type: 'success' | 'error' | 'info' = 'info') => {
     if (onShowToast) {
@@ -84,7 +84,7 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
         notify('Configuration copied to clipboard', 'success');
       } else {
         setImportCode(encoded);
-        setShowImportSection(true);
+        setShowImportDrawer(true);
         setImportError('Clipboard access was blocked. The configuration code is now in the import field for manual copying.');
         notify('Clipboard access was blocked. The configuration code has been added to the import field.', 'error');
       }
@@ -154,7 +154,7 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
     setPendingImport(null);
     setPreviewOpen(false);
     setImportingConfig(true);
-    setShowImportSection(true);
+    setShowImportDrawer(true);
 
     try {
       const decodedConfig = await ConfigurationEncoder.decode(importCode.trim());
@@ -220,6 +220,8 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
       }
 
       setImportError(null);
+      setShowImportDrawer(false);
+      setShowAddSite(false);
       notify('Configuration imported successfully', 'success');
       setPreviewOpen(false);
       setPendingImport(null);
@@ -616,30 +618,17 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
 
         {/* Custom Sites */}
         <div>
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-3">
             <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm">
               Custom Sites
             </h3>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <button
                 type="button"
-                onClick={() => { setShowImportSection(prev => !prev); }}
-                aria-expanded={showImportSection}
-                className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
-                  showImportSection
-                    ? 'border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-600'
-                    : 'border-purple-200 dark:border-purple-700 text-purple-600 dark:text-purple-300 bg-white dark:bg-gray-800 hover:bg-purple-50 dark:hover:bg-purple-900/20'
-                }`}
-                title={showImportSection ? 'Hide import tools' : 'Show import tools'}
-              >
-                <svg className={`w-3.5 h-3.5 ${showImportSection ? 'transform rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                </svg>
-                {showImportSection ? 'Hide Import' : 'Import Configuration'}
-              </button>
-              <button
-                type="button"
-                onClick={() => { setShowAddSite(true); }}
+                onClick={() => {
+                  setShowAddSite(true);
+                  setShowImportDrawer(false);
+                }}
                 disabled={!isPickerWindow && isCurrentSiteIntegrated}
                 className={`flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-lg transition-colors ${
                   !isPickerWindow && isCurrentSiteIntegrated
@@ -655,11 +644,74 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                 </svg>
-                {!isPickerWindow && isCurrentSiteIntegrated ? 'Site Already Added' : 'Add Site'}
+                {!isPickerWindow && isCurrentSiteIntegrated ? 'Site Already Added' : 'New Custom Site'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowImportDrawer((prev) => {
+                    const next = !prev;
+                    if (next) {
+                      setShowAddSite(false);
+                    }
+                    return next;
+                  });
+                }}
+                className={`flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-lg border transition-colors ${
+                  showImportDrawer
+                    ? 'border-purple-300 dark:border-purple-600 bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-200'
+                    : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                }`}
+                aria-expanded={showImportDrawer}
+                aria-controls="custom-site-import-drawer"
+              >
+                <svg className={`w-3.5 h-3.5 transition-transform ${showImportDrawer ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+                {showImportDrawer ? 'Hide Import' : 'Import Configuration'}
               </button>
             </div>
           </div>
 
+          {showImportDrawer && (
+            <div
+              id="custom-site-import-drawer"
+              className="mb-4 rounded-xl border border-purple-200 dark:border-purple-700 bg-purple-50/60 dark:bg-purple-900/20 p-4"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h4 className="text-sm font-semibold text-purple-800 dark:text-purple-200">Import Shared Configuration</h4>
+                  <p className="text-xs text-purple-700/80 dark:text-purple-200/70 mt-1">
+                    Reuse someone else&apos;s setup by pasting their configuration code below.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setShowImportDrawer(false); }}
+                  className="text-purple-700 dark:text-purple-200 hover:text-purple-900 dark:hover:text-purple-100"
+                  aria-label="Close import drawer"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <ImportSection
+                value={importCode}
+                onChange={(value) => {
+                  setImportCode(value);
+                  setImportError(null);
+                }}
+                onPreview={() => { void handlePreviewImport(); }}
+                onClear={() => {
+                  handleClearImport();
+                  setShowImportDrawer(false);
+                }}
+                loading={importingConfig}
+                error={importError}
+              />
+            </div>
+          )}
           {/* Add Site Form */}
           {showAddSite && (
             <div className="mb-3 p-4 bg-purple-50 dark:bg-purple-900/20 border-2 border-purple-200 dark:border-purple-800 rounded-lg">
@@ -952,39 +1004,21 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
                     {!isPickerWindow && isCurrentSiteIntegrated ? 'Current Site Already Added' : 'Add Your First Site'}
                   </button>
                 </div>
-                {showImportSection && (
-                  <div className="mt-4">
-                    <ImportSection
-                      value={importCode}
-                      onChange={(value) => {
-                        setImportCode(value);
-                        setImportError(null);
-                      }}
-                      onPreview={() => { void handlePreviewImport(); }}
-                      onClear={handleClearImport}
-                      loading={importingConfig}
-                      error={importError}
-                    />
-                  </div>
-                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowImportDrawer(true);
+                    setShowAddSite(false);
+                  }}
+                  className="mt-4 inline-flex items-center gap-1 text-xs font-medium text-purple-600 hover:text-purple-700 dark:text-purple-300 dark:hover:text-purple-200"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                  </svg>
+                  Prefer to import a configuration?
+                </button>
               </>
             )
-          )}
-
-          {customSites.length > 0 && showImportSection && (
-            <div className="mt-4">
-              <ImportSection
-                value={importCode}
-                onChange={(value) => {
-                  setImportCode(value);
-                  setImportError(null);
-                }}
-                onPreview={() => { void handlePreviewImport(); }}
-                onClear={handleClearImport}
-                loading={importingConfig}
-                error={importError}
-              />
-            </div>
           )}
         </div>
       </div>
