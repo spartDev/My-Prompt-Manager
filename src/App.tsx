@@ -222,6 +222,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
             void refreshPrompts();
             void refreshCategories();
           }}
+          showToast={showToast}
         />
       )}
 

@@ -1,8 +1,12 @@
-import { FC, useState, useEffect, ReactNode } from 'react';
+import { FC, useState, useEffect, ReactNode, useCallback } from 'react';
 
-import { CustomSite } from '../../types';
+import { useClipboard } from '../../hooks/useClipboard';
+import { ConfigurationEncoder, ConfigurationEncoderError } from '../../services/configurationEncoder';
+import { CustomSite, CustomSiteConfiguration, SecurityWarning } from '../../types';
 import { CustomSiteIcon } from '../icons/SiteIcons';
 
+import ConfigurationPreview from './ConfigurationPreview';
+import ImportSection from './ImportSection';
 import SettingsSection from './SettingsSection';
 import SiteCard from './SiteCard';
 
@@ -10,13 +14,21 @@ interface SiteIntegrationSectionProps {
   enabledSites: string[];
   customSites: CustomSite[];
   siteConfigs: Record<string, { name: string; description: string; icon: ReactNode }>;
-  onSiteToggle: (hostname: string, enabled: boolean) => void;
-  onCustomSiteToggle: (hostname: string, enabled: boolean) => void;
-  onRemoveCustomSite: (hostname: string) => void;
-  onAddCustomSite?: (siteData: Omit<CustomSite, 'dateAdded'>) => void;
+  onSiteToggle: (hostname: string, enabled: boolean) => Promise<void> | void;
+  onCustomSiteToggle: (hostname: string, enabled: boolean) => Promise<void> | void;
+  onRemoveCustomSite: (hostname: string) => Promise<void> | void;
+  onAddCustomSite?: (siteData: Omit<CustomSite, 'dateAdded'>) => Promise<void> | void;
   onEditCustomSite?: (hostname: string) => void;
   interfaceMode?: 'popup' | 'sidepanel';
   saving?: boolean;
+  onShowToast?: (message: string, type?: 'success' | 'error' | 'info') => void;
+}
+
+interface PendingImport {
+  config: CustomSiteConfiguration;
+  warnings: SecurityWarning[];
+  duplicate: boolean;
+  existingSite?: CustomSite;
 }
 
 const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
@@ -29,7 +41,8 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
   onAddCustomSite,
   onEditCustomSite,
   interfaceMode = 'popup',
-  saving = false
+  saving = false,
+  onShowToast
 }) => {
   const [showAddSite, setShowAddSite] = useState(false);
   const [newSiteUrl, setNewSiteUrl] = useState('');
@@ -44,6 +57,177 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
   const [adding, setAdding] = useState(false);
   const [pickingElement, setPickingElement] = useState(false);
   const [pickerError, setPickerError] = useState<string | null>(null);
+
+  const { copyToClipboard, copyStatus } = useClipboard();
+  const [exportingHostname, setExportingHostname] = useState<string | null>(null);
+  const [importCode, setImportCode] = useState('');
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importingConfig, setImportingConfig] = useState(false);
+  const [confirmingImport, setConfirmingImport] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
+
+  const notify = useCallback((message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    if (onShowToast) {
+      onShowToast(message, type);
+    }
+  }, [onShowToast]);
+
+  const handleExportCustomSite = async (site: CustomSite) => {
+    try {
+      setExportingHostname(site.hostname);
+      const encoded = await ConfigurationEncoder.encode(site);
+      const copied = await copyToClipboard(encoded);
+
+      if (copied) {
+        notify('Configuration copied to clipboard', 'success');
+      } else {
+        setImportCode(encoded);
+        setImportError('Clipboard access was blocked. The configuration code is now in the import field for manual copying.');
+        notify('Clipboard access was blocked. The configuration code has been added to the import field.', 'error');
+      }
+    } catch (error) {
+      const message = error instanceof ConfigurationEncoderError
+        ? error.message
+        : 'Failed to export configuration';
+      notify(message, 'error');
+    } finally {
+      setExportingHostname(null);
+    }
+  };
+
+  const mapEncoderErrorToMessage = (error: ConfigurationEncoderError): string => {
+    switch (error.code) {
+      case 'INVALID_FORMAT':
+        return 'Invalid configuration code. Please check the value and try again.';
+      case 'UNSUPPORTED_VERSION':
+        return 'This configuration was created with a newer version that is not supported yet.';
+      case 'CHECKSUM_FAILED':
+        return 'The configuration appears to be corrupted or tampered with.';
+      case 'SECURITY_VIOLATION':
+        return 'Import blocked because the configuration failed security checks.';
+      case 'VALIDATION_ERROR':
+      default:
+        return error.message || 'Configuration failed validation.';
+    }
+  };
+
+  const requestSitePermission = async (hostname: string): Promise<boolean> => {
+    const origin = `https://${hostname}/*`;
+
+    try {
+      const granted = await chrome.permissions.request({
+        origins: [origin]
+      });
+
+      if (!granted) {
+        return false;
+      }
+
+      await chrome.runtime.sendMessage({
+        type: 'REQUEST_PERMISSION',
+        data: { origins: [origin] }
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Failed to request permission for imported site:', error);
+      return false;
+    }
+  };
+
+  const handleClearImport = () => {
+    setImportCode('');
+    setImportError(null);
+    setPendingImport(null);
+  };
+
+  const handlePreviewImport = async () => {
+    if (!importCode.trim()) {
+      setImportError('Enter a configuration code to continue.');
+      return;
+    }
+
+    setImportError(null);
+    setPendingImport(null);
+    setPreviewOpen(false);
+    setImportingConfig(true);
+
+    try {
+      const decodedConfig = await ConfigurationEncoder.decode(importCode.trim());
+      const validation = ConfigurationEncoder.validate(decodedConfig);
+      const existingCustomSite = customSites.find(site => site.hostname === validation.sanitizedConfig.hostname);
+      const isBuiltIn = Object.prototype.hasOwnProperty.call(siteConfigs, validation.sanitizedConfig.hostname);
+
+      if (isBuiltIn) {
+        const message = 'This hostname already has a built-in integration and cannot be imported as custom.';
+        setImportError(message);
+        notify(message, 'error');
+        return;
+      }
+
+      setPendingImport({
+        config: validation.sanitizedConfig,
+        warnings: validation.warnings.filter(warning => warning.severity !== 'error'),
+        duplicate: Boolean(existingCustomSite),
+        existingSite: existingCustomSite
+      });
+      setPreviewOpen(true);
+    } catch (error) {
+      const message = error instanceof ConfigurationEncoderError
+        ? mapEncoderErrorToMessage(error)
+        : 'Failed to decode configuration. Please verify the code and try again.';
+      setImportError(message);
+      notify(message, 'error');
+    } finally {
+      setImportingConfig(false);
+    }
+  };
+
+  const handleConfirmImport = async () => {
+    if (!pendingImport) {
+      return;
+    }
+
+    setConfirmingImport(true);
+
+    try {
+      const granted = await requestSitePermission(pendingImport.config.hostname);
+
+      if (!granted) {
+        const message = 'Permission denied. Please allow access to the site and try again.';
+        setImportError(message);
+        notify(message, 'error');
+        return;
+      }
+
+      if (pendingImport.duplicate && pendingImport.existingSite) {
+        await Promise.resolve(onRemoveCustomSite(pendingImport.existingSite.hostname));
+      }
+
+      const siteData: Omit<CustomSite, 'dateAdded'> = {
+        hostname: pendingImport.config.hostname,
+        displayName: pendingImport.config.displayName,
+        enabled: true,
+        ...(pendingImport.config.positioning ? { positioning: pendingImport.config.positioning } : {})
+      };
+
+      if (onAddCustomSite) {
+        await Promise.resolve(onAddCustomSite(siteData));
+      }
+
+      setImportError(null);
+      notify('Configuration imported successfully', 'success');
+      setPreviewOpen(false);
+      setPendingImport(null);
+      setImportCode('');
+    } catch (error) {
+      console.error('Failed to import configuration:', error);
+      notify('Failed to import configuration. Please try again.', 'error');
+    } finally {
+      setConfirmingImport(false);
+    }
+  };
   
   // Current tab state for auto-fill
   const [currentTabUrl, setCurrentTabUrl] = useState<string | null>(null);
@@ -345,7 +529,7 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
       };
 
       if (onAddCustomSite) {
-        onAddCustomSite(siteData);
+        await Promise.resolve(onAddCustomSite(siteData));
       }
 
       // Inject content script immediately if tabs are open with this hostname
@@ -396,6 +580,7 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
   };
 
   return (
+    <>
     <SettingsSection
       icon={icon}
       title="Site Integration"
@@ -452,6 +637,18 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
               {!isPickerWindow && isCurrentSiteIntegrated ? 'Site Already Added' : 'Add Site'}
             </button>
           </div>
+
+          <ImportSection
+            value={importCode}
+            onChange={(value) => {
+              setImportCode(value);
+              setImportError(null);
+            }}
+            onPreview={() => { void handlePreviewImport(); }}
+            onClear={handleClearImport}
+            loading={importingConfig}
+            error={importError}
+          />
 
           {/* Add Site Form */}
           {showAddSite && (
@@ -701,6 +898,13 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
                   onToggle={onCustomSiteToggle}
                   onRemove={onRemoveCustomSite}
                   onEdit={onEditCustomSite}
+                  onExport={(hostname) => {
+                    const target = customSites.find(s => s.hostname === hostname);
+                    if (target) {
+                      void handleExportCustomSite(target);
+                    }
+                  }}
+                  exporting={exportingHostname === site.hostname && copyStatus === 'copying'}
                   saving={saving}
                 />
               ))}
@@ -742,6 +946,22 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
         </div>
       </div>
     </SettingsSection>
+    <ConfigurationPreview
+      isOpen={previewOpen}
+      config={pendingImport?.config ?? null}
+      warnings={pendingImport?.warnings ?? []}
+      duplicate={Boolean(pendingImport?.duplicate)}
+      existingDisplayName={pendingImport?.existingSite?.displayName}
+      onClose={() => {
+        if (!confirmingImport) {
+          setPreviewOpen(false);
+          setPendingImport(null);
+        }
+      }}
+      onConfirm={() => { void handleConfirmImport(); }}
+      isProcessing={confirmingImport}
+    />
+    </>
   );
 };
 

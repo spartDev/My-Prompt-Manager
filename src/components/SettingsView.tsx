@@ -43,6 +43,7 @@ interface Settings {
 
 interface SettingsViewProps {
   onBack: () => void;
+  showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
 }
 
 const SectionSeparator: FC = () => (
@@ -59,7 +60,7 @@ const SectionSeparator: FC = () => (
   </div>
 );
 
-const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
+const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast }) => {
   const [settings, setSettings] = useState<Settings>({
     enabledSites: [],
     customSites: [],
@@ -428,6 +429,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack }) => {
             onRemoveCustomSite={(hostname) => void handleRemoveCustomSite(hostname)}
             onAddCustomSite={(siteData) => void handleAddCustomSite(siteData)}
             saving={saving}
+            onShowToast={showToast}
           />
 
           <SectionSeparator />

@@ -55,6 +55,48 @@ export interface CustomSite {
   };
 }
 
+export type CustomSitePositioning = NonNullable<CustomSite['positioning']>;
+
+export interface CustomSiteConfiguration {
+  hostname: string;
+  displayName: string;
+  positioning?: CustomSitePositioning;
+}
+
+export interface SecurityWarning {
+  field: string;
+  message: string;
+  severity: 'warning' | 'error';
+}
+
+export interface ConfigurationValidationIssue {
+  field: string;
+  message: string;
+  severity: 'error' | 'warning';
+}
+
+export interface ConfigurationValidationResult {
+  isValid: boolean;
+  issues: ConfigurationValidationIssue[];
+  warnings: SecurityWarning[];
+  sanitizedConfig: CustomSiteConfiguration;
+}
+
+export interface EncodedCustomSitePayloadV1 {
+  v: string;
+  h: string;
+  n: string;
+  p?: {
+    s: string;
+    pl: CustomSitePositioning['placement'];
+    ox?: number;
+    oy?: number;
+    z?: number;
+    d?: string;
+  };
+  c: string;
+}
+
 // UI state interfaces
 export interface AppState {
   prompts: Prompt[];
