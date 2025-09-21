@@ -54,11 +54,11 @@ describe('SiteIntegrationSection - Custom Sites UI', () => {
     expect(screen.queryByText('New Custom Site')).not.toBeInTheDocument();
   });
 
-  it('keeps the header button when no custom sites exist', () => {
+  it('does not render header button when no custom sites exist', () => {
     render(<SiteIntegrationSection {...defaultProps} customSites={[]} />);
 
     expect(getAddCardButton()).not.toBeInTheDocument();
-    expect(screen.getByText('New Custom Site')).toBeInTheDocument();
+    expect(screen.queryByText('New Custom Site')).not.toBeInTheDocument();
     expect(screen.getByText('Add Your First Site')).toBeInTheDocument();
   });
 

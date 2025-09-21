@@ -624,7 +624,6 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
   const addFirstSiteTooltip = addActionDisabled
     ? `Current site (${currentSiteHostname}) is already integrated`
     : 'Add your first custom site';
-  const addActionStatusLabel = addActionDisabled ? 'Site Already Added' : 'New Custom Site';
   const addFirstSiteLabel = addActionDisabled ? 'Current Site Already Added' : 'Add Your First Site';
 
   return (
@@ -665,26 +664,6 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
             <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm">
               Custom Sites
             </h3>
-            {customSites.length === 0 && (
-              <div className="flex items-center gap-2 flex-wrap">
-                <button
-                  type="button"
-                  onClick={openAddMethodSelector}
-                  disabled={addActionDisabled}
-                  className={`flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-lg transition-colors ${
-                    addActionDisabled
-                      ? 'bg-gray-400 dark:bg-gray-600 text-gray-600 dark:text-gray-400 cursor-not-allowed'
-                      : 'bg-purple-600 text-white hover:bg-purple-700'
-                  }`}
-                  title={addCardTooltip}
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                  </svg>
-                  {addActionStatusLabel}
-                </button>
-              </div>
-            )}
           </div>
 
           {showAddMethodChooser && (
