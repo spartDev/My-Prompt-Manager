@@ -67,12 +67,40 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
   const [previewOpen, setPreviewOpen] = useState(false);
   const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
   const [showImportDrawer, setShowImportDrawer] = useState(false);
+  const [showAddMethodChooser, setShowAddMethodChooser] = useState(false);
 
   const notify = useCallback((message: string, type: 'success' | 'error' | 'info' = 'info') => {
     if (onShowToast) {
       onShowToast(message, type);
     }
   }, [onShowToast]);
+
+  const resetAddSiteForm = useCallback(() => {
+    setNewSiteUrl('');
+    setNewSiteName('');
+    setCustomSelector('');
+    setPlacement('before');
+    setOffsetX(0);
+    setOffsetY(0);
+    setZIndex(1000);
+    setPositioningDescription('');
+    setUrlError('');
+    setPickingElement(false);
+    setPickerError(null);
+  }, []);
+
+  const openManualFlow = useCallback(() => {
+    resetAddSiteForm();
+    setShowImportDrawer(false);
+    setShowAddMethodChooser(false);
+    setShowAddSite(true);
+  }, [resetAddSiteForm]);
+
+  const openImportFlow = useCallback(() => {
+    setShowAddMethodChooser(false);
+    setShowAddSite(false);
+    setShowImportDrawer(true);
+  }, []);
 
   const handleExportCustomSite = async (site: CustomSite) => {
     try {
@@ -84,7 +112,7 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
         notify('Configuration copied to clipboard', 'success');
       } else {
         setImportCode(encoded);
-        setShowImportDrawer(true);
+        openImportFlow();
         setImportError('Clipboard access was blocked. The configuration code is now in the import field for manual copying.');
         notify('Clipboard access was blocked. The configuration code has been added to the import field.', 'error');
       }
@@ -154,7 +182,7 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
     setPendingImport(null);
     setPreviewOpen(false);
     setImportingConfig(true);
-    setShowImportDrawer(true);
+    openImportFlow();
 
     try {
       const decodedConfig = await ConfigurationEncoder.decode(importCode.trim());
@@ -222,6 +250,7 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
       setImportError(null);
       setShowImportDrawer(false);
       setShowAddSite(false);
+      setShowAddMethodChooser(false);
       notify('Configuration imported successfully', 'success');
       setPreviewOpen(false);
       setPendingImport(null);
@@ -552,17 +581,9 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
         // Failed to inject content script into existing tabs - not critical, continue
       }
 
-      // Reset form
-      setNewSiteUrl('');
-      setNewSiteName('');
-      setCustomSelector('');
-      setPlacement('before');
-      setOffsetX(0);
-      setOffsetY(0);
-      setZIndex(1000);
-      setPositioningDescription('');
+      resetAddSiteForm();
       setShowAddSite(false);
-      setUrlError('');
+      setShowAddMethodChooser(false);
     } catch {
       setUrlError('Please enter a valid URL');
     } finally {
@@ -571,17 +592,9 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
   };
 
   const cancelAddSite = () => {
+    resetAddSiteForm();
     setShowAddSite(false);
-    setNewSiteUrl('');
-    setNewSiteName('');
-    setCustomSelector('');
-    setPlacement('before');
-    setOffsetX(0);
-    setOffsetY(0);
-    setZIndex(1000);
-    setPositioningDescription('');
-    setUrlError('');
-    setPickingElement(false);
+    setShowAddMethodChooser(false);
   };
 
   return (
@@ -626,8 +639,10 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
               <button
                 type="button"
                 onClick={() => {
-                  setShowAddSite(true);
+                  resetAddSiteForm();
                   setShowImportDrawer(false);
+                  setShowAddSite(false);
+                  setShowAddMethodChooser(true);
                 }}
                 disabled={!isPickerWindow && isCurrentSiteIntegrated}
                 className={`flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-lg transition-colors ${
@@ -646,32 +661,71 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
                 </svg>
                 {!isPickerWindow && isCurrentSiteIntegrated ? 'Site Already Added' : 'New Custom Site'}
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowImportDrawer((prev) => {
-                    const next = !prev;
-                    if (next) {
-                      setShowAddSite(false);
-                    }
-                    return next;
-                  });
-                }}
-                className={`flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-lg border transition-colors ${
-                  showImportDrawer
-                    ? 'border-purple-300 dark:border-purple-600 bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-200'
-                    : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
-                }`}
-                aria-expanded={showImportDrawer}
-                aria-controls="custom-site-import-drawer"
-              >
-                <svg className={`w-3.5 h-3.5 transition-transform ${showImportDrawer ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                </svg>
-                {showImportDrawer ? 'Hide Import' : 'Import Configuration'}
-              </button>
             </div>
           </div>
+
+          {showAddMethodChooser && (
+            <div className="mb-4 rounded-xl border border-purple-200 dark:border-purple-700 bg-white dark:bg-gray-900 shadow-sm">
+              <div className="flex items-start justify-between gap-3 p-4 pb-3">
+                <div>
+                  <h4 className="text-sm font-semibold text-purple-800 dark:text-purple-200">How would you like to add this site?</h4>
+                  <p className="text-xs text-purple-700/80 dark:text-purple-200/70 mt-1">
+                    Choose a method to continue. You can always switch later.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setShowAddMethodChooser(false); }}
+                  className="text-purple-700 dark:text-purple-200 hover:text-purple-900 dark:hover:text-purple-100"
+                  aria-label="Dismiss add site options"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div className="grid gap-3 p-4 pt-0 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={openManualFlow}
+                  className="group flex h-full flex-col justify-between gap-2 rounded-lg border border-gray-200 bg-white px-4 py-3 text-left transition-all hover:border-purple-400 hover:shadow dark:border-gray-700 dark:bg-gray-900 dark:hover:border-purple-500"
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-md bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-200">
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-3-3v6m9-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Add manually</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                        Configure hostname, selectors, and positioning yourself.
+                      </p>
+                    </div>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={openImportFlow}
+                  className="group flex h-full flex-col justify-between gap-2 rounded-lg border border-gray-200 bg-white px-4 py-3 text-left transition-all hover:border-purple-400 hover:shadow dark:border-gray-700 dark:bg-gray-900 dark:hover:border-purple-500"
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-md bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-200">
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8m-2 8H5a2 2 0 01-2-2V8m18 0v6a2 2 0 01-2 2" />
+                      </svg>
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Import configuration</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                        Paste a shared code to reuse an existing setup instantly.
+                      </p>
+                    </div>
+                  </div>
+                </button>
+              </div>
+            </div>
+          )}
 
           {showImportDrawer && (
             <div
@@ -984,39 +1038,31 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
                   <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
                     Add any website to use your prompt library there
                   </p>
-                  <button
-                    onClick={() => { setShowAddSite(true); }}
-                    disabled={!isPickerWindow && isCurrentSiteIntegrated}
-                    className={`inline-flex items-center gap-1 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                      !isPickerWindow && isCurrentSiteIntegrated
-                        ? 'bg-gray-400 dark:bg-gray-600 text-gray-600 dark:text-gray-400 cursor-not-allowed'
-                        : 'bg-purple-600 text-white hover:bg-purple-700'
-                    }`}
-                    title={
-                      !isPickerWindow && isCurrentSiteIntegrated 
-                        ? `Current site (${currentTabUrl ? new URL(currentTabUrl).hostname : 'this website'}) is already integrated`
-                        : 'Add your first custom site'
-                    }
-                  >
+                <button
+                  onClick={() => {
+                    resetAddSiteForm();
+                    setShowImportDrawer(false);
+                    setShowAddSite(false);
+                    setShowAddMethodChooser(true);
+                  }}
+                  disabled={!isPickerWindow && isCurrentSiteIntegrated}
+                  className={`inline-flex items-center gap-1 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                    !isPickerWindow && isCurrentSiteIntegrated
+                      ? 'bg-gray-400 dark:bg-gray-600 text-gray-600 dark:text-gray-400 cursor-not-allowed'
+                      : 'bg-purple-600 text-white hover:bg-purple-700'
+                  }`}
+                  title={
+                    !isPickerWindow && isCurrentSiteIntegrated 
+                      ? `Current site (${currentTabUrl ? new URL(currentTabUrl).hostname : 'this website'}) is already integrated`
+                      : 'Add your first custom site'
+                  }
+                >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                     </svg>
                     {!isPickerWindow && isCurrentSiteIntegrated ? 'Current Site Already Added' : 'Add Your First Site'}
                   </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowImportDrawer(true);
-                    setShowAddSite(false);
-                  }}
-                  className="mt-4 inline-flex items-center gap-1 text-xs font-medium text-purple-600 hover:text-purple-700 dark:text-purple-300 dark:hover:text-purple-200"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                  </svg>
-                  Prefer to import a configuration?
-                </button>
               </>
             )
           )}
