@@ -271,11 +271,11 @@ export class StorageManager {
   }
 
   async deleteCategory(id: string): Promise<void> {
-    return this.withLock(`deleteCategory-${id}`, async () => {
+    return this.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
       try {
         const existingCategories = await this.getCategories();
         const categoryToDelete = existingCategories.find(c => c.id === id);
-        
+
         if (!categoryToDelete) {
           throw new Error(`Category with id ${id} not found`);
         }
@@ -285,22 +285,19 @@ export class StorageManager {
           throw new Error('Cannot delete the default category');
         }
 
-        // Atomic operation: Update both prompts and categories together
-        const [prompts] = await Promise.all([
-          this.getPrompts()
-        ]);
-
-        const updatedPrompts = prompts.map(prompt => 
-          prompt.category === categoryToDelete.name 
+        // Update prompts that belong to the deleted category
+        const prompts = await this.getPrompts();
+        const updatedPrompts = prompts.map(prompt =>
+          prompt.category === categoryToDelete.name
             ? { ...prompt, category: DEFAULT_CATEGORY, updatedAt: Date.now() }
             : prompt
         );
-        
+
         const filteredCategories = existingCategories.filter(c => c.id !== id);
 
         // Perform both updates atomically using Promise.all
         const hasPromptsToUpdate = updatedPrompts.some((p, i) => p.category !== prompts[i].category);
-        
+
         if (hasPromptsToUpdate) {
           await Promise.all([
             this.setStorageData(this.STORAGE_KEYS.PROMPTS, updatedPrompts),
