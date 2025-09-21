@@ -667,18 +667,18 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
           </div>
 
           {showAddMethodChooser && (
-            <div className="mb-4 rounded-xl border border-purple-200 dark:border-purple-700 bg-white dark:bg-gray-900 shadow-sm">
+            <div className="mb-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
               <div className="flex items-start justify-between gap-3 p-4 pb-3">
                 <div>
-                  <h4 className="text-sm font-semibold text-purple-800 dark:text-purple-200">How would you like to add this site?</h4>
-                  <p className="text-xs text-purple-700/80 dark:text-purple-200/70 mt-1">
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">How would you like to add this site?</h4>
+                  <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">
                     Choose a method to continue. You can always switch later.
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => { setShowAddMethodChooser(false); }}
-                  className="text-purple-700 dark:text-purple-200 hover:text-purple-900 dark:hover:text-purple-100"
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
                   aria-label="Dismiss add site options"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -690,10 +690,10 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
                 <button
                   type="button"
                   onClick={openManualFlow}
-                  className="group flex h-full flex-col justify-between gap-2 rounded-lg border border-gray-200 bg-white px-4 py-3 text-left transition-all hover:border-purple-400 hover:shadow dark:border-gray-700 dark:bg-gray-900 dark:hover:border-purple-500"
+                  className="group flex h-full flex-col justify-between gap-2 rounded-lg border border-gray-200 bg-white px-4 py-3 text-left transition-all hover:border-purple-300 hover:shadow-sm dark:border-gray-700 dark:bg-gray-800 dark:hover:border-purple-500/70"
                 >
                   <div className="flex items-start gap-3">
-                    <span className="flex h-9 w-9 items-center justify-center rounded-md bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-200">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-md bg-purple-50 text-purple-600 dark:bg-purple-900/30 dark:text-purple-200">
                       <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-3-3v6m9-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
@@ -709,10 +709,10 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
                 <button
                   type="button"
                   onClick={openImportFlow}
-                  className="group flex h-full flex-col justify-between gap-2 rounded-lg border border-gray-200 bg-white px-4 py-3 text-left transition-all hover:border-purple-400 hover:shadow dark:border-gray-700 dark:bg-gray-900 dark:hover:border-purple-500"
+                  className="group flex h-full flex-col justify-between gap-2 rounded-lg border border-gray-200 bg-white px-4 py-3 text-left transition-all hover:border-purple-300 hover:shadow-sm dark:border-gray-700 dark:bg-gray-800 dark:hover:border-purple-500/70"
                 >
                   <div className="flex items-start gap-3">
-                    <span className="flex h-9 w-9 items-center justify-center rounded-md bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-200">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-md bg-purple-50 text-purple-600 dark:bg-purple-900/30 dark:text-purple-200">
                       <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8m-2 8H5a2 2 0 01-2-2V8m18 0v6a2 2 0 01-2 2" />
                       </svg>
