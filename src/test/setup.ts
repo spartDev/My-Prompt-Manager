@@ -13,7 +13,21 @@ const mockChrome = {
     }
   },
   runtime: {
-    lastError: null
+    lastError: null,
+    sendMessage: vi.fn().mockResolvedValue(undefined),
+    onMessage: {
+      addListener: vi.fn(),
+      removeListener: vi.fn()
+    }
+  },
+  permissions: {
+    request: vi.fn().mockResolvedValue(false),
+    contains: vi.fn().mockResolvedValue(false),
+    remove: vi.fn().mockResolvedValue(undefined)
+  },
+  tabs: {
+    query: vi.fn().mockResolvedValue([]),
+    get: vi.fn().mockResolvedValue(undefined)
   }
 };
 
