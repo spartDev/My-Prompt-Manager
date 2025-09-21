@@ -312,7 +312,7 @@ export class ElementPicker {
     
     if (details.domain) {
       // Only log domain classification, not actual domain
-      const domain = String(details.domain);
+      const domain = details.domain;
       sanitized.domainType = SENSITIVE_DOMAINS.some(pattern => pattern.test(domain)) 
         ? 'sensitive_domain' : 'regular_domain';
     }
@@ -320,7 +320,7 @@ export class ElementPicker {
     if (details.url) {
       // Only log URL protocol and whether it contains sensitive indicators
       try {
-        const url = new URL(String(details.url));
+        const url = new URL(details.url);
         sanitized.protocol = url.protocol;
         sanitized.hasSensitivePath = /login|signin|checkout|payment|account|profile|banking|financial/i.test(url.pathname);
       } catch {

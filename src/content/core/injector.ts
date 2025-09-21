@@ -61,6 +61,8 @@ export class PromptLibraryInjector {
   private readonly cacheTimeout: number = 2000;
 
   constructor() {
+    const hostname = window.location.hostname || '';
+
     this.state = {
       icon: null,
       currentTextarea: null,
@@ -69,8 +71,8 @@ export class PromptLibraryInjector {
       isSiteEnabled: false,
       detectionTimeout: null,
       mutationObserver: null,
-      hostname: String(window.location.hostname || ''),
-      instanceId: `prompt-lib-${window.location.hostname}-${String(Date.now())}-${Math.random().toString(36).substr(2, 9)}`,
+      hostname,
+      instanceId: `prompt-lib-${hostname}-${Date.now().toString()}-${Math.random().toString(36).slice(2, 11)}`,
       settings: null
     };
 
@@ -702,7 +704,12 @@ export class PromptLibraryInjector {
           
           for (const button of buttons) {
             const textElement = button.querySelector('p');
-            if (textElement && textElement.textContent?.trim() === 'Research') {
+            if (!textElement) {
+              continue;
+            }
+
+            const textContent = textElement.textContent;
+            if (textContent && textContent.trim() === 'Research') {
               // Found the Research button, get its parent container
               researchButtonContainer = button.closest('div.flex.shrink.min-w-8');
               break;
