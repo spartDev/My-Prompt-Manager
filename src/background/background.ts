@@ -443,13 +443,13 @@ class ContentScriptInjector {
         } catch {
           // File doesn't exist, continue to fallbacks
           if (this.isDebugMode()) {
-            console.warn('[ContentScriptInjector] Manifest content script path not accessible:', contentScriptPath);
+            console.error('[ContentScriptInjector] Manifest content script path not accessible:', contentScriptPath);
           }
         }
       }
     } catch (error) {
       if (this.isDebugMode()) {
-        console.warn('[ContentScriptInjector] Failed to read manifest:', error);
+        console.error('[ContentScriptInjector] Failed to read manifest:', error);
       }
     }
 
@@ -467,7 +467,7 @@ class ContentScriptInjector {
           return contentEntry.file;
         } catch {
           if (this.isDebugMode()) {
-            console.warn('[ContentScriptInjector] Build manifest content script not accessible:', contentEntry.file);
+            console.error('[ContentScriptInjector] Build manifest content script not accessible:', contentEntry.file);
           }
         }
       }
@@ -485,14 +485,14 @@ class ContentScriptInjector {
           return contentFiles[0];
         } catch {
           if (this.isDebugMode()) {
-            console.warn('[ContentScriptInjector] Build manifest content file not accessible:', contentFiles[0]);
+            console.error('[ContentScriptInjector] Build manifest content file not accessible:', contentFiles[0]);
           }
         }
       }
     } catch {
       // .vite/manifest.json doesn't exist (expected in Chrome Web Store builds)
       if (this.isDebugMode()) {
-        console.info('[ContentScriptInjector] Build manifest not available, trying direct file discovery');
+        console.error('[ContentScriptInjector] Build manifest not available, trying direct file discovery');
       }
     }
 

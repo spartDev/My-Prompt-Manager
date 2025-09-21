@@ -1,8 +1,13 @@
-import { FC, useState, useEffect, ReactNode } from 'react';
+import { FC, useState, useEffect, ReactNode, useCallback } from 'react';
 
-import { CustomSite } from '../../types';
+import { useClipboard } from '../../hooks/useClipboard';
+import { ConfigurationEncoder, ConfigurationEncoderError } from '../../services/configurationEncoder';
+import { CustomSite, CustomSiteConfiguration, SecurityWarning } from '../../types';
 import { CustomSiteIcon } from '../icons/SiteIcons';
 
+import AddCustomSiteCard from './AddCustomSiteCard';
+import ConfigurationPreview from './ConfigurationPreview';
+import ImportSection from './ImportSection';
 import SettingsSection from './SettingsSection';
 import SiteCard from './SiteCard';
 
@@ -10,13 +15,21 @@ interface SiteIntegrationSectionProps {
   enabledSites: string[];
   customSites: CustomSite[];
   siteConfigs: Record<string, { name: string; description: string; icon: ReactNode }>;
-  onSiteToggle: (hostname: string, enabled: boolean) => void;
-  onCustomSiteToggle: (hostname: string, enabled: boolean) => void;
-  onRemoveCustomSite: (hostname: string) => void;
-  onAddCustomSite?: (siteData: Omit<CustomSite, 'dateAdded'>) => void;
+  onSiteToggle: (hostname: string, enabled: boolean) => Promise<void> | void;
+  onCustomSiteToggle: (hostname: string, enabled: boolean) => Promise<void> | void;
+  onRemoveCustomSite: (hostname: string) => Promise<void> | void;
+  onAddCustomSite?: (siteData: Omit<CustomSite, 'dateAdded'>) => Promise<void> | void;
   onEditCustomSite?: (hostname: string) => void;
   interfaceMode?: 'popup' | 'sidepanel';
   saving?: boolean;
+  onShowToast?: (message: string, type?: 'success' | 'error' | 'info') => void;
+}
+
+interface PendingImport {
+  config: CustomSiteConfiguration;
+  warnings: SecurityWarning[];
+  duplicate: boolean;
+  existingSite?: CustomSite;
 }
 
 const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
@@ -29,7 +42,8 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
   onAddCustomSite,
   onEditCustomSite,
   interfaceMode = 'popup',
-  saving = false
+  saving = false,
+  onShowToast
 }) => {
   const [showAddSite, setShowAddSite] = useState(false);
   const [newSiteUrl, setNewSiteUrl] = useState('');
@@ -44,6 +58,218 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
   const [adding, setAdding] = useState(false);
   const [pickingElement, setPickingElement] = useState(false);
   const [pickerError, setPickerError] = useState<string | null>(null);
+
+  const { copyToClipboard, copyStatus } = useClipboard();
+  const [exportingHostname, setExportingHostname] = useState<string | null>(null);
+  const [importCode, setImportCode] = useState('');
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importingConfig, setImportingConfig] = useState(false);
+  const [confirmingImport, setConfirmingImport] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
+  const [showImportDrawer, setShowImportDrawer] = useState(false);
+  const [showAddMethodChooser, setShowAddMethodChooser] = useState(false);
+
+  const notify = useCallback((message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    if (onShowToast) {
+      onShowToast(message, type);
+    }
+  }, [onShowToast]);
+
+  const resetAddSiteForm = useCallback(() => {
+    setNewSiteUrl('');
+    setNewSiteName('');
+    setCustomSelector('');
+    setPlacement('before');
+    setOffsetX(0);
+    setOffsetY(0);
+    setZIndex(1000);
+    setPositioningDescription('');
+    setUrlError('');
+    setPickingElement(false);
+    setPickerError(null);
+  }, []);
+
+  const openAddMethodSelector = useCallback(() => {
+    resetAddSiteForm();
+    setShowImportDrawer(false);
+    setShowAddSite(false);
+    setShowAddMethodChooser(true);
+  }, [resetAddSiteForm]);
+
+  const openManualFlow = useCallback(() => {
+    resetAddSiteForm();
+    setShowImportDrawer(false);
+    setShowAddMethodChooser(false);
+    setShowAddSite(true);
+  }, [resetAddSiteForm]);
+
+  const openImportFlow = useCallback(() => {
+    setShowAddMethodChooser(false);
+    setShowAddSite(false);
+    setShowImportDrawer(true);
+  }, []);
+
+  const handleExportCustomSite = async (site: CustomSite) => {
+    try {
+      setExportingHostname(site.hostname);
+      const encoded = await ConfigurationEncoder.encode(site);
+      const copied = await copyToClipboard(encoded);
+
+      if (copied) {
+        notify('Configuration copied to clipboard', 'success');
+      } else {
+        setImportCode(encoded);
+        openImportFlow();
+        setImportError('Clipboard access was blocked. The configuration code is now in the import field for manual copying.');
+        notify('Clipboard access was blocked. The configuration code has been added to the import field.', 'error');
+      }
+    } catch (error) {
+      const message = error instanceof ConfigurationEncoderError
+        ? error.message
+        : 'Failed to export configuration';
+      notify(message, 'error');
+    } finally {
+      setExportingHostname(null);
+    }
+  };
+
+  const mapEncoderErrorToMessage = (error: ConfigurationEncoderError): string => {
+    switch (error.code) {
+      case 'INVALID_FORMAT':
+        return 'Invalid configuration code. Please check the value and try again.';
+      case 'UNSUPPORTED_VERSION':
+        return 'This configuration was created with a newer version that is not supported yet.';
+      case 'CHECKSUM_FAILED':
+        return 'The configuration appears to be corrupted or tampered with.';
+      case 'SECURITY_VIOLATION':
+        return 'Import blocked because the configuration failed security checks.';
+      case 'VALIDATION_ERROR':
+      default:
+        return error.message || 'Configuration failed validation.';
+    }
+  };
+
+  const requestSitePermission = async (hostname: string): Promise<boolean> => {
+    const origin = `https://${hostname}/*`;
+
+    try {
+      const granted = await chrome.permissions.request({
+        origins: [origin]
+      });
+
+      if (!granted) {
+        return false;
+      }
+
+      await chrome.runtime.sendMessage({
+        type: 'REQUEST_PERMISSION',
+        data: { origins: [origin] }
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Failed to request permission for imported site:', error);
+      return false;
+    }
+  };
+
+  const handleClearImport = () => {
+    setImportCode('');
+    setImportError(null);
+    setPendingImport(null);
+  };
+
+  const handlePreviewImport = async () => {
+    if (!importCode.trim()) {
+      setImportError('Enter a configuration code to continue.');
+      return;
+    }
+
+    setImportError(null);
+    setPendingImport(null);
+    setPreviewOpen(false);
+    setImportingConfig(true);
+    openImportFlow();
+
+    try {
+      const decodedConfig = await ConfigurationEncoder.decode(importCode.trim());
+      const validation = ConfigurationEncoder.validate(decodedConfig);
+      const existingCustomSite = customSites.find(site => site.hostname === validation.sanitizedConfig.hostname);
+      const isBuiltIn = Object.prototype.hasOwnProperty.call(siteConfigs, validation.sanitizedConfig.hostname);
+
+      if (isBuiltIn) {
+        const message = 'This hostname already has a built-in integration and cannot be imported as custom.';
+        setImportError(message);
+        notify(message, 'error');
+        return;
+      }
+
+      setPendingImport({
+        config: validation.sanitizedConfig,
+        warnings: validation.warnings.filter(warning => warning.severity !== 'error'),
+        duplicate: Boolean(existingCustomSite),
+        existingSite: existingCustomSite
+      });
+      setPreviewOpen(true);
+    } catch (error) {
+      const message = error instanceof ConfigurationEncoderError
+        ? mapEncoderErrorToMessage(error)
+        : 'Failed to decode configuration. Please verify the code and try again.';
+      setImportError(message);
+      notify(message, 'error');
+    } finally {
+      setImportingConfig(false);
+    }
+  };
+
+  const handleConfirmImport = async () => {
+    if (!pendingImport) {
+      return;
+    }
+
+    setConfirmingImport(true);
+
+    try {
+      const granted = await requestSitePermission(pendingImport.config.hostname);
+
+      if (!granted) {
+        const message = 'Permission denied. Please allow access to the site and try again.';
+        setImportError(message);
+        notify(message, 'error');
+        return;
+      }
+
+      if (pendingImport.duplicate && pendingImport.existingSite) {
+        await Promise.resolve(onRemoveCustomSite(pendingImport.existingSite.hostname));
+      }
+
+      const siteData: Omit<CustomSite, 'dateAdded'> = {
+        hostname: pendingImport.config.hostname,
+        displayName: pendingImport.config.displayName,
+        enabled: true,
+        ...(pendingImport.config.positioning ? { positioning: pendingImport.config.positioning } : {})
+      };
+
+      if (onAddCustomSite) {
+        await Promise.resolve(onAddCustomSite(siteData));
+      }
+
+      setImportError(null);
+      setShowImportDrawer(false);
+      setShowAddSite(false);
+      setShowAddMethodChooser(false);
+      notify('Configuration imported successfully', 'success');
+      setPreviewOpen(false);
+      setPendingImport(null);
+      setImportCode('');
+    } catch (error) {
+      console.error('Failed to import configuration:', error);
+      notify('Failed to import configuration. Please try again.', 'error');
+    } finally {
+      setConfirmingImport(false);
+    }
+  };
   
   // Current tab state for auto-fill
   const [currentTabUrl, setCurrentTabUrl] = useState<string | null>(null);
@@ -345,7 +571,7 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
       };
 
       if (onAddCustomSite) {
-        onAddCustomSite(siteData);
+        await Promise.resolve(onAddCustomSite(siteData));
       }
 
       // Inject content script immediately if tabs are open with this hostname
@@ -363,17 +589,9 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
         // Failed to inject content script into existing tabs - not critical, continue
       }
 
-      // Reset form
-      setNewSiteUrl('');
-      setNewSiteName('');
-      setCustomSelector('');
-      setPlacement('before');
-      setOffsetX(0);
-      setOffsetY(0);
-      setZIndex(1000);
-      setPositioningDescription('');
+      resetAddSiteForm();
       setShowAddSite(false);
-      setUrlError('');
+      setShowAddMethodChooser(false);
     } catch {
       setUrlError('Please enter a valid URL');
     } finally {
@@ -382,20 +600,34 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
   };
 
   const cancelAddSite = () => {
+    resetAddSiteForm();
     setShowAddSite(false);
-    setNewSiteUrl('');
-    setNewSiteName('');
-    setCustomSelector('');
-    setPlacement('before');
-    setOffsetX(0);
-    setOffsetY(0);
-    setZIndex(1000);
-    setPositioningDescription('');
-    setUrlError('');
-    setPickingElement(false);
+    setShowAddMethodChooser(false);
   };
 
+  const currentSiteHostname = (() => {
+    if (!currentTabUrl) {
+      return 'this website';
+    }
+
+    try {
+      return new URL(currentTabUrl).hostname;
+    } catch {
+      return 'this website';
+    }
+  })();
+
+  const addActionDisabled = !isPickerWindow && isCurrentSiteIntegrated;
+  const addCardTooltip = addActionDisabled
+    ? `Current site (${currentSiteHostname}) is already integrated`
+    : 'Add a new custom site';
+  const addFirstSiteTooltip = addActionDisabled
+    ? `Current site (${currentSiteHostname}) is already integrated`
+    : 'Add your first custom site';
+  const addFirstSiteLabel = addActionDisabled ? 'Current Site Already Added' : 'Add Your First Site';
+
   return (
+    <>
     <SettingsSection
       icon={icon}
       title="Site Integration"
@@ -428,31 +660,114 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
 
         {/* Custom Sites */}
         <div>
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-3">
             <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm">
               Custom Sites
             </h3>
-            <button
-              onClick={() => { setShowAddSite(true); }}
-              disabled={!isPickerWindow && isCurrentSiteIntegrated}
-              className={`flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-lg transition-colors ${
-                !isPickerWindow && isCurrentSiteIntegrated
-                  ? 'bg-gray-400 dark:bg-gray-600 text-gray-600 dark:text-gray-400 cursor-not-allowed'
-                  : 'bg-purple-600 text-white hover:bg-purple-700'
-              }`}
-              title={
-                !isPickerWindow && isCurrentSiteIntegrated 
-                  ? `Current site (${currentTabUrl ? new URL(currentTabUrl).hostname : 'this website'}) is already integrated`
-                  : 'Add a new custom site'
-              }
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-              </svg>
-              {!isPickerWindow && isCurrentSiteIntegrated ? 'Site Already Added' : 'Add Site'}
-            </button>
           </div>
 
+          {showAddMethodChooser && (
+            <div className="mb-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
+              <div className="flex items-start justify-between gap-3 p-4 pb-3">
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">How would you like to add this site?</h4>
+                  <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">
+                    Choose a method to continue. You can always switch later.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setShowAddMethodChooser(false); }}
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  aria-label="Dismiss add site options"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div className="grid gap-3 p-4 pt-0 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={openManualFlow}
+                  className="group flex h-full flex-col justify-between gap-2 rounded-lg border border-gray-200 bg-white px-4 py-3 text-left transition-all hover:border-purple-300 hover:shadow-sm dark:border-gray-700 dark:bg-gray-800 dark:hover:border-purple-500/70"
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-md bg-purple-50 text-purple-600 dark:bg-purple-900/30 dark:text-purple-200">
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-3-3v6m9-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Add manually</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                        Configure hostname, selectors, and positioning yourself.
+                      </p>
+                    </div>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={openImportFlow}
+                  className="group flex h-full flex-col justify-between gap-2 rounded-lg border border-gray-200 bg-white px-4 py-3 text-left transition-all hover:border-purple-300 hover:shadow-sm dark:border-gray-700 dark:bg-gray-800 dark:hover:border-purple-500/70"
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-md bg-purple-50 text-purple-600 dark:bg-purple-900/30 dark:text-purple-200">
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8m-2 8H5a2 2 0 01-2-2V8m18 0v6a2 2 0 01-2 2" />
+                      </svg>
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Import configuration</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                        Paste a shared code to reuse an existing setup instantly.
+                      </p>
+                    </div>
+                  </div>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {showImportDrawer && (
+            <div
+              id="custom-site-import-drawer"
+              className="mb-4 rounded-xl border border-purple-200 dark:border-purple-700 bg-purple-50/60 dark:bg-purple-900/20 p-4"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h4 className="text-sm font-semibold text-purple-800 dark:text-purple-200">Import Shared Configuration</h4>
+                  <p className="text-xs text-purple-700/80 dark:text-purple-200/70 mt-1">
+                    Reuse someone else&apos;s setup by pasting their configuration code below.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setShowImportDrawer(false); }}
+                  className="text-purple-700 dark:text-purple-200 hover:text-purple-900 dark:hover:text-purple-100"
+                  aria-label="Close import drawer"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <ImportSection
+                value={importCode}
+                onChange={(value) => {
+                  setImportCode(value);
+                  setImportError(null);
+                }}
+                onPreview={() => { void handlePreviewImport(); }}
+                onClear={() => {
+                  handleClearImport();
+                  setShowImportDrawer(false);
+                }}
+                loading={importingConfig}
+                error={importError}
+              />
+            </div>
+          )}
           {/* Add Site Form */}
           {showAddSite && (
             <div className="mb-3 p-4 bg-purple-50 dark:bg-purple-900/20 border-2 border-purple-200 dark:border-purple-800 rounded-lg">
@@ -701,47 +1016,73 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
                   onToggle={onCustomSiteToggle}
                   onRemove={onRemoveCustomSite}
                   onEdit={onEditCustomSite}
+                  onExport={(hostname) => {
+                    const target = customSites.find(s => s.hostname === hostname);
+                    if (target) {
+                      void handleExportCustomSite(target);
+                    }
+                  }}
+                  exporting={exportingHostname === site.hostname && copyStatus === 'copying'}
                   saving={saving}
                 />
               ))}
+              <AddCustomSiteCard
+                onClick={openAddMethodSelector}
+                disabled={addActionDisabled}
+                tooltip={addCardTooltip}
+              />
             </div>
           ) : (
             !showAddSite && (
-              <div className="text-center py-8 px-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600">
-                <svg className="w-12 h-12 mx-auto text-gray-400 dark:text-gray-500 mb-3" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418" />
-                </svg>
-                <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
-                  No custom sites added
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-                  Add any website to use your prompt library there
-                </p>
+              <>
+                <div className="text-center py-8 px-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600">
+                  <svg className="w-12 h-12 mx-auto text-gray-400 dark:text-gray-500 mb-3" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418" />
+                  </svg>
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                    No custom sites added
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+                    Add any website to use your prompt library there
+                  </p>
                 <button
-                  onClick={() => { setShowAddSite(true); }}
-                  disabled={!isPickerWindow && isCurrentSiteIntegrated}
+                  onClick={openAddMethodSelector}
+                  disabled={addActionDisabled}
                   className={`inline-flex items-center gap-1 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                    !isPickerWindow && isCurrentSiteIntegrated
+                    addActionDisabled
                       ? 'bg-gray-400 dark:bg-gray-600 text-gray-600 dark:text-gray-400 cursor-not-allowed'
                       : 'bg-purple-600 text-white hover:bg-purple-700'
                   }`}
-                  title={
-                    !isPickerWindow && isCurrentSiteIntegrated 
-                      ? `Current site (${currentTabUrl ? new URL(currentTabUrl).hostname : 'this website'}) is already integrated`
-                      : 'Add your first custom site'
-                  }
+                  title={addFirstSiteTooltip}
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                  </svg>
-                  {!isPickerWindow && isCurrentSiteIntegrated ? 'Current Site Already Added' : 'Add Your First Site'}
-                </button>
-              </div>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                    </svg>
+                    {addFirstSiteLabel}
+                  </button>
+                </div>
+              </>
             )
           )}
         </div>
       </div>
     </SettingsSection>
+    <ConfigurationPreview
+      isOpen={previewOpen}
+      config={pendingImport?.config ?? null}
+      warnings={pendingImport?.warnings ?? []}
+      duplicate={Boolean(pendingImport?.duplicate)}
+      existingDisplayName={pendingImport?.existingSite?.displayName}
+      onClose={() => {
+        if (!confirmingImport) {
+          setPreviewOpen(false);
+          setPendingImport(null);
+        }
+      }}
+      onConfirm={() => { void handleConfirmImport(); }}
+      isProcessing={confirmingImport}
+    />
+    </>
   );
 };
 

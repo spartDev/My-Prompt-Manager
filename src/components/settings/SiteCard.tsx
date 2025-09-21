@@ -1,5 +1,7 @@
 import { FC, ReactNode } from 'react';
 
+import ExportButton from './ExportButton';
+
 // Function to get brand-specific background colors
 const getBrandColors = (hostname: string) => {
   switch (hostname) {
@@ -34,9 +36,11 @@ interface SiteCardProps {
   icon: ReactNode;
   isEnabled: boolean;
   isCustom?: boolean;
-  onToggle: (hostname: string, enabled: boolean) => void;
-  onRemove?: (hostname: string) => void;
-  onEdit?: (hostname: string) => void;
+  onToggle: (hostname: string, enabled: boolean) => Promise<void> | void;
+  onRemove?: (hostname: string) => Promise<void> | void;
+  onEdit?: (hostname: string) => Promise<void> | void;
+  onExport?: (hostname: string) => Promise<void> | void;
+  exporting?: boolean;
   saving?: boolean;
 }
 
@@ -50,6 +54,8 @@ const SiteCard: FC<SiteCardProps> = ({
   onToggle,
   onRemove,
   onEdit,
+  onExport,
+  exporting = false,
   saving = false
 }) => {
   const brandColors = getBrandColors(hostname);
@@ -100,7 +106,7 @@ const SiteCard: FC<SiteCardProps> = ({
           <input
             type="checkbox"
             checked={isEnabled}
-            onChange={(e) => { onToggle(hostname, e.target.checked); }}
+            onChange={(e) => { void onToggle(hostname, e.target.checked); }}
             disabled={saving}
             className="sr-only peer"
             aria-label={`Enable ${name} integration`}
@@ -111,10 +117,17 @@ const SiteCard: FC<SiteCardProps> = ({
 
       {/* Custom Site Actions */}
       {isCustom && (
-        <div className="flex gap-1 mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+        <div className="flex gap-1 flex-wrap mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+          {onExport && (
+            <ExportButton
+              onClick={() => { void onExport(hostname); }}
+              disabled={saving}
+              loading={exporting}
+            />
+          )}
           {onEdit && (
             <button
-              onClick={() => { onEdit(hostname); }}
+              onClick={() => { void onEdit(hostname); }}
               disabled={saving}
               className="flex-1 flex items-center justify-center gap-1 px-2 py-1 text-xs font-medium text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded transition-colors"
             >
@@ -126,7 +139,7 @@ const SiteCard: FC<SiteCardProps> = ({
           )}
           {onRemove && (
             <button
-              onClick={() => { onRemove(hostname); }}
+              onClick={() => { void onRemove(hostname); }}
               disabled={saving}
               className="flex-1 flex items-center justify-center gap-1 px-2 py-1 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
             >
