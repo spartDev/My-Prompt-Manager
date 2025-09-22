@@ -13,7 +13,7 @@ const ORPHANED_TAB_DETECTION_WINDOW_MS = 10000; // 10 seconds after extension st
  * Content script injection controller
  * Handles programmatic injection of content scripts based on site enablement
  */
-class ContentScriptInjector {
+export class ContentScriptInjector {
   private injectedTabs: Set<number> = new Set();
   private injectionPromises: Map<number, Promise<void>> = new Map();
   private extensionStartTime: number = Date.now();

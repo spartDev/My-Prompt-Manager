@@ -15,30 +15,21 @@
 import { JSDOM } from 'jsdom';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
+import { getChromeMock } from '../../test/mocks';
 import { PromptLibraryInjector } from '../core/injector';
 import { injectCSS } from '../utils/styles';
 
-// Mock Chrome APIs
-const mockChrome = {
-  storage: {
-    local: {
-      get: vi.fn().mockResolvedValue({
-        prompts: [
-          {
-            id: 'compat-test-1',
-            title: 'Compatibility Test Prompt',
-            content: 'This is a test prompt for compatibility testing',
-            category: 'Testing',
-            createdAt: Date.now()
-          }
-        ]
-      }),
-      set: vi.fn().mockResolvedValue(undefined)
-    }
-  }
-};
+const chromeMock = getChromeMock();
 
-(globalThis as any).chrome = mockChrome;
+const defaultCompatibilityPrompts = [
+  {
+    id: 'compat-test-1',
+    title: 'Compatibility Test Prompt',
+    content: 'This is a test prompt for compatibility testing',
+    category: 'Testing',
+    createdAt: Date.now()
+  }
+];
 
 describe('Content Script Compatibility Tests', () => {
   let dom: JSDOM;
@@ -73,10 +64,13 @@ describe('Content Script Compatibility Tests', () => {
   };
 
   beforeEach(() => {
+    vi.clearAllMocks();
+    chromeMock.storage.local.get.mockResolvedValue({ prompts: defaultCompatibilityPrompts });
+    chromeMock.storage.local.set.mockResolvedValue(undefined);
+    (globalThis as any).chrome = chromeMock;
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    vi.clearAllMocks();
   });
 
   afterEach(() => {
@@ -93,7 +87,7 @@ describe('Content Script Compatibility Tests', () => {
       setupDOMForPlatform('https://example.com/');
       
       // Mock Chrome-specific features
-      (globalThis as any).chrome = mockChrome;
+      (globalThis as any).chrome = chromeMock;
       const domWindow = dom.window as any;
       Object.defineProperty(domWindow.navigator, 'userAgent', {
         value: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',

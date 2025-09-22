@@ -16,28 +16,19 @@
 import { JSDOM } from 'jsdom';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
+import { getChromeMock } from '../../test/mocks';
 import { PromptLibraryInjector } from '../core/injector';
 import { injectCSS } from '../utils/styles';
 
-// Mock Chrome APIs
-const mockChrome = {
-  storage: {
-    local: {
-      get: vi.fn().mockResolvedValue({
-        prompts: Array.from({ length: 100 }, (_, i) => ({
-          id: `perf-test-${i}`,
-          title: `Performance Test Prompt ${i}`,
-          content: `This is test content for performance testing prompt number ${i}. `.repeat(10),
-          category: `Category ${i % 5}`,
-          createdAt: Date.now() - (i * 1000)
-        }))
-      }),
-      set: vi.fn().mockResolvedValue(undefined)
-    }
-  }
-};
+const chromeMock = getChromeMock();
 
-(global as any).chrome = mockChrome;
+const defaultPrompts = Array.from({ length: 100 }, (_, i) => ({
+  id: `perf-test-${i}`,
+  title: `Performance Test Prompt ${i}`,
+  content: `This is test content for performance testing prompt number ${i}. `.repeat(10),
+  category: `Category ${i % 5}`,
+  createdAt: Date.now() - (i * 1000)
+}));
 
 describe('Content Script Performance Tests', () => {
   let dom: JSDOM;
@@ -70,10 +61,12 @@ describe('Content Script Performance Tests', () => {
   };
 
   beforeEach(() => {
+    vi.clearAllMocks();
+    chromeMock.storage.local.get.mockResolvedValue({ prompts: defaultPrompts });
+    chromeMock.storage.local.set.mockResolvedValue(undefined);
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    vi.clearAllMocks();
   });
 
   afterEach(() => {
@@ -107,7 +100,7 @@ describe('Content Script Performance Tests', () => {
       setupDOMForPlatform('https://example.com/');
       
       // Mock a large dataset
-      mockChrome.storage.local.get.mockResolvedValueOnce({
+      chromeMock.storage.local.get.mockResolvedValueOnce({
         prompts: Array.from({ length: 1000 }, (_, i) => ({
           id: `large-test-${i}`,
           title: `Large Dataset Prompt ${i}`,
@@ -392,7 +385,7 @@ describe('Content Script Performance Tests', () => {
       setupDOMForPlatform('https://example.com/');
       
       // Mock storage to fail
-      mockChrome.storage.local.get.mockRejectedValueOnce(new Error('Storage unavailable'));
+      chromeMock.storage.local.get.mockRejectedValueOnce(new Error('Storage unavailable'));
       
       injectCSS();
       injector = new PromptLibraryInjector();
@@ -407,8 +400,8 @@ describe('Content Script Performance Tests', () => {
       setupDOMForPlatform('https://example.com/');
       
       // Temporarily remove Chrome API
-      const originalChrome = (global as any).chrome;
-      (global as any).chrome = undefined;
+      const originalChrome = (globalThis as any).chrome;
+      (globalThis as any).chrome = undefined;
       
       injectCSS();
       injector = new PromptLibraryInjector();
@@ -419,7 +412,7 @@ describe('Content Script Performance Tests', () => {
       expect(injector).toBeDefined();
       
       // Restore Chrome API
-      (global as any).chrome = originalChrome;
+      (globalThis as any).chrome = originalChrome;
     });
   });
 

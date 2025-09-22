@@ -18,51 +18,44 @@
 import { JSDOM } from 'jsdom';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
+import { getChromeMock } from '../../test/mocks';
 import { PromptLibraryInjector } from '../core/injector';
 import { injectCSS } from '../utils/styles';
 
-// Mock Chrome APIs
-const mockChrome = {
-  storage: {
-    local: {
-      get: vi.fn().mockResolvedValue({
-        prompts: [
-          {
-            id: 'test-1',
-            title: 'Test Prompt 1',
-            content: 'This is a test prompt for integration testing',
-            category: 'Testing',
-            createdAt: Date.now()
-          },
-          {
-            id: 'test-2',
-            title: 'Test Prompt 2',
-            content: 'Another test prompt with different content',
-            category: 'Development',
-            createdAt: Date.now()
-          }
-        ]
-      }),
-      set: vi.fn().mockResolvedValue(undefined)
-    }
-  }
-};
+const chromeMock = getChromeMock();
 
-// Setup global Chrome API mock
-(globalThis as any).chrome = mockChrome;
+const defaultIntegrationPrompts = [
+  {
+    id: 'test-1',
+    title: 'Test Prompt 1',
+    content: 'This is a test prompt for integration testing',
+    category: 'Testing',
+    createdAt: Date.now()
+  },
+  {
+    id: 'test-2',
+    title: 'Test Prompt 2',
+    content: 'Another test prompt with different content',
+    category: 'Development',
+    createdAt: Date.now()
+  }
+];
 
 describe('Content Script Integration Tests', () => {
   let dom: JSDOM;
   let injector: PromptLibraryInjector;
 
   beforeEach(() => {
+    // Reset Chrome API mocks
+    vi.clearAllMocks();
+    chromeMock.storage.local.get.mockResolvedValue({ prompts: defaultIntegrationPrompts });
+    chromeMock.storage.local.set.mockResolvedValue(undefined);
+    (globalThis as any).chrome = chromeMock;
+
     // Mock console methods to avoid noise in tests
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
-
-    // Reset Chrome API mocks
-    vi.clearAllMocks();
   });
 
   const setupDOMForPlatform = (url: string) => {
@@ -401,7 +394,7 @@ describe('Content Script Integration Tests', () => {
 
     it('should handle network errors when loading prompts', async () => {
       // Mock Chrome storage to reject
-      mockChrome.storage.local.get.mockRejectedValueOnce(new Error('Storage error'));
+      chromeMock.storage.local.get.mockRejectedValueOnce(new Error('Storage error'));
 
       // Initialize injector - should handle the error gracefully
       injector = new PromptLibraryInjector();
