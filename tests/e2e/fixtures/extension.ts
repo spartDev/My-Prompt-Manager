@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unnecessary-condition, @typescript-eslint/no-unsafe-argument, @typescript-eslint/restrict-template-expressions, no-empty-pattern, react-hooks/rules-of-hooks */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unnecessary-condition, @typescript-eslint/no-unsafe-argument, @typescript-eslint/restrict-template-expressions, react-hooks/rules-of-hooks, no-empty-pattern */
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -51,10 +51,10 @@ const waitForBackgroundTarget = async (context: BrowserContext): Promise<Backgro
     }
 
     try {
-    const awaitedWorker = await context.waitForEvent('serviceworker', {
-      timeout: 1_000,
-      predicate: (candidate) => candidate.url().startsWith('chrome-extension://'),
-    });
+      const awaitedWorker = await context.waitForEvent('serviceworker', {
+        timeout: 1_000,
+        predicate: (candidate) => candidate.url().startsWith('chrome-extension://'),
+      });
       if (awaitedWorker) {
         return awaitedWorker;
       }
@@ -197,12 +197,13 @@ const createStorageController = (target: BackgroundTarget): ExtensionStorage => 
   };
 };
 
-export const test = base.extend<ExtensionFixtures>({
+const extensionFixtures = {
   context: async ({}, use) => {
     const userDataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'playwright-claude-ext-'));
 
+    const headless = process.env.CI ? 'new' : false;
     const context = await chromium.launchPersistentContext(userDataDir, {
-      headless: false,
+      headless,
       args: [
         `--disable-extensions-except=${extensionPath}`,
         `--load-extension=${extensionPath}`,
@@ -243,12 +244,15 @@ export const test = base.extend<ExtensionFixtures>({
   },
 
   page: async ({ context, extensionId, storage }, use) => {
-    void storage; // Ensure storage fixture initializes for every test.
+    void storage;
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/src/popup.html`);
     await use(page);
     await page.close();
   },
-});
+};
 
-export const expect = test.expect;
+export const withExtensionFixtures = (testType: typeof base) =>
+  testType.extend<ExtensionFixtures>(extensionFixtures);
+
+export type { ExtensionFixtures };

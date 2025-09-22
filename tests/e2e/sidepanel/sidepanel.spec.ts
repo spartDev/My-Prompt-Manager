@@ -1,6 +1,11 @@
+import { test as base } from '@playwright/test';
+
 import { DEFAULT_CATEGORY, DEFAULT_SETTINGS } from '../../../src/types';
-import { test, expect } from '../fixtures/extension';
+import { withExtensionFixtures } from '../fixtures/extension';
 import { seedLibrary, createPromptSeed } from '../utils/storage';
+
+const test = withExtensionFixtures(base);
+const expect = test.expect;
 
 test.describe('Side panel experience', () => {
   test('renders stored prompts in sidepanel context', async ({ context, storage, extensionId }) => {
