@@ -11,10 +11,10 @@ export default defineConfig({
   fullyParallel: false,
   retries: isCI ? 2 : 0,
   workers: isCI ? 1 : undefined,
-  reporter: [['list'], ...(isCI ? [['html', { open: 'never' }]] : [])],
+  reporter: isCI ? [['list'], ['html', { open: 'never' }]] : [['list']],
   globalSetup: './tests/e2e/global-setup.ts',
   use: {
-    headless: isCI ? 'new' : false,
+    headless: isCI ? true : false,
     screenshot: 'only-on-failure',
     trace: 'on-first-retry',
     video: 'retain-on-failure',
