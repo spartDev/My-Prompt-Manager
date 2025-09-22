@@ -32,7 +32,9 @@ export type ExtensionStorage = {
 };
 
 const waitForBackgroundTarget = async (context: BrowserContext): Promise<BackgroundTarget> => {
-  const deadline = Date.now() + 30_000;
+  // Longer timeout for CI environments
+  const deadline = Date.now() + (process.env.CI ? 60_000 : 30_000);
+  const isCI = process.env.CI;
 
   const findWorker = (): Worker | undefined =>
     context
@@ -44,15 +46,26 @@ const waitForBackgroundTarget = async (context: BrowserContext): Promise<Backgro
       .backgroundPages()
       .find((page) => page.url().startsWith('chrome-extension://'));
 
+  // In CI, we need to be more patient and try different approaches
+  if (isCI) {
+    // Wait for the extension to fully load first
+    await new Promise(resolve => setTimeout(resolve, 2000));
+  }
+
   while (Date.now() < deadline) {
     const worker = findWorker();
     if (worker) {
       return worker;
     }
 
+    const backgroundPage = findBackgroundPage();
+    if (backgroundPage) {
+      return backgroundPage;
+    }
+
     try {
       const awaitedWorker = await context.waitForEvent('serviceworker', {
-        timeout: 1_000,
+        timeout: isCI ? 3_000 : 1_000,
         predicate: (candidate) => candidate.url().startsWith('chrome-extension://'),
       });
       if (awaitedWorker) {
@@ -62,12 +75,11 @@ const waitForBackgroundTarget = async (context: BrowserContext): Promise<Backgro
       // Continue polling until deadline
     }
 
-    const backgroundPage = findBackgroundPage();
-    if (backgroundPage) {
-      return backgroundPage;
-    }
+    // In CI, add a longer delay between attempts
+    await new Promise(resolve => setTimeout(resolve, isCI ? 500 : 100));
   }
 
+  // Final attempts before giving up
   const fallbackWorker = findWorker();
   if (fallbackWorker) {
     return fallbackWorker;
@@ -78,7 +90,15 @@ const waitForBackgroundTarget = async (context: BrowserContext): Promise<Backgro
     return fallbackPage;
   }
 
-  throw new Error('Extension background target not found');
+  // More detailed error message for debugging
+  const serviceWorkers = context.serviceWorkers();
+  const backgroundPages = context.backgroundPages();
+
+  throw new Error(
+    `Extension background target not found after ${isCI ? '60' : '30'}s. ` +
+    `Found ${String(serviceWorkers.length)} service workers: [${serviceWorkers.map(w => w.url()).join(', ')}], ` +
+    `Found ${String(backgroundPages.length)} background pages: [${backgroundPages.map(p => p.url()).join(', ')}]`
+  );
 };
 
 const createStorageController = (target: BackgroundTarget): ExtensionStorage => {
@@ -209,6 +229,15 @@ export const test = base.extend<ExtensionFixtures>({
         `--load-extension=${extensionPath}`,
         '--no-first-run',
         '--no-default-browser-check',
+        // Additional args for CI stability
+        ...(process.env.CI ? [
+          '--disable-background-timer-throttling',
+          '--disable-backgrounding-occluded-windows',
+          '--disable-renderer-backgrounding',
+          '--disable-features=TranslateUI',
+          '--disable-default-apps',
+          '--disable-extensions-file-access-check',
+        ] : []),
       ],
     });
 
