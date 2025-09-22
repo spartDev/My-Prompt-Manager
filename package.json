@@ -14,10 +14,12 @@
     "test:coverage": "vitest --coverage",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "lint:fix": "eslint . --ext .js,.jsx,.ts,.tsx --fix",
-    "prepare": "if [ \"$CI\" = \"true\" ] || [ -n \"$GITHUB_ACTIONS\" ] || [ -n \"$JENKINS_URL\" ] || [ -n \"$BUILDKITE\" ]; then echo 'CI detected, skipping husky'; else husky; fi"
+    "prepare": "if [ \"$CI\" = \"true\" ] || [ -n \"$GITHUB_ACTIONS\" ] || [ -n \"$JENKINS_URL\" ] || [ -n \"$BUILDKITE\" ]; then echo 'CI detected, skipping husky'; else husky; fi",
+    "test:e2e": "playwright test"
   },
   "devDependencies": {
     "@crxjs/vite-plugin": "2.2.0",
+    "@playwright/test": "^1.55.0",
     "@testing-library/jest-dom": "6.8.0",
     "@testing-library/react": "16.3.0",
     "@testing-library/user-event": "14.6.1",

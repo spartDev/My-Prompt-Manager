@@ -51,6 +51,8 @@ Thumbs.db
 .tmp/
 coverage/
 .nyc_output
+test-results/
+playwright-report/
 
 # Log files
 logs
