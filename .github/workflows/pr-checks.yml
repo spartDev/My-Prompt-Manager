@@ -281,7 +281,7 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: 🧪 Run Playwright E2E Suite
-        run: npx @playwright/test test --reporter=line
+        run: npm run test:e2e -- --reporter=line
 
       - name: 📤 Upload Playwright Report (on failure)
         if: failure()
