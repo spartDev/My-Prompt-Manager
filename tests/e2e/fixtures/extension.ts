@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unnecessary-condition, @typescript-eslint/no-unsafe-argument, @typescript-eslint/restrict-template-expressions, react-hooks/rules-of-hooks, no-empty-pattern */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unnecessary-condition, @typescript-eslint/no-unsafe-argument, react-hooks/rules-of-hooks, no-empty-pattern */
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -201,7 +201,7 @@ export const test = base.extend<ExtensionFixtures>({
   context: async ({}, use) => {
     const userDataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'playwright-claude-ext-'));
 
-    const headless = process.env.CI ? 'new' : false;
+    const headless = process.env.CI ? true : false;
     const context = await chromium.launchPersistentContext(userDataDir, {
       headless,
       args: [
