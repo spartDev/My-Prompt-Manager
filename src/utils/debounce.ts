@@ -6,7 +6,7 @@
  * @param delay - The delay in milliseconds
  * @returns A debounced version of the function with a cancel method
  */
-export function debounce<T extends (...args: unknown[]) => void>(
+export function debounce<T extends (...args: any[]) => void>(
   func: T,
   delay: number
 ): T & { cancel: () => void } {

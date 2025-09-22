@@ -47,7 +47,7 @@ export class ChatGPTStrategy extends PlatformStrategy {
    * Inserts content using React-compatible methods
    * Uses native property setter to trigger React state updates
    */
-  insert(element: HTMLElement, content: string): InsertionResult {
+  insert(element: HTMLElement, content: string): Promise<InsertionResult> {
     try {
       const textareaElement = element as ReactTextAreaElement;
       
@@ -73,10 +73,10 @@ export class ChatGPTStrategy extends PlatformStrategy {
       textareaElement.dispatchEvent(new Event('change', { bubbles: true }));
       
       this._debug('ChatGPT React insertion successful');
-      return { success: true, method: 'chatgpt-react' };
+      return Promise.resolve({ success: true, method: 'chatgpt-react' });
     } catch (error) {
       this._warn('React insertion failed', error as Error);
-      return { success: false, error: (error as Error).message };
+      return Promise.resolve({ success: false, error: (error as Error).message });
     }
   }
 

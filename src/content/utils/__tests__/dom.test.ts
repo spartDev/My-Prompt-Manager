@@ -41,12 +41,12 @@ describe('DOMUtils', () => {
     vi.clearAllMocks();
     
     // Setup global mocks
-    Object.defineProperty(global, 'document', {
+    Object.defineProperty(globalThis, 'document', {
       value: documentMock,
       writable: true,
     });
-    
-    Object.defineProperty(global, 'window', {
+
+    Object.defineProperty(globalThis, 'window', {
       value: windowMock,
       writable: true,
     });

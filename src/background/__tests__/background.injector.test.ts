@@ -5,7 +5,7 @@ import { ContentScriptInjector } from '../background';
 
 describe('ContentScriptInjector integration', () => {
   beforeEach(() => {
-    const chromeMock = getChromeMock();
+    const chromeMock = getChromeMock() as any;
     chromeMock.storage.local.get.mockResolvedValue({
       promptLibrarySettings: {
         enabledSites: ['chatgpt.com'],
@@ -25,7 +25,7 @@ describe('ContentScriptInjector integration', () => {
   });
 
   it('injects the content script when permissions allow it', async () => {
-    const chromeMock = getChromeMock();
+    const chromeMock = getChromeMock() as any;
     chromeMock.scripting.executeScript
       .mockResolvedValueOnce([{ result: true }])
       .mockResolvedValueOnce([{ result: { isInjected: false, orphanedElements: 0 } }])
@@ -40,7 +40,7 @@ describe('ContentScriptInjector integration', () => {
   });
 
   it('does not attempt injection when permissions are denied', async () => {
-    const chromeMock = getChromeMock();
+    const chromeMock = getChromeMock() as any;
     chromeMock.permissions.contains.mockResolvedValue(false);
 
     const injector = new ContentScriptInjector();
@@ -50,7 +50,7 @@ describe('ContentScriptInjector integration', () => {
   });
 
   it('skips restricted URLs', async () => {
-    const chromeMock = getChromeMock();
+    const chromeMock = getChromeMock() as any;
     chromeMock.tabs.get.mockResolvedValue({
       id: 2,
       url: 'chrome://settings',
@@ -65,13 +65,13 @@ describe('ContentScriptInjector integration', () => {
 
   it('clears tracking state during cleanup', () => {
     const injector = new ContentScriptInjector();
-    (injector as { injectedTabs: Set<number>; injectionPromises: Map<number, Promise<void>>; orphanedTabs: Set<number> }).injectedTabs.add(3);
-    (injector as { injectedTabs: Set<number>; injectionPromises: Map<number, Promise<void>>; orphanedTabs: Set<number> }).injectionPromises.set(3, Promise.resolve());
-    (injector as { injectedTabs: Set<number>; injectionPromises: Map<number, Promise<void>>; orphanedTabs: Set<number> }).orphanedTabs.add(3);
+    (injector as any).injectedTabs.add(3);
+    (injector as any).injectionPromises.set(3, Promise.resolve());
+    (injector as any).orphanedTabs.add(3);
 
     injector.cleanup(3);
 
-    const internal = injector as { injectedTabs: Set<number>; injectionPromises: Map<number, Promise<void>>; orphanedTabs: Set<number> };
+    const internal = injector as any;
     expect(internal.injectedTabs.has(3)).toBe(false);
     expect(internal.injectionPromises.has(3)).toBe(false);
     expect(internal.orphanedTabs.has(3)).toBe(false);

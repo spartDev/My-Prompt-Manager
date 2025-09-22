@@ -35,10 +35,10 @@ export class DefaultStrategy extends PlatformStrategy {
    * Inserts content using generic methods
    * Works with standard textarea, input, and contenteditable elements
    */
-  insert(element: HTMLElement, content: string): InsertionResult {
+  insert(element: HTMLElement, content: string): Promise<InsertionResult> {
     try {
       element.focus();
-      
+
       // Handle different element types with basic insertion
       if (element.tagName === 'TEXTAREA' || element.tagName === 'INPUT') {
         const inputElement = element as HTMLInputElement | HTMLTextAreaElement;
@@ -49,12 +49,12 @@ export class DefaultStrategy extends PlatformStrategy {
         element.textContent = content;
         element.dispatchEvent(new Event('input', { bubbles: true }));
       }
-      
+
       this._debug('Default insertion successful');
-      return { success: true, method: 'default' };
+      return Promise.resolve({ success: true, method: 'default' });
     } catch (error) {
       this._error('Default insertion failed', error as Error);
-      return { success: false, error: (error as Error).message };
+      return Promise.resolve({ success: false, error: (error as Error).message });
     }
   }
 

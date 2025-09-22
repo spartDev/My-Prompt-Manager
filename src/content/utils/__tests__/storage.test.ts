@@ -2,7 +2,7 @@
  * Unit tests for StorageManager utility module
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import * as Logger from '../logger';
 import { getPrompts, sanitizeUserInput, validatePromptData, createPromptListItem, escapeHtml, createElement, createSVGElement } from '../storage';
@@ -41,12 +41,12 @@ describe('StorageManager', () => {
     vi.clearAllMocks();
     
     // Setup global mocks
-    Object.defineProperty(global, 'chrome', {
+    Object.defineProperty(globalThis, 'chrome', {
       value: chromeMock,
       writable: true,
     });
-    
-    Object.defineProperty(global, 'document', {
+
+    Object.defineProperty(globalThis, 'document', {
       value: documentMock,
       writable: true,
     });
@@ -67,7 +67,7 @@ describe('StorageManager', () => {
         },
       ];
       
-      chromeMock.storage.local.get.mockImplementation((keys, callback) => {
+      chromeMock.storage.local.get.mockImplementation((_keys, callback) => {
         callback({ prompts: mockPrompts });
       });
 
@@ -82,7 +82,7 @@ describe('StorageManager', () => {
     });
 
     it('should handle chrome storage errors gracefully', async () => {
-      chromeMock.runtime.lastError = { message: 'Storage error' };
+      chromeMock.runtime.lastError = { message: 'Storage error' } as chrome.runtime.LastError;
       chromeMock.storage.local.get.mockImplementation((keys, callback) => {
         callback({});
       });
@@ -114,7 +114,7 @@ describe('StorageManager', () => {
         null, // Invalid - null prompt
       ];
       
-      chromeMock.storage.local.get.mockImplementation((keys, callback) => {
+      chromeMock.storage.local.get.mockImplementation((_keys, callback) => {
         callback({ prompts: mockPrompts });
       });
 
@@ -223,7 +223,7 @@ describe('StorageManager', () => {
 
     it('should handle creation errors gracefully', () => {
       // Mock createElementNS to throw error, but also provide fallback
-      documentMock.createElementNS.mockImplementation((namespace, tag) => {
+      documentMock.createElementNS.mockImplementation((_namespace, tag) => {
         if (tag === 'path') {
           throw new Error('SVG creation error');
         }
@@ -362,7 +362,7 @@ describe('StorageManager', () => {
 
     it('should handle creation errors gracefully', () => {
       let callCount = 0;
-      documentMock.createElement.mockImplementation((tag) => {
+      documentMock.createElement.mockImplementation((_tag) => {
         callCount++;
         if (callCount === 1) {
           throw new Error('Creation error');

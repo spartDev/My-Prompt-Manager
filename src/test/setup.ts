@@ -370,7 +370,7 @@ const mockChrome = {
   }
 };
 
-Object.defineProperty(global, 'chrome', {
+Object.defineProperty(globalThis, 'chrome', {
   value: mockChrome,
   writable: true
 });
@@ -500,7 +500,7 @@ beforeEach(async () => {
   await ensureInjectorPatched();
 });
 
-const injectorStartTimes = new WeakMap<ContentScriptInjector, number>();
+const injectorStartTimes = new WeakMap<any, number>();
 let injectorPatched = false;
 async function ensureInjectorPatched(): Promise<void> {
   if (injectorPatched) {
