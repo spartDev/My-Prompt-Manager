@@ -1,11 +1,6 @@
-import { test as base } from '@playwright/test';
-
 import { DEFAULT_SETTINGS } from '../../../src/types';
-import { withExtensionFixtures } from '../fixtures/extension';
+import { test, expect } from '../fixtures/extension';
 import { seedLibrary } from '../utils/storage';
-
-const test = withExtensionFixtures(base);
-const expect = test.expect;
 
 test.describe('Element picker integration', () => {
   test('displays selected element after picker flow completes', async ({ context, page, storage, extensionId }) => {

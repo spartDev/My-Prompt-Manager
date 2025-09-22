@@ -1,11 +1,6 @@
-import { test as base } from '@playwright/test';
-
 import { DEFAULT_CATEGORY, DEFAULT_SETTINGS } from '../../../src/types';
-import { withExtensionFixtures } from '../fixtures/extension';
+import { test, expect } from '../fixtures/extension';
 import { seedLibrary, createPromptSeed } from '../utils/storage';
-
-const test = withExtensionFixtures(base);
-const expect = test.expect;
 
 const MOCK_HOST = 'https://claude.ai/';
 const MOCK_BODY = /* html */ `

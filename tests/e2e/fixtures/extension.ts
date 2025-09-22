@@ -197,7 +197,7 @@ const createStorageController = (target: BackgroundTarget): ExtensionStorage => 
   };
 };
 
-const extensionFixtures = {
+export const test = base.extend<ExtensionFixtures>({
   context: async ({}, use) => {
     const userDataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'playwright-claude-ext-'));
 
@@ -250,9 +250,6 @@ const extensionFixtures = {
     await use(page);
     await page.close();
   },
-};
+});
 
-export const withExtensionFixtures = (testType: typeof base) =>
-  testType.extend<ExtensionFixtures>(extensionFixtures);
-
-export type { ExtensionFixtures };
+export const expect = test.expect;
