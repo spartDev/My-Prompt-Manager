@@ -14,7 +14,7 @@ export default defineConfig({
   reporter: [['list'], ...(isCI ? [['html', { open: 'never' }]] : [])],
   globalSetup: './tests/e2e/global-setup.ts',
   use: {
-    headless: false,
+    headless: isCI ? 'new' : false,
     screenshot: 'only-on-failure',
     trace: 'on-first-retry',
     video: 'retain-on-failure',
