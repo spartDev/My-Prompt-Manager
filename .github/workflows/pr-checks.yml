@@ -527,7 +527,7 @@ jobs:
             - ✅ **Zero tolerance** for linting errors (\`npm run lint\`)
             - ✅ **All tests must pass** (\`npm test\`)
             - ✅ **Build must succeed** for Chrome extension
-            - ✅ **Playwright end-to-end suite** must pass (`npm run test:e2e`)
+            - ✅ **Playwright end-to-end suite** must pass (\`npm run test:e2e\`)
             - ✅ **No security vulnerabilities** above moderate level
             - ✅ **Manifest V3 compliance** for Chrome extension
             
