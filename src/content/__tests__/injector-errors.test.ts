@@ -1,35 +1,35 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, Mock } from 'vitest';
 
 import { ContentScriptInjector } from '../../background/background';
-import { getChromeMock } from '../../test/mocks';
+import { getChromeMockFunctions } from '../../test/mocks';
 
 describe('ContentScriptInjector error handling', () => {
   beforeEach(() => {
-    const chromeMock = getChromeMock();
-    chromeMock.tabs.get.mockResolvedValue({ id: 1, url: 'https://example.com', status: 'complete' } as chrome.tabs.Tab);
-    chromeMock.permissions.contains.mockResolvedValue(false);
-    chromeMock.storage.local.get.mockResolvedValue({
+    const chromeMock = getChromeMockFunctions();
+    (chromeMock.tabs.get as Mock).mockResolvedValue({ id: 1, url: 'https://example.com', status: 'complete' } as chrome.tabs.Tab);
+    (chromeMock.permissions.contains as Mock).mockResolvedValue(false);
+    (chromeMock.storage.local.get as Mock).mockResolvedValue({
       promptLibrarySettings: {
         enabledSites: ['example.com'],
         customSites: []
       }
     });
-    chromeMock.scripting.executeScript.mockResolvedValue([{ result: true }]);
+    ((chromeMock.scripting.executeScript as Mock)).mockResolvedValue([{ result: true }]);
   });
 
   it('skips injection when the site permission is missing', async () => {
-    const chromeMock = getChromeMock();
+    const chromeMock = getChromeMockFunctions();
     const injector = new ContentScriptInjector();
 
     await injector.injectIfNeeded(1);
 
-    expect(chromeMock.scripting.executeScript).not.toHaveBeenCalled();
+    expect((chromeMock.scripting.executeScript)).not.toHaveBeenCalled();
   });
 
   it('returns a tab access denied message when execution is blocked', async () => {
-    const chromeMock = getChromeMock();
-    chromeMock.permissions.contains.mockResolvedValue(true);
-    chromeMock.scripting.executeScript
+    const chromeMock = getChromeMockFunctions();
+    (chromeMock.permissions.contains as Mock).mockResolvedValue(true);
+    (chromeMock.scripting.executeScript as Mock)
       .mockResolvedValueOnce([{ result: true }])
       .mockResolvedValueOnce([{ result: { isInjected: false, orphanedElements: 0 } }])
       .mockRejectedValueOnce(new Error('tab access denied'));
@@ -42,15 +42,15 @@ describe('ContentScriptInjector error handling', () => {
   });
 
   it('detects orphaned tabs shortly after extension reload', async () => {
-    const chromeMock = getChromeMock();
-    chromeMock.permissions.contains.mockResolvedValue(true);
-    chromeMock.scripting.executeScript
+    const chromeMock = getChromeMockFunctions();
+    (chromeMock.permissions.contains as Mock).mockResolvedValue(true);
+    (chromeMock.scripting.executeScript as Mock)
       .mockResolvedValueOnce([{ result: true }])
       .mockResolvedValueOnce([{ result: { isInjected: false, orphanedElements: 0 } }])
       .mockRejectedValueOnce(new Error('tab access denied'));
 
     const injector = new ContentScriptInjector();
-    (injector as { extensionStartTime: number }).extensionStartTime = Date.now();
+    (injector as any).extensionStartTime = Date.now();
 
     const result = await injector.forceInjectContentScript(1);
 

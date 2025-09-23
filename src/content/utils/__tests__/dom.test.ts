@@ -104,7 +104,7 @@ describe('DOMUtils', () => {
     });
 
     it('should handle creation errors gracefully', () => {
-      documentMock.createElementNS.mockImplementation((namespace, tag) => {
+      documentMock.createElementNS.mockImplementation((_namespace, tag) => {
         if (tag === 'path') {
           throw new Error('SVG creation error');
         }

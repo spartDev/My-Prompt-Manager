@@ -14,13 +14,13 @@
  
 
 import { JSDOM } from 'jsdom';
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi, Mock } from 'vitest';
 
-import { getChromeMock } from '../../test/mocks';
+import { getChromeMockFunctions } from '../../test/mocks';
 import { PromptLibraryInjector } from '../core/injector';
 import { injectCSS } from '../utils/styles';
 
-const chromeMock = getChromeMock();
+const chromeMock = getChromeMockFunctions();
 
 const defaultPrompts = Array.from({ length: 100 }, (_, i) => ({
   id: `perf-test-${i}`,
@@ -62,8 +62,8 @@ describe('Content Script Performance Tests', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    chromeMock.storage.local.get.mockResolvedValue({ prompts: defaultPrompts });
-    chromeMock.storage.local.set.mockResolvedValue(undefined);
+    (chromeMock.storage.local.get as Mock).mockResolvedValue({ prompts: defaultPrompts });
+    (chromeMock.storage.local.set as Mock).mockResolvedValue(undefined);
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -100,7 +100,7 @@ describe('Content Script Performance Tests', () => {
       setupDOMForPlatform('https://example.com/');
       
       // Mock a large dataset
-      chromeMock.storage.local.get.mockResolvedValueOnce({
+      (chromeMock.storage.local.get as Mock).mockResolvedValueOnce({
         prompts: Array.from({ length: 1000 }, (_, i) => ({
           id: `large-test-${i}`,
           title: `Large Dataset Prompt ${i}`,
@@ -155,8 +155,9 @@ describe('Content Script Performance Tests', () => {
       
       await new Promise(resolve => setTimeout(resolve, 100));
       
-      // Get initial listener count (approximate)
-      const initialListeners = dom.window.document.querySelectorAll('*').length;
+      // Get initial listener count (approximate) - for potential future memory leak detection
+      const initialListenerCount = dom.window.document.querySelectorAll('*').length;
+      expect(initialListenerCount).toBeGreaterThan(0); // Verify DOM has elements
       
       // Cleanup
       injector.cleanup();
@@ -385,7 +386,7 @@ describe('Content Script Performance Tests', () => {
       setupDOMForPlatform('https://example.com/');
       
       // Mock storage to fail
-      chromeMock.storage.local.get.mockRejectedValueOnce(new Error('Storage unavailable'));
+      (chromeMock.storage.local.get as Mock).mockRejectedValueOnce(new Error('Storage unavailable'));
       
       injectCSS();
       injector = new PromptLibraryInjector();

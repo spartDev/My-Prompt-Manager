@@ -7,13 +7,13 @@ import type { EventListenerEntry } from '../types/index';
 import { warn, debug } from '../utils/logger';
 
 export class EventManager {
-  private listeners: Map<HTMLElement, EventListenerEntry[]>;
+  private listeners: Map<EventTarget, EventListenerEntry[]>;
 
   constructor() {
     this.listeners = new Map();
   }
 
-  addTrackedEventListener(element: HTMLElement, event: string, handler: EventListener): void {
+  addTrackedEventListener(element: EventTarget, event: string, handler: EventListener): void {
     element.addEventListener(event, handler);
     
     if (!this.listeners.has(element)) {
@@ -39,9 +39,7 @@ export class EventManager {
           warn('Failed to remove event listener', {
             error: err instanceof Error ? err.message : String(err),
             event,
-            elementTag: element.tagName,
-            elementId: element.id,
-            elementClass: element.className
+            ...this.getElementDebugInfo(element)
           });
         }
       });
@@ -53,5 +51,26 @@ export class EventManager {
       removedListeners: removedCount,
       errors: errorCount
     });
+  }
+
+  private getElementDebugInfo(element: EventTarget): Record<string, string | undefined> {
+    if (element instanceof HTMLElement) {
+      return {
+        elementTag: element.tagName,
+        elementId: element.id,
+        elementClass: element.className
+      };
+    }
+
+    if (typeof Document !== 'undefined' && element instanceof Document) {
+      return { elementTag: 'Document' };
+    }
+
+    if (typeof Window !== 'undefined' && element instanceof Window) {
+      return { elementTag: 'Window' };
+    }
+
+    const constructorName = (element as { constructor?: { name?: string } }).constructor?.name;
+    return { elementTag: constructorName ?? 'UnknownEventTarget' };
   }
 }

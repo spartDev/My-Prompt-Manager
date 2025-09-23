@@ -21,18 +21,19 @@ export class PlatformManager {
   private strategies: PlatformStrategy[];
   private activeStrategy: PlatformStrategy | null;
   private hostname: string;
-  private _options: Required<PlatformManagerOptions>;
   private isInitialized: boolean;
   private customSiteConfig: CustomSite | null;
 
   constructor(options: PlatformManagerOptions = {}) {
-    this._options = {
+    // Store options for potential future use
+    const _options = {
       enableDebugLogging: options.enableDebugLogging || false,
       maxRetries: options.maxRetries || 3,
       timeout: options.timeout || 5000,
       ...options
     };
-    
+    void _options; // Explicitly mark as intentionally unused for now
+
     this.strategies = [];
     this.activeStrategy = null;
     this.hostname = window.location.hostname;

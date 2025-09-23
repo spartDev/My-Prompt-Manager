@@ -13,13 +13,13 @@
  
 
 import { JSDOM } from 'jsdom';
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi, Mock } from 'vitest';
 
-import { getChromeMock } from '../../test/mocks';
+import { getChromeMockFunctions } from '../../test/mocks';
 import { PromptLibraryInjector } from '../core/injector';
 import { injectCSS } from '../utils/styles';
 
-const chromeMock = getChromeMock();
+const chromeMock = getChromeMockFunctions();
 
 const defaultCompatibilityPrompts = [
   {
@@ -65,8 +65,8 @@ describe('Content Script Compatibility Tests', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    chromeMock.storage.local.get.mockResolvedValue({ prompts: defaultCompatibilityPrompts });
-    chromeMock.storage.local.set.mockResolvedValue(undefined);
+    (chromeMock.storage.local.get as Mock).mockResolvedValue({ prompts: defaultCompatibilityPrompts });
+    (chromeMock.storage.local.set as Mock).mockResolvedValue(undefined);
     (globalThis as any).chrome = chromeMock;
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});

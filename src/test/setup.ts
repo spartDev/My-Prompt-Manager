@@ -220,7 +220,7 @@ const promptManagerSpy = vi.spyOn(PromptManager, 'getInstance');
 const createStorageManagerMock = (): StorageManagerMock => {
   const storageMock = Object.create(storageManagerPrototype) as StorageManagerMock;
   Object.assign<StorageManagerMock, StorageManagerInstance>(storageMock, baseStorageManager);
-  (storageMock as { operationLocks: Map<string, Promise<unknown>> }).operationLocks = new Map();
+  (storageMock as any).operationLocks = new Map<string, Promise<unknown>>();
 
   for (const name of storageManagerMethodNames) {
     const descriptor = Object.getOwnPropertyDescriptor(storageManagerPrototype, name);
@@ -461,13 +461,13 @@ const resetChromeMocks = (): void => {
   applyStorageImplementations();
 
   mockChrome.runtime.lastError = null;
-  mockChrome.runtime.sendMessage.mockResolvedValue(undefined);
-  mockChrome.runtime.getManifest.mockReturnValue({ content_scripts: [{ js: ['content.js'] }] });
-  mockChrome.runtime.getURL.mockImplementation((path: string) => path);
-  mockChrome.permissions.request.mockResolvedValue(false);
-  mockChrome.permissions.contains.mockResolvedValue(false);
-  mockChrome.permissions.remove.mockResolvedValue(undefined);
-  mockChrome.tabs.query.mockImplementation((_queryInfo, callback?: (tabs: chrome.tabs.Tab[]) => void) => {
+  (mockChrome.runtime.sendMessage as any).mockResolvedValue(undefined);
+  (mockChrome.runtime.getManifest as any).mockReturnValue({ content_scripts: [{ js: ['content.js'] }] });
+  (mockChrome.runtime.getURL as any).mockImplementation((path: string) => path);
+  (mockChrome.permissions.request as any).mockResolvedValue(false);
+  (mockChrome.permissions.contains as any).mockResolvedValue(false);
+  (mockChrome.permissions.remove as any).mockResolvedValue(undefined);
+  (mockChrome.tabs.query as any).mockImplementation((_queryInfo: any, callback?: (tabs: chrome.tabs.Tab[]) => void) => {
     const result: chrome.tabs.Tab[] = [];
     if (callback) {
       callback(result);
@@ -475,9 +475,9 @@ const resetChromeMocks = (): void => {
     }
     return Promise.resolve(result);
   });
-  mockChrome.tabs.get.mockResolvedValue({ id: 1, url: 'https://example.com', status: 'complete' } as unknown as chrome.tabs.Tab);
-  mockChrome.tabs.sendMessage.mockResolvedValue(undefined);
-  mockChrome.scripting.executeScript.mockResolvedValue([{ result: true }]);
+  (mockChrome.tabs.get as any).mockResolvedValue({ id: 1, url: 'https://example.com', status: 'complete' } as unknown as chrome.tabs.Tab);
+  (mockChrome.tabs.sendMessage as any).mockResolvedValue(undefined);
+  (mockChrome.scripting.executeScript as any).mockResolvedValue([{ result: true }]);
 };
 
 setupDomMocks();
@@ -500,7 +500,7 @@ beforeEach(async () => {
   await ensureInjectorPatched();
 });
 
-const injectorStartTimes = new WeakMap<any, number>();
+const injectorStartTimes = new WeakMap<object, number>();
 let injectorPatched = false;
 async function ensureInjectorPatched(): Promise<void> {
   if (injectorPatched) {

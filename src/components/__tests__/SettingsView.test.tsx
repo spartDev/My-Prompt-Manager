@@ -1,9 +1,9 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
 
 import { ThemeProvider } from '../../contexts/ThemeContext';
-import { getChromeMock, getMockStorageManager } from '../../test/mocks';
+import { getChromeMockFunctions, getMockStorageManager } from '../../test/mocks';
 import { DEFAULT_SETTINGS, type Prompt, type Category } from '../../types';
 import SettingsView from '../SettingsView';
 
@@ -28,8 +28,8 @@ const renderSettings = async () => {
 
 describe('SettingsView', () => {
   beforeEach(() => {
-    const chromeMock = getChromeMock();
-    chromeMock.storage.local.get.mockResolvedValue({
+    const chromeMock = getChromeMockFunctions();
+    (chromeMock.storage.local.get as Mock).mockResolvedValue({
       promptLibrarySettings: {
         enabledSites: ['chatgpt.com'],
         customSites: []
@@ -37,9 +37,9 @@ describe('SettingsView', () => {
       interfaceMode: 'popup',
       settings: DEFAULT_SETTINGS
     });
-    chromeMock.storage.local.set.mockResolvedValue(undefined);
-    chromeMock.storage.local.clear.mockResolvedValue(undefined);
-    chromeMock.tabs.query.mockResolvedValue([]);
+    (chromeMock.storage.local.set as Mock).mockResolvedValue(undefined);
+    (chromeMock.storage.local.clear as Mock).mockResolvedValue(undefined);
+    (chromeMock.tabs.query as Mock).mockResolvedValue([]);
     const storageMock = getMockStorageManager();
     storageMock.getPrompts.mockResolvedValue([]);
     storageMock.getCategories.mockResolvedValue([]);
@@ -47,7 +47,7 @@ describe('SettingsView', () => {
 
   it('imports prompts and categories from a valid backup', async () => {
     const storageMock = getMockStorageManager();
-    const chromeMock = getChromeMock();
+    const chromeMock = getChromeMockFunctions();
     const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
 
     await renderSettings();
@@ -74,7 +74,7 @@ describe('SettingsView', () => {
     });
 
     expect(alertSpy).toHaveBeenCalledWith(expect.stringMatching(/successfully imported/i));
-    expect(chromeMock.storage.local.get.mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect((chromeMock.storage.local.get as Mock).mock.calls.length).toBeGreaterThanOrEqual(2);
     alertSpy.mockRestore();
   });
 
@@ -101,11 +101,11 @@ describe('SettingsView', () => {
   });
 
   it('resets settings to defaults after confirmation', async () => {
-    const chromeMock = getChromeMock();
+    const chromeMock = getChromeMockFunctions();
     const storageMock = getMockStorageManager();
     const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
 
-    chromeMock.storage.local.get.mockResolvedValue({
+    (chromeMock.storage.local.get as Mock).mockResolvedValue({
       promptLibrarySettings: { enabledSites: [], customSites: [] },
       interfaceMode: 'sidepanel',
       settings: {
@@ -122,7 +122,7 @@ describe('SettingsView', () => {
       expect(storageMock.getCategories).toHaveBeenCalled();
     });
     await waitFor(() => {
-      expect(chromeMock.storage.local.get).toHaveBeenCalled();
+      expect(chromeMock.storage.local.get as Mock).toHaveBeenCalled();
     });
 
     const aboutToggle = await screen.findByRole('button', { name: /about & reset/i });
@@ -161,7 +161,7 @@ describe('SettingsView', () => {
   });
 
   it('changes the interface mode when a different option is selected', async () => {
-    const chromeMock = getChromeMock();
+    const chromeMock = getChromeMockFunctions();
     const storageMock = getMockStorageManager();
     await renderSettings();
     await waitFor(() => {

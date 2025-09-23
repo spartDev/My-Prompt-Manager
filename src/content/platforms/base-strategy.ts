@@ -107,7 +107,10 @@ export abstract class PlatformStrategy implements PlatformStrategyInterface {
    * @protected
    */
   protected _warn(message: string, errorOrContext: Record<string, unknown> | Error = {}): void {
-    warn(`[${this.name}] ${message}`, errorOrContext);
+    const context = errorOrContext instanceof Error
+      ? { error: errorOrContext.message, stack: errorOrContext.stack }
+      : errorOrContext;
+    warn(`[${this.name}] ${message}`, context);
   }
 
   /**

@@ -27,6 +27,39 @@ export const getMockPromptManager = (): PromptManagerMock => {
 
 export const getChromeMock = (): typeof chrome => getGlobal().chrome;
 
+// Export proper mock functions for direct use in tests
+export const getChromeMockFunctions = () => {
+  const chromeApi = getGlobal().chrome;
+  return {
+    storage: {
+      local: {
+        get: chromeApi.storage.local.get,
+        set: chromeApi.storage.local.set,
+        clear: chromeApi.storage.local.clear,
+        getBytesInUse: chromeApi.storage.local.getBytesInUse,
+      }
+    },
+    tabs: {
+      query: chromeApi.tabs.query,
+      get: chromeApi.tabs.get,
+      sendMessage: chromeApi.tabs.sendMessage,
+    },
+    runtime: {
+      sendMessage: chromeApi.runtime.sendMessage,
+      getManifest: chromeApi.runtime.getManifest,
+      getURL: chromeApi.runtime.getURL,
+    },
+    permissions: {
+      request: chromeApi.permissions.request,
+      contains: chromeApi.permissions.contains,
+      remove: chromeApi.permissions.remove,
+    },
+    scripting: {
+      executeScript: chromeApi.scripting.executeScript,
+    }
+  };
+};
+
 export const triggerChromeStorageChange = (changes: Record<string, unknown>, areaName: string = 'local'): void => {
   const trigger = getGlobal().__triggerChromeStorageChange__;
   if (trigger) {

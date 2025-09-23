@@ -31,12 +31,16 @@ describe('StorageManager', () => {
       if (Array.isArray(keys)) {
         const result: Record<string, unknown> = {};
         keys.forEach(key => {
-           
+
           result[key] = mockStorage[key] || null;
         });
         return Promise.resolve(result);
       }
-      return Promise.resolve({ [keys as string]: mockStorage[keys as string] });
+      if (typeof keys === 'string') {
+        return Promise.resolve({ [keys]: mockStorage[keys] });
+      }
+      // Handle null/undefined case - return all data
+      return Promise.resolve(mockStorage);
     });
 
      

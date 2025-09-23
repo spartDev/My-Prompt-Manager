@@ -37,7 +37,7 @@ describe('App prompt workflows', () => {
     const storageMock = getMockStorageManager();
     const promptMock = getMockPromptManager();
 
-    promptMock.createPrompt.mockResolvedValue({
+    (promptMock.createPrompt as any).mockResolvedValue({
       ...basePrompt,
       id: 'prompt-created',
       title: 'Greeting',
@@ -170,7 +170,7 @@ describe('App prompt workflows', () => {
       type: ErrorType.STORAGE_QUOTA_EXCEEDED,
       message: 'Quota reached'
     };
-    promptMock.createPrompt.mockRejectedValue(quotaError);
+    (promptMock.createPrompt as any).mockRejectedValue(quotaError);
 
     await renderApp();
 
@@ -183,8 +183,11 @@ describe('App prompt workflows', () => {
     const saveFromEmpty = await screen.findByRole('button', { name: /save prompt/i });
     await userEvent.click(saveFromEmpty);
 
-    await screen.findByRole('heading', { name: /error loading data/i });
-    await screen.findByText(/quota reached/i);
+    const errorHeading = await screen.findByRole('heading', { name: /error loading data/i });
+    expect(errorHeading).toBeInTheDocument();
+    
+    const errorMessage = await screen.findByText(/quota reached/i);
+    expect(errorMessage).toBeInTheDocument();
   });
 
   it('surfaces validation errors through an error toast', async () => {
@@ -196,7 +199,7 @@ describe('App prompt workflows', () => {
       type: ErrorType.VALIDATION_ERROR,
       message: 'Title is required'
     };
-    promptMock.updatePrompt.mockRejectedValue(validationError);
+    (promptMock.updatePrompt as any).mockRejectedValue(validationError);
 
     await renderApp();
 

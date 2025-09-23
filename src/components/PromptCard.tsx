@@ -1,5 +1,5 @@
 import DOMPurify from 'dompurify';
-import React, { useState, useRef, useEffect, memo } from 'react';
+import { useState, useRef, useEffect, memo } from 'react';
 import type { FC, MouseEvent } from 'react';
 
 import { Category, Prompt } from '../types';
@@ -61,22 +61,22 @@ const PromptCard: FC<PromptCardProps> = ({
     return parts;
   };
 
-  const handleCopyClick = (e: MouseEvent) => {
-     
-    e.stopPropagation();
+  const handleCopyClick = (e?: MouseEvent | KeyboardEvent) => {
+
+    e?.stopPropagation();
     (onCopy as (content: string) => void)((prompt).content);
   };
 
-  const handleEditClick = (e: MouseEvent) => {
-     
-    e.stopPropagation();
+  const handleEditClick = (e?: MouseEvent | KeyboardEvent) => {
+
+    e?.stopPropagation();
     (onEdit as (prompt: Prompt) => void)(prompt);
     setShowMenu(false);
   };
 
-  const handleDeleteClick = (e: MouseEvent) => {
-     
-    e.stopPropagation();
+  const handleDeleteClick = (e?: MouseEvent | KeyboardEvent) => {
+
+    e?.stopPropagation();
     setShowDeleteConfirm(true);
     setShowMenu(false);
   };
@@ -109,7 +109,7 @@ const PromptCard: FC<PromptCardProps> = ({
 
   // Close menu on click outside
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: Event) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node) && 
           menuButtonRef.current && !menuButtonRef.current.contains(event.target as Node)) {
         setShowMenu(false);
@@ -126,12 +126,12 @@ const PromptCard: FC<PromptCardProps> = ({
     };
 
     if (showMenu) {
-      document.addEventListener('mousedown', handleClickOutside as EventListener);
+      document.addEventListener('mousedown', handleClickOutside);
       document.addEventListener('keydown', handleEscapeKey);
     }
 
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside as EventListener);
+      document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleEscapeKey);
     };
   }, [showMenu]);
@@ -175,7 +175,7 @@ const PromptCard: FC<PromptCardProps> = ({
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
-                handleCopyClick(e);
+                handleCopyClick();
               }
             }}
             className="inline-flex items-center px-2 py-1 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-md hover:from-purple-600 hover:to-indigo-600 transition-all duration-200 text-xs font-medium focus-primary"

@@ -257,7 +257,7 @@ export class PromptLibraryInjector {
   private setupMessageListener(): void {
     debug('Setting up message listener', { hostname: this.state.hostname });
 
-    chrome.runtime.onMessage.addListener((message: Record<string, unknown>, sender, sendResponse) => {
+    chrome.runtime.onMessage.addListener((message: Record<string, unknown>, _sender, sendResponse) => {
       debug('Received message', { action: message.action });
 
       if (message.action === 'settingsUpdated' && message.settings) {
@@ -591,7 +591,7 @@ export class PromptLibraryInjector {
               (error.name === 'InvalidStateError' || error.name === 'NotFoundError')) {
             // Element was already removed or parent structure changed - continue silently
           } else {
-            warn('Unexpected error removing existing icon', error as Error);
+            warn('Unexpected error removing existing icon', { error: String(error) });
           }
         }
       });
@@ -607,7 +607,7 @@ export class PromptLibraryInjector {
               (error.name === 'InvalidStateError' || error.name === 'NotFoundError')) {
             // Element was already removed or parent structure changed - continue silently
           } else {
-            warn('Unexpected error removing data icon', error as Error);
+            warn('Unexpected error removing data icon', { error: String(error) });
           }
         }
       });
@@ -623,7 +623,7 @@ export class PromptLibraryInjector {
               (error.name === 'InvalidStateError' || error.name === 'NotFoundError')) {
             // Element was already removed or parent structure changed - continue silently
           } else {
-            warn('Unexpected error removing floating icon', error as Error);
+            warn('Unexpected error removing floating icon', { error: String(error) });
           }
         }
       });
@@ -639,7 +639,7 @@ export class PromptLibraryInjector {
               (error.name === 'InvalidStateError' || error.name === 'NotFoundError')) {
             // Element was already removed or parent structure changed - continue silently
           } else {
-            warn('Unexpected error removing selector', error as Error);
+            warn('Unexpected error removing selector', { error: String(error) });
           }
         }
       });
@@ -651,7 +651,7 @@ export class PromptLibraryInjector {
         selectorsRemoved: existingSelectors.length
       });
     } catch (error) {
-      warn('Error during global icon cleanup', error as Error);
+      warn('Error during global icon cleanup', { error: String(error) });
     }
   }
 
@@ -1232,18 +1232,18 @@ export class PromptLibraryInjector {
    */
   private setupPromptSelectorEvents(selector: HTMLElement, prompts: Prompt[], targetElement: HTMLElement): void {
     // Close button
-    const closeButton = selector.querySelector('.close-selector');
+    const closeButton = selector.querySelector<HTMLElement>('.close-selector');
     if (closeButton) {
-      this.eventManager.addTrackedEventListener(closeButton as HTMLElement, 'click', () => {
+      this.eventManager.addTrackedEventListener(closeButton, 'click', () => {
         this.closePromptSelector();
       });
     }
 
     // Prompt item clicks
-    const promptItems = selector.querySelectorAll('.prompt-item');
+    const promptItems = selector.querySelectorAll<HTMLElement>('.prompt-item');
     promptItems.forEach(item => {
-      this.eventManager.addTrackedEventListener(item as HTMLElement, 'click', () => {
-        const promptId = (item as HTMLElement).dataset.promptId;
+      this.eventManager.addTrackedEventListener(item, 'click', () => {
+        const promptId = item.dataset.promptId;
         const prompt = prompts.find(p => p.id === promptId);
         if (prompt) {
           void this.insertPrompt(targetElement, prompt.content);
@@ -1253,21 +1253,27 @@ export class PromptLibraryInjector {
     });
 
     // Search functionality
-    const searchInput = selector.querySelector('.search-input');
+    const searchInput = selector.querySelector<HTMLInputElement>('.search-input');
     if (searchInput) {
-      this.eventManager.addTrackedEventListener(searchInput as HTMLInputElement, 'input', (e: Event) => {
-        const target = e.target as HTMLInputElement;
-        this.filterPrompts(target.value, prompts, selector);
+      this.eventManager.addTrackedEventListener(searchInput, 'input', (e: Event) => {
+        const target = e.target;
+        if (target instanceof HTMLInputElement) {
+          this.filterPrompts(target.value, prompts, selector);
+        }
       });
     }
 
     // Outside click to close
     setTimeout(() => {
       const outsideClickHandler = (e: Event) => {
-        const target = e.target as HTMLElement;
-        if (this.state.promptSelector && 
-            !this.state.promptSelector.contains(target) && 
-            this.state.icon && 
+        const target = e.target;
+        if (!(target instanceof HTMLElement)) {
+          return;
+        }
+
+        if (this.state.promptSelector &&
+            !this.state.promptSelector.contains(target) &&
+            this.state.icon &&
             !this.state.icon.contains(target)) {
           this.closePromptSelector();
         }
@@ -1352,8 +1358,8 @@ export class PromptLibraryInjector {
       }
       
       return result;
-    } catch (error) {
-      error('Error inserting prompt', error as Error);
+    } catch (err) {
+      error('Error inserting prompt', err instanceof Error ? err : new Error(String(err)));
       return {
         success: false,
         error: 'Insertion failed due to error'

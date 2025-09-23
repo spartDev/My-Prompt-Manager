@@ -18,19 +18,32 @@ import { getElementPicker } from './modules/element-picker';
 import { error, warn, info, debug } from './utils/logger';
 import { ThemeManager } from './utils/theme-manager';
 
+interface PromptLibraryDebugApi {
+  getInstance: () => PromptLibraryInjector | null;
+  isInitialized: () => boolean;
+  reinitialize: () => void;
+  cleanup: () => void;
+  getLogger: () => {
+    error: typeof error;
+    warn: typeof warn;
+    info: typeof info;
+    debug: typeof debug;
+  };
+}
+
+declare global {
+  interface Window {
+    __promptLibraryInjected?: boolean;
+    __promptLibraryDebug?: PromptLibraryDebugApi;
+  }
+}
+
 // Global instance management with proper typing
 let promptLibraryInstance: PromptLibraryInjector | null = null;
 let isInitialized = false;
 
 // Mark that content script is injected (for programmatic injection detection)
-(window as { __promptLibraryInjected?: boolean }).__promptLibraryInjected = true;
-
-// Add types for the injection marker
-declare global {
-  interface Window {
-    __promptLibraryInjected?: boolean;
-  }
-}
+window.__promptLibraryInjected = true;
 
 /**
  * Initialize the extension with proper error handling
@@ -73,21 +86,21 @@ async function initializeExtension(): Promise<void> {
 
     debug('Extension initialized');
 
-  } catch (error) {
-    error('Failed to initialize My Prompt Manager content script', error as Error, {
+  } catch (err) {
+    error('Failed to initialize My Prompt Manager content script', err instanceof Error ? err : new Error(String(err)), {
       url: window.location.href,
       hostname: window.location.hostname
     });
-    
+
     // Reset initialization flag on error
     isInitialized = false;
-    
+
     // Clean up partial initialization
     if (promptLibraryInstance) {
       try {
         promptLibraryInstance.cleanup();
       } catch (cleanupError) {
-        error('Error during cleanup after initialization failure', cleanupError as Error);
+        error('Error during cleanup after initialization failure', cleanupError instanceof Error ? cleanupError : new Error(String(cleanupError)));
       }
       promptLibraryInstance = null;
     }
@@ -110,7 +123,7 @@ function cleanupExtension(): void {
     try {
       ThemeManager.getInstance().cleanup();
     } catch (themeError) {
-      warn('Error cleaning up theme manager', themeError as Error);
+      warn('Error cleaning up theme manager', { error: themeError instanceof Error ? themeError.message : String(themeError) });
     }
 
     // Reset initialization flag
@@ -118,8 +131,8 @@ function cleanupExtension(): void {
 
     info('Extension cleanup completed');
 
-  } catch (error) {
-    error('Error during content script cleanup', error as Error);
+  } catch (err) {
+    error('Error during content script cleanup', err instanceof Error ? err : new Error(String(err)));
   }
 }
 
@@ -202,7 +215,7 @@ if (document.readyState === 'loading') {
 
 // Export for potential external access (debugging, testing)
 if (typeof window !== 'undefined') {
-  (window as Record<string, unknown>).__promptLibraryDebug = {
+  window.__promptLibraryDebug = {
     getInstance: () => promptLibraryInstance,
     isInitialized: () => isInitialized,
     reinitialize: () => {

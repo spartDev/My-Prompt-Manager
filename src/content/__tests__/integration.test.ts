@@ -16,13 +16,13 @@
  
 
 import { JSDOM } from 'jsdom';
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi, Mock } from 'vitest';
 
-import { getChromeMock } from '../../test/mocks';
+import { getChromeMockFunctions } from '../../test/mocks';
 import { PromptLibraryInjector } from '../core/injector';
 import { injectCSS } from '../utils/styles';
 
-const chromeMock = getChromeMock();
+const chromeMock = getChromeMockFunctions();
 
 const defaultIntegrationPrompts = [
   {
@@ -48,8 +48,8 @@ describe('Content Script Integration Tests', () => {
   beforeEach(() => {
     // Reset Chrome API mocks
     vi.clearAllMocks();
-    chromeMock.storage.local.get.mockResolvedValue({ prompts: defaultIntegrationPrompts });
-    chromeMock.storage.local.set.mockResolvedValue(undefined);
+    (chromeMock.storage.local.get as Mock).mockResolvedValue({ prompts: defaultIntegrationPrompts });
+    (chromeMock.storage.local.set as Mock).mockResolvedValue(undefined);
     (globalThis as any).chrome = chromeMock;
 
     // Mock console methods to avoid noise in tests
@@ -394,7 +394,7 @@ describe('Content Script Integration Tests', () => {
 
     it('should handle network errors when loading prompts', async () => {
       // Mock Chrome storage to reject
-      chromeMock.storage.local.get.mockRejectedValueOnce(new Error('Storage error'));
+      (chromeMock.storage.local.get as Mock).mockRejectedValueOnce(new Error('Storage error'));
 
       // Initialize injector - should handle the error gracefully
       injector = new PromptLibraryInjector();

@@ -82,8 +82,8 @@ describe('StorageManager', () => {
     });
 
     it('should handle chrome storage errors gracefully', async () => {
-      chromeMock.runtime.lastError = { message: 'Storage error' } as chrome.runtime.LastError;
-      chromeMock.storage.local.get.mockImplementation((keys, callback) => {
+      (chromeMock.runtime as any).lastError = { message: 'Storage error' } as chrome.runtime.LastError;
+      chromeMock.storage.local.get.mockImplementation((_keys, callback) => {
         callback({});
       });
 
