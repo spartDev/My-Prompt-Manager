@@ -278,7 +278,7 @@ jobs:
           key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
 
       - name: 🎯 Install Playwright Chromium
-        run: npx playwright install --with-deps
+        run: npx playwright install --with-deps chromium
 
       - name: Sanity-check Playwright
         run: |
@@ -287,6 +287,8 @@ jobs:
 
       - name: 🧪 Run Playwright E2E Suite
         run: npm run test:e2e -- --reporter=line
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ~/.cache/ms-playwright
 
       - name: 📤 Upload Playwright Report (on failure)
         if: failure()

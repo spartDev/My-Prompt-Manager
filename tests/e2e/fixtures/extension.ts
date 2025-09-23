@@ -32,8 +32,8 @@ export type ExtensionStorage = {
 };
 
 const waitForBackgroundTarget = async (context: BrowserContext): Promise<BackgroundTarget> => {
-  // Longer timeout for CI environments
-  const deadline = Date.now() + (process.env.CI ? 60_000 : 30_000);
+  // Extended timeout for CI environments
+  const deadline = Date.now() + (process.env.CI ? 120_000 : 30_000);
   const isCI = process.env.CI;
 
   const findWorker = (): Worker | undefined =>
@@ -49,55 +49,103 @@ const waitForBackgroundTarget = async (context: BrowserContext): Promise<Backgro
   // In CI, we need to be more patient and try different approaches
   if (isCI) {
     // Wait for the extension to fully load first
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    // eslint-disable-next-line no-console
+    console.log('[CI] Waiting for extension background target...');
   }
 
+  let attemptCount = 0;
   while (Date.now() < deadline) {
+    attemptCount++;
+
+    // Log progress in CI for debugging
+    if (isCI && attemptCount % 10 === 0) {
+      // eslint-disable-next-line no-console
+      console.log(`[CI] Background target search attempt ${String(attemptCount)}...`);
+    }
+
     const worker = findWorker();
     if (worker) {
+      if (isCI) {
+        // eslint-disable-next-line no-console
+        console.log(`[CI] Found service worker after ${String(attemptCount)} attempts`);
+      }
       return worker;
     }
 
     const backgroundPage = findBackgroundPage();
     if (backgroundPage) {
+      if (isCI) {
+        // eslint-disable-next-line no-console
+        console.log(`[CI] Found background page after ${String(attemptCount)} attempts`);
+      }
       return backgroundPage;
     }
 
     try {
       const awaitedWorker = await context.waitForEvent('serviceworker', {
-        timeout: isCI ? 3_000 : 1_000,
+        timeout: isCI ? 5_000 : 1_000,
         predicate: (candidate) => candidate.url().startsWith('chrome-extension://'),
       });
       if (awaitedWorker) {
+        if (isCI) {
+          // eslint-disable-next-line no-console
+          console.log(`[CI] Service worker event triggered after ${String(attemptCount)} attempts`);
+        }
         return awaitedWorker;
       }
-    } catch {
-      // Continue polling until deadline
+    } catch (error) {
+      // Log errors in CI for debugging
+      if (isCI && attemptCount % 20 === 0) {
+        // eslint-disable-next-line no-console
+        console.log(`[CI] Service worker wait failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
     }
 
     // In CI, add a longer delay between attempts
-    await new Promise(resolve => setTimeout(resolve, isCI ? 500 : 100));
+    await new Promise(resolve => setTimeout(resolve, isCI ? 750 : 100));
   }
 
   // Final attempts before giving up
   const fallbackWorker = findWorker();
   if (fallbackWorker) {
+    if (isCI) {
+      // eslint-disable-next-line no-console
+      console.log('[CI] Found service worker in final attempt');
+    }
     return fallbackWorker;
   }
 
   const fallbackPage = findBackgroundPage();
   if (fallbackPage) {
+    if (isCI) {
+      // eslint-disable-next-line no-console
+      console.log('[CI] Found background page in final attempt');
+    }
     return fallbackPage;
   }
 
   // More detailed error message for debugging
   const serviceWorkers = context.serviceWorkers();
   const backgroundPages = context.backgroundPages();
+  const allPages = context.pages();
+
+  console.error('[CI] Extension loading debug info:', {
+    serviceWorkerCount: serviceWorkers.length,
+    serviceWorkerUrls: serviceWorkers.map(w => w.url()),
+    backgroundPageCount: backgroundPages.length,
+    backgroundPageUrls: backgroundPages.map(p => p.url()),
+    allPageCount: allPages.length,
+    allPageUrls: allPages.map(p => p.url()),
+    attemptCount,
+    timeoutDuration: isCI ? '120s' : '30s'
+  });
 
   throw new Error(
-    `Extension background target not found after ${isCI ? '60' : '30'}s. ` +
+    `Extension background target not found after ${isCI ? '120' : '30'}s (${String(attemptCount)} attempts). ` +
     `Found ${String(serviceWorkers.length)} service workers: [${serviceWorkers.map(w => w.url()).join(', ')}], ` +
-    `Found ${String(backgroundPages.length)} background pages: [${backgroundPages.map(p => p.url()).join(', ')}]`
+    `Found ${String(backgroundPages.length)} background pages: [${backgroundPages.map(p => p.url()).join(', ')}], ` +
+    `All pages: [${allPages.map(p => p.url()).join(', ')}]`
   );
 };
 
@@ -118,8 +166,9 @@ const createStorageController = (target: BackgroundTarget): ExtensionStorage => 
   };
 
   const ensureStorageReady = async () => {
-    const maxAttempts = 20;
-    const delay = 100;
+    // Increase attempts and delay for CI environments
+    const maxAttempts = process.env.CI ? 50 : 20;
+    const delay = process.env.CI ? 200 : 100;
 
     for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
       const ready = await normalizeErrors(
@@ -136,7 +185,7 @@ const createStorageController = (target: BackgroundTarget): ExtensionStorage => 
       await new Promise((resolve) => setTimeout(resolve, delay));
     }
 
-    throw new Error('Timed out waiting for chrome.storage.local');
+    throw new Error(`Timed out waiting for chrome.storage.local after ${String(maxAttempts)} attempts (${String((maxAttempts * delay) / 1000)}s)`);
   };
 
   const clearStorage = async () => {
@@ -229,7 +278,7 @@ export const test = base.extend<ExtensionFixtures>({
         `--load-extension=${extensionPath}`,
         '--no-first-run',
         '--no-default-browser-check',
-        // Additional args for CI stability
+        // Essential args for CI stability and extension loading
         ...(process.env.CI ? [
           '--disable-background-timer-throttling',
           '--disable-backgrounding-occluded-windows',
@@ -237,8 +286,17 @@ export const test = base.extend<ExtensionFixtures>({
           '--disable-features=TranslateUI',
           '--disable-default-apps',
           '--disable-extensions-file-access-check',
+          '--disable-dev-shm-usage', // Prevents CI memory issues
+          '--disable-gpu', // Prevents GPU-related crashes in CI
+          '--no-sandbox', // Required for many CI environments
+          '--disable-setuid-sandbox',
+          '--disable-web-security',
+          '--disable-features=VizDisplayCompositor',
+          '--disable-ipc-flooding-protection',
         ] : []),
       ],
+      // Increase timeouts for CI environments
+      timeout: process.env.CI ? 120_000 : 30_000,
     });
 
     for (const page of context.pages()) {
