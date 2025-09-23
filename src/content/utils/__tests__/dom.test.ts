@@ -41,12 +41,12 @@ describe('DOMUtils', () => {
     vi.clearAllMocks();
     
     // Setup global mocks
-    Object.defineProperty(global, 'document', {
+    Object.defineProperty(globalThis, 'document', {
       value: documentMock,
       writable: true,
     });
-    
-    Object.defineProperty(global, 'window', {
+
+    Object.defineProperty(globalThis, 'window', {
       value: windowMock,
       writable: true,
     });
@@ -104,7 +104,7 @@ describe('DOMUtils', () => {
     });
 
     it('should handle creation errors gracefully', () => {
-      documentMock.createElementNS.mockImplementation((namespace, tag) => {
+      documentMock.createElementNS.mockImplementation((_namespace, tag) => {
         if (tag === 'path') {
           throw new Error('SVG creation error');
         }

@@ -33,7 +33,11 @@ describe('Comprehensive Test Suite', () => {
         return Promise.resolve(result);
       }
        
-      return Promise.resolve({ [keys as string]: mockStorage[keys as string] || null });
+      if (typeof keys === 'string') {
+        return Promise.resolve({ [keys]: mockStorage[keys] });
+      }
+      // Handle null/undefined case - return all data
+      return Promise.resolve(mockStorage);
     });
 
      
@@ -52,7 +56,7 @@ describe('Comprehensive Test Suite', () => {
     });
 
      
-    vi.mocked(chrome.storage.local.getBytesInUse).mockResolvedValue(1024);
+    vi.mocked(chrome.storage.local.getBytesInUse).mockImplementation(() => Promise.resolve(1024));
   });
 
   describe('Core Storage Operations', () => {

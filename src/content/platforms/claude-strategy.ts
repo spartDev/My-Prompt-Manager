@@ -115,19 +115,19 @@ export class ClaudeStrategy extends PlatformStrategy {
     // First check if ProseMirror is a parent
     const parentProseMirror = element.closest('.ProseMirror');
     if (parentProseMirror) {
-      return parentProseMirror;
+      return parentProseMirror as HTMLElement;
     }
-    
+
     // Then check if ProseMirror is a child
     const childProseMirror = element.querySelector('.ProseMirror');
     if (childProseMirror) {
-      return childProseMirror;
+      return childProseMirror as HTMLElement;
     }
-    
+
     // Last resort: find any ProseMirror element on the page for Claude.ai
     const anyProseMirror = document.querySelector('div[contenteditable="true"][role="textbox"].ProseMirror');
     if (anyProseMirror) {
-      return anyProseMirror;
+      return anyProseMirror as HTMLElement;
     }
     
     // Return original element as final fallback
@@ -161,7 +161,7 @@ export class ClaudeStrategy extends PlatformStrategy {
         return { success: true, method: 'prosemirror-transaction' };
       }
     } catch (error) {
-      this._warn('ProseMirror transaction failed', error);
+      this._warn('ProseMirror transaction failed', error instanceof Error ? error : { error: String(error) });
     }
     
     return { success: false };
@@ -219,7 +219,7 @@ export class ClaudeStrategy extends PlatformStrategy {
           return { success: true, method: 'execCommand' };
         }
       } catch (error) {
-        this._warn('execCommand failed', error);
+        this._warn('execCommand failed', error instanceof Error ? error : { error: String(error) });
       }
     }
     

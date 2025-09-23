@@ -1,15 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+import { getMockStorageManager, type StorageManagerMock } from '../../test/mocks';
 import { DEFAULT_CATEGORY, VALIDATION_LIMITS, ErrorType } from '../../types';
 import { PromptManager } from '../promptManager';
-import { StorageManager } from '../storage';
-
-// Mock StorageManager
-vi.mock('../storage');
 
 describe('PromptManager - Working Tests', () => {
   let promptManager: PromptManager;
-  let mockStorageManager: Partial<StorageManager>;
+  let storageManagerMock: StorageManagerMock;
 
   const mockCategories = [
     { id: '1', name: DEFAULT_CATEGORY },
@@ -36,18 +33,12 @@ describe('PromptManager - Working Tests', () => {
   ];
 
   beforeEach(() => {
-    mockStorageManager = {
-      getCategories: vi.fn().mockResolvedValue(mockCategories),
-      savePrompt: vi.fn(),
-      getPrompts: vi.fn().mockResolvedValue(mockPrompts),
-      updatePrompt: vi.fn(),
-      deletePrompt: vi.fn()
-    };
-
-     
-    vi.mocked(StorageManager.getInstance).mockReturnValue(mockStorageManager as StorageManager);
-    promptManager = PromptManager.getInstance();
     vi.clearAllMocks();
+    storageManagerMock = getMockStorageManager();
+    storageManagerMock.getCategories.mockResolvedValue(mockCategories);
+    storageManagerMock.getPrompts.mockResolvedValue(mockPrompts);
+
+    promptManager = PromptManager.getInstance();
   });
 
   describe('Singleton Pattern', () => {
@@ -257,7 +248,7 @@ describe('PromptManager - Working Tests', () => {
     it('should throw error for invalid category', async () => {
       // Mock categories without the requested category
        
-      (mockStorageManager.getCategories as any).mockResolvedValue([
+      storageManagerMock.getCategories.mockResolvedValue([
         { id: '1', name: DEFAULT_CATEGORY }
       ]);
 
@@ -295,7 +286,7 @@ describe('PromptManager - Working Tests', () => {
     it('should return empty results gracefully when storage fails', async () => {
       // Test that methods handle storage errors gracefully
        
-      (mockStorageManager.getPrompts as any).mockRejectedValue(new Error('Storage error'));
+      storageManagerMock.getPrompts.mockRejectedValue(new Error('Storage error'));
 
       // These methods should handle errors gracefully, not throw
       try {

@@ -105,7 +105,7 @@ describe('Integration Tests', () => {
 
       // Verify it can recover on next call
        
-      vi.mocked(chrome.storage.local.get).mockResolvedValueOnce({ prompts: [] });
+      vi.mocked(chrome.storage.local.get).mockImplementationOnce(() => Promise.resolve({ prompts: [] }));
       const prompts = await storageManager.getPrompts();
       expect(Array.isArray(prompts)).toBe(true);
     });

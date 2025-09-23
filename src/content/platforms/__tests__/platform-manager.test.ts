@@ -109,7 +109,7 @@ class TestStrategy extends PlatformStrategy {
     return element.tagName === 'DIV';
   }
 
-  async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
+  async insert(_element: HTMLElement, _content: string): Promise<InsertionResult> {
     return { success: true, method: 'test' };
   }
 
@@ -119,6 +119,14 @@ class TestStrategy extends PlatformStrategy {
 
   getButtonContainerSelector(): string | null {
     return '.test-container';
+  }
+
+  createIcon(_uiFactory: UIElementFactory): HTMLElement | null {
+    return document.createElement('div');
+  }
+
+  cleanup(): void {
+    // Default cleanup implementation
   }
 }
 
@@ -157,30 +165,6 @@ describe('PlatformManager', () => {
       new PlatformManager();
       
       expect(Logger.debug).toHaveBeenCalledWith('PlatformManager created (lazy loading mode)', { hostname: 'example.com' });
-    });
-
-    it('should load Claude strategy for claude.ai', async () => {
-      mockLocation.hostname = 'claude.ai';
-      const claudeManager = new PlatformManager();
-      
-      const Logger = await import('../../utils/logger');
-      // Strategy loading is now handled silently - no specific log message expected
-    });
-
-    it('should load ChatGPT strategy for chatgpt.com', async () => {
-      mockLocation.hostname = 'chatgpt.com';
-      const chatgptManager = new PlatformManager();
-      
-      const Logger = await import('../../utils/logger');
-      // Strategy loading is now handled silently - no specific log message expected
-    });
-
-    it('should load Perplexity strategy for www.perplexity.ai', async () => {
-      mockLocation.hostname = 'www.perplexity.ai';
-      const perplexityManager = new PlatformManager();
-      
-      const Logger = await import('../../utils/logger');
-      // Strategy loading is now handled silently - no specific log message expected
     });
   });
 
@@ -227,9 +211,7 @@ describe('PlatformManager', () => {
       // Mock the default strategy to return false
       const strategies = emptyManager.getStrategies();
       strategies.forEach(strategy => {
-        if (strategy.canHandle) {
-          vi.spyOn(strategy, 'canHandle').mockReturnValue(false);
-        }
+        vi.spyOn(strategy, 'canHandle').mockReturnValue(false);
       });
       
       const bestStrategy = emptyManager.findBestStrategy(mockElement);
@@ -243,8 +225,8 @@ describe('PlatformManager', () => {
       });
       manager.registerStrategy(errorStrategy);
       
-      const bestStrategy = manager.findBestStrategy(mockElement);
-      
+      manager.findBestStrategy(mockElement);
+
       const Logger = await import('../../utils/logger');
       expect(Logger.warn).toHaveBeenCalledWith('Strategy error canHandle() failed', { error: expect.any(Error) });
     });
@@ -389,9 +371,7 @@ describe('PlatformManager', () => {
       const emptyManager = new PlatformManager();
       const strategies = emptyManager.getStrategies();
       strategies.forEach(strategy => {
-        if (strategy.canHandle) {
-          vi.spyOn(strategy, 'canHandle').mockReturnValue(false);
-        }
+        vi.spyOn(strategy, 'canHandle').mockReturnValue(false);
       });
       
       const result = await emptyManager.insertContent(mockElement, 'test content');

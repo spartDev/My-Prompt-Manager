@@ -188,7 +188,10 @@ describe('ChatGPTStrategy', () => {
       
       await strategy.insert(mockTextarea, 'test content');
       
-      expect(Logger.warn).toHaveBeenCalledWith('[chatgpt] React insertion failed', error);
+      expect(Logger.warn).toHaveBeenCalledWith('[chatgpt] React insertion failed', {
+        error: 'Test error',
+        stack: expect.stringContaining('Error: Test error')
+      });
     });
   });
 

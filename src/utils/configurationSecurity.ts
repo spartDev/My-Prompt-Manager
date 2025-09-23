@@ -53,7 +53,8 @@ const sanitizePositioning = (positioning: CustomSitePositioning): CustomSitePosi
   }
 
   if (sanitized.selector.length === 0) {
-    delete sanitized.selector;
+    // Don't delete selector as it's required, set to empty string instead
+    sanitized.selector = '';
   }
 
   if (sanitized.zIndex === 0) {

@@ -73,6 +73,16 @@ const SENSITIVE_DOMAINS = [
   /citibank\./i
 ];
 
+type ElementPickerMessage = { source?: string; type?: string };
+type RuntimeMessageListener = Parameters<typeof chrome.runtime.onMessage.addListener>[0];
+
+interface ElementPickerListeners {
+  mousemove?: EventListener;
+  click?: EventListener;
+  keydown?: EventListener;
+  message?: RuntimeMessageListener;
+}
+
 export class ElementPicker {
   private isActive = false;
   private overlay: HTMLDivElement | null = null;
@@ -80,7 +90,7 @@ export class ElementPicker {
   private infoBox: HTMLDivElement | null = null;
   private currentElement: Element | null = null;
   private originalCursor: string = '';
-  private listeners: Map<string, EventListener> = new Map();
+  private listeners: ElementPickerListeners = {};
   private auditLog: Array<{
     timestamp: number;
     action: string;
@@ -109,7 +119,7 @@ export class ElementPicker {
         }
       } catch (error) {
         // Invalid selector, skip
-        debug('[ElementPicker] Invalid selector:', selector, error);
+        debug('[ElementPicker] Invalid selector:', { selector, error });
         continue;
       }
     }
@@ -125,7 +135,7 @@ export class ElementPicker {
       }
     } catch (error) {
       // Invalid selector combination, continue with individual checks
-      debug('[ElementPicker] Error checking parent containers:', error);
+      debug('[ElementPicker] Error checking parent containers:', { error: String(error) });
     }
 
     // Check element attributes for sensitive patterns
@@ -267,7 +277,7 @@ export class ElementPicker {
       );
     } catch (error) {
       // Session storage might be full or disabled
-      debug('[ElementPicker] Audit log storage failed:', error);
+      debug('[ElementPicker] Audit log storage failed:', { error: String(error) });
     }
 
     // Log to console in debug mode (sanitized for security)
@@ -501,10 +511,18 @@ export class ElementPicker {
    */
   private attachEventListeners(): void {
     // Use capture phase to intercept events before page handlers
-    const boundHandleMouseMove = (e: MouseEvent) => { this.handleMouseMove(e); };
-    const boundHandleClick = (e: MouseEvent) => { this.handleClick(e); };
-    const boundHandleKeyDown = (e: KeyboardEvent) => { this.handleKeyDown(e); };
-    const boundHandleMessage = (message: { source?: string; type?: string }, sender: chrome.runtime.MessageSender, sendResponse: (response?: unknown) => void) => { this.handleMessage(message, sender, sendResponse); };
+    const boundHandleMouseMove: EventListener = (event: Event) => {
+      this.handleMouseMove(event as MouseEvent);
+    };
+    const boundHandleClick: EventListener = (event: Event) => {
+      this.handleClick(event as MouseEvent);
+    };
+    const boundHandleKeyDown: EventListener = (event: Event) => {
+      this.handleKeyDown(event as KeyboardEvent);
+    };
+    const boundHandleMessage: RuntimeMessageListener = (message, sender, sendResponse) => {
+      this.handleMessage(message as ElementPickerMessage, sender, sendResponse);
+    };
     
     document.addEventListener('mousemove', boundHandleMouseMove, true);
     document.addEventListener('click', boundHandleClick, true);
@@ -512,27 +530,32 @@ export class ElementPicker {
     chrome.runtime.onMessage.addListener(boundHandleMessage);
     
     // Store listeners for cleanup
-    this.listeners.set('mousemove', boundHandleMouseMove);
-    this.listeners.set('click', boundHandleClick);
-    this.listeners.set('keydown', boundHandleKeyDown);
-    this.listeners.set('message', boundHandleMessage);
+    this.listeners.mousemove = boundHandleMouseMove;
+    this.listeners.click = boundHandleClick;
+    this.listeners.keydown = boundHandleKeyDown;
+    this.listeners.message = boundHandleMessage;
   }
 
   /**
    * Detach event listeners
    */
   private detachEventListeners(): void {
-    const mouseMoveListener = this.listeners.get('mousemove');
-    const clickListener = this.listeners.get('click');
-    const keyDownListener = this.listeners.get('keydown');
-    const messageListener = this.listeners.get('message');
-    
-    if (mouseMoveListener) {document.removeEventListener('mousemove', mouseMoveListener, true);}
-    if (clickListener) {document.removeEventListener('click', clickListener, true);}
-    if (keyDownListener) {document.removeEventListener('keydown', keyDownListener, true);}
-    if (messageListener) {chrome.runtime.onMessage.removeListener(messageListener as (message: { source?: string; type?: string }, sender: chrome.runtime.MessageSender, sendResponse: (response?: unknown) => void) => void);}
-    
-    this.listeners.clear();
+    const { mousemove, click, keydown, message } = this.listeners;
+
+    if (mousemove) {
+      document.removeEventListener('mousemove', mousemove, true);
+    }
+    if (click) {
+      document.removeEventListener('click', click, true);
+    }
+    if (keydown) {
+      document.removeEventListener('keydown', keydown, true);
+    }
+    if (message) {
+      chrome.runtime.onMessage.removeListener(message);
+    }
+
+    this.listeners = {};
   }
 
   /**
@@ -650,7 +673,7 @@ export class ElementPicker {
   /**
    * Handle messages from background script
    */
-  private handleMessage(message: { source?: string; type?: string }): void {
+  private handleMessage(message: ElementPickerMessage, _sender: chrome.runtime.MessageSender, _sendResponse: (response?: unknown) => void): void {
     if (message.source !== 'background') {return;}
     
     switch (message.type) {
@@ -823,7 +846,7 @@ export class ElementPicker {
       // Add nth-child for specificity
       const parent = current.parentElement;
       if (parent) {
-        const siblings = Array.from(parent.children).filter(el => el.tagName === current.tagName);
+        const siblings = Array.from(parent.children).filter(el => el.tagName === current?.tagName);
         if (siblings.length > 1) {
           const index = siblings.indexOf(current) + 1;
           selector += `:nth-of-type(${String(index)})`;

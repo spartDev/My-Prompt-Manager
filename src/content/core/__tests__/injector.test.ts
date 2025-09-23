@@ -50,7 +50,7 @@ vi.mock('../../ui/keyboard-navigation', () => ({
 
 vi.mock('../../utils/storage', () => ({
   getPrompts: vi.fn().mockResolvedValue([]),
-  createPromptListItem: vi.fn().mockImplementation((prompt, index, className) => {
+  createPromptListItem: vi.fn().mockImplementation((prompt, _index, className) => {
     const item = document.createElement('div');
     item.className = className;
     item.dataset.promptId = prompt.id;
@@ -170,9 +170,11 @@ describe('PromptLibraryInjector', () => {
     injector = new PromptLibraryInjector();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     injector.cleanup();
     document.body.removeChild(mockTextarea);
+    // Wait for any pending timeouts to complete
+    await new Promise(resolve => setTimeout(resolve, 150));
   });
 
   describe('constructor', () => {
@@ -275,7 +277,7 @@ describe('PromptLibraryInjector', () => {
 
     beforeEach(async () => {
       const { getPrompts } = await import('../../utils/storage');
-      getPrompts.mockResolvedValue(mockPrompts);
+      (getPrompts as any).mockResolvedValue(mockPrompts);
     });
 
     it('should create and display prompt selector', async () => {
@@ -286,16 +288,16 @@ describe('PromptLibraryInjector', () => {
     });
 
     it('should retrieve prompts from storage', async () => {
-      const { getPrompts, createPromptListItem } = await import('../../utils/storage');
+      const { getPrompts } = await import('../../utils/storage');
       await injector.showPromptSelector(mockTextarea);
-      
+
       expect(getPrompts).toHaveBeenCalled();
     });
 
     it('should create prompt items for each prompt', async () => {
-      const { getPrompts, createPromptListItem } = await import('../../utils/storage');
+      const { createPromptListItem } = await import('../../utils/storage');
       await injector.showPromptSelector(mockTextarea);
-      
+
       expect(createPromptListItem).toHaveBeenCalledTimes(mockPrompts.length);
     });
 
@@ -308,7 +310,7 @@ describe('PromptLibraryInjector', () => {
 
     it('should handle empty prompts array', async () => {
       const { getPrompts } = await import('../../utils/storage');
-      getPrompts.mockResolvedValue([]);
+      (getPrompts as any).mockResolvedValue([]);
       
       await injector.showPromptSelector(mockTextarea);
       
@@ -320,13 +322,13 @@ describe('PromptLibraryInjector', () => {
     });
 
     it('should handle storage errors gracefully', async () => {
-      const { getPrompts, createPromptListItem } = await import('../../utils/storage');
+      const { getPrompts } = await import('../../utils/storage');
       const Logger = await import('../../utils/logger');
-      
-      getPrompts.mockRejectedValue(new Error('Storage error'));
-      
+
+      (getPrompts as any).mockRejectedValue(new Error('Storage error'));
+
       await injector.showPromptSelector(mockTextarea);
-      
+
       expect(Logger.error).toHaveBeenCalled();
     });
   });
@@ -402,8 +404,6 @@ describe('PromptLibraryInjector', () => {
 
   describe('error handling', () => {
     it('should handle initialization errors gracefully', async () => {
-      const Logger = await import('../../utils/logger');
-      
       // Create a new injector that will fail during initialization
       const failingInjector = new PromptLibraryInjector();
       

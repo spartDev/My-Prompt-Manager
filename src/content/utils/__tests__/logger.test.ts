@@ -59,17 +59,17 @@ describe('Logger', () => {
       writable: true,
     });
     
-    Object.defineProperty(global, 'console', {
+    Object.defineProperty(globalThis, 'console', {
       value: consoleMock,
       writable: true,
     });
-    
-    Object.defineProperty(global, 'document', {
+
+    Object.defineProperty(globalThis, 'document', {
       value: documentMock,
       writable: true,
     });
-    
-    Object.defineProperty(global, 'chrome', {
+
+    Object.defineProperty(globalThis, 'chrome', {
       value: { storage: chromeStorageMock },
       writable: true,
     });

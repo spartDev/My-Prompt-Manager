@@ -30,9 +30,9 @@ export class PlatformInsertionManager {
     
     // Initialize the platform manager with compatible options
     this.platformManager = new PlatformManager({
-      enableDebugLogging: this.options.debug,
-      maxRetries: this.options.retries,
-      timeout: this.options.timeout
+      enableDebugLogging: Boolean(this.options.debug),
+      maxRetries: Number(this.options.retries),
+      timeout: Number(this.options.timeout)
     });
     
     debug('PlatformInsertionManager initialized with strategy pattern');

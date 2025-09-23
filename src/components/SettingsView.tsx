@@ -73,7 +73,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast }) => {
   const [saving, setSaving] = useState(false);
   
   // Interface mode states
-  const [interfaceMode, setInterfaceMode] = useState<'popup' | 'sidepanel'>(DEFAULT_SETTINGS.interfaceMode);
+  const [interfaceMode, setInterfaceMode] = useState<'popup' | 'sidepanel'>(DEFAULT_SETTINGS.interfaceMode as 'popup' | 'sidepanel');
   const [interfaceModeChanging, setInterfaceModeChanging] = useState(false);
   
   // Data for import/export
@@ -121,7 +121,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast }) => {
       
       // Load interface mode
       const savedInterfaceMode = result.interfaceMode as 'popup' | 'sidepanel' | undefined;
-      setInterfaceMode(savedInterfaceMode || DEFAULT_SETTINGS.interfaceMode);
+      setInterfaceMode(savedInterfaceMode ?? (DEFAULT_SETTINGS.interfaceMode as 'popup' | 'sidepanel'));
       
       // Load user settings (theme, view mode, etc.)
       const savedUserSettings = result.settings as UserSettings | undefined;
@@ -139,7 +139,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast }) => {
     } catch (error) {
       console.error('Failed to load settings:', error instanceof Error ? error.message : 'Unknown error');
       setSettings(defaultSettings);
-      setInterfaceMode(DEFAULT_SETTINGS.interfaceMode);
+      setInterfaceMode(DEFAULT_SETTINGS.interfaceMode as 'popup' | 'sidepanel');
     } finally {
       setLoading(false);
     }

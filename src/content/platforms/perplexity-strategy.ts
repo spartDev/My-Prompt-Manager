@@ -90,7 +90,7 @@ export class PerplexityStrategy extends PlatformStrategy {
         return { success: true, method: 'perplexity-execCommand' };
       }
     } catch (error) {
-      this._warn('execCommand method failed', error);
+      this._warn('execCommand method failed', error instanceof Error ? error : { error: String(error) });
     }
     
     return { success: false };
@@ -124,7 +124,7 @@ export class PerplexityStrategy extends PlatformStrategy {
       this._debug('Perplexity selection replacement successful');
       return { success: true, method: 'perplexity-selection' };
     } catch (error) {
-      this._warn('Selection replacement method failed', error);
+      this._warn('Selection replacement method failed', error instanceof Error ? error : { error: String(error) });
       return { success: false };
     }
   }

@@ -15,7 +15,8 @@ export const useSearchWithDebounce = (prompts: Prompt[]): UseSearchWithDebounceR
   
   // Use ref to store the debounced function to maintain reference stability
   const debouncedUpdateQuery = useRef(
-    debounce((query: string) => {
+    debounce((...args: unknown[]) => {
+      const query = args[0] as string;
       setDebouncedQuery(query);
       setIsSearching(false);
     }, DEBOUNCE_DELAY)

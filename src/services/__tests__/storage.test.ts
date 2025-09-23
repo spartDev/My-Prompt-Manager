@@ -31,12 +31,16 @@ describe('StorageManager', () => {
       if (Array.isArray(keys)) {
         const result: Record<string, unknown> = {};
         keys.forEach(key => {
-           
+
           result[key] = mockStorage[key] || null;
         });
         return Promise.resolve(result);
       }
-      return Promise.resolve({ [keys as string]: mockStorage[keys as string] || null });
+      if (typeof keys === 'string') {
+        return Promise.resolve({ [keys]: mockStorage[keys] });
+      }
+      // Handle null/undefined case - return all data
+      return Promise.resolve(mockStorage);
     });
 
      
@@ -55,7 +59,7 @@ describe('StorageManager', () => {
     });
 
      
-    vi.mocked(chrome.storage.local.getBytesInUse).mockResolvedValue(1024);
+    vi.mocked(chrome.storage.local.getBytesInUse).mockImplementation(() => Promise.resolve(1024));
   });
 
   describe('Prompt Operations', () => {
@@ -315,9 +319,9 @@ describe('StorageManager', () => {
 
     it('should handle data corruption error', async () => {
        
-      vi.mocked(chrome.storage.local.get).mockResolvedValue({
+      vi.mocked(chrome.storage.local.get).mockImplementation(() => Promise.resolve({
         prompts: null // Invalid data should return empty array
-      });
+      }));
 
       const data = await storageManager.getPrompts();
       expect(Array.isArray(data)).toBe(true);

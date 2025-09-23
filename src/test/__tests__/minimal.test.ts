@@ -44,7 +44,7 @@ describe('Minimal Test Suite', () => {
 
     it('should handle chrome storage mocks', async () => {
        
-      vi.mocked(chrome.storage.local.get).mockResolvedValue({ test: 'value' });
+      vi.mocked(chrome.storage.local.get).mockImplementation(() => Promise.resolve({ test: 'value' }));
       
       const result = await chrome.storage.local.get(['test']);
       expect(result.test).toBe('value');

@@ -13,7 +13,7 @@ const ORPHANED_TAB_DETECTION_WINDOW_MS = 10000; // 10 seconds after extension st
  * Content script injection controller
  * Handles programmatic injection of content scripts based on site enablement
  */
-class ContentScriptInjector {
+export class ContentScriptInjector {
   private injectedTabs: Set<number> = new Set();
   private injectionPromises: Map<number, Promise<void>> = new Map();
   private extensionStartTime: number = Date.now();
@@ -581,10 +581,11 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 
 // Inject when extension icon is clicked (activeTab permission)
 chrome.action.onClicked.addListener((tab) => {
-  if (tab.id) {
+  if (tab.id !== undefined) {
+    const tabId = tab.id; // Capture the value to ensure TypeScript knows it's defined
     void (async () => {
       try {
-        await injector.forceInjectContentScript(tab.id);
+        await injector.forceInjectContentScript(tabId);
         // Content script injected via activeTab
       } catch (error) {
         console.error('[Background] Failed to inject via activeTab:', error);
@@ -695,7 +696,7 @@ async function handleRequestInjection(tabId: number | undefined, sendResponse: (
 /**
  * Handle settings updates that might affect injection
  */
-async function handleSettingsUpdated(settings: unknown, sendResponse: (response?: { success: boolean }) => void) {
+async function handleSettingsUpdated(_settings: unknown, sendResponse: (response?: { success: boolean }) => void) {
   try {
     const tabs = await chrome.tabs.query({});
     
@@ -931,8 +932,8 @@ async function handleOpenPickerWindow(targetTabId: number | undefined, sendRespo
       left: 100,
       top: 100
     });
-    
-    pickerWindowId = window.id || null;
+
+    pickerWindowId = window?.id ?? null;
     sendResponse({ success: true });
   } catch (error) {
     console.error('[Background] Error opening picker window:', error);
@@ -1088,7 +1089,7 @@ async function handleElementSelected(data: BackgroundMessage['data'], sender: ch
 /**
  * Stop element picker mode
  */
-async function handleStopElementPicker(passedTabId: number | undefined, sender: chrome.runtime.MessageSender, sendResponse: (response?: { success: boolean; error?: string }) => void) {
+async function handleStopElementPicker(_passedTabId: number | undefined, _sender: chrome.runtime.MessageSender, sendResponse: (response?: { success: boolean; error?: string }) => void) {
   try {
     // Clear all active sessions
     for (const [tabId] of activePickerSessions) {
@@ -1171,7 +1172,6 @@ chrome.action.onClicked.addListener((tab) => {
   // We can safely open the side panel here as it's a direct user action
   if (tab.windowId) {
     try {
-      // @ts-expect-error - chrome.sidePanel is not in the types yet
       void chrome.sidePanel.open({ windowId: tab.windowId });
     } catch (error) {
       console.error('[Background] Error opening side panel:', error);

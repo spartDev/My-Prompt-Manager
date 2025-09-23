@@ -34,7 +34,7 @@ describe('StylesManager', () => {
     vi.clearAllMocks();
     
     // Setup global mocks
-    Object.defineProperty(global, 'document', {
+    Object.defineProperty(globalThis, 'document', {
       value: documentMock,
       writable: true,
     });

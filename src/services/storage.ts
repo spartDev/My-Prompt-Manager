@@ -247,8 +247,8 @@ export class StorageManager {
       // Check for duplicate names (excluding current category)
       if (updates.name) {
         const duplicateCategory = existingCategories.find(
-          (c, index) => index !== categoryIndex && 
-          c.name.toLowerCase() === updates.name.toLowerCase()
+          (c, index) => index !== categoryIndex &&
+          c.name.toLowerCase() === (updates.name || '').toLowerCase()
         );
         
         if (duplicateCategory) {
