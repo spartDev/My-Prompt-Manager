@@ -26,6 +26,7 @@ export interface InjectorState {
   isSiteEnabled: boolean;
   detectionTimeout: number | null;
   mutationObserver: MutationObserver | null;
+  spaMonitoringInterval: NodeJS.Timeout | null;
   hostname: string;
   instanceId: string;
   settings: ExtensionSettings | null;
@@ -71,6 +72,7 @@ export class PromptLibraryInjector {
       isSiteEnabled: false,
       detectionTimeout: null,
       mutationObserver: null,
+      spaMonitoringInterval: null,
       hostname,
       instanceId: `prompt-lib-${hostname}-${Date.now().toString()}-${Math.random().toString(36).slice(2, 11)}`,
       settings: null
@@ -127,7 +129,7 @@ export class PromptLibraryInjector {
       this.state.settings = await getSettings();
       this.state.isSiteEnabled = await isSiteEnabled(this.state.hostname);
 
-      debug('Site enablement check completed', { 
+      debug('Site enablement check completed', {
         hostname: this.state.hostname,
         isSiteEnabled: this.state.isSiteEnabled,
         enabledSites: this.state.settings.enabledSites
@@ -261,10 +263,14 @@ export class PromptLibraryInjector {
       debug('Received message', { action: message.action });
 
       if (message.action === 'settingsUpdated' && message.settings) {
-        void this.handleSettingsUpdate(message.settings as ExtensionSettings);
+        this.handleSettingsUpdate(message.settings as ExtensionSettings).catch((err: unknown) => {
+          error('Failed to handle settings update', err as Error);
+        });
         sendResponse({ success: true });
       } else if (message.action === 'reinitialize' && message.reason) {
-        void this.handleReinitialize(message.reason as string);
+        this.handleReinitialize(message.reason as string).catch((err: unknown) => {
+          error('Failed to handle reinitialize', err as Error);
+        });
         sendResponse({ success: true });
       } else if (message.action === 'testSelector') {
         const result = this.handleSelectorTest(message as { selector: string; placement: string; offset: { x: number; y: number }; zIndex: number });
@@ -469,13 +475,15 @@ export class PromptLibraryInjector {
         // Re-initialize after navigation
         setTimeout(() => {
           this.cleanup();
-          void this.initialize();
+          this.initialize().catch((err: unknown) => {
+            error('Failed to re-initialize after navigation', err as Error);
+          });
         }, 1000);
       }
     };
 
     // Check for URL changes periodically
-    setInterval(checkUrlChange, 1000);
+    this.state.spaMonitoringInterval = setInterval(checkUrlChange, 1000);
 
     // Also listen for popstate events
     this.eventManager.addTrackedEventListener(window, 'popstate', checkUrlChange);
@@ -1388,14 +1396,19 @@ export class PromptLibraryInjector {
   private partialCleanup(): void {
     debug('Starting partial cleanup (preserving message listener)', { instanceId: this.state.instanceId });
 
-    // Clear timeouts
+    // Clear timeouts and intervals
     if (this.state.detectionTimeout) {
       clearTimeout(this.state.detectionTimeout);
       this.state.detectionTimeout = null;
     }
 
+    if (this.state.spaMonitoringInterval) {
+      clearInterval(this.state.spaMonitoringInterval as unknown as NodeJS.Timeout);
+      this.state.spaMonitoringInterval = null;
+    }
+
     if (this.customSelectorRetry.timeoutId) {
-      clearTimeout(this.customSelectorRetry.timeoutId);
+      clearTimeout(this.customSelectorRetry.timeoutId as unknown as NodeJS.Timeout);
       this.customSelectorRetry.timeoutId = null;
     }
 
@@ -1437,14 +1450,19 @@ export class PromptLibraryInjector {
   cleanup(): void {
     debug('Starting full cleanup', { instanceId: this.state.instanceId });
 
-    // Clear timeouts
+    // Clear timeouts and intervals
     if (this.state.detectionTimeout) {
       clearTimeout(this.state.detectionTimeout);
       this.state.detectionTimeout = null;
     }
 
+    if (this.state.spaMonitoringInterval) {
+      clearInterval(this.state.spaMonitoringInterval as unknown as NodeJS.Timeout);
+      this.state.spaMonitoringInterval = null;
+    }
+
     if (this.customSelectorRetry.timeoutId) {
-      clearTimeout(this.customSelectorRetry.timeoutId);
+      clearTimeout(this.customSelectorRetry.timeoutId as unknown as NodeJS.Timeout);
       this.customSelectorRetry.timeoutId = null;
     }
 
