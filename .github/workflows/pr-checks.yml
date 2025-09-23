@@ -243,7 +243,72 @@ jobs:
           echo "📦 Extension package size:"
           ls -lh *.zip 2>/dev/null || echo "No zip files found"
 
-  # Job 5: Security and dependency scanning
+  # Job 5: End-to-end regression suite with Playwright
+  e2e:
+    name: 🎯 End-to-End Tests
+    runs-on: ubuntu-latest
+    needs: [setup, test]
+    if: github.event.pull_request.draft == false
+    steps:
+      - name: 🛎️ Checkout Repository
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ needs.setup.outputs.node-version }}
+          cache: 'npm'
+
+      - name: 📦 Restore Dependencies
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4
+        with:
+          path: |
+            ~/.npm
+            node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+
+      - name: 🔧 Install Dependencies
+        if: needs.setup.outputs.cache-hit != 'true'
+        run: npm ci --prefer-offline --no-audit
+
+      - name: 📥 Cache Playwright Browsers
+        id: playwright-cache
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4
+        with:
+          path: |
+            ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+
+      - name: 🎯 Install Playwright Chromium
+        run: |
+          if [ "${{ steps.playwright-cache.outputs.cache-hit }}" != 'true' ]; then
+            echo "Cache miss - installing browsers..."
+            npx playwright install --with-deps chromium
+          else
+            echo "Cache hit - verifying browser installation..."
+            npx playwright install chromium --dry-run || npx playwright install --with-deps chromium
+          fi
+
+      - name: Sanity-check Playwright
+        run: |
+          npx playwright --version
+          npm ls @playwright/test
+          ls -la ~/.cache/ms-playwright/ || echo "Browser cache directory not found"
+
+      - name: 🧪 Run Playwright E2E Suite
+        run: npm run test:e2e -- --reporter=line
+
+      - name: 📤 Upload Playwright Report (on failure)
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
+  # Job 6: Security and dependency scanning
   security:
     name: 🔒 Security & Dependencies
     runs-on: ubuntu-latest
@@ -309,11 +374,11 @@ jobs:
           
           echo "✅ Manifest validation passed"
 
-  # Job 6: Final quality gate summary
+  # Job 7: Final quality gate summary
   quality-gate:
     name: ✅ Quality Gate Summary
     runs-on: ubuntu-latest
-    needs: [setup, lint, test, build, security]
+    needs: [setup, lint, test, build, e2e, security]
     # Run even if jobs are cancelled or fail, but not for draft PRs
     if: always() && github.event.pull_request.draft == false
     steps:
@@ -327,16 +392,18 @@ jobs:
           lint_status="${{ needs.lint.result }}"
           test_status="${{ needs.test.result }}"
           build_status="${{ needs.build.result }}"
+          e2e_status="${{ needs.e2e.result }}"
           security_status="${{ needs.security.result }}"
           
           echo "📦 Dependencies & Setup: $setup_status"
           echo "🧹 Code Quality & Linting: $lint_status"
           echo "🧪 Test Suite & Coverage: $test_status"
           echo "🏗️ Build Verification: $build_status"
+          echo "🎯 End-to-End Tests: $e2e_status"
           echo "🔒 Security & Dependencies: $security_status"
           
           # Check if workflow was cancelled (new commit pushed)
-          if [[ "$setup_status" == "cancelled" || "$lint_status" == "cancelled" || "$test_status" == "cancelled" || "$build_status" == "cancelled" || "$security_status" == "cancelled" ]]; then
+          if [[ "$setup_status" == "cancelled" || "$lint_status" == "cancelled" || "$test_status" == "cancelled" || "$build_status" == "cancelled" || "$e2e_status" == "cancelled" || "$security_status" == "cancelled" ]]; then
             echo ""
             echo "⚠️ WORKFLOW CANCELLED"
             echo "A new commit was pushed, cancelling this workflow run."
@@ -344,7 +411,7 @@ jobs:
             # Don't fail on cancelled - it's expected behavior
             exit 0
           # Check if all succeeded
-          elif [[ "$setup_status" == "success" && "$lint_status" == "success" && "$test_status" == "success" && "$build_status" == "success" && "$security_status" == "success" ]]; then
+          elif [[ "$setup_status" == "success" && "$lint_status" == "success" && "$test_status" == "success" && "$build_status" == "success" && "$e2e_status" == "success" && "$security_status" == "success" ]]; then
             echo ""
             echo "🎉 ✅ ALL QUALITY GATES PASSED!"
             echo "🚀 This PR meets all mandatory requirements and is ready for review."
@@ -367,6 +434,7 @@ jobs:
               lint: "${{ needs.lint.result }}",
               test: "${{ needs.test.result }}",
               build: "${{ needs.build.result }}",
+              e2e: "${{ needs.e2e.result }}",
               security: "${{ needs.security.result }}"
             };
             
@@ -448,6 +516,7 @@ jobs:
             | 🧹 Code Quality & Linting | ${getStatusIcon(results.lint)} ${results.lint} |
             | 🧪 Test Suite & Coverage | ${getStatusIcon(results.test)} ${results.test} |
             | 🏗️ Build Verification | ${getStatusIcon(results.build)} ${results.build} |
+            | 🎯 End-to-End Tests | ${getStatusIcon(results.e2e)} ${results.e2e} |
             | 🔒 Security & Dependencies | ${getStatusIcon(results.security)} ${results.security} |
             
             ${message}
@@ -458,6 +527,7 @@ jobs:
             - ✅ **Zero tolerance** for linting errors (\`npm run lint\`)
             - ✅ **All tests must pass** (\`npm test\`)
             - ✅ **Build must succeed** for Chrome extension
+            - ✅ **Playwright end-to-end suite** must pass (\`npm run test:e2e\`)
             - ✅ **No security vulnerabilities** above moderate level
             - ✅ **Manifest V3 compliance** for Chrome extension
             

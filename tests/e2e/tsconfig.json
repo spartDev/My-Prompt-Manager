@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node", "@playwright/test"],
+    "resolveJsonModule": true,
+    "module": "ESNext"
+  },
+  "include": ["./**/*.ts"],
+  "exclude": []
+}
