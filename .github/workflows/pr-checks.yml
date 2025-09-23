@@ -272,23 +272,31 @@ jobs:
         run: npm ci --prefer-offline --no-audit
 
       - name: 📥 Cache Playwright Browsers
+        id: playwright-cache
         uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4
         with:
-          path: ~/.cache/ms-playwright
+          path: |
+            ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
 
       - name: 🎯 Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
+        run: |
+          if [ "${{ steps.playwright-cache.outputs.cache-hit }}" != 'true' ]; then
+            echo "Cache miss - installing browsers..."
+            npx playwright install --with-deps chromium
+          else
+            echo "Cache hit - verifying browser installation..."
+            npx playwright install chromium --dry-run || npx playwright install --with-deps chromium
+          fi
 
       - name: Sanity-check Playwright
         run: |
           npx playwright --version
           npm ls @playwright/test
+          ls -la ~/.cache/ms-playwright/ || echo "Browser cache directory not found"
 
       - name: 🧪 Run Playwright E2E Suite
         run: npm run test:e2e -- --reporter=line
-        env:
-          PLAYWRIGHT_BROWSERS_PATH: ~/.cache/ms-playwright
 
       - name: 📤 Upload Playwright Report (on failure)
         if: failure()
