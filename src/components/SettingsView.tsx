@@ -15,7 +15,7 @@ import SiteIntegrationSection from './settings/SiteIntegrationSection';
 interface SiteConfig {
   name: string;
   description: string;
-  icon: ReactNode;
+  icon: ReactNode | ((isEnabled: boolean) => ReactNode);
 }
 
 interface CustomSite {
@@ -101,7 +101,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast }) => {
     'chat.mistral.ai': {
       name: 'Mistral AI',
       description: 'Mistral\'s conversational AI',
-      icon: <MistralIcon />
+      icon: (isEnabled: boolean) => <MistralIcon disabled={!isEnabled} />
     }
   }), []);
 

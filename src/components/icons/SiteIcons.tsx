@@ -4,6 +4,10 @@ interface IconProps {
   className?: string;
 }
 
+interface MistralIconProps extends IconProps {
+  disabled?: boolean;
+}
+
 export const ClaudeIcon: FC<IconProps> = ({ className = '' }) => (
   <svg 
     viewBox="0 0 512 509.64" 
@@ -55,24 +59,43 @@ export const PerplexityIcon: FC<IconProps> = ({ className = '' }) => (
   </svg>
 );
 
-export const MistralIcon: FC<IconProps> = ({ className = '' }) => (
-  <svg
-    viewBox="0 0 212.121 151.515"
-    className={className}
-    xmlns="http://www.w3.org/2000/svg"
-  >
-    <rect x="30.303001" y="0" width="30.302999" height="30.302999" fill="#ffd700" strokeWidth="0" />
-    <rect x="151.515" y="0" width="30.302999" height="30.302999" fill="#ffd700" strokeWidth="0" />
-    <rect x="30.303001" y="30.303001" width="60.605999" height="30.302999" fill="#ffaf00" strokeWidth="0" />
-    <rect x="121.21201" y="30.303001" width="60.605999" height="30.302999" fill="#ffaf00" strokeWidth="0" />
-    <rect x="30.303001" y="60.606003" width="151.515" height="30.302999" fill="#ff8205" strokeWidth="0" />
-    <rect x="30.303001" y="90.908997" width="30.302999" height="30.302999" fill="#fa500f" strokeWidth="0" />
-    <rect x="90.908997" y="90.908997" width="30.302999" height="30.302999" fill="#fa500f" strokeWidth="0" />
-    <rect x="151.515" y="90.908997" width="30.302999" height="30.302999" fill="#fa500f" strokeWidth="0" />
-    <rect x="0" y="121.21201" width="90.908997" height="30.302999" fill="#e10500" strokeWidth="0" />
-    <rect x="121.21201" y="121.21201" width="90.908997" height="30.302999" fill="#e10500" strokeWidth="0" />
-  </svg>
-);
+export const MistralIcon: FC<MistralIconProps> = ({ className = '', disabled = false }) => {
+  // When disabled, use grayscale colors; otherwise use the brand gradient
+  const colors = disabled
+    ? {
+        gold: 'currentColor',
+        lightOrange: 'currentColor',
+        orange: 'currentColor',
+        darkOrange: 'currentColor',
+        red: 'currentColor'
+      }
+    : {
+        gold: '#ffd700',
+        lightOrange: '#ffaf00',
+        orange: '#ff8205',
+        darkOrange: '#fa500f',
+        red: '#e10500'
+      };
+
+  return (
+    <svg
+      viewBox="0 0 212.121 151.515"
+      className={className}
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <rect x="30.303001" y="0" width="30.302999" height="30.302999" fill={colors.gold} strokeWidth="0" />
+      <rect x="151.515" y="0" width="30.302999" height="30.302999" fill={colors.gold} strokeWidth="0" />
+      <rect x="30.303001" y="30.303001" width="60.605999" height="30.302999" fill={colors.lightOrange} strokeWidth="0" />
+      <rect x="121.21201" y="30.303001" width="60.605999" height="30.302999" fill={colors.lightOrange} strokeWidth="0" />
+      <rect x="30.303001" y="60.606003" width="151.515" height="30.302999" fill={colors.orange} strokeWidth="0" />
+      <rect x="30.303001" y="90.908997" width="30.302999" height="30.302999" fill={colors.darkOrange} strokeWidth="0" />
+      <rect x="90.908997" y="90.908997" width="30.302999" height="30.302999" fill={colors.darkOrange} strokeWidth="0" />
+      <rect x="151.515" y="90.908997" width="30.302999" height="30.302999" fill={colors.darkOrange} strokeWidth="0" />
+      <rect x="0" y="121.21201" width="90.908997" height="30.302999" fill={colors.red} strokeWidth="0" />
+      <rect x="121.21201" y="121.21201" width="90.908997" height="30.302999" fill={colors.red} strokeWidth="0" />
+    </svg>
+  );
+};
 
 // Fallback icon for custom sites (using first letter)
 export const CustomSiteIcon: FC<{ letter: string; className?: string }> = ({ letter, className = '' }) => (

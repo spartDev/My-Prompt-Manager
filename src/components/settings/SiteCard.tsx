@@ -20,6 +20,11 @@ const getBrandColors = (hostname: string) => {
         enabled: 'bg-white text-gray-800 shadow-sm border border-gray-200',
         disabled: 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
       };
+    case 'chat.mistral.ai':
+      return {
+        enabled: 'bg-gradient-to-b from-[#ffd700] to-[#e10500] text-white shadow-sm',
+        disabled: 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+      };
     default:
       // Fallback for custom sites - use the original green gradient
       return {
