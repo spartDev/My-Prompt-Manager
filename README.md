@@ -3,9 +3,9 @@
 [![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)](https://github.com/spartDev/My-Prompt-Manager)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Chrome](https://img.shields.io/badge/Chrome-114%2B-yellow.svg)](https://www.google.com/chrome/)
-[![Tests](https://img.shields.io/badge/tests-470%20passing-brightgreen.svg)](https://github.com/spartDev/My-Prompt-Manager)
+[![Tests](https://img.shields.io/badge/tests-518%20passing-brightgreen.svg)](https://github.com/spartDev/My-Prompt-Manager)
 
-A powerful Chrome extension that provides seamless access to your personal prompt library directly within popular AI chat interfaces. Features both a popup interface for managing prompts and native integration with Claude, ChatGPT, Perplexity, and more.
+A powerful Chrome extension that provides seamless access to your personal prompt library directly within popular AI chat interfaces. Features both a popup interface for managing prompts and native integration with Claude, ChatGPT, Mistral LeChat, Perplexity, and more.
 
 **Author:** Thomas Roux  
 **Repository:** [github.com/spartDev/My-Prompt-Manager](https://github.com/spartDev/My-Prompt-Manager)
@@ -37,10 +37,11 @@ A powerful Chrome extension that provides seamless access to your personal promp
 |----------|--------|--------|----------|
 | Claude | ✅ Fully Supported | claude.ai | 100 |
 | ChatGPT | ✅ Fully Supported | chatgpt.com | 90 |
+| Mistral LeChat | ✅ Fully Supported | chat.mistral.ai | 85 |
 | Perplexity | ✅ Fully Supported | www.perplexity.ai | 80 |
 | Custom Sites | ✅ Configurable | User-defined | Variable |
 
-**Coming Soon:** Gemini, Mistral.ai, and more! See our [Platform Integration Guide](docs/PLATFORM_INTEGRATION.md) to add your own.
+**Coming Soon:** Gemini and more! See our [Platform Integration Guide](docs/PLATFORM_INTEGRATION.md) to add your own.
 
 ## 💻 Tech Stack
 
@@ -100,7 +101,7 @@ A powerful Chrome extension that provides seamless access to your personal promp
 ### Verify Installation
 
 1. Click the extension icon - the popup should open
-2. Visit [claude.ai](https://claude.ai) - look for the library icon
+2. Visit [claude.ai](https://claude.ai) or [chat.mistral.ai](https://chat.mistral.ai) - look for the library icon
 3. Try adding a test prompt and using it in an AI chat
 
 ## 🛠️ Available Scripts
@@ -109,7 +110,7 @@ A powerful Chrome extension that provides seamless access to your personal promp
 |---------|-------------|--------|
 | `npm run dev` | Start development server with HMR | Development |
 | `npm run build` | Create production build | Deployment |
-| `npm test` | Run test suite (470+ tests) | Testing |
+| `npm test` | Run test suite (518+ tests) | Testing |
 | `npm run test:ui` | Run tests with Vitest UI | Interactive Testing |
 | `npm run test:coverage` | Generate coverage report | Code Coverage |
 | `npm run lint` | Run ESLint checks | Code Quality |
@@ -135,7 +136,8 @@ graph TD
     
     G --> J[Claude Strategy]
     G --> K[ChatGPT Strategy]
-    G --> L[Perplexity Strategy]
+    G --> L[Mistral Strategy]
+    G --> M[Perplexity Strategy]
 ```
 
 ### Content Script Architecture (TypeScript Modules)
@@ -160,6 +162,7 @@ src/content/
 │   ├── base-strategy.ts       # Abstract base class
 │   ├── claude-strategy.ts     # Claude.ai implementation
 │   ├── chatgpt-strategy.ts    # ChatGPT implementation
+│   ├── mistral-strategy.ts    # Mistral LeChat implementation
 │   ├── perplexity-strategy.ts # Perplexity implementation
 │   └── platform-manager.ts    # Strategy coordinator
 └── core/                       # Core functionality
@@ -219,7 +222,7 @@ The extension automatically detects your system theme preference. You can also t
 
 ## 🧪 Testing
 
-The project includes a comprehensive test suite with 470+ tests across 26 test files.
+The project includes a comprehensive test suite with 518+ tests across 37 test files.
 
 ### Running Tests
 
