@@ -22,7 +22,7 @@ const getBrandColors = (hostname: string) => {
       };
     case 'chat.mistral.ai':
       return {
-        enabled: 'bg-gradient-to-b from-[#ffd700] to-[#e10500] text-white shadow-sm',
+        enabled: 'bg-gray-700 text-white shadow-sm',
         disabled: 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
       };
     default:

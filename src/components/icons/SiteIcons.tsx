@@ -80,7 +80,7 @@ export const MistralIcon: FC<MistralIconProps> = ({ className = '', disabled = f
   return (
     <svg
       viewBox="0 0 212.121 151.515"
-      className={className}
+      className={`${className} scale-75`}
       xmlns="http://www.w3.org/2000/svg"
     >
       <rect x="30.303001" y="0" width="30.302999" height="30.302999" fill={colors.gold} strokeWidth="0" />
