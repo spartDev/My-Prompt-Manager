@@ -57,12 +57,20 @@ export const PerplexityIcon: FC<IconProps> = ({ className = '' }) => (
 
 export const MistralIcon: FC<IconProps> = ({ className = '' }) => (
   <svg
-    viewBox="0 0 24 24"
+    viewBox="0 0 212.121 151.515"
     className={className}
     xmlns="http://www.w3.org/2000/svg"
-    fill="currentColor"
   >
-    <path d="M12 2l3.09 6.26L22 9l-5.91 4.74L18 22l-6-3.27L6 22l1.91-8.26L2 9l6.91-.74L12 2z"/>
+    <rect x="30.303001" y="0" width="30.302999" height="30.302999" fill="#ffd700" strokeWidth="0" />
+    <rect x="151.515" y="0" width="30.302999" height="30.302999" fill="#ffd700" strokeWidth="0" />
+    <rect x="30.303001" y="30.303001" width="60.605999" height="30.302999" fill="#ffaf00" strokeWidth="0" />
+    <rect x="121.21201" y="30.303001" width="60.605999" height="30.302999" fill="#ffaf00" strokeWidth="0" />
+    <rect x="30.303001" y="60.606003" width="151.515" height="30.302999" fill="#ff8205" strokeWidth="0" />
+    <rect x="30.303001" y="90.908997" width="30.302999" height="30.302999" fill="#fa500f" strokeWidth="0" />
+    <rect x="90.908997" y="90.908997" width="30.302999" height="30.302999" fill="#fa500f" strokeWidth="0" />
+    <rect x="151.515" y="90.908997" width="30.302999" height="30.302999" fill="#fa500f" strokeWidth="0" />
+    <rect x="0" y="121.21201" width="90.908997" height="30.302999" fill="#e10500" strokeWidth="0" />
+    <rect x="121.21201" y="121.21201" width="90.908997" height="30.302999" fill="#e10500" strokeWidth="0" />
   </svg>
 );
 
