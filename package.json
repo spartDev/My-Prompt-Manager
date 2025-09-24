@@ -15,7 +15,8 @@
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "lint:fix": "eslint . --ext .js,.jsx,.ts,.tsx --fix",
     "prepare": "if [ \"$CI\" = \"true\" ] || [ -n \"$GITHUB_ACTIONS\" ] || [ -n \"$JENKINS_URL\" ] || [ -n \"$BUILDKITE\" ]; then echo 'CI detected, skipping husky'; else husky; fi",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@crxjs/vite-plugin": "2.2.0",

@@ -1,10 +1,14 @@
 import type { InsertionResult } from '../types/index';
 import type { UIElementFactory } from '../ui/element-factory';
+import { sanitizeUserInput } from '../utils/storage';
 
 import { PlatformStrategy } from './base-strategy';
 
 // Constants for timing values
 const MISTRAL_FOCUS_DELAY_MS = 50;
+
+// Constants for platform configuration
+const MISTRAL_PLATFORM_PRIORITY = 85;
 
 interface ProseMirrorElement extends HTMLElement {
   _pmViewDesc?: {
@@ -25,13 +29,10 @@ interface ProseMirrorElement extends HTMLElement {
 
 export class MistralStrategy extends PlatformStrategy {
   constructor() {
-    super('mistral', 85, {
+    super('Mistral', MISTRAL_PLATFORM_PRIORITY, {
       selectors: [
-        '.ProseMirror[contenteditable="true"]',
-        'div.ProseMirror[data-placeholder*="Ask"]',
-        '[contenteditable="true"].ProseMirror',
         'div[contenteditable="true"]',
-        'textarea',
+        'textarea[placeholder*="chat"]',
         '[role="textbox"]'
       ],
       // Target the exact button container from Mistral's DOM structure
@@ -40,26 +41,61 @@ export class MistralStrategy extends PlatformStrategy {
         '.flex.w-full.items-center.justify-start.gap-3',           // Compact view
         '.flex.items-center.justify-start.gap-3'                   // Mobile fallback
       ].join(', '),
-      priority: 85
+      priority: MISTRAL_PLATFORM_PRIORITY
     });
   }
 
-  canHandle(_element: HTMLElement): boolean {
-    const canHandle = this.hostname === 'chat.mistral.ai';
-    this._debug(`canHandle called for hostname: ${this.hostname}, result: ${String(canHandle)}`);
-    return canHandle;
+  canHandle(element: HTMLElement): boolean {
+    if (element.tagName === 'TEXTAREA' &&
+        element.hasAttribute('placeholder') &&
+        element.getAttribute('placeholder')?.toLowerCase().includes('chat')) {
+      return true;
+    }
+
+    if (element.contentEditable === 'true' &&
+        (element.classList.contains('ProseMirror') || element.querySelector('.ProseMirror'))) {
+      return true;
+    }
+
+    if (element.getAttribute('role') === 'textbox') {
+      return true;
+    }
+
+    return false;
   }
 
   async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
+    // Sanitize content before any insertion attempts
+    const sanitizedContent = sanitizeUserInput(content);
+    
+    if (!sanitizedContent) {
+      this._warn('Content sanitization resulted in empty content', { 
+        originalLength: content.length,
+        wasEmpty: content.length === 0
+      });
+      return { 
+        success: false, 
+        error: 'Content could not be sanitized safely' 
+      };
+    }
+
+    if (sanitizedContent !== content) {
+      this._debug('Content was sanitized during insertion', {
+        originalLength: content.length,
+        sanitizedLength: sanitizedContent.length,
+        contentModified: true
+      });
+    }
+
     const proseMirrorElement = this._findProseMirrorElement(element);
 
-    const proseMirrorResult = this._tryProseMirrorInsertion(proseMirrorElement, content);
+    const proseMirrorResult = this._tryProseMirrorInsertion(proseMirrorElement, sanitizedContent);
     if (proseMirrorResult.success) {return proseMirrorResult;}
 
-    const execCommandResult = await this._tryExecCommand(proseMirrorElement, content);
+    const execCommandResult = await this._tryExecCommand(proseMirrorElement, sanitizedContent);
     if (execCommandResult.success) {return execCommandResult;}
 
-    return this._tryDOMManipulation(proseMirrorElement, content);
+    return this._tryDOMManipulation(proseMirrorElement, sanitizedContent);
   }
 
   getSelectors(): string[] {
@@ -173,26 +209,46 @@ export class MistralStrategy extends PlatformStrategy {
 
   private _tryDOMManipulation(element: HTMLElement, content: string): InsertionResult {
     try {
-      element.focus();
-      element.textContent = content;
+      if (element.tagName === 'TEXTAREA') {
+        const textarea = element as HTMLTextAreaElement;
+        textarea.value = content;
+        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+        textarea.dispatchEvent(new Event('change', { bubbles: true }));
+        textarea.focus();
 
-      const inputEvent = new InputEvent('input', {
-        bubbles: true,
-        cancelable: true,
-        inputType: 'insertText',
-        data: content
+        this._debug('Textarea manipulation successful');
+        return { success: true, method: 'mistral-textarea' };
+      }
+
+      if (element.contentEditable === 'true') {
+        // Create a text node for safe insertion
+        const textNode = document.createTextNode(content);
+        
+        // Clear existing content and insert new content
+        while (element.firstChild) {
+          element.removeChild(element.firstChild);
+        }
+        element.appendChild(textNode);
+
+        // Dispatch events
+        element.dispatchEvent(new Event('input', { bubbles: true }));
+        element.dispatchEvent(new Event('change', { bubbles: true }));
+        element.focus();
+
+        this._debug('ContentEditable manipulation successful');
+        return { success: true, method: 'mistral-contenteditable' };
+      }
+
+      this._warn('Element is not suitable for DOM manipulation', {
+        tagName: element.tagName,
+        contentEditable: element.contentEditable,
+        hasTextarea: element.tagName === 'TEXTAREA'
       });
-      element.dispatchEvent(inputEvent);
 
-      element.dispatchEvent(new Event('change', { bubbles: true }));
-      element.dispatchEvent(new Event('blur', { bubbles: true }));
-      element.dispatchEvent(new Event('focus', { bubbles: true }));
-
-      this._debug('DOM manipulation insertion successful');
-      return { success: true, method: 'mistral-dom-manipulation' };
     } catch (error) {
-      this._error('All insertion methods failed', error as Error);
-      return { success: false, error: (error as Error).message };
+      this._error('DOM manipulation failed', error as Error);
     }
+
+    return { success: false };
   }
 }
