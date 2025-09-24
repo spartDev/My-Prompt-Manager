@@ -3,6 +3,9 @@ import type { UIElementFactory } from '../ui/element-factory';
 
 import { PlatformStrategy } from './base-strategy';
 
+// Constants for timing values
+const MISTRAL_FOCUS_DELAY_MS = 50;
+
 interface ProseMirrorElement extends HTMLElement {
   _pmViewDesc?: {
     view: {
@@ -32,7 +35,11 @@ export class MistralStrategy extends PlatformStrategy {
         '[role="textbox"]'
       ],
       // Target the exact button container from Mistral's DOM structure
-      buttonContainerSelector: '.flex.w-full.max-w-full.items-center.justify-start.gap-3, .flex.w-full.items-center.justify-start.gap-3, .flex.items-center.justify-start.gap-3',
+      buttonContainerSelector: [
+        '.flex.w-full.max-w-full.items-center.justify-start.gap-3', // Main chat interface
+        '.flex.w-full.items-center.justify-start.gap-3',           // Compact view
+        '.flex.items-center.justify-start.gap-3'                   // Mobile fallback
+      ].join(', '),
       priority: 85
     });
   }
@@ -91,7 +98,7 @@ export class MistralStrategy extends PlatformStrategy {
     try {
       const pElement = element.querySelector('p');
       if (pElement) {
-        pElement.innerHTML = content;
+        pElement.textContent = content;
 
         element.dispatchEvent(new Event('input', { bubbles: true }));
         element.dispatchEvent(new Event('change', { bubbles: true }));
@@ -124,12 +131,13 @@ export class MistralStrategy extends PlatformStrategy {
   }
 
   private async _tryExecCommand(element: HTMLElement, content: string): Promise<InsertionResult> {
-    if (element.contentEditable === 'true') {
+    if (element.contentEditable === 'true' &&
+        (element.classList.contains('ProseMirror') || element.closest('.ProseMirror'))) {
       try {
         element.focus();
         element.click();
 
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise(resolve => setTimeout(resolve, MISTRAL_FOCUS_DELAY_MS));
 
         const selection = window.getSelection();
         if (selection) {
