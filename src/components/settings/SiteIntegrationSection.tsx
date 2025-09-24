@@ -438,7 +438,8 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
         // Skip permission check for already allowed origins
         const isAllowedOrigin = targetTab.url.startsWith('https://claude.ai/') ||
                                targetTab.url.startsWith('https://chatgpt.com/') ||
-                               targetTab.url.startsWith('https://www.perplexity.ai/');
+                               targetTab.url.startsWith('https://www.perplexity.ai/') ||
+                               targetTab.url.startsWith('https://chat.mistral.ai/');
         
         if (!isAllowedOrigin) {
           // Check if we have permission

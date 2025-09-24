@@ -140,7 +140,7 @@ describe('SettingsView', () => {
     await waitFor(() => {
       expect(chromeMock.storage.local.set).toHaveBeenCalledWith({
         promptLibrarySettings: {
-          enabledSites: ['www.perplexity.ai', 'claude.ai', 'chatgpt.com'],
+          enabledSites: ['www.perplexity.ai', 'claude.ai', 'chatgpt.com', 'chat.mistral.ai'],
           customSites: [],
           debugMode: false,
           floatingFallback: true
