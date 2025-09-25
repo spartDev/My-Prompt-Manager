@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { FC, ReactNode } from 'react';
 
+import manifest from '../../manifest.json';
 import { StorageManager } from '../services/storage';
 import type { Prompt, Category, Settings as UserSettings } from '../types';
 import { DEFAULT_SETTINGS } from '../types';
@@ -458,7 +459,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast }) => {
 
           {/* About & Reset Section */}
           <AboutSection
-            version="1.3.0"
+            version={manifest.version}
             onReset={handleResetSettings}
           />
         </div>
