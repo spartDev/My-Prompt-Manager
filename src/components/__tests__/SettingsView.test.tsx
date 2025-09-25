@@ -1,10 +1,11 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
+import { beforeEach, describe, expect, it, Mock, vi } from 'vitest';
 
 import { ThemeProvider } from '../../contexts/ThemeContext';
+import { backupManager } from '../../services/backupManager';
 import { getChromeMockFunctions, getMockStorageManager } from '../../test/mocks';
-import { DEFAULT_SETTINGS, type Prompt, type Category } from '../../types';
+import { DEFAULT_SETTINGS } from '../../types';
 import SettingsView from '../SettingsView';
 
 const createJsonFile = (contents: string): File => {
@@ -16,7 +17,7 @@ const createJsonFile = (contents: string): File => {
   return file;
 };
 
-const renderSettings = async () => {
+const renderSettings = async (showToast = vi.fn()) => {
   const mockToastSettings = {
     position: 'top-right' as const,
     enabledTypes: {
@@ -33,7 +34,7 @@ const renderSettings = async () => {
     <ThemeProvider>
       <SettingsView
         onBack={vi.fn()}
-        showToast={vi.fn()}
+        showToast={showToast}
         toastSettings={mockToastSettings}
         onToastSettingsChange={vi.fn()}
       />
@@ -41,6 +42,7 @@ const renderSettings = async () => {
   );
 
   await screen.findByRole('heading', { name: /settings/i });
+  return showToast;
 };
 
 describe('SettingsView', () => {
@@ -57,70 +59,51 @@ describe('SettingsView', () => {
     (chromeMock.storage.local.set as Mock).mockResolvedValue(undefined);
     (chromeMock.storage.local.clear as Mock).mockResolvedValue(undefined);
     (chromeMock.tabs.query as Mock).mockResolvedValue([]);
-    const storageMock = getMockStorageManager();
-    storageMock.getPrompts.mockResolvedValue([]);
-    storageMock.getCategories.mockResolvedValue([]);
+
+    getMockStorageManager();
   });
 
-  it('imports prompts and categories from a valid backup', async () => {
-    const storageMock = getMockStorageManager();
-    const chromeMock = getChromeMockFunctions();
-    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+  it('disables encrypted backups without a password', async () => {
+    const createSpy = vi.spyOn(backupManager, 'createBackup').mockResolvedValue({
+      fileName: 'test.json',
+      blob: new Blob(['{}'], { type: 'application/json' }),
+      metadata: {
+        version: '2.0.0',
+        createdAt: Date.now(),
+        promptCount: 0,
+        categoryCount: 0,
+        settingsIncluded: false,
+        encrypted: true,
+        checksum: 'abc',
+        fileSize: 0
+      },
+      raw: {} as never
+    });
 
     await renderSettings();
+
+    const encryptionToggle = await screen.findByLabelText(/password protect backup/i);
+    await userEvent.click(encryptionToggle);
+
+    const createButton = await screen.findByRole('button', { name: /create backup/i });
+    expect(createButton).toBeDisabled();
+
+    const passwordInput = await screen.findByPlaceholderText(/encryption password/i);
+    await userEvent.type(passwordInput, 'secret');
+    expect(createButton).not.toBeDisabled();
+
+    await userEvent.click(createButton);
     await waitFor(() => {
-      expect(storageMock.getPrompts).toHaveBeenCalled();
-      expect(storageMock.getCategories).toHaveBeenCalled();
+      expect(createSpy).toHaveBeenCalled();
     });
 
-    const fileInput = document.querySelector<HTMLInputElement>('input[type="file"]');
-    expect(fileInput).not.toBeNull();
-
-    const prompts: Prompt[] = [
-      { id: 'p1', title: 'Greeting', content: 'Hello', category: 'Uncategorized', createdAt: 1, updatedAt: 1 }
-    ];
-    const categories: Category[] = [{ id: 'c1', name: 'Custom' }];
-    const backupContents = JSON.stringify({ prompts, categories, version: '1.0' });
-    const file = createJsonFile(backupContents);
-
-    await userEvent.upload(fileInput as HTMLInputElement, file);
-
-    await waitFor(() => {
-      expect(storageMock.importCategory).toHaveBeenCalledWith(categories[0]);
-      expect(storageMock.importPrompt).toHaveBeenCalledWith(prompts[0]);
-    });
-
-    expect(alertSpy).toHaveBeenCalledWith(expect.stringMatching(/successfully imported/i));
-    expect((chromeMock.storage.local.get as Mock).mock.calls.length).toBeGreaterThanOrEqual(2);
-    alertSpy.mockRestore();
+    createSpy.mockRestore();
   });
 
-  it('alerts when import JSON is invalid', async () => {
-    const storageMock = getMockStorageManager();
-    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
-
-    await renderSettings();
-    await waitFor(() => {
-      expect(storageMock.getPrompts).toHaveBeenCalled();
-      expect(storageMock.getCategories).toHaveBeenCalled();
-    });
-
-    const fileInput = document.querySelector<HTMLInputElement>('input[type="file"]');
-    const badFile = createJsonFile('not-json');
-
-    await userEvent.upload(fileInput as HTMLInputElement, badFile);
-
-    await waitFor(() => {
-      expect(alertSpy).toHaveBeenCalledWith(expect.stringMatching(/invalid json/i));
-    });
-    expect(storageMock.importPrompt).not.toHaveBeenCalled();
-    alertSpy.mockRestore();
-  });
-
-  it('resets settings to defaults after confirmation', async () => {
+  it('resets settings to defaults and shows a toast', async () => {
     const chromeMock = getChromeMockFunctions();
     const storageMock = getMockStorageManager();
-    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    const showToast = vi.fn();
 
     (chromeMock.storage.local.get as Mock).mockResolvedValue({
       promptLibrarySettings: { enabledSites: [], customSites: [] },
@@ -133,11 +116,7 @@ describe('SettingsView', () => {
       }
     });
 
-    await renderSettings();
-    await waitFor(() => {
-      expect(storageMock.getPrompts).toHaveBeenCalled();
-      expect(storageMock.getCategories).toHaveBeenCalled();
-    });
+    await renderSettings(showToast);
     await waitFor(() => {
       expect(chromeMock.storage.local.get as Mock).toHaveBeenCalled();
     });
@@ -185,17 +164,12 @@ describe('SettingsView', () => {
       defaultCategory: 'Uncategorized'
     });
 
-    expect(alertSpy).toHaveBeenCalledWith(expect.stringMatching(/reset to defaults/i));
-    alertSpy.mockRestore();
+    expect(showToast).toHaveBeenCalledWith(expect.stringMatching(/reset to defaults/i), 'success');
   });
 
   it('changes the interface mode when a different option is selected', async () => {
     const chromeMock = getChromeMockFunctions();
-    const storageMock = getMockStorageManager();
     await renderSettings();
-    await waitFor(() => {
-      expect(storageMock.getPrompts).toHaveBeenCalled();
-    });
 
     const sidePanelOption = await screen.findByRole('radio', { name: /select side panel mode/i });
     await userEvent.click(sidePanelOption);

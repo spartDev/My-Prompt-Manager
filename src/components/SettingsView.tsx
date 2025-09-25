@@ -4,7 +4,7 @@ import type { FC, ReactNode } from 'react';
 import manifest from '../../manifest.json';
 import { getDefaultEnabledPlatforms } from '../config/platforms';
 import { StorageManager } from '../services/storage';
-import type { Prompt, Category, Settings as UserSettings } from '../types';
+import type { Settings as UserSettings } from '../types';
 import { DEFAULT_SETTINGS } from '../types';
 import type { ToastSettings } from '../types/hooks';
 import { Logger, toError } from '../utils';
@@ -13,8 +13,8 @@ import { ClaudeIcon, ChatGPTIcon, PerplexityIcon, MistralIcon, GeminiIcon } from
 import AboutSection from './settings/AboutSection';
 import AdvancedSection from './settings/AdvancedSection';
 import AppearanceSection from './settings/AppearanceSection';
-import DataStorageSection from './settings/DataStorageSection';
 import NotificationSection from './settings/NotificationSection';
+import BackupRestoreView from './settings/BackupRestoreView';
 import SiteIntegrationSection from './settings/SiteIntegrationSection';
 import ViewHeader from './ViewHeader';
 
@@ -83,11 +83,11 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
   // Interface mode states
   const [interfaceMode, setInterfaceMode] = useState<'popup' | 'sidepanel'>(DEFAULT_SETTINGS.interfaceMode as 'popup' | 'sidepanel');
   const [interfaceModeChanging, setInterfaceModeChanging] = useState(false);
-
-  // Data for import/export
-  const [prompts, setPrompts] = useState<Prompt[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-
+  
+  // Data for import/export (currently unused but may be needed for future features)
+  // const [prompts, setPrompts] = useState<Prompt[]>([]);
+  // const [categories, setCategories] = useState<Category[]>([]);
+  
   const storageManager = StorageManager.getInstance();
 
   const siteConfigs: Record<string, SiteConfig> = useMemo(() => ({
@@ -147,13 +147,6 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
         setUserSettings(savedUserSettings);
       }
       
-      // Load prompts and categories
-      const [loadedPrompts, loadedCategories] = await Promise.all([
-        storageManager.getPrompts(),
-        storageManager.getCategories()
-      ]);
-      setPrompts(loadedPrompts);
-      setCategories(loadedCategories);
     } catch (error) {
       Logger.error('Failed to load settings', toError(error));
       setSettings(defaultSettings);
@@ -161,7 +154,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
     } finally {
       setLoading(false);
     }
-  }, [defaultSettings, storageManager]);
+  }, [defaultSettings]);
 
   useEffect(() => {
     void loadSettings();
@@ -327,41 +320,6 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
     }
   };
 
-  // Handle import data
-  const handleImportData = async (data: { prompts: Prompt[]; categories: Category[] }) => {
-    try {
-      // Import categories first (prompts reference categories)
-      for (const category of data.categories) {
-        await storageManager.importCategory(category);
-      }
-      
-      // Import prompts
-      for (const prompt of data.prompts) {
-        await storageManager.importPrompt(prompt);
-      }
-      
-      // Reload data
-      await loadSettings();
-      
-      alert(`Successfully imported ${data.prompts.length.toString()} prompts and ${data.categories.length.toString()} categories!`);
-    } catch (error) {
-      Logger.error('Import failed', toError(error));
-      throw error;
-    }
-  };
-
-  // Handle clear data
-  const handleClearData = async () => {
-    try {
-      await chrome.storage.local.clear();
-      await loadSettings();
-      alert('All data has been cleared.');
-    } catch (error) {
-      Logger.error('Failed to clear data', toError(error));
-      throw error;
-    }
-  };
-
   // Handle reset settings
   const handleResetSettings = async () => {
     try {
@@ -381,7 +339,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
       }
       
       await loadSettings();
-      alert('Settings have been reset to defaults.');
+      showToast('Settings have been reset to defaults.', 'success');
     } catch (error) {
       Logger.error('Failed to reset settings', toError(error));
       throw error;
@@ -441,13 +399,8 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
 
           <SectionSeparator />
 
-          {/* Data & Storage Section */}
-          <DataStorageSection
-            prompts={prompts}
-            categories={categories}
-            onImport={handleImportData}
-            onClearData={handleClearData}
-          />
+          {/* Backup & Restore */}
+          <BackupRestoreView onShowToast={showToast} />
 
           {/* Notification Settings Section */}
           <NotificationSection
