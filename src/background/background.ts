@@ -3,6 +3,8 @@
  * Handles message passing, content script injection, and coordination between popup and content scripts
  */
 
+import { getDefaultEnabledPlatforms, getAllHostnamePatterns } from '../config/platforms';
+
 // Track active element picker sessions
 const activePickerSessions = new Map<number, { tabId: number; windowId: number }>();
 
@@ -107,11 +109,11 @@ export class ContentScriptInjector {
       } | undefined;
       
       if (!promptLibrarySettings) {
-        return ['claude.ai', 'chatgpt.com', 'www.perplexity.ai'].includes(hostname);
+        return getDefaultEnabledPlatforms().includes(hostname);
       }
       
       // Get enabled sites and custom sites from settings
-      const enabledSites = promptLibrarySettings.enabledSites || ['claude.ai', 'chatgpt.com', 'www.perplexity.ai'];
+      const enabledSites = promptLibrarySettings.enabledSites || getDefaultEnabledPlatforms();
       const customSites = promptLibrarySettings.customSites || [];
 
       // Check default enabled sites
@@ -711,8 +713,8 @@ async function handleSettingsUpdated(_settings: unknown, sendResponse: (response
         const hostname = url.hostname;
         
         // Quick hostname check - only process tabs that could potentially need injection
-        return ['claude.ai', 'chatgpt.com', 'www.perplexity.ai'].includes(hostname) ||
-               hostname.includes('claude') || hostname.includes('openai') || hostname.includes('perplexity');
+        return getDefaultEnabledPlatforms().includes(hostname) ||
+               getAllHostnamePatterns().some(pattern => hostname.includes(pattern));
       } catch {
         return false; // Invalid URL
       }
@@ -800,7 +802,7 @@ async function handleExtensionUpdate(): Promise<void> {
       enabledSites?: string[];
       customSites?: Array<{ hostname: string; enabled: boolean }>;
     } | undefined;
-    const enabledSites = promptLibrarySettings?.enabledSites || ['claude.ai', 'chatgpt.com', 'www.perplexity.ai'];
+    const enabledSites = promptLibrarySettings?.enabledSites || getDefaultEnabledPlatforms();
     const customSites = promptLibrarySettings?.customSites || [];
 
     const allEnabledHosts = [

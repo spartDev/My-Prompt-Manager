@@ -763,6 +763,26 @@ export class PromptLibraryInjector {
           }
         }
         
+        // For Mistral, find the ms-auto div and insert our button before it
+        if (this.state.hostname === 'chat.mistral.ai' && !injected) {
+          const container = document.querySelector(containerSelector);
+          if (container) {
+            // Find the ms-auto div within the container
+            const msAutoDiv = container.querySelector('.flex.ms-auto');
+            if (msAutoDiv) {
+              // Insert our button before the ms-auto div
+              container.insertBefore(icon, msAutoDiv);
+              injected = true;
+              debug('Icon injected before ms-auto div in Mistral toolbar');
+            } else {
+              // Fallback: insert as last child before any potential ms-auto elements
+              container.appendChild(icon);
+              injected = true;
+              debug('Icon injected into Mistral container (ms-auto not found)');
+            }
+          }
+        }
+        
         // Fallback to generic container selector
         if (!injected) {
           const container = document.querySelector(containerSelector);

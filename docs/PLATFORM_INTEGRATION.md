@@ -2,46 +2,103 @@
 
 This guide explains how to add support for new LLM platforms (like Gemini, Mistral.ai, Anthropic Claude, etc.) to the My Prompt Manager extension.
 
+> **⚡ New in v1.3+**: Adding basic platform support now takes just **5 minutes** with our centralized configuration system!
+
 ## Table of Contents
 
-- [Overview](#overview)
-- [Quick Start](#quick-start)
-- [Step-by-Step Guide](#step-by-step-guide)
-- [Platform Strategy Patterns](#platform-strategy-patterns)
-- [Testing and Debugging](#testing-and-debugging)
-- [Best Practices](#best-practices)
-- [Examples](#examples)
-- [Troubleshooting](#troubleshooting)
+- [🚀 Quick Start (New Method)](#-quick-start-new-method)
+- [📋 Configuration Reference](#-configuration-reference)
+- [🔧 Advanced Integration](#-advanced-integration)
+- [🧪 Testing and Debugging](#-testing-and-debugging)
+- [💡 Best Practices](#-best-practices)
+- [📚 Examples](#-examples)
+- [🐛 Troubleshooting](#-troubleshooting)
 
-## Overview
+## 🚀 Quick Start (New Method)
 
-The extension uses a **Strategy Pattern** architecture that makes adding new platforms straightforward. Each platform has its own strategy class that handles:
+Adding a new platform is now incredibly simple! You only need to update **one file**.
 
-- **Input Detection**: Finding text input elements
-- **Content Insertion**: Inserting prompts into the input
-- **Button Positioning**: Placing the library button in the UI  
-- **Event Handling**: Triggering the right events for the platform
+### Step 1: Add Platform Configuration
 
-### Architecture
+Edit `src/config/platforms.ts` and add your platform to the `SUPPORTED_PLATFORMS` object:
+
+```typescript
+export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
+  // ... existing platforms ...
+
+  yourplatform: {
+    id: 'yourplatform',
+    hostname: 'your-ai-platform.com',
+    displayName: 'Your AI Platform',
+    priority: 70, // Lower than existing platforms
+    defaultEnabled: true, // Include in fresh installs
+    selectors: [
+      'textarea[placeholder*="Ask"]',
+      'div[contenteditable="true"]',
+      '[role="textbox"]'
+    ],
+    buttonContainerSelector: '.button-container', // Where to place icon
+    strategyClass: 'YourPlatformStrategy', // For future custom logic
+    hostnamePatterns: ['yourplatform'] // For hostname matching
+  }
+};
+```
+
+### Step 2: Test Your Integration
+
+1. Build the extension: `npm run build`
+2. Load in Chrome and visit your platform
+3. The prompt library icon should appear automatically!
+
+**That's it!** 🎉 The centralized config system handles:
+- ✅ Background script injection
+- ✅ Content script default settings
+- ✅ Platform detection and matching
+- ✅ Type definitions
+
+## 📋 Configuration Reference
+
+### PlatformDefinition Fields
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | string | ✅ | Unique platform identifier (lowercase, no spaces) |
+| `hostname` | string | ✅ | Exact hostname (e.g., 'claude.ai') |
+| `displayName` | string | ✅ | Human-readable name shown in UI |
+| `priority` | number | ✅ | Strategy selection priority (100 = highest) |
+| `defaultEnabled` | boolean | ✅ | Include in default enabled platforms for new users |
+| `selectors` | string[] | ✅ | CSS selectors for finding text input elements |
+| `buttonContainerSelector` | string | ❌ | Where to place the library icon |
+| `strategyClass` | string | ✅ | Class name for custom strategy (future use) |
+| `hostnamePatterns` | string[] | ❌ | Additional hostname patterns for detection |
+
+### Priority Guidelines
+
+- **100**: Premium platforms (Claude, ChatGPT)
+- **80-90**: Major platforms (Perplexity, Mistral)
+- **60-79**: Secondary platforms
+- **40-59**: Experimental/beta platforms
+- **< 40**: Custom/niche platforms
+
+## 🔧 Advanced Integration
+
+For platforms that need custom insertion logic or special handling, you'll need to create a custom strategy class.
+
+### Architecture Overview
 
 ```
-src/content/platforms/
-├── base-strategy.ts          # Base class with common functionality
-├── claude-strategy.ts        # Claude.ai implementation
-├── chatgpt-strategy.ts       # ChatGPT implementation  
-├── perplexity-strategy.ts    # Perplexity implementation
-├── your-platform-strategy.ts # Your new platform
-└── platform-manager.ts      # Registers and manages all strategies
+src/
+├── config/platforms.ts           # ⭐ Centralized configuration
+├── content/platforms/
+│   ├── base-strategy.ts          # Base class with common functionality
+│   ├── claude-strategy.ts        # Claude.ai implementation
+│   ├── chatgpt-strategy.ts       # ChatGPT implementation
+│   ├── mistral-strategy.ts       # Mistral LeChat implementation
+│   ├── perplexity-strategy.ts    # Perplexity implementation
+│   ├── your-platform-strategy.ts # Your custom strategy
+│   └── platform-manager.ts      # Registers and manages strategies
+└── background/background.ts      # Uses centralized config
 ```
-
-## Quick Start
-
-Adding a new platform typically takes **30-60 minutes** and involves:
-
-1. **Create** a strategy file
-2. **Register** the strategy  
-3. **Test** on the target platform
-4. **Adjust** selectors and insertion logic
 
 ## Step-by-Step Guide
 

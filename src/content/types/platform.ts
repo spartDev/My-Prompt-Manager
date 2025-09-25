@@ -37,7 +37,7 @@ export interface InsertionManagerOptions {
   [key: string]: unknown;
 }
 
-export type PlatformName = 'claude' | 'chatgpt' | 'perplexity' | 'default';
+export type PlatformName = 'claude' | 'chatgpt' | 'mistral' | 'perplexity' | 'default';
 
 export interface PlatformDetectionResult {
   platform: PlatformName;

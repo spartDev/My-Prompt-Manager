@@ -14,7 +14,7 @@ import SiteCard from './SiteCard';
 interface SiteIntegrationSectionProps {
   enabledSites: string[];
   customSites: CustomSite[];
-  siteConfigs: Record<string, { name: string; description: string; icon: ReactNode }>;
+  siteConfigs: Record<string, { name: string; description: string; icon: ReactNode | ((isEnabled: boolean) => ReactNode) }>;
   onSiteToggle: (hostname: string, enabled: boolean) => Promise<void> | void;
   onCustomSiteToggle: (hostname: string, enabled: boolean) => Promise<void> | void;
   onRemoveCustomSite: (hostname: string) => Promise<void> | void;
@@ -438,7 +438,8 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
         // Skip permission check for already allowed origins
         const isAllowedOrigin = targetTab.url.startsWith('https://claude.ai/') ||
                                targetTab.url.startsWith('https://chatgpt.com/') ||
-                               targetTab.url.startsWith('https://www.perplexity.ai/');
+                               targetTab.url.startsWith('https://www.perplexity.ai/') ||
+                               targetTab.url.startsWith('https://chat.mistral.ai/');
         
         if (!isAllowedOrigin) {
           // Check if we have permission
@@ -648,7 +649,7 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
                   hostname={hostname}
                   name={config.name}
                   description={config.description}
-                  icon={config.icon}
+                  icon={typeof config.icon === 'function' ? config.icon(isEnabled) : config.icon}
                   isEnabled={isEnabled}
                   onToggle={onSiteToggle}
                   saving={saving}

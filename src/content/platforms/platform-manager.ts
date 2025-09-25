@@ -15,6 +15,7 @@ import type { PlatformStrategy } from './base-strategy';
 import { ChatGPTStrategy } from './chatgpt-strategy';
 import { ClaudeStrategy } from './claude-strategy';
 import { DefaultStrategy } from './default-strategy';
+import { MistralStrategy } from './mistral-strategy';
 import { PerplexityStrategy } from './perplexity-strategy';
 
 export class PlatformManager {
@@ -106,7 +107,12 @@ export class PlatformManager {
         this.strategies.push(new ChatGPTStrategy());
         this.strategies.push(new DefaultStrategy()); // Fallback for ChatGPT
         break;
-        
+
+      case 'chat.mistral.ai':
+        this.strategies.push(new MistralStrategy());
+        this.strategies.push(new DefaultStrategy()); // Fallback for Mistral
+        break;
+
       case 'www.perplexity.ai':
         this.strategies.push(new PerplexityStrategy());
         this.strategies.push(new DefaultStrategy()); // Fallback for Perplexity

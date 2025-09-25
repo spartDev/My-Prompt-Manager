@@ -5,7 +5,7 @@ import { StorageManager } from '../services/storage';
 import type { Prompt, Category, Settings as UserSettings } from '../types';
 import { DEFAULT_SETTINGS } from '../types';
 
-import { ClaudeIcon, ChatGPTIcon, PerplexityIcon } from './icons/SiteIcons';
+import { ClaudeIcon, ChatGPTIcon, PerplexityIcon, MistralIcon } from './icons/SiteIcons';
 import AboutSection from './settings/AboutSection';
 import AdvancedSection from './settings/AdvancedSection';
 import AppearanceSection from './settings/AppearanceSection';
@@ -15,7 +15,7 @@ import SiteIntegrationSection from './settings/SiteIntegrationSection';
 interface SiteConfig {
   name: string;
   description: string;
-  icon: ReactNode;
+  icon: ReactNode | ((isEnabled: boolean) => ReactNode);
 }
 
 interface CustomSite {
@@ -97,11 +97,16 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast }) => {
       name: 'ChatGPT',
       description: 'OpenAI\'s conversational AI',
       icon: <ChatGPTIcon />
+    },
+    'chat.mistral.ai': {
+      name: 'Mistral AI',
+      description: 'Mistral\'s conversational AI',
+      icon: (isEnabled: boolean) => <MistralIcon disabled={!isEnabled} />
     }
   }), []);
 
   const defaultSettings: Settings = useMemo(() => ({
-    enabledSites: ['www.perplexity.ai', 'claude.ai', 'chatgpt.com'],
+    enabledSites: ['www.perplexity.ai', 'claude.ai', 'chatgpt.com', 'chat.mistral.ai'],
     customSites: [],
     debugMode: false,
     floatingFallback: true
