@@ -1,6 +1,6 @@
 # My Prompt Manager - Chrome Extension
 
-[![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)](https://github.com/spartDev/My-Prompt-Manager)
+[![Version](https://img.shields.io/badge/version-1.4.0-blue.svg)](https://github.com/spartDev/My-Prompt-Manager)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Chrome](https://img.shields.io/badge/Chrome-114%2B-yellow.svg)](https://www.google.com/chrome/)
 [![Tests](https://img.shields.io/badge/tests-518%20passing-brightgreen.svg)](https://github.com/spartDev/My-Prompt-Manager)
@@ -262,7 +262,7 @@ npm test -- src/content/platforms/__tests__/claude-strategy.test.ts
    ```bash
    npm run package
    ```
-   This creates `prompt-library-extension-v1.0.0.zip`
+   This creates `prompt-library-extension-v1.4.0.zip`
 
 4. **Upload to Chrome Web Store:**
    - Go to [Chrome Web Store Developer Dashboard](https://chrome.google.com/webstore/developer/dashboard)
@@ -353,7 +353,7 @@ We welcome contributions! Please follow these guidelines:
 
 ### Adding New Platforms
 
-**New in v1.3+**: Adding support for new AI platforms is now incredibly simple thanks to our centralized platform configuration system!
+**New in v1.4+**: Adding support for new AI platforms is now incredibly simple thanks to our centralized platform configuration system!
 
 To add a new platform, you only need to update **one file**: `src/config/platforms.ts`
 
