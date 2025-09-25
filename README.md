@@ -353,7 +353,28 @@ We welcome contributions! Please follow these guidelines:
 
 ### Adding New Platforms
 
-See our comprehensive [Platform Integration Guide](docs/PLATFORM_INTEGRATION.md) for step-by-step instructions on adding support for new AI platforms.
+**New in v1.3+**: Adding support for new AI platforms is now incredibly simple thanks to our centralized platform configuration system!
+
+To add a new platform, you only need to update **one file**: `src/config/platforms.ts`
+
+```typescript
+// Example: Adding Google Gemini support
+gemini: {
+  id: 'gemini',
+  hostname: 'gemini.google.com',
+  displayName: 'Google Gemini',
+  priority: 75,
+  defaultEnabled: true,
+  selectors: ['textarea[data-testid="input"]'],
+  buttonContainerSelector: '.button-container',
+  strategyClass: 'GeminiStrategy',
+  hostnamePatterns: ['gemini']
+}
+```
+
+All other files (background script, content script, types) automatically pick up the changes!
+
+For more complex integrations, see our comprehensive [Platform Integration Guide](docs/PLATFORM_INTEGRATION.md).
 
 ## 🐛 Troubleshooting
 
