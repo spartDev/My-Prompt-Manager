@@ -3,6 +3,7 @@
  * Handles Chrome storage operations, data validation, and prompt list item creation
  */
 
+import { getDefaultEnabledPlatforms } from '../../config/platforms';
 import type { Prompt } from '../types/index';
 
 import { DOMUtils } from './dom';
@@ -77,7 +78,7 @@ export async function getSettings(): Promise<ExtensionSettings> {
  */
 export function getDefaultSettings(): ExtensionSettings {
   return {
-    enabledSites: ['www.perplexity.ai', 'claude.ai', 'chatgpt.com'],
+    enabledSites: getDefaultEnabledPlatforms(),
     customSites: [],
     debugMode: false,
     floatingFallback: true
