@@ -13,9 +13,9 @@ import type {
   RestoreMode,
   RestoreOptions
 } from '../../types/backup';
+import ConfirmDialog from '../ConfirmDialog';
 
 import SettingsSection from './SettingsSection';
-
 
 interface BackupRestoreViewProps {
   onShowToast?: (message: string, type?: 'success' | 'error' | 'info') => void;
@@ -44,6 +44,12 @@ const conflictStrategyLabels: Record<ConflictResolutionStrategy, string> = {
   skip: 'Skip duplicates',
   overwrite: 'Overwrite duplicates',
   rename: 'Rename imported items'
+};
+
+const conflictStrategyActionLabels: Record<ConflictResolutionStrategy, string> = {
+  skip: 'will be skipped',
+  overwrite: 'will overwrite existing prompts',
+  rename: 'will be renamed'
 };
 
 const modeLabels: Record<RestoreMode, string> = {
@@ -107,6 +113,8 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
   const [isRestoring, setIsRestoring] = useState(false);
   const [selectedFileName, setSelectedFileName] = useState<string>('');
   const [restoreError, setRestoreError] = useState<string | null>(null);
+  const [isReplaceConfirmOpen, setIsReplaceConfirmOpen] = useState(false);
+  const [pendingRestoreMode, setPendingRestoreMode] = useState<RestoreMode | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fileContentRef = useRef<string>('');
   const [storageUsage, setStorageUsage] = useState<{ used: number; total: number } | null>(null);
@@ -243,6 +251,33 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
     });
   };
 
+  const handleRestoreModeSelect = (event: ChangeEvent<HTMLSelectElement>) => {
+    const selectedMode = event.target.value as RestoreMode;
+    if (selectedMode === 'replace' && restoreOptions.mode !== 'replace') {
+      setPendingRestoreMode('replace');
+      setIsReplaceConfirmOpen(true);
+      return;
+    }
+
+    setRestoreOptions((prev) => ({
+      ...prev,
+      mode: selectedMode
+    }));
+  };
+
+  const confirmReplaceMode = () => {
+    if (pendingRestoreMode === 'replace') {
+      setRestoreOptions((prev) => ({ ...prev, mode: 'replace' }));
+    }
+    setPendingRestoreMode(null);
+    setIsReplaceConfirmOpen(false);
+  };
+
+  const cancelReplaceMode = () => {
+    setPendingRestoreMode(null);
+    setIsReplaceConfirmOpen(false);
+  };
+
   const handleRestore = async () => {
     const content = fileContentRef.current;
     if (!content) {
@@ -368,15 +403,15 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
                   </svg>
                 </span>
                 <span>Storage limit details</span>
-              <span
-                id="storage-usage-tooltip"
-                role="tooltip"
-                aria-hidden="true"
-                className="pointer-events-none absolute left-0 top-full z-20 mt-2 w-72 rounded-lg border border-blue-200 dark:border-blue-800 bg-white dark:bg-slate-900 px-3 py-2 text-left text-xs text-blue-700 dark:text-blue-200 opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100"
-              >
-                Chrome extensions can store up to 5&nbsp;MB in <code className="font-mono bg-blue-100/70 dark:bg-blue-900/40 px-1 py-0.5 rounded">chrome.storage.local</code>. Create backups or delete unused prompts if you approach the limit.
-              </span>
-            </button>
+                <span
+                  id="storage-usage-tooltip"
+                  role="tooltip"
+                  aria-hidden="true"
+                  className="pointer-events-none absolute left-0 top-full z-20 mt-2 w-72 rounded-lg border border-blue-200 dark:border-blue-800 bg-white dark:bg-slate-900 px-3 py-2 text-left text-xs text-blue-700 dark:text-blue-200 opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100"
+                >
+                  Chrome extensions can store up to 5&nbsp;MB in <code className="font-mono bg-blue-100/70 dark:bg-blue-900/40 px-1 py-0.5 rounded">chrome.storage.local</code>. Create backups or delete unused prompts if you approach the limit.
+                </span>
+              </button>
             </div>
           </div>
 
@@ -548,7 +583,7 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
               <div className="relative">
                 <select
                   value={restoreOptions.mode}
-                  onChange={(event) => { setRestoreOptions((prev) => ({ ...prev, mode: event.target.value as RestoreMode })); }}
+                  onChange={handleRestoreModeSelect}
                   className="peer w-full appearance-none rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40"
                 >
                   {Object.entries(modeLabels).map(([mode, label]) => (
@@ -584,6 +619,12 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
             </div>
           </div>
 
+          {restoreOptions.mode === 'replace' && (
+            <div className="mt-2 rounded-lg border border-red-200 dark:border-red-700 bg-red-50/80 dark:bg-red-900/20 px-3 py-2 text-xs text-red-700 dark:text-red-300">
+              Replacing will delete prompts and categories that are not present in the backup. Make sure you have a copy of anything you want to keep.
+            </div>
+          )}
+
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
             <button
               type="button"
@@ -614,6 +655,9 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
                   const selected = restoreOptions.selectedCategoryIds.includes(category.id);
                   const checkboxId = `${category.id}-restore-option`;
                   const labelId = `${category.id}-restore-label`;
+                  const duplicateTextClass = restoreOptions.conflictResolution === 'overwrite'
+                    ? 'text-red-600 dark:text-red-400'
+                    : 'text-yellow-600 dark:text-yellow-400';
                   return (
                     <div key={category.id} className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2">
                       <div className="flex items-start gap-2">
@@ -627,8 +671,27 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
                         />
                         <div id={labelId} className="text-sm text-gray-700 dark:text-gray-300">
                           <div className="font-medium text-gray-900 dark:text-gray-100">{category.name}</div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
-                            {category.promptCount.toLocaleString()} prompts{category.existsInLibrary ? ' · already in library' : ''}
+                          <div className="mt-1 space-y-1 text-xs">
+                            <div className="text-gray-500 dark:text-gray-400">
+                              {category.promptCount.toLocaleString()} prompts
+                              {' '}
+                              {category.existsInLibrary ? '· already in library' : '· new category'}
+                            </div>
+                            {category.existsInLibrary && (
+                              <div className="text-gray-500 dark:text-gray-400">
+                                Library currently has {category.existingLibraryPromptCount.toLocaleString()} prompts
+                              </div>
+                            )}
+                            {category.newPromptCount > 0 && (
+                              <div className="text-green-700 dark:text-green-400">
+                                New prompts: {category.newPromptCount.toLocaleString()}
+                              </div>
+                            )}
+                            {category.duplicatePromptCount > 0 && (
+                              <div className={duplicateTextClass}>
+                                Duplicates: {category.duplicatePromptCount.toLocaleString()} ({conflictStrategyActionLabels[restoreOptions.conflictResolution]})
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -660,6 +723,17 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        isOpen={isReplaceConfirmOpen}
+        onConfirm={confirmReplaceMode}
+        onCancel={cancelReplaceMode}
+        title="Replace existing library?"
+        message="This will overwrite your current prompts, categories, and settings with the backup contents. Make sure you have exported anything you want to keep before continuing."
+        confirmText="Replace library"
+        cancelText="Keep merge mode"
+        variant="danger"
+      />
     </SettingsSection>
   );
 };
