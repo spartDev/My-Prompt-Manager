@@ -194,16 +194,35 @@ export class BackupManager {
 
     const dataset = parsed.dataset;
 
-    const currentCategories = await this.storageManager.getCategories();
+    const [currentCategories, existingPrompts] = await Promise.all([
+      this.storageManager.getCategories(),
+      this.storageManager.getPrompts()
+    ]);
     const currentCategoryNames = new Set(currentCategories.map((category) => category.name));
+    const existingPromptsByCategory = new Map<string, number>();
+    const existingPromptIds = new Set(existingPrompts.map((prompt) => prompt.id));
 
-    const categories: BackupPreviewCategory[] = dataset.categories.map((category) => ({
-      id: category.id ?? category.name,
-      name: category.name,
-      promptCount: dataset.prompts.filter((prompt) => prompt.category === category.name).length,
-      selected: true,
-      existsInLibrary: currentCategoryNames.has(category.name)
-    }));
+    existingPrompts.forEach((prompt) => {
+      const current = existingPromptsByCategory.get(prompt.category) ?? 0;
+      existingPromptsByCategory.set(prompt.category, current + 1);
+    });
+
+    const categories: BackupPreviewCategory[] = dataset.categories.map((category) => {
+      const categoryPrompts = dataset.prompts.filter((prompt) => prompt.category === category.name);
+      const duplicatePromptCount = categoryPrompts.filter((prompt) => existingPromptIds.has(prompt.id)).length;
+      const newPromptCount = categoryPrompts.length - duplicatePromptCount;
+
+      return {
+        id: category.id ?? category.name,
+        name: category.name,
+        promptCount: categoryPrompts.length,
+        selected: true,
+        existsInLibrary: currentCategoryNames.has(category.name),
+        existingLibraryPromptCount: existingPromptsByCategory.get(category.name) ?? 0,
+        duplicatePromptCount,
+        newPromptCount
+      };
+    });
 
     return {
       metadata: parsed.metadata,

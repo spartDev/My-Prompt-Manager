@@ -60,6 +60,9 @@ export interface BackupPreviewCategory {
   promptCount: number;
   selected: boolean;
   existsInLibrary: boolean;
+  existingLibraryPromptCount: number;
+  duplicatePromptCount: number;
+  newPromptCount: number;
 }
 
 export interface BackupPreview {
