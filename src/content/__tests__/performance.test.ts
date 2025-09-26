@@ -6,14 +6,7 @@
  */
 
  
- 
- 
- 
- 
- 
- 
-
-import { JSDOM } from 'jsdom';
+import { Window as HappyDOMWindow } from 'happy-dom';
 import { describe, it, expect, beforeEach, afterEach, vi, Mock } from 'vitest';
 
 import { getChromeMockFunctions } from '../../test/mocks';
@@ -30,12 +23,27 @@ const defaultPrompts = Array.from({ length: 100 }, (_, i) => ({
   createdAt: Date.now() - (i * 1000)
 }));
 
+interface DOMWrapper {
+  window: HappyDOMWindow;
+}
+
 describe('Content Script Performance Tests', () => {
-  let dom: JSDOM;
+  let dom: DOMWrapper;
   let injector: PromptLibraryInjector;
 
+  const applyWindowGlobals = (windowInstance: HappyDOMWindow) => {
+    const globalAny = globalThis as any;
+    globalAny.window = windowInstance;
+    globalAny.document = windowInstance.document;
+    globalAny.HTMLElement = windowInstance.HTMLElement;
+    globalAny.Element = windowInstance.Element;
+    globalAny.Node = windowInstance.Node;
+    globalAny.navigator = windowInstance.navigator;
+  };
+
   const setupDOMForPlatform = (url: string) => {
-    dom = new JSDOM(`
+    const windowInstance = new HappyDOMWindow({ url });
+    windowInstance.document.write(`
       <!DOCTYPE html>
       <html>
         <head><title>Performance Test Page</title></head>
@@ -47,17 +55,11 @@ describe('Content Script Performance Tests', () => {
           </div>
         </body>
       </html>
-    `, {
-      url,
-      pretendToBeVisual: true,
-      resources: 'usable'
-    });
+    `);
+    windowInstance.document.close();
 
-    global.document = dom.window.document;
-    global.window = dom.window as any;
-    global.HTMLElement = dom.window.HTMLElement;
-    global.Element = dom.window.Element;
-    global.Node = dom.window.Node;
+    dom = { window: windowInstance };
+    applyWindowGlobals(windowInstance);
   };
 
   beforeEach(() => {
@@ -74,6 +76,13 @@ describe('Content Script Performance Tests', () => {
       injector.cleanup();
     }
     vi.restoreAllMocks();
+    const globalAny = globalThis as any;
+    delete globalAny.window;
+    delete globalAny.document;
+    delete globalAny.HTMLElement;
+    delete globalAny.Element;
+    delete globalAny.Node;
+    delete globalAny.navigator;
   });
 
   describe('Initialization Performance', () => {

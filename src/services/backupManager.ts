@@ -212,76 +212,97 @@ export class BackupManager {
   }
 
   async restoreBackup(content: string, options: RestoreOptions): Promise<RestoreSummary> {
-    const parsed = await this.parseBackupContent(content, options.password);
+    let metadata: BackupMetadata | undefined;
 
-    if (!parsed.dataset) {
-      throw new Error('Unable to restore: dataset is unavailable. Check encryption password.');
+    try {
+      const parsed = await this.parseBackupContent(content, options.password);
+      metadata = parsed.metadata;
+
+      if (!parsed.dataset) {
+        throw new Error('Unable to restore: dataset is unavailable. Check encryption password.');
+      }
+
+      const { dataset } = parsed;
+      const [existingPrompts, existingCategories, existingSettings] = await Promise.all([
+        this.storageManager.getPrompts(),
+        this.storageManager.getCategories(),
+        this.storageManager.getSettings()
+      ]);
+
+      const selectedCategoryNames = new Set(
+        options.selectedCategoryIds.length > 0
+          ? dataset.categories
+              .filter((category) => {
+                const identifier = category.id ?? category.name;
+                return options.selectedCategoryIds.includes(identifier);
+              })
+              .map((category) => category.name)
+          : dataset.categories.map((category) => category.name)
+      );
+
+      const categoriesToImport = dataset.categories
+        .filter((category) => selectedCategoryNames.has(category.name))
+        .map((category) => ({
+          ...category,
+          id: category.id || uuidv4(),
+          color: category.color ?? '#6B7280'
+        }));
+
+      const { finalCategories, categoryNameMap, summary: categorySummary } = this.mergeCategories(
+        existingCategories,
+        categoriesToImport,
+        options.conflictResolution,
+        options.mode
+      );
+
+      const promptsToImport = dataset.prompts
+        .filter((prompt) => selectedCategoryNames.has(prompt.category))
+        .map((prompt) => ({
+          ...prompt,
+          category: categoryNameMap.get(prompt.category) ?? prompt.category
+        }));
+
+      const { finalPrompts, summary: promptSummary } = this.mergePrompts(
+        existingPrompts,
+        promptsToImport,
+        options.conflictResolution,
+        options.mode
+      );
+
+      const finalSettings = options.mode === 'replace' && dataset.settings ? dataset.settings : existingSettings;
+
+      await this.storageManager.ensureLibraryCapacity({
+        prompts: finalPrompts,
+        categories: finalCategories,
+        settings: finalSettings
+      });
+
+      await this.storageManager.replaceLibraryData({
+        prompts: finalPrompts,
+        categories: finalCategories,
+        settings: finalSettings
+      });
+
+      return {
+        metadata: parsed.metadata,
+        importedPrompts: promptSummary.imported,
+        importedCategories: categorySummary.imported,
+        updatedPrompts: promptSummary.updated,
+        updatedCategories: categorySummary.updated,
+        skippedPrompts: promptSummary.skipped,
+        skippedCategories: categorySummary.skipped
+      };
+    } catch (error) {
+      console.error('[backupManager] Restore failed', {
+        error,
+        metadata,
+        options: {
+          ...options,
+          password: options.password ? '***' : undefined
+        }
+      });
+      throw error;
     }
-
-    const { dataset } = parsed;
-    const [existingPrompts, existingCategories, existingSettings] = await Promise.all([
-      this.storageManager.getPrompts(),
-      this.storageManager.getCategories(),
-      this.storageManager.getSettings()
-    ]);
-
-    const selectedCategoryNames = new Set(
-      options.selectedCategoryIds.length > 0
-        ? dataset.categories
-            .filter((category) => {
-              const identifier = category.id ?? category.name;
-              return options.selectedCategoryIds.includes(identifier);
-            })
-            .map((category) => category.name)
-        : dataset.categories.map((category) => category.name)
-    );
-
-    const categoriesToImport = dataset.categories
-      .filter((category) => selectedCategoryNames.has(category.name))
-      .map((category) => ({
-        ...category,
-        id: category.id || uuidv4(),
-        color: category.color ?? '#6B7280'
-      }));
-
-    const { finalCategories, categoryNameMap, summary: categorySummary } = this.mergeCategories(
-      existingCategories,
-      categoriesToImport,
-      options.conflictResolution,
-      options.mode
-    );
-
-    const promptsToImport = dataset.prompts
-      .filter((prompt) => selectedCategoryNames.has(prompt.category))
-      .map((prompt) => ({
-        ...prompt,
-        category: categoryNameMap.get(prompt.category) ?? prompt.category
-      }));
-
-    const { finalPrompts, summary: promptSummary } = this.mergePrompts(
-      existingPrompts,
-      promptsToImport,
-      options.conflictResolution,
-      options.mode
-    );
-
-    const finalSettings = options.mode === 'replace' && dataset.settings ? dataset.settings : existingSettings;
-
-    await chrome.storage.local.set({
-      prompts: finalPrompts,
-      categories: finalCategories,
-      settings: finalSettings
-    });
-
-    return {
-      metadata: parsed.metadata,
-      importedPrompts: promptSummary.imported,
-      importedCategories: categorySummary.imported,
-      updatedPrompts: promptSummary.updated,
-      updatedCategories: categorySummary.updated,
-      skippedPrompts: promptSummary.skipped,
-      skippedCategories: categorySummary.skipped
-    };
   }
 
   private mergeCategories(

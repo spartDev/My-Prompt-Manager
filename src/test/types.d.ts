@@ -79,18 +79,4 @@ declare namespace chrome {
     }
   }
 }
-
-// JSDOM module declaration
-declare module 'jsdom' {
-  export interface DOMWindow extends Window {
-    // JSDOM window extends standard Window with additional test utilities
-    [key: string]: unknown;
-  }
-
-  export class JSDOM {
-    constructor(html?: string, options?: Record<string, unknown>);
-    window: DOMWindow;
-  }
-}
-
 export {};

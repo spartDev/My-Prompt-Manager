@@ -103,14 +103,38 @@ describe('PerplexityStrategy', () => {
       vi.spyOn(mockContentEditableDiv, 'dispatchEvent').mockImplementation(() => true);
       vi.spyOn(mockTextarea, 'focus').mockImplementation(() => {});
       vi.spyOn(mockTextarea, 'dispatchEvent').mockImplementation(() => true);
+      
+      // Mock document.execCommand to succeed and simulate text insertion
+      vi.spyOn(document, 'execCommand').mockImplementation((command, _showUI, value) => {
+        if (command === 'insertText' && value) {
+          // Simulate text insertion for contenteditable elements
+          const selection = window.getSelection();
+          if (selection && selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0);
+            const element = range.commonAncestorContainer as HTMLElement;
+            const targetElement = element.nodeType === Node.TEXT_NODE 
+              ? element.parentElement 
+              : element;
+            if (targetElement) {
+              if ('value' in targetElement) {
+                (targetElement as HTMLTextAreaElement).value = value;
+              } else {
+                targetElement.textContent = value;
+              }
+            }
+          }
+        }
+        return true;
+      });
     });
 
     it('should insert content into contenteditable div', async () => {
       const result = await strategy.insert(mockContentEditableDiv, 'test content');
       
       expect(result.success).toBe(true);
-      expect(result.method).toBe('perplexity-selection');
-      expect(mockContentEditableDiv.textContent).toBe('test content');
+      expect(result.method).toBe('perplexity-execCommand');
+      // execCommand should have been used to insert the text
+      expect(document.execCommand).toHaveBeenCalledWith('insertText', false, 'test content');
       expect(mockContentEditableDiv.focus).toHaveBeenCalled();
     });
 
@@ -118,8 +142,9 @@ describe('PerplexityStrategy', () => {
       const result = await strategy.insert(mockTextarea, 'test content');
       
       expect(result.success).toBe(true);
-      expect(result.method).toBe('perplexity-selection');
-      expect(mockTextarea.value).toBe('test content');
+      expect(result.method).toBe('perplexity-execCommand');
+      // execCommand should have been used to insert the text
+      expect(document.execCommand).toHaveBeenCalledWith('insertText', false, 'test content');
       expect(mockTextarea.focus).toHaveBeenCalled();
     });
 
@@ -153,7 +178,7 @@ describe('PerplexityStrategy', () => {
       
       await strategy.insert(mockContentEditableDiv, 'test content');
       
-      expect(Logger.debug).toHaveBeenCalledWith('[perplexity] Perplexity selection replacement successful', {});
+      expect(Logger.debug).toHaveBeenCalledWith('[perplexity] Perplexity execCommand insertion successful', {});
     });
 
     it('should log error message on failed insertion', async () => {
@@ -171,6 +196,36 @@ describe('PerplexityStrategy', () => {
   });
 
   describe('Perplexity-specific behavior', () => {
+    beforeEach(() => {
+      // Mock document.execCommand to succeed and simulate text insertion
+      vi.spyOn(document, 'execCommand').mockImplementation((command, _showUI, value) => {
+        if (command === 'insertText' && value) {
+          const selection = window.getSelection();
+          if (selection && selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0);
+            const element = range.commonAncestorContainer as HTMLElement;
+            const targetElement = element.nodeType === Node.TEXT_NODE 
+              ? element.parentElement 
+              : element;
+            if (targetElement) {
+              if ('value' in targetElement) {
+                (targetElement as HTMLTextAreaElement).value = value;
+              } else {
+                targetElement.textContent = value;
+              }
+            }
+          }
+        }
+        return true;
+      });
+      vi.spyOn(mockContentEditableDiv, 'focus').mockImplementation(() => {});
+      vi.spyOn(mockContentEditableDiv, 'click').mockImplementation(() => {});
+      vi.spyOn(mockContentEditableDiv, 'dispatchEvent').mockImplementation(() => true);
+      vi.spyOn(mockTextarea, 'focus').mockImplementation(() => {});
+      vi.spyOn(mockTextarea, 'click').mockImplementation(() => {});
+      vi.spyOn(mockTextarea, 'dispatchEvent').mockImplementation(() => true);
+    });
+    
     it('should handle both contenteditable and textarea elements', async () => {
       // Test contenteditable
       const contentEditableResult = await strategy.insert(mockContentEditableDiv, 'content 1');
@@ -228,6 +283,33 @@ describe('PerplexityStrategy', () => {
   });
 
   describe('event handling', () => {
+    beforeEach(() => {
+      // Mock document.execCommand to succeed and simulate text insertion
+      vi.spyOn(document, 'execCommand').mockImplementation((command, _showUI, value) => {
+        if (command === 'insertText' && value) {
+          const selection = window.getSelection();
+          if (selection && selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0);
+            const element = range.commonAncestorContainer as HTMLElement;
+            const targetElement = element.nodeType === Node.TEXT_NODE 
+              ? element.parentElement 
+              : element;
+            if (targetElement) {
+              if ('value' in targetElement) {
+                (targetElement as HTMLTextAreaElement).value = value;
+              } else {
+                targetElement.textContent = value;
+              }
+            }
+          }
+        }
+        return true;
+      });
+      vi.spyOn(mockContentEditableDiv, 'focus').mockImplementation(() => {});
+      vi.spyOn(mockContentEditableDiv, 'click').mockImplementation(() => {});
+      vi.spyOn(mockContentEditableDiv, 'dispatchEvent').mockImplementation(() => true);
+    });
+    
     it('should create events with correct properties', async () => {
       const eventSpy = vi.spyOn(mockContentEditableDiv, 'dispatchEvent');
       

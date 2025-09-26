@@ -2,6 +2,7 @@ import { ChangeEvent, FC, useCallback, useEffect, useMemo, useRef, useState } fr
 
 import { backupManager } from '../../services/backupManager';
 import { StorageManager } from '../../services/storage';
+import { ErrorType } from '../../types';
 import type {
   BackupCreationResult,
   BackupHistoryEntry,
@@ -105,6 +106,7 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
   const [restoreOptions, setRestoreOptions] = useState<RestoreOptions>(initialRestoreOptions);
   const [isRestoring, setIsRestoring] = useState(false);
   const [selectedFileName, setSelectedFileName] = useState<string>('');
+  const [restoreError, setRestoreError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fileContentRef = useRef<string>('');
   const [storageUsage, setStorageUsage] = useState<{ used: number; total: number } | null>(null);
@@ -185,6 +187,7 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
       const validationResult = await backupManager.validateBackup(content);
       setValidation(validationResult);
       setPreview(null);
+      setRestoreError(null);
 
       if (validationResult.metadata?.encrypted && !restoreOptions.password) {
         showToast('This backup is encrypted. Enter the password to preview or restore.', 'info');
@@ -220,6 +223,7 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
           .filter((category) => category.selected)
           .map((category) => category.id)
       }));
+      setRestoreError(null);
       showToast('Preview generated successfully.', 'success');
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Failed to preview backup.', 'error');
@@ -253,6 +257,7 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
 
     try {
       setIsRestoring(true);
+      setRestoreError(null);
       const summary = await backupManager.restoreBackup(content, restoreOptions);
       const importedCount = summary.importedPrompts.toLocaleString();
       const updatedCount = summary.updatedPrompts.toLocaleString();
@@ -271,7 +276,15 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
       }
       void refreshStorageUsage();
     } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Failed to restore backup.', 'error');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to restore backup.';
+      showToast(errorMessage, 'error');
+      console.error('[BackupRestoreView] Restore failed', error);
+
+      if (error && typeof error === 'object' && 'type' in error && (error as { type?: string }).type === ErrorType.STORAGE_QUOTA_EXCEEDED) {
+        setRestoreError('Restoring this backup would exceed Chrome\'s storage limit. Delete unused prompts or restore fewer categories, then try again.');
+      } else {
+        setRestoreError(errorMessage);
+      }
     } finally {
       setIsRestoring(false);
     }
@@ -355,14 +368,15 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
                   </svg>
                 </span>
                 <span>Storage limit details</span>
-                <span
-                  id="storage-usage-tooltip"
-                  role="tooltip"
-                  className="pointer-events-none absolute left-0 top-full z-20 mt-2 w-72 rounded-lg border border-blue-200 dark:border-blue-800 bg-white dark:bg-slate-900 px-3 py-2 text-left text-xs text-blue-700 dark:text-blue-200 opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100"
-                >
-                  Chrome extensions can store up to 5&nbsp;MB in <code className="font-mono bg-blue-100/70 dark:bg-blue-900/40 px-1 py-0.5 rounded">chrome.storage.local</code>. Create backups or delete unused prompts if you approach the limit.
-                </span>
-              </button>
+              <span
+                id="storage-usage-tooltip"
+                role="tooltip"
+                aria-hidden="true"
+                className="pointer-events-none absolute left-0 top-full z-20 mt-2 w-72 rounded-lg border border-blue-200 dark:border-blue-800 bg-white dark:bg-slate-900 px-3 py-2 text-left text-xs text-blue-700 dark:text-blue-200 opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100"
+              >
+                Chrome extensions can store up to 5&nbsp;MB in <code className="font-mono bg-blue-100/70 dark:bg-blue-900/40 px-1 py-0.5 rounded">chrome.storage.local</code>. Create backups or delete unused prompts if you approach the limit.
+              </span>
+            </button>
             </div>
           </div>
 
@@ -376,6 +390,7 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
                 type="button"
                 role="switch"
                 aria-checked={backupOptions.includeSettings}
+                aria-label="Include settings"
                 onClick={() => { handleBackupOptionChange('includeSettings', !backupOptions.includeSettings); }}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${backupOptions.includeSettings ? 'bg-gradient-to-r from-purple-500 to-indigo-500' : 'bg-gray-300 dark:bg-gray-600'}`}
               >
@@ -393,6 +408,7 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
                   type="button"
                   role="switch"
                   aria-checked={backupOptions.encryptionEnabled}
+                  aria-label="Password protect backup (AES-256)"
                   onClick={() => { handleBackupOptionChange('encryptionEnabled', !backupOptions.encryptionEnabled); }}
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${backupOptions.encryptionEnabled ? 'bg-gradient-to-r from-purple-500 to-indigo-500' : 'bg-gray-300 dark:bg-gray-600'}`}
                 >
@@ -463,6 +479,19 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
                 className="sr-only"
               />
             </div>
+
+            {restoreError && (
+              <div className="rounded-lg border border-red-200 dark:border-red-700 bg-red-50/80 dark:bg-red-900/20 px-4 py-3 text-left text-sm text-red-700 dark:text-red-300">
+                <div className="flex items-start gap-2">
+                  <span className="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-red-600/10 text-red-600 dark:text-red-300">
+                    <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9 6a1 1 0 012 0v5a1 1 0 01-2 0V6zm1 8a1.5 1.5 0 110-3 1.5 1.5 0 010 3z" clipRule="evenodd" />
+                    </svg>
+                  </span>
+                  <p>{restoreError}</p>
+                </div>
+              </div>
+            )}
 
             {(validation || selectedFileName) && (
               <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 p-3 text-sm">

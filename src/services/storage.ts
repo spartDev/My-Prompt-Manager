@@ -35,6 +35,7 @@ export class StorageManager {
     CATEGORIES: 'categories',
     SETTINGS: 'settings'
   } as const;
+  private readonly encoder = new TextEncoder();
 
   // Mutex for preventing concurrent storage operations
   private operationLocks = new Map<string, Promise<unknown>>();
@@ -414,7 +415,7 @@ export class StorageManager {
   async getStorageUsage(): Promise<{ used: number; total: number }> {
     try {
       const usage = await chrome.storage.local.getBytesInUse();
-      const quota = chrome.storage.local.QUOTA_BYTES;
+      const quota = chrome.storage.local.QUOTA_BYTES || (5 * 1024 * 1024);
 
       return {
         used: usage,
@@ -551,6 +552,81 @@ export class StorageManager {
     }
   }
 
+  async ensureLibraryCapacity(data: { prompts: Prompt[]; categories: Category[]; settings: Settings | null }): Promise<{ projectedUsage: number; quota: number }> {
+    try {
+      const [totalUsage, datasetUsage] = await Promise.all([
+        chrome.storage.local.getBytesInUse(),
+        chrome.storage.local.getBytesInUse([
+          this.STORAGE_KEYS.PROMPTS,
+          this.STORAGE_KEYS.CATEGORIES,
+          this.STORAGE_KEYS.SETTINGS
+        ])
+      ]);
+
+      const quota = chrome.storage.local.QUOTA_BYTES || (5 * 1024 * 1024);
+      const otherUsage = Math.max(0, totalUsage - datasetUsage);
+      const projectedDatasetBytes = this.calculateDatasetBytes({
+        prompts: data.prompts,
+        categories: data.categories,
+        settings: data.settings ?? DEFAULT_SETTINGS
+      });
+      const projectedUsage = otherUsage + projectedDatasetBytes;
+
+      if (projectedUsage > quota) {
+        const deficit = projectedUsage - quota;
+        throw new StorageError({
+          type: ErrorType.STORAGE_QUOTA_EXCEEDED,
+          message: 'Restoring this backup would exceed the available storage quota.',
+          details: {
+            projectedUsage,
+            quota,
+            deficit
+          }
+        });
+      }
+
+      return { projectedUsage, quota };
+    } catch (error) {
+      if (error instanceof StorageError) {
+        throw error;
+      }
+      throw this.handleStorageError(error);
+    }
+  }
+
+  async replaceLibraryData(data: { prompts: Prompt[]; categories: Category[]; settings: Settings }): Promise<void> {
+    return this.withLock('library-transaction', async () => {
+      const previousState = await this.getAllData();
+
+      try {
+        await chrome.storage.local.set({
+          [this.STORAGE_KEYS.PROMPTS]: data.prompts,
+          [this.STORAGE_KEYS.CATEGORIES]: data.categories,
+          [this.STORAGE_KEYS.SETTINGS]: data.settings
+        });
+      } catch (error) {
+        try {
+          await chrome.storage.local.set({
+            [this.STORAGE_KEYS.PROMPTS]: previousState.prompts,
+            [this.STORAGE_KEYS.CATEGORIES]: previousState.categories,
+            [this.STORAGE_KEYS.SETTINGS]: previousState.settings
+          });
+        } catch (rollbackError) {
+          throw new StorageError({
+            type: ErrorType.DATA_CORRUPTION,
+            message: 'Failed to restore previous data after an unsuccessful restore operation.',
+            details: {
+              originalError: error,
+              rollbackError
+            }
+          });
+        }
+
+        throw this.handleStorageError(error);
+      }
+    });
+  }
+
   // Private helper methods
   private async getStorageData<T>(key: string): Promise<T | null> {
     const result = await chrome.storage.local.get([key]);
@@ -596,6 +672,21 @@ export class StorageManager {
       // Otherwise, wrap it
       throw this.handleStorageError(error);
     }
+  }
+
+  private estimateEntryBytes(key: string, value: unknown): number {
+    const payload = { [key]: value };
+    return this.encoder.encode(JSON.stringify(payload)).length;
+  }
+
+  private calculateDatasetBytes(data: { prompts: Prompt[]; categories: Category[]; settings: Settings }): number {
+    const entries: Array<{ key: string; value: unknown }> = [
+      { key: this.STORAGE_KEYS.PROMPTS, value: data.prompts },
+      { key: this.STORAGE_KEYS.CATEGORIES, value: data.categories },
+      { key: this.STORAGE_KEYS.SETTINGS, value: data.settings }
+    ];
+
+    return entries.reduce((total, entry) => total + this.estimateEntryBytes(entry.key, entry.value), 0);
   }
 
   // Mutex implementation for preventing race conditions
