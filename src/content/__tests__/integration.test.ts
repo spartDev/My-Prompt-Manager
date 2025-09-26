@@ -6,16 +6,7 @@
  * compatibility with the original implementation.
  */
 
- 
- 
- 
- 
- 
- 
- 
- 
-
-import { JSDOM } from 'jsdom';
+import { Window as HappyDOMWindow } from 'happy-dom';
 import { describe, it, expect, beforeEach, afterEach, vi, Mock } from 'vitest';
 
 import { getChromeMockFunctions } from '../../test/mocks';
@@ -41,8 +32,12 @@ const defaultIntegrationPrompts = [
   }
 ];
 
+interface DOMWrapper {
+  window: HappyDOMWindow;
+}
+
 describe('Content Script Integration Tests', () => {
-  let dom: JSDOM;
+  let dom: DOMWrapper;
   let injector: PromptLibraryInjector;
 
   beforeEach(() => {
@@ -58,9 +53,19 @@ describe('Content Script Integration Tests', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
+  const applyWindowGlobals = (windowInstance: HappyDOMWindow) => {
+    const globalAny = globalThis as any;
+    globalAny.window = windowInstance;
+    globalAny.document = windowInstance.document;
+    globalAny.HTMLElement = windowInstance.HTMLElement;
+    globalAny.Element = windowInstance.Element;
+    globalAny.Node = windowInstance.Node;
+    globalAny.navigator = windowInstance.navigator;
+  };
+
   const setupDOMForPlatform = (url: string) => {
-    // Create a fresh DOM for each test
-    dom = new JSDOM(`
+    const windowInstance = new HappyDOMWindow({ url });
+    windowInstance.document.write(`
       <!DOCTYPE html>
       <html>
         <head><title>Test Page</title></head>
@@ -68,18 +73,11 @@ describe('Content Script Integration Tests', () => {
           <div id="test-container"></div>
         </body>
       </html>
-    `, {
-      url,
-      pretendToBeVisual: true,
-      resources: 'usable'
-    });
+    `);
+    windowInstance.document.close();
 
-    // Setup global DOM
-    global.document = dom.window.document;
-    global.window = dom.window as any;
-    global.HTMLElement = dom.window.HTMLElement;
-    global.Element = dom.window.Element;
-    global.Node = dom.window.Node;
+    dom = { window: windowInstance };
+    applyWindowGlobals(windowInstance);
   };
 
   afterEach(() => {
@@ -90,6 +88,13 @@ describe('Content Script Integration Tests', () => {
 
     // Restore console methods
     vi.restoreAllMocks();
+    const globalAny = globalThis as any;
+    delete globalAny.window;
+    delete globalAny.document;
+    delete globalAny.HTMLElement;
+    delete globalAny.Element;
+    delete globalAny.Node;
+    delete globalAny.navigator;
   });
 
   describe('Platform-Specific Icon Injection', () => {
@@ -220,13 +225,16 @@ describe('Content Script Integration Tests', () => {
     });
 
     it('should insert prompts into text inputs correctly', async () => {
-      const input = dom.window.document.getElementById('test-input') as HTMLTextAreaElement;
-      expect(input).toBeDefined();
+      const inputElement = dom.window.document.getElementById('test-input');
+      if (!(inputElement instanceof dom.window.HTMLTextAreaElement)) {
+        throw new Error('Expected textarea element');
+      }
+      const input = inputElement as unknown as HTMLTextAreaElement;
 
       // Simulate prompt insertion
       const testContent = 'This is a test prompt content';
       input.value = testContent;
-      input.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+      input.dispatchEvent(new dom.window.Event('input', { bubbles: true }) as unknown as Event);
 
       expect(input.value).toBe(testContent);
     });
@@ -237,19 +245,26 @@ describe('Content Script Integration Tests', () => {
         <div id="contenteditable-input" contenteditable="true"></div>
       `;
 
-      const editableDiv = dom.window.document.getElementById('contenteditable-input') as HTMLElement;
-      expect(editableDiv).toBeDefined();
+      const editableElement = dom.window.document.getElementById('contenteditable-input');
+      if (!(editableElement instanceof dom.window.HTMLElement)) {
+        throw new Error('Expected contenteditable HTMLElement');
+      }
+      const editableDiv = editableElement as unknown as HTMLElement;
 
       // Simulate prompt insertion
       const testContent = 'Test content for contenteditable';
       editableDiv.textContent = testContent;
-      editableDiv.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+      editableDiv.dispatchEvent(new dom.window.Event('input', { bubbles: true }) as unknown as Event);
 
       expect(editableDiv.textContent).toBe(testContent);
     });
 
     it('should maintain cursor position after insertion', async () => {
-      const input = dom.window.document.getElementById('test-input') as HTMLTextAreaElement;
+      const inputElement = dom.window.document.getElementById('test-input');
+      if (!(inputElement instanceof dom.window.HTMLTextAreaElement)) {
+        throw new Error('Expected textarea element');
+      }
+      const input = inputElement as unknown as HTMLTextAreaElement;
       
       // Set initial content and cursor position
       input.value = 'Initial content';
@@ -285,7 +300,11 @@ describe('Content Script Integration Tests', () => {
     });
 
     it('should support keyboard navigation through prompts', async () => {
-      const promptSelector = dom.window.document.getElementById('prompt-selector') as HTMLElement;
+      const selectorElement = dom.window.document.getElementById('prompt-selector');
+      if (!(selectorElement instanceof dom.window.HTMLElement)) {
+        throw new Error('Expected prompt selector element');
+      }
+      const promptSelector = selectorElement as unknown as HTMLElement;
       const promptItems = promptSelector.querySelectorAll('.prompt-item');
 
       // Show the selector
@@ -300,16 +319,24 @@ describe('Content Script Integration Tests', () => {
       const downEvent = new dom.window.KeyboardEvent('keydown', {
         key: 'ArrowDown',
         bubbles: true
-      });
-      firstItem.dispatchEvent(downEvent);
+      }) as unknown as KeyboardEvent;
+      firstItem.dispatchEvent(downEvent as unknown as Event);
 
       // In a real implementation, this would move focus to the next item
       expect(promptItems.length).toBe(3);
     });
 
     it('should handle Enter key for prompt selection', async () => {
-      const promptSelector = dom.window.document.getElementById('prompt-selector') as HTMLElement;
-      const firstPrompt = promptSelector.querySelector('.prompt-item') as HTMLElement;
+      const selectorElement = dom.window.document.getElementById('prompt-selector');
+      if (!(selectorElement instanceof dom.window.HTMLElement)) {
+        throw new Error('Expected prompt selector element');
+      }
+      const promptSelector = selectorElement as unknown as HTMLElement;
+      const firstPromptElement = promptSelector.querySelector('.prompt-item');
+      if (!(firstPromptElement instanceof dom.window.HTMLElement)) {
+        throw new Error('Expected prompt item element');
+      }
+      const firstPrompt = firstPromptElement as unknown as HTMLElement;
 
       // Show the selector
       promptSelector.style.display = 'block';
@@ -319,15 +346,19 @@ describe('Content Script Integration Tests', () => {
       const enterEvent = new dom.window.KeyboardEvent('keydown', {
         key: 'Enter',
         bubbles: true
-      });
-      firstPrompt.dispatchEvent(enterEvent);
+      }) as unknown as KeyboardEvent;
+      firstPrompt.dispatchEvent(enterEvent as unknown as Event);
 
       // Verify the event was dispatched
       expect(enterEvent.key).toBe('Enter');
     });
 
     it('should handle Escape key to close selector', async () => {
-      const promptSelector = dom.window.document.getElementById('prompt-selector') as HTMLElement;
+      const selectorElement = dom.window.document.getElementById('prompt-selector');
+      if (!(selectorElement instanceof dom.window.HTMLElement)) {
+        throw new Error('Expected prompt selector element');
+      }
+      const promptSelector = selectorElement as unknown as HTMLElement;
 
       // Show the selector
       promptSelector.style.display = 'block';
@@ -336,15 +367,19 @@ describe('Content Script Integration Tests', () => {
       const escapeEvent = new dom.window.KeyboardEvent('keydown', {
         key: 'Escape',
         bubbles: true
-      });
-      promptSelector.dispatchEvent(escapeEvent);
+      }) as unknown as KeyboardEvent;
+      promptSelector.dispatchEvent(escapeEvent as unknown as Event);
 
       // Verify the event was dispatched
       expect(escapeEvent.key).toBe('Escape');
     });
 
     it('should have proper ARIA attributes for accessibility', async () => {
-      const promptSelector = dom.window.document.getElementById('prompt-selector') as HTMLElement;
+      const selectorElement = dom.window.document.getElementById('prompt-selector');
+      if (!(selectorElement instanceof dom.window.HTMLElement)) {
+        throw new Error('Expected prompt selector element');
+      }
+      const promptSelector = selectorElement as unknown as HTMLElement;
       
       // Check for accessibility attributes (these would be set by the actual implementation)
       expect(promptSelector).toBeDefined();
