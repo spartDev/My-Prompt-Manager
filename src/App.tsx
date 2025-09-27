@@ -139,6 +139,8 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   const handleDeleteCategory = async (id: string) => {
     try {
       await deleteCategory(id);
+      // Refresh prompts to show them as Uncategorized after category deletion
+      await refreshPrompts();
       showToast('Category deleted successfully', 'success');
     } catch (error) {
       showToast('Failed to delete category', 'error');
