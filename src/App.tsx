@@ -125,6 +125,10 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   const handleUpdateCategory = async (id: string, updates: Partial<{ name: string; color?: string }>) => {
     try {
       await updateCategory(id, updates);
+      // Refresh prompts to show the updated category names
+      if (updates.name) {
+        await refreshPrompts();
+      }
       showToast('Category updated successfully', 'success');
     } catch (error) {
       showToast('Failed to update category', 'error');
