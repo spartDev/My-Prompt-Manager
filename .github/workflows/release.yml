@@ -84,7 +84,7 @@ jobs:
 
       - name: 📦 Cache Node Modules (Multi-level Strategy)
         id: cache-deps
-        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
             ~/.npm
@@ -137,7 +137,7 @@ jobs:
           npm audit --audit-level=moderate
 
       - name: 🔍 CodeQL Analysis
-        uses: github/codeql-action/analyze@192325c86100d080feab897ff886c34abd4c83a3 # v3
+        uses: github/codeql-action/analyze@3599b3baa15b485a2e49ef411a7a4bb2452e7f93 # v3
         if: success() || failure()
         continue-on-error: true
 
@@ -160,7 +160,7 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
 
       - name: 📦 Restore Cache (Multi-level Strategy)
-        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
             ~/.npm
@@ -179,7 +179,7 @@ jobs:
           npm ci --prefer-offline --no-audit --no-fund --silent
 
       - name: 📋 Cache Build Assets
-        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
             dist
