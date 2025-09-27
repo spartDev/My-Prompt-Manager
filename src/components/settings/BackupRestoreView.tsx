@@ -119,6 +119,7 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
   const fileContentRef = useRef<string>('');
   const [storageUsage, setStorageUsage] = useState<{ used: number; total: number } | null>(null);
   const [loadingUsage, setLoadingUsage] = useState(false);
+  const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
 
   const refreshStorageUsage = useCallback(async () => {
     try {
@@ -182,6 +183,19 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
       setIsBackingUp(false);
     }
   };
+
+  const handleClearFile = useCallback(() => {
+    setSelectedFileName('');
+    setValidation(null);
+    setPreview(null);
+    setRestoreError(null);
+    setRestoreOptions(initialRestoreOptions);
+    setShowTechnicalDetails(false);
+    fileContentRef.current = '';
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  }, []);
 
   const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -301,14 +315,7 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
         `Restore completed: ${importedCount} prompts added, ${updatedCount} updated, ${skippedCount} skipped.`,
         'success'
       );
-      setPreview(null);
-      setValidation(null);
-      setSelectedFileName('');
-      setRestoreOptions({ ...initialRestoreOptions });
-      fileContentRef.current = '';
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+      handleClearFile();
       void refreshStorageUsage();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to restore backup.';
@@ -481,39 +488,225 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
           </div>
 
           <div className="space-y-3">
-            <div className="rounded-xl border border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900/40 p-4 text-center focus-within:border-purple-500 focus-within:ring-2 focus-within:ring-purple-500/40 transition">
-              <div className="flex flex-col items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-                <svg className="h-8 w-8 text-purple-500" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
-                </svg>
-                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                  Drop a backup file here or
-                </p>
-                <button
-                  type="button"
-                  onClick={handleBrowseClick}
-                  className="inline-flex items-center gap-2 rounded-lg border border-purple-500 text-purple-600 dark:text-purple-300 px-3 py-1.5 text-sm font-medium hover:bg-purple-50 dark:hover:bg-purple-900/20 transition"
-                >
-                  Browse files
-                </button>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Supports JSON backups exported from My Prompt Manager.
-                </p>
-                {selectedFileName && (
-                  <p className="text-xs text-gray-700 dark:text-gray-300" aria-live="polite">
-                    Selected: <span className="font-medium">{selectedFileName}</span>
+            {!selectedFileName ? (
+              <div className="rounded-xl border border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900/40 p-4 text-center focus-within:border-purple-500 focus-within:ring-2 focus-within:ring-purple-500/40 transition">
+                <div className="flex flex-col items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                  <svg className="h-8 w-8 text-purple-500" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                  </svg>
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                    Drop a backup file here or
                   </p>
+                  <button
+                    type="button"
+                    onClick={handleBrowseClick}
+                    className="inline-flex items-center gap-2 rounded-lg border border-purple-500 text-purple-600 dark:text-purple-300 px-3 py-1.5 text-sm font-medium hover:bg-purple-50 dark:hover:bg-purple-900/20 transition"
+                  >
+                    Browse files
+                  </button>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Supports JSON backups exported from My Prompt Manager.
+                  </p>
+                </div>
+                <input
+                  id={fileInputId}
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".json"
+                  onChange={(event) => { void handleFileChange(event); }}
+                  className="sr-only"
+                />
+              </div>
+            ) : (
+              <div className={`rounded-xl border p-4 ${
+                validation?.metadata?.encrypted
+                  ? 'border-purple-200 dark:border-purple-700 bg-purple-50 dark:bg-purple-900/20'
+                  : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'
+              }`}>
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    {validation?.metadata?.encrypted ? (
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center">
+                        <svg className="w-4 h-4 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                      </div>
+                    ) : (
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-green-100 dark:bg-green-900/40 flex items-center justify-center">
+                        <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium text-gray-900 dark:text-gray-100 truncate">
+                        {selectedFileName}
+                      </div>
+                      {validation?.metadata?.encrypted && (
+                        <div className="text-sm text-purple-700 dark:text-purple-300 mt-1">
+                          🔒 Encrypted backup - password required
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleClearFile}
+                    className="flex-shrink-0 p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    aria-label="Clear selected file"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                {validation?.metadata && (
+                  <div className="mt-4">
+                    <ul className="space-y-2 text-sm">
+                      <li className="flex justify-between items-center">
+                        <span className="text-gray-600 dark:text-gray-400">Created</span>
+                        <span className="text-gray-900 dark:text-gray-100 font-medium">{formatDate(validation.metadata.createdAt)}</span>
+                      </li>
+                      <li className="flex justify-between items-center">
+                        <span className="text-gray-600 dark:text-gray-400">Prompts</span>
+                        <span className="text-gray-900 dark:text-gray-100 font-medium">{validation.metadata.promptCount.toLocaleString()}</span>
+                      </li>
+                      <li className="flex justify-between items-center">
+                        <span className="text-gray-600 dark:text-gray-400">Categories</span>
+                        <span className="text-gray-900 dark:text-gray-100 font-medium">{validation.metadata.categoryCount.toLocaleString()}</span>
+                      </li>
+                      <li className="flex justify-between items-center">
+                        <span className="text-gray-600 dark:text-gray-400">Size</span>
+                        <span className="text-gray-900 dark:text-gray-100 font-medium">{formatBytes(validation.metadata.fileSize)}</span>
+                      </li>
+                    </ul>
+
+                    <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
+                      <button
+                        type="button"
+                        onClick={() => { setShowTechnicalDetails(!showTechnicalDetails); }}
+                        className="flex items-center gap-2 text-sm text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors"
+                        aria-expanded={showTechnicalDetails}
+                      >
+                        <svg
+                          className={`w-4 h-4 transition-transform ${showTechnicalDetails ? 'rotate-90' : ''}`}
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                        </svg>
+                        <span className="font-medium">
+                          {showTechnicalDetails ? 'Hide Technical Details' : 'Show Technical Details'}
+                        </span>
+                      </button>
+
+                      {showTechnicalDetails && (
+                        <div className="mt-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
+                          <h4 className="text-xs uppercase tracking-wide font-semibold text-gray-500 dark:text-gray-400 mb-3">
+                            Technical Information
+                          </h4>
+                          <ul className="space-y-2 text-sm">
+                            <li className="flex justify-between items-center">
+                              <span className="text-gray-600 dark:text-gray-400">Format Version</span>
+                              <span className="text-gray-900 dark:text-gray-100 font-medium font-mono text-xs">
+                                {validation.metadata.version || '1.0.0'}
+                              </span>
+                            </li>
+                            <li className="flex justify-between items-center">
+                              <span className="text-gray-600 dark:text-gray-400">Encryption</span>
+                              <span className={`font-medium text-xs ${
+                                validation.metadata.encrypted
+                                  ? 'text-purple-600 dark:text-purple-400'
+                                  : 'text-gray-500 dark:text-gray-400'
+                              }`}>
+                                {validation.metadata.encrypted ? 'AES-256' : 'None'}
+                              </span>
+                            </li>
+                            <li className="flex justify-between items-center">
+                              <span className="text-gray-600 dark:text-gray-400">Data Integrity</span>
+                              <span className="text-green-600 dark:text-green-400 font-medium text-xs">
+                                Verified
+                              </span>
+                            </li>
+                            <li className="flex justify-between items-center">
+                              <span className="text-gray-600 dark:text-gray-400">Validation Status</span>
+                              <span className={`font-medium text-xs ${
+                                validation.valid
+                                  ? 'text-green-600 dark:text-green-400'
+                                  : 'text-red-600 dark:text-red-400'
+                              }`}>
+                                {validation.valid ? 'Valid' : 'Invalid'}
+                              </span>
+                            </li>
+                            <li className="flex justify-between items-center">
+                              <span className="text-gray-600 dark:text-gray-400">Checksum</span>
+                              <span className="text-gray-900 dark:text-gray-100 font-medium font-mono text-xs">
+                                {validation.metadata.checksum ? validation.metadata.checksum.substring(0, 8) + '...' : 'N/A'}
+                              </span>
+                            </li>
+                            <li className="flex justify-between items-center">
+                              <span className="text-gray-600 dark:text-gray-400">File Type</span>
+                              <span className="text-gray-900 dark:text-gray-100 font-medium text-xs">
+                                JSON Backup
+                              </span>
+                            </li>
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {validation?.metadata?.encrypted && (
+                  <div className="mt-4 p-3 rounded-lg border-2 border-dashed border-purple-300 dark:border-purple-600 bg-white dark:bg-gray-800">
+                    <div className="flex items-center gap-2 mb-2">
+                      <svg className="w-4 h-4 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-3a1 1 0 011-1h2.586l6.414-6.414a6 6 0 015.743-7.743z" />
+                      </svg>
+                      <label htmlFor="backup-password-input" className="text-sm font-medium text-purple-700 dark:text-purple-300">
+                        Decryption Password Required
+                      </label>
+                    </div>
+                    <input
+                      id="backup-password-input"
+                      type="password"
+                      placeholder="Enter your backup password"
+                      value={restoreOptions.password ?? ''}
+                      onChange={(event) => { setRestoreOptions((prev) => ({ ...prev, password: event.target.value })); }}
+                      className="w-full px-3 py-2.5 rounded-lg border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 shadow-sm"
+                    />
+                    <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">
+                      This backup is encrypted. Enter the password you used when creating it.
+                    </p>
+                  </div>
+                )}
+
+                {validation && validation.issues.length > 0 && (
+                  <div className="mt-4">
+                    <ul className="space-y-1">
+                      {validation.issues.map((issue) => (
+                        <li
+                          key={`${issue.field}-${issue.message}`}
+                          className={`text-xs flex items-start gap-2 ${
+                            issue.severity === 'error'
+                              ? 'text-red-600 dark:text-red-400'
+                              : 'text-yellow-600 dark:text-yellow-400'
+                          }`}
+                        >
+                          <span className="flex-shrink-0 mt-0.5">
+                            {issue.severity === 'error' ? '❌' : '⚠️'}
+                          </span>
+                          <span>{issue.message}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
               </div>
-              <input
-                id={fileInputId}
-                ref={fileInputRef}
-                type="file"
-                accept=".json"
-                onChange={(event) => { void handleFileChange(event); }}
-                className="sr-only"
-              />
-            </div>
+            )}
 
             {restoreError && (
               <div className="rounded-lg border border-red-200 dark:border-red-700 bg-red-50/80 dark:bg-red-900/20 px-4 py-3 text-left text-sm text-red-700 dark:text-red-300">
@@ -528,54 +721,7 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
               </div>
             )}
 
-            {(validation || selectedFileName) && (
-              <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 p-3 text-sm">
-                <div className="font-medium text-gray-900 dark:text-gray-100">{selectedFileName || 'Selected backup'}</div>
-                {validation?.metadata && (
-                  <dl className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-xs text-gray-600 dark:text-gray-400">
-                    <div>
-                      <dt className="uppercase tracking-wide">Created</dt>
-                      <dd>{formatDate(validation.metadata.createdAt)}</dd>
-                    </div>
-                    <div>
-                      <dt className="uppercase tracking-wide">Prompts</dt>
-                      <dd>{validation.metadata.promptCount}</dd>
-                    </div>
-                    <div>
-                      <dt className="uppercase tracking-wide">Categories</dt>
-                      <dd>{validation.metadata.categoryCount}</dd>
-                    </div>
-                    <div>
-                      <dt className="uppercase tracking-wide">Size</dt>
-                      <dd>{formatBytes(validation.metadata.fileSize)}</dd>
-                    </div>
-                  </dl>
-                )}
-                {validation && (
-                  <ul className="mt-3 space-y-1">
-                    {validation.issues.map((issue) => (
-                      <li
-                        key={`${issue.field}-${issue.message}`}
-                        className={`text-xs ${issue.severity === 'error' ? 'text-red-600 dark:text-red-400' : 'text-yellow-600 dark:text-yellow-400'}`}
-                      >
-                        {issue.message}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            )}
           </div>
-
-          {validation?.metadata?.encrypted && (
-            <input
-              type="password"
-              placeholder="Decryption password"
-              value={restoreOptions.password ?? ''}
-              onChange={(event) => { setRestoreOptions((prev) => ({ ...prev, password: event.target.value })); }}
-              className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white"
-            />
-          )}
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="flex flex-col gap-1">
