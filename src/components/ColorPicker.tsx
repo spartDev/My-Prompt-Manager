@@ -12,6 +12,7 @@ interface ColorPickerProps {
   label?: string;
   disabled?: boolean;
   className?: string;
+  compact?: boolean;  // Show only color swatch, no text
 }
 
 const ColorPicker: FC<ColorPickerProps> = ({ 
@@ -19,7 +20,8 @@ const ColorPicker: FC<ColorPickerProps> = ({
   onChange, 
   label = 'Color',
   disabled = false,
-  className = ''
+  className = '',
+  compact = false
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [customColor, setCustomColor] = useState(value);
@@ -89,23 +91,28 @@ const ColorPicker: FC<ColorPickerProps> = ({
             setIsOpen(!isOpen);
           }}
           disabled={disabled}
-          className="flex items-center space-x-2 px-3 py-2 bg-white dark:bg-gray-700 border border-purple-200 dark:border-gray-600 rounded-lg hover:border-purple-400 dark:hover:border-purple-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-fit"
+          className={`flex items-center ${compact ? 'p-1' : 'px-3 py-2 space-x-2'} bg-white dark:bg-gray-700 border border-purple-200 dark:border-gray-600 rounded-lg hover:border-purple-400 dark:hover:border-purple-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-fit`}
+          title={compact ? currentColorName : undefined}
         >
           <div 
-            className="w-6 h-6 rounded-md border-2 border-white dark:border-gray-800 shadow-sm"
+            className={`${compact ? 'w-8 h-8' : 'w-6 h-6'} rounded-md border-2 border-white dark:border-gray-800 shadow-sm`}
             style={{ backgroundColor: value }}
           />
-          <span className="text-sm text-gray-700 dark:text-gray-300">
-            {currentColorName}
-          </span>
-          <svg 
-            className={`w-4 h-4 text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} 
-            fill="none" 
-            stroke="currentColor" 
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
+          {!compact && (
+            <>
+              <span className="text-sm text-gray-700 dark:text-gray-300">
+                {currentColorName}
+              </span>
+              <svg 
+                className={`w-4 h-4 text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </>
+          )}
         </button>
       </div>
       {isOpen && (
