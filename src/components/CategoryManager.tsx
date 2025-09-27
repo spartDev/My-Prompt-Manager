@@ -26,8 +26,7 @@ const CategoryManager: FC<CategoryManagerProps> = ({
 }) => {
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newCategoryColor, setNewCategoryColor] = useState(DEFAULT_CATEGORY_COLOR);
-  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-  const [editingColor, setEditingColor] = useState<{ category: Category; color: string } | null>(null);
+  const [editingCategory, setEditingCategory] = useState<{ category: Category; name: string; color: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; category: Category | null }>({
@@ -66,14 +65,27 @@ const CategoryManager: FC<CategoryManagerProps> = ({
     }
   };
 
-  const handleUpdateCategory = async (category: Category, updates: Partial<Category>) => {
+  const handleUpdateCategory = async () => {
+    if (!editingCategory) {return;}
+    
+    const { category, name, color } = editingCategory;
+    
+    // Check if there are actual changes
+    if (name === category.name && color === (category.color || DEFAULT_CATEGORY_COLOR)) {
+      setEditingCategory(null);
+      return;
+    }
+    
     try {
       setLoading(true);
       setError(null);
       
+      const updates: Partial<Category> = {};
+      if (name !== category.name) {updates.name = name.trim();}
+      if (color !== category.color) {updates.color = color;}
+      
       await onUpdateCategory(category.id, updates);
       setEditingCategory(null);
-      setEditingColor(null);
     } catch {
       setError('Failed to update category');
     } finally {
@@ -227,114 +239,103 @@ const CategoryManager: FC<CategoryManagerProps> = ({
               </div>
             ) : (
               categories.map((category, index) => (
-                <div key={category.id} className="relative group flex items-center justify-between p-5 bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 hover:bg-white/90 dark:hover:bg-gray-800/90 transition-all duration-200" style={{ zIndex: editingColor?.category.id === category.id ? 90 : 10 - index }}>
-                  <div className="flex items-center space-x-4 flex-1">
-                    {/* Color Editor or Display */}
-                    {editingColor?.category.id === category.id ? (
-                      <div className="flex items-center space-x-2">
-                        <ColorPicker
-                          value={editingColor.color}
-                          onChange={(newColor) => { setEditingColor({ category, color: newColor }); }}
-                          label=""
+                <div key={category.id} className="relative group flex items-center justify-between p-5 bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 hover:bg-white/90 dark:hover:bg-gray-800/90 transition-all duration-200" style={{ zIndex: editingCategory?.category.id === category.id ? 90 : 10 - index }}>
+                  {editingCategory?.category.id === category.id ? (
+                    // Edit Mode - Show both color and name editors
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-4">
+                        <div className="relative" style={{ zIndex: 100 }}>
+                          <ColorPicker
+                            value={editingCategory.color}
+                            onChange={(newColor) => { setEditingCategory({ ...editingCategory, color: newColor }); }}
+                            label=""
+                            disabled={loading}
+                          />
+                        </div>
+                        <input
+                          type="text"
+                          value={editingCategory.name}
+                          onChange={(e) => { setEditingCategory({ ...editingCategory, name: e.target.value }); }}
+                          placeholder="Category name"
+                          className="flex-1 text-sm border border-purple-200 dark:border-gray-600 rounded-lg px-3 py-2 focus:outline-none focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-purple-500 bg-white/80 dark:bg-gray-700/80 backdrop-blur-sm font-medium text-gray-900 dark:text-gray-100"
+                          maxLength={50}
                           disabled={loading}
                         />
-                        <button
-                          onClick={() => {
-                            void handleUpdateCategory(category, { color: editingColor.color });
-                          }}
-                          className="p-1 text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                        </button>
-                        <button
-                          onClick={() => { setEditingColor(null); }}
-                          className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => { void handleUpdateCategory(); }}
+                            className="p-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                            disabled={loading || !editingCategory.name.trim()}
+                            title="Save changes"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => { setEditingCategory(null); }}
+                            className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                            title="Cancel"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
                       </div>
-                    ) : (
-                      <button
-                        onClick={() => {
-                          if (category.name !== 'Uncategorized') {
-                            setEditingColor({ category, color: category.color || DEFAULT_CATEGORY_COLOR });
-                          }
-                        }}
-                        className={`${category.name !== 'Uncategorized' ? 'cursor-pointer group-hover:ring-2 group-hover:ring-purple-300 dark:group-hover:ring-purple-600' : 'cursor-default'} rounded-lg p-1 transition-all`}
-                        disabled={category.name === 'Uncategorized'}
-                        title={category.name !== 'Uncategorized' ? `Click to change color (${getColorName(category.color || '#6B7280')})` : 'Cannot edit default category color'}
-                      >
-                        <div
-                          className="w-8 h-8 rounded-lg border-2 border-white dark:border-gray-700 shadow-sm transition-transform group-hover:scale-110"
-                          style={{ backgroundColor: category.color || '#6B7280' }}
-                        />
-                      </button>
-                    )}
-                    
-                    {/* Category Name Editor or Display */}
-                    {editingCategory?.id === category.id ? (
-                      <input
-                        type="text"
-                        value={editingCategory.name}
-                        onChange={(e) => { setEditingCategory({ ...editingCategory, name: e.target.value }); }}
-                        className="flex-1 text-sm border border-purple-200 dark:border-gray-600 rounded-lg px-3 py-2 focus:outline-none focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-purple-500 bg-white/80 dark:bg-gray-700/80 backdrop-blur-sm font-medium text-gray-900 dark:text-gray-100"
-                        onBlur={() => {
-                          if (editingCategory.name.trim() && editingCategory.name !== category.name) {
-                            void handleUpdateCategory(category, { name: editingCategory.name.trim() });
-                          } else {
-                            setEditingCategory(null);
-                          }
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.currentTarget.blur();
-                          } else if (e.key === 'Escape') {
-                            setEditingCategory(null);
-                          }
-                        }}
-                        maxLength={50}
+                    </div>
+                  ) : (
+                    // Display Mode - Show color swatch and name
+                    <div className="flex items-center space-x-4 flex-1">
+                      <div
+                        className="w-8 h-8 rounded-lg border-2 border-white dark:border-gray-700 shadow-sm"
+                        style={{ backgroundColor: category.color || '#6B7280' }}
+                        title={getColorName(category.color || '#6B7280')}
                       />
-                    ) : (
                       <div className="flex-1">
-                        <span className="text-sm text-gray-900 dark:text-gray-100">{category.name}</span>
+                        <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">{category.name}</span>
                         {category.name === 'Uncategorized' && (
                           <span className="ml-2 text-xs text-gray-500 dark:text-gray-400 italic">Default</span>
                         )}
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
 
-                  <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    {category.name !== 'Uncategorized' && (
-                      <>
-                        <button
-                          onClick={() => { setEditingCategory(category); }}
-                          className="p-2 text-gray-400 dark:text-gray-500 hover:text-purple-600 dark:hover:text-purple-400 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors"
-                          disabled={loading}
-                          title="Edit name"
-                        >
-                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  {!editingCategory && (
+                    <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {category.name !== 'Uncategorized' && (
+                        <>
+                          <button
+                            onClick={() => { 
+                              setEditingCategory({ 
+                                category, 
+                                name: category.name, 
+                                color: category.color || DEFAULT_CATEGORY_COLOR 
+                              }); 
+                            }}
+                            className="p-2 text-gray-400 dark:text-gray-500 hover:text-purple-600 dark:hover:text-purple-400 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors"
+                            disabled={loading}
+                            title="Edit category"
+                          >
+                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </button>
+                          
+                          <button
+                            onClick={() => { handleDeleteCategory(category); }}
+                            className="p-2 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                            disabled={loading}
+                            title="Delete category"
+                          >
+                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                           </svg>
-                        </button>
-                        
-                        <button
-                          onClick={() => { handleDeleteCategory(category); }}
-                          className="p-2 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                          disabled={loading}
-                          title="Delete category"
-                        >
-                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
-                      </>
-                    )}
-                  </div>
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))
             )}
