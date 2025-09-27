@@ -35,6 +35,19 @@
       "all_frames": false
     }
   ],
+  "web_accessible_resources": [
+    {
+      "matches": [
+        "https://*/*",
+        "http://*/*"
+      ],
+      "resources": [
+        "assets/content-*.js",
+        "assets/platforms-*.js"
+      ],
+      "use_dynamic_url": false
+    }
+  ],
   "optional_host_permissions": [
     "https://*/*",
     "http://*/*"
