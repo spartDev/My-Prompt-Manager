@@ -41,8 +41,45 @@ export class ContentScriptInjector {
   }
 
   private async _injectIfNeededInternal(tabId: number): Promise<void> {
+    // Check our memory first for performance, but don't trust it completely
+    // We'll verify actual injection state in injectContentScript
     if (this.injectedTabs.has(tabId)) {
-      return;
+      // Even if we think it's injected, verify for custom sites
+      // This handles the case where the page was reloaded
+      try {
+        const tab = await chrome.tabs.get(tabId);
+        if (tab.url) {
+          const url = new URL(tab.url);
+          const hostname = url.hostname;
+          
+          // For custom sites, always verify actual injection state
+          const settings = await chrome.storage.local.get(['promptLibrarySettings']);
+          const promptLibrarySettings = settings.promptLibrarySettings as {
+            customSites?: Array<{ hostname: string; enabled: boolean }>;
+          } | undefined;
+          
+          const customSites = promptLibrarySettings?.customSites || [];
+          const isCustomSite = customSites.some(site => site.hostname === hostname && site.enabled);
+          
+          if (isCustomSite) {
+            // For custom sites, verify the content script is actually there
+            const isActuallyInjected = await this.isContentScriptInjected(tabId);
+            if (!isActuallyInjected) {
+              // It's not there, remove from our tracking and continue to inject
+              this.injectedTabs.delete(tabId);
+            } else {
+              // It's actually there, we're done
+              return;
+            }
+          } else {
+            // For non-custom sites (manifest-injected sites), trust our tracking
+            return;
+          }
+        }
+      } catch {
+        // If we can't verify, trust our tracking
+        return;
+      }
     }
 
     let hostname = 'unknown';
@@ -255,7 +292,7 @@ export class ContentScriptInjector {
         throw new Error(`Cannot inject into tab ${tabId.toString()} for ${hostname} - tab access denied`);
       }
 
-      // First check if already injected by testing for marker
+      // Check if already injected by testing for marker
       const isAlreadyInjected = await this.isContentScriptInjected(tabId);
       if (isAlreadyInjected) {
         this.injectedTabs.add(tabId);
