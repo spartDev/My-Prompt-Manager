@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import type { FC, FormEvent } from 'react';
 
 import { DEFAULT_CATEGORY_COLOR, getColorName } from '../constants/colors';
@@ -33,6 +33,7 @@ const CategoryManager: FC<CategoryManagerProps> = ({
     isOpen: false,
     category: null
   });
+  const ignoreBlurRef = useRef(false);
 
   const handleCreateCategory = async (e: FormEvent) => {
     e.preventDefault();
@@ -267,9 +268,12 @@ const CategoryManager: FC<CategoryManagerProps> = ({
                             }
                           }}
                           onBlur={() => {
-                            if (editingCategory.name.trim()) {
+                            // Don't auto-save if user is clicking on action buttons
+                            if (!ignoreBlurRef.current && editingCategory.name.trim()) {
                               void handleUpdateCategory();
                             }
+                            // Reset the flag after handling blur
+                            ignoreBlurRef.current = false;
                           }}
                           placeholder="Category name"
                           className="flex-1 text-sm border border-purple-200 dark:border-gray-600 rounded-lg px-3 py-2.5 focus:outline-none focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-purple-500 bg-white/80 dark:bg-gray-700/80 backdrop-blur-sm font-medium text-gray-900 dark:text-gray-100"
@@ -279,6 +283,7 @@ const CategoryManager: FC<CategoryManagerProps> = ({
                         <div className="flex items-center space-x-1 flex-shrink-0">
                           <button
                             onClick={() => { void handleUpdateCategory(); }}
+                            onMouseDown={() => { ignoreBlurRef.current = true; }}
                             className="p-2 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-lg transition-all shadow-sm hover:shadow disabled:opacity-50"
                             disabled={loading || !editingCategory.name.trim()}
                             title="Save changes (Enter)"
@@ -290,6 +295,7 @@ const CategoryManager: FC<CategoryManagerProps> = ({
                           </button>
                           <button
                             onClick={() => { setEditingCategory(null); }}
+                            onMouseDown={() => { ignoreBlurRef.current = true; }}
                             className="p-2 text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
                             title="Cancel (Esc)"
                             type="button"
