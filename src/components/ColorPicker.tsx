@@ -25,6 +25,7 @@ const ColorPicker: FC<ColorPickerProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [customColor, setCustomColor] = useState(value);
+  const [hexInputValue, setHexInputValue] = useState(value);
   const [showCustomInput, setShowCustomInput] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -57,22 +58,28 @@ const ColorPicker: FC<ColorPickerProps> = ({
 
   const handleCustomColorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const color = e.target.value;
-    setCustomColor(color);
+    // Only update customColor if it's a valid hex color for the color picker
     if (isValidHexColor(color)) {
+      setCustomColor(color);
       onChange(color);
     }
   };
 
+  const handleHexInputChange = (value: string) => {
+    setHexInputValue(value);
+    // Don't validate or update color picker on every keystroke
+  };
+
   const handleCustomColorSubmit = () => {
-    if (isValidHexColor(customColor)) {
-      onChange(customColor);
+    if (isValidHexColor(hexInputValue)) {
+      setCustomColor(hexInputValue);
+      onChange(hexInputValue);
       setIsOpen(false);
       setShowCustomInput(false);
     }
   };
 
   const currentColorName = getColorName(value);
-  const isPresetColor = PRESET_COLORS.some(c => c.value.toLowerCase() === value.toLowerCase());
 
   return (
     <div className={`relative ${className}`}>
@@ -172,84 +179,135 @@ const ColorPicker: FC<ColorPickerProps> = ({
             </h4>
             
             {!showCustomInput ? (
-              <div className="flex items-center space-x-3">
-                {/* Native Color Input (Hidden but functional) */}
-                <label 
-                  htmlFor="custom-color-input"
-                  className="flex items-center space-x-2 px-3 py-2 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/30 cursor-pointer transition-colors"
-                >
-                  <svg 
-                    className="w-5 h-5" 
-                    fill="none" 
-                    stroke="currentColor" 
-                    viewBox="0 0 24 24"
+              <div className="space-y-3">
+                {/* Button and Color Preview Side by Side */}
+                <div className="flex items-center space-x-3">
+                  {/* Native Color Input (Hidden but functional) */}
+                  <label
+                    htmlFor="custom-color-input"
+                    className="flex items-center space-x-2 px-3 py-2 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/30 cursor-pointer transition-colors"
                   >
-                    <path 
-                      strokeLinecap="round" 
-                      strokeLinejoin="round" 
-                      strokeWidth={2} 
-                      d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" 
-                    />
-                  </svg>
-                  <span className="text-sm font-medium">Pick Custom Color</span>
-                </label>
-                <input
-                  id="custom-color-input"
-                  type="color"
-                  value={customColor}
-                  onChange={handleCustomColorChange}
-                  className="sr-only"
-                />
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"
+                      />
+                    </svg>
+                    <span className="text-sm font-medium">Pick Custom Color</span>
+                  </label>
+                  <input
+                    id="custom-color-input"
+                    type="color"
+                    value={customColor}
+                    onChange={handleCustomColorChange}
+                    className="sr-only"
+                  />
 
-                {/* Manual Hex Input Option */}
+                  {/* Color Preview */}
+                  <div
+                    className="w-10 h-10 rounded-lg border-2 border-gray-200 dark:border-gray-700 flex-shrink-0"
+                    style={{ backgroundColor: value }}
+                  />
+                </div>
+
+                {/* Manual Hex Input Option - Full Width */}
                 <button
                   type="button"
-                  onClick={() => { setShowCustomInput(true); }}
-                  className="px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
+                  onClick={() => {
+                    setShowCustomInput(true);
+                    setHexInputValue(value);
+                  }}
+                  className="w-full px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors border border-gray-200 dark:border-gray-600 rounded-lg hover:border-purple-300 dark:hover:border-purple-500"
                 >
                   Enter Hex Code
                 </button>
               </div>
             ) : (
-              <div className="flex items-center space-x-2">
-                <input
-                  type="text"
-                  value={customColor}
-                  onChange={(e) => { setCustomColor(e.target.value.toUpperCase()); }}
-                  placeholder="#000000"
-                  className="flex-1 px-3 py-2 text-sm border border-purple-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-mono"
-                  maxLength={7}
-                />
-                <button
-                  type="button"
-                  onClick={handleCustomColorSubmit}
-                  disabled={!isValidHexColor(customColor)}
-                  className="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-                >
-                  Apply
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowCustomInput(false);
-                    setCustomColor(value);
-                  }}
-                  className="px-3 py-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors text-sm"
-                >
-                  Cancel
-                </button>
+              <div className="space-y-3">
+                {/* Button and Color Preview Side by Side */}
+                <div className="flex items-center space-x-3">
+                  <label
+                    htmlFor="custom-color-input"
+                    className="flex items-center space-x-2 px-3 py-2 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/30 cursor-pointer transition-colors"
+                  >
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"
+                      />
+                    </svg>
+                    <span className="text-sm font-medium">Pick Custom Color</span>
+                  </label>
+                  <input
+                    id="custom-color-input"
+                    type="color"
+                    value={customColor}
+                    onChange={handleCustomColorChange}
+                    className="sr-only"
+                  />
+
+                  {/* Color Preview */}
+                  <div
+                    className="w-10 h-10 rounded-lg border-2 border-gray-200 dark:border-gray-700 flex-shrink-0"
+                    style={{ backgroundColor: value }}
+                  />
+                </div>
+
+                {/* Hex Input - Compact with icons */}
+                <div className="flex items-center gap-2 w-full">
+                  <input
+                    type="text"
+                    value={hexInputValue}
+                    onChange={(e) => { handleHexInputChange(e.target.value.toUpperCase()); }}
+                    placeholder="#000000"
+                    className="flex-1 min-w-0 px-3 py-2 text-sm border border-purple-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-mono"
+                    maxLength={7}
+                  />
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={handleCustomColorSubmit}
+                      disabled={!isValidHexColor(hexInputValue)}
+                      className="p-2 text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Apply"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowCustomInput(false);
+                        setCustomColor(value);
+                        setHexInputValue(value);
+                      }}
+                      className="p-2 text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                      title="Cancel"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
 
-            {/* Custom Color Preview */}
-            {!isPresetColor && (
-              <div className="mt-3 flex items-center space-x-3">
-                <div 
-                  className="w-full h-10 rounded-lg border-2 border-gray-200 dark:border-gray-700"
-                  style={{ backgroundColor: value }}
-                />
-              </div>
-            )}
           </div>
         </div>
       )}
