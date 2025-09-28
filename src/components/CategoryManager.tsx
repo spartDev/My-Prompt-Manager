@@ -266,6 +266,11 @@ const CategoryManager: FC<CategoryManagerProps> = ({
                               setEditingCategory(null);
                             }
                           }}
+                          onBlur={() => {
+                            if (editingCategory.name.trim()) {
+                              void handleUpdateCategory();
+                            }
+                          }}
                           placeholder="Category name"
                           className="flex-1 text-sm border border-purple-200 dark:border-gray-600 rounded-lg px-3 py-2.5 focus:outline-none focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-purple-500 bg-white/80 dark:bg-gray-700/80 backdrop-blur-sm font-medium text-gray-900 dark:text-gray-100"
                           maxLength={50}
