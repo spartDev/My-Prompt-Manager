@@ -236,38 +236,60 @@ export class StorageManager {
   }
 
   async updateCategory(id: string, updates: Partial<Omit<Category, 'id'>>): Promise<Category> {
-    try {
-      const existingCategories = await this.getCategories();
-      const categoryIndex = existingCategories.findIndex(c => c.id === id);
-      
-      if (categoryIndex === -1) {
-        throw new Error(`Category with id ${id} not found`);
-      }
-
-      // Check for duplicate names (excluding current category)
-      if (updates.name) {
-        const duplicateCategory = existingCategories.find(
-          (c, index) => index !== categoryIndex &&
-          c.name.toLowerCase() === (updates.name || '').toLowerCase()
-        );
+    return this.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
+      try {
+        const existingCategories = await this.getCategories();
+        const categoryIndex = existingCategories.findIndex(c => c.id === id);
         
-        if (duplicateCategory) {
-          throw new Error(`Category with name "${updates.name}" already exists`);
+        if (categoryIndex === -1) {
+          throw new Error(`Category with id ${id} not found`);
         }
+
+        const oldCategory = existingCategories[categoryIndex];
+
+        // Check for duplicate names (excluding current category)
+        if (updates.name) {
+          const duplicateCategory = existingCategories.find(
+            (c, index) => index !== categoryIndex &&
+            c.name.toLowerCase() === (updates.name || '').toLowerCase()
+          );
+          
+          if (duplicateCategory) {
+            throw new Error(`Category with name "${updates.name}" already exists`);
+          }
+        }
+
+        const updatedCategory: Category = {
+          ...oldCategory,
+          ...updates
+        };
+
+        existingCategories[categoryIndex] = updatedCategory;
+        
+        // If the category name changed, update all prompts using the old name
+        if (updates.name && updates.name !== oldCategory.name) {
+          const prompts = await this.getPrompts();
+          const updatedPrompts = prompts.map(prompt =>
+            prompt.category === oldCategory.name
+              ? { ...prompt, category: updates.name, updatedAt: Date.now() }
+              : prompt
+          );
+          
+          // Update both categories and prompts atomically
+          await Promise.all([
+            this.setStorageData(this.STORAGE_KEYS.CATEGORIES, existingCategories),
+            this.setStorageData(this.STORAGE_KEYS.PROMPTS, updatedPrompts)
+          ]);
+        } else {
+          // Only update categories if name hasn't changed
+          await this.setStorageData(this.STORAGE_KEYS.CATEGORIES, existingCategories);
+        }
+        
+        return updatedCategory;
+      } catch (error) {
+        throw this.handleStorageError(error);
       }
-
-      const updatedCategory: Category = {
-        ...existingCategories[categoryIndex],
-        ...updates
-      };
-
-      existingCategories[categoryIndex] = updatedCategory;
-      await this.setStorageData(this.STORAGE_KEYS.CATEGORIES, existingCategories);
-      
-      return updatedCategory;
-    } catch (error) {
-      throw this.handleStorageError(error);
-    }
+    });
   }
 
   async deleteCategory(id: string): Promise<void> {
