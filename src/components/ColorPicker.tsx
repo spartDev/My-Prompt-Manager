@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useId } from 'react';
 import type { FC } from 'react';
 
 import { 
@@ -29,6 +29,7 @@ const ColorPicker: FC<ColorPickerProps> = ({
   const [showCustomInput, setShowCustomInput] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const colorInputId = useId();
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -184,7 +185,7 @@ const ColorPicker: FC<ColorPickerProps> = ({
                 <div className="flex items-center space-x-3">
                   {/* Native Color Input (Hidden but functional) */}
                   <label
-                    htmlFor="custom-color-input"
+                    htmlFor={colorInputId}
                     className="flex items-center space-x-2 px-3 py-2 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/30 cursor-pointer transition-colors"
                   >
                     <svg
@@ -203,7 +204,7 @@ const ColorPicker: FC<ColorPickerProps> = ({
                     <span className="text-sm font-medium">Pick Custom Color</span>
                   </label>
                   <input
-                    id="custom-color-input"
+                    id={colorInputId}
                     type="color"
                     value={customColor}
                     onChange={handleCustomColorChange}
@@ -234,7 +235,7 @@ const ColorPicker: FC<ColorPickerProps> = ({
                 {/* Button and Color Preview Side by Side */}
                 <div className="flex items-center space-x-3">
                   <label
-                    htmlFor="custom-color-input"
+                    htmlFor={colorInputId}
                     className="flex items-center space-x-2 px-3 py-2 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/30 cursor-pointer transition-colors"
                   >
                     <svg
@@ -253,7 +254,7 @@ const ColorPicker: FC<ColorPickerProps> = ({
                     <span className="text-sm font-medium">Pick Custom Color</span>
                   </label>
                   <input
-                    id="custom-color-input"
+                    id={colorInputId}
                     type="color"
                     value={customColor}
                     onChange={handleCustomColorChange}
