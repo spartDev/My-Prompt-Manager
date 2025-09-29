@@ -1,9 +1,22 @@
+import type { BrowserContext, Worker } from '@playwright/test';
+
 import { DEFAULT_SETTINGS } from '../../../src/types';
 import { test, expect } from '../fixtures/extension';
 import { seedLibrary } from '../utils/storage';
 
+const resolveBackgroundWorker = async (context: BrowserContext): Promise<Worker> => {
+  const [existingWorker] = context.serviceWorkers();
+  if (existingWorker) {
+    return existingWorker;
+  }
+
+  return context.waitForEvent('serviceworker', {
+    predicate: (candidate) => candidate.url().startsWith('chrome-extension://'),
+  });
+};
+
 test.describe('Element picker integration', () => {
-  test('displays selected element after picker flow completes', async ({ context, page, storage, extensionId }) => {
+  test('displays selected element after picker flow completes', async ({ context, page, storage }) => {
     await seedLibrary(storage, {
       settings: {
         ...DEFAULT_SETTINGS,
@@ -12,7 +25,7 @@ test.describe('Element picker integration', () => {
       interfaceMode: 'sidepanel',
     });
 
-    const background = context.serviceWorkers()[0] ?? (await context.waitForEvent('serviceworker'));
+    const background = await resolveBackgroundWorker(context);
 
     await page.reload();
 

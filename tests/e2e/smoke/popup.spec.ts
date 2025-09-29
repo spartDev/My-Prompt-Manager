@@ -63,12 +63,12 @@ test.describe('Prompt creation flow', () => {
 
     await page.reload();
 
-    const createButton = page.getByRole('button', { name: /create first prompt/i });
-    if (await createButton.isVisible()) {
-      await createButton.click();
-    } else {
-      await page.getByRole('button', { name: 'Add new prompt' }).click();
-    }
+    const createFirstPrompt = page.getByRole('button', { name: /create first prompt/i });
+    const addPrompt = page.getByRole('button', { name: 'Add new prompt' });
+    const promptCreationTrigger = createFirstPrompt.or(addPrompt);
+
+    await expect(promptCreationTrigger).toBeVisible();
+    await promptCreationTrigger.click();
 
     await expect(page.getByRole('heading', { name: 'Add New Prompt' })).toBeVisible();
 

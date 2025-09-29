@@ -22,6 +22,7 @@ export interface InjectorState {
   icon: HTMLElement | null;
   currentTextarea: HTMLElement | null;
   promptSelector: HTMLElement | null;
+  currentTargetElement: HTMLElement | null;
   isInitialized: boolean;
   isSiteEnabled: boolean;
   detectionTimeout: number | null;
@@ -68,6 +69,7 @@ export class PromptLibraryInjector {
       icon: null,
       currentTextarea: null,
       promptSelector: null,
+      currentTargetElement: null,
       isInitialized: false,
       isSiteEnabled: false,
       detectionTimeout: null,
@@ -1068,6 +1070,9 @@ export class PromptLibraryInjector {
       // Remove existing selector
       this.closePromptSelector();
 
+      // Store target element for use in filterPrompts
+      this.state.currentTargetElement = targetElement;
+
       // Get prompts from storage
       const prompts = await getPrompts();
       debug('Retrieved prompts for selector', { count: prompts.length });
@@ -1078,11 +1083,19 @@ export class PromptLibraryInjector {
       // Position selector
       this.positionPromptSelector(this.state.promptSelector, targetElement);
 
-      // Add event listeners
-      this.setupPromptSelectorEvents(this.state.promptSelector, prompts, targetElement);
-
-      // Add to DOM
+      // Add to DOM first
       document.body.appendChild(this.state.promptSelector);
+      console.log('[CONTENT] Prompt selector added to DOM, setting up events', {
+        selectorInDOM: document.contains(this.state.promptSelector)
+      });
+
+      // IMPORTANT: Add event listeners AFTER DOM insertion to ensure querySelector works properly
+      try {
+        this.setupPromptSelectorEvents(this.state.promptSelector, prompts, targetElement);
+        console.log('[CONTENT] setupPromptSelectorEvents completed successfully');
+      } catch (err) {
+        console.error('[CONTENT] Failed to setup prompt selector events', err);
+      }
 
       // Initialize keyboard navigation
       this.keyboardNav = new KeyboardNavigationManager(this.state.promptSelector, this.eventManager);
@@ -1256,6 +1269,31 @@ export class PromptLibraryInjector {
   }
 
   /**
+   * Sets up click event listeners on prompt items
+   */
+  private setupPromptItemEventListeners(promptItems: NodeListOf<HTMLElement> | HTMLElement[], prompts: Prompt[], targetElement: HTMLElement): void {
+    promptItems.forEach(item => {
+      console.log('[CONTENT] Adding click listener to prompt item', {
+        promptId: item.dataset.promptId,
+        hasDataset: !!item.dataset.promptId
+      });
+
+      this.eventManager.addTrackedEventListener(item, 'click', () => {
+        console.log('[CONTENT] Prompt item clicked', { promptId: item.dataset.promptId });
+        const promptId = item.dataset.promptId;
+        const prompt = prompts.find(p => p.id === promptId);
+        if (prompt) {
+          console.log('[CONTENT] Inserting prompt content', { promptId, contentLength: prompt.content.length });
+          void this.insertPrompt(targetElement, prompt.content);
+          this.closePromptSelector();
+        } else {
+          console.log('[CONTENT] Prompt not found for ID', { promptId });
+        }
+      });
+    });
+  }
+
+  /**
    * Sets up event listeners for the prompt selector
    */
   private setupPromptSelectorEvents(selector: HTMLElement, prompts: Prompt[], targetElement: HTMLElement): void {
@@ -1269,16 +1307,12 @@ export class PromptLibraryInjector {
 
     // Prompt item clicks
     const promptItems = selector.querySelectorAll<HTMLElement>('.prompt-item');
-    promptItems.forEach(item => {
-      this.eventManager.addTrackedEventListener(item, 'click', () => {
-        const promptId = item.dataset.promptId;
-        const prompt = prompts.find(p => p.id === promptId);
-        if (prompt) {
-          void this.insertPrompt(targetElement, prompt.content);
-          this.closePromptSelector();
-        }
-      });
+    console.log('[CONTENT] Setting up prompt item click handlers', {
+      promptItemsFound: promptItems.length,
+      selectorInDOM: document.contains(selector)
     });
+
+    this.setupPromptItemEventListeners(promptItems, prompts, targetElement);
 
     // Search functionality
     const searchInput = selector.querySelector<HTMLInputElement>('.search-input');
@@ -1336,6 +1370,11 @@ export class PromptLibraryInjector {
    * Filters prompts based on search term
    */
   private filterPrompts(searchTerm: string, prompts: Prompt[], selector: HTMLElement): void {
+    console.log('[CONTENT] filterPrompts called', {
+      searchTerm,
+      promptsCount: prompts.length,
+      stackTrace: new Error().stack
+    });
     const filteredPrompts = prompts.filter(prompt => 
       prompt.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       prompt.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -1352,10 +1391,20 @@ export class PromptLibraryInjector {
 
     // Add filtered items
     if (filteredPrompts.length > 0) {
+      const newPromptItems: HTMLElement[] = [];
       filteredPrompts.forEach((prompt, index) => {
         const promptItem = createPromptListItem(prompt, index, 'filtered-prompt-item');
         promptList.appendChild(promptItem);
+        newPromptItems.push(promptItem);
       });
+
+      // Setup event listeners on the newly created prompt items
+      if (this.state.currentTargetElement) {
+        console.log('[CONTENT] Setting up event listeners on filtered prompt items', {
+          itemCount: newPromptItems.length
+        });
+        this.setupPromptItemEventListeners(newPromptItems, filteredPrompts, this.state.currentTargetElement);
+      }
     } else {
       const noPrompts = document.createElement('div');
       noPrompts.className = 'no-prompts';
@@ -1408,6 +1457,8 @@ export class PromptLibraryInjector {
       this.keyboardNav.destroy();
       this.keyboardNav = null;
     }
+    // Clear the stored target element
+    this.state.currentTargetElement = null;
   }
 
   /**
