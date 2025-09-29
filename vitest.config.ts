@@ -24,11 +24,16 @@ export default defineConfig({
         'src/test/',
         '**/*.d.ts',
         'dist/',
+        'tests/e2e/**',
         'package-extension.cjs',
         'tailwind.config.js',
         'postcss.config.js',
         'vite.config.ts',
-        'vitest.config.ts'
+        'vitest.config.ts',
+        '**/index.ts',
+        'src/types/**',
+        'src/background/**',
+        '*.config.*'
       ]
     }
   },
