@@ -1,7 +1,11 @@
 import { DEFAULT_SETTINGS } from '../../../src/types';
 import { test, expect } from '../fixtures/extension';
 import { CLAUDE_MOCK_HTML, CHATGPT_MOCK_HTML } from '../fixtures/mock-pages';
+import { CategoryManagerPage } from '../pages/CategoryManagerPage';
+import { LibraryPage } from '../pages/LibraryPage';
+import { PromptFormPage } from '../pages/PromptFormPage';
 import { seedLibrary } from '../utils/storage';
+import { workflows } from '../utils/workflows';
 
 test.describe('User Journey: New User Setup & First Prompt Creation', () => {
   test('should complete the complete new user onboarding workflow', async ({
@@ -20,93 +24,70 @@ test.describe('User Journey: New User Setup & First Prompt Creation', () => {
     });
 
     // Step 1: User opens extension for the first time
-    const sidepanelPage = await context.newPage();
-    await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, {
-      waitUntil: 'domcontentloaded'
-    });
+    const sidepanelPage = await workflows.navigation.openSidepanel(context, extensionId);
+
+    // Initialize POMs
+    const libraryPage = new LibraryPage(sidepanelPage);
+    const categoryManagerPage = new CategoryManagerPage(sidepanelPage);
+    const promptFormPage = new PromptFormPage(sidepanelPage);
 
     // Verify fresh state - should see empty state
     await expect(sidepanelPage.getByText('You\'re ready to go')).toBeVisible();
     await expect(sidepanelPage.getByText('Create your first prompt to start building')).toBeVisible();
 
     // Step 2: User creates their first custom category
-    await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
+    await categoryManagerPage.openFromLibrary();
 
     // Should see default category only
-    await expect(sidepanelPage.getByText('1 category')).toBeVisible();
-    await expect(sidepanelPage.getByText('Uncategorized')).toBeVisible();
+    await categoryManagerPage.expectCategoryCount(1);
+    await categoryManagerPage.expectCategoryExists('Uncategorized');
 
     // Create first custom category: "Work"
-    await sidepanelPage.getByPlaceholder('Enter category name...').fill('Work');
-    await sidepanelPage.getByRole('button', { name: 'Add' }).click();
-
-    // Verify category created
-    await expect(sidepanelPage.getByText('Category created successfully').first()).toBeVisible();
-    await expect(sidepanelPage.getByText('2 categories')).toBeVisible();
-    await expect(sidepanelPage.getByText('Work')).toBeVisible();
+    await categoryManagerPage.createCategory('Work');
+    await categoryManagerPage.expectCategoryCount(2);
+    await categoryManagerPage.expectCategoryExists('Work');
 
     // Create second category: "Personal"
-    await sidepanelPage.getByPlaceholder('Enter category name...').fill('Personal');
-    await sidepanelPage.getByRole('button', { name: 'Add' }).click();
+    await categoryManagerPage.createCategory('Personal');
+    await categoryManagerPage.expectCategoryCount(3);
+    await categoryManagerPage.expectCategoryExists('Personal');
 
-    await expect(sidepanelPage.getByText('Category created successfully').first()).toBeVisible();
-    await expect(sidepanelPage.getByText('3 categories')).toBeVisible();
-    await expect(sidepanelPage.getByText('Personal')).toBeVisible();
-
-    // Return to main library view (close category manager)
-    const closeButton = sidepanelPage.locator('button').filter({ has: sidepanelPage.locator('path[d="M6 18L18 6M6 6l12 12"]') }).first();
-    await closeButton.click();
+    // Return to main library view
+    await categoryManagerPage.closeToLibrary();
 
     // Step 3: User creates their first prompt in a custom category
-    // Verify we're back in library view
-    await expect(sidepanelPage.getByText('My Prompt Manager')).toBeVisible();
-    await sidepanelPage.getByRole('button', { name: /Add/ }).click();
-
-    // Fill in prompt details
-    await sidepanelPage.getByLabel('Title (optional)').fill('Email Summary Template');
-    await sidepanelPage.getByLabel('Content *').fill('Please summarize the key points from this email and suggest appropriate actions:\n\n[EMAIL_CONTENT]');
-
-    // Select "Work" category
-    await sidepanelPage.getByLabel('Category').selectOption('Work');
-
-    // Save the prompt
-    await sidepanelPage.getByRole('button', { name: 'Save Prompt' }).click();
-
-    // Verify prompt created successfully
-    await expect(sidepanelPage.getByText('Prompt created successfully').first()).toBeVisible();
-    await expect(sidepanelPage.getByText('Email Summary Template')).toBeVisible();
+    await libraryPage.clickAddNewPrompt();
+    await promptFormPage.createPrompt({
+      title: 'Email Summary Template',
+      content: 'Please summarize the key points from this email and suggest appropriate actions:\n\n[EMAIL_CONTENT]',
+      category: 'Work'
+    });
+    await libraryPage.expectPromptVisible('Email Summary Template');
 
     // Step 4: Create another prompt in different category
-    await sidepanelPage.getByRole('button', { name: 'Add New Prompt' }).click();
-
-    await sidepanelPage.getByLabel('Title (optional)').fill('Creative Writing Starter');
-    await sidepanelPage.getByLabel('Content *').fill('Help me start a creative writing piece about [TOPIC]. Provide an engaging opening paragraph and suggest the tone and style.');
-    await sidepanelPage.getByLabel('Category').selectOption('Personal');
-
-    await sidepanelPage.getByRole('button', { name: 'Save Prompt' }).click();
-
-    await expect(sidepanelPage.getByText('Prompt created successfully').first()).toBeVisible();
-    await expect(sidepanelPage.getByText('Creative Writing Starter')).toBeVisible();
+    await libraryPage.clickAddNewPrompt();
+    await promptFormPage.createPrompt({
+      title: 'Creative Writing Starter',
+      content: 'Help me start a creative writing piece about [TOPIC]. Provide an engaging opening paragraph and suggest the tone and style.',
+      category: 'Personal'
+    });
+    await libraryPage.expectPromptVisible('Creative Writing Starter');
 
     // Step 5: Test category filtering
     // Filter by Work category
-    await sidepanelPage.locator('select').filter({ hasText: 'All Categories' }).selectOption('Work');
-
-    // Should only see work-related prompt
-    await expect(sidepanelPage.getByText('Email Summary Template')).toBeVisible();
+    await libraryPage.filterByCategory('Work');
+    await libraryPage.expectPromptVisible('Email Summary Template');
     await expect(sidepanelPage.getByText('Creative Writing Starter')).toBeHidden();
 
     // Filter by Personal category
-    await sidepanelPage.locator('select').filter({ hasText: 'Work' }).selectOption('Personal');
-
-    // Should only see personal prompt
-    await expect(sidepanelPage.getByText('Creative Writing Starter')).toBeVisible();
+    await libraryPage.filterByCategory('Personal');
+    await libraryPage.expectPromptVisible('Creative Writing Starter');
     await expect(sidepanelPage.getByText('Email Summary Template')).toBeHidden();
 
     // Reset to show all
-    await sidepanelPage.locator('select').filter({ hasText: 'Personal' }).selectOption('');
-    await expect(sidepanelPage.getByText('Email Summary Template')).toBeVisible();
-    await expect(sidepanelPage.getByText('Creative Writing Starter')).toBeVisible();
+    await libraryPage.clearFilters();
+    await libraryPage.expectPromptVisible('Email Summary Template');
+    await libraryPage.expectPromptVisible('Creative Writing Starter');
 
     // Step 6: Test prompt usage on Claude.ai (mocked)
     // Set up Claude.ai mocking
@@ -207,32 +188,25 @@ test.describe('User Journey: New User Setup & First Prompt Creation', () => {
     await sidepanelPage.bringToFront();
 
     // Verify all data is still there
-    await expect(sidepanelPage.getByText('Email Summary Template')).toBeVisible();
-    await expect(sidepanelPage.getByText('Creative Writing Starter')).toBeVisible();
+    await libraryPage.expectPromptVisible('Email Summary Template');
+    await libraryPage.expectPromptVisible('Creative Writing Starter');
 
     // Check categories are still available
-    await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
-    await expect(sidepanelPage.getByText('3 categories')).toBeVisible();
-    await expect(sidepanelPage.getByText('Work')).toBeVisible();
-    await expect(sidepanelPage.getByText('Personal')).toBeVisible();
-    await expect(sidepanelPage.getByText('Uncategorized')).toBeVisible();
-
-    // Close category manager
-    const closeButton2 = sidepanelPage.locator('button').filter({ has: sidepanelPage.locator('path[d="M6 18L18 6M6 6l12 12"]') }).first();
-    await closeButton2.click();
+    await categoryManagerPage.openFromLibrary();
+    await categoryManagerPage.expectCategoryCount(3);
+    await categoryManagerPage.expectCategoryExists('Work');
+    await categoryManagerPage.expectCategoryExists('Personal');
+    await categoryManagerPage.expectCategoryExists('Uncategorized');
+    await categoryManagerPage.closeToLibrary();
 
     // Step 9: Add one more prompt to verify iterative building
-    // (Category manager already closed, so we're back in library view)
-    await sidepanelPage.getByRole('button', { name: 'Add New Prompt' }).click();
-
-    await sidepanelPage.getByLabel('Title (optional)').fill('Code Review Helper');
-    await sidepanelPage.getByLabel('Content *').fill('Please review this code for:\n1. Best practices\n2. Potential bugs\n3. Performance improvements\n4. Security issues\n\nCode:\n[CODE_TO_REVIEW]');
-    await sidepanelPage.getByLabel('Category').selectOption('Work');
-
-    await sidepanelPage.getByRole('button', { name: 'Save Prompt' }).click();
-
-    await expect(sidepanelPage.getByText('Prompt created successfully').first()).toBeVisible();
-    await expect(sidepanelPage.getByText('Code Review Helper')).toBeVisible();
+    await libraryPage.clickAddNewPrompt();
+    await promptFormPage.createPrompt({
+      title: 'Code Review Helper',
+      content: 'Please review this code for:\n1. Best practices\n2. Potential bugs\n3. Performance improvements\n4. Security issues\n\nCode:\n[CODE_TO_REVIEW]',
+      category: 'Work'
+    });
+    await libraryPage.expectPromptVisible('Code Review Helper');
 
     // Final verification: User now has a functional prompt library
     // - 3 categories (including default)
@@ -240,14 +214,14 @@ test.describe('User Journey: New User Setup & First Prompt Creation', () => {
     // - Tested cross-platform integration
     // - Verified data persistence and filtering
 
-    await expect(sidepanelPage.locator('article')).toHaveCount(3);
+    await libraryPage.expectPromptCount(3);
 
     // Verify category distribution
-    await sidepanelPage.locator('select').filter({ hasText: 'All Categories' }).selectOption('Work');
-    await expect(sidepanelPage.locator('article')).toHaveCount(2); // Email + Code Review
+    await libraryPage.filterByCategory('Work');
+    await libraryPage.expectPromptCount(2); // Email + Code Review
 
-    await sidepanelPage.locator('select').filter({ hasText: 'Work' }).selectOption('Personal');
-    await expect(sidepanelPage.locator('article')).toHaveCount(1); // Creative Writing
+    await libraryPage.filterByCategory('Personal');
+    await libraryPage.expectPromptCount(1); // Creative Writing
   });
 
   test('should handle new user workflow with search functionality', async ({
@@ -262,16 +236,17 @@ test.describe('User Journey: New User Setup & First Prompt Creation', () => {
       settings: { ...DEFAULT_SETTINGS, interfaceMode: 'sidepanel' },
     });
 
-    const sidepanelPage = await context.newPage();
-    await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`);
+    const sidepanelPage = await workflows.navigation.openSidepanel(context, extensionId);
 
-    // Create a category and multiple prompts
-    await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
-    await sidepanelPage.getByPlaceholder('Enter category name...').fill('Development');
-    await sidepanelPage.getByRole('button', { name: 'Add' }).click();
-    // Close category manager
-    const closeButton3 = sidepanelPage.locator('button').filter({ has: sidepanelPage.locator('path[d="M6 18L18 6M6 6l12 12"]') }).first();
-    await closeButton3.click();
+    // Initialize POMs
+    const libraryPage = new LibraryPage(sidepanelPage);
+    const categoryManagerPage = new CategoryManagerPage(sidepanelPage);
+    const promptFormPage = new PromptFormPage(sidepanelPage);
+
+    // Create a category
+    await categoryManagerPage.openFromLibrary();
+    await categoryManagerPage.createCategory('Development');
+    await categoryManagerPage.closeToLibrary();
 
     // Add multiple prompts with different keywords
     const prompts = [
@@ -281,32 +256,32 @@ test.describe('User Journey: New User Setup & First Prompt Creation', () => {
     ];
 
     for (const prompt of prompts) {
-      await sidepanelPage.getByRole('button', { name: 'Add New Prompt' }).click();
-      await sidepanelPage.getByLabel('Title (optional)').fill(prompt.title);
-      await sidepanelPage.getByLabel('Content *').fill(prompt.content);
-      await sidepanelPage.getByLabel('Category').selectOption('Development');
-      await sidepanelPage.getByRole('button', { name: 'Save Prompt' }).click();
-      await expect(sidepanelPage.getByText('Prompt created successfully').first()).toBeVisible();
+      await libraryPage.clickAddNewPrompt();
+      await promptFormPage.createPrompt({
+        title: prompt.title,
+        content: prompt.content,
+        category: 'Development'
+      });
     }
 
     // Test search functionality
-    await sidepanelPage.getByPlaceholder('Search your prompts...').fill('JavaScript');
-    await expect(sidepanelPage.getByText('JavaScript Debug Helper')).toBeVisible();
+    await libraryPage.searchPrompts('JavaScript');
+    await libraryPage.expectPromptVisible('JavaScript Debug Helper');
     await expect(sidepanelPage.getByText('Python Code Review')).toBeHidden();
     await expect(sidepanelPage.getByText('API Documentation')).toBeHidden();
 
     // Search by title
-    await sidepanelPage.getByPlaceholder('Search your prompts...').fill('Python');
-    await expect(sidepanelPage.getByText('Python Code Review')).toBeVisible();
+    await libraryPage.searchPrompts('Python');
+    await libraryPage.expectPromptVisible('Python Code Review');
     await expect(sidepanelPage.getByText('JavaScript Debug Helper')).toBeHidden();
 
     // Search by content
-    await sidepanelPage.getByPlaceholder('Search your prompts...').fill('documentation');
-    await expect(sidepanelPage.getByText('API Documentation')).toBeVisible();
+    await libraryPage.searchPrompts('documentation');
+    await libraryPage.expectPromptVisible('API Documentation');
     await expect(sidepanelPage.getByText('JavaScript Debug Helper')).toBeHidden();
 
     // Clear search to show all
-    await sidepanelPage.getByPlaceholder('Search your prompts...').fill('');
-    await expect(sidepanelPage.locator('article')).toHaveCount(3);
+    await libraryPage.clearFilters();
+    await libraryPage.expectPromptCount(3);
   });
 });
