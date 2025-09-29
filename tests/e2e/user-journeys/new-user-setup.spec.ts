@@ -343,6 +343,9 @@ const CHATGPT_MOCK_HTML = /* html */ `
   </head>
   <body>
     <div class="chat-container">
+      <header style="padding: 16px 24px; border-bottom: 1px solid #565869;">
+        <h1 style="margin: 0; font-size: 24px; font-weight: 600;">ChatGPT</h1>
+      </header>
       <div class="chat-area" id="chat-area">
         <div class="message assistant-message">
           Hello! I'm ChatGPT, an AI assistant. How can I assist you today?
