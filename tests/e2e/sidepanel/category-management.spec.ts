@@ -150,7 +150,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
       await categoryNameInput.fill('New Category');
 
       // Error should disappear
-      await expect(sidepanelPage.getByText('⚠️ Category already exists')).not.toBeVisible();
+      await expect(sidepanelPage.getByText('⚠️ Category already exists')).toBeHidden();
     });
   });
 
@@ -203,7 +203,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
 
       // Verify changes applied
       await expect(sidepanelPage.getByText('Analysis')).toBeVisible();
-      await expect(sidepanelPage.getByText('Research')).not.toBeVisible();
+      await expect(sidepanelPage.getByText('Research')).toBeHidden();
 
       // Verify persistence in storage
       const categories = await storage.getCategories();
@@ -249,8 +249,8 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
 
       // Verify original name restored and edit mode exited
       await expect(sidepanelPage.getByText('Original Name')).toBeVisible();
-      await expect(sidepanelPage.getByText('Changed Name')).not.toBeVisible();
-      await expect(editInput).not.toBeVisible();
+      await expect(sidepanelPage.getByText('Changed Name')).toBeHidden();
+      await expect(editInput).toBeHidden();
 
       // Verify storage unchanged
       const categories = await storage.getCategories();
@@ -294,7 +294,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
 
       // Verify changes saved
       await expect(sidepanelPage.getByText('New Name')).toBeVisible();
-      await expect(sidepanelPage.getByText('Old Name')).not.toBeVisible();
+      await expect(sidepanelPage.getByText('Old Name')).toBeHidden();
 
       // Verify storage updated
       const categories = await storage.getCategories();
@@ -350,7 +350,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
       await confirmDeleteButton.click();
 
       // Verify category removed from list (not from dialog which should be closed)
-      await expect(sidepanelPage.locator('.text-sm.font-semibold').filter({ hasText: 'Temporary Category' })).not.toBeVisible();
+      await expect(sidepanelPage.locator('.text-sm.font-semibold').filter({ hasText: 'Temporary Category' })).toBeHidden();
       await expect(sidepanelPage.getByText('1 category')).toBeVisible(); // Only "Uncategorized" remains
 
       // Verify storage updated
@@ -377,8 +377,8 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
       await uncategorizedRow.hover();
 
       // Verify no delete button is present (only edit should be missing too for default category)
-      await expect(uncategorizedRow.getByRole('button', { name: 'Delete category' })).not.toBeVisible();
-      await expect(uncategorizedRow.getByRole('button', { name: 'Edit category' })).not.toBeVisible();
+      await expect(uncategorizedRow.getByRole('button', { name: 'Delete category' })).toBeHidden();
+      await expect(uncategorizedRow.getByRole('button', { name: 'Edit category' })).toBeHidden();
     });
 
     test('should cancel deletion dialog', async ({ context, storage, extensionId }) => {
@@ -416,7 +416,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
       await expect(sidepanelPage.getByText('2 categories')).toBeVisible();
 
       // Verify dialog closed
-      await expect(confirmDialog).not.toBeVisible();
+      await expect(confirmDialog).toBeHidden();
 
       // Verify storage unchanged
       const categories = await storage.getCategories();
@@ -542,7 +542,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
 
         // Verify category name changed in UI
         await expect(sidepanelPage.getByText('Analysis')).toBeVisible();
-        await expect(sidepanelPage.getByText('Research')).not.toBeVisible();
+        await expect(sidepanelPage.getByText('Research')).toBeHidden();
 
         // Go back to main view
         const closeButton = sidepanelPage.locator('button').filter({ has: sidepanelPage.locator('path[d="M6 18L18 6M6 6l12 12"]') }).first();
@@ -621,14 +621,14 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
 
         // Should only show the coding prompt
         await expect(sidepanelPage.getByRole('heading', { name: 'Debug Function' })).toBeVisible();
-        await expect(sidepanelPage.getByRole('heading', { name: 'Blog Post Outline' })).not.toBeVisible();
+        await expect(sidepanelPage.getByRole('heading', { name: 'Blog Post Outline' })).toBeHidden();
 
         // Filter by "Writing"
         await categoryFilter.selectOption('Writing');
 
         // Should only show the writing prompt
         await expect(sidepanelPage.getByRole('heading', { name: 'Blog Post Outline' })).toBeVisible();
-        await expect(sidepanelPage.getByRole('heading', { name: 'Debug Function' })).not.toBeVisible();
+        await expect(sidepanelPage.getByRole('heading', { name: 'Debug Function' })).toBeHidden();
 
         // Clear filter (show all)
         await categoryFilter.selectOption('All Categories');
@@ -752,8 +752,8 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
         expect(optionCount).toBe(1);
 
         // Verify the option is "Uncategorized"
-        const optionText = await categoryOptions.first().textContent();
-        expect(optionText).toBe(DEFAULT_CATEGORY);
+        const optionText = categoryOptions.first();
+        await expect(optionText).toHaveText(DEFAULT_CATEGORY);
 
         // Select Uncategorized and save
         await categorySelect.selectOption(DEFAULT_CATEGORY);
@@ -882,7 +882,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
 
         // Verify return to main library view
         await expect(sidepanelPage.getByRole('heading', { name: 'My Prompt Manager' })).toBeVisible();
-        await expect(sidepanelPage.getByRole('heading', { name: 'Manage Categories' })).not.toBeVisible();
+        await expect(sidepanelPage.getByRole('heading', { name: 'Manage Categories' })).toBeHidden();
 
         // Verify the "Manage categories" button is visible again
         await expect(sidepanelPage.getByRole('button', { name: 'Manage categories' })).toBeVisible();
@@ -938,7 +938,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
         // Verify singular form is used
         await expect(sidepanelPage.getByText('1 category')).toBeVisible();
         // Check that the counter doesn't show plural form
-        await expect(sidepanelPage.locator('span').filter({ hasText: /^\d+ categories$/ })).not.toBeVisible();
+        await expect(sidepanelPage.locator('span').filter({ hasText: /^\d+ categories$/ })).toBeHidden();
       });
 
       test('should show empty state when no custom categories exist', async ({ context, storage, extensionId }) => {
@@ -992,7 +992,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
 
         // Verify count updated to 2
         await expect(sidepanelPage.getByText('2 categories')).toBeVisible();
-        await expect(sidepanelPage.getByText('1 category')).not.toBeVisible();
+        await expect(sidepanelPage.getByText('1 category')).toBeHidden();
 
         // Add another category
         await categoryNameInput.fill('Development');
@@ -1015,7 +1015,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
 
         // Verify count decreased to 2
         await expect(sidepanelPage.getByText('2 categories')).toBeVisible();
-        await expect(sidepanelPage.getByText('3 categories')).not.toBeVisible();
+        await expect(sidepanelPage.getByText('3 categories')).toBeHidden();
       });
     });
 
@@ -1135,7 +1135,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
         await editInput.press('Enter');
 
         // Verify edit mode exited
-        await expect(editInput).not.toBeVisible();
+        await expect(editInput).toBeHidden();
         await expect(sidepanelPage.getByText('Color Test')).toBeVisible();
       });
     });
@@ -1204,8 +1204,8 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
 
         // Verify original name is preserved
         await expect(sidepanelPage.getByText('Edit Test')).toBeVisible();
-        await expect(sidepanelPage.getByText('Changed Name')).not.toBeVisible();
-        await expect(editInput).not.toBeVisible();
+        await expect(sidepanelPage.getByText('Changed Name')).toBeHidden();
+        await expect(editInput).toBeHidden();
       });
 
       test('should support Enter key to save category editing', async ({ context, storage, extensionId }) => {
@@ -1237,8 +1237,8 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
 
         // Verify changes were saved
         await expect(sidepanelPage.getByText('Updated Name')).toBeVisible();
-        await expect(sidepanelPage.getByText('Save Test')).not.toBeVisible();
-        await expect(editInput).not.toBeVisible();
+        await expect(sidepanelPage.getByText('Save Test')).toBeHidden();
+        await expect(editInput).toBeHidden();
       });
 
       test('should provide proper ARIA labels and accessibility features', async ({ context, storage, extensionId }) => {

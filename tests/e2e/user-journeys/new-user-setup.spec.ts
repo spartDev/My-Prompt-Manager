@@ -94,14 +94,14 @@ test.describe('User Journey: New User Setup & First Prompt Creation', () => {
 
     // Should only see work-related prompt
     await expect(sidepanelPage.getByText('Email Summary Template')).toBeVisible();
-    await expect(sidepanelPage.getByText('Creative Writing Starter')).not.toBeVisible();
+    await expect(sidepanelPage.getByText('Creative Writing Starter')).toBeHidden();
 
     // Filter by Personal category
     await sidepanelPage.locator('select').filter({ hasText: 'Work' }).selectOption('Personal');
 
     // Should only see personal prompt
     await expect(sidepanelPage.getByText('Creative Writing Starter')).toBeVisible();
-    await expect(sidepanelPage.getByText('Email Summary Template')).not.toBeVisible();
+    await expect(sidepanelPage.getByText('Email Summary Template')).toBeHidden();
 
     // Reset to show all
     await sidepanelPage.locator('select').filter({ hasText: 'Personal' }).selectOption('');
@@ -146,7 +146,7 @@ test.describe('User Journey: New User Setup & First Prompt Creation', () => {
     await expect(searchInput).toBeVisible();
     await searchInput.fill('Email');
     await expect(claudePage.getByText('Email Summary Template')).toBeVisible();
-    await expect(claudePage.getByText('Creative Writing Starter')).not.toBeVisible();
+    await expect(claudePage.getByText('Creative Writing Starter')).toBeHidden();
 
     // Clear search to see all prompts again
     await searchInput.clear();
@@ -160,7 +160,7 @@ test.describe('User Journey: New User Setup & First Prompt Creation', () => {
     await expect(editor).toContainText('Please summarize the key points from this email');
 
     // Verify prompt selector closes after insertion
-    await expect(claudePage.getByText('Email Summary Template')).not.toBeVisible();
+    await expect(claudePage.getByText('Email Summary Template')).toBeHidden();
 
     // Step 7: Test on ChatGPT (mocked) with different prompt
     await context.route('https://chatgpt.com/**', async (route) => {
@@ -191,7 +191,7 @@ test.describe('User Journey: New User Setup & First Prompt Creation', () => {
     const chatgptSearchInput = chatgptPage.locator('.search-input');
     await chatgptSearchInput.fill('Creative');
     await expect(chatgptPage.getByText('Creative Writing Starter')).toBeVisible();
-    await expect(chatgptPage.getByText('Email Summary Template')).not.toBeVisible();
+    await expect(chatgptPage.getByText('Email Summary Template')).toBeHidden();
 
     // Clear search to make selection
     await chatgptSearchInput.clear();
@@ -292,18 +292,18 @@ test.describe('User Journey: New User Setup & First Prompt Creation', () => {
     // Test search functionality
     await sidepanelPage.getByPlaceholder('Search your prompts...').fill('JavaScript');
     await expect(sidepanelPage.getByText('JavaScript Debug Helper')).toBeVisible();
-    await expect(sidepanelPage.getByText('Python Code Review')).not.toBeVisible();
-    await expect(sidepanelPage.getByText('API Documentation')).not.toBeVisible();
+    await expect(sidepanelPage.getByText('Python Code Review')).toBeHidden();
+    await expect(sidepanelPage.getByText('API Documentation')).toBeHidden();
 
     // Search by title
     await sidepanelPage.getByPlaceholder('Search your prompts...').fill('Python');
     await expect(sidepanelPage.getByText('Python Code Review')).toBeVisible();
-    await expect(sidepanelPage.getByText('JavaScript Debug Helper')).not.toBeVisible();
+    await expect(sidepanelPage.getByText('JavaScript Debug Helper')).toBeHidden();
 
     // Search by content
     await sidepanelPage.getByPlaceholder('Search your prompts...').fill('documentation');
     await expect(sidepanelPage.getByText('API Documentation')).toBeVisible();
-    await expect(sidepanelPage.getByText('JavaScript Debug Helper')).not.toBeVisible();
+    await expect(sidepanelPage.getByText('JavaScript Debug Helper')).toBeHidden();
 
     // Clear search to show all
     await sidepanelPage.getByPlaceholder('Search your prompts...').fill('');

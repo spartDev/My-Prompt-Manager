@@ -4,8 +4,8 @@ import react from 'eslint-plugin-react';
 import reactHooks from 'eslint-plugin-react-hooks';
 import importPlugin from 'eslint-plugin-import';
 import jsxA11y from 'eslint-plugin-jsx-a11y';
-import vitest from '@vitest/eslint-plugin'
-
+import vitest from '@vitest/eslint-plugin';
+import playwright from 'eslint-plugin-playwright';
 
 export default [
   // Base JavaScript configuration for all files
@@ -179,7 +179,15 @@ export default [
       '@typescript-eslint/no-misused-promises': 'off',
     },
   },
-  
+
+  // Configuration for E2E tests
+  {
+    ...playwright.configs['flat/recommended'],
+    files: ['tests/**'],
+    rules: {
+      ...playwright.configs['flat/recommended'].rules,
+    },
+  },
   // Global ignores
   {
     ignores: [

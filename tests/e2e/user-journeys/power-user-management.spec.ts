@@ -171,7 +171,7 @@ test.describe('User Journey: Power User Prompt Management & Organization', () =>
 
     // Verify category name changed in the list
     await expect(sidepanelPage.getByText('Professional')).toBeVisible();
-    await expect(sidepanelPage.getByText('Work')).not.toBeVisible();
+    await expect(sidepanelPage.getByText('Work')).toBeHidden();
 
     // Close category manager and verify prompts updated
     const closeButton = sidepanelPage.locator('button').filter({ has: sidepanelPage.locator('path[d="M6 18L18 6M6 6l12 12"]') }).first();
@@ -235,7 +235,7 @@ test.describe('User Journey: Power User Prompt Management & Organization', () =>
     await expect(sidepanelPage.getByText('Category deleted successfully')).toBeVisible();
 
     // Verify Marketing category removed
-    await expect(sidepanelPage.getByText('Marketing')).not.toBeVisible();
+    await expect(sidepanelPage.getByText('Marketing')).toBeHidden();
 
     const closeButton2 = sidepanelPage.locator('button').filter({ has: sidepanelPage.locator('path[d="M6 18L18 6M6 6l12 12"]') }).first();
     await expect(closeButton2).toBeVisible();
@@ -250,8 +250,6 @@ test.describe('User Journey: Power User Prompt Management & Organization', () =>
     // Test search with multiple keywords
     const searchInput = sidepanelPage.getByPlaceholder('Search your prompts...');
     await searchInput.fill('review');
-    // Wait a moment for search to process
-    await sidepanelPage.waitForTimeout(500);
 
     // Should find all prompts containing "review": Performance Review Notes, Code Review Checklist, Literature Review Helper
     await expect(sidepanelPage.locator('article')).toHaveCount(3);
@@ -388,8 +386,8 @@ test.describe('User Journey: Power User Prompt Management & Organization', () =>
 
     // Navigate back to library view for final verification
     await sidepanelPage.getByRole('button', { name: 'Library' }).click();
-    // Wait a moment for the view to load
-    await sidepanelPage.waitForTimeout(1000);
+    // Wait for the prompt list to become visible again
+    await expect(sidepanelPage.locator('article').first()).toBeVisible();
 
     // Final verification: Check current state matches expectations
     const finalPromptCount = await sidepanelPage.locator('article').count();

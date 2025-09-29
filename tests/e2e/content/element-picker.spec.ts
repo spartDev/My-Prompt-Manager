@@ -3,7 +3,7 @@ import { test, expect } from '../fixtures/extension';
 import { seedLibrary } from '../utils/storage';
 
 test.describe('Element picker integration', () => {
-  test('displays selected element after picker flow completes', async ({ context, page, storage, extensionId }) => {
+  test('displays selected element after picker flow completes', async ({ context, page, storage }) => {
     await seedLibrary(storage, {
       settings: {
         ...DEFAULT_SETTINGS,
