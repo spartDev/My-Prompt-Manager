@@ -8,15 +8,6 @@ import { getChromeMockFunctions, getMockStorageManager } from '../../test/mocks'
 import { DEFAULT_SETTINGS } from '../../types';
 import SettingsView from '../SettingsView';
 
-const createJsonFile = (contents: string): File => {
-  const file = new File([contents], 'backup.json', { type: 'application/json' });
-  Object.defineProperty(file, 'text', {
-    value: () => Promise.resolve(contents),
-    configurable: true
-  });
-  return file;
-};
-
 const renderSettings = async (showToast = vi.fn()) => {
   const mockToastSettings = {
     position: 'top-right' as const,

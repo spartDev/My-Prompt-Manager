@@ -11,8 +11,8 @@ import { ClaudeIcon, ChatGPTIcon, PerplexityIcon, MistralIcon } from './icons/Si
 import AboutSection from './settings/AboutSection';
 import AdvancedSection from './settings/AdvancedSection';
 import AppearanceSection from './settings/AppearanceSection';
-import NotificationSection from './settings/NotificationSection';
 import BackupRestoreView from './settings/BackupRestoreView';
+import NotificationSection from './settings/NotificationSection';
 import SiteIntegrationSection from './settings/SiteIntegrationSection';
 
 interface SiteConfig {

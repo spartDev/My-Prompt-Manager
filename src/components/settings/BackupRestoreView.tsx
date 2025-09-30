@@ -1,5 +1,6 @@
 import { ChangeEvent, FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { useSecurePasswords } from '../../hooks/useSecurePassword';
 import { backupManager } from '../../services/backupManager';
 import { StorageManager } from '../../services/storage';
 import { ErrorType } from '../../types';
@@ -14,6 +15,7 @@ import type {
   RestoreOptions
 } from '../../types/backup';
 import ConfirmDialog from '../ConfirmDialog';
+import { PasswordStrengthIndicator } from '../PasswordStrengthIndicator';
 
 import SettingsSection from './SettingsSection';
 
@@ -24,20 +26,17 @@ interface BackupRestoreViewProps {
 interface BackupOptionsState {
   includeSettings: boolean;
   encryptionEnabled: boolean;
-  password: string;
 }
 
 const initialBackupOptions: BackupOptionsState = {
   includeSettings: true,
-  encryptionEnabled: false,
-  password: ''
+  encryptionEnabled: false
 };
 
 const initialRestoreOptions: RestoreOptions = {
   mode: 'merge',
   conflictResolution: 'skip',
-  selectedCategoryIds: [],
-  password: ''
+  selectedCategoryIds: []
 };
 
 const conflictStrategyLabels: Record<ConflictResolutionStrategy, string> = {
@@ -121,6 +120,9 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
   const [loadingUsage, setLoadingUsage] = useState(false);
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
 
+  // Secure password management - automatically cleared on unmount
+  const [encryptionPassword, decryptionPassword] = useSecurePasswords(2);
+
   const refreshStorageUsage = useCallback(async () => {
     try {
       setLoadingUsage(true);
@@ -164,7 +166,7 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
         includePrivatePrompts: true,
         encryption: {
           enabled: backupOptions.encryptionEnabled,
-          password: backupOptions.password
+          password: encryptionPassword.value
         }
       });
 
@@ -177,6 +179,9 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
       }, ...prev]);
       showToast('Backup created successfully.', 'success');
       void refreshStorageUsage();
+
+      // Securely clear password after successful backup
+      encryptionPassword.clear();
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Failed to create backup.', 'error');
     } finally {
@@ -195,7 +200,9 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
-  }, []);
+    // Securely clear decryption password when clearing file
+    decryptionPassword.clear();
+  }, [decryptionPassword]);
 
   const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -211,7 +218,7 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
       setPreview(null);
       setRestoreError(null);
 
-      if (validationResult.metadata?.encrypted && !restoreOptions.password) {
+      if (validationResult.metadata?.encrypted && decryptionPassword.isEmpty()) {
         showToast('This backup is encrypted. Enter the password to preview or restore.', 'info');
       }
 
@@ -237,7 +244,10 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
     }
 
     try {
-      const previewData = await backupManager.previewBackup(content, restoreOptions.password);
+      const previewData = await backupManager.previewBackup(
+        content,
+        decryptionPassword.isEmpty() ? undefined : decryptionPassword.value
+      );
       setPreview(previewData);
       setRestoreOptions((prev) => ({
         ...prev,
@@ -307,7 +317,14 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
     try {
       setIsRestoring(true);
       setRestoreError(null);
-      const summary = await backupManager.restoreBackup(content, restoreOptions);
+
+      // Use secure password for restore
+      const restoreOptionsWithPassword: RestoreOptions = {
+        ...restoreOptions,
+        password: decryptionPassword.isEmpty() ? undefined : decryptionPassword.value
+      };
+
+      const summary = await backupManager.restoreBackup(content, restoreOptionsWithPassword);
       const importedCount = summary.importedPrompts.toLocaleString();
       const updatedCount = summary.updatedPrompts.toLocaleString();
       const skippedCount = summary.skippedPrompts.toLocaleString();
@@ -317,6 +334,9 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
       );
       handleClearFile();
       void refreshStorageUsage();
+
+      // Securely clear password after successful restore
+      decryptionPassword.clear();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to restore backup.';
       showToast(errorMessage, 'error');
@@ -459,13 +479,16 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
               </div>
 
               {backupOptions.encryptionEnabled && (
-                <input
-                  type="password"
-                  placeholder="Encryption password"
-                  value={backupOptions.password}
-                  onChange={(event) => { handleBackupOptionChange('password', event.target.value); }}
-                  className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white"
-                />
+                <div className="space-y-1">
+                  <input
+                    type="password"
+                    placeholder="Encryption password"
+                    value={encryptionPassword.value}
+                    onChange={(event) => { encryptionPassword.setValue(event.target.value); }}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white"
+                  />
+                  <PasswordStrengthIndicator password={encryptionPassword.value} />
+                </div>
               )}
             </div>
           </div>
@@ -473,7 +496,7 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
           <button
             type="button"
             onClick={() => { void handleCreateBackup(); }}
-            disabled={isBackingUp || (backupOptions.encryptionEnabled && !backupOptions.password)}
+            disabled={isBackingUp || (backupOptions.encryptionEnabled && encryptionPassword.isEmpty())}
             className="inline-flex w-full items-center justify-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-sm font-medium hover:from-purple-700 hover:to-indigo-700 transition-colors disabled:opacity-50"
           >
             {isBackingUp ? 'Creating backup…' : 'Create Backup'}
@@ -681,8 +704,8 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
                       id="backup-password-input"
                       type="password"
                       placeholder="Enter your backup password"
-                      value={restoreOptions.password ?? ''}
-                      onChange={(event) => { setRestoreOptions((prev) => ({ ...prev, password: event.target.value })); }}
+                      value={decryptionPassword.value}
+                      onChange={(event) => { decryptionPassword.setValue(event.target.value); }}
                       className="w-full px-3 py-2.5 rounded-lg border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 shadow-sm"
                     />
                     <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">

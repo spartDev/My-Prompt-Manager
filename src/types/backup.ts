@@ -107,3 +107,21 @@ export interface BackupCreationResult {
   metadata: BackupMetadata;
   raw: BackupFileV2 | EncryptedBackupFileV2;
 }
+
+export enum PasswordValidationError {
+  TOO_SHORT = 'TOO_SHORT',
+  TOO_LONG = 'TOO_LONG',
+  NO_UPPERCASE = 'NO_UPPERCASE',
+  NO_LOWERCASE = 'NO_LOWERCASE',
+  NO_NUMBERS = 'NO_NUMBERS',
+  NO_SPECIAL_CHARS = 'NO_SPECIAL_CHARS',
+  COMMON_PASSWORD = 'COMMON_PASSWORD',
+  INSUFFICIENT_ENTROPY = 'INSUFFICIENT_ENTROPY'
+}
+
+export interface PasswordValidationResult {
+  valid: boolean;
+  errors: PasswordValidationError[];
+  strength: 'weak' | 'fair' | 'good' | 'strong';
+  score: number; // 0-100
+}
