@@ -1,4 +1,4 @@
-import { memo, useState, useEffect, useCallback } from 'react';
+import { memo, useState, useEffect, useCallback, useRef } from 'react';
 import type { FC } from 'react';
 
 import { Toast } from '../types/hooks';
@@ -14,11 +14,19 @@ interface ToastContainerProps {
 
 const ToastItem: FC<{ toast: Toast; onDismiss: (id: string) => void }> = ({ toast, onDismiss }) => {
   const [isExiting, setIsExiting] = useState(false);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const exitTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleDismiss = useCallback(() => {
+    // Clear the auto-dismiss timer if it's still running
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+
     setIsExiting(true);
     // Wait for animation to complete before actually dismissing
-    setTimeout(() => {
+    exitTimerRef.current = setTimeout(() => {
       onDismiss(toast.id);
     }, 250);
   }, [toast.id, onDismiss]);
@@ -27,12 +35,19 @@ const ToastItem: FC<{ toast: Toast; onDismiss: (id: string) => void }> = ({ toas
   useEffect(() => {
     if (!toast.duration || toast.duration <= 0) {return;}
 
-    const timer = setTimeout(() => {
+    timerRef.current = setTimeout(() => {
       handleDismiss();
     }, toast.duration);
 
     return () => {
-      clearTimeout(timer);
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+      if (exitTimerRef.current) {
+        clearTimeout(exitTimerRef.current);
+        exitTimerRef.current = null;
+      }
     };
   }, [toast.duration, handleDismiss]);
 
