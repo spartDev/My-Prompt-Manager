@@ -10,6 +10,80 @@ interface NotificationSectionProps {
   onTestToast: (type: 'success' | 'error' | 'info' | 'warning') => void;
 }
 
+interface NotificationTypeRowProps {
+  type: 'success' | 'error' | 'warning' | 'info';
+  label: string;
+  description: string;
+  color: string;
+  enabled: boolean;
+  onToggle: (checked: boolean) => void;
+}
+
+const NotificationTypeRow: FC<NotificationTypeRowProps> = ({
+  type,
+  label,
+  description,
+  color,
+  enabled,
+  onToggle
+}) => {
+  return (
+    <div className={`
+      flex items-center justify-between p-3 rounded-lg border transition-all duration-200
+      ${enabled
+        ? 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+        : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 opacity-60'
+      }
+    `}>
+      <div className="flex items-center space-x-3">
+        <div className={`w-1 h-8 rounded transition-colors duration-200 ${enabled ? color : 'bg-gray-400 dark:bg-gray-600'}`}></div>
+        <div>
+          <div className={`text-sm font-medium transition-colors duration-200 ${enabled ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-500'}`}>
+            {label}
+          </div>
+          <div className={`text-xs transition-colors duration-200 ${enabled ? 'text-gray-500 dark:text-gray-400' : 'text-gray-400 dark:text-gray-600'}`}>
+            {description}
+          </div>
+        </div>
+      </div>
+      <ToggleSwitch
+        checked={enabled}
+        onChange={onToggle}
+        ariaLabel={`Enable ${type} notifications`}
+        size="small"
+      />
+    </div>
+  );
+};
+
+// Configuration for notification types
+const NOTIFICATION_TYPES = [
+  {
+    type: 'success' as const,
+    label: 'Success',
+    description: 'Confirmation messages (2.75s)',
+    color: 'bg-green-500'
+  },
+  {
+    type: 'error' as const,
+    label: 'Error',
+    description: 'Error messages (7s)',
+    color: 'bg-red-500'
+  },
+  {
+    type: 'warning' as const,
+    label: 'Warning',
+    description: 'Important alerts (5s)',
+    color: 'bg-yellow-500'
+  },
+  {
+    type: 'info' as const,
+    label: 'Info',
+    description: 'Informational messages (2.75s)',
+    color: 'bg-blue-500'
+  }
+] as const;
+
 const NotificationSection: FC<NotificationSectionProps> = ({
   settings,
   onSettingsChange,
@@ -170,117 +244,24 @@ const NotificationSection: FC<NotificationSectionProps> = ({
             </button>
           </div>
           <div className="space-y-3">
-            {/* Success */}
-            <div className={`
-              flex items-center justify-between p-3 rounded-lg border transition-all duration-200
-              ${settings?.enabledTypes.success
-                ? 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50'
-                : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 opacity-60'
-              }
-            `}>
-              <div className="flex items-center space-x-3">
-                <div className={`w-1 h-8 rounded transition-colors duration-200 ${settings?.enabledTypes.success ? 'bg-green-500' : 'bg-gray-400 dark:bg-gray-600'}`}></div>
-                <div>
-                  <div className={`text-sm font-medium transition-colors duration-200 ${settings?.enabledTypes.success ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-500'}`}>Success</div>
-                  <div className={`text-xs transition-colors duration-200 ${settings?.enabledTypes.success ? 'text-gray-500 dark:text-gray-400' : 'text-gray-400 dark:text-gray-600'}`}>Confirmation messages (2.75s)</div>
-                </div>
-              </div>
-              <ToggleSwitch
-                checked={currentEnabledTypes.success}
-                onChange={(checked) => { onSettingsChange({
-                  enabledTypes: {
-                    ...currentEnabledTypes,
-                    success: checked
-                  }
-                }); }}
-                ariaLabel="Enable success notifications"
-                size="small"
+            {NOTIFICATION_TYPES.map(({ type, label, description, color }) => (
+              <NotificationTypeRow
+                key={type}
+                type={type}
+                label={label}
+                description={description}
+                color={color}
+                enabled={currentEnabledTypes[type]}
+                onToggle={(checked) => {
+                  onSettingsChange({
+                    enabledTypes: {
+                      ...currentEnabledTypes,
+                      [type]: checked
+                    }
+                  });
+                }}
               />
-            </div>
-
-            {/* Error */}
-            <div className={`
-              flex items-center justify-between p-3 rounded-lg border transition-all duration-200
-              ${settings?.enabledTypes.error
-                ? 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50'
-                : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 opacity-60'
-              }
-            `}>
-              <div className="flex items-center space-x-3">
-                <div className={`w-1 h-8 rounded transition-colors duration-200 ${settings?.enabledTypes.error ? 'bg-red-500' : 'bg-gray-400 dark:bg-gray-600'}`}></div>
-                <div>
-                  <div className={`text-sm font-medium transition-colors duration-200 ${settings?.enabledTypes.error ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-500'}`}>Error</div>
-                  <div className={`text-xs transition-colors duration-200 ${settings?.enabledTypes.error ? 'text-gray-500 dark:text-gray-400' : 'text-gray-400 dark:text-gray-600'}`}>Error messages (7s)</div>
-                </div>
-              </div>
-              <ToggleSwitch
-                checked={currentEnabledTypes.error}
-                onChange={(checked) => { onSettingsChange({
-                  enabledTypes: {
-                    ...currentEnabledTypes,
-                    error: checked
-                  }
-                }); }}
-                ariaLabel="Enable error notifications"
-                size="small"
-              />
-            </div>
-
-            {/* Warning */}
-            <div className={`
-              flex items-center justify-between p-3 rounded-lg border transition-all duration-200
-              ${settings?.enabledTypes.warning
-                ? 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50'
-                : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 opacity-60'
-              }
-            `}>
-              <div className="flex items-center space-x-3">
-                <div className={`w-1 h-8 rounded transition-colors duration-200 ${settings?.enabledTypes.warning ? 'bg-yellow-500' : 'bg-gray-400 dark:bg-gray-600'}`}></div>
-                <div>
-                  <div className={`text-sm font-medium transition-colors duration-200 ${settings?.enabledTypes.warning ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-500'}`}>Warning</div>
-                  <div className={`text-xs transition-colors duration-200 ${settings?.enabledTypes.warning ? 'text-gray-500 dark:text-gray-400' : 'text-gray-400 dark:text-gray-600'}`}>Important alerts (5s)</div>
-                </div>
-              </div>
-              <ToggleSwitch
-                checked={currentEnabledTypes.warning}
-                onChange={(checked) => { onSettingsChange({
-                  enabledTypes: {
-                    ...currentEnabledTypes,
-                    warning: checked
-                  }
-                }); }}
-                ariaLabel="Enable warning notifications"
-                size="small"
-              />
-            </div>
-
-            {/* Info */}
-            <div className={`
-              flex items-center justify-between p-3 rounded-lg border transition-all duration-200
-              ${settings?.enabledTypes.info
-                ? 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50'
-                : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 opacity-60'
-              }
-            `}>
-              <div className="flex items-center space-x-3">
-                <div className={`w-1 h-8 rounded transition-colors duration-200 ${settings?.enabledTypes.info ? 'bg-blue-500' : 'bg-gray-400 dark:bg-gray-600'}`}></div>
-                <div>
-                  <div className={`text-sm font-medium transition-colors duration-200 ${settings?.enabledTypes.info ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-500'}`}>Info</div>
-                  <div className={`text-xs transition-colors duration-200 ${settings?.enabledTypes.info ? 'text-gray-500 dark:text-gray-400' : 'text-gray-400 dark:text-gray-600'}`}>Informational messages (2.75s)</div>
-                </div>
-              </div>
-              <ToggleSwitch
-                checked={currentEnabledTypes.info}
-                onChange={(checked) => { onSettingsChange({
-                  enabledTypes: {
-                    ...currentEnabledTypes,
-                    info: checked
-                  }
-                }); }}
-                ariaLabel="Enable info notifications"
-                size="small"
-              />
-            </div>
+            ))}
           </div>
         </div>
         </div>
