@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 import { Toast } from '../../types/hooks';
@@ -96,10 +96,15 @@ describe('ToastContainer', () => {
     render(<ToastContainer toasts={[toast]} onDismiss={mockOnDismiss} />);
 
     const dismissButton = screen.getByLabelText('Dismiss notification');
-    fireEvent.click(dismissButton);
+
+    act(() => {
+      fireEvent.click(dismissButton);
+    });
 
     // Fast-forward through the animation delay (250ms)
-    vi.advanceTimersByTime(250);
+    act(() => {
+      vi.advanceTimersByTime(250);
+    });
 
     expect(mockOnDismiss).toHaveBeenCalledWith('test-id');
   });
@@ -111,7 +116,9 @@ describe('ToastContainer', () => {
     expect(mockOnDismiss).not.toHaveBeenCalled();
 
     // Fast-forward time (duration + animation delay)
-    vi.advanceTimersByTime(1250);
+    act(() => {
+      vi.advanceTimersByTime(1250);
+    });
 
     expect(mockOnDismiss).toHaveBeenCalledWith('test-id');
   });
@@ -120,7 +127,9 @@ describe('ToastContainer', () => {
     const toast = createToast({ duration: 0 });
     render(<ToastContainer toasts={[toast]} onDismiss={mockOnDismiss} />);
 
-    vi.advanceTimersByTime(5000);
+    act(() => {
+      vi.advanceTimersByTime(5000);
+    });
 
     expect(mockOnDismiss).not.toHaveBeenCalled();
   });
@@ -129,10 +138,14 @@ describe('ToastContainer', () => {
     const toast = createToast();
     render(<ToastContainer toasts={[toast]} onDismiss={mockOnDismiss} />);
 
-    fireEvent.keyDown(window, { key: 'Escape' });
+    act(() => {
+      fireEvent.keyDown(window, { key: 'Escape' });
+    });
 
     // Fast-forward through animation delay
-    vi.advanceTimersByTime(250);
+    act(() => {
+      vi.advanceTimersByTime(250);
+    });
 
     expect(mockOnDismiss).toHaveBeenCalledWith('test-id');
   });
@@ -164,12 +177,17 @@ describe('ToastContainer', () => {
     render(<ToastContainer toasts={[toast]} onDismiss={mockOnDismiss} />);
 
     const actionButton = screen.getByText('Undo');
-    fireEvent.click(actionButton);
+
+    act(() => {
+      fireEvent.click(actionButton);
+    });
 
     expect(mockAction).toHaveBeenCalled();
 
     // Fast-forward through animation delay
-    vi.advanceTimersByTime(250);
+    act(() => {
+      vi.advanceTimersByTime(250);
+    });
 
     expect(mockOnDismiss).toHaveBeenCalledWith('test-id');
   });
