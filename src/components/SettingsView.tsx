@@ -13,8 +13,8 @@ import { ClaudeIcon, ChatGPTIcon, PerplexityIcon, MistralIcon, GeminiIcon } from
 import AboutSection from './settings/AboutSection';
 import AdvancedSection from './settings/AdvancedSection';
 import AppearanceSection from './settings/AppearanceSection';
-import NotificationSection from './settings/NotificationSection';
 import BackupRestoreView from './settings/BackupRestoreView';
+import NotificationSection from './settings/NotificationSection';
 import SiteIntegrationSection from './settings/SiteIntegrationSection';
 import ViewHeader from './ViewHeader';
 

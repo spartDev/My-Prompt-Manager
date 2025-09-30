@@ -1,3 +1,24 @@
+/**
+ * Backup Manager Service
+ *
+ * Provides comprehensive backup creation, validation, preview, and restoration
+ * functionality for prompt libraries. Supports encrypted backups, conflict resolution,
+ * and both replace/merge restore modes.
+ *
+ * Features:
+ * - Encrypted backup creation using AES-256-GCM
+ * - SHA-256 checksum validation for data integrity
+ * - Selective category import/export
+ * - Conflict resolution strategies (skip, overwrite, rename)
+ * - Legacy backup format migration (v1.0.0 → v2.0.0)
+ * - Private prompt filtering
+ *
+ * Backup Format:
+ * - Version 2.0.0: Metadata + encrypted/plaintext dataset
+ * - Version 1.0.0: Legacy format (auto-upgraded on restore)
+ *
+ * @module backupManager
+ */
 
 import { v4 as uuidv4 } from 'uuid';
 
@@ -21,11 +42,22 @@ import type {
 import { encryptionService } from './encryptionService';
 import { StorageManager } from './storage';
 
+/** Current backup file format version */
 const BACKUP_VERSION = '2.0.0';
+
+/** Default prefix for generated backup filenames */
 const DEFAULT_FILENAME_PREFIX = 'prompt-library-backup';
 
+/** Text encoder for computing checksums and size estimates */
 const textEncoder = new TextEncoder();
 
+/**
+ * Gets the Web Crypto API instance
+ *
+ * @returns {Crypto} The Web Crypto API instance
+ * @throws {Error} If Web Crypto API is not available
+ * @private
+ */
 const getCrypto = (): Crypto => {
   if (typeof globalThis.crypto !== 'undefined') {
     return globalThis.crypto;
@@ -33,6 +65,16 @@ const getCrypto = (): Crypto => {
   throw new Error('Web Crypto API is not available.');
 };
 
+/**
+ * Computes SHA-256 checksum for data integrity verification
+ *
+ * Generates a SHA-256 hash of the provided text and returns it as a
+ * hex-encoded string. Used to detect backup file corruption or tampering.
+ *
+ * @param {string} text - The text to hash
+ * @returns {Promise<string>} Hex-encoded SHA-256 hash
+ * @private
+ */
 const computeChecksum = async (text: string): Promise<string> => {
   const cryptoObj = getCrypto();
   const data = textEncoder.encode(text);
@@ -41,11 +83,34 @@ const computeChecksum = async (text: string): Promise<string> => {
   return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
 };
 
+/**
+ * Formats backup filename with timestamp
+ *
+ * Generates a standardized filename for backup files using the format:
+ * `prompt-library-backup-{ISO_timestamp}.json`
+ *
+ * Example: `prompt-library-backup-2025-01-15T14-30-45-123Z.json`
+ *
+ * @param {BackupMetadata} metadata - Backup metadata containing creation timestamp
+ * @returns {string} Formatted filename
+ * @private
+ */
 const formatFileName = (metadata: BackupMetadata): string => {
   const timestamp = new Date(metadata.createdAt).toISOString().replace(/[:.]/g, '-');
   return `${DEFAULT_FILENAME_PREFIX}-${timestamp}.json`;
 };
 
+/**
+ * Filters prompts based on privacy settings
+ *
+ * Optionally excludes private prompts from backup based on user preference.
+ * Private prompts are identified by the `isPrivate` property.
+ *
+ * @param {Prompt[]} prompts - Array of prompts to filter
+ * @param {boolean} includePrivatePrompts - Whether to include private prompts
+ * @returns {Prompt[]} Filtered prompt array
+ * @private
+ */
 const sanitizePrompts = (prompts: Prompt[], includePrivatePrompts: boolean): Prompt[] => {
   if (includePrivatePrompts) {
     return prompts;
@@ -57,16 +122,102 @@ const sanitizePrompts = (prompts: Prompt[], includePrivatePrompts: boolean): Pro
   });
 };
 
+/**
+ * Estimates file size in bytes
+ *
+ * Calculates the byte size of a string when encoded as UTF-8.
+ * Used for file size metadata in backups.
+ *
+ * @param {string} value - The string to measure
+ * @returns {number} Size in bytes
+ * @private
+ */
 const estimateSize = (value: string): number => textEncoder.encode(value).length;
 
+/**
+ * Backup Manager
+ *
+ * Manages creation, validation, preview, and restoration of prompt library backups.
+ * Supports encrypted backups, conflict resolution, and legacy format migration.
+ *
+ * Key Capabilities:
+ * - Create encrypted or plaintext backups with optional settings
+ * - Validate backup integrity using SHA-256 checksums
+ * - Preview backup contents before restoration
+ * - Restore with conflict resolution (skip, overwrite, rename)
+ * - Support replace and merge restore modes
+ * - Filter private prompts from backups
+ *
+ * Security Features:
+ * - AES-256-GCM encryption via EncryptionService
+ * - SHA-256 checksums for integrity verification
+ * - Password validation responsibility delegated to UI layer
+ * - Sensitive data cleared from memory after encryption
+ *
+ * @class BackupManager
+ * @public
+ */
 export class BackupManager {
   private storageManager = StorageManager.getInstance();
 
+  /**
+   * Computes SHA-256 checksum for a backup dataset
+   *
+   * Serializes the dataset and computes its checksum for integrity validation.
+   *
+   * @param {BackupDataset} dataset - The dataset to checksum
+   * @returns {Promise<string>} Hex-encoded SHA-256 hash
+   * @private
+   */
   private async computeChecksumForDataset(dataset: BackupDataset): Promise<string> {
     const serialized = JSON.stringify(dataset);
     return computeChecksum(serialized);
   }
 
+  /**
+   * Creates a backup of the prompt library
+   *
+   * Process:
+   * 1. Fetch prompts, categories, and optionally settings from storage
+   * 2. Filter private prompts if requested
+   * 3. Compute SHA-256 checksum of dataset
+   * 4. Optionally encrypt with AES-256-GCM
+   * 5. Generate metadata and filename
+   * 6. Return Blob ready for download
+   *
+   * Backup Options:
+   * - includePrivatePrompts: Include prompts marked as private
+   * - includeSettings: Include application settings in backup
+   * - encryption.enabled: Encrypt backup with password
+   * - encryption.password: Password for encryption (if enabled)
+   *
+   * Security Notes:
+   * - Password strength validation is caller's responsibility
+   * - Sensitive plaintext is cleared from memory after encryption
+   * - Encryption uses AES-256-GCM with PBKDF2 key derivation
+   *
+   * @param {BackupOptions} options - Backup configuration options
+   * @returns {Promise<BackupCreationResult>} Backup file, metadata, and Blob for download
+   *
+   * @example
+   * // Create encrypted backup with all data
+   * const backup = await backupManager.createBackup({
+   *   includePrivatePrompts: true,
+   *   includeSettings: true,
+   *   encryption: { enabled: true, password: 'MyStr0ng!Pass' }
+   * });
+   * // Download: URL.createObjectURL(backup.blob)
+   *
+   * @example
+   * // Create plaintext backup without private prompts
+   * const backup = await backupManager.createBackup({
+   *   includePrivatePrompts: false,
+   *   includeSettings: false,
+   *   encryption: { enabled: false }
+   * });
+   *
+   * @public
+   */
   async createBackup(options: BackupOptions): Promise<BackupCreationResult> {
     const prompts = await this.storageManager.getPrompts();
     const categories = await this.storageManager.getCategories();
@@ -94,7 +245,8 @@ export class BackupManager {
     let backup: BackupFileV2 | EncryptedBackupFileV2;
 
     if (options.encryption.enabled && options.encryption.password) {
-      const { cipherText, iv, salt } = await encryptionService.encrypt(serializedData, options.encryption.password);
+      // Use 'auto' mode: automatically uses Web Worker for large backups (>100KB)
+      const { cipherText, iv, salt } = await encryptionService.encrypt(serializedData, options.encryption.password, 'auto');
       backup = {
         metadata,
         payload: cipherText,
@@ -129,6 +281,39 @@ export class BackupManager {
     };
   }
 
+  /**
+   * Validates a backup file for integrity and format correctness
+   *
+   * Performs validation checks on backup file content:
+   * - JSON syntax validation
+   * - Format version detection (v1.0.0 legacy, v2.0.0 modern)
+   * - Encryption detection and password requirement check
+   * - SHA-256 checksum verification (if available)
+   * - Metadata consistency checks
+   *
+   * Validation is informative and does NOT prevent restoration.
+   * Issues are categorized by severity:
+   * - error: Critical issues that may prevent restoration
+   * - warning: Non-critical issues (e.g., encryption requires password)
+   *
+   * @param {string} content - Raw backup file content (JSON string)
+   * @returns {Promise<BackupValidationResult>} Validation result with issues and metadata
+   *
+   * @example
+   * // Validate plaintext backup
+   * const result = await backupManager.validateBackup(fileContent);
+   * if (result.valid) {
+   *   console.log('Backup is valid');
+   * }
+   *
+   * @example
+   * // Validate encrypted backup (password not provided yet)
+   * const result = await backupManager.validateBackup(encryptedContent);
+   * // result.issues will include warning about password requirement
+   * // result.valid may still be true (warning doesn't invalidate)
+   *
+   * @public
+   */
   async validateBackup(content: string): Promise<BackupValidationResult> {
     const issues: BackupValidationIssue[] = [];
 
@@ -185,6 +370,44 @@ export class BackupManager {
     }
   }
 
+  /**
+   * Previews backup contents before restoration
+   *
+   * Generates a detailed preview of what will be imported if the backup
+   * is restored. Shows category-level breakdown with conflict detection.
+   *
+   * Preview Information:
+   * - List of categories with prompt counts
+   * - Duplicate detection (existing prompts with same ID)
+   * - New prompt counts (unique to backup)
+   * - Existing library data for comparison
+   * - Metadata (version, timestamps, encryption status)
+   *
+   * For encrypted backups, password is required to decrypt and preview.
+   * Without password, this method will throw an error.
+   *
+   * @param {string} content - Raw backup file content (JSON string)
+   * @param {string} [password] - Decryption password (required for encrypted backups)
+   * @returns {Promise<BackupPreview>} Preview with categories and metadata
+   * @throws {Error} If backup cannot be decrypted or parsed
+   *
+   * @example
+   * // Preview plaintext backup
+   * const preview = await backupManager.previewBackup(fileContent);
+   * preview.categories.forEach(cat => {
+   *   console.log(`${cat.name}: ${cat.newPromptCount.toString()} new, ${cat.duplicatePromptCount.toString()} duplicates`);
+   * });
+   *
+   * @example
+   * // Preview encrypted backup with password
+   * const preview = await backupManager.previewBackup(
+   *   encryptedContent,
+   *   'MyStr0ng!Pass'
+   * );
+   * // preview.metadata.encrypted === true
+   *
+   * @public
+   */
   async previewBackup(content: string, password?: string): Promise<BackupPreview> {
     const parsed = await this.parseBackupContent(content, password);
 
@@ -230,6 +453,61 @@ export class BackupManager {
     };
   }
 
+  /**
+   * Restores a backup to the prompt library
+   *
+   * Imports data from a backup file with configurable conflict resolution
+   * and merge behavior. Supports both replace and merge modes.
+   *
+   * Restore Process:
+   * 1. Parse and optionally decrypt backup file
+   * 2. Filter categories by user selection (if specified)
+   * 3. Merge categories with conflict resolution strategy
+   * 4. Merge prompts with conflict resolution strategy
+   * 5. Optionally replace or merge settings
+   * 6. Validate storage capacity
+   * 7. Commit changes to storage
+   *
+   * Restore Modes:
+   * - replace: Delete all existing data and replace with backup
+   * - merge: Combine backup data with existing library
+   *
+   * Conflict Resolution Strategies:
+   * - skip: Keep existing item, ignore backup item
+   * - overwrite: Replace existing item with backup item
+   * - rename: Import backup item with modified name/ID
+   *
+   * @param {string} content - Raw backup file content (JSON string)
+   * @param {RestoreOptions} options - Restoration configuration
+   * @param {string} [options.password] - Decryption password (for encrypted backups)
+   * @param {'replace' | 'merge'} options.mode - Restore mode
+   * @param {ConflictResolutionStrategy} options.conflictResolution - How to handle conflicts
+   * @param {string[]} [options.selectedCategoryIds] - Category IDs to import (empty = all)
+   * @returns {Promise<RestoreSummary>} Summary of imported, updated, and skipped items
+   * @throws {Error} If decryption fails, validation fails, or storage capacity exceeded
+   *
+   * @example
+   * // Replace all data with backup
+   * const summary = await backupManager.restoreBackup(content, {
+   *   mode: 'replace',
+   *   conflictResolution: 'overwrite',
+   *   selectedCategoryIds: [],
+   *   password: undefined
+   * });
+   * console.log(`Imported ${summary.importedPrompts.toString()} prompts`);
+   *
+   * @example
+   * // Merge specific categories, rename conflicts
+   * const summary = await backupManager.restoreBackup(encryptedContent, {
+   *   mode: 'merge',
+   *   conflictResolution: 'rename',
+   *   selectedCategoryIds: ['cat-123', 'cat-456'],
+   *   password: 'MyStr0ng!Pass'
+   * });
+   * console.log(`Imported: ${summary.importedPrompts.toString()}, Skipped: ${summary.skippedPrompts.toString()}`);
+   *
+   * @public
+   */
   async restoreBackup(content: string, options: RestoreOptions): Promise<RestoreSummary> {
     let metadata: BackupMetadata | undefined;
 
@@ -324,6 +602,37 @@ export class BackupManager {
     }
   }
 
+  /**
+   * Merges backup categories with existing categories
+   *
+   * Combines categories from backup with existing library categories,
+   * applying the specified conflict resolution strategy and restore mode.
+   *
+   * Conflict Detection:
+   * - Categories are matched by name (case-sensitive)
+   * - Conflicts occur when backup category name matches existing category name
+   *
+   * Merge Behavior by Mode:
+   * - replace: Ignore existing categories, use only backup categories
+   * - merge: Combine backup and existing, resolve conflicts with strategy
+   *
+   * Conflict Resolution Strategies:
+   * - skip: Keep existing category, ignore backup category
+   * - overwrite: Update existing category with backup category's properties
+   * - rename: Create new category with modified name (e.g., "Work (Imported)")
+   *
+   * The method always ensures DEFAULT_CATEGORY ("General") exists in final result.
+   *
+   * @param {Category[]} existing - Current library categories
+   * @param {Category[]} incoming - Backup categories to merge
+   * @param {ConflictResolutionStrategy} strategy - How to handle conflicts
+   * @param {'replace' | 'merge'} mode - Restore mode
+   * @returns {object} Merge result with final categories, name mapping, and summary
+   * @returns {Category[]} object.finalCategories - Merged category array
+   * @returns {Map<string, string>} object.categoryNameMap - Maps old names to new names (for renamed categories)
+   * @returns {object} object.summary - Count of imported, skipped, updated categories
+   * @private
+   */
   private mergeCategories(
     existing: Category[],
     incoming: Category[],
@@ -406,6 +715,34 @@ export class BackupManager {
     };
   }
 
+  /**
+   * Merges backup prompts with existing prompts
+   *
+   * Combines prompts from backup with existing library prompts,
+   * applying the specified conflict resolution strategy and restore mode.
+   *
+   * Conflict Detection:
+   * - Prompts are matched by ID (UUID)
+   * - Conflicts occur when backup prompt ID matches existing prompt ID
+   *
+   * Merge Behavior by Mode:
+   * - replace: Ignore existing prompts, use only backup prompts
+   * - merge: Combine backup and existing, resolve conflicts with strategy
+   *
+   * Conflict Resolution Strategies:
+   * - skip: Keep existing prompt, ignore backup prompt
+   * - overwrite: Replace existing prompt with backup prompt (preserves original createdAt)
+   * - rename: Create new prompt with new ID and modified title (e.g., "Title (Imported)")
+   *
+   * @param {Prompt[]} existing - Current library prompts
+   * @param {Prompt[]} incoming - Backup prompts to merge
+   * @param {ConflictResolutionStrategy} strategy - How to handle conflicts
+   * @param {'replace' | 'merge'} mode - Restore mode
+   * @returns {object} Merge result with final prompts and summary
+   * @returns {Prompt[]} object.finalPrompts - Merged prompt array
+   * @returns {object} object.summary - Count of imported, skipped, updated prompts
+   * @private
+   */
   private mergePrompts(
     existing: Prompt[],
     incoming: Prompt[],
@@ -477,6 +814,20 @@ export class BackupManager {
     };
   }
 
+  /**
+   * Generates a unique name by appending numbers if needed
+   *
+   * Creates a unique name from a base name by checking against existing names
+   * and appending a counter if duplicates exist (e.g., "Name 1", "Name 2").
+   *
+   * The generated name is automatically added to the existingNames set to
+   * prevent future collisions.
+   *
+   * @param {string} baseName - The base name to make unique
+   * @param {Set<string>} existingNames - Set of existing names to check against
+   * @returns {string} Unique name (may be modified with counter)
+   * @private
+   */
   private generateUniqueName(baseName: string, existingNames: Set<string>): string {
     let attempt = baseName;
     let counter = 1;
@@ -490,6 +841,19 @@ export class BackupManager {
     return attempt;
   }
 
+  /**
+   * Ensures the default category exists in category list
+   *
+   * Validates that the DEFAULT_CATEGORY ("General") exists in the provided
+   * category array. If missing, adds it at the beginning of the array.
+   *
+   * The default category is required for the application to function correctly
+   * as it serves as a fallback for uncategorized prompts.
+   *
+   * @param {Category[]} categories - Categories to validate
+   * @returns {Category[]} Categories with default category guaranteed to exist
+   * @private
+   */
   private ensureDefaultCategoryPresence(categories: Category[]): Category[] {
     if (categories.some((category) => category.name === DEFAULT_CATEGORY)) {
       return categories;
@@ -504,6 +868,28 @@ export class BackupManager {
     return [defaultCategory, ...categories];
   }
 
+  /**
+   * Parses backup file content and optionally decrypts
+   *
+   * Detects backup format version and structure, then parses and validates:
+   * - Modern format (v2.0.0): { metadata, data } or { metadata, payload, salt, iv }
+   * - Legacy format (v1.0.0): { prompts, categories, settings, version, exportDate }
+   *
+   * For encrypted backups:
+   * - If password is provided: Decrypts payload and returns dataset
+   * - If password is missing: Returns metadata only, dataset is undefined
+   *
+   * Legacy backups are automatically migrated to v2.0.0 format during parsing.
+   *
+   * @param {string} content - Raw backup file content (JSON string)
+   * @param {string} [password] - Decryption password (optional, required for encrypted backups)
+   * @returns {Promise<object>} Parsed backup with metadata, optional dataset, encryption flag
+   * @returns {BackupMetadata} object.metadata - Backup metadata (version, timestamps, counts)
+   * @returns {BackupDataset} [object.dataset] - Backup dataset (undefined if encrypted without password)
+   * @returns {boolean} object.encrypted - Whether backup is encrypted
+   * @throws {Error} If JSON is invalid, format is unsupported, or decryption fails
+   * @private
+   */
   private async parseBackupContent(content: string, password?: string): Promise<{
     metadata: BackupMetadata;
     dataset?: BackupDataset;
@@ -532,13 +918,15 @@ export class BackupManager {
       }
 
       try {
+        // Use 'auto' mode: automatically uses Web Worker for large backups (>100KB)
         const plainText = await encryptionService.decrypt(
           {
             cipherText: backup.payload,
             iv: backup.iv,
             salt: backup.salt
           },
-          password
+          password,
+          'auto'
         );
 
         const dataset = this.ensureDataset(JSON.parse(plainText) as unknown);
@@ -585,6 +973,16 @@ export class BackupManager {
     throw new Error('Unsupported backup format.');
   }
 
+  /**
+   * Type guard for modern backup format (v2.0.0 plaintext)
+   *
+   * Checks if a parsed object matches the modern plaintext backup structure:
+   * { metadata: BackupMetadata, data: BackupDataset }
+   *
+   * @param {unknown} value - Value to check
+   * @returns {boolean} True if value matches BackupFileV2 structure
+   * @private
+   */
   private isModernBackup(value: unknown): value is BackupFileV2 {
     if (!value || typeof value !== 'object') {
       return false;
@@ -594,6 +992,16 @@ export class BackupManager {
     return 'metadata' in candidate && 'data' in candidate;
   }
 
+  /**
+   * Type guard for encrypted backup format (v2.0.0 encrypted)
+   *
+   * Checks if a parsed object matches the encrypted backup structure:
+   * { metadata: BackupMetadata, payload: string, salt: string, iv: string }
+   *
+   * @param {unknown} value - Value to check
+   * @returns {boolean} True if value matches EncryptedBackupFileV2 structure
+   * @private
+   */
   private isEncryptedBackup(value: unknown): value is EncryptedBackupFileV2 {
     if (!value || typeof value !== 'object') {
       return false;
@@ -603,6 +1011,18 @@ export class BackupManager {
     return 'metadata' in candidate && 'payload' in candidate && 'salt' in candidate && 'iv' in candidate;
   }
 
+  /**
+   * Type guard for legacy backup format (v1.0.0)
+   *
+   * Checks if a parsed object matches the legacy backup structure:
+   * { prompts: Prompt[], categories: Category[], settings?: object, version?: string, exportDate?: string }
+   *
+   * Legacy backups are automatically migrated to v2.0.0 format during parsing.
+   *
+   * @param {unknown} value - Value to check
+   * @returns {boolean} True if value matches legacy backup structure
+   * @private
+   */
   private isLegacyBackup(value: unknown): value is { prompts?: unknown; categories?: unknown; settings?: unknown; version?: string; exportDate?: string } {
     if (!value || typeof value !== 'object') {
       return false;
@@ -611,6 +1031,17 @@ export class BackupManager {
     return 'prompts' in candidate && 'categories' in candidate;
   }
 
+  /**
+   * Validates and normalizes backup metadata
+   *
+   * Ensures metadata object has all required fields with correct types.
+   * Provides defaults for missing or invalid fields.
+   *
+   * @param {unknown} value - Metadata value to validate
+   * @returns {BackupMetadata} Validated and normalized metadata
+   * @throws {Error} If metadata is completely missing or not an object
+   * @private
+   */
   private ensureMetadata(value: unknown): BackupMetadata {
     if (!value || typeof value !== 'object') {
       throw new Error('Backup metadata is missing or invalid.');
@@ -630,6 +1061,25 @@ export class BackupManager {
     };
   }
 
+  /**
+   * Validates and normalizes backup dataset
+   *
+   * Ensures dataset object has valid prompts and categories arrays.
+   * Sanitizes and validates all array items, providing safe defaults
+   * for missing or invalid properties.
+   *
+   * Validation Rules:
+   * - Prompts array: Filters out non-object items, preserves all prompt properties
+   * - Categories array: Filters out non-object items, ensures name/id/color properties
+   * - Settings: Optional, validated if present
+   *
+   * Missing category names default to DEFAULT_CATEGORY ("General").
+   *
+   * @param {unknown} value - Dataset value to validate
+   * @returns {BackupDataset} Validated and normalized dataset
+   * @throws {Error} If dataset is completely missing, not an object, or has invalid structure
+   * @private
+   */
   private ensureDataset(value: unknown): BackupDataset {
     if (!value || typeof value !== 'object') {
       throw new Error('Backup dataset is missing or invalid.');
@@ -681,4 +1131,41 @@ export class BackupManager {
   }
 }
 
+/**
+ * Singleton instance of BackupManager
+ *
+ * Pre-instantiated BackupManager ready for use throughout the application.
+ * Provides access to all backup creation, validation, preview, and restoration
+ * functionality.
+ *
+ * @example
+ * import { backupManager } from './backupManager';
+ *
+ * // Create encrypted backup
+ * const backup = await backupManager.createBackup({
+ *   includePrivatePrompts: true,
+ *   includeSettings: true,
+ *   encryption: { enabled: true, password: 'MyStr0ng!Pass' }
+ * });
+ *
+ * @example
+ * // Validate and preview backup
+ * const validation = await backupManager.validateBackup(content);
+ * if (validation.valid) {
+ *   const preview = await backupManager.previewBackup(content);
+ *   console.log(`Will import ${preview.categories.length.toString()} categories`);
+ * }
+ *
+ * @example
+ * // Restore backup with conflict resolution
+ * const summary = await backupManager.restoreBackup(content, {
+ *   mode: 'merge',
+ *   conflictResolution: 'rename',
+ *   selectedCategoryIds: [],
+ *   password: undefined
+ * });
+ * console.log(`Imported ${summary.importedPrompts.toString()} prompts`);
+ *
+ * @public
+ */
 export const backupManager = new BackupManager();
