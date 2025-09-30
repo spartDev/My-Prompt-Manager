@@ -1,6 +1,7 @@
 import { FC, ReactNode } from 'react';
 
 import ExportButton from './ExportButton';
+import ToggleSwitch from './ToggleSwitch';
 
 // Function to get brand-specific background colors
 const getBrandColors = (hostname: string) => {
@@ -107,17 +108,13 @@ const SiteCard: FC<SiteCardProps> = ({
         </div>
 
         {/* Toggle Switch */}
-        <label className="relative inline-flex items-center cursor-pointer">
-          <input
-            type="checkbox"
-            checked={isEnabled}
-            onChange={(e) => { void onToggle(hostname, e.target.checked); }}
-            disabled={saving}
-            className="sr-only peer"
-            aria-label={`Enable ${name} integration`}
-          />
-          <div className="w-11 h-6 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-gradient-to-r peer-checked:from-purple-600 peer-checked:to-indigo-600"></div>
-        </label>
+        <ToggleSwitch
+          checked={isEnabled}
+          onChange={(checked) => { void onToggle(hostname, checked); }}
+          disabled={saving}
+          ariaLabel={`Enable ${name} integration`}
+          size="medium"
+        />
       </div>
 
       {/* Custom Site Actions */}

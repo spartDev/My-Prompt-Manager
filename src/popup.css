@@ -2,6 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Toast progress bar animation */
+@keyframes shrink-width {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
 body {
   margin: 0;
   padding: 0;

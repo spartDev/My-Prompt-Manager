@@ -48,7 +48,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   } = useCategories();
 
   const { copyToClipboard } = useClipboard();
-  const { toasts, showToast } = useToast();
+  const { toasts, showToast, hideToast, queueLength, settings, updateSettings } = useToast();
   
   // Initialize search with debounce functionality
   const searchWithDebounce = useSearchWithDebounce(prompts);
@@ -229,6 +229,8 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
             void refreshCategories();
           }}
           showToast={showToast}
+          toastSettings={settings}
+          onToastSettingsChange={updateSettings}
         />
       )}
 
@@ -238,7 +240,12 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
         }} />
       )}
 
-      <ToastContainer toasts={toasts} />
+      <ToastContainer
+        toasts={toasts}
+        onDismiss={hideToast}
+        position={settings.position}
+        queueLength={queueLength}
+      />
       </div>
     </ThemeProvider>
   );
