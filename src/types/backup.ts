@@ -57,6 +57,7 @@ export interface RestoreOptions {
 export interface BackupPreviewCategory {
   id: string;
   name: string;
+  color?: string;
   promptCount: number;
   selected: boolean;
   existsInLibrary: boolean;
