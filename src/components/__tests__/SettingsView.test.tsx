@@ -17,9 +17,26 @@ const createJsonFile = (contents: string): File => {
 };
 
 const renderSettings = async () => {
+  const mockToastSettings = {
+    position: 'top-right' as const,
+    enabledTypes: {
+      success: true,
+      error: true,
+      info: true,
+      warning: true
+    },
+    enableGrouping: true,
+    groupingWindow: 500
+  };
+
   render(
     <ThemeProvider>
-      <SettingsView onBack={vi.fn()} showToast={vi.fn()} />
+      <SettingsView
+        onBack={vi.fn()}
+        showToast={vi.fn()}
+        toastSettings={mockToastSettings}
+        onToastSettingsChange={vi.fn()}
+      />
     </ThemeProvider>
   );
 

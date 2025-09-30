@@ -5,7 +5,7 @@ import { ToastSettings } from '../../types/hooks';
 import ToggleSwitch from './ToggleSwitch';
 
 interface NotificationSectionProps {
-  settings: ToastSettings;
+  settings?: ToastSettings;
   onSettingsChange: (settings: Partial<ToastSettings>) => void;
   onTestToast: (type: 'success' | 'error' | 'info' | 'warning') => void;
 }
@@ -18,9 +18,22 @@ const NotificationSection: FC<NotificationSectionProps> = ({
   const [isExpanded, setIsExpanded] = useState(false);
   const [currentTestTypeIndex, setCurrentTestTypeIndex] = useState(0);
 
+  // Helper to get enabledTypes with defaults
+  const getEnabledTypes = () => {
+    const types = settings?.enabledTypes;
+    return {
+      success: types?.success ?? true,
+      error: types?.error ?? true,
+      info: types?.info ?? true,
+      warning: types?.warning ?? true
+    };
+  };
+
+  const currentEnabledTypes = getEnabledTypes();
+
   // Get list of enabled notification types
   const enabledTypes = (['success', 'error', 'warning', 'info'] as const).filter(
-    type => settings.enabledTypes[type]
+    type => currentEnabledTypes[type]
   );
 
   // Handle test button click - cycles through enabled types
@@ -79,7 +92,7 @@ const NotificationSection: FC<NotificationSectionProps> = ({
               onClick={() => { onSettingsChange({ position: 'top-right' }); }}
               className={`
                 relative p-4 rounded-lg border-2 transition-all
-                ${settings.position === 'top-right'
+                ${(settings?.position ?? 'top-right') === 'top-right'
                   ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20'
                   : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
                 }
@@ -89,7 +102,7 @@ const NotificationSection: FC<NotificationSectionProps> = ({
                 <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
                   Top Right
                 </span>
-                {settings.position === 'top-right' && (
+                {(settings?.position ?? 'top-right') === 'top-right' && (
                   <svg className="w-5 h-5 text-purple-500" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                   </svg>
@@ -104,7 +117,7 @@ const NotificationSection: FC<NotificationSectionProps> = ({
               onClick={() => { onSettingsChange({ position: 'bottom-right' }); }}
               className={`
                 relative p-4 rounded-lg border-2 transition-all
-                ${settings.position === 'bottom-right'
+                ${settings?.position === 'bottom-right'
                   ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20'
                   : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
                 }
@@ -114,7 +127,7 @@ const NotificationSection: FC<NotificationSectionProps> = ({
                 <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
                   Bottom Right
                 </span>
-                {settings.position === 'bottom-right' && (
+                {settings?.position === 'bottom-right' && (
                   <svg className="w-5 h-5 text-purple-500" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                   </svg>
@@ -160,22 +173,25 @@ const NotificationSection: FC<NotificationSectionProps> = ({
             {/* Success */}
             <div className={`
               flex items-center justify-between p-3 rounded-lg border transition-all duration-200
-              ${settings.enabledTypes.success
+              ${settings?.enabledTypes.success
                 ? 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50'
                 : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 opacity-60'
               }
             `}>
               <div className="flex items-center space-x-3">
-                <div className={`w-1 h-8 rounded transition-colors duration-200 ${settings.enabledTypes.success ? 'bg-green-500' : 'bg-gray-400 dark:bg-gray-600'}`}></div>
+                <div className={`w-1 h-8 rounded transition-colors duration-200 ${settings?.enabledTypes.success ? 'bg-green-500' : 'bg-gray-400 dark:bg-gray-600'}`}></div>
                 <div>
-                  <div className={`text-sm font-medium transition-colors duration-200 ${settings.enabledTypes.success ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-500'}`}>Success</div>
-                  <div className={`text-xs transition-colors duration-200 ${settings.enabledTypes.success ? 'text-gray-500 dark:text-gray-400' : 'text-gray-400 dark:text-gray-600'}`}>Confirmation messages (2.75s)</div>
+                  <div className={`text-sm font-medium transition-colors duration-200 ${settings?.enabledTypes.success ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-500'}`}>Success</div>
+                  <div className={`text-xs transition-colors duration-200 ${settings?.enabledTypes.success ? 'text-gray-500 dark:text-gray-400' : 'text-gray-400 dark:text-gray-600'}`}>Confirmation messages (2.75s)</div>
                 </div>
               </div>
               <ToggleSwitch
-                checked={settings.enabledTypes.success}
+                checked={currentEnabledTypes.success}
                 onChange={(checked) => { onSettingsChange({
-                  enabledTypes: { ...settings.enabledTypes, success: checked }
+                  enabledTypes: {
+                    ...currentEnabledTypes,
+                    success: checked
+                  }
                 }); }}
                 ariaLabel="Enable success notifications"
                 size="small"
@@ -185,22 +201,25 @@ const NotificationSection: FC<NotificationSectionProps> = ({
             {/* Error */}
             <div className={`
               flex items-center justify-between p-3 rounded-lg border transition-all duration-200
-              ${settings.enabledTypes.error
+              ${settings?.enabledTypes.error
                 ? 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50'
                 : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 opacity-60'
               }
             `}>
               <div className="flex items-center space-x-3">
-                <div className={`w-1 h-8 rounded transition-colors duration-200 ${settings.enabledTypes.error ? 'bg-red-500' : 'bg-gray-400 dark:bg-gray-600'}`}></div>
+                <div className={`w-1 h-8 rounded transition-colors duration-200 ${settings?.enabledTypes.error ? 'bg-red-500' : 'bg-gray-400 dark:bg-gray-600'}`}></div>
                 <div>
-                  <div className={`text-sm font-medium transition-colors duration-200 ${settings.enabledTypes.error ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-500'}`}>Error</div>
-                  <div className={`text-xs transition-colors duration-200 ${settings.enabledTypes.error ? 'text-gray-500 dark:text-gray-400' : 'text-gray-400 dark:text-gray-600'}`}>Error messages (7s)</div>
+                  <div className={`text-sm font-medium transition-colors duration-200 ${settings?.enabledTypes.error ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-500'}`}>Error</div>
+                  <div className={`text-xs transition-colors duration-200 ${settings?.enabledTypes.error ? 'text-gray-500 dark:text-gray-400' : 'text-gray-400 dark:text-gray-600'}`}>Error messages (7s)</div>
                 </div>
               </div>
               <ToggleSwitch
-                checked={settings.enabledTypes.error}
+                checked={currentEnabledTypes.error}
                 onChange={(checked) => { onSettingsChange({
-                  enabledTypes: { ...settings.enabledTypes, error: checked }
+                  enabledTypes: {
+                    ...currentEnabledTypes,
+                    error: checked
+                  }
                 }); }}
                 ariaLabel="Enable error notifications"
                 size="small"
@@ -210,22 +229,25 @@ const NotificationSection: FC<NotificationSectionProps> = ({
             {/* Warning */}
             <div className={`
               flex items-center justify-between p-3 rounded-lg border transition-all duration-200
-              ${settings.enabledTypes.warning
+              ${settings?.enabledTypes.warning
                 ? 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50'
                 : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 opacity-60'
               }
             `}>
               <div className="flex items-center space-x-3">
-                <div className={`w-1 h-8 rounded transition-colors duration-200 ${settings.enabledTypes.warning ? 'bg-yellow-500' : 'bg-gray-400 dark:bg-gray-600'}`}></div>
+                <div className={`w-1 h-8 rounded transition-colors duration-200 ${settings?.enabledTypes.warning ? 'bg-yellow-500' : 'bg-gray-400 dark:bg-gray-600'}`}></div>
                 <div>
-                  <div className={`text-sm font-medium transition-colors duration-200 ${settings.enabledTypes.warning ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-500'}`}>Warning</div>
-                  <div className={`text-xs transition-colors duration-200 ${settings.enabledTypes.warning ? 'text-gray-500 dark:text-gray-400' : 'text-gray-400 dark:text-gray-600'}`}>Important alerts (5s)</div>
+                  <div className={`text-sm font-medium transition-colors duration-200 ${settings?.enabledTypes.warning ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-500'}`}>Warning</div>
+                  <div className={`text-xs transition-colors duration-200 ${settings?.enabledTypes.warning ? 'text-gray-500 dark:text-gray-400' : 'text-gray-400 dark:text-gray-600'}`}>Important alerts (5s)</div>
                 </div>
               </div>
               <ToggleSwitch
-                checked={settings.enabledTypes.warning}
+                checked={currentEnabledTypes.warning}
                 onChange={(checked) => { onSettingsChange({
-                  enabledTypes: { ...settings.enabledTypes, warning: checked }
+                  enabledTypes: {
+                    ...currentEnabledTypes,
+                    warning: checked
+                  }
                 }); }}
                 ariaLabel="Enable warning notifications"
                 size="small"
@@ -235,22 +257,25 @@ const NotificationSection: FC<NotificationSectionProps> = ({
             {/* Info */}
             <div className={`
               flex items-center justify-between p-3 rounded-lg border transition-all duration-200
-              ${settings.enabledTypes.info
+              ${settings?.enabledTypes.info
                 ? 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50'
                 : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 opacity-60'
               }
             `}>
               <div className="flex items-center space-x-3">
-                <div className={`w-1 h-8 rounded transition-colors duration-200 ${settings.enabledTypes.info ? 'bg-blue-500' : 'bg-gray-400 dark:bg-gray-600'}`}></div>
+                <div className={`w-1 h-8 rounded transition-colors duration-200 ${settings?.enabledTypes.info ? 'bg-blue-500' : 'bg-gray-400 dark:bg-gray-600'}`}></div>
                 <div>
-                  <div className={`text-sm font-medium transition-colors duration-200 ${settings.enabledTypes.info ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-500'}`}>Info</div>
-                  <div className={`text-xs transition-colors duration-200 ${settings.enabledTypes.info ? 'text-gray-500 dark:text-gray-400' : 'text-gray-400 dark:text-gray-600'}`}>Informational messages (2.75s)</div>
+                  <div className={`text-sm font-medium transition-colors duration-200 ${settings?.enabledTypes.info ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-500'}`}>Info</div>
+                  <div className={`text-xs transition-colors duration-200 ${settings?.enabledTypes.info ? 'text-gray-500 dark:text-gray-400' : 'text-gray-400 dark:text-gray-600'}`}>Informational messages (2.75s)</div>
                 </div>
               </div>
               <ToggleSwitch
-                checked={settings.enabledTypes.info}
+                checked={currentEnabledTypes.info}
                 onChange={(checked) => { onSettingsChange({
-                  enabledTypes: { ...settings.enabledTypes, info: checked }
+                  enabledTypes: {
+                    ...currentEnabledTypes,
+                    info: checked
+                  }
                 }); }}
                 ariaLabel="Enable info notifications"
                 size="small"
