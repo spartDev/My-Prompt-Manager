@@ -548,4 +548,266 @@ describe('Backup/Restore Integration Tests', () => {
       expect(validation.issues.some(issue => issue.field === 'checksum')).toBe(true);
     });
   });
+
+  describe('Legacy Backup Migration (v1.0 → v2.0)', () => {
+    it('should import legacy v1.0 backup format without metadata', async () => {
+      // Legacy v1.0 backup format (before encryption feature)
+      const legacyBackup = {
+        version: '1.0.0',
+        exportDate: '2024-01-15T10:30:00.000Z',
+        prompts: [
+          {
+            id: 'legacy-p1',
+            title: 'Legacy Prompt 1',
+            content: 'This is a legacy prompt',
+            category: DEFAULT_CATEGORY,
+            createdAt: Date.now() - 5000,
+            updatedAt: Date.now() - 5000
+          },
+          {
+            id: 'legacy-p2',
+            title: 'Legacy Prompt 2',
+            content: 'Another legacy prompt',
+            category: 'Old Category',
+            createdAt: Date.now() - 10000,
+            updatedAt: Date.now() - 3000
+          }
+        ],
+        categories: [
+          { id: 'legacy-c1', name: DEFAULT_CATEGORY },
+          { id: 'legacy-c2', name: 'Old Category' } // No color field
+        ],
+        settings: {
+          defaultCategory: DEFAULT_CATEGORY,
+          sortOrder: 'createdAt',
+          theme: 'light'
+        }
+      };
+
+      const legacyBackupContent = JSON.stringify(legacyBackup);
+
+      // Validate legacy backup
+      const validation = await backupManager.validateBackup(legacyBackupContent);
+      expect(validation.valid).toBe(true);
+      expect(validation.metadata?.version).toBe('1.0.0');
+      expect(validation.metadata?.promptCount).toBe(2);
+      expect(validation.metadata?.categoryCount).toBe(2);
+      expect(validation.metadata?.settingsIncluded).toBe(false); // Legacy format doesn't track this
+
+      // Preview legacy backup
+      const preview = await backupManager.previewBackup(legacyBackupContent);
+      expect(preview.categories).toHaveLength(2);
+      expect(preview.categories[0].name).toBe(DEFAULT_CATEGORY);
+      expect(preview.categories[1].name).toBe('Old Category');
+
+      // Restore legacy backup
+      const summary = await backupManager.restoreBackup(legacyBackupContent, {
+        mode: 'merge',
+        conflictResolution: 'rename',
+        selectedCategoryIds: []
+      });
+
+      expect(summary.importedPrompts).toBeGreaterThan(0);
+      expect(summary.importedCategories).toBeGreaterThan(0);
+      expect(summary.metadata.version).toBe('1.0.0');
+    });
+
+    it('should handle legacy backup without version field', async () => {
+      // Very old backup format without version field
+      const veryOldBackup = {
+        prompts: [
+          {
+            id: 'old-p1',
+            title: 'Very Old Prompt',
+            content: 'From the early days',
+            category: DEFAULT_CATEGORY,
+            createdAt: Date.now(),
+            updatedAt: Date.now()
+          }
+        ],
+        categories: [
+          { id: 'old-c1', name: DEFAULT_CATEGORY }
+        ]
+      };
+
+      const oldBackupContent = JSON.stringify(veryOldBackup);
+      const validation = await backupManager.validateBackup(oldBackupContent);
+
+      expect(validation.valid).toBe(true);
+      expect(validation.metadata?.version).toBe('1.0.0'); // Defaults to 1.0.0
+      expect(validation.metadata?.promptCount).toBe(1);
+    });
+
+    it('should migrate categories without color field to undefined color', async () => {
+      const legacyBackup = {
+        version: '1.0.0',
+        exportDate: '2024-01-15T10:30:00.000Z',
+        prompts: [
+          {
+            id: 'p-color-test',
+            title: 'Color Test Prompt',
+            content: 'Testing color migration',
+            category: 'No Color Category',
+            createdAt: Date.now(),
+            updatedAt: Date.now()
+          }
+        ],
+        categories: [
+          { id: 'c-no-color', name: 'No Color Category' }, // Missing color field
+          { id: 'c-with-color', name: 'With Color', color: '#FF0000' } // Has color
+        ],
+        settings: {}
+      };
+
+      const backupContent = JSON.stringify(legacyBackup);
+      const preview = await backupManager.previewBackup(backupContent);
+
+      expect(preview.categories).toHaveLength(2);
+
+      // Find categories by name
+      const noColorCat = preview.categories.find(c => c.name === 'No Color Category');
+      const withColorCat = preview.categories.find(c => c.name === 'With Color');
+
+      // Category without color should have undefined color
+      expect(noColorCat?.color).toBeUndefined();
+
+      // Category with color should preserve color
+      expect(withColorCat?.color).toBe('#FF0000');
+    });
+
+    it('should preserve exportDate as createdAt in metadata', async () => {
+      const exportDate = '2024-01-15T10:30:00.000Z';
+      const legacyBackup = {
+        version: '1.0.0',
+        exportDate: exportDate,
+        prompts: [],
+        categories: [{ id: 'c1', name: DEFAULT_CATEGORY }]
+      };
+
+      const backupContent = JSON.stringify(legacyBackup);
+      const validation = await backupManager.validateBackup(backupContent);
+
+      expect(validation.valid).toBe(true);
+      expect(validation.metadata?.createdAt).toBe(Date.parse(exportDate));
+    });
+
+    it('should handle legacy backup with malformed categories gracefully', async () => {
+      const legacyBackup = {
+        version: '1.0.0',
+        prompts: [
+          {
+            id: 'p1',
+            title: 'Test Prompt',
+            content: 'Test',
+            category: DEFAULT_CATEGORY,
+            createdAt: Date.now(),
+            updatedAt: Date.now()
+          }
+        ],
+        categories: [
+          { id: '', name: '' }, // Invalid: empty id and name
+          { name: 'Valid Category' }, // Missing id
+          { id: 'c3' }, // Missing name
+          { id: 'c4', name: 'Normal Category' } // Valid
+        ]
+      };
+
+      const backupContent = JSON.stringify(legacyBackup);
+      const validation = await backupManager.validateBackup(backupContent);
+
+      // Should still be valid - sanitization handles malformed data
+      expect(validation.valid).toBe(true);
+
+      const preview = await backupManager.previewBackup(backupContent);
+      // Should have at least the default category and valid categories
+      expect(preview.categories.length).toBeGreaterThan(0);
+    });
+
+    it('should restore legacy backup in replace mode', async () => {
+      const legacyBackup = {
+        version: '1.0.0',
+        exportDate: '2024-01-15T10:30:00.000Z',
+        prompts: [
+          {
+            id: 'legacy-replace-p1',
+            title: 'Legacy Replace Prompt',
+            content: 'Testing replace mode with legacy backup',
+            category: DEFAULT_CATEGORY,
+            createdAt: Date.now(),
+            updatedAt: Date.now()
+          }
+        ],
+        categories: [
+          { id: 'legacy-replace-c1', name: DEFAULT_CATEGORY }
+        ]
+      };
+
+      const backupContent = JSON.stringify(legacyBackup);
+      const summary = await backupManager.restoreBackup(backupContent, {
+        mode: 'replace',
+        conflictResolution: 'overwrite',
+        selectedCategoryIds: []
+      });
+
+      expect(summary.importedPrompts).toBe(1);
+      expect(summary.metadata.version).toBe('1.0.0');
+      expect(chrome.storage.local.set).toHaveBeenCalled();
+    });
+
+    it('should handle legacy backup with special characters and Unicode', async () => {
+      const legacyBackup = {
+        version: '1.0.0',
+        prompts: [
+          {
+            id: 'unicode-p1',
+            title: '世界 🌍 émojis',
+            content: 'Unicode content: 世界, émojis 😀, symbols !@#$%',
+            category: 'Unicode Category 世界',
+            createdAt: Date.now(),
+            updatedAt: Date.now()
+          }
+        ],
+        categories: [
+          { id: 'unicode-c1', name: DEFAULT_CATEGORY },
+          { id: 'unicode-c2', name: 'Unicode Category 世界' }
+        ]
+      };
+
+      const backupContent = JSON.stringify(legacyBackup);
+      const preview = await backupManager.previewBackup(backupContent);
+
+      expect(preview.categories).toHaveLength(2);
+      const unicodeCat = preview.categories.find(c => c.name.includes('世界'));
+      expect(unicodeCat).toBeDefined();
+      expect(unicodeCat?.promptCount).toBe(1);
+    });
+
+    it('should compute checksum for legacy backup during migration', async () => {
+      const legacyBackup = {
+        version: '1.0.0',
+        exportDate: '2024-01-15T10:30:00.000Z',
+        prompts: [
+          {
+            id: 'checksum-p1',
+            title: 'Checksum Test',
+            content: 'Testing checksum generation',
+            category: DEFAULT_CATEGORY,
+            createdAt: Date.now(),
+            updatedAt: Date.now()
+          }
+        ],
+        categories: [
+          { id: 'checksum-c1', name: DEFAULT_CATEGORY }
+        ]
+      };
+
+      const backupContent = JSON.stringify(legacyBackup);
+      const validation = await backupManager.validateBackup(backupContent);
+
+      expect(validation.valid).toBe(true);
+      expect(validation.metadata?.checksum).toBeTruthy();
+      expect(typeof validation.metadata?.checksum).toBe('string');
+      expect(validation.metadata?.checksum.length).toBeGreaterThan(0);
+    });
+  });
 });

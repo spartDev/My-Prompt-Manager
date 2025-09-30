@@ -438,6 +438,7 @@ export class BackupManager {
       return {
         id: category.id ?? category.name,
         name: category.name,
+        color: category.color,
         promptCount: categoryPrompts.length,
         selected: true,
         existsInLibrary: currentCategoryNames.has(category.name),
