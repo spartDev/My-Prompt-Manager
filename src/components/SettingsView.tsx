@@ -5,12 +5,14 @@ import manifest from '../../manifest.json';
 import { StorageManager } from '../services/storage';
 import type { Prompt, Category, Settings as UserSettings } from '../types';
 import { DEFAULT_SETTINGS } from '../types';
+import type { ToastSettings } from '../types/hooks';
 
 import { ClaudeIcon, ChatGPTIcon, PerplexityIcon, MistralIcon } from './icons/SiteIcons';
 import AboutSection from './settings/AboutSection';
 import AdvancedSection from './settings/AdvancedSection';
 import AppearanceSection from './settings/AppearanceSection';
 import DataStorageSection from './settings/DataStorageSection';
+import NotificationSection from './settings/NotificationSection';
 import SiteIntegrationSection from './settings/SiteIntegrationSection';
 
 interface SiteConfig {
@@ -44,7 +46,9 @@ interface Settings {
 
 interface SettingsViewProps {
   onBack: () => void;
-  showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
+  showToast: (message: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
+  toastSettings: ToastSettings;
+  onToastSettingsChange: (settings: Partial<ToastSettings>) => void;
 }
 
 const SectionSeparator: FC = () => (
@@ -61,26 +65,26 @@ const SectionSeparator: FC = () => (
   </div>
 );
 
-const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast }) => {
+const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings, onToastSettingsChange }) => {
   const [settings, setSettings] = useState<Settings>({
     enabledSites: [],
     customSites: [],
     debugMode: false,
     floatingFallback: true
   });
-  
+
   const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  
+
   // Interface mode states
   const [interfaceMode, setInterfaceMode] = useState<'popup' | 'sidepanel'>(DEFAULT_SETTINGS.interfaceMode as 'popup' | 'sidepanel');
   const [interfaceModeChanging, setInterfaceModeChanging] = useState(false);
-  
+
   // Data for import/export
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  
+
   const storageManager = StorageManager.getInstance();
 
   const siteConfigs: Record<string, SiteConfig> = useMemo(() => ({
@@ -448,7 +452,14 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast }) => {
             onClearData={handleClearData}
           />
 
-          <SectionSeparator />
+          {/* Notification Settings Section */}
+          <NotificationSection
+            settings={toastSettings}
+            onSettingsChange={onToastSettingsChange}
+            onTestToast={(type) => {
+              showToast(`This is a ${type} notification`, type);
+            }}
+          />
 
           {/* Advanced Section */}
           <AdvancedSection

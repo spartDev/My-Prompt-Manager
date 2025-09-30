@@ -1,5 +1,7 @@
 import { FC, useState } from 'react';
 
+import ToggleSwitch from './ToggleSwitch';
+
 interface AdvancedSectionProps {
   debugMode: boolean;
   onDebugModeChange: (enabled: boolean) => void;
@@ -80,27 +82,13 @@ const AdvancedSection: FC<AdvancedSectionProps> = ({
               </div>
               
               <div className="ml-4">
-                <button
-                  id="debug-mode"
-                  type="button"
-                  onClick={() => { onDebugModeChange(!debugMode); }}
+                <ToggleSwitch
+                  checked={debugMode}
+                  onChange={onDebugModeChange}
                   disabled={saving}
-                  className={`
-                    relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-800
-                    ${debugMode
-                      ? 'bg-purple-600 hover:bg-purple-700'
-                      : 'bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500'
-                    }
-                    ${saving ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
-                  `}
-                >
-                  <span
-                    className={`
-                      inline-block h-3 w-3 transform rounded-full bg-white shadow-sm transition-transform duration-200
-                      ${debugMode ? 'translate-x-5' : 'translate-x-1'}
-                    `}
-                  />
-                </button>
+                  ariaLabel="Debug mode"
+                  size="small"
+                />
               </div>
             </div>
 

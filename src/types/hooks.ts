@@ -67,16 +67,39 @@ export interface TextHighlight {
 }
 
 // Toast hook types
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+  variant?: 'primary' | 'secondary';
+}
+
 export interface Toast {
   id: string;
   message: string;
-  type: 'success' | 'error' | 'info';
+  type: 'success' | 'error' | 'info' | 'warning';
   duration?: number;
+  action?: ToastAction;
+  groupKey?: string; // For grouping similar toasts
+}
+
+export interface ToastSettings {
+  position: 'top-right' | 'bottom-right';
+  enabledTypes: {
+    success: boolean;
+    error: boolean;
+    info: boolean;
+    warning: boolean;
+  };
+  enableGrouping: boolean;
+  groupingWindow: number; // milliseconds
 }
 
 export interface UseToastReturn {
   toasts: Toast[];
-  showToast: (message: string, type?: Toast['type'], duration?: number) => void;
+  queueLength: number;
+  settings: ToastSettings;
+  showToast: (message: string, type?: Toast['type'], duration?: number, action?: ToastAction) => void;
   hideToast: (id: string) => void;
   clearAllToasts: () => void;
+  updateSettings: (settings: Partial<ToastSettings>) => void;
 }
