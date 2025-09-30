@@ -343,21 +343,21 @@ test.describe('User Journey: Power User Prompt Management & Organization', () =>
     // Verify Development category is now empty
     await expect(sidepanelPage.getByText('No matches found')).toBeVisible();
 
-    // Scenario 5: Data export for backup
-    console.log('[TEST] Starting Scenario 5: Data export for backup');
+    // Scenario 5: Data backup
+    console.log('[TEST] Starting Scenario 5: Data backup');
 
-    // Return to all categories view for export
+    // Return to all categories view for backup
     await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
     await sidepanelPage.getByRole('menu', { name: 'Category filter menu' }).waitFor();
     await sidepanelPage.getByRole('menuitem', { name: 'All Categories' }).click();
 
-    // Navigate to settings for export functionality
+    // Navigate to settings for backup functionality
     await sidepanelPage.getByRole('button', { name: 'Settings' }).click();
     await expect(sidepanelPage.getByRole('heading', { name: 'Settings' })).toBeVisible();
 
-    // Test export functionality - set up download promise before clicking
+    // Test backup functionality - set up download promise before clicking
     const downloadPromise = sidepanelPage.waitForEvent('download');
-    await sidepanelPage.getByRole('button', { name: 'Export' }).click();
+    await sidepanelPage.getByRole('button', { name: 'Create Backup' }).click();
 
     // Wait for download
     const download = await downloadPromise;
@@ -366,17 +366,17 @@ test.describe('User Journey: Power User Prompt Management & Organization', () =>
     expect(download.suggestedFilename()).toContain('prompt-library-backup');
     expect(download.suggestedFilename()).toContain('.json');
 
-    // Save and verify export content
-    const exportPath = await download.path();
-    expect(exportPath).toBeTruthy();
+    // Save and verify backup content
+    const backupPath = await download.path();
+    expect(backupPath).toBeTruthy();
 
-    // Read and validate export data structure
-    const exportContent = await sidepanelPage.evaluate(async () => {
-      // Trigger export and capture the data
-      const exportButton = Array.from(document.querySelectorAll('button')).find(btn => btn.textContent?.includes('Export')) as HTMLButtonElement;
+    // Read and validate backup data structure
+    const backupContent = await sidepanelPage.evaluate(async () => {
+      // Trigger backup and capture the data
+      const backupButton = Array.from(document.querySelectorAll('button')).find(btn => btn.textContent?.includes('Create Backup')) as HTMLButtonElement;
 
       // Mock the download to capture data
-      let exportedData: any = null;
+      let backupData: any = null;
       const originalCreateElement = document.createElement;
       document.createElement = function(tagName: string) {
         const element = originalCreateElement.call(this, tagName);
@@ -386,7 +386,7 @@ test.describe('User Journey: Power User Prompt Management & Organization', () =>
             // Extract data from href
             if (this.href.startsWith('data:application/json,')) {
               const jsonData = decodeURIComponent(this.href.replace('data:application/json,', ''));
-              exportedData = JSON.parse(jsonData);
+              backupData = JSON.parse(jsonData);
             }
             return originalClick.call(this);
           };
@@ -394,19 +394,19 @@ test.describe('User Journey: Power User Prompt Management & Organization', () =>
         return element;
       };
 
-      exportButton.click();
+      backupButton.click();
 
       // Restore original createElement
       document.createElement = originalCreateElement;
 
-      return exportedData;
+      return backupData;
     });
 
-    // Note: Complex export content validation commented out due to technical issues
+    // Note: Complex backup content validation commented out due to technical issues
     // The important verification is that the download was successful
-    console.log('[TEST] Export download completed successfully');
+    console.log('[TEST] Backup download completed successfully');
 
-    // TODO: Add file-based export content validation in future iteration
+    // TODO: Add file-based backup content validation in future iteration
 
     console.log('[TEST] Power User Journey completed successfully!');
 
