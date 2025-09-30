@@ -205,4 +205,35 @@ describe('useToast', () => {
     // Should show enabled type
     expect(result.current.toasts).toHaveLength(1);
   });
+
+  it('handles synchronous toast calls without dropping toasts', () => {
+    const { result } = renderHook(() => useToast());
+
+    // Fire two toasts synchronously (in the same tick)
+    act(() => {
+      result.current.showToast('First toast', 'info');
+      result.current.showToast('Second toast', 'success');
+    });
+
+    // First should be displayed, second should be queued
+    expect(result.current.toasts).toHaveLength(1);
+    expect(result.current.toasts[0]?.message).toBe('First toast');
+    expect(result.current.queueLength).toBe(1);
+
+    // Fire three toasts synchronously when no toast is displayed
+    act(() => {
+      result.current.clearAllToasts();
+    });
+
+    act(() => {
+      result.current.showToast('Toast A', 'info');
+      result.current.showToast('Toast B', 'warning');
+      result.current.showToast('Toast C', 'error');
+    });
+
+    // First should display, other two should be queued
+    expect(result.current.toasts).toHaveLength(1);
+    expect(result.current.toasts[0]?.message).toBe('Toast A');
+    expect(result.current.queueLength).toBe(2);
+  });
 });

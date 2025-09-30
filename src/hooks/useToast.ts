@@ -94,14 +94,18 @@ export const useToast = (): UseToastReturn => {
       action
     };
 
-    // If no toast is showing, show immediately
-    if (toasts.length === 0) {
-      setToasts([toast]);
-    } else {
-      // Queue the toast
-      setQueue(prev => [...prev, toast]);
-    }
-  }, [toasts.length, settings.enabledTypes]);
+    // Use functional setState to check current state and decide whether to show or queue
+    setToasts(currentToasts => {
+      if (currentToasts.length === 0) {
+        // No toast showing, show immediately
+        return [toast];
+      } else {
+        // Toast already showing, queue this one
+        setQueue(prev => [...prev, toast]);
+        return currentToasts;
+      }
+    });
+  }, [settings.enabledTypes]);
 
   const hideToast = useCallback((id: string) => {
     if (timeoutRef.current) {
