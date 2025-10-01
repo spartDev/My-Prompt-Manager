@@ -17,7 +17,7 @@ import type {
 import ConfirmDialog from '../ConfirmDialog';
 import { PasswordStrengthIndicator } from '../PasswordStrengthIndicator';
 
-import SettingsSection from './SettingsSection';
+import ToggleSwitch from './ToggleSwitch';
 
 interface BackupRestoreViewProps {
   onShowToast?: (message: string, type?: 'success' | 'error' | 'info') => void;
@@ -119,6 +119,7 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
   const [storageUsage, setStorageUsage] = useState<{ used: number; total: number } | null>(null);
   const [loadingUsage, setLoadingUsage] = useState(false);
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
 
   // Secure password management - automatically cleared on unmount
   const [encryptionPassword, decryptionPassword] = useSecurePasswords(2);
@@ -384,27 +385,43 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
       ? 'bg-yellow-500'
       : 'bg-green-500';
 
-  const backupIcon = (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M3 15a4 4 0 014-4h.01A6 6 0 0117 7a5 5 0 012 9.584M12 12v7m0 0l-3.5-3.5M12 19l3.5-3.5" />
-    </svg>
-  );
-
   return (
-    <SettingsSection
-      icon={backupIcon}
-      title="Backup &amp; Restore"
-      description="Create encrypted backups, validate files, and selectively restore your prompt library."
-    >
-      <div className="space-y-4">
-        {/* Storage Usage Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 space-y-4">
-          <div className="space-y-2">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Storage Usage</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Monitor your extension&apos;s storage consumption and available space.</p>
+    <section className="border-t border-gray-200 dark:border-gray-700 pt-6">
+      <button
+        onClick={() => { setIsExpanded(!isExpanded); }}
+        className="w-full flex items-center justify-between text-left mb-4 group"
+        aria-expanded={isExpanded}
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0">
+            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 15a4 4 0 014-4h.01A6 6 0 0117 7a5 5 0 012 9.584M12 12v7m0 0l-3.5-3.5M12 19l3.5-3.5" />
+            </svg>
           </div>
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+              Backup &amp; Restore
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Create encrypted backups, validate files, and selectively restore your prompt library
+            </p>
+          </div>
+        </div>
+        <svg
+          className={`w-5 h-5 flex-shrink-0 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
 
-          <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 p-4">
+      {isExpanded && (
+        <div className="space-y-4 animate-in slide-in-from-top-2 duration-200">
+        {/* Storage Usage Section */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-700 dark:text-gray-200">Current usage</p>
@@ -436,18 +453,17 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
                   aria-hidden="true"
                   className="pointer-events-none absolute left-0 top-full z-20 mt-2 w-72 rounded-lg border border-blue-200 dark:border-blue-800 bg-white dark:bg-slate-900 px-3 py-2 text-left text-xs text-blue-700 dark:text-blue-200 opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100"
                 >
-                  Chrome extensions can store up to 5&nbsp;MB in <code className="font-mono bg-blue-100/70 dark:bg-blue-900/40 px-1 py-0.5 rounded">chrome.storage.local</code>. Create backups or delete unused prompts if you approach the limit.
+                  Chrome extensions can store up to 10&nbsp;MB in <code className="font-mono bg-blue-100/70 dark:bg-blue-900/40 px-1 py-0.5 rounded">chrome.storage.local</code>. Create backups or delete unused prompts if you approach the limit.
                 </span>
               </button>
-            </div>
           </div>
         </div>
 
         {/* Backup Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 space-y-4">
-          <div className="space-y-2">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Create Backup</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Download an encrypted archive of your prompts, categories, and settings.</p>
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+          <div>
+            <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm mb-3">Create Backup</h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">Download an encrypted archive of your prompts, categories, and settings.</p>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -456,16 +472,11 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
                 <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Include settings</p>
                 <p className="text-xs text-gray-500 dark:text-gray-400">Export appearance preferences and other app-level configuration.</p>
               </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={backupOptions.includeSettings}
-                aria-label="Include settings"
-                onClick={() => { handleBackupOptionChange('includeSettings', !backupOptions.includeSettings); }}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${backupOptions.includeSettings ? 'bg-gradient-to-r from-purple-500 to-indigo-500' : 'bg-gray-300 dark:bg-gray-600'}`}
-              >
-                <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${backupOptions.includeSettings ? 'translate-x-5' : 'translate-x-1'}`} />
-              </button>
+              <ToggleSwitch
+                checked={backupOptions.includeSettings}
+                onChange={(checked) => { handleBackupOptionChange('includeSettings', checked); }}
+                ariaLabel="Include settings"
+              />
             </div>
 
             <div className="flex flex-col gap-3">
@@ -474,16 +485,11 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
                   <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Password protect backup (AES-256)</p>
                   <p className="text-xs text-gray-500 dark:text-gray-400">Encrypt the exported archive with a password before download.</p>
                 </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={backupOptions.encryptionEnabled}
-                  aria-label="Password protect backup (AES-256)"
-                  onClick={() => { handleBackupOptionChange('encryptionEnabled', !backupOptions.encryptionEnabled); }}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${backupOptions.encryptionEnabled ? 'bg-gradient-to-r from-purple-500 to-indigo-500' : 'bg-gray-300 dark:bg-gray-600'}`}
-                >
-                  <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${backupOptions.encryptionEnabled ? 'translate-x-5' : 'translate-x-1'}`} />
-                </button>
+                <ToggleSwitch
+                  checked={backupOptions.encryptionEnabled}
+                  onChange={(checked) => { handleBackupOptionChange('encryptionEnabled', checked); }}
+                  ariaLabel="Password protect backup (AES-256)"
+                />
               </div>
 
               {backupOptions.encryptionEnabled && (
@@ -499,9 +505,7 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
                 </div>
               )}
             </div>
-          </div>
-
-          <button
+            <button
             type="button"
             onClick={() => { void handleCreateBackup(); }}
             disabled={isBackingUp || (backupOptions.encryptionEnabled && encryptionPassword.isEmpty())}
@@ -510,12 +514,15 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
             {isBackingUp ? 'Creating backup…' : 'Create Backup'}
           </button>
         </div>
+          </div>
+
+          
 
         {/* Restore Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 space-y-4">
-          <div className="space-y-2">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Restore Backup</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Validate a backup file, preview its contents, and selectively merge or replace your library.</p>
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+          <div>
+            <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm mb-3">Restore Backup</h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">Validate a backup file, preview its contents, and selectively merge or replace your library.</p>
           </div>
 
           <div className="space-y-3">
@@ -809,7 +816,7 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
             </div>
           )}
 
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+          <div className="flex flex-col mt-4 sm:flex-row sm:items-center gap-2 sm:gap-3">
             <button
               type="button"
               onClick={() => { void handlePreview(); }}
@@ -889,8 +896,8 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
 
         {/* Backup History */}
         {history.length > 0 && (
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 space-y-3">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Recent Backups</h3>
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+            <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm mb-3">Recent Backups</h3>
             <ul className="space-y-2 text-sm">
               {history.map((entry) => (
                 <li key={entry.id} className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 px-3 py-2">
@@ -906,7 +913,8 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
             </p>
           </div>
         )}
-      </div>
+        </div>
+      )}
 
       <ConfirmDialog
         isOpen={isReplaceConfirmOpen}
@@ -918,7 +926,7 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
         cancelText="Keep merge mode"
         variant="danger"
       />
-    </SettingsSection>
+    </section>
   );
 };
 
