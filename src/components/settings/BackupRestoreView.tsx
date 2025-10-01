@@ -396,18 +396,18 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
       title="Backup &amp; Restore"
       description="Create encrypted backups, validate files, and selectively restore your prompt library."
     >
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 divide-y divide-gray-200 dark:divide-gray-700">
-        {/* Backup Section */}
-        <div className="p-4 space-y-4">
+      <div className="space-y-4">
+        {/* Storage Usage Section */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 space-y-4">
           <div className="space-y-2">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Create Backup</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Download an encrypted archive of your prompts, categories, and settings.</p>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Storage Usage</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Monitor your extension&apos;s storage consumption and available space.</p>
           </div>
 
           <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-700 dark:text-gray-200">Storage usage</p>
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-200">Current usage</p>
                 <p className="text-xs text-gray-500 dark:text-gray-400">{storageUsageText}</p>
               </div>
               <span className="text-xs font-medium text-gray-600 dark:text-gray-300">{storageUsagePercentageLabel}%</span>
@@ -440,6 +440,14 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
                 </span>
               </button>
             </div>
+          </div>
+        </div>
+
+        {/* Backup Section */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 space-y-4">
+          <div className="space-y-2">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Create Backup</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Download an encrypted archive of your prompts, categories, and settings.</p>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -504,7 +512,7 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
         </div>
 
         {/* Restore Section */}
-        <div className="p-4 space-y-4">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 space-y-4">
           <div className="space-y-2">
             <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Restore Backup</h3>
             <p className="text-sm text-gray-500 dark:text-gray-400">Validate a backup file, preview its contents, and selectively merge or replace your library.</p>
@@ -881,7 +889,7 @@ const BackupRestoreView: FC<BackupRestoreViewProps> = ({ onShowToast }) => {
 
         {/* Backup History */}
         {history.length > 0 && (
-          <div className="p-6 space-y-3">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 space-y-3">
             <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Recent Backups</h3>
             <ul className="space-y-2 text-sm">
               {history.map((entry) => (
