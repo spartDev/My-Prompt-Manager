@@ -6,13 +6,7 @@
  */
 
  
- 
- 
- 
- 
- 
-
-import { JSDOM } from 'jsdom';
+import { Window as HappyDOMWindow } from 'happy-dom';
 import { describe, it, expect, beforeEach, afterEach, vi, Mock } from 'vitest';
 
 import { getChromeMockFunctions } from '../../test/mocks';
@@ -31,9 +25,23 @@ const defaultCompatibilityPrompts = [
   }
 ];
 
+interface DOMWrapper {
+  window: HappyDOMWindow;
+}
+
 describe('Content Script Compatibility Tests', () => {
-  let dom: JSDOM;
+  let dom: DOMWrapper;
   let injector: PromptLibraryInjector;
+
+  const applyWindowGlobals = (windowInstance: HappyDOMWindow) => {
+    const globalAny = globalThis as any;
+    globalAny.window = windowInstance;
+    globalAny.document = windowInstance.document;
+    globalAny.HTMLElement = windowInstance.HTMLElement;
+    globalAny.Element = windowInstance.Element;
+    globalAny.Node = windowInstance.Node;
+    globalAny.navigator = windowInstance.navigator;
+  };
 
   const setupDOMForPlatform = (url: string, customHTML?: string) => {
     const defaultHTML = `
@@ -48,19 +56,12 @@ describe('Content Script Compatibility Tests', () => {
       </html>
     `;
 
-    dom = new JSDOM(customHTML || defaultHTML, {
-      url,
-      pretendToBeVisual: true,
-      resources: 'usable'
-    });
+    const windowInstance = new HappyDOMWindow({ url });
+    windowInstance.document.write(customHTML || defaultHTML);
+    windowInstance.document.close();
 
-    // Type-safe global assignments
-    const domWindow = dom.window as any;
-    (globalThis as any).document = domWindow.document;
-    (globalThis as any).window = domWindow;
-    (globalThis as any).HTMLElement = domWindow.HTMLElement;
-    (globalThis as any).Element = domWindow.Element;
-    (globalThis as any).Node = domWindow.Node;
+    dom = { window: windowInstance };
+    applyWindowGlobals(windowInstance);
   };
 
   beforeEach(() => {
@@ -80,6 +81,13 @@ describe('Content Script Compatibility Tests', () => {
       // Ignore cleanup errors in tests
     }
     vi.restoreAllMocks();
+    const globalAny = globalThis as any;
+    delete globalAny.window;
+    delete globalAny.document;
+    delete globalAny.HTMLElement;
+    delete globalAny.Element;
+    delete globalAny.Node;
+    delete globalAny.navigator;
   });
 
   describe('Browser Environment Compatibility', () => {

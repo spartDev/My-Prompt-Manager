@@ -1,15 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-import { Prompt, Category, DEFAULT_CATEGORY } from '../../types';
+import { Prompt, Category, Settings, DEFAULT_CATEGORY, ErrorType } from '../../types';
 import { StorageManager } from '../storage';
 
 interface MockStorage {
   prompts: Prompt[];
   categories: Category[];
-  settings: {
-    defaultCategory: string;
-    sortOrder: string;
-  };
+  settings: Settings;
   [key: string]: unknown;
 }
 
@@ -22,7 +19,11 @@ describe('StorageManager', () => {
     mockStorage = {
       prompts: [],
       categories: [{ id: 'default', name: DEFAULT_CATEGORY }],
-      settings: { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt' }
+      settings: {
+        defaultCategory: DEFAULT_CATEGORY,
+        sortOrder: 'updatedAt',
+        theme: 'system'
+      }
     };
 
     // Mock chrome storage API
@@ -59,6 +60,9 @@ describe('StorageManager', () => {
     });
 
      
+    // Default quota for tests
+    chrome.storage.local.QUOTA_BYTES = 1024 * 1024;
+
     vi.mocked(chrome.storage.local.getBytesInUse).mockImplementation(() => Promise.resolve(1024));
   });
 
@@ -143,6 +147,102 @@ describe('StorageManager', () => {
 
       await expect(storageManager.deletePrompt('nonexistent'))
         .rejects.toThrow('Prompt with id nonexistent not found');
+    });
+  });
+
+  describe('Library transactions', () => {
+    it('ensures library capacity when projected usage is within quota', async () => {
+      const totalUsage = 400;
+      const currentDatasetUsage = 220;
+      const getBytesInUseMock = vi.mocked(chrome.storage.local.getBytesInUse);
+      getBytesInUseMock.mockImplementationOnce(() => Promise.resolve(totalUsage));
+      getBytesInUseMock.mockImplementationOnce(() => Promise.resolve(currentDatasetUsage));
+
+      const data = {
+        prompts: mockStorage.prompts,
+        categories: mockStorage.categories,
+        settings: mockStorage.settings
+      };
+
+      await expect(storageManager.ensureLibraryCapacity(data)).resolves.toMatchObject({
+        quota: expect.any(Number),
+        projectedUsage: expect.any(Number)
+      });
+    });
+
+    it('throws when projected usage exceeds quota', async () => {
+      chrome.storage.local.QUOTA_BYTES = 512;
+      const getBytesInUseMock = vi.mocked(chrome.storage.local.getBytesInUse);
+      getBytesInUseMock.mockImplementationOnce(() => Promise.resolve(100));
+      getBytesInUseMock.mockImplementationOnce(() => Promise.resolve(80));
+
+      const largePrompt: Prompt = {
+        id: 'p1',
+        title: 'Large',
+        content: 'x'.repeat(600),
+        category: DEFAULT_CATEGORY,
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      };
+
+      await expect(storageManager.ensureLibraryCapacity({
+        prompts: [largePrompt],
+        categories: mockStorage.categories,
+        settings: mockStorage.settings
+      })).rejects.toMatchObject({
+        message: 'Restoring this backup would exceed the available storage quota.',
+        type: ErrorType.STORAGE_QUOTA_EXCEEDED
+      });
+    });
+
+    it('replaces library data transactionally and rolls back on failure', async () => {
+      const originalSet = vi.mocked(chrome.storage.local.set);
+      const originalState = { ...mockStorage };
+      const quotaError = new Error('QUOTA_EXCEEDED');
+
+      originalSet
+        .mockImplementationOnce(() => Promise.reject(quotaError))
+        .mockImplementationOnce((data) => {
+          Object.assign(mockStorage, data);
+          return Promise.resolve();
+        });
+
+      await expect(storageManager.replaceLibraryData({
+        prompts: [{
+          id: 'p1',
+          title: 'New',
+          content: 'content',
+          category: DEFAULT_CATEGORY,
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        }],
+        categories: mockStorage.categories,
+        settings: mockStorage.settings
+      })).rejects.toMatchObject({
+        type: ErrorType.STORAGE_QUOTA_EXCEEDED
+      });
+
+      expect(mockStorage.prompts).toEqual(originalState.prompts);
+      expect(mockStorage.categories).toEqual(originalState.categories);
+    });
+
+    it('surfaces rollback failures with a dedicated error', async () => {
+      const originalSet = vi.mocked(chrome.storage.local.set);
+      const quotaError = new Error('QUOTA_EXCEEDED');
+      const rollbackError = new Error('ROLLBACK_FAILED');
+
+      originalSet
+        .mockImplementationOnce(() => Promise.reject(quotaError))
+        .mockImplementationOnce(() => Promise.reject(rollbackError));
+
+      await expect(storageManager.replaceLibraryData({
+        prompts: mockStorage.prompts,
+        categories: mockStorage.categories,
+        settings: mockStorage.settings
+      })).rejects.toMatchObject({
+        message: 'Failed to restore previous data after an unsuccessful restore operation.',
+        type: ErrorType.DATA_CORRUPTION
+      });
     });
   });
 

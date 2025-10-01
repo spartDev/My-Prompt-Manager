@@ -16,7 +16,7 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "types": ["chrome", "vite/client", "vitest/globals", "jsdom", "@types/node"]
+    "types": ["chrome", "vite/client", "vitest/globals", "@types/node"]
   },
   "include": [
     "src/**/*.ts",
