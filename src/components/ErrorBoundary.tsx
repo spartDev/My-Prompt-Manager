@@ -1,6 +1,8 @@
 import { Component } from 'react';
 import type { ReactNode, ErrorInfo } from 'react';
 
+import { Logger } from '../utils';
+
 interface Props {
   children: ReactNode;
   fallback?: ReactNode;
@@ -37,8 +39,8 @@ class ErrorBoundary extends Component<Props, State> {
     });
 
     // Log error for debugging
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
-    
+    Logger.error('ErrorBoundary caught an error', error, { errorInfo: errorInfo.componentStack });
+
     // In a real app, you might want to send this to an error reporting service
     this.reportError(error, errorInfo);
   }
@@ -53,9 +55,8 @@ class ErrorBoundary extends Component<Props, State> {
       url: window.location.href,
       userAgent: navigator.userAgent
     };
-    
-    // For now, we'll just log to console
-    console.error('Error Report:', errorData);
+
+    Logger.error('Error Report', new Error('Component error boundary triggered'), errorData);
   }
 
   private handleReload = () => {

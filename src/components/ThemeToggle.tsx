@@ -1,6 +1,7 @@
 import type { FC } from 'react';
 
 import { useThemeContext } from '../contexts/ThemeContext';
+import { Logger, toError } from '../utils';
 
 const ThemeToggle: FC = () => {
   const { theme, resolvedTheme, setTheme } = useThemeContext();
@@ -13,7 +14,7 @@ const ThemeToggle: FC = () => {
         await setTheme(theme === 'light' ? 'dark' : 'light');
       }
     } catch (error) {
-      console.error('Failed to change theme:', error);
+      Logger.error('Failed to change theme', toError(error));
     }
   };
 

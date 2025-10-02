@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import type { FC } from 'react';
 
 import { StorageManager } from '../services/storage';
+import { Logger, toError } from '../utils';
 
 import ConfirmDialog from './ConfirmDialog';
 
@@ -21,8 +22,7 @@ const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
         const info = await storageManager.getStorageUsage();
         setStorageInfo(info);
       } catch (error) {
-         
-        console.error('Failed to load storage info:', error);
+        Logger.error('Failed to load storage info', toError(error));
       }
     };
 
@@ -44,8 +44,7 @@ const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
         // Reload the extension
         window.location.reload();
       } catch (error) {
-         
-        console.error('Failed to clear data:', error);
+        Logger.error('Failed to clear data', toError(error));
       } finally {
         setIsLoading(false);
       }

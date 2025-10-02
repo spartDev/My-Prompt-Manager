@@ -1,6 +1,7 @@
 import { FC, useState, useRef } from 'react';
 
 import type { Prompt, Category } from '../../types';
+import { Logger, toError } from '../../utils';
 
 import SettingsSection from './SettingsSection';
 
@@ -132,8 +133,8 @@ const DataStorageSection: FC<DataStorageSectionProps> = ({
         fileInputRef.current.value = '';
       }
     } catch (error) {
-      console.error('Import failed:', error);
-      
+      Logger.error('Import failed', toError(error));
+
       // Show more specific error messages
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       alert(`Import failed: ${errorMessage}\n\nPlease ensure you are selecting a valid backup file exported from this extension.`);
@@ -153,7 +154,7 @@ const DataStorageSection: FC<DataStorageSectionProps> = ({
       await onClearData();
       setShowClearConfirm(false);
     } catch (error) {
-      console.error('Failed to clear data:', error);
+      Logger.error('Failed to clear data', toError(error));
     } finally {
       setClearing(false);
     }

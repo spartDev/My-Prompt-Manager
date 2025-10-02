@@ -199,10 +199,9 @@ describe('Logger', () => {
   });
 
   describe('info', () => {
-    it('should log critical messages even when debug mode is off', () => {
-      localStorageMock.getItem.mockReturnValue(null);
-      chromeStorageMock.local.get.mockResolvedValue({ promptLibrarySettings: { debugMode: false } });
-      
+    it('should log messages when debug mode is on', () => {
+      localStorageMock.getItem.mockReturnValue('true');
+
       const message = 'Extension initialized successfully';
       const context = { testKey: 'testValue' };
 
@@ -245,22 +244,15 @@ describe('Logger', () => {
       expect(consoleMock.info).not.toHaveBeenCalled();
     });
 
-    it('should log cleanup critical messages', () => {
+    it('should not log messages when debug mode is off', () => {
       localStorageMock.getItem.mockReturnValue(null);
       chromeStorageMock.local.get.mockResolvedValue({ promptLibrarySettings: { debugMode: false } });
-      
+
       const message = 'Extension cleanup completed';
 
       Logger.info(message);
 
-      expect(consoleMock.info).toHaveBeenCalledWith(
-        '[PromptLibrary]',
-        message,
-        expect.objectContaining({
-          level: 'INFO',
-          message,
-        })
-      );
+      expect(consoleMock.info).not.toHaveBeenCalled();
     });
   });
 
