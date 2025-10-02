@@ -4,6 +4,7 @@
  */
 
 import { getDefaultEnabledPlatforms, getAllHostnamePatterns } from '../config/platforms';
+import { toError } from '../utils/error';
 import * as Logger from '../utils/logger';
 
 // Track active element picker sessions
@@ -169,7 +170,7 @@ export class ContentScriptInjector {
 
       return false;
     } catch (error) {
-      Logger.error('[ContentScriptInjector] Error checking site enablement', error as Error);
+      Logger.error('[ContentScriptInjector] Error checking site enablement', toError(error));
       return false;
     }
   }
@@ -196,7 +197,7 @@ export class ContentScriptInjector {
 
       return false;
     } catch (error) {
-      Logger.error(`[ContentScriptInjector] Error checking permissions for ${hostname}`, error as Error);
+      Logger.error(`[ContentScriptInjector] Error checking permissions for ${hostname}`, toError(error));
       return false;
     }
   }
@@ -311,7 +312,7 @@ export class ContentScriptInjector {
       const hostname = await this.getTabHostname(tabId);
       
       // Classify error and handle appropriately
-      const errorType = this.classifyInjectionError(error as Error, tabId);
+      const errorType = this.classifyInjectionError(toError(error), tabId);
       
       switch (errorType) {
         case 'permission':
@@ -324,7 +325,7 @@ export class ContentScriptInjector {
         case 'tab_access_denied':
           // Log warning for unexpected access issues (not orphaned tabs)
           if (!this.isLikelyOrphanedTab(tabId)) {
-            Logger.error(`[ContentScriptInjector] Tab access denied for tab ${String(tabId)}`, undefined, { hostname });
+            Logger.warn(`[ContentScriptInjector] Tab access denied for tab ${String(tabId)}`, { hostname, tabId });
           }
           break;
         case 'network':
@@ -335,7 +336,7 @@ export class ContentScriptInjector {
         case 'unknown':
         default:
           // Unexpected errors - always log
-          Logger.error(`[ContentScriptInjector] Unexpected injection failure for tab ${String(tabId)}`, error as Error, { hostname, errorType });
+          Logger.error(`[ContentScriptInjector] Unexpected injection failure for tab ${String(tabId)}`, toError(error), { hostname, errorType });
           break;
       }
       
@@ -420,7 +421,7 @@ export class ContentScriptInjector {
       return { success: true };
     } catch (error) {
       const hostname = await this.getTabHostname(tabId);
-      const errorType = this.classifyInjectionError(error as Error, tabId);
+      const errorType = this.classifyInjectionError(toError(error), tabId);
       
       // Handle different error types appropriately
       switch (errorType) {
@@ -446,7 +447,7 @@ export class ContentScriptInjector {
           };
         default:
           // Log unexpected errors
-          Logger.error(`[ContentScriptInjector] Force injection failed for tab ${String(tabId)}`, error as Error, { hostname, errorType });
+          Logger.error(`[ContentScriptInjector] Force injection failed for tab ${String(tabId)}`, toError(error), { hostname, errorType });
           return {
             success: false, 
             error: error instanceof Error ? error.message : 'Failed to inject content script'
@@ -483,13 +484,13 @@ export class ContentScriptInjector {
         } catch {
           // File doesn't exist, continue to fallbacks
           if (this.isDebugMode()) {
-            Logger.error('[ContentScriptInjector] Manifest content script path not accessible', undefined, { contentScriptPath });
+            Logger.warn('[ContentScriptInjector] Manifest content script path not accessible', { contentScriptPath });
           }
         }
       }
     } catch (error) {
       if (this.isDebugMode()) {
-        Logger.error('[ContentScriptInjector] Failed to read manifest', error as Error);
+        Logger.error('[ContentScriptInjector] Failed to read manifest', toError(error));
       }
     }
 
@@ -507,7 +508,7 @@ export class ContentScriptInjector {
           return contentEntry.file;
         } catch {
           if (this.isDebugMode()) {
-            Logger.error('[ContentScriptInjector] Build manifest content script not accessible', undefined, { file: contentEntry.file });
+            Logger.warn('[ContentScriptInjector] Build manifest content script not accessible', { file: contentEntry.file });
           }
         }
       }
@@ -525,14 +526,14 @@ export class ContentScriptInjector {
           return contentFiles[0];
         } catch {
           if (this.isDebugMode()) {
-            Logger.error('[ContentScriptInjector] Build manifest content file not accessible', undefined, { file: contentFiles[0] });
+            Logger.warn('[ContentScriptInjector] Build manifest content file not accessible', { file: contentFiles[0] });
           }
         }
       }
     } catch {
       // .vite/manifest.json doesn't exist (expected in Chrome Web Store builds)
       if (this.isDebugMode()) {
-        Logger.error('[ContentScriptInjector] Build manifest not available, trying direct file discovery');
+        Logger.info('[ContentScriptInjector] Build manifest not available, trying direct file discovery');
       }
     }
 
@@ -628,7 +629,7 @@ chrome.action.onClicked.addListener((tab) => {
         await injector.forceInjectContentScript(tabId);
         // Content script injected via activeTab
       } catch (error) {
-        Logger.error('[Background] Failed to inject via activeTab', error as Error);
+        Logger.error('[Background] Failed to inject via activeTab', toError(error));
       }
     })();
   }
@@ -640,7 +641,7 @@ void (async () => {
     const mode = await getInterfaceMode();
     await updateActionBehavior(mode);
   } catch (error) {
-    Logger.error('[Background] Error during initial setup', error as Error);
+    Logger.error('[Background] Error during initial setup', toError(error));
   }
 })();
 
@@ -728,7 +729,7 @@ async function handleRequestInjection(tabId: number | undefined, sendResponse: (
     await injector.forceInjectContentScript(targetTabId);
     sendResponse({ success: true });
   } catch (error) {
-    Logger.error('[Background] Manual injection failed', error as Error);
+    Logger.error('[Background] Manual injection failed', toError(error));
     sendResponse({ success: false, error: String(error) });
   }
 }
@@ -771,14 +772,14 @@ async function handleSettingsUpdated(_settings: unknown, sendResponse: (response
         } catch (error) {
           // Log error but don't fail the entire operation for individual tab failures
           const tabId = tab.id?.toString() || 'unknown';
-          Logger.error(`[Background] Failed to process tab ${tabId} during settings update`, error as Error);
+          Logger.error(`[Background] Failed to process tab ${tabId} during settings update`, toError(error));
         }
       })
     );
     
     sendResponse({ success: true });
   } catch (error) {
-    Logger.error('[Background] Settings update handling failed', error as Error);
+    Logger.error('[Background] Settings update handling failed', toError(error));
     sendResponse({ success: false });
   }
 }
@@ -824,7 +825,7 @@ async function handleRequestPermission(origins: string[], sendResponse: (respons
 
     sendResponse({ success: granted });
   } catch (error) {
-    Logger.error('[Background] Permission request failed', error as Error);
+    Logger.error('[Background] Permission request failed', toError(error));
     sendResponse({ success: false, error: String(error) });
   }
 }
@@ -883,7 +884,7 @@ async function handleExtensionUpdate(): Promise<void> {
     // Silent success for cleaner console output
     // Successfully processed extension update for [N] tabs
   } catch (error) {
-    Logger.error('[Background] Error handling extension update', error as Error);
+    Logger.error('[Background] Error handling extension update', toError(error));
   }
 }
 
@@ -976,7 +977,7 @@ async function handleOpenPickerWindow(targetTabId: number | undefined, sendRespo
     pickerWindowId = window?.id ?? null;
     sendResponse({ success: true });
   } catch (error) {
-    Logger.error('[Background] Error opening picker window', error as Error);
+    Logger.error('[Background] Error opening picker window', toError(error));
     sendResponse({ success: false, error: String(error) });
   }
 }
@@ -1055,7 +1056,7 @@ async function handleStartElementPicker(passedTabId: number | undefined, sender:
         await new Promise(resolve => setTimeout(resolve, 100));
       }
     } catch (error) {
-      Logger.error('[Background] Error checking/injecting content script', error as Error);
+      Logger.error('[Background] Error checking/injecting content script', toError(error));
       sendResponse({
         success: false, 
         error: 'Failed to initialize content script. Please refresh the page and try again.' 
@@ -1071,11 +1072,11 @@ async function handleStartElementPicker(passedTabId: number | undefined, sender:
       });
       sendResponse({ success: true, tabId: targetTabId });
     } catch (messageError) {
-      Logger.error('[Background] Failed to activate element picker', messageError as Error);
+      Logger.error('[Background] Failed to activate element picker', toError(messageError));
       sendResponse({ success: false, error: 'Failed to activate element picker. Please refresh the page and try again.' });
     }
   } catch (error) {
-    Logger.error('[Background] Error starting element picker', error as Error);
+    Logger.error('[Background] Error starting element picker', toError(error));
     sendResponse({ success: false, error: String(error) });
   }
 }
@@ -1121,7 +1122,7 @@ async function handleElementSelected(data: BackgroundMessage['data'], sender: ch
 
     sendResponse({ success: true });
   } catch (error) {
-    Logger.error('[Background] Error handling element selection', error as Error);
+    Logger.error('[Background] Error handling element selection', toError(error));
     sendResponse({ success: false, error: String(error) });
   }
 }
@@ -1144,7 +1145,7 @@ async function handleStopElementPicker(_passedTabId: number | undefined, _sender
     activePickerSessions.clear();
     sendResponse({ success: true });
   } catch (error) {
-    Logger.error('[Background] Error stopping element picker', error as Error);
+    Logger.error('[Background] Error stopping element picker', toError(error));
     sendResponse({ success: false, error: String(error) });
   }
 }
@@ -1189,7 +1190,7 @@ chrome.runtime.onInstalled.addListener((details) => {
         await handleExtensionUpdate();
       }
     } catch (error) {
-      Logger.error('[Background] Error initializing interface mode on install', error as Error);
+      Logger.error('[Background] Error initializing interface mode on install', toError(error));
     }
   })();
 });
@@ -1201,7 +1202,7 @@ chrome.runtime.onStartup.addListener(() => {
       const mode = await getInterfaceMode();
       await updateActionBehavior(mode);
     } catch (error) {
-      Logger.error('[Background] Error initializing interface mode on startup', error as Error);
+      Logger.error('[Background] Error initializing interface mode on startup', toError(error));
     }
   })();
 });
@@ -1214,7 +1215,7 @@ chrome.action.onClicked.addListener((tab) => {
     try {
       void chrome.sidePanel.open({ windowId: tab.windowId });
     } catch (error) {
-      Logger.error('[Background] Error opening side panel', error as Error);
+      Logger.error('[Background] Error opening side panel', toError(error));
     }
   }
 });
@@ -1229,7 +1230,7 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
           const newMode = interfaceModeChange.newValue as InterfaceMode;
           await updateActionBehavior(newMode);
         } catch (error) {
-          Logger.error('[Background] Error updating interface mode', error as Error);
+          Logger.error('[Background] Error updating interface mode', toError(error));
         }
       })();
     }

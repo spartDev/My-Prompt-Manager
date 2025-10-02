@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 
 import { UseClipboardReturn } from '../types/hooks';
-import { Logger } from '../utils';
+import { Logger, toError } from '../utils';
 
 export const useClipboard = (): UseClipboardReturn => {
   const [lastCopied, setLastCopied] = useState<string | null>(null);
@@ -49,7 +49,7 @@ export const useClipboard = (): UseClipboardReturn => {
 
       return true;
     } catch (error) {
-      Logger.error('Failed to copy text to clipboard', error as Error);
+      Logger.error('Failed to copy text to clipboard', toError(error));
       setCopyStatus('error');
       
       // Reset status after a delay

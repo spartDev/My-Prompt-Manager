@@ -6,7 +6,7 @@ import { StorageManager } from '../services/storage';
 import type { Prompt, Category, Settings as UserSettings } from '../types';
 import { DEFAULT_SETTINGS } from '../types';
 import type { ToastSettings } from '../types/hooks';
-import { Logger } from '../utils';
+import { Logger, toError } from '../utils';
 
 import { ClaudeIcon, ChatGPTIcon, PerplexityIcon, MistralIcon } from './icons/SiteIcons';
 import AboutSection from './settings/AboutSection';
@@ -148,7 +148,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
       setPrompts(loadedPrompts);
       setCategories(loadedCategories);
     } catch (error) {
-      Logger.error('Failed to load settings', error as Error);
+      Logger.error('Failed to load settings', toError(error));
       setSettings(defaultSettings);
       setInterfaceMode(DEFAULT_SETTINGS.interfaceMode as 'popup' | 'sidepanel');
     } finally {
@@ -184,7 +184,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
         }
       }
     } catch (error) {
-      Logger.error('Failed to save settings', error as Error);
+      Logger.error('Failed to save settings', toError(error));
     } finally {
       setSaving(false);
     }
@@ -204,7 +204,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
         setInterfaceModeChanging(false);
       }, 3000);
     } catch (error) {
-      Logger.error('Failed to save interface mode', error as Error);
+      Logger.error('Failed to save interface mode', toError(error));
     } finally {
       setSaving(false);
     }
@@ -279,7 +279,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
         }
       }
     } catch (error) {
-      Logger.error('Failed to notify custom site change', error as Error);
+      Logger.error('Failed to notify custom site change', toError(error));
     }
   };
 
@@ -338,7 +338,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
       
       alert(`Successfully imported ${data.prompts.length.toString()} prompts and ${data.categories.length.toString()} categories!`);
     } catch (error) {
-      Logger.error('Import failed', error as Error);
+      Logger.error('Import failed', toError(error));
       throw error;
     }
   };
@@ -350,7 +350,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
       await loadSettings();
       alert('All data has been cleared.');
     } catch (error) {
-      Logger.error('Failed to clear data', error as Error);
+      Logger.error('Failed to clear data', toError(error));
       throw error;
     }
   };
@@ -376,7 +376,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
       await loadSettings();
       alert('Settings have been reset to defaults.');
     } catch (error) {
-      Logger.error('Failed to reset settings', error as Error);
+      Logger.error('Failed to reset settings', toError(error));
       throw error;
     }
   };

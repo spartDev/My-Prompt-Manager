@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 
 import { StorageManager } from '../services/storage';
-import { Logger } from '../utils';
+import { Logger, toError } from '../utils';
 
 export type Theme = 'light' | 'dark' | 'system';
 
@@ -39,7 +39,7 @@ export const useTheme = (): UseThemeReturn => {
 
         setThemeState(settings.theme);
       } catch (error) {
-        Logger.error('Failed to initialize theme', error as Error);
+        Logger.error('Failed to initialize theme', toError(error));
         setThemeState('system');
       }
     };
@@ -93,7 +93,7 @@ export const useTheme = (): UseThemeReturn => {
         });
       }
     } catch (error) {
-      Logger.error('Failed to update theme', error as Error);
+      Logger.error('Failed to update theme', toError(error));
     }
   }, []);
 

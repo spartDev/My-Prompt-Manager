@@ -1,6 +1,6 @@
 import { FC, useState } from 'react';
 
-import { Logger } from '../../utils';
+import { Logger, toError } from '../../utils';
 
 interface AboutSectionProps {
   version: string;
@@ -23,7 +23,7 @@ const AboutSection: FC<AboutSectionProps> = ({ version, onReset }) => {
       await onReset();
       setShowResetConfirm(false);
     } catch (error) {
-      Logger.error('Failed to reset settings', error as Error);
+      Logger.error('Failed to reset settings', toError(error));
     } finally {
       setResetting(false);
     }

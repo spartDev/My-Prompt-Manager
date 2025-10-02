@@ -3,7 +3,7 @@ import { FC, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useClipboard } from '../../hooks/useClipboard';
 import { ConfigurationEncoder, ConfigurationEncoderError } from '../../services/configurationEncoder';
 import { CustomSite, CustomSiteConfiguration, SecurityWarning } from '../../types';
-import { Logger } from '../../utils';
+import { Logger, toError } from '../../utils';
 import { CustomSiteIcon } from '../icons/SiteIcons';
 
 import AddCustomSiteCard from './AddCustomSiteCard';
@@ -170,7 +170,7 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
 
       return true;
     } catch (error) {
-      Logger.error('Failed to request permission for imported site', error as Error);
+      Logger.error('Failed to request permission for imported site', toError(error));
       return false;
     }
   };
@@ -265,7 +265,7 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
       setPendingImport(null);
       setImportCode('');
     } catch (error) {
-      Logger.error('Failed to import configuration', error as Error);
+      Logger.error('Failed to import configuration', toError(error));
       notify('Failed to import configuration. Please try again.', 'error');
     } finally {
       setConfirmingImport(false);
@@ -360,7 +360,7 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
             }
           }
         } catch (error) {
-          Logger.error('Failed to get current tab', error as Error);
+          Logger.error('Failed to get current tab', toError(error));
         }
       })();
     }
@@ -506,7 +506,7 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
         }
       }
     } catch (error) {
-      Logger.error('Failed to start element picker', error as Error);
+      Logger.error('Failed to start element picker', toError(error));
       const errorMessage = error instanceof Error ? error.message : 'Failed to start element picker';
       setPickerError(errorMessage);
       setPickingElement(false);
@@ -551,7 +551,7 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
         });
 
       } catch (permissionError) {
-        Logger.error('Failed to request permission', permissionError as Error);
+        Logger.error('Failed to request permission', toError(permissionError));
         setUrlError('Failed to request permission. Please try again.');
         return;
       }

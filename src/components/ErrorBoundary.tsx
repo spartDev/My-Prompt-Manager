@@ -56,9 +56,7 @@ class ErrorBoundary extends Component<Props, State> {
       userAgent: navigator.userAgent
     };
 
-
-    // Log error report
-    Logger.error('Error Report', undefined, errorData);
+    Logger.error('Error Report', new Error('Component error boundary triggered'), errorData);
   }
 
   private handleReload = () => {
