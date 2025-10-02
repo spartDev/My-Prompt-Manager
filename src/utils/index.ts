@@ -1,3 +1,3 @@
 export { debounce } from './debounce';
-export { toError } from './error';
+export { toError, getErrorMessage } from './error';
 export * as Logger from './logger';

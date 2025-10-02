@@ -18,3 +18,30 @@ export function toError(error: unknown): Error {
 
   return new Error(String(error));
 }
+
+/**
+ * Safely extracts an error message from an unknown error value
+ *
+ * This is a convenience function that combines toError() with message extraction,
+ * eliminating the need for manual instanceof checks and type guards.
+ *
+ * @param error - The error value to extract a message from
+ * @returns The error message as a string
+ *
+ * @example
+ * // Instead of manual checks:
+ * const message = error instanceof Error ? error.message : 'Unknown error';
+ *
+ * // Use this helper:
+ * const message = getErrorMessage(error);
+ *
+ * @example
+ * // Works with any error type:
+ * getErrorMessage(new Error('Test'));              // "Test"
+ * getErrorMessage('String error');                 // "String error"
+ * getErrorMessage({ message: 'Object error' });   // "Object error"
+ * getErrorMessage(undefined);                      // "undefined"
+ */
+export function getErrorMessage(error: unknown): string {
+  return toError(error).message;
+}

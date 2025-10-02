@@ -4,7 +4,7 @@
  */
 
 import { getDefaultEnabledPlatforms, getAllHostnamePatterns } from '../config/platforms';
-import { Logger, toError } from '../utils';
+import { Logger, toError, getErrorMessage } from '../utils';
 
 // Track active element picker sessions
 const activePickerSessions = new Map<number, { tabId: number; windowId: number }>();
@@ -449,7 +449,7 @@ export class ContentScriptInjector {
           Logger.error(`Force injection failed for tab ${tabId.toString()}`, toError(error), { component: 'ContentScriptInjector', hostname, errorType });
           return {
             success: false,
-            error: error instanceof Error ? error.message : 'Failed to inject content script'
+            error: getErrorMessage(error)
           };
       }
     }
@@ -710,7 +710,7 @@ async function handleRequestInjection(tabId: number | undefined, sendResponse: (
     sendResponse({ success: true });
   } catch (error) {
     Logger.error('Manual injection failed', toError(error), { component: 'Background', tabId: targetTabId });
-    sendResponse({ success: false, error: error instanceof Error ? error.message : 'Manual injection failed' });
+    sendResponse({ success: false, error: getErrorMessage(error) });
   }
 }
 
@@ -805,7 +805,7 @@ async function handleRequestPermission(origins: string[], sendResponse: (respons
     sendResponse({ success: granted });
   } catch (error) {
     Logger.error('Permission request failed', toError(error), { component: 'Background', origins });
-    sendResponse({ success: false, error: error instanceof Error ? error.message : 'Permission request failed' });
+    sendResponse({ success: false, error: getErrorMessage(error) });
   }
 }
 
@@ -961,7 +961,7 @@ async function handleOpenPickerWindow(targetTabId: number | undefined, sendRespo
     sendResponse({ success: true });
   } catch (error) {
     Logger.error('Error opening picker window', toError(error), { component: 'Background', originalTabId });
-    sendResponse({ success: false, error: error instanceof Error ? error.message : 'Failed to open picker window' });
+    sendResponse({ success: false, error: getErrorMessage(error) });
   }
 }
 
@@ -1060,7 +1060,7 @@ async function handleStartElementPicker(passedTabId: number | undefined, sender:
     }
   } catch (error) {
     Logger.error('Error starting element picker', toError(error), { component: 'Background', passedTabId, senderTabId: sender.tab?.id });
-    sendResponse({ success: false, error: error instanceof Error ? error.message : 'Failed to start element picker' });
+    sendResponse({ success: false, error: getErrorMessage(error) });
   }
 }
 
@@ -1106,7 +1106,7 @@ async function handleElementSelected(data: BackgroundMessage['data'], sender: ch
     sendResponse({ success: true });
   } catch (error) {
     Logger.error('Error handling element selection', toError(error), { component: 'Background', senderTabId: sender.tab?.id });
-    sendResponse({ success: false, error: error instanceof Error ? error.message : 'Failed to handle element selection' });
+    sendResponse({ success: false, error: getErrorMessage(error) });
   }
 }
 
@@ -1129,7 +1129,7 @@ async function handleStopElementPicker(_passedTabId: number | undefined, _sender
     sendResponse({ success: true });
   } catch (error) {
     Logger.error('Error stopping element picker', toError(error), { component: 'Background', activeSessionCount: activePickerSessions.size });
-    sendResponse({ success: false, error: error instanceof Error ? error.message : 'Failed to stop element picker' });
+    sendResponse({ success: false, error: getErrorMessage(error) });
   }
 }
 
