@@ -133,6 +133,83 @@ src/
 4. Add tests for new functionality
 5. Run `npm test` and `npm run lint` before committing
 
+### Logging Guidelines
+
+**IMPORTANT**: Never use `console.*` statements directly. Always use the centralized logger.
+
+#### Import the Logger
+
+**For popup/sidepanel components:**
+```typescript
+import { Logger, toError } from '../utils';
+```
+
+**For content scripts:**
+```typescript
+import { error, warn, info, debug } from '@content/utils/logger';
+```
+
+#### When to Use Each Log Level
+
+**`Logger.error()` - Critical Errors (Always Logged)**
+- Use for errors that must be visible in production
+- Always include context object with `component` field
+- Use `toError()` utility to ensure Error type
+```typescript
+try {
+  await saveData();
+} catch (err) {
+  Logger.error('Failed to save data', toError(err), {
+    component: 'Storage',
+    operation: 'save'
+  });
+}
+```
+
+**`Logger.warn()` - Warnings (Dev Only)**
+- Non-critical issues that should be investigated
+- Suppressed in production builds
+```typescript
+Logger.warn('Storage quota exceeded', {
+  component: 'Storage',
+  usagePercent: 95
+});
+```
+
+**`Logger.info()` - Informational (Dev Only)**
+- General information about application state
+- Suppressed in production builds
+```typescript
+Logger.info('Settings updated', {
+  component: 'SettingsView',
+  theme: 'dark'
+});
+```
+
+**`Logger.debug()` - Debugging (Dev Only)**
+- Detailed debugging information
+- Suppressed in production builds
+```typescript
+Logger.debug('Cache hit', {
+  component: 'Storage',
+  key: 'prompts',
+  size: 42
+});
+```
+
+#### Context Object Best Practices
+
+Always include a `component` field to identify the source:
+```typescript
+{
+  component: 'Background',        // Required: identifies the component
+  tabId: 123,                     // Optional: relevant IDs
+  url: 'https://example.com',     // Optional: related URLs
+  operation: 'inject',            // Optional: operation name
+  error: 'Network timeout'        // Optional: additional context
+}
+```
+
 ### Modifying Content Scripts
 - Content scripts bundle separately from popup
 - Use `@content` alias for imports within content script
