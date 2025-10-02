@@ -567,7 +567,7 @@ describe('Logger', () => {
     it('should handle concurrent logging calls', () => {
       const calls = 100;
       for (let i = 0; i < calls; i++) {
-        Logger.error(`Error ${i.toString()}`, undefined, { index: i });
+        Logger.error(`Error ${i.toString()}`, undefined, { component: 'Test', index: i });
       }
 
       expect(mockConsole.error).toHaveBeenCalledTimes(calls);
@@ -624,17 +624,77 @@ describe('Logger', () => {
       expect(() => Logger.error('message', error)).not.toThrow();
     });
 
-    it('should accept context objects with any structure', () => {
-      const contexts = [
+    it('should require component field in context (type-level)', () => {
+      // This test verifies the TypeScript type requirement
+      // If component is missing, TypeScript compilation will fail
+
+      // Valid: has component field
+      const validContext: Logger.LogContext = {
+        component: 'TestComponent',
+        additionalData: 'value',
+      };
+      expect(() => Logger.error('test', undefined, validContext)).not.toThrow();
+
+      // The following would fail TypeScript compilation (demonstrated with @ts-expect-error):
+      // @ts-expect-error - Missing required 'component' field
+      const invalidContext: Logger.LogContext = {
+        additionalData: 'value',
+      };
+      // This line exists to avoid unused variable warning
+      expect(invalidContext).toBeDefined();
+    });
+
+    it('should accept context objects with component and any additional properties', () => {
+      const contexts: Logger.LogContext[] = [
         { component: 'Test' },
         { component: 'Test', nested: { deep: { value: 1 } } },
         { component: 'Test', array: [1, 2, 3] },
         { component: 'Test', mixed: { a: 1, b: 'str', c: null } },
+        { component: 'Storage', operation: 'save', size: 1024 },
+        { component: 'Background', tabId: 123, url: 'https://example.com' },
       ];
 
       contexts.forEach((context) => {
         expect(() => Logger.error('test', undefined, context)).not.toThrow();
       });
+    });
+
+    it('should enforce component field is a string', () => {
+      // Valid: component is string
+      const validContext: Logger.LogContext = {
+        component: 'ValidComponent',
+      };
+      expect(validContext.component).toBeTypeOf('string');
+
+      // The following would fail TypeScript compilation:
+      // @ts-expect-error - component must be string, not number
+      const invalidContext1: Logger.LogContext = {
+        component: 123,
+      };
+      expect(invalidContext1).toBeDefined();
+
+      // @ts-expect-error - component must be string, not boolean
+      const invalidContext2: Logger.LogContext = {
+        component: true,
+      };
+      expect(invalidContext2).toBeDefined();
+    });
+
+    it('should allow component field to be used as a discriminator', () => {
+      // TypeScript can use component for type narrowing
+      const context: Logger.LogContext = {
+        component: 'Storage',
+        operation: 'save',
+      };
+
+      // Can safely access component as string
+      const componentName: string = context.component;
+      expect(componentName).toBe('Storage');
+
+      // Can use component in type guards
+      if (context.component === 'Storage') {
+        expect(context.operation).toBe('save');
+      }
     });
   });
 });

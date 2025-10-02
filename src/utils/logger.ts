@@ -11,11 +11,18 @@
  * Context object for structured logging
  * Provides additional metadata about the log entry
  *
+ * The `component` field is required to identify the source of the log.
+ * Additional properties can be added for context-specific information.
+ *
  * @example
  * { component: 'Background', tabId: 123, url: 'https://example.com' }
+ *
+ * @example
+ * { component: 'Storage', operation: 'save', size: 1024 }
  */
-export interface LogContext {
-  [key: string]: unknown;
+export interface LogContext extends Record<string, unknown> {
+  /** Required: Identifies the component or module generating the log */
+  component: string;
 }
 
 interface LogData {
