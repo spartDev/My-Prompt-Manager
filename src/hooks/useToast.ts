@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 
 import { Toast, UseToastReturn, ToastSettings, ToastAction } from '../types/hooks';
+import { Logger } from '../utils';
 
 const TOAST_SETTINGS_KEY = 'toast_settings';
 
@@ -33,7 +34,7 @@ export const useToast = (): UseToastReturn => {
           setSettings({ ...DEFAULT_SETTINGS, ...savedSettings });
         }
       } catch (error) {
-        console.error('Failed to load toast settings:', error);
+        Logger.error('Failed to load toast settings', error as Error);
       }
     };
     void loadSettings();
@@ -137,7 +138,7 @@ export const useToast = (): UseToastReturn => {
 
       // Save to storage asynchronously
       chrome.storage.local.set({ [TOAST_SETTINGS_KEY]: updatedSettings }).catch((error: unknown) => {
-        console.error('Failed to save toast settings:', error);
+        Logger.error('Failed to save toast settings', error as Error);
       });
 
       return updatedSettings;

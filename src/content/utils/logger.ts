@@ -99,6 +99,7 @@ export function _resetDebugCacheForTesting(): void {
 
 /**
  * Log error messages with optional error object and context
+ * Errors are always logged (even in production) as they're critical
  */
 export function error(message: string, errorObj: Error | null = null, context: Record<string, unknown> = {}): void {
     const logData: DebugInfo = {
@@ -118,6 +119,8 @@ export function error(message: string, errorObj: Error | null = null, context: R
       };
     }
 
+    // Always log errors (even in production) as they're critical
+     
     console.error('[PromptLibrary]', message, logData);
 
     // In debug mode, also show user-friendly notifications
@@ -127,9 +130,11 @@ export function error(message: string, errorObj: Error | null = null, context: R
 }
 
 /**
- * Log warning messages with optional context
+ * Log warning messages with optional context (only in debug mode)
  */
 export function warn(message: string, context: Record<string, unknown> = {}): void {
+    if (!isDebugMode()) {return;}
+
     const logData: DebugInfo = {
       timestamp: new Date().toISOString(),
       level: 'WARN',
@@ -138,54 +143,46 @@ export function warn(message: string, context: Record<string, unknown> = {}): vo
       url: window.location.href
     };
 
+     
     console.warn('[PromptLibrary]', message, logData);
-
-    if (isDebugMode()) {
-      showDebugNotification('Warning: ' + message, 'warn');
-    }
+    showDebugNotification('Warning: ' + message, 'warn');
 }
 
 /**
- * Log info messages - only for critical extension lifecycle events
+ * Log info messages (only in debug mode)
  * Most operational messages should use debug() instead
  */
 export function info(message: string, context: Record<string, unknown> = {}): void {
-    // Only log truly critical messages, even outside debug mode
-    const criticalMessages = [
-      'Extension initialized',
-      'Extension cleanup completed'
-    ];
-    
-    const isCritical = criticalMessages.some(critical => message.includes(critical));
-    
-    if (isCritical || isDebugMode()) {
-      const logData: DebugInfo = {
-        timestamp: new Date().toISOString(),
-        level: 'INFO',
-        message,
-        context,
-        url: window.location.href
-      };
+    if (!isDebugMode()) {return;}
 
-      console.info('[PromptLibrary]', message, logData);
-    }
+    const logData: DebugInfo = {
+      timestamp: new Date().toISOString(),
+      level: 'INFO',
+      message,
+      context,
+      url: window.location.href
+    };
+
+     
+    console.info('[PromptLibrary]', message, logData);
 }
 
 /**
  * Log debug messages (only in debug mode)
  */
 export function debug(message: string, context: Record<string, unknown> = {}): void {
-    if (isDebugMode()) {
-      const logData: DebugInfo = {
-        timestamp: new Date().toISOString(),
-        level: 'DEBUG',
-        message,
-        context,
-        url: window.location.href
-      };
+    if (!isDebugMode()) {return;}
 
-      console.debug('[PromptLibrary]', message, logData);
-    }
+    const logData: DebugInfo = {
+      timestamp: new Date().toISOString(),
+      level: 'DEBUG',
+      message,
+      context,
+      url: window.location.href
+    };
+
+     
+    console.debug('[PromptLibrary]', message, logData);
 }
 
 /**

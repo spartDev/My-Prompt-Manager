@@ -7,6 +7,7 @@ import {
   EncodedCustomSitePayloadV1,
   SecurityWarning
 } from '../types';
+import { Logger } from '../utils';
 import {
   detectMaliciousContent,
   isSelectorSafe,
@@ -319,7 +320,7 @@ const decode = async (encodedString: string): Promise<CustomSiteConfiguration> =
   try {
     serialized = decompressFromEncodedURIComponent(encodedString.trim());
   } catch (error) {
-    console.error('Failed to decompress configuration string:', error);
+    Logger.error('Failed to decompress configuration string', error as Error);
     serialized = null;
   }
 
@@ -331,7 +332,7 @@ const decode = async (encodedString: string): Promise<CustomSiteConfiguration> =
   try {
     payload = JSON.parse(serialized) as EncodedCustomSitePayloadV1;
   } catch (error) {
-    console.error('Failed to parse configuration payload:', error);
+    Logger.error('Failed to parse configuration payload', error as Error);
     throw new ConfigurationEncoderError('Invalid configuration format', 'INVALID_FORMAT');
   }
 

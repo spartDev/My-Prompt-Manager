@@ -3,6 +3,7 @@ import type { FC, FormEvent } from 'react';
 
 import { DEFAULT_CATEGORY_COLOR, getColorName } from '../constants/colors';
 import { Category } from '../types';
+import { Logger } from '../utils';
 
 import ColorPicker from './ColorPicker';
 import ConfirmDialog from './ConfirmDialog';
@@ -368,7 +369,7 @@ const CategoryManager: FC<CategoryManagerProps> = ({
       {/* Delete Confirmation Dialog */}
       <ConfirmDialog
         isOpen={deleteConfirm.isOpen}
-        onConfirm={() => { handleConfirmDelete().catch(console.error); }}
+        onConfirm={() => { handleConfirmDelete().catch((err: unknown) => { Logger.error('Failed to delete category', err as Error); }); }}
         onCancel={handleCancelDelete}
         title="Delete Category"
         message={deleteConfirm.category ? 
