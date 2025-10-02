@@ -1,8 +1,19 @@
 /**
  * Logger utility for popup/sidepanel context
  * Provides structured logging with development/production mode support
+ *
+ * All logs are prefixed with [MyPromptManager] for easy identification.
+ * Production mode: Only errors are logged
+ * Development mode: All log levels are active
  */
 
+/**
+ * Context object for structured logging
+ * Provides additional metadata about the log entry
+ *
+ * @example
+ * { component: 'Background', tabId: 123, url: 'https://example.com' }
+ */
 export interface LogContext {
   [key: string]: unknown;
 }
@@ -36,7 +47,25 @@ function formatLog(level: LogData['level'], message: string, context?: LogContex
 
 /**
  * Log error messages (always logged, even in production)
- * Errors are critical and should always be captured
+ *
+ * Use this for critical errors that should always be visible, regardless of environment.
+ * Stack traces are truncated to 200 characters in production to avoid console spam.
+ *
+ * @param message - Human-readable error message
+ * @param errorObj - Optional Error object with stack trace
+ * @param context - Optional structured context data for debugging
+ *
+ * @example
+ * // Simple error without Error object
+ * Logger.error('Failed to save settings', undefined, { component: 'SettingsView' });
+ *
+ * @example
+ * // Error with Error object and context
+ * try {
+ *   await saveData();
+ * } catch (err) {
+ *   Logger.error('Failed to save data', toError(err), { component: 'Storage', operation: 'save' });
+ * }
  */
 export function error(message: string, errorObj?: Error, context?: LogContext): void {
   const logData = formatLog('ERROR', message, context);
@@ -59,6 +88,18 @@ export function error(message: string, errorObj?: Error, context?: LogContext): 
 
 /**
  * Log warning messages (only in development)
+ *
+ * Use this for non-critical issues that should be investigated during development.
+ * These logs are completely suppressed in production builds.
+ *
+ * @param message - Human-readable warning message
+ * @param context - Optional structured context data for debugging
+ *
+ * @example
+ * Logger.warn('Tab access denied', { component: 'ContentScriptInjector', tabId: 123 });
+ *
+ * @example
+ * Logger.warn('Storage quota exceeded', { component: 'Storage', usagePercent: 95 });
  */
 export function warn(message: string, context?: LogContext): void {
   if (isDevelopment()) {
@@ -69,7 +110,19 @@ export function warn(message: string, context?: LogContext): void {
 }
 
 /**
- * Log info messages (only in development)
+ * Log informational messages (only in development)
+ *
+ * Use this for general information about application state or significant events.
+ * These logs are completely suppressed in production builds.
+ *
+ * @param message - Human-readable informational message
+ * @param context - Optional structured context data for debugging
+ *
+ * @example
+ * Logger.info('Settings updated', { component: 'SettingsView', theme: 'dark' });
+ *
+ * @example
+ * Logger.info('Extension initialized', { component: 'Background', mode: 'sidepanel' });
  */
 export function info(message: string, context?: LogContext): void {
   if (isDevelopment()) {
@@ -81,6 +134,18 @@ export function info(message: string, context?: LogContext): void {
 
 /**
  * Log debug messages (only in development)
+ *
+ * Use this for detailed debugging information that's only useful during development.
+ * These logs are completely suppressed in production builds.
+ *
+ * @param message - Human-readable debug message
+ * @param context - Optional structured context data for debugging
+ *
+ * @example
+ * Logger.debug('Function called', { component: 'PromptManager', args: { id: '123' } });
+ *
+ * @example
+ * Logger.debug('Cache hit', { component: 'Storage', key: 'prompts', size: 42 });
  */
 export function debug(message: string, context?: LogContext): void {
   if (isDevelopment()) {
@@ -91,8 +156,19 @@ export function debug(message: string, context?: LogContext): void {
 }
 
 /**
- * Log messages (only in development)
- * General-purpose logging for development
+ * General-purpose log messages (only in development)
+ *
+ * Use this for general development logging that doesn't fit into error/warn/info/debug.
+ * These logs are completely suppressed in production builds.
+ *
+ * @param message - Human-readable log message
+ * @param context - Optional structured context data for debugging
+ *
+ * @example
+ * Logger.log('Processing started', { component: 'Worker', items: 100 });
+ *
+ * @example
+ * Logger.log('User action', { component: 'UI', action: 'click', element: 'button' });
  */
 export function log(message: string, context?: LogContext): void {
   if (isDevelopment()) {
@@ -103,7 +179,18 @@ export function log(message: string, context?: LogContext): void {
 }
 
 /**
- * Group console logs (only in development)
+ * Start a collapsible group of console logs (only in development)
+ *
+ * Use this to organize related log messages into collapsible groups in the console.
+ * Must be paired with a call to groupEnd(). These logs are suppressed in production.
+ *
+ * @param label - Label for the log group
+ *
+ * @example
+ * Logger.group('Processing batch');
+ * Logger.info('Item 1 processed');
+ * Logger.info('Item 2 processed');
+ * Logger.groupEnd();
  */
 export function group(label: string): void {
   if (isDevelopment()) {
@@ -113,7 +200,15 @@ export function group(label: string): void {
 }
 
 /**
- * End console group (only in development)
+ * End the current console log group (only in development)
+ *
+ * Closes a group started by group(). These logs are suppressed in production.
+ *
+ * @example
+ * Logger.group('Processing batch');
+ * Logger.info('Item 1 processed');
+ * Logger.info('Item 2 processed');
+ * Logger.groupEnd();
  */
 export function groupEnd(): void {
   if (isDevelopment()) {
