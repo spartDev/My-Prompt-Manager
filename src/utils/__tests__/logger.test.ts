@@ -157,10 +157,20 @@ describe('Logger', () => {
       );
     });
 
-    it('should truncate stack trace in production mode', () => {
+    it('should truncate stack trace using line-based truncation in production', () => {
       const message = 'Error with long stack';
-      const longStack = 'Error: Test\n'.repeat(100); // Very long stack
-      const error = new Error('Test');
+      // Create realistic stack trace with error message + multiple frames
+      const longStack = [
+        'Error: Test error message',
+        '    at Object.method1 (/path/to/file1.js:10:20)',
+        '    at Object.method2 (/path/to/file2.js:20:30)',
+        '    at Object.method3 (/path/to/file3.js:30:40)',
+        '    at Object.method4 (/path/to/file4.js:40:50)',
+        '    at Object.method5 (/path/to/file5.js:50:60)',
+        '    at Object.method6 (/path/to/file6.js:60:70)',
+      ].join('\n');
+
+      const error = new Error('Test error message');
       error.stack = longStack;
 
       Logger.error(message, error);
@@ -169,14 +179,72 @@ describe('Logger', () => {
       const callArgs = mockConsole.error.mock.calls[0];
       const loggedStack = callArgs[2].error.stack;
 
-      // In production (import.meta.DEV = false), should truncate
       if (!import.meta.env.DEV) {
-        expect(loggedStack).toBe(longStack.substring(0, 200));
-        expect(loggedStack.length).toBe(200);
+        // In production, should preserve error message + first 3 frames + truncation indicator
+        const expectedStack = [
+          'Error: Test error message',
+          '    at Object.method1 (/path/to/file1.js:10:20)',
+          '    at Object.method2 (/path/to/file2.js:20:30)',
+          '    at Object.method3 (/path/to/file3.js:30:40)',
+          '... (stack truncated)',
+        ].join('\n');
+
+        expect(loggedStack).toBe(expectedStack);
+        expect(loggedStack).toContain('... (stack truncated)');
+        expect(loggedStack).toContain('Error: Test error message');
       } else {
         // In development, should keep full stack
         expect(loggedStack).toBe(longStack);
+        expect(loggedStack).not.toContain('... (stack truncated)');
       }
+    });
+
+    it('should preserve error message integrity when truncating', () => {
+      const message = 'Test error message preservation';
+      const stack = [
+        'Error: This is a very important error message that must not be cut',
+        '    at function1 (/file1.js:1:1)',
+        '    at function2 (/file2.js:2:2)',
+        '    at function3 (/file3.js:3:3)',
+        '    at function4 (/file4.js:4:4)',
+      ].join('\n');
+
+      const error = new Error('This is a very important error message that must not be cut');
+      error.stack = stack;
+
+      Logger.error(message, error);
+
+      const callArgs = mockConsole.error.mock.calls[0];
+      const loggedStack = callArgs[2].error.stack;
+
+      if (!import.meta.env.DEV) {
+        // Error message line must be completely preserved
+        expect(loggedStack).toContain('Error: This is a very important error message that must not be cut');
+        // Should not cut mid-message
+        const firstLine = loggedStack.split('\n')[0];
+        expect(firstLine).toBe('Error: This is a very important error message that must not be cut');
+      }
+    });
+
+    it('should not truncate short stacks', () => {
+      const message = 'Short stack test';
+      const shortStack = [
+        'Error: Short error',
+        '    at method1 (/file.js:10:20)',
+        '    at method2 (/file.js:20:30)',
+      ].join('\n');
+
+      const error = new Error('Short error');
+      error.stack = shortStack;
+
+      Logger.error(message, error);
+
+      const callArgs = mockConsole.error.mock.calls[0];
+      const loggedStack = callArgs[2].error.stack;
+
+      // Short stacks should not be truncated even in production
+      expect(loggedStack).toBe(shortStack);
+      expect(loggedStack).not.toContain('... (stack truncated)');
     });
 
     it('should include valid ISO timestamp', () => {

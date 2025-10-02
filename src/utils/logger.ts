@@ -34,6 +34,42 @@ function isDevelopment(): boolean {
 }
 
 /**
+ * Truncate stack trace to preserve error message and first few stack frames
+ *
+ * @param stack - Full stack trace string
+ * @param maxFrames - Maximum number of stack frames to keep (default: 3)
+ * @returns Truncated stack trace with indicator if truncated
+ *
+ * @example
+ * Input: "Error: Test\n    at foo.js:10\n    at bar.js:20\n    at baz.js:30\n    at qux.js:40"
+ * Output: "Error: Test\n    at foo.js:10\n    at bar.js:20\n    at baz.js:30\n... (stack truncated)"
+ */
+function truncateStack(stack: string | undefined, maxFrames: number = 3): string | undefined {
+  if (!stack) {
+    return stack;
+  }
+
+  // In development mode, return full stack
+  if (isDevelopment()) {
+    return stack;
+  }
+
+  const lines = stack.split('\n');
+
+  // If stack is short enough, return as-is
+  // +1 for error message line
+  if (lines.length <= maxFrames + 1) {
+    return stack;
+  }
+
+  // Keep error message line + first N stack frames
+  const truncatedLines = lines.slice(0, maxFrames + 1);
+  truncatedLines.push('... (stack truncated)');
+
+  return truncatedLines.join('\n');
+}
+
+/**
  * Format log message with structured data
  */
 function formatLog(level: LogData['level'], message: string, context?: LogContext): LogData {
@@ -49,7 +85,8 @@ function formatLog(level: LogData['level'], message: string, context?: LogContex
  * Log error messages (always logged, even in production)
  *
  * Use this for critical errors that should always be visible, regardless of environment.
- * Stack traces are truncated to 200 characters in production to avoid console spam.
+ * Stack traces are truncated in production to preserve error message and first 3 stack frames,
+ * with a clear truncation indicator to avoid console spam.
  *
  * @param message - Human-readable error message
  * @param errorObj - Optional Error object with stack trace
@@ -71,17 +108,17 @@ export function error(message: string, errorObj?: Error, context?: LogContext): 
   const logData = formatLog('ERROR', message, context);
 
   if (errorObj) {
-     
+
     console.error('[MyPromptManager]', message, {
       ...logData,
       error: {
         name: errorObj.name,
         message: errorObj.message,
-        stack: isDevelopment() ? errorObj.stack : errorObj.stack?.substring(0, 200) // Truncate in production
+        stack: truncateStack(errorObj.stack)
       }
     });
   } else {
-     
+
     console.error('[MyPromptManager]', message, logData);
   }
 }
