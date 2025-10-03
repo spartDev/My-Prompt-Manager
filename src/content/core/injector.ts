@@ -6,17 +6,24 @@
  * all the modular components.
  */
 
+import type { ComputePositionReturn } from '@floating-ui/dom';
+
 import type { Prompt, InsertionResult } from '../types/index';
 import { UIElementFactory } from '../ui/element-factory';
 import { EventManager } from '../ui/event-manager';
 import { KeyboardNavigationManager } from '../ui/keyboard-navigation';
 import { DOMUtils } from '../utils/dom';
+import { getElementFingerprintGenerator } from '../utils/element-fingerprint';
 import { warn, error, debug, isDebugMode, refreshDebugMode } from '../utils/logger';
 import { getPrompts, createPromptListItem, isSiteEnabled, getSettings, type ExtensionSettings, type CustomSite } from '../utils/storage';
 import { injectCSS } from '../utils/styles';
 import { ThemeManager } from '../utils/theme-manager';
 
 import { PlatformInsertionManager } from './insertion-manager';
+
+// Floating UI imports for robust positioning fallback
+
+// Element fingerprinting for robust element identification
 
 export interface InjectorState {
   icon: HTMLElement | null;
@@ -512,7 +519,7 @@ export class PromptLibraryInjector {
 
         if (textarea !== this.state.currentTextarea) {
           this.state.currentTextarea = textarea;
-          this.injectIcon(textarea);
+          void this.injectIcon(textarea);
         }
       } else {
         debug('No textarea found', { selectorsChecked: selectors.length });
@@ -585,6 +592,24 @@ export class PromptLibraryInjector {
   }
 
   /**
+   * Type guard to check if value is an ElementFingerprint
+   */
+  private isElementFingerprint(value: unknown): value is ElementFingerprint {
+    if (!value || typeof value !== 'object') {
+      return false;
+    }
+    const obj = value as Record<string, unknown>;
+    return (
+      typeof obj.primary === 'object' &&
+      typeof obj.secondary === 'object' &&
+      typeof obj.content === 'object' &&
+      typeof obj.context === 'object' &&
+      typeof obj.attributes === 'object' &&
+      typeof obj.meta === 'object'
+    );
+  }
+
+  /**
    * Removes all existing prompt library icons from the DOM
    * This prevents duplicate icons after extension reloads
    */
@@ -638,6 +663,32 @@ export class PromptLibraryInjector {
         }
       });
 
+      // Clean up Floating UI elements and subscriptions
+      const floatingUIIcons = document.querySelectorAll('[data-positioning-method="floating-ui"]');
+      let floatingUICleanedUp = 0;
+      floatingUIIcons.forEach(icon => {
+        try {
+          // Call cleanup function if it exists (stops autoUpdate subscription)
+          interface IconWithCleanup extends HTMLElement {
+            _floatingUICleanup?: () => void;
+          }
+          const iconWithCleanup = icon as IconWithCleanup;
+          if (iconWithCleanup._floatingUICleanup && typeof iconWithCleanup._floatingUICleanup === 'function') {
+            iconWithCleanup._floatingUICleanup();
+            floatingUICleanedUp++;
+          }
+          icon.remove();
+        } catch (error) {
+          // Expected errors: InvalidStateError (already removed), NotFoundError (parent changed)
+          if (error instanceof DOMException &&
+              (error.name === 'InvalidStateError' || error.name === 'NotFoundError')) {
+            // Element was already removed or parent structure changed - continue silently
+          } else {
+            warn('Unexpected error removing Floating UI icon', { error: String(error) });
+          }
+        }
+      });
+
       // Also remove any prompt selectors that might be open
       const existingSelectors = document.querySelectorAll('.prompt-library-selector');
       existingSelectors.forEach(selector => {
@@ -658,6 +709,8 @@ export class PromptLibraryInjector {
         iconsRemoved: existingIcons.length,
         dataIconsRemoved: dataIcons.length,
         floatingIconsRemoved: floatingIcons.length,
+        floatingUIIconsRemoved: floatingUIIcons.length,
+        floatingUICleanedUp,
         selectorsRemoved: existingSelectors.length
       });
     } catch (error) {
@@ -668,7 +721,7 @@ export class PromptLibraryInjector {
   /**
    * Injects the icon near the textarea
    */
-  private injectIcon(textarea: HTMLElement): void {
+  private async injectIcon(textarea: HTMLElement): Promise<void> {
     try {
       debug('Starting icon injection', { textareaTag: textarea.tagName });
 
@@ -803,39 +856,81 @@ export class PromptLibraryInjector {
       if (!injected) {
         let customPositioned = false;
 
-        if (customConfig?.positioning && customConfig.positioning.selector) {
-          // Check if the current textarea matches the custom selector
-          const customSelector = customConfig.positioning.selector;
+        if (customConfig?.positioning) {
           try {
             let referenceElement: HTMLElement | null = null;
             
-            if (textarea.matches(customSelector)) {
-              // Use custom positioning for the textarea itself
-              referenceElement = textarea;
-              debug('Using textarea as custom positioning reference element');
-            } else {
-              // Try to find the custom reference element
-              const foundElement = document.querySelector(customSelector);
-              if (foundElement) {
-                referenceElement = foundElement as HTMLElement;
-                debug('Found custom positioning reference element', { 
-                  selector: customSelector,
-                  tag: referenceElement.tagName,
-                  id: referenceElement.id
-                });
+            // PRIORITY 1: Try fingerprint matching (most robust)
+            if (customConfig.positioning.fingerprint) {
+              const fingerprintGenerator = getElementFingerprintGenerator();
+              // Type guard to validate fingerprint structure
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+              const rawFingerprint = customConfig.positioning.fingerprint;
+              if (this.isElementFingerprint(rawFingerprint)) {
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+                referenceElement = fingerprintGenerator.findElement(rawFingerprint);
+                
+                if (referenceElement) {
+                  debug('Found element using fingerprint matching', {
+                    tag: referenceElement.tagName,
+                    id: referenceElement.id,
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+                    confidence: rawFingerprint.meta.confidence
+                  });
+                } else {
+                  debug('Fingerprint matching failed, trying fallback selector');
+                }
               } else {
-                debug('Custom reference element not found', { selector: customSelector });
+                debug('Invalid fingerprint structure, skipping fingerprint matching');
               }
             }
             
-            // If we have a reference element, try custom DOM positioning
-            if (referenceElement) {
-              customPositioned = this.positionCustomIcon(icon, referenceElement, customConfig);
-              if (customPositioned) {
-                debug('Icon positioned successfully with custom DOM insertion');
-                return; // Exit here - positioning is complete
+            // PRIORITY 2: Try legacy selector as fallback
+            if (!referenceElement && customConfig.positioning.selector) {
+              const customSelector = customConfig.positioning.selector;
+              
+              if (textarea.matches(customSelector)) {
+                // Use custom positioning for the textarea itself
+                referenceElement = textarea;
+                debug('Using textarea as custom positioning reference element (selector fallback)');
               } else {
-                debug('Custom DOM positioning failed, will try absolute positioning fallback');
+                // Try to find the custom reference element
+                const foundElement = document.querySelector(customSelector);
+                if (foundElement) {
+                  referenceElement = foundElement as HTMLElement;
+                  debug('Found custom positioning reference element using selector', { 
+                    selector: customSelector,
+                    tag: referenceElement.tagName,
+                    id: referenceElement.id
+                  });
+                } else {
+                  debug('Custom reference element not found with selector', { selector: customSelector });
+                }
+              }
+            }
+            
+            // If we have a reference element, try 3-tier fallback positioning
+            if (referenceElement) {
+              // TIER 1: Try Floating UI positioning (best for cross-browser compatibility)
+              try {
+                customPositioned = await this.positionIconWithFloatingUI(icon, referenceElement, customConfig);
+                if (customPositioned) {
+                  debug('Icon positioned successfully with Floating UI (Tier 1)');
+                  return; // Exit here - positioning is complete
+                }
+              } catch (floatingErr) {
+                debug('Floating UI positioning failed, trying DOM insertion', { error: String(floatingErr) });
+              }
+              
+              // TIER 2: Try DOM insertion (fallback for Floating UI failures)
+              if (!customPositioned) {
+                customPositioned = this.positionCustomIcon(icon, referenceElement, customConfig);
+                if (customPositioned) {
+                  debug('Icon positioned successfully with DOM insertion (Tier 2)');
+                  return; // Exit here - positioning is complete
+                } else {
+                  debug('DOM insertion failed, will try absolute positioning (Tier 3)');
+                }
               }
             }
           } catch (selectorError) {
@@ -970,7 +1065,190 @@ export class PromptLibraryInjector {
   }
 
   /**
-   * Positions icon using custom positioning configuration
+   * Position icon using Floating UI library (Tier 2 fallback)
+   * Provides production-grade positioning with collision detection, viewport boundaries,
+   * and automatic repositioning on scroll/resize
+   * @param icon - The icon element to position
+   * @param referenceElement - The element to position relative to
+   * @param customConfig - Custom site configuration with positioning details
+   * @returns Promise<boolean> - true if positioning was successful, false otherwise
+   */
+  private async positionIconWithFloatingUI(
+    icon: HTMLElement, 
+    referenceElement: HTMLElement, 
+    customConfig: CustomSite
+  ): Promise<boolean> {
+    try {
+      // Dynamic import to enable code splitting and reduce initial bundle size
+      const { computePosition, flip, shift, offset: floatingOffset, hide, autoUpdate } = 
+        await import('@floating-ui/dom');
+
+      if (!customConfig.positioning) {
+        return false;
+      }
+
+      const { placement, offset = { x: 0, y: 0 }, zIndex = 999999 } = customConfig.positioning;
+
+      // Map our placement conventions to Floating UI's placement format
+      const placementMap: Record<string, string> = {
+        'before': 'left',
+        'after': 'right',
+        'inside-start': 'top-start',
+        'inside-end': 'bottom-end'
+      };
+
+      const floatingPlacement = placementMap[placement] || 'right';
+
+      // Elements are guaranteed to be non-null by function signature, but add runtime check
+      // Note: This condition is always falsy per signature but kept for runtime safety
+
+      // Append icon to body BEFORE positioning (required for computePosition)
+      // Note: We append early so Floating UI can measure the element
+      if (!icon.parentNode) {
+        document.body.appendChild(icon);
+      }
+
+      // Validate reference element is in the DOM and has dimensions
+      if (!document.body.contains(referenceElement)) {
+        warn('Reference element not in DOM', {
+          tag: referenceElement.tagName,
+          id: referenceElement.id
+        });
+        return false;
+      }
+
+      const refRect = referenceElement.getBoundingClientRect();
+      if (refRect.width === 0 && refRect.height === 0) {
+        warn('Reference element has no dimensions', {
+          tag: referenceElement.tagName,
+          id: referenceElement.id,
+          rect: { width: refRect.width, height: refRect.height }
+        });
+        return false;
+      }
+
+      // Define positioning update function
+      const updatePosition = async (): Promise<void> => {
+        try {
+          const result: ComputePositionReturn = await computePosition(referenceElement, icon, {
+            placement: floatingPlacement as 'left' | 'right' | 'top-start' | 'bottom-end',
+            middleware: [
+              // Apply user-defined offsets
+              floatingOffset({ 
+                mainAxis: offset.y,
+                crossAxis: offset.x
+              }),
+              // Smart collision detection - flips to opposite side if no room
+              flip({
+                fallbackPlacements: ['top', 'bottom', 'left', 'right'],
+                padding: 8 // Keep 8px away from viewport edges
+              }),
+              // Shifts element to stay within viewport
+              shift({ 
+                padding: 8
+              }),
+              // Detects when reference element is hidden/scrolled out of view
+              hide({
+                strategy: 'referenceHidden'
+              })
+            ]
+          });
+
+          const { x, y, middlewareData } = result;
+
+          // Apply computed position
+          Object.assign(icon.style, {
+            position: 'fixed',
+            left: `${String(x)}px`,
+            top: `${String(y)}px`,
+            zIndex: String(zIndex)
+          });
+
+          // Handle visibility based on hide middleware
+          if (middlewareData.hide?.referenceHidden) {
+            icon.style.visibility = 'hidden';
+          } else {
+            icon.style.visibility = 'visible';
+          }
+
+          debug('Floating UI position updated', {
+            x,
+            y,
+            finalPlacement: result.placement,
+            isHidden: middlewareData.hide?.referenceHidden
+          });
+        } catch (updateErr) {
+          const errorMessage = updateErr instanceof Error ? updateErr.message : String(updateErr);
+          const errorStack = updateErr instanceof Error ? updateErr.stack : undefined;
+          
+          warn('Failed to update Floating UI position', { 
+            errorMessage,
+            errorStack,
+            errorType: typeof updateErr,
+            referenceElementExists: !!referenceElement,
+            iconExists: !!icon
+          });
+        }
+      };
+
+      // Initial positioning
+      await updatePosition();
+
+      // Setup auto-update to reposition on scroll, resize, or DOM changes
+      const cleanup = autoUpdate(
+        referenceElement,
+        icon,
+        () => void updatePosition(),
+        {
+          // Optimize performance with RAF
+          animationFrame: true
+        }
+      );
+
+      // Store cleanup function for later removal
+      interface IconWithCleanup extends HTMLElement {
+        _floatingUICleanup?: () => void;
+      }
+      (icon as IconWithCleanup)._floatingUICleanup = cleanup;
+      icon.setAttribute('data-positioning-method', 'floating-ui');
+
+      debug('Floating UI positioning applied successfully (Tier 1)', {
+        placement: floatingPlacement,
+        offset,
+        zIndex,
+        referenceElement: {
+          tag: referenceElement.tagName,
+          id: referenceElement.id,
+          class: referenceElement.className
+        }
+      });
+
+      return true;
+    } catch (err) {
+      // Better error handling for non-Error objects
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      const errorStack = err instanceof Error ? err.stack : undefined;
+      
+      error('Failed to apply Floating UI positioning', err instanceof Error ? err : null, {
+        errorMessage,
+        errorStack,
+        errorType: typeof err,
+        referenceElement: {
+          tag: referenceElement.tagName,
+          id: referenceElement.id,
+          exists: true
+        },
+        icon: {
+          exists: true,
+          isConnected: icon.isConnected
+        }
+      });
+      return false;
+    }
+  }
+
+  /**
+   * Positions icon using custom positioning configuration (Tier 3 fallback)
    */
   private positionCustomIcon(icon: HTMLElement, referenceElement: HTMLElement, customConfig: CustomSite): boolean {
     try {

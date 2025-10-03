@@ -43,7 +43,8 @@
       ],
       "resources": [
         "assets/content-*.js",
-        "assets/platforms-*.js"
+        "assets/platforms-*.js",
+        "assets/floating-ui.dom-*.js"
       ],
       "use_dynamic_url": false
     }

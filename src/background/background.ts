@@ -633,6 +633,7 @@ let originalTabId: number | null = null;
 interface BackgroundMessage {
   type: 'START_ELEMENT_PICKER' | 'STOP_ELEMENT_PICKER' | 'ELEMENT_SELECTED' | 'PICKER_CANCELLED' | 'OPEN_PICKER_WINDOW' | 'GET_INTERFACE_MODE' | 'REQUEST_INJECTION' | 'SETTINGS_UPDATED' | 'REQUEST_PERMISSION';
   data?: {
+    fingerprint?: unknown; // Element fingerprint for robust identification
     selector?: string;
     elementType?: string;
     elementInfo?: Record<string, unknown>;
@@ -1083,6 +1084,7 @@ async function handleElementSelected(data: BackgroundMessage['data'], sender: ch
     void chrome.runtime.sendMessage({
       type: 'ELEMENT_PICKER_RESULT',
       data: {
+        fingerprint: data?.fingerprint, // NEW: Forward fingerprint
         selector: data?.selector,
         elementType: data?.elementType,
         elementInfo: data?.elementInfo,

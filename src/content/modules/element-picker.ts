@@ -3,6 +3,7 @@
  * Provides visual element selection functionality for custom positioning
  */
 
+import { getElementFingerprintGenerator } from '../utils/element-fingerprint';
 import { debug, info } from '../utils/logger';
 
 // Interface for audit log details
@@ -625,24 +626,37 @@ export class ElementPicker {
       }
 
       // Proceed with safe selection
+      // Generate robust fingerprint (preferred method)
+      const fingerprintGenerator = getElementFingerprintGenerator();
+      const fingerprint = fingerprintGenerator.generate(this.currentElement as HTMLElement);
+      
+      // Also generate selector as fallback
       const selector = this.generateSelector(this.currentElement);
       const elementInfo = this.getElementInfo(this.currentElement);
       
-      debug('[ElementPicker] Element selected:', { selector, elementInfo });
+      debug('[ElementPicker] Element selected:', { 
+        fingerprint, 
+        fallbackSelector: selector, 
+        elementInfo,
+        confidence: fingerprint.meta.confidence
+      });
       
       // Log successful selection
       this.logAudit('element_selected', {
         selector,
         elementType: this.currentElement.tagName.toLowerCase(),
         domain: window.location.hostname,
-        secure: !domainCheck.requiresConfirmation && !domainCheck.sensitive
+        secure: !domainCheck.requiresConfirmation && !domainCheck.sensitive,
+        hasFingerprintId: !!fingerprint.primary.id,
+        fingerprintConfidence: fingerprint.meta.confidence
       });
       
-      // Send selection to background script
+      // Send selection to background script with both fingerprint and fallback selector
       void chrome.runtime.sendMessage({
         type: 'ELEMENT_SELECTED',
         data: {
-          selector,
+          fingerprint, // NEW: Robust fingerprint
+          selector, // Legacy fallback
           elementType: this.currentElement.tagName.toLowerCase(),
           elementInfo,
           hostname: window.location.hostname
@@ -721,7 +735,10 @@ export class ElementPicker {
     
     const selector = this.generateSelector(element);
     const tagName = element.tagName.toLowerCase();
-    const className = element.className ? `.${element.className.split(' ').join('.')}` : '';
+    // Handle both string className (HTML) and SVGAnimatedString (SVG)
+    const classNameValue = element.className;
+    const classNameStr = typeof classNameValue === 'string' ? classNameValue : (classNameValue as SVGAnimatedString | undefined)?.baseVal || '';
+    const className = classNameStr ? `.${classNameStr.split(' ').join('.')}` : '';
     const id = element.id ? `#${element.id}` : '';
     
     // Clear any existing warning

@@ -47,11 +47,18 @@ export interface CustomSite {
   dateAdded: number;
   positioning?: {
     mode: 'custom';
-    selector: string;
+    // NEW: Robust element fingerprint (preferred)
+    // Using unknown to allow flexible storage format
+    fingerprint?: unknown;
+    // Legacy: CSS selector (fallback only)
+    selector?: string;
     placement: 'before' | 'after' | 'inside-start' | 'inside-end';
     offset?: { x: number; y: number };
     zIndex?: number;
     description?: string;
+    // For backward compatibility with existing signature-based system
+    anchorId?: string;
+    signature?: ElementSignature;
   };
 }
 
@@ -141,3 +148,54 @@ export const DEFAULT_SETTINGS: Settings = {
   theme: 'system',
   interfaceMode: 'sidepanel'
 };
+
+// Element Fingerprinting for robust element identification
+export interface ElementFingerprint {
+  // Primary identifiers (highest confidence, most stable)
+  primary: {
+    id?: string;
+    dataTestId?: string;
+    dataId?: string;
+    name?: string;
+    ariaLabel?: string;
+  };
+  
+  // Secondary identifiers (medium confidence)
+  secondary: {
+    tagName: string; // Required - always present
+    type?: string;
+    role?: string;
+    placeholder?: string;
+  };
+  
+  // Content-based identifiers (for uniqueness)
+  content: {
+    textContent?: string; // Normalized, trimmed, max 50 chars
+    textHash?: string; // Hash of text content for quick comparison
+  };
+  
+  // Structural context (for disambiguation when multiple matches)
+  context: {
+    parentId?: string;
+    parentDataTestId?: string;
+    parentTagName?: string;
+    siblingIndex?: number; // Position among same-type siblings
+    siblingCount?: number; // Total same-type siblings in parent
+    depth?: number; // Depth in DOM tree from body
+  };
+  
+  // Stable attributes (framework/library specific, non-sensitive only)
+  attributes: {
+    [key: string]: string;
+  };
+  
+  // Semantic class patterns (e.g., ["button", "primary"])
+  classPatterns?: string[];
+  
+  // Metadata about fingerprint generation
+  meta: {
+    generatedAt: number; // Timestamp when fingerprint was created
+    url: string; // URL where element was selected
+    confidence: 'high' | 'medium' | 'low'; // Estimated uniqueness
+  };
+}
