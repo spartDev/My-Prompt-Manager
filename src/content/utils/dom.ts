@@ -312,4 +312,24 @@ export class DOMUtils {
       return ''; // Safe fallback
     }
   }
+
+  /**
+   * Check if CSS Anchor Positioning API is supported
+   * Requires Chrome 125+, Edge 125+, Safari 26+, Opera 111+
+   * @returns true if CSS Anchor Positioning is supported
+   */
+  static supportsCSSAnchorPositioning(): boolean {
+    try {
+      // Check if CSS.supports is available
+      if (typeof CSS === 'undefined' || typeof CSS.supports !== 'function') {
+        return false;
+      }
+
+      // Check for anchor-name property support (core CSS Anchor API)
+      return CSS.supports('anchor-name', '--test');
+    } catch (err) {
+      logError('Failed to check CSS Anchor Positioning support', err as Error);
+      return false;
+    }
+  }
 }

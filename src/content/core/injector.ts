@@ -663,6 +663,39 @@ export class PromptLibraryInjector {
         }
       });
 
+      // Clean up CSS Anchor elements and anchor attributes
+      const cssAnchorIcons = document.querySelectorAll('[data-positioning-method="css-anchor"]');
+      let cssAnchorCleanedUp = 0;
+      cssAnchorIcons.forEach(icon => {
+        try {
+          // Clean up anchor attributes from reference elements
+          const anchors = document.querySelectorAll('[data-mpm-anchor-name]');
+          anchors.forEach(anchor => {
+            try {
+              const anchorName = anchor.getAttribute('data-mpm-anchor-name');
+              if (anchorName) {
+                // Remove CSS anchor styles
+                (anchor as HTMLElement).style.anchorName = '';
+                anchor.removeAttribute('data-mpm-anchor-name');
+              }
+              cssAnchorCleanedUp++;
+            } catch (anchorErr) {
+              // Silently continue if anchor cleanup fails
+              debug('Failed to clean up anchor attributes', { error: String(anchorErr) });
+            }
+          });
+          icon.remove();
+        } catch (error) {
+          // Expected errors: InvalidStateError (already removed), NotFoundError (parent changed)
+          if (error instanceof DOMException &&
+              (error.name === 'InvalidStateError' || error.name === 'NotFoundError')) {
+            // Element was already removed or parent structure changed - continue silently
+          } else {
+            warn('Unexpected error removing CSS Anchor icon', { error: String(error) });
+          }
+        }
+      });
+
       // Clean up Floating UI elements and subscriptions
       const floatingUIIcons = document.querySelectorAll('[data-positioning-method="floating-ui"]');
       let floatingUICleanedUp = 0;
@@ -709,6 +742,8 @@ export class PromptLibraryInjector {
         iconsRemoved: existingIcons.length,
         dataIconsRemoved: dataIcons.length,
         floatingIconsRemoved: floatingIcons.length,
+        cssAnchorIconsRemoved: cssAnchorIcons.length,
+        cssAnchorCleanedUp,
         floatingUIIconsRemoved: floatingUIIcons.length,
         floatingUICleanedUp,
         selectorsRemoved: existingSelectors.length
@@ -909,9 +944,24 @@ export class PromptLibraryInjector {
               }
             }
             
-            // If we have a reference element, try 3-tier fallback positioning
+            // If we have a reference element, try 4-tier fallback positioning (hybrid approach)
             if (referenceElement) {
-              // TIER 1: Try Floating UI positioning (best for cross-browser compatibility)
+              // TIER 0: Try CSS Anchor Positioning (best - native browser API, 71% support)
+              // Native CSS positioning for Chrome 125+, Edge 125+, Safari 26+, Opera 111+
+              // Zero JavaScript overhead, GPU-accelerated, best performance
+              if (DOMUtils.supportsCSSAnchorPositioning()) {
+                customPositioned = this.positionIconWithCSSAnchor(icon, referenceElement, customConfig);
+                if (customPositioned) {
+                  debug('Icon positioned successfully with CSS Anchor (Tier 0 - Native)');
+                  return; // Exit here - positioning is complete
+                } else {
+                  debug('CSS Anchor positioning failed, trying Floating UI');
+                }
+              }
+
+              // TIER 1: Try Floating UI positioning (fallback for older browsers)
+              // Production-grade JS positioning for browsers without CSS Anchor support
+              // Works on Chrome 114+, Firefox, older Safari
               try {
                 customPositioned = await this.positionIconWithFloatingUI(icon, referenceElement, customConfig);
                 if (customPositioned) {
@@ -921,7 +971,7 @@ export class PromptLibraryInjector {
               } catch (floatingErr) {
                 debug('Floating UI positioning failed, trying DOM insertion', { error: String(floatingErr) });
               }
-              
+
               // TIER 2: Try DOM insertion (fallback for Floating UI failures)
               if (!customPositioned) {
                 customPositioned = this.positionCustomIcon(icon, referenceElement, customConfig);
@@ -1065,7 +1115,129 @@ export class PromptLibraryInjector {
   }
 
   /**
-   * Position icon using Floating UI library (Tier 2 fallback)
+   * Position icon using CSS Anchor Positioning API (Tier 0 - Native browser API)
+   * Native CSS positioning for modern browsers (Chrome 125+, Edge 125+, Safari 26+, Opera 111+)
+   * Zero JavaScript, GPU-accelerated, best performance for 71%+ of users
+   * @param icon - The icon element to position
+   * @param referenceElement - The element to position relative to
+   * @param customConfig - Custom site configuration with positioning details
+   * @returns boolean - true if positioning was successful, false otherwise
+   */
+  private positionIconWithCSSAnchor(
+    icon: HTMLElement,
+    referenceElement: HTMLElement,
+    customConfig: CustomSite
+  ): boolean {
+    try {
+      // Check if CSS Anchor Positioning is supported
+      if (!DOMUtils.supportsCSSAnchorPositioning()) {
+        debug('CSS Anchor Positioning not supported, falling back to other methods');
+        return false;
+      }
+
+      if (!customConfig.positioning) {
+        return false;
+      }
+
+      const { placement, offset = { x: 0, y: 0 }, zIndex = 999999, anchorId } = customConfig.positioning;
+
+      // Use existing data-mpm-anchor if present, otherwise use config anchorId or generate new
+      const existingAnchorId: string | null = referenceElement.getAttribute('data-mpm-anchor');
+      const fallbackAnchorId = `mpm-${String(Date.now())}-${Math.random().toString(36).substring(2, 9)}`;
+      // ESLint is confused about the type here, but TypeScript knows anchorId is string | undefined
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      const trackingAnchorId: string = existingAnchorId ?? anchorId ?? fallbackAnchorId;
+
+      // Generate a unique CSS anchor name for this element
+      const cssAnchorName = `--mpm-anchor-${String(Date.now())}-${Math.random().toString(36).substring(2, 9)}`;
+
+      // Set the reference element as the CSS anchor
+      referenceElement.style.anchorName = cssAnchorName;
+
+      // Add data-mpm-anchor for fast recovery lookup (only if not already present)
+      if (!existingAnchorId) {
+        referenceElement.setAttribute('data-mpm-anchor', trackingAnchorId);
+      }
+
+      // Store the CSS anchor name for cleanup
+      referenceElement.setAttribute('data-mpm-anchor-name', cssAnchorName);
+
+      // Configure icon for CSS Anchor Positioning
+      icon.style.position = 'fixed'; // Required for anchor positioning
+      icon.style.positionAnchor = cssAnchorName;
+      icon.style.zIndex = String(zIndex);
+
+      // Map placement to position-area values
+      // position-area uses a 9-cell grid around the anchor
+      const positionAreaMap: Record<string, string> = {
+        'before': 'left', // Left side of anchor
+        'after': 'right', // Right side of anchor
+        'inside-start': 'top', // Top of anchor
+        'inside-end': 'bottom' // Bottom of anchor
+      };
+
+      const positionArea = positionAreaMap[placement];
+      if (!positionArea) {
+        warn('Invalid placement for CSS Anchor positioning', { placement });
+        return false;
+      }
+
+      icon.style.positionArea = positionArea;
+
+      // Apply offsets using margin (CSS Anchor doesn't have built-in offset)
+      if (offset.x !== 0 || offset.y !== 0) {
+        icon.style.marginLeft = `${String(offset.x)}px`;
+        icon.style.marginTop = `${String(offset.y)}px`;
+      }
+
+      // Append to body (required for fixed positioning)
+      if (!icon.parentNode) {
+        document.body.appendChild(icon);
+      }
+
+      // Mark icon with positioning method for cleanup
+      icon.setAttribute('data-positioning-method', 'css-anchor');
+
+      debug('CSS Anchor positioning applied successfully (Tier 0)', {
+        placement,
+        positionArea,
+        offset,
+        zIndex,
+        anchorId: trackingAnchorId,
+        cssAnchorName,
+        referenceElement: {
+          tag: referenceElement.tagName,
+          id: referenceElement.id,
+          class: referenceElement.className
+        }
+      });
+
+      return true;
+    } catch (err) {
+      // Better error handling for non-Error objects
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      const errorStack = err instanceof Error ? err.stack : undefined;
+
+      error('Failed to apply CSS Anchor positioning', err instanceof Error ? err : null, {
+        errorMessage,
+        errorStack,
+        errorType: typeof err,
+        referenceElement: {
+          tag: referenceElement.tagName,
+          id: referenceElement.id,
+          exists: true
+        },
+        icon: {
+          exists: true,
+          isConnected: icon.isConnected
+        }
+      });
+      return false;
+    }
+  }
+
+  /**
+   * Position icon using Floating UI library (Tier 1 fallback)
    * Provides production-grade positioning with collision detection, viewport boundaries,
    * and automatic repositioning on scroll/resize
    * @param icon - The icon element to position
@@ -1248,7 +1420,8 @@ export class PromptLibraryInjector {
   }
 
   /**
-   * Positions icon using custom positioning configuration (Tier 3 fallback)
+   * Positions icon using custom positioning configuration with DOM insertion (Tier 2 fallback)
+   * Inserts icon directly into DOM based on placement (before, after, inside-start, inside-end)
    */
   private positionCustomIcon(icon: HTMLElement, referenceElement: HTMLElement, customConfig: CustomSite): boolean {
     try {
