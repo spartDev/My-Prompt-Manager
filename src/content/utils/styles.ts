@@ -39,6 +39,7 @@ export function getCSS(): string {
     /* Base Prompt Manager Icon Styles */
     .prompt-library-icon-base {
       min-width: 32px;
+      min-height: 32px;
       border-radius: .5rem;
       display: flex;
       align-items: center;
@@ -78,18 +79,18 @@ export function getCSS(): string {
 
     /* Hover and focus styles for all prompt library icons */
     /* Light mode hover (default) */
-    .prompt-library-icon-base:hover:is(.light *):hover,
-    .prompt-library-icon:hover:is(.light *):hover {
+    .prompt-library-icon-base:hover,
+    .prompt-library-icon:hover {
       background: #e4e4e4;
     }
-    
+
     /* Dark mode hover */
-    @media (prefers-color-scheme: dark) {
-      .prompt-library-icon-base:hover,
-      .prompt-library-icon:hover {
-        background: #434343;
-      }
+    .prompt-library-icon-base:hover:is(.dark *):hover,
+    .prompt-library-icon:hover:is(.dark *):hover {
+      background: #ffffff14;
     }
+
+
 
     .prompt-library-icon-base:focus-visible,
     .prompt-library-icon:focus-visible {
