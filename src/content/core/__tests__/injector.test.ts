@@ -395,10 +395,92 @@ describe('PromptLibraryInjector', () => {
 
     it('should reset initialization state', () => {
       (injector as any).state.isInitialized = true;
-      
+
       injector.cleanup();
-      
+
       expect((injector as any).state.isInitialized).toBe(false);
+    });
+
+    it('should cleanup Floating UI subscriptions from WeakMap', () => {
+      // Create a mock icon with Floating UI positioning
+      const mockIcon = document.createElement('div');
+      mockIcon.setAttribute('data-positioning-method', 'floating-ui');
+      document.body.appendChild(mockIcon);
+
+      // Create a mock cleanup function
+      const mockCleanup = vi.fn();
+
+      // Store cleanup in WeakMap (simulating Floating UI setup)
+      const floatingUICleanups = (injector as any).floatingUICleanups;
+      floatingUICleanups.set(mockIcon, mockCleanup);
+
+      // Verify cleanup function is stored
+      expect(floatingUICleanups.get(mockIcon)).toBe(mockCleanup);
+
+      // Run cleanup (which calls removeAllExistingIcons internally)
+      injector.cleanup();
+
+      // Verify cleanup function was called
+      expect(mockCleanup).toHaveBeenCalled();
+
+      // Verify icon was removed from DOM
+      expect(document.body.contains(mockIcon)).toBe(false);
+    });
+
+    it('should not leak memory when Floating UI icons are removed', () => {
+      const floatingUICleanups = (injector as any).floatingUICleanups;
+
+      // Create multiple icons with cleanup functions
+      const icons: HTMLElement[] = [];
+      const cleanups: any[] = [];
+
+      for (let i = 0; i < 5; i++) {
+        const icon = document.createElement('div');
+        icon.setAttribute('data-positioning-method', 'floating-ui');
+        document.body.appendChild(icon);
+
+        const cleanup = vi.fn();
+        floatingUICleanups.set(icon, cleanup);
+
+        icons.push(icon);
+        cleanups.push(cleanup);
+      }
+
+      // Verify all cleanups are stored
+      icons.forEach(icon => {
+        expect(floatingUICleanups.get(icon)).toBeDefined();
+      });
+
+      // Cleanup
+      injector.cleanup();
+
+      // Verify all cleanup functions were called
+      cleanups.forEach(cleanup => {
+        expect(cleanup).toHaveBeenCalled();
+      });
+
+      // Verify all icons were removed
+      icons.forEach(icon => {
+        expect(document.body.contains(icon)).toBe(false);
+      });
+
+      // Note: WeakMap entries are automatically garbage collected
+      // when the icons are removed, preventing memory leaks
+    });
+
+    it('should handle missing cleanup functions gracefully', () => {
+      // Create an icon without a cleanup function
+      const mockIcon = document.createElement('div');
+      mockIcon.setAttribute('data-positioning-method', 'floating-ui');
+      document.body.appendChild(mockIcon);
+
+      // Don't add cleanup function to WeakMap
+
+      // Cleanup should not throw
+      expect(() => injector.cleanup()).not.toThrow();
+
+      // Icon should still be removed
+      expect(document.body.contains(mockIcon)).toBe(false);
     });
   });
 

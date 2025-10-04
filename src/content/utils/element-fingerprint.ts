@@ -117,6 +117,16 @@ export class ElementFingerprintGenerator {
 
     const duration = performance.now() - startTime;
 
+    // Performance monitoring: Log slow fingerprint matching
+    if (duration > 50) {
+      warn('[ElementFingerprint] Slow fingerprint matching detected', {
+        duration: `${duration.toFixed(2)}ms`,
+        candidates: candidates.length,
+        tagName,
+        threshold: '50ms'
+      });
+    }
+
     if (bestMatch && bestScore >= MIN_CONFIDENCE_SCORE) {
       debug('[ElementFingerprint] Element found', {
         score: bestScore,

@@ -68,6 +68,7 @@ export class PromptLibraryInjector {
   private selectorCache: Map<string, HTMLElement[]>;
   private lastCacheTime: number;
   private readonly cacheTimeout: number = 2000;
+  private floatingUICleanups: WeakMap<HTMLElement, () => void>;
 
   constructor() {
     const hostname = window.location.hostname || '';
@@ -121,6 +122,9 @@ export class PromptLibraryInjector {
     // Performance optimization: caching for DOM queries
     this.selectorCache = new Map();
     this.lastCacheTime = 0;
+
+    // Floating UI cleanup tracking (prevents memory leaks)
+    this.floatingUICleanups = new WeakMap();
 
     // Note: initialize() is now called externally to handle async site enablement checking
   }
@@ -690,12 +694,10 @@ export class PromptLibraryInjector {
       floatingUIIcons.forEach(icon => {
         try {
           // Call cleanup function if it exists (stops autoUpdate subscription)
-          interface IconWithCleanup extends HTMLElement {
-            _floatingUICleanup?: () => void;
-          }
-          const iconWithCleanup = icon as IconWithCleanup;
-          if (iconWithCleanup._floatingUICleanup && typeof iconWithCleanup._floatingUICleanup === 'function') {
-            iconWithCleanup._floatingUICleanup();
+          const cleanup = this.floatingUICleanups.get(icon as HTMLElement);
+          if (cleanup && typeof cleanup === 'function') {
+            cleanup();
+            this.floatingUICleanups.delete(icon as HTMLElement);
             floatingUICleanedUp++;
           }
           icon.remove();
@@ -1370,11 +1372,8 @@ export class PromptLibraryInjector {
         }
       );
 
-      // Store cleanup function for later removal
-      interface IconWithCleanup extends HTMLElement {
-        _floatingUICleanup?: () => void;
-      }
-      (icon as IconWithCleanup)._floatingUICleanup = cleanup;
+      // Store cleanup function in WeakMap for later removal (prevents memory leaks)
+      this.floatingUICleanups.set(icon, cleanup);
       icon.setAttribute('data-positioning-method', 'floating-ui');
 
       debug('Floating UI positioning applied successfully (Tier 1)', {
@@ -1992,7 +1991,9 @@ export class PromptLibraryInjector {
       this.state.mutationObserver = null;
     }
 
-    // Clean up UI elements
+    // Clean up UI elements (including all Floating UI icons with cleanup functions)
+    this.removeAllExistingIcons();
+
     if (this.state.icon) {
       this.state.icon.remove();
       this.state.icon = null;
