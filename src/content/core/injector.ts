@@ -1302,13 +1302,20 @@ export class PromptLibraryInjector {
       // Define positioning update function
       const updatePosition = async (): Promise<void> => {
         try {
+          // Determine main/cross axis based on placement direction
+          // For left/right placements (before/after), main axis is horizontal (x)
+          // For top/bottom placements (inside-start/inside-end), main axis is vertical (y)
+          const isHorizontalPlacement = floatingPlacement === 'left' || floatingPlacement === 'right';
+          const mainAxisOffset = isHorizontalPlacement ? offset.x : offset.y;
+          const crossAxisOffset = isHorizontalPlacement ? offset.y : offset.x;
+
           const result: ComputePositionReturn = await computePosition(referenceElement, icon, {
             placement: floatingPlacement as 'left' | 'right' | 'top-start' | 'bottom-end',
             middleware: [
-              // Apply user-defined offsets
-              floatingOffset({ 
-                mainAxis: offset.y,
-                crossAxis: offset.x
+              // Apply user-defined offsets with correct axis mapping
+              floatingOffset({
+                mainAxis: mainAxisOffset,
+                crossAxis: crossAxisOffset
               }),
               // Smart collision detection - flips to opposite side if no room
               flip({
