@@ -94,7 +94,8 @@ export interface EncodedCustomSitePayloadV1 {
   h: string;
   n: string;
   p?: {
-    s: string;
+    s?: string;
+    fp?: ElementFingerprint;
     pl: CustomSitePositioning['placement'];
     ox?: number;
     oy?: number;

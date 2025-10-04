@@ -5,6 +5,7 @@ import {
   CustomSiteConfiguration,
   ConfigurationValidationResult,
   EncodedCustomSitePayloadV1,
+  ElementFingerprint,
   SecurityWarning
 } from '../types';
 import { Logger, toError } from '../utils';
@@ -41,6 +42,68 @@ const VALID_PLACEMENTS: Array<NonNullable<CustomSite['positioning']>['placement'
   'inside-start',
   'inside-end'
 ];
+const CHECKSUM_LENGTH = 16;
+const LEGACY_CHECKSUM_LENGTH = 8;
+
+const canonicalizeFingerprint = (fingerprint: ElementFingerprint): ElementFingerprint => {
+  const canonical: ElementFingerprint = {
+    primary: {},
+    secondary: {
+      tagName: fingerprint.secondary.tagName
+    },
+    content: {},
+    context: {},
+    attributes: {},
+    meta: {
+      generatedAt: fingerprint.meta.generatedAt,
+      url: fingerprint.meta.url,
+      confidence: fingerprint.meta.confidence
+    }
+  };
+
+  const primaryKeys = ['id', 'dataTestId', 'dataId', 'name', 'ariaLabel'] as const;
+  for (const key of primaryKeys) {
+    const value = fingerprint.primary[key];
+    if (value !== undefined) {
+      canonical.primary[key] = value;
+    }
+  }
+
+  const secondaryKeys = ['type', 'role', 'placeholder'] as const;
+  for (const key of secondaryKeys) {
+    const value = fingerprint.secondary[key];
+    if (value !== undefined) {
+      canonical.secondary[key] = value;
+    }
+  }
+
+  const contentKeys = ['textContent', 'textHash'] as const;
+  for (const key of contentKeys) {
+    const value = fingerprint.content[key];
+    if (value !== undefined) {
+      canonical.content[key] = value;
+    }
+  }
+
+  const contextKeys = ['parentId', 'parentDataTestId', 'parentTagName', 'siblingIndex', 'siblingCount', 'depth'] as const;
+  for (const key of contextKeys) {
+    const value = fingerprint.context[key];
+    if (value !== undefined) {
+      canonical.context[key] = value;
+    }
+  }
+
+  const attributeKeys = Object.keys(fingerprint.attributes).sort();
+  for (const key of attributeKeys) {
+    canonical.attributes[key] = fingerprint.attributes[key];
+  }
+
+  if (fingerprint.classPatterns && fingerprint.classPatterns.length > 0) {
+    canonical.classPatterns = [...fingerprint.classPatterns].sort();
+  }
+
+  return canonical;
+};
 
 const canonicalizePayload = (payload: NormalizedPayload): string => {
   const canonical: NormalizedPayload = {
@@ -50,23 +113,32 @@ const canonicalizePayload = (payload: NormalizedPayload): string => {
   };
 
   if (payload.p) {
-    canonical.p = {
-      s: payload.p.s,
-      pl: payload.p.pl
-    };
+    const canonicalPositioning: Partial<NonNullable<NormalizedPayload['p']>> = {};
+
+    if (payload.p.s !== undefined) {
+      canonicalPositioning.s = payload.p.s;
+    }
+
+    if (payload.p.fp) {
+      canonicalPositioning.fp = canonicalizeFingerprint(payload.p.fp);
+    }
+
+    canonicalPositioning.pl = payload.p.pl;
 
     if (payload.p.ox !== undefined) {
-      canonical.p.ox = payload.p.ox;
+      canonicalPositioning.ox = payload.p.ox;
     }
     if (payload.p.oy !== undefined) {
-      canonical.p.oy = payload.p.oy;
+      canonicalPositioning.oy = payload.p.oy;
     }
     if (payload.p.z !== undefined) {
-      canonical.p.z = payload.p.z;
+      canonicalPositioning.z = payload.p.z;
     }
     if (payload.p.d !== undefined) {
-      canonical.p.d = payload.p.d;
+      canonicalPositioning.d = payload.p.d;
     }
+
+    canonical.p = canonicalPositioning as NonNullable<NormalizedPayload['p']>;
   }
 
   return JSON.stringify(canonical);
@@ -79,6 +151,8 @@ const arrayBufferToHex = (buffer: ArrayBuffer): string => {
     .join('');
 };
 
+const toUtf8Bytes = (value: string): Uint8Array => new TextEncoder().encode(value);
+
 const getSubtleCrypto = (): SubtleCrypto | null => {
   if (typeof globalThis === 'undefined') {
     return null;
@@ -88,22 +162,41 @@ const getSubtleCrypto = (): SubtleCrypto | null => {
   return typeof potentialCrypto?.subtle !== 'undefined' ? potentialCrypto.subtle : null;
 };
 
-const computeChecksum = async (value: string): Promise<string> => {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(value);
+const computeLegacyChecksum = (data: Uint8Array): string => {
+  let hash = 0;
+  for (const byte of data) {
+    hash = (Math.imul(hash, 31) + byte) >>> 0;
+  }
+  return hash.toString(16).padStart(LEGACY_CHECKSUM_LENGTH, '0');
+};
 
+const computeFallbackChecksum = (data: Uint8Array): string => {
+  let hashA = 0;
+  let hashB = 0;
+
+  for (const byte of data) {
+    hashA = (Math.imul(hashA, 31) + byte) >>> 0;
+    hashB = (Math.imul(hashB, 33) ^ byte) >>> 0;
+  }
+
+  const partA = hashA.toString(16).padStart(LEGACY_CHECKSUM_LENGTH, '0');
+  const partB = hashB.toString(16).padStart(LEGACY_CHECKSUM_LENGTH, '0');
+  return `${partA}${partB}`;
+};
+
+const computeChecksumFromBytes = async (data: Uint8Array): Promise<string> => {
   const subtle = getSubtleCrypto();
   if (subtle) {
     const digest = await subtle.digest('SHA-256', data);
-    return arrayBufferToHex(digest).slice(0, 16);
+    return arrayBufferToHex(digest).slice(0, CHECKSUM_LENGTH);
   }
 
-  // Fallback checksum (non-cryptographic) for environments without Web Crypto
-  let hash = 0;
-  for (const byte of data) {
-    hash = (hash * 31 + byte) >>> 0;
-  }
-  return hash.toString(16).padStart(8, '0');
+  return computeFallbackChecksum(data);
+};
+
+const computeChecksum = async (value: string): Promise<string> => {
+  const data = toUtf8Bytes(value);
+  return computeChecksumFromBytes(data);
 };
 
 const configToPayload = (config: CustomSiteConfiguration): NormalizedPayload => {
@@ -113,11 +206,18 @@ const configToPayload = (config: CustomSiteConfiguration): NormalizedPayload => 
     n: config.displayName
   };
 
-  if (config.positioning && config.positioning.selector) {
+  if (config.positioning && (config.positioning.selector !== undefined || config.positioning.fingerprint)) {
     payload.p = {
-      s: config.positioning.selector,
       pl: config.positioning.placement
     };
+
+    if (config.positioning.selector !== undefined) {
+      payload.p.s = config.positioning.selector;
+    }
+
+    if (config.positioning.fingerprint) {
+      payload.p.fp = config.positioning.fingerprint;
+    }
 
     if (config.positioning.offset) {
       const { x, y } = config.positioning.offset;
@@ -150,12 +250,15 @@ const payloadToConfig = (payload: NormalizedPayload): CustomSiteConfiguration =>
   if (payload.p) {
     const placement = payload.p.pl;
     const selector = payload.p.s;
+    const fingerprint = payload.p.fp;
+    const hasSelector = typeof selector === 'string' && selector.trim().length > 0;
+    const hasFingerprint = Boolean(fingerprint);
 
-    if (VALID_PLACEMENTS.includes(placement) && typeof selector === 'string' && selector.trim().length > 0) {
+    if (VALID_PLACEMENTS.includes(placement) && (hasSelector || hasFingerprint)) {
       config.positioning = {
         mode: 'custom',
-        selector,
         placement,
+        selector: hasSelector ? selector : '',
         offset: payload.p.ox !== undefined || payload.p.oy !== undefined ? {
           x: payload.p.ox ?? 0,
           y: payload.p.oy ?? 0
@@ -163,6 +266,10 @@ const payloadToConfig = (payload: NormalizedPayload): CustomSiteConfiguration =>
         zIndex: payload.p.z,
         description: payload.p.d
       };
+
+      if (hasFingerprint) {
+        config.positioning.fingerprint = fingerprint;
+      }
     }
   }
 
@@ -203,13 +310,17 @@ const validateConfiguration = (config: CustomSiteConfiguration): ConfigurationVa
   }
 
   if (sanitizedConfig.positioning) {
-    if (!sanitizedConfig.positioning.selector) {
+    const selectorValue = sanitizedConfig.positioning.selector;
+    const hasSelector = typeof selectorValue === 'string' && selectorValue.trim().length > 0;
+    const hasFingerprint = Boolean(sanitizedConfig.positioning.fingerprint);
+
+    if (!hasSelector && !hasFingerprint) {
       issues.push({
         field: 'positioning.selector',
-        message: 'Selector is required when positioning is provided.',
+        message: 'Provide a selector or element fingerprint for positioning.',
         severity: 'error'
       });
-    } else if (!isSelectorSafe(sanitizedConfig.positioning.selector)) {
+    } else if (hasSelector && !isSelectorSafe(selectorValue)) {
       issues.push({
         field: 'positioning.selector',
         message: 'Selector contains unsafe characters or patterns.',
@@ -342,10 +453,18 @@ const decode = async (encodedString: string): Promise<CustomSiteConfiguration> =
 
   const { c: receivedChecksum, ...rest } = payload;
   const canonical = canonicalizePayload(rest);
-  const expectedChecksum = await computeChecksum(canonical);
+  const canonicalBytes = toUtf8Bytes(canonical);
+  const expectedChecksum = await computeChecksumFromBytes(canonicalBytes);
 
   if (receivedChecksum !== expectedChecksum) {
-    throw new ConfigurationEncoderError('Configuration checksum mismatch', 'CHECKSUM_FAILED');
+    const legacyMatch =
+      receivedChecksum.length === LEGACY_CHECKSUM_LENGTH &&
+      computeLegacyChecksum(canonicalBytes) === receivedChecksum;
+    const fallbackMatch = receivedChecksum === computeFallbackChecksum(canonicalBytes);
+
+    if (!legacyMatch && !fallbackMatch) {
+      throw new ConfigurationEncoderError('Configuration checksum mismatch', 'CHECKSUM_FAILED');
+    }
   }
 
   const decodedConfig = payloadToConfig(rest);
