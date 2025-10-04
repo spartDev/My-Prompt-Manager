@@ -2,7 +2,7 @@ import { FC, useState, useEffect, ReactNode, useCallback } from 'react';
 
 import { useClipboard } from '../../hooks/useClipboard';
 import { ConfigurationEncoder, ConfigurationEncoderError } from '../../services/configurationEncoder';
-import { CustomSite, CustomSiteConfiguration, SecurityWarning } from '../../types';
+import { CustomSite, CustomSiteConfiguration, SecurityWarning, ElementFingerprint } from '../../types';
 import { Logger, toError } from '../../utils';
 import { CustomSiteIcon } from '../icons/SiteIcons';
 
@@ -50,7 +50,7 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
   const [newSiteUrl, setNewSiteUrl] = useState('');
   const [newSiteName, setNewSiteName] = useState('');
   const [customSelector, setCustomSelector] = useState('');
-  const [elementFingerprint, setElementFingerprint] = useState<unknown>(null); // NEW: Store fingerprint
+  const [elementFingerprint, setElementFingerprint] = useState<ElementFingerprint | null>(null); // NEW: Store fingerprint
   const [placement, setPlacement] = useState<'before' | 'after' | 'inside-start' | 'inside-end'>('before');
   const [offsetX, setOffsetX] = useState(0);
   const [offsetY, setOffsetY] = useState(0);
@@ -297,11 +297,11 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
   useEffect(() => {
     const handleMessage = (message: { type?: string; data?: unknown }) => {
       if (message.type === 'ELEMENT_PICKER_RESULT') {
-        const data = message.data as { 
-          fingerprint?: unknown; 
-          selector?: string; 
-          elementType?: string; 
-          elementInfo?: Record<string, unknown>; 
+        const data = message.data as {
+          fingerprint?: ElementFingerprint;
+          selector?: string;
+          elementType?: string;
+          elementInfo?: Record<string, unknown>;
           hostname?: string;
         } | undefined;
         

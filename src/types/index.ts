@@ -48,8 +48,7 @@ export interface CustomSite {
   positioning?: {
     mode: 'custom';
     // NEW: Robust element fingerprint (preferred)
-    // Using unknown to allow flexible storage format
-    fingerprint?: unknown;
+    fingerprint?: ElementFingerprint;
     // Legacy: CSS selector (fallback only)
     selector?: string;
     placement: 'before' | 'after' | 'inside-start' | 'inside-end';

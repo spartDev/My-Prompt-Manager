@@ -4,6 +4,7 @@
  */
 
 import { getDefaultEnabledPlatforms, getAllHostnamePatterns } from '../config/platforms';
+import type { ElementFingerprint } from '../types';
 import { Logger, toError, getErrorMessage } from '../utils';
 
 // Track active element picker sessions
@@ -633,7 +634,7 @@ let originalTabId: number | null = null;
 interface BackgroundMessage {
   type: 'START_ELEMENT_PICKER' | 'STOP_ELEMENT_PICKER' | 'ELEMENT_SELECTED' | 'PICKER_CANCELLED' | 'OPEN_PICKER_WINDOW' | 'GET_INTERFACE_MODE' | 'REQUEST_INJECTION' | 'SETTINGS_UPDATED' | 'REQUEST_PERMISSION';
   data?: {
-    fingerprint?: unknown; // Element fingerprint for robust identification
+    fingerprint?: ElementFingerprint; // Element fingerprint for robust identification
     selector?: string;
     elementType?: string;
     elementInfo?: Record<string, unknown>;

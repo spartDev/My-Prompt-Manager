@@ -44,6 +44,7 @@ const VALID_PLACEMENTS: Array<NonNullable<CustomSite['positioning']>['placement'
 ];
 const CHECKSUM_LENGTH = 16;
 const LEGACY_CHECKSUM_LENGTH = 8;
+const MAX_FINGERPRINT_SIZE = 10000; // 10KB limit to prevent DOS attacks
 
 const canonicalizeFingerprint = (fingerprint: ElementFingerprint): ElementFingerprint => {
   const canonical: ElementFingerprint = {
@@ -328,6 +329,26 @@ const validateConfiguration = (config: CustomSiteConfiguration): ConfigurationVa
       });
     }
 
+    // Validate fingerprint size to prevent DOS attacks
+    if (hasFingerprint && sanitizedConfig.positioning.fingerprint) {
+      try {
+        const fingerprintJson = JSON.stringify(sanitizedConfig.positioning.fingerprint);
+        if (fingerprintJson.length > MAX_FINGERPRINT_SIZE) {
+          issues.push({
+            field: 'positioning.fingerprint',
+            message: `Fingerprint exceeds maximum size of ${String(MAX_FINGERPRINT_SIZE)} bytes (current: ${String(fingerprintJson.length)} bytes).`,
+            severity: 'error'
+          });
+        }
+      } catch {
+        issues.push({
+          field: 'positioning.fingerprint',
+          message: 'Fingerprint contains invalid data that cannot be serialized.',
+          severity: 'error'
+        });
+      }
+    }
+
     if (!VALID_PLACEMENTS.includes(sanitizedConfig.positioning.placement)) {
       issues.push({
         field: 'positioning.placement',
@@ -449,6 +470,24 @@ const decode = async (encodedString: string): Promise<CustomSiteConfiguration> =
 
   if (payload.v !== CURRENT_VERSION) {
     throw new ConfigurationEncoderError('Unsupported configuration version', 'UNSUPPORTED_VERSION');
+  }
+
+  // Early validation: Check fingerprint size before expensive checksum computation
+  if (payload.p?.fp) {
+    try {
+      const fingerprintJson = JSON.stringify(payload.p.fp);
+      if (fingerprintJson.length > MAX_FINGERPRINT_SIZE) {
+        throw new ConfigurationEncoderError(
+          `Fingerprint exceeds maximum size of ${String(MAX_FINGERPRINT_SIZE)} bytes`,
+          'VALIDATION_ERROR'
+        );
+      }
+    } catch (error) {
+      if (error instanceof ConfigurationEncoderError) {
+        throw error;
+      }
+      throw new ConfigurationEncoderError('Fingerprint contains invalid data', 'VALIDATION_ERROR');
+    }
   }
 
   const { c: receivedChecksum, ...rest } = payload;

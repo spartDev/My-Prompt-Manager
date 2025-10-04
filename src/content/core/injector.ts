@@ -519,7 +519,13 @@ export class PromptLibraryInjector {
 
         if (textarea !== this.state.currentTextarea) {
           this.state.currentTextarea = textarea;
-          void this.injectIcon(textarea);
+          this.injectIcon(textarea).catch((err: unknown) => {
+            error('Icon injection failed', err instanceof Error ? err : new Error(String(err)), {
+              component: 'PromptLibraryInjector',
+              textareaId: textarea.id,
+              textareaTag: textarea.tagName
+            });
+          });
         }
       } else {
         debug('No textarea found', { selectorsChecked: selectors.length });
@@ -587,26 +593,8 @@ export class PromptLibraryInjector {
    */
   private isElementVisible(element: HTMLElement): boolean {
     const rect = element.getBoundingClientRect();
-    return rect.width > 0 && rect.height > 0 && 
+    return rect.width > 0 && rect.height > 0 &&
            window.getComputedStyle(element).display !== 'none';
-  }
-
-  /**
-   * Type guard to check if value is an ElementFingerprint
-   */
-  private isElementFingerprint(value: unknown): value is ElementFingerprint {
-    if (!value || typeof value !== 'object') {
-      return false;
-    }
-    const obj = value as Record<string, unknown>;
-    return (
-      typeof obj.primary === 'object' &&
-      typeof obj.secondary === 'object' &&
-      typeof obj.content === 'object' &&
-      typeof obj.context === 'object' &&
-      typeof obj.attributes === 'object' &&
-      typeof obj.meta === 'object'
-    );
   }
 
   /**
@@ -891,38 +879,36 @@ export class PromptLibraryInjector {
       if (!injected) {
         let customPositioned = false;
 
-        if (customConfig?.positioning) {
+        const positioning = customConfig?.positioning;
+        if (positioning) {
           try {
             let referenceElement: HTMLElement | null = null;
-            
+
             // PRIORITY 1: Try fingerprint matching (most robust)
-            if (customConfig.positioning.fingerprint) {
-              const fingerprintGenerator = getElementFingerprintGenerator();
-              // Type guard to validate fingerprint structure
+            if (positioning.fingerprint &&
+                typeof positioning.fingerprint === 'object' &&
+                'meta' in positioning.fingerprint) {
               // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-              const rawFingerprint = customConfig.positioning.fingerprint;
-              if (this.isElementFingerprint(rawFingerprint)) {
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-                referenceElement = fingerprintGenerator.findElement(rawFingerprint);
-                
-                if (referenceElement) {
-                  debug('Found element using fingerprint matching', {
-                    tag: referenceElement.tagName,
-                    id: referenceElement.id,
-                    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-                    confidence: rawFingerprint.meta.confidence
-                  });
-                } else {
-                  debug('Fingerprint matching failed, trying fallback selector');
-                }
+              const fpData = positioning.fingerprint;
+              const fingerprintGenerator = getElementFingerprintGenerator();
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+              referenceElement = fingerprintGenerator.findElement(fpData);
+
+              if (referenceElement) {
+                debug('Found element using fingerprint matching', {
+                  tag: referenceElement.tagName,
+                  id: referenceElement.id,
+                  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+                  confidence: fpData.meta.confidence
+                });
               } else {
-                debug('Invalid fingerprint structure, skipping fingerprint matching');
+                debug('Fingerprint matching failed, trying fallback selector');
               }
             }
             
             // PRIORITY 2: Try legacy selector as fallback
-            if (!referenceElement && customConfig.positioning.selector) {
-              const customSelector = customConfig.positioning.selector;
+            if (!referenceElement && positioning.selector) {
+              const customSelector = positioning.selector;
               
               if (textarea.matches(customSelector)) {
                 // Use custom positioning for the textarea itself
