@@ -678,8 +678,8 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
         </div>
 
         {/* Custom Sites */}
-        <div>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-3">
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm">
               Custom Sites
             </h3>
