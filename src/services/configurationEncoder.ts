@@ -1,3 +1,22 @@
+/**
+ * URL-Safe Encoding Strategy
+ *
+ * This module uses lz-string's compressToEncodedURIComponent for encoding configurations.
+ * This provides several advantages:
+ *
+ * 1. **URL Safety**: Produces output safe for URLs, query parameters, and sharing
+ * 2. **Compression**: Reduces payload size by ~60-80% compared to raw JSON
+ * 3. **Unicode Support**: Handles international characters correctly
+ * 4. **Battle-tested**: Used by thousands of projects, well-maintained
+ *
+ * The output is URL-safe because lz-string:
+ * - Avoids '+', '/', '=' characters that require URL encoding
+ * - Uses only alphanumeric characters and safe symbols
+ * - No additional encoding needed for use in URLs
+ *
+ * Alternative: If you need simple base64 URL-safe encoding without compression,
+ * use the utilities in src/utils/base64.ts
+ */
 import { compressToEncodedURIComponent, decompressFromEncodedURIComponent } from 'lz-string';
 
 import {
