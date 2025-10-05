@@ -100,10 +100,6 @@ const ConfigurationPreview: FC<ConfigurationPreviewProps> = ({
             <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
               <h5 className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-3">Custom Positioning</h5>
               <div className="space-y-3">
-                <div>
-                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Selector</p>
-                  <p className="text-sm font-mono text-gray-900 dark:text-gray-100 break-all bg-gray-50 dark:bg-gray-900/50 px-2 py-1 rounded">{config.positioning.selector}</p>
-                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Placement</p>

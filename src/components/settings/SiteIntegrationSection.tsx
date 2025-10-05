@@ -905,16 +905,6 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
 
                   {customSelector && (
                     <div className="space-y-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-                      {/* Selected Element Display */}
-                      <div>
-                        <p className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                          Selected Element
-                        </p>
-                        <div className="px-3 py-2 text-xs bg-gray-50 dark:bg-gray-900/50 border border-gray-300 dark:border-gray-600 rounded-lg font-mono text-gray-900 dark:text-gray-100 break-all">
-                          {customSelector}
-                        </div>
-                      </div>
-
                       {/* Placement */}
                       <div>
                         <label htmlFor="placement-select" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
