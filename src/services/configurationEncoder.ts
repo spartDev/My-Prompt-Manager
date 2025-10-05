@@ -1,3 +1,22 @@
+/**
+ * URL-Safe Encoding Strategy
+ *
+ * This module uses lz-string's compressToEncodedURIComponent for encoding configurations.
+ * This provides several advantages:
+ *
+ * 1. **URL Safety**: Produces output safe for URLs, query parameters, and sharing
+ * 2. **Compression**: Reduces payload size by ~60-80% compared to raw JSON
+ * 3. **Unicode Support**: Handles international characters correctly
+ * 4. **Battle-tested**: Used by thousands of projects, well-maintained
+ *
+ * The output is URL-safe because lz-string:
+ * - Avoids '+', '/', '=' characters that require URL encoding
+ * - Uses only alphanumeric characters and safe symbols
+ * - No additional encoding needed for use in URLs
+ *
+ * Alternative: If you need simple base64 URL-safe encoding without compression,
+ * use the utilities in src/utils/base64.ts
+ */
 import { compressToEncodedURIComponent, decompressFromEncodedURIComponent } from 'lz-string';
 
 import {
@@ -5,6 +24,7 @@ import {
   CustomSiteConfiguration,
   ConfigurationValidationResult,
   EncodedCustomSitePayloadV1,
+  ElementFingerprint,
   SecurityWarning
 } from '../types';
 import { Logger, toError } from '../utils';
@@ -41,6 +61,69 @@ const VALID_PLACEMENTS: Array<NonNullable<CustomSite['positioning']>['placement'
   'inside-start',
   'inside-end'
 ];
+const CHECKSUM_LENGTH = 16;
+const LEGACY_CHECKSUM_LENGTH = 8;
+const MAX_FINGERPRINT_SIZE = 10000; // 10KB limit to prevent DOS attacks
+
+const canonicalizeFingerprint = (fingerprint: ElementFingerprint): ElementFingerprint => {
+  const canonical: ElementFingerprint = {
+    primary: {},
+    secondary: {
+      tagName: fingerprint.secondary.tagName
+    },
+    content: {},
+    context: {},
+    attributes: {},
+    meta: {
+      generatedAt: fingerprint.meta.generatedAt,
+      url: fingerprint.meta.url,
+      confidence: fingerprint.meta.confidence
+    }
+  };
+
+  const primaryKeys = ['id', 'dataTestId', 'dataId', 'name', 'ariaLabel'] as const;
+  for (const key of primaryKeys) {
+    const value = fingerprint.primary[key];
+    if (value !== undefined) {
+      canonical.primary[key] = value;
+    }
+  }
+
+  const secondaryKeys = ['type', 'role', 'placeholder'] as const;
+  for (const key of secondaryKeys) {
+    const value = fingerprint.secondary[key];
+    if (value !== undefined) {
+      canonical.secondary[key] = value;
+    }
+  }
+
+  const contentKeys = ['textContent', 'textHash'] as const;
+  for (const key of contentKeys) {
+    const value = fingerprint.content[key];
+    if (value !== undefined) {
+      canonical.content[key] = value;
+    }
+  }
+
+  const contextKeys = ['parentId', 'parentDataTestId', 'parentTagName', 'siblingIndex', 'siblingCount', 'depth'] as const;
+  for (const key of contextKeys) {
+    const value = fingerprint.context[key];
+    if (value !== undefined) {
+      canonical.context[key] = value;
+    }
+  }
+
+  const attributeKeys = Object.keys(fingerprint.attributes).sort();
+  for (const key of attributeKeys) {
+    canonical.attributes[key] = fingerprint.attributes[key];
+  }
+
+  if (fingerprint.classPatterns && fingerprint.classPatterns.length > 0) {
+    canonical.classPatterns = [...fingerprint.classPatterns].sort();
+  }
+
+  return canonical;
+};
 
 const canonicalizePayload = (payload: NormalizedPayload): string => {
   const canonical: NormalizedPayload = {
@@ -50,23 +133,32 @@ const canonicalizePayload = (payload: NormalizedPayload): string => {
   };
 
   if (payload.p) {
-    canonical.p = {
-      s: payload.p.s,
-      pl: payload.p.pl
-    };
+    const canonicalPositioning: Partial<NonNullable<NormalizedPayload['p']>> = {};
+
+    if (payload.p.s !== undefined) {
+      canonicalPositioning.s = payload.p.s;
+    }
+
+    if (payload.p.fp) {
+      canonicalPositioning.fp = canonicalizeFingerprint(payload.p.fp);
+    }
+
+    canonicalPositioning.pl = payload.p.pl;
 
     if (payload.p.ox !== undefined) {
-      canonical.p.ox = payload.p.ox;
+      canonicalPositioning.ox = payload.p.ox;
     }
     if (payload.p.oy !== undefined) {
-      canonical.p.oy = payload.p.oy;
+      canonicalPositioning.oy = payload.p.oy;
     }
     if (payload.p.z !== undefined) {
-      canonical.p.z = payload.p.z;
+      canonicalPositioning.z = payload.p.z;
     }
     if (payload.p.d !== undefined) {
-      canonical.p.d = payload.p.d;
+      canonicalPositioning.d = payload.p.d;
     }
+
+    canonical.p = canonicalPositioning as NonNullable<NormalizedPayload['p']>;
   }
 
   return JSON.stringify(canonical);
@@ -79,6 +171,8 @@ const arrayBufferToHex = (buffer: ArrayBuffer): string => {
     .join('');
 };
 
+const toUtf8Bytes = (value: string): Uint8Array => new TextEncoder().encode(value);
+
 const getSubtleCrypto = (): SubtleCrypto | null => {
   if (typeof globalThis === 'undefined') {
     return null;
@@ -88,22 +182,41 @@ const getSubtleCrypto = (): SubtleCrypto | null => {
   return typeof potentialCrypto?.subtle !== 'undefined' ? potentialCrypto.subtle : null;
 };
 
-const computeChecksum = async (value: string): Promise<string> => {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(value);
+const computeLegacyChecksum = (data: Uint8Array): string => {
+  let hash = 0;
+  for (const byte of data) {
+    hash = (Math.imul(hash, 31) + byte) >>> 0;
+  }
+  return hash.toString(16).padStart(LEGACY_CHECKSUM_LENGTH, '0');
+};
 
+const computeFallbackChecksum = (data: Uint8Array): string => {
+  let hashA = 0;
+  let hashB = 0;
+
+  for (const byte of data) {
+    hashA = (Math.imul(hashA, 31) + byte) >>> 0;
+    hashB = (Math.imul(hashB, 33) ^ byte) >>> 0;
+  }
+
+  const partA = hashA.toString(16).padStart(LEGACY_CHECKSUM_LENGTH, '0');
+  const partB = hashB.toString(16).padStart(LEGACY_CHECKSUM_LENGTH, '0');
+  return `${partA}${partB}`;
+};
+
+const computeChecksumFromBytes = async (data: Uint8Array): Promise<string> => {
   const subtle = getSubtleCrypto();
   if (subtle) {
     const digest = await subtle.digest('SHA-256', data);
-    return arrayBufferToHex(digest).slice(0, 16);
+    return arrayBufferToHex(digest).slice(0, CHECKSUM_LENGTH);
   }
 
-  // Fallback checksum (non-cryptographic) for environments without Web Crypto
-  let hash = 0;
-  for (const byte of data) {
-    hash = (hash * 31 + byte) >>> 0;
-  }
-  return hash.toString(16).padStart(8, '0');
+  return computeFallbackChecksum(data);
+};
+
+const computeChecksum = async (value: string): Promise<string> => {
+  const data = toUtf8Bytes(value);
+  return computeChecksumFromBytes(data);
 };
 
 const configToPayload = (config: CustomSiteConfiguration): NormalizedPayload => {
@@ -113,11 +226,18 @@ const configToPayload = (config: CustomSiteConfiguration): NormalizedPayload => 
     n: config.displayName
   };
 
-  if (config.positioning && config.positioning.selector) {
+  if (config.positioning && (config.positioning.selector !== undefined || config.positioning.fingerprint)) {
     payload.p = {
-      s: config.positioning.selector,
       pl: config.positioning.placement
     };
+
+    if (config.positioning.selector !== undefined) {
+      payload.p.s = config.positioning.selector;
+    }
+
+    if (config.positioning.fingerprint) {
+      payload.p.fp = config.positioning.fingerprint;
+    }
 
     if (config.positioning.offset) {
       const { x, y } = config.positioning.offset;
@@ -150,12 +270,15 @@ const payloadToConfig = (payload: NormalizedPayload): CustomSiteConfiguration =>
   if (payload.p) {
     const placement = payload.p.pl;
     const selector = payload.p.s;
+    const fingerprint = payload.p.fp;
+    const hasSelector = typeof selector === 'string' && selector.trim().length > 0;
+    const hasFingerprint = Boolean(fingerprint);
 
-    if (VALID_PLACEMENTS.includes(placement) && typeof selector === 'string' && selector.trim().length > 0) {
+    if (VALID_PLACEMENTS.includes(placement) && (hasSelector || hasFingerprint)) {
       config.positioning = {
         mode: 'custom',
-        selector,
         placement,
+        selector: hasSelector ? selector : '',
         offset: payload.p.ox !== undefined || payload.p.oy !== undefined ? {
           x: payload.p.ox ?? 0,
           y: payload.p.oy ?? 0
@@ -163,6 +286,10 @@ const payloadToConfig = (payload: NormalizedPayload): CustomSiteConfiguration =>
         zIndex: payload.p.z,
         description: payload.p.d
       };
+
+      if (hasFingerprint) {
+        config.positioning.fingerprint = fingerprint;
+      }
     }
   }
 
@@ -183,13 +310,13 @@ const validateConfiguration = (config: CustomSiteConfiguration): ConfigurationVa
   if (!sanitizedConfig.hostname) {
     issues.push({
       field: 'hostname',
-      message: 'Hostname is required.',
+      message: 'Hostname is required. Please enter the domain name (e.g., "example.com") without protocol or path.',
       severity: 'error'
     });
   } else if (!HOSTNAME_PATTERN.test(sanitizedConfig.hostname)) {
     issues.push({
       field: 'hostname',
-      message: 'Hostname must be a valid public domain.',
+      message: 'Hostname must be a valid public domain (e.g., "example.com", "subdomain.example.com"). Do not include protocol (http://) or path (/page).',
       severity: 'error'
     });
   }
@@ -197,30 +324,54 @@ const validateConfiguration = (config: CustomSiteConfiguration): ConfigurationVa
   if (!sanitizedConfig.displayName) {
     issues.push({
       field: 'displayName',
-      message: 'Display name is required.',
+      message: 'Display name is required. Provide a friendly name for this site configuration (e.g., "My Custom Blog", "Company Portal").',
       severity: 'error'
     });
   }
 
   if (sanitizedConfig.positioning) {
-    if (!sanitizedConfig.positioning.selector) {
+    const selectorValue = sanitizedConfig.positioning.selector;
+    const hasSelector = typeof selectorValue === 'string' && selectorValue.trim().length > 0;
+    const hasFingerprint = Boolean(sanitizedConfig.positioning.fingerprint);
+
+    if (!hasSelector && !hasFingerprint) {
       issues.push({
         field: 'positioning.selector',
-        message: 'Selector is required when positioning is provided.',
+        message: 'Provide a CSS selector (e.g., "#submit-button", ".chat-input") or use the element picker to create a fingerprint. At least one is required for positioning.',
         severity: 'error'
       });
-    } else if (!isSelectorSafe(sanitizedConfig.positioning.selector)) {
+    } else if (hasSelector && !isSelectorSafe(selectorValue)) {
       issues.push({
         field: 'positioning.selector',
-        message: 'Selector contains unsafe characters or patterns.',
+        message: 'Selector contains unsafe characters or patterns. Use simple CSS selectors like "#id", ".class", or "tag[attribute]". Avoid script injection patterns.',
         severity: 'error'
       });
+    }
+
+    // Validate fingerprint size to prevent DOS attacks
+    if (hasFingerprint && sanitizedConfig.positioning.fingerprint) {
+      try {
+        const fingerprintJson = JSON.stringify(sanitizedConfig.positioning.fingerprint);
+        if (fingerprintJson.length > MAX_FINGERPRINT_SIZE) {
+          issues.push({
+            field: 'positioning.fingerprint',
+            message: `Fingerprint exceeds maximum size of ${String(MAX_FINGERPRINT_SIZE)} bytes (current: ${String(fingerprintJson.length)} bytes).`,
+            severity: 'error'
+          });
+        }
+      } catch {
+        issues.push({
+          field: 'positioning.fingerprint',
+          message: 'Fingerprint contains invalid data that cannot be serialized.',
+          severity: 'error'
+        });
+      }
     }
 
     if (!VALID_PLACEMENTS.includes(sanitizedConfig.positioning.placement)) {
       issues.push({
         field: 'positioning.placement',
-        message: 'Placement is not supported.',
+        message: `Placement must be one of: ${VALID_PLACEMENTS.join(', ')}. Choose where to position the icon relative to the target element.`,
         severity: 'error'
       });
     }
@@ -230,14 +381,14 @@ const validateConfiguration = (config: CustomSiteConfiguration): ConfigurationVa
       if (!Number.isFinite(x) || Math.abs(x) > 500) {
         issues.push({
           field: 'positioning.offset.x',
-          message: 'Offset X must be between -500 and 500.',
+          message: 'Offset X must be between -500 and 500 pixels. Use positive values to move right, negative to move left.',
           severity: 'error'
         });
       }
       if (!Number.isFinite(y) || Math.abs(y) > 500) {
         issues.push({
           field: 'positioning.offset.y',
-          message: 'Offset Y must be between -500 and 500.',
+          message: 'Offset Y must be between -500 and 500 pixels. Use positive values to move down, negative to move up.',
           severity: 'error'
         });
       }
@@ -248,7 +399,7 @@ const validateConfiguration = (config: CustomSiteConfiguration): ConfigurationVa
       if (!Number.isInteger(z) || z < 0 || z > 2147483647) {
         issues.push({
           field: 'positioning.zIndex',
-          message: 'Z-index must be an integer between 0 and 2147483647.',
+          message: 'Z-index must be an integer between 0 and 2147483647. Higher values appear above lower values. Try 999999 for most cases.',
           severity: 'error'
         });
       }
@@ -313,7 +464,7 @@ const encode = async (customSite: CustomSite): Promise<string> => {
 
 const decode = async (encodedString: string): Promise<CustomSiteConfiguration> => {
   if (!encodedString || encodedString.trim().length === 0) {
-    throw new ConfigurationEncoderError('Configuration code is empty', 'INVALID_FORMAT');
+    throw new ConfigurationEncoderError('Configuration code is empty. Please paste a valid configuration code from the sharing dialog.', 'INVALID_FORMAT');
   }
 
   let serialized: string | null;
@@ -325,7 +476,7 @@ const decode = async (encodedString: string): Promise<CustomSiteConfiguration> =
   }
 
   if (!serialized) {
-    throw new ConfigurationEncoderError('Invalid configuration code', 'INVALID_FORMAT');
+    throw new ConfigurationEncoderError('Invalid configuration code. The code may be corrupted or incomplete. Please copy the entire code from the sharing dialog.', 'INVALID_FORMAT');
   }
 
   let payload: EncodedCustomSitePayloadV1;
@@ -333,19 +484,45 @@ const decode = async (encodedString: string): Promise<CustomSiteConfiguration> =
     payload = JSON.parse(serialized) as EncodedCustomSitePayloadV1;
   } catch (error) {
     Logger.error('Failed to parse configuration payload', toError(error));
-    throw new ConfigurationEncoderError('Invalid configuration format', 'INVALID_FORMAT');
+    throw new ConfigurationEncoderError('Invalid configuration format. The configuration data is corrupted. Please request a new sharing code.', 'INVALID_FORMAT');
   }
 
   if (payload.v !== CURRENT_VERSION) {
-    throw new ConfigurationEncoderError('Unsupported configuration version', 'UNSUPPORTED_VERSION');
+    throw new ConfigurationEncoderError(`Unsupported configuration version (v${payload.v}). This code was created with a different version. Please create a new configuration or update the extension.`, 'UNSUPPORTED_VERSION');
+  }
+
+  // Early validation: Check fingerprint size before expensive checksum computation
+  if (payload.p?.fp) {
+    try {
+      const fingerprintJson = JSON.stringify(payload.p.fp);
+      if (fingerprintJson.length > MAX_FINGERPRINT_SIZE) {
+        throw new ConfigurationEncoderError(
+          `Fingerprint exceeds maximum size of ${String(MAX_FINGERPRINT_SIZE)} bytes`,
+          'VALIDATION_ERROR'
+        );
+      }
+    } catch (error) {
+      if (error instanceof ConfigurationEncoderError) {
+        throw error;
+      }
+      throw new ConfigurationEncoderError('Fingerprint contains invalid data', 'VALIDATION_ERROR');
+    }
   }
 
   const { c: receivedChecksum, ...rest } = payload;
   const canonical = canonicalizePayload(rest);
-  const expectedChecksum = await computeChecksum(canonical);
+  const canonicalBytes = toUtf8Bytes(canonical);
+  const expectedChecksum = await computeChecksumFromBytes(canonicalBytes);
 
   if (receivedChecksum !== expectedChecksum) {
-    throw new ConfigurationEncoderError('Configuration checksum mismatch', 'CHECKSUM_FAILED');
+    const legacyMatch =
+      receivedChecksum.length === LEGACY_CHECKSUM_LENGTH &&
+      computeLegacyChecksum(canonicalBytes) === receivedChecksum;
+    const fallbackMatch = receivedChecksum === computeFallbackChecksum(canonicalBytes);
+
+    if (!legacyMatch && !fallbackMatch) {
+      throw new ConfigurationEncoderError('Configuration integrity check failed. The code may have been modified or corrupted during copying. Please copy the code again carefully.', 'CHECKSUM_FAILED');
+    }
   }
 
   const decodedConfig = payloadToConfig(rest);

@@ -2,7 +2,7 @@ import { FC, useState, useEffect, ReactNode, useCallback } from 'react';
 
 import { useClipboard } from '../../hooks/useClipboard';
 import { ConfigurationEncoder, ConfigurationEncoderError } from '../../services/configurationEncoder';
-import { CustomSite, CustomSiteConfiguration, SecurityWarning } from '../../types';
+import { CustomSite, CustomSiteConfiguration, SecurityWarning, ElementFingerprint } from '../../types';
 import { Logger, toError } from '../../utils';
 import { CustomSiteIcon } from '../icons/SiteIcons';
 
@@ -50,6 +50,7 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
   const [newSiteUrl, setNewSiteUrl] = useState('');
   const [newSiteName, setNewSiteName] = useState('');
   const [customSelector, setCustomSelector] = useState('');
+  const [elementFingerprint, setElementFingerprint] = useState<ElementFingerprint | null>(null); // NEW: Store fingerprint
   const [placement, setPlacement] = useState<'before' | 'after' | 'inside-start' | 'inside-end'>('before');
   const [offsetX, setOffsetX] = useState(0);
   const [offsetY, setOffsetY] = useState(0);
@@ -81,6 +82,7 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
     setNewSiteUrl('');
     setNewSiteName('');
     setCustomSelector('');
+    setElementFingerprint(null); // NEW: Reset fingerprint
     setPlacement('before');
     setOffsetX(0);
     setOffsetY(0);
@@ -295,10 +297,24 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
   useEffect(() => {
     const handleMessage = (message: { type?: string; data?: unknown }) => {
       if (message.type === 'ELEMENT_PICKER_RESULT') {
-        const data = message.data as { selector?: string; elementType?: string; elementInfo?: Record<string, unknown>; hostname?: string } | undefined;
+        const data = message.data as {
+          fingerprint?: ElementFingerprint;
+          selector?: string;
+          elementType?: string;
+          elementInfo?: Record<string, unknown>;
+          hostname?: string;
+        } | undefined;
+        
         if (data?.selector) {
           setCustomSelector(data.selector);
+          setElementFingerprint(data.fingerprint || null); // NEW: Store fingerprint
           setPickingElement(false);
+          
+          // Log for debugging
+          Logger.debug('Element picker result received', {
+            hasFingerprint: !!data.fingerprint,
+            selector: data.selector
+          });
         }
       }
     };
@@ -563,6 +579,7 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
         ...(customSelector && {
           positioning: {
             mode: 'custom' as const,
+            fingerprint: elementFingerprint || undefined, // NEW: Include fingerprint
             selector: customSelector,
             placement,
             offset: { x: offsetX, y: offsetY },
