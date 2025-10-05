@@ -944,6 +944,16 @@ export class PromptLibraryInjector {
                   return; // Exit here - positioning is complete
                 } else {
                   debug('CSS Anchor positioning failed, trying Floating UI');
+                  // Telemetry: Track fallback from CSS Anchor to Floating UI
+                  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+                  info('[Telemetry] Positioning fallback', {
+                    from: 'css-anchor',
+                    fromTier: 0,
+                    to: 'floating-ui',
+                    toTier: 1,
+                    reason: 'css-anchor-failed',
+                    url: window.location.hostname
+                  });
                 }
               }
 
@@ -962,12 +972,33 @@ export class PromptLibraryInjector {
 
               // TIER 2: Try DOM insertion (fallback for Floating UI failures)
               if (!customPositioned) {
+                // Telemetry: Track fallback from Floating UI to DOM insertion
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+                info('[Telemetry] Positioning fallback', {
+                  from: 'floating-ui',
+                  fromTier: 1,
+                  to: 'dom-insertion',
+                  toTier: 2,
+                  reason: 'floating-ui-failed',
+                  url: window.location.hostname
+                });
+
                 customPositioned = this.positionCustomIcon(icon, referenceElement, customConfig);
                 if (customPositioned) {
                   debug('Icon positioned successfully with DOM insertion (Tier 2)');
                   return; // Exit here - positioning is complete
                 } else {
                   debug('DOM insertion failed, will try absolute positioning (Tier 3)');
+                  // Telemetry: Track fallback from DOM insertion to absolute positioning
+                  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+                  info('[Telemetry] Positioning fallback', {
+                    from: 'dom-insertion',
+                    fromTier: 2,
+                    to: 'absolute',
+                    toTier: 3,
+                    reason: 'dom-insertion-failed',
+                    url: window.location.hostname
+                  });
                 }
               }
             }
@@ -1090,15 +1121,37 @@ export class PromptLibraryInjector {
       icon.style.top = `${String(top)}px`;
       icon.style.left = `${String(left)}px`;
 
-      debug('Absolute positioning fallback applied', { 
-        placement, 
-        offset, 
+      debug('Absolute positioning fallback applied', {
+        placement,
+        offset,
         zIndex,
         calculatedPosition: { top, left }
       });
 
+      // Telemetry: Track positioning method usage
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+      info('[Telemetry] Positioning method used', {
+        method: 'absolute',
+        tier: 3,
+        success: true,
+        placement,
+        hasOffset: offset.x !== 0 || offset.y !== 0,
+        referenceType: referenceElement.tagName.toLowerCase(),
+        url: window.location.hostname
+      });
+
     } catch (err) {
       error('Failed to apply absolute positioning fallback', err as Error);
+
+      // Telemetry: Track absolute positioning failure
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+      info('[Telemetry] Positioning method used', {
+        method: 'absolute',
+        tier: 3,
+        success: false,
+        error: err instanceof Error ? err.message : String(err),
+        url: window.location.hostname
+      });
     }
   }
 
@@ -1198,6 +1251,18 @@ export class PromptLibraryInjector {
           id: referenceElement.id,
           class: referenceElement.className
         }
+      });
+
+      // Telemetry: Track positioning method usage
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+      info('[Telemetry] Positioning method used', {
+        method: 'css-anchor',
+        tier: 0,
+        success: true,
+        placement,
+        hasOffset: offset.x !== 0 || offset.y !== 0,
+        referenceType: referenceElement.tagName.toLowerCase(),
+        url: window.location.hostname
       });
 
       return true;
@@ -1387,6 +1452,18 @@ export class PromptLibraryInjector {
         }
       });
 
+      // Telemetry: Track positioning method usage
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+      info('[Telemetry] Positioning method used', {
+        method: 'floating-ui',
+        tier: 1,
+        success: true,
+        placement: floatingPlacement,
+        hasOffset: offset.x !== 0 || offset.y !== 0,
+        referenceType: referenceElement.tagName.toLowerCase(),
+        url: window.location.hostname
+      });
+
       return true;
     } catch (err) {
       // Better error handling for non-Error objects
@@ -1482,15 +1559,27 @@ export class PromptLibraryInjector {
         return false;
       }
 
-      debug('Custom DOM insertion completed successfully', { 
-        placement, 
-        offset, 
+      debug('Custom DOM insertion completed successfully', {
+        placement,
+        offset,
         zIndex,
         referenceElement: {
           tag: referenceElement.tagName,
           id: referenceElement.id,
           class: referenceElement.className
         }
+      });
+
+      // Telemetry: Track positioning method usage
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+      info('[Telemetry] Positioning method used', {
+        method: 'dom-insertion',
+        tier: 2,
+        success: true,
+        placement,
+        hasOffset: offset.x !== 0 || offset.y !== 0,
+        referenceType: referenceElement.tagName.toLowerCase(),
+        url: window.location.hostname
       });
 
       return true;

@@ -49,12 +49,41 @@ const HIGH_CONFIDENCE_SCORE = 50;
 // Maximum DOM depth to prevent infinite loops
 const MAX_DOM_DEPTH = 50;
 
+// Content extraction limits
+const MAX_TEXT_CONTENT_LENGTH = 200;
+const MAX_NORMALIZED_TEXT_LENGTH = 50;
+
+// Attribute and class limits
+const MAX_STABLE_ATTRIBUTES = 10;
+const MAX_CLASS_PATTERNS = 5;
+const MIN_SEMANTIC_CLASS_LENGTH = 2;
+const MAX_SEMANTIC_CLASS_LENGTH = 30;
+
+// Performance threshold for slow fingerprint matching (milliseconds)
+const SLOW_MATCHING_THRESHOLD_MS = 50;
+
 // Sensitive patterns to exclude from fingerprints
 const SENSITIVE_PATTERNS = /password|secret|token|key|credential|private|ssn|credit|card|cvv|pin|bank|account|session|auth|api|csrf|nonce/i;
 
 export class ElementFingerprintGenerator {
   /**
-   * Generate a unique fingerprint for an element
+   * Generate a comprehensive fingerprint for an HTML element.
+   *
+   * The fingerprint captures multiple stable attributes including IDs, ARIA labels,
+   * data attributes, text content, and structural context. This multi-attribute
+   * approach provides robustness against DOM changes and A/B testing.
+   *
+   * @param element - The HTML element to fingerprint
+   * @returns An ElementFingerprint object containing primary, secondary, content,
+   *          context identifiers, and a confidence assessment
+   *
+   * @example
+   * ```typescript
+   * const generator = getElementFingerprintGenerator();
+   * const button = document.querySelector('button#submit');
+   * const fingerprint = generator.generate(button);
+   * console.log(fingerprint.meta.confidence); // 'high' | 'medium' | 'low'
+   * ```
    */
   generate(element: HTMLElement): ElementFingerprint {
     const fingerprint: ElementFingerprint = {
@@ -82,7 +111,26 @@ export class ElementFingerprintGenerator {
   }
 
   /**
-   * Find an element matching the given fingerprint
+   * Find an element in the current DOM that matches the given fingerprint.
+   *
+   * Uses a scoring system to match elements against the fingerprint's attributes.
+   * Only returns elements with a confidence score above MIN_CONFIDENCE_SCORE (30).
+   * Performance is monitored and logged if matching takes longer than 50ms.
+   *
+   * @param fingerprint - The element fingerprint to search for
+   * @returns The best matching HTML element if found with sufficient confidence,
+   *          null if no confident match is found
+   *
+   * @example
+   * ```typescript
+   * const generator = getElementFingerprintGenerator();
+   * const savedFingerprint = loadFromStorage();
+   * const element = generator.findElement(savedFingerprint);
+   * if (element) {
+   *   // Element found with high confidence
+   *   element.scrollIntoView();
+   * }
+   * ```
    */
   findElement(fingerprint: ElementFingerprint): HTMLElement | null {
     const startTime = performance.now();
@@ -118,12 +166,12 @@ export class ElementFingerprintGenerator {
     const duration = performance.now() - startTime;
 
     // Performance monitoring: Log slow fingerprint matching
-    if (duration > 50) {
+    if (duration > SLOW_MATCHING_THRESHOLD_MS) {
       warn('[ElementFingerprint] Slow fingerprint matching detected', {
         duration: `${duration.toFixed(2)}ms`,
         candidates: candidates.length,
         tagName,
-        threshold: '50ms'
+        threshold: `${String(SLOW_MATCHING_THRESHOLD_MS)}ms`
       });
     }
 
@@ -222,9 +270,9 @@ export class ElementFingerprintGenerator {
 
     // Get visible text content
     const textContent = element.textContent ? element.textContent.trim() : undefined;
-    if (textContent && textContent.length > 0 && textContent.length < 200) {
-      // Normalize whitespace and take first 50 chars
-      const normalized = textContent.replace(/\s+/g, ' ').substring(0, 50);
+    if (textContent && textContent.length > 0 && textContent.length < MAX_TEXT_CONTENT_LENGTH) {
+      // Normalize whitespace and take first N chars
+      const normalized = textContent.replace(/\s+/g, ' ').substring(0, MAX_NORMALIZED_TEXT_LENGTH);
       
       // Only use if not sensitive
       if (!SENSITIVE_PATTERNS.test(normalized)) {
@@ -299,9 +347,9 @@ export class ElementFingerprintGenerator {
       }
     }
 
-    // Limit to 10 attributes to keep fingerprint size reasonable
+    // Limit to N attributes to keep fingerprint size reasonable
     const limited: { [key: string]: string } = {};
-    const keys = Object.keys(attributes).slice(0, 10);
+    const keys = Object.keys(attributes).slice(0, MAX_STABLE_ATTRIBUTES);
     for (const key of keys) {
       limited[key] = attributes[key];
     }
@@ -325,16 +373,16 @@ export class ElementFingerprintGenerator {
       // Semantic classes are typically: lowercase, use dashes/underscores, meaningful words
       if (
         /^[a-z][a-z0-9_-]*$/.test(cls) && // lowercase start, simple chars
-        cls.length > 2 && // not too short
-        cls.length < 30 && // not too long
+        cls.length > MIN_SEMANTIC_CLASS_LENGTH && // not too short
+        cls.length < MAX_SEMANTIC_CLASS_LENGTH && // not too long
         !/^[a-z]{3,}-[0-9a-f]{5,}$/.test(cls) // not hash-based (e.g., css-1a2b3c)
       ) {
         semantic.push(cls);
       }
     }
 
-    // Return up to 5 most semantic classes
-    return semantic.length > 0 ? semantic.slice(0, 5) : undefined;
+    // Return up to N most semantic classes
+    return semantic.length > 0 ? semantic.slice(0, MAX_CLASS_PATTERNS) : undefined;
   }
 
   /**
@@ -458,14 +506,14 @@ export class ElementFingerprintGenerator {
 
     // Content matching
     if (fingerprint.content.textContent) {
-      const elementText = element.textContent ? element.textContent.trim().replace(/\s+/g, ' ').substring(0, 50) : undefined;
+      const elementText = element.textContent ? element.textContent.trim().replace(/\s+/g, ' ').substring(0, MAX_NORMALIZED_TEXT_LENGTH) : undefined;
       if (elementText === fingerprint.content.textContent) {
         score += MATCH_WEIGHTS.textContent;
       }
     }
 
     if (fingerprint.content.textHash) {
-      const elementText = element.textContent ? element.textContent.trim().replace(/\s+/g, ' ').substring(0, 50) : undefined;
+      const elementText = element.textContent ? element.textContent.trim().replace(/\s+/g, ' ').substring(0, MAX_NORMALIZED_TEXT_LENGTH) : undefined;
       if (elementText && this.simpleHash(elementText) === fingerprint.content.textHash) {
         score += MATCH_WEIGHTS.textHash;
       }
@@ -557,6 +605,20 @@ export class ElementFingerprintGenerator {
 // Export singleton instance
 let instance: ElementFingerprintGenerator | null = null;
 
+/**
+ * Get the singleton instance of the ElementFingerprintGenerator.
+ *
+ * This ensures only one generator instance exists across the application,
+ * which is important for consistent fingerprint generation and matching.
+ *
+ * @returns The singleton ElementFingerprintGenerator instance
+ *
+ * @example
+ * ```typescript
+ * const generator = getElementFingerprintGenerator();
+ * const fingerprint = generator.generate(element);
+ * ```
+ */
 export function getElementFingerprintGenerator(): ElementFingerprintGenerator {
   if (!instance) {
     instance = new ElementFingerprintGenerator();

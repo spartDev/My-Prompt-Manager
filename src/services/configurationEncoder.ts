@@ -291,13 +291,13 @@ const validateConfiguration = (config: CustomSiteConfiguration): ConfigurationVa
   if (!sanitizedConfig.hostname) {
     issues.push({
       field: 'hostname',
-      message: 'Hostname is required.',
+      message: 'Hostname is required. Please enter the domain name (e.g., "example.com") without protocol or path.',
       severity: 'error'
     });
   } else if (!HOSTNAME_PATTERN.test(sanitizedConfig.hostname)) {
     issues.push({
       field: 'hostname',
-      message: 'Hostname must be a valid public domain.',
+      message: 'Hostname must be a valid public domain (e.g., "example.com", "subdomain.example.com"). Do not include protocol (http://) or path (/page).',
       severity: 'error'
     });
   }
@@ -305,7 +305,7 @@ const validateConfiguration = (config: CustomSiteConfiguration): ConfigurationVa
   if (!sanitizedConfig.displayName) {
     issues.push({
       field: 'displayName',
-      message: 'Display name is required.',
+      message: 'Display name is required. Provide a friendly name for this site configuration (e.g., "My Custom Blog", "Company Portal").',
       severity: 'error'
     });
   }
@@ -318,13 +318,13 @@ const validateConfiguration = (config: CustomSiteConfiguration): ConfigurationVa
     if (!hasSelector && !hasFingerprint) {
       issues.push({
         field: 'positioning.selector',
-        message: 'Provide a selector or element fingerprint for positioning.',
+        message: 'Provide a CSS selector (e.g., "#submit-button", ".chat-input") or use the element picker to create a fingerprint. At least one is required for positioning.',
         severity: 'error'
       });
     } else if (hasSelector && !isSelectorSafe(selectorValue)) {
       issues.push({
         field: 'positioning.selector',
-        message: 'Selector contains unsafe characters or patterns.',
+        message: 'Selector contains unsafe characters or patterns. Use simple CSS selectors like "#id", ".class", or "tag[attribute]". Avoid script injection patterns.',
         severity: 'error'
       });
     }
@@ -352,7 +352,7 @@ const validateConfiguration = (config: CustomSiteConfiguration): ConfigurationVa
     if (!VALID_PLACEMENTS.includes(sanitizedConfig.positioning.placement)) {
       issues.push({
         field: 'positioning.placement',
-        message: 'Placement is not supported.',
+        message: `Placement must be one of: ${VALID_PLACEMENTS.join(', ')}. Choose where to position the icon relative to the target element.`,
         severity: 'error'
       });
     }
@@ -362,14 +362,14 @@ const validateConfiguration = (config: CustomSiteConfiguration): ConfigurationVa
       if (!Number.isFinite(x) || Math.abs(x) > 500) {
         issues.push({
           field: 'positioning.offset.x',
-          message: 'Offset X must be between -500 and 500.',
+          message: 'Offset X must be between -500 and 500 pixels. Use positive values to move right, negative to move left.',
           severity: 'error'
         });
       }
       if (!Number.isFinite(y) || Math.abs(y) > 500) {
         issues.push({
           field: 'positioning.offset.y',
-          message: 'Offset Y must be between -500 and 500.',
+          message: 'Offset Y must be between -500 and 500 pixels. Use positive values to move down, negative to move up.',
           severity: 'error'
         });
       }
@@ -380,7 +380,7 @@ const validateConfiguration = (config: CustomSiteConfiguration): ConfigurationVa
       if (!Number.isInteger(z) || z < 0 || z > 2147483647) {
         issues.push({
           field: 'positioning.zIndex',
-          message: 'Z-index must be an integer between 0 and 2147483647.',
+          message: 'Z-index must be an integer between 0 and 2147483647. Higher values appear above lower values. Try 999999 for most cases.',
           severity: 'error'
         });
       }
@@ -445,7 +445,7 @@ const encode = async (customSite: CustomSite): Promise<string> => {
 
 const decode = async (encodedString: string): Promise<CustomSiteConfiguration> => {
   if (!encodedString || encodedString.trim().length === 0) {
-    throw new ConfigurationEncoderError('Configuration code is empty', 'INVALID_FORMAT');
+    throw new ConfigurationEncoderError('Configuration code is empty. Please paste a valid configuration code from the sharing dialog.', 'INVALID_FORMAT');
   }
 
   let serialized: string | null;
@@ -457,7 +457,7 @@ const decode = async (encodedString: string): Promise<CustomSiteConfiguration> =
   }
 
   if (!serialized) {
-    throw new ConfigurationEncoderError('Invalid configuration code', 'INVALID_FORMAT');
+    throw new ConfigurationEncoderError('Invalid configuration code. The code may be corrupted or incomplete. Please copy the entire code from the sharing dialog.', 'INVALID_FORMAT');
   }
 
   let payload: EncodedCustomSitePayloadV1;
@@ -465,11 +465,11 @@ const decode = async (encodedString: string): Promise<CustomSiteConfiguration> =
     payload = JSON.parse(serialized) as EncodedCustomSitePayloadV1;
   } catch (error) {
     Logger.error('Failed to parse configuration payload', toError(error));
-    throw new ConfigurationEncoderError('Invalid configuration format', 'INVALID_FORMAT');
+    throw new ConfigurationEncoderError('Invalid configuration format. The configuration data is corrupted. Please request a new sharing code.', 'INVALID_FORMAT');
   }
 
   if (payload.v !== CURRENT_VERSION) {
-    throw new ConfigurationEncoderError('Unsupported configuration version', 'UNSUPPORTED_VERSION');
+    throw new ConfigurationEncoderError(`Unsupported configuration version (v${payload.v}). This code was created with a different version. Please create a new configuration or update the extension.`, 'UNSUPPORTED_VERSION');
   }
 
   // Early validation: Check fingerprint size before expensive checksum computation
@@ -502,7 +502,7 @@ const decode = async (encodedString: string): Promise<CustomSiteConfiguration> =
     const fallbackMatch = receivedChecksum === computeFallbackChecksum(canonicalBytes);
 
     if (!legacyMatch && !fallbackMatch) {
-      throw new ConfigurationEncoderError('Configuration checksum mismatch', 'CHECKSUM_FAILED');
+      throw new ConfigurationEncoderError('Configuration integrity check failed. The code may have been modified or corrupted during copying. Please copy the code again carefully.', 'CHECKSUM_FAILED');
     }
   }
 
