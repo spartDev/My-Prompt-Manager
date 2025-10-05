@@ -22,52 +22,61 @@ const ImportSection: FC<ImportSectionProps> = ({
   };
 
   return (
-    <div className="mb-4 p-4 bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700 rounded-xl">
-      <div className="flex items-center justify-between">
-        <div>
-          <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">Import Configuration</h4>
+    <div className="space-y-4">
+      {/* Configuration Code Card */}
+      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h5 className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Configuration Code</h5>
+          {value && (
+            <button
+              type="button"
+              onClick={onClear}
+              disabled={loading}
+              className="text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 disabled:text-gray-400 transition-colors"
+            >
+              Clear
+            </button>
+          )}
         </div>
-        {value && (
-          <button
-            type="button"
-            onClick={onClear}
-            disabled={loading}
-            className="text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 disabled:text-gray-400"
-          >
-            Clear
-          </button>
+
+        <textarea
+          value={value}
+          onChange={handleChange}
+          placeholder="Paste your configuration code here..."
+          rows={4}
+          className="w-full resize-y min-h-[120px] px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-mono focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+          aria-label="Encoded configuration string"
+        />
+
+        {error && (
+          <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+          </div>
         )}
+
+        <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+          Configuration codes are validated and sanitized before import to ensure security.
+        </p>
       </div>
 
-      <textarea
-        value={value}
-        onChange={handleChange}
-        placeholder="Enter configuration code here"
-        rows={3}
-        className="mt-3 w-full resize-y min-h-[96px] px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-        aria-label="Encoded configuration string"
-      />
-
-      {error && (
-        <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>
-      )}
-
-      <div className="mt-3 space-y-2">
+      {/* Action Buttons */}
+      <div className="flex flex-col gap-3">
         <button
           type="button"
           onClick={onPreview}
           disabled={loading || !value.trim()}
-          className={`w-full px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-            loading || !value.trim()
-              ? 'bg-purple-200 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 cursor-not-allowed'
-              : 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:from-purple-700 hover:to-indigo-700'
-          }`}
+          className="w-full px-4 py-2.5 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? 'Validating...' : 'Preview Configuration'}
         </button>
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          We will validate and sanitize configs before they are saved.
-        </p>
+        <button
+          type="button"
+          onClick={onClear}
+          disabled={loading}
+          className="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 underline transition-colors"
+        >
+          Cancel
+        </button>
       </div>
     </div>
   );
