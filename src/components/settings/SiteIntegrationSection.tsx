@@ -1052,7 +1052,7 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
               />
             </div>
           ) : (
-            !showAddSite && (
+            !showAddSite && !showAddMethodChooser && !showImportDrawer && (
               <>
                 <div className="text-center py-8 px-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600">
                   <svg className="w-12 h-12 mx-auto text-gray-400 dark:text-gray-500 mb-3" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
