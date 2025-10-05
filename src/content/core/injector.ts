@@ -1010,7 +1010,7 @@ export class PromptLibraryInjector {
               }
             }
           } catch (selectorError) {
-            warn('Invalid custom selector', { selector: customSelector, error: selectorError });
+            warn('Invalid custom selector', { selector: positioning.selector, error: selectorError });
           }
         }
 
