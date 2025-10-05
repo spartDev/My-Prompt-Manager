@@ -12,7 +12,7 @@ import { EventManager } from '../ui/event-manager';
 import { KeyboardNavigationManager } from '../ui/keyboard-navigation';
 import { DOMUtils } from '../utils/dom';
 import { getElementFingerprintGenerator } from '../utils/element-fingerprint';
-import { warn, error, debug, isDebugMode, refreshDebugMode } from '../utils/logger';
+import { warn, error, debug, info, isDebugMode, refreshDebugMode } from '../utils/logger';
 import { getPrompts, createPromptListItem, isSiteEnabled, getSettings, type ExtensionSettings, type CustomSite } from '../utils/storage';
 import { injectCSS } from '../utils/styles';
 import { ThemeManager } from '../utils/theme-manager';
@@ -948,7 +948,7 @@ export class PromptLibraryInjector {
                 } else {
                   debug('CSS Anchor positioning failed, trying Floating UI');
                   // Telemetry: Track fallback from CSS Anchor to Floating UI
-                  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+                   
                   info('[Telemetry] Positioning fallback', {
                     from: 'css-anchor',
                     fromTier: 0,
@@ -980,7 +980,7 @@ export class PromptLibraryInjector {
               // TIER 2: Try DOM insertion (fallback for Floating UI failures)
               if (!customPositioned) {
                 // Telemetry: Track fallback from Floating UI to DOM insertion
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+                 
                 info('[Telemetry] Positioning fallback', {
                   from: 'floating-ui',
                   fromTier: 1,
@@ -997,7 +997,7 @@ export class PromptLibraryInjector {
                 } else {
                   debug('DOM insertion failed, will try absolute positioning (Tier 3)');
                   // Telemetry: Track fallback from DOM insertion to absolute positioning
-                  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+                   
                   info('[Telemetry] Positioning fallback', {
                     from: 'dom-insertion',
                     fromTier: 2,
@@ -1136,7 +1136,7 @@ export class PromptLibraryInjector {
       });
 
       // Telemetry: Track positioning method usage
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+       
       info('[Telemetry] Positioning method used', {
         method: 'absolute',
         tier: 3,
@@ -1151,7 +1151,7 @@ export class PromptLibraryInjector {
       error('Failed to apply absolute positioning fallback', err as Error);
 
       // Telemetry: Track absolute positioning failure
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+       
       info('[Telemetry] Positioning method used', {
         method: 'absolute',
         tier: 3,
@@ -1261,7 +1261,7 @@ export class PromptLibraryInjector {
       });
 
       // Telemetry: Track positioning method usage
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+       
       info('[Telemetry] Positioning method used', {
         method: 'css-anchor',
         tier: 0,
@@ -1473,7 +1473,7 @@ export class PromptLibraryInjector {
       });
 
       // Telemetry: Track positioning method usage
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+       
       info('[Telemetry] Positioning method used', {
         method: 'floating-ui',
         tier: 1,
@@ -1591,7 +1591,7 @@ export class PromptLibraryInjector {
       });
 
       // Telemetry: Track positioning method usage
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+       
       info('[Telemetry] Positioning method used', {
         method: 'dom-insertion',
         tier: 2,
