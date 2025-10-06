@@ -138,7 +138,7 @@ const CategoryManager: FC<CategoryManagerProps> = ({
         }
         title="Manage Categories"
         subtitle="Organize your prompt collection"
-        onClose={onClose}
+        onBack={onClose}
       />
 
       {/* Content */}

@@ -90,10 +90,7 @@ const ViewHeader: FC<ViewHeaderProps> = ({
 
         {/* Action buttons */}
         <div className="flex items-center space-x-2">
-          {/* Custom actions slot */}
-          {actions}
-
-          {/* Back button */}
+          {/* Back button - positioned first for standard UX */}
           {onBack && (
             <button
               onClick={onBack}
@@ -106,6 +103,9 @@ const ViewHeader: FC<ViewHeaderProps> = ({
               </svg>
             </button>
           )}
+
+          {/* Custom actions slot */}
+          {actions}
 
           {/* Settings button */}
           {onSettings && (

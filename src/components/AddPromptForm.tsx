@@ -65,7 +65,7 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
         icon="add"
         title="Add New Prompt"
         subtitle="Create a reusable text snippet"
-        onClose={onCancel as () => void}
+        onBack={onCancel as () => void}
       />
 
       {/* Form */}

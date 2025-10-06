@@ -78,7 +78,7 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
         icon="edit"
         title="Edit Prompt"
         subtitle="Update your text snippet"
-        onClose={onCancel as () => void}
+        onBack={onCancel as () => void}
       />
 
       {/* Form */}
