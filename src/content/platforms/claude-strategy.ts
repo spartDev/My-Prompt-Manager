@@ -45,7 +45,7 @@ export class ClaudeStrategy extends PlatformStrategy {
       selectors: [
         'div[contenteditable="true"][role="textbox"].ProseMirror'
       ],
-      buttonContainerSelector: '.flex.gap-2, .flex.items-center.gap-2, .flex.gap-2.items-center',
+      buttonContainerSelector: '.relative.flex-1.flex.items-center.gap-2.shrink.min-w-0',
       priority: 100
     });
   }

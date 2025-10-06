@@ -782,27 +782,46 @@ export class PromptLibraryInjector {
       let injected = false;
 
       if (containerSelector) {
-        // For Claude, find the Research button and inject after it
+        // For Claude, find the clock/history button and inject after it
         if (this.state.hostname === 'claude.ai') {
-          // Look for Research button by its text content
-          const buttons = document.querySelectorAll('button');
-          let researchButtonContainer = null;
-          
-          for (const button of buttons) {
-            const textElement = button.querySelector('p');
-            if (!textElement) {
-              continue;
+          // Look for the toolbar container first
+          const toolbarContainer = document.querySelector(containerSelector);
+          let clockButtonContainer = null;
+
+          if (toolbarContainer) {
+            // Find all button containers within the toolbar
+            const buttonContainers = toolbarContainer.querySelectorAll('div.flex.shrink');
+
+            // The clock button is typically the last button before the empty flex spacer
+            // It contains an SVG with a specific clock icon path
+            for (const container of buttonContainers) {
+              const button = container.querySelector('button');
+              if (!button) {
+                continue;
+              }
+
+              // Check if this button has an SVG with the clock icon path
+              const svg = button.querySelector('svg');
+              if (svg) {
+                const path = svg.querySelector('path');
+                if (path) {
+                  const pathData = path.getAttribute('d');
+                  // Check for clock icon signature (path starts with coordinates around 10.38 or similar circle/clock pattern)
+                  if (pathData && (pathData.includes('M10.3857') || pathData.includes('M10 5.5'))) {
+                    clockButtonContainer = container;
+                    break;
+                  }
+                }
+              }
             }
 
-            const textContent = textElement.textContent;
-            if (textContent && textContent.trim() === 'Research') {
-              // Found the Research button, get its parent container
-              researchButtonContainer = button.closest('div.flex.shrink.min-w-8');
-              break;
+            // Fallback: if we couldn't find by SVG path, use the last button container before flex-row
+            if (!clockButtonContainer && buttonContainers.length > 0) {
+              clockButtonContainer = buttonContainers[buttonContainers.length - 1];
             }
           }
-          
-          if (researchButtonContainer && researchButtonContainer.parentElement) {
+
+          if (clockButtonContainer && clockButtonContainer.parentElement) {
             // Create a similar wrapper div structure for our button
             const buttonWrapper = document.createElement('div');
             buttonWrapper.className = 'flex shrink min-w-8 !shrink-0';
@@ -810,11 +829,11 @@ export class PromptLibraryInjector {
             buttonWrapper.style.opacity = '1';
             buttonWrapper.style.transform = 'none';
             buttonWrapper.appendChild(icon);
-            
-            // Insert after the Research button container
-            researchButtonContainer.parentElement.insertBefore(buttonWrapper, researchButtonContainer.nextSibling);
+
+            // Insert after the clock button container
+            clockButtonContainer.parentElement.insertBefore(buttonWrapper, clockButtonContainer.nextSibling);
             injected = true;
-            debug('Icon injected after Research button in Claude toolbar');
+            debug('Icon injected after clock/history button in Claude toolbar');
           }
         }
         
