@@ -307,13 +307,16 @@ describe('ViewHeader', () => {
       const header = container.querySelector('header');
 
       expect(header).toHaveClass('flex-shrink-0');
-      expect(header).toHaveClass('p-6');
       expect(header).toHaveClass('bg-white/80');
       expect(header).toHaveClass('dark:bg-gray-800/80');
       expect(header).toHaveClass('backdrop-blur-sm');
       expect(header).toHaveClass('border-b');
       expect(header).toHaveClass('border-purple-100');
       expect(header).toHaveClass('dark:border-gray-700');
+
+      // Padding is on inner div
+      const innerDiv = header?.querySelector('.p-6');
+      expect(innerDiv).toBeInTheDocument();
     });
 
     it('icon container has gradient background', () => {
@@ -411,6 +414,89 @@ describe('ViewHeader', () => {
           expect(svg).toHaveAttribute('aria-hidden', 'true');
         }
       });
+    });
+  });
+
+  describe('Children Slot', () => {
+    it('renders children when provided', () => {
+      render(
+        <ViewHeader title="Test">
+          <div data-testid="child-content">Child Content</div>
+        </ViewHeader>
+      );
+
+      expect(screen.getByTestId('child-content')).toBeInTheDocument();
+      expect(screen.getByText('Child Content')).toBeInTheDocument();
+    });
+
+    it('does not render children slot when not provided', () => {
+      const { container } = render(<ViewHeader title="Test" />);
+
+      // Check that the children wrapper div doesn't exist
+      const childrenWrapper = container.querySelector('.px-6.pb-6');
+      expect(childrenWrapper).not.toBeInTheDocument();
+    });
+
+    it('renders complex children content', () => {
+      const ComplexChild = () => (
+        <div>
+          <input data-testid="search-input" placeholder="Search..." />
+          <button data-testid="filter-button">Filter</button>
+        </div>
+      );
+
+      render(
+        <ViewHeader title="Test">
+          <ComplexChild />
+        </ViewHeader>
+      );
+
+      expect(screen.getByTestId('search-input')).toBeInTheDocument();
+      expect(screen.getByTestId('filter-button')).toBeInTheDocument();
+    });
+
+    it('children content is within header element', () => {
+      const { container } = render(
+        <ViewHeader title="Test">
+          <div data-testid="child-content">Child Content</div>
+        </ViewHeader>
+      );
+
+      const header = container.querySelector('header');
+      const childContent = screen.getByTestId('child-content');
+
+      expect(header).toContainElement(childContent);
+    });
+
+    it('children wrapper has correct padding classes', () => {
+      const { container } = render(
+        <ViewHeader title="Test">
+          <div>Child Content</div>
+        </ViewHeader>
+      );
+
+      const childrenWrapper = container.querySelector('.px-6.pb-6');
+      expect(childrenWrapper).toBeInTheDocument();
+      expect(childrenWrapper).toHaveClass('px-6');
+      expect(childrenWrapper).toHaveClass('pb-6');
+    });
+
+    it('maintains semantic structure with children', () => {
+      const { container } = render(
+        <ViewHeader title="Test">
+          <div role="search">
+            <input placeholder="Search..." />
+          </div>
+        </ViewHeader>
+      );
+
+      const header = container.querySelector('header');
+      const searchRegion = container.querySelector('[role="search"]');
+
+      expect(header).toBeInTheDocument();
+      expect(header).toHaveAttribute('role', 'banner');
+      expect(searchRegion).toBeInTheDocument();
+      expect(header).toContainElement(searchRegion);
     });
   });
 });

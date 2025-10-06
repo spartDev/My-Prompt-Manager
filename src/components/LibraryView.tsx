@@ -37,20 +37,17 @@ const LibraryView: FC<LibraryViewProps> = ({
 
   return (
     <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
-      <div className="flex-shrink-0">
-        <ViewHeader
-          icon="logo"
-          title="My Prompt Manager"
-          subtitle="Organize your creative prompts"
-          onSettings={() => { (onSettings as () => void)(); }}
-          onClose={context === 'sidepanel' ? () => { window.close(); } : undefined}
-          context={context}
-        />
-
+      {/* Header with Search and Filter */}
+      <ViewHeader
+        icon="logo"
+        title="My Prompt Manager"
+        subtitle="Organize your creative prompts"
+        onSettings={() => { (onSettings as () => void)(); }}
+        onClose={context === 'sidepanel' ? () => { window.close(); } : undefined}
+        context={context}
+      >
         {/* Search and Filter */}
-        <div className="p-6 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700">
-          <div className="space-y-4" role="search" aria-label="Search and filter prompts">
+        <div className="space-y-4" role="search" aria-label="Search and filter prompts">
           <div className="relative">
             <SearchBar
               value={query}
@@ -64,7 +61,7 @@ const LibraryView: FC<LibraryViewProps> = ({
               </div>
             )}
           </div>
-          
+
           <div className="flex items-center justify-between">
             <div role="group" aria-label="Filter by category">
               <CategoryFilter
@@ -74,7 +71,7 @@ const LibraryView: FC<LibraryViewProps> = ({
                 showAll={true}
               />
             </div>
-            
+
             <button
               onClick={onManageCategories as () => void}
               onKeyDown={(e) => {
@@ -91,8 +88,7 @@ const LibraryView: FC<LibraryViewProps> = ({
             </button>
           </div>
         </div>
-        </div>
-      </div>
+      </ViewHeader>
 
       {/* Content */}
       <main className={`flex-1 overflow-auto custom-scrollbar ${finalFilteredPrompts.length > 0 ? 'pb-24' : ''}`} aria-label="My Prompt Manager content">
