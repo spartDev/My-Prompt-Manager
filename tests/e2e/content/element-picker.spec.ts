@@ -48,7 +48,7 @@ test.describe('Element picker integration', () => {
     });
 
     await page.getByRole('button', { name: 'Add Your First Site' }).click();
-    await page.getByRole('button', { name: 'Add manually' }).click();
+    await page.getByRole('button', { name: /Manual Configuration/i }).click();
 
     await page.getByLabel('Website URL').fill('https://claude.ai/qa');
 
@@ -67,7 +67,8 @@ test.describe('Element picker integration', () => {
       });
     });
 
-    await expect(page.getByText('Selected Element')).toBeVisible();
-    await expect(page.getByText(/body/i)).toBeVisible();
+    // After element is picked, the positioning options should appear
+    await expect(page.getByLabel('Placement')).toBeVisible();
+    await expect(page.getByRole('combobox', { name: 'Placement' })).toBeVisible();
   });
 });
