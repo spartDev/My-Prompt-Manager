@@ -39,7 +39,10 @@ class ErrorBoundary extends Component<Props, State> {
     });
 
     // Log error for debugging
-    Logger.error('ErrorBoundary caught an error', error, { errorInfo: errorInfo.componentStack });
+    Logger.error('ErrorBoundary caught an error', error, {
+      component: 'ErrorBoundary',
+      errorInfo: errorInfo.componentStack
+    });
 
     // In a real app, you might want to send this to an error reporting service
     this.reportError(error, errorInfo);
@@ -56,7 +59,10 @@ class ErrorBoundary extends Component<Props, State> {
       userAgent: navigator.userAgent
     };
 
-    Logger.error('Error Report', new Error('Component error boundary triggered'), errorData);
+    Logger.error('Error Report', new Error('Component error boundary triggered'), {
+      component: 'ErrorBoundary',
+      ...errorData
+    });
   }
 
   private handleReload = () => {

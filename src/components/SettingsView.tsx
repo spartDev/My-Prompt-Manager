@@ -438,7 +438,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
             onSiteToggle={(hostname, enabled) => void handleSiteToggle(hostname, enabled)}
             onCustomSiteToggle={(hostname, enabled) => void handleCustomSiteToggle(hostname, enabled)}
             onRemoveCustomSite={(hostname) => void handleRemoveCustomSite(hostname)}
-            onAddCustomSite={(siteData) => void handleAddCustomSite(siteData)}
+            onAddCustomSite={(siteData) => void handleAddCustomSite(siteData as Omit<CustomSite, 'dateAdded'>)}
             saving={saving}
             onShowToast={showToast}
           />

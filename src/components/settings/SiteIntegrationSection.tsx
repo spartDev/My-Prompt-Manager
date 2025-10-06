@@ -19,7 +19,7 @@ interface SiteIntegrationSectionProps {
   onSiteToggle: (hostname: string, enabled: boolean) => Promise<void> | void;
   onCustomSiteToggle: (hostname: string, enabled: boolean) => Promise<void> | void;
   onRemoveCustomSite: (hostname: string) => Promise<void> | void;
-  onAddCustomSite?: (siteData: Omit<CustomSite, 'dateAdded'>) => Promise<void> | void;
+  onAddCustomSite?: (siteData: Omit<CustomSite, 'dateAdded'> & { positioning?: CustomSite['positioning'] }) => Promise<void> | void;
   onEditCustomSite?: (hostname: string) => void;
   interfaceMode?: 'popup' | 'sidepanel';
   saving?: boolean;
@@ -312,6 +312,7 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
           
           // Log for debugging
           Logger.debug('Element picker result received', {
+            component: 'SiteIntegrationSection',
             hasFingerprint: !!data.fingerprint,
             selector: data.selector
           });

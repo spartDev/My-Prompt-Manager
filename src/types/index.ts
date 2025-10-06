@@ -57,7 +57,7 @@ export interface CustomSite {
     description?: string;
     // For backward compatibility with existing signature-based system
     anchorId?: string;
-    signature?: ElementSignature;
+    signature?: unknown;
   };
 }
 

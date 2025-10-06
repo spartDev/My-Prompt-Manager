@@ -693,16 +693,16 @@ chrome.runtime.onMessage.addListener((message: BackgroundMessage, sender, sendRe
  * Handle manual injection requests from popup/side panel
  */
 async function handleRequestInjection(tabId: number | undefined, sendResponse: (response?: { success: boolean; error?: string }) => void) {
+  let targetTabId = tabId;
+
   try {
-    let targetTabId = tabId;
-    
     if (!targetTabId) {
       const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
       if (tabs.length > 0 && tabs[0]?.id) {
         targetTabId = tabs[0].id;
       }
     }
-    
+
     if (!targetTabId) {
       sendResponse({ success: false, error: 'No valid tab found' });
       return;

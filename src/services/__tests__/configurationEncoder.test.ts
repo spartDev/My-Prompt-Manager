@@ -53,7 +53,7 @@ const canonicalizeFingerprintForTest = (fingerprint: ElementFingerprint): Elemen
   for (const key of contextKeys) {
     const value = fingerprint.context[key];
     if (value !== undefined) {
-      canonical.context[key] = value;
+      (canonical.context as Record<string, string | number | undefined>)[key] = value;
     }
   }
 

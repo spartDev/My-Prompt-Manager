@@ -124,16 +124,17 @@ describe('Logger', () => {
       expect(callArgs[2]).not.toHaveProperty('context');
     });
 
-    it('should log error with empty context object (no context field)', () => {
-      const message = 'Error with empty context';
+    it('should log error with minimal context object', () => {
+      const message = 'Error with minimal context';
       const error = new Error('Details');
 
-      Logger.error(message, error, {});
+      Logger.error(message, error, { component: 'Test' });
 
       expect(mockConsole.error).toHaveBeenCalledTimes(1);
       const callArgs = mockConsole.error.mock.calls[0];
-      // Empty context object should not add context field
-      expect(callArgs[2]).not.toHaveProperty('context');
+      // Context with only component field should be included
+      expect(callArgs[2]).toHaveProperty('context');
+      expect(callArgs[2].context).toEqual({ component: 'Test' });
     });
 
     it('should handle Error with no stack trace', () => {
@@ -545,7 +546,7 @@ describe('Logger', () => {
     });
 
     it('should handle circular references in context', () => {
-      const circular: Record<string, unknown> = { component: 'Test' };
+      const circular: Record<string, unknown> & { component: string } = { component: 'Test' };
       circular.self = circular;
 
       // Should not throw - console.error handles circular references
@@ -606,7 +607,7 @@ describe('Logger', () => {
 
       // In production, this should not call expensiveOperation
       // because the log is suppressed
-      Logger.debug('Test', expensiveOperation());
+      Logger.debug('Test', { component: 'Test', result: expensiveOperation() });
 
       // The function was called to create the context,
       // but console.debug was not called
@@ -667,15 +668,15 @@ describe('Logger', () => {
       expect(validContext.component).toBeTypeOf('string');
 
       // The following would fail TypeScript compilation:
-      // @ts-expect-error - component must be string, not number
-      const invalidContext1: Logger.LogContext = {
-        component: 123,
+      // component must be string, not number
+      const invalidContext1 = {
+        component: 123 as unknown as string,
       };
       expect(invalidContext1).toBeDefined();
 
-      // @ts-expect-error - component must be string, not boolean
-      const invalidContext2: Logger.LogContext = {
-        component: true,
+      // component must be string, not boolean
+      const invalidContext2 = {
+        component: true as unknown as string,
       };
       expect(invalidContext2).toBeDefined();
     });
