@@ -210,6 +210,41 @@ Always include a `component` field to identify the source:
 }
 ```
 
+### Visual Design Guidelines
+
+**CRITICAL**: When creating or modifying UI components, you MUST follow the design guidelines in `docs/DESIGN_GUIDELINES.md`.
+
+**Quick Reference:**
+- **Colors**: Use purple-indigo gradient for primary actions, predefined status colors (green/red/yellow/blue)
+- **Typography**: system-ui font stack, text-sm (14px) for body, font-semibold for emphasis
+- **Spacing**: Use p-5 for cards, p-6 for containers, space-x-3 for button groups
+- **Borders**: rounded-xl (12px) for all cards, inputs, buttons
+- **Effects**: backdrop-blur-sm with semi-transparent backgrounds (bg-white/70 dark:bg-gray-800/70)
+- **Dark Mode**: MUST include dark: variants for all styles
+- **Focus States**: Use predefined classes (.focus-primary, .focus-input, .focus-interactive)
+- **Transitions**: transition-all duration-200 for smooth interactions
+
+**Complete Guidelines:** See `docs/DESIGN_GUIDELINES.md` for:
+- Complete color palette and usage patterns
+- Typography system and font guidelines
+- Component patterns (buttons, inputs, cards, modals)
+- Animation and transition specifications
+- Dark mode implementation details
+- Accessibility requirements
+
+**Example Primary Button:**
+```tsx
+<button className="
+  px-6 py-3 text-sm font-semibold text-white
+  bg-gradient-to-r from-purple-600 to-indigo-600
+  rounded-xl hover:from-purple-700 hover:to-indigo-700
+  transition-all duration-200 shadow-lg hover:shadow-xl
+  disabled:opacity-50 focus-primary
+">
+  Save Prompt
+</button>
+```
+
 ### Modifying Content Scripts
 - Content scripts bundle separately from popup
 - Use `@content` alias for imports within content script
