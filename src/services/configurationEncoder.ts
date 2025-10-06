@@ -109,7 +109,7 @@ const canonicalizeFingerprint = (fingerprint: ElementFingerprint): ElementFinger
   for (const key of contextKeys) {
     const value = fingerprint.context[key];
     if (value !== undefined) {
-      canonical.context[key] = value;
+      (canonical.context as Record<string, string | number | undefined>)[key] = value;
     }
   }
 
@@ -207,7 +207,7 @@ const computeFallbackChecksum = (data: Uint8Array): string => {
 const computeChecksumFromBytes = async (data: Uint8Array): Promise<string> => {
   const subtle = getSubtleCrypto();
   if (subtle) {
-    const digest = await subtle.digest('SHA-256', data);
+    const digest = await subtle.digest('SHA-256', data as BufferSource);
     return arrayBufferToHex(digest).slice(0, CHECKSUM_LENGTH);
   }
 

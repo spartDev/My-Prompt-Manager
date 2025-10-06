@@ -235,7 +235,7 @@ const sanitizePositioning = (positioning: CustomSitePositioning): CustomSitePosi
     delete sanitized.offset;
   }
 
-  if (sanitized.selector.length === 0) {
+  if (sanitized.selector && sanitized.selector.length === 0) {
     // Don't delete selector as it's required, set to empty string instead
     sanitized.selector = '';
   }

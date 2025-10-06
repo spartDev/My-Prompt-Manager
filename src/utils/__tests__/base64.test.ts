@@ -236,7 +236,7 @@ describe('base64 utilities', () => {
       const encoded = encodeObjectToBase64UrlSafe(config);
       expect(isValidBase64UrlSafe(encoded)).toBe(true);
 
-      const decoded = decodeObjectFromBase64UrlSafe<typeof config>(encoded);
+      const decoded = decodeObjectFromBase64UrlSafe(encoded) as typeof config;
       expect(decoded).toEqual(config);
     });
 
@@ -252,7 +252,7 @@ describe('base64 utilities', () => {
       const encoded = encodeObjectToBase64UrlSafe(largeObj);
       expect(isValidBase64UrlSafe(encoded)).toBe(true);
 
-      const decoded = decodeObjectFromBase64UrlSafe<typeof largeObj>(encoded);
+      const decoded = decodeObjectFromBase64UrlSafe(encoded) as typeof largeObj;
       expect(decoded).toEqual(largeObj);
     });
 
@@ -266,7 +266,7 @@ describe('base64 utilities', () => {
       const encoded = encodeObjectToBase64UrlSafe(obj);
       expect(isValidBase64UrlSafe(encoded)).toBe(true);
 
-      const decoded = decodeObjectFromBase64UrlSafe<typeof obj>(encoded);
+      const decoded = decodeObjectFromBase64UrlSafe(encoded) as typeof obj;
       expect(decoded).toEqual(obj);
     });
   });
@@ -314,6 +314,9 @@ describe('base64 utilities', () => {
       expect(extractedConfig).toBe(encoded);
       expect(extractedConfig).toBeTruthy();
 
+      if (!extractedConfig) {
+        throw new Error('extractedConfig is null');
+      }
       const decoded = decodeObjectFromBase64UrlSafe(extractedConfig) as typeof config;
       expect(decoded).toEqual(config);
     });

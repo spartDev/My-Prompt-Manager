@@ -6,6 +6,7 @@
  * all the modular components.
  */
 
+import type { ElementFingerprint } from '../../types/index';
 import type { Prompt, InsertionResult } from '../types/index';
 import { UIElementFactory } from '../ui/element-factory';
 import { EventManager } from '../ui/event-manager';
@@ -898,7 +899,7 @@ export class PromptLibraryInjector {
       if (!injected) {
         let customPositioned = false;
 
-        const positioning = customConfig?.positioning;
+        const positioning = customConfig?.positioning as (NonNullable<typeof customConfig>['positioning'] & { fingerprint?: ElementFingerprint; anchorId?: string }) | undefined;
         if (positioning) {
           try {
             let referenceElement: HTMLElement | null = null;
@@ -907,17 +908,17 @@ export class PromptLibraryInjector {
             if (positioning.fingerprint &&
                 typeof positioning.fingerprint === 'object' &&
                 'meta' in positioning.fingerprint) {
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+               
               const fpData = positioning.fingerprint;
               const fingerprintGenerator = getElementFingerprintGenerator();
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+               
               referenceElement = fingerprintGenerator.findElement(fpData);
 
               if (referenceElement) {
                 debug('Found element using fingerprint matching', {
                   tag: referenceElement.tagName,
                   id: referenceElement.id,
-                  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+                   
                   confidence: fpData.meta.confidence
                 });
               } else {
@@ -957,7 +958,7 @@ export class PromptLibraryInjector {
               const supportsCSSAnchor = DOMUtils.supportsCSSAnchorPositioning();
 
               if (supportsCSSAnchor) {
-                customPositioned = this.positionIconWithCSSAnchor(icon, referenceElement, customConfig);
+                customPositioned = customConfig ? this.positionIconWithCSSAnchor(icon, referenceElement, customConfig) : false;
                 if (customPositioned) {
                   debug('Icon positioned successfully with CSS Anchor (Tier 0 - Native)', {
                     browser: 'chrome-125+',
@@ -984,7 +985,7 @@ export class PromptLibraryInjector {
               // Works on Chrome 114+, Firefox, older Safari
               // OPTIMIZATION: Only load Floating UI (14KB) when CSS Anchor API is unavailable
               try {
-                customPositioned = await this.positionIconWithFloatingUI(icon, referenceElement, customConfig);
+                customPositioned = customConfig ? await this.positionIconWithFloatingUI(icon, referenceElement, customConfig) : false;
                 if (customPositioned) {
                   debug('Icon positioned successfully with Floating UI (Tier 1)', {
                     browser: 'chrome-114-124 or firefox/safari',
@@ -1009,7 +1010,7 @@ export class PromptLibraryInjector {
                   url: window.location.hostname
                 });
 
-                customPositioned = this.positionCustomIcon(icon, referenceElement, customConfig);
+                customPositioned = customConfig ? this.positionCustomIcon(icon, referenceElement, customConfig) : false;
                 if (customPositioned) {
                   debug('Icon positioned successfully with DOM insertion (Tier 2)');
                   return; // Exit here - positioning is complete
@@ -1206,13 +1207,13 @@ export class PromptLibraryInjector {
         return false;
       }
 
-      const { placement, offset = { x: 0, y: 0 }, zIndex = 999999, anchorId } = customConfig.positioning;
+      const { placement, offset = { x: 0, y: 0 }, zIndex = 999999, anchorId } = customConfig.positioning as typeof customConfig.positioning & { anchorId?: string };
 
       // Use existing data-mpm-anchor if present, otherwise use config anchorId or generate new
       const existingAnchorId: string | null = referenceElement.getAttribute('data-mpm-anchor');
       const fallbackAnchorId = `mpm-${String(Date.now())}-${Math.random().toString(36).substring(2, 9)}`;
       // ESLint is confused about the type here, but TypeScript knows anchorId is string | undefined
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+       
       const trackingAnchorId: string = existingAnchorId ?? anchorId ?? fallbackAnchorId;
 
       // Generate a unique CSS anchor name for this element
