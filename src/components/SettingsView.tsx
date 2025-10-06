@@ -15,6 +15,7 @@ import AppearanceSection from './settings/AppearanceSection';
 import DataStorageSection from './settings/DataStorageSection';
 import NotificationSection from './settings/NotificationSection';
 import SiteIntegrationSection from './settings/SiteIntegrationSection';
+import ViewHeader from './ViewHeader';
 
 interface SiteConfig {
   name: string;
@@ -395,26 +396,12 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
   return (
     <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900">
       {/* Header */}
-      <header className="flex-shrink-0 p-6 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={onBack}
-              className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors focus-interactive"
-              title="Back to library"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path d="M19 12H5M12 19l-7-7 7-7"/>
-              </svg>
-            </button>
-            <div className="w-px h-8 bg-gray-200 dark:bg-gray-700" />
-            <div>
-              <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 leading-tight">Settings</h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Customize your experience</p>
-            </div>
-          </div>
-        </div>
-      </header>
+      <ViewHeader
+        icon="settings"
+        title="Settings"
+        subtitle="Customize your experience"
+        onBack={onBack}
+      />
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-6">
