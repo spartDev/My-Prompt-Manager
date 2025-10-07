@@ -28,6 +28,14 @@ export interface ViewHeaderProps {
   children?: ReactNode;
 }
 
+// Icon map for predefined icon types
+const ICON_MAP: Record<IconType, ReactElement> = {
+  logo: <LogoIcon />,
+  add: <AddIcon />,
+  edit: <EditIcon />,
+  settings: <SettingsIcon />
+};
+
 const ViewHeader: FC<ViewHeaderProps> = ({
   icon = 'logo',
   title,
@@ -42,28 +50,9 @@ const ViewHeader: FC<ViewHeaderProps> = ({
 }) => {
   // Render icon based on type
   const renderIcon = () => {
-    let iconElement: ReactElement;
-
-    if (typeof icon === 'string') {
-      switch (icon) {
-        case 'logo':
-          iconElement = <LogoIcon />;
-          break;
-        case 'add':
-          iconElement = <AddIcon />;
-          break;
-        case 'edit':
-          iconElement = <EditIcon />;
-          break;
-        case 'settings':
-          iconElement = <SettingsIcon />;
-          break;
-        default:
-          iconElement = <LogoIcon />;
-      }
-    } else {
-      iconElement = icon;
-    }
+    const iconElement = typeof icon === 'string'
+      ? ICON_MAP[icon]
+      : icon;
 
     return (
       <div
