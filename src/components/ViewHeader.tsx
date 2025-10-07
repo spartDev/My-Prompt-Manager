@@ -123,7 +123,15 @@ const CloseButton: FC<CloseButtonProps> = ({ onClick, context = 'popup', disable
   );
 };
 
-const ViewHeader: FC<ViewHeaderProps> = ({
+// Define the component with subcomponent types
+interface ViewHeaderComponent extends FC<ViewHeaderProps> {
+  Actions: FC<ActionsProps>;
+  BackButton: FC<BackButtonProps>;
+  SettingsButton: FC<SettingsButtonProps>;
+  CloseButton: FC<CloseButtonProps>;
+}
+
+const ViewHeaderFC: FC<ViewHeaderProps> = ({
   icon = 'logo',
   title,
   subtitle,
@@ -271,7 +279,8 @@ const ViewHeader: FC<ViewHeaderProps> = ({
   );
 };
 
-// Attach subcomponents to main component
+// Attach subcomponents to main component and cast to ViewHeaderComponent
+const ViewHeader = ViewHeaderFC as ViewHeaderComponent;
 ViewHeader.Actions = Actions;
 ViewHeader.BackButton = BackButton;
 ViewHeader.SettingsButton = SettingsButton;

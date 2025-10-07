@@ -42,10 +42,14 @@ const LibraryView: FC<LibraryViewProps> = ({
         icon="logo"
         title="My Prompt Manager"
         subtitle="Organize your creative prompts"
-        onSettings={() => { (onSettings as () => void)(); }}
-        onClose={context === 'sidepanel' ? () => { window.close(); } : undefined}
         context={context}
       >
+        <ViewHeader.Actions>
+          <ViewHeader.SettingsButton onClick={() => { (onSettings as () => void)(); }} />
+          {context === 'sidepanel' && (
+            <ViewHeader.CloseButton onClick={() => { window.close(); }} context="sidepanel" />
+          )}
+        </ViewHeader.Actions>
         {/* Search and Filter */}
         <div className="space-y-4" role="search" aria-label="Search and filter prompts">
           <div className="relative">

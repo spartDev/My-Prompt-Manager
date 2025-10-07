@@ -491,7 +491,7 @@ describe('ViewHeader', () => {
       );
 
       const header = container.querySelector('header');
-      const searchRegion = container.querySelector('[role="search"]');
+      const searchRegion = container.querySelector('[role="search"]') as HTMLElement;
 
       expect(header).toBeInTheDocument();
       expect(header).toHaveAttribute('role', 'banner');

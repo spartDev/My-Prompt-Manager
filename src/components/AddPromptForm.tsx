@@ -65,8 +65,11 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
         icon="add"
         title="Add New Prompt"
         subtitle="Create a reusable text snippet"
-        onBack={onCancel as () => void}
-      />
+      >
+        <ViewHeader.Actions>
+          <ViewHeader.BackButton onClick={onCancel as () => void} />
+        </ViewHeader.Actions>
+      </ViewHeader>
 
       {/* Form */}
       <div className="flex-1 overflow-auto custom-scrollbar">

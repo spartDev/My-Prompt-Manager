@@ -400,8 +400,11 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
         icon="settings"
         title="Settings"
         subtitle="Customize your experience"
-        onBack={onBack}
-      />
+      >
+        <ViewHeader.Actions>
+          <ViewHeader.BackButton onClick={onBack} />
+        </ViewHeader.Actions>
+      </ViewHeader>
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-6">

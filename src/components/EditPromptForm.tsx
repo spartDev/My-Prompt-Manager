@@ -78,8 +78,11 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
         icon="edit"
         title="Edit Prompt"
         subtitle="Update your text snippet"
-        onBack={onCancel as () => void}
-      />
+      >
+        <ViewHeader.Actions>
+          <ViewHeader.BackButton onClick={onCancel as () => void} />
+        </ViewHeader.Actions>
+      </ViewHeader>
 
       {/* Form */}
       <div className="flex-1 overflow-auto custom-scrollbar">

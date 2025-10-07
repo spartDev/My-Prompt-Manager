@@ -138,8 +138,11 @@ const CategoryManager: FC<CategoryManagerProps> = ({
         }
         title="Manage Categories"
         subtitle="Organize your prompt collection"
-        onBack={onClose}
-      />
+      >
+        <ViewHeader.Actions>
+          <ViewHeader.BackButton onClick={onClose} />
+        </ViewHeader.Actions>
+      </ViewHeader>
 
       {/* Content */}
       <div className="flex-1 overflow-auto">
