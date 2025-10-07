@@ -174,7 +174,7 @@ test.describe('User Journey: Power User Prompt Management & Organization', () =>
     await expect(sidepanelPage.getByText('Work')).toBeHidden();
 
     // Close category manager and verify prompts updated
-    const closeButton = sidepanelPage.locator('button').filter({ has: sidepanelPage.locator('path[d="M6 18L18 6M6 6l12 12"]') }).first();
+    const closeButton = sidepanelPage.locator('button').filter({ has: sidepanelPage.locator('path[d="M10 19l-7-7m0 0l7-7m-7 7h18"]') }).first();
     await expect(closeButton).toBeVisible();
     await closeButton.click();
 
@@ -237,7 +237,7 @@ test.describe('User Journey: Power User Prompt Management & Organization', () =>
     // Verify Marketing category removed
     await expect(sidepanelPage.getByText('Marketing')).toBeHidden();
 
-    const closeButton2 = sidepanelPage.locator('button').filter({ has: sidepanelPage.locator('path[d="M6 18L18 6M6 6l12 12"]') }).first();
+    const closeButton2 = sidepanelPage.locator('button').filter({ has: sidepanelPage.locator('path[d="M10 19l-7-7m0 0l7-7m-7 7h18"]') }).first();
     await expect(closeButton2).toBeVisible();
     await closeButton2.click();
 
