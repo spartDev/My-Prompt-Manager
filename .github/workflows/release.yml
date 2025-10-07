@@ -137,7 +137,7 @@ jobs:
           npm audit --audit-level=moderate
 
       - name: 🔍 CodeQL Analysis
-        uses: github/codeql-action/analyze@3599b3baa15b485a2e49ef411a7a4bb2452e7f93 # v3
+        uses: github/codeql-action/analyze@64d10c13136e1c5bce3e5fbde8d4906eeaafc885 # v3
         if: success() || failure()
         continue-on-error: true
 
@@ -332,7 +332,7 @@ jobs:
 
       - name: 🏷️ Create GitHub Release
         id: create-release
-        uses: softprops/action-gh-release@6cbd405e2c4e67a21c47fa9e383d020e4e28b836 # v2
+        uses: softprops/action-gh-release@aec2ec56f94eb8180ceec724245f64ef008b89f5 # v2
         with:
           tag_name: v${{ needs.validate-release.outputs.version }}
           name: Chrome Extension v${{ needs.validate-release.outputs.version }}
