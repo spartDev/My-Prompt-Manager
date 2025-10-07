@@ -385,7 +385,12 @@ test.describe('User Journey: Power User Prompt Management & Organization', () =>
     console.log('[TEST] Power User Journey completed successfully!');
 
     // Navigate back to library view for final verification
-    await sidepanelPage.getByRole('button', { name: 'Library' }).click();
+    // Use back button since views no longer have "Library" navigation button
+    const backButton = sidepanelPage.locator('button').filter({
+      has: sidepanelPage.locator('path[d="M10 19l-7-7m0 0l7-7m-7 7h18"]')
+    });
+    await expect(backButton).toBeVisible();
+    await backButton.click();
     // Wait for the prompt list to become visible again
     await expect(sidepanelPage.locator('article').first()).toBeVisible();
 
