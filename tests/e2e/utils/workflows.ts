@@ -127,12 +127,13 @@ export const categoryWorkflows = {
 
   /**
    * Close category manager and return to library
+   * CategoryManager uses a Back button, not a Close button
    */
   closeManager: async (page: Page): Promise<void> => {
     const selectors = createSelectors(page);
-    const closeButton = selectors.closeButton();
-    await expect(closeButton).toBeVisible();
-    await closeButton.click();
+    const backButton = selectors.backButton();
+    await expect(backButton).toBeVisible();
+    await backButton.click();
     await assertions.navigation.onLibraryPage(page);
   },
 
@@ -256,9 +257,13 @@ export const navigationWorkflows = {
 
   /**
    * Navigate to library and verify
+   * Uses back button since views no longer have "Library" navigation button
    */
   toLibrary: async (page: Page): Promise<void> => {
-    await page.getByRole('button', { name: 'Library' }).click();
+    const selectors = createSelectors(page);
+    const backButton = selectors.backButton();
+    await expect(backButton).toBeVisible();
+    await backButton.click();
     await assertions.navigation.onLibraryPage(page);
   },
 

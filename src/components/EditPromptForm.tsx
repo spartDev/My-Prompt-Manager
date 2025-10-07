@@ -4,6 +4,8 @@ import type { FC, FormEvent } from 'react';
 import { Category } from '../types';
 import { EditPromptFormProps } from '../types/components';
 
+import ViewHeader from './ViewHeader';
+
 const EditPromptForm: FC<EditPromptFormProps> = ({
   prompt,
   categories,
@@ -72,37 +74,15 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
   return (
     <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900">
       {/* Header */}
-      <div className="flex-shrink-0 p-6 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Edit Prompt</h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400 dark:text-gray-400">Update your text snippet</p>
-            </div>
-          </div>
-          <button
-            onClick={onCancel as () => void}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                (onCancel as () => void)();
-              }
-            }}
-            className="text-gray-400 dark:text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 p-2 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors focus-interactive disabled:opacity-50"
-            disabled={isLoading}
-            aria-label="Cancel and close form"
-          >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-      </div>
+      <ViewHeader
+        icon="edit"
+        title="Edit Prompt"
+        subtitle="Update your text snippet"
+      >
+        <ViewHeader.Actions>
+          <ViewHeader.BackButton onClick={onCancel as () => void} />
+        </ViewHeader.Actions>
+      </ViewHeader>
 
       {/* Form */}
       <div className="flex-1 overflow-auto custom-scrollbar">

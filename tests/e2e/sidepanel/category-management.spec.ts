@@ -471,7 +471,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
 
       // Go back to main view to verify prompts moved to Uncategorized
       // Find and click the X button in the category manager header
-      const closeButton = sidepanelPage.locator('button').filter({ has: sidepanelPage.locator('path[d="M6 18L18 6M6 6l12 12"]') });
+      const closeButton = sidepanelPage.locator('button').filter({ has: sidepanelPage.locator('path[d="M10 19l-7-7m0 0l7-7m-7 7h18"]') });
       await closeButton.click();
       await expect(sidepanelPage.getByRole('heading', { name: 'My Prompt Manager' })).toBeVisible();
 
@@ -545,7 +545,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
         await expect(sidepanelPage.getByText('Research')).toBeHidden();
 
         // Go back to main view
-        const closeButton = sidepanelPage.locator('button').filter({ has: sidepanelPage.locator('path[d="M6 18L18 6M6 6l12 12"]') }).first();
+        const closeButton = sidepanelPage.locator('button').filter({ has: sidepanelPage.locator('path[d="M10 19l-7-7m0 0l7-7m-7 7h18"]') }).first();
         await closeButton.click();
         await expect(sidepanelPage.getByRole('heading', { name: 'My Prompt Manager' })).toBeVisible();
 
@@ -704,7 +704,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
         await editInput.press('Enter');
 
         // Go back to main view
-        const closeButton = sidepanelPage.locator('button').filter({ has: sidepanelPage.locator('path[d="M6 18L18 6M6 6l12 12"]') }).first();
+        const closeButton = sidepanelPage.locator('button').filter({ has: sidepanelPage.locator('path[d="M10 19l-7-7m0 0l7-7m-7 7h18"]') }).first();
         await closeButton.click();
 
         // Verify category filter dropdown now shows "Programming" instead of "Development"
@@ -876,7 +876,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
         await expect(sidepanelPage.getByRole('heading', { name: 'Manage Categories' })).toBeVisible();
 
         // Find and click the close button
-        const closeButton = sidepanelPage.locator('button').filter({ has: sidepanelPage.locator('path[d="M6 18L18 6M6 6l12 12"]') }).first();
+        const closeButton = sidepanelPage.locator('button').filter({ has: sidepanelPage.locator('path[d="M10 19l-7-7m0 0l7-7m-7 7h18"]') }).first();
         await expect(closeButton).toBeVisible();
         await closeButton.click();
 
@@ -1281,7 +1281,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
         await expect(deleteButton).toBeVisible();
 
         // Verify close button has proper labeling
-        const closeButton = sidepanelPage.locator('button').filter({ has: sidepanelPage.locator('path[d="M6 18L18 6M6 6l12 12"]') }).first();
+        const closeButton = sidepanelPage.locator('button').filter({ has: sidepanelPage.locator('path[d="M10 19l-7-7m0 0l7-7m-7 7h18"]') }).first();
         await expect(closeButton).toBeVisible();
       });
     });

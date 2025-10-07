@@ -7,6 +7,7 @@ import { Logger, toError } from '../utils';
 
 import ColorPicker from './ColorPicker';
 import ConfirmDialog from './ConfirmDialog';
+import ViewHeader from './ViewHeader';
 
 interface CategoryManagerProps {
   categories: Category[];
@@ -129,30 +130,19 @@ const CategoryManager: FC<CategoryManagerProps> = ({
   return (
     <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900">
       {/* Header */}
-      <div className="flex-shrink-0 p-6 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-              </svg>
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Manage Categories</h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400 dark:text-gray-500">Organize your prompt collection</p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 dark:text-gray-500 dark:text-gray-500 hover:text-purple-600 dark:hover:text-purple-400 dark:hover:text-purple-400 p-2 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors"
-            disabled={loading}
-          >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-      </div>
+      <ViewHeader
+        icon={
+          <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+          </svg>
+        }
+        title="Manage Categories"
+        subtitle="Organize your prompt collection"
+      >
+        <ViewHeader.Actions>
+          <ViewHeader.BackButton onClick={onClose} />
+        </ViewHeader.Actions>
+      </ViewHeader>
 
       {/* Content */}
       <div className="flex-1 overflow-auto">

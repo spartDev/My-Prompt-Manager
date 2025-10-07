@@ -20,9 +20,12 @@ export class CategoryManagerPage extends BasePage {
 
   /**
    * Close category manager and return to library
+   * CategoryManager uses a Back button, not a Close button
    */
   async closeToLibrary(): Promise<void> {
-    await this.closeModal();
+    const backButton = this.getBackButton();
+    await expect(backButton).toBeVisible();
+    await backButton.click();
     await expect(this.page.getByRole('heading', { name: 'My Prompt Manager' })).toBeVisible();
   }
 

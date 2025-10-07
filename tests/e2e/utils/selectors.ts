@@ -72,6 +72,7 @@ export const SELECTORS = {
   // Common UI patterns
   common: {
     closeButtonSvg: 'button:has(path[d="M6 18L18 6M6 6l12 12"])',
+    backButtonSvg: 'button:has(path[d="M10 19l-7-7m0 0l7-7m-7 7h18"])',
     promptCards: 'article',
     moreActionsButton: 'button[name="More actions"]',
     loadingSpinner: '[class*="spinner"], [class*="loading"]',
@@ -109,11 +110,19 @@ export const createSelectors = (page: Page) => ({
     page.locator('article').filter({ hasText: title }).first(),
 
   /**
-   * Get close button using standard SVG path
+   * Get close button using standard X icon SVG path
    */
   closeButton: () =>
     page.locator('button').filter({
       has: page.locator('path[d="M6 18L18 6M6 6l12 12"]')
+    }).first(),
+
+  /**
+   * Get back button using standard arrow icon SVG path
+   */
+  backButton: () =>
+    page.locator('button').filter({
+      has: page.locator('path[d="M10 19l-7-7m0 0l7-7m-7 7h18"]')
     }).first(),
 
   /**

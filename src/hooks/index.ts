@@ -4,3 +4,4 @@ export { useClipboard } from './useClipboard';
 export { useSearch } from './useSearch';
 export { useSearchWithDebounce } from './useSearchWithDebounce';
 export { useToast } from './useToast';
+export { useExtensionContext } from './useExtensionContext';
