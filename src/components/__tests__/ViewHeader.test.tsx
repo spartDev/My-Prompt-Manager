@@ -499,4 +499,287 @@ describe('ViewHeader', () => {
       expect(header).toContainElement(searchRegion);
     });
   });
+
+  describe('Composable API', () => {
+    describe('ViewHeader.Actions', () => {
+      it('renders with composable Actions component', () => {
+        const onBack = vi.fn();
+
+        render(
+          <ViewHeader title="Test">
+            <ViewHeader.Actions>
+              <ViewHeader.BackButton onClick={onBack} />
+            </ViewHeader.Actions>
+          </ViewHeader>
+        );
+
+        expect(screen.getByRole('button', { name: /go back/i })).toBeInTheDocument();
+      });
+
+      it('separates Actions from other children', () => {
+        const onBack = vi.fn();
+
+        render(
+          <ViewHeader title="Test">
+            <div data-testid="search-content">Search Bar</div>
+            <ViewHeader.Actions>
+              <ViewHeader.BackButton onClick={onBack} />
+            </ViewHeader.Actions>
+          </ViewHeader>
+        );
+
+        expect(screen.getByTestId('search-content')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /go back/i })).toBeInTheDocument();
+      });
+    });
+
+    describe('ViewHeader.BackButton', () => {
+      it('renders back button with composable API', () => {
+        const onBack = vi.fn();
+
+        render(
+          <ViewHeader title="Test">
+            <ViewHeader.Actions>
+              <ViewHeader.BackButton onClick={onBack} />
+            </ViewHeader.Actions>
+          </ViewHeader>
+        );
+
+        expect(screen.getByRole('button', { name: /go back/i })).toBeInTheDocument();
+      });
+
+      it('calls onClick when clicked', async () => {
+        const user = userEvent.setup();
+        const onBack = vi.fn();
+
+        render(
+          <ViewHeader title="Test">
+            <ViewHeader.Actions>
+              <ViewHeader.BackButton onClick={onBack} />
+            </ViewHeader.Actions>
+          </ViewHeader>
+        );
+
+        await user.click(screen.getByRole('button', { name: /go back/i }));
+        expect(onBack).toHaveBeenCalledTimes(1);
+      });
+
+      it('supports disabled state', () => {
+        const onBack = vi.fn();
+
+        render(
+          <ViewHeader title="Test">
+            <ViewHeader.Actions>
+              <ViewHeader.BackButton onClick={onBack} disabled />
+            </ViewHeader.Actions>
+          </ViewHeader>
+        );
+
+        const button = screen.getByRole('button', { name: /go back/i });
+        expect(button).toBeDisabled();
+      });
+    });
+
+    describe('ViewHeader.SettingsButton', () => {
+      it('renders settings button with composable API', () => {
+        const onSettings = vi.fn();
+
+        render(
+          <ViewHeader title="Test">
+            <ViewHeader.Actions>
+              <ViewHeader.SettingsButton onClick={onSettings} />
+            </ViewHeader.Actions>
+          </ViewHeader>
+        );
+
+        expect(screen.getByRole('button', { name: /open settings/i })).toBeInTheDocument();
+      });
+
+      it('calls onClick when clicked', async () => {
+        const user = userEvent.setup();
+        const onSettings = vi.fn();
+
+        render(
+          <ViewHeader title="Test">
+            <ViewHeader.Actions>
+              <ViewHeader.SettingsButton onClick={onSettings} />
+            </ViewHeader.Actions>
+          </ViewHeader>
+        );
+
+        await user.click(screen.getByRole('button', { name: /open settings/i }));
+        expect(onSettings).toHaveBeenCalledTimes(1);
+      });
+
+      it('supports disabled state', () => {
+        const onSettings = vi.fn();
+
+        render(
+          <ViewHeader title="Test">
+            <ViewHeader.Actions>
+              <ViewHeader.SettingsButton onClick={onSettings} disabled />
+            </ViewHeader.Actions>
+          </ViewHeader>
+        );
+
+        const button = screen.getByRole('button', { name: /open settings/i });
+        expect(button).toBeDisabled();
+      });
+    });
+
+    describe('ViewHeader.CloseButton', () => {
+      it('renders close button with composable API', () => {
+        const onClose = vi.fn();
+
+        render(
+          <ViewHeader title="Test">
+            <ViewHeader.Actions>
+              <ViewHeader.CloseButton onClick={onClose} />
+            </ViewHeader.Actions>
+          </ViewHeader>
+        );
+
+        expect(screen.getByRole('button', { name: /^close$/i })).toBeInTheDocument();
+      });
+
+      it('calls onClick when clicked', async () => {
+        const user = userEvent.setup();
+        const onClose = vi.fn();
+
+        render(
+          <ViewHeader title="Test">
+            <ViewHeader.Actions>
+              <ViewHeader.CloseButton onClick={onClose} />
+            </ViewHeader.Actions>
+          </ViewHeader>
+        );
+
+        await user.click(screen.getByRole('button', { name: /^close$/i }));
+        expect(onClose).toHaveBeenCalledTimes(1);
+      });
+
+      it('supports disabled state', () => {
+        const onClose = vi.fn();
+
+        render(
+          <ViewHeader title="Test">
+            <ViewHeader.Actions>
+              <ViewHeader.CloseButton onClick={onClose} disabled />
+            </ViewHeader.Actions>
+          </ViewHeader>
+        );
+
+        const button = screen.getByRole('button', { name: /^close$/i });
+        expect(button).toBeDisabled();
+      });
+
+      it('respects context prop for aria labels', () => {
+        const onClose = vi.fn();
+
+        render(
+          <ViewHeader title="Test">
+            <ViewHeader.Actions>
+              <ViewHeader.CloseButton onClick={onClose} context="sidepanel" />
+            </ViewHeader.Actions>
+          </ViewHeader>
+        );
+
+        expect(screen.getByLabelText(/close side panel/i)).toBeInTheDocument();
+      });
+    });
+
+    describe('Multiple Actions with Composable API', () => {
+      it('renders multiple actions together', () => {
+        const onBack = vi.fn();
+        const onSettings = vi.fn();
+        const onClose = vi.fn();
+
+        render(
+          <ViewHeader title="Test">
+            <ViewHeader.Actions>
+              <ViewHeader.BackButton onClick={onBack} />
+              <ViewHeader.SettingsButton onClick={onSettings} />
+              <ViewHeader.CloseButton onClick={onClose} />
+            </ViewHeader.Actions>
+          </ViewHeader>
+        );
+
+        expect(screen.getByRole('button', { name: /go back/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /open settings/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /^close$/i })).toBeInTheDocument();
+      });
+
+      it('allows custom button ordering', () => {
+        const onSettings = vi.fn();
+        const onBack = vi.fn();
+
+        const { container } = render(
+          <ViewHeader title="Test">
+            <ViewHeader.Actions>
+              <ViewHeader.SettingsButton onClick={onSettings} />
+              <ViewHeader.BackButton onClick={onBack} />
+            </ViewHeader.Actions>
+          </ViewHeader>
+        );
+
+        const buttons = container.querySelectorAll('button');
+        expect(buttons[0]).toHaveAttribute('aria-label', 'Open settings');
+        expect(buttons[1]).toHaveAttribute('aria-label', 'Go back');
+      });
+
+      it('allows custom buttons alongside subcomponents', () => {
+        const onBack = vi.fn();
+
+        render(
+          <ViewHeader title="Test">
+            <ViewHeader.Actions>
+              <ViewHeader.BackButton onClick={onBack} />
+              <button data-testid="custom-button">Custom Action</button>
+            </ViewHeader.Actions>
+          </ViewHeader>
+        );
+
+        expect(screen.getByRole('button', { name: /go back/i })).toBeInTheDocument();
+        expect(screen.getByTestId('custom-button')).toBeInTheDocument();
+      });
+    });
+
+    describe('Backward Compatibility', () => {
+      it('legacy callback API still works', () => {
+        const onBack = vi.fn();
+        const onSettings = vi.fn();
+        const onClose = vi.fn();
+
+        render(
+          <ViewHeader
+            title="Test"
+            onBack={onBack}
+            onSettings={onSettings}
+            onClose={onClose}
+          />
+        );
+
+        expect(screen.getByRole('button', { name: /go back/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /open settings/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /^close$/i })).toBeInTheDocument();
+      });
+
+      it('composable API takes precedence over legacy API', () => {
+        const legacyOnBack = vi.fn();
+        const composableOnBack = vi.fn();
+
+        render(
+          <ViewHeader title="Test" onBack={legacyOnBack}>
+            <ViewHeader.Actions>
+              <ViewHeader.BackButton onClick={composableOnBack} />
+            </ViewHeader.Actions>
+          </ViewHeader>
+        );
+
+        // Should only render one back button (from composable API)
+        const backButtons = screen.getAllByRole('button', { name: /go back/i });
+        expect(backButtons).toHaveLength(1);
+      });
+    });
+  });
 });

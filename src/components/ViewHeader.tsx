@@ -1,4 +1,5 @@
 import type { FC, ReactElement, ReactNode } from 'react';
+import { Children, isValidElement } from 'react';
 
 import { AddIcon, EditIcon, LogoIcon, SettingsIcon } from './icons/HeaderIcons';
 
@@ -12,7 +13,7 @@ export interface ViewHeaderProps {
   title: string;
   subtitle?: string;
 
-  // Action buttons
+  // Action buttons (legacy API - maintained for backward compatibility)
   onSettings?: () => void;
   onClose?: () => void;
   onBack?: () => void;
@@ -24,8 +25,28 @@ export interface ViewHeaderProps {
   // Styling
   className?: string;
 
-  // Children slot for additional content (e.g., search, filters)
+  // Children slot for additional content (e.g., search, filters, or Actions)
   children?: ReactNode;
+}
+
+interface BackButtonProps {
+  onClick: () => void;
+  disabled?: boolean;
+}
+
+interface SettingsButtonProps {
+  onClick: () => void;
+  disabled?: boolean;
+}
+
+interface CloseButtonProps {
+  onClick: () => void;
+  context?: 'popup' | 'sidepanel';
+  disabled?: boolean;
+}
+
+interface ActionsProps {
+  children: ReactNode;
 }
 
 // Icon map for predefined icon types
@@ -34,6 +55,72 @@ const ICON_MAP: Record<IconType, ReactElement> = {
   add: <AddIcon />,
   edit: <EditIcon />,
   settings: <SettingsIcon />
+};
+
+// Subcomponent: ViewHeader.Actions
+const Actions: FC<ActionsProps> = ({ children }) => {
+  return <>{children}</>;
+};
+
+// Subcomponent: ViewHeader.BackButton
+const BackButton: FC<BackButtonProps> = ({ onClick, disabled = false }) => {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors focus-interactive disabled:opacity-50 disabled:cursor-not-allowed"
+      title="Go back"
+      aria-label="Go back"
+    >
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+      </svg>
+      <span>Back</span>
+    </button>
+  );
+};
+
+// Subcomponent: ViewHeader.SettingsButton
+const SettingsButton: FC<SettingsButtonProps> = ({ onClick, disabled = false }) => {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors focus-interactive disabled:opacity-50 disabled:cursor-not-allowed"
+      title="Settings"
+      aria-label="Open settings"
+    >
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+        <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+      </svg>
+    </button>
+  );
+};
+
+// Subcomponent: ViewHeader.CloseButton
+const CloseButton: FC<CloseButtonProps> = ({ onClick, context = 'popup', disabled = false }) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onClick();
+    }
+  };
+
+  return (
+    <button
+      onClick={onClick}
+      onKeyDown={handleKeyDown}
+      disabled={disabled}
+      className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors focus-interactive disabled:opacity-50 disabled:cursor-not-allowed"
+      title={context === 'sidepanel' ? 'Close side panel' : 'Close'}
+      aria-label={context === 'sidepanel' ? 'Close side panel' : 'Close'}
+    >
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    </button>
+  );
 };
 
 const ViewHeader: FC<ViewHeaderProps> = ({
@@ -65,6 +152,93 @@ const ViewHeader: FC<ViewHeaderProps> = ({
     );
   };
 
+  // Check if children contains Actions component (composable API)
+  const hasActionsComponent = Children.toArray(children).some(
+    child => isValidElement(child) && child.type === Actions
+  );
+
+  // Separate Actions from other children
+  let actionsComponent: ReactNode = null;
+  let otherChildren: ReactNode = null;
+
+  if (hasActionsComponent) {
+    const childrenArray = Children.toArray(children);
+    actionsComponent = childrenArray.find(
+      child => isValidElement(child) && child.type === Actions
+    );
+    otherChildren = childrenArray.filter(
+      child => !(isValidElement(child) && child.type === Actions)
+    );
+  } else {
+    otherChildren = children;
+  }
+
+  // Render actions using either composable API or legacy callback API
+  const renderActions = () => {
+    // If composable API is used, render it
+    if (actionsComponent) {
+      return <div className="flex items-center space-x-2">{actionsComponent}</div>;
+    }
+
+    // Otherwise, use legacy callback API
+    return (
+      <div className="flex items-center space-x-2">
+        {/* Back button - positioned first for standard UX */}
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors focus-interactive"
+            title="Go back"
+            aria-label="Go back"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            <span>Back</span>
+          </button>
+        )}
+
+        {/* Custom actions slot */}
+        {actions}
+
+        {/* Settings button */}
+        {onSettings && (
+          <button
+            onClick={onSettings}
+            className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors focus-interactive"
+            title="Settings"
+            aria-label="Open settings"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+              <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+            </svg>
+          </button>
+        )}
+
+        {/* Close button */}
+        {onClose && (
+          <button
+            onClick={onClose}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onClose();
+              }
+            }}
+            className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors focus-interactive"
+            title={context === 'sidepanel' ? 'Close side panel' : 'Close'}
+            aria-label={context === 'sidepanel' ? 'Close side panel' : 'Close'}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+      </div>
+    );
+  };
+
   return (
     <header
       className={`flex-shrink-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 ${className}`}
@@ -83,71 +257,24 @@ const ViewHeader: FC<ViewHeaderProps> = ({
           </div>
 
           {/* Action buttons */}
-          <div className="flex items-center space-x-2">
-            {/* Back button - positioned first for standard UX */}
-            {onBack && (
-              <button
-                onClick={onBack}
-                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors focus-interactive"
-                title="Go back"
-                aria-label="Go back"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                </svg>
-                <span>Back</span>
-              </button>
-            )}
-
-            {/* Custom actions slot */}
-            {actions}
-
-            {/* Settings button */}
-            {onSettings && (
-              <button
-                onClick={onSettings}
-                className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors focus-interactive"
-                title="Settings"
-                aria-label="Open settings"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-                  <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                </svg>
-              </button>
-            )}
-
-            {/* Close button */}
-            {onClose && (
-              <button
-                onClick={onClose}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    onClose();
-                  }
-                }}
-                className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors focus-interactive"
-                title={context === 'sidepanel' ? 'Close side panel' : 'Close'}
-                aria-label={context === 'sidepanel' ? 'Close side panel' : 'Close'}
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            )}
-          </div>
+          {renderActions()}
         </div>
       </div>
 
       {/* Children slot for additional content */}
-      {children && (
+      {otherChildren && (
         <div className="px-6 pb-6">
-          {children}
+          {otherChildren}
         </div>
       )}
     </header>
   );
 };
+
+// Attach subcomponents to main component
+ViewHeader.Actions = Actions;
+ViewHeader.BackButton = BackButton;
+ViewHeader.SettingsButton = SettingsButton;
+ViewHeader.CloseButton = CloseButton;
 
 export default ViewHeader;
