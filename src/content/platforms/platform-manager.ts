@@ -123,19 +123,39 @@ export class PlatformManager {
       if (!StrategyConstructor) {
         warn(`No strategy found for platform: ${platform.id}`, { hostname });
       } else {
-        strategies.push(new StrategyConstructor(hostname));
-        debug('Loaded platform strategy', {
-          platform: platform.displayName,
-          id: platform.id,
-          priority: platform.priority
-        });
+        try {
+          strategies.push(new StrategyConstructor(hostname));
+          debug('Loaded platform strategy', {
+            platform: platform.displayName,
+            id: platform.id,
+            priority: platform.priority
+          });
+        } catch (error) {
+          warn(`Failed to instantiate ${platform.id} strategy`, {
+            error,
+            hostname,
+            platformId: platform.id,
+            fallbackToDefault: true
+          });
+          // DefaultStrategy will be added below as fallback
+        }
       }
     } else {
       debug(`Unknown hostname: ${hostname} - using DefaultStrategy only`);
     }
 
-    // Always add fallback strategy
-    strategies.push(new DefaultStrategy(hostname));
+    // Always add fallback strategy (with its own error handling)
+    try {
+      strategies.push(new DefaultStrategy(hostname));
+    } catch (error) {
+      warn('Failed to instantiate DefaultStrategy', {
+        error,
+        hostname,
+        critical: true
+      });
+      // If even DefaultStrategy fails, return empty array
+      // This is a critical failure but won't crash the extension
+    }
 
     return strategies;
   }

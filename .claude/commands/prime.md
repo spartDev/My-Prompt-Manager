@@ -19,5 +19,7 @@ This command loads essential context for a new agent session by examining the co
 - Documentation:
     - @ai/doc/product.md
     - @ai/doc/tech.md
-    - @ai/doc/tech.md
+    - @ai/doc/structure.md
+    - @docs/ARCHITECTURE.md
     - @ai/doc/content-script.md
+    - @docs/DESIGN_GUIDELINES.md
