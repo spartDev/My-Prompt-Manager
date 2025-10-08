@@ -155,15 +155,19 @@ describe('SettingsView', () => {
     await userEvent.click(confirmButton);
 
     await waitFor(() => {
-      expect(chromeMock.storage.local.set).toHaveBeenCalledWith({
-        promptLibrarySettings: {
-          enabledSites: ['www.perplexity.ai', 'claude.ai', 'chatgpt.com', 'chat.mistral.ai'],
-          customSites: [],
-          debugMode: false,
-          floatingFallback: true
-        },
-        interfaceMode: 'popup'
-      });
+      // enabledSites should match the default platforms sorted by priority (highest first)
+      // Claude (100), ChatGPT (90), Gemini (85), Mistral (85), Perplexity (80)
+      const call = (chromeMock.storage.local.set as jest.Mock).mock.calls[0][0];
+      expect(call.promptLibrarySettings.enabledSites).toHaveLength(5);
+      expect(call.promptLibrarySettings.enabledSites).toContain('claude.ai');
+      expect(call.promptLibrarySettings.enabledSites).toContain('chatgpt.com');
+      expect(call.promptLibrarySettings.enabledSites).toContain('gemini.google.com');
+      expect(call.promptLibrarySettings.enabledSites).toContain('chat.mistral.ai');
+      expect(call.promptLibrarySettings.enabledSites).toContain('www.perplexity.ai');
+      expect(call.promptLibrarySettings.customSites).toEqual([]);
+      expect(call.promptLibrarySettings.debugMode).toBe(false);
+      expect(call.promptLibrarySettings.floatingFallback).toBe(true);
+      expect(call.interfaceMode).toBe('popup');
     });
 
     expect(storageMock.updateSettings).toHaveBeenCalledWith({

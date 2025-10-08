@@ -99,6 +99,23 @@ export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
     buttonContainerSelector: '.bg-background-50.dark\\:bg-offsetDark.flex.items-center',
     strategyClass: 'PerplexityStrategy',
     hostnamePatterns: ['perplexity']
+  },
+
+  gemini: {
+    id: 'gemini',
+    hostname: 'gemini.google.com',
+    displayName: 'Google Gemini',
+    priority: 85,
+    defaultEnabled: true,
+    selectors: [
+      'div.ql-editor[contenteditable="true"][role="textbox"]',
+      'rich-textarea .ql-editor',
+      '[data-placeholder*="Gemini"]',
+      'div[contenteditable="true"]'
+    ],
+    buttonContainerSelector: '.input-buttons-wrapper-bottom',
+    strategyClass: 'GeminiStrategy',
+    hostnamePatterns: ['gemini']
   }
 };
 
@@ -183,7 +200,7 @@ export function getPlatformsByPriority(): PlatformDefinition[] {
  * Legacy compatibility: Get platform names as union type
  * @deprecated Use PlatformDefinition.id instead
  */
-export type PlatformName = 'claude' | 'chatgpt' | 'mistral' | 'perplexity' | 'default';
+export type PlatformName = 'claude' | 'chatgpt' | 'mistral' | 'perplexity' | 'gemini' | 'default';
 
 /**
  * Get all platform IDs for TypeScript union types

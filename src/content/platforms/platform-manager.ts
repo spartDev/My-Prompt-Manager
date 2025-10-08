@@ -15,6 +15,7 @@ import type { PlatformStrategy } from './base-strategy';
 import { ChatGPTStrategy } from './chatgpt-strategy';
 import { ClaudeStrategy } from './claude-strategy';
 import { DefaultStrategy } from './default-strategy';
+import { GeminiStrategy } from './gemini-strategy';
 import { MistralStrategy } from './mistral-strategy';
 import { PerplexityStrategy } from './perplexity-strategy';
 
@@ -117,7 +118,12 @@ export class PlatformManager {
         this.strategies.push(new PerplexityStrategy());
         this.strategies.push(new DefaultStrategy()); // Fallback for Perplexity
         break;
-        
+
+      case 'gemini.google.com':
+        this.strategies.push(new GeminiStrategy());
+        this.strategies.push(new DefaultStrategy()); // Fallback for Gemini
+        break;
+
       default:
         debug(`Unknown hostname: ${this.hostname} - loading DefaultStrategy`);
         this.strategies.push(new DefaultStrategy());

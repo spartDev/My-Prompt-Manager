@@ -2,13 +2,14 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { FC, ReactNode } from 'react';
 
 import manifest from '../../manifest.json';
+import { getDefaultEnabledPlatforms } from '../config/platforms';
 import { StorageManager } from '../services/storage';
 import type { Prompt, Category, Settings as UserSettings } from '../types';
 import { DEFAULT_SETTINGS } from '../types';
 import type { ToastSettings } from '../types/hooks';
 import { Logger, toError } from '../utils';
 
-import { ClaudeIcon, ChatGPTIcon, PerplexityIcon, MistralIcon } from './icons/SiteIcons';
+import { ClaudeIcon, ChatGPTIcon, PerplexityIcon, MistralIcon, GeminiIcon } from './icons/SiteIcons';
 import AboutSection from './settings/AboutSection';
 import AdvancedSection from './settings/AdvancedSection';
 import AppearanceSection from './settings/AppearanceSection';
@@ -105,6 +106,11 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
       description: 'OpenAI\'s conversational AI',
       icon: <ChatGPTIcon />
     },
+    'gemini.google.com': {
+      name: 'Google Gemini',
+      description: 'Google\'s AI assistant',
+      icon: (isEnabled: boolean) => <GeminiIcon disabled={!isEnabled} />
+    },
     'chat.mistral.ai': {
       name: 'Mistral AI',
       description: 'Mistral\'s conversational AI',
@@ -113,7 +119,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
   }), []);
 
   const defaultSettings: Settings = useMemo(() => ({
-    enabledSites: ['www.perplexity.ai', 'claude.ai', 'chatgpt.com', 'chat.mistral.ai'],
+    enabledSites: getDefaultEnabledPlatforms(),
     customSites: [],
     debugMode: false,
     floatingFallback: true
