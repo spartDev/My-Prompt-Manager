@@ -5,6 +5,7 @@
  * Uses React-specific event triggering for proper state updates
  */
 
+import { getPlatformById } from '../../config/platforms';
 import type { InsertionResult } from '../types/index';
 import type { UIElementFactory } from '../ui/element-factory';
 
@@ -18,7 +19,7 @@ interface ReactTextAreaElement extends HTMLTextAreaElement {
 }
 
 export class ChatGPTStrategy extends PlatformStrategy {
-  constructor() {
+  constructor(hostname?: string) {
     super('chatgpt', 90, {
       selectors: [
         'textarea[data-testid="chat-input"]',
@@ -32,7 +33,7 @@ export class ChatGPTStrategy extends PlatformStrategy {
       ],
       buttonContainerSelector: '.ms-auto.flex.items-center.gap-1\\.5',
       priority: 90
-    });
+    }, hostname);
   }
 
   /**
@@ -40,7 +41,7 @@ export class ChatGPTStrategy extends PlatformStrategy {
    * Only handles textarea elements on chatgpt.com
    */
   canHandle(element: HTMLElement): boolean {
-    return this.hostname === 'chatgpt.com' && element.tagName === 'TEXTAREA';
+    return this.hostname === getPlatformById('chatgpt')?.hostname && element.tagName === 'TEXTAREA';
   }
 
   /**

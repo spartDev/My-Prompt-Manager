@@ -5,20 +5,21 @@
  * Uses comprehensive event triggering for various input types
  */
 
+import { getPlatformById } from '../../config/platforms';
 import type { InsertionResult } from '../types/index';
 import type { UIElementFactory } from '../ui/element-factory';
 
 import { PlatformStrategy } from './base-strategy';
 
 export class PerplexityStrategy extends PlatformStrategy {
-  constructor() {
+  constructor(hostname?: string) {
     super('perplexity', 80, {
       selectors: [
         'div[contenteditable="true"][role="textbox"]#ask-input'
       ],
       buttonContainerSelector: '.flex.items-center.justify-self-end.col-start-3.row-start-2',
       priority: 80
-    });
+    }, hostname);
   }
 
   /**
@@ -26,7 +27,7 @@ export class PerplexityStrategy extends PlatformStrategy {
    * Handles any element on www.perplexity.ai
    */
   canHandle(_element: HTMLElement): boolean {
-    return this.hostname === 'www.perplexity.ai';
+    return this.hostname === getPlatformById('perplexity')?.hostname;
   }
 
   /**

@@ -156,14 +156,22 @@ describe('SettingsView', () => {
 
     await waitFor(() => {
       // enabledSites should match the default platforms sorted by priority (highest first)
-      // Claude (100), ChatGPT (90), Gemini (85), Mistral (85), Perplexity (80)
+      // Claude (100), ChatGPT (90), Mistral (85), Gemini (85), Perplexity (80)
+      // Note: When priorities are equal, order depends on Object.values() iteration
       const call = (chromeMock.storage.local.set as jest.Mock).mock.calls[0][0];
-      expect(call.promptLibrarySettings.enabledSites).toHaveLength(5);
-      expect(call.promptLibrarySettings.enabledSites).toContain('claude.ai');
-      expect(call.promptLibrarySettings.enabledSites).toContain('chatgpt.com');
-      expect(call.promptLibrarySettings.enabledSites).toContain('gemini.google.com');
-      expect(call.promptLibrarySettings.enabledSites).toContain('chat.mistral.ai');
-      expect(call.promptLibrarySettings.enabledSites).toContain('www.perplexity.ai');
+      const enabledSites = call.promptLibrarySettings.enabledSites;
+
+      // Verify count
+      expect(enabledSites).toHaveLength(5);
+
+      // Verify exact order based on priority (highest first)
+      expect(enabledSites[0]).toBe('claude.ai');        // Priority 100
+      expect(enabledSites[1]).toBe('chatgpt.com');      // Priority 90
+      // Priorities 85: mistral comes before gemini in SUPPORTED_PLATFORMS object order
+      expect(enabledSites[2]).toBe('chat.mistral.ai');  // Priority 85
+      expect(enabledSites[3]).toBe('gemini.google.com'); // Priority 85
+      expect(enabledSites[4]).toBe('www.perplexity.ai'); // Priority 80
+
       expect(call.promptLibrarySettings.customSites).toEqual([]);
       expect(call.promptLibrarySettings.debugMode).toBe(false);
       expect(call.promptLibrarySettings.floatingFallback).toBe(true);

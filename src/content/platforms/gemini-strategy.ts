@@ -4,6 +4,7 @@
  * Uses Quill.js editor with 3-tier fallback chain
  */
 
+import { getPlatformById } from '../../config/platforms';
 import type { InsertionResult } from '../types/index';
 import type { UIElementFactory } from '../ui/element-factory';
 import { sanitizeUserInput } from '../utils/storage';
@@ -43,9 +44,31 @@ interface QuillElement extends HTMLElement {
  * 1. Quill.js API (primary) - Direct Quill instance manipulation
  * 2. execCommand (secondary) - contenteditable fallback
  * 3. DOM manipulation (tertiary) - Direct text node insertion
+ *
+ * Performance Optimization:
+ * - Caches Quill editor references using WeakMap for automatic garbage collection
+ * - Reduces expensive page-wide DOM queries
  */
 export class GeminiStrategy extends PlatformStrategy {
-  constructor() {
+  /**
+   * Cache for Quill editor element lookups
+   * Uses WeakMap for automatic garbage collection when elements are removed
+   */
+  private _quillEditorCache: WeakMap<HTMLElement, HTMLElement | null> = new WeakMap();
+
+  /**
+   * Timestamp of last page-wide Quill search
+   * Used to throttle expensive querySelector operations
+   */
+  private _lastPageWideSearchTime = 0;
+
+  /**
+   * Minimum time (ms) between page-wide Quill searches
+   * Prevents excessive DOM queries on rapid insertions
+   */
+  private static readonly PAGE_WIDE_SEARCH_THROTTLE_MS = 1000;
+
+  constructor(hostname?: string) {
     super('Gemini', GEMINI_PLATFORM_PRIORITY, {
       selectors: [
         'div.ql-editor[contenteditable="true"][role="textbox"]',
@@ -56,7 +79,7 @@ export class GeminiStrategy extends PlatformStrategy {
       // Target the button container where mic and send buttons are located
       buttonContainerSelector: '.input-buttons-wrapper-bottom',
       priority: GEMINI_PLATFORM_PRIORITY
-    });
+    }, hostname);
   }
 
   /**
@@ -64,8 +87,8 @@ export class GeminiStrategy extends PlatformStrategy {
    * Checks for Gemini hostname and Quill editor presence
    */
   canHandle(element: HTMLElement): boolean {
-    // Only handle elements on gemini.google.com
-    if (this.hostname !== 'gemini.google.com') {
+    // Only handle elements on gemini.google.com (defense-in-depth)
+    if (this.hostname !== getPlatformById('gemini')?.hostname) {
       return false;
     }
 
@@ -149,33 +172,73 @@ export class GeminiStrategy extends PlatformStrategy {
 
   /**
    * Finds the Quill editor element from the given element
+   * Uses caching to optimize repeated lookups and throttles expensive page-wide searches
    * @param element - Starting element
    * @returns Quill editor element or original element
    * @private
    */
   private _findQuillEditor(element: HTMLElement): HTMLElement {
-    // If element is already the Quill editor, use it
+    // Check cache first for fast lookup
+    const cachedEditor = this._quillEditorCache.get(element);
+    if (cachedEditor) {
+      // Verify cached element is still in DOM
+      if (document.contains(cachedEditor)) {
+        this._debug('Quill editor found in cache', {
+          elementTag: element.tagName,
+          cachedTag: cachedEditor.tagName
+        });
+        return cachedEditor;
+      } else {
+        // Clear stale cache entry
+        this._quillEditorCache.delete(element);
+      }
+    }
+
+    // If element is already the Quill editor, cache and return
     if (element.classList.contains('ql-editor')) {
+      this._quillEditorCache.set(element, element);
       return element;
     }
 
     // Check if Quill editor is a parent
     const parentQuill = element.closest('.ql-editor');
     if (parentQuill) {
-      return parentQuill as HTMLElement;
+      const quillElement = parentQuill as HTMLElement;
+      this._quillEditorCache.set(element, quillElement);
+      return quillElement;
     }
 
     // Check if Quill editor is a child
     const childQuill = element.querySelector('.ql-editor');
     if (childQuill) {
-      return childQuill as HTMLElement;
+      const quillElement = childQuill as HTMLElement;
+      this._quillEditorCache.set(element, quillElement);
+      return quillElement;
     }
 
-    // Last resort: find any Quill editor on the page for gemini.google.com
-    const anyQuill = document.querySelector('div.ql-editor[contenteditable="true"][role="textbox"]');
-    if (anyQuill) {
-      return anyQuill as HTMLElement;
+    // Last resort: find any Quill editor on the page (throttled)
+    const now = Date.now();
+    if (now - this._lastPageWideSearchTime > GeminiStrategy.PAGE_WIDE_SEARCH_THROTTLE_MS) {
+      this._lastPageWideSearchTime = now;
+
+      const anyQuill = document.querySelector('div.ql-editor[contenteditable="true"][role="textbox"]');
+      if (anyQuill) {
+        const quillElement = anyQuill as HTMLElement;
+        this._quillEditorCache.set(element, quillElement);
+        this._debug('Quill editor found via page-wide search (throttled)', {
+          throttleMs: GeminiStrategy.PAGE_WIDE_SEARCH_THROTTLE_MS
+        });
+        return quillElement;
+      }
+    } else {
+      this._debug('Page-wide Quill search throttled', {
+        timeSinceLastSearch: now - this._lastPageWideSearchTime,
+        throttleMs: GeminiStrategy.PAGE_WIDE_SEARCH_THROTTLE_MS
+      });
     }
+
+    // Cache negative result to avoid repeated searches for same element
+    this._quillEditorCache.set(element, null);
 
     // Return original element as final fallback
     return element;
@@ -200,9 +263,7 @@ export class GeminiStrategy extends PlatformStrategy {
         quill.setText(content);
 
         // Trigger events for Angular change detection
-        element.dispatchEvent(new Event('input', { bubbles: true }));
-        element.dispatchEvent(new Event('change', { bubbles: true }));
-        element.dispatchEvent(new Event('text-change', { bubbles: true }));
+        this._dispatchAngularEvents(element, content, 'basic');
 
         this._debug('Quill API insertion successful');
         return { success: true, method: 'gemini-quill-api' };
@@ -251,15 +312,7 @@ export class GeminiStrategy extends PlatformStrategy {
 
         if (inserted) {
           // Trigger Angular-compatible events
-          const inputEvent = new InputEvent('input', {
-            bubbles: true,
-            cancelable: true,
-            inputType: 'insertText',
-            data: content
-          });
-          element.dispatchEvent(inputEvent);
-          element.dispatchEvent(new Event('change', { bubbles: true }));
-          element.dispatchEvent(new Event('compositionend', { bubbles: true }));
+          this._dispatchAngularEvents(element, content, 'basic');
 
           this._debug('execCommand insertion successful');
           return { success: true, method: 'gemini-execCommand' };
@@ -270,6 +323,42 @@ export class GeminiStrategy extends PlatformStrategy {
     }
 
     return { success: false };
+  }
+
+  /**
+   * Dispatches Angular-compatible events after content insertion
+   * This triggers zone.js change detection for proper UI updates
+   * @param element - Target element
+   * @param content - Inserted content
+   * @param eventType - Type of insertion ('basic' | 'comprehensive')
+   * @private
+   */
+  private _dispatchAngularEvents(
+    element: HTMLElement,
+    content: string,
+    eventType: 'basic' | 'comprehensive' = 'basic'
+  ): void {
+    // Always dispatch input event with proper InputEvent interface
+    const inputEvent = new InputEvent('input', {
+      bubbles: true,
+      cancelable: true,
+      inputType: 'insertText',
+      data: content
+    });
+    element.dispatchEvent(inputEvent);
+
+    // Always dispatch change event
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+
+    if (eventType === 'comprehensive') {
+      // Additional events for DOM manipulation fallback
+      element.dispatchEvent(new Event('blur', { bubbles: true }));
+      element.dispatchEvent(new Event('focus', { bubbles: true }));
+    } else {
+      // Quill-specific events
+      element.dispatchEvent(new Event('text-change', { bubbles: true }));
+      element.dispatchEvent(new Event('compositionend', { bubbles: true }));
+    }
   }
 
   /**
@@ -297,16 +386,7 @@ export class GeminiStrategy extends PlatformStrategy {
         element.appendChild(paragraph);
 
         // Dispatch comprehensive event set for Angular
-        const inputEvent = new InputEvent('input', {
-          bubbles: true,
-          cancelable: true,
-          inputType: 'insertText',
-          data: content
-        });
-        element.dispatchEvent(inputEvent);
-        element.dispatchEvent(new Event('change', { bubbles: true }));
-        element.dispatchEvent(new Event('blur', { bubbles: true }));
-        element.dispatchEvent(new Event('focus', { bubbles: true }));
+        this._dispatchAngularEvents(element, content, 'comprehensive');
 
         this._debug('DOM manipulation successful');
         return { success: true, method: 'gemini-dom-manipulation' };

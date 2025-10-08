@@ -5,6 +5,7 @@
  * Supports multiple insertion methods with fallbacks
  */
 
+import { getPlatformById } from '../../config/platforms';
 import type { InsertionResult } from '../types/index';
 import type { UIElementFactory } from '../ui/element-factory';
 
@@ -40,14 +41,14 @@ declare global {
 }
 
 export class ClaudeStrategy extends PlatformStrategy {
-  constructor() {
+  constructor(hostname?: string) {
     super('claude', 100, {
       selectors: [
         'div[contenteditable="true"][role="textbox"].ProseMirror'
       ],
       buttonContainerSelector: '.relative.flex-1.flex.items-center.gap-2.shrink.min-w-0',
       priority: 100
-    });
+    }, hostname);
   }
 
   /**
@@ -55,8 +56,8 @@ export class ClaudeStrategy extends PlatformStrategy {
    * Always returns true for claude.ai to ensure Claude strategy is used
    */
   canHandle(_element: HTMLElement): boolean {
-    // Only handle elements on Claude
-    if (this.hostname !== 'claude.ai') {
+    // Only handle elements on Claude (defense-in-depth)
+    if (this.hostname !== getPlatformById('claude')?.hostname) {
       return false;
     }
     
