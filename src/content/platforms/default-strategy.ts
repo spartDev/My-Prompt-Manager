@@ -11,7 +11,7 @@ import type { UIElementFactory } from '../ui/element-factory';
 import { PlatformStrategy } from './base-strategy';
 
 export class DefaultStrategy extends PlatformStrategy {
-  constructor() {
+  constructor(hostname?: string) {
     super('default', 0, {
       selectors: [
         'textarea',
@@ -21,7 +21,7 @@ export class DefaultStrategy extends PlatformStrategy {
       ],
       buttonContainerSelector: undefined, // No specific container for default
       priority: 0
-    });
+    }, hostname);
   }
 
   /**

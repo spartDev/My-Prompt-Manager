@@ -37,11 +37,12 @@ A powerful Chrome extension that provides seamless access to your personal promp
 |----------|--------|--------|----------|
 | Claude | ✅ Fully Supported | claude.ai | 100 |
 | ChatGPT | ✅ Fully Supported | chatgpt.com | 90 |
+| Google Gemini | ✅ Fully Supported | gemini.google.com | 85 |
 | Mistral LeChat | ✅ Fully Supported | chat.mistral.ai | 85 |
 | Perplexity | ✅ Fully Supported | www.perplexity.ai | 80 |
 | Custom Sites | ✅ Configurable | User-defined | Variable |
 
-**Coming Soon:** Gemini and more! See our [Platform Integration Guide](docs/PLATFORM_INTEGRATION.md) to add your own.
+See our [Platform Integration Guide](docs/PLATFORM_INTEGRATION.md) to add your own platforms.
 
 ## 💻 Tech Stack
 

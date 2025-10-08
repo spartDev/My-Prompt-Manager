@@ -15,16 +15,16 @@ export abstract class PlatformStrategy implements PlatformStrategyInterface {
   protected config?: PlatformConfig;
   protected hostname: string;
 
-  constructor(name: string, priority: number, config?: PlatformConfig) {
+  constructor(name: string, priority: number, config?: PlatformConfig, hostname?: string) {
     if (this.constructor === PlatformStrategy) {
       throw new Error('PlatformStrategy is abstract and cannot be instantiated');
     }
-    
+
     this.name = name;
     this.priority = priority;
     this.config = config;
-    this.hostname = window.location.hostname;
-    
+    this.hostname = hostname ?? window.location.hostname;
+
     // Validate required methods are implemented
     this._validateImplementation();
   }

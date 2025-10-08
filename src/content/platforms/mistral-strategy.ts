@@ -1,3 +1,4 @@
+import { getPlatformById } from '../../config/platforms';
 import type { InsertionResult } from '../types/index';
 import type { UIElementFactory } from '../ui/element-factory';
 import { sanitizeUserInput } from '../utils/storage';
@@ -28,7 +29,7 @@ interface ProseMirrorElement extends HTMLElement {
 }
 
 export class MistralStrategy extends PlatformStrategy {
-  constructor() {
+  constructor(hostname?: string) {
     super('Mistral', MISTRAL_PLATFORM_PRIORITY, {
       selectors: [
         'div[contenteditable="true"]',
@@ -42,10 +43,15 @@ export class MistralStrategy extends PlatformStrategy {
         '.flex.items-center.justify-start.gap-3'                   // Mobile fallback
       ].join(', '),
       priority: MISTRAL_PLATFORM_PRIORITY
-    });
+    }, hostname);
   }
 
   canHandle(element: HTMLElement): boolean {
+    // Only handle elements on Mistral (defense-in-depth)
+    if (this.hostname !== getPlatformById('mistral')?.hostname) {
+      return false;
+    }
+
     if (element.tagName === 'TEXTAREA' &&
         element.hasAttribute('placeholder') &&
         element.getAttribute('placeholder')?.toLowerCase().includes('chat')) {

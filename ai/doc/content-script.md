@@ -545,7 +545,9 @@ Abstract base class that defines the interface for platform-specific implementat
 
 #### **Platform Implementations:**
 - **ClaudeStrategy** (`platforms/claude-strategy.ts`): Claude.ai specific implementation
-- **ChatGPTStrategy** (`platforms/chatgpt-strategy.ts`): ChatGPT specific implementation  
+- **ChatGPTStrategy** (`platforms/chatgpt-strategy.ts`): ChatGPT specific implementation
+- **GeminiStrategy** (`platforms/gemini-strategy.ts`): Google Gemini specific implementation
+- **MistralStrategy** (`platforms/mistral-strategy.ts`): Mistral.ai specific implementation
 - **PerplexityStrategy** (`platforms/perplexity-strategy.ts`): Perplexity.ai specific implementation
 - **DefaultStrategy** (`platforms/default-strategy.ts`): Fallback implementation for generic sites
 
@@ -642,7 +644,20 @@ Provides secure element selection functionality with comprehensive security safe
 - Integration: Inline button near voice mode
 - Button container: `.bg-background-50.dark\\:bg-offsetDark.flex.items-center`
 
-**4. Custom Sites**
+**4. Mistral.ai**
+- Selectors: `div[contenteditable="true"]`, `.ProseMirror`, `[role="textbox"]`
+- Integration: Inline button in input area
+- Button container: `.col-span-10.relative.flex.flex-row.items-center`
+- Special features: ProseMirror editor support
+
+**5. Google Gemini**
+- Selectors: `div.ql-editor[contenteditable="true"][role="textbox"]`, `rich-textarea .ql-editor`
+- Integration: Inline button with mic and send buttons
+- Button container: `.input-buttons-wrapper-bottom`
+- Special features: Quill.js editor with 3-tier insertion fallback (Quill API → execCommand → DOM manipulation)
+- Framework: Angular with zone.js change detection
+
+**6. Custom Sites**
 - Configurable via extension settings
 - Support for custom CSS selectors
 - Flexible positioning options (before, after, inside-start, inside-end)

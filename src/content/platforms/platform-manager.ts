@@ -5,6 +5,7 @@
  * Provides isolation between strategies and handles strategy selection logic
  */
 
+import { getPlatformByHostname } from '../../config/platforms';
 import type { InsertionResult } from '../types/index';
 import type { PlatformManagerOptions } from '../types/platform';
 import type { UIElementFactory } from '../ui/element-factory';
@@ -15,10 +16,23 @@ import type { PlatformStrategy } from './base-strategy';
 import { ChatGPTStrategy } from './chatgpt-strategy';
 import { ClaudeStrategy } from './claude-strategy';
 import { DefaultStrategy } from './default-strategy';
+import { GeminiStrategy } from './gemini-strategy';
 import { MistralStrategy } from './mistral-strategy';
 import { PerplexityStrategy } from './perplexity-strategy';
 
 export class PlatformManager {
+  /**
+   * Strategy registry mapping platform IDs to constructor functions
+   * Type-safe registry ensures all constructors accept optional hostname parameter
+   */
+  private static readonly STRATEGY_REGISTRY: Record<string, new (hostname?: string) => PlatformStrategy> = {
+    'claude': ClaudeStrategy,
+    'chatgpt': ChatGPTStrategy,
+    'gemini': GeminiStrategy,
+    'mistral': MistralStrategy,
+    'perplexity': PerplexityStrategy
+  };
+
   private strategies: PlatformStrategy[];
   private activeStrategy: PlatformStrategy | null;
   private hostname: string;
@@ -89,43 +103,81 @@ export class PlatformManager {
   }
 
   /**
+   * Creates strategies for the given hostname using factory pattern
+   * @param hostname - Hostname to create strategies for
+   * @returns Array of strategies (platform-specific + fallback)
+   * @private
+   */
+  private _createStrategyForHostname(hostname: string): PlatformStrategy[] {
+    const strategies: PlatformStrategy[] = [];
+
+    // Look up platform configuration by hostname
+    const platform = getPlatformByHostname(hostname);
+
+    if (platform) {
+      // Use strategy registry to instantiate platform-specific strategy
+      const StrategyConstructor = PlatformManager.STRATEGY_REGISTRY[platform.id];
+
+      // TypeScript knows registry is complete, but we check defensively for runtime safety
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      if (!StrategyConstructor) {
+        warn(`No strategy found for platform: ${platform.id}`, { hostname });
+      } else {
+        try {
+          strategies.push(new StrategyConstructor(hostname));
+          debug('Loaded platform strategy', {
+            platform: platform.displayName,
+            id: platform.id,
+            priority: platform.priority
+          });
+        } catch (error) {
+          warn(`Failed to instantiate ${platform.id} strategy`, {
+            error,
+            hostname,
+            platformId: platform.id,
+            fallbackToDefault: true
+          });
+          // DefaultStrategy will be added below as fallback
+        }
+      }
+    } else {
+      debug(`Unknown hostname: ${hostname} - using DefaultStrategy only`);
+    }
+
+    // Always add fallback strategy (with its own error handling)
+    try {
+      strategies.push(new DefaultStrategy(hostname));
+    } catch (error) {
+      warn('Failed to instantiate DefaultStrategy', {
+        error,
+        hostname,
+        critical: true
+      });
+      // If even DefaultStrategy fails, return empty array
+      // This is a critical failure but won't crash the extension
+    }
+
+    return strategies;
+  }
+
+  /**
    * Initializes platform strategies based on current hostname
-   * Loads specialized strategies for known AI platforms, DefaultStrategy for others
+   * Uses data-driven approach via strategy registry
    * @private
    */
   private _initializeStrategies(): void {
     debug('Initializing platform strategies', { hostname: this.hostname });
-    
-    // Add specialized strategies for known AI platforms, DefaultStrategy for others
-    switch (this.hostname) {
-      case 'claude.ai':
-        this.strategies.push(new ClaudeStrategy());
-        this.strategies.push(new DefaultStrategy()); // Fallback for Claude
-        break;
-        
-      case 'chatgpt.com':
-        this.strategies.push(new ChatGPTStrategy());
-        this.strategies.push(new DefaultStrategy()); // Fallback for ChatGPT
-        break;
 
-      case 'chat.mistral.ai':
-        this.strategies.push(new MistralStrategy());
-        this.strategies.push(new DefaultStrategy()); // Fallback for Mistral
-        break;
+    // Create strategies using factory method
+    this.strategies = this._createStrategyForHostname(this.hostname);
 
-      case 'www.perplexity.ai':
-        this.strategies.push(new PerplexityStrategy());
-        this.strategies.push(new DefaultStrategy()); // Fallback for Perplexity
-        break;
-        
-      default:
-        debug(`Unknown hostname: ${this.hostname} - loading DefaultStrategy`);
-        this.strategies.push(new DefaultStrategy());
-        break;
-    }
-    
     // Sort strategies by priority (highest first)
     this.strategies.sort((a, b) => b.priority - a.priority);
+
+    debug('Strategies initialized', {
+      count: this.strategies.length,
+      names: this.strategies.map(s => s.name)
+    });
   }
 
   /**
@@ -354,7 +406,7 @@ export class PlatformManager {
    */
   cleanup(): void {
     debug('Starting cleanup');
-    
+
     for (const strategy of this.strategies) {
       try {
         strategy.cleanup?.();
@@ -362,12 +414,48 @@ export class PlatformManager {
         warn(`Failed to cleanup strategy ${strategy.name}`, { error });
       }
     }
-    
+
     this.strategies = [];
     this.activeStrategy = null;
     this.customSiteConfig = null;
     this.isInitialized = false;
-    
+
     debug('Cleanup complete');
+  }
+
+  /**
+   * Debug-only method to switch strategy for testing/debugging
+   * Only works when debug mode is enabled
+   * @param hostname - Hostname to switch to
+   */
+  public debugSwitchStrategy(hostname: string): void {
+    if (window.__promptLibraryDebug?.enabled) {
+      debug('Debug mode: Switching strategy', {
+        from: this.hostname,
+        to: hostname
+      });
+
+      this.hostname = hostname;
+      this.strategies = [];
+      this.activeStrategy = null;
+      this._initializeStrategies();
+
+      debug('Debug mode: Strategy switch complete', {
+        hostname: this.hostname,
+        strategies: this.strategies.map(s => s.name)
+      });
+    } else {
+      warn('debugSwitchStrategy called but debug mode not enabled');
+    }
+  }
+
+  /**
+   * Test-only method to set strategies directly
+   * For use in automated tests only
+   * @param strategies - Strategies to set
+   */
+  public setStrategiesForTesting(strategies: PlatformStrategy[]): void {
+    this.strategies = strategies;
+    this.isInitialized = true;
   }
 }
