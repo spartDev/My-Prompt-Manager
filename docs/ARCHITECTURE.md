@@ -982,8 +982,8 @@ npm run build
 
 **Files to update**:
 - `README.md` - Add to supported platforms table
-- `ai/doc/content-script.md` - Document strategy implementation
 - `docs/PLATFORM_INTEGRATION.md` - Add platform-specific notes
+- `docs/CHROME_WEBSTORE_GUIDE.md` - Update supported platforms list
 
 ---
 

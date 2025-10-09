@@ -81,6 +81,18 @@ Chrome Storage API ← → StorageManager (singleton)
 - `PromptManager`: Search, validation, duplicate detection (Levenshtein distance)
 - `InsertionManager`: Platform-agnostic text insertion coordination
 
+### Detailed Documentation
+
+For comprehensive technical documentation, see:
+
+- **[Architecture Deep Dive](docs/ARCHITECTURE.md)** - Complete system design, design patterns, and adding new platforms
+- **[Component Catalog](docs/COMPONENTS.md)** - All 40+ React components with examples and patterns
+- **[Services & Hooks](docs/SERVICES_AND_HOOKS.md)** - Business logic layer, algorithms, and data flow
+- **[Platform Integration](docs/PLATFORM_INTEGRATION.md)** - Adding new AI platform support
+- **[Custom Sites Guide](docs/ELEMENT_FINGERPRINTING_DESIGN.md)** - Element fingerprinting and custom positioning
+- **[Testing Guide](docs/TESTING.md)** - Testing strategies, patterns, and coverage
+- **[Design Guidelines](docs/DESIGN_GUIDELINES.md)** - Visual design system and UI patterns
+
 ### File Organization
 
 ```
