@@ -17,9 +17,8 @@ This command loads essential context for a new agent session by examining the co
 - Codebase structure all: `eza . --tree`
 - Project README: `@README.md`
 - Documentation:
-    - @ai/doc/product.md
-    - @ai/doc/tech.md
-    - @ai/doc/structure.md
     - @docs/ARCHITECTURE.md
-    - @ai/doc/content-script.md
     - @docs/DESIGN_GUIDELINES.md
+    - @docs/PLATFORM_INTEGRATION.md
+    - @docs/TESTING.md
+    - @docs/archive/product.md (historical)

@@ -14,9 +14,11 @@ This document outlines the steps to package and submit the Prompt Library extens
 ### 2. Extension Requirements
 - [ ] Manifest V3 compliance verified
 - [ ] CSP (Content Security Policy) properly configured
-- [ ] Minimal permissions requested (only `storage`)
-- [ ] No network requests or external dependencies
-- [ ] Extension works offline
+- [ ] Permissions documented (storage, sidePanel, <all_urls>)
+- [ ] No external network requests (except CDN for optional libraries)
+- [ ] Extension works completely offline
+- [ ] Content scripts properly inject on supported platforms
+- [ ] Side panel functionality tested
 
 ### 3. Assets Ready
 - [ ] Icon files created in all required sizes (16, 32, 48, 128px)
@@ -57,8 +59,14 @@ This document outlines the steps to package and submit the Prompt Library extens
 
 1. **Create Submission Package:**
    ```bash
+   npm run package
+   # This automatically creates prompt-library-extension-v{version}.zip
+   ```
+
+   Or manually:
+   ```bash
    cd dist/
-   zip -r ../prompt-library-extension-v1.0.0.zip .
+   zip -r ../prompt-library-extension-v1.5.0.zip .
    cd ..
    ```
 
@@ -80,56 +88,95 @@ This document outlines the steps to package and submit the Prompt Library extens
 ### Store Listing Information
 
 **Basic Information:**
-- **Name:** Prompt Library
-- **Summary:** Store, organize, and quickly access your personal collection of text prompts
+- **Name:** My Prompt Manager (or "Prompt Library" if preferred)
+- **Summary:** Seamlessly manage and insert prompts directly in Claude, ChatGPT, Gemini, and other AI platforms
 - **Description:** See detailed description below
-- **Category:** Productivity
+- **Category:** Productivity / Developer Tools
 - **Language:** English
 
 **Detailed Description:**
 ```
-Prompt Library is a powerful Chrome extension designed for anyone who frequently uses text prompts, templates, or snippets. Whether you're a content creator, developer, customer service representative, or just someone who likes to stay organized, this extension helps you manage your personal collection of reusable text content.
+My Prompt Manager is a powerful Chrome extension for AI power users who want seamless access to their personal prompt library directly within AI chat interfaces. Whether you're working with Claude, ChatGPT, Perplexity, Gemini, or custom AI platforms, this extension brings your prompts right where you need them.
 
 KEY FEATURES:
-✅ Store unlimited text prompts with custom titles
-✅ Organize prompts into color-coded categories  
-✅ Quick one-click copying to clipboard
-✅ Real-time search with text highlighting
-✅ Edit and delete prompts with confirmation dialogs
-✅ Automatic data backup and recovery
-✅ Clean, modern interface that's easy to use
-✅ Works completely offline - your data stays private
+✅ **Native AI Platform Integration** - Library icon appears directly in Claude, ChatGPT, Perplexity, Gemini, and Mistral chat interfaces
+✅ **One-Click Insertion** - Click prompts to instantly insert them into chat inputs (no copy-paste needed)
+✅ **Smart Organization** - Color-coded categories, fuzzy search, duplicate detection, and intelligent sorting
+✅ **Custom Site Support** - Configure any AI platform with visual element picker and fingerprinting
+✅ **Side Panel UI** - Modern Chrome side panel interface alongside popup for enhanced workflow
+✅ **Dark Mode** - Automatic theme detection with manual toggle for comfortable use
+✅ **Import/Export** - Backup and share your prompt library with full data portability
+✅ **Advanced Search** - Real-time fuzzy search with Levenshtein distance matching
+✅ **Privacy First** - 100% local storage, no external servers, complete offline functionality
+
+SUPPORTED PLATFORMS:
+• Claude.ai (claude.ai)
+• ChatGPT (chat.openai.com)
+• Perplexity (perplexity.ai)
+• Google Gemini (gemini.google.com)
+• Mistral LeChat (chat.mistral.ai)
+• Custom sites via settings (any AI platform with text input)
 
 PERFECT FOR:
-• Content creators managing templates and snippets
-• Developers storing commonly used code patterns
-• Customer service teams with standard responses
-• Writers organizing research and quotes
-• Students managing study materials
-• Anyone who wants quick access to frequently used text
+• AI researchers managing complex prompt templates
+• Content creators with reusable AI workflows
+• Developers storing code generation prompts
+• Data scientists with analysis prompt libraries
+• Writers organizing creative AI interactions
+• Anyone who frequently uses AI chat platforms
 
 PRIVACY & SECURITY:
-Your data is stored locally using Chrome's secure storage API. No data is sent to external servers, ensuring complete privacy and offline functionality.
+• All data stored locally using Chrome's secure storage API
+• No external network requests or analytics
+• No data collection or transmission to servers
+• Open source and auditable code
+• DOMPurify sanitization for XSS protection
+• Secure element fingerprinting (no sensitive data captured)
 
 HOW TO USE:
-1. Click the extension icon to open the prompt library
-2. Add new prompts with custom titles and categories
-3. Use the search bar to quickly find specific prompts
-4. Click "Copy" to instantly copy any prompt to your clipboard
-5. Right-click prompts to edit or delete them
-6. Use "Manage Categories" to organize your collection
+1. Install the extension and pin the icon
+2. Add prompts via popup or side panel
+3. Visit any supported AI platform (Claude, ChatGPT, etc.)
+4. Look for the prompt library icon near the chat input
+5. Click the icon to open your prompt selector
+6. Select a prompt - it instantly inserts into the chat
+7. For custom sites: Settings → Custom Sites → Add Site → Use Element Picker
 
-The extension requires only storage permission to save your prompts locally. No other permissions are needed, ensuring maximum security and privacy.
+ADVANCED FEATURES:
+• **Element Fingerprinting**: Robust element identification that survives UI updates
+• **Hybrid Positioning**: CSS Anchor API + Floating UI for optimal icon placement
+• **Keyboard Navigation**: Arrow keys, Enter/Escape for quick selection
+• **Bulk Operations**: Multi-select, bulk delete, and category reassignment
+• **Data Compression**: LZ-string compression for efficient storage
+• **Levenshtein Distance**: Smart duplicate detection and fuzzy search
 
-Start organizing your text snippets today with Prompt Library!
+TECHNICAL DETAILS:
+• Manifest V3 compliant
+• React 18 + TypeScript
+• 470+ automated tests
+• Lazy-loaded positioning libraries (optimal bundle size)
+• Content Security Policy compliant
+• Accessible keyboard navigation (WCAG 2.1)
+
+PERMISSIONS:
+• storage - Save prompts locally
+• sidePanel - Open side panel UI
+• <all_urls> - Inject library icon on AI platforms
+
+Version 1.5.0 - Continuously updated with new platform support and features!
+
+Start supercharging your AI workflow today with My Prompt Manager!
 ```
 
 **Screenshots Required:**
-1. Main library view showing prompts
-2. Add prompt form
-3. Search functionality in action
-4. Category management interface
-5. Right-click context menu
+1. **Native Integration**: Library icon in Claude/ChatGPT chat interface
+2. **Prompt Selector**: Dropdown showing prompts with search and categories
+3. **Side Panel**: Modern side panel UI with prompt library
+4. **Popup Interface**: Main popup with prompt cards and categories
+5. **Custom Sites**: Element picker for configuring custom AI platforms
+6. **Dark Mode**: Extension in dark theme showing theme toggle
+7. **Category Management**: Category editor with colors and organization
+8. **Settings**: Settings page showing platform toggles and custom sites
 
 ### Required Assets
 

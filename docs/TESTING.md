@@ -1,0 +1,765 @@
+# Testing Guide
+
+**Version:** 1.5.0
+**Last Updated:** 2025-10-09
+
+This document provides comprehensive testing strategies, patterns, and guidelines for the My Prompt Manager extension.
+
+---
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Test Infrastructure](#test-infrastructure)
+- [Unit Testing](#unit-testing)
+- [Integration Testing](#integration-testing)
+- [End-to-End Testing](#end-to-end-testing)
+- [Manual QA](#manual-qa)
+- [Coverage Requirements](#coverage-requirements)
+
+---
+
+## Overview
+
+### Test Statistics
+
+- **Total Tests:** 470+
+- **Test Files:** 26
+- **Coverage Threshold:** 50% (statements)
+- **Test Framework:** Vitest + React Testing Library + Playwright
+
+### Test Pyramid
+
+```
+       ┌─────────────┐
+       │   Manual    │
+       │   Testing   │  (QA documents, real browser testing)
+       └─────────────┘
+      ┌───────────────┐
+      │  E2E Tests    │  (Playwright - browser automation)
+      └───────────────┘
+    ┌───────────────────┐
+    │ Integration Tests │  (Cross-module interactions)
+    └───────────────────┘
+  ┌─────────────────────────┐
+  │    Unit Tests (470+)    │  (Individual functions, components)
+  └─────────────────────────┘
+```
+
+---
+
+## Test Infrastructure
+
+### Configuration
+
+**Vitest Config:** `vitest.config.ts`
+```typescript
+export default defineConfig({
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./src/test/setup.ts'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html'],
+      thresholds: {
+        statements: 50
+      }
+    }
+  }
+});
+```
+
+**Playwright Config:** `playwright.config.ts`
+```typescript
+export default defineConfig({
+  testDir: './tests/e2e',
+  use: {
+    channel: 'chromium',
+    headless: process.env.CI === 'true'
+  }
+});
+```
+
+### Test Setup
+
+**File:** `src/test/setup.ts` (530 lines)
+
+**Chrome API Mocking:**
+```typescript
+// Mock chrome.storage.local
+const mockStorage: Record<string, any> = {};
+
+global.chrome = {
+  storage: {
+    local: {
+      get: vi.fn((keys) => Promise.resolve(mockStorage)),
+      set: vi.fn((items) => { Object.assign(mockStorage, items); }),
+      remove: vi.fn((keys) => { /* ... */ }),
+      clear: vi.fn(() => { Object.keys(mockStorage).forEach(k => delete mockStorage[k]); })
+    }
+  },
+  runtime: {
+    sendMessage: vi.fn(),
+    onMessage: { addListener: vi.fn() }
+  }
+};
+```
+
+**Service Manager Mocking:**
+```typescript
+// Spy wrapper for StorageManager
+vi.spyOn(StorageManager, 'getInstance').mockReturnValue({
+  getPrompts: vi.fn(),
+  savePrompt: vi.fn(),
+  // ... all methods wrapped with vi.fn()
+});
+```
+
+**DOM Mocking:**
+```typescript
+// matchMedia for responsive testing
+Object.defineProperty(window, 'matchMedia', {
+  value: vi.fn((query) => ({
+    matches: false,
+    media: query,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn()
+  }))
+});
+
+// navigator.clipboard for copy/paste tests
+Object.assign(navigator, {
+  clipboard: {
+    writeText: vi.fn(() => Promise.resolve())
+  }
+});
+```
+
+### Running Tests
+
+```bash
+# Run all tests
+npm test
+
+# Run tests with UI
+npm run test:ui
+
+# Generate coverage report
+npm run test:coverage
+
+# Run E2E tests
+npm run test:e2e
+
+# Watch mode (development)
+npm test -- --watch
+```
+
+---
+
+## Unit Testing
+
+### Component Tests
+
+**Pattern:** React Testing Library
+
+**Example:** `src/components/__tests__/PromptCard.test.tsx`
+
+```typescript
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, userEvent } from '@testing-library/react';
+import PromptCard from '../PromptCard';
+
+describe('PromptCard', () => {
+  const mockPrompt: Prompt = {
+    id: '1',
+    title: 'Test Prompt',
+    content: 'Test content',
+    categoryId: 'cat1',
+    createdAt: Date.now()
+  };
+
+  const handlers = {
+    onCopy: vi.fn(),
+    onEdit: vi.fn(),
+    onDelete: vi.fn()
+  };
+
+  it('renders prompt title and content', () => {
+    render(<PromptCard prompt={mockPrompt} {...handlers} />);
+    expect(screen.getByText('Test Prompt')).toBeInTheDocument();
+    expect(screen.getByText('Test content')).toBeInTheDocument();
+  });
+
+  it('calls onCopy when copy button clicked', async () => {
+    render(<PromptCard prompt={mockPrompt} {...handlers} />);
+
+    const copyButton = screen.getByLabelText(/copy/i);
+    await userEvent.click(copyButton);
+
+    expect(handlers.onCopy).toHaveBeenCalledWith('1');
+  });
+
+  it('highlights search term when provided', () => {
+    render(
+      <PromptCard
+        prompt={mockPrompt}
+        searchTerm="Test"
+        {...handlers}
+      />
+    );
+
+    const highlights = screen.getAllByTestId('highlight');
+    expect(highlights).toHaveLength(2); // "Test" appears twice
+  });
+});
+```
+
+**Test Categories:**
+1. **Rendering** - Component renders correctly
+2. **Interactions** - User actions trigger correct handlers
+3. **State** - State changes reflected in UI
+4. **Accessibility** - ARIA attributes present
+5. **Edge Cases** - Empty states, error states
+
+---
+
+### Service Tests
+
+**Pattern:** Unit tests with mocked dependencies
+
+**Example:** `src/services/__tests__/promptManager.test.ts`
+
+```typescript
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { PromptManager } from '../promptManager';
+import { StorageManager } from '../storage';
+
+describe('PromptManager', () => {
+  let manager: PromptManager;
+  let mockStorage: jest.Mocked<StorageManager>;
+
+  beforeEach(() => {
+    mockStorage = {
+      getPrompts: vi.fn(),
+      savePrompt: vi.fn(),
+      // ... other methods
+    } as any;
+
+    manager = new PromptManager(mockStorage);
+  });
+
+  describe('searchPrompts', () => {
+    it('filters prompts by title', async () => {
+      mockStorage.getPrompts.mockResolvedValue([
+        { id: '1', title: 'React Hook', content: '...' },
+        { id: '2', title: 'Vue Component', content: '...' }
+      ]);
+
+      const results = await manager.searchPrompts('React');
+      expect(results).toHaveLength(1);
+      expect(results[0].title).toBe('React Hook');
+    });
+
+    it('filters prompts by content', async () => {
+      mockStorage.getPrompts.mockResolvedValue([
+        { id: '1', title: 'Test', content: 'React hooks' },
+        { id: '2', title: 'Test', content: 'Vue composables' }
+      ]);
+
+      const results = await manager.searchPrompts('hooks');
+      expect(results).toHaveLength(1);
+    });
+  });
+
+  describe('findDuplicatePrompts', () => {
+    it('detects similar prompts', async () => {
+      mockStorage.getPrompts.mockResolvedValue([
+        { id: '1', title: 'Test', content: 'Hello world' },
+        { id: '2', title: 'Test', content: 'Hello world!' }
+      ]);
+
+      const duplicates = await manager.findDuplicatePrompts(0.90);
+      expect(duplicates).toHaveLength(1);
+      expect(duplicates[0].similarity).toBeGreaterThan(0.90);
+    });
+  });
+
+  describe('validatePromptData', () => {
+    it('rejects empty content', () => {
+      const error = manager.validatePromptData({
+        title: 'Test',
+        content: '',
+        categoryId: 'cat1'
+      });
+
+      expect(error).toBeTruthy();
+      expect(error?.field).toBe('content');
+    });
+
+    it('rejects oversized content', () => {
+      const longContent = 'a'.repeat(10001);
+      const error = manager.validatePromptData({
+        content: longContent,
+        categoryId: 'cat1'
+      });
+
+      expect(error).toBeTruthy();
+      expect(error?.message).toContain('10,000 characters');
+    });
+  });
+});
+```
+
+---
+
+### Hook Tests
+
+**Pattern:** `@testing-library/react-hooks` (or renderHook from RTL)
+
+**Example:** `src/hooks/__tests__/usePrompts.test.ts`
+
+```typescript
+import { describe, it, expect, vi } from 'vitest';
+import { renderHook, waitFor } from '@testing-library/react';
+import { usePrompts } from '../usePrompts';
+
+describe('usePrompts', () => {
+  it('loads prompts on mount', async () => {
+    const { result } = renderHook(() => usePrompts());
+
+    expect(result.current.loading).toBe(true);
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.prompts).toBeDefined();
+  });
+
+  it('creates prompt and refreshes list', async () => {
+    const { result } = renderHook(() => usePrompts());
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await result.current.createPrompt({
+      title: 'New Prompt',
+      content: 'Test content',
+      categoryId: 'cat1'
+    });
+
+    await waitFor(() => {
+      expect(result.current.prompts).toContainEqual(
+        expect.objectContaining({ title: 'New Prompt' })
+      );
+    });
+  });
+
+  it('handles errors gracefully', async () => {
+    // Mock PromptManager to throw error
+    vi.spyOn(PromptManager.prototype, 'createPrompt')
+      .mockRejectedValueOnce(new Error('Save failed'));
+
+    const { result } = renderHook(() => usePrompts());
+
+    await result.current.createPrompt({ /* data */ });
+
+    await waitFor(() => {
+      expect(result.current.error).toBe('Save failed');
+    });
+  });
+});
+```
+
+---
+
+## Integration Testing
+
+### Cross-Module Tests
+
+**Pattern:** Test interactions between services
+
+**Example:** Storage → PromptManager integration
+
+```typescript
+describe('Storage Integration', () => {
+  let storage: StorageManager;
+  let manager: PromptManager;
+
+  beforeEach(async () => {
+    storage = StorageManager.getInstance();
+    manager = PromptManager.getInstance();
+    await storage.clearAllData();
+  });
+
+  it('creates prompt and retrieves via search', async () => {
+    // Create prompt via manager
+    await manager.createPrompt({
+      title: 'Integration Test',
+      content: 'Testing storage integration',
+      categoryId: 'default'
+    });
+
+    // Search via manager (uses storage internally)
+    const results = await manager.searchPrompts('Integration');
+
+    expect(results).toHaveLength(1);
+    expect(results[0].title).toBe('Integration Test');
+  });
+
+  it('updates prompt and reflects in storage', async () => {
+    const promptId = await manager.createPrompt({ /* data */ });
+
+    await manager.updatePrompt(promptId, {
+      title: 'Updated Title'
+    });
+
+    const prompts = await storage.getPrompts();
+    const updated = prompts.find(p => p.id === promptId);
+
+    expect(updated?.title).toBe('Updated Title');
+  });
+});
+```
+
+---
+
+## End-to-End Testing
+
+### Playwright Tests
+
+**File:** `tests/e2e/extension.spec.ts`
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test.describe('Extension E2E', () => {
+  test.beforeEach(async ({ page }) => {
+    // Load extension
+    await page.goto('chrome://extensions/');
+    // ... extension loading logic
+  });
+
+  test('creates and displays prompt', async ({ page }) => {
+    // Open popup
+    await page.goto('chrome-extension://[ID]/popup.html');
+
+    // Click "Add Prompt" button
+    await page.click('button[aria-label="Add new prompt"]');
+
+    // Fill form
+    await page.fill('input[name="title"]', 'E2E Test Prompt');
+    await page.fill('textarea[name="content"]', 'E2E test content');
+
+    // Submit
+    await page.click('button[type="submit"]');
+
+    // Verify prompt appears
+    await expect(page.locator('text=E2E Test Prompt')).toBeVisible();
+  });
+
+  test('searches prompts', async ({ page }) => {
+    await page.goto('chrome-extension://[ID]/popup.html');
+
+    // Type in search
+    await page.fill('input[role="searchbox"]', 'React');
+
+    // Wait for debounce
+    await page.waitForTimeout(350);
+
+    // Check filtered results
+    const promptCards = page.locator('[data-testid="prompt-card"]');
+    await expect(promptCards).toHaveCount(5);
+  });
+});
+```
+
+---
+
+## Manual QA
+
+### QA Checklists
+
+**Platform Integration QA:**
+
+See: `docs/GEMINI_MANUAL_QA.md` for platform-specific example
+
+**General Checklist:**
+- [ ] Extension loads without errors
+- [ ] Popup opens correctly
+- [ ] Side panel opens correctly
+- [ ] Prompts display properly
+- [ ] Search works (instant + debounced)
+- [ ] Create prompt form validates
+- [ ] Edit prompt updates correctly
+- [ ] Delete prompt with confirmation
+- [ ] Categories CRUD operations work
+- [ ] Settings persist across sessions
+- [ ] Import/export data works
+- [ ] Theme switching works (light/dark/system)
+- [ ] Toast notifications display
+- [ ] Storage quota warnings appear
+- [ ] Custom site configuration works
+- [ ] Element picker activates
+- [ ] Content script icon appears on AI platforms
+- [ ] Prompt insertion works on all platforms
+- [ ] Keyboard navigation functional
+- [ ] Accessibility (screen reader compatible)
+
+---
+
+## Coverage Requirements
+
+### Current Coverage
+
+**Target:** 50% statement coverage
+**Achieved:** ~55% (exceeds target)
+
+**Coverage by Area:**
+- **Services:** ~80% (well-tested)
+- **Components:** ~60% (good coverage)
+- **Hooks:** ~70% (comprehensive)
+- **Content Scripts:** ~40% (needs improvement)
+- **Utilities:** ~90% (excellent)
+
+### Excluded from Coverage
+
+- `node_modules/`
+- `src/test/`
+- `dist/`
+- `tests/e2e/`
+- Config files (vite.config.ts, etc.)
+- Type definitions (*.d.ts)
+- Background scripts (browser-only)
+
+### Generating Reports
+
+```bash
+# Generate HTML coverage report
+npm run test:coverage
+
+# View report
+open coverage/index.html
+```
+
+**Coverage Report Structure:**
+```
+coverage/
+├── index.html          # Main report
+├── lcov-report/        # Detailed line coverage
+└── coverage.json       # Raw data
+```
+
+---
+
+## Best Practices
+
+### 1. Test Organization
+
+**File Structure:**
+```
+src/
+├── components/
+│   ├── PromptCard.tsx
+│   └── __tests__/
+│       └── PromptCard.test.tsx
+├── services/
+│   ├── storage.ts
+│   └── __tests__/
+│       └── storage.test.ts
+└── hooks/
+    ├── usePrompts.ts
+    └── __tests__/
+        └── usePrompts.test.ts
+```
+
+### 2. Test Naming
+
+```typescript
+// ✅ Good - Descriptive
+it('calls onCopy when copy button clicked', () => { });
+it('displays error message when validation fails', () => { });
+
+// ❌ Bad - Vague
+it('works', () => { });
+it('test1', () => { });
+```
+
+### 3. Test Independence
+
+```typescript
+// ✅ Good - Each test is independent
+describe('PromptManager', () => {
+  beforeEach(() => {
+    // Reset state before each test
+    vi.clearAllMocks();
+  });
+
+  it('test 1', () => { /* ... */ });
+  it('test 2', () => { /* ... */ });
+});
+
+// ❌ Bad - Tests depend on each other
+it('creates prompt', () => {
+  createPrompt(data);
+});
+
+it('retrieves created prompt', () => {
+  // Assumes previous test ran
+  const prompt = getPrompt(id);
+});
+```
+
+### 4. Async Testing
+
+```typescript
+// ✅ Good - Use async/await or waitFor
+it('loads data asynchronously', async () => {
+  const { result } = renderHook(() => usePrompts());
+
+  await waitFor(() => {
+    expect(result.current.loading).toBe(false);
+  });
+
+  expect(result.current.prompts).toBeDefined();
+});
+
+// ❌ Bad - No wait for async operation
+it('loads data', () => {
+  const { result } = renderHook(() => usePrompts());
+  expect(result.current.prompts).toBeDefined(); // Will fail
+});
+```
+
+### 5. Mock Management
+
+```typescript
+// ✅ Good - Clear mocks between tests
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
+// ✅ Good - Restore after test
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+```
+
+---
+
+## Debugging Tests
+
+### Common Issues
+
+**1. Test Timeouts**
+
+```typescript
+// Increase timeout for slow operations
+it('loads large dataset', async () => {
+  // ...
+}, 10000); // 10 second timeout
+```
+
+**2. Async State Updates**
+
+```typescript
+// Use waitFor for React state updates
+await waitFor(() => {
+  expect(screen.getByText('Loaded')).toBeInTheDocument();
+});
+```
+
+**3. Mock Not Called**
+
+```typescript
+// Verify mock setup
+expect(mockFn).toHaveBeenCalled();
+
+// Check call arguments
+expect(mockFn).toHaveBeenCalledWith(expectedArg);
+
+// View all calls
+console.log(mockFn.mock.calls);
+```
+
+### Debug Tools
+
+**Vitest UI:**
+```bash
+npm run test:ui
+# Opens browser with test results and coverage
+```
+
+**Console Debugging:**
+```typescript
+it('debug test', () => {
+  const { debug } = render(<Component />);
+  debug(); // Prints DOM to console
+});
+```
+
+**Query Debugging:**
+```typescript
+screen.logTestingPlaygroundURL(); // Get query suggestions
+```
+
+---
+
+## Continuous Integration
+
+### GitHub Actions
+
+**PR Checks** (`.github/workflows/pr-checks.yml`):
+- Runs all unit tests
+- Checks coverage threshold
+- Reports failures
+
+**Main Deploy** (`.github/workflows/main-deploy.yml`):
+- Extended validation
+- E2E tests
+- Performance benchmarks
+
+### Pre-commit Hooks
+
+**Husky + Lint-staged:**
+```json
+{
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "vitest related --run"
+    ]
+  }
+}
+```
+
+---
+
+## Quick Reference
+
+### Test Commands
+
+| Command | Purpose |
+|---------|---------|
+| `npm test` | Run all unit tests |
+| `npm run test:ui` | Run tests with UI |
+| `npm run test:coverage` | Generate coverage report |
+| `npm run test:e2e` | Run E2E tests with Playwright |
+| `npm test -- --watch` | Watch mode for development |
+
+### Test Patterns
+
+| Pattern | Use Case |
+|---------|----------|
+| `render()` | Render React component |
+| `screen.getByText()` | Query rendered element |
+| `userEvent.click()` | Simulate user interaction |
+| `waitFor()` | Wait for async state |
+| `vi.fn()` | Create mock function |
+| `vi.spyOn()` | Spy on existing function |
+| `expect().toHaveBeenCalled()` | Verify mock called |
+
+---
+
+**Last Updated:** 2025-10-09
+**Version:** 1.5.0
