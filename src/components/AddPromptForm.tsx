@@ -1,62 +1,103 @@
-import { useState } from 'react';
-import type { FC, FormEvent } from 'react';
+import { useActionState, useReducer, useRef } from 'react';
+import type { FC } from 'react';
 
+import { MAX_CONTENT_LENGTH, MAX_TITLE_LENGTH, VALIDATION_MESSAGES, formatCharacterCount } from '../constants/validation';
 import { DEFAULT_CATEGORY, Category } from '../types';
 import { AddPromptFormProps } from '../types/components';
+import { Logger, toError } from '../utils';
 
 import ViewHeader from './ViewHeader';
+
+// Error state type for field-specific validation
+interface FieldErrors {
+  title?: string;
+  content?: string;
+  general?: string;
+}
 
 const AddPromptForm: FC<AddPromptFormProps> = ({
   categories,
   onSubmit,
-  onCancel,
-  isLoading = false
+  onCancel
 }) => {
-  const [formData, setFormData] = useState({
-    title: '',
-    content: '',
-    category: DEFAULT_CATEGORY
-  });
-  const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  // Refs to form elements for deriving character counts (single source of truth)
+  const titleRef = useRef<HTMLInputElement>(null);
+  const contentRef = useRef<HTMLTextAreaElement>(null);
 
-  const validateForm = () => {
-    const newErrors: { [key: string]: string } = {};
+  // Force component re-render to update character count display
+  const [, forceUpdate] = useReducer((x: number) => x + 1, 0);
 
-    if (!formData.content.trim()) {
-      newErrors.content = 'Content is required';
-    }
+  // Derive character counts from actual form values
+  const titleLength = titleRef.current?.value.length ?? 0;
+  const contentLength = contentRef.current?.value.length ?? 0;
 
-    if (formData.content.length > 10000) {
-      newErrors.content = 'Content cannot exceed 10000 characters';
-    }
+  // React 19 useActionState for automatic loading/error handling
+  const [errors, submitAction, isPending] = useActionState(
+    async (_prevState: FieldErrors | null, formData: FormData) => {
+      // Validation
+      const title = formData.get('title') as string;
+      const content = formData.get('content') as string;
+      const category = formData.get('category') as string;
 
-    if (formData.title.length > 100) {
-      newErrors.title = 'Title cannot exceed 100 characters';
-    }
+      const validationErrors: FieldErrors = {};
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+      if (!content.trim()) {
+        Logger.warn('Form validation failed: Content is required', {
+          component: 'AddPromptForm',
+          field: 'content'
+        });
+        validationErrors.content = VALIDATION_MESSAGES.CONTENT_REQUIRED;
+      }
 
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
-     
-    e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
+      if (content.length > MAX_CONTENT_LENGTH) {
+        Logger.warn('Form validation failed: Content exceeds limit', {
+          component: 'AddPromptForm',
+          field: 'content',
+          length: content.length,
+          limit: MAX_CONTENT_LENGTH
+        });
+        validationErrors.content = VALIDATION_MESSAGES.CONTENT_TOO_LONG;
+      }
 
-    (onSubmit as (data: typeof formData) => void)(formData);
-  };
+      if (title.length > MAX_TITLE_LENGTH) {
+        Logger.warn('Form validation failed: Title exceeds limit', {
+          component: 'AddPromptForm',
+          field: 'title',
+          length: title.length,
+          limit: MAX_TITLE_LENGTH
+        });
+        validationErrors.title = VALIDATION_MESSAGES.TITLE_TOO_LONG;
+      }
 
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    
-    // Clear error when user starts typing
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }));
-    }
-  };
+      // Return validation errors if any
+      if (Object.keys(validationErrors).length > 0) {
+        return validationErrors;
+      }
+
+      // Submit data
+      try {
+        await (onSubmit as (data: { title: string; content: string; category: string }) => Promise<void>)({
+          title,
+          content,
+          category
+        });
+        Logger.info('Prompt form submitted successfully', {
+          component: 'AddPromptForm',
+          category,
+          hasTitle: !!title.trim()
+        });
+        return null; // Success, no error
+      } catch (err) {
+        Logger.error('Failed to submit prompt form', toError(err), {
+          component: 'AddPromptForm',
+          category,
+          hasTitle: !!title.trim()
+        });
+        return { general: (err as Error).message || 'Failed to save prompt' };
+      }
+    },
+    null // Initial error state
+  );
 
   return (
     <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900">
@@ -71,30 +112,44 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
         </ViewHeader.Actions>
       </ViewHeader>
 
+      {/* General Error Display */}
+      {errors?.general && (
+        <div
+          role="alert"
+          aria-live="polite"
+          className="flex-shrink-0 p-4 text-sm text-red-600 dark:text-red-400 bg-red-50/80 dark:bg-red-900/20 backdrop-blur-sm border-b border-red-200 dark:border-red-700 font-medium"
+        >
+          ⚠️ {errors.general}
+        </div>
+      )}
+
       {/* Form */}
       <div className="flex-1 overflow-auto custom-scrollbar">
-          <form id="add-prompt-form" onSubmit={handleSubmit}>
+          <form id="add-prompt-form" action={submitAction}>
             {/* Title */}
             <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5">
               <label htmlFor="title" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
                 Title (optional)
               </label>
               <input
+                ref={titleRef}
                 type="text"
                 id="title"
-                value={formData.title}
-                onChange={(e) => { handleInputChange('title', e.target.value); }}
+                name="title"
+                defaultValue=""
+                onChange={forceUpdate}
                 placeholder="Enter a descriptive title or leave blank to auto-generate"
                 className={`w-full px-4 py-3 border rounded-xl focus-input bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 text-gray-900 dark:text-gray-100 ${
-                  errors.title ? 'border-red-300 dark:border-red-500' : 'border-purple-200 dark:border-gray-600'
+                  errors?.title ? 'border-red-300 dark:border-red-500' : 'border-purple-200 dark:border-gray-600'
                 }`}
-                disabled={isLoading}
+                disabled={isPending}
+                maxLength={MAX_TITLE_LENGTH}
               />
-              {errors.title && (
-                <p className="mt-2 text-sm text-red-600 dark:text-red-400 font-medium">{errors.title}</p>
+              {errors?.title && (
+                <p className="mt-2 text-sm text-red-600 dark:text-red-400 font-medium">⚠️ {errors.title}</p>
               )}
               <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
-                {formData.title.length}/100 characters
+                {formatCharacterCount(titleLength, MAX_TITLE_LENGTH)}
               </p>
             </div>
 
@@ -106,10 +161,10 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
               <div className="relative">
                 <select
                   id="category"
-                  value={formData.category}
-                  onChange={(e) => { handleInputChange('category', e.target.value); }}
+                  name="category"
+                  defaultValue={DEFAULT_CATEGORY}
                   className="w-full px-4 py-3 pr-10 border border-purple-200 dark:border-gray-600 rounded-xl focus-input bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 font-medium appearance-none cursor-pointer text-gray-900 dark:text-gray-100"
-                  disabled={isLoading}
+                  disabled={isPending}
                 >
                   {(categories).map((category: Category) => (
                     <option key={category.id} value={category.name}>
@@ -131,21 +186,25 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
                 Content *
               </label>
               <textarea
+                ref={contentRef}
                 id="content"
-                value={formData.content}
-                onChange={(e) => { handleInputChange('content', e.target.value); }}
+                name="content"
+                defaultValue=""
+                onChange={forceUpdate}
                 placeholder="Enter your prompt content here..."
                 rows={8}
                 className={`w-full px-4 py-3 border rounded-xl focus-input resize-none bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 text-gray-900 dark:text-gray-100 ${
-                  errors.content ? 'border-red-300 dark:border-red-500' : 'border-purple-200 dark:border-gray-600'
+                  errors?.content ? 'border-red-300 dark:border-red-500' : 'border-purple-200 dark:border-gray-600'
                 }`}
-                disabled={isLoading}
+                disabled={isPending}
+                maxLength={MAX_CONTENT_LENGTH}
+                required
               />
-              {errors.content && (
-                <p className="mt-2 text-sm text-red-600 dark:text-red-400 font-medium">{errors.content}</p>
+              {errors?.content && (
+                <p className="mt-2 text-sm text-red-600 dark:text-red-400 font-medium">⚠️ {errors.content}</p>
               )}
               <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
-                {formData.content.length}/10000 characters
+                {formatCharacterCount(contentLength, MAX_CONTENT_LENGTH)}
               </p>
             </div>
 
@@ -159,7 +218,7 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
             type="button"
             onClick={onCancel as () => void}
             className="flex-1 px-6 py-3 text-sm font-semibold text-gray-700 dark:text-gray-300 bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm border border-purple-200 dark:border-gray-600 rounded-xl hover:bg-white/80 dark:hover:bg-gray-700/80 transition-all duration-200 focus-secondary"
-            disabled={isLoading}
+            disabled={isPending}
           >
             Cancel
           </button>
@@ -167,9 +226,9 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
             type="submit"
             form="add-prompt-form"
             className="flex-1 px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 focus-primary"
-            disabled={isLoading || !formData.content.trim()}
+            disabled={isPending}
           >
-            {isLoading ? (
+            {isPending ? (
               <div className="flex items-center justify-center space-x-2">
                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                 <span>Saving...</span>

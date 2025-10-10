@@ -1,70 +1,137 @@
-import { useState } from 'react';
-import type { FC, FormEvent } from 'react';
+import { useActionState, useReducer, useRef, useState } from 'react';
+import type { FC } from 'react';
 
+import { MAX_CONTENT_LENGTH, MAX_TITLE_LENGTH, VALIDATION_MESSAGES, formatCharacterCount } from '../constants/validation';
 import { Category } from '../types';
 import { EditPromptFormProps } from '../types/components';
+import { Logger, toError } from '../utils';
 
 import ViewHeader from './ViewHeader';
+
+// Error state type for field-specific validation
+interface FieldErrors {
+  title?: string;
+  content?: string;
+  general?: string;
+}
 
 const EditPromptForm: FC<EditPromptFormProps> = ({
   prompt,
   categories,
   onSubmit,
-  onCancel,
-  isLoading = false
+  onCancel
 }) => {
-  const [formData, setFormData] = useState({
-    title: (prompt).title,
-    content: (prompt).content,
-    category: (prompt).category
-  });
-  const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  // Refs to form elements for deriving character counts (single source of truth)
+  const titleRef = useRef<HTMLInputElement>(null);
+  const contentRef = useRef<HTMLTextAreaElement>(null);
 
-  const validateForm = () => {
-    const newErrors: { [key: string]: string } = {};
+  // Force component re-render to update character count display
+  const [, forceUpdate] = useReducer((x: number) => x + 1, 0);
 
-    if (!formData.content.trim()) {
-      newErrors.content = 'Content is required';
-    }
+  // Derive character counts from actual form values
+  const titleLength = titleRef.current?.value.length ?? 0;
+  const contentLength = contentRef.current?.value.length ?? 0;
 
-    if (formData.content.length > 10000) {
-      newErrors.content = 'Content cannot exceed 10000 characters';
-    }
+  // Track form dirty state (has unsaved changes)
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-    if (formData.title.length > 100) {
-      newErrors.title = 'Title cannot exceed 100 characters';
-    }
+  // React 19 useActionState for automatic loading/error handling
+  const [errors, submitAction, isPending] = useActionState(
+    async (_prevState: FieldErrors | null, formData: FormData) => {
+      // Validation
+      const title = formData.get('title') as string;
+      const content = formData.get('content') as string;
+      const category = formData.get('category') as string;
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+      const validationErrors: FieldErrors = {};
 
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
-     
-    e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
+      if (!content.trim()) {
+        Logger.warn('Form validation failed: Content is required', {
+          component: 'EditPromptForm',
+          field: 'content',
+          promptId: prompt.id
+        });
+        validationErrors.content = VALIDATION_MESSAGES.CONTENT_REQUIRED;
+      }
 
-    (onSubmit as (data: typeof formData) => void)(formData);
-  };
+      if (content.length > MAX_CONTENT_LENGTH) {
+        Logger.warn('Form validation failed: Content exceeds limit', {
+          component: 'EditPromptForm',
+          field: 'content',
+          length: content.length,
+          limit: MAX_CONTENT_LENGTH,
+          promptId: prompt.id
+        });
+        validationErrors.content = VALIDATION_MESSAGES.CONTENT_TOO_LONG;
+      }
 
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    
-    // Clear error when user starts typing
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }));
-    }
-  };
+      if (title.length > MAX_TITLE_LENGTH) {
+        Logger.warn('Form validation failed: Title exceeds limit', {
+          component: 'EditPromptForm',
+          field: 'title',
+          length: title.length,
+          limit: MAX_TITLE_LENGTH,
+          promptId: prompt.id
+        });
+        validationErrors.title = VALIDATION_MESSAGES.TITLE_TOO_LONG;
+      }
 
-  const hasChanges = () => {
-    return (
-      formData.title !== (prompt).title ||
-      formData.content !== (prompt).content ||
-      formData.category !== (prompt).category
-    );
+      // Return validation errors if any
+      if (Object.keys(validationErrors).length > 0) {
+        return validationErrors;
+      }
+
+      // Check if there are changes
+      if (
+        title === prompt.title &&
+        content === prompt.content &&
+        category === prompt.category
+      ) {
+        Logger.warn('Form validation failed: No changes to save', {
+          component: 'EditPromptForm',
+          promptId: prompt.id
+        });
+        return { general: 'No changes to save' };
+      }
+
+      // Submit data
+      try {
+        await (onSubmit as (data: { title: string; content: string; category: string }) => Promise<void>)({
+          title,
+          content,
+          category
+        });
+        Logger.info('Prompt form submitted successfully', {
+          component: 'EditPromptForm',
+          promptId: prompt.id,
+          category,
+          hasTitle: !!title.trim()
+        });
+        return null; // Success, no error
+      } catch (err) {
+        Logger.error('Failed to submit prompt form', toError(err), {
+          component: 'EditPromptForm',
+          promptId: prompt.id,
+          category,
+          hasTitle: !!title.trim()
+        });
+        return { general: (err as Error).message || 'Failed to update prompt' };
+      }
+    },
+    null // Initial error state
+  );
+
+  // Track form changes to show unsaved changes indicator
+  const handleFieldChange = (field: 'title' | 'content' | 'category', value: string) => {
+    const isDirty =
+      field === 'title' ? value !== prompt.title :
+      field === 'content' ? value !== prompt.content :
+      value !== prompt.category;
+
+    setHasUnsavedChanges(isDirty || hasUnsavedChanges);
+
+    // Trigger re-render to update character counts
+    forceUpdate();
   };
 
   const formatDate = (timestamp: number) => {
@@ -84,9 +151,20 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
         </ViewHeader.Actions>
       </ViewHeader>
 
+      {/* General Error Display */}
+      {errors?.general && (
+        <div
+          role="alert"
+          aria-live="polite"
+          className="flex-shrink-0 p-4 text-sm text-red-600 dark:text-red-400 bg-red-50/80 dark:bg-red-900/20 backdrop-blur-sm border-b border-red-200 dark:border-red-700 font-medium"
+        >
+          ⚠️ {errors.general}
+        </div>
+      )}
+
       {/* Form */}
       <div className="flex-1 overflow-auto custom-scrollbar">
-        <form id="edit-prompt-form" onSubmit={handleSubmit}>
+        <form id="edit-prompt-form" action={submitAction}>
           {/* Title Section */}
           <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5">
             <div className="flex items-center space-x-2 mb-4">
@@ -95,21 +173,24 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
               </label>
             </div>
             <input
+              ref={titleRef}
               type="text"
               id="title"
-              value={formData.title}
-              onChange={(e) => { handleInputChange('title', e.target.value); }}
+              name="title"
+              defaultValue={prompt.title}
+              onChange={(e) => { handleFieldChange('title', e.target.value); }}
               placeholder="Enter a descriptive title"
               className={`w-full px-4 py-3 border rounded-xl focus-input bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 text-sm text-gray-900 dark:text-gray-100 ${
-                errors.title ? 'border-red-300 dark:border-red-500' : 'border-purple-200 dark:border-gray-600'
+                errors?.title ? 'border-red-300 dark:border-red-500' : 'border-purple-200 dark:border-gray-600'
               }`}
-              disabled={isLoading}
+              disabled={isPending}
+              maxLength={MAX_TITLE_LENGTH}
             />
-            {errors.title && (
+            {errors?.title && (
               <p className="mt-2 text-sm text-red-600 dark:text-red-400 font-medium">⚠️ {errors.title}</p>
             )}
             <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
-              {formData.title.length}/100 characters
+              {formatCharacterCount(titleLength, MAX_TITLE_LENGTH)}
             </p>
           </div>
 
@@ -123,10 +204,10 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
             <div className="relative">
               <select
                 id="category"
-                value={formData.category}
-                onChange={(e) => { handleInputChange('category', e.target.value); }}
+                name="category"
+                defaultValue={prompt.category}
                 className="w-full px-4 py-3 pr-10 border border-purple-200 dark:border-gray-600 rounded-xl focus-input bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 text-sm text-gray-900 dark:text-gray-100 appearance-none cursor-pointer"
-                disabled={isLoading}
+                disabled={isPending}
               >
                 {(categories).map((category: Category) => (
                   <option key={category.id} value={category.name}>
@@ -150,21 +231,25 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
               </label>
             </div>
             <textarea
+              ref={contentRef}
               id="content"
-              value={formData.content}
-              onChange={(e) => { handleInputChange('content', e.target.value); }}
+              name="content"
+              defaultValue={prompt.content}
+              onChange={(e) => { handleFieldChange('content', e.target.value); }}
               placeholder="Enter your prompt content here..."
               rows={10}
               className={`w-full px-4 py-3 border rounded-xl focus-input resize-none bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 text-sm text-gray-900 dark:text-gray-100 ${
-                errors.content ? 'border-red-300 dark:border-red-500' : 'border-purple-200 dark:border-gray-600'
+                errors?.content ? 'border-red-300 dark:border-red-500' : 'border-purple-200 dark:border-gray-600'
               }`}
-              disabled={isLoading}
+              disabled={isPending}
+              maxLength={MAX_CONTENT_LENGTH}
+              required
             />
-            {errors.content && (
+            {errors?.content && (
               <p className="mt-2 text-sm text-red-600 dark:text-red-400 font-medium">⚠️ {errors.content}</p>
             )}
             <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
-              {formData.content.length}/10000 characters
+              {formatCharacterCount(contentLength, MAX_CONTENT_LENGTH)}
             </p>
           </div>
         </form>
@@ -187,21 +272,21 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
 
       {/* Footer */}
       <div className="flex-shrink-0 p-6 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-t border-purple-100 dark:border-gray-700">
-        {/* Status indicator - only show when there are changes */}
-        {hasChanges() && (
+        {/* Unsaved changes indicator */}
+        {hasUnsavedChanges && !isPending && (
           <div className="mb-4 text-xs text-amber-600 dark:text-amber-400 font-medium flex items-center space-x-2 bg-amber-50/80 dark:bg-amber-900/20 backdrop-blur-sm border border-amber-200 dark:border-amber-700 rounded-lg px-3 py-2">
             <span>⚡</span>
             <span>You have unsaved changes</span>
           </div>
         )}
-        
+
         {/* Action buttons - full width for better spacing */}
         <div className="flex space-x-3">
           <button
             type="button"
             onClick={onCancel as () => void}
             className="flex-1 px-6 py-3 text-sm font-semibold text-gray-700 dark:text-gray-300 bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm border border-purple-200 dark:border-gray-600 rounded-xl hover:bg-white/80 dark:hover:bg-gray-700/80 transition-all duration-200 focus-secondary"
-            disabled={isLoading}
+            disabled={isPending}
           >
             Cancel
           </button>
@@ -209,9 +294,9 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
             type="submit"
             form="edit-prompt-form"
             className="flex-1 px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 focus-primary"
-            disabled={isLoading || !formData.content.trim() || !hasChanges()}
+            disabled={isPending}
           >
-            {isLoading ? (
+            {isPending ? (
               <div className="flex items-center justify-center space-x-2">
                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                 <span>Saving...</span>

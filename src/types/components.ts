@@ -31,7 +31,6 @@ export interface AddPromptFormProps {
   categories: Category[];
   onSubmit: (data: { title: string; content: string; category: string }) => void;
   onCancel: () => void;
-  isLoading?: boolean;
 }
 
 export interface EditPromptFormProps {
@@ -39,7 +38,6 @@ export interface EditPromptFormProps {
   categories: Category[];
   onSubmit: (data: { title: string; content: string; category: string }) => void;
   onCancel: () => void;
-  isLoading?: boolean;
 }
 
 export interface LibraryViewProps {

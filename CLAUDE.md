@@ -44,10 +44,11 @@ Never proceed without both passing. No exceptions for "small changes".
 The extension operates in three main contexts:
 
 1. **Extension UI (Popup & Side Panel)**
-   - React 18 + TypeScript + Tailwind CSS
+   - React 19 + TypeScript + Tailwind CSS
    - Entry points: `src/popup.tsx`, `src/sidepanel.tsx`
    - Shared component tree via `src/App.tsx`
    - State management through React contexts and hooks
+   - Modern form handling with `useActionState` and optimistic updates with `useOptimistic`
 
 2. **Content Script System**
    - Modular TypeScript architecture in `src/content/`
@@ -87,6 +88,7 @@ For comprehensive technical documentation, see:
 
 - **[Architecture Deep Dive](docs/ARCHITECTURE.md)** - Complete system design, design patterns, and adding new platforms
 - **[Component Catalog](docs/COMPONENTS.md)** - All 40+ React components with examples and patterns
+- **[React 19 Migration](docs/REACT_19_MIGRATION.md)** - Form handling with `useActionState`, optimistic updates, migration patterns
 - **[Services & Hooks](docs/SERVICES_AND_HOOKS.md)** - Business logic layer, algorithms, and data flow
 - **[Platform Integration](docs/PLATFORM_INTEGRATION.md)** - Adding new AI platform support
 - **[Custom Sites Guide](docs/ELEMENT_FINGERPRINTING_DESIGN.md)** - Element fingerprinting and custom positioning
@@ -130,11 +132,13 @@ src/
 - Debug interface: `window.__promptLibraryDebug`
 
 ### Testing Strategy
-- 470+ tests across 26 test files
+- 875 tests across 46 test files
 - Unit tests for services and utilities
 - Component tests with React Testing Library
 - Integration tests for storage operations
 - Mock Chrome APIs in `src/test/setup.ts`
+- **Test environment**: happy-dom (faster and more modern than jsdom)
+- **Note**: React 19 hooks (`useActionState`, `useOptimistic`) tested manually in browser (not supported in Node.js test environments)
 
 ## Development Guidelines
 
@@ -144,6 +148,75 @@ src/
 3. Follow TypeScript strict mode requirements
 4. Add tests for new functionality
 5. Run `npm test` and `npm run lint` before committing
+
+### Creating New Form Components (React 19)
+
+When creating new forms, use React 19's modern patterns. See **[React 19 Migration Guide](docs/REACT_19_MIGRATION.md)** for comprehensive examples.
+
+**Quick Start:**
+
+```typescript
+import { useActionState, useState } from 'react';
+
+interface FieldErrors {
+  fieldName?: string;
+  general?: string;
+}
+
+const MyForm: FC<Props> = ({ onSubmit, onCancel }) => {
+  const [charCount, setCharCount] = useState(0);
+
+  const [errors, submitAction, isPending] = useActionState(
+    async (_prevState: FieldErrors | null, formData: FormData) => {
+      const field = formData.get('fieldName') as string;
+
+      // Validation
+      const validationErrors: FieldErrors = {};
+      if (!field.trim()) {
+        validationErrors.fieldName = 'Field is required';
+      }
+      if (Object.keys(validationErrors).length > 0) {
+        return validationErrors;
+      }
+
+      // Submission
+      try {
+        await onSubmit({ field });
+        return null;
+      } catch (err) {
+        return { general: (err as Error).message };
+      }
+    },
+    null
+  );
+
+  return (
+    <form action={submitAction}>
+      {errors?.general && <ErrorBanner message={errors.general} />}
+
+      <input
+        name="fieldName"
+        onChange={(e) => setCharCount(e.target.value.length)}
+        disabled={isPending}
+        className={errors?.fieldName ? 'border-red-300' : 'border-purple-200'}
+      />
+      {errors?.fieldName && <FieldError message={errors.fieldName} />}
+      <p>{charCount}/100 characters</p>
+
+      <button type="submit" disabled={isPending}>
+        {isPending ? 'Saving...' : 'Save'}
+      </button>
+    </form>
+  );
+};
+```
+
+**Key Points:**
+- Use `useActionState` for form handling (not manual `useState`)
+- All inputs need `name` attributes for FormData API
+- Return `null` on success, `FieldErrors` object on validation failure
+- Use local `useState` for UI-only state (character counts, etc.)
+- See existing implementations: `AddPromptForm.tsx`, `EditPromptForm.tsx`
 
 ### Logging Guidelines
 
