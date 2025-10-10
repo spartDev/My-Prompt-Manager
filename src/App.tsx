@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useOptimistic, useTransition } from 'react';
 import type { FC } from 'react';
 
 import AddPromptForm from './components/AddPromptForm';
@@ -28,30 +28,40 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [showStorageWarning, setShowStorageWarning] = useState<boolean>(false);
 
-  const { 
-    prompts, 
-    loading: promptsLoading, 
+  // React 19 useTransition for managing optimistic updates
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [isPending, startTransition] = useTransition();
+
+  const {
+    prompts,
+    loading: promptsLoading,
     error: promptsError,
-    createPrompt, 
-    updatePrompt, 
+    createPrompt,
+    updatePrompt,
     deletePrompt,
     refreshPrompts
   } = usePrompts();
 
-  const { 
-    categories, 
+  // React 19 useOptimistic for instant UI updates on deletions
+  const [optimisticPrompts, setOptimisticDeletePrompt] = useOptimistic(
+    prompts,
+    (state, deletedId: string) => state.filter(p => p.id !== deletedId)
+  );
+
+  const {
+    categories,
     loading: categoriesLoading,
     createCategory,
     updateCategory,
     deleteCategory,
-    refreshCategories 
+    refreshCategories
   } = useCategories();
 
   const { copyToClipboard } = useClipboard();
   const { toasts, showToast, hideToast, queueLength, settings, updateSettings } = useToast();
-  
-  // Initialize search with debounce functionality
-  const searchWithDebounce = useSearchWithDebounce(prompts);
+
+  // Initialize search with debounce functionality using optimistic prompts
+  const searchWithDebounce = useSearchWithDebounce(optimisticPrompts);
 
   const handleAddNew = () => {
     setCurrentView('add');
@@ -64,10 +74,18 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   };
 
   const handleDeletePrompt = async (id: string) => {
+    // React 19 useOptimistic: Remove from UI immediately for instant feedback
+    // Wrap in startTransition as required by React for optimistic updates
+    startTransition(() => {
+      setOptimisticDeletePrompt(id);
+    });
+
     try {
       await deletePrompt(id);
       showToast('Prompt deleted successfully', 'success');
     } catch {
+      // On error, the actual prompts state remains unchanged,
+      // and React will revert the optimistic update automatically
       showToast('Failed to delete prompt', 'error');
     }
   };
@@ -168,7 +186,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
       <div className={`h-full w-full bg-gray-50 dark:bg-gray-900 relative ${context === 'sidepanel' ? 'sidepanel' : ''}`}>
       {currentView === 'library' && (
         <LibraryView
-          prompts={prompts}
+          prompts={optimisticPrompts}
           categories={categories}
           searchWithDebounce={searchWithDebounce}
           selectedCategory={selectedCategory}
