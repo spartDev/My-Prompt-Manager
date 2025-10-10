@@ -1,6 +1,6 @@
 import DOMPurify from 'dompurify';
 import { useState, useRef, useEffect, memo } from 'react';
-import type { FC, MouseEvent } from 'react';
+import type { FC, MouseEvent, ReactNode } from 'react';
 
 import { Category, Prompt } from '../types';
 import { PromptCardProps } from '../types/components';
@@ -21,7 +21,7 @@ const PromptCard: FC<PromptCardProps> = ({
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const firstMenuItemRef = useRef<HTMLButtonElement>(null);
 
-  const highlightText = (text: string, query: string) => {
+  const highlightText = (text: string, query: string): ReactNode => {
     if (!query.trim()) {return text;}
     
     // Sanitize both text and query to prevent XSS
@@ -32,7 +32,7 @@ const PromptCard: FC<PromptCardProps> = ({
     
     const searchTerm = sanitizedQuery.toLowerCase().trim();
     const lowerText = sanitizedText.toLowerCase();
-    const parts: (string | JSX.Element)[] = [];
+    const parts: ReactNode[] = [];
     let lastIndex = 0;
     let index = lowerText.indexOf(searchTerm);
     
