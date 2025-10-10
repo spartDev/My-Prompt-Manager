@@ -32,6 +32,18 @@ describe('PromptCard - Basic Rendering', () => {
     expect(screen.getByText('Test Prompt')).toBeInTheDocument();
   });
 
+  it('should handle empty titles gracefully', () => {
+    const emptyPrompt = { ...mockPrompt, title: '' };
+    render(<PromptCard {...mockProps} prompt={emptyPrompt} />);
+    expect(screen.queryByRole('heading')).toBeInTheDocument();
+  });
+
+  it('should sanitize HTML in titles', () => {
+    const xssPrompt = { ...mockPrompt, title: '<script>alert("xss")</script>' };
+    render(<PromptCard {...mockProps} prompt={xssPrompt} />);
+    expect(screen.queryByText('<script>')).not.toBeInTheDocument();
+  });
+
   it('should render prompt date', () => {
     render(<PromptCard {...mockProps} />);
     // Check that a date is rendered (using aria-label since date format may vary)
