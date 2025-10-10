@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect, useId } from 'react';
 import type { FC } from 'react';
 
-import { 
-  PRESET_COLORS, 
-  isValidHexColor, 
+import {
+  PRESET_COLORS,
+  isValidHexColor,
   getColorName
 } from '../constants/colors';
+import { MAX_HEX_COLOR_LENGTH } from '../constants/validation';
 interface ColorPickerProps {
   value: string;
   onChange: (color: string) => void;
@@ -276,7 +277,7 @@ const ColorPicker: FC<ColorPickerProps> = ({
                     onChange={(e) => { handleHexInputChange(e.target.value.toUpperCase()); }}
                     placeholder="#000000"
                     className="flex-1 min-w-0 px-3 py-2 text-sm border border-purple-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-mono"
-                    maxLength={7}
+                    maxLength={MAX_HEX_COLOR_LENGTH}
                   />
                   <div className="flex items-center gap-1 flex-shrink-0">
                     <button

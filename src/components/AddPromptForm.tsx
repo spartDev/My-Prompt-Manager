@@ -1,6 +1,7 @@
-import { useActionState, useState } from 'react';
+import { useActionState, useReducer, useRef } from 'react';
 import type { FC } from 'react';
 
+import { MAX_CONTENT_LENGTH, MAX_TITLE_LENGTH, VALIDATION_MESSAGES, formatCharacterCount } from '../constants/validation';
 import { DEFAULT_CATEGORY, Category } from '../types';
 import { AddPromptFormProps } from '../types/components';
 import { Logger, toError } from '../utils';
@@ -19,9 +20,16 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
   onSubmit,
   onCancel
 }) => {
-  // Local state for character count tracking
-  const [titleLength, setTitleLength] = useState(0);
-  const [contentLength, setContentLength] = useState(0);
+  // Refs to form elements for deriving character counts (single source of truth)
+  const titleRef = useRef<HTMLInputElement>(null);
+  const contentRef = useRef<HTMLTextAreaElement>(null);
+
+  // Force component re-render to update character count display
+  const [, forceUpdate] = useReducer((x: number) => x + 1, 0);
+
+  // Derive character counts from actual form values
+  const titleLength = titleRef.current?.value.length ?? 0;
+  const contentLength = contentRef.current?.value.length ?? 0;
 
   // React 19 useActionState for automatic loading/error handling
   const [errors, submitAction, isPending] = useActionState(
@@ -38,27 +46,27 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
           component: 'AddPromptForm',
           field: 'content'
         });
-        validationErrors.content = 'Content is required';
+        validationErrors.content = VALIDATION_MESSAGES.CONTENT_REQUIRED;
       }
 
-      if (content.length > 10000) {
+      if (content.length > MAX_CONTENT_LENGTH) {
         Logger.warn('Form validation failed: Content exceeds limit', {
           component: 'AddPromptForm',
           field: 'content',
           length: content.length,
-          limit: 10000
+          limit: MAX_CONTENT_LENGTH
         });
-        validationErrors.content = 'Content cannot exceed 10,000 characters';
+        validationErrors.content = VALIDATION_MESSAGES.CONTENT_TOO_LONG;
       }
 
-      if (title.length > 100) {
+      if (title.length > MAX_TITLE_LENGTH) {
         Logger.warn('Form validation failed: Title exceeds limit', {
           component: 'AddPromptForm',
           field: 'title',
           length: title.length,
-          limit: 100
+          limit: MAX_TITLE_LENGTH
         });
-        validationErrors.title = 'Title cannot exceed 100 characters';
+        validationErrors.title = VALIDATION_MESSAGES.TITLE_TOO_LONG;
       }
 
       // Return validation errors if any
@@ -124,23 +132,24 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
                 Title (optional)
               </label>
               <input
+                ref={titleRef}
                 type="text"
                 id="title"
                 name="title"
                 defaultValue=""
-                onChange={(e) => { setTitleLength(e.target.value.length); }}
+                onChange={forceUpdate}
                 placeholder="Enter a descriptive title or leave blank to auto-generate"
                 className={`w-full px-4 py-3 border rounded-xl focus-input bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 text-gray-900 dark:text-gray-100 ${
                   errors?.title ? 'border-red-300 dark:border-red-500' : 'border-purple-200 dark:border-gray-600'
                 }`}
                 disabled={isPending}
-                maxLength={100}
+                maxLength={MAX_TITLE_LENGTH}
               />
               {errors?.title && (
                 <p className="mt-2 text-sm text-red-600 dark:text-red-400 font-medium">⚠️ {errors.title}</p>
               )}
               <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
-                {titleLength}/100 characters
+                {formatCharacterCount(titleLength, MAX_TITLE_LENGTH)}
               </p>
             </div>
 
@@ -177,24 +186,25 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
                 Content *
               </label>
               <textarea
+                ref={contentRef}
                 id="content"
                 name="content"
                 defaultValue=""
-                onChange={(e) => { setContentLength(e.target.value.length); }}
+                onChange={forceUpdate}
                 placeholder="Enter your prompt content here..."
                 rows={8}
                 className={`w-full px-4 py-3 border rounded-xl focus-input resize-none bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 text-gray-900 dark:text-gray-100 ${
                   errors?.content ? 'border-red-300 dark:border-red-500' : 'border-purple-200 dark:border-gray-600'
                 }`}
                 disabled={isPending}
-                maxLength={10000}
+                maxLength={MAX_CONTENT_LENGTH}
                 required
               />
               {errors?.content && (
                 <p className="mt-2 text-sm text-red-600 dark:text-red-400 font-medium">⚠️ {errors.content}</p>
               )}
               <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
-                {contentLength}/10,000 characters
+                {formatCharacterCount(contentLength, MAX_CONTENT_LENGTH)}
               </p>
             </div>
 

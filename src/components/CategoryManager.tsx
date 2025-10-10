@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import type { FC, FormEvent } from 'react';
 
 import { DEFAULT_CATEGORY_COLOR, getColorName } from '../constants/colors';
+import { MAX_CATEGORY_NAME_LENGTH } from '../constants/validation';
 import { Category } from '../types';
 import { Logger, toError } from '../utils';
 
@@ -175,7 +176,7 @@ const CategoryManager: FC<CategoryManagerProps> = ({
                     placeholder="Enter category name..."
                     className="flex-1 px-4 py-3 h-12 border border-purple-200 dark:border-gray-600 rounded-xl focus:outline-none focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-purple-500 text-sm text-gray-900 dark:text-gray-100 bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 placeholder-gray-400 dark:placeholder-gray-500"
                     disabled={loading}
-                    maxLength={50}
+                    maxLength={MAX_CATEGORY_NAME_LENGTH}
                   />
                   
                   <button
@@ -268,7 +269,7 @@ const CategoryManager: FC<CategoryManagerProps> = ({
                           }}
                           placeholder="Category name"
                           className="flex-1 text-sm border border-purple-200 dark:border-gray-600 rounded-lg px-3 py-2.5 focus:outline-none focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-purple-500 bg-white/80 dark:bg-gray-700/80 backdrop-blur-sm font-medium text-gray-900 dark:text-gray-100"
-                          maxLength={50}
+                          maxLength={MAX_CATEGORY_NAME_LENGTH}
                           disabled={loading}
                         />
                         <div className="flex items-center space-x-1 flex-shrink-0">

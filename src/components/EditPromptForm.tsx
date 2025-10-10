@@ -1,6 +1,7 @@
-import { useActionState, useState } from 'react';
+import { useActionState, useReducer, useRef, useState } from 'react';
 import type { FC } from 'react';
 
+import { MAX_CONTENT_LENGTH, MAX_TITLE_LENGTH, VALIDATION_MESSAGES, formatCharacterCount } from '../constants/validation';
 import { Category } from '../types';
 import { EditPromptFormProps } from '../types/components';
 import { Logger, toError } from '../utils';
@@ -20,9 +21,16 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
   onSubmit,
   onCancel
 }) => {
-  // Local state for character count tracking (initialized with existing prompt values)
-  const [titleLength, setTitleLength] = useState(prompt.title.length);
-  const [contentLength, setContentLength] = useState(prompt.content.length);
+  // Refs to form elements for deriving character counts (single source of truth)
+  const titleRef = useRef<HTMLInputElement>(null);
+  const contentRef = useRef<HTMLTextAreaElement>(null);
+
+  // Force component re-render to update character count display
+  const [, forceUpdate] = useReducer((x: number) => x + 1, 0);
+
+  // Derive character counts from actual form values
+  const titleLength = titleRef.current?.value.length ?? 0;
+  const contentLength = contentRef.current?.value.length ?? 0;
 
   // Track form dirty state (has unsaved changes)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -43,29 +51,29 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
           field: 'content',
           promptId: prompt.id
         });
-        validationErrors.content = 'Content is required';
+        validationErrors.content = VALIDATION_MESSAGES.CONTENT_REQUIRED;
       }
 
-      if (content.length > 10000) {
+      if (content.length > MAX_CONTENT_LENGTH) {
         Logger.warn('Form validation failed: Content exceeds limit', {
           component: 'EditPromptForm',
           field: 'content',
           length: content.length,
-          limit: 10000,
+          limit: MAX_CONTENT_LENGTH,
           promptId: prompt.id
         });
-        validationErrors.content = 'Content cannot exceed 10,000 characters';
+        validationErrors.content = VALIDATION_MESSAGES.CONTENT_TOO_LONG;
       }
 
-      if (title.length > 100) {
+      if (title.length > MAX_TITLE_LENGTH) {
         Logger.warn('Form validation failed: Title exceeds limit', {
           component: 'EditPromptForm',
           field: 'title',
           length: title.length,
-          limit: 100,
+          limit: MAX_TITLE_LENGTH,
           promptId: prompt.id
         });
-        validationErrors.title = 'Title cannot exceed 100 characters';
+        validationErrors.title = VALIDATION_MESSAGES.TITLE_TOO_LONG;
       }
 
       // Return validation errors if any
@@ -122,12 +130,8 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
 
     setHasUnsavedChanges(isDirty || hasUnsavedChanges);
 
-    // Update character counts
-    if (field === 'title') {
-      setTitleLength(value.length);
-    } else if (field === 'content') {
-      setContentLength(value.length);
-    }
+    // Trigger re-render to update character counts
+    forceUpdate();
   };
 
   const formatDate = (timestamp: number) => {
@@ -169,6 +173,7 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
               </label>
             </div>
             <input
+              ref={titleRef}
               type="text"
               id="title"
               name="title"
@@ -179,13 +184,13 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
                 errors?.title ? 'border-red-300 dark:border-red-500' : 'border-purple-200 dark:border-gray-600'
               }`}
               disabled={isPending}
-              maxLength={100}
+              maxLength={MAX_TITLE_LENGTH}
             />
             {errors?.title && (
               <p className="mt-2 text-sm text-red-600 dark:text-red-400 font-medium">⚠️ {errors.title}</p>
             )}
             <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
-              {titleLength}/100 characters
+              {formatCharacterCount(titleLength, MAX_TITLE_LENGTH)}
             </p>
           </div>
 
@@ -226,6 +231,7 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
               </label>
             </div>
             <textarea
+              ref={contentRef}
               id="content"
               name="content"
               defaultValue={prompt.content}
@@ -236,14 +242,14 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
                 errors?.content ? 'border-red-300 dark:border-red-500' : 'border-purple-200 dark:border-gray-600'
               }`}
               disabled={isPending}
-              maxLength={10000}
+              maxLength={MAX_CONTENT_LENGTH}
               required
             />
             {errors?.content && (
               <p className="mt-2 text-sm text-red-600 dark:text-red-400 font-medium">⚠️ {errors.content}</p>
             )}
             <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
-              {contentLength}/10,000 characters
+              {formatCharacterCount(contentLength, MAX_CONTENT_LENGTH)}
             </p>
           </div>
         </form>
