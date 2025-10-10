@@ -11,6 +11,7 @@ import ToastContainer from './components/ToastContainer';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { usePrompts, useCategories, useClipboard, useToast, useSearchWithDebounce } from './hooks';
 import { Prompt, ErrorType, AppError } from './types';
+import { Logger, toError } from './utils';
 
 type ViewType = 'library' | 'add' | 'edit' | 'categories' | 'settings';
 
@@ -81,11 +82,37 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
 
     try {
       await deletePrompt(id);
+      Logger.info('Prompt deleted successfully', {
+        component: 'App',
+        promptId: id,
+        operation: 'deletePrompt'
+      });
       showToast('Prompt deleted successfully', 'success');
-    } catch {
+    } catch (err) {
+      Logger.error('Failed to delete prompt', toError(err), {
+        component: 'App',
+        promptId: id,
+        operation: 'deletePrompt'
+      });
+
       // CRITICAL: useOptimistic only reconciles when base state changes
       // Refresh prompts to update base state, triggering automatic revert
-      await refreshPrompts();
+      try {
+        await refreshPrompts();
+        Logger.info('Prompts refreshed after delete failure', {
+          component: 'App',
+          operation: 'deletePrompt-recovery'
+        });
+      } catch (refreshErr) {
+        // If refresh fails, log the error - React will still attempt reconciliation
+        // when prompts state eventually updates from other operations
+        Logger.error('Failed to refresh prompts after delete failure', toError(refreshErr), {
+          component: 'App',
+          operation: 'deletePrompt-recovery',
+          originalError: (err as Error).message
+        });
+      }
+
       showToast('Failed to delete prompt', 'error');
     }
   };
@@ -103,15 +130,33 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
     try {
       if (currentView === 'add') {
         await createPrompt(data);
+        Logger.info('Prompt created successfully', {
+          component: 'App',
+          operation: 'createPrompt',
+          category: data.category
+        });
         showToast('Prompt created successfully', 'success');
       } else if (currentView === 'edit' && selectedPrompt) {
         await updatePrompt(selectedPrompt.id, data);
+        Logger.info('Prompt updated successfully', {
+          component: 'App',
+          operation: 'updatePrompt',
+          promptId: selectedPrompt.id,
+          category: data.category
+        });
         showToast('Prompt updated successfully', 'success');
       }
       setCurrentView('library');
       setSelectedPrompt(null);
     } catch (error: unknown) {
       const appError = error as AppError;
+      Logger.error('Failed to save prompt', toError(appError), {
+        component: 'App',
+        operation: currentView === 'add' ? 'createPrompt' : 'updatePrompt',
+        errorType: appError.type,
+        category: data.category
+      });
+
       if (appError.type === ErrorType.STORAGE_QUOTA_EXCEEDED) {
         setShowStorageWarning(true);
       } else {
@@ -211,7 +256,6 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
           categories={categories}
           onSubmit={(data) => { void handleFormSubmit(data); }}
           onCancel={handleFormCancel}
-          isLoading={loading}
         />
       )}
 
@@ -221,7 +265,6 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
           categories={categories}
           onSubmit={(data) => { void handleFormSubmit(data); }}
           onCancel={handleFormCancel}
-          isLoading={loading}
         />
       )}
 
