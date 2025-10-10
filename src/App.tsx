@@ -84,8 +84,9 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
       await deletePrompt(id);
       showToast('Prompt deleted successfully', 'success');
     } catch {
-      // On error, the actual prompts state remains unchanged,
-      // and React will revert the optimistic update automatically
+      // CRITICAL: useOptimistic only reconciles when base state changes
+      // Refresh prompts to update base state, triggering automatic revert
+      await refreshPrompts();
       showToast('Failed to delete prompt', 'error');
     }
   };

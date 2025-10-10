@@ -1,4 +1,4 @@
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 import type { FC } from 'react';
 
 import { Category } from '../types';
@@ -13,6 +13,10 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
   onCancel,
   isLoading: _isLoading = false // Deprecated, now managed internally
 }) => {
+  // Local state for character count tracking (initialized with existing prompt values)
+  const [titleLength, setTitleLength] = useState(prompt.title.length);
+  const [contentLength, setContentLength] = useState(prompt.content.length);
+
   // React 19 useActionState for automatic loading/error handling
   const [error, submitAction, isPending] = useActionState(
     async (_prevState: string | null, formData: FormData) => {
@@ -96,11 +100,15 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
               id="title"
               name="title"
               defaultValue={prompt.title}
+              onChange={(e) => { setTitleLength(e.target.value.length); }}
               placeholder="Enter a descriptive title"
               className="w-full px-4 py-3 border border-purple-200 dark:border-gray-600 rounded-xl focus-input bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 text-sm text-gray-900 dark:text-gray-100"
               disabled={isPending}
               maxLength={100}
             />
+            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
+              {titleLength}/100 characters
+            </p>
           </div>
 
           {/* Category Section */}
@@ -143,6 +151,7 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
               id="content"
               name="content"
               defaultValue={prompt.content}
+              onChange={(e) => { setContentLength(e.target.value.length); }}
               placeholder="Enter your prompt content here..."
               rows={10}
               className="w-full px-4 py-3 border border-purple-200 dark:border-gray-600 rounded-xl focus-input resize-none bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 text-sm text-gray-900 dark:text-gray-100"
@@ -150,6 +159,9 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
               maxLength={10000}
               required
             />
+            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
+              {contentLength}/10,000 characters
+            </p>
           </div>
         </form>
         

@@ -1,4 +1,4 @@
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 import type { FC } from 'react';
 
 import { DEFAULT_CATEGORY, Category } from '../types';
@@ -12,6 +12,10 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
   onCancel,
   isLoading: _isLoading = false // Deprecated, now managed internally
 }) => {
+  // Local state for character count tracking
+  const [titleLength, setTitleLength] = useState(0);
+  const [contentLength, setContentLength] = useState(0);
+
   // React 19 useActionState for automatic loading/error handling
   const [error, submitAction, isPending] = useActionState(
     async (_prevState: string | null, formData: FormData) => {
@@ -80,11 +84,15 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
                 id="title"
                 name="title"
                 defaultValue=""
+                onChange={(e) => { setTitleLength(e.target.value.length); }}
                 placeholder="Enter a descriptive title or leave blank to auto-generate"
                 className="w-full px-4 py-3 border border-purple-200 dark:border-gray-600 rounded-xl focus-input bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 text-gray-900 dark:text-gray-100"
                 disabled={isPending}
                 maxLength={100}
               />
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
+                {titleLength}/100 characters
+              </p>
             </div>
 
             {/* Category */}
@@ -123,6 +131,7 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
                 id="content"
                 name="content"
                 defaultValue=""
+                onChange={(e) => { setContentLength(e.target.value.length); }}
                 placeholder="Enter your prompt content here..."
                 rows={8}
                 className="w-full px-4 py-3 border border-purple-200 dark:border-gray-600 rounded-xl focus-input resize-none bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 text-gray-900 dark:text-gray-100"
@@ -130,6 +139,9 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
                 maxLength={10000}
                 required
               />
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
+                {contentLength}/10,000 characters
+              </p>
             </div>
 
           </form>
