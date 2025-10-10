@@ -139,13 +139,15 @@ const PromptCard: FC<PromptCardProps> = ({
 
   return (
     <article className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5 hover:bg-white/90 dark:hover:bg-gray-800/90 transition-all duration-200 relative group" style={{ zIndex: showMenu ? 1000 : 'auto' }} aria-labelledby={`prompt-title-${prompt.id}`}>
-      <div className="flex items-center justify-between">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-4 items-center">
         {/* Title and metadata */}
-        <div className="flex-1 min-w-0 pr-3">
-          <h3 
+        <div className="pr-3">
+          {/* inline-block enables text-overflow: ellipsis to work with inline elements (e.g., <mark> tags from search highlighting) */}
+          <h3
             id={`prompt-title-${prompt.id}`}
-            className="font-semibold text-gray-900 dark:text-gray-100 text-sm leading-tight truncate" 
+            className="inline-block max-w-full font-semibold text-gray-900 dark:text-gray-100 text-sm leading-tight truncate"
             title={(prompt).title}
+            aria-label={prompt.title}
           >
             {highlightText((prompt).title, searchQuery)}
           </h3>
