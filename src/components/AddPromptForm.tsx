@@ -66,7 +66,11 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
 
       {/* Error Display */}
       {error && (
-        <div className="flex-shrink-0 p-4 text-sm text-red-600 dark:text-red-400 bg-red-50/80 dark:bg-red-900/20 backdrop-blur-sm border-b border-red-200 dark:border-red-700 font-medium">
+        <div
+          role="alert"
+          aria-live="polite"
+          className="flex-shrink-0 p-4 text-sm text-red-600 dark:text-red-400 bg-red-50/80 dark:bg-red-900/20 backdrop-blur-sm border-b border-red-200 dark:border-red-700 font-medium"
+        >
           ⚠️ {error}
         </div>
       )}
