@@ -29,8 +29,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   const [showStorageWarning, setShowStorageWarning] = useState<boolean>(false);
 
   // React 19 useTransition for managing optimistic updates
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
 
   const {
     prompts,
