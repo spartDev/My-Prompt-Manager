@@ -57,7 +57,7 @@ describe('PromptCard - Basic Rendering', () => {
 
   it('should render copy button', () => {
     render(<PromptCard {...mockProps} />);
-    expect(screen.getByText('Copy')).toBeInTheDocument();
+    expect(screen.getByLabelText(/copy.*to clipboard/i)).toBeInTheDocument();
   });
 
   it('should apply truncate styles to long titles', () => {
