@@ -170,7 +170,7 @@ const PromptCard: FC<PromptCardProps> = ({
         </div>
         
         {/* Actions */}
-        <div className="flex items-center space-x-1 flex-shrink-0">
+        <div className="flex items-center space-x-2 flex-shrink-0">
           {/* Copy Button */}
           <button
             onClick={handleCopyClick}
@@ -180,10 +180,11 @@ const PromptCard: FC<PromptCardProps> = ({
                 handleCopyClick();
               }
             }}
-            className="inline-flex items-center px-2 py-1 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-md hover:from-purple-600 hover:to-indigo-600 transition-all duration-200 text-xs font-medium focus-primary"
+            className="p-2 text-gray-400 dark:text-gray-500 hover:text-purple-600 dark:hover:text-purple-400 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors focus-interactive"
             aria-label={`Copy content of ${prompt.title} to clipboard`}
+            title="Copy to clipboard"
           >
-            <svg className="h-3 w-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -191,7 +192,6 @@ const PromptCard: FC<PromptCardProps> = ({
                 d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
               />
             </svg>
-            Copy
           </button>
 
           {/* Menu */}
