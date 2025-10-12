@@ -117,5 +117,62 @@ export function encode(prompt: Prompt): string {
   return encoded;
 }
 
+/**
+ * Decodes a shared prompt string back into prompt data
+ * @param encoded - The encoded string to decode
+ * @returns Sanitized and validated prompt data
+ * @throws {Error} If decoding fails, version is unsupported, checksum is invalid, or validation fails
+ */
+export function decode(encoded: string): SharedPromptData {
+  // 1. Decompress
+  const json = LZString.decompressFromEncodedURIComponent(encoded);
+  if (!json) {
+    throw new Error('Invalid sharing code format');
+  }
+
+  // 2. Parse JSON
+  let payload: unknown;
+  try {
+    payload = JSON.parse(json);
+  } catch {
+    throw new Error('Invalid sharing code format');
+  }
+
+  // 3. Verify version
+  if (
+    !payload ||
+    typeof payload !== 'object' ||
+    !('v' in payload) ||
+    payload.v !== '1.0'
+  ) {
+    const version = payload && typeof payload === 'object' && 'v' in payload
+      ? String(payload.v)
+      : 'unknown';
+    throw new Error(
+      `This sharing code format (${version}) is not supported. ` +
+      'Please ask the sender to reshare using the latest extension version.'
+    );
+  }
+
+  // Type assertion after validation
+  const typedPayload = payload as EncodedPromptPayloadV1;
+
+  // 4. Verify checksum
+  const dataString = `${typedPayload.t}|${typedPayload.c}|${typedPayload.cat}`;
+  verifyChecksum(dataString, typedPayload.cs);
+
+  // 5. Sanitize again (defense in depth)
+  const sanitized: SharedPromptData = {
+    title: sanitizeText(typedPayload.t),
+    content: sanitizeText(typedPayload.c),
+    category: sanitizeText(typedPayload.cat),
+  };
+
+  // 6. Validate sanitized data
+  validatePromptData(sanitized);
+
+  return sanitized;
+}
+
 // Export helper functions for testing
 export { sanitizeText, validatePromptData, calculateChecksum, verifyChecksum };
