@@ -1,3 +1,39 @@
+/**
+ * @file PromptEncoder Service
+ * @module services/promptEncoder
+ * @description Provides secure encoding/decoding for sharing prompts via URLs
+ *
+ * This service implements a multi-layered security approach for sharing prompts:
+ * 1. **Sanitization**: Strips all HTML tags using DOMPurify to prevent XSS attacks
+ * 2. **Validation**: Enforces size limits and required fields
+ * 3. **Checksums**: Detects data corruption/tampering (non-cryptographic)
+ * 4. **Compression**: Uses LZ-string for 60-80% size reduction
+ * 5. **Defense-in-depth**: Sanitizes on both encode and decode paths
+ *
+ * @example
+ * ```typescript
+ * // Encoding a prompt for sharing
+ * const prompt = {
+ *   id: '123',
+ *   title: 'My Prompt',
+ *   content: 'Write a function...',
+ *   category: 'Development',
+ *   createdAt: Date.now(),
+ *   updatedAt: Date.now()
+ * };
+ * const shareCode = encode(prompt);
+ * // shareCode: "N4IgdghgtgpiBcIACAFgJwgLjGABABxABdgAjMaASlk..."
+ *
+ * // Decoding a shared prompt
+ * const decoded = decode(shareCode);
+ * // { title: 'My Prompt', content: 'Write a function...', category: 'Development' }
+ * ```
+ *
+ * @see {@link https://spartdev.atlassian.net/wiki/x/BgAi | Confluence Design Doc}
+ * @version 1.0.0
+ * @since MPM-2
+ */
+
 import DOMPurify from 'dompurify';
 import LZString from 'lz-string';
 
@@ -8,7 +44,11 @@ import {
   Prompt
 } from '../types';
 
-// Sanitization configuration - strip all HTML tags
+/**
+ * DOMPurify sanitization configuration
+ * Strips all HTML tags and attributes while preserving text content
+ * @private
+ */
 const SANITIZATION_CONFIG = {
   ALLOWED_TAGS: [] as string[],      // Strip all HTML
   ALLOWED_ATTR: [] as string[],      // Strip all attributes
@@ -17,6 +57,21 @@ const SANITIZATION_CONFIG = {
 
 /**
  * Sanitizes text by removing all HTML tags and trimming whitespace
+ *
+ * Uses DOMPurify to strip all HTML tags, preventing XSS attacks while
+ * preserving the text content. Trims leading/trailing whitespace.
+ *
+ * @param text - The text to sanitize
+ * @returns Sanitized text with HTML removed and whitespace trimmed
+ *
+ * @example
+ * ```typescript
+ * sanitizeText('<script>alert("xss")</script>Hello');  // 'Hello'
+ * sanitizeText('  <b>Bold</b> text  ');                // 'Bold text'
+ * sanitizeText('Plain text');                          // 'Plain text'
+ * ```
+ *
+ * @internal
  */
 function sanitizeText(text: string): string {
   return DOMPurify.sanitize(text.trim(), SANITIZATION_CONFIG);
@@ -24,7 +79,38 @@ function sanitizeText(text: string): string {
 
 /**
  * Validates prompt data against size limits and required fields
- * @throws {Error} If validation fails
+ *
+ * Ensures all required fields are present and non-empty (after trimming),
+ * and that field lengths don't exceed configured size limits.
+ *
+ * @param data - The prompt data to validate
+ * @throws {Error} If any field is empty or exceeds size limits
+ *
+ * @example
+ * ```typescript
+ * // Valid data
+ * validatePromptData({
+ *   title: 'My Prompt',
+ *   content: 'Some content',
+ *   category: 'Dev'
+ * }); // No error
+ *
+ * // Invalid - empty title
+ * validatePromptData({
+ *   title: '   ',
+ *   content: 'Content',
+ *   category: 'Cat'
+ * }); // Throws: 'Title is required'
+ *
+ * // Invalid - oversized content
+ * validatePromptData({
+ *   title: 'Title',
+ *   content: 'x'.repeat(20000),
+ *   category: 'Cat'
+ * }); // Throws: 'Content too long (max 10000 characters)'
+ * ```
+ *
+ * @internal
  */
 function validatePromptData(data: SharedPromptData): void {
   // Check required fields
@@ -56,7 +142,27 @@ function validatePromptData(data: SharedPromptData): void {
 
 /**
  * Calculates a simple checksum for data integrity verification
- * Note: This is NOT cryptographic - only detects accidental corruption
+ *
+ * Implements a basic hash function for detecting accidental data corruption
+ * during transmission or storage. **Not cryptographically secure** - only
+ * detects unintentional changes, not malicious tampering.
+ *
+ * Uses a simple bit-shift hash algorithm and converts to base36 for compactness.
+ *
+ * @param data - The string data to hash
+ * @returns Base36-encoded checksum string (e.g., "1a2b3c")
+ *
+ * @example
+ * ```typescript
+ * const checksum1 = calculateChecksum('Test data');
+ * const checksum2 = calculateChecksum('Test data');
+ * console.log(checksum1 === checksum2);  // true - deterministic
+ *
+ * const checksum3 = calculateChecksum('Different data');
+ * console.log(checksum1 === checksum3);  // false - different input
+ * ```
+ *
+ * @internal
  */
 function calculateChecksum(data: string): string {
   let hash = 0;
@@ -70,7 +176,29 @@ function calculateChecksum(data: string): string {
 
 /**
  * Verifies checksum matches expected value
- * @throws {Error} If checksum doesn't match
+ *
+ * Recalculates the checksum for the provided data and compares it to the
+ * expected value. Throws an error if they don't match, indicating potential
+ * data corruption.
+ *
+ * @param data - The data to verify
+ * @param expected - The expected checksum value
+ * @throws {Error} If calculated checksum doesn't match expected value
+ *
+ * @example
+ * ```typescript
+ * const data = 'Test data';
+ * const checksum = calculateChecksum(data);
+ *
+ * // Valid checksum
+ * verifyChecksum(data, checksum); // No error
+ *
+ * // Invalid checksum
+ * verifyChecksum(data, 'wrong-checksum');
+ * // Throws: 'Sharing code appears corrupted...'
+ * ```
+ *
+ * @internal
  */
 function verifyChecksum(data: string, expected: string): void {
   const actual = calculateChecksum(data);
@@ -81,9 +209,43 @@ function verifyChecksum(data: string, expected: string): void {
 
 /**
  * Encodes a prompt into a shareable compressed string
- * @param prompt - The prompt to encode
- * @returns URL-safe encoded string
- * @throws {Error} If validation fails or encoding produces oversized result
+ *
+ * This is the main entry point for creating shareable prompt URLs. The function:
+ * 1. Sanitizes all text fields to prevent XSS attacks
+ * 2. Validates field lengths and required data
+ * 3. Creates a versioned payload (v1.0) with checksum
+ * 4. Compresses to URL-safe string using LZ-string
+ * 5. Verifies final size is under 50KB limit
+ *
+ * The resulting string is safe to include in URLs and can be decoded using
+ * the `decode()` function.
+ *
+ * @param prompt - The prompt object to encode (only title, content, category are used)
+ * @returns URL-safe base64-encoded compressed string (e.g., "N4IgdghgtgpiBcI...")
+ * @throws {Error} If validation fails (empty fields, too large) or encoding produces >50KB result
+ *
+ * @example
+ * ```typescript
+ * const prompt = {
+ *   id: 'abc-123',
+ *   title: 'Code Review Checklist',
+ *   content: 'Review the following code for...',
+ *   category: 'Development',
+ *   createdAt: 1234567890,
+ *   updatedAt: 1234567890
+ * };
+ *
+ * try {
+ *   const shareCode = encode(prompt);
+ *   const shareUrl = `https://example.com/import?code=${shareCode}`;
+ *   console.log(shareUrl);  // Share this URL with others
+ * } catch (err) {
+ *   console.error('Failed to encode:', err.message);
+ * }
+ * ```
+ *
+ * @see {@link decode} for decoding shared prompts
+ * @public
  */
 export function encode(prompt: Prompt): string {
   // 1. Sanitize all text fields
@@ -119,9 +281,58 @@ export function encode(prompt: Prompt): string {
 
 /**
  * Decodes a shared prompt string back into prompt data
- * @param encoded - The encoded string to decode
- * @returns Sanitized and validated prompt data
- * @throws {Error} If decoding fails, version is unsupported, checksum is invalid, or validation fails
+ *
+ * This is the main entry point for importing shared prompts. The function:
+ * 1. Decompresses the URL-safe string using LZ-string
+ * 2. Parses the JSON payload
+ * 3. Verifies the payload version is supported (currently only v1.0)
+ * 4. Validates the checksum to detect corruption/tampering
+ * 5. Sanitizes all fields (defense-in-depth, even if sender encoded malicious HTML)
+ * 6. Validates field lengths and required data
+ *
+ * The function is designed to be defensive and will reject invalid,
+ * corrupted, or malicious share codes with clear error messages.
+ *
+ * @param encoded - The encoded sharing code string
+ * @returns Sanitized and validated prompt data (title, content, category only)
+ * @throws {Error} If:
+ *   - Decompression fails → "Invalid sharing code format"
+ *   - JSON parsing fails → "Invalid sharing code format"
+ *   - Version unsupported → "This sharing code format (X) is not supported..."
+ *   - Checksum invalid → "Sharing code appears corrupted..."
+ *   - Validation fails → Field-specific error (e.g., "Title is required")
+ *
+ * @example
+ * ```typescript
+ * // Basic usage
+ * try {
+ *   const shareCode = "N4IgdghgtgpiBcIACAFgJwgLjGA...";
+ *   const promptData = decode(shareCode);
+ *   console.log(promptData);
+ *   // { title: 'My Prompt', content: 'Some content', category: 'Dev' }
+ * } catch (err) {
+ *   console.error('Failed to decode:', err.message);
+ *   // Handle error - show user-friendly message
+ * }
+ *
+ * // Handling different error types
+ * try {
+ *   const promptData = decode(shareCode);
+ *   // Create new prompt with decoded data
+ *   await promptManager.addPrompt(promptData);
+ * } catch (err) {
+ *   if (err.message.includes('corrupted')) {
+ *     alert('The share link is corrupted. Please ask for a new link.');
+ *   } else if (err.message.includes('not supported')) {
+ *     alert('This share link requires a newer version of the extension.');
+ *   } else {
+ *     alert('Invalid share link format.');
+ *   }
+ * }
+ * ```
+ *
+ * @see {@link encode} for creating shareable prompts
+ * @public
  */
 export function decode(encoded: string): SharedPromptData {
   // 1. Decompress
