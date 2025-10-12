@@ -149,6 +149,28 @@ export const DEFAULT_SETTINGS: Settings = {
   interfaceMode: 'sidepanel'
 };
 
+// Prompt Sharing types
+export interface SharedPromptData {
+  title: string;
+  content: string;
+  category: string;
+}
+
+export interface EncodedPromptPayloadV1 {
+  v: '1.0';
+  t: string;    // title
+  c: string;    // content
+  cat: string;  // category
+  cs: string;   // checksum
+}
+
+export const PROMPT_SHARING_SIZE_LIMITS = {
+  TITLE_MAX: 100,
+  CONTENT_MAX: 10_000,
+  CATEGORY_MAX: 50,
+  ENCODED_MAX: 50_000,
+} as const;
+
 // Element Fingerprinting for robust element identification
 export interface ElementFingerprint {
   // Primary identifiers (highest confidence, most stable)
