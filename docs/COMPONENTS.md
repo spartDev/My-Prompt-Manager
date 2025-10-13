@@ -238,6 +238,7 @@ type IconType = 'logo' | 'add' | 'edit' | 'settings';
 - **Search highlighting** with stable React keys
 - **Full keyboard navigation** with arrow keys
 - **Dropdown menu** with accessibility
+- **Icon-only action buttons** for clean, minimal design
 
 **Props:**
 ```typescript
@@ -272,6 +273,11 @@ const sanitizedText = DOMPurify.sanitize(text, {
   ALLOWED_ATTR: []
 });
 ```
+
+**Actions:**
+- **Copy button**: Icon-only design matching menu button aesthetics (gray with purple hover)
+- **Menu button**: 3-dot dropdown for Edit/Delete actions
+- Both buttons use consistent icon-button styling pattern for visual harmony
 
 **File:** `src/components/PromptCard.tsx:1-357`
 
