@@ -1,7 +1,7 @@
 import LZString from 'lz-string';
 import { describe, it, expect } from 'vitest';
 
-import { Prompt } from '../../types';
+import { Prompt, ErrorType } from '../../types';
 import {
   encode,
   decode,
@@ -60,51 +60,93 @@ describe('PromptEncoder', () => {
       expect(() => validatePromptData(validData)).not.toThrow();
     });
 
-    it('should throw error for empty title', () => {
+    it('should throw PromptEncoderError for empty title', () => {
       const data = { title: '', content: 'Content', category: 'Category' };
       expect(() => validatePromptData(data)).toThrow('Title is required');
+      try {
+        validatePromptData(data);
+      } catch (err) {
+        expect(err).toHaveProperty('type', ErrorType.VALIDATION_ERROR);
+        expect(err).toHaveProperty('name', 'PromptEncoderError');
+      }
     });
 
-    it('should throw error for empty content', () => {
+    it('should throw PromptEncoderError for empty content', () => {
       const data = { title: 'Title', content: '', category: 'Category' };
       expect(() => validatePromptData(data)).toThrow('Content is required');
+      try {
+        validatePromptData(data);
+      } catch (err) {
+        expect(err).toHaveProperty('type', ErrorType.VALIDATION_ERROR);
+        expect(err).toHaveProperty('name', 'PromptEncoderError');
+      }
     });
 
-    it('should throw error for empty category', () => {
+    it('should throw PromptEncoderError for empty category', () => {
       const data = { title: 'Title', content: 'Content', category: '' };
       expect(() => validatePromptData(data)).toThrow('Category is required');
+      try {
+        validatePromptData(data);
+      } catch (err) {
+        expect(err).toHaveProperty('type', ErrorType.VALIDATION_ERROR);
+        expect(err).toHaveProperty('name', 'PromptEncoderError');
+      }
     });
 
-    it('should throw error for whitespace-only title', () => {
+    it('should throw PromptEncoderError for whitespace-only title', () => {
       const data = { title: '   ', content: 'Content', category: 'Category' };
       expect(() => validatePromptData(data)).toThrow('Title is required');
+      try {
+        validatePromptData(data);
+      } catch (err) {
+        expect(err).toHaveProperty('type', ErrorType.VALIDATION_ERROR);
+        expect(err).toHaveProperty('name', 'PromptEncoderError');
+      }
     });
 
-    it('should throw error for oversized title', () => {
+    it('should throw PromptEncoderError for oversized title', () => {
       const data = {
         title: 'x'.repeat(150),
         content: 'Content',
         category: 'Category',
       };
       expect(() => validatePromptData(data)).toThrow('Title too long');
+      try {
+        validatePromptData(data);
+      } catch (err) {
+        expect(err).toHaveProperty('type', ErrorType.VALIDATION_ERROR);
+        expect(err).toHaveProperty('name', 'PromptEncoderError');
+      }
     });
 
-    it('should throw error for oversized content', () => {
+    it('should throw PromptEncoderError for oversized content', () => {
       const data = {
         title: 'Title',
         content: 'x'.repeat(15_000),
         category: 'Category',
       };
       expect(() => validatePromptData(data)).toThrow('Content too long');
+      try {
+        validatePromptData(data);
+      } catch (err) {
+        expect(err).toHaveProperty('type', ErrorType.VALIDATION_ERROR);
+        expect(err).toHaveProperty('name', 'PromptEncoderError');
+      }
     });
 
-    it('should throw error for oversized category', () => {
+    it('should throw PromptEncoderError for oversized category', () => {
       const data = {
         title: 'Title',
         content: 'Content',
         category: 'x'.repeat(100),
       };
       expect(() => validatePromptData(data)).toThrow('Category too long');
+      try {
+        validatePromptData(data);
+      } catch (err) {
+        expect(err).toHaveProperty('type', ErrorType.VALIDATION_ERROR);
+        expect(err).toHaveProperty('name', 'PromptEncoderError');
+      }
     });
   });
 
@@ -135,9 +177,15 @@ describe('PromptEncoder', () => {
       expect(() => verifyChecksum(data, checksum)).not.toThrow();
     });
 
-    it('should throw for invalid checksum', () => {
+    it('should throw PromptEncoderError for invalid checksum', () => {
       const data = 'Test data';
       expect(() => verifyChecksum(data, 'invalid')).toThrow('corrupted');
+      try {
+        verifyChecksum(data, 'invalid');
+      } catch (err) {
+        expect(err).toHaveProperty('type', ErrorType.DATA_CORRUPTION);
+        expect(err).toHaveProperty('name', 'PromptEncoderError');
+      }
     });
   });
 
@@ -228,19 +276,30 @@ describe('PromptEncoder', () => {
       });
     });
 
-    it('should throw for invalid encoded string', () => {
+    it('should throw PromptEncoderError for invalid encoded string', () => {
       expect(() => decode('invalid')).toThrow('Invalid sharing code format');
+      try {
+        decode('invalid');
+      } catch (err) {
+        expect(err).toHaveProperty('type', ErrorType.DATA_CORRUPTION);
+        expect(err).toHaveProperty('name', 'PromptEncoderError');
+      }
     });
 
-    it('should throw for corrupted encoded string', () => {
+    it('should throw PromptEncoderError for corrupted encoded string', () => {
       const prompt = createTestPrompt();
       const encoded = encode(prompt);
       // Truncate to corrupt
       const corrupted = encoded.slice(0, -10);
       expect(() => decode(corrupted)).toThrow();
+      try {
+        decode(corrupted);
+      } catch (err) {
+        expect(err).toHaveProperty('name', 'PromptEncoderError');
+      }
     });
 
-    it('should throw for unsupported version', () => {
+    it('should throw PromptEncoderError for unsupported version', () => {
       const payload = {
         v: '2.0',
         t: 'Test',
@@ -252,9 +311,15 @@ describe('PromptEncoder', () => {
         JSON.stringify(payload)
       );
       expect(() => decode(encoded)).toThrow('not supported');
+      try {
+        decode(encoded);
+      } catch (err) {
+        expect(err).toHaveProperty('type', ErrorType.DATA_CORRUPTION);
+        expect(err).toHaveProperty('name', 'PromptEncoderError');
+      }
     });
 
-    it('should throw for invalid checksum', () => {
+    it('should throw PromptEncoderError for invalid checksum', () => {
       const payload = {
         v: '1.0',
         t: 'Test',
@@ -266,6 +331,12 @@ describe('PromptEncoder', () => {
         JSON.stringify(payload)
       );
       expect(() => decode(encoded)).toThrow('corrupted');
+      try {
+        decode(encoded);
+      } catch (err) {
+        expect(err).toHaveProperty('type', ErrorType.DATA_CORRUPTION);
+        expect(err).toHaveProperty('name', 'PromptEncoderError');
+      }
     });
 
     it('should apply defense-in-depth sanitization', () => {
@@ -288,12 +359,18 @@ describe('PromptEncoder', () => {
       expect(decoded.category).toBe('Cat');
     });
 
-    it('should throw for malformed JSON', () => {
+    it('should throw PromptEncoderError for malformed JSON', () => {
       const malformed = LZString.compressToEncodedURIComponent('{invalid json}');
       expect(() => decode(malformed)).toThrow('Invalid sharing code format');
+      try {
+        decode(malformed);
+      } catch (err) {
+        expect(err).toHaveProperty('type', ErrorType.DATA_CORRUPTION);
+        expect(err).toHaveProperty('name', 'PromptEncoderError');
+      }
     });
 
-    it('should throw for missing required fields', () => {
+    it('should throw PromptEncoderError for missing required fields', () => {
       const payload = {
         v: '1.0',
         t: '',
@@ -305,6 +382,12 @@ describe('PromptEncoder', () => {
         JSON.stringify(payload)
       );
       expect(() => decode(encoded)).toThrow('required');
+      try {
+        decode(encoded);
+      } catch (err) {
+        expect(err).toHaveProperty('type', ErrorType.VALIDATION_ERROR);
+        expect(err).toHaveProperty('name', 'PromptEncoderError');
+      }
     });
   });
 
@@ -366,6 +449,12 @@ describe('PromptEncoder', () => {
         JSON.stringify(payload)
       );
       expect(() => decode(tampered)).toThrow('corrupted');
+      try {
+        decode(tampered);
+      } catch (err) {
+        expect(err).toHaveProperty('type', ErrorType.DATA_CORRUPTION);
+        expect(err).toHaveProperty('name', 'PromptEncoderError');
+      }
     });
 
     it('should detect tampered content', () => {
@@ -379,6 +468,12 @@ describe('PromptEncoder', () => {
         JSON.stringify(payload)
       );
       expect(() => decode(tampered)).toThrow('corrupted');
+      try {
+        decode(tampered);
+      } catch (err) {
+        expect(err).toHaveProperty('type', ErrorType.DATA_CORRUPTION);
+        expect(err).toHaveProperty('name', 'PromptEncoderError');
+      }
     });
 
     it('should detect tampered category', () => {
@@ -392,6 +487,12 @@ describe('PromptEncoder', () => {
         JSON.stringify(payload)
       );
       expect(() => decode(tampered)).toThrow('corrupted');
+      try {
+        decode(tampered);
+      } catch (err) {
+        expect(err).toHaveProperty('type', ErrorType.DATA_CORRUPTION);
+        expect(err).toHaveProperty('name', 'PromptEncoderError');
+      }
     });
   });
 

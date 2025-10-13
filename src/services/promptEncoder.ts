@@ -41,8 +41,39 @@ import {
   SharedPromptData,
   EncodedPromptPayloadV1,
   PROMPT_SHARING_SIZE_LIMITS,
-  Prompt
+  Prompt,
+  ErrorType,
+  AppError
 } from '../types';
+import { toError } from '../utils/error';
+import { error as logError } from '../utils/logger';
+
+/**
+ * Custom error class for PromptEncoder operations
+ *
+ * Extends the standard Error class and implements the AppError interface
+ * to provide consistent error handling across the extension.
+ *
+ * @example
+ * ```typescript
+ * throw new PromptEncoderError({
+ *   type: ErrorType.VALIDATION_ERROR,
+ *   message: 'Title is required',
+ *   details: { field: 'title' }
+ * });
+ * ```
+ */
+class PromptEncoderError extends Error implements AppError {
+  public type: ErrorType;
+  public details?: unknown;
+
+  constructor(appError: AppError) {
+    super(appError.message);
+    this.name = 'PromptEncoderError';
+    this.type = appError.type;
+    this.details = appError.details;
+  }
+}
 
 /**
  * DOMPurify sanitization configuration
@@ -113,30 +144,59 @@ function sanitizeText(text: string): string {
  * @internal
  */
 function validatePromptData(data: SharedPromptData): void {
+  // Trim all fields for validation
+  const trimmedTitle = data.title.trim();
+  const trimmedContent = data.content.trim();
+  const trimmedCategory = data.category.trim();
+
   // Check required fields
-  if (!data.title.trim()) {
-    throw new Error('Title is required');
+  if (!trimmedTitle) {
+    throw new PromptEncoderError({
+      type: ErrorType.VALIDATION_ERROR,
+      message: 'Title is required',
+      details: { field: 'title' }
+    });
   }
-  if (!data.content.trim()) {
-    throw new Error('Content is required');
+  if (!trimmedContent) {
+    throw new PromptEncoderError({
+      type: ErrorType.VALIDATION_ERROR,
+      message: 'Content is required',
+      details: { field: 'content' }
+    });
   }
-  if (!data.category.trim()) {
-    throw new Error('Category is required');
+  if (!trimmedCategory) {
+    throw new PromptEncoderError({
+      type: ErrorType.VALIDATION_ERROR,
+      message: 'Category is required',
+      details: { field: 'category' }
+    });
   }
 
-  // Check size limits
+  // Check size limits on trimmed values
   const titleMax = PROMPT_SHARING_SIZE_LIMITS.TITLE_MAX;
   const contentMax = PROMPT_SHARING_SIZE_LIMITS.CONTENT_MAX;
   const categoryMax = PROMPT_SHARING_SIZE_LIMITS.CATEGORY_MAX;
 
-  if (data.title.length > titleMax) {
-    throw new Error(`Title too long (max ${String(titleMax)} characters)`);
+  if (trimmedTitle.length > titleMax) {
+    throw new PromptEncoderError({
+      type: ErrorType.VALIDATION_ERROR,
+      message: `Title too long (max ${String(titleMax)} characters)`,
+      details: { field: 'title', length: trimmedTitle.length, max: titleMax }
+    });
   }
-  if (data.content.length > contentMax) {
-    throw new Error(`Content too long (max ${String(contentMax)} characters)`);
+  if (trimmedContent.length > contentMax) {
+    throw new PromptEncoderError({
+      type: ErrorType.VALIDATION_ERROR,
+      message: `Content too long (max ${String(contentMax)} characters)`,
+      details: { field: 'content', length: trimmedContent.length, max: contentMax }
+    });
   }
-  if (data.category.length > categoryMax) {
-    throw new Error(`Category too long (max ${String(categoryMax)} characters)`);
+  if (trimmedCategory.length > categoryMax) {
+    throw new PromptEncoderError({
+      type: ErrorType.VALIDATION_ERROR,
+      message: `Category too long (max ${String(categoryMax)} characters)`,
+      details: { field: 'category', length: trimmedCategory.length, max: categoryMax }
+    });
   }
 }
 
@@ -203,7 +263,11 @@ function calculateChecksum(data: string): string {
 function verifyChecksum(data: string, expected: string): void {
   const actual = calculateChecksum(data);
   if (actual !== expected) {
-    throw new Error('Sharing code appears corrupted. Please ask the sender to reshare.');
+    throw new PromptEncoderError({
+      type: ErrorType.DATA_CORRUPTION,
+      message: 'Sharing code appears corrupted. Please ask the sender to reshare.',
+      details: { expected, actual }
+    });
   }
 }
 
@@ -248,35 +312,66 @@ function verifyChecksum(data: string, expected: string): void {
  * @public
  */
 export function encode(prompt: Prompt): string {
-  // 1. Sanitize all text fields
-  const sanitized: SharedPromptData = {
-    title: sanitizeText(prompt.title),
-    content: sanitizeText(prompt.content),
-    category: sanitizeText(prompt.category),
-  };
+  try {
+    // 1. Sanitize all text fields
+    const sanitized: SharedPromptData = {
+      title: sanitizeText(prompt.title),
+      content: sanitizeText(prompt.content),
+      category: sanitizeText(prompt.category),
+    };
 
-  // 2. Validate sanitized data
-  validatePromptData(sanitized);
+    // 2. Validate sanitized data
+    validatePromptData(sanitized);
 
-  // 3. Create payload with checksum
-  const dataString = `${sanitized.title}|${sanitized.content}|${sanitized.category}`;
-  const payload: EncodedPromptPayloadV1 = {
-    v: '1.0',
-    t: sanitized.title,
-    c: sanitized.content,
-    cat: sanitized.category,
-    cs: calculateChecksum(dataString),
-  };
+    // 3. Create payload with checksum
+    const dataString = `${sanitized.title}|${sanitized.content}|${sanitized.category}`;
+    const payload: EncodedPromptPayloadV1 = {
+      v: '1.0',
+      t: sanitized.title,
+      c: sanitized.content,
+      cat: sanitized.category,
+      cs: calculateChecksum(dataString),
+    };
 
-  // 4. Compress to URL-safe string
-  const encoded = LZString.compressToEncodedURIComponent(JSON.stringify(payload));
+    // 4. Compress to URL-safe string
+    const encoded = LZString.compressToEncodedURIComponent(JSON.stringify(payload));
 
-  // 5. Verify size limit
-  if (encoded.length > PROMPT_SHARING_SIZE_LIMITS.ENCODED_MAX) {
-    throw new Error('Prompt too large to share');
+    // 5. Verify size limit
+    if (encoded.length > PROMPT_SHARING_SIZE_LIMITS.ENCODED_MAX) {
+      const error = new PromptEncoderError({
+        type: ErrorType.VALIDATION_ERROR,
+        message: 'Prompt too large to share',
+        details: { encodedLength: encoded.length, max: PROMPT_SHARING_SIZE_LIMITS.ENCODED_MAX }
+      });
+      logError('Failed to encode prompt - size limit exceeded', error, {
+        component: 'PromptEncoder',
+        operation: 'encode',
+        promptId: prompt.id,
+        encodedLength: encoded.length
+      });
+      throw error;
+    }
+
+    return encoded;
+  } catch (err) {
+    // Re-throw PromptEncoderError instances (including validation errors)
+    if (err instanceof PromptEncoderError) {
+      throw err;
+    }
+
+    // Wrap unexpected errors
+    const error = new PromptEncoderError({
+      type: ErrorType.VALIDATION_ERROR,
+      message: 'Failed to encode prompt',
+      details: err
+    });
+    logError('Unexpected error during prompt encoding', toError(err), {
+      component: 'PromptEncoder',
+      operation: 'encode',
+      promptId: prompt.id
+    });
+    throw error;
   }
-
-  return encoded;
 }
 
 /**
@@ -335,54 +430,99 @@ export function encode(prompt: Prompt): string {
  * @public
  */
 export function decode(encoded: string): SharedPromptData {
-  // 1. Decompress
-  const json = LZString.decompressFromEncodedURIComponent(encoded);
-  if (!json) {
-    throw new Error('Invalid sharing code format');
-  }
-
-  // 2. Parse JSON
-  let payload: unknown;
   try {
-    payload = JSON.parse(json);
-  } catch {
-    throw new Error('Invalid sharing code format');
+    // 1. Decompress
+    const json = LZString.decompressFromEncodedURIComponent(encoded);
+    if (!json) {
+      const error = new PromptEncoderError({
+        type: ErrorType.DATA_CORRUPTION,
+        message: 'Invalid sharing code format',
+        details: { step: 'decompression' }
+      });
+      logError('Failed to decompress sharing code', error, {
+        component: 'PromptEncoder',
+        operation: 'decode'
+      });
+      throw error;
+    }
+
+    // 2. Parse JSON
+    let payload: unknown;
+    try {
+      payload = JSON.parse(json);
+    } catch (parseErr) {
+      const error = new PromptEncoderError({
+        type: ErrorType.DATA_CORRUPTION,
+        message: 'Invalid sharing code format',
+        details: { step: 'json-parse', error: parseErr }
+      });
+      logError('Failed to parse sharing code JSON', toError(parseErr), {
+        component: 'PromptEncoder',
+        operation: 'decode'
+      });
+      throw error;
+    }
+
+    // 3. Verify version
+    if (
+      !payload ||
+      typeof payload !== 'object' ||
+      !('v' in payload) ||
+      payload.v !== '1.0'
+    ) {
+      const version = payload && typeof payload === 'object' && 'v' in payload
+        ? String(payload.v)
+        : 'unknown';
+      const error = new PromptEncoderError({
+        type: ErrorType.DATA_CORRUPTION,
+        message: `This sharing code format (${version}) is not supported. ` +
+          'Please ask the sender to reshare using the latest extension version.',
+        details: { version, step: 'version-check' }
+      });
+      logError('Unsupported sharing code version', error, {
+        component: 'PromptEncoder',
+        operation: 'decode',
+        version
+      });
+      throw error;
+    }
+
+    // Type assertion after validation
+    const typedPayload = payload as EncodedPromptPayloadV1;
+
+    // 4. Verify checksum
+    const dataString = `${typedPayload.t}|${typedPayload.c}|${typedPayload.cat}`;
+    verifyChecksum(dataString, typedPayload.cs);
+
+    // 5. Sanitize again (defense in depth)
+    const sanitized: SharedPromptData = {
+      title: sanitizeText(typedPayload.t),
+      content: sanitizeText(typedPayload.c),
+      category: sanitizeText(typedPayload.cat),
+    };
+
+    // 6. Validate sanitized data
+    validatePromptData(sanitized);
+
+    return sanitized;
+  } catch (err) {
+    // Re-throw PromptEncoderError instances (including validation/checksum errors)
+    if (err instanceof PromptEncoderError) {
+      throw err;
+    }
+
+    // Wrap unexpected errors
+    const error = new PromptEncoderError({
+      type: ErrorType.DATA_CORRUPTION,
+      message: 'Failed to decode sharing code',
+      details: err
+    });
+    logError('Unexpected error during prompt decoding', toError(err), {
+      component: 'PromptEncoder',
+      operation: 'decode'
+    });
+    throw error;
   }
-
-  // 3. Verify version
-  if (
-    !payload ||
-    typeof payload !== 'object' ||
-    !('v' in payload) ||
-    payload.v !== '1.0'
-  ) {
-    const version = payload && typeof payload === 'object' && 'v' in payload
-      ? String(payload.v)
-      : 'unknown';
-    throw new Error(
-      `This sharing code format (${version}) is not supported. ` +
-      'Please ask the sender to reshare using the latest extension version.'
-    );
-  }
-
-  // Type assertion after validation
-  const typedPayload = payload as EncodedPromptPayloadV1;
-
-  // 4. Verify checksum
-  const dataString = `${typedPayload.t}|${typedPayload.c}|${typedPayload.cat}`;
-  verifyChecksum(dataString, typedPayload.cs);
-
-  // 5. Sanitize again (defense in depth)
-  const sanitized: SharedPromptData = {
-    title: sanitizeText(typedPayload.t),
-    content: sanitizeText(typedPayload.c),
-    category: sanitizeText(typedPayload.cat),
-  };
-
-  // 6. Validate sanitized data
-  validatePromptData(sanitized);
-
-  return sanitized;
 }
 
 // Export helper functions for testing
