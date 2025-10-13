@@ -100,14 +100,14 @@ const PromptCard: FC<PromptCardProps> = ({
     try {
       const encoded = encode(prompt);
       await navigator.clipboard.writeText(encoded);
-      showToast('Sharing code copied to clipboard!', 'success');
+      showToast('Share link copied to clipboard!', 'success');
     } catch (err) {
       Logger.error('Share failed', toError(err), {
         component: 'PromptCard',
         operation: 'share',
         promptId: prompt.id
       });
-      showToast('Failed to copy. Please try again.', 'error');
+      showToast('Failed to share prompt. Please try again.', 'error');
     } finally {
       setIsSharing(false);
     }

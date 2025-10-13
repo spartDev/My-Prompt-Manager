@@ -230,7 +230,7 @@ describe('PromptCard - Share Button', () => {
 
     await waitFor(() => {
       expect(mockEncode).toHaveBeenCalledWith(mockPrompt);
-      expect(mockShowToast).toHaveBeenCalledWith('Sharing code copied to clipboard!', 'success');
+      expect(mockShowToast).toHaveBeenCalledWith('Share link copied to clipboard!', 'success');
     });
   });
 
@@ -247,7 +247,7 @@ describe('PromptCard - Share Button', () => {
 
     await waitFor(() => {
       expect(mockEncode).toHaveBeenCalledWith(mockPrompt);
-      expect(mockShowToast).toHaveBeenCalledWith('Failed to copy. Please try again.', 'error');
+      expect(mockShowToast).toHaveBeenCalledWith('Failed to share prompt. Please try again.', 'error');
     }, { timeout: 1000 });
   });
 
@@ -299,7 +299,7 @@ describe('PromptCard - Share Button', () => {
 
     await waitFor(() => {
       expect(mockEncode).toHaveBeenCalledWith(mockPrompt);
-      expect(mockShowToast).toHaveBeenCalledWith('Sharing code copied to clipboard!', 'success');
+      expect(mockShowToast).toHaveBeenCalledWith('Share link copied to clipboard!', 'success');
     });
   });
 
@@ -315,7 +315,7 @@ describe('PromptCard - Share Button', () => {
 
     await waitFor(() => {
       expect(mockEncode).toHaveBeenCalledWith(mockPrompt);
-      expect(mockShowToast).toHaveBeenCalledWith('Sharing code copied to clipboard!', 'success');
+      expect(mockShowToast).toHaveBeenCalledWith('Share link copied to clipboard!', 'success');
     });
   });
 });
