@@ -228,7 +228,7 @@ const PromptCard: FC<PromptCardProps> = ({
             }}
             disabled={isSharing}
             className="p-2 text-gray-400 dark:text-gray-500 hover:text-purple-600 dark:hover:text-purple-400 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors focus-interactive disabled:opacity-50 disabled:cursor-not-allowed"
-            aria-label={`Share ${prompt.title}`}
+            aria-label={isSharing ? `Sharing ${prompt.title}...` : `Share ${prompt.title}`}
             title="Share this prompt"
             aria-busy={isSharing}
           >
@@ -402,7 +402,8 @@ const arePropsEqual = (prevProps: PromptCardProps, nextProps: PromptCardProps): 
   if (prevProps.onEdit !== nextProps.onEdit) {return false;}
   if (prevProps.onDelete !== nextProps.onDelete) {return false;}
   if (prevProps.onCopy !== nextProps.onCopy) {return false;}
-  if (prevProps.showToast !== nextProps.showToast) {return false;}
+  // Note: showToast is excluded from comparison as function references change frequently
+  // and re-rendering on showToast changes provides no benefit
 
   return true;
 };

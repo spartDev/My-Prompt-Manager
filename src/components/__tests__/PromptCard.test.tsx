@@ -251,11 +251,10 @@ describe('PromptCard - Share Button', () => {
     }, { timeout: 1000 });
   });
 
-  it('should show error toast when clipboard write fails', async () => {
-    // Note: Error handling is thoroughly tested in "should show error toast when encoding fails"
+  it('should execute share handler successfully with valid encoding', async () => {
+    // Note: This validates the successful execution path of the share handler.
+    // Error handling is thoroughly tested in "should show error toast when encoding fails"
     // which validates the try-catch block and error toast display.
-    // Clipboard-specific errors in test environment are difficult to simulate due to
-    // mock timing issues, but the error handling code path is identical.
 
     const user = userEvent.setup();
     mockEncode.mockReturnValue('encoded-string');
@@ -271,20 +270,19 @@ describe('PromptCard - Share Button', () => {
     });
   });
 
-  it('should have disabled and aria-busy attributes during sharing', async () => {
-    // Note: Testing intermediate loading states with click events in test environment
-    // is challenging due to async timing. The keyboard navigation tests (Enter/Space)
-    // successfully validate the complete workflow including loading states.
-    // This test validates initial state and that the button is interactive.
+  it('should have loading state support with disabled and aria-busy attributes', () => {
+    // This test verifies that the button has proper loading state UI setup.
+    // The keyboard navigation tests validate the complete workflow including actual loading states.
 
     render(<PromptCard {...getMockProps()} />);
     const shareButton = screen.getByLabelText(/share test prompt/i);
 
-    // Button should be enabled and not busy initially
+    // Verify initial state: not disabled and not busy
     expect(shareButton).not.toBeDisabled();
     expect(shareButton).toHaveAttribute('aria-busy', 'false');
 
-    // Button should have proper disabled styles in className
+    // Verify button has proper disabled state styling for when loading state is active
+    // These Tailwind classes ensure proper visual feedback during loading
     expect(shareButton).toHaveClass('disabled:opacity-50');
     expect(shareButton).toHaveClass('disabled:cursor-not-allowed');
   });
