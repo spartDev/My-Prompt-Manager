@@ -45,8 +45,7 @@ import {
   ErrorType,
   AppError
 } from '../types';
-import { toError } from '../utils/error';
-import { error as logError } from '../utils/logger';
+import { Logger, toError } from '../utils';
 
 /**
  * Custom error class for PromptEncoder operations
@@ -104,29 +103,6 @@ const SANITIZATION_CONFIG: DOMPurify.Config = {
   SANITIZE_DOM: true,                 // Enable DOM sanitization
   IN_PLACE: false,                    // Don't modify input
 } as const;
-
-/**
- * Security hook to remove event handler attributes that bypass sanitization
- *
- * Additional defense layer that strips any event handler attributes (onclick,
- * onerror, onload, etc.) that might slip through DOMPurify's main sanitization.
- * This provides extra protection against XSS vectors that exploit parsing edge cases.
- *
- * Registered once at module initialization time.
- * @private
- */
-DOMPurify.addHook('afterSanitizeAttributes', (node) => {
-  if (node.hasAttributes()) {
-    const attrs = node.attributes;
-    for (let i = attrs.length - 1; i >= 0; i--) {
-      const attr = attrs[i];
-      // Remove any attribute starting with 'on' (event handlers)
-      if (attr.name.startsWith('on')) {
-        node.removeAttribute(attr.name);
-      }
-    }
-  }
-});
 
 /**
  * Sanitizes text by removing all HTML tags and trimming whitespace
@@ -393,7 +369,7 @@ export async function encode(prompt: Prompt): Promise<string> {
         message: 'Prompt too large to share',
         details: { encodedLength: encoded.length, max: PROMPT_SHARING_SIZE_LIMITS.ENCODED_MAX }
       });
-      logError('Failed to encode prompt - size limit exceeded', error, {
+      Logger.error('Failed to encode prompt - size limit exceeded', error, {
         component: 'PromptEncoder',
         operation: 'encode',
         promptId: prompt.id,
@@ -415,7 +391,7 @@ export async function encode(prompt: Prompt): Promise<string> {
       message: 'Failed to encode prompt',
       details: err
     });
-    logError('Unexpected error during prompt encoding', toError(err), {
+    Logger.error('Unexpected error during prompt encoding', toError(err), {
       component: 'PromptEncoder',
       operation: 'encode',
       promptId: prompt.id
@@ -492,7 +468,7 @@ export async function decode(encoded: string): Promise<SharedPromptData> {
         message: 'Sharing code too large',
         details: { encodedLength: encoded.length, max: PROMPT_SHARING_SIZE_LIMITS.ENCODED_MAX }
       });
-      logError('Sharing code exceeds size limit', error, {
+      Logger.error('Sharing code exceeds size limit', error, {
         component: 'PromptEncoder',
         operation: 'decode'
       });
@@ -507,7 +483,7 @@ export async function decode(encoded: string): Promise<SharedPromptData> {
         message: 'Invalid sharing code format',
         details: { step: 'decompression' }
       });
-      logError('Failed to decompress sharing code', error, {
+      Logger.error('Failed to decompress sharing code', error, {
         component: 'PromptEncoder',
         operation: 'decode'
       });
@@ -522,7 +498,7 @@ export async function decode(encoded: string): Promise<SharedPromptData> {
         message: 'Decompressed data too large',
         details: { decompressedLength: json.length, max: PROMPT_SHARING_SIZE_LIMITS.ENCODED_MAX * 2 }
       });
-      logError('Decompressed data exceeds size limit', error, {
+      Logger.error('Decompressed data exceeds size limit', error, {
         component: 'PromptEncoder',
         operation: 'decode'
       });
@@ -546,7 +522,7 @@ export async function decode(encoded: string): Promise<SharedPromptData> {
           decompressedLength: json.length
         }
       });
-      logError('Suspicious compression ratio detected', error, {
+      Logger.error('Suspicious compression ratio detected', error, {
         component: 'PromptEncoder',
         operation: 'decode',
         compressionRatio: compressionRatio.toFixed(2)
@@ -564,7 +540,7 @@ export async function decode(encoded: string): Promise<SharedPromptData> {
         message: 'Invalid sharing code format',
         details: { step: 'json-parse', error: parseErr }
       });
-      logError('Failed to parse sharing code JSON', toError(parseErr), {
+      Logger.error('Failed to parse sharing code JSON', toError(parseErr), {
         component: 'PromptEncoder',
         operation: 'decode'
       });
@@ -587,7 +563,7 @@ export async function decode(encoded: string): Promise<SharedPromptData> {
           'Please ask the sender to reshare using the latest extension version.',
         details: { version, step: 'version-check' }
       });
-      logError('Unsupported sharing code version', error, {
+      Logger.error('Unsupported sharing code version', error, {
         component: 'PromptEncoder',
         operation: 'decode',
         version
@@ -625,7 +601,7 @@ export async function decode(encoded: string): Promise<SharedPromptData> {
       message: 'Failed to decode sharing code',
       details: err
     });
-    logError('Unexpected error during prompt decoding', toError(err), {
+    Logger.error('Unexpected error during prompt decoding', toError(err), {
       component: 'PromptEncoder',
       operation: 'decode'
     });

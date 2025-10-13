@@ -168,7 +168,7 @@ export const PROMPT_SHARING_SIZE_LIMITS = {
   TITLE_MAX: 100,
   CONTENT_MAX: 10_000,
   CATEGORY_MAX: 50,
-  ENCODED_MAX: 50_000,
+  ENCODED_MAX: 20_000,
 } as const;
 
 // Element Fingerprinting for robust element identification
