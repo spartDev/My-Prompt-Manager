@@ -207,7 +207,16 @@ function validatePromptData(data: SharedPromptData): void {
  * during transmission or storage. **Not cryptographically secure** - only
  * detects unintentional changes, not malicious tampering.
  *
- * Uses a simple bit-shift hash algorithm and converts to base36 for compactness.
+ * ⚠️ **SECURITY NOTE**: This is NOT cryptographically secure and does NOT
+ * prevent intentional tampering. It only detects ACCIDENTAL corruption
+ * (copy/paste errors, truncation, network errors).
+ *
+ * For trusted user-to-user sharing, this provides sufficient protection
+ * against common transmission errors. If you need protection against
+ * malicious tampering, use HMAC-SHA256 instead.
+ *
+ * Uses djb2-like hash algorithm (hash * 33 + char) and converts to base36.
+ * Collision resistance: ~4 billion possible values (32-bit hash space).
  *
  * @param data - The string data to hash
  * @returns Base36-encoded checksum string (e.g., "1a2b3c")
@@ -229,9 +238,9 @@ function calculateChecksum(data: string): string {
   for (let i = 0; i < data.length; i++) {
     const char = data.charCodeAt(i);
     hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32-bit integer
+    hash = hash >>> 0; // Force unsigned 32-bit integer conversion
   }
-  return Math.abs(hash).toString(36);
+  return hash.toString(36); // Already positive, no need for Math.abs
 }
 
 /**
@@ -323,10 +332,11 @@ export function encode(prompt: Prompt): string {
     // 2. Validate sanitized data
     validatePromptData(sanitized);
 
-    // 3. Create payload with checksum
-    const dataString = `${sanitized.title}|${sanitized.content}|${sanitized.category}`;
+    // 3. Create payload with checksum (including version for better integrity)
+    const version = '1.0';
+    const dataString = `${version}|${sanitized.title}|${sanitized.content}|${sanitized.category}`;
     const payload: EncodedPromptPayloadV1 = {
-      v: '1.0',
+      v: version,
       t: sanitized.title,
       c: sanitized.content,
       cat: sanitized.category,
@@ -431,7 +441,21 @@ export function encode(prompt: Prompt): string {
  */
 export function decode(encoded: string): SharedPromptData {
   try {
-    // 1. Decompress
+    // 1. Check encoded size BEFORE decompression (prevent decompression bombs)
+    if (encoded.length > PROMPT_SHARING_SIZE_LIMITS.ENCODED_MAX * 2) {
+      const error = new PromptEncoderError({
+        type: ErrorType.VALIDATION_ERROR,
+        message: 'Sharing code too large',
+        details: { encodedLength: encoded.length, max: PROMPT_SHARING_SIZE_LIMITS.ENCODED_MAX * 2 }
+      });
+      logError('Sharing code exceeds size limit', error, {
+        component: 'PromptEncoder',
+        operation: 'decode'
+      });
+      throw error;
+    }
+
+    // 2. Decompress
     const json = LZString.decompressFromEncodedURIComponent(encoded);
     if (!json) {
       const error = new PromptEncoderError({
@@ -446,7 +470,21 @@ export function decode(encoded: string): SharedPromptData {
       throw error;
     }
 
-    // 2. Parse JSON
+    // 3. Check decompressed size (prevent decompression bombs)
+    if (json.length > PROMPT_SHARING_SIZE_LIMITS.ENCODED_MAX * 5) {
+      const error = new PromptEncoderError({
+        type: ErrorType.VALIDATION_ERROR,
+        message: 'Decompressed sharing code too large',
+        details: { decompressedLength: json.length, max: PROMPT_SHARING_SIZE_LIMITS.ENCODED_MAX * 5 }
+      });
+      logError('Decompressed data exceeds size limit', error, {
+        component: 'PromptEncoder',
+        operation: 'decode'
+      });
+      throw error;
+    }
+
+    // 4. Parse JSON
     let payload: unknown;
     try {
       payload = JSON.parse(json);
@@ -463,7 +501,7 @@ export function decode(encoded: string): SharedPromptData {
       throw error;
     }
 
-    // 3. Verify version
+    // 5. Verify version
     if (
       !payload ||
       typeof payload !== 'object' ||
@@ -490,18 +528,18 @@ export function decode(encoded: string): SharedPromptData {
     // Type assertion after validation
     const typedPayload = payload as EncodedPromptPayloadV1;
 
-    // 4. Verify checksum
-    const dataString = `${typedPayload.t}|${typedPayload.c}|${typedPayload.cat}`;
+    // 6. Verify checksum (including version for better integrity)
+    const dataString = `${typedPayload.v}|${typedPayload.t}|${typedPayload.c}|${typedPayload.cat}`;
     verifyChecksum(dataString, typedPayload.cs);
 
-    // 5. Sanitize again (defense in depth)
+    // 7. Sanitize again (defense in depth)
     const sanitized: SharedPromptData = {
       title: sanitizeText(typedPayload.t),
       content: sanitizeText(typedPayload.c),
       category: sanitizeText(typedPayload.cat),
     };
 
-    // 6. Validate sanitized data
+    // 8. Validate sanitized data
     validatePromptData(sanitized);
 
     return sanitized;

@@ -347,7 +347,7 @@ describe('PromptEncoder', () => {
         t: '<b>Test</b>',
         c: '<script>alert(1)</script>Content',
         cat: '<img src=x>Cat',
-        cs: calculateChecksum('<b>Test</b>|<script>alert(1)</script>Content|<img src=x>Cat'),
+        cs: calculateChecksum('1.0|<b>Test</b>|<script>alert(1)</script>Content|<img src=x>Cat'),
       };
       const encoded = LZString.compressToEncodedURIComponent(
         JSON.stringify(payload)
@@ -376,7 +376,7 @@ describe('PromptEncoder', () => {
         t: '',
         c: 'Content',
         cat: 'Cat',
-        cs: calculateChecksum('|Content|Cat'),
+        cs: calculateChecksum('1.0||Content|Cat'),
       };
       const encoded = LZString.compressToEncodedURIComponent(
         JSON.stringify(payload)
