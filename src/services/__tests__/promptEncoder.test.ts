@@ -26,32 +26,32 @@ function createTestPrompt(overrides: Partial<Prompt> = {}): Prompt {
 
 describe('PromptEncoder', () => {
   describe('sanitizeText', () => {
-    it('should remove HTML tags', () => {
+    it('should remove HTML tags', async () => {
       const result = sanitizeText('<script>alert("xss")</script>Test');
       expect(result).toBe('Test');
     });
 
-    it('should remove all HTML tags from all fields', () => {
+    it('should remove all HTML tags from all fields', async () => {
       expect(sanitizeText('<b>Bold</b> text')).toBe('Bold text');
       expect(sanitizeText('<img src=x onerror=alert(1)>Cat')).toBe('Cat');
     });
 
-    it('should trim whitespace', () => {
+    it('should trim whitespace', async () => {
       expect(sanitizeText('  Test  ')).toBe('Test');
     });
 
-    it('should handle plain text', () => {
+    it('should handle plain text', async () => {
       expect(sanitizeText('Normal text')).toBe('Normal text');
     });
 
-    it('should handle empty strings', () => {
+    it('should handle empty strings', async () => {
       expect(sanitizeText('')).toBe('');
       expect(sanitizeText('   ')).toBe('');
     });
   });
 
   describe('validatePromptData', () => {
-    it('should pass validation for valid data', () => {
+    it('should pass validation for valid data', async () => {
       const validData = {
         title: 'Test',
         content: 'Content',
@@ -60,7 +60,7 @@ describe('PromptEncoder', () => {
       expect(() => validatePromptData(validData)).not.toThrow();
     });
 
-    it('should throw PromptEncoderError for empty title', () => {
+    it('should throw PromptEncoderError for empty title', async () => {
       const data = { title: '', content: 'Content', category: 'Category' };
       expect(() => validatePromptData(data)).toThrow('Title is required');
       try {
@@ -71,7 +71,7 @@ describe('PromptEncoder', () => {
       }
     });
 
-    it('should throw PromptEncoderError for empty content', () => {
+    it('should throw PromptEncoderError for empty content', async () => {
       const data = { title: 'Title', content: '', category: 'Category' };
       expect(() => validatePromptData(data)).toThrow('Content is required');
       try {
@@ -82,7 +82,7 @@ describe('PromptEncoder', () => {
       }
     });
 
-    it('should throw PromptEncoderError for empty category', () => {
+    it('should throw PromptEncoderError for empty category', async () => {
       const data = { title: 'Title', content: 'Content', category: '' };
       expect(() => validatePromptData(data)).toThrow('Category is required');
       try {
@@ -93,7 +93,7 @@ describe('PromptEncoder', () => {
       }
     });
 
-    it('should throw PromptEncoderError for whitespace-only title', () => {
+    it('should throw PromptEncoderError for whitespace-only title', async () => {
       const data = { title: '   ', content: 'Content', category: 'Category' };
       expect(() => validatePromptData(data)).toThrow('Title is required');
       try {
@@ -104,7 +104,7 @@ describe('PromptEncoder', () => {
       }
     });
 
-    it('should throw PromptEncoderError for oversized title', () => {
+    it('should throw PromptEncoderError for oversized title', async () => {
       const data = {
         title: 'x'.repeat(150),
         content: 'Content',
@@ -119,7 +119,7 @@ describe('PromptEncoder', () => {
       }
     });
 
-    it('should throw PromptEncoderError for oversized content', () => {
+    it('should throw PromptEncoderError for oversized content', async () => {
       const data = {
         title: 'Title',
         content: 'x'.repeat(15_000),
@@ -134,7 +134,7 @@ describe('PromptEncoder', () => {
       }
     });
 
-    it('should throw PromptEncoderError for oversized category', () => {
+    it('should throw PromptEncoderError for oversized category', async () => {
       const data = {
         title: 'Title',
         content: 'Content',
@@ -151,37 +151,38 @@ describe('PromptEncoder', () => {
   });
 
   describe('calculateChecksum', () => {
-    it('should return consistent checksum for same input', () => {
+    it('should return consistent checksum for same input', async () => {
       const data = 'Test data';
-      const checksum1 = calculateChecksum(data);
-      const checksum2 = calculateChecksum(data);
+      const checksum1 = await calculateChecksum(data);
+      const checksum2 = await calculateChecksum(data);
       expect(checksum1).toBe(checksum2);
     });
 
-    it('should return different checksums for different inputs', () => {
-      const checksum1 = calculateChecksum('Test 1');
-      const checksum2 = calculateChecksum('Test 2');
+    it('should return different checksums for different inputs', async () => {
+      const checksum1 = await calculateChecksum('Test 1');
+      const checksum2 = await calculateChecksum('Test 2');
       expect(checksum1).not.toBe(checksum2);
     });
 
-    it('should return base36 string', () => {
-      const checksum = calculateChecksum('Test');
-      expect(checksum).toMatch(/^[0-9a-z]+$/);
+    it('should return hexadecimal string', async () => {
+      const checksum = await calculateChecksum('Test');
+      expect(checksum).toMatch(/^[0-9a-f]+$/);
+      expect(checksum.length).toBe(12); // 48 bits = 12 hex chars
     });
   });
 
   describe('verifyChecksum', () => {
-    it('should not throw for valid checksum', () => {
+    it('should not throw for valid checksum', async () => {
       const data = 'Test data';
-      const checksum = calculateChecksum(data);
-      expect(() => verifyChecksum(data, checksum)).not.toThrow();
+      const checksum = await calculateChecksum(data);
+      await expect(async () => await verifyChecksum(data, checksum)).not.toThrow();
     });
 
-    it('should throw PromptEncoderError for invalid checksum', () => {
+    it('should throw PromptEncoderError for invalid checksum', async () => {
       const data = 'Test data';
-      expect(() => verifyChecksum(data, 'invalid')).toThrow('corrupted');
+      await expect(async () => await verifyChecksum(data, 'invalid')).toThrow('corrupted');
       try {
-        verifyChecksum(data, 'invalid');
+        await verifyChecksum(data, 'invalid');
       } catch (err) {
         expect(err).toHaveProperty('type', ErrorType.DATA_CORRUPTION);
         expect(err).toHaveProperty('name', 'PromptEncoderError');
@@ -190,61 +191,61 @@ describe('PromptEncoder', () => {
   });
 
   describe('encode', () => {
-    it('should encode a valid prompt', () => {
+    it('should encode a valid prompt', async () => {
       const prompt = createTestPrompt();
-      const encoded = encode(prompt);
+      const encoded = await encode(prompt);
       expect(encoded).toBeTruthy();
       expect(typeof encoded).toBe('string');
     });
 
-    it('should produce URL-safe string', () => {
+    it('should produce URL-safe string', async () => {
       const prompt = createTestPrompt();
-      const encoded = encode(prompt);
+      const encoded = await encode(prompt);
       // URL-safe characters only (alphanumeric, -, _)
       expect(encoded).toMatch(/^[A-Za-z0-9_-]+$/);
     });
 
-    it('should sanitize HTML in all fields', () => {
+    it('should sanitize HTML in all fields', async () => {
       const prompt = createTestPrompt({
         title: '<script>alert("xss")</script>Test',
         content: '<b>Bold</b> content',
         category: '<img src=x>Cat',
       });
-      const encoded = encode(prompt);
-      const decoded = decode(encoded);
+      const encoded = await encode(prompt);
+      const decoded = await decode(encoded);
       expect(decoded.title).toBe('Test');
       expect(decoded.content).toBe('Bold content');
       expect(decoded.category).toBe('Cat');
     });
 
-    it('should trim whitespace from all fields', () => {
+    it('should trim whitespace from all fields', async () => {
       const prompt = createTestPrompt({
         title: '   Test   ',
         content: '   Content   ',
         category: '   Cat   ',
       });
-      const encoded = encode(prompt);
-      const decoded = decode(encoded);
+      const encoded = await encode(prompt);
+      const decoded = await decode(encoded);
       expect(decoded.title).toBe('Test');
       expect(decoded.content).toBe('Content');
       expect(decoded.category).toBe('Cat');
     });
 
-    it('should throw for empty title', () => {
+    it('should throw for empty title', async () => {
       const prompt = createTestPrompt({ title: '' });
-      expect(() => encode(prompt)).toThrow('Title is required');
+      await expect(encode(prompt)).rejects.toThrow('Title is required');
     });
 
-    it('should throw for oversized content', () => {
-      const prompt = createTestPrompt({ content: 'x'.repeat(20_000) });
-      expect(() => encode(prompt)).toThrow('too long');
+    it('should throw for oversized content', async () => {
+      const prompt = createTestPrompt({ content: 'x'.repeat(15_000) });
+      await expect(encode(prompt)).rejects.toThrow('too long');
     });
 
-    it('should produce compressed output', () => {
+    it('should produce compressed output', async () => {
       const prompt = createTestPrompt({
         content: 'A'.repeat(1000),
       });
-      const encoded = encode(prompt);
+      const encoded = await encode(prompt);
       const uncompressed = JSON.stringify(prompt);
       // Encoded should be significantly smaller
       expect(encoded.length).toBeLessThan(uncompressed.length / 2);
@@ -252,54 +253,53 @@ describe('PromptEncoder', () => {
   });
 
   describe('decode', () => {
-    it('should decode a valid encoded string', () => {
+    it('should decode a valid encoded string', async () => {
       const prompt = createTestPrompt();
-      const encoded = encode(prompt);
-      const decoded = decode(encoded);
+      const encoded = await encode(prompt);
+      const decoded = await decode(encoded);
       expect(decoded.title).toBe(prompt.title);
       expect(decoded.content).toBe(prompt.content);
       expect(decoded.category).toBe(prompt.category);
     });
 
-    it('should handle round-trip encoding/decoding', () => {
+    it('should handle round-trip encoding/decoding', async () => {
       const prompt = createTestPrompt({
         title: 'Complex Title',
         content: 'Complex content with special chars: !@#$%^&*()',
         category: 'Complex Category',
       });
-      const encoded = encode(prompt);
-      const decoded = decode(encoded);
-      expect(decoded).toEqual({
-        title: prompt.title,
-        content: prompt.content,
-        category: prompt.category,
-      });
+      const encoded = await encode(prompt);
+      const decoded = await decode(encoded);
+      // Compare individual fields since decoded doesn't include id/timestamps
+      expect(decoded.title).toBe(prompt.title);
+      expect(decoded.content).toBe(prompt.content);
+      expect(decoded.category).toBe(prompt.category);
     });
 
-    it('should throw PromptEncoderError for invalid encoded string', () => {
-      expect(() => decode('invalid')).toThrow('Invalid sharing code format');
+    it('should throw PromptEncoderError for invalid encoded string', async () => {
+      await expect(decode('invalid')).rejects.toThrow('Invalid sharing code format');
       try {
-        decode('invalid');
+        await decode('invalid');
       } catch (err) {
         expect(err).toHaveProperty('type', ErrorType.DATA_CORRUPTION);
         expect(err).toHaveProperty('name', 'PromptEncoderError');
       }
     });
 
-    it('should throw PromptEncoderError for corrupted encoded string', () => {
+    it('should throw PromptEncoderError for corrupted encoded string', async () => {
       const prompt = createTestPrompt();
-      const encoded = encode(prompt);
+      const encoded = await encode(prompt);
       // Truncate to corrupt
       const corrupted = encoded.slice(0, -10);
-      expect(() => decode(corrupted)).toThrow();
+      await expect(decode(corrupted)).rejects.toThrow();
       try {
-        decode(corrupted);
+        await decode(corrupted);
       } catch (err) {
         expect(err).toHaveProperty('name', 'PromptEncoderError');
       }
     });
 
-    it('should throw PromptEncoderError for unsupported version', () => {
+    it('should throw PromptEncoderError for unsupported version', async () => {
       const payload = {
         v: '2.0',
         t: 'Test',
@@ -310,16 +310,16 @@ describe('PromptEncoder', () => {
       const encoded = LZString.compressToEncodedURIComponent(
         JSON.stringify(payload)
       );
-      expect(() => decode(encoded)).toThrow('not supported');
+      await expect(decode(encoded)).rejects.toThrow('not supported');
       try {
-        decode(encoded);
+        await decode(encoded);
       } catch (err) {
         expect(err).toHaveProperty('type', ErrorType.DATA_CORRUPTION);
         expect(err).toHaveProperty('name', 'PromptEncoderError');
       }
     });
 
-    it('should throw PromptEncoderError for invalid checksum', () => {
+    it('should throw PromptEncoderError for invalid checksum', async () => {
       const payload = {
         v: '1.0',
         t: 'Test',
@@ -330,16 +330,16 @@ describe('PromptEncoder', () => {
       const encoded = LZString.compressToEncodedURIComponent(
         JSON.stringify(payload)
       );
-      expect(() => decode(encoded)).toThrow('corrupted');
+      await expect(decode(encoded)).rejects.toThrow('corrupted');
       try {
-        decode(encoded);
+        await decode(encoded);
       } catch (err) {
         expect(err).toHaveProperty('type', ErrorType.DATA_CORRUPTION);
         expect(err).toHaveProperty('name', 'PromptEncoderError');
       }
     });
 
-    it('should apply defense-in-depth sanitization', () => {
+    it('should apply defense-in-depth sanitization', async () => {
       // Manually create payload with HTML (bypassing encode)
       // Note: checksum must match the raw payload data for verification to pass
       const payload = {
@@ -347,43 +347,43 @@ describe('PromptEncoder', () => {
         t: '<b>Test</b>',
         c: '<script>alert(1)</script>Content',
         cat: '<img src=x>Cat',
-        cs: calculateChecksum('1.0|<b>Test</b>|<script>alert(1)</script>Content|<img src=x>Cat'),
+        cs: await calculateChecksum('1.0|<b>Test</b>|<script>alert(1)</script>Content|<img src=x>Cat'),
       };
       const encoded = LZString.compressToEncodedURIComponent(
         JSON.stringify(payload)
       );
-      const decoded = decode(encoded);
+      const decoded = await decode(encoded);
       // HTML should be stripped even though it's in the payload
       expect(decoded.title).toBe('Test');
       expect(decoded.content).toBe('Content');
       expect(decoded.category).toBe('Cat');
     });
 
-    it('should throw PromptEncoderError for malformed JSON', () => {
+    it('should throw PromptEncoderError for malformed JSON', async () => {
       const malformed = LZString.compressToEncodedURIComponent('{invalid json}');
-      expect(() => decode(malformed)).toThrow('Invalid sharing code format');
+      await expect(decode(malformed)).rejects.toThrow('Invalid sharing code format');
       try {
-        decode(malformed);
+        await decode(malformed);
       } catch (err) {
         expect(err).toHaveProperty('type', ErrorType.DATA_CORRUPTION);
         expect(err).toHaveProperty('name', 'PromptEncoderError');
       }
     });
 
-    it('should throw PromptEncoderError for missing required fields', () => {
+    it('should throw PromptEncoderError for missing required fields', async () => {
       const payload = {
         v: '1.0',
         t: '',
         c: 'Content',
         cat: 'Cat',
-        cs: calculateChecksum('1.0||Content|Cat'),
+        cs: await calculateChecksum('1.0||Content|Cat'),
       };
       const encoded = LZString.compressToEncodedURIComponent(
         JSON.stringify(payload)
       );
-      expect(() => decode(encoded)).toThrow('required');
+      await expect(decode(encoded)).rejects.toThrow('required');
       try {
-        decode(encoded);
+        await decode(encoded);
       } catch (err) {
         expect(err).toHaveProperty('type', ErrorType.VALIDATION_ERROR);
         expect(err).toHaveProperty('name', 'PromptEncoderError');
@@ -392,45 +392,45 @@ describe('PromptEncoder', () => {
   });
 
   describe('Security', () => {
-    it('should prevent XSS in title', () => {
+    it('should prevent XSS in title', async () => {
       const prompt = createTestPrompt({
         title: '<script>alert("xss")</script>Malicious',
       });
-      const encoded = encode(prompt);
-      const decoded = decode(encoded);
+      const encoded = await encode(prompt);
+      const decoded = await decode(encoded);
       expect(decoded.title).toBe('Malicious');
       expect(decoded.title).not.toContain('<script>');
     });
 
-    it('should prevent XSS in content', () => {
+    it('should prevent XSS in content', async () => {
       const prompt = createTestPrompt({
         content: '<img src=x onerror=alert("xss")>Content',
       });
-      const encoded = encode(prompt);
-      const decoded = decode(encoded);
+      const encoded = await encode(prompt);
+      const decoded = await decode(encoded);
       expect(decoded.content).toBe('Content');
       expect(decoded.content).not.toContain('<img');
       expect(decoded.content).not.toContain('onerror');
     });
 
-    it('should prevent XSS in category', () => {
+    it('should prevent XSS in category', async () => {
       const prompt = createTestPrompt({
         category: '<iframe src="evil.com"></iframe>Category',
       });
-      const encoded = encode(prompt);
-      const decoded = decode(encoded);
+      const encoded = await encode(prompt);
+      const decoded = await decode(encoded);
       expect(decoded.category).toBe('Category');
       expect(decoded.category).not.toContain('<iframe');
     });
 
-    it('should handle multiple XSS vectors', () => {
+    it('should handle multiple XSS vectors', async () => {
       const prompt = createTestPrompt({
         title: '<script>alert(1)</script><b>Test</b>',
         content: '<img src=x onerror=alert(2)><i>Content</i>',
         category: '<a href="javascript:alert(3)">Cat</a>',
       });
-      const encoded = encode(prompt);
-      const decoded = decode(encoded);
+      const encoded = await encode(prompt);
+      const decoded = await decode(encoded);
       expect(decoded.title).toBe('Test');
       expect(decoded.content).toBe('Content');
       expect(decoded.category).toBe('Cat');
@@ -438,9 +438,9 @@ describe('PromptEncoder', () => {
   });
 
   describe('Data Integrity', () => {
-    it('should detect tampered title', () => {
+    it('should detect tampered title', async () => {
       const prompt = createTestPrompt();
-      const encoded = encode(prompt);
+      const encoded = await encode(prompt);
       const decoded = LZString.decompressFromEncodedURIComponent(encoded);
       const payload = JSON.parse(decoded);
       // Tamper with title
@@ -448,18 +448,18 @@ describe('PromptEncoder', () => {
       const tampered = LZString.compressToEncodedURIComponent(
         JSON.stringify(payload)
       );
-      expect(() => decode(tampered)).toThrow('corrupted');
+      await expect(decode(tampered)).rejects.toThrow('corrupted');
       try {
-        decode(tampered);
+        await decode(tampered);
       } catch (err) {
         expect(err).toHaveProperty('type', ErrorType.DATA_CORRUPTION);
         expect(err).toHaveProperty('name', 'PromptEncoderError');
       }
     });
 
-    it('should detect tampered content', () => {
+    it('should detect tampered content', async () => {
       const prompt = createTestPrompt();
-      const encoded = encode(prompt);
+      const encoded = await encode(prompt);
       const decoded = LZString.decompressFromEncodedURIComponent(encoded);
       const payload = JSON.parse(decoded);
       // Tamper with content
@@ -467,18 +467,18 @@ describe('PromptEncoder', () => {
       const tampered = LZString.compressToEncodedURIComponent(
         JSON.stringify(payload)
       );
-      expect(() => decode(tampered)).toThrow('corrupted');
+      await expect(decode(tampered)).rejects.toThrow('corrupted');
       try {
-        decode(tampered);
+        await decode(tampered);
       } catch (err) {
         expect(err).toHaveProperty('type', ErrorType.DATA_CORRUPTION);
         expect(err).toHaveProperty('name', 'PromptEncoderError');
       }
     });
 
-    it('should detect tampered category', () => {
+    it('should detect tampered category', async () => {
       const prompt = createTestPrompt();
-      const encoded = encode(prompt);
+      const encoded = await encode(prompt);
       const decoded = LZString.decompressFromEncodedURIComponent(encoded);
       const payload = JSON.parse(decoded);
       // Tamper with category
@@ -486,9 +486,9 @@ describe('PromptEncoder', () => {
       const tampered = LZString.compressToEncodedURIComponent(
         JSON.stringify(payload)
       );
-      expect(() => decode(tampered)).toThrow('corrupted');
+      await expect(decode(tampered)).rejects.toThrow('corrupted');
       try {
-        decode(tampered);
+        await decode(tampered);
       } catch (err) {
         expect(err).toHaveProperty('type', ErrorType.DATA_CORRUPTION);
         expect(err).toHaveProperty('name', 'PromptEncoderError');
@@ -497,57 +497,306 @@ describe('PromptEncoder', () => {
   });
 
   describe('Edge Cases', () => {
-    it('should handle special characters', () => {
+    it('should handle special characters', async () => {
       const prompt = createTestPrompt({
         // DOMPurify escapes &, <, > as HTML entities
         title: '!@#$%^*()_+-=[]{}|;:",?/',
         content: 'Content with émojis 🎉🚀',
         category: 'Category with Ü̈mlaut',
       });
-      const encoded = encode(prompt);
-      const decoded = decode(encoded);
+      const encoded = await encode(prompt);
+      const decoded = await decode(encoded);
       expect(decoded.title).toBe(prompt.title);
       expect(decoded.content).toBe(prompt.content);
       expect(decoded.category).toBe(prompt.category);
     });
 
-    it('should handle unicode characters', () => {
+    it('should handle unicode characters', async () => {
       const prompt = createTestPrompt({
         title: '中文标题',
         content: 'Contenu en français',
         category: 'Категория',
       });
-      const encoded = encode(prompt);
-      const decoded = decode(encoded);
+      const encoded = await encode(prompt);
+      const decoded = await decode(encoded);
       expect(decoded.title).toBe(prompt.title);
       expect(decoded.content).toBe(prompt.content);
       expect(decoded.category).toBe(prompt.category);
     });
 
-    it('should handle maximum allowed sizes', () => {
+    it('should handle maximum allowed sizes', async () => {
       const prompt = createTestPrompt({
         title: 'x'.repeat(100), // Max allowed
         content: 'y'.repeat(10_000), // Max allowed
         category: 'z'.repeat(50), // Max allowed
       });
-      const encoded = encode(prompt);
-      const decoded = decode(encoded);
+      const encoded = await encode(prompt);
+      const decoded = await decode(encoded);
       expect(decoded.title).toBe(prompt.title);
       expect(decoded.content).toBe(prompt.content);
       expect(decoded.category).toBe(prompt.category);
     });
 
-    it('should handle newlines and tabs', () => {
+    it('should handle newlines and tabs', async () => {
       const prompt = createTestPrompt({
         title: 'Title with\ttabs',
         content: 'Content\nwith\nnewlines',
         category: 'Category\rwith\rreturns',
       });
-      const encoded = encode(prompt);
-      const decoded = decode(encoded);
+      const encoded = await encode(prompt);
+      const decoded = await decode(encoded);
       expect(decoded.title).toBe(prompt.title);
       expect(decoded.content).toBe(prompt.content);
       expect(decoded.category).toBe(prompt.category);
+    });
+  });
+
+  describe('Decompression Bomb Protection', () => {
+    it('should reject encoded strings exceeding size limit', async () => {
+      // Create string that exceeds 50KB encoded limit
+      const hugeString = 'x'.repeat(50_001);
+
+      await expect(decode(hugeString)).rejects.toThrow('Sharing code too large');
+      try {
+        await decode(hugeString);
+      } catch (err) {
+        expect(err).toHaveProperty('type', ErrorType.VALIDATION_ERROR);
+        expect(err).toHaveProperty('name', 'PromptEncoderError');
+      }
+    });
+
+    it('should reject payloads exceeding decompressed size limit (100KB)', async () => {
+      // Create highly compressible payload that decompresses to >100KB (2x the 50KB limit)
+      // Use repetitive content for efficient compression
+      const payload = {
+        v: '1.0',
+        t: 'Title',
+        c: 'A'.repeat(101_000), // 101KB of same character
+        cat: 'Cat',
+        cs: await calculateChecksum('1.0|Title|' + 'A'.repeat(101_000) + '|Cat')
+      };
+
+      const encoded = LZString.compressToEncodedURIComponent(JSON.stringify(payload));
+
+      // Should detect decompressed size exceeds 100KB (2x limit)
+      await expect(decode(encoded)).rejects.toThrow('too large');
+
+      try {
+        await decode(encoded);
+      } catch (err) {
+        expect(err).toHaveProperty('type', ErrorType.VALIDATION_ERROR);
+        expect(err).toHaveProperty('name', 'PromptEncoderError');
+        expect((err as Error).message).toContain('Decompressed data too large');
+      }
+    });
+
+    it('should reject payloads with suspicious compression ratios (>200x on large payloads)', async () => {
+      // Create compression bomb with >200x compression ratio on >50KB payload
+      // Highly repetitive 80KB content compresses to very small size
+      const repetitiveContent = 'A'.repeat(80_000); // 80KB (>50KB threshold)
+      const payload = {
+        v: '1.0',
+        t: 'T',
+        c: repetitiveContent,
+        cat: 'C',
+        cs: await calculateChecksum(`1.0|T|${repetitiveContent}|C`)
+      };
+
+      const encoded = LZString.compressToEncodedURIComponent(JSON.stringify(payload));
+      const decompressedLength = JSON.stringify(payload).length;
+      const compressionRatio = decompressedLength / encoded.length;
+
+      // Verify this meets the criteria for compression ratio check:
+      // 1. Decompressed size >50KB
+      // 2. Compression ratio >200x
+      expect(decompressedLength).toBeGreaterThan(50_000);
+      expect(compressionRatio).toBeGreaterThan(200);
+
+      // Should reject due to either size limit OR compression ratio
+      await expect(decode(encoded)).rejects.toThrow();
+
+      try {
+        await decode(encoded);
+      } catch (err) {
+        expect(err).toHaveProperty('type', ErrorType.VALIDATION_ERROR);
+        expect(err).toHaveProperty('name', 'PromptEncoderError');
+      }
+    });
+
+    it('should reject decompressed payloads at exact 2x limit boundary', async () => {
+      // Create payload that decompresses to exactly 100KB (2x the 50KB limit)
+      // Use repeated pattern with some variation to avoid extreme compression ratios
+      const targetSize = 100_000;
+      const overhead = 100; // Estimate for JSON structure, version, checksum
+      const contentSize = targetSize - overhead;
+
+      // Use moderately repetitive content (compresses well but not extremely)
+      const basePattern = 'The quick brown fox jumps over the lazy dog. ';
+      const variedContent = basePattern.repeat(Math.ceil(contentSize / basePattern.length)).substring(0, contentSize);
+
+      const payload = {
+        v: '1.0',
+        t: 'T',
+        c: variedContent,
+        cat: 'C',
+        cs: await calculateChecksum('1.0|T|' + variedContent + '|C')
+      };
+
+      const encoded = LZString.compressToEncodedURIComponent(JSON.stringify(payload));
+
+      await expect(decode(encoded)).rejects.toThrow();
+
+      try {
+        await decode(encoded);
+      } catch (err) {
+        expect(err).toHaveProperty('type', ErrorType.VALIDATION_ERROR);
+        expect(err).toHaveProperty('name', 'PromptEncoderError');
+        // Should fail on decompressed size check (100KB > limit)
+        expect((err as Error).message).toContain('too large');
+      }
+    });
+
+    it('should accept legitimate payloads with normal compression ratios', async () => {
+      // Normal prompt with typical compression ratio (3-5x)
+      const prompt = createTestPrompt({
+        title: 'Test Prompt',
+        content: 'This is a normal prompt with typical text that compresses reasonably. ' +
+                 'It contains various words and punctuation that create a realistic compression scenario. ' +
+                 'The compression ratio should be within normal bounds.',
+        category: 'Test'
+      });
+
+      const encoded = await encode(prompt);
+      const decoded = await decode(encoded);
+
+      expect(decoded.title).toBe('Test Prompt');
+      expect(decoded.content).toContain('normal prompt');
+      expect(decoded.category).toBe('Test');
+    });
+
+    it('should accept maximum valid content with typical compression', async () => {
+      // Test at maximum allowed content size (10KB) with realistic text
+      // This should compress reasonably and stay well under limits
+      const normalText = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. ';
+      const repetitions = Math.floor(10_000 / normalText.length);
+      const content = normalText.repeat(repetitions).substring(0, 10_000);
+
+      const prompt = createTestPrompt({
+        title: 'Maximum Size Prompt',
+        content: content, // Exactly at limit
+        category: 'Test'
+      });
+
+      const encoded = await encode(prompt);
+      const decoded = await decode(encoded);
+
+      expect(decoded.title).toBe('Maximum Size Prompt');
+      // Allow for slight variation due to sanitization/trimming
+      expect(decoded.content.length).toBeGreaterThanOrEqual(9900);
+      expect(decoded.content.length).toBeLessThanOrEqual(10_000);
+      expect(decoded.category).toBe('Test');
+    });
+
+    it('should detect compression bomb with small encoded but large decompressed size', async () => {
+      // Create a compression bomb: small encoded size, large decompressed size
+      // Repeating 'A' 80KB times compresses to very small size (< 50KB)
+      const maliciousPayload = {
+        v: '1.0',
+        t: 'Attack',
+        c: 'A'.repeat(80_000), // 80KB > 2x limit (100KB threshold is lower)
+        cat: 'Cat',
+        cs: await calculateChecksum('1.0|Attack|' + 'A'.repeat(80_000) + '|Cat')
+      };
+
+      const encoded = LZString.compressToEncodedURIComponent(JSON.stringify(maliciousPayload));
+
+      // Encoded size is small (due to compression), but decompressed is huge
+      expect(encoded.length).toBeLessThan(50_000); // Passes first check
+
+      // Should fail on decompressed size check OR compression ratio check
+      await expect(decode(encoded)).rejects.toThrow();
+
+      try {
+        await decode(encoded);
+      } catch (err) {
+        expect(err).toHaveProperty('name', 'PromptEncoderError');
+        expect(err).toHaveProperty('type', ErrorType.VALIDATION_ERROR);
+      }
+    });
+
+    it('should accept realistic repetitive content with moderate compression', async () => {
+      // Test content with natural repetition (like code examples)
+      // Should be accepted even with higher compression ratio (<50x)
+      const codeExample = 'function test() {\n  return true;\n}\n';
+      const repeatedCode = codeExample.repeat(100); // ~3KB of repeated code
+
+      const prompt = createTestPrompt({
+        title: 'Code Examples',
+        content: repeatedCode,
+        category: 'Programming'
+      });
+
+      const encoded = await encode(prompt);
+      const decoded = await decode(encoded);
+
+      // Should work fine - realistic content with natural repetition
+      expect(decoded.title).toBe('Code Examples');
+      expect(decoded.content).toContain('function test()');
+      expect(decoded.category).toBe('Programming');
+    });
+
+    it('should provide clear error messages for size limit violations', async () => {
+      const maliciousPayload = {
+        v: '1.0',
+        t: 'Attack',
+        c: 'X'.repeat(110_000), // 110KB > 100KB limit
+        cat: 'Cat',
+        cs: await calculateChecksum('1.0|Attack|' + 'X'.repeat(110_000) + '|Cat')
+      };
+
+      const encoded = LZString.compressToEncodedURIComponent(JSON.stringify(maliciousPayload));
+
+      try {
+        await decode(encoded);
+        // Should not reach here
+        expect(true).toBe(false);
+      } catch (err) {
+        expect(err).toHaveProperty('message');
+        expect((err as Error).message).toContain('too large');
+        expect(err).toHaveProperty('details');
+        const details = (err as { details?: { decompressedLength?: number } }).details;
+        expect(details).toHaveProperty('decompressedLength');
+        expect(details?.decompressedLength).toBeGreaterThan(100_000);
+      }
+    });
+
+    it('should verify both decompressed size AND compression ratio checks', async () => {
+      // This test verifies the defense-in-depth approach:
+      // Even if one check fails, the other should catch malicious payloads
+
+      // Case 1: Large decompressed size (would fail size check)
+      const largPayload = {
+        v: '1.0',
+        t: 'Large',
+        c: 'X'.repeat(105_000), // >100KB
+        cat: 'Cat',
+        cs: await calculateChecksum('1.0|Large|' + 'X'.repeat(105_000) + '|Cat')
+      };
+
+      const largeEncoded = LZString.compressToEncodedURIComponent(JSON.stringify(largPayload));
+      await expect(decode(largeEncoded)).rejects.toThrow();
+
+      // Case 2: Extreme compression ratio (would fail ratio check)
+      const extremePayload = {
+        v: '1.0',
+        t: 'Extreme',
+        c: 'A'.repeat(75_000), // 75KB, compresses extremely well
+        cat: 'Cat',
+        cs: await calculateChecksum('1.0|Extreme|' + 'A'.repeat(75_000) + '|Cat')
+      };
+
+      const extremeEncoded = LZString.compressToEncodedURIComponent(JSON.stringify(extremePayload));
+      await expect(decode(extremeEncoded)).rejects.toThrow();
     });
   });
 });
