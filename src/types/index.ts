@@ -156,14 +156,6 @@ export interface SharedPromptData {
   category: string;
 }
 
-export interface EncodedPromptPayloadV1 {
-  v: '1.0';
-  t: string;    // title
-  c: string;    // content
-  cat: string;  // category
-  cs: string;   // checksum
-}
-
 export const PROMPT_SHARING_SIZE_LIMITS = {
   TITLE_MAX: 100,
   CONTENT_MAX: 10_000,
