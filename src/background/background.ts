@@ -1171,7 +1171,7 @@ chrome.runtime.onInstalled.addListener((details) => {
       await updateActionBehavior(mode);
 
       // Re-inject content scripts after extension updates
-      if (details.reason === chrome.runtime.OnInstalledReason.UPDATE) {
+      if (details.reason === chrome.runtime.OnInstalledReason.UPDATE as string) {
         // Extension updated, re-injecting content scripts
         await handleExtensionUpdate();
       }
