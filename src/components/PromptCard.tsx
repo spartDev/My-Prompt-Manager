@@ -2,8 +2,10 @@ import DOMPurify from 'dompurify';
 import { useState, useRef, useEffect, memo } from 'react';
 import type { FC, MouseEvent, ReactNode } from 'react';
 
+import { encode } from '../services/promptEncoder';
 import { Category, Prompt } from '../types';
 import { PromptCardProps } from '../types/components';
+import { Logger, toError } from '../utils';
 
 import ConfirmDialog from './ConfirmDialog';
 
@@ -13,10 +15,12 @@ const PromptCard: FC<PromptCardProps> = ({
   onEdit,
   onDelete,
   onCopy,
+  showToast,
   searchQuery = ''
 }) => {
   const [showMenu, setShowMenu] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const firstMenuItemRef = useRef<HTMLButtonElement>(null);
@@ -88,6 +92,25 @@ const PromptCard: FC<PromptCardProps> = ({
 
   const handleCancelDelete = () => {
     setShowDeleteConfirm(false);
+  };
+
+  const handleShare = async (e?: MouseEvent | KeyboardEvent) => {
+    e?.stopPropagation();
+    setIsSharing(true);
+    try {
+      const encoded = encode(prompt);
+      await navigator.clipboard.writeText(encoded);
+      showToast('Sharing code copied to clipboard!', 'success');
+    } catch (err) {
+      Logger.error('Share failed', toError(err), {
+        component: 'PromptCard',
+        operation: 'share',
+        promptId: prompt.id
+      });
+      showToast('Failed to copy. Please try again.', 'error');
+    } finally {
+      setIsSharing(false);
+    }
   };
 
   const formatDate = (timestamp: number) => {
@@ -196,19 +219,18 @@ const PromptCard: FC<PromptCardProps> = ({
 
           {/* Share Button */}
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              // Handler will be implemented in MPM-12
-            }}
+            onClick={(e) => { void handleShare(e); }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
-                // Handler will be implemented in MPM-12
+                void handleShare();
               }
             }}
-            className="p-2 text-gray-400 dark:text-gray-500 hover:text-purple-600 dark:hover:text-purple-400 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors focus-interactive"
+            disabled={isSharing}
+            className="p-2 text-gray-400 dark:text-gray-500 hover:text-purple-600 dark:hover:text-purple-400 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors focus-interactive disabled:opacity-50 disabled:cursor-not-allowed"
             aria-label={`Share ${prompt.title}`}
             title="Share this prompt"
+            aria-busy={isSharing}
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path
@@ -380,7 +402,8 @@ const arePropsEqual = (prevProps: PromptCardProps, nextProps: PromptCardProps): 
   if (prevProps.onEdit !== nextProps.onEdit) {return false;}
   if (prevProps.onDelete !== nextProps.onDelete) {return false;}
   if (prevProps.onCopy !== nextProps.onCopy) {return false;}
-  
+  if (prevProps.showToast !== nextProps.showToast) {return false;}
+
   return true;
 };
 

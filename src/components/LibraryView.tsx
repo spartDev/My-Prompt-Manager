@@ -18,6 +18,7 @@ const LibraryView: FC<LibraryViewProps> = ({
   onEditPrompt,
   onDeletePrompt,
   onCopyPrompt,
+  showToast,
   onCategoryChange,
   onManageCategories,
   onSettings,
@@ -142,6 +143,7 @@ const LibraryView: FC<LibraryViewProps> = ({
                 onEdit={onEditPrompt as (prompt: Prompt) => void}
                 onDelete={onDeletePrompt as (id: string) => void}
                 onCopy={onCopyPrompt as (content: string) => void}
+                showToast={showToast}
                 searchQuery={debouncedQuery}
               />
             ))}
