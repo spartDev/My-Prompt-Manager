@@ -1,4 +1,4 @@
-import { useActionState, useRef, useState } from 'react';
+import { useActionState, useEffect, useRef, useState } from 'react';
 import type { FC } from 'react';
 
 import { MAX_CONTENT_LENGTH, MAX_TITLE_LENGTH, VALIDATION_MESSAGES, formatCharacterCount } from '../constants/validation';
@@ -40,6 +40,22 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
   
   // Ref for debounce timer
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup when leaving import mode to prevent race conditions
+  useEffect(() => {
+    if (mode !== 'import') {
+      // Clear any pending validation timer
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
+      // Reset import state
+      setImportCode('');
+      setDecodedPrompt(null);
+      setValidationError('');
+      setIsValidating(false);
+    }
+  }, [mode]);
 
   // Handle import code change with debounced validation
   const handleImportCodeChange = (code: string) => {
