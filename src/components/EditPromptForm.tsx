@@ -1,19 +1,12 @@
 import { useActionState, useReducer, useRef, useState } from 'react';
 import type { FC } from 'react';
 
-import { MAX_CONTENT_LENGTH, MAX_TITLE_LENGTH, VALIDATION_MESSAGES, formatCharacterCount } from '../constants/validation';
+import { MAX_CONTENT_LENGTH, MAX_TITLE_LENGTH, formatCharacterCount } from '../constants/validation';
 import { Category } from '../types';
 import { EditPromptFormProps } from '../types/components';
-import { Logger, toError } from '../utils';
+import { Logger, toError, validatePromptFields, type FieldErrors } from '../utils';
 
 import ViewHeader from './ViewHeader';
-
-// Error state type for field-specific validation
-interface FieldErrors {
-  title?: string;
-  content?: string;
-  general?: string;
-}
 
 const EditPromptForm: FC<EditPromptFormProps> = ({
   prompt,
@@ -43,38 +36,11 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
       const content = formData.get('content') as string;
       const category = formData.get('category') as string;
 
-      const validationErrors: FieldErrors = {};
-
-      if (!content.trim()) {
-        Logger.warn('Form validation failed: Content is required', {
-          component: 'EditPromptForm',
-          field: 'content',
-          promptId: prompt.id
-        });
-        validationErrors.content = VALIDATION_MESSAGES.CONTENT_REQUIRED;
-      }
-
-      if (content.length > MAX_CONTENT_LENGTH) {
-        Logger.warn('Form validation failed: Content exceeds limit', {
-          component: 'EditPromptForm',
-          field: 'content',
-          length: content.length,
-          limit: MAX_CONTENT_LENGTH,
-          promptId: prompt.id
-        });
-        validationErrors.content = VALIDATION_MESSAGES.CONTENT_TOO_LONG;
-      }
-
-      if (title.length > MAX_TITLE_LENGTH) {
-        Logger.warn('Form validation failed: Title exceeds limit', {
-          component: 'EditPromptForm',
-          field: 'title',
-          length: title.length,
-          limit: MAX_TITLE_LENGTH,
-          promptId: prompt.id
-        });
-        validationErrors.title = VALIDATION_MESSAGES.TITLE_TOO_LONG;
-      }
+      // Validation using shared utility
+      const validationErrors = validatePromptFields(title, content, {
+        component: 'EditPromptForm',
+        promptId: prompt.id
+      });
 
       // Return validation errors if any
       if (Object.keys(validationErrors).length > 0) {

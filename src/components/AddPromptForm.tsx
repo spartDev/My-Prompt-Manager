@@ -1,23 +1,16 @@
 import { useActionState, useEffect, useRef, useState } from 'react';
 import type { FC } from 'react';
 
-import { MAX_CONTENT_LENGTH, MAX_TITLE_LENGTH, VALIDATION_MESSAGES, formatCharacterCount } from '../constants/validation';
+import { MAX_CONTENT_LENGTH, MAX_TITLE_LENGTH, formatCharacterCount } from '../constants/validation';
 import { decode } from '../services/promptEncoder';
 import { DEFAULT_CATEGORY, Category, SharedPromptData } from '../types';
 import { AddPromptFormProps } from '../types/components';
-import { Logger, toError } from '../utils';
+import { Logger, toError, validatePromptFields, type FieldErrors } from '../utils';
 
 import ViewHeader from './ViewHeader';
 
 // Form mode type
 type FormMode = 'create' | 'import';
-
-// Error state type for field-specific validation
-interface FieldErrors {
-  title?: string;
-  content?: string;
-  general?: string;
-}
 
 const AddPromptForm: FC<AddPromptFormProps> = ({
   categories,
@@ -173,36 +166,10 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
         content = formData.get('content') as string;
         category = formData.get('category') as string;
 
-        // Validation for create mode
-        const validationErrors: FieldErrors = {};
-
-        if (!content.trim()) {
-          Logger.warn('Form validation failed: Content is required', {
-            component: 'AddPromptForm',
-            field: 'content'
-          });
-          validationErrors.content = VALIDATION_MESSAGES.CONTENT_REQUIRED;
-        }
-
-        if (content.length > MAX_CONTENT_LENGTH) {
-          Logger.warn('Form validation failed: Content exceeds limit', {
-            component: 'AddPromptForm',
-            field: 'content',
-            length: content.length,
-            limit: MAX_CONTENT_LENGTH
-          });
-          validationErrors.content = VALIDATION_MESSAGES.CONTENT_TOO_LONG;
-        }
-
-        if (title.length > MAX_TITLE_LENGTH) {
-          Logger.warn('Form validation failed: Title exceeds limit', {
-            component: 'AddPromptForm',
-            field: 'title',
-            length: title.length,
-            limit: MAX_TITLE_LENGTH
-          });
-          validationErrors.title = VALIDATION_MESSAGES.TITLE_TOO_LONG;
-        }
+        // Validation for create mode using shared utility
+        const validationErrors = validatePromptFields(title, content, {
+          component: 'AddPromptForm'
+        });
 
         // Return validation errors if any
         if (Object.keys(validationErrors).length > 0) {
