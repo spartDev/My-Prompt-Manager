@@ -44,7 +44,7 @@ describe('AddPromptForm - Import Integration Tests', () => {
     const { props } = renderForm();
 
     // Switch to import mode
-    const importButton = screen.getByRole('button', { name: /📥 import shared/i });
+    const importButton = screen.getByRole('button', { name: /import shared prompt/i });
     await userEvent.click(importButton);
 
     // Paste the sharing code
@@ -86,7 +86,7 @@ describe('AddPromptForm - Import Integration Tests', () => {
     const { props } = renderForm();
 
     // Switch to import mode
-    const importButton = screen.getByRole('button', { name: /📥 import shared/i });
+    const importButton = screen.getByRole('button', { name: /import shared prompt/i });
     await userEvent.click(importButton);
 
     // Paste the sharing code
@@ -122,7 +122,7 @@ describe('AddPromptForm - Import Integration Tests', () => {
     const { props } = renderForm();
 
     // Switch to import mode
-    const importButton = screen.getByRole('button', { name: /📥 import shared/i });
+    const importButton = screen.getByRole('button', { name: /import shared prompt/i });
     await userEvent.click(importButton);
 
     // Paste the sharing code
@@ -167,7 +167,7 @@ describe('AddPromptForm - Import Integration Tests', () => {
     const { props } = renderForm();
 
     // Switch to import mode
-    const importButton = screen.getByRole('button', { name: /📥 import shared/i });
+    const importButton = screen.getByRole('button', { name: /import shared prompt/i });
     await userEvent.click(importButton);
 
     // Paste the sharing code
@@ -208,7 +208,7 @@ describe('AddPromptForm - Import Integration Tests', () => {
     const { props } = renderForm();
 
     // Switch to import mode
-    const importButton = screen.getByRole('button', { name: /📥 import shared/i });
+    const importButton = screen.getByRole('button', { name: /import shared prompt/i });
     await userEvent.click(importButton);
 
     // Paste the sharing code
@@ -238,11 +238,11 @@ describe('AddPromptForm - Import Integration Tests', () => {
     const { props } = renderForm();
 
     // Switch to import mode
-    const importButton = screen.getByRole('button', { name: /📥 import shared/i });
+    const importButton = screen.getByRole('button', { name: /import shared prompt/i });
     await userEvent.click(importButton);
 
     // Switch back to create mode without entering code
-    const createButton = screen.getByRole('button', { name: /📝 create new/i });
+    const createButton = screen.getByRole('button', { name: /create new prompt/i });
     await userEvent.click(createButton);
 
     // Switch back to import mode
@@ -272,7 +272,7 @@ describe('AddPromptForm - Import Integration Tests', () => {
     renderForm();
 
     // Switch to import mode
-    const importButton = screen.getByRole('button', { name: /📥 import shared/i });
+    const importButton = screen.getByRole('button', { name: /import shared prompt/i });
     await userEvent.click(importButton);
 
     // Paste first sharing code
@@ -304,7 +304,7 @@ describe('AddPromptForm - End-to-End Workflow Tests', () => {
     await userEvent.type(screen.getByLabelText(/content/i), 'Initial content');
 
     // Switch to import mode
-    const importButton = screen.getByRole('button', { name: /📥 import shared/i });
+    const importButton = screen.getByRole('button', { name: /import shared prompt/i });
     await userEvent.click(importButton);
 
     // Import a prompt

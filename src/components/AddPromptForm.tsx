@@ -265,8 +265,14 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
             }`}
             disabled={isPending}
             aria-pressed={mode === 'create'}
+            aria-label="Create new prompt"
           >
-            📝 Create New
+            <div className="flex items-center justify-center space-x-2">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              <span>Create New</span>
+            </div>
           </button>
           <button
             type="button"
@@ -280,8 +286,14 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
             }`}
             disabled={isPending}
             aria-pressed={mode === 'import'}
+            aria-label="Import shared prompt"
           >
-            📥 Import Shared
+            <div className="flex items-center justify-center space-x-2">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              <span>Import Shared</span>
+            </div>
           </button>
         </div>
       </div>
@@ -293,7 +305,12 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
           aria-live="polite"
           className="flex-shrink-0 p-4 text-sm text-red-600 dark:text-red-400 bg-red-50/80 dark:bg-red-900/20 backdrop-blur-sm border-b border-red-200 dark:border-red-700 font-medium"
         >
-          ⚠️ {errors.general}
+          <div className="flex items-center space-x-2">
+            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <span>{errors.general}</span>
+          </div>
         </div>
       )}
 
@@ -348,7 +365,12 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
                     </div>
                   )}
                   {validationError && (
-                    <p className="mt-2 text-sm text-red-600 dark:text-red-400 font-medium">⚠️ {validationError}</p>
+                    <p className="mt-2 text-sm text-red-600 dark:text-red-400 font-medium flex items-center space-x-1">
+                      <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      <span>{validationError}</span>
+                    </p>
                   )}
                   {decodedPrompt && !validationError && (
                     <p className="mt-2 text-sm text-green-600 dark:text-green-400 font-medium flex items-center space-x-1">
@@ -411,8 +433,11 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
                     </div>
 
                     {/* Info Note */}
-                    <p className="mt-3 text-xs text-gray-500 dark:text-gray-400 italic">
-                      💡 You can select a different category below before importing
+                    <p className="mt-3 text-xs text-gray-500 dark:text-gray-400 italic flex items-start space-x-1">
+                      <svg className="w-3 h-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span>You can select a different category below before importing</span>
                     </p>
                   </div>
                 )}
@@ -478,7 +503,12 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
                 maxLength={MAX_TITLE_LENGTH}
               />
               {errors?.title && (
-                <p className="mt-2 text-sm text-red-600 dark:text-red-400 font-medium">⚠️ {errors.title}</p>
+                <p className="mt-2 text-sm text-red-600 dark:text-red-400 font-medium flex items-center space-x-1">
+                  <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <span>{errors.title}</span>
+                </p>
               )}
               <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
                 {formatCharacterCount(titleLength, MAX_TITLE_LENGTH)}
@@ -532,7 +562,12 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
                 required
               />
               {errors?.content && (
-                <p className="mt-2 text-sm text-red-600 dark:text-red-400 font-medium">⚠️ {errors.content}</p>
+                <p className="mt-2 text-sm text-red-600 dark:text-red-400 font-medium flex items-center space-x-1">
+                  <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <span>{errors.content}</span>
+                </p>
               )}
               <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
                 {formatCharacterCount(contentLength, MAX_CONTENT_LENGTH)}

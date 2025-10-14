@@ -33,7 +33,7 @@ describe('AddPromptForm - Create Mode', () => {
   it('renders in create mode by default', () => {
     renderForm();
 
-    expect(screen.getByRole('button', { name: /📝 create new/i })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /create new prompt/i })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByLabelText(/title/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/content/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/category/i)).toBeInTheDocument();
@@ -96,7 +96,7 @@ describe('AddPromptForm - Import Mode', () => {
   it('switches to import mode when import button is clicked', async () => {
     renderForm();
 
-    const importButton = screen.getByRole('button', { name: /📥 import shared/i });
+    const importButton = screen.getByRole('button', { name: /import shared prompt/i });
     await userEvent.click(importButton);
 
     expect(importButton).toHaveAttribute('aria-pressed', 'true');
@@ -109,7 +109,7 @@ describe('AddPromptForm - Import Mode', () => {
     renderForm();
 
     // Switch to import mode
-    const importButton = screen.getByRole('button', { name: /📥 import shared/i });
+    const importButton = screen.getByRole('button', { name: /import shared prompt/i });
     await userEvent.click(importButton);
 
     // Type sharing code
@@ -143,7 +143,7 @@ describe('AddPromptForm - Import Mode', () => {
     renderForm();
 
     // Switch to import mode
-    const importButton = screen.getByRole('button', { name: /📥 import shared/i });
+    const importButton = screen.getByRole('button', { name: /import shared prompt/i });
     await userEvent.click(importButton);
 
     // Type invalid sharing code
@@ -163,7 +163,7 @@ describe('AddPromptForm - Import Mode', () => {
     renderForm();
 
     // Switch to import mode
-    const importButton = screen.getByRole('button', { name: /📥 import shared/i });
+    const importButton = screen.getByRole('button', { name: /import shared prompt/i });
     await userEvent.click(importButton);
 
     // Submit button should be disabled initially
@@ -175,7 +175,7 @@ describe('AddPromptForm - Import Mode', () => {
     renderForm();
 
     // Switch to import mode
-    const importButton = screen.getByRole('button', { name: /📥 import shared/i });
+    const importButton = screen.getByRole('button', { name: /import shared prompt/i });
     await userEvent.click(importButton);
 
     // Type valid sharing code
@@ -196,7 +196,7 @@ describe('AddPromptForm - Import Mode', () => {
     renderForm();
 
     // Switch to import mode
-    const importButton = screen.getByRole('button', { name: /📥 import shared/i });
+    const importButton = screen.getByRole('button', { name: /import shared prompt/i });
     await userEvent.click(importButton);
 
     // Type valid sharing code
@@ -224,7 +224,7 @@ describe('AddPromptForm - Import Mode', () => {
     renderForm();
 
     // Switch to import mode
-    const importButton = screen.getByRole('button', { name: /📥 import shared/i });
+    const importButton = screen.getByRole('button', { name: /import shared prompt/i });
     await userEvent.click(importButton);
 
     // Type valid sharing code
@@ -245,7 +245,7 @@ describe('AddPromptForm - Import Mode', () => {
     renderForm();
 
     // Switch to import mode
-    const importButton = screen.getByRole('button', { name: /📥 import shared/i });
+    const importButton = screen.getByRole('button', { name: /import shared prompt/i });
     await userEvent.click(importButton);
 
     // Type valid sharing code
@@ -269,7 +269,7 @@ describe('AddPromptForm - Import Mode', () => {
     const { props } = renderForm();
 
     // Switch to import mode
-    const importButton = screen.getByRole('button', { name: /📥 import shared/i });
+    const importButton = screen.getByRole('button', { name: /import shared prompt/i });
     await userEvent.click(importButton);
 
     // Type valid sharing code
@@ -303,7 +303,7 @@ describe('AddPromptForm - Import Mode', () => {
     const { props } = renderForm();
 
     // Switch to import mode
-    const importButton = screen.getByRole('button', { name: /📥 import shared/i });
+    const importButton = screen.getByRole('button', { name: /import shared prompt/i });
     await userEvent.click(importButton);
 
     // Try to submit without entering code (button is disabled, but test the validation)
@@ -328,7 +328,7 @@ describe('AddPromptForm - Import Mode', () => {
     renderForm();
 
     // Switch to import mode
-    const importButton = screen.getByRole('button', { name: /📥 import shared/i });
+    const importButton = screen.getByRole('button', { name: /import shared prompt/i });
     await userEvent.click(importButton);
 
     // Type valid sharing code
@@ -354,7 +354,7 @@ describe('AddPromptForm - Import Mode', () => {
     renderForm();
 
     // Switch to import mode
-    const importButton = screen.getByRole('button', { name: /📥 import shared/i });
+    const importButton = screen.getByRole('button', { name: /import shared prompt/i });
     await userEvent.click(importButton);
 
     // Verify we're in import mode
@@ -362,7 +362,7 @@ describe('AddPromptForm - Import Mode', () => {
     expect(screen.queryByLabelText(/title/i)).not.toBeInTheDocument();
 
     // Switch back to create mode
-    const createButton = screen.getByRole('button', { name: /📝 create new/i });
+    const createButton = screen.getByRole('button', { name: /create new prompt/i });
     await userEvent.click(createButton);
 
     // Check that create mode form is shown again
@@ -385,7 +385,7 @@ describe('AddPromptForm - Submit Button Text', () => {
   it('shows "Import Prompt" in import mode', async () => {
     renderForm();
 
-    const importButton = screen.getByRole('button', { name: /📥 import shared/i });
+    const importButton = screen.getByRole('button', { name: /import shared prompt/i });
     await userEvent.click(importButton);
 
     expect(screen.getByRole('button', { name: /import prompt/i })).toBeInTheDocument();
@@ -411,7 +411,7 @@ describe('AddPromptForm - Submit Button Text', () => {
     (props.onSubmit as any).mockImplementation(() => new Promise(resolve => setTimeout(resolve, 1000)));
 
     // Switch to import mode
-    const importButton = screen.getByRole('button', { name: /📥 import shared/i });
+    const importButton = screen.getByRole('button', { name: /import shared prompt/i });
     await userEvent.click(importButton);
 
     // Enter valid code
