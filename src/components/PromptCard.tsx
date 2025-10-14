@@ -2,8 +2,10 @@ import DOMPurify from 'dompurify';
 import { useState, useRef, useEffect, memo } from 'react';
 import type { FC, MouseEvent, ReactNode } from 'react';
 
+import { encode } from '../services/promptEncoder';
 import { Category, Prompt } from '../types';
 import { PromptCardProps } from '../types/components';
+import { Logger, toError } from '../utils';
 
 import ConfirmDialog from './ConfirmDialog';
 
@@ -13,10 +15,12 @@ const PromptCard: FC<PromptCardProps> = ({
   onEdit,
   onDelete,
   onCopy,
+  showToast,
   searchQuery = ''
 }) => {
   const [showMenu, setShowMenu] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const firstMenuItemRef = useRef<HTMLButtonElement>(null);
@@ -88,6 +92,25 @@ const PromptCard: FC<PromptCardProps> = ({
 
   const handleCancelDelete = () => {
     setShowDeleteConfirm(false);
+  };
+
+  const handleShare = async (e?: MouseEvent | KeyboardEvent) => {
+    e?.stopPropagation();
+    setIsSharing(true);
+    try {
+      const encoded = encode(prompt);
+      await navigator.clipboard.writeText(encoded);
+      showToast('Share link copied to clipboard!', 'success');
+    } catch (err) {
+      Logger.error('Share failed', toError(err), {
+        component: 'PromptCard',
+        operation: 'share',
+        promptId: prompt.id
+      });
+      showToast('Failed to share prompt. Please try again.', 'error');
+    } finally {
+      setIsSharing(false);
+    }
   };
 
   const formatDate = (timestamp: number) => {
@@ -190,6 +213,31 @@ const PromptCard: FC<PromptCardProps> = ({
                 strokeLinejoin="round"
                 strokeWidth={2}
                 d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+              />
+            </svg>
+          </button>
+
+          {/* Share Button */}
+          <button
+            onClick={(e) => { void handleShare(e); }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                void handleShare();
+              }
+            }}
+            disabled={isSharing}
+            className="p-2 text-gray-400 dark:text-gray-500 hover:text-purple-600 dark:hover:text-purple-400 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors focus-interactive disabled:opacity-50 disabled:cursor-not-allowed"
+            aria-label={isSharing ? `Sharing ${prompt.title}...` : `Share ${prompt.title}`}
+            title="Share this prompt"
+            aria-busy={isSharing}
+          >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
               />
             </svg>
           </button>
@@ -354,7 +402,9 @@ const arePropsEqual = (prevProps: PromptCardProps, nextProps: PromptCardProps): 
   if (prevProps.onEdit !== nextProps.onEdit) {return false;}
   if (prevProps.onDelete !== nextProps.onDelete) {return false;}
   if (prevProps.onCopy !== nextProps.onCopy) {return false;}
-  
+  // Note: showToast is excluded from comparison as function references change frequently
+  // and re-rendering on showToast changes provides no benefit
+
   return true;
 };
 

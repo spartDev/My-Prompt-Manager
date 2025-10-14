@@ -239,6 +239,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
           onEditPrompt={handleEditPrompt}
           onDeletePrompt={(id: string) => { void handleDeletePrompt(id); }}
           onCopyPrompt={(content: string) => { void handleCopyPrompt(content); }}
+          showToast={showToast}
           onCategoryChange={setSelectedCategory}
           onManageCategories={() => {
             setCurrentView('categories');

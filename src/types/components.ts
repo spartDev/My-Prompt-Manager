@@ -9,6 +9,7 @@ export interface PromptCardProps {
   onEdit: (prompt: Prompt) => void;
   onDelete: (id: string) => void;
   onCopy: (content: string) => void;
+  showToast: (message: string, type: 'success' | 'error' | 'info' | 'warning') => void;
   isSelected?: boolean;
   searchQuery?: string;
 }
@@ -49,6 +50,7 @@ export interface LibraryViewProps {
   onEditPrompt: (prompt: Prompt) => void;
   onDeletePrompt: (id: string) => void;
   onCopyPrompt: (content: string) => void;
+  showToast: (message: string, type: 'success' | 'error' | 'info' | 'warning') => void;
   onCategoryChange: (category: string | null) => void;
   onManageCategories: () => void;
   onSettings: () => void;
