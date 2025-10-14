@@ -126,6 +126,26 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
         content = decodedPrompt.content;
         category = selectedCategory;
 
+        // Defense-in-depth: Validate decoded data against form limits
+        if (title.length > MAX_TITLE_LENGTH) {
+          Logger.warn('Import failed: Title exceeds form limit', {
+            component: 'AddPromptForm',
+            mode: 'import',
+            titleLength: title.length,
+            limit: MAX_TITLE_LENGTH
+          });
+          return { general: `Imported title exceeds maximum length (${String(MAX_TITLE_LENGTH)} characters)` };
+        }
+        if (content.length > MAX_CONTENT_LENGTH) {
+          Logger.warn('Import failed: Content exceeds form limit', {
+            component: 'AddPromptForm',
+            mode: 'import',
+            contentLength: content.length,
+            limit: MAX_CONTENT_LENGTH
+          });
+          return { general: `Imported content exceeds maximum length (${MAX_CONTENT_LENGTH.toLocaleString()} characters)` };
+        }
+
         Logger.info('Importing prompt from sharing code', {
           component: 'AddPromptForm',
           mode: 'import',
