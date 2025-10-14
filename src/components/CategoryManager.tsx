@@ -232,7 +232,13 @@ const CategoryManager: FC<CategoryManagerProps> = ({
               </div>
             ) : (
               categories.map((category, index) => (
-                <div key={category.id} className="relative group flex items-center justify-between p-5 bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 hover:bg-white/90 dark:hover:bg-gray-800/90 transition-all duration-200" style={{ zIndex: editingCategory?.category.id === category.id ? 90 : 10 - index }}>
+                <div
+                  key={category.id}
+                  className="relative group flex items-center justify-between p-5 bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 hover:bg-white/90 dark:hover:bg-gray-800/90 transition-all duration-200"
+                  style={{ zIndex: editingCategory?.category.id === category.id ? 90 : 10 - index }}
+                  data-testid="category-row"
+                  data-category-id={category.id}
+                >
                   {editingCategory?.category.id === category.id ? (
                     // Edit Mode - Show both color and name editors
                     <div className="flex-1">
@@ -271,6 +277,7 @@ const CategoryManager: FC<CategoryManagerProps> = ({
                           className="flex-1 text-sm border border-purple-200 dark:border-gray-600 rounded-lg px-3 py-2.5 focus:outline-none focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-purple-500 bg-white/80 dark:bg-gray-700/80 backdrop-blur-sm font-medium text-gray-900 dark:text-gray-100"
                           maxLength={MAX_CATEGORY_NAME_LENGTH}
                           disabled={loading}
+                          data-testid="category-row-name-input"
                         />
                         <div className="flex items-center space-x-1 flex-shrink-0">
                           <button
@@ -280,6 +287,7 @@ const CategoryManager: FC<CategoryManagerProps> = ({
                             disabled={loading || !editingCategory.name.trim()}
                             title="Save changes (Enter)"
                             type="button"
+                            data-testid="category-row-save-button"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -291,6 +299,7 @@ const CategoryManager: FC<CategoryManagerProps> = ({
                             className="p-2 text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
                             title="Cancel (Esc)"
                             type="button"
+                            data-testid="category-row-cancel-button"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -321,16 +330,17 @@ const CategoryManager: FC<CategoryManagerProps> = ({
                       {category.name !== 'Uncategorized' && (
                         <>
                           <button
-                            onClick={() => { 
-                              setEditingCategory({ 
-                                category, 
-                                name: category.name, 
-                                color: category.color || DEFAULT_CATEGORY_COLOR 
-                              }); 
+                            onClick={() => {
+                              setEditingCategory({
+                                category,
+                                name: category.name,
+                                color: category.color || DEFAULT_CATEGORY_COLOR
+                              });
                             }}
                             className="p-2 text-gray-400 dark:text-gray-500 hover:text-purple-600 dark:hover:text-purple-400 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors"
                             disabled={loading}
                             title="Edit category"
+                            data-testid="category-row-edit-button"
                           >
                             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -342,6 +352,7 @@ const CategoryManager: FC<CategoryManagerProps> = ({
                             className="p-2 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                             disabled={loading}
                             title="Delete category"
+                            data-testid="category-row-delete-button"
                           >
                             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
