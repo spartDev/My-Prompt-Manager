@@ -1,4 +1,4 @@
-import { useActionState, useReducer, useRef, useState, useEffect, useCallback } from 'react';
+import { useActionState, useReducer, useRef, useState } from 'react';
 import type { FC } from 'react';
 
 import { MAX_CONTENT_LENGTH, MAX_TITLE_LENGTH, VALIDATION_MESSAGES, formatCharacterCount } from '../constants/validation';
@@ -37,6 +37,9 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
   // Refs to form elements for deriving character counts (single source of truth)
   const titleRef = useRef<HTMLInputElement>(null);
   const contentRef = useRef<HTMLTextAreaElement>(null);
+  
+  // Ref for debounce timer
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Force component re-render to update character count display
   const [, forceUpdate] = useReducer((x: number) => x + 1, 0);
@@ -45,8 +48,16 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
   const titleLength = titleRef.current?.value.length ?? 0;
   const contentLength = contentRef.current?.value.length ?? 0;
 
-  // Debounced validation for import code
-  const validateImportCode = useCallback((code: string) => {
+  // Handle import code change with debounced validation
+  const handleImportCodeChange = (code: string) => {
+    setImportCode(code);
+    
+    // Clear existing timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    // If empty, clear validation state immediately
     if (!code.trim()) {
       setDecodedPrompt(null);
       setValidationError('');
@@ -54,52 +65,41 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
       return;
     }
 
+    // Set validating state
     setIsValidating(true);
 
-    try {
-      const decoded = decode(code);
-      setDecodedPrompt(decoded);
-      setValidationError('');
+    // Debounced validation (300ms)
+    debounceTimerRef.current = setTimeout(() => {
+      try {
+        const decoded = decode(code);
+        setDecodedPrompt(decoded);
+        setValidationError('');
 
-      // Try to set the category to the decoded prompt's category if it exists
-      const categoryExists = categories.find(c => c.name === decoded.category);
-      if (categoryExists) {
-        setSelectedCategory(decoded.category);
-      } else {
-        // If category doesn't exist, keep default
-        setSelectedCategory(DEFAULT_CATEGORY);
+        // Try to set the category to the decoded prompt's category if it exists
+        const categoryExists = categories.find(c => c.name === decoded.category);
+        if (categoryExists) {
+          setSelectedCategory(decoded.category);
+        } else {
+          // If category doesn't exist, keep default
+          setSelectedCategory(DEFAULT_CATEGORY);
+        }
+
+        Logger.info('Import code validated successfully', {
+          component: 'AddPromptForm',
+          mode: 'import'
+        });
+      } catch (err) {
+        setDecodedPrompt(null);
+        setValidationError((err as Error).message || 'Invalid sharing code');
+        Logger.warn('Import code validation failed', {
+          component: 'AddPromptForm',
+          error: (err as Error).message
+        });
+      } finally {
+        setIsValidating(false);
       }
-
-      Logger.info('Import code validated successfully', {
-        component: 'AddPromptForm',
-        mode: 'import'
-      });
-    } catch (err) {
-      setDecodedPrompt(null);
-      setValidationError((err as Error).message || 'Invalid sharing code');
-      Logger.warn('Import code validation failed', {
-        component: 'AddPromptForm',
-        error: (err as Error).message
-      });
-    } finally {
-      setIsValidating(false);
-    }
-  }, [categories]);
-
-  // Effect for debounced validation (300ms)
-  useEffect(() => {
-    if (mode !== 'import') {
-      return;
-    }
-
-    const timeoutId = setTimeout(() => {
-      validateImportCode(importCode);
     }, 300);
-
-    return () => {
-      clearTimeout(timeoutId);
-    };
-  }, [importCode, mode, validateImportCode]);
+  };
 
   // React 19 useActionState for automatic loading/error handling
   const [errors, submitAction, isPending] = useActionState(
@@ -302,7 +302,7 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
                     id="import-code"
                     value={importCode}
                     onChange={(e) => {
-                      setImportCode(e.target.value);
+                      handleImportCodeChange(e.target.value);
                     }}
                     placeholder="Paste the sharing code here..."
                     rows={6}
