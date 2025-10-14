@@ -161,7 +161,13 @@ const PromptCard: FC<PromptCardProps> = ({
 
 
   return (
-    <article className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5 hover:bg-white/90 dark:hover:bg-gray-800/90 transition-all duration-200 relative group" style={{ zIndex: showMenu ? 1000 : 'auto' }} aria-labelledby={`prompt-title-${prompt.id}`}>
+    <article
+      className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5 hover:bg-white/90 dark:hover:bg-gray-800/90 transition-all duration-200 relative group"
+      style={{ zIndex: showMenu ? 1000 : 'auto' }}
+      aria-labelledby={`prompt-title-${prompt.id}`}
+      data-testid="prompt-card"
+      data-prompt-id={prompt.id}
+    >
       <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-4 items-center">
         {/* Title and metadata */}
         <div className="pr-3">
@@ -171,14 +177,16 @@ const PromptCard: FC<PromptCardProps> = ({
             className="inline-block max-w-full font-semibold text-gray-900 dark:text-gray-100 text-sm leading-tight truncate"
             title={(prompt).title}
             aria-label={prompt.title}
+            data-testid="prompt-card-title"
           >
             {highlightText((prompt).title, searchQuery)}
           </h3>
           <div className="flex items-center space-x-2 mt-1">
-            <span 
+            <span
               className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium text-white"
               style={{ backgroundColor: getCategoryColor((prompt).category) }}
               aria-label={`Category: ${(prompt).category}`}
+              data-testid="prompt-card-category-badge"
             >
               {(prompt).category}
             </span>
@@ -206,6 +214,7 @@ const PromptCard: FC<PromptCardProps> = ({
             className="p-2 text-gray-400 dark:text-gray-500 hover:text-purple-600 dark:hover:text-purple-400 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors focus-interactive"
             aria-label={`Copy content of ${prompt.title} to clipboard`}
             title="Copy to clipboard"
+            data-testid="prompt-card-copy-button"
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path
@@ -231,6 +240,7 @@ const PromptCard: FC<PromptCardProps> = ({
             aria-label={isSharing ? `Sharing ${prompt.title}...` : `Share ${prompt.title}`}
             title="Share this prompt"
             aria-busy={isSharing}
+            data-testid="prompt-card-share-button"
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path
@@ -268,6 +278,7 @@ const PromptCard: FC<PromptCardProps> = ({
               aria-label={`More actions for ${prompt.title}`}
               aria-expanded={showMenu}
               aria-haspopup="menu"
+              data-testid="prompt-card-more-actions"
             >
               <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
                 <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
