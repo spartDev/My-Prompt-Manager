@@ -48,10 +48,17 @@ const SANITIZE_CONFIG: DOMPurify.Config = {
 
 /**
  * Sanitizes text by removing HTML tags and trimming whitespace
+ *
+ * Uses RETURN_DOM to get unencoded text content, preserving special characters
+ * like &, <, > in their original form (not as HTML entities).
+ *
  * @internal
  */
 function sanitizeText(text: string): string {
-  return DOMPurify.sanitize(text.trim(), SANITIZE_CONFIG);
+  // Use RETURN_DOM to get the sanitized DOM element, then extract textContent
+  // This preserves special characters (& stays as &, not &amp;)
+  const sanitized = DOMPurify.sanitize(text.trim(), { ...SANITIZE_CONFIG, RETURN_DOM: true }) as HTMLElement;
+  return sanitized.textContent || '';
 }
 
 /**
