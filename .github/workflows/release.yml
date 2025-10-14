@@ -2,18 +2,18 @@ name: 🚀 Release & Chrome Web Store
 
 on:
   release:
-    types: [ published, created ]
+    types: [published, created]
   push:
     tags:
-      - 'v*.*.*'
+      - "v*.*.*"
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release (e.g., 1.0.0)'
+        description: "Version to release (e.g., 1.0.0)"
         required: true
         type: string
       prerelease:
-        description: 'Mark as pre-release'
+        description: "Mark as pre-release"
         required: false
         type: boolean
         default: false
@@ -24,19 +24,19 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  NODE_VERSION: '22.x'
+  NODE_VERSION: "22.x"
   CI: true
   FORCE_COLOR: 1
 
 # Security and permissions configuration (Principle of Least Privilege)
 permissions:
-  contents: write           # Required for creating releases and uploading assets
-  id-token: write           # Required for OIDC authentication
-  actions: read             # Required for action status checks
-  security-events: write    # Required for security scanning
-  packages: read            # Required for downloading packages if needed
-  attestations: write       # Required for supply chain attestations
-  statuses: read            # Required for status checks
+  contents: write # Required for creating releases and uploading assets
+  id-token: write # Required for OIDC authentication
+  actions: read # Required for action status checks
+  security-events: write # Required for security scanning
+  packages: read # Required for downloading packages if needed
+  attestations: write # Required for supply chain attestations
+  statuses: read # Required for status checks
 
 jobs:
   # Pre-release validation
@@ -56,10 +56,10 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
+          cache: "npm"
           # Performance optimizations
-          check-latest: false  # Use cached version for speed
-          registry-url: 'https://registry.npmjs.org'
+          check-latest: false # Use cached version for speed
+          registry-url: "https://registry.npmjs.org"
 
       - name: 📋 Extract Version Information
         id: version
@@ -75,10 +75,10 @@ jobs:
             version=${version#v}
             is_prerelease="${{ github.event.release.prerelease }}"
           fi
-          
+
           echo "version=$version" >> $GITHUB_OUTPUT
           echo "is-prerelease=$is_prerelease" >> $GITHUB_OUTPUT
-          
+
           echo "📦 Release Version: $version"
           echo "🏷️ Pre-release: $is_prerelease"
 
@@ -107,16 +107,16 @@ jobs:
         run: |
           package_version=$(node -p "require('./package.json').version")
           release_version="${{ steps.version.outputs.version }}"
-          
+
           echo "📦 Package.json version: $package_version"
           echo "🏷️ Release version: $release_version"
-          
+
           if [ "$package_version" != "$release_version" ]; then
             echo "❌ Version mismatch between package.json ($package_version) and release ($release_version)"
             echo "🔧 Please update package.json version to match the release tag"
             exit 1
           fi
-          
+
           echo "✅ Version consistency verified"
 
       - name: 🧹 Quality Gates - Linting
@@ -154,10 +154,10 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
+          cache: "npm"
           # Performance optimizations
-          check-latest: false  # Use cached version for speed
-          registry-url: 'https://registry.npmjs.org'
+          check-latest: false # Use cached version for speed
+          registry-url: "https://registry.npmjs.org"
 
       - name: 📦 Restore Cache (Multi-level Strategy)
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
@@ -208,7 +208,7 @@ jobs:
       - name: 🔍 Build Verification
         run: |
           echo "🔍 Verifying release build..."
-          
+
           # Verify essential files
           required_files=("dist/manifest.json" "dist/popup.html")
           for file in "${required_files[@]}"; do
@@ -217,16 +217,16 @@ jobs:
               exit 1
             fi
           done
-          
+
           # Verify manifest version matches release
           manifest_version=$(node -p "require('./dist/manifest.json').version")
           release_version="${{ needs.validate-release.outputs.version }}"
-          
+
           if [ "$manifest_version" != "$release_version" ]; then
             echo "❌ Manifest version ($manifest_version) doesn't match release ($release_version)"
             exit 1
           fi
-          
+
           echo "✅ Build verification passed"
 
       - name: 📊 Release Build Analysis
@@ -242,7 +242,7 @@ jobs:
       - name: 🔐 Generate Build Attestation
         uses: actions/attest-build-provenance@ef244123eb79f2f7a7e75d99086184180e6d0018 # v1
         with:
-          subject-path: '*.zip'
+          subject-path: "*.zip"
 
       - name: 📤 Upload Release Build
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -277,57 +277,57 @@ jobs:
         id: release-notes
         run: |
           echo "📝 Generating release notes..."
-          
+
           version="v${{ needs.validate-release.outputs.version }}"
-          
+
           # Try to find previous tag
           previous_tag=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
-          
+
           # Create release notes
           cat > release-notes.md << EOF
           # Chrome Extension Release $version
-          
+
           ## 🎉 What's New
-          
+
           $(if [ -n "$previous_tag" ]; then
             echo "### Changes since $previous_tag"
             git log $previous_tag..HEAD --pretty=format:"- %s (%h)" --no-merges | head -20
           else
             echo "- Initial release of the Chrome Extension"
           fi)
-          
+
           ## 📦 Installation
-          
+
           ### Chrome Web Store (Recommended)
           - Visit the Chrome Web Store listing (link will be available after store approval)
-          
+
           ### Manual Installation (Developer Mode)
           1. Download the \`chrome-extension-v${{ needs.validate-release.outputs.version }}.zip\` file
           2. Extract the contents
           3. Open Chrome and go to \`chrome://extensions/\`
           4. Enable "Developer mode"
           5. Click "Load unpacked" and select the extracted folder
-          
+
           ## 🔧 Technical Details
-          
+
           - **Version**: ${{ needs.validate-release.outputs.version }}
           - **Manifest Version**: 3
           - **Build Date**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
           - **Commit**: ${{ github.sha }}
-          
+
           ## 🛠️ Chrome Extension Features
-          
+
           - Popup interface for prompt management
           - Content script integration with AI platforms
           - Secure local storage with Chrome API
           - Dark/light theme support
           - Export/import functionality
-          
+
           ## 🐛 Bug Reports & Feature Requests
-          
+
           Please report issues on our [GitHub Issues](https://github.com/${{ github.repository }}/issues) page.
           EOF
-          
+
           echo "📋 Release notes generated"
 
       - name: 🏷️ Create GitHub Release
@@ -358,18 +358,18 @@ jobs:
       - name: 🔍 Chrome Web Store Validation
         run: |
           echo "🔍 Validating extension for Chrome Web Store submission..."
-          
+
           cd webstore-prep
-          
+
           # Check for Chrome Web Store requirements
           if [ ! -f "dist/manifest.json" ]; then
             echo "❌ Missing manifest.json"
             exit 1
           fi
-          
+
           # Validate manifest for Web Store
           echo "📋 Validating manifest for Chrome Web Store..."
-          
+
           # Check required manifest fields for Web Store
           required_fields=("name" "version" "description" "permissions" "manifest_version")
           for field in "${required_fields[@]}"; do
@@ -378,26 +378,26 @@ jobs:
               exit 1
             fi
           done
-          
+
           # Check for prohibited permissions or content
           echo "🔒 Checking for prohibited content..."
-          
+
           # Validate icons exist
           if ! grep -q "\"icons\"" dist/manifest.json || [ ! -f "dist/icons/icon-128.png" ]; then
             echo "⚠️ Warning: Icons may be missing or not properly configured"
           fi
-          
+
           echo "✅ Chrome Web Store validation passed"
 
       - name: 📦 Prepare Web Store Package
         run: |
           echo "📦 Preparing final package for Chrome Web Store..."
-          
+
           cd webstore-prep
-          
+
           # Create a clean Web Store package
           zip -r "chrome-extension-webstore-v${{ needs.validate-release.outputs.version }}.zip" dist/
-          
+
           echo "📊 Web Store package details:"
           ls -lh *.zip
           echo "📁 Package contents:"
@@ -431,7 +431,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [validate-release, build-release, chrome-web-store-prep]
     if: github.event_name != 'workflow_dispatch' || github.event.inputs.prerelease == 'false'
-    environment: chrome-webstore  # Protect production releases
+    environment: chrome-webstore # Protect production releases
     steps:
       - name: 📤 Download Web Store Package
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
@@ -439,16 +439,27 @@ jobs:
           name: chrome-webstore-package-v${{ needs.validate-release.outputs.version }}
           path: ./webstore-package
 
+      - name: 🔍 Check Chrome Web Store Configuration
+        id: check-secrets
+        run: |
+          if [[ -n "${{ secrets.CHROME_EXTENSION_ID }}" && -n "${{ secrets.CHROME_CLIENT_ID }}" && -n "${{ secrets.CHROME_WEB_STORE_API_KEYS }}" ]]; then
+            echo "configured=true" >> $GITHUB_OUTPUT
+            echo "✅ Chrome Web Store secrets are configured"
+          else
+            echo "configured=false" >> $GITHUB_OUTPUT
+            echo "⚠️ Chrome Web Store secrets are not configured - skipping publication"
+          fi
+
       - name: 🚀 Publish to Chrome Web Store
-        if: secrets.CHROME_EXTENSION_ID != '' && secrets.CHROME_CLIENT_ID != ''
+        if: steps.check-secrets.outputs.configured == 'true'
         uses: PlasmoHQ/bpp@v3
         with:
           keys: ${{ secrets.CHROME_WEB_STORE_API_KEYS }}
           artifact: ./webstore-package/chrome-extension-webstore-v${{ needs.validate-release.outputs.version }}.zip
           verbose: true
           # Enhanced security and reliability options
-          upload-timeout: 300000  # 5 minutes timeout
-          submit-timeout: 300000  # 5 minutes timeout
+          upload-timeout: 300000 # 5 minutes timeout
+          submit-timeout: 300000 # 5 minutes timeout
 
       - name: 📝 Publication Status
         run: |
@@ -465,7 +476,14 @@ jobs:
   release-summary:
     name: 📊 Release Summary
     runs-on: ubuntu-latest
-    needs: [validate-release, build-release, create-github-release, chrome-web-store-prep, chrome-web-store-publish]
+    needs:
+      [
+        validate-release,
+        build-release,
+        create-github-release,
+        chrome-web-store-prep,
+        chrome-web-store-publish,
+      ]
     if: always()
     steps:
       - name: 📊 Release Process Summary
@@ -477,14 +495,14 @@ jobs:
           echo "🔖 Pre-release: ${{ needs.validate-release.outputs.is-prerelease }}"
           echo "📝 Commit: ${{ github.sha }}"
           echo ""
-          
+
           # Check job statuses
           validate_status="${{ needs.validate-release.result }}"
           build_status="${{ needs.build-release.result }}"
           github_release_status="${{ needs.create-github-release.result }}"
           webstore_status="${{ needs.chrome-web-store-prep.result }}"
           publish_status="${{ needs.chrome-web-store-publish.result }}"
-          
+
           echo "Job Results:"
           echo "🔍 Validation: $validate_status"
           echo "🏗️ Build: $build_status"
@@ -492,7 +510,7 @@ jobs:
           echo "🌐 Web Store Prep: $webstore_status"
           echo "🚀 Web Store Publish: $publish_status"
           echo ""
-          
+
           if [[ "$validate_status" == "success" && "$build_status" == "success" ]]; then
             echo "🎉 ✅ RELEASE PROCESS COMPLETED SUCCESSFULLY!"
             echo ""
@@ -555,7 +573,15 @@ jobs:
     name: 🚨 Emergency Rollback
     runs-on: ubuntu-latest
     if: failure() && github.event_name == 'workflow_dispatch'
-    needs: [validate-release, build-release, create-github-release, chrome-web-store-prep, chrome-web-store-publish, release-summary]
+    needs:
+      [
+        validate-release,
+        build-release,
+        create-github-release,
+        chrome-web-store-prep,
+        chrome-web-store-publish,
+        release-summary,
+      ]
     environment: emergency-rollback
     steps:
       - name: 🛎️ Checkout Repository
