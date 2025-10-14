@@ -559,7 +559,7 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
             type="submit"
             form="add-prompt-form"
             className="flex-1 px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 focus-primary"
-            disabled={isPending || (mode === 'import' && (!decodedPrompt || !!validationError))}
+            disabled={isPending || (mode === 'import' && (!decodedPrompt || !!validationError || isValidating))}
           >
             {isPending ? (
               <div className="flex items-center justify-center space-x-2">
