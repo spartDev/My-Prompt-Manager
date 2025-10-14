@@ -1,4 +1,4 @@
-import { useActionState, useReducer, useRef, useState } from 'react';
+import { useActionState, useRef, useState } from 'react';
 import type { FC } from 'react';
 
 import { MAX_CONTENT_LENGTH, MAX_TITLE_LENGTH, VALIDATION_MESSAGES, formatCharacterCount } from '../constants/validation';
@@ -34,19 +34,12 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
   const [isValidating, setIsValidating] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>(DEFAULT_CATEGORY);
 
-  // Refs to form elements for deriving character counts (single source of truth)
-  const titleRef = useRef<HTMLInputElement>(null);
-  const contentRef = useRef<HTMLTextAreaElement>(null);
+  // Character count state for validation feedback
+  const [titleLength, setTitleLength] = useState(0);
+  const [contentLength, setContentLength] = useState(0);
   
   // Ref for debounce timer
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Force component re-render to update character count display
-  const [, forceUpdate] = useReducer((x: number) => x + 1, 0);
-
-  // Derive character counts from actual form values
-  const titleLength = titleRef.current?.value.length ?? 0;
-  const contentLength = contentRef.current?.value.length ?? 0;
 
   // Handle import code change with debounced validation
   const handleImportCodeChange = (code: string) => {
@@ -436,12 +429,11 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
                 Title (optional)
               </label>
               <input
-                ref={titleRef}
                 type="text"
                 id="title"
                 name="title"
                 defaultValue=""
-                onChange={forceUpdate}
+                onChange={(e) => { setTitleLength(e.target.value.length); }}
                 placeholder="Enter a descriptive title or leave blank to auto-generate"
                 className={`w-full px-4 py-3 border rounded-xl focus-input bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 text-gray-900 dark:text-gray-100 ${
                   errors?.title ? 'border-red-300 dark:border-red-500' : 'border-purple-200 dark:border-gray-600'
@@ -490,11 +482,10 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
                 Content *
               </label>
               <textarea
-                ref={contentRef}
                 id="content"
                 name="content"
                 defaultValue=""
-                onChange={forceUpdate}
+                onChange={(e) => { setContentLength(e.target.value.length); }}
                 placeholder="Enter your prompt content here..."
                 rows={8}
                 className={`w-full px-4 py-3 border rounded-xl focus-input resize-none bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 text-gray-900 dark:text-gray-100 ${
