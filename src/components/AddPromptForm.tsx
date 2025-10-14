@@ -1,12 +1,16 @@
-import { useActionState, useReducer, useRef } from 'react';
+import { useActionState, useReducer, useRef, useState, useEffect, useCallback } from 'react';
 import type { FC } from 'react';
 
 import { MAX_CONTENT_LENGTH, MAX_TITLE_LENGTH, VALIDATION_MESSAGES, formatCharacterCount } from '../constants/validation';
-import { DEFAULT_CATEGORY, Category } from '../types';
+import { decode } from '../services/promptEncoder';
+import { DEFAULT_CATEGORY, Category, SharedPromptData } from '../types';
 import { AddPromptFormProps } from '../types/components';
 import { Logger, toError } from '../utils';
 
 import ViewHeader from './ViewHeader';
+
+// Form mode type
+type FormMode = 'create' | 'import';
 
 // Error state type for field-specific validation
 interface FieldErrors {
@@ -20,6 +24,16 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
   onSubmit,
   onCancel
 }) => {
+  // Mode state - controls whether user is creating or importing
+  const [mode, setMode] = useState<FormMode>('create');
+
+  // Import mode state
+  const [importCode, setImportCode] = useState('');
+  const [decodedPrompt, setDecodedPrompt] = useState<SharedPromptData | null>(null);
+  const [validationError, setValidationError] = useState<string>('');
+  const [isValidating, setIsValidating] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>(DEFAULT_CATEGORY);
+
   // Refs to form elements for deriving character counts (single source of truth)
   const titleRef = useRef<HTMLInputElement>(null);
   const contentRef = useRef<HTMLTextAreaElement>(null);
@@ -31,50 +45,143 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
   const titleLength = titleRef.current?.value.length ?? 0;
   const contentLength = contentRef.current?.value.length ?? 0;
 
+  // Debounced validation for import code
+  const validateImportCode = useCallback((code: string) => {
+    if (!code.trim()) {
+      setDecodedPrompt(null);
+      setValidationError('');
+      setIsValidating(false);
+      return;
+    }
+
+    setIsValidating(true);
+
+    try {
+      const decoded = decode(code);
+      setDecodedPrompt(decoded);
+      setValidationError('');
+
+      // Try to set the category to the decoded prompt's category if it exists
+      const categoryExists = categories.find(c => c.name === decoded.category);
+      if (categoryExists) {
+        setSelectedCategory(decoded.category);
+      } else {
+        // If category doesn't exist, keep default
+        setSelectedCategory(DEFAULT_CATEGORY);
+      }
+
+      Logger.info('Import code validated successfully', {
+        component: 'AddPromptForm',
+        mode: 'import'
+      });
+    } catch (err) {
+      setDecodedPrompt(null);
+      setValidationError((err as Error).message || 'Invalid sharing code');
+      Logger.warn('Import code validation failed', {
+        component: 'AddPromptForm',
+        error: (err as Error).message
+      });
+    } finally {
+      setIsValidating(false);
+    }
+  }, [categories]);
+
+  // Effect for debounced validation (300ms)
+  useEffect(() => {
+    if (mode !== 'import') {
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      validateImportCode(importCode);
+    }, 300);
+
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [importCode, mode, validateImportCode]);
+
   // React 19 useActionState for automatic loading/error handling
   const [errors, submitAction, isPending] = useActionState(
     async (_prevState: FieldErrors | null, formData: FormData) => {
-      // Validation
-      const title = formData.get('title') as string;
-      const content = formData.get('content') as string;
-      const category = formData.get('category') as string;
+      let title: string;
+      let content: string;
+      let category: string;
 
-      const validationErrors: FieldErrors = {};
+      // Handle import mode vs create mode
+      if (mode === 'import') {
+        // Import mode validation
+        if (!decodedPrompt) {
+          Logger.warn('Import failed: No valid prompt decoded', {
+            component: 'AddPromptForm',
+            mode: 'import'
+          });
+          return { general: 'Please enter a valid sharing code to import' };
+        }
 
-      if (!content.trim()) {
-        Logger.warn('Form validation failed: Content is required', {
+        if (validationError) {
+          Logger.warn('Import failed: Validation error present', {
+            component: 'AddPromptForm',
+            mode: 'import',
+            error: validationError
+          });
+          return { general: validationError };
+        }
+
+        // Use decoded prompt data
+        title = decodedPrompt.title;
+        content = decodedPrompt.content;
+        category = selectedCategory;
+
+        Logger.info('Importing prompt from sharing code', {
           component: 'AddPromptForm',
-          field: 'content'
+          mode: 'import',
+          category: selectedCategory
         });
-        validationErrors.content = VALIDATION_MESSAGES.CONTENT_REQUIRED;
+      } else {
+        // Create mode - extract from form data
+        title = formData.get('title') as string;
+        content = formData.get('content') as string;
+        category = formData.get('category') as string;
+
+        // Validation for create mode
+        const validationErrors: FieldErrors = {};
+
+        if (!content.trim()) {
+          Logger.warn('Form validation failed: Content is required', {
+            component: 'AddPromptForm',
+            field: 'content'
+          });
+          validationErrors.content = VALIDATION_MESSAGES.CONTENT_REQUIRED;
+        }
+
+        if (content.length > MAX_CONTENT_LENGTH) {
+          Logger.warn('Form validation failed: Content exceeds limit', {
+            component: 'AddPromptForm',
+            field: 'content',
+            length: content.length,
+            limit: MAX_CONTENT_LENGTH
+          });
+          validationErrors.content = VALIDATION_MESSAGES.CONTENT_TOO_LONG;
+        }
+
+        if (title.length > MAX_TITLE_LENGTH) {
+          Logger.warn('Form validation failed: Title exceeds limit', {
+            component: 'AddPromptForm',
+            field: 'title',
+            length: title.length,
+            limit: MAX_TITLE_LENGTH
+          });
+          validationErrors.title = VALIDATION_MESSAGES.TITLE_TOO_LONG;
+        }
+
+        // Return validation errors if any
+        if (Object.keys(validationErrors).length > 0) {
+          return validationErrors;
+        }
       }
 
-      if (content.length > MAX_CONTENT_LENGTH) {
-        Logger.warn('Form validation failed: Content exceeds limit', {
-          component: 'AddPromptForm',
-          field: 'content',
-          length: content.length,
-          limit: MAX_CONTENT_LENGTH
-        });
-        validationErrors.content = VALIDATION_MESSAGES.CONTENT_TOO_LONG;
-      }
-
-      if (title.length > MAX_TITLE_LENGTH) {
-        Logger.warn('Form validation failed: Title exceeds limit', {
-          component: 'AddPromptForm',
-          field: 'title',
-          length: title.length,
-          limit: MAX_TITLE_LENGTH
-        });
-        validationErrors.title = VALIDATION_MESSAGES.TITLE_TOO_LONG;
-      }
-
-      // Return validation errors if any
-      if (Object.keys(validationErrors).length > 0) {
-        return validationErrors;
-      }
-
-      // Submit data
+      // Submit data (works for both modes)
       try {
         await (onSubmit as (data: { title: string; content: string; category: string }) => Promise<void>)({
           title,
@@ -83,6 +190,7 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
         });
         Logger.info('Prompt form submitted successfully', {
           component: 'AddPromptForm',
+          mode,
           category,
           hasTitle: !!title.trim()
         });
@@ -90,6 +198,7 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
       } catch (err) {
         Logger.error('Failed to submit prompt form', toError(err), {
           component: 'AddPromptForm',
+          mode,
           category,
           hasTitle: !!title.trim()
         });
@@ -112,6 +221,42 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
         </ViewHeader.Actions>
       </ViewHeader>
 
+      {/* Mode Selector */}
+      <div className="flex-shrink-0 p-4 bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700">
+        <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-700 rounded-xl p-1">
+          <button
+            type="button"
+            onClick={() => {
+              setMode('create');
+            }}
+            className={`flex-1 px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 focus-interactive ${
+              mode === 'create'
+                ? 'bg-white dark:bg-gray-600 text-purple-600 dark:text-purple-400 shadow-sm'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+            }`}
+            disabled={isPending}
+            aria-pressed={mode === 'create'}
+          >
+            📝 Create New
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMode('import');
+            }}
+            className={`flex-1 px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 focus-interactive ${
+              mode === 'import'
+                ? 'bg-white dark:bg-gray-600 text-purple-600 dark:text-purple-400 shadow-sm'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+            }`}
+            disabled={isPending}
+            aria-pressed={mode === 'import'}
+          >
+            📥 Import Shared
+          </button>
+        </div>
+      </div>
+
       {/* General Error Display */}
       {errors?.general && (
         <div
@@ -126,6 +271,165 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
       {/* Form */}
       <div className="flex-1 overflow-auto custom-scrollbar">
           <form id="add-prompt-form" action={submitAction}>
+            {/* Import Mode UI */}
+            {mode === 'import' && (
+              <>
+                {/* Instructions */}
+                <div className="bg-blue-50/80 dark:bg-blue-900/20 backdrop-blur-sm border-b border-blue-200 dark:border-blue-800 p-5">
+                  <div className="flex items-start space-x-3">
+                    <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-500 dark:bg-blue-400 flex items-center justify-center">
+                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">
+                        How to Import
+                      </h3>
+                      <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">
+                        Paste the sharing code you received from another user below. The code will be automatically validated and decoded.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Import Code Text Area */}
+                <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5">
+                  <label htmlFor="import-code" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                    Sharing Code *
+                  </label>
+                  <textarea
+                    id="import-code"
+                    value={importCode}
+                    onChange={(e) => {
+                      setImportCode(e.target.value);
+                    }}
+                    placeholder="Paste the sharing code here..."
+                    rows={6}
+                    className={`w-full px-4 py-3 border rounded-xl focus-input resize-none bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 text-gray-900 dark:text-gray-100 font-mono text-sm ${
+                      validationError ? 'border-red-300 dark:border-red-500' : 'border-purple-200 dark:border-gray-600'
+                    }`}
+                    disabled={isPending}
+                  />
+                  {/* Validation Status */}
+                  {isValidating && (
+                    <div className="mt-2 flex items-center space-x-2 text-sm text-purple-600 dark:text-purple-400">
+                      <div className="w-4 h-4 border-2 border-purple-600/30 border-t-purple-600 rounded-full animate-spin"></div>
+                      <span>Validating...</span>
+                    </div>
+                  )}
+                  {validationError && (
+                    <p className="mt-2 text-sm text-red-600 dark:text-red-400 font-medium">⚠️ {validationError}</p>
+                  )}
+                  {decodedPrompt && !validationError && (
+                    <p className="mt-2 text-sm text-green-600 dark:text-green-400 font-medium flex items-center space-x-1">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span>Valid sharing code detected</span>
+                    </p>
+                  )}
+                </div>
+
+                {/* Preview Section */}
+                {decodedPrompt && !validationError && (
+                  <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                        Preview
+                      </h3>
+                      <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">
+                        Decoded from sharing code
+                      </span>
+                    </div>
+
+                    {/* Preview Card */}
+                    <div className="bg-white dark:bg-gray-700 rounded-xl border border-purple-100 dark:border-gray-600 p-4 space-y-3">
+                      {/* Title Preview */}
+                      <div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mb-1">
+                          Title
+                        </p>
+                        <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                          {decodedPrompt.title}
+                        </p>
+                      </div>
+
+                      {/* Content Preview */}
+                      <div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mb-1">
+                          Content
+                        </p>
+                        <div className="bg-gray-50 dark:bg-gray-600 rounded-lg p-3 max-h-40 overflow-y-auto custom-scrollbar">
+                          <p className="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap break-words">
+                            {decodedPrompt.content}
+                          </p>
+                        </div>
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 font-medium">
+                          {decodedPrompt.content.length} characters
+                        </p>
+                      </div>
+
+                      {/* Original Category Preview */}
+                      <div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mb-1">
+                          Original Category
+                        </p>
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">
+                          {decodedPrompt.category}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Info Note */}
+                    <p className="mt-3 text-xs text-gray-500 dark:text-gray-400 italic">
+                      💡 You can select a different category below before importing
+                    </p>
+                  </div>
+                )}
+
+                {/* Category Selector for Import */}
+                {decodedPrompt && !validationError && (
+                  <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5">
+                    <label htmlFor="import-category" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                      Import to Category
+                    </label>
+                    <div className="relative">
+                      <select
+                        id="import-category"
+                        value={selectedCategory}
+                        onChange={(e) => {
+                          setSelectedCategory(e.target.value);
+                        }}
+                        className="w-full px-4 py-3 pr-10 border border-purple-200 dark:border-gray-600 rounded-xl focus-input bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 font-medium appearance-none cursor-pointer text-gray-900 dark:text-gray-100"
+                        disabled={isPending}
+                      >
+                        {categories.map((category: Category) => (
+                          <option key={category.id} value={category.name}>
+                            {category.name}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                        <svg className="w-4 h-4 text-purple-400 dark:text-purple-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </div>
+                    </div>
+                    <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
+                      {selectedCategory === decodedPrompt.category
+                        ? 'Using original category'
+                        : `Importing to "${selectedCategory}" instead of "${decodedPrompt.category}"`
+                      }
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Create Mode UI */}
+            {mode === 'create' && (
+              <>
             {/* Title */}
             <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5">
               <label htmlFor="title" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
@@ -207,6 +511,8 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
                 {formatCharacterCount(contentLength, MAX_CONTENT_LENGTH)}
               </p>
             </div>
+              </>
+            )}
 
           </form>
       </div>
@@ -226,15 +532,15 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
             type="submit"
             form="add-prompt-form"
             className="flex-1 px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 focus-primary"
-            disabled={isPending}
+            disabled={isPending || (mode === 'import' && (!decodedPrompt || !!validationError))}
           >
             {isPending ? (
               <div className="flex items-center justify-center space-x-2">
                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                <span>Saving...</span>
+                <span>{mode === 'import' ? 'Importing...' : 'Saving...'}</span>
               </div>
             ) : (
-              'Save Prompt'
+              mode === 'import' ? 'Import Prompt' : 'Save Prompt'
             )}
           </button>
         </div>
