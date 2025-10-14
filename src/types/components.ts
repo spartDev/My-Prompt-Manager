@@ -30,14 +30,14 @@ export interface CategoryFilterProps {
 
 export interface AddPromptFormProps {
   categories: Category[];
-  onSubmit: (data: { title: string; content: string; category: string }) => void;
+  onSubmit: (data: { title: string; content: string; category: string }) => Promise<void> | void;
   onCancel: () => void;
 }
 
 export interface EditPromptFormProps {
   prompt: Prompt;
   categories: Category[];
-  onSubmit: (data: { title: string; content: string; category: string }) => void;
+  onSubmit: (data: { title: string; content: string; category: string }) => Promise<void> | void;
   onCancel: () => void;
 }
 

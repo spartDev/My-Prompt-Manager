@@ -96,7 +96,7 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
 
       // Submit data
       try {
-        await (onSubmit as (data: { title: string; content: string; category: string }) => Promise<void>)({
+        await onSubmit({
           title,
           content,
           category
@@ -147,7 +147,7 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
         subtitle="Update your text snippet"
       >
         <ViewHeader.Actions>
-          <ViewHeader.BackButton onClick={onCancel as () => void} />
+          <ViewHeader.BackButton onClick={onCancel} />
         </ViewHeader.Actions>
       </ViewHeader>
 
@@ -284,7 +284,7 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
         <div className="flex space-x-3">
           <button
             type="button"
-            onClick={onCancel as () => void}
+            onClick={onCancel}
             className="flex-1 px-6 py-3 text-sm font-semibold text-gray-700 dark:text-gray-300 bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm border border-purple-200 dark:border-gray-600 rounded-xl hover:bg-white/80 dark:hover:bg-gray-700/80 transition-all duration-200 focus-secondary"
             disabled={isPending}
           >
