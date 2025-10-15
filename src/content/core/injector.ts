@@ -6,6 +6,7 @@
  * all the modular components.
  */
 
+import { AnalyticsManager } from '../../services/analyticsManager';
 import type { ElementFingerprint } from '../../types/index';
 import type { Prompt, InsertionResult } from '../types/index';
 import { UIElementFactory } from '../ui/element-factory';
@@ -19,6 +20,8 @@ import { injectCSS } from '../utils/styles';
 import { ThemeManager } from '../utils/theme-manager';
 
 import { PlatformInsertionManager } from './insertion-manager';
+
+// Import AnalyticsManager for tracking prompt insertions
 
 // Floating UI imports for robust positioning fallback
 
@@ -1856,7 +1859,8 @@ export class PromptLibraryInjector {
         const prompt = prompts.find(p => p.id === promptId);
         if (prompt) {
           debug('[CONTENT] Inserting prompt content', { promptId, contentLength: prompt.content.length });
-          void this.insertPrompt(targetElement, prompt.content);
+          // Pass the full prompt object and 'browse' as the source
+          void this.insertPrompt(targetElement, prompt, 'browse');
           this.closePromptSelector();
         } else {
           debug('[CONTENT] Prompt not found for ID', { promptId });
@@ -1993,19 +1997,48 @@ export class PromptLibraryInjector {
   /**
    * Inserts a prompt into the target element
    */
-  private async insertPrompt(element: HTMLElement, content: string): Promise<InsertionResult> {
+  private async insertPrompt(
+    element: HTMLElement,
+    prompt: Prompt,
+    source: 'browse' | 'search' | 'favorite' = 'browse'
+  ): Promise<InsertionResult> {
     try {
-      const result = await this.platformManager.insertPrompt(element, content);
-      
+      const result = await this.platformManager.insertPrompt(element, prompt.content);
+
       if (result.success) {
         debug('Prompt inserted successfully', {
           method: result.method,
-          contentLength: content.length
+          contentLength: prompt.content.length
         });
+
+        // Track analytics after successful insertion
+        try {
+          const analyticsManager = AnalyticsManager.getInstance();
+
+          await analyticsManager.trackInsertion({
+            promptId: prompt.id,
+            categoryId: prompt.category,
+            platform: this.state.hostname,
+            source
+          });
+
+          debug('Analytics tracked for prompt insertion', {
+            promptId: prompt.id,
+            platform: this.state.hostname,
+            source
+          });
+        } catch (analyticsError) {
+          // Don't fail insertion if analytics tracking fails
+          error('Failed to track analytics', analyticsError instanceof Error ? analyticsError : new Error(String(analyticsError)), {
+            component: 'PromptLibraryInjector',
+            operation: 'trackAnalytics',
+            promptId: prompt.id
+          });
+        }
       } else {
         warn('Prompt insertion failed', { error: result.error });
       }
-      
+
       return result;
     } catch (err) {
       error('Error inserting prompt', err instanceof Error ? err : new Error(String(err)));
