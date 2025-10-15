@@ -4,6 +4,7 @@
  */
 
 import { getDefaultEnabledPlatforms, getAllHostnamePatterns } from '../config/platforms';
+import { StorageManager } from '../services/storage';
 import type { ElementFingerprint } from '../types';
 import { Logger, toError, getErrorMessage } from '../utils';
 
@@ -12,6 +13,42 @@ const activePickerSessions = new Map<number, { tabId: number; windowId: number }
 
 // Configuration constants
 const ORPHANED_TAB_DETECTION_WINDOW_MS = 10000; // 10 seconds after extension start
+
+/**
+ * Migrate existing users to analytics system
+ * Initializes empty analytics data for users who don't have it yet
+ */
+export async function migrateToAnalytics(): Promise<void> {
+  try {
+    const storage = StorageManager.getInstance();
+    const data = await storage.get(['analytics']);
+
+    if (!data.analytics) {
+      // Initialize analytics for existing users
+      await storage.set({
+        analytics: {
+          events: [],
+          achievements: [],
+          stats: {
+            firstInsertionDate: Date.now(),
+            totalInsertions: 0,
+            currentStreak: 0,
+            longestStreak: 0
+          }
+        }
+      });
+
+      Logger.info('Analytics initialized for existing user', {
+        component: 'Background'
+      });
+    }
+  } catch (error) {
+    Logger.error('Failed to migrate analytics', toError(error), {
+      component: 'Background',
+      operation: 'migrateToAnalytics'
+    });
+  }
+}
 
 /**
  * Content script injection controller
@@ -1169,6 +1206,11 @@ chrome.runtime.onInstalled.addListener((details) => {
     try {
       const mode = await getInterfaceMode();
       await updateActionBehavior(mode);
+
+      // Run migration on install or update
+      if (details.reason === 'install' || details.reason === 'update') {
+        await migrateToAnalytics();
+      }
 
       // Re-inject content scripts after extension updates
       if (details.reason === chrome.runtime.OnInstalledReason.UPDATE as string) {
