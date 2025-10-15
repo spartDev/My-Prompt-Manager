@@ -41,6 +41,29 @@ describe('AnalyticsView', () => {
         { categoryId: 'cat1', name: 'Work', count: 20 }
       ]
     });
+
+    (mockAnalyticsManager.getData as any).mockResolvedValue({
+      events: [],
+      achievements: [
+        {
+          id: 'first_prompt',
+          name: 'Getting Started',
+          description: 'Insert your first prompt',
+          tier: 'bronze',
+          category: 'usage',
+          icon: '🎯',
+          requirement: 1,
+          unlockedAt: Date.now(),
+          progress: 1
+        }
+      ],
+      stats: {
+        firstInsertionDate: Date.now(),
+        totalInsertions: 42,
+        currentStreak: 7,
+        longestStreak: 14
+      }
+    });
   });
 
   it('should render stats overview cards', async () => {
@@ -62,6 +85,17 @@ describe('AnalyticsView', () => {
       weeklyActivity: [],
       platformDistribution: [],
       categoryBreakdown: []
+    });
+
+    (mockAnalyticsManager.getData as any).mockResolvedValue({
+      events: [],
+      achievements: [],
+      stats: {
+        firstInsertionDate: 0,
+        totalInsertions: 0,
+        currentStreak: 0,
+        longestStreak: 0
+      }
     });
 
     render(<AnalyticsView onBack={vi.fn()} />);

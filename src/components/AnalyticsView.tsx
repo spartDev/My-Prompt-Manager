@@ -1,8 +1,10 @@
 import { FC, useEffect, useState } from 'react';
 
 import { AnalyticsManager } from '../services/analyticsManager';
-import type { ComputedStats } from '../types/analytics';
+import type { ComputedStats, Achievement } from '../types/analytics';
 import { Logger, toError } from '../utils';
+
+import { AchievementsSection } from './AchievementsSection';
 
 interface AnalyticsViewProps {
   onBack: () => void;
@@ -10,6 +12,7 @@ interface AnalyticsViewProps {
 
 export const AnalyticsView: FC<AnalyticsViewProps> = ({ onBack }) => {
   const [stats, setStats] = useState<ComputedStats | null>(null);
+  const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -21,8 +24,12 @@ export const AnalyticsView: FC<AnalyticsViewProps> = ({ onBack }) => {
     try {
       setLoading(true);
       const analyticsManager = AnalyticsManager.getInstance();
-      const computedStats = await analyticsManager.getComputedStats();
+      const [computedStats, data] = await Promise.all([
+        analyticsManager.getComputedStats(),
+        analyticsManager.getData()
+      ]);
       setStats(computedStats);
+      setAchievements(data.achievements);
       setError(null);
     } catch (err) {
       Logger.error('Failed to load analytics', toError(err), {
@@ -154,6 +161,15 @@ export const AnalyticsView: FC<AnalyticsViewProps> = ({ onBack }) => {
             )}
           </div>
         </div>
+
+        {/* Achievements Section */}
+        {stats.totalInsertions > 0 && (
+          <AchievementsSection
+            unlockedAchievements={achievements}
+            totalInsertions={stats.totalInsertions}
+            currentStreak={stats.currentStreak}
+          />
+        )}
       </div>
     </div>
   );
