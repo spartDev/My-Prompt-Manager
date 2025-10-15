@@ -2,6 +2,7 @@ import { useState, useOptimistic, useTransition } from 'react';
 import type { FC } from 'react';
 
 import AddPromptForm from './components/AddPromptForm';
+import { AnalyticsView } from './components/AnalyticsView';
 import CategoryManager from './components/CategoryManager';
 import EditPromptForm from './components/EditPromptForm';
 import LibraryView from './components/LibraryView';
@@ -13,7 +14,7 @@ import { usePrompts, useCategories, useClipboard, useToast, useSearchWithDebounc
 import { Prompt, ErrorType, AppError } from './types';
 import { Logger, toError } from './utils';
 
-type ViewType = 'library' | 'add' | 'edit' | 'categories' | 'settings';
+type ViewType = 'library' | 'add' | 'edit' | 'categories' | 'settings' | 'analytics';
 
 interface AppProps {
   context?: 'popup' | 'sidepanel';
@@ -247,6 +248,9 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
           onSettings={() => {
             setCurrentView('settings');
           }}
+          onAnalytics={() => {
+            setCurrentView('analytics');
+          }}
           loading={loading}
           context={context}
         />
@@ -293,6 +297,14 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
           showToast={showToast}
           toastSettings={settings}
           onToastSettingsChange={updateSettings}
+        />
+      )}
+
+      {currentView === 'analytics' && (
+        <AnalyticsView
+          onBack={() => {
+            setCurrentView('library');
+          }}
         />
       )}
 

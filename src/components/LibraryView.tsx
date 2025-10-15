@@ -22,6 +22,7 @@ const LibraryView: FC<LibraryViewProps> = ({
   onCategoryChange,
   onManageCategories,
   onSettings,
+  onAnalytics,
   loading,
   context = 'popup'
 }) => {
@@ -46,6 +47,7 @@ const LibraryView: FC<LibraryViewProps> = ({
         context={context}
       >
         <ViewHeader.Actions>
+          {onAnalytics && <ViewHeader.AnalyticsButton onClick={() => { (onAnalytics as () => void)(); }} />}
           <ViewHeader.SettingsButton onClick={() => { (onSettings as () => void)(); }} />
           {context === 'sidepanel' && (
             <ViewHeader.CloseButton onClick={() => { window.close(); }} context="sidepanel" />

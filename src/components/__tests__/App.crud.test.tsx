@@ -6,6 +6,34 @@ import App from '../../App';
 import { getMockPromptManager, getMockStorageManager } from '../../test/mocks';
 import { ErrorType, type Prompt, type Category, type AppError } from '../../types';
 
+// Mock AnalyticsManager
+vi.mock('../../services/analyticsManager', () => ({
+  AnalyticsManager: {
+    getInstance: vi.fn(() => ({
+      getComputedStats: vi.fn().mockResolvedValue({
+        totalInsertions: 0,
+        currentStreak: 0,
+        longestStreak: 0,
+        mostUsedPrompt: null,
+        mostActivePlatform: null,
+        weeklyActivity: [],
+        platformDistribution: [],
+        categoryBreakdown: []
+      }),
+      getData: vi.fn().mockResolvedValue({
+        events: [],
+        achievements: [],
+        stats: {
+          firstInsertionDate: 0,
+          totalInsertions: 0,
+          currentStreak: 0,
+          longestStreak: 0
+        }
+      })
+    }))
+  }
+}));
+
 const defaultCategories: Category[] = [
   { id: 'default', name: 'Uncategorized', color: '#888888' },
   { id: 'work', name: 'Work', color: '#ff00ff' }
@@ -219,5 +247,24 @@ describe('App prompt workflows', () => {
     });
 
     await screen.findByText(/title is required/i);
+  });
+
+  it('navigates to analytics view when analytics button is clicked', async () => {
+    const storageMock = getMockStorageManager();
+    storageMock.getPrompts.mockResolvedValue([basePrompt]);
+
+    await renderApp();
+
+    await waitFor(() => {
+      expect(storageMock.getPrompts).toHaveBeenCalled();
+    });
+
+    // Find and click analytics button
+    const analyticsButton = await screen.findByLabelText(/analytics/i);
+    await userEvent.click(analyticsButton);
+
+    // Should show analytics view with empty state (since totalInsertions is 0)
+    await screen.findByText(/Start Building Your Stats/i);
+    expect(screen.getByText(/Insert prompts on AI platforms to track your usage and unlock achievements!/i)).toBeInTheDocument();
   });
 });

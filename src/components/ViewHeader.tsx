@@ -186,6 +186,24 @@ interface BackButtonProps {
 }
 
 /**
+ * Props for the AnalyticsButton subcomponent.
+ */
+interface AnalyticsButtonProps {
+  /**
+   * Callback fired when the analytics button is clicked.
+   * @example
+   * onClick={() => openAnalytics()}
+   */
+  onClick: () => void;
+
+  /**
+   * Whether the button is disabled.
+   * @default false
+   */
+  disabled?: boolean;
+}
+
+/**
  * Props for the SettingsButton subcomponent.
  */
 interface SettingsButtonProps {
@@ -301,6 +319,32 @@ const BackButton: FC<BackButtonProps> = ({ onClick, disabled = false }) => {
 };
 
 /**
+ * Analytics button subcomponent.
+ * Displays a chart icon button for opening analytics.
+ *
+ * @example
+ * <ViewHeader.AnalyticsButton onClick={() => setView('analytics')} />
+ *
+ * @example
+ * <ViewHeader.AnalyticsButton onClick={openAnalytics} disabled={!hasData} />
+ */
+const AnalyticsButton: FC<AnalyticsButtonProps> = ({ onClick, disabled = false }) => {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors focus-interactive disabled:opacity-50 disabled:cursor-not-allowed"
+      title="Analytics"
+      aria-label="Open analytics"
+    >
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+      </svg>
+    </button>
+  );
+};
+
+/**
  * Settings button subcomponent.
  * Displays a gear icon button for opening settings.
  *
@@ -382,6 +426,12 @@ interface ViewHeaderComponent extends FC<ViewHeaderProps> {
    * @see {@link BackButton}
    */
   BackButton: FC<BackButtonProps>;
+
+  /**
+   * Analytics button subcomponent.
+   * @see {@link AnalyticsButton}
+   */
+  AnalyticsButton: FC<AnalyticsButtonProps>;
 
   /**
    * Settings button subcomponent.
@@ -668,6 +718,7 @@ const ViewHeaderFC: FC<ViewHeaderProps> = ({
 const ViewHeader = ViewHeaderFC as ViewHeaderComponent;
 ViewHeader.Actions = Actions;
 ViewHeader.BackButton = BackButton;
+ViewHeader.AnalyticsButton = AnalyticsButton;
 ViewHeader.SettingsButton = SettingsButton;
 ViewHeader.CloseButton = CloseButton;
 
