@@ -3,7 +3,7 @@
 [![Version](https://img.shields.io/badge/version-1.6.0-blue.svg)](https://github.com/spartDev/My-Prompt-Manager)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Chrome](https://img.shields.io/badge/Chrome-114%2B-yellow.svg)](https://www.google.com/chrome/)
-[![Tests](https://img.shields.io/badge/tests-518%20passing-brightgreen.svg)](https://github.com/spartDev/My-Prompt-Manager)
+[![Tests](https://img.shields.io/badge/tests-1002%20passing-brightgreen.svg)](https://github.com/spartDev/My-Prompt-Manager)
 
 Transform your AI interactions with a powerful personal prompt library that integrates seamlessly with Claude, ChatGPT, Gemini, and Perplexity. Store, organize, share, and instantly insert your best prompts with one click.
 
@@ -23,13 +23,20 @@ Transform your AI interactions with a powerful personal prompt library that inte
 ✅ **Import/Export:** JSON backup and restore functionality with data portability
 
 ### AI Platform Integration
-✅ **Native Integration:** Library icon appears seamlessly in AI chat interfaces  
-✅ **Smart Positioning:** Context-aware popup placement for optimal UX  
-✅ **Universal Compatibility:** Works with textarea and contenteditable elements  
-✅ **Keyboard Navigation:** Full keyboard support for accessibility  
-✅ **Custom Sites:** Add support for any AI platform through settings  
-✅ **Theme Synchronization:** Matches the host platform's theme automatically  
+✅ **Native Integration:** Library icon appears seamlessly in AI chat interfaces
+✅ **Smart Positioning:** Context-aware popup placement for optimal UX
+✅ **Universal Compatibility:** Works with textarea and contenteditable elements
+✅ **Keyboard Navigation:** Full keyboard support for accessibility
+✅ **Custom Sites:** Add support for any AI platform through settings
+✅ **Theme Synchronization:** Matches the host platform's theme automatically
 ✅ **Side Panel Support:** Chrome 114+ dual interface mode (popup or side panel)
+
+### Analytics & Insights
+✅ **Usage Analytics:** Track prompt insertions with iOS Screen Time-inspired insights
+✅ **Achievement System:** Unlock milestones and streaks (bronze/silver/gold/platinum tiers)
+✅ **Privacy-First:** All analytics data stored locally, never leaves your device
+✅ **Rich Statistics:** Weekly activity charts, platform distribution, category breakdown
+✅ **90-Day History:** Rolling window of usage events for trend analysis
 
 ## 🎯 Supported Platforms
 
@@ -111,7 +118,7 @@ See our [Platform Integration Guide](docs/PLATFORM_INTEGRATION.md) to add your o
 |---------|-------------|--------|
 | `npm run dev` | Start development server with HMR | Development |
 | `npm run build` | Create production build | Deployment |
-| `npm test` | Run test suite (518+ tests) | Testing |
+| `npm test` | Run test suite (1002+ tests) | Testing |
 | `npm run test:ui` | Run tests with Vitest UI | Interactive Testing |
 | `npm run test:coverage` | Generate coverage report | Code Coverage |
 | `npm run lint` | Run ESLint checks | Code Quality |
@@ -223,7 +230,7 @@ The extension automatically detects your system theme preference. You can also t
 
 ## 🧪 Testing
 
-The project includes a comprehensive test suite with 518+ tests across 37 test files.
+The project includes a comprehensive test suite with 1002+ tests across 55 test files.
 
 ### Running Tests
 

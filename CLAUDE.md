@@ -81,6 +81,7 @@ Chrome Storage API ← → StorageManager (singleton)
 - `StorageManager`: Singleton with mutex locking for concurrent operations
 - `PromptManager`: Search, validation, duplicate detection (Levenshtein distance)
 - `InsertionManager`: Platform-agnostic text insertion coordination
+- `AnalyticsManager`: Event tracking with 90-day rolling window and achievement system
 
 ### Detailed Documentation
 
@@ -131,8 +132,17 @@ src/
 - Custom site configuration with user-defined selectors
 - Debug interface: `window.__promptLibraryDebug`
 
+### Analytics System
+- `AnalyticsManager`: Singleton service for tracking prompt insertion events
+- Event-driven architecture with 90-day rolling window for privacy
+- Achievement system with tiered milestones (bronze/silver/gold/platinum)
+- Stats computed on-demand when Analytics view opens (not stored)
+- Graceful degradation: analytics failures don't block core prompt insertion
+- Privacy-first: all data stored locally, opt-in with settings toggle
+- Integration: Content script tracks insertions automatically after successful operations
+
 ### Testing Strategy
-- 875 tests across 46 test files
+- 1002 tests across 55 test files
 - Unit tests for services and utilities
 - Component tests with React Testing Library
 - Integration tests for storage operations
