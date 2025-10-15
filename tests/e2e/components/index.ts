@@ -6,7 +6,5 @@
 
 export { PromptCard } from './PromptCard';
 export { CategoryRow } from './CategoryRow';
-
-// Add more component exports as they are created:
-// export { SearchBar } from './SearchBar';
-// export { ConfirmationDialog } from './ConfirmationDialog';
+export { SearchBar } from './SearchBar';
+export { ConfirmDialog } from './ConfirmDialog';

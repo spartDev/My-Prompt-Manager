@@ -127,9 +127,10 @@ const ConfirmDialog: FC<ConfirmDialogProps> = ({
       />
 
       {/* Modal panel */}
-      <div 
+      <div
         ref={dialogRef}
         className="relative bg-white dark:bg-gray-800 rounded-xl p-3 shadow-xl transform transition-all max-w-xs w-full mx-2 backdrop-blur-sm border border-purple-100 dark:border-gray-700"
+        data-testid="confirmation-dialog"
       >
         <div className="flex items-start">
           <div className={`flex-shrink-0 flex items-center justify-center h-8 w-8 rounded-full ${styles.iconBg}`}>
@@ -138,16 +139,18 @@ const ConfirmDialog: FC<ConfirmDialogProps> = ({
             </div>
           </div>
           <div className="ml-3 flex-1">
-            <h3 
+            <h3
               id="dialog-title"
               className="text-sm leading-5 font-bold text-gray-900 dark:text-gray-100"
+              data-testid="confirmation-dialog-title"
             >
               {title}
             </h3>
             <div className="mt-1">
-              <p 
+              <p
                 id="dialog-description"
                 className="text-xs text-gray-600 dark:text-gray-400 leading-tight"
+                data-testid="confirmation-dialog-message"
               >
                 {message}
               </p>
@@ -160,6 +163,7 @@ const ConfirmDialog: FC<ConfirmDialogProps> = ({
             type="button"
             onClick={onConfirm}
             className={`inline-flex justify-center rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-sm focus-secondary transition-colors ${styles.confirmButton}`}
+            data-testid="confirmation-dialog-confirm"
           >
             {confirmText}
           </button>
@@ -168,6 +172,7 @@ const ConfirmDialog: FC<ConfirmDialogProps> = ({
             type="button"
             onClick={onCancel}
             className="inline-flex justify-center rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-gray-300 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-600 focus-secondary transition-colors"
+            data-testid="confirmation-dialog-cancel"
           >
             {cancelText}
           </button>
