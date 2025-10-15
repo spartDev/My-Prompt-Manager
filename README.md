@@ -5,7 +5,7 @@
 [![Chrome](https://img.shields.io/badge/Chrome-114%2B-yellow.svg)](https://www.google.com/chrome/)
 [![Tests](https://img.shields.io/badge/tests-518%20passing-brightgreen.svg)](https://github.com/spartDev/My-Prompt-Manager)
 
-A powerful Chrome extension that provides seamless access to your personal prompt library directly within popular AI chat interfaces. Features both a popup interface for managing prompts and native integration with Claude, ChatGPT, Mistral LeChat, Perplexity, and more.
+Transform your AI interactions with a powerful personal prompt library that integrates seamlessly with Claude, ChatGPT, Gemini, and Perplexity. Store, organize, share, and instantly insert your best prompts with one click.
 
 **Author:** Thomas Roux  
 **Repository:** [github.com/spartDev/My-Prompt-Manager](https://github.com/spartDev/My-Prompt-Manager)
