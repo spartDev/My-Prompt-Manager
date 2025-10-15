@@ -127,7 +127,8 @@ describe('PromptCard - Share Button', () => {
 
   let mockShowToast: ReturnType<typeof vi.fn>;
   let mockWriteText: ReturnType<typeof vi.fn>;
-  let mockEncode: ReturnType<typeof vi.spyOn>;
+   
+  let mockEncode: any;
   let originalClipboard: Clipboard | undefined;
 
   beforeAll(() => {

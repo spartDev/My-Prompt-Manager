@@ -158,7 +158,7 @@ describe('SettingsView', () => {
       // enabledSites should match the default platforms sorted by priority (highest first)
       // Claude (100), ChatGPT (90), Mistral (85), Gemini (85), Perplexity (80)
       // Note: When priorities are equal, order depends on Object.values() iteration
-      const call = (chromeMock.storage.local.set as jest.Mock).mock.calls[0][0];
+      const call = (chromeMock.storage.local.set as Mock).mock.calls[0][0];
       const enabledSites = call.promptLibrarySettings.enabledSites;
 
       // Verify count

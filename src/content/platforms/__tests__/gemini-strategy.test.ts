@@ -352,16 +352,19 @@ describe('GeminiStrategy', () => {
     });
 
     it('should dispatch InputEvent with correct properties', async () => {
-      let capturedEvent: InputEvent | null = null;
+      let capturedEvent: Event | null = null;
       mockElement.addEventListener('input', (e) => {
-        capturedEvent = e as InputEvent;
+        capturedEvent = e;
       });
 
       await strategy.insert(mockElement, 'Test content');
 
       expect(capturedEvent).toBeTruthy();
-      expect(capturedEvent?.bubbles).toBe(true);
-      expect(capturedEvent?.data).toBe('Test content');
+      expect(capturedEvent).toBeInstanceOf(Event);
+      // Type assertion is safe here since we've verified truthiness
+      const inputEvent = capturedEvent as unknown as InputEvent;
+      expect(inputEvent.bubbles).toBe(true);
+      expect(inputEvent.data).toBe('Test content');
 
       mockElement.removeEventListener('input', () => {});
     });
