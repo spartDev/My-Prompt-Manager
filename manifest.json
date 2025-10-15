@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "My Prompt Manager",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "Store, organize, and quickly access your personal collection of text prompts with categories and search functionality.",
   "author": "Thomas Roux",
   "homepage_url": "https://github.com/spartDev/My-Prompt-Manager",

@@ -55,15 +55,3 @@ export interface IconCreationResult {
   element?: HTMLElement;
   error?: string;
 }
-
-/**
- * Debug window interface for runtime strategy switching
- */
-declare global {
-  interface Window {
-    __promptLibraryDebug?: {
-      enabled: boolean;
-      switchPlatform?: (hostname: string) => void;
-    };
-  }
-}

@@ -429,7 +429,7 @@ export class PlatformManager {
    * @param hostname - Hostname to switch to
    */
   public debugSwitchStrategy(hostname: string): void {
-    if (window.__promptLibraryDebug?.enabled) {
+    if (window.__promptLibraryDebug) {
       debug('Debug mode: Switching strategy', {
         from: this.hostname,
         to: hostname
@@ -445,7 +445,7 @@ export class PlatformManager {
         strategies: this.strategies.map(s => s.name)
       });
     } else {
-      warn('debugSwitchStrategy called but debug mode not enabled');
+      warn('debugSwitchStrategy called but debug API not available');
     }
   }
 
