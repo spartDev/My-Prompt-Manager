@@ -16,13 +16,20 @@ import type { Locator, Page } from '@playwright/test';
  * - Contain assertions (tests do that)
  */
 export class PromptCard {
-  constructor(private readonly locator: Locator) {}
+  constructor(private readonly _locator: Locator) {}
 
   /**
    * Get the page this card belongs to
    */
   private get page(): Page {
-    return this.locator.page();
+    return this._locator.page();
+  }
+
+  /**
+   * Get the underlying locator for this card (for use in test assertions)
+   */
+  get locator(): Locator {
+    return this._locator;
   }
 
   // ==================
@@ -33,35 +40,35 @@ export class PromptCard {
    * Get the prompt title element
    */
   get title(): Locator {
-    return this.locator.getByTestId('prompt-card-title');
+    return this._locator.getByTestId('prompt-card-title');
   }
 
   /**
    * Get the category badge
    */
   get category(): Locator {
-    return this.locator.getByTestId('prompt-card-category-badge');
+    return this._locator.getByTestId('prompt-card-category-badge');
   }
 
   /**
    * Get the copy button
    */
   get copyButton(): Locator {
-    return this.locator.getByTestId('prompt-card-copy-button');
+    return this._locator.getByTestId('prompt-card-copy-button');
   }
 
   /**
    * Get the share button
    */
   get shareButton(): Locator {
-    return this.locator.getByTestId('prompt-card-share-button');
+    return this._locator.getByTestId('prompt-card-share-button');
   }
 
   /**
    * Get the more actions button
    */
   private get moreActionsButton(): Locator {
-    return this.locator.getByTestId('prompt-card-more-actions');
+    return this._locator.getByTestId('prompt-card-more-actions');
   }
 
   // ==================
@@ -72,7 +79,7 @@ export class PromptCard {
    * Click the card (opens preview or details)
    */
   async click(): Promise<void> {
-    await this.locator.click();
+    await this._locator.click();
   }
 
   /**
@@ -120,7 +127,7 @@ export class PromptCard {
    * Check if card is visible
    */
   async isVisible(): Promise<boolean> {
-    return this.locator.isVisible();
+    return this._locator.isVisible();
   }
 
   /**
@@ -141,6 +148,6 @@ export class PromptCard {
    * Get the prompt ID from data attribute
    */
   async getPromptId(): Promise<string> {
-    return (await this.locator.getAttribute('data-prompt-id')) || '';
+    return (await this._locator.getAttribute('data-prompt-id')) || '';
   }
 }

@@ -1,22 +1,23 @@
 import type { Locator } from '@playwright/test';
 
-import { expect } from '../fixtures/extension';
+import { PromptCard, SearchBar } from '../components';
 
 import { BasePage } from './BasePage';
 
 /**
  * Page Object Model for the main prompt library view
  * This is the primary interface users interact with
+ *
+ * Responsibilities:
+ * - Page-level navigation
+ * - Provide access to components (PromptCard, SearchBar, etc.)
+ * - Coordinate page-level actions
+ *
+ * Does NOT:
+ * - Contain assertions (tests do that)
+ * - Duplicate component methods (components handle their own interactions)
  */
 export class LibraryPage extends BasePage {
-  // Selectors
-  private readonly headingSelector = 'heading[name="My Prompt Manager"]';
-  private readonly addNewPromptButton = 'button[name="Add new prompt"]';
-  private readonly manageCategoriesButton = 'button[name="Manage categories"]';
-  private readonly settingsButton = 'button[name="Settings"]';
-  private readonly searchInput = 'input[placeholder="Search your prompts..."]';
-  private readonly categoryFilter = 'select';
-  private readonly promptCards = 'article';
 
 
   /**
@@ -24,7 +25,8 @@ export class LibraryPage extends BasePage {
    */
   async navigateToSettings(): Promise<void> {
     await this.page.getByRole('button', { name: 'Settings' }).click();
-    await expect(this.page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+    // Wait for settings page to load
+    await this.page.getByRole('heading', { name: 'Settings' }).waitFor({ state: 'visible' });
   }
 
   /**
@@ -32,15 +34,16 @@ export class LibraryPage extends BasePage {
    */
   async navigateToCategoryManager(): Promise<void> {
     await this.page.getByRole('button', { name: 'Manage categories' }).click();
-    await expect(this.page.getByRole('heading', { name: 'Manage Categories' })).toBeVisible();
+    // Wait for category manager to load
+    await this.page.getByRole('heading', { name: 'Manage Categories' }).waitFor({ state: 'visible' });
   }
 
   /**
    * Search for prompts using the search input
+   * Convenience method that delegates to SearchBar component
    */
   async searchPrompts(query: string): Promise<void> {
-    const searchField = this.page.getByPlaceholder('Search your prompts...');
-    await searchField.fill(query);
+    await this.searchBar().search(query);
     // Wait for search results to update
     await this.page.waitForLoadState('domcontentloaded');
   }
@@ -54,10 +57,11 @@ export class LibraryPage extends BasePage {
 
   /**
    * Clear all filters and search
+   * Convenience method that clears both category filter and search
    */
   async clearFilters(): Promise<void> {
     await this.page.locator('select').selectOption('');
-    await this.page.getByPlaceholder('Search your prompts...').clear();
+    await this.searchBar().clearByFill();
   }
 
   /**
@@ -67,79 +71,42 @@ export class LibraryPage extends BasePage {
     await this.page.getByRole('button', { name: 'Add new prompt' }).click();
   }
 
+  // ==================
+  // COMPONENT ACCESS
+  // ==================
+
   /**
-   * Get all prompt cards
+   * Get the SearchBar component instance
    */
-  getPromptCards(): Locator {
-    return this.page.locator('article');
+  searchBar(): SearchBar {
+    return new SearchBar(this.page);
   }
 
   /**
-   * Get a specific prompt card by title
+   * Get all prompt card elements as Locator (for counting, waiting, etc.)
    */
-  getPromptCard(title: string): Locator {
-    return this.page.locator('article').filter({ hasText: title }).first();
+  get promptCards(): Locator {
+    return this.page.getByTestId('prompt-card');
   }
 
   /**
-   * Expect the empty state to be visible
+   * Get a specific prompt card component by title
+   * Returns a PromptCard component instance for interaction
    */
-  async expectEmptyState(): Promise<void> {
-    await expect(this.page.getByText('No matches found')).toBeVisible();
+  promptCard(title: string): PromptCard {
+    const locator = this.page
+      .getByTestId('prompt-card')
+      .filter({ hasText: title })
+      .first();
+    return new PromptCard(locator);
   }
 
   /**
-   * Expect a specific number of prompts to be visible
+   * Get all prompt cards as component instances
    */
-  async expectPromptCount(count: number): Promise<void> {
-    await expect(this.getPromptCards()).toHaveCount(count);
+  async allPromptCards(): Promise<PromptCard[]> {
+    const locators = await this.page.getByTestId('prompt-card').all();
+    return locators.map(loc => new PromptCard(loc));
   }
 
-  /**
-   * Expect a specific prompt to be visible
-   */
-  async expectPromptVisible(title: string): Promise<void> {
-    const promptCard = this.getPromptCard(title);
-    await expect(promptCard).toBeVisible();
-  }
-
-  /**
-   * Expect the library heading to be visible (page loaded)
-   */
-  async expectLibraryLoaded(): Promise<void> {
-    await expect(this.page.getByRole('heading', { name: 'My Prompt Manager' })).toBeVisible();
-  }
-
-  /**
-   * Open actions menu for a specific prompt
-   */
-  async openPromptActionsMenu(promptTitle: string): Promise<void> {
-    const promptCard = this.getPromptCard(promptTitle);
-    await promptCard.getByRole('button', { name: 'More actions' }).click();
-  }
-
-  /**
-   * Click edit action for a specific prompt
-   */
-  async editPrompt(promptTitle: string): Promise<void> {
-    await this.openPromptActionsMenu(promptTitle);
-    await this.page.getByRole('menuitem', { name: 'Edit' }).click();
-  }
-
-  /**
-   * Click delete action for a specific prompt
-   */
-  async deletePrompt(promptTitle: string): Promise<void> {
-    await this.openPromptActionsMenu(promptTitle);
-    await this.page.getByRole('menuitem', { name: 'Delete' }).click();
-  }
-
-  /**
-   * Verify category count in the filter dropdown
-   */
-  async expectCategoryFilterOptions(categories: string[]): Promise<void> {
-    for (const category of categories) {
-      await expect(this.page.getByRole('option', { name: category })).toBeVisible();
-    }
-  }
 }

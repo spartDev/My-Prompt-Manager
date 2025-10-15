@@ -62,7 +62,7 @@ test.describe('User Journey: New User Setup & First Prompt Creation', () => {
       content: 'Please summarize the key points from this email and suggest appropriate actions:\n\n[EMAIL_CONTENT]',
       category: 'Work'
     });
-    await libraryPage.expectPromptVisible('Email Summary Template');
+    await expect(libraryPage.promptCard('Email Summary Template').locator).toBeVisible();
 
     // Step 4: Create another prompt in different category
     await libraryPage.clickAddNewPrompt();
@@ -71,23 +71,23 @@ test.describe('User Journey: New User Setup & First Prompt Creation', () => {
       content: 'Help me start a creative writing piece about [TOPIC]. Provide an engaging opening paragraph and suggest the tone and style.',
       category: 'Personal'
     });
-    await libraryPage.expectPromptVisible('Creative Writing Starter');
+    await expect(libraryPage.promptCard('Creative Writing Starter').locator).toBeVisible();
 
     // Step 5: Test category filtering
     // Filter by Work category
     await libraryPage.filterByCategory('Work');
-    await libraryPage.expectPromptVisible('Email Summary Template');
+    await expect(libraryPage.promptCard('Email Summary Template').locator).toBeVisible();
     await expect(sidepanelPage.getByText('Creative Writing Starter')).toBeHidden();
 
     // Filter by Personal category
     await libraryPage.filterByCategory('Personal');
-    await libraryPage.expectPromptVisible('Creative Writing Starter');
+    await expect(libraryPage.promptCard('Creative Writing Starter').locator).toBeVisible();
     await expect(sidepanelPage.getByText('Email Summary Template')).toBeHidden();
 
     // Reset to show all
     await libraryPage.clearFilters();
-    await libraryPage.expectPromptVisible('Email Summary Template');
-    await libraryPage.expectPromptVisible('Creative Writing Starter');
+    await expect(libraryPage.promptCard('Email Summary Template').locator).toBeVisible();
+    await expect(libraryPage.promptCard('Creative Writing Starter').locator).toBeVisible();
 
     // Step 6: Test prompt usage on Claude.ai (mocked)
     // Set up Claude.ai mocking
@@ -188,8 +188,8 @@ test.describe('User Journey: New User Setup & First Prompt Creation', () => {
     await sidepanelPage.bringToFront();
 
     // Verify all data is still there
-    await libraryPage.expectPromptVisible('Email Summary Template');
-    await libraryPage.expectPromptVisible('Creative Writing Starter');
+    await expect(libraryPage.promptCard('Email Summary Template').locator).toBeVisible();
+    await expect(libraryPage.promptCard('Creative Writing Starter').locator).toBeVisible();
 
     // Check categories are still available
     await categoryManagerPage.openFromLibrary();
@@ -206,7 +206,7 @@ test.describe('User Journey: New User Setup & First Prompt Creation', () => {
       content: 'Please review this code for:\n1. Best practices\n2. Potential bugs\n3. Performance improvements\n4. Security issues\n\nCode:\n[CODE_TO_REVIEW]',
       category: 'Work'
     });
-    await libraryPage.expectPromptVisible('Code Review Helper');
+    await expect(libraryPage.promptCard('Code Review Helper').locator).toBeVisible();
 
     // Final verification: User now has a functional prompt library
     // - 3 categories (including default)
@@ -214,14 +214,14 @@ test.describe('User Journey: New User Setup & First Prompt Creation', () => {
     // - Tested cross-platform integration
     // - Verified data persistence and filtering
 
-    await libraryPage.expectPromptCount(3);
+    await expect(libraryPage.promptCards).toHaveCount(3);
 
     // Verify category distribution
     await libraryPage.filterByCategory('Work');
-    await libraryPage.expectPromptCount(2); // Email + Code Review
+    await expect(libraryPage.promptCards).toHaveCount(2); // Email + Code Review
 
     await libraryPage.filterByCategory('Personal');
-    await libraryPage.expectPromptCount(1); // Creative Writing
+    await expect(libraryPage.promptCards).toHaveCount(1); // Creative Writing
   });
 
   test('should handle new user workflow with search functionality', async ({
@@ -266,22 +266,22 @@ test.describe('User Journey: New User Setup & First Prompt Creation', () => {
 
     // Test search functionality
     await libraryPage.searchPrompts('JavaScript');
-    await libraryPage.expectPromptVisible('JavaScript Debug Helper');
+    await expect(libraryPage.promptCard('JavaScript Debug Helper').locator).toBeVisible();
     await expect(sidepanelPage.getByText('Python Code Review')).toBeHidden();
     await expect(sidepanelPage.getByText('API Documentation')).toBeHidden();
 
     // Search by title
     await libraryPage.searchPrompts('Python');
-    await libraryPage.expectPromptVisible('Python Code Review');
+    await expect(libraryPage.promptCard('Python Code Review').locator).toBeVisible();
     await expect(sidepanelPage.getByText('JavaScript Debug Helper')).toBeHidden();
 
     // Search by content
     await libraryPage.searchPrompts('documentation');
-    await libraryPage.expectPromptVisible('API Documentation');
+    await expect(libraryPage.promptCard('API Documentation').locator).toBeVisible();
     await expect(sidepanelPage.getByText('JavaScript Debug Helper')).toBeHidden();
 
     // Clear search to show all
     await libraryPage.clearFilters();
-    await libraryPage.expectPromptCount(3);
+    await expect(libraryPage.promptCards).toHaveCount(3);
   });
 });
