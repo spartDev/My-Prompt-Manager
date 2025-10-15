@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 
 import type { AnalyticsEvent } from '../../types/analytics';
 import { AnalyticsManager } from '../analyticsManager';
+import { StorageManager } from '../storage';
 
 describe('AnalyticsManager', () => {
   let manager: AnalyticsManager;
@@ -32,15 +33,31 @@ describe('AnalyticsManager', () => {
   it('should maintain 90-day rolling window', async () => {
     const oldTimestamp = Date.now() - (91 * 24 * 60 * 60 * 1000);
 
-    // Manually insert old event
-    await manager.trackInsertion({
+    // Manually insert old event into storage
+    const storage = StorageManager.getInstance();
+    const oldEvent: AnalyticsEvent = {
+      id: 'old-event',
+      timestamp: oldTimestamp,
       promptId: 'old-prompt',
       categoryId: 'cat-1',
       platform: 'claude',
       source: 'browse'
+    };
+
+    await storage.set({
+      analytics: {
+        events: [oldEvent],
+        achievements: [],
+        stats: {
+          firstInsertionDate: oldTimestamp,
+          totalInsertions: 1,
+          currentStreak: 0,
+          longestStreak: 0
+        }
+      }
     });
 
-    // Trigger cleanup
+    // Trigger cleanup by tracking new event
     await manager.trackInsertion({
       promptId: 'new-prompt',
       categoryId: 'cat-2',
@@ -48,9 +65,11 @@ describe('AnalyticsManager', () => {
       source: 'search'
     });
 
+    // Verify old event was removed
     const data = await manager.getData();
-    // Old events should be removed
-    expect(data.events.every(e => e.timestamp > oldTimestamp)).toBe(true);
+    expect(data.events.find(e => e.id === 'old-event')).toBeUndefined();
+    expect(data.events.length).toBe(1);
+    expect(data.events[0].promptId).toBe('new-prompt');
   });
 
   it('should compute stats correctly', async () => {
