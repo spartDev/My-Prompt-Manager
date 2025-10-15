@@ -18,6 +18,7 @@ export interface Settings {
   sortOrder: 'createdAt' | 'updatedAt' | 'title';
   theme: 'light' | 'dark' | 'system';
   interfaceMode?: 'popup' | 'sidepanel';
+  analyticsEnabled?: boolean;
 }
 
 export interface StorageData {

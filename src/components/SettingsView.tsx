@@ -15,6 +15,7 @@ import AdvancedSection from './settings/AdvancedSection';
 import AppearanceSection from './settings/AppearanceSection';
 import DataStorageSection from './settings/DataStorageSection';
 import NotificationSection from './settings/NotificationSection';
+import PrivacySection from './settings/PrivacySection';
 import SiteIntegrationSection from './settings/SiteIntegrationSection';
 import ViewHeader from './ViewHeader';
 
@@ -136,17 +137,20 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
         ...(savedSettings ?? {})
       };
       setSettings(loadedSettings);
-      
+
       // Load interface mode
       const savedInterfaceMode = result.interfaceMode as 'popup' | 'sidepanel' | undefined;
       setInterfaceMode(savedInterfaceMode ?? (DEFAULT_SETTINGS.interfaceMode as 'popup' | 'sidepanel'));
-      
+
       // Load user settings (theme, view mode, etc.)
       const savedUserSettings = result.settings as UserSettings | undefined;
-      if (savedUserSettings) {
-        setUserSettings(savedUserSettings);
+      // Default analyticsEnabled to true if not set
+      const finalUserSettings = savedUserSettings ?? DEFAULT_SETTINGS;
+      if (finalUserSettings.analyticsEnabled === undefined) {
+        finalUserSettings.analyticsEnabled = true;
       }
-      
+      setUserSettings(finalUserSettings);
+
       // Load prompts and categories
       const [loadedPrompts, loadedCategories] = await Promise.all([
         storageManager.getPrompts(),
@@ -327,6 +331,24 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
     }
   };
 
+  // Handle analytics toggle
+  const handleAnalyticsChange = async (enabled: boolean) => {
+    try {
+      setSaving(true);
+      const updatedSettings = {
+        ...userSettings,
+        analyticsEnabled: enabled
+      } as UserSettings;
+
+      await storageManager.updateSettings(updatedSettings);
+      setUserSettings(updatedSettings);
+    } catch (error) {
+      Logger.error('Failed to update analytics setting', toError(error));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // Handle import data
   const handleImportData = async (data: { prompts: Prompt[]; categories: Category[] }) => {
     try {
@@ -456,6 +478,15 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
             onTestToast={(type) => {
               showToast(`This is a ${type} notification`, type);
             }}
+          />
+
+          <SectionSeparator />
+
+          {/* Privacy & Data Section */}
+          <PrivacySection
+            analyticsEnabled={userSettings?.analyticsEnabled ?? true}
+            onAnalyticsChange={(enabled) => void handleAnalyticsChange(enabled)}
+            saving={saving}
           />
 
           {/* Advanced Section */}

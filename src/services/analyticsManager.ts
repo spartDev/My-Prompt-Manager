@@ -38,8 +38,21 @@ export class AnalyticsManager {
     categoryId: string;
     platform: string;
     source: InsertionSource;
-  }): Promise<AnalyticsEvent> {
+  }): Promise<AnalyticsEvent | null> {
     try {
+      // Check if analytics is enabled
+      const storage = StorageManager.getInstance();
+      const data = await storage.get(['settings']);
+      const settings = (data.settings ?? {}) as { analyticsEnabled?: boolean };
+      const analyticsEnabled = settings.analyticsEnabled ?? true; // Default to enabled
+
+      if (!analyticsEnabled) {
+        Logger.debug('Analytics tracking skipped (disabled in settings)', {
+          component: 'AnalyticsManager'
+        });
+        return null;
+      }
+
       const event: AnalyticsEvent = {
         id: uuidv4(),
         timestamp: Date.now(),
