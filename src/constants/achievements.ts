@@ -105,7 +105,11 @@ export function getAchievementProgress(
   achievementId: string,
   currentValue: number
 ): number {
-  return currentValue;
+  const achievement = ACHIEVEMENT_DEFINITIONS.find(a => a.id === achievementId);
+  if (!achievement) {
+    return 0;
+  }
+  return Math.min(currentValue, achievement.requirement);
 }
 
 /**
