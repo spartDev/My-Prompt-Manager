@@ -424,6 +424,25 @@ export class StorageManager {
     }
   }
 
+  // Generic get/set methods for flexible data access (used by analytics, custom sites, etc.)
+  async get(keys: string | string[]): Promise<Record<string, unknown>> {
+    try {
+      const keyArray = Array.isArray(keys) ? keys : [keys];
+      const result = await chrome.storage.local.get(keyArray);
+      return result as Record<string, unknown>;
+    } catch (error) {
+      throw this.handleStorageError(error);
+    }
+  }
+
+  async set(items: Record<string, unknown>): Promise<void> {
+    try {
+      await chrome.storage.local.set(items);
+    } catch (error) {
+      throw this.handleStorageError(error);
+    }
+  }
+
   // Private helper methods
   private async getStorageData<T>(key: string): Promise<T | null> {
     const result = await chrome.storage.local.get([key]);
