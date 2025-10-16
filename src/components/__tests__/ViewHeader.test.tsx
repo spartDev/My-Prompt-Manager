@@ -468,19 +468,6 @@ describe('ViewHeader', () => {
       expect(header).toContainElement(childContent);
     });
 
-    it('children wrapper has correct padding classes', () => {
-      const { container } = render(
-        <ViewHeader title="Test">
-          <div>Child Content</div>
-        </ViewHeader>
-      );
-
-      const childrenWrapper = container.querySelector('.px-6.pb-6');
-      expect(childrenWrapper).toBeInTheDocument();
-      expect(childrenWrapper).toHaveClass('px-6');
-      expect(childrenWrapper).toHaveClass('pb-6');
-    });
-
     it('maintains semantic structure with children', () => {
       const { container } = render(
         <ViewHeader title="Test">

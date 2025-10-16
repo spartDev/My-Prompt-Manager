@@ -52,7 +52,7 @@ const LibraryView: FC<LibraryViewProps> = ({
           )}
         </ViewHeader.Actions>
         {/* Search and Filter */}
-        <div className="space-y-4" role="search" aria-label="Search and filter prompts">
+        <div className="space-y-4 pb-6" role="search" aria-label="Search and filter prompts">
           <div className="relative">
             <SearchBar
               value={query}
