@@ -54,6 +54,9 @@ coverage/
 test-results/
 playwright-report/
 
+# Git worktrees
+.worktrees/
+
 # Log files
 logs
 *.log

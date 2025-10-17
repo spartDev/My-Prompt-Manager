@@ -584,7 +584,7 @@ const ViewHeaderFC: FC<ViewHeaderProps> = ({
 
       {/* Children slot for additional content */}
       {otherChildren && (
-        <div className="px-6 pb-6">
+        <div className="px-6">
           {otherChildren}
         </div>
       )}
