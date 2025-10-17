@@ -1,12 +1,14 @@
-import { 
-  Prompt, 
-  VALIDATION_LIMITS, 
+import {
+  Prompt,
+  VALIDATION_LIMITS,
   DEFAULT_CATEGORY,
   ErrorType,
-  AppError 
+  AppError
 } from '../types';
 import { HighlightedPrompt, TextHighlight } from '../types/hooks';
 
+import { getSearchIndex } from './SearchIndex';
+import { smartSimilarity } from './SimilarityAlgorithms';
 import { StorageManager } from './storage';
 
 class PromptManagerError extends Error implements AppError {
@@ -96,20 +98,34 @@ export class PromptManager {
   }
 
   // Search functionality
-  async searchPrompts(query: string): Promise<Prompt[]> {
+  async searchPrompts(query: string, categoryFilter?: string): Promise<Prompt[]> {
     try {
+      // Empty query returns all prompts
       if (!query.trim()) {
-        return await this.storageManager.getPrompts();
+        const prompts = await this.storageManager.getPrompts();
+        return categoryFilter
+          ? prompts.filter(p => p.category === categoryFilter)
+          : prompts;
       }
 
+      // Get all prompts and build/update index
       const allPrompts = await this.storageManager.getPrompts();
-      const searchTerm = query.toLowerCase().trim();
+      const searchIndex = getSearchIndex();
 
-      return allPrompts.filter(prompt => 
-        prompt.title.toLowerCase().includes(searchTerm) ||
-        prompt.content.toLowerCase().includes(searchTerm) ||
-        prompt.category.toLowerCase().includes(searchTerm)
-      );
+      // Rebuild index if needed (first search or prompts changed)
+      if (searchIndex.needsRebuild(allPrompts)) {
+        searchIndex.buildIndex(allPrompts);
+      }
+
+      // Use indexed search for fast O(t + k) performance
+      const searchResults = searchIndex.search(query, {
+        maxResults: 1000,
+        minRelevance: 0.1,
+        categoryFilter
+      });
+
+      // Return prompts ordered by relevance
+      return searchResults.map(result => result.prompt);
     } catch (error) {
       throw this.handleError(error);
     }
@@ -395,49 +411,13 @@ export class PromptManager {
       return true;
     }
 
-    // Check for similar titles and content (simple similarity check)
-    const titleSimilarity = this.calculateStringSimilarity(prompt1.title, prompt2.title);
-    const contentSimilarity = this.calculateStringSimilarity(prompt1.content, prompt2.content);
-    
-    return titleSimilarity > 0.8 && contentSimilarity > 0.9;
-  }
+    // Use optimized smart similarity algorithm
+    // Uses different algorithms based on text length for optimal performance
+    const titleSimilarity = smartSimilarity(prompt1.title, prompt2.title, 0.8);
+    const contentSimilarity = smartSimilarity(prompt1.content, prompt2.content, 0.9);
 
-  private calculateStringSimilarity(str1: string, str2: string): number {
-    const longer = str1.length > str2.length ? str1 : str2;
-    const shorter = str1.length > str2.length ? str2 : str1;
-    
-    if (longer.length === 0) {
-      return 1.0; // Both strings are empty
-    }
-    
-    const editDistance = this.levenshteinDistance(longer, shorter);
-    return (longer.length - editDistance) / longer.length;
-  }
-
-  private levenshteinDistance(str1: string, str2: string): number {
-    const matrix: number[][] = Array.from({ length: str2.length + 1 }, () => 
-      Array.from({ length: str1.length + 1 }, () => 0)
-    );
-    
-    for (let i = 0; i <= str1.length; i++) {
-      matrix[0][i] = i;
-    }
-    for (let j = 0; j <= str2.length; j++) {
-      matrix[j][0] = j;
-    }
-    
-    for (let j = 1; j <= str2.length; j++) {
-      for (let i = 1; i <= str1.length; i++) {
-        const indicator = str1[i - 1] === str2[j - 1] ? 0 : 1;
-        matrix[j][i] = Math.min(
-          matrix[j][i - 1] + 1, // deletion
-          matrix[j - 1][i] + 1, // insertion
-          matrix[j - 1][i - 1] + indicator // substitution
-        );
-      }
-    }
-    
-    return matrix[str2.length][str1.length];
+    // smartSimilarity returns -1 if below threshold, otherwise returns score
+    return titleSimilarity >= 0.8 && contentSimilarity >= 0.9;
   }
 
   private handleError(error: unknown): PromptManagerError {
