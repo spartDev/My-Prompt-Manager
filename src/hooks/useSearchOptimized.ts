@@ -6,8 +6,9 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 
 import { getSearchIndex } from '../services/SearchIndex';
 import { Prompt } from '../types';
-import { HighlightedPrompt, TextHighlight } from '../types/hooks';
+import { HighlightedPrompt } from '../types/hooks';
 import { Logger, toError } from '../utils';
+import { findTextHighlights } from '../utils/textHighlight';
 
 /**
  * Debounce delay in milliseconds
@@ -224,31 +225,6 @@ function linearSearch(
       prompt.category.toLowerCase().includes(searchTerm)
     );
   });
-}
-
-/**
- * Find text highlights in a string
- */
-function findTextHighlights(text: string, searchTerm: string): TextHighlight[] {
-  const highlights: TextHighlight[] = [];
-  const lowerText = text.toLowerCase();
-  const lowerSearchTerm = searchTerm.toLowerCase();
-
-  let startIndex = 0;
-  let index = lowerText.indexOf(lowerSearchTerm, startIndex);
-
-  while (index !== -1) {
-    highlights.push({
-      start: index,
-      end: index + searchTerm.length,
-      text: text.substring(index, index + searchTerm.length)
-    });
-
-    startIndex = index + searchTerm.length;
-    index = lowerText.indexOf(lowerSearchTerm, startIndex);
-  }
-
-  return highlights;
 }
 
 /**

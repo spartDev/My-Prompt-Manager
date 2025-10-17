@@ -5,7 +5,8 @@ import {
   ErrorType,
   AppError
 } from '../types';
-import { HighlightedPrompt, TextHighlight } from '../types/hooks';
+import { HighlightedPrompt } from '../types/hooks';
+import { findTextHighlights } from '../utils/textHighlight';
 
 import { getSearchIndex } from './SearchIndex';
 import { smartSimilarity } from './SimilarityAlgorithms';
@@ -147,8 +148,8 @@ export class PromptManager {
 
       return searchResults.map(prompt => ({
         ...prompt,
-        titleHighlights: this.findTextHighlights(prompt.title, searchTerm),
-        contentHighlights: this.findTextHighlights(prompt.content, searchTerm)
+        titleHighlights: findTextHighlights(prompt.title, searchTerm),
+        contentHighlights: findTextHighlights(prompt.content, searchTerm)
       }));
     } catch (error) {
       throw this.handleError(error);
@@ -383,28 +384,6 @@ export class PromptManager {
   }
 
   // Private helper methods
-  private findTextHighlights(text: string, searchTerm: string): TextHighlight[] {
-    const highlights: TextHighlight[] = [];
-    const lowerText = text.toLowerCase();
-    const lowerSearchTerm = searchTerm.toLowerCase();
-    
-    let startIndex = 0;
-    let index = lowerText.indexOf(lowerSearchTerm, startIndex);
-    
-    while (index !== -1) {
-      highlights.push({
-        start: index,
-        end: index + searchTerm.length,
-        text: text.substring(index, index + searchTerm.length)
-      });
-      
-      startIndex = index + searchTerm.length;
-      index = lowerText.indexOf(lowerSearchTerm, startIndex);
-    }
-    
-    return highlights;
-  }
-
   private areSimilarPrompts(prompt1: Prompt, prompt2: Prompt): boolean {
     // Check for exact content match
     if (prompt1.content.trim() === prompt2.content.trim()) {
