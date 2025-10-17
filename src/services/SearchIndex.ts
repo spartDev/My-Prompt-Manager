@@ -313,6 +313,9 @@ export class SearchIndex {
 
   /**
    * Check if index needs rebuilding
+   *
+   * IMPORTANT: This must detect changes even when importing older backups
+   * where timestamps go backward (common scenario that broke previous implementation)
    */
   needsRebuild(prompts: Prompt[]): boolean {
     // Rebuild if prompt count doesn't match
@@ -320,9 +323,47 @@ export class SearchIndex {
       return true;
     }
 
-    // Rebuild if any prompt has been modified since last index
+    // Fast path: check if any prompt has been modified since last index
     const lastUpdated = this.index.metadata.lastUpdated;
-    return prompts.some(prompt => prompt.updatedAt > lastUpdated);
+    const hasNewerPrompts = prompts.some(prompt => prompt.updatedAt > lastUpdated);
+    if (hasNewerPrompts) {
+      return true;
+    }
+
+    // CRITICAL: Check if prompt IDs have changed (handles backup/restore with older timestamps)
+    // This catches the case where user imports a backup with same count but different prompts
+    const currentIds = new Set(prompts.map(p => p.id));
+    const indexedIds = new Set(this.index.prompts.keys());
+
+    // If any ID is missing from index or index has IDs not in current set, rebuild
+    if (currentIds.size !== indexedIds.size) {
+      return true;
+    }
+
+    for (const id of currentIds) {
+      if (!indexedIds.has(id)) {
+        return true; // New prompt ID found
+      }
+    }
+
+    // Check if any indexed prompt content has changed (handles same ID, different content)
+    for (const prompt of prompts) {
+      const indexedPrompt = this.index.prompts.get(prompt.id);
+      if (!indexedPrompt) {
+        return true; // Should never happen due to above check, but defensive
+      }
+
+      // Check if content has changed (title, content, or category)
+      if (
+        indexedPrompt.title !== prompt.title ||
+        indexedPrompt.content !== prompt.content ||
+        indexedPrompt.category !== prompt.category
+      ) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   /**
