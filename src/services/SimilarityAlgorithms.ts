@@ -323,17 +323,22 @@ export function smartSimilarity(
   }
 
   // Choose algorithm based on string characteristics
+  let similarity: number;
+
   if (maxLen < 100) {
     // Short strings: use Jaro-Winkler (fast, good for typos)
-    return jaroWinklerSimilarity(str1, str2);
+    similarity = jaroWinklerSimilarity(str1, str2);
   } else if (maxLen < 1000) {
-    // Medium strings: use optimized Levenshtein
+    // Medium strings: use optimized Levenshtein (handles threshold internally)
     return calculateSimilarityOptimized(str1, str2, threshold);
   } else if (maxLen < 10000) {
     // Long strings: use cosine similarity with trigrams
-    return cosineSimilarity(str1, str2, 3);
+    similarity = cosineSimilarity(str1, str2, 3);
   } else {
     // Very long strings: use hash-based similarity
-    return hashBasedSimilarity(str1, str2, 200);
+    similarity = hashBasedSimilarity(str1, str2, 200);
   }
+
+  // Apply threshold check for algorithms that don't handle it internally
+  return similarity < threshold ? -1 : similarity;
 }

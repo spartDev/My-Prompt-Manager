@@ -7,6 +7,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { getSearchIndex } from '../services/SearchIndex';
 import { Prompt } from '../types';
 import { HighlightedPrompt, TextHighlight } from '../types/hooks';
+import { Logger, toError } from '../utils';
 
 /**
  * Debounce delay in milliseconds
@@ -22,9 +23,16 @@ const DEFAULT_DEBOUNCE_DELAY = 300;
  * @returns Debounced value
  */
 export function useDebounce<T>(value: T, delay: number = DEFAULT_DEBOUNCE_DELAY): T {
+  // If delay is 0, return value immediately without debouncing
   const [debouncedValue, setDebouncedValue] = useState<T>(value);
 
   useEffect(() => {
+    // If delay is 0, update immediately (for testing)
+    if (delay === 0) {
+      setDebouncedValue(value);
+      return;
+    }
+
     // Set up the timeout
     const timeoutId = setTimeout(() => {
       setDebouncedValue(value);
@@ -36,7 +44,8 @@ export function useDebounce<T>(value: T, delay: number = DEFAULT_DEBOUNCE_DELAY)
     };
   }, [value, delay]);
 
-  return debouncedValue;
+  // Return value directly if delay is 0 (synchronous behavior for tests)
+  return delay === 0 ? value : debouncedValue;
 }
 
 /**
@@ -109,8 +118,8 @@ export function useSearchOptimized(
   // Get search index instance
   const searchIndex = useMemo(() => getSearchIndex(), []);
 
-  // Build/rebuild index when prompts change
-  useEffect(() => {
+  // Build/rebuild index when prompts change (using useMemo for synchronous execution)
+  useMemo(() => {
     if (!enableIndexing) {return;}
 
     const startTime = performance.now();
@@ -121,10 +130,12 @@ export function useSearchOptimized(
     }
 
     const buildTime = performance.now() - startTime;
-    if (buildTime > 10 && process.env.NODE_ENV === 'development') {
-      // Only log in development mode
-      // eslint-disable-next-line no-console
-      console.debug('[Search] Index build/check took', buildTime.toFixed(2), 'ms');
+    if (buildTime > 10) {
+      Logger.debug('Search index rebuild completed', {
+        component: 'useSearchOptimized',
+        buildTimeMs: buildTime.toFixed(2),
+        promptCount: prompts.length
+      });
     }
   }, [prompts, enableIndexing, searchIndex]);
 
@@ -358,8 +369,11 @@ export function useSearchState(
   useEffect(() => {
     try {
       localStorage.setItem(storageKey, query);
-    } catch (error) {
-      console.error('Failed to persist search query:', error);
+    } catch (err) {
+      Logger.error('Failed to persist search query', toError(err), {
+        component: 'useSearchState',
+        storageKey
+      });
     }
   }, [query, storageKey]);
 

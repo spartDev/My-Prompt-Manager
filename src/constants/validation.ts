@@ -11,8 +11,9 @@ export const MAX_TITLE_LENGTH = 100;
 /**
  * Maximum length for prompt content field
  * Used in: AddPromptForm, EditPromptForm
+ * Updated to 20K to match backend VALIDATION_LIMITS.PROMPT_CONTENT_MAX
  */
-export const MAX_CONTENT_LENGTH = 10_000;
+export const MAX_CONTENT_LENGTH = 20_000;
 
 /**
  * Maximum length for category name
