@@ -11,7 +11,12 @@ interface StorageWarningProps {
 }
 
 const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
-  const [storageInfo, setStorageInfo] = useState<{ used: number; total: number } | null>(null);
+  const [storageInfo, setStorageInfo] = useState<{
+    used: number;
+    total: number;
+    percentage: number;
+    warningLevel: 'safe' | 'warning' | 'critical' | 'danger';
+  } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
 
@@ -19,7 +24,7 @@ const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
     const loadStorageInfo = async () => {
       try {
         const storageManager = StorageManager.getInstance();
-        const info = await storageManager.getStorageUsage();
+        const info = await storageManager.getStorageUsageWithWarnings();
         setStorageInfo(info);
       } catch (error) {
         Logger.error('Failed to load storage info', toError(error));
@@ -55,11 +60,6 @@ const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
     setShowClearConfirm(false);
   };
 
-  const getUsagePercentage = () => {
-    if (!storageInfo) {return 0;}
-    return Math.round((storageInfo.used / storageInfo.total) * 100);
-  };
-
   const formatBytes = (bytes: number) => {
     if (bytes === 0) {return '0 Bytes';}
     const k = 1024;
@@ -68,9 +68,30 @@ const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
     return String(parseFloat((bytes / Math.pow(k, i)).toFixed(2))) + ' ' + sizes[i];
   };
 
-  const usagePercentage = getUsagePercentage();
-  const isNearLimit = usagePercentage >= 80;
-  const isAtLimit = usagePercentage >= 95;
+  const usagePercentage = storageInfo?.percentage ?? 0;
+  const warningLevel = storageInfo?.warningLevel ?? 'safe';
+
+  // Map warning levels to colors and states
+  const isAtLimit = warningLevel === 'danger';
+  const isCritical = warningLevel === 'critical' || warningLevel === 'danger';
+
+  const getProgressBarColor = () => {
+    switch (warningLevel) {
+      case 'danger': return 'bg-red-500';
+      case 'critical': return 'bg-orange-500';
+      case 'warning': return 'bg-yellow-500';
+      default: return 'bg-green-500';
+    }
+  };
+
+  const getIconColor = () => {
+    switch (warningLevel) {
+      case 'danger': return 'text-red-500';
+      case 'critical': return 'text-orange-500';
+      case 'warning': return 'text-yellow-500';
+      default: return 'text-green-500';
+    }
+  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -79,7 +100,7 @@ const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
         <div className="flex items-center mb-4">
           <div className="flex-shrink-0">
             <svg
-              className={`h-8 w-8 ${isAtLimit ? 'text-red-500' : 'text-yellow-500'}`}
+              className={`h-8 w-8 ${getIconColor()}`}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -94,7 +115,7 @@ const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
           </div>
           <div className="ml-3">
             <h3 className="text-lg font-medium text-gray-900">
-              {isAtLimit ? 'Storage Limit Reached' : 'Storage Warning'}
+              {isAtLimit ? 'Storage Limit Reached' : isCritical ? 'Critical Storage Warning' : 'Storage Warning'}
             </h3>
           </div>
         </div>
@@ -109,9 +130,7 @@ const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
             
             <div className="w-full bg-gray-200 rounded-full h-2.5">
               <div
-                className={`h-2.5 rounded-full ${
-                  isAtLimit ? 'bg-red-500' : isNearLimit ? 'bg-yellow-500' : 'bg-green-500'
-                }`}
+                className={`h-2.5 rounded-full ${getProgressBarColor()}`}
                 style={{ width: `${String(Math.min(usagePercentage, 100))}%` }}
               />
             </div>
@@ -126,15 +145,25 @@ const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
         {/* Warning Message */}
         <div className="mb-6">
           <p className="text-sm text-gray-700">
-            {isAtLimit ? (
+            {warningLevel === 'danger' ? (
               <>
-                Your storage is full. You won&apos;t be able to save new prompts until you free up space.
+                Your storage is full ({Math.round(usagePercentage)}% used). You won&apos;t be able to save new prompts until you free up space.
                 Consider deleting old prompts or clearing all data.
+              </>
+            ) : warningLevel === 'critical' ? (
+              <>
+                Your storage is critically low ({Math.round(usagePercentage)}% used).
+                You may encounter issues saving new prompts soon. Please delete unused prompts to free up space.
+              </>
+            ) : warningLevel === 'warning' ? (
+              <>
+                Your storage is getting low ({Math.round(usagePercentage)}% used).
+                Consider managing your prompts to free up space before reaching the limit.
               </>
             ) : (
               <>
-                Your storage is nearly full ({usagePercentage}% used). 
-                Consider managing your prompts to free up space.
+                Your storage usage is at {Math.round(usagePercentage)}%.
+                You have plenty of space available.
               </>
             )}
           </p>

@@ -383,10 +383,43 @@ export class StorageManager {
     try {
       const usage = await chrome.storage.local.getBytesInUse();
       const quota = chrome.storage.local.QUOTA_BYTES;
-      
+
       return {
         used: usage,
         total: quota
+      };
+    } catch (error) {
+      throw this.handleStorageError(error);
+    }
+  }
+
+  async getStorageUsageWithWarnings(): Promise<{
+    used: number;
+    total: number;
+    percentage: number;
+    warningLevel: 'safe' | 'warning' | 'critical' | 'danger';
+  }> {
+    try {
+      const usage = await chrome.storage.local.getBytesInUse();
+      const quota = chrome.storage.local.QUOTA_BYTES;
+      const percentage = (usage / quota) * 100;
+
+      let warningLevel: 'safe' | 'warning' | 'critical' | 'danger';
+      if (percentage < 70) {
+        warningLevel = 'safe';
+      } else if (percentage < 85) {
+        warningLevel = 'warning';
+      } else if (percentage < 95) {
+        warningLevel = 'critical';
+      } else {
+        warningLevel = 'danger';
+      }
+
+      return {
+        used: usage,
+        total: quota,
+        percentage,
+        warningLevel
       };
     } catch (error) {
       throw this.handleStorageError(error);
@@ -405,20 +438,41 @@ export class StorageManager {
   async importData(jsonData: string): Promise<void> {
     try {
       const data = JSON.parse(jsonData) as unknown;
-      
-      // Validate imported data structure
+
+      // Validate imported data structure FIRST
       if (!this.validateImportedData(data)) {
         throw new Error('Invalid data format');
       }
 
-      // Clear existing data and import new data
-      await this.clearAllData();
-      
-      await Promise.all([
-        this.setStorageData(this.STORAGE_KEYS.PROMPTS, data.prompts),
-        this.setStorageData(this.STORAGE_KEYS.CATEGORIES, data.categories),
-        this.setStorageData(this.STORAGE_KEYS.SETTINGS, data.settings)
-      ]);
+      // Create backup of existing data before clearing
+      const backup = await this.getAllData();
+
+      try {
+        // Clear existing data and import new data
+        await this.clearAllData();
+
+        await Promise.all([
+          this.setStorageData(this.STORAGE_KEYS.PROMPTS, data.prompts),
+          this.setStorageData(this.STORAGE_KEYS.CATEGORIES, data.categories),
+          this.setStorageData(this.STORAGE_KEYS.SETTINGS, data.settings)
+        ]);
+      } catch (importError) {
+        // Rollback: restore backup if import fails
+        try {
+          await Promise.all([
+            this.setStorageData(this.STORAGE_KEYS.PROMPTS, backup.prompts),
+            this.setStorageData(this.STORAGE_KEYS.CATEGORIES, backup.categories),
+            this.setStorageData(this.STORAGE_KEYS.SETTINGS, backup.settings)
+          ]);
+        } catch (rollbackError) {
+          // If rollback fails, throw error with both details
+          throw new Error(
+            `Import failed and rollback encountered an error. Original error: ${importError instanceof Error ? importError.message : String(importError)}. Rollback error: ${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}`
+          );
+        }
+        // Re-throw the original import error after successful rollback
+        throw importError;
+      }
     } catch (error) {
       throw this.handleStorageError(error);
     }
