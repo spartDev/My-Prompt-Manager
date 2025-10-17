@@ -1,15 +1,20 @@
 import { v4 as uuidv4 } from 'uuid';
 
-import { 
-  Prompt, 
-  Category, 
-  Settings, 
-  StorageData, 
-  DEFAULT_SETTINGS, 
+import {
+  Prompt,
+  Category,
+  Settings,
+  StorageData,
+  DEFAULT_SETTINGS,
   DEFAULT_CATEGORY,
   ErrorType,
-  AppError 
+  AppError
 } from '../types';
+import {
+  checkQuotaAvailability,
+  estimatePromptSize,
+  estimatePromptsArraySize
+} from '../utils/storageQuota';
 
 class StorageError extends Error implements AppError {
   public type: ErrorType;
@@ -47,6 +52,10 @@ export class StorageManager {
   async savePrompt(prompt: Omit<Prompt, 'id' | 'createdAt' | 'updatedAt'>): Promise<Prompt> {
     return this.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
       try {
+        // Proactive quota check BEFORE attempting write
+        const estimatedSize = estimatePromptSize(prompt.title, prompt.content, prompt.category);
+        await this.checkQuotaBeforeWrite(estimatedSize);
+
         const newPrompt: Prompt = {
           ...prompt,
           id: uuidv4(),
@@ -56,7 +65,7 @@ export class StorageManager {
 
         const existingPrompts = await this.getPrompts();
         const updatedPrompts = [...existingPrompts, newPrompt];
-        
+
         await this.setStorageData(this.STORAGE_KEYS.PROMPTS, updatedPrompts);
         return newPrompt;
       } catch (error) {
@@ -79,7 +88,7 @@ export class StorageManager {
       try {
         const existingPrompts = await this.getPrompts();
         const promptIndex = existingPrompts.findIndex(p => p.id === id);
-        
+
         if (promptIndex === -1) {
           throw new Error(`Prompt with id ${id} not found`);
         }
@@ -90,9 +99,20 @@ export class StorageManager {
           updatedAt: Date.now()
         };
 
+        // Check if update would increase size (content/title getting longer)
+        const oldPrompt = existingPrompts[promptIndex];
+        const oldSize = estimatePromptSize(oldPrompt.title, oldPrompt.content, oldPrompt.category);
+        const newSize = estimatePromptSize(updatedPrompt.title, updatedPrompt.content, updatedPrompt.category);
+        const sizeDelta = newSize - oldSize;
+
+        // Only check quota if size is increasing
+        if (sizeDelta > 0) {
+          await this.checkQuotaBeforeWrite(sizeDelta);
+        }
+
         existingPrompts[promptIndex] = updatedPrompt;
         await this.setStorageData(this.STORAGE_KEYS.PROMPTS, existingPrompts);
-        
+
         return updatedPrompt;
       } catch (error) {
         throw this.handleStorageError(error);
@@ -147,9 +167,18 @@ export class StorageManager {
       try {
         const existingPrompts = await this.getPrompts();
         const existingIndex = existingPrompts.findIndex(p => p.id === prompt.id);
-        
+
         if (existingIndex >= 0) {
-          // Update existing prompt, preserving original timestamps if they exist
+          // Update existing prompt - check quota if size is increasing
+          const oldPrompt = existingPrompts[existingIndex];
+          const oldSize = estimatePromptSize(oldPrompt.title, oldPrompt.content, oldPrompt.category);
+          const newSize = estimatePromptSize(prompt.title, prompt.content, prompt.category);
+          const sizeDelta = newSize - oldSize;
+
+          if (sizeDelta > 0) {
+            await this.checkQuotaBeforeWrite(sizeDelta);
+          }
+
           const updatedPrompt: Prompt = {
             ...prompt,
             updatedAt: Date.now() // Update the modification time
@@ -158,7 +187,10 @@ export class StorageManager {
           await this.setStorageData(this.STORAGE_KEYS.PROMPTS, existingPrompts);
           return updatedPrompt;
         } else {
-          // Add new prompt, preserving original timestamps if they exist
+          // Add new prompt - check quota for full size
+          const promptSize = estimatePromptSize(prompt.title, prompt.content, prompt.category);
+          await this.checkQuotaBeforeWrite(promptSize);
+
           const newPrompt: Prompt = {
             ...prompt,
             // Use provided timestamps or set current time as fallback
@@ -444,6 +476,15 @@ export class StorageManager {
         throw new Error('Invalid data format');
       }
 
+      // Proactive quota check BEFORE clearing data
+      // Estimate total size of imported data
+      const estimatedPromptsSize = estimatePromptsArraySize(data.prompts);
+      const estimatedCategoriesSize = data.categories.length * 100; // Rough estimate
+      const estimatedSettingsSize = 500; // Settings overhead
+      const totalEstimatedSize = estimatedPromptsSize + estimatedCategoriesSize + estimatedSettingsSize;
+
+      await this.checkQuotaBeforeWrite(totalEstimatedSize);
+
       // Create backup of existing data before clearing
       const backup = await this.getAllData();
 
@@ -486,6 +527,43 @@ export class StorageManager {
 
   private async setStorageData(key: string, data: unknown): Promise<void> {
     await chrome.storage.local.set({ [key]: data });
+  }
+
+  /**
+   * Check if there's enough storage quota before performing a write operation
+   * Throws an error if quota would be exceeded
+   *
+   * @param estimatedSize Estimated size of data to be written (in bytes)
+   * @throws StorageError if quota check fails
+   */
+  private async checkQuotaBeforeWrite(estimatedSize: number): Promise<void> {
+    try {
+      const usage = await chrome.storage.local.getBytesInUse();
+      const quota = chrome.storage.local.QUOTA_BYTES;
+
+      const quotaCheck = checkQuotaAvailability(estimatedSize, usage, quota);
+
+      if (!quotaCheck.canWrite) {
+        throw new StorageError({
+          type: ErrorType.STORAGE_QUOTA_EXCEEDED,
+          message: quotaCheck.reason || 'Storage quota would be exceeded by this operation.',
+          details: {
+            estimatedSize,
+            currentUsage: usage,
+            totalQuota: quota,
+            available: quotaCheck.available,
+            percentageAfterWrite: quotaCheck.percentageAfterWrite
+          }
+        });
+      }
+    } catch (error) {
+      // If it's already a StorageError, re-throw it
+      if (error instanceof StorageError) {
+        throw error;
+      }
+      // Otherwise, wrap it
+      throw this.handleStorageError(error);
+    }
   }
 
   // Mutex implementation for preventing race conditions
