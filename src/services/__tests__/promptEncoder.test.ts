@@ -108,7 +108,7 @@ describe('PromptEncoder', () => {
     it('should throw PromptEncoderError for oversized content', () => {
       const data = {
         title: 'Title',
-        content: 'x'.repeat(15_000),
+        content: 'x'.repeat(25_000),
         category: 'Category',
       };
       expect(() => validatePromptData(data)).toThrow('Content too long');
@@ -173,7 +173,7 @@ describe('PromptEncoder', () => {
     });
 
     it('should throw for oversized content', () => {
-      const prompt = createTestPrompt({ content: 'x'.repeat(15_000) });
+      const prompt = createTestPrompt({ content: 'x'.repeat(25_000) });
       expect(() => encode(prompt)).toThrow('too long');
     });
 
@@ -331,7 +331,7 @@ describe('PromptEncoder', () => {
     it('should handle maximum allowed sizes', () => {
       const prompt = createTestPrompt({
         title: 'x'.repeat(100),
-        content: 'y'.repeat(10_000),
+        content: 'y'.repeat(20_000),
         category: 'z'.repeat(50),
       });
       const encoded = encode(prompt);
@@ -357,14 +357,14 @@ describe('PromptEncoder', () => {
 
   describe('Decompression Bomb Protection', () => {
     it('should reject encoded strings exceeding size limit', () => {
-      const hugeString = 'x'.repeat(25_000);
+      const hugeString = 'x'.repeat(45_000);
       expect(() => decode(hugeString)).toThrow('Sharing code too large');
     });
 
     it('should reject payloads exceeding decompressed size limit', () => {
       const payload = {
         title: 'Title',
-        content: 'A'.repeat(11_000), // Over 10KB content limit
+        content: 'A'.repeat(25_000), // Over 20KB content limit
         category: 'Cat',
       };
       const encoded = LZString.compressToEncodedURIComponent(JSON.stringify(payload));
@@ -386,8 +386,8 @@ describe('PromptEncoder', () => {
 
     it('should accept maximum valid content', () => {
       const normalText = 'Lorem ipsum dolor sit amet. ';
-      const repetitions = Math.floor(10_000 / normalText.length);
-      const content = normalText.repeat(repetitions).substring(0, 10_000);
+      const repetitions = Math.floor(20_000 / normalText.length);
+      const content = normalText.repeat(repetitions).substring(0, 20_000);
 
       const prompt = createTestPrompt({
         title: 'Maximum Size Prompt',
@@ -398,8 +398,8 @@ describe('PromptEncoder', () => {
       const encoded = encode(prompt);
       const decoded = decode(encoded);
       expect(decoded.title).toBe('Maximum Size Prompt');
-      expect(decoded.content.length).toBeGreaterThanOrEqual(9900);
-      expect(decoded.content.length).toBeLessThanOrEqual(10_000);
+      expect(decoded.content.length).toBeGreaterThanOrEqual(19900);
+      expect(decoded.content.length).toBeLessThanOrEqual(20_000);
       expect(decoded.category).toBe('Test');
     });
 
