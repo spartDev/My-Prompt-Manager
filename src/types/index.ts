@@ -1,7 +1,7 @@
 export interface Prompt {
   id: string; // uuid-v4-string
   title: string; // max 100 chars
-  content: string; // max 10000 chars
+  content: string; // max 20000 chars
   category: string; // default: 'Uncategorized'
   createdAt: number; // timestamp
   updatedAt: number; // timestamp
@@ -135,7 +135,7 @@ export interface AppError {
 // Validation constants
 export const VALIDATION_LIMITS = {
   PROMPT_TITLE_MAX: 100,
-  PROMPT_CONTENT_MAX: 10000,
+  PROMPT_CONTENT_MAX: 20000,
   CATEGORY_NAME_MAX: 50,
   TITLE_GENERATION_LENGTH: 50
 } as const;
@@ -158,9 +158,9 @@ export interface SharedPromptData {
 
 export const PROMPT_SHARING_SIZE_LIMITS = {
   TITLE_MAX: 100,
-  CONTENT_MAX: 10_000,
+  CONTENT_MAX: 20_000,
   CATEGORY_MAX: 50,
-  ENCODED_MAX: 20_000,
+  ENCODED_MAX: 40_000,
 } as const;
 
 // Element Fingerprinting for robust element identification
