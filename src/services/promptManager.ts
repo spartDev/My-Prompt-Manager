@@ -353,28 +353,70 @@ export class PromptManager {
   }
 
   // Duplicate detection
-  async findDuplicatePrompts(): Promise<{ original: Prompt; duplicates: Prompt[] }[]> {
+  async findDuplicatePrompts(options?: {
+    timeoutMs?: number;
+    onProgress?: (progress: number, current: number, total: number) => void;
+  }): Promise<{ original: Prompt; duplicates: Prompt[] }[]> {
+    const { timeoutMs = 30000, onProgress } = options || {};
+
     try {
       const allPrompts = await this.storageManager.getPrompts();
       const duplicateGroups: { original: Prompt; duplicates: Prompt[] }[] = [];
       const processedIds = new Set<string>();
 
+      const startTime = performance.now();
+      const totalComparisons = (allPrompts.length * (allPrompts.length - 1)) / 2;
+      let completedComparisons = 0;
+
       for (let i = 0; i < allPrompts.length; i++) {
+        // Check timeout every outer loop iteration
+        if (performance.now() - startTime > timeoutMs) {
+          throw new PromptManagerError({
+            type: ErrorType.VALIDATION_ERROR,
+            message: `Duplicate detection timed out after ${String(timeoutMs)}ms. Try with fewer prompts or increase timeout.`,
+            details: {
+              processedPrompts: i,
+              totalPrompts: allPrompts.length,
+              foundDuplicates: duplicateGroups.length
+            }
+          });
+        }
+
         const prompt = allPrompts[i];
-        
+
         if (processedIds.has(prompt.id)) {
           continue;
         }
 
-        const duplicates = allPrompts.slice(i + 1).filter(other => 
-          !processedIds.has(other.id) && this.areSimilarPrompts(prompt, other)
-        );
+        const duplicates: Prompt[] = [];
+
+        // Compare with remaining prompts
+        for (let j = i + 1; j < allPrompts.length; j++) {
+          const other = allPrompts[j];
+
+          if (!processedIds.has(other.id) && this.areSimilarPrompts(prompt, other)) {
+            duplicates.push(other);
+          }
+
+          completedComparisons++;
+
+          // Report progress every 100 comparisons
+          if (onProgress && completedComparisons % 100 === 0) {
+            const progress = (completedComparisons / totalComparisons) * 100;
+            onProgress(progress, completedComparisons, totalComparisons);
+          }
+        }
 
         if (duplicates.length > 0) {
           duplicateGroups.push({ original: prompt, duplicates });
           processedIds.add(prompt.id);
           duplicates.forEach(dup => processedIds.add(dup.id));
         }
+      }
+
+      // Report 100% completion
+      if (onProgress) {
+        onProgress(100, totalComparisons, totalComparisons);
       }
 
       return duplicateGroups;
@@ -385,7 +427,18 @@ export class PromptManager {
 
   // Private helper methods
   private areSimilarPrompts(prompt1: Prompt, prompt2: Prompt): boolean {
-    // Check for exact content match
+    // Quick length-based rejection (saves expensive similarity calculations)
+    // If content lengths differ by more than 10%, can't be 90% similar
+    const len1 = prompt1.content.length;
+    const len2 = prompt2.content.length;
+    const minLen = Math.min(len1, len2);
+    const maxLen = Math.max(len1, len2);
+
+    if (minLen / maxLen < 0.9) {
+      return false;
+    }
+
+    // Check for exact content match (fast)
     if (prompt1.content.trim() === prompt2.content.trim()) {
       return true;
     }
@@ -393,10 +446,16 @@ export class PromptManager {
     // Use optimized smart similarity algorithm
     // Uses different algorithms based on text length for optimal performance
     const titleSimilarity = smartSimilarity(prompt1.title, prompt2.title, 0.8);
+
+    // Early exit if titles are too different (saves expensive content comparison)
+    if (titleSimilarity < 0.8) {
+      return false;
+    }
+
     const contentSimilarity = smartSimilarity(prompt1.content, prompt2.content, 0.9);
 
     // smartSimilarity returns -1 if below threshold, otherwise returns score
-    return titleSimilarity >= 0.8 && contentSimilarity >= 0.9;
+    return contentSimilarity >= 0.9;
   }
 
   private handleError(error: unknown): PromptManagerError {
