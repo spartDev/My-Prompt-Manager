@@ -477,13 +477,26 @@ export class StorageManager {
       }
 
       // Proactive quota check BEFORE clearing data
-      // Estimate total size of imported data
+      // Since we clear ALL existing data before import, check if import size
+      // fits within total quota (not current usage + import size)
       const estimatedPromptsSize = estimatePromptsArraySize(data.prompts);
       const estimatedCategoriesSize = data.categories.length * 100; // Rough estimate
       const estimatedSettingsSize = 500; // Settings overhead
       const totalEstimatedSize = estimatedPromptsSize + estimatedCategoriesSize + estimatedSettingsSize;
 
-      await this.checkQuotaBeforeWrite(totalEstimatedSize);
+      // Check against total quota since existing data will be cleared
+      const quota = chrome.storage.local.QUOTA_BYTES;
+      if (totalEstimatedSize > quota) {
+        throw new StorageError({
+          type: ErrorType.STORAGE_QUOTA_EXCEEDED,
+          message: `Import size (${Math.round(totalEstimatedSize / 1024).toString()} KB) exceeds storage quota (${Math.round(quota / 1024).toString()} KB).`,
+          details: {
+            estimatedSize: totalEstimatedSize,
+            totalQuota: quota,
+            percentageOfQuota: Math.round((totalEstimatedSize / quota) * 100)
+          }
+        });
+      }
 
       // Create backup of existing data before clearing
       const backup = await this.getAllData();
