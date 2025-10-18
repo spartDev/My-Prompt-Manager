@@ -145,8 +145,8 @@ export function useSearchOptimized(
     setIsSearching(query !== debouncedQuery);
   }, [query, debouncedQuery]);
 
-  // Perform search
-  const results = useMemo(() => {
+  // Perform search and compute stats (no state updates during render)
+  const searchResult = useMemo(() => {
     const startTime = performance.now();
 
     // Empty query returns all prompts (filtered by category if specified)
@@ -157,13 +157,14 @@ export function useSearchOptimized(
         filteredPrompts = prompts.filter(p => p.category === categoryFilter);
       }
 
-      setSearchStats({
-        resultCount: filteredPrompts.length,
-        searchTime: 0,
-        isIndexed: false
-      });
-
-      return filteredPrompts;
+      return {
+        results: filteredPrompts,
+        stats: {
+          resultCount: filteredPrompts.length,
+          searchTime: 0,
+          isIndexed: false
+        }
+      };
     }
 
     let searchResults: Prompt[];
@@ -186,17 +187,24 @@ export function useSearchOptimized(
 
     const searchTime = performance.now() - startTime;
 
-    setSearchStats({
-      resultCount: searchResults.length,
-      searchTime,
-      isIndexed
-    });
-
-    return searchResults;
+    return {
+      results: searchResults,
+      stats: {
+        resultCount: searchResults.length,
+        searchTime,
+        isIndexed
+      }
+    };
   }, [prompts, debouncedQuery, categoryFilter, enableIndexing, maxResults, minRelevance, searchIndex]);
 
+  // Update stats in effect (after render, not during)
+  // Using individual stat values as dependencies to avoid unnecessary re-renders
+  useEffect(() => {
+    setSearchStats(searchResult.stats);
+  }, [searchResult.stats.resultCount, searchResult.stats.searchTime, searchResult.stats.isIndexed]);
+
   return {
-    results,
+    results: searchResult.results,
     isSearching,
     searchStats
   };
