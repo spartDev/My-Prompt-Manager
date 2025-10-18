@@ -148,8 +148,16 @@ export class SearchIndex {
   }
 
   /**
-   * Search with inverted index
-   * Time: O(t + k) where t = query terms, k = matching prompts
+   * Search with inverted index and prefix matching
+   *
+   * Complexity:
+   * - Exact matches: O(t) where t = query terms
+   * - Prefix scan: O(t × V) where V = vocabulary size (~6K-12K typical)
+   * - Scoring: O(k × t) where k = matching prompts
+   * - Total: O(t × V + k × t)
+   *
+   * Performance: <2ms for realistic data (2000 prompts, 12K vocabulary)
+   * Storage limit (5MB) naturally bounds vocabulary, keeping searches fast.
    *
    * @param query Search query string
    * @param options Search options
