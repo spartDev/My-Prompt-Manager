@@ -160,7 +160,7 @@ export class SearchIndex {
    * Storage limit (5MB) naturally bounds vocabulary, keeping searches fast.
    *
    * @param query Search query string
-   * @param options Search options
+   * @param options Search options (including prompts for auto-rebuild)
    * @returns Array of search results sorted by relevance
    */
   search(
@@ -169,9 +169,15 @@ export class SearchIndex {
       maxResults?: number;
       minRelevance?: number;
       categoryFilter?: string;
+      prompts?: Prompt[]; // Optional: for auto-rebuild if index is stale
     } = {}
   ): SearchResult[] {
-    const { maxResults = 100, minRelevance = 0.1, categoryFilter } = options;
+    const { maxResults = 100, minRelevance = 0.1, categoryFilter, prompts } = options;
+
+    // Auto-rebuild index if prompts provided and index is stale
+    if (prompts && this.needsRebuild(prompts)) {
+      this.buildIndex(prompts);
+    }
 
     if (!query.trim()) {
       return [];

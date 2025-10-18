@@ -512,19 +512,38 @@ export class StorageManager {
         ]);
       } catch (importError) {
         // Rollback: restore backup if import fails
-        try {
-          await Promise.all([
-            this.setStorageData(this.STORAGE_KEYS.PROMPTS, backup.prompts),
-            this.setStorageData(this.STORAGE_KEYS.CATEGORIES, backup.categories),
-            this.setStorageData(this.STORAGE_KEYS.SETTINGS, backup.settings)
-          ]);
-        } catch (rollbackError) {
-          // If rollback fails, throw error with both details
+        // Use Promise.allSettled to ensure ALL rollback operations are attempted
+        // even if some fail, to maximize chances of data recovery
+        const rollbackResults = await Promise.allSettled([
+          this.setStorageData(this.STORAGE_KEYS.PROMPTS, backup.prompts),
+          this.setStorageData(this.STORAGE_KEYS.CATEGORIES, backup.categories),
+          this.setStorageData(this.STORAGE_KEYS.SETTINGS, backup.settings)
+        ]);
+
+        // Check if any rollback operations failed
+        const rollbackFailures = rollbackResults.filter(r => r.status === 'rejected');
+
+        if (rollbackFailures.length > 0) {
+          // Construct detailed error message with which operations failed
+          const failureDetails = rollbackResults
+            .map((result, index) => {
+              const keys = ['prompts', 'categories', 'settings'];
+              if (result.status === 'rejected') {
+                return `${keys[index]}: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`;
+              }
+              return null;
+            })
+            .filter(Boolean)
+            .join(', ');
+
           throw new Error(
-            `Import failed and rollback encountered an error. Original error: ${importError instanceof Error ? importError.message : String(importError)}. Rollback error: ${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}`
+            `Import failed and rollback partially failed (${rollbackFailures.length.toString()}/3 operations failed). ` +
+            `Original error: ${importError instanceof Error ? importError.message : String(importError)}. ` +
+            `Rollback failures: ${failureDetails}`
           );
         }
-        // Re-throw the original import error after successful rollback
+
+        // All rollback operations succeeded - re-throw the original import error
         throw importError;
       }
     } catch (error) {

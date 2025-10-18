@@ -119,8 +119,8 @@ export function useSearchOptimized(
   // Get search index instance
   const searchIndex = useMemo(() => getSearchIndex(), []);
 
-  // Build/rebuild index when prompts change (using useMemo for synchronous execution)
-  useMemo(() => {
+  // Build/rebuild index when prompts change (side effect in useEffect)
+  useEffect(() => {
     if (!enableIndexing) {return;}
 
     const startTime = performance.now();
@@ -171,11 +171,12 @@ export function useSearchOptimized(
     let isIndexed = false;
 
     if (enableIndexing) {
-      // Use indexed search
+      // Use indexed search (SearchIndex handles auto-rebuild internally)
       const indexResults = searchIndex.search(debouncedQuery, {
         maxResults,
         minRelevance,
-        categoryFilter: categoryFilter || undefined
+        categoryFilter: categoryFilter || undefined,
+        prompts // Pass prompts for auto-rebuild if needed
       });
 
       searchResults = indexResults.map(r => r.prompt);
