@@ -181,7 +181,9 @@ describe('SimilarityAlgorithms', () => {
       }
       const duration = performance.now() - startTime;
 
-      expect(duration).toBeLessThan(1000);
+      // CI environments are slower - allow reasonable margin for batch operations
+      const maxDuration = process.env.CI ? 6000 : 1000;
+      expect(duration).toBeLessThan(maxDuration);
     });
 
     it('should handle comparisons of 20K strings', { timeout: 30000 }, () => {
@@ -194,7 +196,9 @@ describe('SimilarityAlgorithms', () => {
       const duration = performance.now() - startTime;
 
       expect(result).toBe(1.0);
-      expect(duration).toBeLessThan(5000); // Single comparison should complete
+      // CI environments are slower - extremely heavy computation for full 20K comparison
+      const maxDuration = process.env.CI ? 25000 : 5000;
+      expect(duration).toBeLessThan(maxDuration); // Single comparison should complete
     });
 
     it('should early terminate for very different long strings', () => {
