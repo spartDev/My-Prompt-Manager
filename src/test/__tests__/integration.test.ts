@@ -126,7 +126,7 @@ describe('Integration Tests', () => {
 
     it('should validate data limits', async () => {
       const longTitle = 'a'.repeat(101); // Exceeds 100 char limit
-      const longContent = 'a'.repeat(10001); // Exceeds 10000 char limit
+      const longContent = 'a'.repeat(20001); // Exceeds 20000 char limit
 
       await expect(promptManager.createPrompt(longTitle, 'Content')).rejects.toThrow();
       await expect(promptManager.createPrompt('Title', longContent)).rejects.toThrow();

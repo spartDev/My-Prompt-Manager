@@ -1,12 +1,15 @@
-import { 
-  Prompt, 
-  VALIDATION_LIMITS, 
+import {
+  Prompt,
+  VALIDATION_LIMITS,
   DEFAULT_CATEGORY,
   ErrorType,
-  AppError 
+  AppError
 } from '../types';
-import { HighlightedPrompt, TextHighlight } from '../types/hooks';
+import { HighlightedPrompt } from '../types/hooks';
+import { findTextHighlights } from '../utils/textHighlight';
 
+import { getSearchIndex } from './SearchIndex';
+import { calculateSimilarityOptimized } from './SimilarityAlgorithms';
 import { StorageManager } from './storage';
 
 class PromptManagerError extends Error implements AppError {
@@ -96,20 +99,34 @@ export class PromptManager {
   }
 
   // Search functionality
-  async searchPrompts(query: string): Promise<Prompt[]> {
+  async searchPrompts(query: string, categoryFilter?: string): Promise<Prompt[]> {
     try {
+      // Empty query returns all prompts
       if (!query.trim()) {
-        return await this.storageManager.getPrompts();
+        const prompts = await this.storageManager.getPrompts();
+        return categoryFilter
+          ? prompts.filter(p => p.category === categoryFilter)
+          : prompts;
       }
 
+      // Get all prompts and build/update index
       const allPrompts = await this.storageManager.getPrompts();
-      const searchTerm = query.toLowerCase().trim();
+      const searchIndex = getSearchIndex();
 
-      return allPrompts.filter(prompt => 
-        prompt.title.toLowerCase().includes(searchTerm) ||
-        prompt.content.toLowerCase().includes(searchTerm) ||
-        prompt.category.toLowerCase().includes(searchTerm)
-      );
+      // Rebuild index if needed (first search or prompts changed)
+      if (searchIndex.needsRebuild(allPrompts)) {
+        searchIndex.buildIndex(allPrompts);
+      }
+
+      // Use indexed search for fast O(t + k) performance
+      const searchResults = searchIndex.search(query, {
+        maxResults: 1000,
+        minRelevance: 0.1,
+        categoryFilter
+      });
+
+      // Return prompts ordered by relevance
+      return searchResults.map(result => result.prompt);
     } catch (error) {
       throw this.handleError(error);
     }
@@ -131,8 +148,8 @@ export class PromptManager {
 
       return searchResults.map(prompt => ({
         ...prompt,
-        titleHighlights: this.findTextHighlights(prompt.title, searchTerm),
-        contentHighlights: this.findTextHighlights(prompt.content, searchTerm)
+        titleHighlights: findTextHighlights(prompt.title, searchTerm),
+        contentHighlights: findTextHighlights(prompt.content, searchTerm)
       }));
     } catch (error) {
       throw this.handleError(error);
@@ -336,28 +353,70 @@ export class PromptManager {
   }
 
   // Duplicate detection
-  async findDuplicatePrompts(): Promise<{ original: Prompt; duplicates: Prompt[] }[]> {
+  async findDuplicatePrompts(options?: {
+    timeoutMs?: number;
+    onProgress?: (progress: number, current: number, total: number) => void;
+  }): Promise<{ original: Prompt; duplicates: Prompt[] }[]> {
+    const { timeoutMs = 30000, onProgress } = options || {};
+
     try {
       const allPrompts = await this.storageManager.getPrompts();
       const duplicateGroups: { original: Prompt; duplicates: Prompt[] }[] = [];
       const processedIds = new Set<string>();
 
+      const startTime = performance.now();
+      const totalComparisons = (allPrompts.length * (allPrompts.length - 1)) / 2;
+      let completedComparisons = 0;
+
       for (let i = 0; i < allPrompts.length; i++) {
+        // Check timeout every outer loop iteration
+        if (performance.now() - startTime > timeoutMs) {
+          throw new PromptManagerError({
+            type: ErrorType.VALIDATION_ERROR,
+            message: `Duplicate detection timed out after ${String(timeoutMs)}ms. Try with fewer prompts or increase timeout.`,
+            details: {
+              processedPrompts: i,
+              totalPrompts: allPrompts.length,
+              foundDuplicates: duplicateGroups.length
+            }
+          });
+        }
+
         const prompt = allPrompts[i];
-        
+
         if (processedIds.has(prompt.id)) {
           continue;
         }
 
-        const duplicates = allPrompts.slice(i + 1).filter(other => 
-          !processedIds.has(other.id) && this.areSimilarPrompts(prompt, other)
-        );
+        const duplicates: Prompt[] = [];
+
+        // Compare with remaining prompts
+        for (let j = i + 1; j < allPrompts.length; j++) {
+          const other = allPrompts[j];
+
+          if (!processedIds.has(other.id) && this.areSimilarPrompts(prompt, other)) {
+            duplicates.push(other);
+          }
+
+          completedComparisons++;
+
+          // Report progress every 100 comparisons
+          if (onProgress && completedComparisons % 100 === 0) {
+            const progress = (completedComparisons / totalComparisons) * 100;
+            onProgress(progress, completedComparisons, totalComparisons);
+          }
+        }
 
         if (duplicates.length > 0) {
           duplicateGroups.push({ original: prompt, duplicates });
           processedIds.add(prompt.id);
           duplicates.forEach(dup => processedIds.add(dup.id));
         }
+      }
+
+      // Report 100% completion
+      if (onProgress) {
+        onProgress(100, totalComparisons, totalComparisons);
       }
 
       return duplicateGroups;
@@ -367,77 +426,35 @@ export class PromptManager {
   }
 
   // Private helper methods
-  private findTextHighlights(text: string, searchTerm: string): TextHighlight[] {
-    const highlights: TextHighlight[] = [];
-    const lowerText = text.toLowerCase();
-    const lowerSearchTerm = searchTerm.toLowerCase();
-    
-    let startIndex = 0;
-    let index = lowerText.indexOf(lowerSearchTerm, startIndex);
-    
-    while (index !== -1) {
-      highlights.push({
-        start: index,
-        end: index + searchTerm.length,
-        text: text.substring(index, index + searchTerm.length)
-      });
-      
-      startIndex = index + searchTerm.length;
-      index = lowerText.indexOf(lowerSearchTerm, startIndex);
-    }
-    
-    return highlights;
-  }
-
   private areSimilarPrompts(prompt1: Prompt, prompt2: Prompt): boolean {
-    // Check for exact content match
+    // Quick length-based rejection (saves expensive similarity calculations)
+    // If content lengths differ by more than 10%, can't be 90% similar
+    const len1 = prompt1.content.length;
+    const len2 = prompt2.content.length;
+    const minLen = Math.min(len1, len2);
+    const maxLen = Math.max(len1, len2);
+
+    if (minLen / maxLen < 0.9) {
+      return false;
+    }
+
+    // Check for exact content match (fast)
     if (prompt1.content.trim() === prompt2.content.trim()) {
       return true;
     }
 
-    // Check for similar titles and content (simple similarity check)
-    const titleSimilarity = this.calculateStringSimilarity(prompt1.title, prompt2.title);
-    const contentSimilarity = this.calculateStringSimilarity(prompt1.content, prompt2.content);
-    
-    return titleSimilarity > 0.8 && contentSimilarity > 0.9;
-  }
+    // Use optimized Levenshtein similarity algorithm
+    const titleSimilarity = calculateSimilarityOptimized(prompt1.title, prompt2.title, 0.8);
 
-  private calculateStringSimilarity(str1: string, str2: string): number {
-    const longer = str1.length > str2.length ? str1 : str2;
-    const shorter = str1.length > str2.length ? str2 : str1;
-    
-    if (longer.length === 0) {
-      return 1.0; // Both strings are empty
+    // Early exit if titles are too different (saves expensive content comparison)
+    if (titleSimilarity < 0.8) {
+      return false;
     }
-    
-    const editDistance = this.levenshteinDistance(longer, shorter);
-    return (longer.length - editDistance) / longer.length;
-  }
 
-  private levenshteinDistance(str1: string, str2: string): number {
-    const matrix: number[][] = Array.from({ length: str2.length + 1 }, () => 
-      Array.from({ length: str1.length + 1 }, () => 0)
-    );
-    
-    for (let i = 0; i <= str1.length; i++) {
-      matrix[0][i] = i;
-    }
-    for (let j = 0; j <= str2.length; j++) {
-      matrix[j][0] = j;
-    }
-    
-    for (let j = 1; j <= str2.length; j++) {
-      for (let i = 1; i <= str1.length; i++) {
-        const indicator = str1[i - 1] === str2[j - 1] ? 0 : 1;
-        matrix[j][i] = Math.min(
-          matrix[j][i - 1] + 1, // deletion
-          matrix[j - 1][i] + 1, // insertion
-          matrix[j - 1][i - 1] + indicator // substitution
-        );
-      }
-    }
-    
-    return matrix[str2.length][str1.length];
+    const contentSimilarity = calculateSimilarityOptimized(prompt1.content, prompt2.content, 0.9);
+
+    // calculateSimilarityOptimized returns -1 if below threshold, otherwise returns score
+    return contentSimilarity >= 0.9;
   }
 
   private handleError(error: unknown): PromptManagerError {

@@ -377,4 +377,218 @@ describe('StorageManager', () => {
         .rejects.toThrow('Invalid data format');
     });
   });
+
+  describe('Import Rollback Scenarios', () => {
+    it('should rollback to backup if import fails', async () => {
+      // Setup: Create initial data
+      const initialPrompts: Prompt[] = [{
+        id: '1',
+        title: 'Original Prompt',
+        content: 'Original Content',
+        category: DEFAULT_CATEGORY,
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      }];
+      mockStorage.prompts = initialPrompts;
+
+      // Mock: Make the import write fail after clearing
+      let callCount = 0;
+      vi.mocked(chrome.storage.local.set).mockImplementation((data) => {
+        callCount++;
+        // First call is clear (removing prompts), second call is the first write attempt
+        if (callCount === 2) {
+          return Promise.reject(new Error('Quota exceeded'));
+        }
+        Object.assign(mockStorage, data);
+        return Promise.resolve();
+      });
+
+      const importData = {
+        prompts: [{
+          id: '2',
+          title: 'New Prompt',
+          content: 'New Content',
+          category: DEFAULT_CATEGORY,
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        }],
+        categories: [{ id: '1', name: DEFAULT_CATEGORY }],
+        settings: { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt' }
+      };
+
+      // Verify: Import fails and data is rolled back
+      await expect(
+        storageManager.importData(JSON.stringify(importData))
+      ).rejects.toThrow('Quota exceeded');
+
+      // Verify: Original prompts are restored
+      const finalPrompts = await storageManager.getPrompts();
+      expect(finalPrompts).toEqual(initialPrompts);
+    });
+
+    it('should report partial rollback failures with detailed error', async () => {
+      // Setup: Create initial data
+      const initialPrompts: Prompt[] = [{
+        id: '1',
+        title: 'Original Prompt',
+        content: 'Original Content',
+        category: DEFAULT_CATEGORY,
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      }];
+      mockStorage.prompts = initialPrompts;
+
+      // Mock: Make import fail AND make rollback partially fail
+      let callCount = 0;
+      vi.mocked(chrome.storage.local.set).mockImplementation((data) => {
+        callCount++;
+
+        // Import phase: second call fails (after clear)
+        if (callCount === 2) {
+          return Promise.reject(new Error('Import quota exceeded'));
+        }
+
+        // Rollback phase: fail the categories restore (4th call)
+        // Call order: 1=prompts write, 2=fails, 3=prompts restore, 4=categories restore, 5=settings restore
+        if (callCount === 4) {
+          return Promise.reject(new Error('Rollback quota exceeded'));
+        }
+
+        Object.assign(mockStorage, data);
+        return Promise.resolve();
+      });
+
+      const importData = {
+        prompts: [{
+          id: '2',
+          title: 'New Prompt',
+          content: 'New Content',
+          category: DEFAULT_CATEGORY,
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        }],
+        categories: [{ id: '1', name: DEFAULT_CATEGORY }],
+        settings: { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt' }
+      };
+
+      // Verify: Import fails with detailed rollback error
+      await expect(
+        storageManager.importData(JSON.stringify(importData))
+      ).rejects.toThrow(/rollback partially failed.*1\/3 operations failed/);
+
+      // Verify error message contains specific failure details
+      try {
+        await storageManager.importData(JSON.stringify(importData));
+      } catch (error) {
+        expect((error as Error).message).toContain('categories: Rollback quota exceeded');
+        expect((error as Error).message).toContain('Original error: Import quota exceeded');
+      }
+    });
+
+    it('should successfully rollback all data when all operations succeed', async () => {
+      // Setup: Create complete initial data
+      const initialPrompts: Prompt[] = [{
+        id: '1',
+        title: 'Original Prompt',
+        content: 'Original Content',
+        category: DEFAULT_CATEGORY,
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      }];
+      const initialCategories: Category[] = [
+        { id: 'cat1', name: 'Work' },
+        { id: 'default', name: DEFAULT_CATEGORY }
+      ];
+      const initialSettings = { defaultCategory: 'Work', sortOrder: 'createdAt' };
+
+      mockStorage.prompts = initialPrompts;
+      mockStorage.categories = initialCategories;
+      mockStorage.settings = initialSettings;
+
+      // Mock: Make import fail but rollback succeed
+      let callCount = 0;
+      vi.mocked(chrome.storage.local.set).mockImplementation((data) => {
+        callCount++;
+
+        // Import phase: second call fails (after clear)
+        if (callCount === 2) {
+          return Promise.reject(new Error('Import failed'));
+        }
+
+        // All rollback operations succeed
+        Object.assign(mockStorage, data);
+        return Promise.resolve();
+      });
+
+      const importData = {
+        prompts: [{ id: '2', title: 'New', content: 'New', category: DEFAULT_CATEGORY, createdAt: Date.now(), updatedAt: Date.now() }],
+        categories: [{ id: '1', name: DEFAULT_CATEGORY }],
+        settings: { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt' }
+      };
+
+      // Verify: Import fails with original error (not rollback error)
+      await expect(
+        storageManager.importData(JSON.stringify(importData))
+      ).rejects.toThrow('Import failed');
+
+      // Verify: All original data is restored
+      expect(mockStorage.prompts).toEqual(initialPrompts);
+      expect(mockStorage.categories).toEqual(initialCategories);
+      expect(mockStorage.settings).toEqual(initialSettings);
+    });
+
+    it('should attempt all rollback operations even if first one fails', async () => {
+      // Setup initial data
+      mockStorage.prompts = [{ id: '1', title: 'Original', content: 'Content', category: DEFAULT_CATEGORY, createdAt: Date.now(), updatedAt: Date.now() }];
+      mockStorage.categories = [{ id: 'cat1', name: 'Work' }];
+      mockStorage.settings = { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt' };
+
+      // Track which restore operations were attempted during rollback phase
+      const rollbackAttempts = new Set<string>();
+      let isInRollbackPhase = false;
+
+      let callCount = 0;
+      vi.mocked(chrome.storage.local.set).mockImplementation((data) => {
+        callCount++;
+
+        // Import fails (second call after clear)
+        if (callCount === 2) {
+          isInRollbackPhase = true;
+          return Promise.reject(new Error('Import failed'));
+        }
+
+        // Track rollback attempts (after import failure)
+        if (isInRollbackPhase && callCount >= 3) {
+          const keys = Object.keys(data);
+          keys.forEach(key => rollbackAttempts.add(key));
+
+          // Fail the first rollback operation (prompts)
+          if (callCount === 3) {
+            return Promise.reject(new Error('Prompts restore failed'));
+          }
+        }
+
+        Object.assign(mockStorage, data);
+        return Promise.resolve();
+      });
+
+      const importData = {
+        prompts: [],
+        categories: [{ id: '1', name: DEFAULT_CATEGORY }],
+        settings: { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt' }
+      };
+
+      // Verify: Import fails
+      await expect(
+        storageManager.importData(JSON.stringify(importData))
+      ).rejects.toThrow();
+
+      // Verify: ALL three restore operations were attempted (not just the first)
+      // With Promise.allSettled, even though prompts failed, categories and settings should still be attempted
+      expect(rollbackAttempts.has('prompts')).toBe(true);
+      expect(rollbackAttempts.has('categories')).toBe(true);
+      expect(rollbackAttempts.has('settings')).toBe(true);
+      expect(rollbackAttempts.size).toBe(3);
+    });
+  });
 });
