@@ -2,8 +2,8 @@ name: 🔍 Pull Request Checks
 
 on:
   pull_request:
-    branches: [ main ]
-    types: [ opened, synchronize, reopened, ready_for_review ]
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
 
 # Cancel in-progress runs when a new commit is pushed
 concurrency:
@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NODE_VERSION: '22.x'
+  NODE_VERSION: "22.x"
   # Fail fast - stop immediately on any quality gate failure
   CI: true
 
@@ -26,16 +26,16 @@ jobs:
       node-version: ${{ env.NODE_VERSION }}
     steps:
       - name: 🛎️ Checkout Repository
-        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.2.1
         with:
           # Fetch full history for better caching and analysis
           fetch-depth: 0
 
       - name: 🟢 Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6 # v4.0.4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
+          cache: "npm"
 
       - name: 📦 Cache Dependencies
         id: cache-deps
@@ -58,11 +58,61 @@ jobs:
           node --version
           npm --version
 
-  # Job 2: Linting with zero tolerance policy
+  # Job 2: Type checking
+  type-check:
+    name: "📘 TypeScript Type Checking"
+    runs-on: ubuntu-latest
+    needs: setup
+    if: github.event.pull_request.draft == false
+    steps:
+      - name: "🛎️ Checkout Repository"
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.2.1
+
+      - name: "🟢 Setup Node.js"
+        uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6 # v4.0.4
+        with:
+          node-version: ${{ needs.setup.outputs.node-version }}
+          cache: "npm"
+
+      - name: "📦 Restore Dependencies"
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.npm
+            node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+
+      - name: "🔧 Install Dependencies"
+        if: needs.setup.outputs.cache-hit != 'true'
+        run: npm ci --prefer-offline --no-audit
+
+      - name: "📘 TypeScript Type Check"
+        run: |
+          echo "🚨 MANDATORY: Running TypeScript strict type checking"
+          npm run typecheck
+          echo "✅ All types are correct"
+
+      - name: "📋 Type Coverage Report"
+        if: always()
+        run: |
+          echo "📊 TypeScript Configuration:"
+          node -e "
+            const { compilerOptions } = require('./tsconfig.json');
+            const strictOptions = {
+              strict: compilerOptions.strict,
+              noImplicitAny: compilerOptions.noImplicitAny,
+              noUnusedLocals: compilerOptions.noUnusedLocals,
+              noUnusedParameters: compilerOptions.noUnusedParameters,
+              noFallthroughCasesInSwitch: compilerOptions.noFallthroughCasesInSwitch
+            };
+            console.log(JSON.stringify(strictOptions, null, 2));
+          "
+
+  # Job 3: Linting with zero tolerance policy
   lint:
     name: 🧹 Code Quality & Linting
     runs-on: ubuntu-latest
-    needs: setup
+    needs: [setup, type-check]
     if: github.event.pull_request.draft == false
     steps:
       - name: 🛎️ Checkout Repository
@@ -72,7 +122,7 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ needs.setup.outputs.node-version }}
-          cache: 'npm'
+          cache: "npm"
 
       - name: 📦 Restore Dependencies
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
@@ -107,15 +157,15 @@ jobs:
           echo "📋 ESLint Summary:"
           npx eslint . --format=compact --max-warnings=0 || echo "⚠️ Linting issues found above"
 
-  # Job 3: Comprehensive testing with coverage
+  # Job 4: Comprehensive testing with coverage
   test:
     name: 🧪 Test Suite & Coverage
     runs-on: ubuntu-latest
-    needs: setup
+    needs: [setup, type-check]
     if: github.event.pull_request.draft == false
     strategy:
       matrix:
-        node-version: ['22.x', '24.x']
+        node-version: ["22.x", "24.x"]
       fail-fast: true # Stop immediately on first failure
     steps:
       - name: 🛎️ Checkout Repository
@@ -125,7 +175,7 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: 'npm'
+          cache: "npm"
 
       - name: 📦 Restore Dependencies
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
@@ -168,11 +218,11 @@ jobs:
             cat coverage/coverage-summary.json
           fi
 
-  # Job 4: Build verification for both dev and production
+  # Job 5: Build verification for both dev and production
   build:
     name: 🏗️ Build Verification
     runs-on: ubuntu-latest
-    needs: [setup, lint, test]
+    needs: [setup, type-check, lint, test]
     if: github.event.pull_request.draft == false
     steps:
       - name: 🛎️ Checkout Repository
@@ -182,7 +232,7 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ needs.setup.outputs.node-version }}
-          cache: 'npm'
+          cache: "npm"
 
       - name: 📦 Restore Dependencies
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
@@ -243,7 +293,7 @@ jobs:
           echo "📦 Extension package size:"
           ls -lh *.zip 2>/dev/null || echo "No zip files found"
 
-  # Job 5: End-to-end regression suite with Playwright
+  # Job 6: End-to-end regression suite with Playwright
   e2e:
     name: 🎯 End-to-End Tests
     runs-on: ubuntu-latest
@@ -257,7 +307,7 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ needs.setup.outputs.node-version }}
-          cache: 'npm'
+          cache: "npm"
 
       - name: 📦 Restore Dependencies
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
@@ -308,7 +358,7 @@ jobs:
             test-results/
           retention-days: 7
 
-  # Job 6: Security and dependency scanning
+  # Job 7: Security and dependency scanning
   security:
     name: 🔒 Security & Dependencies
     runs-on: ubuntu-latest
@@ -322,7 +372,7 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ needs.setup.outputs.node-version }}
-          cache: 'npm'
+          cache: "npm"
 
       - name: 📦 Restore Dependencies
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
@@ -355,14 +405,14 @@ jobs:
             echo "❌ Missing manifest.json"
             exit 1
           fi
-          
+
           # Check for Manifest V3 compliance
           if ! grep -q '"manifest_version": 3' manifest.json; then
             echo "⚠️ Warning: Not using Manifest V3"
           else
             echo "✅ Using Manifest V3"
           fi
-          
+
           # Validate required fields
           required_fields=("name" "version" "description" "permissions")
           for field in "${required_fields[@]}"; do
@@ -371,14 +421,14 @@ jobs:
               exit 1
             fi
           done
-          
+
           echo "✅ Manifest validation passed"
 
-  # Job 7: Final quality gate summary
+  # Job 8: Final quality gate summary
   quality-gate:
     name: ✅ Quality Gate Summary
     runs-on: ubuntu-latest
-    needs: [setup, lint, test, build, e2e, security]
+    needs: [setup, type-check, lint, test, build, e2e, security]
     # Run even if jobs are cancelled or fail, but not for draft PRs
     if: always() && github.event.pull_request.draft == false
     steps:
@@ -386,7 +436,7 @@ jobs:
         run: |
           echo "📋 Quality Gate Summary for PR #${{ github.event.pull_request.number }}"
           echo "=================================="
-          
+
           # Check each job status
           setup_status="${{ needs.setup.result }}"
           lint_status="${{ needs.lint.result }}"
@@ -394,14 +444,14 @@ jobs:
           build_status="${{ needs.build.result }}"
           e2e_status="${{ needs.e2e.result }}"
           security_status="${{ needs.security.result }}"
-          
+
           echo "📦 Dependencies & Setup: $setup_status"
           echo "🧹 Code Quality & Linting: $lint_status"
           echo "🧪 Test Suite & Coverage: $test_status"
           echo "🏗️ Build Verification: $build_status"
           echo "🎯 End-to-End Tests: $e2e_status"
           echo "🔒 Security & Dependencies: $security_status"
-          
+
           # Check if workflow was cancelled (new commit pushed)
           if [[ "$setup_status" == "cancelled" || "$lint_status" == "cancelled" || "$test_status" == "cancelled" || "$build_status" == "cancelled" || "$e2e_status" == "cancelled" || "$security_status" == "cancelled" ]]; then
             echo ""
@@ -437,27 +487,27 @@ jobs:
               e2e: "${{ needs.e2e.result }}",
               security: "${{ needs.security.result }}"
             };
-            
+
             // Check workflow status
             const anyCancelled = Object.values(results).some(result => result === 'cancelled');
             const allPassed = Object.values(results).every(result => result === 'success');
             const allSkipped = Object.values(results).every(result => result === 'skipped');
-            
+
             // Skip comment for cancelled workflows - they're superseded by new commits
             if (anyCancelled) {
               console.log('Workflow cancelled - skipping comment to reduce noise');
               return;
             }
-            
+
             // Skip comment for fully skipped workflows (e.g., draft PRs)
             if (allSkipped) {
               console.log('All checks skipped - no comment needed');
               return;
             }
-            
+
             // Determine status for meaningful results only
             let status, emoji, message;
-            
+
             if (allPassed) {
               status = '✅ PASSED';
               emoji = '🎉';
@@ -467,7 +517,7 @@ jobs:
               emoji = '🚨';
               message = '🛑 **Quality gates failed.** Please address all issues before requesting review.';
             }
-            
+
             // Helper function to get status icon
             const getStatusIcon = (result) => {
               switch(result) {
@@ -478,19 +528,19 @@ jobs:
                 default: return '❓';
               }
             };
-            
+
             // Find and delete previous bot comments to keep PR clean
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number
             });
-            
+
             const botComments = comments.filter(comment => 
               comment.user.type === 'Bot' && 
               comment.body.includes('Quality Gate Results')
             );
-            
+
             // Delete old quality gate comments (keep only the latest)
             for (const comment of botComments) {
               try {
@@ -504,12 +554,12 @@ jobs:
                 console.log(`Could not delete comment ${comment.id}: ${error.message}`);
               }
             }
-            
+
             // Create the new comment with meaningful results
             const comment = `## ${emoji} Quality Gate Results ${status}
-            
+
             **Commit:** \`${context.sha.substring(0, 7)}\` | **Run:** [#${context.runNumber}](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})
-            
+
             | Check | Status |
             |-------|---------|
             | 📦 Dependencies & Setup | ${getStatusIcon(results.setup)} ${results.setup} |
@@ -518,11 +568,11 @@ jobs:
             | 🏗️ Build Verification | ${getStatusIcon(results.build)} ${results.build} |
             | 🎯 End-to-End Tests | ${getStatusIcon(results.e2e)} ${results.e2e} |
             | 🔒 Security & Dependencies | ${getStatusIcon(results.security)} ${results.security} |
-            
+
             ${message}
-            
+
             ---
-            
+
             ### 📋 Mandatory Requirements:
             - ✅ **Zero tolerance** for linting errors (\`npm run lint\`)
             - ✅ **All tests must pass** (\`npm test\`)
@@ -530,10 +580,10 @@ jobs:
             - ✅ **Playwright end-to-end suite** must pass (\`npm run test:e2e\`)
             - ✅ **No security vulnerabilities** above moderate level
             - ✅ **Manifest V3 compliance** for Chrome extension
-            
+
             <sub>💡 This comment updates automatically with each workflow run. Previous results are replaced to keep the PR clean.</sub>
             `;
-            
+
             await github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
