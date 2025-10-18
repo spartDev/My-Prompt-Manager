@@ -127,7 +127,7 @@ describe('SearchIndex', () => {
       expect(searchIndex.getStats().promptCount).toBe(1);
     });
 
-    it('should ignore terms shorter than 3 characters', () => {
+    it('should index single character terms (for CJK language support)', () => {
       const testPrompt: Prompt = {
         id: 'test',
         title: 'a b ab test',
@@ -139,11 +139,11 @@ describe('SearchIndex', () => {
 
       searchIndex.buildIndex([testPrompt]);
 
-      // Single/double char terms should not match
-      expect(searchIndex.search('a', { maxResults: 10 })).toHaveLength(0);
-      expect(searchIndex.search('ab', { maxResults: 10 })).toHaveLength(0);
+      // Single/double char terms should now match (needed for CJK languages)
+      expect(searchIndex.search('a', { maxResults: 10 })).toHaveLength(1);
+      expect(searchIndex.search('ab', { maxResults: 10 })).toHaveLength(1);
 
-      // 3+ char terms should match
+      // 3+ char terms should still match
       expect(searchIndex.search('test', { maxResults: 10 }).length).toBeGreaterThan(0);
     });
 
@@ -538,6 +538,131 @@ describe('SearchIndex', () => {
       const maxSearchTime = process.env.CI ? 150 : 50;
       expect(searchTime).toBeLessThan(maxSearchTime);
       expect(results.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('International Text Support', () => {
+    it('should index and search Chinese characters', () => {
+      const prompt: Prompt = {
+        id: 'zh',
+        title: '编程教程',
+        content: '学习JavaScript的基础知识',
+        category: 'Programming',
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      };
+
+      searchIndex.buildIndex([prompt]);
+      const results = searchIndex.search('编程', { maxResults: 10 });
+
+      expect(results.length).toBe(1);
+      expect(results[0].prompt.id).toBe('zh');
+    });
+
+    it('should index and search French accented characters', () => {
+      const prompt: Prompt = {
+        id: 'fr',
+        title: 'Guide de programmation',
+        content: 'Comment créer un café virtuel',
+        category: 'Programming',
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      };
+
+      searchIndex.buildIndex([prompt]);
+      const results = searchIndex.search('créer', { maxResults: 10 });
+
+      expect(results.length).toBe(1);
+      expect(results[0].prompt.id).toBe('fr');
+    });
+
+    it('should index and search Russian Cyrillic', () => {
+      const prompt: Prompt = {
+        id: 'ru',
+        title: 'Привет мир',
+        content: 'Изучение программирования',
+        category: 'Programming',
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      };
+
+      searchIndex.buildIndex([prompt]);
+      const results = searchIndex.search('программирования', { maxResults: 10 });
+
+      expect(results.length).toBe(1);
+      expect(results[0].prompt.id).toBe('ru');
+    });
+
+    it('should index and search Arabic text', () => {
+      const prompt: Prompt = {
+        id: 'ar',
+        title: 'دليل البرمجة',
+        content: 'تعلم أساسيات البرمجة',
+        category: 'Programming',
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      };
+
+      searchIndex.buildIndex([prompt]);
+      const results = searchIndex.search('البرمجة', { maxResults: 10 });
+
+      expect(results.length).toBe(1);
+      expect(results[0].prompt.id).toBe('ar');
+    });
+
+    it('should handle mixed language prompts', () => {
+      const prompt: Prompt = {
+        id: 'mixed',
+        title: 'JavaScript Tutorial 编程教程',
+        content: 'Learn 学习 programming',
+        category: 'Programming',
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      };
+
+      searchIndex.buildIndex([prompt]);
+
+      // Should find with English term
+      const enResults = searchIndex.search('javascript', { maxResults: 10 });
+      expect(enResults.length).toBe(1);
+
+      // Should also find with Chinese term
+      const zhResults = searchIndex.search('编程', { maxResults: 10 });
+      expect(zhResults.length).toBe(1);
+    });
+
+    it('should preserve emoji in search', () => {
+      const prompt: Prompt = {
+        id: 'emoji',
+        title: 'React Tutorial 🚀',
+        content: 'Learn React with fun 🎉',
+        category: 'Programming',
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      };
+
+      searchIndex.buildIndex([prompt]);
+
+      // Emoji are punctuation, so they're removed, but text around them should work
+      const results = searchIndex.search('react', { maxResults: 10 });
+      expect(results.length).toBe(1);
+    });
+
+    it('should handle Japanese hiragana and katakana', () => {
+      const prompt: Prompt = {
+        id: 'jp',
+        title: 'プログラミング入門',  // Katakana
+        content: 'はじめてのプログラミング',  // Hiragana + Katakana
+        category: 'Programming',
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      };
+
+      searchIndex.buildIndex([prompt]);
+      const results = searchIndex.search('プログラミング', { maxResults: 10 });
+
+      expect(results.length).toBe(1);
+      expect(results[0].prompt.id).toBe('jp');
     });
   });
 });

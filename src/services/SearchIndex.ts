@@ -12,9 +12,9 @@ import { Prompt } from '../types';
 function tokenize(text: string): string[] {
   return text
     .toLowerCase()
-    .replace(/[^\w\s]/g, ' ') // Replace punctuation with spaces
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ') // Replace punctuation with spaces (Unicode-aware: \p{L}=letters, \p{N}=numbers)
     .split(/\s+/)
-    .filter(term => term.length > 2); // Ignore single/double character terms
+    .filter(term => term.length > 0 && term.trim().length > 0); // Handle CJK single-character words
 }
 
 /**
