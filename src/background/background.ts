@@ -859,15 +859,23 @@ async function handleExtensionUpdate(): Promise<void> {
     // Only log if there were actual issues during re-injection
     const failedReinjections = reinjectionResults.filter(r => !r.success);
     if (failedReinjections.length > 0) {
-      Logger.error('Failed to re-inject content scripts after extension update', undefined, {
+      Logger.warn(
+        `Some tabs could not be re-injected after extension update (${failedReinjections.length.toString()}/${reinjectionResults.length.toString()} failed). This is normal for orphaned tabs - they will work after refresh.`,
+        {
+          component: 'ContentScriptInjector',
+          failedCount: failedReinjections.length,
+          totalTabs: reinjectionResults.length,
+          failedTabIds: failedReinjections.map(r => r.tabId)
+        }
+      );
+    } else if (reinjectionResults.length > 0) {
+      Logger.info(`Successfully re-injected content scripts in ${reinjectionResults.length.toString()} tabs after extension update`, {
         component: 'ContentScriptInjector',
-        failedCount: failedReinjections.length,
         totalTabs: reinjectionResults.length
       });
     }
 
-    // Silent success for cleaner console output
-    // Successfully processed extension update for [N] tabs
+    // Extension update processing complete
   } catch (error) {
     Logger.error('Error handling extension update', toError(error), { component: 'Background', phase: 'extension_update' });
   }

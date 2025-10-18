@@ -2,12 +2,12 @@
  * Optimized search hooks with debouncing and indexing
  */
 
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 
 import { getSearchIndex } from '../services/SearchIndex';
 import { Prompt } from '../types';
 import { HighlightedPrompt } from '../types/hooks';
-import { Logger, toError } from '../utils';
+import { Logger } from '../utils';
 import { findTextHighlights } from '../utils/textHighlight';
 
 /**
@@ -272,142 +272,3 @@ export function useSearchWithHighlights(
   };
 }
 
-/**
- * Custom hook for search input with automatic debouncing
- *
- * Usage:
- * ```typescript
- * const { value, onChange, debouncedValue, isDebouncing } = useSearchInput('', 300);
- *
- * <input
- *   type="text"
- *   value={value}
- *   onChange={onChange}
- *   placeholder="Search..."
- * />
- * ```
- *
- * @param initialValue Initial search value
- * @param debounceDelay Debounce delay in milliseconds
- * @returns Search input state and handlers
- */
-export function useSearchInput(
-  initialValue: string = '',
-  debounceDelay: number = DEFAULT_DEBOUNCE_DELAY
-) {
-  const [value, setValue] = useState(initialValue);
-  const debouncedValue = useDebounce(value, debounceDelay);
-  const isDebouncing = value !== debouncedValue;
-
-  const onChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    setValue(event.target.value);
-  }, []);
-
-  const clear = useCallback(() => {
-    setValue('');
-  }, []);
-
-  return {
-    value,
-    setValue,
-    onChange,
-    debouncedValue,
-    isDebouncing,
-    clear
-  };
-}
-
-/**
- * Custom hook for managing search state with persistence
- *
- * @param storageKey Key for localStorage persistence
- * @param debounceDelay Debounce delay
- * @returns Search state management
- */
-export function useSearchState(
-  storageKey: string = 'promptSearch',
-  debounceDelay: number = DEFAULT_DEBOUNCE_DELAY
-) {
-  // Load initial value from localStorage
-  const [query, setQuery] = useState(() => {
-    try {
-      const stored = localStorage.getItem(storageKey);
-      return stored || '';
-    } catch {
-      return '';
-    }
-  });
-
-  const debouncedQuery = useDebounce(query, debounceDelay);
-  const isDebouncing = query !== debouncedQuery;
-
-  // Persist to localStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem(storageKey, query);
-    } catch (err) {
-      Logger.error('Failed to persist search query', toError(err), {
-        component: 'useSearchState',
-        storageKey
-      });
-    }
-  }, [query, storageKey]);
-
-  const clear = useCallback(() => {
-    setQuery('');
-  }, []);
-
-  return {
-    query,
-    setQuery,
-    debouncedQuery,
-    isDebouncing,
-    clear
-  };
-}
-
-/**
- * Hook for tracking search performance metrics
- */
-export function useSearchMetrics() {
-  const metricsRef = useRef<{
-    totalSearches: number;
-    avgSearchTime: number;
-    maxSearchTime: number;
-    minSearchTime: number;
-  }>({
-    totalSearches: 0,
-    avgSearchTime: 0,
-    maxSearchTime: 0,
-    minSearchTime: Infinity
-  });
-
-  const recordSearch = useCallback((searchTime: number) => {
-    const metrics = metricsRef.current;
-    metrics.totalSearches++;
-    metrics.maxSearchTime = Math.max(metrics.maxSearchTime, searchTime);
-    metrics.minSearchTime = Math.min(metrics.minSearchTime, searchTime);
-    metrics.avgSearchTime =
-      (metrics.avgSearchTime * (metrics.totalSearches - 1) + searchTime) /
-      metrics.totalSearches;
-  }, []);
-
-  const getMetrics = useCallback(() => {
-    return { ...metricsRef.current };
-  }, []);
-
-  const resetMetrics = useCallback(() => {
-    metricsRef.current = {
-      totalSearches: 0,
-      avgSearchTime: 0,
-      maxSearchTime: 0,
-      minSearchTime: Infinity
-    };
-  }, []);
-
-  return {
-    recordSearch,
-    getMetrics,
-    resetMetrics
-  };
-}

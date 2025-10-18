@@ -9,7 +9,7 @@ import { HighlightedPrompt } from '../types/hooks';
 import { findTextHighlights } from '../utils/textHighlight';
 
 import { getSearchIndex } from './SearchIndex';
-import { smartSimilarity } from './SimilarityAlgorithms';
+import { calculateSimilarityOptimized } from './SimilarityAlgorithms';
 import { StorageManager } from './storage';
 
 class PromptManagerError extends Error implements AppError {
@@ -443,18 +443,17 @@ export class PromptManager {
       return true;
     }
 
-    // Use optimized smart similarity algorithm
-    // Uses different algorithms based on text length for optimal performance
-    const titleSimilarity = smartSimilarity(prompt1.title, prompt2.title, 0.8);
+    // Use optimized Levenshtein similarity algorithm
+    const titleSimilarity = calculateSimilarityOptimized(prompt1.title, prompt2.title, 0.8);
 
     // Early exit if titles are too different (saves expensive content comparison)
     if (titleSimilarity < 0.8) {
       return false;
     }
 
-    const contentSimilarity = smartSimilarity(prompt1.content, prompt2.content, 0.9);
+    const contentSimilarity = calculateSimilarityOptimized(prompt1.content, prompt2.content, 0.9);
 
-    // smartSimilarity returns -1 if below threshold, otherwise returns score
+    // calculateSimilarityOptimized returns -1 if below threshold, otherwise returns score
     return contentSimilarity >= 0.9;
   }
 

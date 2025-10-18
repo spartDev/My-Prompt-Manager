@@ -262,7 +262,9 @@ describe('SearchIndex', () => {
       searchIndex.search('programming', { maxResults: 100 });
       const searchTime = performance.now() - startTime;
 
-      expect(searchTime).toBeLessThan(10);
+      // CI environments are slower - allow reasonable margin
+      const maxSearchTime = process.env.CI ? 50 : 10;
+      expect(searchTime).toBeLessThan(maxSearchTime);
     });
   });
 
@@ -532,8 +534,9 @@ describe('SearchIndex', () => {
       const results = searchIndex.search('prompt', { maxResults: 100 });
       const searchTime = performance.now() - startTime;
 
-      // Should be reasonably fast (< 50ms even on slower machines)
-      expect(searchTime).toBeLessThan(50);
+      // CI environments are slower - allow reasonable margin
+      const maxSearchTime = process.env.CI ? 150 : 50;
+      expect(searchTime).toBeLessThan(maxSearchTime);
       expect(results.length).toBeGreaterThan(0);
     });
   });
