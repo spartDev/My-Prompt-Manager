@@ -30,12 +30,12 @@ import { useEffect, RefObject } from 'react';
  */
 export const useFloatingPosition = (
   isOpen: boolean,
-  referenceRef: RefObject<HTMLElement>,
-  floatingRef: RefObject<HTMLElement>
+  referenceRef: RefObject<HTMLElement | null>,
+  floatingRef: RefObject<HTMLElement | null>
 ): void => {
   useEffect(() => {
     // Only run positioning when dropdown is open and refs are available
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+     
     if (!isOpen || !referenceRef.current || !floatingRef.current) {
       return;
     }
