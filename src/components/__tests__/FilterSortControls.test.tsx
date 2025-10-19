@@ -471,11 +471,11 @@ describe('FilterSortControls', () => {
   });
 
   describe('Manage Categories Button', () => {
-    it('shows "Manage..." text on desktop viewport', () => {
+    it('shows "Categories" text on desktop viewport', () => {
       render(<FilterSortControls {...defaultProps} />);
 
       const manageButton = screen.getByLabelText(/manage categories/i);
-      expect(manageButton.textContent).toContain('Manage...');
+      expect(manageButton.textContent).toContain('Categories');
     });
 
     it('calls onManageCategories when manage button is clicked', async () => {
