@@ -10,6 +10,7 @@ import StorageWarning from './components/StorageWarning';
 import ToastContainer from './components/ToastContainer';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { usePrompts, useCategories, useClipboard, useToast, useSearchWithDebounce } from './hooks';
+import { PromptManager } from './services/promptManager';
 import { Prompt, ErrorType, AppError, SortOrder, SortDirection } from './types';
 import { Logger, toError } from './utils';
 
@@ -62,29 +63,13 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   const { copyToClipboard } = useClipboard();
   const { toasts, showToast, hideToast, queueLength, settings, updateSettings } = useToast();
 
-  // Sort optimistic prompts based on current sort settings
+  // Sort optimistic prompts based on current sort settings using PromptManager service
   const sortedPrompts = useMemo(() => {
-    const prompts = [...optimisticPrompts];
-
-    prompts.sort((a, b) => {
-      let comparison = 0;
-
-      switch (sortOrder) {
-        case 'title':
-          comparison = a.title.localeCompare(b.title);
-          break;
-        case 'createdAt':
-          comparison = a.createdAt - b.createdAt;
-          break;
-        case 'updatedAt':
-          comparison = a.updatedAt - b.updatedAt;
-          break;
-      }
-
-      return sortDirection === 'asc' ? comparison : -comparison;
-    });
-
-    return prompts;
+    return PromptManager.getInstance().sortPrompts(
+      optimisticPrompts,
+      sortOrder,
+      sortDirection
+    );
   }, [optimisticPrompts, sortOrder, sortDirection]);
 
   // Initialize search with debounce functionality using sorted prompts

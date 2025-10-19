@@ -3,7 +3,9 @@ import {
   VALIDATION_LIMITS,
   DEFAULT_CATEGORY,
   ErrorType,
-  AppError
+  AppError,
+  SortOrder,
+  SortDirection
 } from '../types';
 import { HighlightedPrompt } from '../types/hooks';
 import { findTextHighlights } from '../utils/textHighlight';
@@ -135,7 +137,7 @@ export class PromptManager {
   async searchPromptsWithHighlights(query: string): Promise<HighlightedPrompt[]> {
     try {
       const searchResults = await this.searchPrompts(query);
-      
+
       if (!query.trim()) {
         return searchResults.map(prompt => ({
           ...prompt,
@@ -154,6 +156,51 @@ export class PromptManager {
     } catch (error) {
       throw this.handleError(error);
     }
+  }
+
+  /**
+   * Sorts prompts based on specified order and direction
+   * @param prompts - Array of prompts to sort
+   * @param order - Sort field (title, createdAt, or updatedAt)
+   * @param direction - Sort direction (asc or desc)
+   * @returns Sorted array of prompts (new array, does not mutate input)
+   */
+  sortPrompts(
+    prompts: Prompt[],
+    order: SortOrder,
+    direction: SortDirection
+  ): Prompt[] {
+    // Create new array to avoid mutating input
+    const sorted = [...prompts];
+
+    sorted.sort((a, b) => {
+      let comparison = 0;
+
+      switch (order) {
+        case 'title':
+          comparison = a.title.localeCompare(b.title);
+          break;
+        case 'createdAt':
+          comparison = a.createdAt - b.createdAt;
+          break;
+        case 'updatedAt':
+          comparison = a.updatedAt - b.updatedAt;
+          break;
+        default: {
+          // Exhaustiveness check - TypeScript will error if a new SortOrder is added
+          // without handling it in the switch statement
+          const _exhaustiveCheck: never = order;
+          throw new PromptManagerError({
+            type: ErrorType.VALIDATION_ERROR,
+            message: `Unknown sort order: ${String(_exhaustiveCheck)}`
+          });
+        }
+      }
+
+      return direction === 'asc' ? comparison : -comparison;
+    });
+
+    return sorted;
   }
 
   // Filtering functionality
