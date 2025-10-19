@@ -279,7 +279,7 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
               className="
                 fixed
                 min-w-[200px]
-                max-h-[400px]
+                max-h-[250px]
                 bg-white dark:bg-gray-800 backdrop-blur-sm
                 rounded-xl
                 shadow-xl
@@ -516,7 +516,7 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
         </svg>
 
         {/* Text - desktop only (>= 375px) */}
-        <span className="hidden min-[375px]:inline">Manage...</span>
+        <span className="hidden min-[375px]:inline">Categories</span>
       </button>
     </div>
   );
