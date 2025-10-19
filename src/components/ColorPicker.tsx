@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useId } from 'react';
+import { useState, useRef, useId } from 'react';
 import type { FC } from 'react';
 
 import {
@@ -7,6 +7,7 @@ import {
   getColorName
 } from '../constants/colors';
 import { MAX_HEX_COLOR_LENGTH } from '../constants/validation';
+import { useDropdownClose } from '../hooks';
 interface ColorPickerProps {
   value: string;
   onChange: (color: string) => void;
@@ -32,24 +33,13 @@ const ColorPicker: FC<ColorPickerProps> = ({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const colorInputId = useId();
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        dropdownRef.current && 
-        buttonRef.current &&
-        !dropdownRef.current.contains(event.target as Node) &&
-        !buttonRef.current.contains(event.target as Node)
-      ) {
-        setIsOpen(false);
-      }
-    };
-
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => { document.removeEventListener('mousedown', handleClickOutside); };
-    }
-  }, [isOpen]);
+  // Handle dropdown close interactions
+  useDropdownClose({
+    isOpen,
+    onClose: () => { setIsOpen(false); },
+    triggerRef: buttonRef,
+    menuRef: dropdownRef
+  });
 
   const handleColorSelect = (color: string) => {
     onChange(color);

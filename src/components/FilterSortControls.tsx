@@ -1,9 +1,9 @@
 import type { FC } from 'react';
-import { useState, useRef, useEffect, memo } from 'react';
+import { useState, useRef, memo } from 'react';
 import { createPortal } from 'react-dom';
 
 import { DROPDOWN_CONFIG, DEFAULT_COLORS } from '../constants/ui';
-import { useFloatingPosition } from '../hooks';
+import { useFloatingPosition, useDropdownClose } from '../hooks';
 import { SortOrder } from '../types';
 import { FilterSortControlsProps } from '../types/components';
 
@@ -52,38 +52,20 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
   const filterMenuRef = useRef<HTMLDivElement>(null);
   const sortMenuRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdowns on outside click
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Node;
+  // Handle dropdown close interactions
+  useDropdownClose({
+    isOpen: showFilterMenu,
+    onClose: () => { setShowFilterMenu(false); },
+    triggerRef: filterButtonRef,
+    menuRef: filterMenuRef
+  });
 
-      if (showFilterMenu && filterMenuRef.current && !filterMenuRef.current.contains(target) &&
-          filterButtonRef.current && !filterButtonRef.current.contains(target)) {
-        setShowFilterMenu(false);
-      }
-
-      if (showSortMenu && sortMenuRef.current && !sortMenuRef.current.contains(target) &&
-          sortButtonRef.current && !sortButtonRef.current.contains(target)) {
-        setShowSortMenu(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => { document.removeEventListener('mousedown', handleClickOutside); };
-  }, [showFilterMenu, showSortMenu]);
-
-  // Close on Escape key
-  useEffect(() => {
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setShowFilterMenu(false);
-        setShowSortMenu(false);
-      }
-    };
-
-    document.addEventListener('keydown', handleEscape);
-    return () => { document.removeEventListener('keydown', handleEscape); };
-  }, []);
+  useDropdownClose({
+    isOpen: showSortMenu,
+    onClose: () => { setShowSortMenu(false); },
+    triggerRef: sortButtonRef,
+    menuRef: sortMenuRef
+  });
 
   // Position dropdowns with floating-ui custom hook
   useFloatingPosition(showFilterMenu, filterButtonRef, filterMenuRef);

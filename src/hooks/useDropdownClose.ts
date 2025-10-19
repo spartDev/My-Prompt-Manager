@@ -1,0 +1,98 @@
+import { useEffect, RefObject } from 'react';
+
+export interface UseDropdownCloseOptions {
+  /** Whether the dropdown is currently open */
+  isOpen: boolean;
+  /** Callback to close the dropdown */
+  onClose: () => void;
+  /** Ref to the dropdown trigger button */
+  triggerRef: RefObject<HTMLElement>;
+  /** Ref to the dropdown menu/content */
+  menuRef: RefObject<HTMLElement>;
+  /** Whether to close on Escape key (default: true) */
+  closeOnEscape?: boolean;
+  /** Element to focus when closing via Escape (default: triggerRef) */
+  focusOnEscape?: RefObject<HTMLElement>;
+}
+
+/**
+ * Custom hook for handling dropdown close interactions
+ * Handles click-outside and optional Escape key closing
+ *
+ * @param options - Configuration options for dropdown close behavior
+ *
+ * @example
+ * ```tsx
+ * const [isOpen, setIsOpen] = useState(false);
+ * const buttonRef = useRef<HTMLButtonElement>(null);
+ * const menuRef = useRef<HTMLDivElement>(null);
+ *
+ * useDropdownClose({
+ *   isOpen,
+ *   onClose: () => setIsOpen(false),
+ *   triggerRef: buttonRef,
+ *   menuRef: menuRef,
+ *   closeOnEscape: true
+ * });
+ * ```
+ */
+export const useDropdownClose = ({
+  isOpen,
+  onClose,
+  triggerRef,
+  menuRef,
+  closeOnEscape = true,
+  focusOnEscape
+}: UseDropdownCloseOptions): void => {
+  useEffect(() => {
+    if (!isOpen) {return;}
+
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+
+      // Check if click is outside both trigger and menu
+      const menu = menuRef.current;
+      const trigger = triggerRef.current;
+
+      /* eslint-disable @typescript-eslint/no-unnecessary-condition */
+      if (
+        menu &&
+        !menu.contains(target) &&
+        trigger &&
+        !trigger.contains(target)
+      ) {
+        onClose();
+      }
+      /* eslint-enable @typescript-eslint/no-unnecessary-condition */
+    };
+
+    const handleEscapeKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+
+        // Restore focus to specified element or trigger
+        const focusTarget = focusOnEscape || triggerRef;
+        const focusElement = focusTarget.current;
+        /* eslint-disable @typescript-eslint/no-unnecessary-condition */
+        if (focusElement) {
+          focusElement.focus();
+        }
+        /* eslint-enable @typescript-eslint/no-unnecessary-condition */
+      }
+    };
+
+    // Attach listeners
+    document.addEventListener('mousedown', handleClickOutside);
+    if (closeOnEscape) {
+      document.addEventListener('keydown', handleEscapeKey);
+    }
+
+    // Cleanup
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      if (closeOnEscape) {
+        document.removeEventListener('keydown', handleEscapeKey);
+      }
+    };
+  }, [isOpen, onClose, triggerRef, menuRef, closeOnEscape, focusOnEscape]);
+};
