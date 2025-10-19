@@ -40,8 +40,11 @@ describe('FilterSortControls', () => {
     it('shows active state text', () => {
       render(<FilterSortControls {...defaultProps} />);
 
-      // Active state text should show "All • Newest"
-      expect(screen.getByText('All')).toBeInTheDocument();
+      // Filter button should show "All"
+      const filterButton = screen.getByLabelText(/filter by category/i);
+      expect(filterButton).toHaveTextContent('All');
+
+      // Active state text should show "Newest"
       expect(screen.getByText('Newest')).toBeInTheDocument();
     });
 
@@ -522,21 +525,24 @@ describe('FilterSortControls', () => {
     it('displays selected category name in active state', () => {
       render(<FilterSortControls {...defaultProps} selectedCategory="Work" />);
 
-      expect(screen.getByText('Work')).toBeInTheDocument();
+      const filterButton = screen.getByLabelText(/filter by category/i);
+      expect(filterButton).toHaveTextContent('Work');
     });
 
     it('displays "All" when no category is selected', () => {
       render(<FilterSortControls {...defaultProps} selectedCategory={null} />);
 
-      expect(screen.getByText('All')).toBeInTheDocument();
+      const filterButton = screen.getByLabelText(/filter by category/i);
+      expect(filterButton).toHaveTextContent('All');
     });
 
     it('updates active state when category changes', () => {
       const { rerender } = render(<FilterSortControls {...defaultProps} selectedCategory={null} />);
-      expect(screen.getByText('All')).toBeInTheDocument();
+      const filterButton = screen.getByLabelText(/filter by category/i);
+      expect(filterButton).toHaveTextContent('All');
 
       rerender(<FilterSortControls {...defaultProps} selectedCategory="Personal" />);
-      expect(screen.getByText('Personal')).toBeInTheDocument();
+      expect(filterButton).toHaveTextContent('Personal');
     });
 
     it('updates active state when sort changes', () => {
@@ -715,9 +721,11 @@ describe('FilterSortControls', () => {
       ];
       render(<FilterSortControls {...defaultProps} categories={longNameCategories} selectedCategory="This is a very long category name that might overflow" />);
 
-      // Should truncate with ellipsis
-      const activeState = screen.getByText('This is a very long category name that might overflow');
-      expect(activeState).toHaveClass('truncate');
+      // Filter button label should truncate with ellipsis
+      const filterButton = screen.getByLabelText(/filter by category/i);
+      const labelSpan = filterButton.querySelector('.truncate');
+      expect(labelSpan).toBeInTheDocument();
+      expect(labelSpan).toHaveClass('max-w-[100px]');
     });
   });
 
