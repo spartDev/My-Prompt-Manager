@@ -87,5 +87,4 @@ export interface FilterSortControlsProps {
   onSortChange: (order: SortOrder, direction: SortDirection) => void;
   onManageCategories: () => void;
   loading?: boolean;
-  context?: 'popup' | 'sidepanel';
 }

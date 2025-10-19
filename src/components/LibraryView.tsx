@@ -79,7 +79,6 @@ const LibraryView: FC<LibraryViewProps> = ({
             onSortChange={onSortChange}
             onManageCategories={onManageCategories}
             loading={loading}
-            context={context}
           />
         </div>
       </ViewHeader>

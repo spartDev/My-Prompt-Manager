@@ -1,8 +1,8 @@
-import { computePosition, flip, offset, autoUpdate } from '@floating-ui/dom';
 import type { FC } from 'react';
 import { useState, useRef, useEffect, useCallback, memo } from 'react';
 import { createPortal } from 'react-dom';
 
+import { useFloatingPosition } from '../hooks';
 import { SortOrder } from '../types';
 import { FilterSortControlsProps } from '../types/components';
 
@@ -39,8 +39,7 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
   onCategoryChange,
   onSortChange,
   onManageCategories,
-  loading = false,
-  context: _context = 'popup'
+  loading = false
 }) => {
   // Dropdown state
   const [showFilterMenu, setShowFilterMenu] = useState(false);
@@ -85,63 +84,9 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
     return () => { document.removeEventListener('keydown', handleEscape); };
   }, []);
 
-  // Position filter dropdown with floating-ui
-  useEffect(() => {
-    if (!showFilterMenu || !filterButtonRef.current || !filterMenuRef.current) {return;}
-
-    const cleanup = autoUpdate(
-      filterButtonRef.current,
-      filterMenuRef.current,
-      () => {
-        if (!filterButtonRef.current || !filterMenuRef.current) {return;}
-
-        void computePosition(filterButtonRef.current, filterMenuRef.current, {
-          placement: 'bottom-start',
-          middleware: [
-            offset(4),
-            flip()
-          ]
-        }).then(({ x, y }) => {
-          if (!filterMenuRef.current) {return;}
-          Object.assign(filterMenuRef.current.style, {
-            left: `${String(x)}px`,
-            top: `${String(y)}px`,
-          });
-        });
-      }
-    );
-
-    return cleanup;
-  }, [showFilterMenu]);
-
-  // Position sort dropdown with floating-ui
-  useEffect(() => {
-    if (!showSortMenu || !sortButtonRef.current || !sortMenuRef.current) {return;}
-
-    const cleanup = autoUpdate(
-      sortButtonRef.current,
-      sortMenuRef.current,
-      () => {
-        if (!sortButtonRef.current || !sortMenuRef.current) {return;}
-
-        void computePosition(sortButtonRef.current, sortMenuRef.current, {
-          placement: 'bottom-start',
-          middleware: [
-            offset(4),
-            flip()
-          ]
-        }).then(({ x, y }) => {
-          if (!sortMenuRef.current) {return;}
-          Object.assign(sortMenuRef.current.style, {
-            left: `${String(x)}px`,
-            top: `${String(y)}px`,
-          });
-        });
-      }
-    );
-
-    return cleanup;
-  }, [showSortMenu]);
+  // Position dropdowns with floating-ui custom hook
+  useFloatingPosition(showFilterMenu, filterButtonRef, filterMenuRef);
+  useFloatingPosition(showSortMenu, sortButtonRef, sortMenuRef);
 
   // Get active state text
   const getCategoryLabel = useCallback(() => {
@@ -533,7 +478,6 @@ const arePropsEqual = (
   if (prev.sortOrder !== next.sortOrder) {return false;}
   if (prev.sortDirection !== next.sortDirection) {return false;}
   if (prev.loading !== next.loading) {return false;}
-  if (prev.context !== next.context) {return false;}
 
   // Check categories array length first (fast check)
   if (prev.categories.length !== next.categories.length) {return false;}
