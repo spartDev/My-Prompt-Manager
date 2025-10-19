@@ -49,14 +49,25 @@ export class LibraryPage extends BasePage {
    * Filter prompts by category
    */
   async filterByCategory(category: string): Promise<void> {
-    await this.page.locator('select').filter({ hasText: 'All Categories' }).selectOption(category);
+    // Click the filter button to open dropdown
+    await this.page.getByRole('button', { name: /Filter by category:/i }).click();
+    // Wait for menu to appear
+    await this.page.getByRole('menu', { name: 'Category filter menu' }).waitFor();
+    // Click the category option
+    await this.page.getByRole('menuitem', { name: category }).click();
   }
 
   /**
    * Clear all filters and search
    */
   async clearFilters(): Promise<void> {
-    await this.page.locator('select').selectOption('');
+    // Click the filter button to open dropdown
+    await this.page.getByRole('button', { name: /Filter by category:/i }).click();
+    // Wait for menu to appear
+    await this.page.getByRole('menu', { name: 'Category filter menu' }).waitFor();
+    // Click "All Categories" to clear
+    await this.page.getByRole('menuitem', { name: 'All Categories' }).click();
+    // Clear search
     await this.page.getByPlaceholder('Search your prompts...').clear();
   }
 
@@ -138,8 +149,15 @@ export class LibraryPage extends BasePage {
    * Verify category count in the filter dropdown
    */
   async expectCategoryFilterOptions(categories: string[]): Promise<void> {
+    // Open the filter dropdown
+    await this.page.getByRole('button', { name: /Filter by category:/i }).click();
+    // Wait for menu to appear
+    await this.page.getByRole('menu', { name: 'Category filter menu' }).waitFor();
+    // Verify each category exists in the menu
     for (const category of categories) {
-      await expect(this.page.getByRole('option', { name: category })).toBeVisible();
+      await expect(this.page.getByRole('menuitem', { name: category })).toBeVisible();
     }
+    // Close the menu by pressing Escape
+    await this.page.keyboard.press('Escape');
   }
 }

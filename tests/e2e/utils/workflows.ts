@@ -222,7 +222,12 @@ export const searchWorkflows = {
    * Filter by category and verify results
    */
   filterByCategoryAndVerify: async (page: Page, category: string, expectedCount: number): Promise<void> => {
-    await page.locator('select').filter({ hasText: 'All Categories' }).selectOption(category);
+    // Click the filter button to open dropdown
+    await page.getByRole('button', { name: /Filter by category:/i }).click();
+    // Wait for menu to appear
+    await page.getByRole('menu', { name: 'Category filter menu' }).waitFor();
+    // Click the category option
+    await page.getByRole('menuitem', { name: category }).click();
     await assertions.prompts.count(page, expectedCount);
   },
 
@@ -230,7 +235,12 @@ export const searchWorkflows = {
    * Clear all filters and search
    */
   clearAllFilters: async (page: Page): Promise<void> => {
-    await page.locator('select').selectOption('');
+    // Click the filter button to open dropdown
+    await page.getByRole('button', { name: /Filter by category:/i }).click();
+    // Wait for menu to appear
+    await page.getByRole('menu', { name: 'Category filter menu' }).waitFor();
+    // Click "All Categories" to clear
+    await page.getByRole('menuitem', { name: 'All Categories' }).click();
     await page.getByPlaceholder('Search your prompts...').clear();
   },
 

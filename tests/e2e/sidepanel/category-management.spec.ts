@@ -616,22 +616,27 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
         await expect(sidepanelPage.getByRole('heading', { name: 'Blog Post Outline' })).toBeVisible();
 
         // Test category filtering - filter by "Coding"
-        const categoryFilter = sidepanelPage.locator('select').filter({ hasText: 'All Categories' });
-        await categoryFilter.selectOption('Coding');
+        await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
+        await sidepanelPage.getByRole('menu', { name: 'Category filter menu' }).waitFor();
+        await sidepanelPage.getByRole('menuitem', { name: 'Coding' }).click();
 
         // Should only show the coding prompt
         await expect(sidepanelPage.getByRole('heading', { name: 'Debug Function' })).toBeVisible();
         await expect(sidepanelPage.getByRole('heading', { name: 'Blog Post Outline' })).toBeHidden();
 
         // Filter by "Writing"
-        await categoryFilter.selectOption('Writing');
+        await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
+        await sidepanelPage.getByRole('menu', { name: 'Category filter menu' }).waitFor();
+        await sidepanelPage.getByRole('menuitem', { name: 'Writing' }).click();
 
         // Should only show the writing prompt
         await expect(sidepanelPage.getByRole('heading', { name: 'Blog Post Outline' })).toBeVisible();
         await expect(sidepanelPage.getByRole('heading', { name: 'Debug Function' })).toBeHidden();
 
         // Clear filter (show all)
-        await categoryFilter.selectOption('All Categories');
+        await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
+        await sidepanelPage.getByRole('menu', { name: 'Category filter menu' }).waitFor();
+        await sidepanelPage.getByRole('menuitem', { name: 'All Categories' }).click();
 
         // Should show both prompts again
         await expect(sidepanelPage.getByRole('heading', { name: 'Debug Function' })).toBeVisible();
@@ -682,15 +687,18 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
         await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
         // First, verify filtering works with original category name
-        const categoryFilter = sidepanelPage.locator('select').filter({ hasText: 'All Categories' });
-        await categoryFilter.selectOption('Development');
+        await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
+        await sidepanelPage.getByRole('menu', { name: 'Category filter menu' }).waitFor();
+        await sidepanelPage.getByRole('menuitem', { name: 'Development' }).click();
 
         // Should show both development prompts
         await expect(sidepanelPage.getByRole('heading', { name: 'Code Review Checklist' })).toBeVisible();
         await expect(sidepanelPage.getByRole('heading', { name: 'Git Workflow' })).toBeVisible();
 
         // Clear filter to show all prompts
-        await categoryFilter.selectOption('All Categories');
+        await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
+        await sidepanelPage.getByRole('menu', { name: 'Category filter menu' }).waitFor();
+        await sidepanelPage.getByRole('menuitem', { name: 'All Categories' }).click();
 
         // Now rename the category
         await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
@@ -709,7 +717,9 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
 
         // Verify category filter dropdown now shows "Programming" instead of "Development"
         // Check options by trying to select them
-        await categoryFilter.selectOption('Programming');
+        await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
+        await sidepanelPage.getByRole('menu', { name: 'Category filter menu' }).waitFor();
+        await sidepanelPage.getByRole('menuitem', { name: 'Programming' }).click();
 
         // Should still show the same prompts, now under "Programming"
         await expect(sidepanelPage.getByRole('heading', { name: 'Code Review Checklist' })).toBeVisible();
