@@ -147,25 +147,27 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
   // Menu keyboard navigation
   const handleMenuKeyDown = (
     event: React.KeyboardEvent,
-    items: Array<{ handler: () => void }>,
     currentIndex: number
   ) => {
     if (event.key === 'ArrowDown') {
       event.preventDefault();
-      const nextIndex = (currentIndex + 1) % items.length;
       const parent = event.currentTarget.parentElement;
       if (parent) {
+        const nextIndex = (currentIndex + 1) % parent.children.length;
         (parent.children[nextIndex] as HTMLElement).focus();
       }
     } else if (event.key === 'ArrowUp') {
       event.preventDefault();
-      const prevIndex = (currentIndex - 1 + items.length) % items.length;
       const parent = event.currentTarget.parentElement;
       if (parent) {
+        const prevIndex = (currentIndex - 1 + parent.children.length) % parent.children.length;
         (parent.children[prevIndex] as HTMLElement).focus();
       }
     }
   };
+
+  // Get current sort icon component for badge rendering
+  const CurrentSortIcon = getCurrentSortIcon();
 
   return (
     <div className="flex items-center justify-between">
@@ -241,7 +243,7 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
               {/* All Categories option */}
               <button
                 onClick={() => { handleCategorySelect(null); }}
-                onKeyDown={(e) => { handleMenuKeyDown(e, [], 0); }}
+                onKeyDown={(e) => { handleMenuKeyDown(e, 0); }}
                 className={`
                   block w-full text-left
                   px-4 py-3
@@ -275,7 +277,7 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
                 <button
                   key={category.id}
                   onClick={() => { handleCategorySelect(category.name); }}
-                  onKeyDown={(e) => { handleMenuKeyDown(e, [], index + 1); }}
+                  onKeyDown={(e) => { handleMenuKeyDown(e, index + 1); }}
                   className={`
                     block w-full text-left
                     px-4 py-3
@@ -348,14 +350,9 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
               className="absolute -top-1 -right-1 w-5 h-5 bg-purple-100 dark:bg-purple-900/40 border-2 border-white dark:border-gray-800 rounded-full flex items-center justify-center"
               aria-hidden="true"
             >
-              {(() => {
-                const SortIcon = getCurrentSortIcon();
-                return (
-                  <div className="w-3 h-3 text-purple-700 dark:text-purple-400">
-                    <SortIcon />
-                  </div>
-                );
-              })()}
+              <div className="w-3 h-3 text-purple-700 dark:text-purple-400">
+                <CurrentSortIcon />
+              </div>
             </span>
           </button>
 
@@ -384,7 +381,7 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
                 <button
                   key={option.value}
                   onClick={() => { handleSortSelect(option.value); }}
-                  onKeyDown={(e) => { handleMenuKeyDown(e, [], index); }}
+                  onKeyDown={(e) => { handleMenuKeyDown(e, index); }}
                   className={`
                     block w-full text-left
                     px-4 py-3
