@@ -279,12 +279,15 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
               className="
                 fixed
                 min-w-[200px]
+                max-h-[400px]
                 bg-white dark:bg-gray-800 backdrop-blur-sm
                 rounded-xl
                 shadow-xl
                 border border-purple-200 dark:border-gray-700
-                overflow-hidden
+                overflow-y-auto
+                overflow-x-hidden
                 animate-in fade-in-0 zoom-in-95
+                custom-scrollbar
               "
               style={{ zIndex: 1001 }}
               role="menu"
@@ -418,12 +421,15 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
               className="
                 fixed
                 min-w-[220px]
+                max-h-[400px]
                 bg-white dark:bg-gray-800 backdrop-blur-sm
                 rounded-xl
                 shadow-xl
                 border border-purple-200 dark:border-gray-700
-                overflow-hidden
+                overflow-y-auto
+                overflow-x-hidden
                 animate-in fade-in-0 zoom-in-95
+                custom-scrollbar
               "
               style={{ zIndex: 1001 }}
               role="menu"
