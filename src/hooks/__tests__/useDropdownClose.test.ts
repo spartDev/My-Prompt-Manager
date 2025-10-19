@@ -2,7 +2,7 @@ import { renderHook } from '@testing-library/react';
 import { useRef } from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-import { useDropdownClose, UseDropdownCloseOptions } from '../useDropdownClose';
+import { useDropdownClose } from '../useDropdownClose';
 
 describe('useDropdownClose', () => {
   let triggerElement: HTMLButtonElement;
@@ -330,7 +330,7 @@ describe('useDropdownClose', () => {
     it('should handle null refs gracefully', () => {
       const onClose = vi.fn();
 
-      const { result } = renderHook(() => {
+      renderHook(() => {
         const triggerRef = useRef<HTMLButtonElement>(null);
         const menuRef = useRef<HTMLDivElement>(null);
 
@@ -340,8 +340,6 @@ describe('useDropdownClose', () => {
           triggerRef,
           menuRef
         });
-
-        return { triggerRef, menuRef };
       });
 
       // Should not throw

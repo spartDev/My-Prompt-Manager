@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 
-import type { Prompt, SortOrder, SortDirection } from '../../types';
+import type { Prompt, SortOrder } from '../../types';
 import { PromptManager } from '../promptManager';
 
 describe('PromptManager - Sorting', () => {

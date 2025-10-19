@@ -1,4 +1,4 @@
-import { useEffect, RefObject } from 'react';
+import { useEffect } from 'react';
 
 export interface UseDropdownCloseOptions {
   /** Whether the dropdown is currently open */
@@ -6,13 +6,13 @@ export interface UseDropdownCloseOptions {
   /** Callback to close the dropdown */
   onClose: () => void;
   /** Ref to the dropdown trigger button */
-  triggerRef: RefObject<HTMLElement>;
+  triggerRef: { readonly current: HTMLElement | null };
   /** Ref to the dropdown menu/content */
-  menuRef: RefObject<HTMLElement>;
+  menuRef: { readonly current: HTMLElement | null };
   /** Whether to close on Escape key (default: true) */
   closeOnEscape?: boolean;
   /** Element to focus when closing via Escape (default: triggerRef) */
-  focusOnEscape?: RefObject<HTMLElement>;
+  focusOnEscape?: { readonly current: HTMLElement | null };
 }
 
 /**
@@ -54,7 +54,6 @@ export const useDropdownClose = ({
       const menu = menuRef.current;
       const trigger = triggerRef.current;
 
-      /* eslint-disable @typescript-eslint/no-unnecessary-condition */
       if (
         menu &&
         !menu.contains(target) &&
@@ -63,7 +62,6 @@ export const useDropdownClose = ({
       ) {
         onClose();
       }
-      /* eslint-enable @typescript-eslint/no-unnecessary-condition */
     };
 
     const handleEscapeKey = (event: KeyboardEvent) => {
@@ -73,11 +71,9 @@ export const useDropdownClose = ({
         // Restore focus to specified element or trigger
         const focusTarget = focusOnEscape || triggerRef;
         const focusElement = focusTarget.current;
-        /* eslint-disable @typescript-eslint/no-unnecessary-condition */
         if (focusElement) {
           focusElement.focus();
         }
-        /* eslint-enable @typescript-eslint/no-unnecessary-condition */
       }
     };
 
