@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import type { FC } from 'react';
 
-import { Prompt, SortOrder, SortDirection } from '../types';
+import { Prompt } from '../types';
 import { LibraryViewProps } from '../types/components';
 
 import FilterSortControls from './FilterSortControls';
@@ -49,7 +49,7 @@ const LibraryView: FC<LibraryViewProps> = ({
         context={context}
       >
         <ViewHeader.Actions>
-          <ViewHeader.SettingsButton onClick={() => { (onSettings as () => void)(); }} />
+          <ViewHeader.SettingsButton onClick={onSettings} />
           {context === 'sidepanel' && (
             <ViewHeader.CloseButton onClick={() => { window.close(); }} context="sidepanel" />
           )}
@@ -75,10 +75,10 @@ const LibraryView: FC<LibraryViewProps> = ({
             selectedCategory={selectedCategory}
             sortOrder={sortOrder}
             sortDirection={sortDirection}
-            onCategoryChange={onCategoryChange as (category: string | null) => void}
-            onSortChange={onSortChange as (order: SortOrder, direction: SortDirection) => void}
-            onManageCategories={onManageCategories as () => void}
-            loading={loading as boolean}
+            onCategoryChange={onCategoryChange}
+            onSortChange={onSortChange}
+            onManageCategories={onManageCategories}
+            loading={loading}
             context={context}
           />
         </div>
@@ -86,7 +86,7 @@ const LibraryView: FC<LibraryViewProps> = ({
 
       {/* Content */}
       <main className={`flex-1 overflow-auto custom-scrollbar ${finalFilteredPrompts.length > 0 ? 'pb-24' : ''}`} aria-label="My Prompt Manager content">
-        {(loading as boolean) ? (
+        {loading ? (
           <div className="flex flex-col items-center justify-center h-full space-y-4" role="status" aria-live="polite">
             <div className="w-8 h-8 border-4 border-purple-200 dark:border-purple-800 border-t-purple-500 dark:border-t-purple-400 rounded-full animate-spin" aria-hidden="true"></div>
             <div className="text-gray-600 dark:text-gray-400 font-medium">Loading your prompts...</div>
@@ -103,7 +103,7 @@ const LibraryView: FC<LibraryViewProps> = ({
                 <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-2">You&apos;re ready to go</h2>
                 <p className="text-gray-500 dark:text-gray-400 mb-4 text-sm leading-relaxed">Create your first prompt to start building your personal collection of reusable content.</p>
                 <button
-                  onClick={onAddNew as () => void}
+                  onClick={onAddNew}
                   className="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl focus-primary"
                   aria-label="Create your first prompt"
                 >
@@ -129,9 +129,9 @@ const LibraryView: FC<LibraryViewProps> = ({
                 key={prompt.id}
                 prompt={prompt}
                 categories={categories}
-                onEdit={onEditPrompt as (prompt: Prompt) => void}
-                onDelete={onDeletePrompt as (id: string) => void}
-                onCopy={onCopyPrompt as (content: string) => void}
+                onEdit={onEditPrompt}
+                onDelete={onDeletePrompt}
+                onCopy={onCopyPrompt}
                 showToast={showToast}
                 searchQuery={debouncedQuery}
               />
@@ -155,15 +155,15 @@ const LibraryView: FC<LibraryViewProps> = ({
 
       {/* Floating Add Button */}
       <button
-        onClick={onAddNew as () => void}
+        onClick={onAddNew}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
-            (onAddNew as () => void)();
+            onAddNew();
           }
         }}
         className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-full hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 shadow-2xl hover:shadow-3xl transform hover:scale-110 z-50 flex items-center justify-center focus-primary disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-        disabled={loading as boolean}
+        disabled={loading}
         aria-label="Add new prompt"
         title="Add New Prompt"
       >

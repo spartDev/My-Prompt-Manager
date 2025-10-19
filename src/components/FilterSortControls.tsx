@@ -1,6 +1,6 @@
 import { computePosition, flip, offset, autoUpdate } from '@floating-ui/dom';
 import type { FC } from 'react';
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, memo } from 'react';
 import { createPortal } from 'react-dom';
 
 import { SortOrder } from '../types';
@@ -522,4 +522,36 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
   );
 };
 
-export default FilterSortControls;
+// Custom props comparison for React.memo optimization
+// Prevents unnecessary re-renders when props haven't actually changed
+const arePropsEqual = (
+  prev: FilterSortControlsProps,
+  next: FilterSortControlsProps
+): boolean => {
+  // Check primitive props
+  if (prev.selectedCategory !== next.selectedCategory) {return false;}
+  if (prev.sortOrder !== next.sortOrder) {return false;}
+  if (prev.sortDirection !== next.sortDirection) {return false;}
+  if (prev.loading !== next.loading) {return false;}
+  if (prev.context !== next.context) {return false;}
+
+  // Check categories array length first (fast check)
+  if (prev.categories.length !== next.categories.length) {return false;}
+
+  // Deep comparison of categories (only if lengths match)
+  for (let i = 0; i < prev.categories.length; i++) {
+    if (prev.categories[i].id !== next.categories[i].id) {return false;}
+    if (prev.categories[i].name !== next.categories[i].name) {return false;}
+    if (prev.categories[i].color !== next.categories[i].color) {return false;}
+  }
+
+  // Handler stability check (these should be stable from useCallback in parent)
+  if (prev.onCategoryChange !== next.onCategoryChange) {return false;}
+  if (prev.onSortChange !== next.onSortChange) {return false;}
+  if (prev.onManageCategories !== next.onManageCategories) {return false;}
+
+  // All props are equal
+  return true;
+};
+
+export default memo(FilterSortControls, arePropsEqual);

@@ -21,13 +21,6 @@ export interface SearchBarProps {
   placeholder?: string;
 }
 
-export interface CategoryFilterProps {
-  categories: Category[];
-  selectedCategory: string | null;
-  onChange: (category: string | null) => void;
-  showAll?: boolean;
-}
-
 export interface AddPromptFormProps {
   categories: Category[];
   onSubmit: (data: { title: string; content: string; category: string }) => Promise<void> | void;
