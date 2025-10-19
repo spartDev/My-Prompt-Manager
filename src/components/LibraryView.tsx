@@ -1,10 +1,10 @@
 import { useMemo } from 'react';
 import type { FC } from 'react';
 
-import { Prompt } from '../types';
+import { Prompt, SortOrder, SortDirection } from '../types';
 import { LibraryViewProps } from '../types/components';
 
-import CategoryFilter from './CategoryFilter';
+import FilterSortControls from './FilterSortControls';
 import PromptCard from './PromptCard';
 import SearchBar from './SearchBar';
 import ViewHeader from './ViewHeader';
@@ -14,12 +14,15 @@ const LibraryView: FC<LibraryViewProps> = ({
   categories,
   searchWithDebounce,
   selectedCategory,
+  sortOrder,
+  sortDirection,
   onAddNew,
   onEditPrompt,
   onDeletePrompt,
   onCopyPrompt,
   showToast,
   onCategoryChange,
+  onSortChange,
   onManageCategories,
   onSettings,
   loading,
@@ -67,31 +70,17 @@ const LibraryView: FC<LibraryViewProps> = ({
             )}
           </div>
 
-          <div className="flex items-center justify-between">
-            <div role="group" aria-label="Filter by category">
-              <CategoryFilter
-                categories={categories}
-                selectedCategory={selectedCategory}
-                onChange={onCategoryChange as (category: string | null) => void}
-                showAll={true}
-              />
-            </div>
-
-            <button
-              onClick={onManageCategories as () => void}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  (onManageCategories as () => void)();
-                }
-              }}
-              className="text-xs text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-semibold px-3 py-2 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors focus-interactive disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={loading as boolean}
-              aria-label="Manage categories"
-            >
-              Manage Categories
-            </button>
-          </div>
+          <FilterSortControls
+            categories={categories}
+            selectedCategory={selectedCategory}
+            sortOrder={sortOrder}
+            sortDirection={sortDirection}
+            onCategoryChange={onCategoryChange as (category: string | null) => void}
+            onSortChange={onSortChange as (order: SortOrder, direction: SortDirection) => void}
+            onManageCategories={onManageCategories as () => void}
+            loading={loading as boolean}
+            context={context}
+          />
         </div>
       </ViewHeader>
 

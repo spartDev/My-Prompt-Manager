@@ -1,6 +1,6 @@
 import { UseSearchWithDebounceReturn } from './hooks';
 
-import { Prompt, Category } from './index';
+import { Prompt, Category, SortOrder, SortDirection } from './index';
 
 // Component prop interfaces
 export interface PromptCardProps {
@@ -46,12 +46,15 @@ export interface LibraryViewProps {
   categories: Category[];
   searchWithDebounce: UseSearchWithDebounceReturn;
   selectedCategory: string | null;
+  sortOrder: SortOrder;
+  sortDirection: SortDirection;
   onAddNew: () => void;
   onEditPrompt: (prompt: Prompt) => void;
   onDeletePrompt: (id: string) => void;
   onCopyPrompt: (content: string) => void;
   showToast: (message: string, type: 'success' | 'error' | 'info' | 'warning') => void;
   onCategoryChange: (category: string | null) => void;
+  onSortChange: (order: SortOrder, direction: SortDirection) => void;
   onManageCategories: () => void;
   onSettings: () => void;
   loading?: boolean;
@@ -80,4 +83,16 @@ export interface ConfirmDialogProps {
   cancelText?: string;
   onConfirm: () => void;
   onCancel: () => void;
+}
+
+export interface FilterSortControlsProps {
+  categories: Category[];
+  selectedCategory: string | null;
+  sortOrder: SortOrder;
+  sortDirection: SortDirection;
+  onCategoryChange: (category: string | null) => void;
+  onSortChange: (order: SortOrder, direction: SortDirection) => void;
+  onManageCategories: () => void;
+  loading?: boolean;
+  context?: 'popup' | 'sidepanel';
 }

@@ -20,6 +20,10 @@ export interface Settings {
   interfaceMode?: 'popup' | 'sidepanel';
 }
 
+// Sort order type for prompts
+export type SortOrder = 'createdAt' | 'updatedAt' | 'title';
+export type SortDirection = 'asc' | 'desc';
+
 export interface StorageData {
   prompts: Prompt[];
   categories: Category[];
