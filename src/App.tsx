@@ -1,4 +1,4 @@
-import { useState, useOptimistic, useTransition, useMemo, useCallback } from 'react';
+import { useState, useOptimistic, useTransition } from 'react';
 import type { FC } from 'react';
 
 import AddPromptForm from './components/AddPromptForm';
@@ -10,8 +10,7 @@ import StorageWarning from './components/StorageWarning';
 import ToastContainer from './components/ToastContainer';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { usePrompts, useCategories, useClipboard, useToast, useSearchWithDebounce } from './hooks';
-import { PromptManager } from './services/promptManager';
-import { Prompt, ErrorType, AppError, SortOrder, SortDirection } from './types';
+import { Prompt, ErrorType, AppError } from './types';
 import { Logger, toError } from './utils';
 
 type ViewType = 'library' | 'add' | 'edit' | 'categories' | 'settings';
@@ -28,8 +27,6 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   const [currentView, setCurrentView] = useState<ViewType>(isPickerMode ? 'settings' : 'library');
   const [selectedPrompt, setSelectedPrompt] = useState<Prompt | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [sortOrder, setSortOrder] = useState<SortOrder>('updatedAt');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [showStorageWarning, setShowStorageWarning] = useState<boolean>(false);
 
   // React 19 useTransition for managing optimistic updates
@@ -63,17 +60,8 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   const { copyToClipboard } = useClipboard();
   const { toasts, showToast, hideToast, queueLength, settings, updateSettings } = useToast();
 
-  // Sort optimistic prompts based on current sort settings using PromptManager service
-  const sortedPrompts = useMemo(() => {
-    return PromptManager.getInstance().sortPrompts(
-      optimisticPrompts,
-      sortOrder,
-      sortDirection
-    );
-  }, [optimisticPrompts, sortOrder, sortDirection]);
-
-  // Initialize search with debounce functionality using sorted prompts
-  const searchWithDebounce = useSearchWithDebounce(sortedPrompts);
+  // Initialize search with debounce functionality using optimistic prompts
+  const searchWithDebounce = useSearchWithDebounce(optimisticPrompts);
 
   const handleAddNew = () => {
     setCurrentView('add');
@@ -128,11 +116,6 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
       showToast('Failed to delete prompt', 'error');
     }
   };
-
-  const handleSortChange = useCallback((order: SortOrder, direction: SortDirection) => {
-    setSortOrder(order);
-    setSortDirection(direction);
-  }, []);
 
   const handleCopyPrompt = async (content: string) => {
     const success = await copyToClipboard(content);
@@ -252,9 +235,6 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
           categories={categories}
           searchWithDebounce={searchWithDebounce}
           selectedCategory={selectedCategory}
-          sortOrder={sortOrder}
-          sortDirection={sortDirection}
-          onSortChange={handleSortChange}
           onAddNew={handleAddNew}
           onEditPrompt={handleEditPrompt}
           onDeletePrompt={(id: string) => { void handleDeletePrompt(id); }}

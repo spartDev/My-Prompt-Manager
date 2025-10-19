@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import type { FC } from 'react';
 
+import { useSort } from '../hooks';
+import { PromptManager } from '../services/promptManager';
 import { Prompt } from '../types';
 import { LibraryViewProps } from '../types/components';
 
@@ -14,30 +16,30 @@ const LibraryView: FC<LibraryViewProps> = ({
   categories,
   searchWithDebounce,
   selectedCategory,
-  sortOrder,
-  sortDirection,
   onAddNew,
   onEditPrompt,
   onDeletePrompt,
   onCopyPrompt,
   showToast,
   onCategoryChange,
-  onSortChange,
   onManageCategories,
   onSettings,
   loading,
   context = 'popup'
 }) => {
   const { query, debouncedQuery, filteredPrompts, isSearching } = searchWithDebounce;
+  const { sortOrder, sortDirection, handleSortChange } = useSort();
 
   const finalFilteredPrompts = useMemo(() => {
     // Apply category filter to search-filtered prompts
+    let filtered = filteredPrompts;
     if (selectedCategory) {
-      return filteredPrompts.filter((prompt: Prompt) => prompt.category === selectedCategory);
+      filtered = filteredPrompts.filter((prompt: Prompt) => prompt.category === selectedCategory);
     }
-    
-    return filteredPrompts;
-  }, [filteredPrompts, selectedCategory]);
+
+    // Apply sorting using PromptManager service
+    return PromptManager.getInstance().sortPrompts(filtered, sortOrder, sortDirection);
+  }, [filteredPrompts, selectedCategory, sortOrder, sortDirection]);
 
   return (
     <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900">
@@ -76,7 +78,7 @@ const LibraryView: FC<LibraryViewProps> = ({
             sortOrder={sortOrder}
             sortDirection={sortDirection}
             onCategoryChange={onCategoryChange}
-            onSortChange={onSortChange}
+            onSortChange={handleSortChange}
             onManageCategories={onManageCategories}
             loading={loading}
           />

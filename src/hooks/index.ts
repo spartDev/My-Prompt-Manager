@@ -6,3 +6,4 @@ export { useSearchWithDebounce } from './useSearchWithDebounce';
 export { useToast } from './useToast';
 export { useExtensionContext } from './useExtensionContext';
 export { useFloatingPosition } from './useFloatingPosition';
+export { useSort } from './useSort';
