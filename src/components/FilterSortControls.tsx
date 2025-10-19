@@ -1,7 +1,8 @@
 import type { FC } from 'react';
-import { useState, useRef, useEffect, useCallback, memo } from 'react';
+import { useState, useRef, useEffect, memo } from 'react';
 import { createPortal } from 'react-dom';
 
+import { DROPDOWN_CONFIG, DEFAULT_COLORS } from '../constants/ui';
 import { useFloatingPosition } from '../hooks';
 import { SortOrder } from '../types';
 import { FilterSortControlsProps } from '../types/components';
@@ -88,13 +89,10 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
   useFloatingPosition(showFilterMenu, filterButtonRef, filterMenuRef);
   useFloatingPosition(showSortMenu, sortButtonRef, sortMenuRef);
 
-  // Get active state text
-  const getCategoryLabel = useCallback(() => {
-    if (!selectedCategory) {return 'All';}
-    return selectedCategory;
-  }, [selectedCategory]);
+  // Derived values for active state text
+  const categoryLabel = selectedCategory || 'All';
 
-  const getSortLabel = useCallback(() => {
+  const getSortLabel = (): string => {
     const option = SORT_OPTIONS.find(opt => opt.value === sortOrder);
     if (!option) {return 'A→Z';}
 
@@ -102,7 +100,9 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
       return sortDirection === 'asc' ? 'A→Z' : 'Z→A';
     }
     return sortDirection === 'desc' ? 'Newest' : 'Oldest';
-  }, [sortOrder, sortDirection]);
+  };
+
+  const sortLabel = getSortLabel();
 
   // Handlers
   const handleCategorySelect = (category: string | null) => {
@@ -120,21 +120,6 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
       onSortChange(order, defaultDirection);
     }
     setShowSortMenu(false);
-  };
-
-  // Get selected category color for badge
-  const getSelectedCategoryColor = (): string => {
-    if (!selectedCategory) {
-      return '#a855f7'; // Default purple-500
-    }
-    const category = categories.find(cat => cat.name === selectedCategory);
-    return category?.color || '#a855f7'; // Fallback to purple-500
-  };
-
-  // Get current sort icon component
-  const getCurrentSortIcon = (): FC => {
-    const option = SORT_OPTIONS.find(opt => opt.value === sortOrder);
-    return option?.icon || ClockIcon; // Default to clock icon
   };
 
   const handleKeyDown = (event: React.KeyboardEvent, handler: () => void) => {
@@ -166,9 +151,6 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
     }
   };
 
-  // Get current sort icon component for badge rendering
-  const CurrentSortIcon = getCurrentSortIcon();
-
   return (
     <div className="flex items-center justify-between">
       {/* Left: Filter + Sort + Active State */}
@@ -194,10 +176,10 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
               disabled:opacity-50 disabled:cursor-not-allowed
               relative
             "
-            aria-label={`Filter by category: ${getCategoryLabel()}`}
+            aria-label={`Filter by category: ${categoryLabel}`}
             aria-expanded={showFilterMenu}
             aria-haspopup="menu"
-            title={`Filter: ${getCategoryLabel()}`}
+            title={`Filter: ${categoryLabel}`}
           >
             {/* Funnel icon */}
             <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -206,14 +188,18 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
 
             {/* Filter label */}
             <span className="text-sm font-semibold truncate max-w-[100px]">
-              {getCategoryLabel()}
+              {categoryLabel}
             </span>
 
             {/* Badge indicator when category selected */}
             {selectedCategory && (
               <span
                 className="absolute -top-1 -right-1 w-3 h-3 border-2 border-white dark:border-gray-800 rounded-full"
-                style={{ backgroundColor: getSelectedCategoryColor() }}
+                style={{
+                  backgroundColor: selectedCategory
+                    ? categories.find(cat => cat.name === selectedCategory)?.color || DEFAULT_COLORS.CATEGORY_BADGE
+                    : DEFAULT_COLORS.CATEGORY_BADGE
+                }}
                 aria-hidden="true"
               />
             )}
@@ -226,7 +212,6 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
               className="
                 fixed
                 min-w-[200px]
-                max-h-[250px]
                 bg-white dark:bg-gray-800 backdrop-blur-sm
                 rounded-xl
                 shadow-xl
@@ -236,7 +221,10 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
                 animate-in fade-in-0 zoom-in-95
                 custom-scrollbar
               "
-              style={{ zIndex: 1001 }}
+              style={{
+                maxHeight: `${String(DROPDOWN_CONFIG.FILTER_MAX_HEIGHT)}px`,
+                zIndex: DROPDOWN_CONFIG.PORTAL_Z_INDEX
+              }}
               role="menu"
               aria-label="Category filter menu"
             >
@@ -335,10 +323,10 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
               focus-interactive
               disabled:opacity-50 disabled:cursor-not-allowed
             "
-            aria-label={`Sort order: ${getSortLabel()}`}
+            aria-label={`Sort order: ${sortLabel}`}
             aria-expanded={showSortMenu}
             aria-haspopup="menu"
-            title={`Sort: ${getSortLabel()}`}
+            title={`Sort: ${sortLabel}`}
           >
             {/* Sort icon (arrows up/down) */}
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -351,7 +339,11 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
               aria-hidden="true"
             >
               <div className="w-3 h-3 text-purple-700 dark:text-purple-400">
-                <CurrentSortIcon />
+                {(() => {
+                  const option = SORT_OPTIONS.find(opt => opt.value === sortOrder);
+                  const Icon = option?.icon || ClockIcon;
+                  return <Icon />;
+                })()}
               </div>
             </span>
           </button>
@@ -363,7 +355,6 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
               className="
                 fixed
                 min-w-[220px]
-                max-h-[400px]
                 bg-white dark:bg-gray-800 backdrop-blur-sm
                 rounded-xl
                 shadow-xl
@@ -373,7 +364,10 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
                 animate-in fade-in-0 zoom-in-95
                 custom-scrollbar
               "
-              style={{ zIndex: 1001 }}
+              style={{
+                maxHeight: `${String(DROPDOWN_CONFIG.SORT_MAX_HEIGHT)}px`,
+                zIndex: DROPDOWN_CONFIG.PORTAL_Z_INDEX
+              }}
               role="menu"
               aria-label="Sort order menu"
             >
@@ -425,9 +419,9 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
           aria-live="polite"
           aria-atomic="true"
         >
-          <span className="truncate">{getCategoryLabel()}</span>
+          <span className="truncate">{categoryLabel}</span>
           <span className="mx-2 text-purple-400 dark:text-purple-500" aria-hidden="true">•</span>
-          <span className="truncate">{getSortLabel()}</span>
+          <span className="truncate">{sortLabel}</span>
         </div>
       </div>
 

@@ -2,6 +2,7 @@ import DOMPurify from 'dompurify';
 import { useState, useRef, useEffect, memo } from 'react';
 import type { FC, MouseEvent, ReactNode } from 'react';
 
+import { DROPDOWN_CONFIG } from '../constants/ui';
 import { encode } from '../services/promptEncoder';
 import { Category, Prompt } from '../types';
 import { PromptCardProps } from '../types/components';
@@ -287,10 +288,10 @@ const PromptCard: FC<PromptCardProps> = ({
                   }}
                   aria-label="Close menu"
                 />
-                <div 
+                <div
                   ref={menuRef}
                   className="absolute right-0 top-full mt-1 w-28 bg-white dark:bg-gray-800 backdrop-blur-sm rounded-xl shadow-xl border border-purple-200 dark:border-gray-700 overflow-hidden"
-                  style={{ zIndex: 1001 }}
+                  style={{ zIndex: DROPDOWN_CONFIG.PORTAL_Z_INDEX }}
                   role="menu"
                   aria-label="Prompt actions"
                 >
