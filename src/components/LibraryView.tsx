@@ -1,10 +1,12 @@
 import { useMemo } from 'react';
 import type { FC } from 'react';
 
+import { useSort } from '../hooks';
+import { PromptManager } from '../services/promptManager';
 import { Prompt } from '../types';
 import { LibraryViewProps } from '../types/components';
 
-import CategoryFilter from './CategoryFilter';
+import FilterSortControls from './FilterSortControls';
 import PromptCard from './PromptCard';
 import SearchBar from './SearchBar';
 import ViewHeader from './ViewHeader';
@@ -26,15 +28,18 @@ const LibraryView: FC<LibraryViewProps> = ({
   context = 'popup'
 }) => {
   const { query, debouncedQuery, filteredPrompts, isSearching } = searchWithDebounce;
+  const { sortOrder, sortDirection, handleSortChange } = useSort();
 
   const finalFilteredPrompts = useMemo(() => {
     // Apply category filter to search-filtered prompts
+    let filtered = filteredPrompts;
     if (selectedCategory) {
-      return filteredPrompts.filter((prompt: Prompt) => prompt.category === selectedCategory);
+      filtered = filteredPrompts.filter((prompt) => prompt.category === selectedCategory);
     }
-    
-    return filteredPrompts;
-  }, [filteredPrompts, selectedCategory]);
+
+    // Apply sorting using PromptManager service
+    return PromptManager.getInstance().sortPrompts(filtered, sortOrder, sortDirection);
+  }, [filteredPrompts, selectedCategory, sortOrder, sortDirection]);
 
   return (
     <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900">
@@ -46,7 +51,7 @@ const LibraryView: FC<LibraryViewProps> = ({
         context={context}
       >
         <ViewHeader.Actions>
-          <ViewHeader.SettingsButton onClick={() => { (onSettings as () => void)(); }} />
+          <ViewHeader.SettingsButton onClick={onSettings} />
           {context === 'sidepanel' && (
             <ViewHeader.CloseButton onClick={() => { window.close(); }} context="sidepanel" />
           )}
@@ -67,37 +72,22 @@ const LibraryView: FC<LibraryViewProps> = ({
             )}
           </div>
 
-          <div className="flex items-center justify-between">
-            <div role="group" aria-label="Filter by category">
-              <CategoryFilter
-                categories={categories}
-                selectedCategory={selectedCategory}
-                onChange={onCategoryChange as (category: string | null) => void}
-                showAll={true}
-              />
-            </div>
-
-            <button
-              onClick={onManageCategories as () => void}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  (onManageCategories as () => void)();
-                }
-              }}
-              className="text-xs text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-semibold px-3 py-2 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors focus-interactive disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={loading as boolean}
-              aria-label="Manage categories"
-            >
-              Manage Categories
-            </button>
-          </div>
+          <FilterSortControls
+            categories={categories}
+            selectedCategory={selectedCategory}
+            sortOrder={sortOrder}
+            sortDirection={sortDirection}
+            onCategoryChange={onCategoryChange}
+            onSortChange={handleSortChange}
+            onManageCategories={onManageCategories}
+            loading={loading}
+          />
         </div>
       </ViewHeader>
 
       {/* Content */}
       <main className={`flex-1 overflow-auto custom-scrollbar ${finalFilteredPrompts.length > 0 ? 'pb-24' : ''}`} aria-label="My Prompt Manager content">
-        {(loading as boolean) ? (
+        {loading ? (
           <div className="flex flex-col items-center justify-center h-full space-y-4" role="status" aria-live="polite">
             <div className="w-8 h-8 border-4 border-purple-200 dark:border-purple-800 border-t-purple-500 dark:border-t-purple-400 rounded-full animate-spin" aria-hidden="true"></div>
             <div className="text-gray-600 dark:text-gray-400 font-medium">Loading your prompts...</div>
@@ -114,7 +104,7 @@ const LibraryView: FC<LibraryViewProps> = ({
                 <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-2">You&apos;re ready to go</h2>
                 <p className="text-gray-500 dark:text-gray-400 mb-4 text-sm leading-relaxed">Create your first prompt to start building your personal collection of reusable content.</p>
                 <button
-                  onClick={onAddNew as () => void}
+                  onClick={onAddNew}
                   className="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl focus-primary"
                   aria-label="Create your first prompt"
                 >
@@ -140,9 +130,9 @@ const LibraryView: FC<LibraryViewProps> = ({
                 key={prompt.id}
                 prompt={prompt}
                 categories={categories}
-                onEdit={onEditPrompt as (prompt: Prompt) => void}
-                onDelete={onDeletePrompt as (id: string) => void}
-                onCopy={onCopyPrompt as (content: string) => void}
+                onEdit={onEditPrompt}
+                onDelete={onDeletePrompt}
+                onCopy={onCopyPrompt}
                 showToast={showToast}
                 searchQuery={debouncedQuery}
               />
@@ -166,15 +156,15 @@ const LibraryView: FC<LibraryViewProps> = ({
 
       {/* Floating Add Button */}
       <button
-        onClick={onAddNew as () => void}
+        onClick={onAddNew}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
-            (onAddNew as () => void)();
+            onAddNew();
           }
         }}
         className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-full hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 shadow-2xl hover:shadow-3xl transform hover:scale-110 z-50 flex items-center justify-center focus-primary disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-        disabled={loading as boolean}
+        disabled={loading}
         aria-label="Add new prompt"
         title="Add New Prompt"
       >

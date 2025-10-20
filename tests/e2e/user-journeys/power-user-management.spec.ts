@@ -179,7 +179,9 @@ test.describe('User Journey: Power User Prompt Management & Organization', () =>
     await closeButton.click();
 
     // Check that all former "Work" prompts now show "Professional" category
-    await sidepanelPage.locator('select').filter({ hasText: 'All Categories' }).selectOption('Professional');
+    await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
+    await sidepanelPage.getByRole('menu', { name: 'Category filter menu' }).waitFor();
+    await sidepanelPage.getByRole('menuitem', { name: 'Professional' }).click();
     await expect(sidepanelPage.locator('article')).toHaveCount(5); // 5 work prompts
 
     // Verify specific prompts show new category
@@ -187,13 +189,17 @@ test.describe('User Journey: Power User Prompt Management & Organization', () =>
     await expect(sidepanelPage.getByText('Client Proposal Outline')).toBeVisible();
 
     // Return to all categories view
-    await sidepanelPage.locator('select').filter({ hasText: 'Professional' }).selectOption('');
+    await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
+    await sidepanelPage.getByRole('menu', { name: 'Category filter menu' }).waitFor();
+    await sidepanelPage.getByRole('menuitem', { name: 'All Categories' }).click();
 
     // Scenario 2: Category consolidation - merge Marketing into Professional
     console.log('[TEST] Starting Scenario 2: Category consolidation');
 
     // First, move Marketing prompts to Professional category
-    await sidepanelPage.locator('select').filter({ hasText: 'All Categories' }).selectOption('Marketing');
+    await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
+    await sidepanelPage.getByRole('menu', { name: 'Category filter menu' }).waitFor();
+    await sidepanelPage.getByRole('menuitem', { name: 'Marketing' }).click();
     await expect(sidepanelPage.locator('article')).toHaveCount(2); // 2 marketing prompts
 
     // Edit first marketing prompt to change category
@@ -217,11 +223,15 @@ test.describe('User Journey: Power User Prompt Management & Organization', () =>
     await expect(sidepanelPage.getByText('Prompt updated successfully').first()).toBeVisible();
 
     // Verify Marketing category is now empty
-    await sidepanelPage.locator('select').filter({ hasText: 'All Categories' }).selectOption('Marketing');
+    await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
+    await sidepanelPage.getByRole('menu', { name: 'Category filter menu' }).waitFor();
+    await sidepanelPage.getByRole('menuitem', { name: 'Marketing' }).click();
     await expect(sidepanelPage.getByText('No matches found')).toBeVisible();
 
     // Verify prompts moved to Professional category
-    await sidepanelPage.locator('select').filter({ hasText: 'Marketing' }).selectOption('Professional');
+    await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
+    await sidepanelPage.getByRole('menu', { name: 'Category filter menu' }).waitFor();
+    await sidepanelPage.getByRole('menuitem', { name: 'Professional' }).click();
     await expect(sidepanelPage.locator('article')).toHaveCount(7); // 5 original + 2 moved
 
     // Delete empty Marketing category
@@ -245,7 +255,9 @@ test.describe('User Journey: Power User Prompt Management & Organization', () =>
     console.log('[TEST] Starting Scenario 3: Advanced search & filtering');
 
     // Return to all categories to test search
-    await sidepanelPage.locator('select').filter({ hasText: 'Professional' }).selectOption('');
+    await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
+    await sidepanelPage.getByRole('menu', { name: 'Category filter menu' }).waitFor();
+    await sidepanelPage.getByRole('menuitem', { name: 'All Categories' }).click();
 
     // Test search with multiple keywords
     const searchInput = sidepanelPage.getByPlaceholder('Search your prompts...');
@@ -260,7 +272,9 @@ test.describe('User Journey: Power User Prompt Management & Organization', () =>
     // Test category + search term combination
     await searchInput.clear();
     await searchInput.fill('template');
-    await sidepanelPage.locator('select').filter({ hasText: 'All Categories' }).selectOption('Professional');
+    await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
+    await sidepanelPage.getByRole('menu', { name: 'Category filter menu' }).waitFor();
+    await sidepanelPage.getByRole('menuitem', { name: 'Professional' }).click();
 
     // Should find prompts with "template" in Professional category
     await expect(sidepanelPage.locator('article')).toHaveCount(2); // Meeting Summary Template, Email Response Template
@@ -269,7 +283,9 @@ test.describe('User Journey: Power User Prompt Management & Organization', () =>
 
     // Clear filters
     await searchInput.clear();
-    await sidepanelPage.locator('select').filter({ hasText: 'Professional' }).selectOption('');
+    await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
+    await sidepanelPage.getByRole('menu', { name: 'Category filter menu' }).waitFor();
+    await sidepanelPage.getByRole('menuitem', { name: 'All Categories' }).click();
 
     // Scenario 4: Bulk prompt operations
     console.log('[TEST] Starting Scenario 4: Bulk prompt operations');
@@ -279,7 +295,9 @@ test.describe('User Journey: Power User Prompt Management & Organization', () =>
     // that demonstrate the workflow a power user would need
 
     // Filter to Development category to work with those prompts
-    await sidepanelPage.locator('select').filter({ hasText: 'All Categories' }).selectOption('Development');
+    await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
+    await sidepanelPage.getByRole('menu', { name: 'Category filter menu' }).waitFor();
+    await sidepanelPage.getByRole('menuitem', { name: 'Development' }).click();
     await expect(sidepanelPage.locator('article')).toHaveCount(4);
 
     // Simulate moving multiple Development prompts to Professional category
@@ -297,16 +315,22 @@ test.describe('User Journey: Power User Prompt Management & Organization', () =>
     }
 
     // Verify Development category now has only 1 prompt
-    await sidepanelPage.locator('select').filter({ hasText: 'All Categories' }).selectOption('Development');
+    await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
+    await sidepanelPage.getByRole('menu', { name: 'Category filter menu' }).waitFor();
+    await sidepanelPage.getByRole('menuitem', { name: 'Development' }).click();
     await expect(sidepanelPage.locator('article')).toHaveCount(1);
     await expect(sidepanelPage.getByText('Database Query Optimizer')).toBeVisible();
 
     // Verify Professional category now has the moved prompts (7 + 3 = 10)
-    await sidepanelPage.locator('select').filter({ hasText: 'Development' }).selectOption('Professional');
+    await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
+    await sidepanelPage.getByRole('menu', { name: 'Category filter menu' }).waitFor();
+    await sidepanelPage.getByRole('menuitem', { name: 'Professional' }).click();
     await expect(sidepanelPage.locator('article')).toHaveCount(10);
 
     // Test bulk delete simulation - delete remaining Development prompts
-    await sidepanelPage.locator('select').filter({ hasText: 'Professional' }).selectOption('Development');
+    await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
+    await sidepanelPage.getByRole('menu', { name: 'Category filter menu' }).waitFor();
+    await sidepanelPage.getByRole('menuitem', { name: 'Development' }).click();
 
     const lastDevPrompt = sidepanelPage.locator('article').filter({ hasText: 'Database Query Optimizer' }).first();
     await lastDevPrompt.getByRole('button', { name: 'More actions' }).click();
@@ -323,7 +347,9 @@ test.describe('User Journey: Power User Prompt Management & Organization', () =>
     console.log('[TEST] Starting Scenario 5: Data export for backup');
 
     // Return to all categories view for export
-    await sidepanelPage.locator('select').filter({ hasText: 'Development' }).selectOption('');
+    await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
+    await sidepanelPage.getByRole('menu', { name: 'Category filter menu' }).waitFor();
+    await sidepanelPage.getByRole('menuitem', { name: 'All Categories' }).click();
 
     // Navigate to settings for export functionality
     await sidepanelPage.getByRole('button', { name: 'Settings' }).click();
@@ -399,7 +425,9 @@ test.describe('User Journey: Power User Prompt Management & Organization', () =>
     expect(finalPromptCount).toBe(16); // Total after all operations
 
     // Verify Professional category has consolidated prompts
-    await sidepanelPage.locator('select').filter({ hasText: 'All Categories' }).selectOption('Professional');
+    await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
+    await sidepanelPage.getByRole('menu', { name: 'Category filter menu' }).waitFor();
+    await sidepanelPage.getByRole('menuitem', { name: 'Professional' }).click();
     await expect(sidepanelPage.locator('article')).toHaveCount(10);
 
     // Test one final search to ensure everything still works
