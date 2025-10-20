@@ -1,4 +1,4 @@
-import { useState, useOptimistic, useTransition } from 'react';
+import { useState, useOptimistic, useTransition, useCallback } from 'react';
 import type { FC } from 'react';
 
 import AddPromptForm from './components/AddPromptForm';
@@ -211,6 +211,30 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
     }
   };
 
+  // Memoized callbacks to prevent unnecessary re-renders
+  const handleManageCategories = useCallback(() => {
+    setCurrentView('categories');
+  }, []);
+
+  const handleSettings = useCallback(() => {
+    setCurrentView('settings');
+  }, []);
+
+  const handleBackToLibrary = useCallback(() => {
+    setCurrentView('library');
+  }, []);
+
+  const handleBackToLibraryWithRefresh = useCallback(() => {
+    setCurrentView('library');
+    // Refresh data to ensure imported prompts/categories are visible
+    void refreshPrompts();
+    void refreshCategories();
+  }, [refreshPrompts, refreshCategories]);
+
+  const handleCloseStorageWarning = useCallback(() => {
+    setShowStorageWarning(false);
+  }, []);
+
   const loading = promptsLoading || categoriesLoading;
 
   if (promptsError) {
@@ -241,12 +265,8 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
           onCopyPrompt={(content: string) => { void handleCopyPrompt(content); }}
           showToast={showToast}
           onCategoryChange={setSelectedCategory}
-          onManageCategories={() => {
-            setCurrentView('categories');
-          }}
-          onSettings={() => {
-            setCurrentView('settings');
-          }}
+          onManageCategories={handleManageCategories}
+          onSettings={handleSettings}
           loading={loading}
           context={context}
         />
@@ -276,20 +296,13 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
           onUpdateCategory={handleUpdateCategory}
           onDeleteCategory={handleDeleteCategory}
           isOpen={true}
-          onClose={() => {
-            setCurrentView('library');
-          }}
+          onClose={handleBackToLibrary}
         />
       )}
 
       {currentView === 'settings' && (
         <SettingsView
-          onBack={() => {
-            setCurrentView('library');
-            // Refresh data to ensure imported prompts/categories are visible
-            void refreshPrompts();
-            void refreshCategories();
-          }}
+          onBack={handleBackToLibraryWithRefresh}
           showToast={showToast}
           toastSettings={settings}
           onToastSettingsChange={updateSettings}
@@ -297,9 +310,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
       )}
 
       {showStorageWarning && (
-        <StorageWarning onClose={() => {
-          setShowStorageWarning(false);
-        }} />
+        <StorageWarning onClose={handleCloseStorageWarning} />
       )}
 
       <ToastContainer
