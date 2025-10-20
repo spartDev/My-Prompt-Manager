@@ -34,7 +34,7 @@ const LibraryView: FC<LibraryViewProps> = ({
     // Apply category filter to search-filtered prompts
     let filtered = filteredPrompts;
     if (selectedCategory) {
-      filtered = filteredPrompts.filter((prompt: Prompt) => prompt.category === selectedCategory);
+      filtered = filteredPrompts.filter((prompt) => prompt.category === selectedCategory);
     }
 
     // Apply sorting using PromptManager service
