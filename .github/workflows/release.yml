@@ -48,12 +48,12 @@ jobs:
       is-prerelease: ${{ steps.version.outputs.is-prerelease }}
     steps:
       - name: 🛎️ Checkout Repository
-        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
         with:
           fetch-depth: 0
 
       - name: 🟢 Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: "npm"
@@ -137,7 +137,7 @@ jobs:
           npm audit --audit-level=moderate
 
       - name: 🔍 CodeQL Analysis
-        uses: github/codeql-action/analyze@755f44910c12a3d7ca0d8c6e42c048b3362f7cec # v3
+        uses: github/codeql-action/analyze@16140ae1a102900babc80a33c44059580f687047 # v4
         if: success() || failure()
         continue-on-error: true
 
@@ -148,10 +148,10 @@ jobs:
     needs: validate-release
     steps:
       - name: 🛎️ Checkout Repository
-        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
 
       - name: 🟢 Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: "npm"
@@ -240,7 +240,7 @@ jobs:
           find dist/ -type f -exec sh -c 'echo "  $(basename "$1"): $(wc -c < "$1") bytes"' _ {} \;
 
       - name: 🔐 Generate Build Attestation
-        uses: actions/attest-build-provenance@ef244123eb79f2f7a7e75d99086184180e6d0018 # v1
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
         with:
           subject-path: "*.zip"
 
@@ -263,12 +263,12 @@ jobs:
     if: github.event_name != 'release' # Skip if release already exists
     steps:
       - name: 🛎️ Checkout Repository
-        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
         with:
           fetch-depth: 0
 
       - name: 📤 Download Release Build
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
           name: chrome-extension-release-v${{ needs.validate-release.outputs.version }}
           path: ./release-assets
@@ -350,7 +350,7 @@ jobs:
     needs: [validate-release, build-release]
     steps:
       - name: 📤 Download Release Build
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
           name: chrome-extension-release-v${{ needs.validate-release.outputs.version }}
           path: ./webstore-prep
@@ -434,7 +434,7 @@ jobs:
     environment: chrome-webstore # Protect production releases
     steps:
       - name: 📤 Download Web Store Package
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
           name: chrome-webstore-package-v${{ needs.validate-release.outputs.version }}
           path: ./webstore-package
@@ -585,7 +585,7 @@ jobs:
     environment: emergency-rollback
     steps:
       - name: 🛎️ Checkout Repository
-        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
         with:
           fetch-depth: 0
 
