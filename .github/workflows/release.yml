@@ -1,8 +1,6 @@
 name: 🚀 Release & Chrome Web Store
 
 on:
-  release:
-    types: [published, created]
   push:
     tags:
       - "v*.*.*"
@@ -67,13 +65,15 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             version="${{ github.event.inputs.version }}"
             is_prerelease="${{ github.event.inputs.prerelease }}"
-          elif [ "${{ github.event_name }}" = "push" ]; then
-            version=${GITHUB_REF#refs/tags/v}
-            is_prerelease="false"
           else
-            version="${{ github.event.release.tag_name }}"
-            version=${version#v}
-            is_prerelease="${{ github.event.release.prerelease }}"
+            # Tag push event
+            version=${GITHUB_REF#refs/tags/v}
+            # Detect pre-release from version string (contains -alpha, -beta, -rc)
+            if [[ "$version" =~ -alpha|-beta|-rc ]]; then
+              is_prerelease="true"
+            else
+              is_prerelease="false"
+            fi
           fi
 
           echo "version=$version" >> $GITHUB_OUTPUT
@@ -260,7 +260,6 @@ jobs:
     name: 🏷️ GitHub Release
     runs-on: ubuntu-latest
     needs: [validate-release, build-release]
-    if: github.event_name != 'release' # Skip if release already exists
     steps:
       - name: 🛎️ Checkout Repository
         uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
@@ -273,62 +272,135 @@ jobs:
           name: chrome-extension-release-v${{ needs.validate-release.outputs.version }}
           path: ./release-assets
 
-      - name: 📝 Generate Release Notes
+      - name: 📝 Extract Release Notes from CHANGELOG
         id: release-notes
         run: |
-          echo "📝 Generating release notes..."
+          echo "📝 Extracting release notes from CHANGELOG.md..."
 
-          version="v${{ needs.validate-release.outputs.version }}"
+          version="${{ needs.validate-release.outputs.version }}"
 
-          # Try to find previous tag
-          previous_tag=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
+          # Check if CHANGELOG.md exists
+          if [ ! -f CHANGELOG.md ]; then
+            echo "⚠️ CHANGELOG.md not found, generating basic release notes"
+            cat > release-notes.md << EOF
+          ## What's New in v$version
 
-          # Create release notes
-          cat > release-notes.md << EOF
-          # Chrome Extension Release $version
-
-          ## 🎉 What's New
-
-          $(if [ -n "$previous_tag" ]; then
-            echo "### Changes since $previous_tag"
-            git log $previous_tag..HEAD --pretty=format:"- %s (%h)" --no-merges | head -20
-          else
-            echo "- Initial release of the Chrome Extension"
-          fi)
+          See commit history for details.
 
           ## 📦 Installation
 
           ### Chrome Web Store (Recommended)
-          - Visit the Chrome Web Store listing (link will be available after store approval)
+          Visit the Chrome Web Store listing (link will be available after store approval)
 
-          ### Manual Installation (Developer Mode)
-          1. Download the \`chrome-extension-v${{ needs.validate-release.outputs.version }}.zip\` file
+          ### Manual Installation
+          1. Download the chrome-extension-v$version.zip file
           2. Extract the contents
-          3. Open Chrome and go to \`chrome://extensions/\`
+          3. Open Chrome and navigate to chrome://extensions/
           4. Enable "Developer mode"
           5. Click "Load unpacked" and select the extracted folder
 
+          ## 🐛 Bug Reports
+          Please report issues at https://github.com/${{ github.repository }}/issues
+          EOF
+          else
+            # Extract the changelog section for this version
+            echo "📋 Extracting changelog for version $version"
+
+            # Find the section for this version in CHANGELOG.md
+            # Format: ## [1.7.0] - 2025-10-21
+            awk -v version="$version" '
+              /^## \['$version'\]/ { found=1; print; next }
+              /^## \[/ { if (found) exit }
+              found { print }
+            ' CHANGELOG.md > changelog-excerpt.txt
+
+            # Check if we found the changelog section
+            if [ ! -s changelog-excerpt.txt ]; then
+              echo "⚠️ Changelog section for v$version not found in CHANGELOG.md"
+              echo "Using fallback release notes"
+              cat > release-notes.md << EOF
+          ## What's New in v$version
+
+          See CHANGELOG.md for details.
+
+          ## 📦 Installation
+
+          ### Chrome Web Store (Recommended)
+          Visit the Chrome Web Store listing
+
+          ### Manual Installation
+          1. Download and extract chrome-extension-v$version.zip
+          2. Open chrome://extensions/
+          3. Enable Developer mode
+          4. Load unpacked extension
+
+          ## 🐛 Bug Reports
+          https://github.com/${{ github.repository }}/issues
+          EOF
+            else
+              # Create enhanced release notes with changelog
+              cat > release-notes.md << EOF
+          # Chrome Extension v$version
+
+          $(cat changelog-excerpt.txt)
+
+          ---
+
+          ## 📦 Installation
+
+          ### Chrome Web Store (Recommended)
+          - Visit the [Chrome Web Store](https://chrome.google.com/webstore) listing
+          - Click "Add to Chrome" to install
+          - Extension will auto-update with new releases
+
+          ### Manual Installation (Developer Mode)
+          1. Download the \`chrome-extension-v$version.zip\` file from release assets
+          2. Extract the ZIP file to a folder
+          3. Open Chrome and navigate to \`chrome://extensions/\`
+          4. Enable **Developer mode** (toggle in top-right corner)
+          5. Click **Load unpacked** and select the extracted folder
+          6. The extension should now appear in your browser toolbar
+
           ## 🔧 Technical Details
 
-          - **Version**: ${{ needs.validate-release.outputs.version }}
+          - **Version**: $version
           - **Manifest Version**: 3
           - **Build Date**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
           - **Commit**: ${{ github.sha }}
+          - **Node Version**: ${{ env.NODE_VERSION }}
 
-          ## 🛠️ Chrome Extension Features
+          ## 🛠️ Key Features
 
-          - Popup interface for prompt management
-          - Content script integration with AI platforms
-          - Secure local storage with Chrome API
-          - Dark/light theme support
-          - Export/import functionality
+          - 📝 Popup interface for prompt management
+          - 🤖 Content script integration with AI platforms (Claude, ChatGPT, Perplexity)
+          - 💾 Secure local storage using Chrome Storage API
+          - 🌓 Dark/light theme support with system preference detection
+          - 📤 Export/import functionality for prompt libraries
+          - 🔍 Advanced search and filtering
+          - 🏷️ Category management and organization
 
           ## 🐛 Bug Reports & Feature Requests
 
-          Please report issues on our [GitHub Issues](https://github.com/${{ github.repository }}/issues) page.
-          EOF
+          - **Issues**: [GitHub Issues](https://github.com/${{ github.repository }}/issues)
+          - **Discussions**: [GitHub Discussions](https://github.com/${{ github.repository }}/discussions)
+          - **Security**: Report via [Security Advisory](https://github.com/${{ github.repository }}/security/advisories/new)
 
-          echo "📋 Release notes generated"
+          ## 📚 Documentation
+
+          - [Installation Guide](https://github.com/${{ github.repository }}#installation)
+          - [User Guide](https://github.com/${{ github.repository }}#usage)
+          - [Contributing](https://github.com/${{ github.repository }}/blob/main/CONTRIBUTING.md)
+          - [Changelog](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md)
+          EOF
+            fi
+          fi
+
+          echo "✅ Release notes prepared"
+          echo ""
+          echo "Preview:"
+          echo "========================================"
+          head -30 release-notes.md
+          echo "========================================"
 
       - name: 🏷️ Create GitHub Release
         id: create-release
@@ -426,63 +498,62 @@ jobs:
           echo "🎉 Release v${{ needs.validate-release.outputs.version }} is ready for publication!"
 
   # Chrome Web Store Publishing (Optional - requires secrets)
-  chrome-web-store-publish:
-    name: 🚀 Chrome Web Store Publishing
-    runs-on: ubuntu-latest
-    needs: [validate-release, build-release, chrome-web-store-prep]
-    if: github.event_name != 'workflow_dispatch' || github.event.inputs.prerelease == 'false'
-    environment: chrome-webstore # Protect production releases
-    steps:
-      - name: 📤 Download Web Store Package
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: chrome-webstore-package-v${{ needs.validate-release.outputs.version }}
-          path: ./webstore-package
+  # chrome-web-store-publish:
+  #   name: 🚀 Chrome Web Store Publishing
+  #   runs-on: ubuntu-latest
+  #   needs: [validate-release, build-release, chrome-web-store-prep]
+  #   if: github.event_name != 'workflow_dispatch' || github.event.inputs.prerelease == 'false'
+  #   environment: chrome-webstore # Protect production releases
+  #   steps:
+  #     - name: 📤 Download Web Store Package
+  #       uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+  #       with:
+  #         name: chrome-webstore-package-v${{ needs.validate-release.outputs.version }}
+  #         path: ./webstore-package
 
-      - name: 🔍 Check Chrome Web Store Configuration
-        id: check-secrets
-        run: |
-          if [[ -n "${{ secrets.CHROME_EXTENSION_ID }}" && -n "${{ secrets.CHROME_CLIENT_ID }}" && -n "${{ secrets.CHROME_WEB_STORE_API_KEYS }}" ]]; then
-            echo "configured=true" >> $GITHUB_OUTPUT
-            echo "✅ Chrome Web Store secrets are configured"
-          else
-            echo "configured=false" >> $GITHUB_OUTPUT
-            echo "⚠️ Chrome Web Store secrets are not configured - skipping publication"
-          fi
+  #     - name: 🔍 Check Chrome Web Store Configuration
+  #       id: check-secrets
+  #       run: |
+  #         if [[ -n "${{ secrets.CHROME_EXTENSION_ID }}" && -n "${{ secrets.CHROME_CLIENT_ID }}" && -n "${{ secrets.CHROME_WEB_STORE_API_KEYS }}" ]]; then
+  #           echo "configured=true" >> $GITHUB_OUTPUT
+  #           echo "✅ Chrome Web Store secrets are configured"
+  #         else
+  #           echo "configured=false" >> $GITHUB_OUTPUT
+  #           echo "⚠️ Chrome Web Store secrets are not configured - skipping publication"
+  #         fi
 
-      - name: 🚀 Publish to Chrome Web Store
-        if: steps.check-secrets.outputs.configured == 'true'
-        uses: PlasmoHQ/bpp@v3
-        with:
-          keys: ${{ secrets.CHROME_WEB_STORE_API_KEYS }}
-          artifact: ./webstore-package/chrome-extension-webstore-v${{ needs.validate-release.outputs.version }}.zip
-          verbose: true
-          # Enhanced security and reliability options
-          upload-timeout: 300000 # 5 minutes timeout
-          submit-timeout: 300000 # 5 minutes timeout
+  #     - name: 🚀 Publish to Chrome Web Store
+  #       if: steps.check-secrets.outputs.configured == 'true'
+  #       uses: PlasmoHQ/bpp@v3
+  #       with:
+  #         keys: ${{ secrets.CHROME_WEB_STORE_API_KEYS }}
+  #         artifact: ./webstore-package/chrome-extension-webstore-v${{ needs.validate-release.outputs.version }}.zip
+  #         verbose: true
+  #         # Enhanced security and reliability options
+  #         upload-timeout: 300000 # 5 minutes timeout
+  #         submit-timeout: 300000 # 5 minutes timeout
 
-      - name: 📝 Publication Status
-        run: |
-          if [[ "${{ secrets.CHROME_EXTENSION_ID }}" != "" ]]; then
-            echo "🚀 Chrome Web Store publication initiated"
-            echo "🔗 Extension URL: https://chrome.google.com/webstore/detail/${{ secrets.CHROME_EXTENSION_ID }}"
-            echo "⏳ Review process typically takes 1-3 business days"
-          else
-            echo "⚠️ Chrome Web Store secrets not configured - skipping automated publication"
-            echo "📋 Manual publication required via Chrome Web Store Developer Dashboard"
-          fi
+  #     - name: 📝 Publication Status
+  #       run: |
+  #         if [[ "${{ secrets.CHROME_EXTENSION_ID }}" != "" ]]; then
+  #           echo "🚀 Chrome Web Store publication initiated"
+  #           echo "🔗 Extension URL: https://chrome.google.com/webstore/detail/${{ secrets.CHROME_EXTENSION_ID }}"
+  #           echo "⏳ Review process typically takes 1-3 business days"
+  #         else
+  #           echo "⚠️ Chrome Web Store secrets not configured - skipping automated publication"
+  #           echo "📋 Manual publication required via Chrome Web Store Developer Dashboard"
+  #         fi
 
   # Release summary and cleanup
   release-summary:
     name: 📊 Release Summary
     runs-on: ubuntu-latest
-    needs:
-      [
+    needs: [
         validate-release,
         build-release,
         create-github-release,
         chrome-web-store-prep,
-        chrome-web-store-publish,
+        # chrome-web-store-publish,
       ]
     if: always()
     steps:
@@ -501,14 +572,12 @@ jobs:
           build_status="${{ needs.build-release.result }}"
           github_release_status="${{ needs.create-github-release.result }}"
           webstore_status="${{ needs.chrome-web-store-prep.result }}"
-          publish_status="${{ needs.chrome-web-store-publish.result }}"
 
           echo "Job Results:"
           echo "🔍 Validation: $validate_status"
           echo "🏗️ Build: $build_status"
           echo "🏷️ GitHub Release: $github_release_status"
           echo "🌐 Web Store Prep: $webstore_status"
-          echo "🚀 Web Store Publish: $publish_status"
           echo ""
 
           if [[ "$validate_status" == "success" && "$build_status" == "success" ]]; then
@@ -559,7 +628,6 @@ jobs:
             - 🏗️ Build: $build_status  
             - 🏷️ GitHub Release: $github_release_status
             - 🌐 Web Store Prep: $webstore_status
-            - 🚀 Web Store Publish: $publish_status
             
             ### 🔧 Troubleshooting
             Please check the failed job logs and retry the release after fixing issues.
@@ -573,13 +641,12 @@ jobs:
     name: 🚨 Emergency Rollback
     runs-on: ubuntu-latest
     if: failure() && github.event_name == 'workflow_dispatch'
-    needs:
-      [
+    needs: [
         validate-release,
         build-release,
         create-github-release,
         chrome-web-store-prep,
-        chrome-web-store-publish,
+        # chrome-web-store-publish,
         release-summary,
       ]
     environment: emergency-rollback
