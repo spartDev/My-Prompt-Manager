@@ -72,20 +72,35 @@ This skill automates the complete pre-release workflow for the My Prompt Manager
 CURRENT_VERSION=$(node -p "require('./package.json').version")
 echo "📦 Current version: $CURRENT_VERSION"
 
-# Get last git tag
+# Get last release - try git tags first, then fall back to version bump commits
 LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-if [ -z "$LAST_TAG" ]; then
-  echo "⚠️  No previous tags found. This will be the first release."
-  LAST_TAG="HEAD"
-  RANGE="HEAD"
-else
-  echo "🏷️  Last release: $LAST_TAG"
+if [ -n "$LAST_TAG" ]; then
+  echo "🏷️  Last release (git tag): $LAST_TAG"
   RANGE="${LAST_TAG}..HEAD"
+  LAST_VERSION=$(echo "$LAST_TAG" | sed 's/^v//')
+else
+  # No tags found, look for version bump commits
+  LAST_BUMP_COMMIT=$(git log --all --pretty=format:"%H|%s" --grep="chore: bump version to" | head -1)
+
+  if [ -n "$LAST_BUMP_COMMIT" ]; then
+    COMMIT_HASH=$(echo "$LAST_BUMP_COMMIT" | cut -d'|' -f1)
+    COMMIT_MSG=$(echo "$LAST_BUMP_COMMIT" | cut -d'|' -f2)
+    LAST_VERSION=$(echo "$COMMIT_MSG" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+
+    echo "📌 Last release (version bump commit): v$LAST_VERSION"
+    echo "   Commit: $COMMIT_HASH"
+    RANGE="${COMMIT_HASH}..HEAD"
+  else
+    echo "⚠️  No previous releases found (no tags or version bump commits)"
+    echo "   This will be the first release."
+    LAST_VERSION="0.0.0"
+    RANGE="HEAD"
+  fi
 fi
 
 # Count commits since last release
 COMMIT_COUNT=$(git rev-list --count $RANGE)
-echo "📊 Commits since last release: $COMMIT_COUNT"
+echo "📊 Commits since v$LAST_VERSION: $COMMIT_COUNT"
 
 if [ "$COMMIT_COUNT" -eq 0 ]; then
   echo "❌ No commits since last release. Nothing to release."
