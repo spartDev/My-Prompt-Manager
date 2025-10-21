@@ -305,7 +305,7 @@ EOF
 # Add Security section
 if [ -f /tmp/security.txt ]; then
   cat >> "$CHANGELOG_FILE" <<EOF
-### Security
+### 🔒 Security
 
 EOF
   cat /tmp/security.txt >> "$CHANGELOG_FILE"
@@ -325,7 +325,7 @@ fi
 # Add Added section
 if [ -f /tmp/added.txt ]; then
   cat >> "$CHANGELOG_FILE" <<EOF
-### Added
+### ✨ Added
 
 EOF
   cat /tmp/added.txt >> "$CHANGELOG_FILE"
@@ -335,7 +335,7 @@ fi
 # Add Changed section
 if [ -f /tmp/changed.txt ]; then
   cat >> "$CHANGELOG_FILE" <<EOF
-### Changed
+### 🔄 Changed
 
 EOF
   cat /tmp/changed.txt >> "$CHANGELOG_FILE"
@@ -345,7 +345,7 @@ fi
 # Add Fixed section
 if [ -f /tmp/fixed.txt ]; then
   cat >> "$CHANGELOG_FILE" <<EOF
-### Fixed
+### 🐛 Fixed
 
 EOF
   cat /tmp/fixed.txt >> "$CHANGELOG_FILE"
