@@ -11,14 +11,16 @@ const DEBOUNCE_DELAY = 300; // 300ms debounce delay
 export const useSearchWithDebounce = (prompts: Prompt[]): UseSearchWithDebounceReturn => {
   const [inputQuery, setInputQuery] = useState<string>('');
   const [debouncedQuery, setDebouncedQuery] = useState<string>('');
-  const [isSearching, setIsSearching] = useState<boolean>(false);
-  
+
+  // Derive isSearching from state (no need for separate state tracking)
+  // We're searching if: input has value AND input differs from debounced value
+  const isSearching = inputQuery.trim() !== '' && inputQuery !== debouncedQuery;
+
   // Use ref to store the debounced function to maintain reference stability
   const debouncedUpdateQuery = useRef(
     debounce((...args: unknown[]) => {
       const query = args[0] as string;
       setDebouncedQuery(query);
-      setIsSearching(false);
     }, DEBOUNCE_DELAY)
   );
 
@@ -30,13 +32,16 @@ export const useSearchWithDebounce = (prompts: Prompt[]): UseSearchWithDebounceR
     // If query is empty, update immediately (no debounce for clear operations)
     if (inputQuery.trim() === '') {
       debouncedUpdateQuery.current.cancel();
-      setDebouncedQuery('');
-      setIsSearching(false);
-      return;
+      // Use setTimeout(0) to avoid synchronous setState in effect (works with fake timers)
+      const timeoutId = setTimeout(() => {
+        setDebouncedQuery('');
+      }, 0);
+      return () => {
+        clearTimeout(timeoutId);
+      };
     }
 
-    // For non-empty queries, show loading state and debounce the update
-    setIsSearching(true);
+    // For non-empty queries, debounce the update
     debouncedUpdateQuery.current(inputQuery);
   }, [inputQuery]);
 
@@ -57,7 +62,7 @@ export const useSearchWithDebounce = (prompts: Prompt[]): UseSearchWithDebounceR
     debouncedUpdateQuery.current.cancel();
     setInputQuery('');
     setDebouncedQuery('');
-    setIsSearching(false);
+    // Note: isSearching is derived, so no need to set it
   }, []);
 
   return {

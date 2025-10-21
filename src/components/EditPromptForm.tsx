@@ -1,4 +1,4 @@
-import { useActionState, useReducer, useRef, useState } from 'react';
+import { useActionState, useRef, useState } from 'react';
 import type { FC } from 'react';
 
 import { MAX_CONTENT_LENGTH, MAX_TITLE_LENGTH, formatCharacterCount } from '../constants/validation';
@@ -14,16 +14,13 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
   onSubmit,
   onCancel
 }) => {
-  // Refs to form elements for deriving character counts (single source of truth)
+  // Refs to form elements (for focus management if needed)
   const titleRef = useRef<HTMLInputElement>(null);
   const contentRef = useRef<HTMLTextAreaElement>(null);
 
-  // Force component re-render to update character count display
-  const [, forceUpdate] = useReducer((x: number) => x + 1, 0);
-
-  // Derive character counts from actual form values
-  const titleLength = titleRef.current?.value.length ?? 0;
-  const contentLength = contentRef.current?.value.length ?? 0;
+  // Track character counts in state (updated on change)
+  const [titleLength, setTitleLength] = useState(prompt.title.length);
+  const [contentLength, setContentLength] = useState(prompt.content.length);
 
   // Track form dirty state (has unsaved changes)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -96,8 +93,12 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
 
     setHasUnsavedChanges(isDirty || hasUnsavedChanges);
 
-    // Trigger re-render to update character counts
-    forceUpdate();
+    // Update character counts when title or content changes
+    if (field === 'title') {
+      setTitleLength(value.length);
+    } else if (field === 'content') {
+      setContentLength(value.length);
+    }
   };
 
   const formatDate = (timestamp: number) => {
