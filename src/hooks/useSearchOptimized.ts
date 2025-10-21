@@ -30,7 +30,10 @@ export function useDebounce<T>(value: T, delay: number = DEFAULT_DEBOUNCE_DELAY)
   useEffect(() => {
     // If delay is 0, update immediately (for testing)
     if (delay === 0) {
-      setDebouncedValue(value);
+      // Use microtask to avoid synchronous setState in effect
+      queueMicrotask(() => {
+        setDebouncedValue(value);
+      });
       return;
     }
 
@@ -147,6 +150,7 @@ export function useSearchOptimized(
 
   // Perform search and compute stats (no state updates during render)
   const searchResult = useMemo(() => {
+    // eslint-disable-next-line react-hooks/purity -- Performance measurement for debugging
     const startTime = performance.now();
 
     // Empty query returns all prompts (filtered by category if specified)
@@ -186,6 +190,7 @@ export function useSearchOptimized(
       searchResults = linearSearch(prompts, debouncedQuery, categoryFilter);
     }
 
+    // eslint-disable-next-line react-hooks/purity -- Performance measurement for debugging
     const searchTime = performance.now() - startTime;
 
     return {
@@ -199,10 +204,9 @@ export function useSearchOptimized(
   }, [prompts, debouncedQuery, categoryFilter, enableIndexing, maxResults, minRelevance, searchIndex]);
 
   // Update stats in effect (after render, not during)
-  // Using individual stat values as dependencies to avoid unnecessary re-renders
   useEffect(() => {
     setSearchStats(searchResult.stats);
-  }, [searchResult.stats.resultCount, searchResult.stats.searchTime, searchResult.stats.isIndexed]);
+  }, [searchResult.stats]);
 
   return {
     results: searchResult.results,

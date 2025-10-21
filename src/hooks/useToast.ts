@@ -43,16 +43,17 @@ export const useToast = (): UseToastReturn => {
   // Process queue when current toast is dismissed
   useEffect(() => {
     if (toasts.length === 0 && queue.length > 0) {
-      // Use functional setState to avoid race conditions
-      // This ensures we read and update the queue atomically
-      setQueue(prevQueue => {
-        if (prevQueue.length === 0) {
-          return prevQueue; // No items to process
-        }
+      // Use microtask to avoid synchronous setState in effect
+      queueMicrotask(() => {
+        setQueue(prevQueue => {
+          if (prevQueue.length === 0) {
+            return prevQueue; // No items to process
+          }
 
-        const nextToast = prevQueue[0];
-        setToasts([nextToast]);
-        return prevQueue.slice(1);
+          const nextToast = prevQueue[0];
+          setToasts([nextToast]);
+          return prevQueue.slice(1);
+        });
       });
     }
 
@@ -61,7 +62,7 @@ export const useToast = (): UseToastReturn => {
         clearTimeout(timeoutRef.current);
       }
     };
-  }, [toasts.length, queue]);
+  }, [toasts.length, queue.length]);
 
   const showToast = useCallback((
     message: string,
