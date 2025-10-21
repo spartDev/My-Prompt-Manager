@@ -396,7 +396,9 @@ jobs:
         uses: actions/dependency-review-action@45529485b5eb76184ced07362d2331fd9d26f03f # v4
         with:
           fail-on-severity: moderate
-          allow-licenses: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, MPL-2.0
+          # DOMPurify is dual-licensed (Apache-2.0 OR MPL-2.0) but npm metadata includes GPL-2.0-only
+          # We use the Apache-2.0 option. Adding GPL-2.0-only acknowledges it's in the SPDX expression.
+          allow-licenses: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, MPL-2.0, GPL-2.0-only
 
       - name: 📋 Chrome Extension Manifest Validation
         run: |
