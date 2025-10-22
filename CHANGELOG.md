@@ -1,6 +1,40 @@
 ## [Unreleased]
 
 
+## Release v1.7.0
+
+### ✨ Added
+
+- Icon-Based Compact Filter/Sort Controls for Mobile-First UI ([#114](https://github.com/spartDev/My-Prompt-Manager/pull/114))
+- Claude Code skills system for project workflows ([#112](https://github.com/spartDev/My-Prompt-Manager/pull/112))
+- TypeScript type-checking job to pr-checks workflow ([#113](https://github.com/spartDev/My-Prompt-Manager/pull/113))
+- Release automation skill with changelog generation ([#123](https://github.com/spartDev/My-Prompt-Manager/pull/123))
+- Enhanced release format with project branding and emojis ([#124](https://github.com/spartDev/My-Prompt-Manager/pull/124))
+- Increased prompt character limit from 10K to 20K ([#103](https://github.com/spartDev/My-Prompt-Manager/pull/103))
+
+### 🔄 Changed
+
+- Disabled watch mode in Vitest configuration ([#115](https://github.com/spartDev/My-Prompt-Manager/pull/115))
+- Updated DOMPurify to 3.3.0 ([#111](https://github.com/spartDev/My-Prompt-Manager/pull/111))
+- Updated allowed licenses in dependency review action ([#122](https://github.com/spartDev/My-Prompt-Manager/pull/122))
+- Updated eslint-plugin-react-hooks to 7.0.0 ([#93](https://github.com/spartDev/My-Prompt-Manager/pull/93))
+- Updated testing libraries ([#119](https://github.com/spartDev/My-Prompt-Manager/pull/119))
+- Updated Playwright monorepo to 1.56.1 ([#118](https://github.com/spartDev/My-Prompt-Manager/pull/118))
+- Updated multiple dependencies including Vite to 7.1.10, happy-dom to 20.0.5, lint-staged to 16.2.4, and various @types packages
+- Removed deprecated @types/uuid and @types/dompurify dependencies ([#106](https://github.com/spartDev/My-Prompt-Manager/pull/106), [#105](https://github.com/spartDev/My-Prompt-Manager/pull/105))
+
+### 🐛 Fixed
+
+- Adjusted padding in LibraryView and ViewHeader components ([#102](https://github.com/spartDev/My-Prompt-Manager/pull/102))
+
+### 📚 Documentation
+
+- Added historical release changelogs (v1.0.1 to v1.6.0)
+- Updated tech stack versions and test counts ([#100](https://github.com/spartDev/My-Prompt-Manager/pull/100))
+- Updated Chrome Web Store description for v1.6.0
+
+**Full Changelog**: https://github.com/spartDev/My-Prompt-Manager/compare/v1.6.0...v1.7.0
+
 ## Release v1.6.0
 
 ### ✨ Added
