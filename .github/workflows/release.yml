@@ -591,47 +591,47 @@ jobs:
             echo "🚀 Chrome Extension v${{ needs.validate-release.outputs.version }} is ready for distribution!"
             
             # Add to GitHub workflow summary
-            cat >> $GITHUB_STEP_SUMMARY << EOF
+            cat >> $GITHUB_STEP_SUMMARY << 'SUMMARY_EOF'
             ## 🎉 Release v${{ needs.validate-release.outputs.version }} Completed Successfully!
-            
+
             ### 📊 Release Summary
             - **Version**: v${{ needs.validate-release.outputs.version }}
             - **Release Date**: $(date -u)
             - **Pre-release**: ${{ needs.validate-release.outputs.is-prerelease }}
             - **Commit**: ${{ github.sha }}
-            
+
             ### ✅ Completed Tasks
             - 🔍 Release validation and quality gates passed
-            - 🏗️ Production build completed successfully  
+            - 🏗️ Production build completed successfully
             - 🏷️ GitHub release created with assets
             - 🌐 Chrome Web Store package prepared
             - 🔐 Build attestation generated for supply chain security
-            
+
             ### 📦 Available Artifacts
-            - Chrome Extension Package: \`chrome-extension-release-v${{ needs.validate-release.outputs.version }}\`
-            - Chrome Web Store Package: \`chrome-webstore-package-v${{ needs.validate-release.outputs.version }}\`
-            
+            - Chrome Extension Package: `chrome-extension-release-v${{ needs.validate-release.outputs.version }}`
+            - Chrome Web Store Package: `chrome-webstore-package-v${{ needs.validate-release.outputs.version }}`
+
             ### 🚀 Next Steps
             - Chrome Web Store: Package is ready for submission
             - GitHub Release: Available at [releases page](https://github.com/${{ github.repository }}/releases/tag/v${{ needs.validate-release.outputs.version }})
-            EOF
+            SUMMARY_EOF
           else
             echo "❌ 🚨 RELEASE PROCESS FAILED!"
             echo "🔧 Please check failed jobs and retry the release"
             
             # Add failure summary to GitHub workflow summary
-            cat >> $GITHUB_STEP_SUMMARY << EOF
+            cat >> $GITHUB_STEP_SUMMARY << 'SUMMARY_EOF'
             ## 🚨 Release v${{ needs.validate-release.outputs.version }} Failed!
-            
+
             ### ❌ Failed Jobs
             - 🔍 Validation: $validate_status
-            - 🏗️ Build: $build_status  
+            - 🏗️ Build: $build_status
             - 🏷️ GitHub Release: $github_release_status
             - 🌐 Web Store Prep: $webstore_status
-            
+
             ### 🔧 Troubleshooting
             Please check the failed job logs and retry the release after fixing issues.
-            EOF
+            SUMMARY_EOF
             
             exit 1
           fi
