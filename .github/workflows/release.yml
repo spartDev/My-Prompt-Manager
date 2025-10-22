@@ -210,7 +210,7 @@ jobs:
           echo "🔍 Verifying release build..."
 
           # Verify essential files
-          required_files=("dist/manifest.json" "dist/popup.html")
+          required_files=("dist/manifest.json" "dist/src/popup.html" "dist/src/sidepanel.html")
           for file in "${required_files[@]}"; do
             if [ ! -f "$file" ]; then
               echo "❌ Missing required file: $file"
