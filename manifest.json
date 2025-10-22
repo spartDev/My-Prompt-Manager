@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "My Prompt Manager",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "Personal prompt library for Claude, ChatGPT, Gemini, and Perplexity. Store, organize, share, and instantly insert your best prompts.",
   "author": "Thomas Roux",
   "homepage_url": "https://github.com/spartDev/My-Prompt-Manager",
