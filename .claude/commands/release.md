@@ -52,9 +52,15 @@ This command performs a comprehensive release preparation process, determining t
 
 3. **Update documentation files**:
    - `README.md`:
-     - Version badges
-     - Installation examples that reference version
-     - Package naming that includes version
+     - **Version badge** at the top (e.g., `version-1.7.0-blue.svg`)
+     - **Tests badge** with current test count (e.g., `tests-1169%20passing-brightgreen.svg`)
+     - **Tech Stack table** with current dependency versions:
+       - Vite version (check package.json)
+       - DOMPurify version (check package.json)
+       - Other major dependencies as needed
+     - **Available Scripts table**: Update test count in description (e.g., "Run test suite (1169+ tests)")
+     - **Testing section**: Update test file count (e.g., "1169+ tests across 56 test files")
+     - **Package naming** that includes version (e.g., `prompt-library-extension-v1.7.0.zip`)
      - Any version-specific feature references
    - `CLAUDE.md`: Check for version-specific instructions or references
 
@@ -93,16 +99,17 @@ This command performs a comprehensive release preparation process, determining t
 2. **Prepare release artifacts** (but don't execute unless requested):
    - **Stage all changes for commit**:
      ```bash
-     git add package.json manifest.json README.md src/components/SettingsView.tsx package-lock.json
-     # Add any other files that were updated
+     git add package.json manifest.json README.md CHANGELOG.md package-lock.json
+     # Add any other files that were updated (e.g., src/components/SettingsView.tsx)
      ```
    - **Prepare commit message**:
      ```bash
      git commit -m "chore: bump version to {NEW_VERSION}
 
      - Update package.json and manifest.json to {NEW_VERSION}
-     - Replace hardcoded versions with dynamic imports
-     - Update README.md version references
+     - Update CHANGELOG.md with release notes
+     - Update README.md: version badges, test counts, tech stack versions
+     - Replace hardcoded versions with dynamic imports (if any)
 
      🤖 Generated with Claude Code"
      ```
@@ -125,15 +132,17 @@ This command performs a comprehensive release preparation process, determining t
 
      ### Changes
      - Update package.json and manifest.json to v{NEW_VERSION}
-     - Replace hardcoded versions with dynamic imports
-     - Update documentation version references
+     - Update CHANGELOG.md with release notes
+     - Update README.md: version badges, test counts, tech stack versions
+     - Replace hardcoded versions with dynamic imports (if any)
      - Run comprehensive quality checks (tests, lint, build)
 
      ### Files Changed
      - `package.json` - Version bump
      - `manifest.json` - Version bump
-     - `README.md` - Version references
-     - `src/components/SettingsView.tsx` - Dynamic version import
+     - `CHANGELOG.md` - Release notes added
+     - `README.md` - Version badges, test counts, tech stack versions
+     - `src/components/SettingsView.tsx` - Dynamic version import (if needed)
      - `package-lock.json` - Regenerated
 
      ### Quality Assurance
@@ -170,8 +179,9 @@ This command performs a comprehensive release preparation process, determining t
 ### File References
 - **Package.json**: `@package.json` - Main project configuration
 - **Manifest.json**: `@manifest.json` - Chrome extension manifest
+- **CHANGELOG.md**: `@CHANGELOG.md` - Release history and notes
 - **Package-lock.json**: `@package-lock.json` - Dependency lockfile
-- **README**: `@README.md` - Project documentation
+- **README**: `@README.md` - Project documentation (includes version badges, test counts)
 - **CLAUDE.md**: `@CLAUDE.md` - Development instructions
 
 ### Chrome Extension Specific
