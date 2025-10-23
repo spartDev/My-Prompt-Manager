@@ -284,7 +284,7 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
             })}
           </Dropdown.Content>
         </Dropdown.Root>
-
+      
       </div>
 
       {/* Right: Manage Categories Button */}
