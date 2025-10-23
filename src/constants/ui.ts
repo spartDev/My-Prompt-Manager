@@ -4,6 +4,31 @@
  */
 
 /**
+ * Z-Index scale for proper stacking contexts
+ * Based on industry best practices and inspired by Tailwind CSS scale
+ */
+export const Z_INDEX = {
+  /** Base level content */
+  BASE: 0,
+  /** Dropdown menus, select options */
+  DROPDOWN: 1000,
+  /** Sticky elements (headers, toolbars) */
+  STICKY: 1020,
+  /** Fixed position elements */
+  FIXED: 1030,
+  /** Modal backdrop/overlay */
+  MODAL_BACKDROP: 1040,
+  /** Modal content */
+  MODAL: 1050,
+  /** Popover content (higher than modals) */
+  POPOVER: 1060,
+  /** Tooltips (highest priority) */
+  TOOLTIP: 1070,
+  /** Notifications/toasts */
+  NOTIFICATION: 1080,
+} as const;
+
+/**
  * Dropdown configuration
  */
 export const DROPDOWN_CONFIG = {
@@ -14,7 +39,7 @@ export const DROPDOWN_CONFIG = {
   SORT_MAX_HEIGHT: 400,
 
   /** Z-index for portal-rendered dropdowns */
-  PORTAL_Z_INDEX: 1001,
+  PORTAL_Z_INDEX: Z_INDEX.DROPDOWN,
 
   /** Offset from trigger element (in pixels) */
   OFFSET: 4,

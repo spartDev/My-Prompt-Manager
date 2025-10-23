@@ -1,11 +1,11 @@
 import type { FC } from 'react';
-import { useState, useRef, memo } from 'react';
-import { createPortal } from 'react-dom';
+import { memo } from 'react';
 
-import { DROPDOWN_CONFIG, DEFAULT_COLORS } from '../constants/ui';
-import { useFloatingPosition, useDropdownClose } from '../hooks';
+import { DEFAULT_COLORS } from '../constants/ui';
 import { SortOrder } from '../types';
 import { FilterSortControlsProps } from '../types/components';
+
+import { Dropdown } from './primitives/Dropdown';
 
 // Sort option icons
 const ClockIcon: FC = () => (
@@ -42,37 +42,8 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
   onManageCategories,
   loading = false
 }) => {
-  // Dropdown state
-  const [showFilterMenu, setShowFilterMenu] = useState(false);
-  const [showSortMenu, setShowSortMenu] = useState(false);
-
-  // Refs for floating-ui positioning
-  const filterButtonRef = useRef<HTMLButtonElement>(null);
-  const sortButtonRef = useRef<HTMLButtonElement>(null);
-  const filterMenuRef = useRef<HTMLDivElement>(null);
-  const sortMenuRef = useRef<HTMLDivElement>(null);
-
-  // Handle dropdown close interactions
-  useDropdownClose({
-    isOpen: showFilterMenu,
-    onClose: () => { setShowFilterMenu(false); },
-    triggerRef: filterButtonRef,
-    menuRef: filterMenuRef
-  });
-
-  useDropdownClose({
-    isOpen: showSortMenu,
-    onClose: () => { setShowSortMenu(false); },
-    triggerRef: sortButtonRef,
-    menuRef: sortMenuRef
-  });
-
-  // Position dropdowns with floating-ui custom hook
-  useFloatingPosition(showFilterMenu, filterButtonRef, filterMenuRef);
-  useFloatingPosition(showSortMenu, sortButtonRef, sortMenuRef);
-
   // Derived values for active state text
-  const categoryLabel = selectedCategory || 'All';
+  const categoryLabel = selectedCategory || 'All Categories';
 
   const getSortLabel = (): string => {
     const option = SORT_OPTIONS.find(opt => opt.value === sortOrder);
@@ -89,7 +60,6 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
   // Handlers
   const handleCategorySelect = (category: string | null) => {
     onCategoryChange(category);
-    setShowFilterMenu(false);
   };
 
   const handleSortSelect = (order: SortOrder) => {
@@ -101,316 +71,225 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
       const defaultDirection = order === 'title' ? 'asc' : 'desc';
       onSortChange(order, defaultDirection);
     }
-    setShowSortMenu(false);
-  };
-
-  const handleKeyDown = (event: React.KeyboardEvent, handler: () => void) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      handler();
-    }
-  };
-
-  // Menu keyboard navigation
-  const handleMenuKeyDown = (
-    event: React.KeyboardEvent,
-    currentIndex: number
-  ) => {
-    if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      const parent = event.currentTarget.parentElement;
-      if (parent) {
-        const nextIndex = (currentIndex + 1) % parent.children.length;
-        (parent.children[nextIndex] as HTMLElement).focus();
-      }
-    } else if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      const parent = event.currentTarget.parentElement;
-      if (parent) {
-        const prevIndex = (currentIndex - 1 + parent.children.length) % parent.children.length;
-        (parent.children[prevIndex] as HTMLElement).focus();
-      }
-    }
   };
 
   return (
     <div className="flex items-center justify-between">
       {/* Left: Filter + Sort + Active State */}
       <div className="flex items-center space-x-2" role="group" aria-label="Filter and sort controls">
-        {/* Filter Button */}
-        <div className="relative">
-          <button
-            ref={filterButtonRef}
-            onClick={() => { setShowFilterMenu(!showFilterMenu); }}
-            onKeyDown={(e) => { handleKeyDown(e, () => { setShowFilterMenu(!showFilterMenu); }); }}
-            disabled={loading}
-            className="
-              h-11 px-3
-              flex items-center space-x-2
-              text-gray-700 dark:text-gray-300
-              bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm
-              border border-purple-200 dark:border-gray-600
-              rounded-lg
-              hover:bg-white/80 dark:hover:bg-gray-700/80
-              hover:border-purple-300 dark:hover:border-gray-500
-              transition-all duration-200
-              focus-interactive
-              disabled:opacity-50 disabled:cursor-not-allowed
-              relative
-            "
-            aria-label={`Filter by category: ${categoryLabel}`}
-            aria-expanded={showFilterMenu}
-            aria-haspopup="menu"
-            title={`Filter: ${categoryLabel}`}
-          >
-            {/* Funnel icon */}
-            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-            </svg>
-
-            {/* Filter label */}
-            <span className="text-sm font-semibold truncate max-w-[100px]">
-              {categoryLabel}
-            </span>
-
-            {/* Badge indicator when category selected */}
-            {selectedCategory && (
-              <span
-                className="absolute -top-1 -right-1 w-3 h-3 border-2 border-white dark:border-gray-800 rounded-full"
-                style={{
-                  backgroundColor: selectedCategory
-                    ? categories.find(cat => cat.name === selectedCategory)?.color || DEFAULT_COLORS.CATEGORY_BADGE
-                    : DEFAULT_COLORS.CATEGORY_BADGE
-                }}
-                aria-hidden="true"
-              />
-            )}
-          </button>
-
-          {/* Filter Dropdown Menu */}
-          {showFilterMenu && createPortal(
-            <div
-              ref={filterMenuRef}
+        {/* Filter Dropdown */}
+        <Dropdown.Root>
+          <Dropdown.Trigger asChild>
+            <button
+              disabled={loading}
               className="
-                fixed
-                min-w-[200px]
-                bg-white dark:bg-gray-800 backdrop-blur-sm
-                rounded-xl
-                shadow-xl
-                border border-purple-200 dark:border-gray-700
-                overflow-y-auto
-                overflow-x-hidden
-                animate-in fade-in-0 zoom-in-95
-                custom-scrollbar
+                h-11 px-3
+                flex items-center space-x-2
+                text-gray-700 dark:text-gray-300
+                bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm
+                border border-purple-200 dark:border-gray-600
+                rounded-lg
+                hover:bg-white/80 dark:hover:bg-gray-700/80
+                hover:border-purple-300 dark:hover:border-gray-500
+                transition-all duration-200
+                focus-interactive
+                disabled:opacity-50 disabled:cursor-not-allowed
+                relative
               "
-              style={{
-                maxHeight: `${String(DROPDOWN_CONFIG.FILTER_MAX_HEIGHT)}px`,
-                zIndex: DROPDOWN_CONFIG.PORTAL_Z_INDEX
-              }}
-              role="menu"
-              aria-label="Category filter menu"
+              aria-label={`Filter by category: ${categoryLabel}`}
+              title={`Filter: ${categoryLabel}`}
             >
-              {/* All Categories option */}
-              <button
-                onClick={() => { handleCategorySelect(null); }}
-                onKeyDown={(e) => { handleMenuKeyDown(e, 0); }}
+              {/* Funnel icon */}
+              <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+              </svg>
+
+              {/* Filter label */}
+              <span className="text-sm font-semibold truncate max-w-[100px]">
+                {categoryLabel}
+              </span>
+
+              {/* Badge indicator when category selected */}
+              {selectedCategory && (
+                <span
+                  className="absolute -top-1 -right-1 w-3 h-3 border-2 border-white dark:border-gray-800 rounded-full"
+                  style={{
+                    backgroundColor: selectedCategory
+                      ? categories.find(cat => cat.name === selectedCategory)?.color || DEFAULT_COLORS.CATEGORY_BADGE
+                      : DEFAULT_COLORS.CATEGORY_BADGE
+                  }}
+                  aria-hidden="true"
+                />
+              )}
+            </button>
+          </Dropdown.Trigger>
+
+          <Dropdown.Content
+            side="bottom"
+            align="start"
+            sideOffset={4}
+            className="min-w-[200px] max-h-[250px] overflow-y-auto custom-scrollbar"
+          >
+            {/* All Categories option */}
+            <Dropdown.Item
+              onSelect={() => { handleCategorySelect(null); }}
+              className={`
+                block w-full text-left
+                px-4 py-3
+                text-sm font-medium
+                transition-colors
+                focus-secondary
+                ${!selectedCategory
+                  ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400'
+                  : 'text-gray-700 dark:text-gray-300 hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:text-purple-700 dark:hover:text-purple-400'
+                }
+              `}
+            >
+              <span className="flex items-center justify-between">
+                <span>All Categories</span>
+                {!selectedCategory && (
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                )}
+              </span>
+            </Dropdown.Item>
+
+            {/* Divider */}
+            {categories.length > 0 && (
+              <Dropdown.Separator />
+            )}
+
+            {/* Category options */}
+            {categories.map((category) => (
+              <Dropdown.Item
+                key={category.id}
+                onSelect={() => { handleCategorySelect(category.name); }}
                 className={`
                   block w-full text-left
                   px-4 py-3
                   text-sm font-medium
                   transition-colors
                   focus-secondary
-                  ${!selectedCategory
+                  ${selectedCategory === category.name
                     ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400'
                     : 'text-gray-700 dark:text-gray-300 hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:text-purple-700 dark:hover:text-purple-400'
                   }
                 `}
-                role="menuitem"
               >
                 <span className="flex items-center justify-between">
-                  <span>All Categories</span>
-                  {!selectedCategory && (
+                  <span className="flex items-center space-x-2">
+                    {category.color && (
+                      <span
+                        className="w-3 h-3 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: category.color }}
+                        aria-hidden="true"
+                      />
+                    )}
+                    <span>{category.name}</span>
+                  </span>
+                  {selectedCategory === category.name && (
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
                   )}
                 </span>
-              </button>
+              </Dropdown.Item>
+            ))}
+          </Dropdown.Content>
+        </Dropdown.Root>
 
-              {/* Divider */}
-              {categories.length > 0 && (
-                <div className="h-px bg-gray-200 dark:bg-gray-700" />
-              )}
-
-              {/* Category options */}
-              {categories.map((category, index) => (
-                <button
-                  key={category.id}
-                  onClick={() => { handleCategorySelect(category.name); }}
-                  onKeyDown={(e) => { handleMenuKeyDown(e, index + 1); }}
-                  className={`
-                    block w-full text-left
-                    px-4 py-3
-                    text-sm font-medium
-                    transition-colors
-                    focus-secondary
-                    ${selectedCategory === category.name
-                      ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400'
-                      : 'text-gray-700 dark:text-gray-300 hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:text-purple-700 dark:hover:text-purple-400'
-                    }
-                  `}
-                  role="menuitem"
-                >
-                  <span className="flex items-center justify-between">
-                    <span className="flex items-center space-x-2">
-                      {category.color && (
-                        <span
-                          className="w-3 h-3 rounded-full flex-shrink-0"
-                          style={{ backgroundColor: category.color }}
-                          aria-hidden="true"
-                        />
-                      )}
-                      <span>{category.name}</span>
-                    </span>
-                    {selectedCategory === category.name && (
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    )}
-                  </span>
-                </button>
-              ))}
-            </div>,
-            document.body
-          )}
-        </div>
-
-        {/* Sort Button */}
-        <div className="relative">
-          <button
-            ref={sortButtonRef}
-            onClick={() => { setShowSortMenu(!showSortMenu); }}
-            onKeyDown={(e) => { handleKeyDown(e, () => { setShowSortMenu(!showSortMenu); }); }}
-            disabled={loading}
-            className="
-              w-11 h-11
-              flex items-center justify-center
-              text-gray-700 dark:text-gray-300
-              bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm
-              border border-purple-200 dark:border-gray-600
-              rounded-lg
-              hover:bg-white/80 dark:hover:bg-gray-700/80
-              hover:border-purple-300 dark:hover:border-gray-500
-              transition-all duration-200
-              focus-interactive
-              disabled:opacity-50 disabled:cursor-not-allowed
-            "
-            aria-label={`Sort order: ${sortLabel}`}
-            aria-expanded={showSortMenu}
-            aria-haspopup="menu"
-            title={`Sort: ${sortLabel}`}
-          >
-            {/* Sort icon (arrows up/down) */}
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-            </svg>
-
-            {/* Badge indicator with current sort icon */}
-            <span
-              className="absolute -top-1 -right-1 w-5 h-5 bg-purple-100 dark:bg-purple-900/40 border-2 border-white dark:border-gray-800 rounded-full flex items-center justify-center"
-              aria-hidden="true"
-            >
-              <div className="w-3 h-3 text-purple-700 dark:text-purple-400">
-                {(() => {
-                  const option = SORT_OPTIONS.find(opt => opt.value === sortOrder);
-                  const Icon = option?.icon || ClockIcon;
-                  return <Icon />;
-                })()}
-              </div>
-            </span>
-          </button>
-
-          {/* Sort Dropdown Menu */}
-          {showSortMenu && createPortal(
-            <div
-              ref={sortMenuRef}
+        {/* Sort Dropdown */}
+        <Dropdown.Root>
+          <Dropdown.Trigger asChild>
+            <button
+              disabled={loading}
               className="
-                fixed
-                min-w-[220px]
-                bg-white dark:bg-gray-800 backdrop-blur-sm
-                rounded-xl
-                shadow-xl
-                border border-purple-200 dark:border-gray-700
-                overflow-y-auto
-                overflow-x-hidden
-                animate-in fade-in-0 zoom-in-95
-                custom-scrollbar
+                w-11 h-11
+                flex items-center justify-center
+                text-gray-700 dark:text-gray-300
+                bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm
+                border border-purple-200 dark:border-gray-600
+                rounded-lg
+                hover:bg-white/80 dark:hover:bg-gray-700/80
+                hover:border-purple-300 dark:hover:border-gray-500
+                transition-all duration-200
+                focus-interactive
+                disabled:opacity-50 disabled:cursor-not-allowed
               "
-              style={{
-                maxHeight: `${String(DROPDOWN_CONFIG.SORT_MAX_HEIGHT)}px`,
-                zIndex: DROPDOWN_CONFIG.PORTAL_Z_INDEX
-              }}
-              role="menu"
-              aria-label="Sort order menu"
+              aria-label={`Sort order: ${sortLabel}`}
+              title={`Sort: ${sortLabel}`}
             >
-              {SORT_OPTIONS.map((option, index) => (
-                <button
+              {/* Sort icon */}
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+              </svg>
+            </button>
+          </Dropdown.Trigger>
+
+          <Dropdown.Content
+            side="bottom"
+            align="start"
+            sideOffset={4}
+            className="min-w-[200px] max-h-[400px] overflow-y-auto custom-scrollbar"
+          >
+            {SORT_OPTIONS.map((option) => {
+              const Icon = option.icon;
+              const isActive = sortOrder === option.value;
+
+              return (
+                <Dropdown.Item
                   key={option.value}
-                  onClick={() => { handleSortSelect(option.value); }}
-                  onKeyDown={(e) => { handleMenuKeyDown(e, index); }}
+                  onSelect={() => { handleSortSelect(option.value); }}
                   className={`
                     block w-full text-left
                     px-4 py-3
                     text-sm font-medium
                     transition-colors
                     focus-secondary
-                    ${sortOrder === option.value
+                    ${isActive
                       ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400'
                       : 'text-gray-700 dark:text-gray-300 hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:text-purple-700 dark:hover:text-purple-400'
                     }
                   `}
-                  role="menuitem"
                 >
                   <span className="flex items-center justify-between">
-                    <span className="flex items-center space-x-2">
-                      <option.icon />
+                    <span className="flex items-center space-x-3">
+                      <Icon />
                       <span>{option.label}</span>
                     </span>
-                    {sortOrder === option.value && (
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    )}
+                    <span className="flex items-center space-x-2">
+                      {isActive && (
+                        <>
+                          {/* Direction indicator */}
+                          {option.value === 'title' ? (
+                            <span className="text-xs font-semibold">
+                              {sortDirection === 'asc' ? 'A→Z' : 'Z→A'}
+                            </span>
+                          ) : (
+                            <span className="text-xs font-semibold">
+                              {sortDirection === 'desc' ? '↓' : '↑'}
+                            </span>
+                          )}
+                          {/* Checkmark */}
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        </>
+                      )}
+                    </span>
                   </span>
-                </button>
-              ))}
-            </div>,
-            document.body
-          )}
-        </div>
+                </Dropdown.Item>
+              );
+            })}
+          </Dropdown.Content>
+        </Dropdown.Root>
 
-        {/* Active State Text */}
-        <div
-          className="
-            hidden sm:flex
-            items-center
-            text-sm font-medium
-            text-gray-600 dark:text-gray-400
-            min-w-0
-          "
-          aria-live="polite"
-          aria-atomic="true"
-        >
-          <span className="truncate">{categoryLabel}</span>
-          <span className="mx-2 text-purple-400 dark:text-purple-500" aria-hidden="true">•</span>
-          <span className="truncate">{sortLabel}</span>
-        </div>
       </div>
 
       {/* Right: Manage Categories Button */}
       <button
         onClick={onManageCategories}
-        onKeyDown={(e) => { handleKeyDown(e, onManageCategories); }}
         disabled={loading}
         className="
           flex items-center space-x-2
@@ -440,35 +319,29 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
   );
 };
 
-// Custom props comparison for React.memo optimization
-// Prevents unnecessary re-renders when props haven't actually changed
+// Performance optimization: memoize with custom comparison
 const arePropsEqual = (
   prev: FilterSortControlsProps,
   next: FilterSortControlsProps
 ): boolean => {
-  // Check primitive props
-  if (prev.selectedCategory !== next.selectedCategory) {return false;}
-  if (prev.sortOrder !== next.sortOrder) {return false;}
-  if (prev.sortDirection !== next.sortDirection) {return false;}
-  if (prev.loading !== next.loading) {return false;}
-
-  // Check categories array length first (fast check)
-  if (prev.categories.length !== next.categories.length) {return false;}
-
-  // Deep comparison of categories (only if lengths match)
-  for (let i = 0; i < prev.categories.length; i++) {
-    if (prev.categories[i].id !== next.categories[i].id) {return false;}
-    if (prev.categories[i].name !== next.categories[i].name) {return false;}
-    if (prev.categories[i].color !== next.categories[i].color) {return false;}
+  // Deep compare categories by ID to avoid re-renders on same data
+  if (prev.categories.length !== next.categories.length) {
+    return false;
   }
 
-  // Handler stability check (these should be stable from useCallback in parent)
-  if (prev.onCategoryChange !== next.onCategoryChange) {return false;}
-  if (prev.onSortChange !== next.onSortChange) {return false;}
-  if (prev.onManageCategories !== next.onManageCategories) {return false;}
+  const prevCategoryIds = prev.categories.map(c => c.id).join(',');
+  const nextCategoryIds = next.categories.map(c => c.id).join(',');
 
-  // All props are equal
-  return true;
+  return (
+    prevCategoryIds === nextCategoryIds &&
+    prev.selectedCategory === next.selectedCategory &&
+    prev.sortOrder === next.sortOrder &&
+    prev.sortDirection === next.sortDirection &&
+    prev.onCategoryChange === next.onCategoryChange &&
+    prev.onSortChange === next.onSortChange &&
+    prev.onManageCategories === next.onManageCategories &&
+    prev.loading === next.loading
+  );
 };
 
 export default memo(FilterSortControls, arePropsEqual);
