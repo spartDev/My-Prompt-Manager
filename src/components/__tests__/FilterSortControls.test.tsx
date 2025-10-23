@@ -186,7 +186,8 @@ describe('FilterSortControls', () => {
       const allOptions = await screen.findAllByText('All Categories');
       // The dropdown item should be the second one (first is in the button)
       const dropdownOption = allOptions.find(el => el.closest('[role="menu"]'));
-      const allButton = dropdownOption?.parentElement?.parentElement;
+      // Navigate up to the button element (3 levels up due to nested spans)
+      const allButton = dropdownOption?.parentElement?.parentElement?.parentElement;
 
       expect(allButton).toHaveClass('bg-purple-50');
     });

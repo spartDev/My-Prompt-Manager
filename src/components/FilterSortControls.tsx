@@ -5,7 +5,7 @@ import { DEFAULT_COLORS } from '../constants/ui';
 import { SortOrder } from '../types';
 import { FilterSortControlsProps } from '../types/components';
 
-import { Dropdown } from './primitives/Dropdown';
+import { Dropdown, DropdownSeparator, DropdownItem } from './Dropdown';
 
 // Sort option icons
 const ClockIcon: FC = () => (
@@ -73,13 +73,117 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
     }
   };
 
+  // Build filter dropdown items
+  const filterItems: DropdownItem[] = [
+    {
+      id: 'all',
+      label: (
+        <span className="flex items-center justify-between w-full">
+          <span>All Categories</span>
+          {!selectedCategory && (
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+            </svg>
+          )}
+        </span>
+      ),
+      onSelect: () => { handleCategorySelect(null); },
+      className: !selectedCategory
+        ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400'
+        : ''
+    }
+  ];
+
+  // Add separator if there are categories
+  if (categories.length > 0) {
+    filterItems.push({
+      id: 'separator',
+      label: <DropdownSeparator />,
+      onSelect: () => {},
+      disabled: true,
+      className: 'p-0 hover:bg-transparent cursor-default'
+    });
+  }
+
+  // Add category items
+  categories.forEach(category => {
+    filterItems.push({
+      id: category.id,
+      label: (
+        <span className="flex items-center justify-between w-full">
+          <span className="flex items-center space-x-2">
+            {category.color && (
+              <span
+                className="w-3 h-3 rounded-full flex-shrink-0"
+                style={{ backgroundColor: category.color }}
+                aria-hidden="true"
+              />
+            )}
+            <span>{category.name}</span>
+          </span>
+          {selectedCategory === category.name && (
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+            </svg>
+          )}
+        </span>
+      ),
+      onSelect: () => { handleCategorySelect(category.name); },
+      className: selectedCategory === category.name
+        ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400'
+        : ''
+    });
+  });
+
+  // Build sort dropdown items
+  const sortItems: DropdownItem[] = SORT_OPTIONS.map(option => {
+    const Icon = option.icon;
+    const isActive = sortOrder === option.value;
+
+    return {
+      id: option.value,
+      label: (
+        <span className="flex items-center justify-between w-full">
+          <span className="flex items-center space-x-3">
+            <Icon />
+            <span>{option.label}</span>
+          </span>
+          <span className="flex items-center space-x-2">
+            {isActive && (
+              <>
+                {/* Direction indicator */}
+                {option.value === 'title' ? (
+                  <span className="text-xs font-semibold">
+                    {sortDirection === 'asc' ? 'A→Z' : 'Z→A'}
+                  </span>
+                ) : (
+                  <span className="text-xs font-semibold">
+                    {sortDirection === 'desc' ? '↓' : '↑'}
+                  </span>
+                )}
+                {/* Checkmark */}
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              </>
+            )}
+          </span>
+        </span>
+      ),
+      onSelect: () => { handleSortSelect(option.value); },
+      className: isActive
+        ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400'
+        : ''
+    };
+  });
+
   return (
     <div className="flex items-center justify-between">
       {/* Left: Filter + Sort + Active State */}
       <div className="flex items-center space-x-2" role="group" aria-label="Filter and sort controls">
         {/* Filter Dropdown */}
-        <Dropdown.Root>
-          <Dropdown.Trigger asChild>
+        <Dropdown
+          trigger={
             <button
               disabled={loading}
               className="
@@ -122,86 +226,15 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
                 />
               )}
             </button>
-          </Dropdown.Trigger>
-
-          <Dropdown.Content
-            side="bottom"
-            align="start"
-            sideOffset={4}
-            className="min-w-[200px] max-h-[250px] overflow-y-auto custom-scrollbar"
-          >
-            {/* All Categories option */}
-            <Dropdown.Item
-              onSelect={() => { handleCategorySelect(null); }}
-              className={`
-                block w-full text-left
-                px-4 py-3
-                text-sm font-medium
-                transition-colors
-                focus-secondary
-                ${!selectedCategory
-                  ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400'
-                  : 'text-gray-700 dark:text-gray-300 hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:text-purple-700 dark:hover:text-purple-400'
-                }
-              `}
-            >
-              <span className="flex items-center justify-between">
-                <span>All Categories</span>
-                {!selectedCategory && (
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                )}
-              </span>
-            </Dropdown.Item>
-
-            {/* Divider */}
-            {categories.length > 0 && (
-              <Dropdown.Separator />
-            )}
-
-            {/* Category options */}
-            {categories.map((category) => (
-              <Dropdown.Item
-                key={category.id}
-                onSelect={() => { handleCategorySelect(category.name); }}
-                className={`
-                  block w-full text-left
-                  px-4 py-3
-                  text-sm font-medium
-                  transition-colors
-                  focus-secondary
-                  ${selectedCategory === category.name
-                    ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400'
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:text-purple-700 dark:hover:text-purple-400'
-                  }
-                `}
-              >
-                <span className="flex items-center justify-between">
-                  <span className="flex items-center space-x-2">
-                    {category.color && (
-                      <span
-                        className="w-3 h-3 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: category.color }}
-                        aria-hidden="true"
-                      />
-                    )}
-                    <span>{category.name}</span>
-                  </span>
-                  {selectedCategory === category.name && (
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                  )}
-                </span>
-              </Dropdown.Item>
-            ))}
-          </Dropdown.Content>
-        </Dropdown.Root>
+          }
+          items={filterItems}
+          className="min-w-[200px] max-h-[250px] overflow-y-auto custom-scrollbar"
+          itemClassName="px-4 py-3 text-sm font-medium"
+        />
 
         {/* Sort Dropdown */}
-        <Dropdown.Root>
-          <Dropdown.Trigger asChild>
+        <Dropdown
+          trigger={
             <button
               disabled={loading}
               className="
@@ -225,66 +258,11 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
               </svg>
             </button>
-          </Dropdown.Trigger>
-
-          <Dropdown.Content
-            side="bottom"
-            align="start"
-            sideOffset={4}
-            className="min-w-[200px] max-h-[400px] overflow-y-auto custom-scrollbar"
-          >
-            {SORT_OPTIONS.map((option) => {
-              const Icon = option.icon;
-              const isActive = sortOrder === option.value;
-
-              return (
-                <Dropdown.Item
-                  key={option.value}
-                  onSelect={() => { handleSortSelect(option.value); }}
-                  className={`
-                    block w-full text-left
-                    px-4 py-3
-                    text-sm font-medium
-                    transition-colors
-                    focus-secondary
-                    ${isActive
-                      ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400'
-                      : 'text-gray-700 dark:text-gray-300 hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:text-purple-700 dark:hover:text-purple-400'
-                    }
-                  `}
-                >
-                  <span className="flex items-center justify-between">
-                    <span className="flex items-center space-x-3">
-                      <Icon />
-                      <span>{option.label}</span>
-                    </span>
-                    <span className="flex items-center space-x-2">
-                      {isActive && (
-                        <>
-                          {/* Direction indicator */}
-                          {option.value === 'title' ? (
-                            <span className="text-xs font-semibold">
-                              {sortDirection === 'asc' ? 'A→Z' : 'Z→A'}
-                            </span>
-                          ) : (
-                            <span className="text-xs font-semibold">
-                              {sortDirection === 'desc' ? '↓' : '↑'}
-                            </span>
-                          )}
-                          {/* Checkmark */}
-                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                          </svg>
-                        </>
-                      )}
-                    </span>
-                  </span>
-                </Dropdown.Item>
-              );
-            })}
-          </Dropdown.Content>
-        </Dropdown.Root>
-      
+          }
+          items={sortItems}
+          className="min-w-[200px] max-h-[400px] overflow-y-auto custom-scrollbar"
+          itemClassName="px-4 py-3 text-sm font-medium"
+        />
       </div>
 
       {/* Right: Manage Categories Button */}
