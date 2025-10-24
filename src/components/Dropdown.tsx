@@ -9,7 +9,7 @@ import {
   createContext,
   useContext,
   useEffect,
-  isValidElement
+  useId
 } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -38,6 +38,8 @@ export interface DropdownItem {
   icon?: ReactNode;
   disabled?: boolean;
   className?: string;
+  /** Type of item - 'separator' items render as dividers */
+  type?: 'item' | 'separator';
 }
 
 // Main dropdown props
@@ -114,9 +116,12 @@ export const Dropdown: FC<DropdownProps> = ({
   const isControlled = controlledOpen !== undefined;
   const isOpen = isControlled ? controlledOpen : uncontrolledOpen;
 
+  // Generate unique IDs for ARIA relationships
+  const dropdownId = useId();
+
   // Refs for positioning and close detection
   const triggerRef = useRef<HTMLElement>(null);
-  const contentRef = useRef<HTMLElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   // Handle open state changes
   const handleOpenChange = (open: boolean) => {
@@ -233,12 +238,18 @@ export const Dropdown: FC<DropdownProps> = ({
   }, [isOpen, items]);
 
   // Render trigger with enhanced props
+  // Get original props with proper typing
+  const triggerProps = trigger.props as Record<string, unknown> & {
+    onClick?: (e: React.MouseEvent) => void;
+    onKeyDown?: (e: React.KeyboardEvent) => void;
+    id?: string;
+  };
+
   // eslint-disable-next-line react-hooks/refs
   const enhancedTrigger = cloneElement(trigger, {
     ref: triggerRef,
     onClick: (e: React.MouseEvent) => {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-      trigger.props?.onClick?.(e);
+      triggerProps.onClick?.(e);
       handleToggle();
     },
     onKeyDown: (e: React.KeyboardEvent) => {
@@ -247,19 +258,20 @@ export const Dropdown: FC<DropdownProps> = ({
         e.preventDefault();
         handleToggle();
       }
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-      trigger.props?.onKeyDown?.(e);
+      triggerProps.onKeyDown?.(e);
     },
     'aria-expanded': isOpen,
-    'aria-haspopup': items ? 'menu' : 'dialog'
+    'aria-haspopup': items ? 'menu' : 'dialog',
+    'aria-controls': dropdownId
   } as React.HTMLAttributes<HTMLElement>);
 
   // Render dropdown content
   const dropdownContent = isOpen ? (
     <div
       ref={contentRef}
+      id={dropdownId}
       role={items ? 'menu' : 'dialog'}
-      aria-labelledby={trigger.props?.id as string | undefined}
+      aria-labelledby={triggerProps.id}
       className={cn(
         'absolute z-50 min-w-[8rem] overflow-hidden',
         'rounded-xl border bg-white shadow-lg',
@@ -274,7 +286,8 @@ export const Dropdown: FC<DropdownProps> = ({
         <div className="py-1">
           {items.map(item => {
             // Check if this is a separator (special case)
-            if (item.id === 'separator' || (isValidElement(item.label) && item.label.type === DropdownSeparator)) {
+            // Use explicit type field or fallback to id check for backward compatibility
+            if (item.type === 'separator' || item.id === 'separator') {
               return (
                 <div key={item.id} role="separator" className="my-1 h-px bg-gray-200 dark:bg-gray-700" />
               );
