@@ -1,4 +1,4 @@
-import { useState, useId } from 'react';
+import { useState, useId, useEffect } from 'react';
 import type { FC } from 'react';
 
 import {
@@ -313,6 +313,14 @@ const ColorPicker: FC<ColorPickerProps> = ({
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const colorInputId = useId();
+
+  // FIX: Sync internal states when value prop changes externally
+  // This prevents stale state when parent updates the value (e.g., undo/redo, storage sync)
+  // Without this, the "Apply" button may appear incorrectly with stale customColor
+  useEffect(() => {
+    setCustomColor(value);
+    setHexInputValue(value);
+  }, [value]);
 
   const currentColorName = getColorName(value);
 
