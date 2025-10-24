@@ -5,7 +5,7 @@ import { DEFAULT_COLORS } from '../constants/ui';
 import { SortOrder } from '../types';
 import { FilterSortControlsProps } from '../types/components';
 
-import { Dropdown, DropdownSeparator, DropdownItem } from './Dropdown';
+import { Dropdown, DropdownItem } from './Dropdown';
 
 // Sort option icons
 const ClockIcon: FC = () => (
@@ -98,10 +98,9 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
   if (categories.length > 0) {
     filterItems.push({
       id: 'separator',
-      label: <DropdownSeparator />,
-      onSelect: () => {},
-      disabled: true,
-      className: 'p-0 hover:bg-transparent cursor-default'
+      type: 'separator',
+      label: '',
+      onSelect: () => {}
     });
   }
 
@@ -213,6 +212,11 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
                 {categoryLabel}
               </span>
 
+              {/* Dropdown arrow */}
+              <svg className="w-4 h-4 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+
               {/* Badge indicator when category selected */}
               {selectedCategory && (
                 <span
@@ -256,6 +260,11 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
               {/* Sort icon */}
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+              </svg>
+
+              {/* Dropdown arrow */}
+              <svg className="w-3 h-3 text-gray-500 absolute -bottom-0.5 -right-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </button>
           }
