@@ -284,7 +284,7 @@ export const Dropdown: FC<DropdownProps> = ({
     'aria-expanded': isOpen,
     'aria-haspopup': items ? 'menu' : 'dialog',
     'aria-controls': dropdownId
-  });
+  } as React.HTMLAttributes<HTMLElement> & { ref: React.Ref<HTMLElement> });
 
   // Render dropdown content
   const dropdownContent = isOpen ? (
