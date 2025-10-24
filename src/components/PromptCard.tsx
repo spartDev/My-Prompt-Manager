@@ -1,15 +1,14 @@
 import DOMPurify from 'dompurify';
-import { useState, useRef, useEffect, memo } from 'react';
+import { useState, memo } from 'react';
 import type { FC, MouseEvent, ReactNode } from 'react';
 
-import { DROPDOWN_CONFIG } from '../constants/ui';
-import { useDropdownClose } from '../hooks';
 import { encode } from '../services/promptEncoder';
 import { Category, Prompt } from '../types';
 import { PromptCardProps } from '../types/components';
 import { Logger, toError } from '../utils';
 
 import ConfirmDialog from './ConfirmDialog';
+import { Dropdown, DropdownItem } from './Dropdown';
 
 const PromptCard: FC<PromptCardProps> = ({
   prompt,
@@ -20,12 +19,8 @@ const PromptCard: FC<PromptCardProps> = ({
   showToast,
   searchQuery = ''
 }) => {
-  const [showMenu, setShowMenu] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const menuButtonRef = useRef<HTMLButtonElement>(null);
-  const firstMenuItemRef = useRef<HTMLButtonElement>(null);
 
   const highlightText = (text: string, query: string): ReactNode => {
     if (!query.trim()) {return text;}
@@ -73,18 +68,12 @@ const PromptCard: FC<PromptCardProps> = ({
     (onCopy as (content: string) => void)((prompt).content);
   };
 
-  const handleEditClick = (e?: MouseEvent | KeyboardEvent) => {
-
-    e?.stopPropagation();
+  const handleEditClick = () => {
     (onEdit as (prompt: Prompt) => void)(prompt);
-    setShowMenu(false);
   };
 
-  const handleDeleteClick = (e?: MouseEvent | KeyboardEvent) => {
-
-    e?.stopPropagation();
+  const handleDeleteClick = () => {
     setShowDeleteConfirm(true);
-    setShowMenu(false);
   };
 
   const handleConfirmDelete = () => {
@@ -124,26 +113,24 @@ const PromptCard: FC<PromptCardProps> = ({
     return (category?.color as string) || '#6B7280'; // Default gray color if category not found
   };
 
-
-  // Focus management for dropdown menu
-  useEffect(() => {
-    if (showMenu && firstMenuItemRef.current) {
-      firstMenuItemRef.current.focus();
+  // Menu items for dropdown
+  const menuItems: DropdownItem[] = [
+    {
+      id: 'edit',
+      label: 'Edit',
+      onSelect: handleEditClick
+    },
+    {
+      id: 'delete',
+      label: 'Delete',
+      onSelect: handleDeleteClick,
+      className: 'text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 focus:bg-red-50 dark:focus:bg-red-900/20 focus:text-red-700 dark:focus:text-red-400'
     }
-  }, [showMenu]);
-
-  // Handle dropdown close interactions
-  useDropdownClose({
-    isOpen: showMenu,
-    onClose: () => { setShowMenu(false); },
-    triggerRef: menuButtonRef,
-    menuRef: menuRef,
-    focusOnEscape: menuButtonRef
-  });
+  ];
 
 
   return (
-    <article className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5 hover:bg-white/90 dark:hover:bg-gray-800/90 transition-all duration-200 relative group" style={{ zIndex: showMenu ? 1000 : 'auto' }} aria-labelledby={`prompt-title-${prompt.id}`}>
+    <article className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5 hover:bg-white/90 dark:hover:bg-gray-800/90 transition-all duration-200 relative group" aria-labelledby={`prompt-title-${prompt.id}`}>
       <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-4 items-center">
         {/* Title and metadata */}
         <div className="pr-3">
@@ -225,116 +212,22 @@ const PromptCard: FC<PromptCardProps> = ({
           </button>
 
           {/* Menu */}
-          <div className="relative">
-            <button
-              ref={menuButtonRef}
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowMenu(!showMenu);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setShowMenu(!showMenu);
-                } else if (e.key === 'Escape') {
-                  setShowMenu(false);
-                } else if (e.key === 'ArrowDown' && showMenu) {
-                  e.preventDefault();
-                  if (firstMenuItemRef.current) {
-                    firstMenuItemRef.current.focus();
-                  }
-                }
-              }}
-              className="p-1 text-gray-400 dark:text-gray-500 hover:text-purple-600 dark:hover:text-purple-400 rounded-md hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors focus-interactive"
-              aria-label={`More actions for ${prompt.title}`}
-              aria-expanded={showMenu}
-              aria-haspopup="menu"
-            >
-              <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-                <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-              </svg>
-            </button>
-            
-            {showMenu && (
-              <>
-                <button
-                  type="button"
-                  className="fixed inset-0 z-10 bg-transparent border-0 cursor-default"
-                  onClick={() => { setShowMenu(false); }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Escape') {
-                      setShowMenu(false);
-                    }
-                  }}
-                  aria-label="Close menu"
-                />
-                <div
-                  ref={menuRef}
-                  className="absolute right-0 top-full mt-1 w-28 bg-white dark:bg-gray-800 backdrop-blur-sm rounded-xl shadow-xl border border-purple-200 dark:border-gray-700 overflow-hidden"
-                  style={{ zIndex: DROPDOWN_CONFIG.PORTAL_Z_INDEX }}
-                  role="menu"
-                  aria-label="Prompt actions"
-                >
-                  <button
-                    ref={firstMenuItemRef}
-                    onClick={handleEditClick}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        (onEdit as (prompt: Prompt) => void)(prompt);
-                        setShowMenu(false);
-                      } else if (e.key === 'Escape') {
-                        setShowMenu(false);
-                        if (menuButtonRef.current) {
-                          menuButtonRef.current.focus();
-                        }
-                      } else if (e.key === 'ArrowDown') {
-                        e.preventDefault();
-                        const nextButton = e.currentTarget.nextElementSibling as HTMLButtonElement | null;
-                        nextButton?.focus();
-                      } else if (e.key === 'ArrowUp') {
-                        e.preventDefault();
-                        menuButtonRef.current?.focus();
-                      }
-                    }}
-                    className="block w-full text-left px-4 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:text-purple-700 dark:hover:text-purple-400 font-medium transition-colors focus-secondary focus:bg-purple-50 dark:focus:bg-purple-900/20 focus:text-purple-700 dark:focus:text-purple-400"
-                    role="menuitem"
-                    aria-label={`Edit ${prompt.title}`}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={handleDeleteClick}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        setShowDeleteConfirm(true);
-                        setShowMenu(false);
-                      } else if (e.key === 'Escape') {
-                        setShowMenu(false);
-                        if (menuButtonRef.current) {
-                          menuButtonRef.current.focus();
-                        }
-                      } else if (e.key === 'ArrowUp') {
-                        e.preventDefault();
-                        const prevButton = e.currentTarget.previousElementSibling as HTMLButtonElement | null;
-                        prevButton?.focus();
-                      } else if (e.key === 'ArrowDown') {
-                        e.preventDefault();
-                        menuButtonRef.current?.focus();
-                      }
-                    }}
-                    className="block w-full text-left px-4 py-3 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 font-medium transition-colors focus-danger focus:bg-red-50 dark:focus:bg-red-900/20 focus:text-red-700 dark:focus:text-red-400"
-                    role="menuitem"
-                    aria-label={`Delete ${prompt.title}`}
-                  >
-                    Delete
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
+          <Dropdown
+            trigger={
+              <button
+                className="p-1 text-gray-400 dark:text-gray-500 hover:text-purple-600 dark:hover:text-purple-400 rounded-md hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors focus-interactive"
+                aria-label={`More actions for ${prompt.title}`}
+              >
+                <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                  <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                </svg>
+              </button>
+            }
+            items={menuItems}
+            placement="bottom-end"
+            className="w-28"
+            itemClassName="px-4 py-3 text-sm font-medium"
+          />
         </div>
       </div>
 
