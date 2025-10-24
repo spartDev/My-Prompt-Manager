@@ -117,12 +117,12 @@ const PromptCard: FC<PromptCardProps> = ({
   const menuItems: DropdownItem[] = [
     {
       id: 'edit',
-      label: 'Edit',
+      label: `Edit ${prompt.title}`,
       onSelect: handleEditClick
     },
     {
       id: 'delete',
-      label: 'Delete',
+      label: `Delete ${prompt.title}`,
       onSelect: handleDeleteClick,
       className: 'text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 focus:bg-red-50 dark:focus:bg-red-900/20 focus:text-red-700 dark:focus:text-red-400'
     }

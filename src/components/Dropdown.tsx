@@ -72,6 +72,8 @@ export interface DropdownProps {
   closeOnEscape?: boolean;
   /** Whether to focus trigger on close (default: true) */
   focusTriggerOnClose?: boolean;
+  /** Optional aria-label for the dropdown menu */
+  ariaLabel?: string;
 }
 
 /**
@@ -109,7 +111,8 @@ export const Dropdown: FC<DropdownProps> = ({
   portalContainer = document.body,
   offset = 4,
   closeOnEscape = true,
-  focusTriggerOnClose = true
+  focusTriggerOnClose = true,
+  ariaLabel
 }) => {
   // State management - support both controlled and uncontrolled modes
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
@@ -271,7 +274,8 @@ export const Dropdown: FC<DropdownProps> = ({
       ref={contentRef}
       id={dropdownId}
       role={items ? 'menu' : 'dialog'}
-      aria-labelledby={triggerProps.id}
+      aria-label={ariaLabel}
+      aria-labelledby={!ariaLabel ? triggerProps.id : undefined}
       className={cn(
         'absolute z-50 min-w-[8rem] overflow-hidden',
         'rounded-xl border bg-white shadow-lg',

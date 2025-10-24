@@ -185,6 +185,7 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
           trigger={
             <button
               disabled={loading}
+              id="category-filter-button"
               className="
                 h-11 px-3
                 flex items-center space-x-2
@@ -234,6 +235,7 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
           items={filterItems}
           className="min-w-[200px] max-h-[250px] overflow-y-auto custom-scrollbar"
           itemClassName="px-4 py-3 text-sm font-medium"
+          ariaLabel="Category filter menu"
         />
 
         {/* Sort Dropdown */}
