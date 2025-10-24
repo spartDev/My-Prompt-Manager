@@ -2,6 +2,8 @@
  * Predefined color palettes for category management
  */
 
+import { Logger } from '../utils';
+
 export interface ColorOption {
   name: string;
   value: string;
@@ -56,45 +58,84 @@ export const isValidHexColor = (color: string): boolean => {
 
 // Function to get contrasting text color (simple version)
 export const getContrastingTextColor = (hexColor: string): string => {
+  // GUARD: Validate input hex color format
+  if (!isValidHexColor(hexColor)) {
+    Logger.warn('Invalid hex color provided to getContrastingTextColor', {
+      component: 'colors',
+      value: hexColor
+    });
+    return '#000000'; // Safe default: black text
+  }
+
   // Remove # if present
   const hex = hexColor.replace('#', '');
-  
-  // Convert to RGB
-  const r = parseInt(hex.substr(0, 2), 16);
-  const g = parseInt(hex.substr(2, 2), 16);
-  const b = parseInt(hex.substr(4, 2), 16);
-  
+
+  // Convert to RGB using .substring() (not deprecated .substr())
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
+
+  // GUARD: Validate parsed RGB values
+  if (isNaN(r) || isNaN(g) || isNaN(b)) {
+    Logger.error('Failed to parse hex color to RGB', new Error('Invalid RGB values'), {
+      component: 'colors',
+      hex: hexColor,
+      rgb: { r, g, b }
+    });
+    return '#000000'; // Safe default
+  }
+
   // Calculate luminance
   const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  
+
   // Return white for dark colors, black for light colors
   return luminance > 0.5 ? '#000000' : '#FFFFFF';
 };
 
 // Function to lighten or darken a color
 export const adjustColorBrightness = (hexColor: string, percent: number): string => {
+  // GUARD: Validate input hex color format
+  if (!isValidHexColor(hexColor)) {
+    Logger.warn('Invalid hex color provided to adjustColorBrightness', {
+      component: 'colors',
+      value: hexColor,
+      percent
+    });
+    return hexColor; // Return as-is, don't attempt adjustment
+  }
+
   // Remove # if present
   const hex = hexColor.replace('#', '');
-  
-  // Convert to RGB
-  const r = parseInt(hex.substr(0, 2), 16);
-  const g = parseInt(hex.substr(2, 2), 16);
-  const b = parseInt(hex.substr(4, 2), 16);
-  
+
+  // Convert to RGB using .substring() (not deprecated .substr())
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
+
+  // GUARD: Validate parsed RGB values
+  if (isNaN(r) || isNaN(g) || isNaN(b)) {
+    Logger.error('Failed to parse hex color for brightness adjustment', new Error('Invalid RGB values'), {
+      component: 'colors',
+      hex: hexColor,
+      rgb: { r, g, b }
+    });
+    return hexColor; // Safe fallback: return original
+  }
+
   // Adjust brightness
   const adjust = (value: number) => {
     const adjusted = value + (value * percent / 100);
     return Math.min(255, Math.max(0, Math.round(adjusted)));
   };
-  
+
   const newR = adjust(r);
   const newG = adjust(g);
   const newB = adjust(b);
-  
+
   // Convert back to hex
   const toHex = (value: number) => value.toString(16).padStart(2, '0');
-  
-  return `#${toHex(newR)}${toHex(newG)}${toHex(newB)}`;
+
+  return `#${toHex(newR)}${toHex(newG)}${toHex(newB)}`.toUpperCase();
 };
 
 // Get color name from preset or return "Custom"
