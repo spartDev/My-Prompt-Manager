@@ -3,7 +3,6 @@ import { useState, memo } from 'react';
 import type { FC, MouseEvent, ReactNode } from 'react';
 
 import { encode } from '../services/promptEncoder';
-import { Category, Prompt } from '../types';
 import { PromptCardProps } from '../types/components';
 import { Logger, toError } from '../utils';
 
@@ -63,13 +62,12 @@ const PromptCard: FC<PromptCardProps> = ({
   };
 
   const handleCopyClick = (e?: MouseEvent | KeyboardEvent) => {
-
     e?.stopPropagation();
-    (onCopy as (content: string) => void)((prompt).content);
+    onCopy(prompt.content);
   };
 
   const handleEditClick = () => {
-    (onEdit as (prompt: Prompt) => void)(prompt);
+    onEdit(prompt);
   };
 
   const handleDeleteClick = () => {
@@ -77,7 +75,7 @@ const PromptCard: FC<PromptCardProps> = ({
   };
 
   const handleConfirmDelete = () => {
-    (onDelete as (id: string) => void)((prompt).id);
+    onDelete(prompt.id);
     setShowDeleteConfirm(false);
   };
 
@@ -109,8 +107,8 @@ const PromptCard: FC<PromptCardProps> = ({
   };
 
   const getCategoryColor = (categoryName: string) => {
-    const category = (categories).find((cat: Category) => cat.name === categoryName);
-    return (category?.color as string) || '#6B7280'; // Default gray color if category not found
+    const category = categories.find(cat => cat.name === categoryName);
+    return category?.color || '#6B7280'; // Default gray color if category not found
   };
 
   // Menu items for dropdown

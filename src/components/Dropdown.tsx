@@ -240,33 +240,51 @@ export const Dropdown: FC<DropdownProps> = ({
     };
   }, [isOpen, items]);
 
-  // Render trigger with enhanced props
-  // Get original props with proper typing
-  const triggerProps = trigger.props as Record<string, unknown> & {
-    onClick?: (e: React.MouseEvent) => void;
-    onKeyDown?: (e: React.KeyboardEvent) => void;
-    id?: string;
+  // Helper to safely extract trigger handlers with runtime validation
+  const extractTriggerHandlers = (props: unknown) => {
+    if (!props || typeof props !== 'object') {
+      return { onClick: undefined, onKeyDown: undefined, id: undefined };
+    }
+
+    const obj = props as Record<string, unknown>;
+    return {
+      onClick: typeof obj.onClick === 'function'
+        ? (obj.onClick as (e: React.MouseEvent) => void)
+        : undefined,
+      onKeyDown: typeof obj.onKeyDown === 'function'
+        ? (obj.onKeyDown as (e: React.KeyboardEvent) => void)
+        : undefined,
+      id: typeof obj.id === 'string' ? obj.id : undefined
+    };
   };
 
-  // eslint-disable-next-line react-hooks/refs
+  // Extract trigger props with runtime validation
+  const triggerHandlers = extractTriggerHandlers(trigger.props);
+
+  // SAFETY: Using ref callback pattern which is safe with cloneElement.
+  // The ref is assigned synchronously during render, and triggerRef is stable
+  // across renders because it's created with useRef outside this function.
+  // This pattern is documented in React docs: https://react.dev/reference/react/cloneElement#caveats
+  // We must disable the rule because ESLint doesn't recognize this safe usage.
+  // eslint-disable-next-line react-hooks/refs -- Safe: ref callback with stable useRef
   const enhancedTrigger = cloneElement(trigger, {
     ref: triggerRef,
     onClick: (e: React.MouseEvent) => {
-      triggerProps.onClick?.(e);
+      triggerHandlers.onClick?.(e);
       handleToggle();
     },
     onKeyDown: (e: React.KeyboardEvent) => {
-      // Handle Space key to toggle dropdown and prevent scrolling
-      if (e.key === ' ') {
+      // Handle Space and Enter keys to toggle dropdown and prevent scrolling
+      if (e.key === ' ' || e.key === 'Enter') {
         e.preventDefault();
         handleToggle();
       }
-      triggerProps.onKeyDown?.(e);
+      triggerHandlers.onKeyDown?.(e);
     },
     'aria-expanded': isOpen,
     'aria-haspopup': items ? 'menu' : 'dialog',
     'aria-controls': dropdownId
-  } as React.HTMLAttributes<HTMLElement>);
+  });
 
   // Render dropdown content
   const dropdownContent = isOpen ? (
@@ -275,7 +293,7 @@ export const Dropdown: FC<DropdownProps> = ({
       id={dropdownId}
       role={items ? 'menu' : 'dialog'}
       aria-label={ariaLabel}
-      aria-labelledby={!ariaLabel ? triggerProps.id : undefined}
+      aria-labelledby={!ariaLabel ? triggerHandlers.id : undefined}
       className={cn(
         'absolute z-50 min-w-[8rem] overflow-hidden',
         'rounded-xl border bg-white shadow-lg',
