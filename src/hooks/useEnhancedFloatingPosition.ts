@@ -73,6 +73,10 @@ export const useEnhancedFloatingPosition = (
     const reference = referenceRef.current;
     const floating = floatingRef.current;
 
+    // Track mount status to prevent DOM mutations after unmount
+    // Prevents memory leaks and React warnings from async computePosition
+    let isMounted = true;
+
     // Build middleware array based on options
     const middleware = [
       // Offset from reference element
@@ -91,10 +95,13 @@ export const useEnhancedFloatingPosition = (
       // Constrain size to available space
       size({
         apply({ availableHeight, elements }) {
-          Object.assign(elements.floating.style, {
-            maxHeight: `${String(Math.min(availableHeight - 16, maxHeight))}px`,
-            overflow: 'auto'
-          });
+          // Only mutate DOM if component is still mounted
+          if (isMounted) {
+            Object.assign(elements.floating.style, {
+              maxHeight: `${String(Math.min(availableHeight - 16, maxHeight))}px`,
+              overflow: 'auto'
+            });
+          }
         },
         padding: shiftPadding
       })
@@ -110,11 +117,14 @@ export const useEnhancedFloatingPosition = (
           placement,
           middleware
         }).then(({ x, y }) => {
-          // Apply computed position
-          Object.assign(floating.style, {
-            left: `${String(x)}px`,
-            top: `${String(y)}px`,
-          });
+          // Only apply position if component is still mounted
+          // Prevents React warnings and memory leaks from unmounted DOM mutations
+          if (isMounted) {
+            Object.assign(floating.style, {
+              left: `${String(x)}px`,
+              top: `${String(y)}px`,
+            });
+          }
         });
       },
       {
@@ -123,7 +133,10 @@ export const useEnhancedFloatingPosition = (
       }
     );
 
-    // Cleanup function removes auto-update listener
-    return cleanup;
+    // Cleanup function marks component as unmounted and removes auto-update listener
+    return () => {
+      isMounted = false;
+      cleanup();
+    };
   }, [isOpen, referenceRef, floatingRef, placement, offsetValue, enableShift, enableFlip, maxHeight, shiftPadding]);
 };
