@@ -48,7 +48,12 @@ export const useDropdownClose = ({
     if (!isOpen) {return;}
 
     const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Node;
+      const target = event.target;
+
+      // Guard: Ensure target is a valid Node before using contains()
+      if (!(target instanceof Node)) {
+        return;
+      }
 
       // Check if click is outside both trigger and menu
       const menu = menuRef.current;

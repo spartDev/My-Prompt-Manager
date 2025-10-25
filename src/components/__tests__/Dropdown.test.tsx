@@ -816,6 +816,55 @@ describe('Dropdown', () => {
         expect(container.contains(menu)).toBe(true);
       });
     });
+
+    it('uses custom portal container when provided', async () => {
+      const user = userEvent.setup();
+      const customContainer = document.createElement('div');
+      document.body.appendChild(customContainer);
+
+      render(
+        <Dropdown
+          trigger={<button>Open Menu</button>}
+          items={mockItems}
+          portalContainer={customContainer}
+        />
+      );
+
+      await user.click(screen.getByRole('button', { name: /open menu/i }));
+
+      await waitFor(() => {
+        const menu = screen.getByRole('menu');
+        // Should render in custom container
+        expect(menu.parentElement).toBe(customContainer);
+      });
+
+      // Cleanup
+      document.body.removeChild(customContainer);
+    });
+
+    it('falls back to document.body when portal container is not in document', async () => {
+      const user = userEvent.setup();
+      const disconnectedContainer = document.createElement('div');
+      // Note: disconnectedContainer is NOT appended to document
+
+      render(
+        <Dropdown
+          trigger={<button>Open Menu</button>}
+          items={mockItems}
+          portalContainer={disconnectedContainer}
+        />
+      );
+
+      await user.click(screen.getByRole('button', { name: /open menu/i }));
+
+      await waitFor(() => {
+        const menu = screen.getByRole('menu');
+        // Should fallback to document.body
+        expect(menu.parentElement).toBe(document.body);
+        // Should NOT be in disconnected container
+        expect(disconnectedContainer.contains(menu)).toBe(false);
+      });
+    });
   });
 
   describe('DropdownSeparator Component', () => {

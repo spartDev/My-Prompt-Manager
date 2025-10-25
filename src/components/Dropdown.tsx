@@ -64,7 +64,7 @@ export interface DropdownProps {
   itemClassName?: string;
   /** Whether to render in a portal (default: true) */
   portal?: boolean;
-  /** Container for portal (default: document.body) */
+  /** Container for portal (default: document.body). If invalid or not in document, falls back to document.body */
   portalContainer?: HTMLElement;
   /** Offset from trigger in pixels */
   offset?: number;
@@ -240,20 +240,32 @@ export const Dropdown: FC<DropdownProps> = ({
     };
   }, [isOpen, items]);
 
+  // Define interface for trigger element props we need to extract
+  interface TriggerHandlers {
+    onClick?: (e: React.MouseEvent) => void;
+    onKeyDown?: (e: React.KeyboardEvent) => void;
+    id?: string;
+  }
+
+  // Type guards for proper function signature validation
+  const isMouseEventHandler = (fn: unknown): fn is (e: React.MouseEvent) => void => {
+    return typeof fn === 'function';
+  };
+
+  const isKeyboardEventHandler = (fn: unknown): fn is (e: React.KeyboardEvent) => void => {
+    return typeof fn === 'function';
+  };
+
   // Helper to safely extract trigger handlers with runtime validation
-  const extractTriggerHandlers = (props: unknown) => {
+  const extractTriggerHandlers = (props: unknown): TriggerHandlers => {
     if (!props || typeof props !== 'object') {
       return { onClick: undefined, onKeyDown: undefined, id: undefined };
     }
 
     const obj = props as Record<string, unknown>;
     return {
-      onClick: typeof obj.onClick === 'function'
-        ? (obj.onClick as (e: React.MouseEvent) => void)
-        : undefined,
-      onKeyDown: typeof obj.onKeyDown === 'function'
-        ? (obj.onKeyDown as (e: React.KeyboardEvent) => void)
-        : undefined,
+      onClick: isMouseEventHandler(obj.onClick) ? obj.onClick : undefined,
+      onKeyDown: isKeyboardEventHandler(obj.onKeyDown) ? obj.onKeyDown : undefined,
       id: typeof obj.id === 'string' ? obj.id : undefined
     };
   };
@@ -261,13 +273,16 @@ export const Dropdown: FC<DropdownProps> = ({
   // Extract trigger props with runtime validation
   const triggerHandlers = extractTriggerHandlers(trigger.props);
 
-  // SAFETY: Using ref callback pattern which is safe with cloneElement.
-  // The ref is assigned synchronously during render, and triggerRef is stable
-  // across renders because it's created with useRef outside this function.
-  // This pattern is documented in React docs: https://react.dev/reference/react/cloneElement#caveats
-  // We must disable the rule because ESLint doesn't recognize this safe usage.
-  // eslint-disable-next-line react-hooks/refs -- Safe: ref callback with stable useRef
-  const enhancedTrigger = cloneElement(trigger, {
+  // Define the props type for cloneElement to avoid unsafe type assertions
+  type EnhancedTriggerProps = React.HTMLAttributes<HTMLElement> & {
+    ref: React.Ref<HTMLElement>;
+    'aria-expanded': boolean;
+    'aria-haspopup': 'menu' | 'dialog';
+    'aria-controls': string;
+  };
+
+  // Build enhanced trigger props with proper typing
+  const enhancedTriggerProps: EnhancedTriggerProps = {
     ref: triggerRef,
     onClick: (e: React.MouseEvent) => {
       triggerHandlers.onClick?.(e);
@@ -284,7 +299,33 @@ export const Dropdown: FC<DropdownProps> = ({
     'aria-expanded': isOpen,
     'aria-haspopup': items ? 'menu' : 'dialog',
     'aria-controls': dropdownId
-  } as React.HTMLAttributes<HTMLElement> & { ref: React.Ref<HTMLElement> });
+  };
+
+  // SAFETY: Using ref callback pattern which is safe with cloneElement.
+  // The ref is assigned synchronously during render, and triggerRef is stable
+  // across renders because it's created with useRef outside this function.
+  // This pattern is documented in React docs: https://react.dev/reference/react/cloneElement#caveats
+  // We must disable the rule because ESLint doesn't recognize this safe usage.
+  // eslint-disable-next-line react-hooks/refs -- Safe: ref callback with stable useRef
+  const enhancedTrigger = cloneElement(trigger, enhancedTriggerProps);
+
+  // Validate portal container - ensure it's a valid HTMLElement in the document
+  // Falls back to document.body if invalid to prevent runtime errors
+  const getValidPortalContainer = (): HTMLElement => {
+    // Check if portalContainer is a valid HTMLElement and is connected to the document
+    // Note: portalContainer has a default value of document.body, but could be overridden with an invalid element
+    if (
+      portalContainer instanceof HTMLElement &&
+      portalContainer.isConnected // Ensure element is in the document
+    ) {
+      return portalContainer;
+    }
+
+    // Fallback to document.body if validation fails
+    return document.body;
+  };
+
+  const validPortalContainer = getValidPortalContainer();
 
   // Render dropdown content
   const dropdownContent = isOpen ? (
@@ -364,7 +405,7 @@ export const Dropdown: FC<DropdownProps> = ({
     <>
       {enhancedTrigger}
       {portal && dropdownContent
-        ? createPortal(dropdownContent, portalContainer)
+        ? createPortal(dropdownContent, validPortalContainer)
         : dropdownContent}
     </>
   );
