@@ -155,7 +155,7 @@ const CategoryManager: FC<CategoryManagerProps> = ({
           )}
 
           {/* Add New Category Form */}
-          <div className="relative bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5" style={{ zIndex: 100 }}>
+          <div className="relative bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5">
             <form onSubmit={(e) => { void handleCreateCategory(e); }} className="space-y-4">
               <h3 className="font-bold text-gray-900 dark:text-gray-100 flex items-center space-x-2">
                 <svg className="w-5 h-5 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -231,8 +231,8 @@ const CategoryManager: FC<CategoryManagerProps> = ({
                 <p className="text-gray-500 dark:text-gray-400 text-sm">No categories yet. Create your first category above!</p>
               </div>
             ) : (
-              categories.map((category, index) => (
-                <div key={category.id} className="relative group flex items-center justify-between p-5 bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 hover:bg-white/90 dark:hover:bg-gray-800/90 transition-all duration-200" style={{ zIndex: editingCategory?.category.id === category.id ? 90 : 10 - index }}>
+              categories.map((category) => (
+                <div key={category.id} className="relative group flex items-center justify-between p-5 bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 hover:bg-white/90 dark:hover:bg-gray-800/90 transition-all duration-200">
                   {editingCategory?.category.id === category.id ? (
                     // Edit Mode - Show both color and name editors
                     <div className="flex-1">

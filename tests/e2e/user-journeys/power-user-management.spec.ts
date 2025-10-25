@@ -205,7 +205,7 @@ test.describe('User Journey: Power User Prompt Management & Organization', () =>
     // Edit first marketing prompt to change category
     const socialMediaCard = sidepanelPage.locator('article').filter({ hasText: 'Social Media Content' }).first();
     await socialMediaCard.getByRole('button', { name: 'More actions' }).click();
-    await socialMediaCard.getByRole('menuitem', { name: 'Edit' }).click();
+    await sidepanelPage.getByRole('menuitem', { name: 'Edit' }).click();
 
     await expect(sidepanelPage.getByRole('heading', { name: 'Edit Prompt' })).toBeVisible();
     await sidepanelPage.getByLabel('Category').selectOption('Professional');
@@ -215,7 +215,7 @@ test.describe('User Journey: Power User Prompt Management & Organization', () =>
     // Edit second marketing prompt
     const campaignAnalysisCard = sidepanelPage.locator('article').filter({ hasText: 'Campaign Analysis' }).first();
     await campaignAnalysisCard.getByRole('button', { name: 'More actions' }).click();
-    await campaignAnalysisCard.getByRole('menuitem', { name: 'Edit' }).click();
+    await sidepanelPage.getByRole('menuitem', { name: 'Edit' }).click();
 
     await expect(sidepanelPage.getByRole('heading', { name: 'Edit Prompt' })).toBeVisible();
     await sidepanelPage.getByLabel('Category').selectOption('Professional');
@@ -306,7 +306,7 @@ test.describe('User Journey: Power User Prompt Management & Organization', () =>
     for (const promptTitle of devPrompts) {
       const promptCard = sidepanelPage.locator('article').filter({ hasText: promptTitle }).first();
       await promptCard.getByRole('button', { name: 'More actions' }).click();
-      await promptCard.getByRole('menuitem', { name: 'Edit' }).click();
+      await sidepanelPage.getByRole('menuitem', { name: 'Edit' }).click();
 
       await expect(sidepanelPage.getByRole('heading', { name: 'Edit Prompt' })).toBeVisible();
       await sidepanelPage.getByLabel('Category').selectOption('Professional');
@@ -334,7 +334,7 @@ test.describe('User Journey: Power User Prompt Management & Organization', () =>
 
     const lastDevPrompt = sidepanelPage.locator('article').filter({ hasText: 'Database Query Optimizer' }).first();
     await lastDevPrompt.getByRole('button', { name: 'More actions' }).click();
-    await lastDevPrompt.getByRole('menuitem', { name: 'Delete' }).click();
+    await sidepanelPage.getByRole('menuitem', { name: 'Delete' }).click();
 
     await expect(sidepanelPage.getByText('Delete Prompt')).toBeVisible();
     await sidepanelPage.getByRole('button', { name: 'Delete' }).click();

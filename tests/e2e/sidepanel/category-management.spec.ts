@@ -809,7 +809,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
         await expect(sidepanelPage.getByRole('heading', { name: 'Editable Prompt' })).toBeVisible();
 
         await sidepanelPage.getByRole('button', { name: 'More actions for Editable Prompt' }).click();
-        await sidepanelPage.getByRole('menuitem', { name: 'Edit Editable Prompt' }).click();
+        await sidepanelPage.getByRole('menuitem', { name: 'Edit' }).click();
 
         // Change category to the valid one
         const categorySelect = sidepanelPage.getByLabel('Category');
