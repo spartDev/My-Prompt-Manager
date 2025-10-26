@@ -81,9 +81,8 @@ describe('FilterSortControls', () => {
       });
 
       // Check that category options are visible in the dropdown
-      // Note: "All Categories" appears in both button text and dropdown
-      const allCategoriesOptions = screen.getAllByText('All Categories');
-      expect(allCategoriesOptions.length).toBeGreaterThan(1); // At least in button and dropdown
+      // Note: "All" appears in button text and "All Categories" in dropdown
+      expect(screen.getByText('All Categories')).toBeInTheDocument(); // In dropdown
       expect(screen.getByText('Work')).toBeInTheDocument();
       expect(screen.getByText('Personal')).toBeInTheDocument();
       expect(screen.getByText('Ideas')).toBeInTheDocument();
@@ -619,7 +618,7 @@ describe('FilterSortControls', () => {
       render(<FilterSortControls {...defaultProps} />);
 
       const filterButton = screen.getByLabelText(/filter by category/i);
-      expect(filterButton).toHaveAttribute('aria-label', 'Filter by category: All Categories');
+      expect(filterButton).toHaveAttribute('aria-label', 'Filter by category: All');
       expect(filterButton).toHaveAttribute('aria-expanded', 'false');
       expect(filterButton).toHaveAttribute('aria-haspopup', 'menu');
     });
@@ -690,7 +689,7 @@ describe('FilterSortControls', () => {
       render(<FilterSortControls {...defaultProps} />);
 
       const filterButton = screen.getByLabelText(/filter by category/i);
-      expect(filterButton).toHaveAttribute('title', 'Filter: All Categories');
+      expect(filterButton).toHaveAttribute('title', 'Filter: All');
 
       const sortButton = screen.getByLabelText(/sort order/i);
       expect(sortButton).toHaveAttribute('title', 'Sort: Newest');

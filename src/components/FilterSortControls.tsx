@@ -8,25 +8,25 @@ import { FilterSortControlsProps } from '../types/components';
 import { Dropdown, DropdownItem } from './Dropdown';
 
 // Sort option icons
-const ClockIcon: FC = () => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+const ClockIcon: FC<{ className?: string }> = ({ className = "w-4 h-4" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
   </svg>
 );
 
-const CalendarIcon: FC = () => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+const CalendarIcon: FC<{ className?: string }> = ({ className = "w-4 h-4" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
   </svg>
 );
 
-const AlphabeticalIcon: FC = () => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+const AlphabeticalIcon: FC<{ className?: string }> = ({ className = "w-4 h-4" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h18M3 12h12M3 20h6" />
   </svg>
 );
 
-const SORT_OPTIONS: Array<{ value: SortOrder; label: string; icon: FC }> = [
+const SORT_OPTIONS: Array<{ value: SortOrder; label: string; icon: FC<{ className?: string }> }> = [
   { value: 'updatedAt', label: 'Recently Updated', icon: ClockIcon },
   { value: 'createdAt', label: 'Recently Created', icon: CalendarIcon },
   { value: 'title', label: 'Alphabetical', icon: AlphabeticalIcon }
@@ -43,7 +43,7 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
   loading = false
 }) => {
   // Derived values for active state text
-  const categoryLabel = selectedCategory || 'All Categories';
+  const categoryLabel = selectedCategory || 'All';
 
   const getSortLabel = (): string => {
     const option = SORT_OPTIONS.find(opt => opt.value === sortOrder);
@@ -56,6 +56,9 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
   };
 
   const sortLabel = getSortLabel();
+
+  // Get the active sort icon
+  const ActiveSortIcon = SORT_OPTIONS.find(opt => opt.value === sortOrder)?.icon || AlphabeticalIcon;
 
   // Handlers - Memoized to prevent recreating callbacks on every render
   const handleCategorySelect = useCallback((category: string | null) => {
@@ -270,10 +273,15 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
               </svg>
 
-              {/* Dropdown arrow */}
-              <svg className="w-3 h-3 text-gray-500 absolute -bottom-0.5 -right-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
+              {/* Active sort badge indicator */}
+              <span
+                className="absolute -top-1 -right-1 w-5 h-5 bg-purple-100 dark:bg-purple-900/40 border-2 border-white dark:border-gray-800 rounded-full flex items-center justify-center"
+                aria-hidden="true"
+              >
+                <div className="w-3 h-3 text-purple-700 dark:text-purple-400">
+                  <ActiveSortIcon className="w-4 h-4" />
+                </div>
+              </span>
             </button>
           }
           items={sortItems}
