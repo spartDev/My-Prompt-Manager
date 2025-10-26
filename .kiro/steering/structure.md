@@ -2,98 +2,116 @@
 inclusion: always
 ---
 
-# Project Structure & Architecture Guidelines
+# Project Structure & Code Organization Guide
 
-## Critical Architecture Patterns
+## Code Organization Decision Tree
 
-### Strategy Pattern for AI Platform Integration
-**When to use**: Adding support for new AI platforms (Claude, ChatGPT, etc.)
-**Location**: `src/content/platforms/`
-**Implementation**:
-1. Extend `PlatformStrategy` base class
-2. Implement required methods: `getInsertionPoint()`, `createPromptIcon()`, `insertPrompt()`
-3. Register in `PlatformManager` constructor
-4. Use kebab-case naming: `[platform]-strategy.ts`
+**Need to add UI functionality?** → `src/components/[ComponentName].tsx` (PascalCase)
+**Need to manage state/data?** → `src/hooks/use[Name].ts` (camelCase with `use` prefix)  
+**Need business logic/data operations?** → `src/services/[serviceName].ts` (camelCase)
+**Need AI platform integration?** → `src/content/platforms/[platform]-strategy.ts` (kebab-case)
+**Need shared utilities?** → `src/utils/[utilName].ts` (camelCase)
+**Need type definitions?** → `src/types/[typeName].ts` (camelCase)
 
-### Service Layer Pattern
-**When to use**: All business logic and data operations
-**Location**: `src/services/`
-**Critical Rule**: ALL Chrome storage operations MUST go through `StorageManager` singleton
-**Key Services**: `StorageManager`, `PromptManager`
-**Naming**: camelCase (e.g., `promptManager.ts`)
+## File Naming Conventions (Strict)
 
-### Custom Hook Pattern
-**When to use**: Reusable stateful logic for React components
-**Location**: `src/hooks/`
-**Critical Rule**: State management logic belongs in hooks, NOT components
-**Naming**: camelCase with `use` prefix (e.g., `usePrompts.ts`)
+| Code Type | Naming Pattern | Location | Example |
+|-----------|---------------|----------|---------|
+| React Components | PascalCase | `src/components/` | `PromptCard.tsx` |
+| Custom Hooks | `use` + camelCase | `src/hooks/` | `usePrompts.ts` |
+| Services | camelCase | `src/services/` | `promptManager.ts` |
+| Platform Strategies | kebab-case | `src/content/platforms/` | `claude-strategy.ts` |
+| Utilities | camelCase | `src/utils/` | `textHighlight.ts` |
+| Types | camelCase | `src/types/` | `components.ts` |
+| Tests | Source name + `.test.ts` | `__tests__/` | `PromptCard.test.tsx` |
 
-## File Naming & Organization Rules
+## Directory Structure & Purpose
 
-### Strict Naming Conventions
-- **Components**: PascalCase (`PromptCard.tsx`)
-- **Hooks**: camelCase with `use` prefix (`usePrompts.ts`)
-- **Services**: camelCase (`promptManager.ts`)
-- **Platform Strategies**: kebab-case (`claude-strategy.ts`)
-- **Tests**: Source name + `.test.ts` suffix
-
-### Directory Structure
 ```
 src/
-├── components/           # React components (PascalCase)
-│   ├── settings/        # Settings-specific components
-│   └── __tests__/       # Co-located component tests
-├── content/             # Content script architecture
-│   ├── platforms/       # Platform strategy implementations
-│   ├── ui/             # UI injection utilities
-│   ├── utils/          # Content script utilities
-│   └── core/           # Core injection logic
-├── services/           # Business logic (camelCase)
-├── hooks/              # React hooks (use[Name].ts)
-├── types/              # TypeScript definitions
-└── utils/              # Shared utilities
+├── components/              # React UI components (PascalCase files)
+│   ├── settings/           # Settings-specific components
+│   ├── icons/              # Icon components
+│   └── __tests__/          # Component tests (co-located)
+├── content/                # Content script architecture
+│   ├── platforms/          # AI platform integration strategies
+│   ├── core/               # Core injection logic
+│   ├── ui/                 # UI injection utilities
+│   ├── utils/              # Content script utilities
+│   └── types/              # Content script type definitions
+├── services/               # Business logic & data operations
+├── hooks/                  # React state management hooks
+├── types/                  # Shared TypeScript definitions
+├── utils/                  # Shared utility functions
+├── contexts/               # React context providers
+└── constants/              # Application constants
 ```
 
-## Extension Points & Implementation Steps
+## Architecture Pattern Selection
+
+### When to Use Strategy Pattern
+- **Trigger**: Adding support for new AI platforms (Claude, ChatGPT, Gemini, etc.)
+- **Location**: `src/content/platforms/[platform]-strategy.ts`
+- **Action**: Extend `PlatformStrategy` base class, implement required methods
+
+### When to Use Service Layer
+- **Trigger**: Need data operations, business logic, or Chrome API interactions
+- **Location**: `src/services/[serviceName].ts`
+- **Action**: Create service class, use singleton pattern for stateful services
+
+### When to Use Custom Hooks
+- **Trigger**: Need reusable stateful logic for React components
+- **Location**: `src/hooks/use[Name].ts`
+- **Action**: Extract state management from components into custom hooks
+
+## Common Task Workflows
 
 ### Adding New AI Platform Support
-1. Create `src/content/platforms/[platform]-strategy.ts`
+1. Create `src/content/platforms/[platform]-strategy.ts` (kebab-case)
 2. Extend `PlatformStrategy` base class
-3. Implement DOM integration methods
-4. Add to `PlatformManager` constructor
-5. Test on actual platform pages
+3. Implement: `getInsertionPoint()`, `createPromptIcon()`, `insertPrompt()`
+4. Register in `PlatformManager` constructor
+5. Add tests in `src/content/platforms/__tests__/[platform]-strategy.test.ts`
 
-### Adding New Components
+### Adding New React Component
 1. Create `src/components/[ComponentName].tsx` (PascalCase)
-2. Add test in `src/components/__tests__/[ComponentName].test.tsx`
-3. Export from appropriate index file
+2. Create test `src/components/__tests__/[ComponentName].test.tsx`
+3. Export from `src/components/index.ts` if needed
 4. Use functional components with hooks only
 
 ### Adding Business Logic
-1. Create service in `src/services/[serviceName].ts` (camelCase)
-2. Create hook in `src/hooks/use[ServiceName].ts`
-3. Add comprehensive tests in `__tests__/` directories
-4. Use singleton pattern for stateful services
+1. Create service `src/services/[serviceName].ts` (camelCase)
+2. Create hook `src/hooks/use[ServiceName].ts` for React integration
+3. Add tests in respective `__tests__/` directories
+4. Use `StorageManager` singleton for Chrome storage operations
 
-## Code Organization Standards
+### Adding Shared Utilities
+1. Create `src/utils/[utilName].ts` (camelCase)
+2. Add tests in `src/utils/__tests__/[utilName].test.ts`
+3. Export from `src/utils/index.ts`
 
-### Import Order (Enforce Strictly)
-1. Built-in modules (Node.js)
-2. External libraries (npm packages)
+## File Creation Rules
+
+### Always Create Together
+- **Component** → Always create corresponding test file
+- **Service** → Create service + hook + tests
+- **Platform Strategy** → Create strategy + tests + register in manager
+
+### Import Organization (Enforce Order)
+1. Node.js built-in modules
+2. External npm packages  
 3. Internal modules (relative imports)
 4. Type-only imports (`import type`)
 
-### Testing Requirements
-- **Location**: Co-located `__tests__/` directories
-- **Coverage**: Maintain 470+ test suite
-- **Naming**: Descriptive test names explaining scenarios
-- **Chrome APIs**: Always mock properly in tests
+### Test Co-location
+- Place tests in `__tests__/` directory next to source files
+- Use descriptive test names that explain scenarios
+- Mock Chrome APIs properly in all tests
 
-## Critical Rules for AI Assistants
+## Critical Structural Rules
 
-1. **NEVER** put business logic in React components - use services and hooks
-2. **ALWAYS** use `StorageManager` for Chrome storage operations
-3. **ALWAYS** co-locate tests with source files
-4. **ALWAYS** follow naming conventions exactly
-5. **ALWAYS** extend `PlatformStrategy` for new AI platform support
-6. **NEVER** create components without corresponding tests
+1. **Component Logic**: Keep components pure - move state to hooks, business logic to services
+2. **Storage Operations**: ALL Chrome storage MUST go through `StorageManager` singleton
+3. **Test Coverage**: Every new file requires corresponding test file
+4. **Naming Consistency**: Follow naming patterns exactly - no exceptions
+5. **Architecture Patterns**: Use Strategy for platforms, Services for business logic, Hooks for state

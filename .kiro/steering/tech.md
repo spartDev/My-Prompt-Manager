@@ -2,116 +2,133 @@
 inclusion: always
 ---
 
-# Technology Stack & Development Guidelines
+# My Prompt Manager - AI Assistant Development Guide
+
+**Chrome Extension for AI Platform Prompt Management**
 
 ## Critical Rules for AI Assistants
 
-### MUST Always Do
-- **ALWAYS** sanitize user input with DOMPurify before DOM insertion
-- **ALWAYS** use `StorageManager` singleton for Chrome storage operations
-- **ALWAYS** define explicit return types for async functions
-- **ALWAYS** co-locate tests in `__tests__/` directories
-- **ALWAYS** extend `PlatformStrategy` for new AI platform support
-- **ALWAYS** validate imported configuration data with proper error handling
+### ALWAYS Do
+- **Sanitize ALL user input** with DOMPurify before DOM insertion
+- **Use `StorageManager` singleton** for ALL Chrome storage operations
+- **Co-locate tests** in `__tests__/` directories next to source files
+- **Extend `PlatformStrategy`** for new AI platform support
+- **Define explicit return types** for async functions
+- **Run quality checks** after each task: `npm test`, `npm run lint`, `npm run typecheck`
 
 ### NEVER Do
-- **NEVER** put business logic in React components - use services and hooks
-- **NEVER** use inline scripts or CSP-violating event handling
-- **NEVER** create components without corresponding tests
-- **NEVER** use class components - functional components only
-- **NEVER** skip cleanup in useEffect hooks
+- **Business logic in React components** - use services and hooks instead
+- **Inline scripts or CSP violations** - use proper event delegation only
+- **Components without tests** - every component needs corresponding tests
+- **Class components** - functional components with hooks only
+- **Skip useEffect cleanup** - always prevent memory leaks
+- **Direct Chrome storage calls** - use StorageManager singleton
 
-## Core Technology Stack
+## Architecture Patterns (Required)
 
-- **React 18.3.1**: Functional components with custom hooks only
-- **TypeScript 5.5.3**: Strict mode, explicit async return types required
-- **Tailwind CSS 3.4.4**: Utility-first styling, system dark mode support
-- **Vite 6.3.6**: Build tool with HMR, separate extension context bundles
-- **Chrome Extension Manifest V3**: Service workers, declarative permissions only
-
-## Architecture Implementation Patterns
-
-### Strategy Pattern (AI Platform Integration)
-**When to use**: Adding support for new AI platforms
+### Strategy Pattern - AI Platform Integration
+**When**: Adding support for new AI platforms (Claude, ChatGPT, etc.)
 **Location**: `src/content/platforms/[platform]-strategy.ts`
 **Steps**:
 1. Extend `PlatformStrategy` base class
-2. Implement required methods: `getInsertionPoint()`, `createPromptIcon()`, `insertPrompt()`
+2. Implement: `getInsertionPoint()`, `createPromptIcon()`, `insertPrompt()`
 3. Register in `PlatformManager` constructor
-4. Add comprehensive tests for platform-specific DOM handling
+4. Add platform-specific tests
+5. Test on actual platform pages
 
-### Service Layer Pattern
-**When to use**: All business logic and data operations
+### Service Layer - Business Logic
+**When**: All data operations and business logic
 **Location**: `src/services/[serviceName].ts`
 **Rules**:
-- Use singleton pattern for `StorageManager`
-- Handle Chrome storage quota limits with user warnings at 80%
-- Implement proper error handling with user-friendly messages
-- Keep all business logic out of UI components
+- ALL Chrome storage operations MUST go through `StorageManager` singleton
+- Handle storage quota limits (warn at 80%)
+- Keep ALL business logic out of UI components
+- Implement comprehensive error handling
 
-### Custom Hook Pattern
-**When to use**: Reusable stateful logic for React components
+### Custom Hooks - React State Management
+**When**: Reusable stateful logic for React components
 **Location**: `src/hooks/use[Name].ts`
 **Rules**:
-- State management logic belongs in hooks, NOT components
+- State management belongs in hooks, NOT components
 - Implement proper cleanup to prevent memory leaks
-- Use debouncing for user input operations (300ms standard)
+- Use 300ms debouncing for user input operations
 
-## Code Style & Naming Conventions
+## File Naming Conventions (Strict)
 
-### File Naming (Strict)
-- **Components**: PascalCase (`PromptCard.tsx`)
-- **Hooks**: camelCase with `use` prefix (`usePrompts.ts`)
-- **Services**: camelCase (`promptManager.ts`)
-- **Platform Strategies**: kebab-case (`claude-strategy.ts`)
-- **Tests**: Source name + `.test.ts` suffix
+| Type | Pattern | Example |
+|------|---------|---------|
+| Components | PascalCase | `PromptCard.tsx` |
+| Hooks | camelCase with `use` prefix | `usePrompts.ts` |
+| Services | camelCase | `promptManager.ts` |
+| Platform Strategies | kebab-case | `claude-strategy.ts` |
+| Tests | Source name + `.test.ts` | `PromptCard.test.tsx` |
 
-### TypeScript Standards
+## Technology Stack & Standards
+
+- **React 18.3.1** + **TypeScript 5.5.3** (strict mode)
+- **Tailwind CSS 3.4.4** (utility-first, dark mode support)
+- **Vite 6.3.6** (build tool with HMR)
+- **Chrome Extension Manifest V3** (service workers only)
+
+### TypeScript Rules
 - Use `import type` for type-only imports
 - Prefer interfaces over types for object shapes
-- Define explicit return types for all async functions
-- Use strict mode configuration
+- Explicit return types for all async functions
+- Strict mode configuration required
 
-### React Standards
-- Functional components with custom hooks exclusively
-- Use React.memo() for performance-critical components
-- Implement proper error boundaries
-- Handle loading and error states consistently
+### React Rules
+- Functional components with custom hooks only
+- Use `React.memo()` for performance-critical components
+- Implement error boundaries and loading states
+- Handle cleanup in useEffect hooks
 
-## Security & Performance Constraints
+## Security Requirements (CRITICAL)
 
-### Security Requirements (CRITICAL)
-- **Input Sanitization**: Use DOMPurify for all user content before DOM insertion
-- **CSP Compliance**: No inline scripts, use proper event delegation
+- **Input Sanitization**: DOMPurify for ALL user content before DOM insertion
+- **CSP Compliance**: No inline scripts, proper event delegation only
 - **Data Validation**: Validate ALL imported configuration with error handling
-- **Chrome Extension**: Use service workers only, declarative permissions
+- **Chrome Extension**: Service workers only, declarative permissions
+- **Local Storage Only**: No external data transmission
+- **Defensive Programming**: Handle platform DOM changes gracefully
+
+## Performance & Quality Standards
 
 ### Performance Constraints
-- **Bundle Size**: Keep content scripts under 100KB
-- **Debouncing**: 300ms for search operations, 500ms for auto-save
-- **Memory Management**: Implement cleanup in useEffect hooks
-- **SPA Handling**: Handle route changes with proper cleanup to prevent leaks
+- **Content Scripts**: Keep bundles under 100KB
+- **Debouncing**: 300ms for search, 500ms for auto-save
+- **Memory Management**: Cleanup in useEffect hooks
+- **SPA Handling**: Handle route changes with proper cleanup
 
-## Testing & Quality Standards
+### Testing Requirements
+- **Coverage**: Maintain 470+ test suite
+- **Chrome APIs**: Mock properly in all tests
+- **Edge Cases**: Test error conditions and edge cases
+- **Descriptive Names**: Test names should explain scenarios
+- **Co-location**: Tests in `__tests__/` directories next to source
 
-### Required Test Coverage
-- Maintain 470+ test suite
-- Mock Chrome APIs properly in all tests
-- Test error conditions and edge cases
-- Use descriptive test names explaining scenarios
-
-### Development Workflow
+### Quality Gates (Run After Each Task)
 ```bash
-npm run dev              # Development with HMR
-npm run build           # Production build
-npm test                # Run full test suite
-npm run lint:fix        # Auto-fix code issues
-npm run typecheck       # TypeScript validation
-npm run package         # Chrome Web Store package
+npm test           # Must pass - maintain 470+ tests
+npm run lint       # Must pass - no ESLint errors
+npm run typecheck  # Must pass - TypeScript strict mode
 ```
 
-### Quality Gates
-- All tests must pass before code changes
-- TypeScript strict mode compliance required
-- ESLint rules must be followed
-- No console.log statements in production code
+## Common Implementation Patterns
+
+### Adding New Components
+1. Create `src/components/[ComponentName].tsx` (PascalCase)
+2. Add test in `src/components/__tests__/[ComponentName].test.tsx`
+3. Export from appropriate index file
+4. Use functional components with hooks only
+
+### Adding Business Logic
+1. Create service in `src/services/[serviceName].ts` (camelCase)
+2. Create hook in `src/hooks/use[ServiceName].ts`
+3. Add comprehensive tests in `__tests__/` directories
+4. Use singleton pattern for stateful services
+
+### Error Handling Standards
+- Provide clear, actionable error messages
+- Use toast notifications for user feedback
+- Implement error boundaries in React components
+- Handle storage errors and network failures gracefully

@@ -21,4 +21,3 @@ This command loads essential context for a new agent session by examining the co
     - @docs/DESIGN_GUIDELINES.md
     - @docs/PLATFORM_INTEGRATION.md
     - @docs/TESTING.md
-    - @docs/archive/product.md (historical)

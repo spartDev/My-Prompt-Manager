@@ -2,79 +2,61 @@
 inclusion: always
 ---
 
-# Development Best Practices
+# AI Assistant Quick Reference
 
-## Architecture Patterns
+## Critical Safety Rules (NEVER BREAK)
 
-### Strategy Pattern (AI Platform Integration)
-- Extend `PlatformStrategy` base class for new AI platforms
-- Implement: `getInsertionPoint()`, `createPromptIcon()`, `insertPrompt()`
-- Register in `PlatformManager` at `src/content/platforms/`
-- Handle platform-specific DOM selectors and dynamic content
+### Security & Data Safety
+- **ALWAYS** sanitize user input with `DOMPurify` before DOM insertion
+- **NEVER** use inline scripts - CSP violations will break the extension
+- **ONLY** use `StorageManager` singleton for Chrome storage - never direct calls
+- **ALWAYS** validate imported data before processing
 
-### Service Layer
-- Use `StorageManager` singleton for all Chrome storage operations
-- Keep business logic in `src/services/`, not UI components
-- Implement error handling and validation in all service methods
+### Code Safety
+- **NEVER** put business logic in React components - use services/hooks
+- **ALWAYS** create tests alongside new files - no exceptions
+- **NEVER** skip `useEffect` cleanup - prevents memory leaks
+- **ALWAYS** use functional components with hooks - no class components
 
-## Code Standards
+## Quality Gates (Run After Each Task)
 
-### TypeScript
-- Use `import type` for type-only imports
-- Define explicit return types for async functions
-- Prefer interfaces over types for object shapes
+```bash
+npm test           # Must pass - maintain 470+ tests
+npm run lint       # Must pass - zero ESLint errors
+npm run typecheck  # Must pass - TypeScript strict mode
+```
 
-### React
-- Functional components with custom hooks only
-- PascalCase for components, camelCase for utilities
-- Co-locate tests in `__tests__/` directories
-- Use React.memo() for performance-critical components
+## Quick Decision Tree
 
-### File Naming
-- Components: `PromptCard.tsx`
-- Hooks: `usePrompts.ts`
-- Services: `promptManager.ts`
-- Strategies: `claude-strategy.ts`
+**Adding UI?** → `src/components/ComponentName.tsx` + test file
+**Adding logic?** → `src/services/serviceName.ts` + hook + tests  
+**Adding AI platform?** → `src/content/platforms/platform-strategy.ts` + tests
+**Adding utility?** → `src/utils/utilName.ts` + test
 
-## Security Requirements
+## Common Pitfalls to Avoid
 
-### Content Script Safety
-- **ALWAYS** sanitize user input with DOMPurify before DOM insertion
-- Use CSP-compliant event handling (no inline scripts)
-- Validate all imported configuration data
-- Implement defensive programming for platform DOM changes
+### Performance Killers
+- Content script bundles >100KB
+- Missing debouncing on user input (use 300ms)
+- Forgetting cleanup in useEffect hooks
+- Not handling SPA route changes
 
-### Chrome Extension Security
-- Use service workers (Manifest V3)
-- Handle storage quota limits gracefully
-- Implement proper message passing between contexts
-- Use declarative permissions only
+### Breaking Changes
+- Direct Chrome storage calls (use `StorageManager`)
+- Business logic in components (use services)
+- Missing error boundaries in React
+- Skipping input sanitization
 
-## Performance Guidelines
+### Test Failures
+- Not mocking Chrome APIs properly
+- Missing edge case testing
+- Vague test descriptions
+- Forgetting to test error conditions
 
-- Keep content script bundles minimal (<100KB)
-- Debounce user input operations (300ms for search)
-- Use mutation observers for dynamic content detection
-- Implement proper cleanup in useEffect hooks
-- Handle SPA route changes with cleanup to prevent memory leaks
+## File Naming Quick Reference
 
-## Testing Requirements
-
-**Always run after each task:**
-- `npm run test` (maintain 470+ test coverage)
-- `npm run lint`
-- `npm run typecheck`
-
-**Test Standards:**
-- Mock Chrome APIs properly
-- Test error conditions and edge cases
-- Use descriptive test names explaining scenarios
-- Test content script injection on real platform pages
-
-## Error Handling
-
-- Provide clear, actionable error messages
-- Use toast notifications for user feedback
-- Implement error boundaries in React components
-- Handle storage errors and network failures gracefully
-- Use appropriate logging levels (dev vs production)
+- Components: `PascalCase.tsx`
+- Hooks: `useCamelCase.ts`
+- Services: `camelCase.ts`
+- Strategies: `kebab-case.ts`
+- Tests: `SourceName.test.ts`
