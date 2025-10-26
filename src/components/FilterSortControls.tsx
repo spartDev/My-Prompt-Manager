@@ -6,27 +6,9 @@ import { SortOrder } from '../types';
 import { FilterSortControlsProps } from '../types/components';
 
 import { Dropdown, DropdownItem } from './Dropdown';
+import { CheckIcon, ClockIcon, CalendarIcon, AlphabeticalIcon } from './icons/UIIcons';
 
-// Sort option icons
-const ClockIcon: FC = () => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-  </svg>
-);
-
-const CalendarIcon: FC = () => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-  </svg>
-);
-
-const AlphabeticalIcon: FC = () => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h18M3 12h12M3 20h6" />
-  </svg>
-);
-
-const SORT_OPTIONS: Array<{ value: SortOrder; label: string; icon: FC }> = [
+const SORT_OPTIONS: Array<{ value: SortOrder; label: string; icon: FC<{ className?: string }> }> = [
   { value: 'updatedAt', label: 'Recently Updated', icon: ClockIcon },
   { value: 'createdAt', label: 'Recently Created', icon: CalendarIcon },
   { value: 'title', label: 'Alphabetical', icon: AlphabeticalIcon }
@@ -43,7 +25,7 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
   loading = false
 }) => {
   // Derived values for active state text
-  const categoryLabel = selectedCategory || 'All Categories';
+  const categoryLabel = selectedCategory || 'All';
 
   const getSortLabel = (): string => {
     const option = SORT_OPTIONS.find(opt => opt.value === sortOrder);
@@ -56,6 +38,12 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
   };
 
   const sortLabel = getSortLabel();
+
+  // Get the active sort icon - memoized to prevent re-computation on every render
+  const ActiveSortIcon = useMemo(
+    () => SORT_OPTIONS.find(opt => opt.value === sortOrder)?.icon || AlphabeticalIcon,
+    [sortOrder]
+  );
 
   // Handlers - Memoized to prevent recreating callbacks on every render
   const handleCategorySelect = useCallback((category: string | null) => {
@@ -81,11 +69,7 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
         label: (
           <span className="flex items-center justify-between w-full">
             <span>All Categories</span>
-            {!selectedCategory && (
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-            )}
+            {!selectedCategory && <CheckIcon />}
           </span>
         ),
         onSelect: () => { handleCategorySelect(null); },
@@ -121,11 +105,7 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
               )}
               <span>{category.name}</span>
             </span>
-            {selectedCategory === category.name && (
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-            )}
+            {selectedCategory === category.name && <CheckIcon />}
           </span>
         ),
         onSelect: () => { handleCategorySelect(category.name); },
@@ -166,9 +146,7 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
                     </span>
                   )}
                   {/* Checkmark */}
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
+                  <CheckIcon />
                 </>
               )}
             </span>
@@ -270,10 +248,13 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
               </svg>
 
-              {/* Dropdown arrow */}
-              <svg className="w-3 h-3 text-gray-500 absolute -bottom-0.5 -right-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
+              {/* Active sort badge indicator */}
+              <span
+                className="absolute -top-1 -right-1 w-5 h-5 bg-purple-100 dark:bg-purple-900/40 border-2 border-white dark:border-gray-800 rounded-full flex items-center justify-center text-purple-700 dark:text-purple-400"
+                aria-hidden="true"
+              >
+                <ActiveSortIcon />
+              </span>
             </button>
           }
           items={sortItems}

@@ -373,10 +373,8 @@ export const Dropdown: FC<DropdownProps> = ({
                 className={cn(
                   'flex w-full items-center px-3 py-2 text-sm',
                   'text-gray-700 dark:text-gray-300',
-                  'hover:bg-purple-50 dark:hover:bg-purple-900/20',
-                  'hover:text-purple-700 dark:hover:text-purple-400',
-                  'focus:bg-purple-50 dark:focus:bg-purple-900/20',
-                  'focus:text-purple-700 dark:focus:text-purple-400',
+                  'hover:bg-gray-100 dark:hover:bg-gray-700',
+                  'focus:bg-gray-100 dark:focus:bg-gray-700',
                   'focus:outline-none transition-colors',
                   'disabled:opacity-50 disabled:cursor-not-allowed',
                   item.disabled && 'hover:bg-transparent dark:hover:bg-transparent',
