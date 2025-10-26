@@ -13,6 +13,8 @@ export interface Category {
   color?: string; // hex color code (optional)
 }
 
+export * from './backup';
+
 export interface Settings {
   defaultCategory: string;
   sortOrder: 'createdAt' | 'updatedAt' | 'title';
