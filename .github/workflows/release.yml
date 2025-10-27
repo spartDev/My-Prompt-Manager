@@ -46,12 +46,12 @@ jobs:
       is-prerelease: ${{ steps.version.outputs.is-prerelease }}
     steps:
       - name: 🛎️ Checkout Repository
-        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
         with:
           fetch-depth: 0
 
       - name: 🟢 Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: "npm"
@@ -137,7 +137,7 @@ jobs:
           npm audit --audit-level=moderate
 
       - name: 🔍 CodeQL Analysis
-        uses: github/codeql-action/analyze@755f44910c12a3d7ca0d8c6e42c048b3362f7cec # v3
+        uses: github/codeql-action/analyze@4e94bd11f71e507f7f87df81788dff88d1dacbfb # v4
         if: success() || failure()
         continue-on-error: true
 
@@ -148,10 +148,10 @@ jobs:
     needs: validate-release
     steps:
       - name: 🛎️ Checkout Repository
-        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
 
       - name: 🟢 Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: "npm"
@@ -240,12 +240,12 @@ jobs:
           find dist/ -type f -exec sh -c 'echo "  $(basename "$1"): $(wc -c < "$1") bytes"' _ {} \;
 
       - name: 🔐 Generate Build Attestation
-        uses: actions/attest-build-provenance@ef244123eb79f2f7a7e75d99086184180e6d0018 # v1
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
         with:
           subject-path: "*.zip"
 
       - name: 📤 Upload Release Build
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: chrome-extension-release-v${{ needs.validate-release.outputs.version }}
           path: |
@@ -262,12 +262,12 @@ jobs:
     needs: [validate-release, build-release]
     steps:
       - name: 🛎️ Checkout Repository
-        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
         with:
           fetch-depth: 0
 
       - name: 📤 Download Release Build
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with:
           name: chrome-extension-release-v${{ needs.validate-release.outputs.version }}
           path: ./release-assets
@@ -422,7 +422,7 @@ jobs:
     needs: [validate-release, build-release]
     steps:
       - name: 📤 Download Release Build
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with:
           name: chrome-extension-release-v${{ needs.validate-release.outputs.version }}
           path: ./webstore-prep
@@ -476,7 +476,7 @@ jobs:
           unzip -l "chrome-extension-webstore-v${{ needs.validate-release.outputs.version }}.zip"
 
       - name: 📤 Upload Web Store Package
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: chrome-webstore-package-v${{ needs.validate-release.outputs.version }}
           path: webstore-prep/chrome-extension-webstore-v${{ needs.validate-release.outputs.version }}.zip
@@ -652,7 +652,7 @@ jobs:
     environment: emergency-rollback
     steps:
       - name: 🛎️ Checkout Repository
-        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
         with:
           fetch-depth: 0
 
