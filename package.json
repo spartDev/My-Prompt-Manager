@@ -44,7 +44,7 @@
     "happy-dom": "20.0.8",
     "husky": "9.1.7",
     "jsdom": "27.0.1",
-    "lint-staged": "16.2.4",
+    "lint-staged": "16.2.6",
     "playwright": "1.56.1",
     "postcss": "8.5.6",
     "tailwindcss": "3.4.18",
