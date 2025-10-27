@@ -3,7 +3,7 @@
 [![Version](https://img.shields.io/badge/version-1.7.0-blue.svg)](https://github.com/spartDev/My-Prompt-Manager)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Chrome](https://img.shields.io/badge/Chrome-114%2B-yellow.svg)](https://www.google.com/chrome/)
-[![Tests](https://img.shields.io/badge/tests-1169%20passing-brightgreen.svg)](https://github.com/spartDev/My-Prompt-Manager)
+[![Tests](https://img.shields.io/badge/tests-1211%20passing-brightgreen.svg)](https://github.com/spartDev/My-Prompt-Manager)
 
 Transform your AI interactions with a powerful personal prompt library that integrates seamlessly with Claude, ChatGPT, Gemini, and Perplexity. Store, organize, share, and instantly insert your best prompts with one click.
 
@@ -55,7 +55,7 @@ See our [Platform Integration Guide](docs/PLATFORM_INTEGRATION.md) to add your o
 | **Vitest** | Testing Framework | 3.2.4 |
 | **DOMPurify** | XSS Protection | 3.3.0 |
 | **Husky** | Git Hooks | 9.1.7 |
-| **@crxjs/vite-plugin** | Chrome Extension Support | 2.2.0 |
+| **WXT** | Chrome Extension Framework | 0.20.7 |
 
 ## 📦 Installation
 
@@ -82,20 +82,20 @@ See our [Platform Integration Guide](docs/PLATFORM_INTEGRATION.md) to add your o
    ```bash
    npm run dev
    ```
-   This starts Vite with hot module replacement (HMR) enabled.
+   This starts WXT dev server with hot module replacement (HMR) enabled.
 
 4. **Build for production:**
    ```bash
    npm run build
    ```
-   Creates an optimized build in the `dist/` folder.
+   Creates an optimized build in the `.output/chrome-mv3/` folder.
 
 ### Loading in Chrome
 
 1. Open Chrome and navigate to `chrome://extensions/`
 2. Enable **"Developer mode"** (toggle in top right corner)
 3. Click **"Load unpacked"** button
-4. Select the `dist` folder from the project
+4. Select the `.output/chrome-mv3` folder from the project
 5. The extension icon should appear in your toolbar
 6. Pin the extension for easy access (optional)
 
@@ -111,7 +111,7 @@ See our [Platform Integration Guide](docs/PLATFORM_INTEGRATION.md) to add your o
 |---------|-------------|--------|
 | `npm run dev` | Start development server with HMR | Development |
 | `npm run build` | Create production build | Deployment |
-| `npm test` | Run test suite (1169+ tests) | Testing |
+| `npm test` | Run test suite (1211 tests) | Testing |
 | `npm run test:ui` | Run tests with Vitest UI | Interactive Testing |
 | `npm run test:coverage` | Generate coverage report | Code Coverage |
 | `npm run lint` | Run ESLint checks | Code Quality |
@@ -144,8 +144,11 @@ graph TD
 ### Content Script Architecture (TypeScript Modules)
 
 ```
+entrypoints/
+├── content.ts                  # WXT content script entry point
+└── background.ts               # WXT background worker entry point
+
 src/content/
-├── index.ts                    # Main entry point
 ├── types/                      # TypeScript definitions
 │   ├── platform.ts            # Platform interfaces
 │   └── ui.ts                  # UI component types
@@ -223,7 +226,7 @@ The extension automatically detects your system theme preference. You can also t
 
 ## 🧪 Testing
 
-The project includes a comprehensive test suite with 1169+ tests across 56 test files.
+The project includes a comprehensive test suite with 1211 tests across 57 test files.
 
 ### Running Tests
 
@@ -252,7 +255,7 @@ npm test -- src/content/platforms/__tests__/claude-strategy.test.ts
 
 ### Building for Chrome Web Store
 
-1. **Update version** in `manifest.json` and `package.json`
+1. **Update version** in `wxt.config.ts` (manifest section) and `package.json`
 
 2. **Run production build:**
    ```bash
