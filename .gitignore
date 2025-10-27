@@ -4,6 +4,10 @@
 dist/
 build/
 
+# WXT build output
+.wxt/
+.output/
+
 # Node.js dependencies
 node_modules/
 npm-debug.log*

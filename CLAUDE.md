@@ -12,8 +12,8 @@ Chrome extension for managing personal prompt libraries with dual interfaces:
 
 ```bash
 # Development
-npm run dev          # Start development server with hot reload
-npm run build        # Production build (creates dist/ folder)
+npm run dev          # Start development server with hot reload (WXT)
+npm run build        # Production build (creates .output/chrome-mv3/ folder)
 npm run preview      # Preview production build
 
 # Testing
@@ -26,7 +26,7 @@ npm run lint         # Run ESLint checks
 npm run lint:fix     # Fix ESLint issues automatically
 
 # Packaging
-npm run package      # Package extension for Chrome Web Store
+npm run package      # Package extension for Chrome Web Store (wxt zip)
 ```
 
 ## Development Workflow
@@ -115,7 +115,9 @@ src/
 
 ### Chrome Extension Specifics
 - Manifest V3 with service worker background script
-- Uses `@crxjs/vite-plugin` for development experience
+- Built with **WXT framework** (https://wxt.dev) for modern extension development
+- Entry points in `entrypoints/` directory (background.ts, content.ts, popup.html, sidepanel.html)
+- Configuration in `wxt.config.ts` (replaces vite.config.ts + manifest.json)
 - Host permissions for `<all_urls>` to work on any site
 - Side panel API for enhanced UI (Chrome 114+)
 
@@ -132,7 +134,7 @@ src/
 - Debug interface: `window.__promptLibraryDebug`
 
 ### Testing Strategy
-- 875 tests across 46 test files
+- 1211 tests across 57 test files
 - Unit tests for services and utilities
 - Component tests with React Testing Library
 - Integration tests for storage operations
@@ -337,8 +339,18 @@ Always include a `component` field to identify the source:
 - Test on actual AI platforms after changes
 
 ### Chrome Extension Loading
-1. Run `npm run build` to create dist/ folder
+1. Run `npm run build` to create .output/chrome-mv3/ folder
 2. Open chrome://extensions/
 3. Enable Developer mode
-4. Load unpacked → select dist/ folder
+4. Load unpacked → select .output/chrome-mv3/ folder
 5. Test both popup and content script functionality
+
+### WXT Framework Notes
+- **Entry Points**: All extension entry points are in the `entrypoints/` directory
+  - `background.ts`: Service worker wrapped in `defineBackground()`
+  - `content.ts`: Content script wrapped in `defineContentScript()`
+  - `popup.html` / `sidepanel.html`: HTML entry points that reference src/ files
+- **Configuration**: `wxt.config.ts` contains manifest definition and build configuration
+- **Build Output**: `.output/chrome-mv3/` (gitignored, excluded from ESLint)
+- **Type Generation**: `wxt prepare` generates TypeScript definitions (runs via postinstall)
+- **Auto-imports**: WXT can auto-import React hooks and browser APIs (configured in wxt.config.ts)

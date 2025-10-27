@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { FC, ReactNode } from 'react';
 
-import manifest from '../../manifest.json';
 import { getDefaultEnabledPlatforms } from '../config/platforms';
 import { StorageManager } from '../services/storage';
 import type { Prompt, Category, Settings as UserSettings } from '../types';
@@ -467,7 +466,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
 
           {/* About & Reset Section */}
           <AboutSection
-            version={manifest.version}
+            version={chrome.runtime.getManifest().version}
             onReset={handleResetSettings}
           />
         </div>

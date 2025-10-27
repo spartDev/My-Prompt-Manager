@@ -188,12 +188,25 @@ export default [
       ...playwright.configs['flat/recommended'].rules,
     },
   },
+
+  // Configuration for WXT entrypoints - relax type checking for framework functions
+  {
+    files: ['entrypoints/**/*.{ts,tsx}'],
+    rules: {
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+    },
+  },
+
   // Global ignores
   {
     ignores: [
       'node_modules/**',
       'dist/**',
       'build/**',
+      '.output/**',      // WXT build output
+      '.wxt/**',         // WXT generated files
       '*.config.js',
       '*.config.ts',
       'coverage/**',
