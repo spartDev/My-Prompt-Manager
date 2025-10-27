@@ -2,8 +2,8 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 
 import App from './App';
-import './popup.css';
-import './sidepanel.css';
+import './assets/popup.css';
+import './assets/sidepanel.css';
 
 const rootElement = document.getElementById('root');
 if (rootElement) {

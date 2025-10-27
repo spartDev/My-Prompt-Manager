@@ -2,7 +2,7 @@ import { createRoot } from 'react-dom/client';
 
 import App from './App';
 import ErrorBoundary from './components/ErrorBoundary';
-import './popup.css';
+import './assets/popup.css';
 
 const container = document.getElementById('root');
 if (container) {

@@ -98,22 +98,30 @@ For comprehensive technical documentation, see:
 ### File Organization
 
 ```
-src/
-├── entrypoints/       # WXT extension entry points
-│   ├── background.ts # Background service worker
-│   ├── content.ts    # Content script
-│   ├── popup.html    # Popup interface
-│   └── sidepanel.html # Side panel interface
-├── components/        # React UI components (atomic design)
-├── hooks/            # Custom React hooks for data operations
-├── services/         # Core business logic (storage, prompt management)
-├── contexts/         # React contexts (theme, etc.)
-├── content/          # Content script modules
-│   ├── core/        # Main orchestration (injector, insertion)
-│   ├── platforms/   # Platform-specific strategies
-│   ├── ui/          # UI factory, keyboard nav, events
-│   └── utils/       # Logger, storage, DOM, styles
-└── test/            # Test setup and utilities
+project-root/
+├── src/                    # Source directory (srcDir: 'src')
+│   ├── assets/            # CSS, images (processed by WXT)
+│   ├── components/        # React UI components (auto-imported)
+│   ├── hooks/             # Custom React hooks (auto-imported)
+│   ├── utils/             # Utility functions (auto-imported)
+│   ├── entrypoints/       # WXT extension entry points
+│   │   ├── background.ts # Background service worker
+│   │   ├── content.ts    # Content script
+│   │   ├── popup.html    # Popup interface
+│   │   └── sidepanel.html # Side panel interface
+│   ├── services/          # Core business logic
+│   ├── contexts/          # React contexts
+│   ├── content/           # Content script modules
+│   │   ├── core/         # Main orchestration
+│   │   ├── platforms/    # Platform strategies
+│   │   ├── ui/           # UI factory, keyboard nav
+│   │   └── utils/        # Logger, storage, DOM
+│   └── test/             # Test setup and utilities
+├── public/                # Static files (copied as-is)
+│   └── icons/            # Extension icons
+├── .output/               # Build output (Chrome MV3)
+├── .wxt/                  # Generated TypeScript config
+└── wxt.config.ts          # WXT configuration
 ```
 
 ## Technical Implementation Details
@@ -351,12 +359,27 @@ Always include a `component` field to identify the source:
 5. Test both popup and content script functionality
 
 ### WXT Framework Notes
-- **Source Directory**: All source code lives in `src/` (configured via `srcDir: 'src'`)
-- **Entry Points**: Extension entry points are in `src/entrypoints/` directory
+
+**Official Structure (follows https://wxt.dev/guide/essentials/project-structure.html):**
+
+**Inside `src/` (srcDir: 'src'):**
+- `assets/` - CSS, images, fonts (processed by Vite)
+- `components/` - React components (auto-imported)
+- `hooks/` - Custom React hooks (auto-imported)
+- `utils/` - Utility functions (auto-imported)
+- `entrypoints/` - Extension entry points
   - `background.ts`: Service worker wrapped in `defineBackground()`
   - `content.ts`: Content script wrapped in `defineContentScript()`
   - `popup.html` / `sidepanel.html`: HTML entry points
-- **Configuration**: `wxt.config.ts` contains manifest definition and build configuration
-- **Build Output**: `.output/chrome-mv3/` (gitignored, excluded from ESLint)
-- **Type Generation**: `wxt prepare` generates TypeScript definitions (runs via postinstall)
-- **Auto-imports**: WXT auto-imports from `components/`, `hooks/`, and `utils/` directories
+
+**At Root Level:**
+- `public/` - Static files copied as-is (icons, etc.)
+- `modules/` - Local WXT modules (optional, not used in this project)
+- `.output/` - Build output directory
+- `.wxt/` - Generated TypeScript config and types
+- `wxt.config.ts` - Main WXT configuration
+
+**Key Points:**
+- Type generation: `wxt prepare` (runs via postinstall)
+- Auto-imports work for components, hooks, and utils
+- Build output: `.output/chrome-mv3/`
