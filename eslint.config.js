@@ -191,7 +191,7 @@ export default [
 
   // Configuration for WXT entrypoints - relax type checking for framework functions
   {
-    files: ['entrypoints/**/*.{ts,tsx}'],
+    files: ['src/entrypoints/**/*.{ts,tsx}'],
     rules: {
       '@typescript-eslint/no-unsafe-call': 'off',
       '@typescript-eslint/no-unsafe-assignment': 'off',

@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "wxt",
+    "dev:safari": "wxt --browser safari",
     "build": "wxt build",
     "preview": "wxt preview",
     "package": "wxt zip",

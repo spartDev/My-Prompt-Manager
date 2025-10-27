@@ -144,11 +144,13 @@ graph TD
 ### Content Script Architecture (TypeScript Modules)
 
 ```
-entrypoints/
-├── content.ts                  # WXT content script entry point
-└── background.ts               # WXT background worker entry point
-
-src/content/
+src/
+├── entrypoints/                # WXT entry points (inside src/)
+│   ├── content.ts             # Content script entry point
+│   ├── background.ts          # Background worker entry point
+│   ├── popup.html             # Popup interface HTML
+│   └── sidepanel.html         # Side panel interface HTML
+└── content/                    # Content script modules
 ├── types/                      # TypeScript definitions
 │   ├── platform.ts            # Platform interfaces
 │   └── ui.ts                  # UI component types

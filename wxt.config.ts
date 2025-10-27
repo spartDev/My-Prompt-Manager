@@ -1,6 +1,9 @@
 import { defineConfig } from 'wxt';
 
 export default defineConfig({
+  // Source directory - all application code lives in src/
+  srcDir: 'src',
+
   // Use WXT React module for automatic React setup
   modules: ['@wxt-dev/module-react'],
 

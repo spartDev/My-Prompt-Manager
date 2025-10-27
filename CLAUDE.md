@@ -99,6 +99,11 @@ For comprehensive technical documentation, see:
 
 ```
 src/
+├── entrypoints/       # WXT extension entry points
+│   ├── background.ts # Background service worker
+│   ├── content.ts    # Content script
+│   ├── popup.html    # Popup interface
+│   └── sidepanel.html # Side panel interface
 ├── components/        # React UI components (atomic design)
 ├── hooks/            # Custom React hooks for data operations
 ├── services/         # Core business logic (storage, prompt management)
@@ -346,11 +351,12 @@ Always include a `component` field to identify the source:
 5. Test both popup and content script functionality
 
 ### WXT Framework Notes
-- **Entry Points**: All extension entry points are in the `entrypoints/` directory
+- **Source Directory**: All source code lives in `src/` (configured via `srcDir: 'src'`)
+- **Entry Points**: Extension entry points are in `src/entrypoints/` directory
   - `background.ts`: Service worker wrapped in `defineBackground()`
   - `content.ts`: Content script wrapped in `defineContentScript()`
-  - `popup.html` / `sidepanel.html`: HTML entry points that reference src/ files
+  - `popup.html` / `sidepanel.html`: HTML entry points
 - **Configuration**: `wxt.config.ts` contains manifest definition and build configuration
 - **Build Output**: `.output/chrome-mv3/` (gitignored, excluded from ESLint)
 - **Type Generation**: `wxt prepare` generates TypeScript definitions (runs via postinstall)
-- **Auto-imports**: WXT can auto-import React hooks and browser APIs (configured in wxt.config.ts)
+- **Auto-imports**: WXT auto-imports from `components/`, `hooks/`, and `utils/` directories

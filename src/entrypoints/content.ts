@@ -15,10 +15,10 @@
 
 import { defineContentScript } from 'wxt/utils/define-content-script';
 
-import { PromptLibraryInjector } from '../src/content/core/injector';
-import { getElementPicker } from '../src/content/modules/element-picker';
-import { error, warn, info, debug } from '../src/content/utils/logger';
-import { ThemeManager } from '../src/content/utils/theme-manager';
+import { PromptLibraryInjector } from '../content/core/injector';
+import { getElementPicker } from '../content/modules/element-picker';
+import { error, warn, info, debug } from '../content/utils/logger';
+import { ThemeManager } from '../content/utils/theme-manager';
 
 interface PromptLibraryDebugApi {
   getInstance: () => PromptLibraryInjector | null;

@@ -20,7 +20,6 @@
     "types": ["chrome", "vite/client", "vitest/globals", "jsdom", "@types/node"]
   },
   "include": [
-    "entrypoints/**/*",
     "src/**/*.ts",
     "src/**/*.tsx"
   ],
