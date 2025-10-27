@@ -6,7 +6,8 @@ import { StorageManager } from '../services/storage';
 import type { Prompt, Category, Settings as UserSettings } from '../types';
 import { DEFAULT_SETTINGS } from '../types';
 import type { ToastSettings } from '../types/hooks';
-import { Logger, toError } from '../utils';
+import { toError } from '../utils/error';
+import * as Logger from '../utils/logger';
 
 import { ClaudeIcon, ChatGPTIcon, PerplexityIcon, MistralIcon, GeminiIcon } from './icons/SiteIcons';
 import AboutSection from './settings/AboutSection';
@@ -83,9 +84,9 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
   const [interfaceMode, setInterfaceMode] = useState<'popup' | 'sidepanel'>(DEFAULT_SETTINGS.interfaceMode as 'popup' | 'sidepanel');
   const [interfaceModeChanging, setInterfaceModeChanging] = useState(false);
 
-  // Data for import/export
-  const [prompts, setPrompts] = useState<Prompt[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
+  // Data for import/export (renamed to avoid WXT auto-import conflicts)
+  const [localPrompts, setLocalPrompts] = useState<Prompt[]>([]);
+  const [localCategories, setLocalCategories] = useState<Category[]>([]);
 
   const storageManager = StorageManager.getInstance();
 
@@ -151,8 +152,8 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
         storageManager.getPrompts(),
         storageManager.getCategories()
       ]);
-      setPrompts(loadedPrompts);
-      setCategories(loadedCategories);
+      setLocalPrompts(loadedPrompts);
+      setLocalCategories(loadedCategories);
     } catch (error) {
       Logger.error('Failed to load settings', toError(error));
       setSettings(defaultSettings);
@@ -442,8 +443,8 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
 
           {/* Data & Storage Section */}
           <DataStorageSection
-            prompts={prompts}
-            categories={categories}
+            prompts={localPrompts}
+            categories={localCategories}
             onImport={handleImportData}
             onClearData={handleClearData}
           />

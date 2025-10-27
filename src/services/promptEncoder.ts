@@ -20,7 +20,8 @@ import {
   ErrorType,
   AppError
 } from '../types';
-import { Logger, toError } from '../utils';
+import { toError } from '../utils/error';
+import * as Logger from '../utils/logger';
 
 /**
  * Custom error class for PromptEncoder operations

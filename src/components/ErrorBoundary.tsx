@@ -1,7 +1,7 @@
 import { Component } from 'react';
 import type { ReactNode, ErrorInfo } from 'react';
 
-import { Logger } from '../utils';
+import * as Logger from '../utils/logger';
 
 interface Props {
   children: ReactNode;

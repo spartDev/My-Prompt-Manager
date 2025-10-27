@@ -4,7 +4,9 @@ import type { FC } from 'react';
 import { MAX_CONTENT_LENGTH, MAX_TITLE_LENGTH, formatCharacterCount } from '../constants/validation';
 import { Category } from '../types';
 import { EditPromptFormProps } from '../types/components';
-import { Logger, toError, validatePromptFields, type FieldErrors } from '../utils';
+import { toError } from '../utils/error';
+import * as Logger from '../utils/logger';
+import { validatePromptFields, type FieldErrors } from '../utils/validation';
 
 import ViewHeader from './ViewHeader';
 

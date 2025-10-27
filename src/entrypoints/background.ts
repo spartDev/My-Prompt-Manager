@@ -7,7 +7,8 @@ import { defineBackground } from 'wxt/utils/define-background';
 
 import { getDefaultEnabledPlatforms, getAllHostnamePatterns } from '../config/platforms';
 import type { ElementFingerprint } from '../types';
-import { Logger, toError, getErrorMessage } from '../utils';
+import { toError, getErrorMessage } from '../utils/error';
+import * as Logger from '../utils/logger';
 
 // Configuration constants
 const ORPHANED_TAB_DETECTION_WINDOW_MS = 10000; // 10 seconds after extension start

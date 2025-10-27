@@ -13,8 +13,9 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 
-import { useEnhancedFloatingPosition, useDropdownClose } from '../hooks';
-import { cn } from '../utils';
+import { useDropdownClose } from '../hooks/useDropdownClose';
+import { useEnhancedFloatingPosition } from '../hooks/useEnhancedFloatingPosition';
+import { cn } from '../utils/cn';
 
 // Context for custom content to access dropdown controls
 interface DropdownContextValue {

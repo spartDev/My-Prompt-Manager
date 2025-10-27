@@ -2,7 +2,8 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 
 import { Toast, UseToastReturn, ToastSettings, ToastAction } from '../types/hooks';
-import { Logger, toError } from '../utils';
+import { toError } from '../utils/error';
+import * as Logger from '../utils/logger';
 
 const TOAST_SETTINGS_KEY = 'toast_settings';
 

@@ -1,6 +1,7 @@
 import { FC, useState } from 'react';
 
-import { Logger, toError } from '../../utils';
+import { toError } from '../../utils/error';
+import * as Logger from '../../utils/logger';
 
 interface AboutSectionProps {
   version: string;

@@ -1,8 +1,8 @@
 import type { FC, ReactElement, ReactNode } from 'react';
 import { Children, isValidElement } from 'react';
 
-import { useExtensionContext } from '../hooks';
-import { Logger } from '../utils';
+import { useExtensionContext } from '../hooks/useExtensionContext';
+import * as Logger from '../utils/logger';
 
 import { AddIcon, EditIcon, LogoIcon, SettingsIcon } from './icons/HeaderIcons';
 

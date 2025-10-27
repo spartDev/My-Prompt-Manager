@@ -27,13 +27,14 @@ import {
   ElementFingerprint,
   SecurityWarning
 } from '../types';
-import { Logger, toError } from '../utils';
 import {
   detectMaliciousContent,
   isSelectorSafe,
   sanitizeConfiguration,
   HOSTNAME_PATTERN
 } from '../utils/configurationSecurity';
+import { toError } from '../utils/error';
+import * as Logger from '../utils/logger';
 
 type NormalizedPayload = Omit<EncodedCustomSitePayloadV1, 'c'>;
 

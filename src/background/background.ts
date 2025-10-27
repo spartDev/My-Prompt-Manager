@@ -5,7 +5,8 @@
 
 import { getDefaultEnabledPlatforms, getAllHostnamePatterns } from '../config/platforms';
 import type { ElementFingerprint } from '../types';
-import { Logger, toError, getErrorMessage } from '../utils';
+import { toError, getErrorMessage } from '../utils/error';
+import * as Logger from '../utils/logger';
 
 // Track active element picker sessions
 const activePickerSessions = new Map<number, { tabId: number; windowId: number }>();

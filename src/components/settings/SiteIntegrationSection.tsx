@@ -3,7 +3,8 @@ import { FC, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useClipboard } from '../../hooks/useClipboard';
 import { ConfigurationEncoder, ConfigurationEncoderError } from '../../services/configurationEncoder';
 import { CustomSite, CustomSiteConfiguration, SecurityWarning, ElementFingerprint } from '../../types';
-import { Logger, toError } from '../../utils';
+import { toError } from '../../utils/error';
+import * as Logger from '../../utils/logger';
 import { CustomSiteIcon } from '../icons/SiteIcons';
 
 import AddCustomSiteCard from './AddCustomSiteCard';

@@ -1,7 +1,8 @@
 import { FC, useState, useRef } from 'react';
 
 import type { Prompt, Category } from '../../types';
-import { Logger, toError } from '../../utils';
+import { toError } from '../../utils/error';
+import * as Logger from '../../utils/logger';
 
 import SettingsSection from './SettingsSection';
 

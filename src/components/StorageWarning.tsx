@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import type { FC } from 'react';
 
 import { StorageManager } from '../services/storage';
-import { Logger, toError } from '../utils';
+import { toError } from '../utils/error';
+import * as Logger from '../utils/logger';
 
 import ConfirmDialog from './ConfirmDialog';
 

@@ -10,12 +10,16 @@ export default defineConfig({
   // Use Chrome extension API (WXT provides browser wrapper for cross-browser compatibility)
   extensionApi: 'chrome',
 
-  // Enable auto-imports for React hooks and browser APIs
+  // Enable auto-imports for React hooks and browser APIs only
+  // Disable automatic directory scanning to avoid false positives
   imports: {
     presets: ['react'],
     addons: {
       vueTemplate: false,
     },
+    // Disable directory scanning - all imports should be explicit
+    // This prevents WXT from incorrectly detecting local component state as exports
+    dirs: [],
   },
 
   // Manifest configuration (converted from manifest.json)
