@@ -7,8 +7,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { getSearchIndex } from '../services/SearchIndex';
 import { Prompt } from '../types';
 import { HighlightedPrompt } from '../types/hooks';
-import * as Logger from '../utils/logger';
-import { findTextHighlights } from '../utils/textHighlight';
+import { Logger, findTextHighlights } from '../utils';
 
 /**
  * Debounce delay in milliseconds

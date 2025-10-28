@@ -20,6 +20,11 @@ export default defineConfig({
     // Disable directory scanning - all imports should be explicit
     // This prevents WXT from incorrectly detecting local component state as exports
     dirs: [],
+    // Exclude barrel export files (index.ts) from auto-import detection
+    // This prevents duplicate import warnings when using barrel exports
+    dirsScanOptions: {
+      fileFilter: (file: string) => !file.endsWith('index.ts'),
+    },
   },
 
   // Manifest configuration (converted from manifest.json)

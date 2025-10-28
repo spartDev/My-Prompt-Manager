@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, Mock } from 'vitest';
 
-import { ContentScriptInjector } from '../../background/background';
+import { ContentScriptInjector } from '../../entrypoints/background';
 import { getChromeMockFunctions } from '../../test/mocks';
 
 describe('ContentScriptInjector error handling', () => {

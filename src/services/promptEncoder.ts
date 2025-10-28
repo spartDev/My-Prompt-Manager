@@ -11,6 +11,7 @@
  */
 
 import DOMPurify from 'dompurify';
+import type { Config } from 'dompurify';
 import LZString from 'lz-string';
 
 import {
@@ -20,8 +21,7 @@ import {
   ErrorType,
   AppError
 } from '../types';
-import { toError } from '../utils/error';
-import * as Logger from '../utils/logger';
+import { Logger, toError } from '../utils';
 
 /**
  * Custom error class for PromptEncoder operations
@@ -41,7 +41,7 @@ class PromptEncoderError extends Error implements AppError {
 /**
  * DOMPurify configuration - strips all HTML tags
  */
-const SANITIZE_CONFIG: DOMPurify.Config = {
+const SANITIZE_CONFIG: Config = {
   ALLOWED_TAGS: [],
   ALLOWED_ATTR: [],
   KEEP_CONTENT: true,

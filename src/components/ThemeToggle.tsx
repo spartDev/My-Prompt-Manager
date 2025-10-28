@@ -1,8 +1,7 @@
 import type { FC } from 'react';
 
 import { useThemeContext } from '../contexts/ThemeContext';
-import { toError } from '../utils/error';
-import * as Logger from '../utils/logger';
+import { Logger, toError } from '../utils';
 
 const ThemeToggle: FC = () => {
   const { theme, resolvedTheme, setTheme } = useThemeContext();

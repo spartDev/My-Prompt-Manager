@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import type { FC } from 'react';
 
-import { useSort } from '../hooks/useSort';
+import { useSort } from '../hooks';
 import { PromptManager } from '../services/promptManager';
 import { Prompt } from '../types';
 import { LibraryViewProps } from '../types/components';

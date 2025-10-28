@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "wxt",
     "build": "wxt build",
+    "build:safari": "wxt build --browser safari",
     "preview": "wxt preview",
     "package": "wxt zip",
     "postinstall": "wxt prepare",

@@ -6,8 +6,7 @@ import { StorageManager } from '../services/storage';
 import type { Prompt, Category, Settings as UserSettings } from '../types';
 import { DEFAULT_SETTINGS } from '../types';
 import type { ToastSettings } from '../types/hooks';
-import { toError } from '../utils/error';
-import * as Logger from '../utils/logger';
+import { Logger, toError } from '../utils';
 
 import { ClaudeIcon, ChatGPTIcon, PerplexityIcon, MistralIcon, GeminiIcon } from './icons/SiteIcons';
 import AboutSection from './settings/AboutSection';

@@ -4,8 +4,7 @@ import type { FC, FormEvent } from 'react';
 import { DEFAULT_CATEGORY_COLOR, getColorName } from '../constants/colors';
 import { MAX_CATEGORY_NAME_LENGTH } from '../constants/validation';
 import { Category } from '../types';
-import { toError } from '../utils/error';
-import * as Logger from '../utils/logger';
+import { Logger, toError } from '../utils';
 
 import ColorPicker from './ColorPicker';
 import ConfirmDialog from './ConfirmDialog';

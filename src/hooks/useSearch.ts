@@ -2,7 +2,7 @@ import { useCallback, useMemo } from 'react';
 
 import { Prompt } from '../types';
 import { UseSearchReturn } from '../types/hooks';
-import { findTextHighlights } from '../utils/textHighlight';
+import { findTextHighlights } from '../utils';
 
 export const useSearch = (prompts: Prompt[], query: string): UseSearchReturn => {
   const filteredPrompts = useMemo(() => {

@@ -4,8 +4,7 @@ import type { FC, MouseEvent, ReactNode } from 'react';
 
 import { encode } from '../services/promptEncoder';
 import { PromptCardProps } from '../types/components';
-import { toError } from '../utils/error';
-import * as Logger from '../utils/logger';
+import { Logger, toError } from '../utils';
 
 import ConfirmDialog from './ConfirmDialog';
 import { Dropdown, DropdownItem } from './Dropdown';

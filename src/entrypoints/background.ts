@@ -7,8 +7,7 @@ import { defineBackground } from 'wxt/utils/define-background';
 
 import { getDefaultEnabledPlatforms, getAllHostnamePatterns } from '../config/platforms';
 import type { ElementFingerprint } from '../types';
-import { toError, getErrorMessage } from '../utils/error';
-import * as Logger from '../utils/logger';
+import { Logger, toError, getErrorMessage } from '../utils';
 
 // Configuration constants
 const ORPHANED_TAB_DETECTION_WINDOW_MS = 10000; // 10 seconds after extension start
@@ -16,8 +15,9 @@ const ORPHANED_TAB_DETECTION_WINDOW_MS = 10000; // 10 seconds after extension st
 /**
  * Content script injection controller
  * Handles programmatic injection of content scripts based on site enablement
+ * Exported for testing purposes
  */
-class ContentScriptInjector {
+export class ContentScriptInjector {
   private injectedTabs: Set<number> = new Set();
   private injectionPromises: Map<number, Promise<void>> = new Map();
   private extensionStartTime: number = Date.now();
@@ -508,7 +508,6 @@ class ContentScriptInjector {
     // Other fallbacks
     const fallbackFiles = [
       'assets/content.js',
-      'src/content/index.js',
       'content.js'
     ];
 

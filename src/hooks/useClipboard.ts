@@ -1,8 +1,7 @@
 import { useState, useCallback } from 'react';
 
 import { UseClipboardReturn } from '../types/hooks';
-import { toError } from '../utils/error';
-import * as Logger from '../utils/logger';
+import { Logger, toError } from '../utils';
 
 export const useClipboard = (): UseClipboardReturn => {
   const [lastCopied, setLastCopied] = useState<string | null>(null);

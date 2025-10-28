@@ -2,7 +2,7 @@
  * Predefined color palettes for category management
  */
 
-import * as Logger from '../utils/logger';
+import { Logger } from '../utils';
 
 export interface ColorOption {
   name: string;

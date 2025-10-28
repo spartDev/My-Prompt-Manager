@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 
 import { Prompt } from '../types';
 import { UseSearchWithDebounceReturn } from '../types/hooks';
-import { debounce } from '../utils/debounce';
+import { debounce } from '../utils';
 
 import { useSearch } from './useSearch';
 

@@ -14,7 +14,7 @@ import {
   checkQuotaAvailability,
   estimatePromptSize,
   estimatePromptsArraySize
-} from '../utils/storageQuota';
+} from '../utils';
 
 class StorageError extends Error implements AppError {
   public type: ErrorType;

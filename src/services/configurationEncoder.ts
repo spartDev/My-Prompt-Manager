@@ -32,9 +32,8 @@ import {
   isSelectorSafe,
   sanitizeConfiguration,
   HOSTNAME_PATTERN
-} from '../utils/configurationSecurity';
-import { toError } from '../utils/error';
-import * as Logger from '../utils/logger';
+} from '../utils';
+import { Logger, toError } from '../utils';
 
 type NormalizedPayload = Omit<EncodedCustomSitePayloadV1, 'c'>;
 

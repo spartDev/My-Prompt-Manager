@@ -5,9 +5,7 @@ import { MAX_CONTENT_LENGTH, MAX_TITLE_LENGTH, formatCharacterCount } from '../c
 import { decode } from '../services/promptEncoder';
 import { DEFAULT_CATEGORY, Category, SharedPromptData } from '../types';
 import { AddPromptFormProps } from '../types/components';
-import { toError } from '../utils/error';
-import * as Logger from '../utils/logger';
-import { validatePromptFields, type FieldErrors } from '../utils/validation';
+import { Logger, toError, validatePromptFields, type FieldErrors } from '../utils';
 
 import ViewHeader from './ViewHeader';
 

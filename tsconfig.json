@@ -5,7 +5,7 @@
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "skipLibCheck": true,
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
@@ -20,7 +20,6 @@
     "types": ["chrome", "vite/client", "vitest/globals", "jsdom", "@types/node"]
   },
   "include": [
-    "entrypoints/**/*",
     "src/**/*.ts",
     "src/**/*.tsx"
   ],

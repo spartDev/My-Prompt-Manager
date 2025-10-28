@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 
 import { StorageManager } from '../services/storage';
-import { toError } from '../utils/error';
-import * as Logger from '../utils/logger';
+import { Logger, toError } from '../utils';
 
 export type Theme = 'light' | 'dark' | 'system';
 

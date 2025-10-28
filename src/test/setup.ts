@@ -507,7 +507,7 @@ async function ensureInjectorPatched(): Promise<void> {
     return;
   }
 
-  const backgroundModule = await import('../background/background');
+  const backgroundModule = await import('../entrypoints/background');
   const ContentScriptInjector = backgroundModule.ContentScriptInjector;
   Object.defineProperty(ContentScriptInjector.prototype, 'extensionStartTime', {
     get(this: InstanceType<typeof ContentScriptInjector>) {
