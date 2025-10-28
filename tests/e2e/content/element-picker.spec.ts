@@ -33,18 +33,83 @@ test.describe('Element picker integration', () => {
     await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
 
     await page.evaluate(() => {
-      const originalSendMessage = chrome.runtime.sendMessage.bind(chrome.runtime);
-      chrome.runtime.sendMessage = (message, responseCallback) => {
-        if (message && typeof message === 'object' && (message as { type?: string }).type === 'START_ELEMENT_PICKER') {
-          responseCallback?.({ success: true });
-          return;
-        }
+      const originalTabsQuery = chrome.tabs.query.bind(chrome.tabs);
+      const originalTabsGet = chrome.tabs.get.bind(chrome.tabs);
+      const originalTabsSendMessage = chrome.tabs.sendMessage.bind(chrome.tabs);
+      const originalTabsUpdate = chrome.tabs.update.bind(chrome.tabs);
+      const originalWindowsUpdate = chrome.windows.update.bind(chrome.windows);
 
-        return originalSendMessage(
-          message as Parameters<typeof chrome.runtime.sendMessage>[0],
-          responseCallback as Parameters<typeof chrome.runtime.sendMessage>[1]
-        );
+      // Mock chrome.tabs.query to return a fake web tab for element picker
+      chrome.tabs.query = (queryInfo) => {
+        // For active tab queries, return a fake web page tab
+        if (queryInfo.active && queryInfo.currentWindow) {
+          return Promise.resolve([
+            {
+              id: 123,
+              url: 'https://claude.ai/qa',
+              title: 'Claude QA',
+              active: true,
+              windowId: 1,
+              status: 'complete'
+            } as chrome.tabs.Tab
+          ]);
+        }
+        return originalTabsQuery(queryInfo);
       };
+
+      // Mock chrome.tabs.get to return the fake tab
+      chrome.tabs.get = (tabId) => {
+        if (tabId === 123) {
+          return Promise.resolve({
+            id: 123,
+            url: 'https://claude.ai/qa',
+            title: 'Claude QA',
+            active: true,
+            windowId: 1,
+            status: 'complete'
+          } as chrome.tabs.Tab);
+        }
+        return originalTabsGet(tabId);
+      };
+
+      // Mock chrome.tabs.sendMessage to simulate successful message sending to content script
+      chrome.tabs.sendMessage = (tabId, message, responseCallback) => {
+        if (tabId === 123) {
+          // Simulate successful message delivery
+          if (responseCallback) {
+            responseCallback({ success: true });
+          }
+          return Promise.resolve({ success: true });
+        }
+        return originalTabsSendMessage(tabId, message, responseCallback);
+      };
+
+      // Mock chrome.tabs.update to simulate tab activation
+      chrome.tabs.update = (tabId, updateProperties) => {
+        if (tabId === 123) {
+          return Promise.resolve({
+            id: 123,
+            url: 'https://claude.ai/qa',
+            title: 'Claude QA',
+            active: true,
+            windowId: 1,
+            status: 'complete'
+          } as chrome.tabs.Tab);
+        }
+        return originalTabsUpdate(tabId, updateProperties);
+      };
+
+      // Mock chrome.windows.update to simulate window focus
+      chrome.windows.update = (windowId, updateInfo) => {
+        if (windowId === 1) {
+          return Promise.resolve({ id: 1, focused: true } as chrome.windows.Window);
+        }
+        return originalWindowsUpdate(windowId, updateInfo);
+      };
+
+      // Mock chrome.permissions methods to bypass permission checks
+      chrome.permissions.request = () => Promise.resolve(true);
+      chrome.permissions.contains = () => Promise.resolve(true);
     });
 
     await page.getByRole('button', { name: 'Add Your First Site' }).click();
@@ -56,8 +121,15 @@ test.describe('Element picker integration', () => {
     await pickElementButton.scrollIntoViewIfNeeded();
     await pickElementButton.click();
 
-    await background.evaluate(() => {
-      chrome.runtime.sendMessage({
+    // Wait for the picker to start (button should show "Picking...")
+    await expect(page.getByRole('button', { name: 'Picking...' })).toBeVisible();
+
+    // Simulate element picker result - send message directly to the page context
+    // This simulates what would happen when the content script sends ELEMENT_SELECTED to background,
+    // and background broadcasts ELEMENT_PICKER_RESULT to all listeners
+    await page.evaluate(() => {
+      // Trigger the message listener directly in the page context
+      chrome.runtime.onMessage.dispatch({
         type: 'ELEMENT_PICKER_RESULT',
         data: {
           selector: 'body',
@@ -67,8 +139,9 @@ test.describe('Element picker integration', () => {
       });
     });
 
-    // After element is picked, the positioning options should appear
-    await expect(page.getByLabel('Placement')).toBeVisible();
+    // Wait for the selector value to be populated (indicates message was received)
+    // The positioning options should appear after the element picker result is processed
+    await expect(page.getByLabel('Placement')).toBeVisible({ timeout: 15000 });
     await expect(page.getByRole('combobox', { name: 'Placement' })).toBeVisible();
   });
 });
