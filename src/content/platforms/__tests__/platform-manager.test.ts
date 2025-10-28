@@ -45,81 +45,93 @@ vi.mock('../../../config/platforms', () => ({
 
 // Mock all strategy modules
 vi.mock('../claude-strategy', () => ({
-  ClaudeStrategy: vi.fn().mockImplementation(() => ({
-    name: 'claude',
-    priority: 100,
-    canHandle: vi.fn().mockReturnValue(false),
-    insert: vi.fn().mockResolvedValue({ success: true, method: 'claude' }),
-    getSelectors: vi.fn().mockReturnValue(['div.claude']),
-    getButtonContainerSelector: vi.fn().mockReturnValue('.claude-container'),
-    createIcon: vi.fn().mockReturnValue(document.createElement('div')),
-    cleanup: vi.fn()
-  }))
+  ClaudeStrategy: vi.fn(function() {
+    return {
+      name: 'claude',
+      priority: 100,
+      canHandle: vi.fn().mockReturnValue(false),
+      insert: vi.fn().mockResolvedValue({ success: true, method: 'claude' }),
+      getSelectors: vi.fn().mockReturnValue(['div.claude']),
+      getButtonContainerSelector: vi.fn().mockReturnValue('.claude-container'),
+      createIcon: vi.fn().mockReturnValue(document.createElement('div')),
+      cleanup: vi.fn()
+    };
+  })
 }));
 
 vi.mock('../chatgpt-strategy', () => ({
-  ChatGPTStrategy: vi.fn().mockImplementation(() => ({
-    name: 'chatgpt',
-    priority: 90,
-    canHandle: vi.fn().mockReturnValue(false),
-    insert: vi.fn().mockResolvedValue({ success: true, method: 'chatgpt' }),
-    getSelectors: vi.fn().mockReturnValue(['textarea.chatgpt']),
-    getButtonContainerSelector: vi.fn().mockReturnValue('.chatgpt-container'),
-    createIcon: vi.fn().mockReturnValue(document.createElement('div')),
-    cleanup: vi.fn()
-  }))
+  ChatGPTStrategy: vi.fn(function() {
+    return {
+      name: 'chatgpt',
+      priority: 90,
+      canHandle: vi.fn().mockReturnValue(false),
+      insert: vi.fn().mockResolvedValue({ success: true, method: 'chatgpt' }),
+      getSelectors: vi.fn().mockReturnValue(['textarea.chatgpt']),
+      getButtonContainerSelector: vi.fn().mockReturnValue('.chatgpt-container'),
+      createIcon: vi.fn().mockReturnValue(document.createElement('div')),
+      cleanup: vi.fn()
+    };
+  })
 }));
 
 vi.mock('../perplexity-strategy', () => ({
-  PerplexityStrategy: vi.fn().mockImplementation(() => ({
-    name: 'perplexity',
-    priority: 80,
-    canHandle: vi.fn().mockReturnValue(false),
-    insert: vi.fn().mockResolvedValue({ success: true, method: 'perplexity' }),
-    getSelectors: vi.fn().mockReturnValue(['div.perplexity']),
-    getButtonContainerSelector: vi.fn().mockReturnValue('.perplexity-container'),
-    createIcon: vi.fn().mockReturnValue(document.createElement('div')),
-    cleanup: vi.fn()
-  }))
+  PerplexityStrategy: vi.fn(function() {
+    return {
+      name: 'perplexity',
+      priority: 80,
+      canHandle: vi.fn().mockReturnValue(false),
+      insert: vi.fn().mockResolvedValue({ success: true, method: 'perplexity' }),
+      getSelectors: vi.fn().mockReturnValue(['div.perplexity']),
+      getButtonContainerSelector: vi.fn().mockReturnValue('.perplexity-container'),
+      createIcon: vi.fn().mockReturnValue(document.createElement('div')),
+      cleanup: vi.fn()
+    };
+  })
 }));
 
 vi.mock('../gemini-strategy', () => ({
-  GeminiStrategy: vi.fn().mockImplementation(() => ({
-    name: 'gemini',
-    priority: 85,
-    canHandle: vi.fn().mockReturnValue(false),
-    insert: vi.fn().mockResolvedValue({ success: true, method: 'gemini' }),
-    getSelectors: vi.fn().mockReturnValue(['div.ql-editor']),
-    getButtonContainerSelector: vi.fn().mockReturnValue('.input-buttons-wrapper-bottom'),
-    createIcon: vi.fn().mockReturnValue(document.createElement('div')),
-    cleanup: vi.fn()
-  }))
+  GeminiStrategy: vi.fn(function() {
+    return {
+      name: 'gemini',
+      priority: 85,
+      canHandle: vi.fn().mockReturnValue(false),
+      insert: vi.fn().mockResolvedValue({ success: true, method: 'gemini' }),
+      getSelectors: vi.fn().mockReturnValue(['div.ql-editor']),
+      getButtonContainerSelector: vi.fn().mockReturnValue('.input-buttons-wrapper-bottom'),
+      createIcon: vi.fn().mockReturnValue(document.createElement('div')),
+      cleanup: vi.fn()
+    };
+  })
 }));
 
 vi.mock('../mistral-strategy', () => ({
-  MistralStrategy: vi.fn().mockImplementation(() => ({
-    name: 'mistral',
-    priority: 85,
-    canHandle: vi.fn().mockReturnValue(false),
-    insert: vi.fn().mockResolvedValue({ success: true, method: 'mistral' }),
-    getSelectors: vi.fn().mockReturnValue(['div[contenteditable="true"]']),
-    getButtonContainerSelector: vi.fn().mockReturnValue('.col-span-10'),
-    createIcon: vi.fn().mockReturnValue(document.createElement('div')),
-    cleanup: vi.fn()
-  }))
+  MistralStrategy: vi.fn(function() {
+    return {
+      name: 'mistral',
+      priority: 85,
+      canHandle: vi.fn().mockReturnValue(false),
+      insert: vi.fn().mockResolvedValue({ success: true, method: 'mistral' }),
+      getSelectors: vi.fn().mockReturnValue(['div[contenteditable="true"]']),
+      getButtonContainerSelector: vi.fn().mockReturnValue('.col-span-10'),
+      createIcon: vi.fn().mockReturnValue(document.createElement('div')),
+      cleanup: vi.fn()
+    };
+  })
 }));
 
 vi.mock('../default-strategy', () => ({
-  DefaultStrategy: vi.fn().mockImplementation(() => ({
-    name: 'default',
-    priority: 0,
-    canHandle: vi.fn().mockReturnValue(true),
-    insert: vi.fn().mockResolvedValue({ success: true, method: 'default' }),
-    getSelectors: vi.fn().mockReturnValue(['textarea', 'input']),
-    getButtonContainerSelector: vi.fn().mockReturnValue(null),
-    createIcon: vi.fn().mockReturnValue(null),
-    cleanup: vi.fn()
-  }))
+  DefaultStrategy: vi.fn(function() {
+    return {
+      name: 'default',
+      priority: 0,
+      canHandle: vi.fn().mockReturnValue(true),
+      insert: vi.fn().mockResolvedValue({ success: true, method: 'default' }),
+      getSelectors: vi.fn().mockReturnValue(['textarea', 'input']),
+      getButtonContainerSelector: vi.fn().mockReturnValue(null),
+      createIcon: vi.fn().mockReturnValue(null),
+      cleanup: vi.fn()
+    };
+  })
 }));
 
 // Mock window.location.hostname

@@ -45,6 +45,9 @@ const renderSettings = async () => {
 
 describe('SettingsView', () => {
   beforeEach(() => {
+    // Ensure window.alert exists for spying
+    window.alert = vi.fn();
+
     const chromeMock = getChromeMockFunctions();
     (chromeMock.storage.local.get as Mock).mockResolvedValue({
       promptLibrarySettings: {

@@ -14,14 +14,16 @@ import { PlatformInsertionManager } from '../insertion-manager';
 
 // Mock the PlatformManager
 vi.mock('../../platforms/platform-manager', () => ({
-  PlatformManager: vi.fn().mockImplementation(() => ({
-    insertContent: vi.fn(),
-    getAllSelectors: vi.fn(),
-    getButtonContainerSelector: vi.fn(),
-    createIcon: vi.fn(),
-    getActiveStrategy: vi.fn(),
-    cleanup: vi.fn()
-  }))
+  PlatformManager: vi.fn(function() {
+    return {
+      insertContent: vi.fn(),
+      getAllSelectors: vi.fn(),
+      getButtonContainerSelector: vi.fn(),
+      createIcon: vi.fn(),
+      getActiveStrategy: vi.fn(),
+      cleanup: vi.fn()
+    };
+  })
 }));
 
 // Mock the Logger

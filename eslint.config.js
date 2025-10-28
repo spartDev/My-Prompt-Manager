@@ -197,6 +197,8 @@ export default [
       '*.config.js',
       '*.config.ts',
       'coverage/**',
+      'playwright-report/**',
+      'test-results/**',
       '.claude/**',
       '.conductor/**'
     ],
