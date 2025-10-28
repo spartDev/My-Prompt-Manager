@@ -141,8 +141,8 @@ describe('ChatGPTStrategy', () => {
     it('should use native value setter when available', async () => {
       const mockSetter = vi.fn();
       const originalGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
-      Object.getOwnPropertyDescriptor = vi.fn(function(...args) {
-        if (args[0] === HTMLTextAreaElement.prototype && args[1] === 'value') {
+      Object.getOwnPropertyDescriptor = vi.fn((obj: any, prop: PropertyKey) => {
+        if (obj === HTMLTextAreaElement.prototype && prop === 'value') {
           return {
             set: mockSetter,
             get: vi.fn(),
@@ -150,7 +150,7 @@ describe('ChatGPTStrategy', () => {
             configurable: true
           };
         }
-        return originalGetOwnPropertyDescriptor.apply(this, args);
+        return originalGetOwnPropertyDescriptor.call(Object, obj, prop);
       }) as any;
 
       await strategy.insert(mockTextarea, 'test content');
