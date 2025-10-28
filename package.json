@@ -53,7 +53,7 @@
     "typescript-eslint": "8.46.0",
     "vite": "7.1.12",
     "vitest": "3.2.4",
-    "wxt": "0.20.11"
+    "wxt": "^0.20.5"
   },
   "dependencies": {
     "@floating-ui/dom": "1.7.4",
