@@ -140,7 +140,7 @@ test.describe('User Journey: Power User Prompt Management & Organization', () =>
 
     // Open sidepanel
     const sidepanelPage = await context.newPage();
-    await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`);
+    await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`);
 
     // Wait for app to load
     await expect(sidepanelPage.getByRole('heading', { name: 'My Prompt Manager' })).toBeVisible();

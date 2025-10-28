@@ -20,6 +20,8 @@ export interface Settings {
   interfaceMode?: 'popup' | 'sidepanel';
 }
 
+export type InterfaceMode = NonNullable<Settings['interfaceMode']>;
+
 // Sort order type for prompts
 export type SortOrder = 'createdAt' | 'updatedAt' | 'title';
 export type SortDirection = 'asc' | 'desc';
@@ -144,13 +146,23 @@ export const VALIDATION_LIMITS = {
   TITLE_GENERATION_LENGTH: 50
 } as const;
 
+const resolveDefaultInterfaceMode = (): InterfaceMode => {
+  const browserTarget =
+    (typeof import.meta !== 'undefined' &&
+      (import.meta as unknown as { env?: { BROWSER?: string } }).env?.BROWSER) ??
+    'chrome';
+
+  return browserTarget === 'safari' ? 'popup' : 'sidepanel';
+};
+
 // Default values
 export const DEFAULT_CATEGORY = 'Uncategorized';
+export const DEFAULT_INTERFACE_MODE: InterfaceMode = resolveDefaultInterfaceMode();
 export const DEFAULT_SETTINGS: Settings = {
   defaultCategory: DEFAULT_CATEGORY,
   sortOrder: 'updatedAt',
   theme: 'system',
-  interfaceMode: 'sidepanel'
+  interfaceMode: DEFAULT_INTERFACE_MODE,
 };
 
 // Prompt Sharing types

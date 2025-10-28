@@ -7,8 +7,9 @@ export default defineConfig({
   // Use WXT React module for automatic React setup
   modules: ['@wxt-dev/module-react'],
 
-  // Use Chrome extension API (WXT provides browser wrapper for cross-browser compatibility)
-  extensionApi: 'chrome',
+  // Build outputs for Chrome + Safari and lock all builds to Manifest V3
+  targetBrowsers: ['chrome', 'safari'],
+  manifestVersion: 3,
 
   // Enable auto-imports for React hooks and browser APIs only
   // Disable automatic directory scanning to avoid false positives
@@ -28,67 +29,91 @@ export default defineConfig({
   },
 
   // Manifest configuration (converted from manifest.json)
-  manifest: {
-    name: 'My Prompt Manager',
-    version: '1.7.0',
-    description: 'Personal prompt library for AI platforms. Store, organize, and instantly insert your best prompts with one click.',
-    author: 'Thomas Roux',
-    homepage_url: 'https://github.com/spartDev/My-Prompt-Manager',
-
-    permissions: [
+  manifest: ({ browser }) => {
+    const permissions = [
       'storage',
       'activeTab',
       'tabs',
-      'sidePanel',
       'scripting',
-    ],
+    ] as const;
 
-    host_permissions: [
-      'https://claude.ai/*',
-      'https://chatgpt.com/*',
-      'https://gemini.google.com/*',
-      'https://www.perplexity.ai/*',
-      'https://chat.mistral.ai/*',
-    ],
+    const isSafari = browser === 'safari';
+    const isChrome = browser === 'chrome';
+    const supportsSidePanel = isChrome;
 
-    optional_host_permissions: [
-      'https://*/*',
-      'http://*/*',
-    ],
+    return {
+      name: 'My Prompt Manager',
+      version: '1.7.0',
+      description: 'Personal prompt library for AI platforms. Store, organize, and instantly insert your best prompts with one click.',
+      author: 'Thomas Roux',
+      homepage_url: 'https://github.com/spartDev/My-Prompt-Manager',
 
-    action: {
-      default_title: 'My Prompt Manager - Manage your prompts',
-    },
+      permissions: supportsSidePanel ? [...permissions, 'sidePanel'] : [...permissions],
 
-    side_panel: {
-      default_path: '/sidepanel.html',
-    },
+      host_permissions: [
+        'https://claude.ai/*',
+        'https://chatgpt.com/*',
+        'https://gemini.google.com/*',
+        'https://www.perplexity.ai/*',
+        'https://chat.mistral.ai/*',
+      ],
 
-    icons: {
-      16: '/icons/icon-16.png',
-      32: '/icons/icon-32.png',
-      48: '/icons/icon-48.png',
-      128: '/icons/icon-128.png',
-    },
+      optional_host_permissions: [
+        'https://*/*',
+        'http://*/*',
+      ],
 
-    content_security_policy: {
-      extension_pages: "script-src 'self'; object-src 'self'",
-    },
-
-    short_name: 'My Prompt Manager',
-    minimum_chrome_version: '114',
-
-    // Web accessible resources for dynamic content script loading
-    web_accessible_resources: [
-      {
-        matches: ['https://*/*', 'http://*/*'],
-        resources: [
-          'content-scripts/*.js',
-          'chunks/*.js',
-        ],
-        use_dynamic_url: false,
+      action: {
+        default_title: 'My Prompt Manager - Manage your prompts',
       },
-    ],
+
+      ...(supportsSidePanel
+        ? {
+            side_panel: {
+              default_path: '/sidepanel.html',
+            },
+          }
+        : {}),
+
+      icons: {
+        16: '/icons/icon-16.png',
+        32: '/icons/icon-32.png',
+        48: '/icons/icon-48.png',
+        128: '/icons/icon-128.png',
+      },
+
+      content_security_policy: {
+        extension_pages: "script-src 'self'; object-src 'self'",
+      },
+
+      short_name: 'My Prompt Manager',
+      ...(isChrome
+        ? {
+            minimum_chrome_version: '114',
+          }
+        : {}),
+
+      ...(isSafari
+        ? {
+            browser_specific_settings: {
+              safari: {
+                strict_min_version: '17.4',
+              },
+            },
+          }
+        : {}),
+
+      // Web accessible resources for dynamic content script loading
+      web_accessible_resources: [
+        {
+          matches: ['https://*/*', 'http://*/*'],
+          resources: [
+            'content-scripts/*.js',
+            'chunks/*.js',
+          ],
+        },
+      ],
+    };
   },
 
   // Vite configuration (migrated from vite.config.ts)

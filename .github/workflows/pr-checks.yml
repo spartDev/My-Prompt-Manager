@@ -250,9 +250,9 @@ jobs:
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
-            dist
+            .output
             .vite
-          key: ${{ runner.os }}-build-${{ hashFiles('src/**/*', 'public/**/*', 'manifest.json') }}
+          key: ${{ runner.os }}-build-${{ hashFiles('src/**/*', 'public/**/*', 'wxt.config.ts') }}
 
       - name: 🏗️ Production Build
         run: |
@@ -263,9 +263,14 @@ jobs:
 
       - name: 🔍 Verify Build Output
         run: |
-          echo "🔍 Verifying build artifacts..."
-          ls -la dist/
-          if [ ! -f "dist/manifest.json" ]; then
+          BUILD_DIR=".output/chrome-mv3"
+          echo "🔍 Verifying build artifacts in ${BUILD_DIR}..."
+          if [ ! -d "${BUILD_DIR}" ]; then
+            echo "❌ Missing build directory: ${BUILD_DIR}"
+            exit 1
+          fi
+          ls -la "${BUILD_DIR}"
+          if [ ! -f "${BUILD_DIR}/manifest.json" ]; then
             echo "❌ Missing manifest.json in build output"
             exit 1
           fi
@@ -281,17 +286,18 @@ jobs:
         with:
           name: chrome-extension-build
           path: |
-            dist/
-            *.zip
+            .output/chrome-mv3/
+            .output/*.zip
           retention-days: 7
 
       - name: 📊 Build Size Analysis
         run: |
           echo "📊 Build Size Analysis:"
-          du -sh dist/
-          find dist/ -name "*.js" -exec wc -c {} + | sort -n
+          BUILD_DIR=".output/chrome-mv3"
+          du -sh "${BUILD_DIR}"
+          find "${BUILD_DIR}" -name "*.js" -exec wc -c {} + | sort -n
           echo "📦 Extension package size:"
-          ls -lh *.zip 2>/dev/null || echo "No zip files found"
+          ls -lh .output/*.zip 2>/dev/null || echo "No zip files found"
 
   # Job 6: End-to-end regression suite with Playwright
   e2e:

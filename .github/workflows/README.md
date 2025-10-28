@@ -116,7 +116,7 @@ main:
 
 **Caching Strategy**:
 - 📦 Dependencies: `~/.npm`, `node_modules`
-- 🏗️ Build assets: `dist/`, `.vite/`
+- 🏗️ Build assets: `.output/`, `.vite/`
 - 🧹 ESLint cache: `.eslintcache`
 
 **Parallel Execution**:

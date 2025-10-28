@@ -182,14 +182,14 @@ jobs:
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
-            dist
+            .output
             .vite
             node_modules/.vite
             node_modules/.cache
-          key: ${{ runner.os }}-build-${{ hashFiles('src/**/*', 'public/**/*', 'manifest.json', 'package.json', 'vite.config.*') }}-${{ github.sha }}
+          key: ${{ runner.os }}-build-${{ hashFiles('src/**/*', 'public/**/*', 'wxt.config.ts', 'package.json', 'vite.config.*') }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-build-${{ hashFiles('src/**/*', 'public/**/*', 'manifest.json', 'package.json', 'vite.config.*') }}-
-            ${{ runner.os }}-build-${{ hashFiles('src/**/*', 'public/**/*', 'manifest.json') }}-
+            ${{ runner.os }}-build-${{ hashFiles('src/**/*', 'public/**/*', 'wxt.config.ts', 'package.json', 'vite.config.*') }}-
+            ${{ runner.os }}-build-${{ hashFiles('src/**/*', 'public/**/*', 'wxt.config.ts') }}-
             ${{ runner.os }}-build-
 
       - name: 🏗️ Production Build
@@ -208,9 +208,10 @@ jobs:
       - name: 🔍 Build Verification
         run: |
           echo "🔍 Verifying release build..."
+          BUILD_DIR=".output/chrome-mv3"
 
           # Verify essential files
-          required_files=("dist/manifest.json" "dist/src/popup.html" "dist/src/sidepanel.html")
+          required_files=("${BUILD_DIR}/manifest.json" "${BUILD_DIR}/popup.html" "${BUILD_DIR}/sidepanel.html")
           for file in "${required_files[@]}"; do
             if [ ! -f "$file" ]; then
               echo "❌ Missing required file: $file"
@@ -219,7 +220,7 @@ jobs:
           done
 
           # Verify manifest version matches release
-          manifest_version=$(node -p "require('./dist/manifest.json').version")
+          manifest_version=$(node -p "require('./.output/chrome-mv3/manifest.json').version")
           release_version="${{ needs.validate-release.outputs.version }}"
 
           if [ "$manifest_version" != "$release_version" ]; then
@@ -233,24 +234,25 @@ jobs:
         run: |
           echo "📊 Release Build Analysis"
           echo "========================"
-          echo "📦 Total build size: $(du -sh dist/ | cut -f1)"
-          echo "📋 Extension package size: $(ls -lh *.zip | awk '{print $5}')"
+          BUILD_DIR=".output/chrome-mv3"
+          echo "📦 Total build size: $(du -sh ${BUILD_DIR} | cut -f1)"
+          echo "📋 Extension package size: $(ls -lh .output/*.zip | awk '{print $5}')"
           echo ""
           echo "📁 Build contents:"
-          find dist/ -type f -exec sh -c 'echo "  $(basename "$1"): $(wc -c < "$1") bytes"' _ {} \;
+          find "${BUILD_DIR}" -type f -exec sh -c 'echo "  $(basename "$1"): $(wc -c < "$1") bytes"' _ {} \;
 
       - name: 🔐 Generate Build Attestation
         uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
         with:
-          subject-path: "*.zip"
+          subject-path: ".output/*.zip"
 
       - name: 📤 Upload Release Build
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: chrome-extension-release-v${{ needs.validate-release.outputs.version }}
           path: |
-            dist/
-            *.zip
+            .output/chrome-mv3/
+            .output/*.zip
           retention-days: 90
           # Enhanced security options
           compression-level: 6
@@ -432,9 +434,10 @@ jobs:
           echo "🔍 Validating extension for Chrome Web Store submission..."
 
           cd webstore-prep
+          BUILD_DIR=".output/chrome-mv3"
 
           # Check for Chrome Web Store requirements
-          if [ ! -f "dist/manifest.json" ]; then
+          if [ ! -f "${BUILD_DIR}/manifest.json" ]; then
             echo "❌ Missing manifest.json"
             exit 1
           fi
@@ -445,7 +448,7 @@ jobs:
           # Check required manifest fields for Web Store
           required_fields=("name" "version" "description" "permissions" "manifest_version")
           for field in "${required_fields[@]}"; do
-            if ! grep -q "\"$field\"" dist/manifest.json; then
+            if ! grep -q "\"$field\"" "${BUILD_DIR}/manifest.json"; then
               echo "❌ Missing required manifest field: $field"
               exit 1
             fi
@@ -455,7 +458,7 @@ jobs:
           echo "🔒 Checking for prohibited content..."
 
           # Validate icons exist
-          if ! grep -q "\"icons\"" dist/manifest.json || [ ! -f "dist/icons/icon-128.png" ]; then
+          if ! grep -q "\"icons\"" "${BUILD_DIR}/manifest.json" || [ ! -f "${BUILD_DIR}/icons/icon-128.png" ]; then
             echo "⚠️ Warning: Icons may be missing or not properly configured"
           fi
 
@@ -466,14 +469,21 @@ jobs:
           echo "📦 Preparing final package for Chrome Web Store..."
 
           cd webstore-prep
+          BUILD_DIR=".output/chrome-mv3"
+          ZIP_NAME="chrome-extension-webstore-v${{ needs.validate-release.outputs.version }}.zip"
+          PACKAGE_DIR="webstore-package"
 
-          # Create a clean Web Store package
-          zip -r "chrome-extension-webstore-v${{ needs.validate-release.outputs.version }}.zip" dist/
+          rm -f "${ZIP_NAME}"
+          rm -rf "${PACKAGE_DIR}"
+          mkdir -p "${PACKAGE_DIR}"
+          cp -R "${BUILD_DIR}/." "${PACKAGE_DIR}/"
+
+          (cd "${PACKAGE_DIR}" && zip -r "../${ZIP_NAME}" .)
 
           echo "📊 Web Store package details:"
-          ls -lh *.zip
+          ls -lh "${ZIP_NAME}"
           echo "📁 Package contents:"
-          unzip -l "chrome-extension-webstore-v${{ needs.validate-release.outputs.version }}.zip"
+          unzip -l "${ZIP_NAME}"
 
       - name: 📤 Upload Web Store Package
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5

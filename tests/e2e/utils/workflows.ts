@@ -282,7 +282,7 @@ export const navigationWorkflows = {
    */
   openSidepanel: async (context: BrowserContext, extensionId: string): Promise<Page> => {
     const page = await context.newPage();
-    await page.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, {
+    await page.goto(`chrome-extension://${extensionId}/sidepanel.html`, {
       waitUntil: 'domcontentloaded'
     });
     await assertions.navigation.onLibraryPage(page);
@@ -294,7 +294,7 @@ export const navigationWorkflows = {
    */
   openPopup: async (context: BrowserContext, extensionId: string): Promise<Page> => {
     const page = await context.newPage();
-    await page.goto(`chrome-extension://${extensionId}/src/popup.html`);
+    await page.goto(`chrome-extension://${extensionId}/popup.html`);
     await assertions.navigation.onLibraryPage(page);
     return page;
   },

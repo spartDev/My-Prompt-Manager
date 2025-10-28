@@ -76,14 +76,15 @@ jobs:
       - name: 📊 Build Analysis
         run: |
           echo "📊 Analyzing build output..."
+          BUILD_DIR=".output/chrome-mv3"
           echo "Build size:"
-          du -sh dist/
+          du -sh "${BUILD_DIR}"
           echo ""
           echo "JavaScript bundle sizes:"
-          find dist/ -name "*.js" -exec sh -c 'echo "$(basename "$1"): $(wc -c < "$1") bytes"' _ {} \;
+          find "${BUILD_DIR}" -name "*.js" -exec sh -c 'echo "$(basename "$1"): $(wc -c < "$1") bytes"' _ {} \;
           echo ""
           echo "Extension package:"
-          ls -lh *.zip 2>/dev/null || echo "No extension package found"
+          ls -lh .output/*.zip 2>/dev/null || echo "No extension package found"
 
   # Performance and extended testing
   performance:
@@ -121,9 +122,10 @@ jobs:
           
           # Test extension startup performance (if applicable)
           echo "🚀 Extension performance validation:"
-          if [ -f "dist/manifest.json" ]; then
+          BUILD_DIR=".output/chrome-mv3"
+          if [ -f "${BUILD_DIR}/manifest.json" ]; then
             echo "✅ Extension manifest is ready"
-            echo "📋 Manifest size: $(wc -c < dist/manifest.json) bytes"
+            echo "📋 Manifest size: $(wc -c < ${BUILD_DIR}/manifest.json) bytes"
           fi
           
           # Memory usage during tests
@@ -135,10 +137,11 @@ jobs:
           echo "📊 Bundle size analysis for main branch:"
           
           # Create bundle size report
-          if [ -d "dist" ]; then
+          BUILD_DIR=".output/chrome-mv3"
+          if [ -d "${BUILD_DIR}" ]; then
             echo "Bundle Analysis:" > bundle-report.txt
             echo "================" >> bundle-report.txt
-            find dist/ -name "*.js" -o -name "*.css" | while read file; do
+            find "${BUILD_DIR}" -name "*.js" -o -name "*.css" | while read file; do
               size=$(wc -c < "$file")
               echo "$(basename "$file"): ${size} bytes" >> bundle-report.txt
             done
@@ -194,8 +197,8 @@ jobs:
             "node_version": "${{ env.NODE_VERSION }}",
             "workflow_run": "${{ github.run_number }}",
             "build_size": {
-              "dist_total": "$(du -sb dist/ | cut -f1)",
-              "package_size": "$(ls -l *.zip 2>/dev/null | awk '{print $5}' || echo 0)"
+              "bundle_total": "$(du -sb .output/chrome-mv3/ | cut -f1)",
+              "package_size": "$(ls -l .output/*.zip 2>/dev/null | awk '{print $5}' || echo 0)"
             }
           }
           EOF
@@ -208,8 +211,8 @@ jobs:
         with:
           name: production-chrome-extension-${{ github.sha }}
           path: |
-            dist/
-            *.zip
+            .output/chrome-mv3/
+            .output/*.zip
             build-info.json
             coverage/
           retention-days: 30
@@ -320,6 +323,6 @@ jobs:
         with:
           name: release-ready-${{ steps.version-check.outputs.current_version }}
           path: |
-            dist/
-            *.zip
+            .output/chrome-mv3/
+            .output/*.zip
           retention-days: 90

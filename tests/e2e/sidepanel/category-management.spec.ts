@@ -18,7 +18,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
   test.describe('Category Creation', () => {
     test('should create a new category with name and color', async ({ context, storage, extensionId }) => {
       const sidepanelPage = await context.newPage();
-      await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+      await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
       // Navigate to category manager (button is in the main library view)
       await expect(sidepanelPage.getByRole('heading', { name: 'My Prompt Manager' })).toBeVisible();
@@ -72,7 +72,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
       });
 
       const sidepanelPage = await context.newPage();
-      await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+      await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
       // Navigate to category manager
       await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
@@ -98,7 +98,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
 
     test('should show validation error for empty category name', async ({ context, storage, extensionId }) => {
       const sidepanelPage = await context.newPage();
-      await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+      await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
       // Navigate to category manager
       await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
@@ -133,7 +133,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
       });
 
       const sidepanelPage = await context.newPage();
-      await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+      await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
       // Navigate to category manager
       await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
@@ -171,7 +171,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
       });
 
       const sidepanelPage = await context.newPage();
-      await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+      await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
       // Navigate to category manager
       await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
@@ -229,7 +229,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
       });
 
       const sidepanelPage = await context.newPage();
-      await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+      await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
       // Navigate to category manager
       await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
@@ -276,7 +276,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
       });
 
       const sidepanelPage = await context.newPage();
-      await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+      await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
       // Navigate to category manager
       await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
@@ -322,7 +322,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
       });
 
       const sidepanelPage = await context.newPage();
-      await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+      await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
       // Navigate to category manager
       await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
@@ -364,7 +364,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
 
     test('should prevent deletion of "Uncategorized" default category', async ({ context, storage, extensionId }) => {
       const sidepanelPage = await context.newPage();
-      await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+      await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
       // Navigate to category manager
       await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
@@ -393,7 +393,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
       });
 
       const sidepanelPage = await context.newPage();
-      await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+      await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
       // Navigate to category manager
       await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
@@ -455,7 +455,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
       });
 
       const sidepanelPage = await context.newPage();
-      await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+      await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
       // Navigate to category manager
       await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
@@ -523,7 +523,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
         });
 
         const sidepanelPage = await context.newPage();
-        await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+        await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
         // Navigate to category manager and edit the Research category
         await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
@@ -584,7 +584,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
         });
 
         const sidepanelPage = await context.newPage();
-        await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+        await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
         // Create a prompt in the "Coding" category
         await sidepanelPage.getByRole('button', { name: 'Add new prompt' }).click();
@@ -684,7 +684,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
         });
 
         const sidepanelPage = await context.newPage();
-        await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+        await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
         // First, verify filtering works with original category name
         await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
@@ -746,7 +746,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
         });
 
         const sidepanelPage = await context.newPage();
-        await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+        await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
         // Try to create a prompt
         await sidepanelPage.getByRole('button', { name: 'Add new prompt' }).click();
@@ -803,7 +803,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
         });
 
         const sidepanelPage = await context.newPage();
-        await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+        await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
         // Edit the prompt
         await expect(sidepanelPage.getByRole('heading', { name: 'Editable Prompt' })).toBeVisible();
@@ -846,7 +846,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
         });
 
         const sidepanelPage = await context.newPage();
-        await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+        await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
         // Verify we're in the main library view
         await expect(sidepanelPage.getByRole('heading', { name: 'My Prompt Manager' })).toBeVisible();
@@ -879,7 +879,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
         });
 
         const sidepanelPage = await context.newPage();
-        await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+        await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
         // Open category manager
         await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
@@ -915,7 +915,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
         });
 
         const sidepanelPage = await context.newPage();
-        await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+        await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
         // Open category manager
         await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
@@ -940,7 +940,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
         });
 
         const sidepanelPage = await context.newPage();
-        await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+        await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
         // Open category manager
         await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
@@ -961,7 +961,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
         });
 
         const sidepanelPage = await context.newPage();
-        await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+        await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
         // Open category manager
         await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
@@ -987,7 +987,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
         });
 
         const sidepanelPage = await context.newPage();
-        await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+        await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
         // Open category manager
         await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
@@ -1039,7 +1039,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
         });
 
         const sidepanelPage = await context.newPage();
-        await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+        await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
         // Open category manager
         await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
@@ -1080,7 +1080,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
         });
 
         const sidepanelPage = await context.newPage();
-        await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+        await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
         // Open category manager
         await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
@@ -1116,7 +1116,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
         });
 
         const sidepanelPage = await context.newPage();
-        await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+        await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
         // Open category manager
         await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
@@ -1160,7 +1160,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
         });
 
         const sidepanelPage = await context.newPage();
-        await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+        await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
         // Open category manager
         await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
@@ -1195,7 +1195,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
         });
 
         const sidepanelPage = await context.newPage();
-        await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+        await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
         // Open category manager and start editing
         await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
@@ -1230,7 +1230,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
         });
 
         const sidepanelPage = await context.newPage();
-        await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+        await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
         // Open category manager and start editing
         await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
@@ -1263,7 +1263,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
         });
 
         const sidepanelPage = await context.newPage();
-        await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+        await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
         // Open category manager
         await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
@@ -1306,7 +1306,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
         });
 
         const sidepanelPage = await context.newPage();
-        await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+        await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
         // Open category manager
         await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
@@ -1337,7 +1337,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
         });
 
         const sidepanelPage = await context.newPage();
-        await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+        await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
         // Open category manager
         await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
@@ -1371,7 +1371,7 @@ test.describe('Category Management - Phase 1: Core CRUD Operations', () => {
         });
 
         const sidepanelPage = await context.newPage();
-        await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+        await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
         // Open category manager
         await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();

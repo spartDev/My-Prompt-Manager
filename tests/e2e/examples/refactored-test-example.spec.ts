@@ -31,7 +31,7 @@ test.describe('Example: Refactored Category Management Tests', () => {
 
     // Open sidepanel and initialize page objects
     const page = await context.newPage();
-    await page.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, {
+    await page.goto(`chrome-extension://${extensionId}/sidepanel.html`, {
       waitUntil: 'domcontentloaded'
     });
 
@@ -148,7 +148,7 @@ test.describe('Example: Using Test Data Scenarios', () => {
     await testDataManager.seedForPowerUserTesting();
 
     const page = await context.newPage();
-    await page.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, {
+    await page.goto(`chrome-extension://${extensionId}/sidepanel.html`, {
       waitUntil: 'domcontentloaded'
     });
 
@@ -178,7 +178,7 @@ test.describe('Example: Using Test Data Scenarios', () => {
     await testDataManager.seedForEdgeCaseTesting();
 
     const page = await context.newPage();
-    await page.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, {
+    await page.goto(`chrome-extension://${extensionId}/sidepanel.html`, {
       waitUntil: 'domcontentloaded'
     });
 

@@ -19,7 +19,7 @@ export const extensionNavigation = {
    */
   openSidepanel: async (context: BrowserContext, extensionId: string): Promise<Page> => {
     const page = await context.newPage();
-    await page.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, {
+    await page.goto(`chrome-extension://${extensionId}/sidepanel.html`, {
       waitUntil: 'domcontentloaded'
     });
     return page;
@@ -30,7 +30,7 @@ export const extensionNavigation = {
    */
   openPopup: async (context: BrowserContext, extensionId: string): Promise<Page> => {
     const page = await context.newPage();
-    await page.goto(`chrome-extension://${extensionId}/src/popup.html`);
+    await page.goto(`chrome-extension://${extensionId}/popup.html`);
     return page;
   },
 
@@ -38,7 +38,7 @@ export const extensionNavigation = {
    * Switch between extension views
    */
   switchToView: async (page: Page, extensionId: string, view: 'popup' | 'sidepanel'): Promise<void> => {
-    const url = `chrome-extension://${extensionId}/src/${view}.html`;
+    const url = `chrome-extension://${extensionId}/${view}.html`;
     await page.goto(url, { waitUntil: 'domcontentloaded' });
   },
 };

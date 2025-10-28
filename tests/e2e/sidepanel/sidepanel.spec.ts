@@ -21,7 +21,7 @@ test.describe('Side panel experience', () => {
     });
 
     const sidepanelPage = await context.newPage();
-    await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+    await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
     await expect(sidepanelPage.locator('.sidepanel')).toBeVisible();
     await expect(sidepanelPage.getByRole('heading', { name: 'My Prompt Manager' })).toBeVisible();
@@ -39,7 +39,7 @@ test.describe('Side panel experience', () => {
     });
 
     const sidepanelPage = await context.newPage();
-    await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+    await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
     await sidepanelPage.getByRole('button', { name: 'Settings' }).click();
     const popupRadio = sidepanelPage.getByRole('radio', { name: 'Select popup window mode' });
@@ -64,7 +64,7 @@ test.describe('Side panel experience', () => {
     });
 
     const sidepanelPage = await context.newPage();
-    await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+    await sidepanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
     await sidepanelPage.getByRole('button', { name: 'Settings' }).click();
     const lightThemeButton = sidepanelPage.getByRole('button', { name: 'Light' });

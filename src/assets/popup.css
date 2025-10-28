@@ -21,6 +21,11 @@ body {
   background: #ffffff;
 }
 
+:root.dark body {
+  background: #111827;
+  color: #f9fafb;
+}
+
 #root {
   width: 100%;
   height: 100%;

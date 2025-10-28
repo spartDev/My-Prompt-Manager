@@ -5,9 +5,13 @@ import path from 'node:path';
 function globalSetup(): void {
   execSync('npm run build', { stdio: 'inherit' });
 
-  const distPath = path.resolve(process.cwd(), 'dist');
-  if (!fs.existsSync(distPath)) {
-    throw new Error(`Expected built extension at ${distPath}, but the folder was not found.`);
+  const outputDir = path.resolve(
+    process.cwd(),
+    process.env.EXTENSION_OUTPUT_DIR ?? path.join('.output', 'chrome-mv3')
+  );
+
+  if (!fs.existsSync(outputDir)) {
+    throw new Error(`Expected built extension at ${outputDir}, but the folder was not found.`);
   }
 }
 

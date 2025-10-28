@@ -62,7 +62,7 @@ test('example test', async ({ context, storage, extensionId }) => {
 
   // Open extension and initialize POM
   const page = await context.newPage();
-  await page.goto(`chrome-extension://${extensionId}/src/sidepanel.html`);
+  await page.goto(`chrome-extension://${extensionId}/sidepanel.html`);
   const libraryPage = new LibraryPage(page);
 
   // Use workflow functions
@@ -223,7 +223,7 @@ test.describe('Feature Name', () => {
 
     // Setup page objects
     const page = await context.newPage();
-    await page.goto(`chrome-extension://${extensionId}/src/sidepanel.html`);
+    await page.goto(`chrome-extension://${extensionId}/sidepanel.html`);
     libraryPage = new LibraryPage(page);
   });
 

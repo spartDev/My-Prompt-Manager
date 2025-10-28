@@ -8,7 +8,10 @@ import { chromium, test as base } from '@playwright/test';
 
 import type { Prompt, Category, Settings } from '../../../src/types';
 
-const extensionPath = path.resolve(process.cwd(), 'dist');
+const extensionPath = path.resolve(
+  process.cwd(),
+  process.env.EXTENSION_OUTPUT_DIR ?? path.join('.output', 'chrome-mv3')
+);
 
 type ExtensionFixtures = {
   context: BrowserContext;
@@ -333,7 +336,7 @@ export const test = base.extend<ExtensionFixtures>({
   page: async ({ context, extensionId, storage }, use) => {
     void storage;
     const page = await context.newPage();
-    await page.goto(`chrome-extension://${extensionId}/src/popup.html`);
+    await page.goto(`chrome-extension://${extensionId}/popup.html`);
     await use(page);
     await page.close();
   },

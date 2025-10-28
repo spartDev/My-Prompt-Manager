@@ -6,11 +6,24 @@
 import { defineBackground } from 'wxt/utils/define-background';
 
 import { getDefaultEnabledPlatforms, getAllHostnamePatterns } from '../config/platforms';
-import type { ElementFingerprint } from '../types';
+import { DEFAULT_INTERFACE_MODE, type ElementFingerprint, type InterfaceMode } from '../types';
 import { Logger, toError, getErrorMessage } from '../utils';
 
 // Configuration constants
 const ORPHANED_TAB_DETECTION_WINDOW_MS = 10000; // 10 seconds after extension start
+const SIDE_PANEL_SUPPORTED = (() => {
+  const maybeChrome = (globalThis as Record<string, unknown>).chrome;
+  if (typeof maybeChrome !== 'object' || maybeChrome === null) {
+    return false;
+  }
+
+  const sidePanel = (maybeChrome as Record<string, unknown>).sidePanel;
+  if (typeof sidePanel !== 'object' || sidePanel === null) {
+    return false;
+  }
+
+  return typeof (sidePanel as Record<string, unknown>).open === 'function';
+})();
 
 /**
  * Content script injection controller
@@ -551,9 +564,6 @@ export class ContentScriptInjector {
   }
 }
 
-// Interface mode types
-type InterfaceMode = 'popup' | 'sidepanel';
-
 // Message types for element picker and injection
 interface BackgroundMessage {
   type: 'START_ELEMENT_PICKER' | 'STOP_ELEMENT_PICKER' | 'ELEMENT_SELECTED' | 'PICKER_CANCELLED' | 'OPEN_PICKER_WINDOW' | 'GET_INTERFACE_MODE' | 'REQUEST_INJECTION' | 'SETTINGS_UPDATED' | 'REQUEST_PERMISSION';
@@ -620,13 +630,19 @@ export default defineBackground(() => {
    */
   async function getInterfaceMode(): Promise<InterfaceMode> {
     const result = await chrome.storage.local.get('interfaceMode');
-    return (result.interfaceMode as InterfaceMode | undefined) || 'sidepanel';
+    return (result.interfaceMode as InterfaceMode | undefined) || DEFAULT_INTERFACE_MODE;
   }
 
   /**
    * Update the action button behavior based on interface mode
    */
   async function updateActionBehavior(mode: InterfaceMode): Promise<void> {
+    if (mode === 'sidepanel' && !SIDE_PANEL_SUPPORTED) {
+      await chrome.storage.local.set({ interfaceMode: DEFAULT_INTERFACE_MODE });
+      await chrome.action.setPopup({ popup: '/popup.html' });
+      return;
+    }
+
     if (mode === 'popup') {
       // Set popup for action button  - WXT will use /popup.html
       await chrome.action.setPopup({ popup: '/popup.html' });
@@ -1130,6 +1146,10 @@ export default defineBackground(() => {
 
   // Handle action button clicks for side panel mode
   chrome.action.onClicked.addListener((tab) => {
+    if (!SIDE_PANEL_SUPPORTED) {
+      return;
+    }
+
     if (tab.windowId) {
       try {
         void chrome.sidePanel.open({ windowId: tab.windowId });

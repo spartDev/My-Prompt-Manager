@@ -18,6 +18,7 @@ const AppearanceSection: FC<AppearanceSectionProps> = ({
   saving = false,
   interfaceModeChanging = false
 }) => {
+  const showInterfaceModeSelector = !import.meta.env.SAFARI;
   const { theme, setTheme } = useThemeContext();
   const icon = (
     <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -99,14 +100,16 @@ const AppearanceSection: FC<AppearanceSectionProps> = ({
         </div>
 
         {/* Interface Mode */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-          <InterfaceModeSelector
-            value={interfaceMode}
-            onChange={onInterfaceModeChange}
-            disabled={saving}
-            loading={interfaceModeChanging}
-          />
-        </div>
+        {showInterfaceModeSelector && (
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+            <InterfaceModeSelector
+              value={interfaceMode}
+              onChange={onInterfaceModeChange}
+              disabled={saving}
+              loading={interfaceModeChanging}
+            />
+          </div>
+        )}
       </div>
     </SettingsSection>
   );

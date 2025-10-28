@@ -74,7 +74,7 @@ This document outlines the steps to package and submit the Prompt Library extens
    The zip should contain:
    ```
    manifest.json
-   src/popup.html
+   popup.html
    assets/popup-[hash].js
    assets/popup-[hash].css
    public/icons/icon-16.png
