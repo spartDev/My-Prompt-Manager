@@ -21,9 +21,11 @@ vi.mock('../../utils/logger', () => ({
 
 // Mock EventManager
 vi.mock('../event-manager', () => ({
-  EventManager: vi.fn().mockImplementation(() => ({
-    addTrackedEventListener: vi.fn()
-  }))
+  EventManager: vi.fn(function() {
+    return {
+      addTrackedEventListener: vi.fn()
+    };
+  })
 }));
 
 describe('KeyboardNavigationManager', () => {

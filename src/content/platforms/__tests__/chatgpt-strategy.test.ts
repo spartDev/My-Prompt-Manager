@@ -36,9 +36,11 @@ describe('ChatGPTStrategy', () => {
     strategy = new ChatGPTStrategy();
     mockTextarea = document.createElement('textarea');
     mockTextarea.setAttribute('data-testid', 'chat-input');
-    
+    // Ensure focus method exists for spying
+    mockTextarea.focus = vi.fn();
+
     mockDiv = document.createElement('div');
-    
+
     mockUIFactory = {
       createChatGPTIcon: vi.fn().mockReturnValue(document.createElement('button'))
     } as any;
@@ -138,34 +140,48 @@ describe('ChatGPTStrategy', () => {
 
     it('should use native value setter when available', async () => {
       const mockSetter = vi.fn();
-      vi.spyOn(Object, 'getOwnPropertyDescriptor').mockReturnValue({
-        set: mockSetter,
-        get: vi.fn(),
-        enumerable: true,
-        configurable: true
-      });
-      
+      const originalGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+      Object.getOwnPropertyDescriptor = vi.fn((obj: any, prop: PropertyKey) => {
+        if (obj === HTMLTextAreaElement.prototype && prop === 'value') {
+          return {
+            set: mockSetter,
+            get: vi.fn(),
+            enumerable: true,
+            configurable: true
+          };
+        }
+        return originalGetOwnPropertyDescriptor.call(Object, obj, prop);
+      }) as any;
+
       await strategy.insert(mockTextarea, 'test content');
-      
+
       expect(mockSetter).toHaveBeenCalledWith('test content');
+
+      // Restore
+      Object.getOwnPropertyDescriptor = originalGetOwnPropertyDescriptor;
     });
 
     it('should handle case when native value setter is not available', async () => {
-      vi.spyOn(Object, 'getOwnPropertyDescriptor').mockReturnValue(undefined);
-      
+      const originalGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+      Object.getOwnPropertyDescriptor = vi.fn(() => undefined) as any;
+
       const result = await strategy.insert(mockTextarea, 'test content');
-      
+
       expect(result.success).toBe(true);
       expect(mockTextarea.value).toBe('test content');
+
+      // Restore
+      Object.getOwnPropertyDescriptor = originalGetOwnPropertyDescriptor;
     });
 
     it('should handle errors gracefully', async () => {
-      vi.spyOn(mockTextarea, 'focus').mockImplementation(() => {
+      // Replace the focus mock to throw an error
+      mockTextarea.focus = vi.fn(() => {
         throw new Error('Focus failed');
       });
-      
+
       const result = await strategy.insert(mockTextarea, 'test content');
-      
+
       expect(result.success).toBe(false);
       expect(result.error).toBe('Focus failed');
     });
@@ -181,13 +197,14 @@ describe('ChatGPTStrategy', () => {
     it('should log warning message on failed insertion', async () => {
       const Logger = await import('../../utils/logger');
       const error = new Error('Test error');
-      
-      vi.spyOn(mockTextarea, 'focus').mockImplementation(() => {
+
+      // Replace the focus mock to throw an error
+      mockTextarea.focus = vi.fn(() => {
         throw error;
       });
-      
+
       await strategy.insert(mockTextarea, 'test content');
-      
+
       expect(Logger.warn).toHaveBeenCalledWith('[chatgpt] React insertion failed', {
         error: 'Test error',
         stack: expect.stringContaining('Error: Test error')

@@ -18,34 +18,42 @@ import { PromptLibraryInjector } from '../injector';
 
 // Mock all dependencies
 vi.mock('../insertion-manager', () => ({
-  PlatformInsertionManager: vi.fn().mockImplementation(() => ({
-    getAllSelectors: vi.fn().mockReturnValue(['textarea', 'div[contenteditable="true"]']),
-    createIcon: vi.fn().mockReturnValue(document.createElement('button')),
-    insertPrompt: vi.fn().mockResolvedValue({ success: true, method: 'direct' }),
-    initializeStrategies: vi.fn(),
-    cleanup: vi.fn()
-  }))
+  PlatformInsertionManager: vi.fn(function() {
+    return {
+      getAllSelectors: vi.fn().mockReturnValue(['textarea', 'div[contenteditable="true"]']),
+      createIcon: vi.fn().mockReturnValue(document.createElement('button')),
+      insertPrompt: vi.fn().mockResolvedValue({ success: true, method: 'direct' }),
+      initializeStrategies: vi.fn(),
+      cleanup: vi.fn()
+    };
+  })
 }));
 
 vi.mock('../../ui/event-manager', () => ({
-  EventManager: vi.fn().mockImplementation(() => ({
-    addTrackedEventListener: vi.fn(),
-    cleanup: vi.fn()
-  }))
+  EventManager: vi.fn(function() {
+    return {
+      addTrackedEventListener: vi.fn(),
+      cleanup: vi.fn()
+    };
+  })
 }));
 
 vi.mock('../../ui/element-factory', () => ({
-  UIElementFactory: vi.fn().mockImplementation(() => ({
-    createFloatingIcon: vi.fn().mockReturnValue(document.createElement('button'))
-  }))
+  UIElementFactory: vi.fn(function() {
+    return {
+      createFloatingIcon: vi.fn().mockReturnValue(document.createElement('button'))
+    };
+  })
 }));
 
 vi.mock('../../ui/keyboard-navigation', () => ({
-  KeyboardNavigationManager: vi.fn().mockImplementation(() => ({
-    initialize: vi.fn(),
-    updateItems: vi.fn(),
-    destroy: vi.fn()
-  }))
+  KeyboardNavigationManager: vi.fn(function() {
+    return {
+      initialize: vi.fn(),
+      updateItems: vi.fn(),
+      destroy: vi.fn()
+    };
+  })
 }));
 
 vi.mock('../../utils/storage', () => ({
