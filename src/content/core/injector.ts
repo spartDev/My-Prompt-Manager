@@ -1856,13 +1856,40 @@ export class PromptLibraryInjector {
         const prompt = prompts.find(p => p.id === promptId);
         if (prompt) {
           debug('[CONTENT] Inserting prompt content', { promptId, contentLength: prompt.content.length });
-          void this.insertPrompt(targetElement, prompt.content);
-          this.closePromptSelector();
+          void this.handlePromptSelection(prompt, targetElement);
         } else {
           debug('[CONTENT] Prompt not found for ID', { promptId });
         }
       });
     });
+  }
+
+  private async handlePromptSelection(prompt: Prompt, targetElement: HTMLElement): Promise<void> {
+    try {
+      const result = await this.insertPrompt(targetElement, prompt.content);
+
+      if (result.success) {
+        try {
+          await chrome.runtime.sendMessage({
+            type: 'PROMPT_USAGE_INCREMENT',
+            data: { promptId: prompt.id }
+          });
+        } catch (sendMessageError) {
+          debug('[CONTENT] Failed to report prompt usage', {
+            promptId: prompt.id,
+            error: sendMessageError instanceof Error ? sendMessageError.message : String(sendMessageError)
+          });
+        }
+      } else {
+        warn('[CONTENT] Prompt insertion reported failure', { promptId: prompt.id, error: result.error });
+      }
+    } catch (err) {
+      error('[CONTENT] Error handling prompt selection', err instanceof Error ? err : new Error(String(err)), {
+        promptId: prompt.id
+      });
+    } finally {
+      this.closePromptSelector();
+    }
   }
 
   /**

@@ -5,7 +5,7 @@ export interface UsePromptsReturn {
   prompts: Prompt[];
   loading: boolean;
   error: AppError | null;
-  createPrompt: (prompt: Omit<Prompt, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
+  createPrompt: (prompt: Omit<Prompt, 'id' | 'createdAt' | 'updatedAt' | 'usageCount' | 'lastUsedAt'>) => Promise<void>;
   updatePrompt: (id: string, updates: Partial<Prompt>) => Promise<void>;
   deletePrompt: (id: string) => Promise<void>;
   searchPrompts: (query: string) => Prompt[];

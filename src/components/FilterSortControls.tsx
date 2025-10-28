@@ -6,9 +6,11 @@ import { SortOrder } from '../types';
 import { FilterSortControlsProps } from '../types/components';
 
 import { Dropdown, DropdownItem } from './Dropdown';
-import { CheckIcon, ClockIcon, CalendarIcon, AlphabeticalIcon } from './icons/UIIcons';
+import { CheckIcon, ClockIcon, CalendarIcon, AlphabeticalIcon, StarIcon, HistoryIcon } from './icons/UIIcons';
 
 const SORT_OPTIONS: Array<{ value: SortOrder; label: string; icon: FC<{ className?: string }> }> = [
+  { value: 'usageCount', label: 'Most Used', icon: StarIcon },
+  { value: 'lastUsedAt', label: 'Recently Used', icon: HistoryIcon },
   { value: 'updatedAt', label: 'Recently Updated', icon: ClockIcon },
   { value: 'createdAt', label: 'Recently Created', icon: CalendarIcon },
   { value: 'title', label: 'Alphabetical', icon: AlphabeticalIcon }
@@ -34,6 +36,15 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
     if (sortOrder === 'title') {
       return sortDirection === 'asc' ? 'A→Z' : 'Z→A';
     }
+
+    if (sortOrder === 'usageCount') {
+      return sortDirection === 'desc' ? 'Most Used' : 'Least Used';
+    }
+
+    if (sortOrder === 'lastUsedAt') {
+      return sortDirection === 'desc' ? 'Recently Used' : 'Least Recent';
+    }
+
     return sortDirection === 'desc' ? 'Newest' : 'Oldest';
   };
 

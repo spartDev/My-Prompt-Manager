@@ -8,6 +8,9 @@ export interface Prompt {
   content: string;
   category: string;
   createdAt: number;
+  updatedAt: number;
+  usageCount?: number;
+  lastUsedAt?: number;
 }
 
 export interface InsertionResult {

@@ -204,6 +204,8 @@ describe('FilterSortControls', () => {
         expect(screen.getByRole('menu')).toBeInTheDocument();
       });
 
+      expect(screen.getByText('Most Used')).toBeInTheDocument();
+      expect(screen.getByText('Recently Used')).toBeInTheDocument();
       expect(screen.getByText('Recently Updated')).toBeInTheDocument();
       expect(screen.getByText('Recently Created')).toBeInTheDocument();
       expect(screen.getByText('Alphabetical')).toBeInTheDocument();
@@ -243,6 +245,34 @@ describe('FilterSortControls', () => {
       expect(onSortChange).toHaveBeenCalledTimes(1);
     });
 
+    it('calls onSortChange with usage sort defaults', async () => {
+      const user = userEvent.setup();
+      const onSortChange = vi.fn();
+      render(<FilterSortControls {...defaultProps} onSortChange={onSortChange} />);
+
+      const sortButton = screen.getByLabelText(/sort order/i);
+      await user.click(sortButton);
+
+      const mostUsedOption = await screen.findByText('Most Used');
+      await user.click(mostUsedOption);
+
+      expect(onSortChange).toHaveBeenCalledWith('usageCount', 'desc');
+    });
+
+    it('calls onSortChange with recency usage defaults', async () => {
+      const user = userEvent.setup();
+      const onSortChange = vi.fn();
+      render(<FilterSortControls {...defaultProps} onSortChange={onSortChange} />);
+
+      const sortButton = screen.getByLabelText(/sort order/i);
+      await user.click(sortButton);
+
+      const recentlyUsedOption = await screen.findByText('Recently Used');
+      await user.click(recentlyUsedOption);
+
+      expect(onSortChange).toHaveBeenCalledWith('lastUsedAt', 'desc');
+    });
+
     it('toggles sort direction when same option clicked twice', async () => {
       const user = userEvent.setup();
       const onSortChange = vi.fn();
@@ -256,6 +286,20 @@ describe('FilterSortControls', () => {
 
       // Should toggle from desc to asc
       expect(onSortChange).toHaveBeenCalledWith('updatedAt', 'asc');
+    });
+
+    it('toggles sort direction for usage sort when reselected', async () => {
+      const user = userEvent.setup();
+      const onSortChange = vi.fn();
+      render(<FilterSortControls {...defaultProps} sortOrder="usageCount" sortDirection="desc" onSortChange={onSortChange} />);
+
+      const sortButton = screen.getByLabelText(/sort order/i);
+      await user.click(sortButton);
+
+      const mostUsedOption = await screen.findByText('Most Used');
+      await user.click(mostUsedOption);
+
+      expect(onSortChange).toHaveBeenCalledWith('usageCount', 'asc');
     });
 
     it('uses default direction for new sort option', async () => {

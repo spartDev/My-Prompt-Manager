@@ -80,7 +80,7 @@ describe('Type Definitions', () => {
       };
 
       expect(typeof validSettings.defaultCategory).toBe('string');
-      expect(['createdAt', 'updatedAt', 'title']).toContain(validSettings.sortOrder);
+      expect(['createdAt', 'updatedAt', 'title', 'usageCount', 'lastUsedAt']).toContain(validSettings.sortOrder);
     });
   });
 });

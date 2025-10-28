@@ -64,6 +64,9 @@ describe('StorageManager', () => {
           content: 'Test content',
           category: 'Test',
           createdAt: 1234567890,
+          updatedAt: 1234567890,
+          usageCount: 0,
+          lastUsedAt: 1234567890,
         },
       ];
       
@@ -104,6 +107,9 @@ describe('StorageManager', () => {
           content: 'Valid content',
           category: 'Test',
           createdAt: 1234567890,
+          updatedAt: 1234567890,
+          usageCount: 0,
+          lastUsedAt: 1234567890,
         },
         {
           id: '', // Invalid - empty id
@@ -288,18 +294,23 @@ describe('StorageManager', () => {
         title: 'Test Title',
         content: 'Test content',
         category: 'Test Category',
-        createdAt: 1234567890,
+        createdAt: 1234567890
       };
 
       const result = validatePromptData(input);
 
-      expect(result).toEqual(input);
+      expect(result).toEqual({
+        ...input,
+        updatedAt: 1234567890,
+        usageCount: 0,
+        lastUsedAt: 1234567890
+      });
     });
 
     it('should provide defaults for missing fields', () => {
       const input = {
         id: 'test-id',
-        content: 'Test content',
+        content: 'Test content'
       };
 
       const result = validatePromptData(input);
@@ -310,7 +321,12 @@ describe('StorageManager', () => {
         content: 'Test content',
         category: 'General',
         createdAt: expect.any(Number),
+        updatedAt: expect.any(Number),
+        usageCount: 0,
+        lastUsedAt: expect.any(Number)
       });
+      expect(result?.updatedAt).toBe(result?.createdAt);
+      expect(result?.lastUsedAt).toBe(result?.createdAt);
     });
 
     it('should return null for invalid data', () => {
@@ -352,6 +368,9 @@ describe('StorageManager', () => {
         content: 'Test content that is longer than 100 characters to test the truncation functionality properly',
         category: 'Test Category',
         createdAt: 1234567890,
+        updatedAt: 1234567890,
+        usageCount: 0,
+        lastUsedAt: 1234567890,
       };
 
       const result = createPromptListItem(prompt, 0);
@@ -381,6 +400,9 @@ describe('StorageManager', () => {
         content: 'Test content',
         category: 'Test Category',
         createdAt: 1234567890,
+        updatedAt: 1234567890,
+        usageCount: 0,
+        lastUsedAt: 1234567890,
       };
 
       const result = createPromptListItem(prompt, 0);

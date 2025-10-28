@@ -49,18 +49,22 @@ export class StorageManager {
   }
 
   // Prompt operations
-  async savePrompt(prompt: Omit<Prompt, 'id' | 'createdAt' | 'updatedAt'>): Promise<Prompt> {
+  async savePrompt(prompt: Omit<Prompt, 'id' | 'createdAt' | 'updatedAt' | 'usageCount' | 'lastUsedAt'>): Promise<Prompt> {
     return this.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
       try {
         // Proactive quota check BEFORE attempting write
         const estimatedSize = estimatePromptSize(prompt.title, prompt.content, prompt.category);
         await this.checkQuotaBeforeWrite(estimatedSize);
 
+        const timestamp = Date.now();
+
         const newPrompt: Prompt = {
           ...prompt,
           id: uuidv4(),
-          createdAt: Date.now(),
-          updatedAt: Date.now()
+          createdAt: timestamp,
+          updatedAt: timestamp,
+          usageCount: 0,
+          lastUsedAt: timestamp
         };
 
         const existingPrompts = await this.getPrompts();
@@ -77,7 +81,24 @@ export class StorageManager {
   async getPrompts(): Promise<Prompt[]> {
     try {
       const prompts = await this.getStorageData<Prompt[]>(this.STORAGE_KEYS.PROMPTS);
-      return prompts || [];
+      const rawPrompts = prompts || [];
+      const normalizedPrompts = rawPrompts.map(prompt => this.normalizePrompt(prompt));
+
+      const needsMigration = rawPrompts.some((prompt, index) => {
+        const normalized = normalizedPrompts[index];
+        return (
+          typeof prompt.usageCount !== 'number' ||
+          typeof prompt.lastUsedAt !== 'number' ||
+          prompt.usageCount !== normalized.usageCount ||
+          prompt.lastUsedAt !== normalized.lastUsedAt
+        );
+      });
+
+      if (needsMigration) {
+        await this.setStorageData(this.STORAGE_KEYS.PROMPTS, normalizedPrompts);
+      }
+
+      return normalizedPrompts;
     } catch (error) {
       throw this.handleStorageError(error);
     }
@@ -93,11 +114,11 @@ export class StorageManager {
           throw new Error(`Prompt with id ${id} not found`);
         }
 
-        const updatedPrompt: Prompt = {
+        const updatedPrompt = this.normalizePrompt({
           ...existingPrompts[promptIndex],
           ...updates,
           updatedAt: Date.now()
-        };
+        });
 
         // Check if update would increase size (content/title getting longer)
         const oldPrompt = existingPrompts[promptIndex];
@@ -131,6 +152,38 @@ export class StorageManager {
         }
 
         await this.setStorageData(this.STORAGE_KEYS.PROMPTS, filteredPrompts);
+      } catch (error) {
+        throw this.handleStorageError(error);
+      }
+    });
+  }
+
+  async incrementUsageCount(id: string): Promise<Prompt> {
+    return this.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
+      try {
+        const existingPrompts = await this.getPrompts();
+        const promptIndex = existingPrompts.findIndex(p => p.id === id);
+
+        if (promptIndex === -1) {
+          throw new Error(`Prompt with id ${id} not found`);
+        }
+
+        const now = Date.now();
+        const currentUsage = Number.isFinite(existingPrompts[promptIndex].usageCount)
+          ? (existingPrompts[promptIndex].usageCount as number)
+          : 0;
+        const usageCount = currentUsage + 1;
+
+        const updatedPrompt: Prompt = {
+          ...existingPrompts[promptIndex],
+          usageCount,
+          lastUsedAt: now
+        };
+
+        existingPrompts[promptIndex] = updatedPrompt;
+        await this.setStorageData(this.STORAGE_KEYS.PROMPTS, existingPrompts);
+
+        return updatedPrompt;
       } catch (error) {
         throw this.handleStorageError(error);
       }
@@ -179,10 +232,11 @@ export class StorageManager {
             await this.checkQuotaBeforeWrite(sizeDelta);
           }
 
-          const updatedPrompt: Prompt = {
+          const updatedPrompt = this.normalizePrompt({
+            ...existingPrompts[existingIndex],
             ...prompt,
             updatedAt: Date.now() // Update the modification time
-          };
+          });
           existingPrompts[existingIndex] = updatedPrompt;
           await this.setStorageData(this.STORAGE_KEYS.PROMPTS, existingPrompts);
           return updatedPrompt;
@@ -191,12 +245,13 @@ export class StorageManager {
           const promptSize = estimatePromptSize(prompt.title, prompt.content, prompt.category);
           await this.checkQuotaBeforeWrite(promptSize);
 
-          const newPrompt: Prompt = {
+          const timestamp = Date.now();
+          const newPrompt = this.normalizePrompt({
             ...prompt,
             // Use provided timestamps or set current time as fallback
-            createdAt: prompt.createdAt || Date.now(),
-            updatedAt: prompt.updatedAt || Date.now()
-          };
+            createdAt: prompt.createdAt || timestamp,
+            updatedAt: prompt.updatedAt || timestamp
+          });
           const updatedPrompts = [...existingPrompts, newPrompt];
           await this.setStorageData(this.STORAGE_KEYS.PROMPTS, updatedPrompts);
           return newPrompt;
@@ -596,6 +651,34 @@ export class StorageManager {
       // Otherwise, wrap it
       throw this.handleStorageError(error);
     }
+  }
+
+  private normalizePrompt(prompt: Prompt): Prompt {
+    const createdAt = typeof prompt.createdAt === 'number' ? prompt.createdAt : Date.now();
+    const updatedAt = typeof prompt.updatedAt === 'number' ? prompt.updatedAt : createdAt;
+    const usageCount =
+      typeof prompt.usageCount === 'number' && Number.isFinite(prompt.usageCount) && prompt.usageCount >= 0
+        ? Math.floor(prompt.usageCount)
+        : 0;
+
+    let lastUsedAt: number;
+    if (typeof prompt.lastUsedAt === 'number' && Number.isFinite(prompt.lastUsedAt) && prompt.lastUsedAt > 0) {
+      lastUsedAt = prompt.lastUsedAt;
+    } else {
+      lastUsedAt = usageCount > 0 ? updatedAt : createdAt;
+    }
+
+    if (lastUsedAt < createdAt) {
+      lastUsedAt = createdAt;
+    }
+
+    return {
+      ...prompt,
+      createdAt,
+      updatedAt,
+      usageCount,
+      lastUsedAt
+    };
   }
 
   // Mutex implementation for preventing race conditions

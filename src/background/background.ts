@@ -4,11 +4,14 @@
  */
 
 import { getDefaultEnabledPlatforms, getAllHostnamePatterns } from '../config/platforms';
+import { StorageManager } from '../services/storage';
 import type { ElementFingerprint } from '../types';
 import { Logger, toError, getErrorMessage } from '../utils';
 
 // Track active element picker sessions
 const activePickerSessions = new Map<number, { tabId: number; windowId: number }>();
+
+const storageManager = StorageManager.getInstance();
 
 // Configuration constants
 const ORPHANED_TAB_DETECTION_WINDOW_MS = 10000; // 10 seconds after extension start
@@ -632,7 +635,17 @@ let originalTabId: number | null = null;
 
 // Message types for element picker and injection
 interface BackgroundMessage {
-  type: 'START_ELEMENT_PICKER' | 'STOP_ELEMENT_PICKER' | 'ELEMENT_SELECTED' | 'PICKER_CANCELLED' | 'OPEN_PICKER_WINDOW' | 'GET_INTERFACE_MODE' | 'REQUEST_INJECTION' | 'SETTINGS_UPDATED' | 'REQUEST_PERMISSION';
+  type:
+    | 'START_ELEMENT_PICKER'
+    | 'STOP_ELEMENT_PICKER'
+    | 'ELEMENT_SELECTED'
+    | 'PICKER_CANCELLED'
+    | 'OPEN_PICKER_WINDOW'
+    | 'GET_INTERFACE_MODE'
+    | 'REQUEST_INJECTION'
+    | 'SETTINGS_UPDATED'
+    | 'REQUEST_PERMISSION'
+    | 'PROMPT_USAGE_INCREMENT';
   data?: {
     fingerprint?: ElementFingerprint; // Element fingerprint for robust identification
     selector?: string;
@@ -642,6 +655,7 @@ interface BackgroundMessage {
     tabId?: number;
     origins?: string[];
     settings?: unknown;
+    promptId?: string;
   };
 }
 
@@ -679,6 +693,10 @@ chrome.runtime.onMessage.addListener((message: BackgroundMessage, sender, sendRe
 
     case 'REQUEST_PERMISSION':
       void handleRequestPermission(message.data?.origins || [], sendResponse);
+      break;
+
+    case 'PROMPT_USAGE_INCREMENT':
+      void handlePromptUsageIncrement(message.data?.promptId, sendResponse);
       break;
 
     default:
@@ -807,6 +825,21 @@ async function handleRequestPermission(origins: string[], sendResponse: (respons
     sendResponse({ success: granted });
   } catch (error) {
     Logger.error('Permission request failed', toError(error), { component: 'Background', origins });
+    sendResponse({ success: false, error: getErrorMessage(error) });
+  }
+}
+
+async function handlePromptUsageIncrement(promptId: string | undefined, sendResponse: (response?: { success: boolean; error?: string }) => void) {
+  if (!promptId) {
+    sendResponse({ success: false, error: 'Prompt ID is required' });
+    return;
+  }
+
+  try {
+    await storageManager.incrementUsageCount(promptId);
+    sendResponse({ success: true });
+  } catch (error) {
+    Logger.error('Failed to increment prompt usage', toError(error), { component: 'Background', promptId });
     sendResponse({ success: false, error: getErrorMessage(error) });
   }
 }

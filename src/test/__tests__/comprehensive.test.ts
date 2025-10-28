@@ -75,7 +75,7 @@ describe('Comprehensive Test Suite', () => {
       expect(savedPrompt.updatedAt).toBeDefined();
 
       const prompts = await storageManager.getPrompts();
-      expect(prompts).toContain(savedPrompt);
+      expect(prompts).toContainEqual(savedPrompt);
     });
 
     it('should update prompts correctly', async () => {
