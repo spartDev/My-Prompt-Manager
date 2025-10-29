@@ -6,7 +6,7 @@
  * @see docs/TEST_PLAN_USAGE_COUNTER_SMART_SORTING.md
  */
 
-import { DEFAULT_CATEGORY, DEFAULT_SETTINGS } from '../../../src/types';
+import { DEFAULT_CATEGORY } from '../../../src/types';
 import { test, expect } from '../fixtures/extension';
 import { getSortedPromptTitles, selectSortOption, navigateToContext } from '../utils/sort-helpers';
 import { seedLibrary, createPromptSeed } from '../utils/storage';
@@ -309,12 +309,8 @@ test.describe('Usage Counter & Smart Sorting - UI Display', () => {
           // Select "Recently Used" from dropdown
           await selectSortOption(page, 'Recently Used');
 
-          // Wait for sort to be applied
-          await page.waitForTimeout(400);
-
           // Verify prompts are sorted by lastUsedAt descending (most recent first)
-          const promptTitles = await getSortedPromptTitles(page);
-          expect(promptTitles).toEqual([
+          await expect.poll(async () => getSortedPromptTitles(page)).toEqual([
             'Used Just Now',    // now
             'Used 1 Hour Ago',  // now - 3600000
             'Used Yesterday',   // now - 86400000
@@ -385,24 +381,16 @@ test.describe('Usage Counter & Smart Sorting - UI Display', () => {
           await sortButton.click();
           await page.getByRole('menuitem', { name: /Most Used/i }).click();
 
-          // Wait for re-render
-          await page.waitForTimeout(100);
-
-          // Verify descending order
-          let promptTitles = await page.locator('article h3').allTextContents();
-          expect(promptTitles).toEqual(['High', 'Low']);
+          const promptHeadings = page.locator('article h3');
+          await expect(promptHeadings).toHaveText(['High', 'Low']);
 
           // Toggle to ascending
           sortButton = page.getByRole('button', { name: /Sort order: Most Used/i });
+          await expect(sortButton).toBeVisible();
           await sortButton.click();
           await page.getByRole('menuitem', { name: /Most Used/i }).click();
 
-          // Wait for re-render
-          await page.waitForTimeout(100);
-
-          // Verify ascending order
-          promptTitles = await page.locator('article h3').allTextContents();
-          expect(promptTitles).toEqual(['Low', 'High']);
+          await expect(promptHeadings).toHaveText(['Low', 'High']);
 
           // Verify persistence to storage
           const settings = await storage.getSettings();
@@ -444,17 +432,19 @@ test.describe('Usage Counter & Smart Sorting - UI Display', () => {
       await popupPage.waitForLoadState('domcontentloaded');
 
       // Select "Most Used" and toggle to ascending
-      await popupPage.getByRole('button', { name: /Sort order:/i }).click();
-      await popupPage.getByRole('menuitem', { name: /Most Used/i }).click();
-      await popupPage.waitForTimeout(100);
-
-      let sortButton = popupPage.getByRole('button', { name: /Sort order: Most Used/i });
+      let sortButton = popupPage.getByRole('button', { name: /Sort order:/i });
       await sortButton.click();
       await popupPage.getByRole('menuitem', { name: /Most Used/i }).click();
-      await popupPage.waitForTimeout(100);
+
+      sortButton = popupPage.getByRole('button', { name: /Sort order: Most Used/i });
+      await expect(sortButton).toBeVisible();
+      await sortButton.click();
+      await popupPage.getByRole('menuitem', { name: /Most Used/i }).click();
 
       // Verify ascending in popup
-      let titles = await popupPage.locator('article h3').allTextContents();
+      const popupPromptHeadings = popupPage.locator('article h3');
+      await expect(popupPromptHeadings).toHaveText(['Low', 'High']);
+      let titles = await popupPromptHeadings.allTextContents();
       expect(titles).toEqual(['Low', 'High']);
 
       // Verify button shows "Least Used"
@@ -497,7 +487,6 @@ test.describe('Usage Counter & Smart Sorting - UI Display', () => {
       // Select "Recently Used"
       await sidepanelPage.getByRole('button', { name: /Sort order:/i }).click();
       await sidepanelPage.getByRole('menuitem', { name: /Recently Used/i }).click();
-      await sidepanelPage.waitForTimeout(100);
 
       // Verify sort was applied
       const sortButton = sidepanelPage.getByRole('button', { name: /Sort order: Recently Used/i });
@@ -550,7 +539,7 @@ test.describe('Usage Counter & Smart Sorting - UI Display', () => {
           await page.waitForLoadState('domcontentloaded');
 
           // Wait for prompts to render
-          await page.waitForSelector('article[aria-labelledby^="prompt-title-"]');
+          await expect(page.locator('article[aria-labelledby^="prompt-title-"]').first()).toBeVisible();
 
           // Verify migration happened by checking storage state
           const prompts = await storage.getPrompts();
@@ -598,7 +587,7 @@ test.describe('Usage Counter & Smart Sorting - UI Display', () => {
           await page.waitForLoadState('domcontentloaded');
 
           // Wait for prompts to render
-          await page.waitForSelector('article[aria-labelledby^="prompt-title-"]');
+          await expect(page.locator('article[aria-labelledby^="prompt-title-"]').first()).toBeVisible();
 
           // Verify both prompts migrated/preserved correctly
           const prompts = await storage.getPrompts();
@@ -663,7 +652,7 @@ test.describe('Usage Counter & Smart Sorting - UI Display', () => {
           await page.waitForLoadState('domcontentloaded');
 
           // Wait for prompts to render
-          await page.waitForSelector('article[aria-labelledby^="prompt-title-"]');
+          await expect(page.locator('article[aria-labelledby^="prompt-title-"]').first()).toBeVisible();
 
           // Verify migration normalized corrupted data
           const prompts = await storage.getPrompts();
@@ -690,9 +679,10 @@ test.describe('Usage Counter & Smart Sorting - UI Display', () => {
           // Verify sorting works after migration/recovery
           await page.getByRole('button', { name: /Sort order:/i }).click();
           await page.getByRole('menuitem', { name: /Most Used/i }).click();
-          await page.waitForTimeout(100);
+          const sortedHeadings = page.locator('article h3');
+          await expect(sortedHeadings.first()).toHaveText('Float Usage Count');
 
-          const titles = await page.locator('article h3').allTextContents();
+          const titles = await sortedHeadings.allTextContents();
           expect(titles[0]).toBe('Float Usage Count'); // usageCount: 5
           // The other two prompts (usageCount: 0) will follow in some order
           expect(titles.slice(1)).toContain('Invalid Usage Count');
@@ -736,7 +726,6 @@ test.describe('Usage Counter & Smart Sorting - UI Display', () => {
 
           // Click an option to ensure no crashes occur
           await page.getByRole('menuitem', { name: /Most Used/i }).click();
-          await page.waitForTimeout(100);
 
           // Verify no errors and dropdown closed
           await expect(page.getByRole('menuitem', { name: /Most Used/i })).toBeHidden();
@@ -880,7 +869,7 @@ test.describe('Usage Counter & Smart Sorting - UI Display', () => {
             await page.waitForLoadState('domcontentloaded');
 
             // Wait for initial render
-            await page.waitForSelector('article[aria-labelledby^="prompt-title-"]');
+            await expect(page.locator('article[aria-labelledby^="prompt-title-"]').first()).toBeVisible();
 
             // Measure sort performance
             const startTime = performance.now();
@@ -889,7 +878,7 @@ test.describe('Usage Counter & Smart Sorting - UI Display', () => {
             await selectSortOption(page, 'Most Used');
 
             // Wait for re-render
-            await page.waitForSelector('article[aria-labelledby^="prompt-title-"]');
+            await expect(page.locator('article[aria-labelledby^="prompt-title-"]').first()).toBeVisible();
 
             const endTime = performance.now();
             const duration = endTime - startTime;
