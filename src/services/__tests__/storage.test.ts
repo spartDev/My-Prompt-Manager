@@ -523,8 +523,10 @@ describe('StorageManager', () => {
       }).rejects.toThrow(/rollback partially failed.*1\/3 operations failed/);
 
       expect(capturedError).toBeInstanceOf(Error);
-      expect(capturedError?.message).toContain('categories: Rollback quota exceeded');
-      expect(capturedError?.message).toContain('Original error: Import quota exceeded');
+      // Type assertion: after toBeInstanceOf check, we know it's an Error
+      const errorMessage = (capturedError as unknown as Error).message;
+      expect(errorMessage).toContain('categories: Rollback quota exceeded');
+      expect(errorMessage).toContain('Original error: Import quota exceeded');
     });
 
     it('should successfully rollback all data when all operations succeed', async () => {
