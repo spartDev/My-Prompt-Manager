@@ -17,6 +17,7 @@ describe('Type Definitions', () => {
       expect(DEFAULT_SETTINGS).toEqual({
         defaultCategory: 'Uncategorized',
         sortOrder: 'updatedAt',
+        sortDirection: 'desc',
         theme: 'system',
         interfaceMode: 'sidepanel'
       });
