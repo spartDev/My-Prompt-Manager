@@ -18,6 +18,7 @@ export interface Category {
 export interface Settings {
   defaultCategory: string;
   sortOrder: 'createdAt' | 'updatedAt' | 'title' | 'usageCount' | 'lastUsedAt';
+  sortDirection: 'asc' | 'desc';
   theme: 'light' | 'dark' | 'system';
   interfaceMode?: 'popup' | 'sidepanel';
 }
@@ -151,6 +152,7 @@ export const DEFAULT_CATEGORY = 'Uncategorized';
 export const DEFAULT_SETTINGS: Settings = {
   defaultCategory: DEFAULT_CATEGORY,
   sortOrder: 'updatedAt',
+  sortDirection: 'desc',
   theme: 'system',
   interfaceMode: 'sidepanel'
 };

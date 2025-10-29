@@ -1,6 +1,6 @@
 # Review Command
 
-<command_purpose> Perform exhaustive code reviews using multi-agent analysis, ultra-thinking, and Git worktrees for deep local inspection. </command_purpose>
+<command_purpose> Perform exhaustive code reviews using multi-agent analysis, ultra-thinking for deep local inspection. </command_purpose>
 
 ## Introduction
 

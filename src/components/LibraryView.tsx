@@ -1,9 +1,10 @@
-import { useMemo } from 'react';
+import { useMemo, useEffect, useCallback } from 'react';
 import type { FC } from 'react';
 
 import { useSort } from '../hooks';
 import { PromptManager } from '../services/promptManager';
-import { Prompt } from '../types';
+import { StorageManager } from '../services/storage';
+import { Prompt, SortOrder, SortDirection } from '../types';
 import { LibraryViewProps } from '../types/components';
 
 import FilterSortControls from './FilterSortControls';
@@ -28,7 +29,31 @@ const LibraryView: FC<LibraryViewProps> = ({
   context = 'popup'
 }) => {
   const { query, debouncedQuery, filteredPrompts, isSearching } = searchWithDebounce;
-  const { sortOrder, sortDirection, handleSortChange } = useSort();
+  const { sortOrder, sortDirection, handleSortChange: internalHandleSortChange } = useSort();
+
+  // Load sort settings from storage on mount
+  useEffect(() => {
+    const loadSortSettings = async () => {
+      try {
+        const storageManager = StorageManager.getInstance();
+        const settings = await storageManager.getSettings();
+        internalHandleSortChange(settings.sortOrder, settings.sortDirection);
+      } catch (error) {
+        console.error('Failed to load sort settings:', error);
+      }
+    };
+    void loadSortSettings();
+  }, [internalHandleSortChange]);
+
+  // Wrap handleSortChange to persist to storage
+  const handleSortChange = useCallback((order: SortOrder, direction: SortDirection) => {
+    internalHandleSortChange(order, direction);
+    // Persist to storage asynchronously (fire-and-forget)
+    const storageManager = StorageManager.getInstance();
+    void storageManager.updateSettings({ sortOrder: order, sortDirection: direction }).catch((error: unknown) => {
+      console.error('Failed to persist sort settings:', error);
+    });
+  }, [internalHandleSortChange]);
 
   const finalFilteredPrompts = useMemo(() => {
     // Apply category filter to search-filtered prompts

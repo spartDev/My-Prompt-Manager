@@ -11,14 +11,24 @@ type SeedOptions = {
 
 export const createPromptSeed = (overrides: Partial<Prompt>): Prompt => {
   const now = Date.now();
+  const createdAt = overrides.createdAt ?? now;
+  const updatedAt = overrides.updatedAt ?? createdAt;
+  const usageCount = overrides.usageCount ?? 0;
+
+  // Match normalizePrompt logic: lastUsedAt depends on usageCount
+  // If usageCount === 0: lastUsedAt defaults to createdAt
+  // If usageCount > 0: lastUsedAt defaults to updatedAt
+  const defaultLastUsedAt = usageCount > 0 ? updatedAt : createdAt;
 
   return {
     id: overrides.id ?? `prompt-${Math.random().toString(36).slice(2, 10)}`,
     title: overrides.title ?? 'Sample Prompt',
     content: overrides.content ?? 'Sample prompt content',
     category: overrides.category ?? DEFAULT_CATEGORY,
-    createdAt: overrides.createdAt ?? now,
-    updatedAt: overrides.updatedAt ?? now,
+    createdAt,
+    updatedAt,
+    usageCount,
+    lastUsedAt: overrides.lastUsedAt ?? defaultLastUsedAt,
   };
 };
 
