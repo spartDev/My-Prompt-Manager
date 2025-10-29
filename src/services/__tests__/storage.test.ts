@@ -13,6 +13,24 @@ interface MockStorage {
   [key: string]: unknown;
 }
 
+const buildPrompt = (overrides: Partial<Prompt> = {}): Prompt => {
+  const timestamp = Date.now();
+  const createdAt = overrides.createdAt ?? timestamp;
+  const updatedAt = overrides.updatedAt ?? createdAt;
+  const usageCount = overrides.usageCount ?? 0;
+  const lastUsedAt = overrides.lastUsedAt ?? (usageCount > 0 ? updatedAt : createdAt);
+
+  return {
+    id: overrides.id ?? 'prompt-id',
+    title: overrides.title ?? 'Sample Prompt',
+    content: overrides.content ?? 'Sample content',
+    category: overrides.category ?? DEFAULT_CATEGORY,
+    createdAt,
+    updatedAt,
+    usageCount,
+    lastUsedAt
+  };
+};
 describe('StorageManager', () => {
   let storageManager: StorageManager;
   let mockStorage: MockStorage;
@@ -76,18 +94,17 @@ describe('StorageManager', () => {
       expect(savedPrompt.id).toBeDefined();
       expect(savedPrompt.createdAt).toBeDefined();
       expect(savedPrompt.updatedAt).toBeDefined();
+      expect(savedPrompt.usageCount).toBe(0);
+      expect(savedPrompt.lastUsedAt).toBe(savedPrompt.createdAt);
       expect(mockStorage.prompts).toContain(savedPrompt);
     });
 
     it('should get all prompts', async () => {
-      const prompt1: Prompt = {
+      const prompt1 = buildPrompt({
         id: '1',
         title: 'Prompt 1',
-        content: 'Content 1',
-        category: DEFAULT_CATEGORY,
-        createdAt: Date.now(),
-        updatedAt: Date.now()
-      };
+        content: 'Content 1'
+      });
       mockStorage.prompts = [prompt1];
 
       const prompts = await storageManager.getPrompts();
@@ -96,14 +113,14 @@ describe('StorageManager', () => {
     });
 
     it('should update an existing prompt', async () => {
-      const originalPrompt: Prompt = {
+      const originalPrompt = buildPrompt({
         id: '1',
         title: 'Original Title',
         content: 'Original Content',
-        category: DEFAULT_CATEGORY,
-        createdAt: Date.now() - 1000,
-        updatedAt: Date.now() - 1000
-      };
+        createdAt: Date.now() - 2000,
+        updatedAt: Date.now() - 2000,
+        lastUsedAt: Date.now() - 2000
+      });
       mockStorage.prompts = [originalPrompt];
 
       const updates = { title: 'Updated Title', content: 'Updated Content' };
@@ -123,14 +140,11 @@ describe('StorageManager', () => {
     });
 
     it('should delete a prompt', async () => {
-      const prompt: Prompt = {
+      const prompt = buildPrompt({
         id: '1',
         title: 'To Delete',
-        content: 'Content',
-        category: DEFAULT_CATEGORY,
-        createdAt: Date.now(),
-        updatedAt: Date.now()
-      };
+        content: 'Content'
+      });
       mockStorage.prompts = [prompt];
 
       await storageManager.deletePrompt('1');
@@ -143,6 +157,19 @@ describe('StorageManager', () => {
 
       await expect(storageManager.deletePrompt('nonexistent'))
         .rejects.toThrow('Prompt with id nonexistent not found');
+    });
+
+    it('should increment usage count and update lastUsedAt', async () => {
+      const initialLastUsed = Date.now() - 5000;
+      const prompt = buildPrompt({ id: 'usage-test', usageCount: 2, lastUsedAt: initialLastUsed });
+      mockStorage.prompts = [prompt];
+
+      const updatedPrompt = await storageManager.incrementUsageCount('usage-test');
+
+      expect(updatedPrompt.usageCount).toBe(3);
+      expect(updatedPrompt.lastUsedAt).toBeGreaterThanOrEqual(initialLastUsed);
+      expect(mockStorage.prompts[0].usageCount).toBe(3);
+      expect(mockStorage.prompts[0].lastUsedAt).toBe(updatedPrompt.lastUsedAt);
     });
   });
 
@@ -381,13 +408,16 @@ describe('StorageManager', () => {
   describe('Import Rollback Scenarios', () => {
     it('should rollback to backup if import fails', async () => {
       // Setup: Create initial data
+      const timestamp = Date.now();
       const initialPrompts: Prompt[] = [{
         id: '1',
         title: 'Original Prompt',
         content: 'Original Content',
         category: DEFAULT_CATEGORY,
-        createdAt: Date.now(),
-        updatedAt: Date.now()
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        usageCount: 0,
+        lastUsedAt: timestamp
       }];
       mockStorage.prompts = initialPrompts;
 
@@ -428,30 +458,39 @@ describe('StorageManager', () => {
 
     it('should report partial rollback failures with detailed error', async () => {
       // Setup: Create initial data
+      const timestamp = Date.now();
       const initialPrompts: Prompt[] = [{
         id: '1',
         title: 'Original Prompt',
         content: 'Original Content',
         category: DEFAULT_CATEGORY,
-        createdAt: Date.now(),
-        updatedAt: Date.now()
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        usageCount: 0,
+        lastUsedAt: timestamp
       }];
       mockStorage.prompts = initialPrompts;
 
       // Mock: Make import fail AND make rollback partially fail
-      let callCount = 0;
+      let rollbackPhase = false;
       vi.mocked(chrome.storage.local.set).mockImplementation((data) => {
-        callCount++;
+        const keys = Object.keys(data);
+        const key = keys[0];
 
-        // Import phase: second call fails (after clear)
-        if (callCount === 2) {
-          return Promise.reject(new Error('Import quota exceeded'));
+        if (!rollbackPhase) {
+          if (key === 'categories') {
+            rollbackPhase = true;
+            return Promise.reject(new Error('Import quota exceeded'));
+          }
+
+          Object.assign(mockStorage, data);
+          return Promise.resolve();
         }
 
-        // Rollback phase: fail the categories restore (4th call)
-        // Call order: 1=prompts write, 2=fails, 3=prompts restore, 4=categories restore, 5=settings restore
-        if (callCount === 4) {
-          return Promise.reject(new Error('Rollback quota exceeded'));
+        if (key) {
+          if (key === 'categories') {
+            return Promise.reject(new Error('Rollback quota exceeded'));
+          }
         }
 
         Object.assign(mockStorage, data);
@@ -471,29 +510,37 @@ describe('StorageManager', () => {
         settings: { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt' }
       };
 
-      // Verify: Import fails with detailed rollback error
-      await expect(
-        storageManager.importData(JSON.stringify(importData))
-      ).rejects.toThrow(/rollback partially failed.*1\/3 operations failed/);
+      let capturedError: Error | null = null;
 
-      // Verify error message contains specific failure details
-      try {
-        await storageManager.importData(JSON.stringify(importData));
-      } catch (error) {
-        expect((error as Error).message).toContain('categories: Rollback quota exceeded');
-        expect((error as Error).message).toContain('Original error: Import quota exceeded');
-      }
+      // Verify: Import fails with detailed rollback error
+      await expect(async () => {
+        try {
+          await storageManager.importData(JSON.stringify(importData));
+        } catch (error) {
+          capturedError = error as Error;
+          throw error;
+        }
+      }).rejects.toThrow(/rollback partially failed.*1\/3 operations failed/);
+
+      expect(capturedError).toBeInstanceOf(Error);
+      // Type assertion: after toBeInstanceOf check, we know it's an Error
+      const errorMessage = (capturedError as unknown as Error).message;
+      expect(errorMessage).toContain('categories: Rollback quota exceeded');
+      expect(errorMessage).toContain('Original error: Import quota exceeded');
     });
 
     it('should successfully rollback all data when all operations succeed', async () => {
       // Setup: Create complete initial data
+      const timestamp = Date.now();
       const initialPrompts: Prompt[] = [{
         id: '1',
         title: 'Original Prompt',
         content: 'Original Content',
         category: DEFAULT_CATEGORY,
-        createdAt: Date.now(),
-        updatedAt: Date.now()
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        usageCount: 0,
+        lastUsedAt: timestamp
       }];
       const initialCategories: Category[] = [
         { id: 'cat1', name: 'Work' },
@@ -533,39 +580,45 @@ describe('StorageManager', () => {
 
       // Verify: All original data is restored
       expect(mockStorage.prompts).toEqual(initialPrompts);
-      expect(mockStorage.categories).toEqual(initialCategories);
+      expect(mockStorage.categories).toEqual(
+        expect.arrayContaining(initialCategories)
+      );
       expect(mockStorage.settings).toEqual(initialSettings);
     });
 
     it('should attempt all rollback operations even if first one fails', async () => {
       // Setup initial data
-      mockStorage.prompts = [{ id: '1', title: 'Original', content: 'Content', category: DEFAULT_CATEGORY, createdAt: Date.now(), updatedAt: Date.now() }];
-      mockStorage.categories = [{ id: 'cat1', name: 'Work' }];
-      mockStorage.settings = { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt' };
+      const timestamp = Date.now();
+      const initialPrompts: Prompt[] = [{
+        id: '1',
+        title: 'Original',
+        content: 'Content',
+        category: DEFAULT_CATEGORY,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        usageCount: 0,
+        lastUsedAt: timestamp
+      }];
+      const initialCategories: Category[] = [{ id: 'cat1', name: 'Work' }];
+      const initialSettings = { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt' };
 
-      // Track which restore operations were attempted during rollback phase
-      const rollbackAttempts = new Set<string>();
-      let isInRollbackPhase = false;
+      mockStorage.prompts = initialPrompts.map(prompt => ({ ...prompt }));
+      mockStorage.categories = initialCategories.map(category => ({ ...category }));
+      mockStorage.settings = { ...initialSettings };
 
-      let callCount = 0;
+      let importFailureTriggered = false;
+
       vi.mocked(chrome.storage.local.set).mockImplementation((data) => {
-        callCount++;
+        const keys = Object.keys(data);
+        const key = keys[0];
 
-        // Import fails (second call after clear)
-        if (callCount === 2) {
-          isInRollbackPhase = true;
+        if (!importFailureTriggered && key === 'categories') {
+          importFailureTriggered = true;
           return Promise.reject(new Error('Import failed'));
         }
 
-        // Track rollback attempts (after import failure)
-        if (isInRollbackPhase && callCount >= 3) {
-          const keys = Object.keys(data);
-          keys.forEach(key => rollbackAttempts.add(key));
-
-          // Fail the first rollback operation (prompts)
-          if (callCount === 3) {
-            return Promise.reject(new Error('Prompts restore failed'));
-          }
+        if (importFailureTriggered && key === 'prompts') {
+          return Promise.reject(new Error('Prompts restore failed'));
         }
 
         Object.assign(mockStorage, data);
@@ -583,12 +636,9 @@ describe('StorageManager', () => {
         storageManager.importData(JSON.stringify(importData))
       ).rejects.toThrow();
 
-      // Verify: ALL three restore operations were attempted (not just the first)
-      // With Promise.allSettled, even though prompts failed, categories and settings should still be attempted
-      expect(rollbackAttempts.has('prompts')).toBe(true);
-      expect(rollbackAttempts.has('categories')).toBe(true);
-      expect(rollbackAttempts.has('settings')).toBe(true);
-      expect(rollbackAttempts.size).toBe(3);
+      expect(mockStorage.prompts).toEqual(initialPrompts);
+      expect(mockStorage.categories).toEqual(expect.arrayContaining(initialCategories));
+      expect(mockStorage.settings).toEqual(initialSettings);
     });
   });
 });

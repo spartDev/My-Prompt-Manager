@@ -314,12 +314,31 @@ export function validatePromptData(prompt: unknown): Prompt | null {
         return fallback;
       };
       
+      const createdAt = typeof promptObj.createdAt === 'number' ? promptObj.createdAt : Date.now();
+      const updatedAt = typeof promptObj.updatedAt === 'number' ? promptObj.updatedAt : createdAt;
+
+      const usageCountRaw = promptObj.usageCount;
+      const usageCount = typeof usageCountRaw === 'number' && Number.isFinite(usageCountRaw) && usageCountRaw >= 0
+        ? Math.floor(usageCountRaw)
+        : 0;
+
+      let lastUsedAt = typeof promptObj.lastUsedAt === 'number' && Number.isFinite(promptObj.lastUsedAt) && promptObj.lastUsedAt > 0
+        ? promptObj.lastUsedAt
+        : (usageCount > 0 ? updatedAt : createdAt);
+
+      if (lastUsedAt < createdAt) {
+        lastUsedAt = createdAt;
+      }
+
       const validatedPrompt: Prompt = {
         id: sanitizeUserInput(safeString(promptObj.id, '')),
         title: sanitizeUserInput(safeString(promptObj.title, 'Untitled')),
         content: sanitizeUserInput(safeString(promptObj.content, '')),
         category: sanitizeUserInput(safeString(promptObj.category, 'General')),
-        createdAt: typeof promptObj.createdAt === 'number' ? promptObj.createdAt : Date.now()
+        createdAt,
+        updatedAt,
+        usageCount,
+        lastUsedAt
       };
 
       // Ensure required fields are not empty after sanitization

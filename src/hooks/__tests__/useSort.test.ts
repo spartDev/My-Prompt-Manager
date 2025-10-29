@@ -92,7 +92,7 @@ describe('useSort', () => {
     it('should accept all valid SortOrder values', () => {
       const { result } = renderHook(() => useSort());
 
-      const validOrders: SortOrder[] = ['title', 'createdAt', 'updatedAt'];
+      const validOrders: SortOrder[] = ['title', 'createdAt', 'updatedAt', 'usageCount', 'lastUsedAt'];
 
       validOrders.forEach((order) => {
         act(() => {

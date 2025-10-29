@@ -297,7 +297,7 @@ jobs:
   e2e:
     name: 🎯 End-to-End Tests
     runs-on: ubuntu-latest
-    needs: [setup, test]
+    needs: [setup, type-check, lint, test]
     if: github.event.pull_request.draft == false
     steps:
       - name: 🛎️ Checkout Repository
@@ -328,25 +328,19 @@ jobs:
           path: |
             ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
 
       - name: 🎯 Install Playwright Chromium
-        run: |
-          if [ "${{ steps.playwright-cache.outputs.cache-hit }}" != 'true' ]; then
-            echo "Cache miss - installing browsers..."
-            npx playwright install --with-deps chromium
-          else
-            echo "Cache hit - verifying browser installation..."
-            npx playwright install chromium --dry-run || npx playwright install --with-deps chromium
-          fi
-
-      - name: Sanity-check Playwright
-        run: |
-          npx playwright --version
-          npm ls @playwright/test
-          ls -la ~/.cache/ms-playwright/ || echo "Browser cache directory not found"
+        run: npx playwright install --with-deps chromium
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "false"
 
       - name: 🧪 Run Playwright E2E Suite
-        run: npm run test:e2e -- --reporter=line
+        run: npm run test:e2e
+        env:
+          CI: true
+          PLAYWRIGHT_WORKERS: "4"
 
       - name: 📤 Upload Playwright Report (on failure)
         if: failure()

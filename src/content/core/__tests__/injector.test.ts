@@ -272,14 +272,20 @@ describe('PromptLibraryInjector', () => {
         title: 'Test Prompt 1',
         content: 'This is test content 1',
         category: 'Test',
-        createdAt: Date.now()
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        usageCount: 0,
+        lastUsedAt: Date.now()
       },
       {
         id: '2',
         title: 'Test Prompt 2',
         content: 'This is test content 2',
         category: 'Test',
-        createdAt: Date.now()
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        usageCount: 0,
+        lastUsedAt: Date.now()
       }
     ];
 
@@ -569,7 +575,10 @@ describe('PromptLibraryInjector', () => {
           title: 'Test Prompt',
           content: 'Test content',
           category: 'Test',
-          createdAt: Date.now()
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          usageCount: 0,
+          lastUsedAt: Date.now()
         }
       ];
       

@@ -186,6 +186,18 @@ export class PromptManager {
         case 'updatedAt':
           comparison = a.updatedAt - b.updatedAt;
           break;
+        case 'usageCount': {
+          const usageA = typeof a.usageCount === 'number' && Number.isFinite(a.usageCount) ? a.usageCount : 0;
+          const usageB = typeof b.usageCount === 'number' && Number.isFinite(b.usageCount) ? b.usageCount : 0;
+          comparison = usageA - usageB;
+          break;
+        }
+        case 'lastUsedAt': {
+          const lastUsedA = typeof a.lastUsedAt === 'number' && Number.isFinite(a.lastUsedAt) ? a.lastUsedAt : a.createdAt;
+          const lastUsedB = typeof b.lastUsedAt === 'number' && Number.isFinite(b.lastUsedAt) ? b.lastUsedAt : b.createdAt;
+          comparison = lastUsedA - lastUsedB;
+          break;
+        }
         default: {
           // Exhaustiveness check - TypeScript will error if a new SortOrder is added
           // without handling it in the switch statement
@@ -231,27 +243,11 @@ export class PromptManager {
   }
 
   // Sorting functionality
-  async getSortedPrompts(sortBy: 'createdAt' | 'updatedAt' | 'title', order: 'asc' | 'desc' = 'desc'): Promise<Prompt[]> {
+  async getSortedPrompts(sortBy: SortOrder, order: SortDirection = 'desc'): Promise<Prompt[]> {
     try {
       const allPrompts = await this.storageManager.getPrompts();
-      
-      return allPrompts.sort((a, b) => {
-        let comparison = 0;
-        
-        switch (sortBy) {
-          case 'title':
-            comparison = a.title.localeCompare(b.title);
-            break;
-          case 'createdAt':
-            comparison = a.createdAt - b.createdAt;
-            break;
-          case 'updatedAt':
-            comparison = a.updatedAt - b.updatedAt;
-            break;
-        }
-        
-        return order === 'asc' ? comparison : -comparison;
-      });
+
+      return this.sortPrompts(allPrompts, sortBy, order);
     } catch (error) {
       throw this.handleError(error);
     }

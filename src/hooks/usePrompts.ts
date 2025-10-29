@@ -26,7 +26,7 @@ export const usePrompts = (): UsePromptsReturn => {
     }
   }, [storageManager]);
 
-  const createPrompt = useCallback(async (prompt: Omit<Prompt, 'id' | 'createdAt' | 'updatedAt'>) => {
+  const createPrompt = useCallback(async (prompt: Omit<Prompt, 'id' | 'createdAt' | 'updatedAt' | 'usageCount' | 'lastUsedAt'>) => {
     try {
       setLoading(true);
       setError(null);

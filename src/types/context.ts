@@ -21,7 +21,7 @@ export interface AppContextType {
   clearError: () => void;
   
   // Prompt operations
-  createPrompt: (prompt: Omit<Prompt, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
+  createPrompt: (prompt: Omit<Prompt, 'id' | 'createdAt' | 'updatedAt' | 'usageCount' | 'lastUsedAt'>) => Promise<void>;
   updatePrompt: (id: string, updates: Partial<Prompt>) => Promise<void>;
   deletePrompt: (id: string) => Promise<void>;
   

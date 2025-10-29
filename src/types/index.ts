@@ -5,6 +5,8 @@ export interface Prompt {
   category: string; // default: 'Uncategorized'
   createdAt: number; // timestamp
   updatedAt: number; // timestamp
+  usageCount?: number; // number of times the prompt has been used
+  lastUsedAt?: number; // timestamp of the last usage (defaults to createdAt)
 }
 
 export interface Category {
@@ -15,13 +17,14 @@ export interface Category {
 
 export interface Settings {
   defaultCategory: string;
-  sortOrder: 'createdAt' | 'updatedAt' | 'title';
+  sortOrder: 'createdAt' | 'updatedAt' | 'title' | 'usageCount' | 'lastUsedAt';
+  sortDirection: 'asc' | 'desc';
   theme: 'light' | 'dark' | 'system';
   interfaceMode?: 'popup' | 'sidepanel';
 }
 
 // Sort order type for prompts
-export type SortOrder = 'createdAt' | 'updatedAt' | 'title';
+export type SortOrder = 'createdAt' | 'updatedAt' | 'title' | 'usageCount' | 'lastUsedAt';
 export type SortDirection = 'asc' | 'desc';
 
 export interface StorageData {
@@ -149,6 +152,7 @@ export const DEFAULT_CATEGORY = 'Uncategorized';
 export const DEFAULT_SETTINGS: Settings = {
   defaultCategory: DEFAULT_CATEGORY,
   sortOrder: 'updatedAt',
+  sortDirection: 'desc',
   theme: 'system',
   interfaceMode: 'sidepanel'
 };

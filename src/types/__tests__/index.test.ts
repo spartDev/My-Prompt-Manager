@@ -17,6 +17,7 @@ describe('Type Definitions', () => {
       expect(DEFAULT_SETTINGS).toEqual({
         defaultCategory: 'Uncategorized',
         sortOrder: 'updatedAt',
+        sortDirection: 'desc',
         theme: 'system',
         interfaceMode: 'sidepanel'
       });
@@ -80,7 +81,7 @@ describe('Type Definitions', () => {
       };
 
       expect(typeof validSettings.defaultCategory).toBe('string');
-      expect(['createdAt', 'updatedAt', 'title']).toContain(validSettings.sortOrder);
+      expect(['createdAt', 'updatedAt', 'title', 'usageCount', 'lastUsedAt']).toContain(validSettings.sortOrder);
     });
   });
 });
