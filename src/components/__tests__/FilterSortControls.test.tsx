@@ -775,9 +775,10 @@ describe('FilterSortControls', () => {
         expect(screen.getByText('No Color')).toBeInTheDocument();
       });
 
+      // Categories without colors now show the default color for consistency
       const noColorOption = screen.getByText('No Color');
       const colorIndicator = noColorOption.parentElement?.querySelector('.rounded-full');
-      expect(colorIndicator).not.toBeInTheDocument();
+      expect(colorIndicator).toBeInTheDocument();
     });
 
     it('handles long category names gracefully', () => {

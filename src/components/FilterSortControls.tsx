@@ -5,6 +5,7 @@ import { DEFAULT_COLORS } from '../constants/ui';
 import { SortOrder } from '../types';
 import { FilterSortControlsProps } from '../types/components';
 
+import CategoryBadge from './CategoryBadge';
 import { Dropdown, DropdownItem } from './Dropdown';
 import { CheckIcon, ClockIcon, CalendarIcon, AlphabeticalIcon, StarIcon, HistoryIcon } from './icons/UIIcons';
 
@@ -107,13 +108,7 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
         label: (
           <span className="flex items-center justify-between w-full">
             <span className="flex items-center space-x-2">
-              {category.color && (
-                <span
-                  className="w-3 h-3 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: category.color }}
-                  aria-hidden="true"
-                />
-              )}
+              <CategoryBadge category={category} variant="dot" />
               <span>{category.name}</span>
             </span>
             {selectedCategory === category.name && <CheckIcon />}

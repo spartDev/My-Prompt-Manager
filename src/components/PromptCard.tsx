@@ -6,6 +6,7 @@ import { encode } from '../services/promptEncoder';
 import { PromptCardProps } from '../types/components';
 import { Logger, toError } from '../utils';
 
+import CategoryBadge from './CategoryBadge';
 import ConfirmDialog from './ConfirmDialog';
 import { Dropdown, DropdownItem } from './Dropdown';
 
@@ -106,9 +107,8 @@ const PromptCard: FC<PromptCardProps> = ({
     return new Date(timestamp).toLocaleDateString();
   };
 
-  const getCategoryColor = (categoryName: string) => {
-    const category = categories.find(cat => cat.name === categoryName);
-    return category?.color || '#6B7280'; // Default gray color if category not found
+  const getCategory = (categoryName: string) => {
+    return categories.find(cat => cat.name === categoryName);
   };
 
   // Menu items for dropdown
@@ -142,14 +142,17 @@ const PromptCard: FC<PromptCardProps> = ({
             {highlightText((prompt).title, searchQuery)}
           </h3>
           <div className="flex items-center space-x-2 mt-1">
-            <span 
-              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium text-white"
-              style={{ backgroundColor: getCategoryColor((prompt).category) }}
-              aria-label={`Category: ${(prompt).category}`}
-            >
-              {(prompt).category}
-            </span>
-            <time 
+            {(() => {
+              const category = getCategory((prompt).category);
+              return category ? (
+                <CategoryBadge
+                  category={category}
+                  variant="pill"
+                  size="sm"
+                />
+              ) : null;
+            })()}
+            <time
               className="text-xs text-gray-500 dark:text-gray-400"
               dateTime={new Date((prompt).updatedAt).toISOString()}
               aria-label={`Last updated: ${formatDate((prompt).updatedAt)}`}
