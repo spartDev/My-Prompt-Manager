@@ -221,9 +221,6 @@ describe('Color Contrast Accessibility', () => {
       const darkBackground = '#1F2937'; // Tailwind gray-800
 
       PRESET_COLORS.forEach(color => {
-        // Get the best text color for this background on dark mode
-        const textColor = getAccessibleTextColor(color.value);
-
         // Color should have sufficient contrast against dark background
         const contrastOnDark = getContrastRatio(color.value, darkBackground);
 
@@ -234,8 +231,6 @@ describe('Color Contrast Accessibility', () => {
     });
 
     it('text colors should remain accessible in dark mode', () => {
-      const darkBackground = '#1F2937'; // Tailwind gray-800
-
       PRESET_COLORS.forEach(color => {
         const textColor = color.textColor || '#FFFFFF';
 
@@ -286,8 +281,6 @@ describe('Color Contrast Accessibility', () => {
 
   describe('Real-World Scenarios', () => {
     it('category badges on white background should be accessible', () => {
-      const whiteBackground = '#FFFFFF';
-
       PRESET_COLORS.forEach(color => {
         const textColor = getAccessibleTextColor(color.value);
         const passes = meetsWCAGStandard(textColor, color.value, 'AA', false);
@@ -297,8 +290,6 @@ describe('Color Contrast Accessibility', () => {
     });
 
     it('category badges on light gray background should be accessible', () => {
-      const lightGrayBackground = '#F3F4F6'; // Tailwind gray-100
-
       PRESET_COLORS.forEach(color => {
         const textColor = getAccessibleTextColor(color.value);
         const passes = meetsWCAGStandard(textColor, color.value, 'AA', false);
@@ -308,8 +299,6 @@ describe('Color Contrast Accessibility', () => {
     });
 
     it('category badges on dark background should be accessible', () => {
-      const darkBackground = '#1F2937'; // Tailwind gray-800
-
       PRESET_COLORS.forEach(color => {
         const textColor = getAccessibleTextColor(color.value);
         const passes = meetsWCAGStandard(textColor, color.value, 'AA', false);

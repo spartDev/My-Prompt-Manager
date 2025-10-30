@@ -145,9 +145,6 @@ describe('CategoryBadge', () => {
       expect(badge).toBeTruthy();
 
       if (badge) {
-        const style = badge.style;
-        const textColor = style.color;
-
         // Should use black text for yellow
         const expectedTextColor = getAccessibleTextColor('#EAB308');
         expect(expectedTextColor).toBe('#000000');
