@@ -11,7 +11,7 @@ export default defineConfig({
   fullyParallel: true,
   retries: isCI ? 1 : 0,
   workers: isCI ? 4 : undefined,
-  reporter: isCI ? [['list'], ['html', { open: 'never' }], ['json', { outputFile: 'test-results.json' }]] : [['list']],
+  reporter: isCI ? 'blob' : [['list']],
   globalSetup: './tests/e2e/global-setup.ts',
   use: {
     headless: isCI ? true : false,

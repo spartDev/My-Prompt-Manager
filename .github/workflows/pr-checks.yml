@@ -293,12 +293,17 @@ jobs:
           echo "📦 Extension package size:"
           ls -lh *.zip 2>/dev/null || echo "No zip files found"
 
-  # Job 6: End-to-end regression suite with Playwright
+  # Job 6: End-to-end regression suite with Playwright (SHARDED)
   e2e:
-    name: 🎯 End-to-End Tests
+    name: 🎯 E2E Tests (Shard ${{ matrix.shardIndex }}/${{ matrix.shardTotal }})
     runs-on: ubuntu-latest
     needs: [setup, type-check, lint, test]
     if: github.event.pull_request.draft == false
+    strategy:
+      fail-fast: false
+      matrix:
+        shardIndex: [1, 2, 3, 4]
+        shardTotal: [4]
     steps:
       - name: 🛎️ Checkout Repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
@@ -336,21 +341,19 @@ jobs:
         env:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "false"
 
-      - name: 🧪 Run Playwright E2E Suite
-        run: npm run test:e2e
+      - name: 🧪 Run Playwright E2E Suite (Shard ${{ matrix.shardIndex }}/${{ matrix.shardTotal }})
+        run: npx playwright test --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }}
         env:
           CI: true
           PLAYWRIGHT_WORKERS: "4"
 
-      - name: 📤 Upload Playwright Report (on failure)
-        if: failure()
+      - name: 📤 Upload Blob Report
+        if: always()
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
-          name: playwright-report
-          path: |
-            playwright-report/
-            test-results/
-          retention-days: 7
+          name: blob-report-${{ matrix.shardIndex }}
+          path: blob-report
+          retention-days: 1
 
   # Job 7: Security and dependency scanning
   security:
@@ -420,11 +423,84 @@ jobs:
 
           echo "✅ Manifest validation passed"
 
-  # Job 8: Final quality gate summary
+  # Job 8: Merge E2E test reports from all shards
+  merge-e2e-reports:
+    name: 📊 Merge E2E Reports
+    runs-on: ubuntu-latest
+    needs: [setup, e2e]
+    if: always() && github.event.pull_request.draft == false
+    steps:
+      - name: 🛎️ Checkout Repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6
+        with:
+          node-version: ${{ needs.setup.outputs.node-version }}
+          cache: "npm"
+
+      - name: 📦 Restore Dependencies
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.npm
+            node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+
+      - name: 🔧 Install Dependencies
+        if: needs.setup.outputs.cache-hit != 'true'
+        run: npm ci --prefer-offline --no-audit
+
+      - name: 📥 Download All Blob Reports
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4
+        with:
+          path: all-blob-reports
+          pattern: blob-report-*
+          merge-multiple: true
+
+      - name: 📊 Merge into HTML Report
+        run: npx playwright merge-reports --reporter html ./all-blob-reports
+
+      - name: 📊 Merge into JSON Report
+        if: always()
+        run: npx playwright merge-reports --reporter json ./all-blob-reports > test-results.json
+
+      - name: 📤 Upload HTML Report
+        if: always()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: playwright-report-merged
+          path: playwright-report
+          retention-days: 7
+
+      - name: 📤 Upload JSON Report
+        if: always()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: test-results-json
+          path: test-results.json
+          retention-days: 7
+
+      - name: 📋 Report Summary
+        if: always()
+        run: |
+          echo "📊 Playwright Test Results Summary"
+          echo "=================================="
+          if [ -f playwright-report/index.html ]; then
+            echo "✅ Merged HTML report generated successfully"
+            echo "📂 Report available in artifacts: playwright-report-merged"
+          else
+            echo "⚠️ HTML report not generated (may indicate test failures)"
+          fi
+          if [ -f test-results.json ]; then
+            echo "✅ JSON report generated successfully"
+          fi
+
+  # Job 9: Final quality gate summary
   quality-gate:
     name: ✅ Quality Gate Summary
     runs-on: ubuntu-latest
-    needs: [setup, type-check, lint, test, build, e2e, security]
+    needs: [setup, type-check, lint, test, build, merge-e2e-reports, security]
     # Run even if jobs are cancelled or fail, but not for draft PRs
     if: always() && github.event.pull_request.draft == false
     steps:
@@ -438,14 +514,14 @@ jobs:
           lint_status="${{ needs.lint.result }}"
           test_status="${{ needs.test.result }}"
           build_status="${{ needs.build.result }}"
-          e2e_status="${{ needs.e2e.result }}"
+          e2e_status="${{ needs.merge-e2e-reports.result }}"
           security_status="${{ needs.security.result }}"
 
           echo "📦 Dependencies & Setup: $setup_status"
           echo "🧹 Code Quality & Linting: $lint_status"
           echo "🧪 Test Suite & Coverage: $test_status"
           echo "🏗️ Build Verification: $build_status"
-          echo "🎯 End-to-End Tests: $e2e_status"
+          echo "🎯 End-to-End Tests (Sharded): $e2e_status"
           echo "🔒 Security & Dependencies: $security_status"
 
           # Check if workflow was cancelled (new commit pushed)
@@ -480,7 +556,7 @@ jobs:
               lint: "${{ needs.lint.result }}",
               test: "${{ needs.test.result }}",
               build: "${{ needs.build.result }}",
-              e2e: "${{ needs.e2e.result }}",
+              e2e: "${{ needs.merge-e2e-reports.result }}",
               security: "${{ needs.security.result }}"
             };
 
