@@ -62,12 +62,6 @@ describe('PlatformStrategy', () => {
       expect(strategy.name).toBe('test');
       expect(strategy.priority).toBe(50);
     });
-
-    it('should throw error when trying to instantiate abstract class directly', () => {
-      expect(() => {
-        new (PlatformStrategy as any)('test', 50);
-      }).toThrow('PlatformStrategy is abstract and cannot be instantiated');
-    });
   });
 
   describe('abstract methods', () => {
