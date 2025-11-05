@@ -8,8 +8,8 @@ describe('useToast', () => {
     vi.useFakeTimers();
 
     // Mock chrome.storage.local to return immediately
-    vi.spyOn(chrome.storage.local, 'get').mockResolvedValue({});
-    vi.spyOn(chrome.storage.local, 'set').mockResolvedValue(undefined);
+    (vi.spyOn(chrome.storage.local, 'get') as any).mockResolvedValue({});
+    (vi.spyOn(chrome.storage.local, 'set') as any).mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -382,7 +382,7 @@ describe('useToast', () => {
     it('loads settings from storage on mount', async () => {
       const mockSettings = {
         toast_settings: {
-          position: 'bottom-left',
+          position: 'bottom-right',
           enabledTypes: {
             success: true,
             error: true,
@@ -394,7 +394,7 @@ describe('useToast', () => {
         }
       };
 
-      vi.mocked(chrome.storage.local.get).mockResolvedValue(mockSettings);
+      (vi.mocked(chrome.storage.local.get) as any).mockResolvedValue(mockSettings);
 
       const { result } = renderHook(() => useToast());
 
@@ -404,14 +404,14 @@ describe('useToast', () => {
       });
 
       expect(result.current.settings).toBeDefined();
-      expect(result.current.settings.position).toBe('bottom-left');
+      expect(result.current.settings.position).toBe('bottom-right');
       expect(result.current.settings.enabledTypes.info).toBe(false);
       expect(result.current.settings.enableGrouping).toBe(false);
       expect(result.current.settings.groupingWindow).toBe(1000);
     });
 
     it('uses default settings when storage is empty', async () => {
-      vi.mocked(chrome.storage.local.get).mockResolvedValue({});
+      (vi.mocked(chrome.storage.local.get) as any).mockResolvedValue({});
 
       const { result } = renderHook(() => useToast());
 
@@ -487,7 +487,7 @@ describe('useToast', () => {
       const { result } = renderHook(() => useToast());
 
       act(() => {
-        result.current.updateSettings({ position: 'bottom-left' });
+        result.current.updateSettings({ position: 'bottom-right' });
       });
 
       // Wait for async storage operation
@@ -496,7 +496,7 @@ describe('useToast', () => {
       });
 
       // Settings should still update in memory despite storage error
-      expect(result.current.settings.position).toBe('bottom-left');
+      expect(result.current.settings.position).toBe('bottom-right');
 
       consoleErrorSpy.mockRestore();
     });

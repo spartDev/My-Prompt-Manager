@@ -333,7 +333,7 @@ describe('StorageManager', () => {
     });
 
     it('should handle data corruption error', async () => {
-      vi.mocked(chrome.storage.local.get).mockResolvedValueOnce({
+      (vi.mocked(chrome.storage.local.get) as any).mockResolvedValueOnce({
         prompts: null // Invalid data should return empty array
       });
 
@@ -419,7 +419,7 @@ describe('StorageManager', () => {
           return Promise.reject(new Error('Quota exceeded'));
         }
         // All other calls (rollback) should succeed using the original implementation
-        return originalSetImpl ? originalSetImpl(items) : Promise.resolve();
+        return originalSetImpl ? (originalSetImpl as any)(items) : Promise.resolve();
       });
 
       const importData = {
@@ -480,7 +480,7 @@ describe('StorageManager', () => {
         }
 
         // All other calls succeed using the original implementation
-        return originalSetImpl ? originalSetImpl(items) : Promise.resolve();
+        return originalSetImpl ? (originalSetImpl as any)(items) : Promise.resolve();
       });
 
       const importData = {
@@ -551,7 +551,7 @@ describe('StorageManager', () => {
           return Promise.reject(new Error('Import failed'));
         }
         // All rollback operations succeed using the original implementation
-        return originalSetImpl ? originalSetImpl(items) : Promise.resolve();
+        return originalSetImpl ? (originalSetImpl as any)(items) : Promise.resolve();
       });
 
       const importData = {
@@ -617,7 +617,7 @@ describe('StorageManager', () => {
         }
 
         // All other calls succeed using the original implementation
-        return originalSetImpl ? originalSetImpl(items) : Promise.resolve();
+        return originalSetImpl ? (originalSetImpl as any)(items) : Promise.resolve();
       });
 
       const importData = {

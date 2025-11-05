@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 import { StorageManager } from '../../services/storage';
 import type { StorageManagerMock } from '../../test/setup';
+import { DEFAULT_SETTINGS } from '../../types';
 import { useTheme } from '../useTheme';
 
 describe('useTheme', () => {
@@ -82,7 +83,7 @@ describe('useTheme', () => {
         enableSync: false,
         customSites: []
       });
-      storageManager.updateSettings.mockResolvedValue();
+      (storageManager.updateSettings as any).mockResolvedValue(DEFAULT_SETTINGS);
 
       // Act
       const { result } = renderHook(() => useTheme());
@@ -170,7 +171,7 @@ describe('useTheme', () => {
         enableSync: false,
         customSites: []
       });
-      storageManager.updateSettings.mockResolvedValue();
+      (storageManager.updateSettings as any).mockResolvedValue(DEFAULT_SETTINGS);
 
       const { result } = renderHook(() => useTheme());
 
@@ -195,7 +196,7 @@ describe('useTheme', () => {
         enableSync: false,
         customSites: []
       });
-      storageManager.updateSettings.mockResolvedValue();
+      (storageManager.updateSettings as any).mockResolvedValue(DEFAULT_SETTINGS);
 
       const { result } = renderHook(() => useTheme());
 
@@ -222,7 +223,7 @@ describe('useTheme', () => {
         enableSync: false,
         customSites: []
       });
-      storageManager.updateSettings.mockResolvedValue();
+      (storageManager.updateSettings as any).mockResolvedValue(DEFAULT_SETTINGS);
 
       const { result } = renderHook(() => useTheme());
 
@@ -261,7 +262,7 @@ describe('useTheme', () => {
         enableSync: false,
         customSites: []
       });
-      storageManager.updateSettings.mockResolvedValue();
+      (storageManager.updateSettings as any).mockResolvedValue(DEFAULT_SETTINGS);
 
       const { result } = renderHook(() => useTheme());
 
@@ -307,7 +308,7 @@ describe('useTheme', () => {
         enableSync: false,
         customSites: []
       });
-      storageManager.updateSettings.mockResolvedValue();
+      (storageManager.updateSettings as any).mockResolvedValue(DEFAULT_SETTINGS);
 
       const { result } = renderHook(() => useTheme());
 
@@ -603,7 +604,7 @@ describe('useTheme', () => {
         enableSync: false,
         customSites: []
       });
-      storageManager.updateSettings.mockResolvedValue();
+      (storageManager.updateSettings as any).mockResolvedValue(DEFAULT_SETTINGS);
 
       const { result } = renderHook(() => useTheme());
 
@@ -627,7 +628,7 @@ describe('useTheme', () => {
         enableSync: false,
         customSites: []
       });
-      storageManager.updateSettings.mockResolvedValue();
+      (storageManager.updateSettings as any).mockResolvedValue(DEFAULT_SETTINGS);
 
       const { result } = renderHook(() => useTheme());
 
@@ -652,7 +653,7 @@ describe('useTheme', () => {
         enableSync: false,
         customSites: []
       });
-      storageManager.updateSettings.mockResolvedValue();
+      (storageManager.updateSettings as any).mockResolvedValue(DEFAULT_SETTINGS);
 
       const { result } = renderHook(() => useTheme());
 
@@ -678,7 +679,7 @@ describe('useTheme', () => {
         enableSync: false,
         customSites: []
       });
-      storageManager.updateSettings.mockResolvedValue();
+      (storageManager.updateSettings as any).mockResolvedValue(DEFAULT_SETTINGS);
 
       const { result } = renderHook(() => useTheme());
 
@@ -725,7 +726,7 @@ describe('useTheme', () => {
         enableSync: false,
         customSites: []
       });
-      storageManager.updateSettings.mockRejectedValue(new Error('Storage write error'));
+      (storageManager.updateSettings as any).mockRejectedValue(new Error('Storage write error'));
 
       const { result } = renderHook(() => useTheme());
 

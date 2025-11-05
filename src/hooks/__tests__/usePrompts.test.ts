@@ -4,6 +4,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { PromptManager } from '../../services/promptManager';
 import { StorageManager } from '../../services/storage';
 import type { Prompt, AppError } from '../../types';
+import { ErrorType } from '../../types';
 import { usePrompts } from '../usePrompts';
 
 // Mock StorageManager
@@ -125,7 +126,7 @@ describe('usePrompts', () => {
       // Arrange
       const error: AppError = {
         message: 'Failed to load prompts',
-        type: 'storage_error'
+        type: ErrorType.STORAGE_UNAVAILABLE
       };
       vi.mocked(mockStorageManager.getPrompts).mockRejectedValue(error);
 
@@ -270,7 +271,7 @@ describe('usePrompts', () => {
       // Arrange
       const error: AppError = {
         message: 'Create failed',
-        type: 'validation_error'
+        type: ErrorType.VALIDATION_ERROR
       };
 
       vi.mocked(mockStorageManager.getPrompts).mockResolvedValue(mockPrompts);
@@ -302,7 +303,7 @@ describe('usePrompts', () => {
       // Arrange
       const error: AppError = {
         message: 'Update failed',
-        type: 'storage_error'
+        type: ErrorType.STORAGE_UNAVAILABLE
       };
 
       vi.mocked(mockStorageManager.getPrompts).mockResolvedValue(mockPrompts);
@@ -330,7 +331,7 @@ describe('usePrompts', () => {
       // Arrange
       const error: AppError = {
         message: 'Delete failed',
-        type: 'storage_error'
+        type: ErrorType.STORAGE_UNAVAILABLE
       };
 
       vi.mocked(mockStorageManager.getPrompts).mockResolvedValue(mockPrompts);
@@ -578,7 +579,7 @@ describe('usePrompts', () => {
       // Arrange
       const loadError: AppError = {
         message: 'Failed to load',
-        type: 'storage_error'
+        type: ErrorType.STORAGE_UNAVAILABLE
       };
       vi.mocked(mockStorageManager.getPrompts).mockRejectedValue(loadError);
 
@@ -598,7 +599,7 @@ describe('usePrompts', () => {
       // Arrange - First load fails
       const error: AppError = {
         message: 'Initial load failed',
-        type: 'storage_error'
+        type: ErrorType.STORAGE_UNAVAILABLE
       };
       vi.mocked(mockStorageManager.getPrompts).mockRejectedValueOnce(error);
 
@@ -628,7 +629,7 @@ describe('usePrompts', () => {
       // Arrange
       const createError: AppError = {
         message: 'Create failed',
-        type: 'validation_error'
+        type: ErrorType.VALIDATION_ERROR
       };
 
       vi.mocked(mockStorageManager.getPrompts).mockResolvedValue(mockPrompts);
