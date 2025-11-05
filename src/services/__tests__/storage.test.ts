@@ -3,16 +3,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Prompt, Category, DEFAULT_CATEGORY } from '../../types';
 import { StorageManager } from '../storage';
 
-interface MockStorage {
-  prompts: Prompt[];
-  categories: Category[];
-  settings: {
-    defaultCategory: string;
-    sortOrder: string;
-  };
-  [key: string]: unknown;
-}
-
 const FIXED_TIME = new Date('2025-01-01T00:00:00Z');
 
 const buildPrompt = (overrides: Partial<Prompt> = {}): Prompt => {
@@ -35,53 +25,18 @@ const buildPrompt = (overrides: Partial<Prompt> = {}): Prompt => {
 };
 describe('StorageManager', () => {
   let storageManager: StorageManager;
-  let mockStorage: MockStorage;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.useFakeTimers();
     vi.setSystemTime(FIXED_TIME);
     storageManager = StorageManager.getInstance();
-    mockStorage = {
+
+    // Initialize storage with default data using the real chrome.storage API
+    await chrome.storage.local.set({
       prompts: [],
       categories: [{ id: 'default', name: DEFAULT_CATEGORY }],
       settings: { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt' }
-    };
-
-    // Mock chrome storage API
-     
-    vi.mocked(chrome.storage.local.get).mockImplementation((keys) => {
-      if (Array.isArray(keys)) {
-        const result: Record<string, unknown> = {};
-        keys.forEach(key => {
-
-          result[key] = mockStorage[key] || null;
-        });
-        return Promise.resolve(result);
-      }
-      if (typeof keys === 'string') {
-        return Promise.resolve({ [keys]: mockStorage[keys] });
-      }
-      // Handle null/undefined case - return all data
-      return Promise.resolve(mockStorage);
     });
-
-     
-    vi.mocked(chrome.storage.local.set).mockImplementation((data) => {
-      Object.assign(mockStorage, data);
-      return Promise.resolve();
-    });
-
-     
-    vi.mocked(chrome.storage.local.clear).mockImplementation(() => {
-      Object.keys(mockStorage).forEach(key => {
-        // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-        delete mockStorage[key];
-      });
-      return Promise.resolve();
-    });
-
-
-    vi.mocked(chrome.storage.local.getBytesInUse).mockImplementation(() => Promise.resolve(1024));
   });
 
   afterEach(() => {
@@ -104,7 +59,11 @@ describe('StorageManager', () => {
       expect(savedPrompt.updatedAt).toBeDefined();
       expect(savedPrompt.usageCount).toBe(0);
       expect(savedPrompt.lastUsedAt).toBe(savedPrompt.createdAt);
-      expect(mockStorage.prompts).toContain(savedPrompt);
+
+      // Verify using chrome.storage API
+      const result = await chrome.storage.local.get('prompts');
+      const prompts = result.prompts as Prompt[];
+      expect(prompts).toContainEqual(savedPrompt);
     });
 
     it('should get all prompts', async () => {
@@ -113,7 +72,7 @@ describe('StorageManager', () => {
         title: 'Prompt 1',
         content: 'Content 1'
       });
-      mockStorage.prompts = [prompt1];
+      await chrome.storage.local.set({ prompts: [prompt1] });
 
       const prompts = await storageManager.getPrompts();
 
@@ -129,7 +88,7 @@ describe('StorageManager', () => {
         updatedAt: FIXED_TIME.getTime() - 2000,
         lastUsedAt: FIXED_TIME.getTime() - 2000
       });
-      mockStorage.prompts = [originalPrompt];
+      await chrome.storage.local.set({ prompts: [originalPrompt] });
 
       const updates = { title: 'Updated Title', content: 'Updated Content' };
       const updatedPrompt = await storageManager.updatePrompt('1', updates);
@@ -137,11 +96,15 @@ describe('StorageManager', () => {
       expect(updatedPrompt.title).toBe('Updated Title');
       expect(updatedPrompt.content).toBe('Updated Content');
       expect(updatedPrompt.updatedAt).toBeGreaterThan(originalPrompt.updatedAt);
-      expect(mockStorage.prompts[0]).toEqual(updatedPrompt);
+
+      // Verify using chrome.storage API
+      const result = await chrome.storage.local.get('prompts');
+      const prompts = result.prompts as Prompt[];
+      expect(prompts[0]).toEqual(updatedPrompt);
     });
 
     it('should throw error when updating non-existent prompt', async () => {
-      mockStorage.prompts = [];
+      await chrome.storage.local.set({ prompts: [] });
 
       await expect(storageManager.updatePrompt('nonexistent', { title: 'New Title' }))
         .rejects.toThrow('Prompt with id nonexistent not found');
@@ -153,15 +116,18 @@ describe('StorageManager', () => {
         title: 'To Delete',
         content: 'Content'
       });
-      mockStorage.prompts = [prompt];
+      await chrome.storage.local.set({ prompts: [prompt] });
 
       await storageManager.deletePrompt('1');
 
-      expect(mockStorage.prompts).toEqual([]);
+      // Verify using chrome.storage API
+      const result = await chrome.storage.local.get('prompts');
+      const prompts = result.prompts as Prompt[];
+      expect(prompts).toEqual([]);
     });
 
     it('should throw error when deleting non-existent prompt', async () => {
-      mockStorage.prompts = [];
+      await chrome.storage.local.set({ prompts: [] });
 
       await expect(storageManager.deletePrompt('nonexistent'))
         .rejects.toThrow('Prompt with id nonexistent not found');
@@ -170,14 +136,18 @@ describe('StorageManager', () => {
     it('should increment usage count and update lastUsedAt', async () => {
       const initialLastUsed = FIXED_TIME.getTime() - 5000;
       const prompt = buildPrompt({ id: 'usage-test', usageCount: 2, lastUsedAt: initialLastUsed });
-      mockStorage.prompts = [prompt];
+      await chrome.storage.local.set({ prompts: [prompt] });
 
       const updatedPrompt = await storageManager.incrementUsageCount('usage-test');
 
       expect(updatedPrompt.usageCount).toBe(3);
       expect(updatedPrompt.lastUsedAt).toBeGreaterThanOrEqual(initialLastUsed);
-      expect(mockStorage.prompts[0].usageCount).toBe(3);
-      expect(mockStorage.prompts[0].lastUsedAt).toBe(updatedPrompt.lastUsedAt);
+
+      // Verify using chrome.storage API
+      const result = await chrome.storage.local.get('prompts');
+      const prompts = result.prompts as Prompt[];
+      expect(prompts[0].usageCount).toBe(3);
+      expect(prompts[0].lastUsedAt).toBe(updatedPrompt.lastUsedAt);
     });
   });
 
@@ -192,7 +162,11 @@ describe('StorageManager', () => {
 
       expect(savedCategory).toMatchObject(categoryData);
       expect(savedCategory.id).toBeDefined();
-      expect(mockStorage.categories).toContainEqual(savedCategory);
+
+      // Verify using chrome.storage API
+      const result = await chrome.storage.local.get('categories');
+      const categories = result.categories as Category[];
+      expect(categories).toContainEqual(savedCategory);
     });
 
     it('should prevent duplicate category names', async () => {
@@ -200,7 +174,7 @@ describe('StorageManager', () => {
         id: '1',
         name: 'Existing Category'
       };
-      mockStorage.categories = [existingCategory];
+      await chrome.storage.local.set({ categories: [existingCategory] });
 
       await expect(storageManager.saveCategory({ name: 'Existing Category' }))
         .rejects.toThrow('Category with name "Existing Category" already exists');
@@ -219,11 +193,11 @@ describe('StorageManager', () => {
         name: 'Original Name',
         color: '#FF0000'
       };
-      mockStorage.categories = [category];
+      await chrome.storage.local.set({ categories: [category] });
 
-      const updatedCategory = await storageManager.updateCategory('1', { 
-        name: 'Updated Name', 
-        color: '#00FF00' 
+      const updatedCategory = await storageManager.updateCategory('1', {
+        name: 'Updated Name',
+        color: '#00FF00'
       });
 
       expect(updatedCategory.name).toBe('Updated Name');
@@ -239,7 +213,7 @@ describe('StorageManager', () => {
         id: 'default',
         name: DEFAULT_CATEGORY
       };
-      mockStorage.categories = [defaultCategory, categoryToDelete];
+      await chrome.storage.local.set({ categories: [defaultCategory, categoryToDelete] });
 
       const affectedPrompt: Prompt = {
         id: 'prompt1',
@@ -249,12 +223,16 @@ describe('StorageManager', () => {
         createdAt: FIXED_TIME.getTime(),
         updatedAt: FIXED_TIME.getTime()
       };
-      mockStorage.prompts = [affectedPrompt];
+      await chrome.storage.local.set({ prompts: [affectedPrompt] });
 
       await storageManager.deleteCategory('cat1');
 
-      expect(mockStorage.categories).not.toContainEqual(categoryToDelete);
-      expect(mockStorage.prompts[0].category).toBe(DEFAULT_CATEGORY);
+      // Verify using chrome.storage API
+      const result = await chrome.storage.local.get(['categories', 'prompts']);
+      const categories = result.categories as Category[];
+      const prompts = result.prompts as Prompt[];
+      expect(categories).not.toContainEqual(categoryToDelete);
+      expect(prompts[0].category).toBe(DEFAULT_CATEGORY);
     });
 
     it('should prevent deletion of default category', async () => {
@@ -262,7 +240,7 @@ describe('StorageManager', () => {
         id: 'default',
         name: DEFAULT_CATEGORY
       };
-      mockStorage.categories = [defaultCategory];
+      await chrome.storage.local.set({ categories: [defaultCategory] });
 
       await expect(storageManager.deleteCategory('default'))
         .rejects.toThrow('Cannot delete the default category');
@@ -289,9 +267,13 @@ describe('StorageManager', () => {
       ]);
 
       expect(savedPrompt1.id).not.toBe(savedPrompt2.id);
-      expect(mockStorage.prompts).toHaveLength(2);
-      expect(mockStorage.prompts).toContainEqual(savedPrompt1);
-      expect(mockStorage.prompts).toContainEqual(savedPrompt2);
+
+      // Verify using chrome.storage API
+      const result = await chrome.storage.local.get('prompts');
+      const prompts = result.prompts as Prompt[];
+      expect(prompts).toHaveLength(2);
+      expect(prompts).toContainEqual(savedPrompt1);
+      expect(prompts).toContainEqual(savedPrompt2);
     });
 
     it('should handle concurrent updates to different prompts', async () => {
@@ -311,7 +293,7 @@ describe('StorageManager', () => {
         createdAt: FIXED_TIME.getTime(),
         updatedAt: FIXED_TIME.getTime()
       };
-      mockStorage.prompts = [prompt1, prompt2];
+      await chrome.storage.local.set({ prompts: [prompt1, prompt2] });
 
       const [updated1, updated2] = await Promise.all([
         storageManager.updatePrompt('1', { title: 'Updated 1' }),
@@ -325,8 +307,7 @@ describe('StorageManager', () => {
 
   describe('Error Handling', () => {
     it('should handle storage quota exceeded error', async () => {
-       
-      vi.mocked(chrome.storage.local.set).mockRejectedValue(
+      vi.mocked(chrome.storage.local.set).mockRejectedValueOnce(
         new Error('QUOTA_EXCEEDED: Storage quota exceeded')
       );
 
@@ -341,8 +322,7 @@ describe('StorageManager', () => {
     });
 
     it('should handle storage API unavailable error', async () => {
-       
-      vi.mocked(chrome.storage.local.get).mockRejectedValue(
+      vi.mocked(chrome.storage.local.get).mockRejectedValueOnce(
         new Error('storage API unavailable')
       );
 
@@ -353,10 +333,9 @@ describe('StorageManager', () => {
     });
 
     it('should handle data corruption error', async () => {
-       
-      vi.mocked(chrome.storage.local.get).mockImplementation(() => Promise.resolve({
+      vi.mocked(chrome.storage.local.get).mockResolvedValueOnce({
         prompts: null // Invalid data should return empty array
-      }));
+      });
 
       const data = await storageManager.getPrompts();
       expect(Array.isArray(data)).toBe(true);
@@ -427,18 +406,20 @@ describe('StorageManager', () => {
         usageCount: 0,
         lastUsedAt: timestamp
       }];
-      mockStorage.prompts = initialPrompts;
+      await chrome.storage.local.set({ prompts: initialPrompts });
 
-      // Mock: Make the import write fail after clearing
-      let callCount = 0;
-      vi.mocked(chrome.storage.local.set).mockImplementation((data) => {
-        callCount++;
-        // First call is clear (removing prompts), second call is the first write attempt
-        if (callCount === 2) {
+      // Mock: Track calls and fail on the first import write
+      let setCallCount = 0;
+      const originalSetImpl = vi.mocked(chrome.storage.local.set).getMockImplementation();
+
+      vi.mocked(chrome.storage.local.set).mockImplementation((items: Record<string, unknown>) => {
+        setCallCount++;
+        // First call is prompts import - make it fail
+        if (setCallCount === 1) {
           return Promise.reject(new Error('Quota exceeded'));
         }
-        Object.assign(mockStorage, data);
-        return Promise.resolve();
+        // All other calls (rollback) should succeed using the original implementation
+        return originalSetImpl ? originalSetImpl(items) : Promise.resolve();
       });
 
       const importData = {
@@ -477,32 +458,29 @@ describe('StorageManager', () => {
         usageCount: 0,
         lastUsedAt: timestamp
       }];
-      mockStorage.prompts = initialPrompts;
+      await chrome.storage.local.set({ prompts: initialPrompts });
 
-      // Mock: Make import fail AND make rollback partially fail
-      let rollbackPhase = false;
-      vi.mocked(chrome.storage.local.set).mockImplementation((data) => {
-        const keys = Object.keys(data);
+      // Track which phase we're in: import or rollback
+      let importPhase = true;
+      const originalSetImpl = vi.mocked(chrome.storage.local.set).getMockImplementation();
+
+      vi.mocked(chrome.storage.local.set).mockImplementation((items: Record<string, unknown>) => {
+        const keys = Object.keys(items);
         const key = keys[0];
 
-        if (!rollbackPhase) {
-          if (key === 'categories') {
-            rollbackPhase = true;
-            return Promise.reject(new Error('Import quota exceeded'));
-          }
-
-          Object.assign(mockStorage, data);
-          return Promise.resolve();
+        // During import phase, fail categories
+        if (importPhase && key === 'categories') {
+          importPhase = false; // Switch to rollback phase
+          return Promise.reject(new Error('Import quota exceeded'));
         }
 
-        if (key) {
-          if (key === 'categories') {
-            return Promise.reject(new Error('Rollback quota exceeded'));
-          }
+        // During rollback phase, fail categories
+        if (!importPhase && key === 'categories') {
+          return Promise.reject(new Error('Rollback quota exceeded'));
         }
 
-        Object.assign(mockStorage, data);
-        return Promise.resolve();
+        // All other calls succeed using the original implementation
+        return originalSetImpl ? originalSetImpl(items) : Promise.resolve();
       });
 
       const importData = {
@@ -556,23 +534,24 @@ describe('StorageManager', () => {
       ];
       const initialSettings = { defaultCategory: 'Work', sortOrder: 'createdAt' };
 
-      mockStorage.prompts = initialPrompts;
-      mockStorage.categories = initialCategories;
-      mockStorage.settings = initialSettings;
+      await chrome.storage.local.set({
+        prompts: initialPrompts,
+        categories: initialCategories,
+        settings: initialSettings
+      });
 
       // Mock: Make import fail but rollback succeed
-      let callCount = 0;
-      vi.mocked(chrome.storage.local.set).mockImplementation((data) => {
-        callCount++;
+      let setCallCount = 0;
+      const originalSetImpl = vi.mocked(chrome.storage.local.set).getMockImplementation();
 
-        // Import phase: second call fails (after clear)
-        if (callCount === 2) {
+      vi.mocked(chrome.storage.local.set).mockImplementation((items: Record<string, unknown>) => {
+        setCallCount++;
+        // First import write fails
+        if (setCallCount === 1) {
           return Promise.reject(new Error('Import failed'));
         }
-
-        // All rollback operations succeed
-        Object.assign(mockStorage, data);
-        return Promise.resolve();
+        // All rollback operations succeed using the original implementation
+        return originalSetImpl ? originalSetImpl(items) : Promise.resolve();
       });
 
       const importData = {
@@ -587,11 +566,13 @@ describe('StorageManager', () => {
       ).rejects.toThrow('Import failed');
 
       // Verify: All original data is restored
-      expect(mockStorage.prompts).toEqual(initialPrompts);
-      expect(mockStorage.categories).toEqual(
-        expect.arrayContaining(initialCategories)
-      );
-      expect(mockStorage.settings).toEqual(initialSettings);
+      const result = await chrome.storage.local.get(['prompts', 'categories', 'settings']);
+      const prompts = result.prompts as Prompt[];
+      const categories = result.categories as Category[];
+      const settings = result.settings as Record<string, unknown>;
+      expect(prompts).toEqual(initialPrompts);
+      expect(categories).toEqual(expect.arrayContaining(initialCategories));
+      expect(settings).toEqual(initialSettings);
     });
 
     it('should attempt all rollback operations even if first one fails', async () => {
@@ -610,27 +591,33 @@ describe('StorageManager', () => {
       const initialCategories: Category[] = [{ id: 'cat1', name: 'Work' }];
       const initialSettings = { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt' };
 
-      mockStorage.prompts = initialPrompts.map(prompt => ({ ...prompt }));
-      mockStorage.categories = initialCategories.map(category => ({ ...category }));
-      mockStorage.settings = { ...initialSettings };
+      await chrome.storage.local.set({
+        prompts: initialPrompts,
+        categories: initialCategories,
+        settings: initialSettings
+      });
 
-      let importFailureTriggered = false;
+      // Track which phase we're in: import or rollback
+      let importPhase = true;
+      const originalSetImpl = vi.mocked(chrome.storage.local.set).getMockImplementation();
 
-      vi.mocked(chrome.storage.local.set).mockImplementation((data) => {
-        const keys = Object.keys(data);
+      vi.mocked(chrome.storage.local.set).mockImplementation((items: Record<string, unknown>) => {
+        const keys = Object.keys(items);
         const key = keys[0];
 
-        if (!importFailureTriggered && key === 'categories') {
-          importFailureTriggered = true;
+        // During import phase, fail categories
+        if (importPhase && key === 'categories') {
+          importPhase = false; // Switch to rollback phase
           return Promise.reject(new Error('Import failed'));
         }
 
-        if (importFailureTriggered && key === 'prompts') {
+        // During rollback phase, fail prompts
+        if (!importPhase && key === 'prompts') {
           return Promise.reject(new Error('Prompts restore failed'));
         }
 
-        Object.assign(mockStorage, data);
-        return Promise.resolve();
+        // All other calls succeed using the original implementation
+        return originalSetImpl ? originalSetImpl(items) : Promise.resolve();
       });
 
       const importData = {
@@ -644,9 +631,14 @@ describe('StorageManager', () => {
         storageManager.importData(JSON.stringify(importData))
       ).rejects.toThrow();
 
-      expect(mockStorage.prompts).toEqual(initialPrompts);
-      expect(mockStorage.categories).toEqual(expect.arrayContaining(initialCategories));
-      expect(mockStorage.settings).toEqual(initialSettings);
+      // Verify: Data that could be restored was restored
+      const result = await chrome.storage.local.get(['prompts', 'categories', 'settings']);
+      const prompts = result.prompts as Prompt[];
+      const categories = result.categories as Category[];
+      const settings = result.settings as Record<string, unknown>;
+      expect(prompts).toEqual(initialPrompts);
+      expect(categories).toEqual(expect.arrayContaining(initialCategories));
+      expect(settings).toEqual(initialSettings);
     });
   });
 });
