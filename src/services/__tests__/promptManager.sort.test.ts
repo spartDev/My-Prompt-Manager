@@ -1,13 +1,18 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 import type { Prompt, SortOrder } from '../../types';
 import { PromptManager } from '../promptManager';
 
 describe('PromptManager - Sorting', () => {
+  const FIXED_TIME = new Date('2025-01-01T00:00:00Z').getTime();
+
   let manager: PromptManager;
   let mockPrompts: Prompt[];
 
   beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2025-01-01T00:00:00Z'));
+
     manager = PromptManager.getInstance();
 
     // Create test prompts with different timestamps and titles
@@ -17,26 +22,30 @@ describe('PromptManager - Sorting', () => {
         title: 'Zebra Prompt',
         content: 'Content 1',
         category: 'Work',
-        createdAt: 1000, // Oldest creation
-        updatedAt: 3000, // Newest update
+        createdAt: FIXED_TIME - 3000, // Oldest creation
+        updatedAt: FIXED_TIME, // Newest update
       },
       {
         id: '2',
         title: 'Apple Prompt',
         content: 'Content 2',
         category: 'Personal',
-        createdAt: 2000, // Middle creation
-        updatedAt: 1000, // Oldest update
+        createdAt: FIXED_TIME - 2000, // Middle creation
+        updatedAt: FIXED_TIME - 3000, // Oldest update
       },
       {
         id: '3',
         title: 'Mango Prompt',
         content: 'Content 3',
         category: 'Work',
-        createdAt: 3000, // Newest creation
-        updatedAt: 2000, // Middle update
+        createdAt: FIXED_TIME - 1000, // Newest creation
+        updatedAt: FIXED_TIME - 2000, // Middle update
       },
     ];
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   describe('Sort by title', () => {
@@ -78,14 +87,14 @@ describe('PromptManager - Sorting', () => {
       const sorted = manager.sortPrompts(mockPrompts, 'createdAt', 'asc');
 
       expect(sorted.map(p => p.id)).toEqual(['1', '2', '3']);
-      expect(sorted.map(p => p.createdAt)).toEqual([1000, 2000, 3000]);
+      expect(sorted.map(p => p.createdAt)).toEqual([FIXED_TIME - 3000, FIXED_TIME - 2000, FIXED_TIME - 1000]);
     });
 
     it('should sort by createdAt descending (newest first)', () => {
       const sorted = manager.sortPrompts(mockPrompts, 'createdAt', 'desc');
 
       expect(sorted.map(p => p.id)).toEqual(['3', '2', '1']);
-      expect(sorted.map(p => p.createdAt)).toEqual([3000, 2000, 1000]);
+      expect(sorted.map(p => p.createdAt)).toEqual([FIXED_TIME - 1000, FIXED_TIME - 2000, FIXED_TIME - 3000]);
     });
   });
 
@@ -94,14 +103,14 @@ describe('PromptManager - Sorting', () => {
       const sorted = manager.sortPrompts(mockPrompts, 'updatedAt', 'asc');
 
       expect(sorted.map(p => p.id)).toEqual(['2', '3', '1']);
-      expect(sorted.map(p => p.updatedAt)).toEqual([1000, 2000, 3000]);
+      expect(sorted.map(p => p.updatedAt)).toEqual([FIXED_TIME - 3000, FIXED_TIME - 2000, FIXED_TIME]);
     });
 
     it('should sort by updatedAt descending (newest first)', () => {
       const sorted = manager.sortPrompts(mockPrompts, 'updatedAt', 'desc');
 
       expect(sorted.map(p => p.id)).toEqual(['1', '3', '2']);
-      expect(sorted.map(p => p.updatedAt)).toEqual([3000, 2000, 1000]);
+      expect(sorted.map(p => p.updatedAt)).toEqual([FIXED_TIME, FIXED_TIME - 2000, FIXED_TIME - 3000]);
     });
   });
 
@@ -229,17 +238,17 @@ describe('PromptManager - Sorting', () => {
       // Most common use case: Recently Updated, newest first
       const sorted = manager.sortPrompts(mockPrompts, 'updatedAt', 'desc');
 
-      expect(sorted[0].id).toBe('1'); // updatedAt: 3000 (newest)
-      expect(sorted[1].id).toBe('3'); // updatedAt: 2000
-      expect(sorted[2].id).toBe('2'); // updatedAt: 1000 (oldest)
+      expect(sorted[0].id).toBe('1'); // updatedAt: FIXED_TIME (newest)
+      expect(sorted[1].id).toBe('3'); // updatedAt: FIXED_TIME - 2000
+      expect(sorted[2].id).toBe('2'); // updatedAt: FIXED_TIME - 3000 (oldest)
     });
 
     it('should correctly sort "Recently Created"', () => {
       const sorted = manager.sortPrompts(mockPrompts, 'createdAt', 'desc');
 
-      expect(sorted[0].id).toBe('3'); // createdAt: 3000 (newest)
-      expect(sorted[1].id).toBe('2'); // createdAt: 2000
-      expect(sorted[2].id).toBe('1'); // createdAt: 1000 (oldest)
+      expect(sorted[0].id).toBe('3'); // createdAt: FIXED_TIME - 1000 (newest)
+      expect(sorted[1].id).toBe('2'); // createdAt: FIXED_TIME - 2000
+      expect(sorted[2].id).toBe('1'); // createdAt: FIXED_TIME - 3000 (oldest)
     });
 
     it('should correctly sort "Alphabetical" (A→Z)', () => {

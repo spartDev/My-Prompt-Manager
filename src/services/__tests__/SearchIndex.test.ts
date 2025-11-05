@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 import { Prompt } from '../../types';
 import { SearchIndex, getSearchIndex, resetSearchIndex } from '../SearchIndex';
@@ -6,47 +6,56 @@ import { SearchIndex, getSearchIndex, resetSearchIndex } from '../SearchIndex';
 describe('SearchIndex', () => {
   let searchIndex: SearchIndex;
   let mockPrompts: Prompt[];
+  const baseTime = new Date('2025-01-01T00:00:00Z').getTime();
 
   beforeEach(() => {
+    // Use fake timers for deterministic testing
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2025-01-01T00:00:00Z'));
+
     // Reset singleton between tests
     resetSearchIndex();
     searchIndex = new SearchIndex();
 
-    // Create mock prompts
+    // Create mock prompts with fixed timestamps
     mockPrompts = [
       {
         id: '1',
         title: 'JavaScript Tutorial',
         content: 'Learn JavaScript basics including variables, functions, and objects.',
         category: 'Programming',
-        createdAt: Date.now() - 3000,
-        updatedAt: Date.now() - 3000
+        createdAt: baseTime - 3000,
+        updatedAt: baseTime - 3000
       },
       {
         id: '2',
         title: 'Python Guide',
         content: 'Python programming guide for beginners. Covers syntax and data structures.',
         category: 'Programming',
-        createdAt: Date.now() - 2000,
-        updatedAt: Date.now() - 2000
+        createdAt: baseTime - 2000,
+        updatedAt: baseTime - 2000
       },
       {
         id: '3',
         title: 'Recipe: Chocolate Cake',
         content: 'Delicious chocolate cake recipe with step-by-step instructions.',
         category: 'Cooking',
-        createdAt: Date.now() - 1000,
-        updatedAt: Date.now() - 1000
+        createdAt: baseTime - 1000,
+        updatedAt: baseTime - 1000
       },
       {
         id: '4',
         title: 'Meeting Notes',
         content: 'Quarterly review meeting notes and action items.',
         category: 'Work',
-        createdAt: Date.now(),
-        updatedAt: Date.now()
+        createdAt: baseTime,
+        updatedAt: baseTime
       }
     ];
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   describe('Index Building', () => {
@@ -56,7 +65,7 @@ describe('SearchIndex', () => {
 
       expect(stats.promptCount).toBe(4);
       expect(stats.termCount).toBeGreaterThan(0);
-      expect(stats.lastUpdated).toBeLessThanOrEqual(Date.now());
+      expect(stats.lastUpdated).toBeLessThanOrEqual(baseTime);
     });
 
     it('should handle empty prompt array', () => {
@@ -73,8 +82,8 @@ describe('SearchIndex', () => {
         title: 'Test Title',
         content: 'Test content with multiple words',
         category: 'TestCategory',
-        createdAt: Date.now(),
-        updatedAt: Date.now()
+        createdAt: baseTime,
+        updatedAt: baseTime
       };
 
       searchIndex.buildIndex([testPrompt]);
@@ -90,8 +99,8 @@ describe('SearchIndex', () => {
         title: 'The Quick Brown Fox',
         content: 'The and for are but not you all',
         category: 'Test',
-        createdAt: Date.now(),
-        updatedAt: Date.now()
+        createdAt: baseTime,
+        updatedAt: baseTime
       };
 
       searchIndex.buildIndex([testPrompt]);
@@ -115,8 +124,8 @@ describe('SearchIndex', () => {
         title: 'Large Prompt',
         content: largeContent,
         category: 'Test',
-        createdAt: Date.now(),
-        updatedAt: Date.now()
+        createdAt: baseTime,
+        updatedAt: baseTime
       };
 
       const startTime = performance.now();
@@ -133,8 +142,8 @@ describe('SearchIndex', () => {
         title: 'a b ab test',
         content: 'x y xy testing',
         category: 'Test',
-        createdAt: Date.now(),
-        updatedAt: Date.now()
+        createdAt: baseTime,
+        updatedAt: baseTime
       };
 
       searchIndex.buildIndex([testPrompt]);
@@ -305,16 +314,16 @@ describe('SearchIndex', () => {
         title: 'Python Programming',
         content: 'Learn coding basics',
         category: 'Programming',
-        createdAt: Date.now(),
-        updatedAt: Date.now()
+        createdAt: baseTime,
+        updatedAt: baseTime
       };
       const contentMatch: Prompt = {
         id: 'content',
         title: 'Coding Guide',
         content: 'Python is a popular language',
         category: 'Programming',
-        createdAt: Date.now(),
-        updatedAt: Date.now()
+        createdAt: baseTime,
+        updatedAt: baseTime
       };
 
       const testIndex = new SearchIndex();
@@ -338,8 +347,8 @@ describe('SearchIndex', () => {
         title: 'Additional Prompt',
         content: 'Additional content for testing',
         category: 'Test',
-        createdAt: Date.now(),
-        updatedAt: Date.now()
+        createdAt: baseTime,
+        updatedAt: baseTime
       };
 
       searchIndex.addPromptToIndex(newPrompt);
@@ -360,7 +369,7 @@ describe('SearchIndex', () => {
       const updatedPrompt: Prompt = {
         ...mockPrompts[0],
         title: 'Modified JavaScript Tutorial',
-        updatedAt: Date.now()
+        updatedAt: baseTime
       };
 
       searchIndex.updatePromptInIndex(updatedPrompt);
@@ -389,7 +398,7 @@ describe('SearchIndex', () => {
       // Simulate prompt update after index was built
       const updatedPrompts = mockPrompts.map(p => ({
         ...p,
-        updatedAt: Date.now() + 1000
+        updatedAt: baseTime + 1000
       }));
 
       expect(searchIndex.needsRebuild(updatedPrompts)).toBe(true);
@@ -417,8 +426,8 @@ describe('SearchIndex', () => {
         title: '',
         content: '',
         category: '',
-        createdAt: Date.now(),
-        updatedAt: Date.now()
+        createdAt: baseTime,
+        updatedAt: baseTime
       };
 
       expect(() => {
@@ -432,8 +441,8 @@ describe('SearchIndex', () => {
         title: 'Emoji Test 🚀',
         content: 'Content with 中文字符 and émojis',
         category: 'Test',
-        createdAt: Date.now(),
-        updatedAt: Date.now()
+        createdAt: baseTime,
+        updatedAt: baseTime
       };
 
       searchIndex.buildIndex([unicodePrompt]);
@@ -457,8 +466,8 @@ describe('SearchIndex', () => {
         title: '!!!???...',
         content: '---***===',
         category: '###',
-        createdAt: Date.now(),
-        updatedAt: Date.now()
+        createdAt: baseTime,
+        updatedAt: baseTime
       };
 
       expect(() => {
@@ -506,8 +515,8 @@ describe('SearchIndex', () => {
         title: `Prompt ${i}`,
         content: `Content for prompt number ${i} with some searchable text`,
         category: 'Test',
-        createdAt: Date.now(),
-        updatedAt: Date.now()
+        createdAt: baseTime,
+        updatedAt: baseTime
       }));
 
       const startTime = performance.now();
@@ -524,8 +533,8 @@ describe('SearchIndex', () => {
         title: `Prompt ${i}`,
         content: `Content for prompt number ${i} with some searchable text`,
         category: 'Test',
-        createdAt: Date.now(),
-        updatedAt: Date.now()
+        createdAt: baseTime,
+        updatedAt: baseTime
       }));
 
       searchIndex.buildIndex(manyPrompts);
@@ -548,8 +557,8 @@ describe('SearchIndex', () => {
         title: '编程教程',
         content: '学习JavaScript的基础知识',
         category: 'Programming',
-        createdAt: Date.now(),
-        updatedAt: Date.now()
+        createdAt: baseTime,
+        updatedAt: baseTime
       };
 
       searchIndex.buildIndex([prompt]);
@@ -565,8 +574,8 @@ describe('SearchIndex', () => {
         title: 'Guide de programmation',
         content: 'Comment créer un café virtuel',
         category: 'Programming',
-        createdAt: Date.now(),
-        updatedAt: Date.now()
+        createdAt: baseTime,
+        updatedAt: baseTime
       };
 
       searchIndex.buildIndex([prompt]);
@@ -582,8 +591,8 @@ describe('SearchIndex', () => {
         title: 'Привет мир',
         content: 'Изучение программирования',
         category: 'Programming',
-        createdAt: Date.now(),
-        updatedAt: Date.now()
+        createdAt: baseTime,
+        updatedAt: baseTime
       };
 
       searchIndex.buildIndex([prompt]);
@@ -599,8 +608,8 @@ describe('SearchIndex', () => {
         title: 'دليل البرمجة',
         content: 'تعلم أساسيات البرمجة',
         category: 'Programming',
-        createdAt: Date.now(),
-        updatedAt: Date.now()
+        createdAt: baseTime,
+        updatedAt: baseTime
       };
 
       searchIndex.buildIndex([prompt]);
@@ -616,8 +625,8 @@ describe('SearchIndex', () => {
         title: 'JavaScript Tutorial 编程教程',
         content: 'Learn 学习 programming',
         category: 'Programming',
-        createdAt: Date.now(),
-        updatedAt: Date.now()
+        createdAt: baseTime,
+        updatedAt: baseTime
       };
 
       searchIndex.buildIndex([prompt]);
@@ -637,8 +646,8 @@ describe('SearchIndex', () => {
         title: 'React Tutorial 🚀',
         content: 'Learn React with fun 🎉',
         category: 'Programming',
-        createdAt: Date.now(),
-        updatedAt: Date.now()
+        createdAt: baseTime,
+        updatedAt: baseTime
       };
 
       searchIndex.buildIndex([prompt]);
@@ -654,8 +663,8 @@ describe('SearchIndex', () => {
         title: 'プログラミング入門',  // Katakana
         content: 'はじめてのプログラミング',  // Hiragana + Katakana
         category: 'Programming',
-        createdAt: Date.now(),
-        updatedAt: Date.now()
+        createdAt: baseTime,
+        updatedAt: baseTime
       };
 
       searchIndex.buildIndex([prompt]);

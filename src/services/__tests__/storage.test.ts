@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 import { Prompt, Category, DEFAULT_CATEGORY } from '../../types';
 import { StorageManager } from '../storage';
@@ -13,8 +13,10 @@ interface MockStorage {
   [key: string]: unknown;
 }
 
+const FIXED_TIME = new Date('2025-01-01T00:00:00Z');
+
 const buildPrompt = (overrides: Partial<Prompt> = {}): Prompt => {
-  const timestamp = Date.now();
+  const timestamp = FIXED_TIME.getTime();
   const createdAt = overrides.createdAt ?? timestamp;
   const updatedAt = overrides.updatedAt ?? createdAt;
   const usageCount = overrides.usageCount ?? 0;
@@ -36,6 +38,8 @@ describe('StorageManager', () => {
   let mockStorage: MockStorage;
 
   beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(FIXED_TIME);
     storageManager = StorageManager.getInstance();
     mockStorage = {
       prompts: [],
@@ -76,8 +80,12 @@ describe('StorageManager', () => {
       return Promise.resolve();
     });
 
-     
+
     vi.mocked(chrome.storage.local.getBytesInUse).mockImplementation(() => Promise.resolve(1024));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   describe('Prompt Operations', () => {
@@ -117,9 +125,9 @@ describe('StorageManager', () => {
         id: '1',
         title: 'Original Title',
         content: 'Original Content',
-        createdAt: Date.now() - 2000,
-        updatedAt: Date.now() - 2000,
-        lastUsedAt: Date.now() - 2000
+        createdAt: FIXED_TIME.getTime() - 2000,
+        updatedAt: FIXED_TIME.getTime() - 2000,
+        lastUsedAt: FIXED_TIME.getTime() - 2000
       });
       mockStorage.prompts = [originalPrompt];
 
@@ -160,7 +168,7 @@ describe('StorageManager', () => {
     });
 
     it('should increment usage count and update lastUsedAt', async () => {
-      const initialLastUsed = Date.now() - 5000;
+      const initialLastUsed = FIXED_TIME.getTime() - 5000;
       const prompt = buildPrompt({ id: 'usage-test', usageCount: 2, lastUsedAt: initialLastUsed });
       mockStorage.prompts = [prompt];
 
@@ -238,8 +246,8 @@ describe('StorageManager', () => {
         title: 'Affected Prompt',
         content: 'Content',
         category: 'Category To Delete',
-        createdAt: Date.now(),
-        updatedAt: Date.now()
+        createdAt: FIXED_TIME.getTime(),
+        updatedAt: FIXED_TIME.getTime()
       };
       mockStorage.prompts = [affectedPrompt];
 
@@ -292,16 +300,16 @@ describe('StorageManager', () => {
         title: 'Prompt 1',
         content: 'Content 1',
         category: DEFAULT_CATEGORY,
-        createdAt: Date.now(),
-        updatedAt: Date.now()
+        createdAt: FIXED_TIME.getTime(),
+        updatedAt: FIXED_TIME.getTime()
       };
       const prompt2: Prompt = {
         id: '2',
         title: 'Prompt 2',
         content: 'Content 2',
         category: DEFAULT_CATEGORY,
-        createdAt: Date.now(),
-        updatedAt: Date.now()
+        createdAt: FIXED_TIME.getTime(),
+        updatedAt: FIXED_TIME.getTime()
       };
       mockStorage.prompts = [prompt1, prompt2];
 
@@ -408,7 +416,7 @@ describe('StorageManager', () => {
   describe('Import Rollback Scenarios', () => {
     it('should rollback to backup if import fails', async () => {
       // Setup: Create initial data
-      const timestamp = Date.now();
+      const timestamp = FIXED_TIME.getTime();
       const initialPrompts: Prompt[] = [{
         id: '1',
         title: 'Original Prompt',
@@ -439,8 +447,8 @@ describe('StorageManager', () => {
           title: 'New Prompt',
           content: 'New Content',
           category: DEFAULT_CATEGORY,
-          createdAt: Date.now(),
-          updatedAt: Date.now()
+          createdAt: FIXED_TIME.getTime(),
+          updatedAt: FIXED_TIME.getTime()
         }],
         categories: [{ id: '1', name: DEFAULT_CATEGORY }],
         settings: { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt' }
@@ -458,7 +466,7 @@ describe('StorageManager', () => {
 
     it('should report partial rollback failures with detailed error', async () => {
       // Setup: Create initial data
-      const timestamp = Date.now();
+      const timestamp = FIXED_TIME.getTime();
       const initialPrompts: Prompt[] = [{
         id: '1',
         title: 'Original Prompt',
@@ -503,8 +511,8 @@ describe('StorageManager', () => {
           title: 'New Prompt',
           content: 'New Content',
           category: DEFAULT_CATEGORY,
-          createdAt: Date.now(),
-          updatedAt: Date.now()
+          createdAt: FIXED_TIME.getTime(),
+          updatedAt: FIXED_TIME.getTime()
         }],
         categories: [{ id: '1', name: DEFAULT_CATEGORY }],
         settings: { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt' }
@@ -531,7 +539,7 @@ describe('StorageManager', () => {
 
     it('should successfully rollback all data when all operations succeed', async () => {
       // Setup: Create complete initial data
-      const timestamp = Date.now();
+      const timestamp = FIXED_TIME.getTime();
       const initialPrompts: Prompt[] = [{
         id: '1',
         title: 'Original Prompt',
@@ -568,7 +576,7 @@ describe('StorageManager', () => {
       });
 
       const importData = {
-        prompts: [{ id: '2', title: 'New', content: 'New', category: DEFAULT_CATEGORY, createdAt: Date.now(), updatedAt: Date.now() }],
+        prompts: [{ id: '2', title: 'New', content: 'New', category: DEFAULT_CATEGORY, createdAt: FIXED_TIME.getTime(), updatedAt: FIXED_TIME.getTime() }],
         categories: [{ id: '1', name: DEFAULT_CATEGORY }],
         settings: { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt' }
       };
@@ -588,7 +596,7 @@ describe('StorageManager', () => {
 
     it('should attempt all rollback operations even if first one fails', async () => {
       // Setup initial data
-      const timestamp = Date.now();
+      const timestamp = FIXED_TIME.getTime();
       const initialPrompts: Prompt[] = [{
         id: '1',
         title: 'Original',
