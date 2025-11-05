@@ -132,7 +132,9 @@ describe('SearchIndex', () => {
       searchIndex.buildIndex([largePrompt]);
       const buildTime = performance.now() - startTime;
 
-      expect(buildTime).toBeLessThan(500); // Should build in < 500ms
+      // CI environments are slower - allow 3x margin
+      const maxBuildTime = process.env.CI ? 1500 : 500;
+      expect(buildTime).toBeLessThan(maxBuildTime);
       expect(searchIndex.getStats().promptCount).toBe(1);
     });
 
@@ -509,7 +511,22 @@ describe('SearchIndex', () => {
   });
 
   describe('Performance', () => {
-    it('should handle 1000 prompts efficiently', () => {
+    /**
+     * Performance Benchmarks
+     *
+     * These tests verify SearchIndex meets performance requirements for production use.
+     * They measure actual execution time using performance.now(), which can vary based
+     * on system load and CPU characteristics.
+     *
+     * CI environments are typically 3-5x slower due to:
+     * - Shared resources in GitHub Actions runners
+     * - CPU throttling
+     * - VM/container overhead
+     *
+     * All thresholds include CI-specific adjustments to prevent flaky test failures.
+     */
+
+    it('should handle 1000 prompts efficiently', { timeout: 10000 }, () => {
       const manyPrompts: Prompt[] = Array.from({ length: 1000 }, (_, i) => ({
         id: String(i),
         title: `Prompt ${i}`,
@@ -523,11 +540,13 @@ describe('SearchIndex', () => {
       searchIndex.buildIndex(manyPrompts);
       const buildTime = performance.now() - startTime;
 
-      expect(buildTime).toBeLessThan(1000); // Should build in < 1 second
+      // CI environments are slower - allow 3x margin
+      const maxBuildTime = process.env.CI ? 3000 : 1000;
+      expect(buildTime).toBeLessThan(maxBuildTime);
       expect(searchIndex.getStats().promptCount).toBe(1000);
     });
 
-    it('should search 1000 prompts quickly', () => {
+    it('should search 1000 prompts quickly', { timeout: 10000 }, () => {
       const manyPrompts: Prompt[] = Array.from({ length: 1000 }, (_, i) => ({
         id: String(i),
         title: `Prompt ${i}`,
