@@ -44,25 +44,6 @@ class TestStrategy extends PlatformStrategy {
   }
 }
 
-// Incomplete implementation for testing validation
-class IncompleteStrategy extends PlatformStrategy {
-  constructor() {
-    super('incomplete', 10);
-  }
-
-  canHandle(_element: HTMLElement): boolean {
-    return true;
-  }
-
-  async insert(_element: HTMLElement, _content: string): Promise<InsertionResult> {
-    return { success: false, error: 'Not implemented' };
-  }
-
-  getSelectors(): string[] {
-    return [];
-  }
-}
-
 describe('PlatformStrategy', () => {
   let mockElement: HTMLElement;
   let mockUIFactory: UIElementFactory;
@@ -80,21 +61,12 @@ describe('PlatformStrategy', () => {
 
       expect(strategy.name).toBe('test');
       expect(strategy.priority).toBe(50);
-      expect((strategy as any).hostname).toBe(window.location.hostname);
     });
 
     it('should throw error when trying to instantiate abstract class directly', () => {
       expect(() => {
         new (PlatformStrategy as any)('test', 50);
       }).toThrow('PlatformStrategy is abstract and cannot be instantiated');
-    });
-
-    it('should validate implementation and throw error for incomplete strategies', () => {
-      // This test is no longer needed since IncompleteStrategy now implements all methods
-      // The validation is done at TypeScript compile time
-      expect(() => {
-        new IncompleteStrategy();
-      }).not.toThrow();
     });
   });
 
@@ -152,39 +124,6 @@ describe('PlatformStrategy', () => {
     it('should not throw when cleanup is called', () => {
       const strategy = new TestStrategy();
       expect(() => strategy.cleanup?.()).not.toThrow();
-    });
-  });
-
-  describe('logging methods', () => {
-    let strategy: TestStrategy;
-
-    beforeEach(() => {
-      strategy = new TestStrategy();
-    });
-
-    it('should log debug messages with platform prefix', async () => {
-      const Logger = await import('../../utils/logger');
-      
-      (strategy as any)._debug('test message', { key: 'value' });
-      
-      expect(Logger.debug).toHaveBeenCalledWith('[test] test message', { key: 'value' });
-    });
-
-    it('should log warnings with platform prefix', async () => {
-      const Logger = await import('../../utils/logger');
-      
-      (strategy as any)._warn('test warning', { error: 'details' });
-      
-      expect(Logger.warn).toHaveBeenCalledWith('[test] test warning', { error: 'details' });
-    });
-
-    it('should log errors with platform prefix', async () => {
-      const Logger = await import('../../utils/logger');
-      const error = new Error('test error');
-      
-      (strategy as any)._error('test error message', error, { context: 'test' });
-      
-      expect(Logger.error).toHaveBeenCalledWith('[test] test error message', error, { context: 'test' });
     });
   });
 

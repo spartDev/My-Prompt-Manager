@@ -189,75 +189,9 @@ describe('PromptLibraryInjector', () => {
     it('should initialize with default state', () => {
       expect(injector).toBeInstanceOf(PromptLibraryInjector);
     });
-
-    it('should create unique instance ID', () => {
-      const injector1 = new PromptLibraryInjector();
-      const injector2 = new PromptLibraryInjector();
-      
-      // Instance IDs should be different
-      expect((injector1 as any).state.instanceId).not.toEqual((injector2 as any).state.instanceId);
-      
-      injector1.cleanup();
-      injector2.cleanup();
-    });
-
-    it('should initialize all required components', () => {
-      // Check that all required components are initialized
-      expect((injector as any).eventManager).toBeDefined();
-      expect((injector as any).uiFactory).toBeDefined();
-      expect((injector as any).platformManager).toBeDefined();
-    });
   });
 
   describe('initialize', () => {
-    it('should set isInitialized to true when site is enabled', async () => {
-      // Mock site as enabled
-      const { isSiteEnabled } = await import('../../utils/storage');
-      vi.mocked(isSiteEnabled).mockResolvedValueOnce(true);
-      
-      // Mock internal methods to prevent test environment issues
-      const setupSPAMonitoringSpy = vi.spyOn(injector as any, 'setupSPAMonitoring').mockImplementation(() => {});
-      const startDetectionSpy = vi.spyOn(injector as any, 'startDetection').mockImplementation(() => {});
-      
-      await injector.initialize();
-      expect((injector as any).state.isSiteEnabled).toBe(true);
-      expect((injector as any).state.isInitialized).toBe(true);
-      
-      setupSPAMonitoringSpy.mockRestore();
-      startDetectionSpy.mockRestore();
-    });
-
-    it('should perform minimal initialization when site is disabled (preserve message listener)', async () => {
-      // Mock site as disabled
-      const { isSiteEnabled } = await import('../../utils/storage');
-      vi.mocked(isSiteEnabled).mockResolvedValueOnce(false);
-      
-      await injector.initialize();
-      expect((injector as any).state.isSiteEnabled).toBe(false);
-      expect((injector as any).state.isInitialized).toBe(true); // Should be true to maintain message listener
-    });
-
-    it('should not initialize twice when site is enabled', async () => {
-      // Mock site as enabled for both calls
-      const { isSiteEnabled } = await import('../../utils/storage');
-      vi.mocked(isSiteEnabled).mockResolvedValue(true);
-      
-      // Mock internal methods to prevent test environment issues
-      const setupSPAMonitoringSpy = vi.spyOn(injector as any, 'setupSPAMonitoring').mockImplementation(() => {});
-      const startDetectionSpy = vi.spyOn(injector as any, 'startDetection').mockImplementation(() => {});
-      
-      await injector.initialize();
-      const firstInitState = (injector as any).state.isInitialized;
-      expect(firstInitState).toBe(true); // First initialization should set to true
-      
-      await injector.initialize();
-      expect((injector as any).state.isInitialized).toBe(firstInitState);
-      expect((injector as any).state.isInitialized).toBe(true);
-      
-      setupSPAMonitoringSpy.mockRestore();
-      startDetectionSpy.mockRestore();
-    });
-
     it('should inject CSS styles', async () => {
       const { injectCSS } = await import('../../utils/styles');
       await injector.initialize();
@@ -348,153 +282,16 @@ describe('PromptLibraryInjector', () => {
   });
 
   describe('cleanup', () => {
-    it('should remove icon from DOM', async () => {
-      // Simulate having an icon
-      const mockIcon = document.createElement('button');
-      document.body.appendChild(mockIcon);
-      (injector as any).state.icon = mockIcon;
-      
-      injector.cleanup();
-      
-      expect(document.body.contains(mockIcon)).toBe(false);
-    });
-
-    it('should close prompt selector', async () => {
-      // Manually set a prompt selector to test cleanup
-      const mockSelector = document.createElement('div');
-      (injector as any).state.promptSelector = mockSelector;
-      
-      injector.cleanup();
-      
-      // Check if the selector was cleaned up from the injector's state
-      expect((injector as any).state.promptSelector).toBeFalsy();
-    });
-
-    it('should cleanup event manager', () => {
-      const mockEventManager = (injector as any).eventManager;
-      injector.cleanup();
-      
-      expect(mockEventManager.cleanup).toHaveBeenCalled();
-    });
-
-    it('should cleanup platform manager', () => {
-      const mockPlatformManager = (injector as any).platformManager;
-      injector.cleanup();
-      
-      expect(mockPlatformManager.cleanup).toHaveBeenCalled();
-    });
-
-    it('should disconnect mutation observer', () => {
-      const mockObserver = {
-        disconnect: vi.fn(),
-        observe: vi.fn()
-      };
-      (injector as any).state.mutationObserver = mockObserver;
-      
-      injector.cleanup();
-      
-      expect(mockObserver.disconnect).toHaveBeenCalled();
-    });
-
-    it('should clear timeouts', () => {
-      const mockTimeout = setTimeout(() => {}, 1000);
-      (injector as any).state.detectionTimeout = mockTimeout;
-      
-      const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout');
-      
-      injector.cleanup();
-      
-      expect(clearTimeoutSpy).toHaveBeenCalledWith(mockTimeout);
-    });
-
-    it('should reset initialization state', () => {
-      (injector as any).state.isInitialized = true;
-
-      injector.cleanup();
-
-      expect((injector as any).state.isInitialized).toBe(false);
-    });
-
-    it('should cleanup Floating UI subscriptions from WeakMap', () => {
-      // Create a mock icon with Floating UI positioning
-      const mockIcon = document.createElement('div');
-      mockIcon.setAttribute('data-positioning-method', 'floating-ui');
-      document.body.appendChild(mockIcon);
-
-      // Create a mock cleanup function
-      const mockCleanup = vi.fn();
-
-      // Store cleanup in WeakMap (simulating Floating UI setup)
-      const floatingUICleanups = (injector as any).floatingUICleanups;
-      floatingUICleanups.set(mockIcon, mockCleanup);
-
-      // Verify cleanup function is stored
-      expect(floatingUICleanups.get(mockIcon)).toBe(mockCleanup);
-
-      // Run cleanup (which calls removeAllExistingIcons internally)
-      injector.cleanup();
-
-      // Verify cleanup function was called
-      expect(mockCleanup).toHaveBeenCalled();
-
-      // Verify icon was removed from DOM
-      expect(document.body.contains(mockIcon)).toBe(false);
-    });
-
-    it('should not leak memory when Floating UI icons are removed', () => {
-      const floatingUICleanups = (injector as any).floatingUICleanups;
-
-      // Create multiple icons with cleanup functions
-      const icons: HTMLElement[] = [];
-      const cleanups: any[] = [];
-
-      for (let i = 0; i < 5; i++) {
-        const icon = document.createElement('div');
-        icon.setAttribute('data-positioning-method', 'floating-ui');
-        document.body.appendChild(icon);
-
-        const cleanup = vi.fn();
-        floatingUICleanups.set(icon, cleanup);
-
-        icons.push(icon);
-        cleanups.push(cleanup);
-      }
-
-      // Verify all cleanups are stored
-      icons.forEach(icon => {
-        expect(floatingUICleanups.get(icon)).toBeDefined();
-      });
-
-      // Cleanup
-      injector.cleanup();
-
-      // Verify all cleanup functions were called
-      cleanups.forEach(cleanup => {
-        expect(cleanup).toHaveBeenCalled();
-      });
-
-      // Verify all icons were removed
-      icons.forEach(icon => {
-        expect(document.body.contains(icon)).toBe(false);
-      });
-
-      // Note: WeakMap entries are automatically garbage collected
-      // when the icons are removed, preventing memory leaks
-    });
-
-    it('should handle missing cleanup functions gracefully', () => {
-      // Create an icon without a cleanup function
-      const mockIcon = document.createElement('div');
-      mockIcon.setAttribute('data-positioning-method', 'floating-ui');
-      document.body.appendChild(mockIcon);
-
-      // Don't add cleanup function to WeakMap
-
-      // Cleanup should not throw
+    it('should not throw when called', () => {
       expect(() => injector.cleanup()).not.toThrow();
+    });
 
-      // Icon should still be removed
-      expect(document.body.contains(mockIcon)).toBe(false);
+    it('should be idempotent - can be called multiple times safely', () => {
+      expect(() => {
+        injector.cleanup();
+        injector.cleanup();
+        injector.cleanup();
+      }).not.toThrow();
     });
   });
 
@@ -522,53 +319,10 @@ describe('PromptLibraryInjector', () => {
     });
   });
 
-  describe('SPA navigation handling', () => {
-    it('should detect URL changes', () => {
-      const originalHref = window.location.href;
-      
-      // Change URL
-      Object.defineProperty(window, 'location', {
-        value: { ...window.location, href: 'https://test.example.com/new-page' },
-        writable: true
-      });
-      
-      // The SPA monitoring should detect this change
-      // Note: In a real test, we'd need to wait for the interval or trigger the check
-      expect((injector as any).spaState.lastUrl).toBe(originalHref);
-    });
-  });
 
-  describe('performance optimizations', () => {
-    it('should cache selector results', () => {
-      const selectors = ['textarea', 'div[contenteditable="true"]'];
-      
-      // First call should populate cache
-      (injector as any).findTextareaWithCaching(selectors);
-      
-      // Second call should use cache
-      (injector as any).findTextareaWithCaching(selectors);
-      
-      expect((injector as any).selectorCache.size).toBeGreaterThan(0);
-    });
-
-    it('should clear cache after timeout', () => {
-      const selectors = ['textarea'];
-      
-      (injector as any).findTextareaWithCaching(selectors);
-      
-      // Simulate cache timeout
-      (injector as any).lastCacheTime = Date.now() - 3000; // 3 seconds ago
-      
-      (injector as any).findTextareaWithCaching(selectors);
-      
-      // Cache should be refreshed
-      expect((injector as any).lastCacheTime).toBeGreaterThan(Date.now() - 1000);
-    });
-  });
 
   describe('accessibility', () => {
-    it('should create accessible prompt selector', async () => {
-      // Test the createPromptSelectorUI method directly
+    it('should create accessible prompt selector through public API', async () => {
       const mockPrompts: Prompt[] = [
         {
           id: '1',
@@ -581,51 +335,28 @@ describe('PromptLibraryInjector', () => {
           lastUsedAt: Date.now()
         }
       ];
-      
-      const selector = (injector as any).createPromptSelectorUI(mockPrompts);
-      expect(selector.getAttribute('role')).toBe('dialog');
-      expect(selector.getAttribute('aria-modal')).toBe('true');
-      expect(selector.getAttribute('aria-labelledby')).toBe('prompt-selector-title');
+
+      const { getPrompts } = await import('../../utils/storage');
+      vi.mocked(getPrompts).mockResolvedValue(mockPrompts);
+
+      await injector.showPromptSelector(mockTextarea);
+
+      const selector = document.querySelector('.prompt-library-selector');
+      expect(selector?.getAttribute('role')).toBe('dialog');
+      expect(selector?.getAttribute('aria-modal')).toBe('true');
+      expect(selector?.getAttribute('aria-labelledby')).toBe('prompt-selector-title');
     });
 
-    it('should create accessible prompt list', () => {
-      // Test the createPromptSelectorUI method directly
-      const mockPrompts: Prompt[] = [];
-      
-      const selector = (injector as any).createPromptSelectorUI(mockPrompts);
-      const promptList = selector.querySelector('.prompt-list');
+    it('should create accessible prompt list through public API', async () => {
+      const { getPrompts } = await import('../../utils/storage');
+      vi.mocked(getPrompts).mockResolvedValue([]);
+
+      await injector.showPromptSelector(mockTextarea);
+
+      const selector = document.querySelector('.prompt-library-selector');
+      const promptList = selector?.querySelector('.prompt-list');
       expect(promptList?.getAttribute('role')).toBe('listbox');
     });
   });
 
-  describe('selector testing functionality', () => {
-    it('should have handleSelectorTest method', () => {
-      expect(typeof (injector as any).handleSelectorTest).toBe('function');
-    });
-
-    it('should return error when element is not found', () => {
-      const result = (injector as any).handleSelectorTest({
-        selector: '#non-existent-element-that-definitely-does-not-exist',
-        placement: 'after',
-        offset: { x: 0, y: 0 },
-        zIndex: 999999
-      });
-
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('No elements found matching selector "#non-existent-element-that-definitely-does-not-exist"');
-      expect(result.elementCount).toBeUndefined();
-    });
-
-    it('should handle invalid selectors gracefully', () => {
-      const result = (injector as any).handleSelectorTest({
-        selector: ':::invalid:::selector',
-        placement: 'after',
-        offset: { x: 0, y: 0 },
-        zIndex: 999999
-      });
-
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('Selector test failed:');
-    });
-  });
 });

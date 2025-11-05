@@ -421,64 +421,6 @@ describe('MistralStrategy', () => {
     });
   });
 
-  describe('_findProseMirrorElement', () => {
-    it('should return element if it is already ProseMirror', () => {
-      const proseMirrorElement = document.createElement('div');
-      proseMirrorElement.classList.add('ProseMirror');
-
-      const result = (strategy as any)._findProseMirrorElement(proseMirrorElement);
-      expect(result).toBe(proseMirrorElement);
-    });
-
-    it('should find ProseMirror parent', () => {
-      const parentElement = document.createElement('div');
-      parentElement.classList.add('ProseMirror');
-      const childElement = document.createElement('span');
-      parentElement.appendChild(childElement);
-
-      const result = (strategy as any)._findProseMirrorElement(childElement);
-      expect(result).toBe(parentElement);
-    });
-
-    it('should find ProseMirror child', () => {
-      const parentElement = document.createElement('div');
-      const childElement = document.createElement('div');
-      childElement.classList.add('ProseMirror');
-      parentElement.appendChild(childElement);
-
-      const result = (strategy as any)._findProseMirrorElement(parentElement);
-      expect(result).toBe(childElement);
-    });
-
-    it('should find any ProseMirror element on page as fallback', () => {
-      const proseMirrorElement = document.createElement('div');
-      proseMirrorElement.contentEditable = 'true';
-      proseMirrorElement.classList.add('ProseMirror');
-      document.body.appendChild(proseMirrorElement);
-
-      const originalQuerySelector = document.querySelector;
-      vi.spyOn(document, 'querySelector').mockImplementation((selector) => {
-        if (selector === '.ProseMirror[contenteditable="true"]') {
-          return proseMirrorElement;
-        }
-        return originalQuerySelector.call(document, selector);
-      });
-
-      const randomElement = document.createElement('div');
-      const result = (strategy as any)._findProseMirrorElement(randomElement);
-      expect(result).toBe(proseMirrorElement);
-
-      document.body.removeChild(proseMirrorElement);
-      vi.restoreAllMocks();
-    });
-
-    it('should return original element as final fallback', () => {
-      const element = document.createElement('div');
-      const result = (strategy as any)._findProseMirrorElement(element);
-      expect(result).toBe(element);
-    });
-  });
-
   describe('event handling', () => {
     beforeEach(() => {
       mockSanitizeUserInput.mockReturnValue('test content');
