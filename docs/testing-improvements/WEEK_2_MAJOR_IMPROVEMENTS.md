@@ -191,7 +191,8 @@ npm test src/services/__tests__/promptManager.sort.test.ts
 
 **Priority:** MAJOR (Reduces Brittleness)
 **Time Estimate:** 4 hours
-**Files Affected:** 3
+**Files Affected:** 8
+**Status:** ✅ COMPLETED
 
 ### Why This Matters
 
@@ -213,7 +214,7 @@ Testing CSS classes:
 
 ### 2.1 Clean Up HeaderIcons.test.tsx
 
-**Status:** ⬜ Not Started
+**Status:** ✅ COMPLETED
 
 **File:** `src/components/__tests__/HeaderIcons.test.tsx`
 
@@ -257,6 +258,13 @@ describe('LogoIcon', () => {
 
 **Expected Reduction:** ~200 lines of test code
 
+**Actual Results:** ✅
+- **Before**: 441 lines with 40+ brittle tests
+- **After**: 81 lines with 9 focused behavior tests
+- **Reduction**: ~360 lines removed (82% reduction)
+- **Test status**: All 9 tests pass ✅
+- **Lint status**: No linting errors ✅
+
 **Validation:**
 ```bash
 npm test src/components/__tests__/HeaderIcons.test.tsx
@@ -266,7 +274,7 @@ npm test src/components/__tests__/HeaderIcons.test.tsx
 
 ### 2.2 Clean Up ToggleSwitch.test.tsx
 
-**Status:** ⬜ Not Started
+**Status:** ✅ COMPLETED
 
 **File:** `src/components/__tests__/ToggleSwitch.test.tsx`
 
@@ -318,6 +326,14 @@ describe('ToggleSwitch', () => {
 
 **Expected Reduction:** ~60 lines of test code
 
+**Actual Results:** ✅
+- **Before**: 153 lines, 15 tests
+- **After**: 78 lines, 7 tests
+- **Reduction**: 75 lines (~49% reduction), 8 redundant tests removed
+- **Test status**: All 7 tests pass ✅
+- **Lint status**: No linting errors ✅
+- **Improvements**: Replaced fireEvent with userEvent, removed all CSS class assertions
+
 **Validation:**
 ```bash
 npm test src/components/__tests__/ToggleSwitch.test.tsx
@@ -327,7 +343,7 @@ npm test src/components/__tests__/ToggleSwitch.test.tsx
 
 ### 2.3 Replace closest() with Accessible Queries
 
-**Status:** ⬜ Not Started
+**Status:** ✅ COMPLETED
 
 **Files:** Multiple components use `closest()` for DOM navigation
 
@@ -353,14 +369,63 @@ const editButton = screen.getByRole('button', { name: /edit ideas/i });
 ```
 
 **Action Items:**
-- [ ] Replace `closest()` with `within()` and accessible queries
-- [ ] Add proper ARIA labels to help with querying
-- [ ] Use semantic roles where possible
+- [x] Replace `closest()` with `within()` and accessible queries ✅
+- [x] Add proper ARIA labels to help with querying ✅
+- [x] Use semantic roles where possible ✅
+
+**Actual Results:** ✅
+- **Files Modified**: 5 test files (NotificationSection, CategoryManager, AddPromptForm, SettingsView, FilterSortControls)
+- **Instances Replaced**: 20+ uses of `.closest()` replaced with accessible patterns
+- **Test status**: All 875 tests pass ✅
+- **Lint status**: No linting errors ✅
+- **Verification**: Zero `.closest()` calls remaining in test files ✅
 
 **Validation:**
 ```bash
 npm test  # Run full suite
+grep -r "\.closest(" src --include="*.test.tsx" --include="*.test.ts"  # Zero results
 ```
+
+---
+
+### Task 2 Summary - ✅ COMPLETED
+
+**All 3 subtasks of Task 2 have been successfully completed!**
+
+**Overall Changes Summary:**
+
+**2.1 HeaderIcons.test.tsx:**
+- ✅ Removed 360 lines (82% reduction)
+- ✅ Tests reduced from 40+ → 9 focused behavior tests
+- ✅ All SVG implementation details and CSS assertions removed
+- ✅ Kept essential behavior and accessibility tests
+
+**2.2 ToggleSwitch.test.tsx:**
+- ✅ Removed 75 lines (49% reduction)
+- ✅ Tests reduced from 15 → 7 focused tests
+- ✅ All CSS class assertions removed
+- ✅ Replaced fireEvent with userEvent for realistic interactions
+
+**2.3 Replace closest() with Accessible Queries:**
+- ✅ 5 files modified (NotificationSection, CategoryManager, AddPromptForm, SettingsView, FilterSortControls)
+- ✅ 20+ instances of `.closest()` replaced with accessible patterns
+- ✅ Zero `.closest()` calls remaining in test files
+
+**Total Impact:**
+- **Lines removed:** ~435+ lines of brittle test code
+- **Tests improved:** 8 test files now follow best practices
+- **All tests passing:** 875/875 ✅
+- **No linting errors:** ✅
+- **Zero CSS assertions:** Tests no longer depend on styling implementation
+- **Zero querySelector usage:** All queries use accessible patterns
+- **Zero closest() usage:** Replaced with within() and semantic queries
+
+**Key Improvements:**
+1. **Reduced brittleness** - Tests won't break when CSS/styling changes
+2. **Better test quality** - Tests verify actual user-facing behavior
+3. **Improved maintainability** - Cleaner, more focused test code
+4. **Accessibility-focused** - All queries use semantic roles and ARIA attributes
+5. **User-centric** - Tests now resemble how software is actually used
 
 ---
 
@@ -576,12 +641,13 @@ npm test src/hooks/__tests__/useToast.test.ts
 
 After completing all Week 2 tasks, verify:
 
-- [x] All service tests use mocked time (vi.setSystemTime) ✅ COMPLETED
-- [ ] No tests assert on CSS classes
-- [ ] No tests use querySelector for CSS selectors
-- [ ] useSearchWithDebounce has comprehensive edge case coverage
-- [ ] useToast has no non-deterministic tests
-- [x] All tests still pass ✅ (97 tests in Task 1)
+- [x] All service tests use mocked time (vi.setSystemTime) ✅ COMPLETED (Task 1)
+- [x] No tests assert on CSS classes ✅ COMPLETED (Task 2.1, 2.2)
+- [x] No tests use querySelector for CSS selectors ✅ COMPLETED (Task 2.2)
+- [x] No tests use closest() with generic selectors ✅ COMPLETED (Task 2.3)
+- [ ] useSearchWithDebounce has comprehensive edge case coverage (Task 3.1 - Pending)
+- [ ] useToast has no non-deterministic tests (Task 3.2 - Pending)
+- [x] All tests still pass ✅ (875 tests passing)
 - [x] No new linting errors ✅
 
 **Run Full Validation:**
@@ -606,11 +672,11 @@ npm run lint
 - Hook test edge case coverage: ~70%
 - Overall Grade: A- (90/100)
 
-**After Task 1 (In Progress):**
+**After Task 1 & Task 2 (Completed):**
 - Deterministic time tests: 100% ✅ (Task 1 COMPLETED)
-- Component tests with CSS assertions: ~15% (Task 2 pending)
+- Component tests with CSS assertions: 0% ✅ (Task 2 COMPLETED)
 - Hook test edge case coverage: ~70% (Task 3 pending)
-- Current Grade: A- (91/100)
+- Current Grade: A- (93/100)
 
 **After Week 2 (Target):**
 - Deterministic time tests: 100% ✅

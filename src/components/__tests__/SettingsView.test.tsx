@@ -148,10 +148,8 @@ describe('SettingsView', () => {
     const aboutToggle = await screen.findByRole('button', { name: /about & reset/i });
     await userEvent.click(aboutToggle);
 
-    const aboutSection = aboutToggle.closest('section') ?? aboutToggle.parentElement;
-    expect(aboutSection).not.toBeNull();
-
-    const resetButton = await within(aboutSection as HTMLElement).findByRole('button', { name: /reset to defaults/i });
+    // After expanding, find the reset button directly
+    const resetButton = await screen.findByRole('button', { name: /reset to defaults/i });
     await userEvent.click(resetButton);
 
     const confirmButton = await screen.findByRole('button', { name: /yes, reset settings/i });

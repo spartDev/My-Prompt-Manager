@@ -127,12 +127,8 @@ describe('AddPromptForm - Import Mode', () => {
     expect(screen.getByText('Test Content')).toBeInTheDocument();
 
     // Check that the preview section shows the category
-    const previewHeading = screen.getByText(/preview/i);
-    const previewSection = previewHeading.closest('div')?.parentElement;
-    expect(previewSection).toBeInTheDocument();
-    if (previewSection) {
-      expect(within(previewSection).getByText(/original category/i)).toBeInTheDocument();
-    }
+    // The preview shows both "Original Category" label and "Using original category" text
+    expect(screen.getByText('Original Category')).toBeInTheDocument();
   });
 
   it('shows validation error for invalid sharing code', async () => {

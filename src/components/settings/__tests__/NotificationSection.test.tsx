@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 
 import { ToastSettings } from '../../../types/hooks';
@@ -87,7 +87,9 @@ describe('NotificationSection', () => {
 
       fireEvent.click(screen.getByRole('button', { expanded: false }));
 
-      const topRightButton = screen.getByText('Top Right').closest('button');
+      // Find position buttons - they contain "Top Right" text
+      const allButtons = screen.getAllByRole('button');
+      const topRightButton = allButtons.find(btn => btn.textContent?.includes('Top Right'));
       expect(topRightButton).toHaveClass('border-purple-500');
     });
 
@@ -103,7 +105,9 @@ describe('NotificationSection', () => {
 
       fireEvent.click(screen.getByRole('button', { expanded: false }));
 
-      const bottomRightButton = screen.getByText('Bottom Right').closest('button');
+      // Find position buttons - they contain "Bottom Right" text
+      const allButtons = screen.getAllByRole('button');
+      const bottomRightButton = allButtons.find(btn => btn.textContent?.includes('Bottom Right'));
       expect(bottomRightButton).toHaveClass('border-purple-500');
     });
 
@@ -119,7 +123,9 @@ describe('NotificationSection', () => {
 
       fireEvent.click(screen.getByRole('button', { expanded: false }));
 
-      const topRightButton = screen.getByText('Top Right').closest('button');
+      // Find position buttons - they contain "Top Right" text
+      const allButtons = screen.getAllByRole('button');
+      const topRightButton = allButtons.find(btn => btn.textContent?.includes('Top Right'));
       fireEvent.click(topRightButton!);
 
       expect(mockOnSettingsChange).toHaveBeenCalledWith({
@@ -138,7 +144,9 @@ describe('NotificationSection', () => {
 
       fireEvent.click(screen.getByRole('button', { expanded: false }));
 
-      const bottomRightButton = screen.getByText('Bottom Right').closest('button');
+      // Find position buttons - they contain "Bottom Right" text
+      const allButtons = screen.getAllByRole('button');
+      const bottomRightButton = allButtons.find(btn => btn.textContent?.includes('Bottom Right'));
       fireEvent.click(bottomRightButton!);
 
       expect(mockOnSettingsChange).toHaveBeenCalledWith({
@@ -184,26 +192,29 @@ describe('NotificationSection', () => {
 
     it('cycles through enabled types when test button is clicked', () => {
       renderAndExpand();
-      const testButton = screen.getByText('Test').closest('button')!;
+      // Find the test button by its text and role
+      const allButtons = screen.getAllByRole('button');
+      const testButton = allButtons.find(btn => btn.textContent?.includes('Test'));
+      expect(testButton).toBeDefined();
 
       // Click 1: Should test Success
-      fireEvent.click(testButton);
+      fireEvent.click(testButton!);
       expect(mockOnTestToast).toHaveBeenCalledWith('success');
 
       // Click 2: Should test Error
-      fireEvent.click(testButton);
+      fireEvent.click(testButton!);
       expect(mockOnTestToast).toHaveBeenCalledWith('error');
 
       // Click 3: Should test Warning
-      fireEvent.click(testButton);
+      fireEvent.click(testButton!);
       expect(mockOnTestToast).toHaveBeenCalledWith('warning');
 
       // Click 4: Should test Info
-      fireEvent.click(testButton);
+      fireEvent.click(testButton!);
       expect(mockOnTestToast).toHaveBeenCalledWith('info');
 
       // Click 5: Should cycle back to Success
-      fireEvent.click(testButton);
+      fireEvent.click(testButton!);
       expect(mockOnTestToast).toHaveBeenCalledWith('success');
     });
 
@@ -220,18 +231,21 @@ describe('NotificationSection', () => {
 
       renderAndExpand(settings);
 
-      const testButton = screen.getByText('Test').closest('button')!;
+      // Find the test button by its text and role
+      const allButtons = screen.getAllByRole('button');
+      const testButton = allButtons.find(btn => btn.textContent?.includes('Test'));
+      expect(testButton).toBeDefined();
 
       // Click 1: Should test Success
-      fireEvent.click(testButton);
+      fireEvent.click(testButton!);
       expect(mockOnTestToast).toHaveBeenCalledWith('success');
 
       // Click 2: Should skip Error and Warning, test Info
-      fireEvent.click(testButton);
+      fireEvent.click(testButton!);
       expect(mockOnTestToast).toHaveBeenCalledWith('info');
 
       // Click 3: Should cycle back to Success (skipping Error and Warning)
-      fireEvent.click(testButton);
+      fireEvent.click(testButton!);
       expect(mockOnTestToast).toHaveBeenCalledWith('success');
     });
 
@@ -248,7 +262,10 @@ describe('NotificationSection', () => {
 
       renderAndExpand(settings);
 
-      const testButton = screen.getByText('Test').closest('button')!;
+      // Find the test button by its text and role
+      const allButtons = screen.getAllByRole('button');
+      const testButton = allButtons.find(btn => btn.textContent?.includes('Test'));
+      expect(testButton).toBeDefined();
       expect(testButton).toBeDisabled();
     });
   });
@@ -345,8 +362,13 @@ describe('NotificationSection', () => {
 
       fireEvent.click(screen.getByRole('button', { expanded: false }));
 
-      const successCard = screen.getByText('Success').closest('.flex.items-center.justify-between');
-      const infoCard = screen.getByText('Info').closest('.flex.items-center.justify-between');
+      // Find notification type rows by their label text
+      const successLabel = screen.getByText('Success');
+      const infoLabel = screen.getByText('Info');
+
+      // Navigate to the parent container (the row div)
+      const successCard = successLabel.parentElement?.parentElement?.parentElement;
+      const infoCard = infoLabel.parentElement?.parentElement?.parentElement;
 
       // Disabled cards should have opacity-60
       expect(successCard).toHaveClass('opacity-60');
@@ -367,28 +389,42 @@ describe('NotificationSection', () => {
     });
 
     it('displays position preview for top-right', () => {
-      const topRightButton = screen.getByText('Top Right').closest('button');
+      const allButtons = screen.getAllByRole('button');
+      const topRightButton = allButtons.find(btn => btn.textContent?.includes('Top Right'));
       const preview = topRightButton!.querySelector('.absolute.top-1.right-1');
       expect(preview).toBeInTheDocument();
     });
 
     it('displays position preview for bottom-right', () => {
-      const bottomRightButton = screen.getByText('Bottom Right').closest('button');
+      const allButtons = screen.getAllByRole('button');
+      const bottomRightButton = allButtons.find(btn => btn.textContent?.includes('Bottom Right'));
       const preview = bottomRightButton!.querySelector('.absolute.bottom-1.right-1');
       expect(preview).toBeInTheDocument();
     });
 
     it('shows checkmark for selected position', () => {
-      const topRightButton = screen.getByText('Top Right').closest('button');
+      const allButtons = screen.getAllByRole('button');
+      const topRightButton = allButtons.find(btn => btn.textContent?.includes('Top Right'));
       const checkmark = topRightButton!.querySelector('svg.text-purple-500');
       expect(checkmark).toBeInTheDocument();
     });
 
     it('shows color indicators for each notification type', () => {
-      const successIndicator = screen.getByText('Success').closest('.flex.items-center.justify-between')!.querySelector('.bg-green-500');
-      const errorIndicator = screen.getByText('Error').closest('.flex.items-center.justify-between')!.querySelector('.bg-red-500');
-      const warningIndicator = screen.getByText('Warning').closest('.flex.items-center.justify-between')!.querySelector('.bg-yellow-500');
-      const infoIndicator = screen.getByText('Info').closest('.flex.items-center.justify-between')!.querySelector('.bg-blue-500');
+      // Find notification type rows by their label text and navigate to parent
+      const successLabel = screen.getByText('Success');
+      const errorLabel = screen.getByText('Error');
+      const warningLabel = screen.getByText('Warning');
+      const infoLabel = screen.getByText('Info');
+
+      const successRow = successLabel.parentElement?.parentElement?.parentElement;
+      const errorRow = errorLabel.parentElement?.parentElement?.parentElement;
+      const warningRow = warningLabel.parentElement?.parentElement?.parentElement;
+      const infoRow = infoLabel.parentElement?.parentElement?.parentElement;
+
+      const successIndicator = successRow!.querySelector('.bg-green-500');
+      const errorIndicator = errorRow!.querySelector('.bg-red-500');
+      const warningIndicator = warningRow!.querySelector('.bg-yellow-500');
+      const infoIndicator = infoRow!.querySelector('.bg-blue-500');
 
       expect(successIndicator).toBeInTheDocument();
       expect(errorIndicator).toBeInTheDocument();

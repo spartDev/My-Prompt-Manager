@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -163,13 +163,19 @@ describe('FilterSortControls', () => {
       });
 
       // Find the Work option in the dropdown (not in the button)
-      const workOptions = screen.getAllByText('Work');
-      // The dropdown item should be the one inside a menu
-      const dropdownOption = workOptions.find(el => el.closest('[role="menu"]'));
-      expect(dropdownOption).toBeDefined();
+      const menu = screen.getByRole('menu');
+      const workOption = within(menu).getByText('Work');
+      expect(workOption).toBeDefined();
 
-      // The Dropdown.Item wraps the content - look for the parent with the bg-purple class
-      const itemElement = dropdownOption?.closest('[class*="bg-purple"]');
+      // The Dropdown.Item wraps the content - navigate up to find the button with the bg-purple class
+      // Structure is: button > div > div > span (text)
+      let itemElement = workOption.parentElement;
+      while (itemElement && !itemElement.classList.contains('bg-purple-50')) {
+        itemElement = itemElement.parentElement;
+        if (!itemElement || itemElement.tagName === 'BODY') {
+          break;
+        }
+      }
       expect(itemElement).toBeDefined();
       expect(itemElement).toHaveClass('bg-purple-50');
     });
@@ -181,12 +187,12 @@ describe('FilterSortControls', () => {
       const filterButton = screen.getByLabelText(/filter by category/i);
       await user.click(filterButton);
 
-      // Find the "All Categories" option in the dropdown (not in the button)
-      const allOptions = await screen.findAllByText('All Categories');
-      // The dropdown item should be the second one (first is in the button)
-      const dropdownOption = allOptions.find(el => el.closest('[role="menu"]'));
+      // Find the "All Categories" option in the dropdown using within
+      const menu = await screen.findByRole('menu');
+      const allCategoriesOption = within(menu).getByText('All Categories');
+
       // Navigate up to the button element (3 levels up due to nested spans)
-      const allButton = dropdownOption?.parentElement?.parentElement?.parentElement;
+      const allButton = allCategoriesOption.parentElement?.parentElement?.parentElement;
 
       expect(allButton).toHaveClass('bg-purple-50');
     });
@@ -339,8 +345,17 @@ describe('FilterSortControls', () => {
       const sortButton = screen.getByLabelText(/sort order/i);
       await user.click(sortButton);
 
-      const updatedOption = await screen.findByText('Recently Updated');
-      const updatedButton = updatedOption.closest('div[role="menuitem"]') || updatedOption.closest('button');
+      const menu = await screen.findByRole('menu');
+      const updatedOption = within(menu).getByText('Recently Updated');
+
+      // Navigate up to find the button with the bg-purple class
+      let updatedButton = updatedOption.parentElement;
+      while (updatedButton && !updatedButton.classList.contains('bg-purple-50')) {
+        updatedButton = updatedButton.parentElement;
+        if (!updatedButton || updatedButton.tagName === 'BODY') {
+          break;
+        }
+      }
 
       expect(updatedButton).toHaveClass('bg-purple-50');
     });
