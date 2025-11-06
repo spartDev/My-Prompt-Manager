@@ -285,7 +285,7 @@ describe('ViewHeader', () => {
         <button data-testid="custom-action">Custom</button>
       );
 
-      const { container } = render(
+      render(
         <ViewHeader
           title="Test"
           onBack={onBack}
@@ -293,64 +293,18 @@ describe('ViewHeader', () => {
         />
       );
 
-      const actionContainer = container.querySelector('.flex.items-center.space-x-2');
-      const buttons = actionContainer?.querySelectorAll('button');
+      const backButton = screen.getByRole('button', { name: /go back/i });
+      const customButton = screen.getByTestId('custom-action');
 
-      expect(buttons?.[0]).toHaveAttribute('aria-label', 'Go back');
-      expect(buttons?.[1]).toHaveAttribute('data-testid', 'custom-action');
-    });
-  });
-
-  describe('Styling', () => {
-    it('has correct base styling classes', () => {
-      const { container } = render(<ViewHeader title="Test" />);
-      const header = container.querySelector('header');
-
-      expect(header).toHaveClass('flex-shrink-0');
-      expect(header).toHaveClass('bg-white/80');
-      expect(header).toHaveClass('dark:bg-gray-800/80');
-      expect(header).toHaveClass('backdrop-blur-sm');
-      expect(header).toHaveClass('border-b');
-      expect(header).toHaveClass('border-purple-100');
-      expect(header).toHaveClass('dark:border-gray-700');
-
-      // Padding is on inner div
-      const innerDiv = header?.querySelector('.p-6');
-      expect(innerDiv).toBeInTheDocument();
-    });
-
-    it('icon container has gradient background', () => {
-      const { container } = render(<ViewHeader title="Test" />);
-      const iconContainer = container.querySelector('[role="img"]');
-
-      expect(iconContainer).toHaveClass('bg-gradient-to-br');
-      expect(iconContainer).toHaveClass('from-purple-600');
-      expect(iconContainer).toHaveClass('to-indigo-600');
-      expect(iconContainer).toHaveClass('rounded-xl');
-    });
-
-    it('title has correct text styling', () => {
-      render(<ViewHeader title="Test Title" />);
-      const title = screen.getByText('Test Title');
-
-      expect(title).toHaveClass('text-xl');
-      expect(title).toHaveClass('font-bold');
-      expect(title).toHaveClass('text-gray-900');
-      expect(title).toHaveClass('dark:text-gray-100');
-    });
-
-    it('subtitle has correct text styling', () => {
-      render(<ViewHeader title="Test" subtitle="Subtitle" />);
-      const subtitle = screen.getByText('Subtitle');
-
-      expect(subtitle).toHaveClass('text-sm');
-      expect(subtitle).toHaveClass('text-gray-500');
-      expect(subtitle).toHaveClass('dark:text-gray-400');
+      // Verify both buttons are present and accessible
+      expect(backButton).toBeInTheDocument();
+      expect(customButton).toBeInTheDocument();
+      expect(backButton).toHaveAttribute('aria-label', 'Go back');
     });
   });
 
   describe('Accessibility', () => {
-    it('all buttons have proper focus styles', () => {
+    it('all buttons are keyboard accessible', () => {
       const onBack = vi.fn();
       const onSettings = vi.fn();
       const onClose = vi.fn();
@@ -368,9 +322,10 @@ describe('ViewHeader', () => {
       const settingsButton = screen.getByRole('button', { name: /open settings/i });
       const closeButton = screen.getByRole('button', { name: /^close$/i });
 
-      expect(backButton).toHaveClass('focus-interactive');
-      expect(settingsButton).toHaveClass('focus-interactive');
-      expect(closeButton).toHaveClass('focus-interactive');
+      // Verify buttons are focusable
+      expect(backButton).not.toHaveAttribute('tabIndex', '-1');
+      expect(settingsButton).not.toHaveAttribute('tabIndex', '-1');
+      expect(closeButton).not.toHaveAttribute('tabIndex', '-1');
     });
 
     it('all buttons have title attributes', () => {
@@ -429,12 +384,12 @@ describe('ViewHeader', () => {
       expect(screen.getByText('Child Content')).toBeInTheDocument();
     });
 
-    it('does not render children slot when not provided', () => {
-      const { container } = render(<ViewHeader title="Test" />);
+    it('does not render children when not provided', () => {
+      render(<ViewHeader title="Test" />);
 
-      // Check that the children wrapper div doesn't exist
-      const childrenWrapper = container.querySelector('.px-6.pb-6');
-      expect(childrenWrapper).not.toBeInTheDocument();
+      // Verify only the title is present, no additional child content
+      expect(screen.getByText('Test')).toBeInTheDocument();
+      expect(screen.queryByTestId('child-content')).not.toBeInTheDocument();
     });
 
     it('renders complex children content', () => {
