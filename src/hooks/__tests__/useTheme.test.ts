@@ -1,5 +1,5 @@
 import { renderHook, act, waitFor } from '@testing-library/react';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 import { testThemeToggle } from '../../test/helpers/theme-helpers';
 import { DEFAULT_SETTINGS } from '../../types';
@@ -18,8 +18,11 @@ describe('useTheme', () => {
     addEventListener: ReturnType<typeof vi.fn>;
     removeEventListener: ReturnType<typeof vi.fn>;
   };
+  let originalMatchMedia: typeof window.matchMedia;
 
   beforeEach(async () => {
+    // Save original window.matchMedia
+    originalMatchMedia = window.matchMedia;
     // Reset localStorage
     localStorage.clear();
 
@@ -64,6 +67,20 @@ describe('useTheme', () => {
         theme: 'system'
       }
     });
+  });
+
+  afterEach(() => {
+    // 1. Restore window.matchMedia to original
+    window.matchMedia = originalMatchMedia;
+
+    // 2. Clean up localStorage
+    localStorage.clear();
+
+    // 3. Reset document class
+    document.documentElement.className = '';
+
+    // 4. Clear mock call history (but keep mock implementations from test setup)
+    vi.clearAllMocks();
   });
 
   describe('Initialization', () => {
