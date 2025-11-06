@@ -1,0 +1,39 @@
+{
+  "prompts": [
+    {
+      "id": "prompt-1",
+      "content": "This prompt is missing the required 'title' field",
+      "category": "Test",
+      "createdAt": 1704110400000,
+      "updatedAt": 1704110400000
+    },
+    {
+      "id": "prompt-2",
+      "title": "Missing Content",
+      "category": "Test",
+      "createdAt": 1704110400000,
+      "updatedAt": 1704110400000
+    },
+    {
+      "title": "Missing ID",
+      "content": "This prompt has no ID",
+      "category": "Test",
+      "createdAt": 1704110400000,
+      "updatedAt": 1704110400000
+    }
+  ],
+  "categories": [
+    {
+      "id": "cat-1",
+      "name": "Test"
+    },
+    {
+      "id": "cat-2"
+    }
+  ],
+  "settings": {
+    "sortOrder": "updatedAt",
+    "sortDirection": "desc",
+    "theme": "light"
+  }
+}

@@ -7,6 +7,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { DOMUtils } from '../dom';
 import * as Logger from '../logger';
 
+// Save real document before mocks are applied
+const realDocument = global.document;
+
 // Mock Logger
 vi.mock('../logger', () => ({
   info: vi.fn(),
@@ -276,13 +279,18 @@ describe('DOMUtils', () => {
 
   describe('appendChild', () => {
     it('should append child successfully', () => {
-      const mockParent = { appendChild: vi.fn(), tagName: 'DIV' };
-      const mockChild = { tagName: 'SPAN' };
+      // Use REAL DOM elements
+      const parent = realDocument.createElement('div');
+      const child = realDocument.createElement('span');
+      child.textContent = 'test content';
 
-      const result = DOMUtils.appendChild(mockParent as any, mockChild as any);
+      const result = DOMUtils.appendChild(parent, child);
 
-      expect(mockParent.appendChild).toHaveBeenCalledWith(mockChild);
       expect(result).toBe(true);
+      expect(parent.children).toHaveLength(1);
+      expect(parent.children[0]).toBe(child);
+      expect(child.parentNode).toBe(parent);
+      expect(parent.innerHTML).toBe('<span>test content</span>');
     });
 
     it('should handle errors gracefully', () => {
@@ -307,33 +315,37 @@ describe('DOMUtils', () => {
 
   describe('removeElement', () => {
     it('should remove element with parent node', () => {
-      const mockParent = { removeChild: vi.fn() };
-      const mockElement = { 
-        parentNode: mockParent,
-        tagName: 'DIV',
-        id: 'test',
-        className: 'test-class'
-      };
+      // Use REAL DOM elements with actual parent-child relationship
+      const parent = realDocument.createElement('div');
+      const element = realDocument.createElement('span');
+      element.id = 'test';
+      element.className = 'test-class';
+      parent.appendChild(element);
 
-      const result = DOMUtils.removeElement(mockElement as any);
+      // Verify element is in the DOM
+      expect(parent.children).toHaveLength(1);
+      expect(element.parentNode).toBe(parent);
 
-      expect(mockParent.removeChild).toHaveBeenCalledWith(mockElement);
+      const result = DOMUtils.removeElement(element);
+
       expect(result).toBe(true);
+      expect(parent.children).toHaveLength(0);
+      expect(element.parentNode).toBeNull();
     });
 
     it('should remove element without parent node', () => {
-      const mockElement = { 
-        parentNode: null,
-        remove: vi.fn(),
-        tagName: 'DIV',
-        id: 'test',
-        className: 'test-class'
-      };
+      // Use REAL DOM element without a parent
+      const element = realDocument.createElement('div');
+      element.id = 'test';
+      element.className = 'test-class';
 
-      const result = DOMUtils.removeElement(mockElement as any);
+      // Verify element has no parent
+      expect(element.parentNode).toBe(null);
 
-      expect(mockElement.remove).toHaveBeenCalled();
+      const result = DOMUtils.removeElement(element);
+
       expect(result).toBe(true);
+      expect(element.parentNode).toBe(null);
     });
 
     it('should handle errors gracefully', () => {

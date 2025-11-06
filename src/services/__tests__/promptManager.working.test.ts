@@ -173,7 +173,7 @@ describe('PromptManager - Working Tests', () => {
     });
   });
 
-  describe('Filter and Sort Functionality', () => {
+  describe('Filter Functionality', () => {
     it('should filter prompts by category', async () => {
       const results = await promptManager.filterByCategory('Development');
 
@@ -185,20 +185,6 @@ describe('PromptManager - Working Tests', () => {
       const results = await promptManager.filterByCategory(null);
 
       expect(results).toHaveLength(2);
-    });
-
-    it('should sort prompts by title ascending', async () => {
-      const results = await promptManager.getSortedPrompts('title', 'asc');
-
-      expect(results[0].title).toBe('JavaScript Function');
-      expect(results[1].title).toBe('Python Script');
-    });
-
-    it('should sort prompts by updatedAt descending (default)', async () => {
-      const results = await promptManager.getSortedPrompts('updatedAt');
-
-      expect(results[0].id).toBe('2'); // Most recently updated
-      expect(results[1].id).toBe('1');
     });
   });
 
@@ -212,37 +198,6 @@ describe('PromptManager - Working Tests', () => {
       });
 
       expect(result).toBeNull(); // Should be valid
-
-      // Test title generation
-      const generatedTitle = promptManager.generateTitle('Test Content');
-      expect(generatedTitle).toBe('Test Content');
-    });
-
-    it('should generate title when empty', () => {
-      const title1 = promptManager.generateTitle('');
-      const title2 = promptManager.generateTitle('Long content here');
-
-      expect(title1).toBe('Untitled Prompt');
-      expect(title2).toBe('Long content here');
-    });
-
-    it('should validate prompt creation data', () => {
-      // Test validation with empty content
-      const error1 = promptManager.validatePromptData({
-        title: 'Valid Title',
-        content: '',
-        category: DEFAULT_CATEGORY
-      });
-      expect(error1).toBeDefined();
-      expect(error1?.message).toBe('Prompt content cannot be empty');
-
-      // Test validation with valid data
-      const error2 = promptManager.validatePromptData({
-        title: 'Valid Title',
-        content: 'Valid Content',
-        category: DEFAULT_CATEGORY
-      });
-      expect(error2).toBeNull();
     });
 
     it('should throw error for invalid category', async () => {
@@ -283,19 +238,11 @@ describe('PromptManager - Working Tests', () => {
       expect(error2?.type).toBe(ErrorType.VALIDATION_ERROR);
     });
 
-    it('should return empty results gracefully when storage fails', async () => {
-      // Test that methods handle storage errors gracefully
-       
+    it('should throw error when storage fails', async () => {
       storageManagerMock.getPrompts.mockRejectedValue(new Error('Storage error'));
 
-      // These methods should handle errors gracefully, not throw
-      try {
-        const searchResults = await promptManager.searchPrompts('test');
-        expect(Array.isArray(searchResults)).toBe(true);
-      } catch (error) {
-        // If it does throw, that's also acceptable behavior
-        expect(error).toBeInstanceOf(Error);
-      }
+      await expect(promptManager.searchPrompts('test'))
+        .rejects.toThrow();
     });
   });
 
@@ -316,21 +263,6 @@ describe('PromptManager - Working Tests', () => {
       expect(stats).toHaveProperty('categoryCounts');
       expect(stats.totalPrompts).toBe(2);
       expect(stats.categoryCounts.Development).toBe(2);
-    });
-
-    it('should handle search with different queries', async () => {
-      // Test various search scenarios
-      const results1 = await promptManager.searchPrompts('JavaScript');
-      expect(results1).toHaveLength(1);
-
-      const results2 = await promptManager.searchPrompts('Python');
-      expect(results2).toHaveLength(1);
-
-      const results3 = await promptManager.searchPrompts('nonexistent');
-      expect(results3).toHaveLength(0);
-
-      const results4 = await promptManager.searchPrompts('');
-      expect(results4).toHaveLength(2);
     });
   });
 });

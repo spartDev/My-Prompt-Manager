@@ -370,105 +370,120 @@ describe('GeminiStrategy', () => {
     });
   });
 
-  describe('Performance - Quill editor caching', () => {
-    it('should cache Quill editor references for repeated lookups', async () => {
+  describe('Quill editor caching behavior', () => {
+    /**
+     * Caching Behavior Tests
+     *
+     * These tests verify the Quill editor caching mechanism prevents expensive
+     * repeated DOM queries. The cache improves performance by storing editor
+     * references for reuse across multiple insertions to the same element.
+     *
+     * We test the observable behavior (successful insertions) rather than timing,
+     * as performance measurements are non-deterministic and can cause flaky tests.
+     */
+
+    it('should successfully insert text multiple times using cached editor', async () => {
+      // Performance optimization: Quill editor references are cached to avoid
+      // expensive DOM queries on repeated insertions to the same element
       const quillElement = document.createElement('div');
       quillElement.classList.add('ql-editor');
       quillElement.contentEditable = 'true';
       document.body.appendChild(quillElement);
 
-      // Measure first insertion time
-      const start1 = performance.now();
-      await strategy.insert(quillElement, 'Test 1');
-      const duration1 = performance.now() - start1;
-
-      // Second insertion should be faster due to caching
-      const start2 = performance.now();
-      await strategy.insert(quillElement, 'Test 2');
-      const duration2 = performance.now() - start2;
-
-      // Both should succeed
-      const result1 = await strategy.insert(quillElement, 'Test 3');
+      // First insertion - editor will be cached
+      const result1 = await strategy.insert(quillElement, 'Test 1');
       expect(result1.success).toBe(true);
+      expect(result1.method).toBe('gemini-dom-manipulation');
 
-      // Cache improves performance (though hard to measure reliably in tests)
-      // Just verify both insertions work
-      expect(duration1).toBeGreaterThan(0);
-      expect(duration2).toBeGreaterThan(0);
+      // Second insertion - uses cached editor (no DOM query)
+      const result2 = await strategy.insert(quillElement, 'Test 2');
+      expect(result2.success).toBe(true);
+      expect(result2.method).toBe('gemini-dom-manipulation');
 
+      // Third insertion - verify cache still works
+      const result3 = await strategy.insert(quillElement, 'Test 3');
+      expect(result3.success).toBe(true);
+
+      // All three insertions succeeded without errors
+      // (Performance benefit: avoided 2 extra DOM traversals)
       document.body.removeChild(quillElement);
     });
 
-    it('should invalidate cache when element is removed from DOM', async () => {
+    it('should handle insertions after element is removed from DOM', async () => {
+      // Test cache invalidation: verify that stale cached references don't
+      // cause errors when the original element is removed from DOM
       const quillElement = document.createElement('div');
       quillElement.classList.add('ql-editor');
       quillElement.contentEditable = 'true';
       document.body.appendChild(quillElement);
 
-      // First insertion - cache the editor
-      await strategy.insert(quillElement, 'Test 1');
+      // First insertion - cache the editor reference
+      const result1 = await strategy.insert(quillElement, 'Test 1');
+      expect(result1.success).toBe(true);
 
-      // Remove from DOM
+      // Remove from DOM - cache should be invalidated
       document.body.removeChild(quillElement);
 
-      // Create new element and re-add
+      // Create new element and add to DOM
       const newQuillElement = document.createElement('div');
       newQuillElement.classList.add('ql-editor');
       newQuillElement.contentEditable = 'true';
       document.body.appendChild(newQuillElement);
 
-      // Should work with new element (cache should be invalid for old one)
-      const result = await strategy.insert(newQuillElement, 'Test 2');
-      expect(result.success).toBe(true);
+      // Should work with new element (proves cache doesn't hold stale references)
+      const result2 = await strategy.insert(newQuillElement, 'Test 2');
+      expect(result2.success).toBe(true);
 
       document.body.removeChild(newQuillElement);
     });
 
-    it('should throttle page-wide Quill searches', async () => {
-      // Create a non-Quill element that will trigger page-wide search
+    it('should handle rapid insertions to non-Quill elements', async () => {
+      // Test throttling behavior: verify that rapid insertions to non-Quill
+      // elements succeed via DOM manipulation fallback without causing errors
       const nonQuillElement = document.createElement('div');
       nonQuillElement.contentEditable = 'true';
 
-      // First call - should do page-wide search
+      // Multiple rapid insertions to element without Quill editor class
+      // Strategy should fall back to DOM manipulation for all insertions
       const result1 = await strategy.insert(nonQuillElement, 'Test 1');
-
-      // Second call immediately - should be throttled (returns element as-is)
-      const result2 = await strategy.insert(nonQuillElement, 'Test 2');
-
-      // Both should work (DOM manipulation fallback)
       expect(result1.success).toBe(true);
+
+      const result2 = await strategy.insert(nonQuillElement, 'Test 2');
       expect(result2.success).toBe(true);
 
-      // Verify throttling works by checking that rapid calls still succeed
-      // (throttle just skips page-wide search, doesn't fail insertion)
       const result3 = await strategy.insert(nonQuillElement, 'Test 3');
       expect(result3.success).toBe(true);
+
+      // All insertions succeeded despite not finding Quill editor
+      // (Throttling prevents repeated expensive page-wide searches)
     });
 
-    it('should cache negative results to avoid repeated searches', async () => {
-      // Create contenteditable element that won't match Quill editor class
+    it('should handle repeated insertions to elements without Quill editor', async () => {
+      // Test negative result caching: verify that repeated insertions to
+      // non-Quill elements succeed via fallback without performance degradation
       const nonQuillElement = document.createElement('div');
       nonQuillElement.contentEditable = 'true';
       document.body.appendChild(nonQuillElement);
 
-      // First search - will fail to find Quill editor but succeed with DOM manipulation
+      // First insertion - won't find Quill editor, uses DOM manipulation fallback
       const result1 = await strategy.insert(nonQuillElement, 'Test 1');
       expect(result1.success).toBe(true);
 
-      // Second search - should use cached result (even if negative for Quill)
-      // and still succeed via DOM manipulation
+      // Subsequent insertions should also succeed via fallback
+      // (Cache prevents repeated expensive page-wide DOM queries)
       const result2 = await strategy.insert(nonQuillElement, 'Test 2');
       expect(result2.success).toBe(true);
 
-      // Multiple rapid insertions should all work
-      // Cache prevents repeated page-wide DOM queries
       const result3 = await strategy.insert(nonQuillElement, 'Test 3');
       expect(result3.success).toBe(true);
 
+      // All insertions succeeded via DOM manipulation fallback
       document.body.removeChild(nonQuillElement);
     });
 
-    it('should find Quill editor in parent hierarchy and cache result', async () => {
+    it('should find Quill editor in parent hierarchy for child elements', async () => {
+      // Test parent traversal: verify that insertions to child elements
+      // correctly find and cache the parent Quill editor reference
       const quillParent = document.createElement('div');
       quillParent.classList.add('ql-editor');
       quillParent.contentEditable = 'true';
@@ -477,16 +492,15 @@ describe('GeminiStrategy', () => {
       quillParent.appendChild(childElement);
       document.body.appendChild(quillParent);
 
-      // Insert using child element - should find parent Quill editor
-      const result = await strategy.insert(childElement, 'Test');
+      // Insert using child element - should traverse up to find parent Quill editor
+      const result1 = await strategy.insert(childElement, 'Test 1');
+      expect(result1.success).toBe(true);
 
-      // Should succeed by finding parent
-      expect(result.success).toBe(true);
-
-      // Second call should use cache
+      // Second insertion should reuse cached parent editor reference
       const result2 = await strategy.insert(childElement, 'Test 2');
       expect(result2.success).toBe(true);
 
+      // Both insertions succeeded by finding parent editor
       document.body.removeChild(quillParent);
     });
   });

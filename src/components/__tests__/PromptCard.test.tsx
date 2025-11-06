@@ -63,7 +63,7 @@ describe('PromptCard - Basic Rendering', () => {
     expect(screen.getByLabelText(/copy.*to clipboard/i)).toBeInTheDocument();
   });
 
-  it('should apply truncate styles to long titles', () => {
+  it('should provide tooltip for long titles', () => {
     const longTitle = 'This is a very long title that should be truncated with ellipsis when it exceeds the available width of the container';
     const promptWithLongTitle: Prompt = {
       ...mockPrompt,
@@ -73,27 +73,12 @@ describe('PromptCard - Basic Rendering', () => {
     render(<PromptCard {...mockProps} prompt={promptWithLongTitle} />);
     const titleElement = screen.getByText(longTitle);
 
-    // Check that truncate class is applied with inline-block for proper truncation with inline elements
-    expect(titleElement).toHaveClass('truncate');
-    expect(titleElement).toHaveClass('inline-block');
-    expect(titleElement).toHaveClass('max-w-full');
-  });
-
-  it('should have title attribute with full text for long titles', () => {
-    const longTitle = 'This is a very long title that should be truncated with ellipsis when it exceeds the available width of the container';
-    const promptWithLongTitle: Prompt = {
-      ...mockPrompt,
-      title: longTitle
-    };
-
-    render(<PromptCard {...mockProps} prompt={promptWithLongTitle} />);
-    const titleElement = screen.getByText(longTitle);
-
-    // Check that title attribute contains full text (for tooltip on hover)
+    // Verify full text is accessible via tooltip
     expect(titleElement).toHaveAttribute('title', longTitle);
+    expect(titleElement).toBeVisible();
   });
 
-  it('should truncate long titles even with search highlighting', () => {
+  it('should display long titles with search highlighting and tooltip', () => {
     const longTitle = 'This is a very long title with searchable text that should still be truncated properly';
     const promptWithLongTitle: Prompt = {
       ...mockPrompt,
@@ -103,11 +88,13 @@ describe('PromptCard - Basic Rendering', () => {
     render(<PromptCard {...mockProps} prompt={promptWithLongTitle} searchQuery="searchable" />);
     const titleElement = screen.getByRole('heading', { name: /searchable/i });
 
-    // Check that truncate styles are still applied even with highlighting (inline-block enables ellipsis with mark tags)
-    expect(titleElement).toHaveClass('truncate');
-    expect(titleElement).toHaveClass('inline-block');
-    expect(titleElement).toHaveClass('max-w-full');
+    // Verify full text is accessible via tooltip even with highlighting
     expect(titleElement).toHaveAttribute('title', longTitle);
+    expect(titleElement).toBeVisible();
+
+    // Verify highlighting is present
+    const highlight = screen.getByText('searchable');
+    expect(highlight).toBeInTheDocument();
   });
 });
 
@@ -281,11 +268,6 @@ describe('PromptCard - Share Button', () => {
     // Verify initial state: not disabled and not busy
     expect(shareButton).not.toBeDisabled();
     expect(shareButton).toHaveAttribute('aria-busy', 'false');
-
-    // Verify button has proper disabled state styling for when loading state is active
-    // These Tailwind classes ensure proper visual feedback during loading
-    expect(shareButton).toHaveClass('disabled:opacity-50');
-    expect(shareButton).toHaveClass('disabled:cursor-not-allowed');
   });
 
   it('should support keyboard navigation with Enter key', async () => {

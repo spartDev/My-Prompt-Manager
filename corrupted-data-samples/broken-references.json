@@ -1,0 +1,40 @@
+{
+  "prompts": [
+    {
+      "id": "prompt-1",
+      "title": "Valid Prompt",
+      "content": "This references an existing category",
+      "category": "ExistingCategory",
+      "createdAt": 1704110400000,
+      "updatedAt": 1704110400000
+    },
+    {
+      "id": "prompt-2",
+      "title": "Broken Reference 1",
+      "content": "This references a non-existent category",
+      "category": "NonExistentCategory",
+      "createdAt": 1704110400000,
+      "updatedAt": 1704110400000
+    },
+    {
+      "id": "prompt-3",
+      "title": "Broken Reference 2",
+      "content": "This also references a missing category",
+      "category": "AnotherMissingCategory",
+      "createdAt": 1704110400000,
+      "updatedAt": 1704110400000
+    }
+  ],
+  "categories": [
+    {
+      "id": "cat-1",
+      "name": "ExistingCategory"
+    }
+  ],
+  "settings": {
+    "defaultCategory": "ExistingCategory",
+    "sortOrder": "updatedAt",
+    "sortDirection": "desc",
+    "theme": "light"
+  }
+}

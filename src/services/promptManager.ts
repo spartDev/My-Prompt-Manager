@@ -87,12 +87,17 @@ export class PromptManager {
         }
       }
 
-      // Clean up data
-      const cleanUpdates = {
-        ...updates,
-        title: updates.title?.trim(),
-        content: updates.content?.trim()
-      };
+      // Clean up data - only include fields that were actually provided
+      const cleanUpdates: { title?: string; content?: string; category?: string } = {};
+      if (updates.title !== undefined) {
+        cleanUpdates.title = updates.title.trim();
+      }
+      if (updates.content !== undefined) {
+        cleanUpdates.content = updates.content.trim();
+      }
+      if (updates.category !== undefined) {
+        cleanUpdates.category = updates.category;
+      }
 
       return await this.storageManager.updatePrompt(id, cleanUpdates);
     } catch (error) {

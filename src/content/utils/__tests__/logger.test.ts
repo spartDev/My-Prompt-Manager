@@ -4,8 +4,6 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-import * as Logger from '../logger';
-
 // Mock localStorage
 const localStorageMock = {
   getItem: vi.fn(),
@@ -39,49 +37,67 @@ const documentMock = {
 };
 
 describe('Logger', () => {
-  beforeEach(() => {
+  let Logger: typeof import('../logger');
+
+  beforeEach(async () => {
+    // Mock setTimeout FIRST
+    vi.useFakeTimers();
+
     // Reset all mocks
     vi.clearAllMocks();
-    
-    // Setup global mocks
+
+    // Default Chrome storage mock to return empty settings
+    chromeStorageMock.local.get.mockResolvedValue({ promptLibrarySettings: { debugMode: false } });
+
+    // Default localStorage to not set debug mode
+    localStorageMock.getItem.mockReturnValue(null);
+
+    // Setup global mocks BEFORE module import
     Object.defineProperty(window, 'localStorage', {
       value: localStorageMock,
       writable: true,
+      configurable: true,
     });
-    
+
     Object.defineProperty(window, 'location', {
       value: { hostname: 'example.com', href: 'https://example.com/test' },
       writable: true,
+      configurable: true,
     });
-    
+
     Object.defineProperty(window, 'navigator', {
       value: { userAgent: 'Test User Agent' },
       writable: true,
+      configurable: true,
     });
-    
+
     Object.defineProperty(globalThis, 'console', {
       value: consoleMock,
       writable: true,
+      configurable: true,
     });
 
     Object.defineProperty(globalThis, 'document', {
       value: documentMock,
       writable: true,
+      configurable: true,
     });
 
     Object.defineProperty(globalThis, 'chrome', {
       value: { storage: chromeStorageMock },
       writable: true,
+      configurable: true,
     });
-    
-    // Default Chrome storage mock to return empty settings
-    chromeStorageMock.local.get.mockResolvedValue({ promptLibrarySettings: { debugMode: false } });
-    
-    // Reset debug cache before each test
-    Logger._resetDebugCacheForTesting();
-    
-    // Mock setTimeout
-    vi.useFakeTimers();
+
+    // Reset module cache and re-import Logger to get fresh instance with reset internal state
+    vi.resetModules();
+    Logger = await import('../logger');
+
+    // Run all pending timers to complete the async updateDebugModeCache() call from module initialization
+    await vi.runAllTimersAsync();
+
+    // Advance time past cache duration (5000ms) so each test gets a fresh check
+    vi.advanceTimersByTime(6000);
   });
 
   afterEach(() => {
@@ -179,6 +195,7 @@ describe('Logger', () => {
 
   describe('warn', () => {
     it('should log warning with proper structure', () => {
+      localStorageMock.getItem.mockReturnValue('true'); // Enable debug mode
       const message = 'Test warning message';
       const context = { testKey: 'testValue' };
 
@@ -296,11 +313,9 @@ describe('Logger', () => {
 
   describe('showDebugNotification', () => {
     beforeEach(() => {
-      // Reset the static property before each test
-      (Logger as any)._lastNotification = null;
-      
-      const mockElement = { 
-        style: { cssText: '' }, 
+      // Setup mock element for notification creation
+      const mockElement = {
+        style: { cssText: '' },
         textContent: '',
         parentNode: document.body,
         remove: vi.fn()
@@ -325,16 +340,29 @@ describe('Logger', () => {
     });
 
     it('should prevent spam notifications', () => {
-      // Clear any previous calls and reset state
+      // Clear any previous calls
       vi.clearAllMocks();
       localStorageMock.getItem.mockReturnValue('true');
-      
+
       // Use a unique message to avoid contamination from other tests
       const uniqueMessage = 'Unique spam test message ' + Date.now();
 
+      // First call should create notification
       Logger.showDebugNotification(uniqueMessage);
-      Logger.showDebugNotification(uniqueMessage); // Second call should be ignored
+      expect(documentMock.createElement).toHaveBeenCalledTimes(1);
 
+      // Clear mock calls to verify second call behavior
+      vi.clearAllMocks();
+
+      // Second call with same message should be ignored (spam prevention)
+      Logger.showDebugNotification(uniqueMessage);
+      expect(documentMock.createElement).not.toHaveBeenCalled();
+
+      // After 10 seconds, spam prevention should clear
+      vi.advanceTimersByTime(10000);
+
+      // Third call should work again
+      Logger.showDebugNotification(uniqueMessage);
       expect(documentMock.createElement).toHaveBeenCalledTimes(1);
     });
 
@@ -361,31 +389,25 @@ describe('Logger', () => {
 
     it('should apply correct styles for different notification types', () => {
       localStorageMock.getItem.mockReturnValue('true');
-      
-      // Test error style
+
+      // Test error style - use unique message to avoid spam prevention
       const errorElement = { style: { cssText: '' }, textContent: '' };
       documentMock.createElement.mockReturnValue(errorElement);
-      Logger.showDebugNotification('Error message', 'error');
+      Logger.showDebugNotification('Error message ' + Date.now(), 'error');
       expect(errorElement.style.cssText).toContain('#fee');
       expect(errorElement.style.cssText).toContain('#f56565');
 
-      // Reset for next test
-      (Logger as any)._lastNotification = null;
-      
-      // Test warn style
+      // Test warn style - use unique message to avoid spam prevention
       const warnElement = { style: { cssText: '' }, textContent: '' };
       documentMock.createElement.mockReturnValue(warnElement);
-      Logger.showDebugNotification('Warning message', 'warn');
+      Logger.showDebugNotification('Warning message ' + Date.now(), 'warn');
       expect(warnElement.style.cssText).toContain('#fef5e7');
       expect(warnElement.style.cssText).toContain('#ed8936');
 
-      // Reset for next test
-      (Logger as any)._lastNotification = null;
-      
-      // Test info style
+      // Test info style - use unique message to avoid spam prevention
       const infoElement = { style: { cssText: '' }, textContent: '' };
       documentMock.createElement.mockReturnValue(infoElement);
-      Logger.showDebugNotification('Info message', 'info');
+      Logger.showDebugNotification('Info message ' + Date.now(), 'info');
       expect(infoElement.style.cssText).toContain('#e6fffa');
       expect(infoElement.style.cssText).toContain('#38b2ac');
     });

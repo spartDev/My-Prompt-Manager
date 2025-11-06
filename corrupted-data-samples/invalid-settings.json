@@ -1,0 +1,25 @@
+{
+  "prompts": [
+    {
+      "id": "prompt-1",
+      "title": "Valid Prompt",
+      "content": "This is a valid prompt",
+      "category": "Test",
+      "createdAt": 1704110400000,
+      "updatedAt": 1704110400000
+    }
+  ],
+  "categories": [
+    {
+      "id": "cat-1",
+      "name": "Test"
+    }
+  ],
+  "settings": {
+    "defaultCategory": "Test",
+    "sortOrder": "invalidSortOrder",
+    "sortDirection": "sideways",
+    "theme": "rainbow",
+    "interfaceMode": "holographic"
+  }
+}

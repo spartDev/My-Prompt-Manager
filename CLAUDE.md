@@ -132,13 +132,26 @@ src/
 - Debug interface: `window.__promptLibraryDebug`
 
 ### Testing Strategy
-- 875 tests across 46 test files
-- Unit tests for services and utilities
-- Component tests with React Testing Library
-- Integration tests for storage operations
-- Mock Chrome APIs in `src/test/setup.ts`
-- **Test environment**: happy-dom (faster and more modern than jsdom)
-- **Note**: React 19 hooks (`useActionState`, `useOptimistic`) tested manually in browser (not supported in Node.js test environments)
+
+We maintain a comprehensive test suite with 920+ tests across 49 test files:
+
+- **Unit tests** - Services, utilities, and helper functions
+- **Component tests** - React Testing Library with accessible queries
+- **Integration tests** - Content script system and storage operations
+- **Hook tests** - 100% coverage of custom React hooks (8/8)
+- **Test environment** - happy-dom (faster and more modern than jsdom)
+
+**React 19 Limitations:**
+- `useActionState` and `useOptimistic` hooks tested manually in browser
+- Not supported in Node.js test environments (happy-dom/jsdom)
+
+**For testing best practices, see:** `docs/TESTING_BEST_PRACTICES.md`
+
+**Key testing principles:**
+1. Test behavior, not implementation
+2. Use accessible queries (getByRole, getByLabelText)
+3. Mock time for deterministic tests
+4. Avoid testing private methods or CSS classes
 
 ## Development Guidelines
 

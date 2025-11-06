@@ -1,0 +1,48 @@
+{
+  "prompts": [
+    {
+      "id": "duplicate-id",
+      "title": "First Prompt",
+      "content": "This has a duplicate ID",
+      "category": "Test",
+      "createdAt": 1704110400000,
+      "updatedAt": 1704110400000
+    },
+    {
+      "id": "duplicate-id",
+      "title": "Second Prompt",
+      "content": "This also has the same ID!",
+      "category": "Test",
+      "createdAt": 1704110400000,
+      "updatedAt": 1704110400000
+    },
+    {
+      "id": "unique-id",
+      "title": "Third Prompt",
+      "content": "This one is unique",
+      "category": "Test",
+      "createdAt": 1704110400000,
+      "updatedAt": 1704110400000
+    }
+  ],
+  "categories": [
+    {
+      "id": "cat-1",
+      "name": "Test"
+    },
+    {
+      "id": "cat-2",
+      "name": "test"
+    },
+    {
+      "id": "cat-3",
+      "name": "TEST"
+    }
+  ],
+  "settings": {
+    "defaultCategory": "Test",
+    "sortOrder": "updatedAt",
+    "sortDirection": "desc",
+    "theme": "light"
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "prompts": [
+    {
+      "id": "prompt-1",
+      "title": "Negative Timestamp",
+      "content": "This has a negative createdAt",
+      "category": "Test",
+      "createdAt": -1000,
+      "updatedAt": 1704110400000
+    },
+    {
+      "id": "prompt-2",
+      "title": "Future Timestamp",
+      "content": "This has a timestamp far in the future (year 3000)",
+      "category": "Test",
+      "createdAt": 32503680000000,
+      "updatedAt": 32503680000000
+    },
+    {
+      "id": "prompt-3",
+      "title": "UpdatedAt Before CreatedAt",
+      "content": "UpdatedAt is before createdAt",
+      "category": "Test",
+      "createdAt": 1704110400000,
+      "updatedAt": 1704100000000
+    },
+    {
+      "id": "prompt-4",
+      "title": "Invalid UsageCount",
+      "content": "Negative usage count",
+      "category": "Test",
+      "createdAt": 1704110400000,
+      "updatedAt": 1704110400000,
+      "usageCount": -5
+    },
+    {
+      "id": "prompt-5",
+      "title": "Invalid LastUsedAt",
+      "content": "LastUsedAt is before createdAt",
+      "category": "Test",
+      "createdAt": 1704110400000,
+      "updatedAt": 1704110400000,
+      "lastUsedAt": 1704100000000
+    }
+  ],
+  "categories": [
+    {
+      "id": "cat-1",
+      "name": "Test"
+    }
+  ],
+  "settings": {
+    "defaultCategory": "Test",
+    "sortOrder": "updatedAt",
+    "sortDirection": "desc",
+    "theme": "light"
+  }
+}

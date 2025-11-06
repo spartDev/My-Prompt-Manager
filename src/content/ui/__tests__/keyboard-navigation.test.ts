@@ -59,20 +59,20 @@ describe('KeyboardNavigationManager', () => {
       expect(keyboardNav).toBeInstanceOf(KeyboardNavigationManager);
     });
 
-    it('should initialize with inactive state', () => {
-      // Access private properties through any for testing
-      expect((keyboardNav as any).isActive).toBe(false);
-      expect((keyboardNav as any).selectedIndex).toBe(-1);
-      expect((keyboardNav as any).items).toEqual([]);
+    it('should initialize with no selected items', () => {
+      // Test observable DOM state instead of private properties
+      mockPromptItems.forEach(item => {
+        expect(item.classList.contains('keyboard-selected')).toBe(false);
+        expect(item.hasAttribute('aria-selected')).toBe(false);
+      });
     });
   });
 
   describe('initialize', () => {
     it('should set up keyboard navigation', () => {
       keyboardNav.initialize();
-      
-      expect((keyboardNav as any).isActive).toBe(true);
-      expect((keyboardNav as any).items).toHaveLength(3);
+
+      // Test observable effects instead of private state
       expect(mockEventManager.addTrackedEventListener).toHaveBeenCalledWith(
         expect.any(Object), // Accept any document object
         'keydown',
@@ -100,17 +100,24 @@ describe('KeyboardNavigationManager', () => {
       keyboardNav.initialize();
     });
 
-    it('should update items list', () => {
+    it('should update items list and allow navigation to new items', () => {
       // Add a new item
       const newItem = document.createElement('div');
       newItem.className = 'prompt-item';
       newItem.dataset.promptId = '4';
       mockSelector.querySelector('.prompt-list')?.appendChild(newItem);
-      
+
       keyboardNav.updateItems();
-      
-      expect((keyboardNav as any).items).toHaveLength(4);
-      expect((keyboardNav as any).selectedIndex).toBe(-1);
+
+      // Test observable behavior: navigation should work with new item count
+      // Get all items including the new one
+      const allItems = Array.from(mockSelector.querySelectorAll('.prompt-item'));
+      expect(allItems).toHaveLength(4);
+
+      // Verify no items are selected after update
+      allItems.forEach(item => {
+        expect(item.classList.contains('keyboard-selected')).toBe(false);
+      });
     });
 
     it('should clear selection when updating items', () => {
@@ -151,13 +158,20 @@ describe('KeyboardNavigationManager', () => {
       });
 
       it('should wrap to first item when at end', () => {
-        // Select last item first
-        (keyboardNav as any).selectedIndex = 2;
-        (keyboardNav as any).updateSelection();
-        
-        const event = new KeyboardEvent('keydown', { key: 'ArrowDown' });
-        keyboardHandler(event);
-        
+        // Navigate to last item by pressing ArrowDown multiple times
+        const event1 = new KeyboardEvent('keydown', { key: 'ArrowDown' });
+        keyboardHandler(event1); // Select item 0
+
+        const event2 = new KeyboardEvent('keydown', { key: 'ArrowDown' });
+        keyboardHandler(event2); // Select item 1
+
+        const event3 = new KeyboardEvent('keydown', { key: 'ArrowDown' });
+        keyboardHandler(event3); // Select item 2
+
+        // Now press ArrowDown again to wrap
+        const event4 = new KeyboardEvent('keydown', { key: 'ArrowDown' });
+        keyboardHandler(event4); // Should wrap to item 0
+
         expect(mockPromptItems[0].classList.contains('keyboard-selected')).toBe(true);
         expect(mockPromptItems[2].classList.contains('keyboard-selected')).toBe(false);
       });
@@ -165,15 +179,19 @@ describe('KeyboardNavigationManager', () => {
 
     describe('ArrowUp key', () => {
       it('should select previous item', () => {
-        // Start with second item selected
-        (keyboardNav as any).selectedIndex = 1;
-        (keyboardNav as any).updateSelection();
-        
-        const event = new KeyboardEvent('keydown', { key: 'ArrowUp' });
-        const preventDefaultSpy = vi.spyOn(event, 'preventDefault');
-        
-        keyboardHandler(event);
-        
+        // Navigate down to select second item
+        const event1 = new KeyboardEvent('keydown', { key: 'ArrowDown' });
+        keyboardHandler(event1); // Select item 0
+
+        const event2 = new KeyboardEvent('keydown', { key: 'ArrowDown' });
+        keyboardHandler(event2); // Select item 1
+
+        // Now press ArrowUp to go back to item 0
+        const event3 = new KeyboardEvent('keydown', { key: 'ArrowUp' });
+        const preventDefaultSpy = vi.spyOn(event3, 'preventDefault');
+
+        keyboardHandler(event3);
+
         expect(preventDefaultSpy).toHaveBeenCalled();
         expect(mockPromptItems[0].classList.contains('keyboard-selected')).toBe(true);
         expect(mockPromptItems[1].classList.contains('keyboard-selected')).toBe(false);
@@ -189,16 +207,16 @@ describe('KeyboardNavigationManager', () => {
 
     describe('Enter key', () => {
       it('should activate selected item', () => {
-        // Select first item
-        (keyboardNav as any).selectedIndex = 0;
-        (keyboardNav as any).updateSelection();
-        
+        // Navigate down to select first item
+        const event1 = new KeyboardEvent('keydown', { key: 'ArrowDown' });
+        keyboardHandler(event1); // Select item 0
+
         const clickSpy = vi.spyOn(mockPromptItems[0], 'click');
-        const event = new KeyboardEvent('keydown', { key: 'Enter' });
-        const preventDefaultSpy = vi.spyOn(event, 'preventDefault');
-        
-        keyboardHandler(event);
-        
+        const event2 = new KeyboardEvent('keydown', { key: 'Enter' });
+        const preventDefaultSpy = vi.spyOn(event2, 'preventDefault');
+
+        keyboardHandler(event2);
+
         expect(preventDefaultSpy).toHaveBeenCalled();
         expect(clickSpy).toHaveBeenCalled();
         expect(Logger.debug).toHaveBeenCalledWith('Activating selected item via keyboard', {
@@ -282,14 +300,15 @@ describe('KeyboardNavigationManager', () => {
       });
     });
 
-    it('should ignore events when inactive', () => {
-      (keyboardNav as any).isActive = false;
-      
+    it('should ignore events when destroyed', () => {
+      // Destroy the keyboard navigation
+      keyboardNav.destroy();
+
       const event = new KeyboardEvent('keydown', { key: 'ArrowDown' });
       const preventDefaultSpy = vi.spyOn(event, 'preventDefault');
-      
+
       keyboardHandler(event);
-      
+
       expect(preventDefaultSpy).not.toHaveBeenCalled();
       expect(mockPromptItems[0].classList.contains('keyboard-selected')).toBe(false);
     });
@@ -302,18 +321,24 @@ describe('KeyboardNavigationManager', () => {
 
     it('should deactivate keyboard navigation', () => {
       keyboardNav.destroy();
-      
-      expect((keyboardNav as any).isActive).toBe(false);
+
       expect(Logger.debug).toHaveBeenCalledWith('Keyboard navigation manager destroyed');
     });
 
     it('should clear selection', () => {
-      // Select an item first
-      (keyboardNav as any).selectedIndex = 0;
-      (keyboardNav as any).updateSelection();
-      
+      // Navigate down to select first item
+      const event = new KeyboardEvent('keydown', { key: 'ArrowDown' });
+      const addTrackedEventListenerCalls = (mockEventManager.addTrackedEventListener as any).mock.calls;
+      const keydownCall = addTrackedEventListenerCalls.find((call: any) => call[1] === 'keydown');
+      const keyboardHandler = keydownCall[2];
+      keyboardHandler(event);
+
+      // Verify item is selected
+      expect(mockPromptItems[0].classList.contains('keyboard-selected')).toBe(true);
+
+      // Destroy and verify selection is cleared
       keyboardNav.destroy();
-      
+
       expect(mockPromptItems[0].classList.contains('keyboard-selected')).toBe(false);
       expect(mockPromptItems[0].hasAttribute('aria-selected')).toBe(false);
     });
@@ -365,15 +390,26 @@ describe('KeyboardNavigationManager', () => {
         x: 0,
         y: 350
       } as DOMRect);
-      
+
       mockPromptItems[2].scrollIntoView = vi.fn();
-      
-      (keyboardNav as any).selectedIndex = 2;
-      (keyboardNav as any).scrollToSelected();
-      
-      expect(mockPromptItems[2].scrollIntoView).toHaveBeenCalledWith({ 
-        block: 'end', 
-        behavior: 'smooth' 
+
+      // Navigate to last item using keyboard
+      const addTrackedEventListenerCalls = (mockEventManager.addTrackedEventListener as any).mock.calls;
+      const keydownCall = addTrackedEventListenerCalls.find((call: any) => call[1] === 'keydown');
+      const keyboardHandler = keydownCall[2];
+
+      const event1 = new KeyboardEvent('keydown', { key: 'ArrowDown' });
+      keyboardHandler(event1); // Select item 0
+
+      const event2 = new KeyboardEvent('keydown', { key: 'ArrowDown' });
+      keyboardHandler(event2); // Select item 1
+
+      const event3 = new KeyboardEvent('keydown', { key: 'ArrowDown' });
+      keyboardHandler(event3); // Select item 2
+
+      expect(mockPromptItems[2].scrollIntoView).toHaveBeenCalledWith({
+        block: 'end',
+        behavior: 'smooth'
       });
     });
 
@@ -389,15 +425,20 @@ describe('KeyboardNavigationManager', () => {
         x: 0,
         y: 50
       } as DOMRect);
-      
+
       mockPromptItems[0].scrollIntoView = vi.fn();
-      
-      (keyboardNav as any).selectedIndex = 0;
-      (keyboardNav as any).scrollToSelected();
-      
-      expect(mockPromptItems[0].scrollIntoView).toHaveBeenCalledWith({ 
-        block: 'start', 
-        behavior: 'smooth' 
+
+      // Navigate to first item using keyboard
+      const addTrackedEventListenerCalls = (mockEventManager.addTrackedEventListener as any).mock.calls;
+      const keydownCall = addTrackedEventListenerCalls.find((call: any) => call[1] === 'keydown');
+      const keyboardHandler = keydownCall[2];
+
+      const event = new KeyboardEvent('keydown', { key: 'ArrowDown' });
+      keyboardHandler(event); // Select item 0
+
+      expect(mockPromptItems[0].scrollIntoView).toHaveBeenCalledWith({
+        block: 'start',
+        behavior: 'smooth'
       });
     });
   });

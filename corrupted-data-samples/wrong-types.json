@@ -1,0 +1,39 @@
+{
+  "prompts": [
+    {
+      "id": null,
+      "title": 123,
+      "content": ["array", "of", "strings"],
+      "category": "Test",
+      "createdAt": "not-a-number",
+      "updatedAt": -1000,
+      "usageCount": "five",
+      "lastUsedAt": true
+    },
+    {
+      "id": "prompt-2",
+      "title": "Valid Prompt",
+      "content": "This one is fine",
+      "category": 456,
+      "createdAt": 1704110400000,
+      "updatedAt": 1704110400000
+    }
+  ],
+  "categories": [
+    {
+      "id": 789,
+      "name": 123,
+      "color": "not-a-hex-color"
+    },
+    {
+      "id": "cat-2",
+      "name": "Test"
+    }
+  ],
+  "settings": {
+    "defaultCategory": ["should", "be", "string"],
+    "sortOrder": 999,
+    "sortDirection": true,
+    "theme": {"nested": "object"}
+  }
+}

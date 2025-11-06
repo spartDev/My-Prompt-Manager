@@ -46,14 +46,18 @@ describe('CategoryManager', () => {
     ];
     const { props } = renderManager({ categories });
 
-    const row = screen.getByText('Ideas').closest('div');
-    const rowContainer = row?.parentElement?.parentElement as HTMLElement | null;
+    // Find the Ideas category row by text
+    const ideasText = screen.getByText('Ideas');
+    // Navigate up to the row container
+    const rowContainer = ideasText.parentElement?.parentElement?.parentElement as HTMLElement | null;
     expect(rowContainer).not.toBeNull();
 
+    // Temporarily modify the category name to trigger the error
     categories[1].name = 'Uncategorized';
 
+    // Get all buttons within this row, expecting [editButton, deleteButton]
     const buttons = within(rowContainer as HTMLElement).getAllByRole('button');
-    const deleteButton = buttons[1];
+    const deleteButton = buttons[1]; // Second button is delete
     await userEvent.click(deleteButton);
 
     expect(await screen.findByText(/cannot delete the default category/i)).toBeInTheDocument();
@@ -63,10 +67,13 @@ describe('CategoryManager', () => {
   it('updates a category name when edit input loses focus', async () => {
     const { props } = renderManager();
 
-    const row = screen.getByText('Ideas').closest('div');
-    const rowContainer = row?.parentElement?.parentElement as HTMLElement | null;
+    // Find the Ideas category row by text
+    const ideasText = screen.getByText('Ideas');
+    // Navigate up to the row container
+    const rowContainer = ideasText.parentElement?.parentElement?.parentElement as HTMLElement | null;
     expect(rowContainer).not.toBeNull();
 
+    // Get the first button (edit button) within the row
     const [editButton] = within(rowContainer as HTMLElement).getAllByRole('button');
     await userEvent.click(editButton);
 
