@@ -1,28 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+import { buildPrompt } from '../../test/builders';
 import { Prompt, Category, DEFAULT_CATEGORY } from '../../types';
 import { StorageManager } from '../storage';
 
 const FIXED_TIME = new Date('2025-01-01T00:00:00Z');
-
-const buildPrompt = (overrides: Partial<Prompt> = {}): Prompt => {
-  const timestamp = FIXED_TIME.getTime();
-  const createdAt = overrides.createdAt ?? timestamp;
-  const updatedAt = overrides.updatedAt ?? createdAt;
-  const usageCount = overrides.usageCount ?? 0;
-  const lastUsedAt = overrides.lastUsedAt ?? (usageCount > 0 ? updatedAt : createdAt);
-
-  return {
-    id: overrides.id ?? 'prompt-id',
-    title: overrides.title ?? 'Sample Prompt',
-    content: overrides.content ?? 'Sample content',
-    category: overrides.category ?? DEFAULT_CATEGORY,
-    createdAt,
-    updatedAt,
-    usageCount,
-    lastUsedAt
-  };
-};
 describe('StorageManager', () => {
   let storageManager: StorageManager;
 

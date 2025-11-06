@@ -2,6 +2,7 @@ import { renderHook, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 import { StorageManager } from '../../services/storage';
+import { testThemeToggle } from '../../test/helpers/theme-helpers';
 import type { StorageManagerMock } from '../../test/setup';
 import { DEFAULT_SETTINGS } from '../../types';
 import type {
@@ -613,52 +614,14 @@ describe('useTheme', () => {
   });
 
   describe('Toggle Theme', () => {
+    // eslint-disable-next-line vitest/expect-expect -- Assertion is in testThemeToggle helper
     it('should toggle from light to dark', async () => {
-      // Arrange
-      storageManager.getSettings.mockResolvedValue({
-        theme: 'light',
-        enableSync: false,
-        customSites: []
-      });
-      vi.mocked(storageManager.updateSettings).mockResolvedValue(DEFAULT_SETTINGS);
-
-      const { result } = renderHook(() => useTheme());
-
-      await waitFor(() => {
-        expect(result.current.theme).toBe('light');
-      });
-
-      // Act
-      await act(async () => {
-        await result.current.toggleTheme();
-      });
-
-      // Assert
-      expect(result.current.theme).toBe('dark');
+      await testThemeToggle('light', 'dark');
     });
 
+    // eslint-disable-next-line vitest/expect-expect -- Assertion is in testThemeToggle helper
     it('should toggle from dark to light', async () => {
-      // Arrange
-      storageManager.getSettings.mockResolvedValue({
-        theme: 'dark',
-        enableSync: false,
-        customSites: []
-      });
-      vi.mocked(storageManager.updateSettings).mockResolvedValue(DEFAULT_SETTINGS);
-
-      const { result } = renderHook(() => useTheme());
-
-      await waitFor(() => {
-        expect(result.current.theme).toBe('dark');
-      });
-
-      // Act
-      await act(async () => {
-        await result.current.toggleTheme();
-      });
-
-      // Assert
-      expect(result.current.theme).toBe('light');
+      await testThemeToggle('dark', 'light');
     });
 
     it('should toggle from system to opposite of current system preference', async () => {

@@ -1,6 +1,7 @@
 import LZString from 'lz-string';
 import { describe, it, expect } from 'vitest';
 
+import { testEncoderRoundtrip } from '../../test/helpers/encoder-helpers';
 import { Prompt, ErrorType } from '../../types';
 import {
   encode,
@@ -198,17 +199,14 @@ describe('PromptEncoder', () => {
       expect(decoded.category).toBe(prompt.category);
     });
 
+    // eslint-disable-next-line vitest/expect-expect -- Assertion is in testEncoderRoundtrip helper
     it('should handle round-trip encoding/decoding', () => {
       const prompt = createTestPrompt({
         title: 'Complex Title',
         content: 'Complex content with special chars: !@#$%^*()',
         category: 'Complex Category',
       });
-      const encoded = encode(prompt);
-      const decoded = decode(encoded);
-      expect(decoded.title).toBe(prompt.title);
-      expect(decoded.content).toBe(prompt.content);
-      expect(decoded.category).toBe(prompt.category);
+      testEncoderRoundtrip(prompt);
     });
 
     it('should throw PromptEncoderError for invalid encoded string', () => {
@@ -302,56 +300,44 @@ describe('PromptEncoder', () => {
   });
 
   describe('Edge Cases', () => {
+    // eslint-disable-next-line vitest/expect-expect -- Assertion is in testEncoderRoundtrip helper
     it('should handle special characters', () => {
       const prompt = createTestPrompt({
         title: '!@#$%^*()_+-=[]{}|;:",?/',
         content: 'Content with émojis 🎉🚀',
         category: 'Category with Ü̈mlaut',
       });
-      const encoded = encode(prompt);
-      const decoded = decode(encoded);
-      expect(decoded.title).toBe(prompt.title);
-      expect(decoded.content).toBe(prompt.content);
-      expect(decoded.category).toBe(prompt.category);
+      testEncoderRoundtrip(prompt);
     });
 
+    // eslint-disable-next-line vitest/expect-expect -- Assertion is in testEncoderRoundtrip helper
     it('should handle unicode characters', () => {
       const prompt = createTestPrompt({
         title: '中文标题',
         content: 'Contenu en français',
         category: 'Категория',
       });
-      const encoded = encode(prompt);
-      const decoded = decode(encoded);
-      expect(decoded.title).toBe(prompt.title);
-      expect(decoded.content).toBe(prompt.content);
-      expect(decoded.category).toBe(prompt.category);
+      testEncoderRoundtrip(prompt);
     });
 
+    // eslint-disable-next-line vitest/expect-expect -- Assertion is in testEncoderRoundtrip helper
     it('should handle maximum allowed sizes', () => {
       const prompt = createTestPrompt({
         title: 'x'.repeat(100),
         content: 'y'.repeat(20_000),
         category: 'z'.repeat(50),
       });
-      const encoded = encode(prompt);
-      const decoded = decode(encoded);
-      expect(decoded.title).toBe(prompt.title);
-      expect(decoded.content).toBe(prompt.content);
-      expect(decoded.category).toBe(prompt.category);
+      testEncoderRoundtrip(prompt);
     });
 
+    // eslint-disable-next-line vitest/expect-expect -- Assertion is in testEncoderRoundtrip helper
     it('should handle newlines and tabs', () => {
       const prompt = createTestPrompt({
         title: 'Title with\ttabs',
         content: 'Content\nwith\nnewlines',
         category: 'Category\rwith\rreturns',
       });
-      const encoded = encode(prompt);
-      const decoded = decode(encoded);
-      expect(decoded.title).toBe(prompt.title);
-      expect(decoded.content).toBe(prompt.content);
-      expect(decoded.category).toBe(prompt.category);
+      testEncoderRoundtrip(prompt);
     });
   });
 
