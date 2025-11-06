@@ -1,7 +1,7 @@
 # Testing Best Practices
 
-**Version:** 1.0.0
-**Last Updated:** 2025-11-04
+**Version:** 1.1.0
+**Last Updated:** 2025-11-06
 
 ---
 
@@ -126,6 +126,178 @@ it('should delete a prompt', async () => {
 - Tests can run in parallel
 - Debugging is easier when tests don't affect each other
 - CI/CD failures are more predictable
+
+### Test Cleanup and Lifecycle Management
+
+**Proper cleanup prevents memory leaks, test interference, and flaky tests.** Always clean up what you set up in tests.
+
+#### The Cleanup Checklist
+
+Every test suite should clean up:
+
+1. **Event Listeners** - Remove all registered listeners
+2. **Global Mutations** - Restore modified window/document properties
+3. **DOM State** - Clear localStorage, sessionStorage, reset document classes
+4. **Mock State** - Clear or restore mocks appropriately
+5. **Timers** - Restore real timers if using fake timers
+6. **Components/Hooks** - Unmount rendered components (usually automatic with Testing Library)
+
+#### Choosing the Right Mock Cleanup Method
+
+**Use `vi.clearAllMocks()` when:**
+- Tests depend on global mocks from test setup files
+- Helper functions need preserved mock implementations
+- You want to clear call history but keep mock behavior
+
+```typescript
+// ✅ Good - Preserves global mocks, clears history
+describe('useTheme', () => {
+  let originalMatchMedia: typeof window.matchMedia;
+
+  beforeEach(() => {
+    originalMatchMedia = window.matchMedia;
+    window.matchMedia = vi.fn().mockReturnValue(mockMatchMedia);
+  });
+
+  afterEach(() => {
+    window.matchMedia = originalMatchMedia;  // Restore global
+    vi.clearAllMocks();  // Clear history, keep implementations
+  });
+});
+```
+
+**Use `vi.restoreAllMocks()` when:**
+- Tests only create local spies within the test file
+- No helper functions depend on mocks
+- You want to completely remove all mock implementations
+
+```typescript
+// ✅ Good - Removes all local spies
+describe('useToast', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn(chrome.storage.local, 'get').mockResolvedValue({});
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();  // Safe - only local spies created
+  });
+});
+```
+
+#### Pattern: Cleanup for Tests with Global Mocks
+
+```typescript
+describe('Component with Global Dependencies', () => {
+  let originalGlobal: typeof window.someGlobal;
+
+  beforeEach(() => {
+    // 1. Save original references
+    originalGlobal = window.someGlobal;
+
+    // 2. Set up mocks
+    window.someGlobal = mockImplementation;
+  });
+
+  afterEach(() => {
+    // 1. Restore globals
+    window.someGlobal = originalGlobal;
+
+    // 2. Clean storage
+    localStorage.clear();
+    sessionStorage.clear();
+
+    // 3. Reset DOM state
+    document.documentElement.className = '';
+
+    // 4. Clear mock call history (keeps implementations)
+    vi.clearAllMocks();
+  });
+});
+```
+
+#### Pattern: Cleanup for Tests with Local Spies
+
+```typescript
+describe('Component with Local Spies', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    // Create local spies
+    vi.spyOn(module, 'function').mockReturnValue(value);
+  });
+
+  afterEach(() => {
+    // Restore timers
+    vi.useRealTimers();
+
+    // Remove all spies and restore originals
+    vi.restoreAllMocks();
+  });
+});
+```
+
+#### Common Cleanup Mistakes
+
+```typescript
+// ❌ Bad - Using restoreAllMocks with global test setup
+describe('useTheme', () => {
+  beforeEach(() => {
+    // StorageManager mocked globally in test/setup.ts
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();  // ❌ Removes global mocks!
+    // Helper functions will fail!
+  });
+});
+
+// ❌ Bad - Not saving original before mocking
+describe('useTheme', () => {
+  beforeEach(() => {
+    window.matchMedia = mockMatchMedia;  // ❌ Original lost!
+  });
+
+  afterEach(() => {
+    // Can't restore - original was overwritten
+  });
+});
+
+// ❌ Bad - Not cleaning up DOM state
+describe('Component', () => {
+  it('adds dark class to document', () => {
+    document.documentElement.classList.add('dark');
+    // ❌ No cleanup - affects next test
+  });
+});
+```
+
+#### Memory Leak Prevention
+
+Without proper cleanup, tests accumulate:
+
+- **Event listeners** (~200 bytes each)
+- **Closure contexts** (~500 bytes each)
+- **Mock objects** (~300 bytes each)
+- **DOM mutations** (varies)
+
+**Example:** 27 tests creating event listeners = ~27 KB per run. Over 100 runs during development = ~2.7 MB leaked.
+
+#### When Tests Fail Due to Missing Cleanup
+
+**Symptoms:**
+- Tests pass individually but fail in suite
+- Tests fail in different order
+- "Test timed out" errors
+- Unexpected values from previous tests
+- Memory errors in CI/CD
+
+**Solution:**
+1. Add `afterEach()` with comprehensive cleanup
+2. Use proper mock cleanup method (`clearAllMocks` vs `restoreAllMocks`)
+3. Save and restore all global references
+4. Clear all storage (localStorage, sessionStorage)
+5. Reset all DOM state (classes, attributes)
 
 ### Determinism
 
