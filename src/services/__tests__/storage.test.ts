@@ -373,14 +373,14 @@ describe('StorageManager', () => {
       const importData = {
         prompts: [],
         categories: [{ id: '1', name: DEFAULT_CATEGORY }],
-        settings: { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt' }
+        settings: { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt' as const, sortDirection: 'desc' as const, theme: 'system' as const }
       };
 
       await storageManager.importData(JSON.stringify(importData));
 
-       
+
       expect(chrome.storage.local.clear).toHaveBeenCalled();
-       
+
       expect(chrome.storage.local.set).toHaveBeenCalledWith({ prompts: importData.prompts });
     });
 
@@ -388,7 +388,7 @@ describe('StorageManager', () => {
       const invalidData = JSON.stringify({ invalid: 'data' });
 
       await expect(storageManager.importData(invalidData))
-        .rejects.toThrow('Invalid data format');
+        .rejects.toThrow(/Invalid import data structure.*Missing required field/);
     });
   });
 
@@ -432,7 +432,7 @@ describe('StorageManager', () => {
           updatedAt: FIXED_TIME.getTime()
         }],
         categories: [{ id: '1', name: DEFAULT_CATEGORY }],
-        settings: { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt' }
+        settings: { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt' as const, sortDirection: 'desc' as const, theme: 'system' as const }
       };
 
       // Verify: Import fails and data is rolled back
@@ -493,7 +493,7 @@ describe('StorageManager', () => {
           updatedAt: FIXED_TIME.getTime()
         }],
         categories: [{ id: '1', name: DEFAULT_CATEGORY }],
-        settings: { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt' }
+        settings: { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt' as const, sortDirection: 'desc' as const, theme: 'system' as const }
       };
 
       let capturedError: Error | null = null;
@@ -557,7 +557,7 @@ describe('StorageManager', () => {
       const importData = {
         prompts: [{ id: '2', title: 'New', content: 'New', category: DEFAULT_CATEGORY, createdAt: FIXED_TIME.getTime(), updatedAt: FIXED_TIME.getTime() }],
         categories: [{ id: '1', name: DEFAULT_CATEGORY }],
-        settings: { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt' }
+        settings: { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt' as const, sortDirection: 'desc' as const, theme: 'system' as const }
       };
 
       // Verify: Import fails with original error (not rollback error)
@@ -623,7 +623,7 @@ describe('StorageManager', () => {
       const importData = {
         prompts: [],
         categories: [{ id: '1', name: DEFAULT_CATEGORY }],
-        settings: { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt' }
+        settings: { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt' as const, sortDirection: 'desc' as const, theme: 'system' as const }
       };
 
       // Verify: Import fails

@@ -705,8 +705,13 @@ export class StorageManager {
   }
 
   private handleStorageError(error: unknown): StorageError {
+    // If it's already a StorageError, return it as-is to preserve details
+    if (error instanceof StorageError) {
+      return error;
+    }
+
     const errorMessage = error instanceof Error ? error.message : String(error);
-    
+
     if (errorMessage.includes('QUOTA_EXCEEDED')) {
       return new StorageError({
         type: ErrorType.STORAGE_QUOTA_EXCEEDED,
@@ -739,19 +744,348 @@ export class StorageManager {
   }
 
   private validateImportedData(data: unknown): data is StorageData {
+    const errors: string[] = [];
+
+    // Basic structure validation
     if (!data || typeof data !== 'object') {
-      return false;
+      throw new StorageError({
+        type: ErrorType.VALIDATION_ERROR,
+        message: 'Import data must be a valid JSON object',
+        details: { errors: ['Data is not an object'] }
+      });
     }
-    
+
     const obj = data as Record<string, unknown>;
-    return (
-      'prompts' in obj &&
-      'categories' in obj &&
-      'settings' in obj &&
-      Array.isArray(obj.prompts) &&
-      Array.isArray(obj.categories) &&
-      typeof obj.settings === 'object' &&
-      obj.settings !== null
+
+    // Check for required top-level fields
+    if (!('prompts' in obj)) {
+      errors.push('Missing required field: prompts');
+    } else if (!Array.isArray(obj.prompts)) {
+      errors.push('Field "prompts" must be an array');
+    }
+
+    if (!('categories' in obj)) {
+      errors.push('Missing required field: categories');
+    } else if (!Array.isArray(obj.categories)) {
+      errors.push('Field "categories" must be an array');
+    }
+
+    if (!('settings' in obj)) {
+      errors.push('Missing required field: settings');
+    } else if (typeof obj.settings !== 'object' || obj.settings === null) {
+      errors.push('Field "settings" must be an object');
+    }
+
+    // If structure is invalid, throw immediately
+    if (errors.length > 0) {
+      throw new StorageError({
+        type: ErrorType.VALIDATION_ERROR,
+        message: `Invalid import data structure: ${errors.join('; ')}`,
+        details: { errors }
+      });
+    }
+
+    // Validate each prompt
+    (obj.prompts as unknown[]).forEach((prompt, index) => {
+      const promptErrors = this.validatePrompt(prompt, index);
+      errors.push(...promptErrors);
+    });
+
+    // Check for duplicate prompt IDs
+    const promptIds = new Set<string>();
+    const duplicatePromptIds: string[] = [];
+    (obj.prompts as Array<{ id?: unknown }>).forEach((p, _index) => {
+      if (typeof p.id === 'string') {
+        if (promptIds.has(p.id)) {
+          duplicatePromptIds.push(p.id);
+        }
+        promptIds.add(p.id);
+      }
+    });
+    if (duplicatePromptIds.length > 0) {
+      errors.push(`Duplicate prompt IDs found: ${duplicatePromptIds.join(', ')}`);
+    }
+
+    // Validate each category
+    (obj.categories as unknown[]).forEach((category, index) => {
+      const categoryErrors = this.validateCategory(category, index);
+      errors.push(...categoryErrors);
+    });
+
+    // Check for duplicate category names (case-insensitive)
+    const categoryNames = new Map<string, string>();
+    const duplicateCategoryNames: string[] = [];
+    (obj.categories as Array<{ name?: unknown }>).forEach((c, _index) => {
+      if (typeof c.name === 'string') {
+        const lowerName = c.name.toLowerCase();
+        if (categoryNames.has(lowerName)) {
+          duplicateCategoryNames.push(c.name);
+        }
+        categoryNames.set(lowerName, c.name);
+      }
+    });
+    if (duplicateCategoryNames.length > 0) {
+      errors.push(`Duplicate category names found: ${duplicateCategoryNames.join(', ')}`);
+    }
+
+    // Validate referential integrity (prompts reference valid categories)
+    const validCategoryNames = new Set(
+      (obj.categories as Array<{ name?: unknown }>)
+        .filter(c => typeof c.name === 'string')
+        .map(c => c.name as string)
     );
+    const invalidReferences: Array<{ promptIndex: number; category: string }> = [];
+    (obj.prompts as Array<{ category?: unknown }>).forEach((p, index) => {
+      if (typeof p.category === 'string' && !validCategoryNames.has(p.category)) {
+        invalidReferences.push({ promptIndex: index, category: p.category });
+      }
+    });
+    if (invalidReferences.length > 0) {
+      const refDetails = invalidReferences
+        .slice(0, 5)
+        .map(r => `prompt[${String(r.promptIndex)}] → "${r.category}"`)
+        .join(', ');
+      const moreCount = invalidReferences.length > 5 ? ` and ${String(invalidReferences.length - 5)} more` : '';
+      errors.push(`Referential integrity violation: ${String(invalidReferences.length)} prompt(s) reference non-existent categories (${refDetails}${moreCount})`);
+    }
+
+    // Validate settings
+    const settingsErrors = this.validateSettings(obj.settings);
+    errors.push(...settingsErrors);
+
+    // If any validation errors occurred, throw with all errors
+    if (errors.length > 0) {
+      throw new StorageError({
+        type: ErrorType.VALIDATION_ERROR,
+        message: `Import validation failed with ${String(errors.length)} error(s)`,
+        details: { errors, errorCount: errors.length }
+      });
+    }
+
+    return true;
+  }
+
+  /**
+   * Validates a single prompt object
+   * Returns array of error messages (empty if valid)
+   * Accepts missing optional fields for backwards compatibility
+   */
+  private validatePrompt(p: unknown, index: number): string[] {
+    const errors: string[] = [];
+    const prefix = `prompt[${String(index)}]`;
+
+    if (!p || typeof p !== 'object') {
+      return [`${prefix}: Must be an object`];
+    }
+
+    const prompt = p as Record<string, unknown>;
+
+    // ID validation
+    if (!('id' in prompt)) {
+      errors.push(`${prefix}: Missing required field "id"`);
+    } else if (typeof prompt.id !== 'string') {
+      errors.push(`${prefix}: Field "id" must be a string`);
+    } else if (prompt.id.length === 0) {
+      errors.push(`${prefix}: Field "id" cannot be empty`);
+    }
+
+    // Title validation
+    if (!('title' in prompt)) {
+      errors.push(`${prefix}: Missing required field "title"`);
+    } else if (typeof prompt.title !== 'string') {
+      errors.push(`${prefix}: Field "title" must be a string`);
+    } else if (prompt.title.length === 0) {
+      errors.push(`${prefix}: Field "title" cannot be empty`);
+    } else if (prompt.title.length > 100) {
+      errors.push(`${prefix}: Field "title" exceeds maximum length of 100 characters (got ${String(prompt.title.length)})`);
+    }
+
+    // Content validation
+    if (!('content' in prompt)) {
+      errors.push(`${prefix}: Missing required field "content"`);
+    } else if (typeof prompt.content !== 'string') {
+      errors.push(`${prefix}: Field "content" must be a string`);
+    } else if (prompt.content.length === 0) {
+      errors.push(`${prefix}: Field "content" cannot be empty`);
+    } else if (prompt.content.length > 20000) {
+      errors.push(`${prefix}: Field "content" exceeds maximum length of 20,000 characters (got ${String(prompt.content.length)})`);
+    }
+
+    // Category validation
+    if (!('category' in prompt)) {
+      errors.push(`${prefix}: Missing required field "category"`);
+    } else if (typeof prompt.category !== 'string') {
+      errors.push(`${prefix}: Field "category" must be a string`);
+    } else if (prompt.category.length === 0) {
+      errors.push(`${prefix}: Field "category" cannot be empty`);
+    }
+
+    // Timestamp validation (createdAt is required)
+    if (!('createdAt' in prompt)) {
+      errors.push(`${prefix}: Missing required field "createdAt"`);
+    } else if (typeof prompt.createdAt !== 'number') {
+      errors.push(`${prefix}: Field "createdAt" must be a number`);
+    } else if (!Number.isFinite(prompt.createdAt)) {
+      errors.push(`${prefix}: Field "createdAt" must be a finite number`);
+    } else if (prompt.createdAt <= 0) {
+      errors.push(`${prefix}: Field "createdAt" must be a positive number`);
+    } else if (prompt.createdAt > Date.now() + 86400000) {
+      // Allow 1 day in the future for clock skew
+      errors.push(`${prefix}: Field "createdAt" cannot be more than 1 day in the future`);
+    }
+
+    // updatedAt validation (required)
+    if (!('updatedAt' in prompt)) {
+      errors.push(`${prefix}: Missing required field "updatedAt"`);
+    } else if (typeof prompt.updatedAt !== 'number') {
+      errors.push(`${prefix}: Field "updatedAt" must be a number`);
+    } else if (!Number.isFinite(prompt.updatedAt)) {
+      errors.push(`${prefix}: Field "updatedAt" must be a finite number`);
+    } else if (typeof prompt.createdAt === 'number' && prompt.updatedAt < prompt.createdAt) {
+      errors.push(`${prefix}: Field "updatedAt" cannot be before "createdAt"`);
+    }
+
+    // Optional fields validation (accept missing, but validate if present)
+    if ('usageCount' in prompt) {
+      if (typeof prompt.usageCount !== 'number') {
+        errors.push(`${prefix}: Field "usageCount" must be a number if provided`);
+      } else if (!Number.isFinite(prompt.usageCount)) {
+        errors.push(`${prefix}: Field "usageCount" must be a finite number`);
+      } else if (prompt.usageCount < 0) {
+        errors.push(`${prefix}: Field "usageCount" cannot be negative`);
+      } else if (!Number.isInteger(prompt.usageCount)) {
+        errors.push(`${prefix}: Field "usageCount" must be an integer`);
+      }
+    }
+
+    if ('lastUsedAt' in prompt) {
+      if (typeof prompt.lastUsedAt !== 'number') {
+        errors.push(`${prefix}: Field "lastUsedAt" must be a number if provided`);
+      } else if (!Number.isFinite(prompt.lastUsedAt)) {
+        errors.push(`${prefix}: Field "lastUsedAt" must be a finite number`);
+      } else if (typeof prompt.createdAt === 'number' && prompt.lastUsedAt < prompt.createdAt) {
+        errors.push(`${prefix}: Field "lastUsedAt" cannot be before "createdAt"`);
+      }
+    }
+
+    return errors;
+  }
+
+  /**
+   * Validates a single category object
+   * Returns array of error messages (empty if valid)
+   */
+  private validateCategory(c: unknown, index: number): string[] {
+    const errors: string[] = [];
+    const prefix = `category[${String(index)}]`;
+
+    if (!c || typeof c !== 'object') {
+      return [`${prefix}: Must be an object`];
+    }
+
+    const category = c as Record<string, unknown>;
+
+    // ID validation
+    if (!('id' in category)) {
+      errors.push(`${prefix}: Missing required field "id"`);
+    } else if (typeof category.id !== 'string') {
+      errors.push(`${prefix}: Field "id" must be a string`);
+    } else if (category.id.length === 0) {
+      errors.push(`${prefix}: Field "id" cannot be empty`);
+    }
+
+    // Name validation
+    if (!('name' in category)) {
+      errors.push(`${prefix}: Missing required field "name"`);
+    } else if (typeof category.name !== 'string') {
+      errors.push(`${prefix}: Field "name" must be a string`);
+    } else if (category.name.length === 0) {
+      errors.push(`${prefix}: Field "name" cannot be empty`);
+    } else if (category.name.length > 50) {
+      errors.push(`${prefix}: Field "name" exceeds maximum length of 50 characters (got ${String(category.name.length)})`);
+    }
+
+    // Optional color validation
+    if ('color' in category && category.color !== undefined) {
+      if (typeof category.color !== 'string') {
+        errors.push(`${prefix}: Field "color" must be a string if provided`);
+      } else if (category.color.length > 0 && !category.color.match(/^#[0-9A-Fa-f]{6}$/)) {
+        errors.push(`${prefix}: Field "color" must be a valid hex color (#RRGGBB format)`);
+      }
+    }
+
+    return errors;
+  }
+
+  /**
+   * Validates settings object
+   * Returns array of error messages (empty if valid)
+   */
+  private validateSettings(s: unknown): string[] {
+    const errors: string[] = [];
+    const prefix = 'settings';
+
+    if (!s || typeof s !== 'object') {
+      return [`${prefix}: Must be an object`];
+    }
+
+    const settings = s as Record<string, unknown>;
+
+    // Required field validation
+    const requiredFields = ['defaultCategory', 'sortOrder', 'sortDirection', 'theme'];
+    requiredFields.forEach(field => {
+      if (!(field in settings)) {
+        errors.push(`${prefix}: Missing required field "${field}"`);
+      }
+    });
+
+    // defaultCategory validation
+    if ('defaultCategory' in settings) {
+      if (typeof settings.defaultCategory !== 'string') {
+        errors.push(`${prefix}.defaultCategory: Must be a string`);
+      }
+    }
+
+    // sortOrder validation
+    if ('sortOrder' in settings) {
+      const validSortOrders = ['createdAt', 'updatedAt', 'title', 'usageCount', 'lastUsedAt'];
+      if (typeof settings.sortOrder !== 'string') {
+        errors.push(`${prefix}.sortOrder: Must be a string`);
+      } else if (!validSortOrders.includes(settings.sortOrder)) {
+        errors.push(`${prefix}.sortOrder: Must be one of: ${validSortOrders.join(', ')}`);
+      }
+    }
+
+    // sortDirection validation
+    if ('sortDirection' in settings) {
+      const validDirections = ['asc', 'desc'];
+      if (typeof settings.sortDirection !== 'string') {
+        errors.push(`${prefix}.sortDirection: Must be a string`);
+      } else if (!validDirections.includes(settings.sortDirection)) {
+        errors.push(`${prefix}.sortDirection: Must be one of: ${validDirections.join(', ')}`);
+      }
+    }
+
+    // theme validation
+    if ('theme' in settings) {
+      const validThemes = ['light', 'dark', 'system'];
+      if (typeof settings.theme !== 'string') {
+        errors.push(`${prefix}.theme: Must be a string`);
+      } else if (!validThemes.includes(settings.theme)) {
+        errors.push(`${prefix}.theme: Must be one of: ${validThemes.join(', ')}`);
+      }
+    }
+
+    // Optional interfaceMode validation
+    if ('interfaceMode' in settings && settings.interfaceMode !== undefined) {
+      const validModes = ['popup', 'sidepanel'];
+      if (typeof settings.interfaceMode !== 'string') {
+        errors.push(`${prefix}.interfaceMode: Must be a string if provided`);
+      } else if (!validModes.includes(settings.interfaceMode)) {
+        errors.push(`${prefix}.interfaceMode: Must be one of: ${validModes.join(', ')}`);
+      }
+    }
+
+    return errors;
   }
 }
