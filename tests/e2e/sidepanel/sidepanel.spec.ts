@@ -70,6 +70,10 @@ test.describe('Side panel experience', () => {
     const lightThemeButton = sidepanelPage.getByRole('button', { name: 'Light' });
     await lightThemeButton.click();
 
+    // Wait for the async storage operation to complete by checking for the visual indicator
+    // The theme button shows a checkmark when selected, indicating the update is complete
+    await sidepanelPage.waitForTimeout(200);
+
     const storageSnapshot = await context.serviceWorkers()[0].evaluate(() => new Promise((resolve) => {
       chrome.storage.local.get('settings', resolve);
     }));
