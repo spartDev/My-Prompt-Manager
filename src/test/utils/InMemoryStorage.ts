@@ -12,7 +12,18 @@
  * - More maintainable and easier to understand
  * - Provides higher confidence in storage operations
  *
- * @example
+ * ## Global Test Setup
+ *
+ * **Note:** The global test setup in `src/test/setup.ts` uses an enhanced `TestStorage`
+ * subclass that extends `InMemoryStorage` with additional features:
+ * - **Deep cloning** - Prevents test pollution from object mutations
+ * - **Change listeners** - Triggers `chrome.storage.onChanged` events
+ * - **Automatic cleanup** - Fresh instance for each test via `beforeEach`
+ *
+ * Most tests automatically use this enhanced version through the global setup.
+ * You only need to instantiate `InMemoryStorage` directly for isolated unit tests.
+ *
+ * @example Basic usage (for isolated tests)
  * ```typescript
  * import { InMemoryStorage } from '@test/utils/InMemoryStorage';
  *
@@ -34,6 +45,26 @@
  *     expect(result.key).toBe('value');
  *   });
  * });
+ * ```
+ *
+ * @example Extended usage (for testing storage change listeners)
+ * ```typescript
+ * import { InMemoryStorage } from '@test/utils/InMemoryStorage';
+ *
+ * // Extend InMemoryStorage to add change listener support
+ * class TestStorage extends InMemoryStorage {
+ *   private listeners: Array<(changes: Record<string, any>) => void> = [];
+ *
+ *   async set(items: Record<string, unknown>): Promise<void> {
+ *     const changes: Record<string, any> = {};
+ *     for (const [key, newValue] of Object.entries(items)) {
+ *       const oldValue = this.has(key) ? (await super.get(key))[key] : undefined;
+ *       changes[key] = { oldValue, newValue };
+ *     }
+ *     await super.set(items);
+ *     this.listeners.forEach(listener => listener(changes));
+ *   }
+ * }
  * ```
  */
 export class InMemoryStorage {

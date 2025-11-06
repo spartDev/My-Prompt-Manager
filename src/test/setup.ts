@@ -35,6 +35,8 @@ if (!globalForSetup.chrome) {
 import { PromptManager } from '../services/promptManager';
 import { StorageManager } from '../services/storage';
 
+import { InMemoryStorage } from './utils/InMemoryStorage';
+
 type StorageChangeListener = (changes: Record<string, chrome.storage.StorageChange>, areaName: string) => void;
 
 type MockFn = ReturnType<typeof vi.fn>;
@@ -65,142 +67,132 @@ type GlobalWithMocks = typeof globalThis & {
 };
 
 const storageChangeListeners: StorageChangeListener[] = [];
-const storageState: Record<string, unknown> = {};
 
-const isRecord = (value: unknown): value is Record<string, unknown> => (
-  typeof value === 'object' && value !== null && !Array.isArray(value)
-);
+/**
+ * Enhanced InMemoryStorage with deep cloning and change listener support
+ *
+ * This class extends InMemoryStorage to add:
+ * - Deep cloning to prevent test pollution from object mutations
+ * - Storage change listener triggering (for chrome.storage.onChanged)
+ * - Full compatibility with existing test infrastructure
+ */
+class TestStorage extends InMemoryStorage {
+  private cloneDeep<T>(value: T): T {
+    if (value === undefined || value === null) {
+      return value;
+    }
 
-const cloneDeep = <T>(value: T): T => {
-  if (value === undefined || value === null) {
+    if (typeof value === 'object' || Array.isArray(value)) {
+      try {
+        return structuredClone(value) as T;
+      } catch {
+        return JSON.parse(JSON.stringify(value)) as T;
+      }
+    }
+
     return value;
   }
 
-  if (typeof value === 'object' || Array.isArray(value)) {
-    try {
-      return structuredClone(value) as T;
-    } catch {
-      return JSON.parse(JSON.stringify(value)) as T;
+  async get(keys: string | string[] | Record<string, unknown> | null): Promise<Record<string, unknown>> {
+    const result = await super.get(keys);
+    // Deep clone all values to prevent test pollution
+    const clonedResult: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(result)) {
+      clonedResult[key] = this.cloneDeep(value);
     }
+    return clonedResult;
   }
 
-  return value;
-};
-
-const getSnapshot = (keys?: string | string[] | Record<string, unknown>): Record<string, unknown> => {
-  if (keys === undefined) {
-    return Object.fromEntries(
-      Object.entries(storageState).map(([key, value]) => [key, cloneDeep(value)])
-    );
-  }
-
-  if (typeof keys === 'string') {
-    return { [keys]: cloneDeep(storageState[keys]) };
-  }
-
-  if (Array.isArray(keys)) {
-    const result: Record<string, unknown> = {};
-    keys.forEach((key) => {
-      result[key] = cloneDeep(storageState[key]);
-    });
-    return result;
-  }
-
-  if (!isRecord(keys)) {
-    return {};
-  }
-  const result: Record<string, unknown> = {};
-  Object.entries(keys).forEach(([key, defaultValue]) => {
-    if (key in storageState) {
-      result[key] = cloneDeep(storageState[key]);
-    } else {
-      result[key] = cloneDeep(defaultValue);
-    }
-  });
-  return result;
-};
-
-const calculateBytes = (keys?: string | string[] | Record<string, unknown>): number => {
-  const keyList = keys === undefined
-    ? Object.keys(storageState)
-    : typeof keys === 'string'
-      ? [keys]
-      : Array.isArray(keys)
-        ? keys
-        : Object.keys(keys);
-
-  const encoder = new TextEncoder();
-
-  return keyList.reduce((total, key) => {
-    if (!(key in storageState)) {
-      return total;
-    }
-    try {
-      const serialized = JSON.stringify(storageState[key]);
-      if (typeof serialized !== 'string') {
-        return total;
-      }
-      return total + encoder.encode(serialized).length;
-    } catch {
-      return total;
-    }
-  }, 0);
-};
-
-const storageLocalGet = vi.fn();
-const storageLocalSet = vi.fn();
-const storageLocalClear = vi.fn();
-const storageLocalGetBytesInUse = vi.fn();
-
-const applyStorageImplementations = (): void => {
-  storageLocalGet.mockImplementation((keys?: string | string[] | Record<string, unknown>) =>
-    Promise.resolve(getSnapshot(keys))
-  );
-
-  storageLocalSet.mockImplementation((items: Record<string, unknown>) => {
+  async set(items: Record<string, unknown>): Promise<void> {
     const changes: Record<string, chrome.storage.StorageChange> = {};
 
-    Object.entries(items).forEach(([key, value]) => {
-      const oldValue = key in storageState ? cloneDeep(storageState[key]) : undefined;
-      const newValue = cloneDeep(value);
-      storageState[key] = newValue;
+    // Capture old values and prepare changes
+    for (const [key, value] of Object.entries(items)) {
+      const oldValue = this.has(key) ? this.cloneDeep((await super.get(key))[key]) : undefined;
+      const newValue = this.cloneDeep(value);
       changes[key] = { oldValue, newValue };
-    });
+    }
 
+    // Clone values before storing to prevent external mutations
+    const clonedItems: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(items)) {
+      clonedItems[key] = this.cloneDeep(value);
+    }
+
+    await super.set(clonedItems);
+
+    // Trigger change listeners
     if (Object.keys(changes).length > 0) {
       storageChangeListeners.forEach((listener) => {
         listener(changes, 'local');
       });
     }
+  }
 
-    return Promise.resolve();
-  });
+  async clear(): Promise<void> {
+    const allKeys = this.keys();
 
-  storageLocalClear.mockImplementation(() => {
-    if (Object.keys(storageState).length === 0) {
-      return Promise.resolve();
+    if (allKeys.length === 0) {
+      return;
     }
 
     const changes: Record<string, chrome.storage.StorageChange> = {};
-    Object.keys(storageState).forEach((key) => {
-      const oldValue = cloneDeep(storageState[key]);
-      Reflect.deleteProperty(storageState, key);
-      changes[key] = { oldValue, newValue: undefined };
-    });
+    const allData = await super.get(null);
 
+    for (const key of allKeys) {
+      const oldValue = this.cloneDeep(allData[key]);
+      changes[key] = { oldValue, newValue: undefined };
+    }
+
+    await super.clear();
+
+    // Trigger change listeners
     storageChangeListeners.forEach((listener) => {
       listener(changes, 'local');
     });
+  }
 
-    return Promise.resolve();
-  });
+  async remove(keys: string | string[]): Promise<void> {
+    const keysArray = Array.isArray(keys) ? keys : [keys];
+    const changes: Record<string, chrome.storage.StorageChange> = {};
 
-  storageLocalGetBytesInUse.mockImplementation((keys?: string | string[] | Record<string, unknown>) =>
-    Promise.resolve(calculateBytes(keys))
-  );
-};
+    // Capture old values
+    for (const key of keysArray) {
+      if (this.has(key)) {
+        const oldValue = this.cloneDeep((await super.get(key))[key]);
+        changes[key] = { oldValue, newValue: undefined };
+      }
+    }
 
-applyStorageImplementations();
+    await super.remove(keys);
+
+    // Trigger change listeners if any keys were removed
+    if (Object.keys(changes).length > 0) {
+      storageChangeListeners.forEach((listener) => {
+        listener(changes, 'local');
+      });
+    }
+  }
+}
+
+let testStorage: TestStorage = new TestStorage();
+
+// Create vi.fn() wrappers around TestStorage methods for test spying/mocking
+const storageLocalGet = vi.fn((keys?: string | string[] | Record<string, unknown> | null) =>
+  testStorage.get(keys)
+);
+const storageLocalSet = vi.fn((items: Record<string, unknown>) =>
+  testStorage.set(items)
+);
+const storageLocalClear = vi.fn(() =>
+  testStorage.clear()
+);
+const storageLocalGetBytesInUse = vi.fn((keys?: string | string[] | null) =>
+  testStorage.getBytesInUse(keys)
+);
+const storageLocalRemove = vi.fn((keys: string | string[]) =>
+  testStorage.remove(keys)
+);
 
 const baseStorageManager = originalStorageGetInstance();
 const basePromptManager = originalPromptGetInstance();
@@ -282,6 +274,7 @@ const mockChrome = {
       set: storageLocalSet,
       clear: storageLocalClear,
       getBytesInUse: storageLocalGetBytesInUse,
+      remove: storageLocalRemove,
       QUOTA_BYTES: 5242880
     },
     onChanged: {
@@ -450,15 +443,26 @@ const applyManagerMocks = (): void => {
 
 const resetChromeMocks = (): void => {
   storageChangeListeners.length = 0;
-  Object.keys(storageState).forEach((key) => {
-    Reflect.deleteProperty(storageState, key);
-  });
 
-  storageLocalGet.mockReset();
-  storageLocalSet.mockReset();
-  storageLocalClear.mockReset();
-  storageLocalGetBytesInUse.mockReset();
-  applyStorageImplementations();
+  // Reset storage by creating a new TestStorage instance
+  testStorage = new TestStorage();
+
+  // Reset vi.fn() wrappers to point to new testStorage instance
+  storageLocalGet.mockReset().mockImplementation((keys?: string | string[] | Record<string, unknown> | null) =>
+    testStorage.get(keys)
+  );
+  storageLocalSet.mockReset().mockImplementation((items: Record<string, unknown>) =>
+    testStorage.set(items)
+  );
+  storageLocalClear.mockReset().mockImplementation(() =>
+    testStorage.clear()
+  );
+  storageLocalGetBytesInUse.mockReset().mockImplementation((keys?: string | string[] | null) =>
+    testStorage.getBytesInUse(keys)
+  );
+  storageLocalRemove.mockReset().mockImplementation((keys: string | string[]) =>
+    testStorage.remove(keys)
+  );
 
   mockChrome.runtime.lastError = null;
   (mockChrome.runtime.sendMessage as any).mockResolvedValue(undefined);
