@@ -3,12 +3,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 import { testThemeToggle } from '../../test/helpers/theme-helpers';
 import { DEFAULT_SETTINGS } from '../../types';
-import type {
-  ChromeTabsQueryMock,
-  ChromeTabsSendMessageMock,
-  GlobalWithMocks,
-  WindowMatchMediaMock
-} from '../../types/test-helpers';
+import type { GlobalWithMocks } from '../../types/test-helpers';
 import { useTheme } from '../useTheme';
 
 describe('useTheme', () => {
@@ -17,6 +12,10 @@ describe('useTheme', () => {
     media: string;
     addEventListener: ReturnType<typeof vi.fn>;
     removeEventListener: ReturnType<typeof vi.fn>;
+    onchange: ((this: MediaQueryList, ev: MediaQueryListEvent) => void) | null;
+    addListener: ReturnType<typeof vi.fn>;
+    removeListener: ReturnType<typeof vi.fn>;
+    dispatchEvent: ReturnType<typeof vi.fn>;
   };
   let originalMatchMedia: typeof window.matchMedia;
 
@@ -34,7 +33,11 @@ describe('useTheme', () => {
       matches: false,
       media: '(prefers-color-scheme: dark)',
       addEventListener: vi.fn(),
-      removeEventListener: vi.fn()
+      removeEventListener: vi.fn(),
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn()
     };
 
     Object.defineProperty(window, 'matchMedia', {
@@ -47,7 +50,7 @@ describe('useTheme', () => {
     });
 
     // Reset chrome.tabs.query mock
-    vi.mocked<ChromeTabsQueryMock>(chrome.tabs.query).mockImplementation(
+    vi.mocked(chrome.tabs.query).mockImplementation(
       (_queryInfo: chrome.tabs.QueryInfo, callback?: (tabs: chrome.tabs.Tab[]) => void) => {
         const result: chrome.tabs.Tab[] = [];
         if (callback) {
@@ -280,7 +283,7 @@ describe('useTheme', () => {
         { id: 2, url: 'https://example.org' }
       ] as chrome.tabs.Tab[];
 
-      vi.mocked<ChromeTabsQueryMock>(chrome.tabs.query).mockImplementation(
+      vi.mocked(chrome.tabs.query).mockImplementation(
         (_queryInfo: chrome.tabs.QueryInfo, callback?: (tabs: chrome.tabs.Tab[]) => void) => {
           if (callback) {
             callback(mockTabs);
@@ -326,7 +329,7 @@ describe('useTheme', () => {
       // Arrange
       const mockTabs = [{ id: 1 }] as chrome.tabs.Tab[];
 
-      vi.mocked<ChromeTabsQueryMock>(chrome.tabs.query).mockImplementation(
+      vi.mocked(chrome.tabs.query).mockImplementation(
         (_queryInfo: chrome.tabs.QueryInfo, callback?: (tabs: chrome.tabs.Tab[]) => void) => {
           if (callback) {
             callback(mockTabs);
@@ -336,7 +339,7 @@ describe('useTheme', () => {
         }
       );
 
-      vi.mocked<ChromeTabsSendMessageMock>(chrome.tabs.sendMessage).mockRejectedValue(
+      vi.mocked(chrome.tabs.sendMessage).mockRejectedValue(
         new Error('No content script')
       );
 
@@ -482,7 +485,7 @@ describe('useTheme', () => {
 
       // Act - Simulate system preference change
       mockMatchMedia.matches = true;
-      vi.mocked<WindowMatchMediaMock>(window.matchMedia).mockImplementation(
+      vi.mocked(window.matchMedia).mockImplementation(
         (query: string): MediaQueryList => ({
           ...mockMatchMedia,
           matches: true,

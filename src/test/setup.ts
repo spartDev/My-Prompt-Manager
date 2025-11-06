@@ -179,7 +179,7 @@ let testStorage: TestStorage = new TestStorage();
 
 // Create vi.fn() wrappers around TestStorage methods for test spying/mocking
 const storageLocalGet = vi.fn((keys?: string | string[] | Record<string, unknown> | null) =>
-  testStorage.get(keys)
+  testStorage.get(keys ?? null)
 );
 const storageLocalSet = vi.fn((items: Record<string, unknown>) =>
   testStorage.set(items)
@@ -449,7 +449,7 @@ const resetChromeMocks = (): void => {
 
   // Reset vi.fn() wrappers to point to new testStorage instance
   storageLocalGet.mockReset().mockImplementation((keys?: string | string[] | Record<string, unknown> | null) =>
-    testStorage.get(keys)
+    testStorage.get(keys ?? null)
   );
   storageLocalSet.mockReset().mockImplementation((items: Record<string, unknown>) =>
     testStorage.set(items)

@@ -2,8 +2,7 @@ import { renderHook, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 import { buildPrompt } from '../../test/builders';
-import type { Prompt, AppError } from '../../types';
-import { ErrorType } from '../../types';
+import type { Prompt } from '../../types';
 import { usePrompts } from '../usePrompts';
 
 describe('usePrompts', () => {

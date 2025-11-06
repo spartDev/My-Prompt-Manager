@@ -3,8 +3,8 @@ import { act } from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 import { buildCategory } from '../../test/builders';
-import type { Category, AppError } from '../../types';
-import { DEFAULT_CATEGORY, ErrorType } from '../../types';
+import type { Category } from '../../types';
+import { DEFAULT_CATEGORY } from '../../types';
 import { useCategories } from '../useCategories';
 
 describe('useCategories', () => {

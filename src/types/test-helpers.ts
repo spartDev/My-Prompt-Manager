@@ -20,24 +20,21 @@ import type { StorageManagerMock, PromptManagerMock } from '../test/setup';
  * Handles both callback and promise-based usage patterns
  */
 export type ChromeTabsQueryMock = Mock<
-  [queryInfo: chrome.tabs.QueryInfo, callback?: (tabs: chrome.tabs.Tab[]) => void],
-  Promise<chrome.tabs.Tab[]>
+  (queryInfo: chrome.tabs.QueryInfo, callback?: (tabs: chrome.tabs.Tab[]) => void) => Promise<chrome.tabs.Tab[]>
 >;
 
 /**
  * Type for chrome.tabs.sendMessage mock function
  */
 export type ChromeTabsSendMessageMock = Mock<
-  [tabId: number, message: unknown, options?: chrome.tabs.MessageSendOptions],
-  Promise<unknown>
+  (tabId: number, message: unknown, options?: chrome.tabs.MessageSendOptions) => Promise<unknown>
 >;
 
 /**
  * Type for window.matchMedia mock function
  */
 export type WindowMatchMediaMock = Mock<
-  [query: string],
-  MediaQueryList
+  (query: string) => MediaQueryList
 >;
 
 /**
@@ -79,8 +76,7 @@ export function isGlobalWithMocks(global: typeof globalThis): global is GlobalWi
  * Type for updateSettings mock function
  */
 export type UpdateSettingsMock = Mock<
-  [updates: Partial<chrome.storage.StorageChange['newValue']>],
-  Promise<chrome.storage.StorageChange['newValue']>
+  (updates: Partial<chrome.storage.StorageChange['newValue']>) => Promise<chrome.storage.StorageChange['newValue']>
 >;
 
 /**
