@@ -4,6 +4,12 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { StorageManager } from '../../services/storage';
 import type { StorageManagerMock } from '../../test/setup';
 import { DEFAULT_SETTINGS } from '../../types';
+import type {
+  ChromeTabsQueryMock,
+  ChromeTabsSendMessageMock,
+  GlobalWithMocks,
+  WindowMatchMediaMock
+} from '../../types/test-helpers';
 import { useTheme } from '../useTheme';
 
 describe('useTheme', () => {
@@ -42,14 +48,16 @@ describe('useTheme', () => {
     });
 
     // Reset chrome.tabs.query mock
-    (chrome.tabs.query as any).mockImplementation((_queryInfo: any, callback?: (tabs: chrome.tabs.Tab[]) => void) => {
-      const result: chrome.tabs.Tab[] = [];
-      if (callback) {
-        callback(result);
+    vi.mocked<ChromeTabsQueryMock>(chrome.tabs.query).mockImplementation(
+      (_queryInfo: chrome.tabs.QueryInfo, callback?: (tabs: chrome.tabs.Tab[]) => void) => {
+        const result: chrome.tabs.Tab[] = [];
+        if (callback) {
+          callback(result);
+          return Promise.resolve(result);
+        }
         return Promise.resolve(result);
       }
-      return Promise.resolve(result);
-    });
+    );
   });
 
   describe('Initialization', () => {
@@ -83,7 +91,7 @@ describe('useTheme', () => {
         enableSync: false,
         customSites: []
       });
-      (storageManager.updateSettings as any).mockResolvedValue(DEFAULT_SETTINGS);
+      vi.mocked(storageManager.updateSettings).mockResolvedValue(DEFAULT_SETTINGS);
 
       // Act
       const { result } = renderHook(() => useTheme());
@@ -171,7 +179,7 @@ describe('useTheme', () => {
         enableSync: false,
         customSites: []
       });
-      (storageManager.updateSettings as any).mockResolvedValue(DEFAULT_SETTINGS);
+      vi.mocked(storageManager.updateSettings).mockResolvedValue(DEFAULT_SETTINGS);
 
       const { result } = renderHook(() => useTheme());
 
@@ -196,7 +204,7 @@ describe('useTheme', () => {
         enableSync: false,
         customSites: []
       });
-      (storageManager.updateSettings as any).mockResolvedValue(DEFAULT_SETTINGS);
+      vi.mocked(storageManager.updateSettings).mockResolvedValue(DEFAULT_SETTINGS);
 
       const { result } = renderHook(() => useTheme());
 
@@ -223,7 +231,7 @@ describe('useTheme', () => {
         enableSync: false,
         customSites: []
       });
-      (storageManager.updateSettings as any).mockResolvedValue(DEFAULT_SETTINGS);
+      vi.mocked(storageManager.updateSettings).mockResolvedValue(DEFAULT_SETTINGS);
 
       const { result } = renderHook(() => useTheme());
 
@@ -249,20 +257,22 @@ describe('useTheme', () => {
         { id: 2, url: 'https://example.org' }
       ] as chrome.tabs.Tab[];
 
-      (chrome.tabs.query as any).mockImplementation((_queryInfo: any, callback?: (tabs: chrome.tabs.Tab[]) => void) => {
-        if (callback) {
-          callback(mockTabs);
+      vi.mocked<ChromeTabsQueryMock>(chrome.tabs.query).mockImplementation(
+        (_queryInfo: chrome.tabs.QueryInfo, callback?: (tabs: chrome.tabs.Tab[]) => void) => {
+          if (callback) {
+            callback(mockTabs);
+            return Promise.resolve(mockTabs);
+          }
           return Promise.resolve(mockTabs);
         }
-        return Promise.resolve(mockTabs);
-      });
+      );
 
       storageManager.getSettings.mockResolvedValue({
         theme: 'light',
         enableSync: false,
         customSites: []
       });
-      (storageManager.updateSettings as any).mockResolvedValue(DEFAULT_SETTINGS);
+      vi.mocked(storageManager.updateSettings).mockResolvedValue(DEFAULT_SETTINGS);
 
       const { result } = renderHook(() => useTheme());
 
@@ -293,22 +303,26 @@ describe('useTheme', () => {
       // Arrange
       const mockTabs = [{ id: 1 }] as chrome.tabs.Tab[];
 
-      (chrome.tabs.query as any).mockImplementation((_queryInfo: any, callback?: (tabs: chrome.tabs.Tab[]) => void) => {
-        if (callback) {
-          callback(mockTabs);
+      vi.mocked<ChromeTabsQueryMock>(chrome.tabs.query).mockImplementation(
+        (_queryInfo: chrome.tabs.QueryInfo, callback?: (tabs: chrome.tabs.Tab[]) => void) => {
+          if (callback) {
+            callback(mockTabs);
+            return Promise.resolve(mockTabs);
+          }
           return Promise.resolve(mockTabs);
         }
-        return Promise.resolve(mockTabs);
-      });
+      );
 
-      (chrome.tabs.sendMessage as any).mockRejectedValue(new Error('No content script'));
+      vi.mocked<ChromeTabsSendMessageMock>(chrome.tabs.sendMessage).mockRejectedValue(
+        new Error('No content script')
+      );
 
       storageManager.getSettings.mockResolvedValue({
         theme: 'light',
         enableSync: false,
         customSites: []
       });
-      (storageManager.updateSettings as any).mockResolvedValue(DEFAULT_SETTINGS);
+      vi.mocked(storageManager.updateSettings).mockResolvedValue(DEFAULT_SETTINGS);
 
       const { result } = renderHook(() => useTheme());
 
@@ -440,11 +454,13 @@ describe('useTheme', () => {
 
       // Act - Simulate system preference change
       mockMatchMedia.matches = true;
-      (window.matchMedia as any).mockImplementation((query: string) => ({
-        ...mockMatchMedia,
-        matches: true,
-        media: query
-      }));
+      vi.mocked<WindowMatchMediaMock>(window.matchMedia).mockImplementation(
+        (query: string): MediaQueryList => ({
+          ...mockMatchMedia,
+          matches: true,
+          media: query
+        } as MediaQueryList)
+      );
 
       const changeHandler = mockMatchMedia.addEventListener.mock.calls[0]?.[1];
 
@@ -498,8 +514,8 @@ describe('useTheme', () => {
 
       // Act - Simulate storage change from another tab
       await act(async () => {
-        const globalWithMocks = globalThis as any;
-        globalWithMocks.__triggerChromeStorageChange__({
+        const globalWithMocks = globalThis as GlobalWithMocks;
+        globalWithMocks.__triggerChromeStorageChange__?.({
           settings: {
             newValue: { theme: 'dark', enableSync: false, customSites: [] },
             oldValue: { theme: 'light', enableSync: false, customSites: [] }
@@ -531,8 +547,8 @@ describe('useTheme', () => {
 
       // Act - Trigger storage change with same theme
       await act(async () => {
-        const globalWithMocks = globalThis as any;
-        globalWithMocks.__triggerChromeStorageChange__({
+        const globalWithMocks = globalThis as GlobalWithMocks;
+        globalWithMocks.__triggerChromeStorageChange__?.({
           settings: {
             newValue: { theme: 'dark', enableSync: false, customSites: [] },
             oldValue: { theme: 'dark', enableSync: false, customSites: [] }
@@ -560,8 +576,8 @@ describe('useTheme', () => {
 
       // Act - Trigger storage change for different key
       await act(async () => {
-        const globalWithMocks = globalThis as any;
-        globalWithMocks.__triggerChromeStorageChange__({
+        const globalWithMocks = globalThis as GlobalWithMocks;
+        globalWithMocks.__triggerChromeStorageChange__?.({
           prompts: {
             newValue: [],
             oldValue: []
@@ -604,7 +620,7 @@ describe('useTheme', () => {
         enableSync: false,
         customSites: []
       });
-      (storageManager.updateSettings as any).mockResolvedValue(DEFAULT_SETTINGS);
+      vi.mocked(storageManager.updateSettings).mockResolvedValue(DEFAULT_SETTINGS);
 
       const { result } = renderHook(() => useTheme());
 
@@ -628,7 +644,7 @@ describe('useTheme', () => {
         enableSync: false,
         customSites: []
       });
-      (storageManager.updateSettings as any).mockResolvedValue(DEFAULT_SETTINGS);
+      vi.mocked(storageManager.updateSettings).mockResolvedValue(DEFAULT_SETTINGS);
 
       const { result } = renderHook(() => useTheme());
 
@@ -653,7 +669,7 @@ describe('useTheme', () => {
         enableSync: false,
         customSites: []
       });
-      (storageManager.updateSettings as any).mockResolvedValue(DEFAULT_SETTINGS);
+      vi.mocked(storageManager.updateSettings).mockResolvedValue(DEFAULT_SETTINGS);
 
       const { result } = renderHook(() => useTheme());
 
@@ -679,7 +695,7 @@ describe('useTheme', () => {
         enableSync: false,
         customSites: []
       });
-      (storageManager.updateSettings as any).mockResolvedValue(DEFAULT_SETTINGS);
+      vi.mocked(storageManager.updateSettings).mockResolvedValue(DEFAULT_SETTINGS);
 
       const { result } = renderHook(() => useTheme());
 
@@ -726,7 +742,7 @@ describe('useTheme', () => {
         enableSync: false,
         customSites: []
       });
-      (storageManager.updateSettings as any).mockRejectedValue(new Error('Storage write error'));
+      vi.mocked(storageManager.updateSettings).mockRejectedValue(new Error('Storage write error'));
 
       const { result } = renderHook(() => useTheme());
 
@@ -761,8 +777,8 @@ describe('useTheme', () => {
 
       // Act - Trigger storage change without theme
       await act(async () => {
-        const globalWithMocks = globalThis as any;
-        globalWithMocks.__triggerChromeStorageChange__({
+        const globalWithMocks = globalThis as GlobalWithMocks;
+        globalWithMocks.__triggerChromeStorageChange__?.({
           settings: {
             newValue: { enableSync: true, customSites: [] },
             oldValue: { theme: 'light', enableSync: false, customSites: [] }

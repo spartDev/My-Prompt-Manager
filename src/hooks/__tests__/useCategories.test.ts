@@ -4,7 +4,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 import { PromptManager } from '../../services/promptManager';
 import { StorageManager } from '../../services/storage';
-import { Category, DEFAULT_CATEGORY, ErrorType } from '../../types';
+import type { Category, AppError } from '../../types';
+import { DEFAULT_CATEGORY, ErrorType } from '../../types';
 import { useCategories } from '../useCategories';
 
 // Mock StorageManager
@@ -149,11 +150,11 @@ describe('useCategories', () => {
 
     it('should validate category name is not empty', async () => {
       // Arrange
-      const validationError = {
+      const validationError: AppError = {
         type: ErrorType.VALIDATION_ERROR,
         message: 'Category name cannot be empty'
       };
-      vi.mocked(mockPromptManager.validateCategoryData).mockReturnValue(validationError as any);
+      vi.mocked(mockPromptManager.validateCategoryData).mockReturnValue(validationError);
 
       const { result } = renderHook(() => useCategories());
 
@@ -335,11 +336,11 @@ describe('useCategories', () => {
 
     it('should handle validation errors on update', async () => {
       // Arrange
-      const validationError = {
+      const validationError: AppError = {
         type: ErrorType.VALIDATION_ERROR,
         message: 'Category name cannot be empty'
       };
-      vi.mocked(mockPromptManager.validateCategoryData).mockReturnValue(validationError as any);
+      vi.mocked(mockPromptManager.validateCategoryData).mockReturnValue(validationError);
 
       const { result } = renderHook(() => useCategories());
 
@@ -596,14 +597,14 @@ describe('useCategories', () => {
   describe('Error State Management', () => {
     it('should clear error state on successful operation after error', async () => {
       // Arrange
-      const validationError = {
+      const validationError: AppError = {
         type: ErrorType.VALIDATION_ERROR,
         message: 'Category name cannot be empty'
       };
       const newCategory: Category = { id: 'cat-4', name: 'Valid Category' };
 
       vi.mocked(mockPromptManager.validateCategoryData)
-        .mockReturnValueOnce(validationError as any)
+        .mockReturnValueOnce(validationError)
         .mockReturnValueOnce(null);
       vi.mocked(mockStorageManager.saveCategory).mockResolvedValue(newCategory);
 
