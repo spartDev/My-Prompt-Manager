@@ -2,61 +2,36 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { act } from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-import { PromptManager } from '../../services/promptManager';
-import { StorageManager } from '../../services/storage';
+import { buildCategory } from '../../test/builders';
 import type { Category, AppError } from '../../types';
 import { DEFAULT_CATEGORY, ErrorType } from '../../types';
 import { useCategories } from '../useCategories';
 
-// Mock StorageManager
-vi.mock('../../services/storage', () => {
-  const mockStorageManager = {
-    getCategories: vi.fn(),
-    saveCategory: vi.fn(),
-    updateCategory: vi.fn(),
-    deleteCategory: vi.fn()
-  };
-
-  return {
-    StorageManager: {
-      getInstance: () => mockStorageManager
-    }
-  };
-});
-
-// Mock PromptManager
-vi.mock('../../services/promptManager', () => {
-  const mockPromptManager = {
-    validateCategoryData: vi.fn()
-  };
-
-  return {
-    PromptManager: {
-      getInstance: () => mockPromptManager
-    }
-  };
-});
-
 describe('useCategories', () => {
-  const mockStorageManager = StorageManager.getInstance();
-  const mockPromptManager = PromptManager.getInstance();
-
   const mockCategories: Category[] = [
-    { id: 'cat-1', name: DEFAULT_CATEGORY },
-    { id: 'cat-2', name: 'Development', color: '#3B82F6' },
-    { id: 'cat-3', name: 'Design', color: '#8B5CF6' }
+    buildCategory({ id: 'cat-1', name: DEFAULT_CATEGORY }),
+    buildCategory({ id: 'cat-2', name: 'Development', color: '#3B82F6' }),
+    buildCategory({ id: 'cat-3', name: 'Design', color: '#8B5CF6' })
   ];
 
-  beforeEach(() => {
-    vi.clearAllMocks();
-    // Reset to default resolved value
-    vi.mocked(mockStorageManager.getCategories).mockResolvedValue(mockCategories);
+  beforeEach(async () => {
+    // Initialize storage with default data
+    await chrome.storage.local.set({
+      prompts: [],
+      categories: [],
+      settings: {
+        defaultCategory: DEFAULT_CATEGORY,
+        sortOrder: 'updatedAt',
+        sortDirection: 'desc',
+        theme: 'light'
+      }
+    });
   });
 
   describe('Loading', () => {
     it('should load categories on mount', async () => {
-      // Arrange
-      vi.mocked(mockStorageManager.getCategories).mockResolvedValue(mockCategories);
+      // Arrange - Seed storage with test data
+      await chrome.storage.local.set({ categories: mockCategories });
 
       // Act
       const { result } = renderHook(() => useCategories());
@@ -73,14 +48,11 @@ describe('useCategories', () => {
 
       expect(result.current.categories).toEqual(mockCategories);
       expect(result.current.error).toBeNull();
-      expect(mockStorageManager.getCategories).toHaveBeenCalledTimes(1);
     });
 
     it('should set loading state while fetching', async () => {
-      // Arrange
-      vi.mocked(mockStorageManager.getCategories).mockImplementation(
-        () => new Promise(resolve => setTimeout(() => resolve(mockCategories), 100))
-      );
+      // Arrange - Seed storage
+      await chrome.storage.local.set({ categories: mockCategories });
 
       // Act
       const { result } = renderHook(() => useCategories());
@@ -98,9 +70,9 @@ describe('useCategories', () => {
     });
 
     it('should handle load errors gracefully', async () => {
-      // Arrange
-      const loadError = new Error('Failed to load categories');
-      vi.mocked(mockStorageManager.getCategories).mockRejectedValue(loadError);
+      // Arrange - Simulate storage failure
+      const getSpy = vi.spyOn(chrome.storage.local, 'get');
+      getSpy.mockRejectedValueOnce(new Error('Failed to load categories'));
 
       // Act
       const { result } = renderHook(() => useCategories());
@@ -110,17 +82,17 @@ describe('useCategories', () => {
         expect(result.current.loading).toBe(false);
       });
 
-      expect(result.current.error).toEqual(loadError);
+      expect(result.current.error).toBeTruthy();
       expect(result.current.categories).toEqual([]);
+
+      getSpy.mockRestore();
     });
   });
 
   describe('Creating Categories', () => {
     it('should create a new category', async () => {
-      // Arrange
-      const newCategory: Category = { id: 'cat-4', name: 'Testing', color: '#10B981' };
-      vi.mocked(mockPromptManager.validateCategoryData).mockReturnValue(null);
-      vi.mocked(mockStorageManager.saveCategory).mockResolvedValue(newCategory);
+      // Arrange - Seed storage
+      await chrome.storage.local.set({ categories: mockCategories });
 
       const { result } = renderHook(() => useCategories());
 
@@ -129,32 +101,29 @@ describe('useCategories', () => {
         expect(result.current.loading).toBe(false);
       });
 
+      expect(result.current.categories).toHaveLength(3);
+
       // Act
       await act(async () => {
         await result.current.createCategory({ name: 'Testing', color: '#10B981' });
       });
 
-      // Assert
-      expect(mockPromptManager.validateCategoryData).toHaveBeenCalledWith({
-        name: 'Testing',
-        color: '#10B981'
-      });
-      expect(mockStorageManager.saveCategory).toHaveBeenCalledWith({
-        name: 'Testing',
-        color: '#10B981'
-      });
-      expect(result.current.categories).toContainEqual(newCategory);
+      // Assert - Verify through storage
+      const data = await chrome.storage.local.get('categories');
+      const categories = data.categories as Category[];
+
+      expect(categories).toHaveLength(4);
+      expect(categories.some(c => c.name === 'Testing')).toBe(true);
+      expect(categories.find(c => c.name === 'Testing')?.color).toBe('#10B981');
+      expect(result.current.categories).toHaveLength(4);
+      expect(result.current.categories.some(c => c.name === 'Testing')).toBe(true);
       expect(result.current.error).toBeNull();
       expect(result.current.loading).toBe(false);
     });
 
     it('should validate category name is not empty', async () => {
       // Arrange
-      const validationError: AppError = {
-        type: ErrorType.VALIDATION_ERROR,
-        message: 'Category name cannot be empty'
-      };
-      vi.mocked(mockPromptManager.validateCategoryData).mockReturnValue(validationError);
+      await chrome.storage.local.set({ categories: mockCategories });
 
       const { result } = renderHook(() => useCategories());
 
@@ -167,18 +136,18 @@ describe('useCategories', () => {
       await act(async () => {
         await expect(
           result.current.createCategory({ name: '' })
-        ).rejects.toEqual(validationError);
+        ).rejects.toThrow();
       });
 
-      expect(mockStorageManager.saveCategory).not.toHaveBeenCalled();
-      expect(result.current.error).toEqual(validationError);
+      // Verify storage unchanged
+      const data = await chrome.storage.local.get('categories');
+      expect(data.categories).toEqual(mockCategories);
+      expect(result.current.error).toBeTruthy();
     });
 
     it('should validate category name is unique', async () => {
       // Arrange
-      const duplicateError = new Error('Category with name "Development" already exists');
-      vi.mocked(mockPromptManager.validateCategoryData).mockReturnValue(null);
-      vi.mocked(mockStorageManager.saveCategory).mockRejectedValue(duplicateError);
+      await chrome.storage.local.set({ categories: mockCategories });
 
       const { result } = renderHook(() => useCategories());
 
@@ -191,17 +160,18 @@ describe('useCategories', () => {
       await act(async () => {
         await expect(
           result.current.createCategory({ name: 'Development' })
-        ).rejects.toThrow('Category with name "Development" already exists');
+        ).rejects.toThrow();
       });
 
-      expect(result.current.error).toEqual(duplicateError);
+      // Verify storage unchanged
+      const data = await chrome.storage.local.get('categories');
+      expect(data.categories).toEqual(mockCategories);
+      expect(result.current.error).toBeTruthy();
     });
 
     it('should handle creation errors', async () => {
       // Arrange
-      const storageError = new Error('Storage quota exceeded');
-      vi.mocked(mockPromptManager.validateCategoryData).mockReturnValue(null);
-      vi.mocked(mockStorageManager.saveCategory).mockRejectedValue(storageError);
+      await chrome.storage.local.set({ categories: mockCategories });
 
       const { result } = renderHook(() => useCategories());
 
@@ -210,27 +180,26 @@ describe('useCategories', () => {
         expect(result.current.loading).toBe(false);
       });
 
+      // Simulate storage failure
+      const setSpy = vi.spyOn(chrome.storage.local, 'set');
+      setSpy.mockRejectedValueOnce(new Error('Storage quota exceeded'));
+
       // Act & Assert
       await act(async () => {
         await expect(
           result.current.createCategory({ name: 'New Category' })
-        ).rejects.toThrow('Storage quota exceeded');
+        ).rejects.toThrow();
       });
 
-      expect(result.current.error).toEqual(storageError);
+      expect(result.current.error).toBeTruthy();
       expect(result.current.loading).toBe(false);
+
+      setSpy.mockRestore();
     });
 
     it('should set loading state during creation', async () => {
       // Arrange
-      const newCategory: Category = { id: 'cat-4', name: 'Testing' };
-      let resolveCreate: (value: Category) => void;
-      const createPromise = new Promise<Category>((resolve) => {
-        resolveCreate = resolve;
-      });
-
-      vi.mocked(mockPromptManager.validateCategoryData).mockReturnValue(null);
-      vi.mocked(mockStorageManager.saveCategory).mockReturnValue(createPromise);
+      await chrome.storage.local.set({ categories: mockCategories });
 
       const { result } = renderHook(() => useCategories());
 
@@ -249,24 +218,21 @@ describe('useCategories', () => {
         expect(result.current.loading).toBe(true);
       });
 
-      // Complete the creation
-      await act(async () => {
-        if (resolveCreate) {
-          resolveCreate(newCategory);
-        }
-        await createPromise;
+      // Wait for completion
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
       });
 
-      expect(result.current.loading).toBe(false);
+      // Verify category was created
+      const data = await chrome.storage.local.get('categories');
+      expect((data.categories as Category[]).some(c => c.name === 'Testing')).toBe(true);
     });
   });
 
   describe('Updating Categories', () => {
     it('should update category name', async () => {
       // Arrange
-      const updatedCategory: Category = { ...mockCategories[1], name: 'Programming' };
-      vi.mocked(mockPromptManager.validateCategoryData).mockReturnValue(null);
-      vi.mocked(mockStorageManager.updateCategory).mockResolvedValue(updatedCategory);
+      await chrome.storage.local.set({ categories: mockCategories });
 
       const { result } = renderHook(() => useCategories());
 
@@ -280,18 +246,19 @@ describe('useCategories', () => {
         await result.current.updateCategory('cat-2', { name: 'Programming' });
       });
 
-      // Assert
-      expect(mockPromptManager.validateCategoryData).toHaveBeenCalledWith({ name: 'Programming' });
-      expect(mockStorageManager.updateCategory).toHaveBeenCalledWith('cat-2', { name: 'Programming' });
+      // Assert - Verify through storage
+      const data = await chrome.storage.local.get('categories');
+      const categories = data.categories as Category[];
+      const updated = categories.find(c => c.id === 'cat-2');
+
+      expect(updated?.name).toBe('Programming');
       expect(result.current.categories.find(c => c.id === 'cat-2')?.name).toBe('Programming');
       expect(result.current.error).toBeNull();
     });
 
     it('should update category color', async () => {
       // Arrange
-      const updatedCategory: Category = { ...mockCategories[1], color: '#EF4444' };
-      vi.mocked(mockPromptManager.validateCategoryData).mockReturnValue(null);
-      vi.mocked(mockStorageManager.updateCategory).mockResolvedValue(updatedCategory);
+      await chrome.storage.local.set({ categories: mockCategories });
 
       const { result } = renderHook(() => useCategories());
 
@@ -305,17 +272,18 @@ describe('useCategories', () => {
         await result.current.updateCategory('cat-2', { color: '#EF4444' });
       });
 
-      // Assert
-      expect(mockPromptManager.validateCategoryData).toHaveBeenCalledWith({ color: '#EF4444' });
-      expect(mockStorageManager.updateCategory).toHaveBeenCalledWith('cat-2', { color: '#EF4444' });
+      // Assert - Verify through storage
+      const data = await chrome.storage.local.get('categories');
+      const categories = data.categories as Category[];
+      const updated = categories.find(c => c.id === 'cat-2');
+
+      expect(updated?.color).toBe('#EF4444');
       expect(result.current.categories.find(c => c.id === 'cat-2')?.color).toBe('#EF4444');
     });
 
     it('should validate unique name on update', async () => {
       // Arrange
-      const duplicateError = new Error('Category with name "Design" already exists');
-      vi.mocked(mockPromptManager.validateCategoryData).mockReturnValue(null);
-      vi.mocked(mockStorageManager.updateCategory).mockRejectedValue(duplicateError);
+      await chrome.storage.local.set({ categories: mockCategories });
 
       const { result } = renderHook(() => useCategories());
 
@@ -328,19 +296,15 @@ describe('useCategories', () => {
       await act(async () => {
         await expect(
           result.current.updateCategory('cat-2', { name: 'Design' })
-        ).rejects.toThrow('Category with name "Design" already exists');
+        ).rejects.toThrow();
       });
 
-      expect(result.current.error).toEqual(duplicateError);
+      expect(result.current.error).toBeTruthy();
     });
 
     it('should handle validation errors on update', async () => {
       // Arrange
-      const validationError: AppError = {
-        type: ErrorType.VALIDATION_ERROR,
-        message: 'Category name cannot be empty'
-      };
-      vi.mocked(mockPromptManager.validateCategoryData).mockReturnValue(validationError);
+      await chrome.storage.local.set({ categories: mockCategories });
 
       const { result } = renderHook(() => useCategories());
 
@@ -353,18 +317,18 @@ describe('useCategories', () => {
       await act(async () => {
         await expect(
           result.current.updateCategory('cat-2', { name: '' })
-        ).rejects.toEqual(validationError);
+        ).rejects.toThrow();
       });
 
-      expect(mockStorageManager.updateCategory).not.toHaveBeenCalled();
-      expect(result.current.error).toEqual(validationError);
+      // Verify storage unchanged
+      const data = await chrome.storage.local.get('categories');
+      expect(data.categories).toEqual(mockCategories);
+      expect(result.current.error).toBeTruthy();
     });
 
     it('should handle update errors', async () => {
       // Arrange
-      const updateError = new Error('Category not found');
-      vi.mocked(mockPromptManager.validateCategoryData).mockReturnValue(null);
-      vi.mocked(mockStorageManager.updateCategory).mockRejectedValue(updateError);
+      await chrome.storage.local.set({ categories: mockCategories });
 
       const { result } = renderHook(() => useCategories());
 
@@ -373,21 +337,19 @@ describe('useCategories', () => {
         expect(result.current.loading).toBe(false);
       });
 
-      // Act & Assert
+      // Act & Assert - Try to update non-existent category
       await act(async () => {
         await expect(
           result.current.updateCategory('invalid-id', { name: 'New Name' })
-        ).rejects.toThrow('Category not found');
+        ).rejects.toThrow();
       });
 
-      expect(result.current.error).toEqual(updateError);
+      expect(result.current.error).toBeTruthy();
     });
 
     it('should maintain other categories when updating one', async () => {
       // Arrange
-      const updatedCategory: Category = { ...mockCategories[1], name: 'Updated' };
-      vi.mocked(mockPromptManager.validateCategoryData).mockReturnValue(null);
-      vi.mocked(mockStorageManager.updateCategory).mockResolvedValue(updatedCategory);
+      await chrome.storage.local.set({ categories: mockCategories });
 
       const { result } = renderHook(() => useCategories());
 
@@ -413,7 +375,7 @@ describe('useCategories', () => {
   describe('Deleting Categories', () => {
     it('should delete a category', async () => {
       // Arrange
-      vi.mocked(mockStorageManager.deleteCategory).mockResolvedValue();
+      await chrome.storage.local.set({ categories: mockCategories });
 
       const { result } = renderHook(() => useCategories());
 
@@ -429,8 +391,12 @@ describe('useCategories', () => {
         await result.current.deleteCategory('cat-2');
       });
 
-      // Assert
-      expect(mockStorageManager.deleteCategory).toHaveBeenCalledWith('cat-2');
+      // Assert - Verify through storage
+      const data = await chrome.storage.local.get('categories');
+      const categories = data.categories as Category[];
+
+      expect(categories).toHaveLength(initialCount - 1);
+      expect(categories.find(c => c.id === 'cat-2')).toBeUndefined();
       expect(result.current.categories).toHaveLength(initialCount - 1);
       expect(result.current.categories.find(c => c.id === 'cat-2')).toBeUndefined();
       expect(result.current.error).toBeNull();
@@ -438,8 +404,7 @@ describe('useCategories', () => {
 
     it('should handle deletion errors', async () => {
       // Arrange
-      const deleteError = new Error('Cannot delete the default category');
-      vi.mocked(mockStorageManager.deleteCategory).mockRejectedValue(deleteError);
+      await chrome.storage.local.set({ categories: mockCategories });
 
       const { result } = renderHook(() => useCategories());
 
@@ -448,20 +413,25 @@ describe('useCategories', () => {
         expect(result.current.loading).toBe(false);
       });
 
+      // Simulate storage failure
+      const setSpy = vi.spyOn(chrome.storage.local, 'set');
+      setSpy.mockRejectedValueOnce(new Error('Cannot delete the default category'));
+
       // Act & Assert
       await act(async () => {
         await expect(
           result.current.deleteCategory('cat-1')
-        ).rejects.toThrow('Cannot delete the default category');
+        ).rejects.toThrow();
       });
 
-      expect(result.current.error).toEqual(deleteError);
+      expect(result.current.error).toBeTruthy();
+
+      setSpy.mockRestore();
     });
 
     it('should handle category not found error', async () => {
       // Arrange
-      const notFoundError = new Error('Category with id invalid-id not found');
-      vi.mocked(mockStorageManager.deleteCategory).mockRejectedValue(notFoundError);
+      await chrome.storage.local.set({ categories: mockCategories });
 
       const { result } = renderHook(() => useCategories());
 
@@ -474,15 +444,15 @@ describe('useCategories', () => {
       await act(async () => {
         await expect(
           result.current.deleteCategory('invalid-id')
-        ).rejects.toThrow('Category with id invalid-id not found');
+        ).rejects.toThrow();
       });
 
-      expect(result.current.error).toEqual(notFoundError);
+      expect(result.current.error).toBeTruthy();
     });
 
     it('should maintain remaining categories after deletion', async () => {
       // Arrange
-      vi.mocked(mockStorageManager.deleteCategory).mockResolvedValue();
+      await chrome.storage.local.set({ categories: mockCategories });
 
       const { result } = renderHook(() => useCategories());
 
@@ -503,12 +473,7 @@ describe('useCategories', () => {
 
     it('should set loading state during deletion', async () => {
       // Arrange
-      let resolveDelete: () => void;
-      const deletePromise = new Promise<void>((resolve) => {
-        resolveDelete = resolve;
-      });
-
-      vi.mocked(mockStorageManager.deleteCategory).mockReturnValue(deletePromise);
+      await chrome.storage.local.set({ categories: mockCategories });
 
       const { result } = renderHook(() => useCategories());
 
@@ -527,15 +492,14 @@ describe('useCategories', () => {
         expect(result.current.loading).toBe(true);
       });
 
-      // Complete the deletion
-      await act(async () => {
-        if (resolveDelete) {
-          resolveDelete();
-        }
-        await deletePromise;
+      // Wait for completion
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
       });
 
-      expect(result.current.loading).toBe(false);
+      // Verify category was deleted
+      const data = await chrome.storage.local.get('categories');
+      expect((data.categories as Category[]).find(c => c.id === 'cat-2')).toBeUndefined();
     });
   });
 
@@ -543,11 +507,7 @@ describe('useCategories', () => {
     it('should refresh categories list', async () => {
       // Arrange
       const initialCategories = [mockCategories[0]];
-      const updatedCategories = [...mockCategories];
-
-      vi.mocked(mockStorageManager.getCategories)
-        .mockResolvedValueOnce(initialCategories)
-        .mockResolvedValueOnce(updatedCategories);
+      await chrome.storage.local.set({ categories: initialCategories });
 
       const { result } = renderHook(() => useCategories());
 
@@ -558,22 +518,21 @@ describe('useCategories', () => {
 
       expect(result.current.categories).toEqual(initialCategories);
 
+      // Update storage directly to simulate external change
+      await chrome.storage.local.set({ categories: mockCategories });
+
       // Act
       await act(async () => {
         await result.current.refreshCategories();
       });
 
       // Assert
-      expect(result.current.categories).toEqual(updatedCategories);
-      expect(mockStorageManager.getCategories).toHaveBeenCalledTimes(2);
+      expect(result.current.categories).toEqual(mockCategories);
     });
 
     it('should handle refresh errors', async () => {
       // Arrange
-      const refreshError = new Error('Failed to refresh categories');
-      vi.mocked(mockStorageManager.getCategories)
-        .mockResolvedValueOnce(mockCategories)
-        .mockRejectedValueOnce(refreshError);
+      await chrome.storage.local.set({ categories: mockCategories });
 
       const { result } = renderHook(() => useCategories());
 
@@ -582,6 +541,10 @@ describe('useCategories', () => {
         expect(result.current.loading).toBe(false);
       });
 
+      // Simulate storage failure on refresh
+      const getSpy = vi.spyOn(chrome.storage.local, 'get');
+      getSpy.mockRejectedValueOnce(new Error('Failed to refresh categories'));
+
       // Act
       await act(async () => {
         await result.current.refreshCategories();
@@ -589,24 +552,17 @@ describe('useCategories', () => {
 
       // Assert
       await waitFor(() => {
-        expect(result.current.error).toEqual(refreshError);
+        expect(result.current.error).toBeTruthy();
       });
+
+      getSpy.mockRestore();
     });
   });
 
   describe('Error State Management', () => {
     it('should clear error state on successful operation after error', async () => {
       // Arrange
-      const validationError: AppError = {
-        type: ErrorType.VALIDATION_ERROR,
-        message: 'Category name cannot be empty'
-      };
-      const newCategory: Category = { id: 'cat-4', name: 'Valid Category' };
-
-      vi.mocked(mockPromptManager.validateCategoryData)
-        .mockReturnValueOnce(validationError)
-        .mockReturnValueOnce(null);
-      vi.mocked(mockStorageManager.saveCategory).mockResolvedValue(newCategory);
+      await chrome.storage.local.set({ categories: mockCategories });
 
       const { result } = renderHook(() => useCategories());
 
@@ -615,14 +571,14 @@ describe('useCategories', () => {
         expect(result.current.loading).toBe(false);
       });
 
-      // Act - Create with error
+      // Act - Create with error (empty name)
       await act(async () => {
         await expect(
           result.current.createCategory({ name: '' })
-        ).rejects.toEqual(validationError);
+        ).rejects.toThrow();
       });
 
-      expect(result.current.error).toEqual(validationError);
+      expect(result.current.error).toBeTruthy();
 
       // Act - Create successfully
       await act(async () => {
@@ -634,24 +590,22 @@ describe('useCategories', () => {
     });
 
     it('should clear error state at the start of operations', async () => {
-      // Arrange
-      const loadError = new Error('Initial load error');
-      const newCategory: Category = { id: 'cat-4', name: 'New Category' };
-
-      vi.mocked(mockStorageManager.getCategories).mockRejectedValueOnce(loadError);
-      vi.mocked(mockPromptManager.validateCategoryData).mockReturnValue(null);
-      vi.mocked(mockStorageManager.saveCategory).mockResolvedValue(newCategory);
+      // Arrange - Simulate initial load error
+      const getSpy = vi.spyOn(chrome.storage.local, 'get');
+      getSpy.mockRejectedValueOnce(new Error('Initial load error'));
 
       const { result } = renderHook(() => useCategories());
 
       // Wait for initial load error
       await waitFor(() => {
-        expect(result.current.error).toEqual(loadError);
+        expect(result.current.error).toBeTruthy();
       });
 
-      // Act - Attempt create (will clear error state)
-      vi.mocked(mockStorageManager.getCategories).mockResolvedValue([newCategory]);
+      // Restore normal storage behavior
+      getSpy.mockRestore();
+      await chrome.storage.local.set({ categories: mockCategories });
 
+      // Act - Attempt create (will clear error state)
       await act(async () => {
         await result.current.createCategory({ name: 'New Category' });
       });

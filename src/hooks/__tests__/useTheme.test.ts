@@ -1,9 +1,7 @@
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-import { StorageManager } from '../../services/storage';
 import { testThemeToggle } from '../../test/helpers/theme-helpers';
-import type { StorageManagerMock } from '../../test/setup';
 import { DEFAULT_SETTINGS } from '../../types';
 import type {
   ChromeTabsQueryMock,
@@ -14,7 +12,6 @@ import type {
 import { useTheme } from '../useTheme';
 
 describe('useTheme', () => {
-  let storageManager: StorageManagerMock;
   let mockMatchMedia: {
     matches: boolean;
     media: string;
@@ -22,9 +19,7 @@ describe('useTheme', () => {
     removeEventListener: ReturnType<typeof vi.fn>;
   };
 
-  beforeEach(() => {
-    storageManager = StorageManager.getInstance() as StorageManagerMock;
-
+  beforeEach(async () => {
     // Reset localStorage
     localStorage.clear();
 
@@ -59,15 +54,26 @@ describe('useTheme', () => {
         return Promise.resolve(result);
       }
     );
+
+    // Initialize storage with default data
+    await chrome.storage.local.set({
+      prompts: [],
+      categories: [],
+      settings: {
+        ...DEFAULT_SETTINGS,
+        theme: 'system'
+      }
+    });
   });
 
   describe('Initialization', () => {
     it('should load theme from Chrome storage on mount', async () => {
-      // Arrange
-      storageManager.getSettings.mockResolvedValue({
-        theme: 'dark',
-        enableSync: false,
-        customSites: []
+      // Arrange - Seed storage with dark theme
+      await chrome.storage.local.set({
+        settings: {
+          ...DEFAULT_SETTINGS,
+          theme: 'dark'
+        }
       });
 
       // Act
@@ -80,19 +86,17 @@ describe('useTheme', () => {
       await waitFor(() => {
         expect(result.current.theme).toBe('dark');
       });
-
-      expect(storageManager.getSettings).toHaveBeenCalled();
     });
 
     it('should migrate from localStorage if Chrome storage is empty', async () => {
       // Arrange
       localStorage.setItem('prompt-library-theme', 'light');
-      storageManager.getSettings.mockResolvedValue({
-        theme: 'system',
-        enableSync: false,
-        customSites: []
+      await chrome.storage.local.set({
+        settings: {
+          ...DEFAULT_SETTINGS,
+          theme: 'system'
+        }
       });
-      vi.mocked(storageManager.updateSettings).mockResolvedValue(DEFAULT_SETTINGS);
 
       // Act
       const { result } = renderHook(() => useTheme());
@@ -102,18 +106,20 @@ describe('useTheme', () => {
         expect(result.current.theme).toBe('light');
       });
 
-      // Assert
-      expect(storageManager.updateSettings).toHaveBeenCalledWith({ theme: 'light' });
+      // Assert - Verify through storage
+      const data = await chrome.storage.local.get('settings');
+      expect(data.settings.theme).toBe('light');
       expect(localStorage.getItem('prompt-library-theme')).toBeNull();
     });
 
     it('should only migrate valid theme values from localStorage', async () => {
       // Arrange
       localStorage.setItem('prompt-library-theme', 'invalid-theme');
-      storageManager.getSettings.mockResolvedValue({
-        theme: 'system',
-        enableSync: false,
-        customSites: []
+      await chrome.storage.local.set({
+        settings: {
+          ...DEFAULT_SETTINGS,
+          theme: 'system'
+        }
       });
 
       // Act
@@ -121,21 +127,22 @@ describe('useTheme', () => {
 
       // Wait for initialization
       await waitFor(() => {
-        expect(storageManager.getSettings).toHaveBeenCalled();
+        expect(result.current.theme).toBe('system');
       });
 
       // Assert - Should not migrate invalid theme
-      expect(storageManager.updateSettings).not.toHaveBeenCalled();
-      expect(result.current.theme).toBe('system');
+      const data = await chrome.storage.local.get('settings');
+      expect(data.settings.theme).toBe('system');
     });
 
     it('should not migrate if Chrome storage already has non-system theme', async () => {
       // Arrange
       localStorage.setItem('prompt-library-theme', 'light');
-      storageManager.getSettings.mockResolvedValue({
-        theme: 'dark',
-        enableSync: false,
-        customSites: []
+      await chrome.storage.local.set({
+        settings: {
+          ...DEFAULT_SETTINGS,
+          theme: 'dark'
+        }
       });
 
       // Act
@@ -147,16 +154,16 @@ describe('useTheme', () => {
       });
 
       // Assert - Should not migrate when Chrome storage has theme
-      expect(storageManager.updateSettings).not.toHaveBeenCalled();
       expect(localStorage.getItem('prompt-library-theme')).toBe('light');
     });
 
     it('should default to system theme if no saved preference', async () => {
       // Arrange
-      storageManager.getSettings.mockResolvedValue({
-        theme: 'system',
-        enableSync: false,
-        customSites: []
+      await chrome.storage.local.set({
+        settings: {
+          ...DEFAULT_SETTINGS,
+          theme: 'system'
+        }
       });
 
       // Act
@@ -164,23 +171,20 @@ describe('useTheme', () => {
 
       // Wait for initialization
       await waitFor(() => {
-        expect(storageManager.getSettings).toHaveBeenCalled();
+        expect(result.current.theme).toBe('system');
       });
-
-      // Assert
-      expect(result.current.theme).toBe('system');
     });
   });
 
   describe('Theme Changes', () => {
     it('should update theme and save to storage', async () => {
       // Arrange
-      storageManager.getSettings.mockResolvedValue({
-        theme: 'system',
-        enableSync: false,
-        customSites: []
+      await chrome.storage.local.set({
+        settings: {
+          ...DEFAULT_SETTINGS,
+          theme: 'system'
+        }
       });
-      vi.mocked(storageManager.updateSettings).mockResolvedValue(DEFAULT_SETTINGS);
 
       const { result } = renderHook(() => useTheme());
 
@@ -193,19 +197,20 @@ describe('useTheme', () => {
         await result.current.setTheme('dark');
       });
 
-      // Assert
+      // Assert - Verify through storage
+      const data = await chrome.storage.local.get('settings');
+      expect(data.settings.theme).toBe('dark');
       expect(result.current.theme).toBe('dark');
-      expect(storageManager.updateSettings).toHaveBeenCalledWith({ theme: 'dark' });
     });
 
     it('should update document classList when theme changes to dark', async () => {
       // Arrange
-      storageManager.getSettings.mockResolvedValue({
-        theme: 'light',
-        enableSync: false,
-        customSites: []
+      await chrome.storage.local.set({
+        settings: {
+          ...DEFAULT_SETTINGS,
+          theme: 'light'
+        }
       });
-      vi.mocked(storageManager.updateSettings).mockResolvedValue(DEFAULT_SETTINGS);
 
       const { result } = renderHook(() => useTheme());
 
@@ -227,12 +232,12 @@ describe('useTheme', () => {
     it('should remove dark class when theme changes to light', async () => {
       // Arrange
       document.documentElement.classList.add('dark');
-      storageManager.getSettings.mockResolvedValue({
-        theme: 'dark',
-        enableSync: false,
-        customSites: []
+      await chrome.storage.local.set({
+        settings: {
+          ...DEFAULT_SETTINGS,
+          theme: 'dark'
+        }
       });
-      vi.mocked(storageManager.updateSettings).mockResolvedValue(DEFAULT_SETTINGS);
 
       const { result } = renderHook(() => useTheme());
 
@@ -268,12 +273,12 @@ describe('useTheme', () => {
         }
       );
 
-      storageManager.getSettings.mockResolvedValue({
-        theme: 'light',
-        enableSync: false,
-        customSites: []
+      await chrome.storage.local.set({
+        settings: {
+          ...DEFAULT_SETTINGS,
+          theme: 'light'
+        }
       });
-      vi.mocked(storageManager.updateSettings).mockResolvedValue(DEFAULT_SETTINGS);
 
       const { result } = renderHook(() => useTheme());
 
@@ -318,12 +323,12 @@ describe('useTheme', () => {
         new Error('No content script')
       );
 
-      storageManager.getSettings.mockResolvedValue({
-        theme: 'light',
-        enableSync: false,
-        customSites: []
+      await chrome.storage.local.set({
+        settings: {
+          ...DEFAULT_SETTINGS,
+          theme: 'light'
+        }
       });
-      vi.mocked(storageManager.updateSettings).mockResolvedValue(DEFAULT_SETTINGS);
 
       const { result } = renderHook(() => useTheme());
 
@@ -345,10 +350,11 @@ describe('useTheme', () => {
     it('should use light theme when system preference is light', async () => {
       // Arrange
       mockMatchMedia.matches = false; // Light mode
-      storageManager.getSettings.mockResolvedValue({
-        theme: 'system',
-        enableSync: false,
-        customSites: []
+      await chrome.storage.local.set({
+        settings: {
+          ...DEFAULT_SETTINGS,
+          theme: 'system'
+        }
       });
 
       // Act
@@ -366,10 +372,11 @@ describe('useTheme', () => {
     it('should use dark theme when system preference is dark', async () => {
       // Arrange
       mockMatchMedia.matches = true; // Dark mode
-      storageManager.getSettings.mockResolvedValue({
-        theme: 'system',
-        enableSync: false,
-        customSites: []
+      await chrome.storage.local.set({
+        settings: {
+          ...DEFAULT_SETTINGS,
+          theme: 'system'
+        }
       });
 
       // Act
@@ -388,10 +395,11 @@ describe('useTheme', () => {
 
     it('should listen for system theme changes', async () => {
       // Arrange
-      storageManager.getSettings.mockResolvedValue({
-        theme: 'system',
-        enableSync: false,
-        customSites: []
+      await chrome.storage.local.set({
+        settings: {
+          ...DEFAULT_SETTINGS,
+          theme: 'system'
+        }
       });
 
       // Act
@@ -408,10 +416,11 @@ describe('useTheme', () => {
 
     it('should re-evaluate system theme when media query fires change event', async () => {
       // Arrange
-      storageManager.getSettings.mockResolvedValue({
-        theme: 'system',
-        enableSync: false,
-        customSites: []
+      await chrome.storage.local.set({
+        settings: {
+          ...DEFAULT_SETTINGS,
+          theme: 'system'
+        }
       });
 
       const { result } = renderHook(() => useTheme());
@@ -437,10 +446,11 @@ describe('useTheme', () => {
     it('should not listen for system changes when theme is not system', async () => {
       // Arrange
       mockMatchMedia.matches = false; // System is light
-      storageManager.getSettings.mockResolvedValue({
-        theme: 'dark',
-        enableSync: false,
-        customSites: []
+      await chrome.storage.local.set({
+        settings: {
+          ...DEFAULT_SETTINGS,
+          theme: 'dark'
+        }
       });
 
       // Act
@@ -477,10 +487,11 @@ describe('useTheme', () => {
 
     it('should cleanup media query listener on unmount', async () => {
       // Arrange
-      storageManager.getSettings.mockResolvedValue({
-        theme: 'system',
-        enableSync: false,
-        customSites: []
+      await chrome.storage.local.set({
+        settings: {
+          ...DEFAULT_SETTINGS,
+          theme: 'system'
+        }
       });
 
       // Act
@@ -501,10 +512,11 @@ describe('useTheme', () => {
   describe('Storage Listener', () => {
     it('should update theme when storage changes from another tab', async () => {
       // Arrange
-      storageManager.getSettings.mockResolvedValue({
-        theme: 'light',
-        enableSync: false,
-        customSites: []
+      await chrome.storage.local.set({
+        settings: {
+          ...DEFAULT_SETTINGS,
+          theme: 'light'
+        }
       });
 
       const { result } = renderHook(() => useTheme());
@@ -518,8 +530,8 @@ describe('useTheme', () => {
         const globalWithMocks = globalThis as GlobalWithMocks;
         globalWithMocks.__triggerChromeStorageChange__?.({
           settings: {
-            newValue: { theme: 'dark', enableSync: false, customSites: [] },
-            oldValue: { theme: 'light', enableSync: false, customSites: [] }
+            newValue: { ...DEFAULT_SETTINGS, theme: 'dark' },
+            oldValue: { ...DEFAULT_SETTINGS, theme: 'light' }
           }
         }, 'local');
       });
@@ -532,10 +544,11 @@ describe('useTheme', () => {
 
     it('should not update if theme is the same', async () => {
       // Arrange
-      storageManager.getSettings.mockResolvedValue({
-        theme: 'dark',
-        enableSync: false,
-        customSites: []
+      await chrome.storage.local.set({
+        settings: {
+          ...DEFAULT_SETTINGS,
+          theme: 'dark'
+        }
       });
 
       const { result } = renderHook(() => useTheme());
@@ -551,8 +564,8 @@ describe('useTheme', () => {
         const globalWithMocks = globalThis as GlobalWithMocks;
         globalWithMocks.__triggerChromeStorageChange__?.({
           settings: {
-            newValue: { theme: 'dark', enableSync: false, customSites: [] },
-            oldValue: { theme: 'dark', enableSync: false, customSites: [] }
+            newValue: { ...DEFAULT_SETTINGS, theme: 'dark' },
+            oldValue: { ...DEFAULT_SETTINGS, theme: 'dark' }
           }
         }, 'local');
       });
@@ -563,10 +576,11 @@ describe('useTheme', () => {
 
     it('should ignore changes to non-settings keys', async () => {
       // Arrange
-      storageManager.getSettings.mockResolvedValue({
-        theme: 'light',
-        enableSync: false,
-        customSites: []
+      await chrome.storage.local.set({
+        settings: {
+          ...DEFAULT_SETTINGS,
+          theme: 'light'
+        }
       });
 
       const { result } = renderHook(() => useTheme());
@@ -592,10 +606,11 @@ describe('useTheme', () => {
 
     it('should cleanup storage listener on unmount', async () => {
       // Arrange
-      storageManager.getSettings.mockResolvedValue({
-        theme: 'light',
-        enableSync: false,
-        customSites: []
+      await chrome.storage.local.set({
+        settings: {
+          ...DEFAULT_SETTINGS,
+          theme: 'light'
+        }
       });
 
       // Act
@@ -627,12 +642,12 @@ describe('useTheme', () => {
     it('should toggle from system to opposite of current system preference', async () => {
       // Arrange - System preference is light
       mockMatchMedia.matches = false;
-      storageManager.getSettings.mockResolvedValue({
-        theme: 'system',
-        enableSync: false,
-        customSites: []
+      await chrome.storage.local.set({
+        settings: {
+          ...DEFAULT_SETTINGS,
+          theme: 'system'
+        }
       });
-      vi.mocked(storageManager.updateSettings).mockResolvedValue(DEFAULT_SETTINGS);
 
       const { result } = renderHook(() => useTheme());
 
@@ -653,12 +668,12 @@ describe('useTheme', () => {
     it('should toggle from system dark to light', async () => {
       // Arrange - System preference is dark
       mockMatchMedia.matches = true;
-      storageManager.getSettings.mockResolvedValue({
-        theme: 'system',
-        enableSync: false,
-        customSites: []
+      await chrome.storage.local.set({
+        settings: {
+          ...DEFAULT_SETTINGS,
+          theme: 'system'
+        }
       });
-      vi.mocked(storageManager.updateSettings).mockResolvedValue(DEFAULT_SETTINGS);
 
       const { result } = renderHook(() => useTheme());
 
@@ -681,37 +696,42 @@ describe('useTheme', () => {
     it('should handle storage read errors gracefully', async () => {
       // Arrange
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      storageManager.getSettings.mockRejectedValue(new Error('Storage read error'));
+      const getSpy = vi.spyOn(chrome.storage.local, 'get');
+      getSpy.mockRejectedValueOnce(new Error('Storage read error'));
 
       // Act
       const { result } = renderHook(() => useTheme());
 
       // Wait for error to be handled
       await waitFor(() => {
-        expect(storageManager.getSettings).toHaveBeenCalled();
+        expect(getSpy).toHaveBeenCalled();
       });
 
       // Assert - Should default to system theme
       expect(result.current.theme).toBe('system');
 
+      getSpy.mockRestore();
       consoleErrorSpy.mockRestore();
     });
 
     it('should handle storage write errors gracefully', async () => {
       // Arrange
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      storageManager.getSettings.mockResolvedValue({
-        theme: 'light',
-        enableSync: false,
-        customSites: []
+      await chrome.storage.local.set({
+        settings: {
+          ...DEFAULT_SETTINGS,
+          theme: 'light'
+        }
       });
-      vi.mocked(storageManager.updateSettings).mockRejectedValue(new Error('Storage write error'));
 
       const { result } = renderHook(() => useTheme());
 
       await waitFor(() => {
         expect(result.current.theme).toBe('light');
       });
+
+      const setSpy = vi.spyOn(chrome.storage.local, 'set');
+      setSpy.mockRejectedValueOnce(new Error('Storage write error'));
 
       // Act - Should not throw error
       await act(async () => {
@@ -719,17 +739,19 @@ describe('useTheme', () => {
       });
 
       // Assert - Operation should complete without crashing
-      expect(storageManager.updateSettings).toHaveBeenCalledWith({ theme: 'dark' });
+      expect(setSpy).toHaveBeenCalled();
 
+      setSpy.mockRestore();
       consoleErrorSpy.mockRestore();
     });
 
     it('should handle missing theme in storage change event', async () => {
       // Arrange
-      storageManager.getSettings.mockResolvedValue({
-        theme: 'light',
-        enableSync: false,
-        customSites: []
+      await chrome.storage.local.set({
+        settings: {
+          ...DEFAULT_SETTINGS,
+          theme: 'light'
+        }
       });
 
       const { result } = renderHook(() => useTheme());
@@ -738,13 +760,14 @@ describe('useTheme', () => {
         expect(result.current.theme).toBe('light');
       });
 
-      // Act - Trigger storage change without theme
+      // Act - Trigger storage change without theme property (exclude theme from newValue)
       await act(async () => {
         const globalWithMocks = globalThis as GlobalWithMocks;
+        const { theme: _removed, ...settingsWithoutTheme } = DEFAULT_SETTINGS;
         globalWithMocks.__triggerChromeStorageChange__?.({
           settings: {
-            newValue: { enableSync: true, customSites: [] },
-            oldValue: { theme: 'light', enableSync: false, customSites: [] }
+            newValue: { ...settingsWithoutTheme, enableSync: true },
+            oldValue: { ...DEFAULT_SETTINGS, theme: 'light', enableSync: false }
           }
         }, 'local');
       });

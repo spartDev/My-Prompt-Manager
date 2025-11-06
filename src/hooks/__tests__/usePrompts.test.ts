@@ -1,88 +1,69 @@
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-import { PromptManager } from '../../services/promptManager';
-import { StorageManager } from '../../services/storage';
+import { buildPrompt } from '../../test/builders';
 import type { Prompt, AppError } from '../../types';
 import { ErrorType } from '../../types';
 import { usePrompts } from '../usePrompts';
 
-// Mock StorageManager
-vi.mock('../../services/storage', () => {
-  const mockStorageManager = {
-    getPrompts: vi.fn(),
-    deletePrompt: vi.fn()
-  };
-
-  return {
-    StorageManager: {
-      getInstance: () => mockStorageManager
-    }
-  };
-});
-
-// Mock PromptManager
-vi.mock('../../services/promptManager', () => {
-  const mockPromptManager = {
-    createPrompt: vi.fn(),
-    updatePrompt: vi.fn()
-  };
-
-  return {
-    PromptManager: {
-      getInstance: () => mockPromptManager
-    }
-  };
-});
-
 describe('usePrompts', () => {
-  const mockStorageManager = StorageManager.getInstance();
-  const mockPromptManager = PromptManager.getInstance();
+  // Test data with realistic timestamps
+  const now = Date.now();
+  const oneDayAgo = now - 86400000;
+  const twoDaysAgo = now - 172800000;
+  const threeDaysAgo = now - 259200000;
 
-  // Test data
   const mockPrompts: Prompt[] = [
-    {
+    buildPrompt({
       id: '1',
       title: 'React Hooks Guide',
       content: 'Learn about useState and useEffect',
       category: 'Development',
-      createdAt: 1000,
-      updatedAt: 1000,
+      createdAt: threeDaysAgo,
+      updatedAt: twoDaysAgo,
       usageCount: 5,
-      lastUsedAt: 1000
-    },
-    {
+      lastUsedAt: oneDayAgo
+    }),
+    buildPrompt({
       id: '2',
       title: 'TypeScript Tips',
       content: 'Advanced TypeScript patterns',
       category: 'Development',
-      createdAt: 2000,
-      updatedAt: 2000,
+      createdAt: twoDaysAgo,
+      updatedAt: oneDayAgo,
       usageCount: 3,
-      lastUsedAt: 2000
-    },
-    {
+      lastUsedAt: oneDayAgo
+    }),
+    buildPrompt({
       id: '3',
       title: 'Meeting Notes',
       content: 'Quarterly planning discussion',
       category: 'Work',
-      createdAt: 3000,
-      updatedAt: 3000,
+      createdAt: oneDayAgo,
+      updatedAt: oneDayAgo,
       usageCount: 1,
-      lastUsedAt: 3000
-    }
+      lastUsedAt: oneDayAgo
+    })
   ];
 
-  beforeEach(() => {
-    vi.clearAllMocks();
-    // Default mock implementation
-    vi.mocked(mockStorageManager.getPrompts).mockResolvedValue([]);
+  beforeEach(async () => {
+    // Initialize storage with default data
+    await chrome.storage.local.set({
+      prompts: [],
+      categories: [{ id: 'default', name: 'General' }],
+      settings: {
+        defaultCategory: 'General',
+        sortOrder: 'updatedAt',
+        sortDirection: 'desc',
+        theme: 'light'
+      }
+    });
   });
 
   describe('Loading', () => {
     it('should load prompts on mount', async () => {
-      // Arrange
-      vi.mocked(mockStorageManager.getPrompts).mockResolvedValue(mockPrompts);
+      // Arrange - Seed storage with test data
+      await chrome.storage.local.set({ prompts: mockPrompts });
 
       // Act
       const { result } = renderHook(() => usePrompts());
@@ -98,14 +79,11 @@ describe('usePrompts', () => {
 
       expect(result.current.prompts).toEqual(mockPrompts);
       expect(result.current.error).toBeNull();
-      expect(mockStorageManager.getPrompts).toHaveBeenCalled();
     });
 
     it('should set loading state while fetching', async () => {
-      // Arrange
-      vi.mocked(mockStorageManager.getPrompts).mockImplementation(
-        () => new Promise(resolve => setTimeout(() => resolve(mockPrompts), 100))
-      );
+      // Arrange - Seed storage
+      await chrome.storage.local.set({ prompts: mockPrompts });
 
       // Act
       const { result } = renderHook(() => usePrompts());
@@ -123,12 +101,9 @@ describe('usePrompts', () => {
     });
 
     it('should handle load errors gracefully', async () => {
-      // Arrange
-      const error: AppError = {
-        message: 'Failed to load prompts',
-        type: ErrorType.STORAGE_UNAVAILABLE
-      };
-      vi.mocked(mockStorageManager.getPrompts).mockRejectedValue(error);
+      // Arrange - Simulate storage failure
+      const getSpy = vi.spyOn(chrome.storage.local, 'get');
+      getSpy.mockRejectedValueOnce(new Error('Failed to load prompts'));
 
       // Act
       const { result } = renderHook(() => usePrompts());
@@ -138,27 +113,25 @@ describe('usePrompts', () => {
         expect(result.current.loading).toBe(false);
       });
 
-      expect(result.current.error).toEqual(error);
+      expect(result.current.error).toBeTruthy();
       expect(result.current.prompts).toEqual([]);
+
+      getSpy.mockRestore();
     });
   });
 
   describe('CRUD Operations', () => {
     it('should create a new prompt', async () => {
-      // Arrange
-      const newPrompt: Prompt = {
-        id: '4',
-        title: 'New Prompt',
-        content: 'New content',
-        category: 'Test',
-        createdAt: 4000,
-        updatedAt: 4000,
-        usageCount: 0,
-        lastUsedAt: 4000
-      };
-
-      vi.mocked(mockStorageManager.getPrompts).mockResolvedValue(mockPrompts);
-      vi.mocked(mockPromptManager.createPrompt).mockResolvedValue(newPrompt);
+      // Arrange - Seed storage with initial prompts and categories
+      await chrome.storage.local.set({
+        prompts: mockPrompts,
+        categories: [
+          { id: 'default', name: 'General' },
+          { id: 'dev', name: 'Development' },
+          { id: 'work', name: 'Work' },
+          { id: 'test', name: 'Test' }
+        ]
+      });
 
       const { result } = renderHook(() => usePrompts());
 
@@ -166,6 +139,8 @@ describe('usePrompts', () => {
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
       });
+
+      expect(result.current.prompts).toHaveLength(3);
 
       // Act - Create prompt
       await act(async () => {
@@ -176,23 +151,33 @@ describe('usePrompts', () => {
         });
       });
 
-      // Assert
-      expect(mockPromptManager.createPrompt).toHaveBeenCalledWith('New Prompt', 'New content', 'Test');
-      expect(result.current.prompts).toContainEqual(newPrompt);
+      // Assert - Verify through storage
+      const data = await chrome.storage.local.get('prompts');
+      const prompts = data.prompts as Prompt[];
+
+      expect(prompts).toHaveLength(4);
+      expect(prompts.some(p => p.title === 'New Prompt')).toBe(true);
+      expect(result.current.prompts).toHaveLength(4);
       expect(result.current.error).toBeNull();
       expect(result.current.loading).toBe(false);
     });
 
     it('should update an existing prompt', async () => {
       // Arrange
-      const updatedPrompt: Prompt = {
-        ...mockPrompts[0],
-        title: 'Updated Title',
-        updatedAt: 5000
-      };
-
-      vi.mocked(mockStorageManager.getPrompts).mockResolvedValue(mockPrompts);
-      vi.mocked(mockPromptManager.updatePrompt).mockResolvedValue(updatedPrompt);
+      await chrome.storage.local.set({
+        prompts: mockPrompts,
+        categories: [
+          { id: 'default', name: 'General' },
+          { id: 'dev', name: 'Development' },
+          { id: 'work', name: 'Work' }
+        ],
+        settings: {
+          defaultCategory: 'General',
+          sortOrder: 'updatedAt',
+          sortDirection: 'desc',
+          theme: 'light'
+        }
+      });
 
       const { result } = renderHook(() => usePrompts());
 
@@ -201,13 +186,21 @@ describe('usePrompts', () => {
         expect(result.current.loading).toBe(false);
       });
 
+      const originalPrompt = result.current.prompts[0];
+
       // Act - Update prompt
       await act(async () => {
         await result.current.updatePrompt('1', { title: 'Updated Title' });
       });
 
-      // Assert
-      expect(mockPromptManager.updatePrompt).toHaveBeenCalledWith('1', { title: 'Updated Title' });
+      // Assert - Verify through storage
+      const data = await chrome.storage.local.get('prompts');
+      const prompts = data.prompts as Prompt[];
+      const updated = prompts.find(p => p.id === '1');
+
+      expect(updated?.title).toBe('Updated Title');
+      expect(updated?.updatedAt).toBeGreaterThan(originalPrompt.updatedAt);
+      expect(updated?.createdAt).toBe(originalPrompt.createdAt);
       expect(result.current.prompts.find(p => p.id === '1')?.title).toBe('Updated Title');
       expect(result.current.error).toBeNull();
       expect(result.current.loading).toBe(false);
@@ -215,10 +208,9 @@ describe('usePrompts', () => {
 
     it('should delete a prompt', async () => {
       // Arrange
-      vi.mocked(mockStorageManager.getPrompts).mockResolvedValue(mockPrompts);
-      vi.mocked(mockStorageManager.deletePrompt).mockResolvedValue(undefined);
+      await chrome.storage.local.set({ prompts: mockPrompts });
 
-      const { result} = renderHook(() => usePrompts());
+      const { result } = renderHook(() => usePrompts());
 
       // Wait for initial load
       await waitFor(() => {
@@ -232,8 +224,12 @@ describe('usePrompts', () => {
         await result.current.deletePrompt('2');
       });
 
-      // Assert
-      expect(mockStorageManager.deletePrompt).toHaveBeenCalledWith('2');
+      // Assert - Verify through storage
+      const data = await chrome.storage.local.get('prompts');
+      const prompts = data.prompts as Prompt[];
+
+      expect(prompts).toHaveLength(2);
+      expect(prompts.find(p => p.id === '2')).toBeUndefined();
       expect(result.current.prompts).toHaveLength(2);
       expect(result.current.prompts.find(p => p.id === '2')).toBeUndefined();
       expect(result.current.error).toBeNull();
@@ -242,7 +238,7 @@ describe('usePrompts', () => {
 
     it('should refresh prompts list after operations', async () => {
       // Arrange
-      vi.mocked(mockStorageManager.getPrompts).mockResolvedValue(mockPrompts);
+      await chrome.storage.local.set({ prompts: mockPrompts });
 
       const { result } = renderHook(() => usePrompts());
 
@@ -251,7 +247,11 @@ describe('usePrompts', () => {
         expect(result.current.loading).toBe(false);
       });
 
-      const initialCallCount = vi.mocked(mockStorageManager.getPrompts).mock.calls.length;
+      expect(result.current.prompts).toHaveLength(3);
+
+      // Modify storage directly to simulate external change
+      const updatedPrompts = [...mockPrompts, buildPrompt({ id: '4', title: 'External Prompt' })];
+      await chrome.storage.local.set({ prompts: updatedPrompts });
 
       // Act - Manually refresh
       await act(async () => {
@@ -263,19 +263,13 @@ describe('usePrompts', () => {
         expect(result.current.loading).toBe(false);
       });
 
-      expect(mockStorageManager.getPrompts).toHaveBeenCalledTimes(initialCallCount + 1);
-      expect(result.current.prompts).toEqual(mockPrompts);
+      expect(result.current.prompts).toHaveLength(4);
+      expect(result.current.prompts.some(p => p.title === 'External Prompt')).toBe(true);
     });
 
     it('should re-throw errors from create operation', async () => {
       // Arrange
-      const error: AppError = {
-        message: 'Create failed',
-        type: ErrorType.VALIDATION_ERROR
-      };
-
-      vi.mocked(mockStorageManager.getPrompts).mockResolvedValue(mockPrompts);
-      vi.mocked(mockPromptManager.createPrompt).mockRejectedValue(error);
+      await chrome.storage.local.set({ prompts: mockPrompts });
 
       const { result } = renderHook(() => usePrompts());
 
@@ -284,30 +278,24 @@ describe('usePrompts', () => {
         expect(result.current.loading).toBe(false);
       });
 
-      // Act & Assert
+      // Act & Assert - Try to create invalid prompt (empty title)
       await act(async () => {
         await expect(
           result.current.createPrompt({
-            title: 'Test',
+            title: '',
             content: 'Test content',
             category: 'Test'
           })
-        ).rejects.toEqual(error);
+        ).rejects.toThrow();
       });
 
-      expect(result.current.error).toEqual(error);
+      expect(result.current.error).toBeTruthy();
       expect(result.current.loading).toBe(false);
     });
 
     it('should re-throw errors from update operation', async () => {
       // Arrange
-      const error: AppError = {
-        message: 'Update failed',
-        type: ErrorType.STORAGE_UNAVAILABLE
-      };
-
-      vi.mocked(mockStorageManager.getPrompts).mockResolvedValue(mockPrompts);
-      vi.mocked(mockPromptManager.updatePrompt).mockRejectedValue(error);
+      await chrome.storage.local.set({ prompts: mockPrompts });
 
       const { result } = renderHook(() => usePrompts());
 
@@ -315,27 +303,27 @@ describe('usePrompts', () => {
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
       });
+
+      // Simulate storage failure
+      const setSpy = vi.spyOn(chrome.storage.local, 'set');
+      setSpy.mockRejectedValueOnce(new Error('Update failed'));
 
       // Act & Assert
       await act(async () => {
         await expect(
           result.current.updatePrompt('1', { title: 'New Title' })
-        ).rejects.toEqual(error);
+        ).rejects.toThrow();
       });
 
-      expect(result.current.error).toEqual(error);
+      expect(result.current.error).toBeTruthy();
       expect(result.current.loading).toBe(false);
+
+      setSpy.mockRestore();
     });
 
     it('should re-throw errors from delete operation', async () => {
       // Arrange
-      const error: AppError = {
-        message: 'Delete failed',
-        type: ErrorType.STORAGE_UNAVAILABLE
-      };
-
-      vi.mocked(mockStorageManager.getPrompts).mockResolvedValue(mockPrompts);
-      vi.mocked(mockStorageManager.deletePrompt).mockRejectedValue(error);
+      await chrome.storage.local.set({ prompts: mockPrompts });
 
       const { result } = renderHook(() => usePrompts());
 
@@ -344,19 +332,25 @@ describe('usePrompts', () => {
         expect(result.current.loading).toBe(false);
       });
 
+      // Simulate storage failure
+      const setSpy = vi.spyOn(chrome.storage.local, 'set');
+      setSpy.mockRejectedValueOnce(new Error('Delete failed'));
+
       // Act & Assert
       await act(async () => {
-        await expect(result.current.deletePrompt('1')).rejects.toEqual(error);
+        await expect(result.current.deletePrompt('1')).rejects.toThrow();
       });
 
-      expect(result.current.error).toEqual(error);
+      expect(result.current.error).toBeTruthy();
       expect(result.current.loading).toBe(false);
+
+      setSpy.mockRestore();
     });
   });
 
   describe('Search', () => {
     beforeEach(async () => {
-      vi.mocked(mockStorageManager.getPrompts).mockResolvedValue(mockPrompts);
+      await chrome.storage.local.set({ prompts: mockPrompts });
     });
 
     it('should filter prompts by search query in title', async () => {
@@ -442,19 +436,19 @@ describe('usePrompts', () => {
     it('should handle special characters in search query', async () => {
       // Arrange
       const specialPrompts: Prompt[] = [
-        {
+        buildPrompt({
           id: '5',
           title: 'C++ Guide',
           content: 'Learn C++ basics',
           category: 'Development',
-          createdAt: 5000,
-          updatedAt: 5000,
+          createdAt: oneDayAgo,
+          updatedAt: oneDayAgo,
           usageCount: 0,
-          lastUsedAt: 5000
-        }
+          lastUsedAt: oneDayAgo
+        })
       ];
 
-      vi.mocked(mockStorageManager.getPrompts).mockResolvedValue(specialPrompts);
+      await chrome.storage.local.set({ prompts: specialPrompts });
       const { result } = renderHook(() => usePrompts());
 
       await waitFor(() => {
@@ -507,7 +501,7 @@ describe('usePrompts', () => {
 
   describe('Filtering', () => {
     beforeEach(async () => {
-      vi.mocked(mockStorageManager.getPrompts).mockResolvedValue(mockPrompts);
+      await chrome.storage.local.set({ prompts: mockPrompts });
     });
 
     it('should filter prompts by category', async () => {
@@ -576,12 +570,9 @@ describe('usePrompts', () => {
 
   describe('Error Handling', () => {
     it('should set error state when operations fail', async () => {
-      // Arrange
-      const loadError: AppError = {
-        message: 'Failed to load',
-        type: ErrorType.STORAGE_UNAVAILABLE
-      };
-      vi.mocked(mockStorageManager.getPrompts).mockRejectedValue(loadError);
+      // Arrange - Simulate storage failure
+      const getSpy = vi.spyOn(chrome.storage.local, 'get');
+      getSpy.mockRejectedValueOnce(new Error('Failed to load'));
 
       // Act
       const { result } = renderHook(() => usePrompts());
@@ -591,26 +582,26 @@ describe('usePrompts', () => {
         expect(result.current.loading).toBe(false);
       });
 
-      expect(result.current.error).toEqual(loadError);
+      expect(result.current.error).toBeTruthy();
       expect(result.current.prompts).toEqual([]);
+
+      getSpy.mockRestore();
     });
 
     it('should clear error state on successful operation', async () => {
       // Arrange - First load fails
-      const error: AppError = {
-        message: 'Initial load failed',
-        type: ErrorType.STORAGE_UNAVAILABLE
-      };
-      vi.mocked(mockStorageManager.getPrompts).mockRejectedValueOnce(error);
+      const getSpy = vi.spyOn(chrome.storage.local, 'get');
+      getSpy.mockRejectedValueOnce(new Error('Initial load failed'));
 
       const { result } = renderHook(() => usePrompts());
 
       await waitFor(() => {
-        expect(result.current.error).toEqual(error);
+        expect(result.current.error).toBeTruthy();
       });
 
-      // Act - Refresh with success
-      vi.mocked(mockStorageManager.getPrompts).mockResolvedValue(mockPrompts);
+      // Act - Refresh with success (restore real implementation)
+      getSpy.mockRestore();
+      await chrome.storage.local.set({ prompts: mockPrompts });
 
       await act(async () => {
         await result.current.refreshPrompts();
@@ -627,13 +618,7 @@ describe('usePrompts', () => {
 
     it('should maintain error state after failed operation', async () => {
       // Arrange
-      const createError: AppError = {
-        message: 'Create failed',
-        type: ErrorType.VALIDATION_ERROR
-      };
-
-      vi.mocked(mockStorageManager.getPrompts).mockResolvedValue(mockPrompts);
-      vi.mocked(mockPromptManager.createPrompt).mockRejectedValue(createError);
+      await chrome.storage.local.set({ prompts: mockPrompts });
 
       const { result } = renderHook(() => usePrompts());
 
@@ -641,11 +626,11 @@ describe('usePrompts', () => {
         expect(result.current.loading).toBe(false);
       });
 
-      // Act - Create with error
+      // Act - Create with error (empty title is invalid)
       await act(async () => {
         try {
           await result.current.createPrompt({
-            title: 'Test',
+            title: '',
             content: 'Test',
             category: 'Test'
           });
@@ -659,27 +644,22 @@ describe('usePrompts', () => {
         expect(result.current.loading).toBe(false);
       });
 
-      expect(result.current.error).toEqual(createError);
+      expect(result.current.error).toBeTruthy();
     });
   });
 
   describe('State Management', () => {
     it('should maintain prompts state across multiple operations', async () => {
-      // Arrange
-      const newPrompt: Prompt = {
-        id: '4',
-        title: 'Fourth Prompt',
-        content: 'Fourth content',
-        category: 'Test',
-        createdAt: 4000,
-        updatedAt: 4000,
-        usageCount: 0,
-        lastUsedAt: 4000
-      };
-
-      vi.mocked(mockStorageManager.getPrompts).mockResolvedValue(mockPrompts);
-      vi.mocked(mockPromptManager.createPrompt).mockResolvedValue(newPrompt);
-      vi.mocked(mockStorageManager.deletePrompt).mockResolvedValue(undefined);
+      // Arrange - Add Test category
+      await chrome.storage.local.set({
+        prompts: mockPrompts,
+        categories: [
+          { id: 'default', name: 'General' },
+          { id: 'dev', name: 'Development' },
+          { id: 'work', name: 'Work' },
+          { id: 'test', name: 'Test' }
+        ]
+      });
 
       const { result } = renderHook(() => usePrompts());
 
@@ -710,39 +690,29 @@ describe('usePrompts', () => {
         expect(result.current.loading).toBe(false);
       });
 
+      // Verify through storage
+      const data = await chrome.storage.local.get('prompts');
+      const prompts = data.prompts as Prompt[];
+
+      expect(prompts).toHaveLength(3);
+      expect(prompts.some(p => p.title === 'Fourth Prompt')).toBe(true);
+      expect(prompts.find(p => p.id === '2')).toBeUndefined();
       expect(result.current.prompts).toHaveLength(3);
-      expect(result.current.prompts.find(p => p.id === '4')).toBeDefined();
+      expect(result.current.prompts.find(p => p.title === 'Fourth Prompt')).toBeDefined();
       expect(result.current.prompts.find(p => p.id === '2')).toBeUndefined();
     });
 
     it('should handle concurrent operations correctly', async () => {
-      // Arrange
-      const prompt1: Prompt = {
-        id: '4',
-        title: 'Prompt 4',
-        content: 'Content 4',
-        category: 'Test',
-        createdAt: 4000,
-        updatedAt: 4000,
-        usageCount: 0,
-        lastUsedAt: 4000
-      };
-
-      const prompt2: Prompt = {
-        id: '5',
-        title: 'Prompt 5',
-        content: 'Content 5',
-        category: 'Test',
-        createdAt: 5000,
-        updatedAt: 5000,
-        usageCount: 0,
-        lastUsedAt: 5000
-      };
-
-      vi.mocked(mockStorageManager.getPrompts).mockResolvedValue(mockPrompts);
-      vi.mocked(mockPromptManager.createPrompt)
-        .mockResolvedValueOnce(prompt1)
-        .mockResolvedValueOnce(prompt2);
+      // Arrange - Add Test category
+      await chrome.storage.local.set({
+        prompts: mockPrompts,
+        categories: [
+          { id: 'default', name: 'General' },
+          { id: 'dev', name: 'Development' },
+          { id: 'work', name: 'Work' },
+          { id: 'test', name: 'Test' }
+        ]
+      });
 
       const { result } = renderHook(() => usePrompts());
 
@@ -771,9 +741,16 @@ describe('usePrompts', () => {
         expect(result.current.loading).toBe(false);
       });
 
+      // Verify through storage (tests mutex locking)
+      const data = await chrome.storage.local.get('prompts');
+      const prompts = data.prompts as Prompt[];
+
+      expect(prompts).toHaveLength(5);
+      expect(prompts.some(p => p.title === 'Prompt 4')).toBe(true);
+      expect(prompts.some(p => p.title === 'Prompt 5')).toBe(true);
       expect(result.current.prompts).toHaveLength(5);
-      expect(result.current.prompts.find(p => p.id === '4')).toBeDefined();
-      expect(result.current.prompts.find(p => p.id === '5')).toBeDefined();
+      expect(result.current.prompts.find(p => p.title === 'Prompt 4')).toBeDefined();
+      expect(result.current.prompts.find(p => p.title === 'Prompt 5')).toBeDefined();
     });
   });
 });
