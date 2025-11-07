@@ -119,7 +119,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
     'copilot.microsoft.com': {
       name: 'Microsoft Copilot',
       description: 'Microsoft\'s AI assistant',
-      icon: <CopilotIcon className="scale-75" />
+      icon: (isEnabled: boolean) => <CopilotIcon disabled={!isEnabled} className="scale-75" />
     }
   }), []);
 
