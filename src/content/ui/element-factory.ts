@@ -274,6 +274,52 @@ export class UIElementFactory {
   }
 
   /**
+   * Creates Microsoft Copilot-specific icon matching native button styling
+   * Follows Copilot's design: rounded-2xl, border, transparent background with hover
+   */
+  createCopilotIcon(): HTMLElement {
+    const icon = document.createElement('button');
+
+    // Match Copilot's button classes exactly (from "Quick response" and "Talk to Copilot" buttons)
+    icon.className = `prompt-library-integrated-icon relative flex items-center text-foreground-800 fill-foreground-800 active:text-foreground-600 active:fill-foreground-600 dark:active:text-foreground-650 dark:active:fill-foreground-650 bg-transparent safe-hover:bg-black/5 active:bg-black/3 dark:safe-hover:bg-black/30 dark:active:bg-black/20 text-sm justify-center min-h-9 min-w-9 after:rounded-xl after:absolute after:inset-0 after:pointer-events-none after:border after:border-transparent after:contrast-more:border-2 outline-2 outline-offset-1 focus-visible:z-[1] focus-visible:outline focus-visible:outline-stroke-900 h-9 select-none gap-1 rounded-2xl border border-black/8 dark:border-white/8 px-2.5 py-1`;
+
+    icon.setAttribute('type', 'button');
+    icon.setAttribute('aria-label', 'Open my prompt manager - Access your saved prompts');
+    icon.setAttribute('title', 'My Prompt Manager - Access your saved prompts');
+    icon.setAttribute('data-instance-id', this.instanceId);
+    icon.setAttribute('tabindex', '0');
+    icon.setAttribute('data-dashlane-label', 'true');
+
+    // Create icon SVG (18px consistent sizing)
+    const svg = createSVGElement('svg', {
+      xmlns: 'http://www.w3.org/2000/svg',
+      width: '18',
+      height: '18',
+      viewBox: '0 0 24 24',
+      fill: 'currentColor',
+      'aria-hidden': 'true',
+      style: 'flex-shrink: 0;'
+    });
+
+    // Standard chat bubble icon with three dots (consistent across platforms)
+    const path = createSVGElement('path', {
+      d: 'M5.65 9.42C5.93 9.42 6.17 9.32 6.36 9.13C6.55 8.94 6.65 8.69 6.65 8.4C6.65 8.1 6.55 7.85 6.36 7.66C6.17 7.47 5.93 7.37 5.65 7.37C5.37 7.37 5.13 7.47 4.94 7.66C4.75 7.85 4.65 8.1 4.65 8.4C4.65 8.69 4.75 8.94 4.94 9.13C5.13 9.32 5.37 9.42 5.65 9.42ZM10.08 9.42C10.36 9.42 10.6 9.32 10.79 9.13C10.98 8.94 11.08 8.69 11.08 8.4C11.08 8.1 10.98 7.85 10.79 7.66C10.6 7.47 10.36 7.37 10.08 7.37C9.8 7.37 9.56 7.47 9.37 7.66C9.18 7.85 9.08 8.1 9.08 8.4C9.08 8.69 9.18 8.94 9.37 9.13C9.56 9.32 9.8 9.42 10.08 9.42ZM14.32 9.42C14.6 9.42 14.84 9.32 15.03 9.13C15.22 8.94 15.32 8.69 15.32 8.4C15.32 8.1 15.22 7.85 15.03 7.66C14.84 7.47 14.6 7.37 14.32 7.37C14.04 7.37 13.8 7.47 13.61 7.66C13.42 7.85 13.32 8.1 13.32 8.4C13.32 8.69 13.42 8.94 13.61 9.13C13.8 9.32 14.04 9.42 14.32 9.42ZM0 19.21V1.58C0 1.18 0.15 0.81 0.45 0.49C0.75 0.16 1.1 0 1.5 0H18.5C18.88 0 19.23 0.16 19.54 0.49C19.85 0.81 20 1.18 20 1.58V15.3C20 15.7 19.85 16.07 19.54 16.39C19.23 16.72 18.88 16.88 18.5 16.88H4L1.28 19.76C1.04 20.01 0.77 20.06 0.46 19.93C0.15 19.8 0 19.56 0 19.21ZM1.5 17.28L3.37 15.3H18.5V1.58H1.5V17.28ZM1.5 1.58V15.3V17.28V1.58Z'
+    });
+
+    svg.appendChild(path);
+    icon.appendChild(svg);
+
+    // Add text label matching Copilot's button pattern
+    const textElement = createElement('span', {
+      class: 'text-sm'
+    });
+    textElement.textContent = 'My Prompts';
+    icon.appendChild(textElement);
+
+    return icon;
+  }
+
+  /**
    * Creates Gemini-specific icon using Material Design 3
    * Matches Gemini's mic and send button styling with Angular Material components
    */

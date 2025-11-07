@@ -21,7 +21,8 @@
     "https://chatgpt.com/*",
     "https://gemini.google.com/*",
     "https://www.perplexity.ai/*",
-    "https://chat.mistral.ai/*"
+    "https://chat.mistral.ai/*",
+    "https://copilot.microsoft.com/*"
   ],
   "content_scripts": [
     {
@@ -30,7 +31,8 @@
         "https://chatgpt.com/*",
         "https://gemini.google.com/*",
         "https://www.perplexity.ai/*",
-        "https://chat.mistral.ai/*"
+        "https://chat.mistral.ai/*",
+        "https://copilot.microsoft.com/*"
       ],
       "js": ["src/content/index.ts"],
       "run_at": "document_idle",

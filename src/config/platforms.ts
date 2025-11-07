@@ -116,6 +116,23 @@ export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
     buttonContainerSelector: '.input-buttons-wrapper-bottom',
     strategyClass: 'GeminiStrategy',
     hostnamePatterns: ['gemini']
+  },
+
+  copilot: {
+    id: 'copilot',
+    hostname: 'copilot.microsoft.com',
+    displayName: 'Microsoft Copilot',
+    priority: 80,
+    defaultEnabled: true,
+    selectors: [
+      'textarea[data-testid="composer-input"]',  // Primary selector - most specific
+      'textarea#userInput',                      // Fallback - ID selector
+      'textarea[placeholder*="Message"]',        // Pattern match fallback
+      'textarea[placeholder*="Copilot"]'         // Additional pattern match
+    ],
+    buttonContainerSelector: '.flex.gap-2.items-center', // Second occurrence with "Talk to Copilot"
+    strategyClass: 'DefaultStrategy',  // Uses default strategy (no custom class needed)
+    hostnamePatterns: ['copilot.microsoft']
   }
 };
 
@@ -200,7 +217,7 @@ export function getPlatformsByPriority(): PlatformDefinition[] {
  * Legacy compatibility: Get platform names as union type
  * @deprecated Use PlatformDefinition.id instead
  */
-export type PlatformName = 'claude' | 'chatgpt' | 'mistral' | 'perplexity' | 'gemini' | 'default';
+export type PlatformName = 'claude' | 'chatgpt' | 'mistral' | 'perplexity' | 'gemini' | 'copilot' | 'default';
 
 /**
  * Get all platform IDs for TypeScript union types

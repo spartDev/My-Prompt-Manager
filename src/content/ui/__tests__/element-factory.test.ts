@@ -198,16 +198,74 @@ describe('UIElementFactory', () => {
     });
   });
 
+  describe('createCopilotIcon', () => {
+    it('should create Copilot icon button element', () => {
+      const icon = factory.createCopilotIcon();
+
+      expect(icon).toBeDefined();
+      expect(icon.tagName).toBe('BUTTON');
+      expect(icon.getAttribute('type')).toBe('button');
+    });
+
+    it('should include prompt-library-integrated-icon class', () => {
+      const icon = factory.createCopilotIcon();
+      expect(icon.className).toContain('prompt-library-integrated-icon');
+    });
+
+    it('should include Copilot-specific styling classes', () => {
+      const icon = factory.createCopilotIcon();
+      expect(icon.className).toContain('rounded-2xl');
+      expect(icon.className).toContain('border');
+      expect(icon.className).toContain('bg-transparent');
+    });
+
+    it('should have proper ARIA attributes', () => {
+      const icon = factory.createCopilotIcon();
+
+      expect(icon.getAttribute('aria-label')).toContain('Open my prompt manager');
+      expect(icon.getAttribute('title')).toContain('My Prompt Manager');
+      expect(icon.getAttribute('tabindex')).toBe('0');
+    });
+
+    it('should include instance ID', () => {
+      const icon = factory.createCopilotIcon();
+      expect(icon.getAttribute('data-instance-id')).toBe(testInstanceId);
+    });
+
+    it('should contain SVG icon element', () => {
+      const icon = factory.createCopilotIcon();
+      const svg = icon.querySelector('svg');
+
+      expect(svg).toBeDefined();
+      expect(svg?.getAttribute('width')).toBe('18');
+      expect(svg?.getAttribute('height')).toBe('18');
+      expect(svg?.getAttribute('viewBox')).toBe('0 0 24 24');
+    });
+
+    it('should include text label "My Prompts"', () => {
+      const icon = factory.createCopilotIcon();
+      const textElement = icon.querySelector('span');
+
+      expect(textElement).toBeDefined();
+      expect(textElement?.textContent).toBe('My Prompts');
+    });
+
+    it('should have dark mode classes', () => {
+      const icon = factory.createCopilotIcon();
+      expect(icon.className).toContain('dark:');
+    });
+  });
+
   describe('Storage integration', () => {
     it('should use createElement for creating elements', () => {
       factory.createPerplexityIcon();
-      
+
       expect(createElement).toHaveBeenCalled();
     });
 
     it('should use createSVGElement for creating SVG elements', () => {
       factory.createPerplexityIcon();
-      
+
       expect(createSVGElement).toHaveBeenCalled();
     });
   });
