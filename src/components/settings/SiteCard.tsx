@@ -33,7 +33,7 @@ const getBrandColors = (hostname: string) => {
       };
     case 'copilot.microsoft.com':
       return {
-        enabled: 'bg-black text-white shadow-sm',
+        enabled: 'bg-[#0e111b] text-white shadow-sm',
         disabled: 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
       };
     default:
