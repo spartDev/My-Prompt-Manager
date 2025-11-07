@@ -6,6 +6,10 @@
  * to avoid configuration drift across multiple files.
  */
 
+import type { BrandColorScheme } from '../constants/brandColors';
+
+const DISABLED_STATE = 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400';
+
 /**
  * Interface for comprehensive platform configuration
  */
@@ -28,6 +32,8 @@ export interface PlatformDefinition {
   strategyClass: string;
   /** Additional hostname patterns to check for platform detection */
   hostnamePatterns?: string[];
+  /** Brand color scheme for UI elements (optional, defaults to green gradient when omitted) */
+  brandColors?: BrandColorScheme;
 }
 
 /**
@@ -48,7 +54,11 @@ export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
     ],
     buttonContainerSelector: '.relative.flex-1.flex.items-center.gap-2.shrink.min-w-0',
     strategyClass: 'ClaudeStrategy',
-    hostnamePatterns: ['claude']
+    hostnamePatterns: ['claude'],
+    brandColors: {
+      enabled: 'bg-[#d37354] text-white shadow-sm',
+      disabled: DISABLED_STATE
+    }
   },
 
   chatgpt: {
@@ -63,7 +73,11 @@ export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
     ],
     buttonContainerSelector: 'div[data-testid="composer-trailing-actions"] .ms-auto.flex.items-center',
     strategyClass: 'ChatGPTStrategy',
-    hostnamePatterns: ['openai', 'chatgpt']
+    hostnamePatterns: ['openai', 'chatgpt'],
+    brandColors: {
+      enabled: 'bg-white text-gray-800 shadow-sm border border-gray-200',
+      disabled: DISABLED_STATE
+    }
   },
 
   mistral: {
@@ -83,7 +97,11 @@ export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
       '.flex.items-center.justify-start.gap-3'                   // Mobile fallback
     ].join(', '),
     strategyClass: 'MistralStrategy',
-    hostnamePatterns: ['mistral']
+    hostnamePatterns: ['mistral'],
+    brandColors: {
+      enabled: 'bg-gray-700 text-white shadow-sm',
+      disabled: DISABLED_STATE
+    }
   },
 
   perplexity: {
@@ -98,7 +116,11 @@ export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
     ],
     buttonContainerSelector: '.bg-background-50.dark\\:bg-offsetDark.flex.items-center',
     strategyClass: 'PerplexityStrategy',
-    hostnamePatterns: ['perplexity']
+    hostnamePatterns: ['perplexity'],
+    brandColors: {
+      enabled: 'bg-[#2d808c] text-white shadow-sm',
+      disabled: DISABLED_STATE
+    }
   },
 
   gemini: {
@@ -115,7 +137,11 @@ export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
     ],
     buttonContainerSelector: '.input-buttons-wrapper-bottom',
     strategyClass: 'GeminiStrategy',
-    hostnamePatterns: ['gemini']
+    hostnamePatterns: ['gemini'],
+    brandColors: {
+      enabled: 'bg-white text-gray-800 shadow-sm border border-gray-200',
+      disabled: DISABLED_STATE
+    }
   },
 
   copilot: {
@@ -132,7 +158,11 @@ export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
     ],
     buttonContainerSelector: '.flex.gap-2.items-center', // Second occurrence with "Talk to Copilot"
     strategyClass: 'DefaultStrategy',  // Uses default strategy (no custom class needed)
-    hostnamePatterns: ['copilot.microsoft']
+    hostnamePatterns: ['copilot.microsoft'],
+    brandColors: {
+      enabled: 'bg-[#0e111b] text-white shadow-sm',
+      disabled: DISABLED_STATE
+    }
   }
 };
 

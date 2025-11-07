@@ -29,6 +29,7 @@ Before starting, ensure you have:
 1. The target platform URL (e.g., `gemini.google.com`)
 2. Browser DevTools open on the target platform
 3. Understanding of the input element type (textarea vs contenteditable)
+4. Preferred Tailwind classes for the platform badge styling (optional but recommended)
 
 ## 10-Step Integration Workflow
 
@@ -76,16 +77,40 @@ export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
     ],
     buttonContainerSelector: '.toolbar-container', // Where to place icon (optional)
     strategyClass: 'YourPlatformStrategy',        // Strategy class name
-    hostnamePatterns: ['yourplatform', 'your-ai'] // Additional hostname patterns
+    hostnamePatterns: ['yourplatform', 'your-ai'], // Additional hostname patterns
+    brandColors: {                                // Tailwind classes for badge styling
+      enabled: 'bg-[#123456] text-white shadow-sm',
+      disabled: 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+    }
   }
 };
 ```
+
+> ℹ️ If you omit `brandColors`, the UI falls back to a green gradient badge so the integration still renders correctly.
 
 **Priority Guidelines:**
 - 100: Premium platforms (Claude, ChatGPT)
 - 80-90: Major platforms (Perplexity, Mistral, Gemini)
 - 60-79: Secondary platforms (new additions)
 - < 60: Experimental/beta platforms
+
+### Step 2.1: Update SiteCard UI (Optional)
+
+Add or update the platform card shown in settings so users can enable/disable the integration.
+
+**When to do this:**
+- You're adding a core platform (not just a custom site).
+- You want the new platform visible in the Settings UI.
+
+**File:** `src/components/settings/SiteCard.tsx`
+
+**Actions:**
+1. Add an icon component in `src/components/icons/SiteIcons.tsx` (or reuse an existing one).
+2. Update `src/components/settings/SiteCardList.tsx` (or wherever cards are listed) to include the new platform with the right icon.
+3. Make sure the new card passes the correct hostname and uses `getBrandColors(hostname)`.
+4. Verify the badge colors/labels look correct; adjust `brandColors` if needed.
+
+**Tip:** The label for the platform name comes from `displayName` in `SUPPORTED_PLATFORMS`. Keep them in sync.
 
 ### Step 3: Create the Platform Strategy
 
@@ -652,6 +677,7 @@ Use this checklist when adding a new platform:
 
 - [ ] **Step 1:** Identified input element selector
 - [ ] **Step 2:** Added platform to `src/config/platforms.ts`
+- [ ] **Step 2.1:** Updated SiteCard UI (optional)
 - [ ] **Step 3:** Created strategy class in `src/content/platforms/`
 - [ ] **Step 4:** Registered strategy in `platform-manager.ts` and `index.ts`
 - [ ] **Step 5:** Updated manifest permissions (if needed)

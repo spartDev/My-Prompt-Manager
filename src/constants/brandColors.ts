@@ -3,7 +3,12 @@
  * 
  * Centralized configuration for platform-specific brand colors used in UI components.
  * This provides type-safe, maintainable color schemes for each supported platform.
+ * 
+ * Brand colors are defined directly on PlatformDefinition.brandColors so that
+ * each platform remains the single source of truth for its UI styling.
  */
+
+import { getPlatformByHostname } from '../config/platforms';
 
 /**
  * Brand color scheme for platform UI elements
@@ -30,43 +35,13 @@ const DEFAULT_BRAND_COLORS: BrandColorScheme = {
 };
 
 /**
- * Platform-specific brand color configurations
- * Maps hostnames to their brand color schemes
- */
-export const PLATFORM_BRAND_COLORS: Record<string, BrandColorScheme> = {
-  'www.perplexity.ai': {
-    enabled: 'bg-[#2d808c] text-white shadow-sm',
-    disabled: DISABLED_STATE
-  },
-  'claude.ai': {
-    enabled: 'bg-[#d37354] text-white shadow-sm',
-    disabled: DISABLED_STATE
-  },
-  'chatgpt.com': {
-    enabled: 'bg-white text-gray-800 shadow-sm border border-gray-200',
-    disabled: DISABLED_STATE
-  },
-  'chat.mistral.ai': {
-    enabled: 'bg-gray-700 text-white shadow-sm',
-    disabled: DISABLED_STATE
-  },
-  'gemini.google.com': {
-    enabled: 'bg-white text-gray-800 shadow-sm border border-gray-200',
-    disabled: DISABLED_STATE
-  },
-  'copilot.microsoft.com': {
-    enabled: 'bg-[#0e111b] text-white shadow-sm',
-    disabled: DISABLED_STATE
-  }
-};
-
-/**
  * Get brand colors for a given hostname
- * 
+ *
  * @param hostname - The platform hostname (e.g., 'claude.ai')
  * @returns Brand color scheme for the platform, or default colors for custom sites
  */
 export const getBrandColors = (hostname: string): BrandColorScheme => {
-  return PLATFORM_BRAND_COLORS[hostname] ?? DEFAULT_BRAND_COLORS;
+  const platform = getPlatformByHostname(hostname);
+  return platform?.brandColors ?? DEFAULT_BRAND_COLORS;
 };
 
