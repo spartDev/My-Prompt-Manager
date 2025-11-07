@@ -280,8 +280,9 @@ export class UIElementFactory {
   createCopilotIcon(): HTMLElement {
     const icon = document.createElement('button');
 
-    // Match Copilot's button classes exactly (from "Quick response" and "Talk to Copilot" buttons)
-    icon.className = `prompt-library-integrated-icon relative flex items-center text-foreground-800 fill-foreground-800 active:text-foreground-600 active:fill-foreground-600 dark:active:text-foreground-650 dark:active:fill-foreground-650 bg-transparent safe-hover:bg-black/5 active:bg-black/3 dark:safe-hover:bg-black/30 dark:active:bg-black/20 text-sm justify-center min-h-9 min-w-9 after:rounded-xl after:absolute after:inset-0 after:pointer-events-none after:border after:border-transparent after:contrast-more:border-2 outline-2 outline-offset-1 focus-visible:z-[1] focus-visible:outline focus-visible:outline-stroke-900 h-9 select-none gap-1 rounded-2xl border border-black/8 dark:border-white/8 px-2.5 py-1`;
+    // Use the base classes for consistency with the desired output
+    // The wrapper div will have class="relative", so the button doesn't need positioning classes
+    icon.className = 'prompt-library-icon-base prompt-library-cleanup-target';
 
     icon.setAttribute('type', 'button');
     icon.setAttribute('aria-label', 'Open my prompt manager - Access your saved prompts');
@@ -309,12 +310,7 @@ export class UIElementFactory {
     svg.appendChild(path);
     icon.appendChild(svg);
 
-    // Add text label matching Copilot's button pattern
-    const textElement = createElement('span', {
-      class: 'text-sm'
-    });
-    textElement.textContent = 'My Prompts';
-    icon.appendChild(textElement);
+    // No text label for Copilot - just the icon
 
     return icon;
   }
