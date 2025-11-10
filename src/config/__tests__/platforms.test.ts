@@ -64,7 +64,9 @@ describe('Copilot Platform Configuration', () => {
   });
 
   it('should have button container selector', () => {
-    expect(SUPPORTED_PLATFORMS.copilot.buttonContainerSelector).toBe('.flex.gap-2.items-center');
+    expect(SUPPORTED_PLATFORMS.copilot.buttonContainerSelector).toBe(
+      '.relative.bottom-0.flex.justify-between.pb-0\\.5.pe-2\\.5.ps-1\\.5 > .flex.gap-2.items-center:last-child'
+    );
   });
 
   it('should be included in all supported hostnames', () => {
