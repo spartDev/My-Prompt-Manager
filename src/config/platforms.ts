@@ -42,8 +42,11 @@ export interface PlatformDefinition {
  *
  * IMPORTANT: When adding a new platform, only update this configuration.
  * All other files will automatically pick up the changes.
+ *
+ * NOTE: This object is frozen to prevent runtime mutations that could
+ * compromise platform detection and security.
  */
-export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
+export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefinition>>> = Object.freeze({
   claude: {
     id: "claude",
     hostname: "claude.ai",
@@ -161,14 +164,14 @@ export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
     // Target the container with microphone button - more specific than generic .flex.gap-2
     buttonContainerSelector:
       ".relative.bottom-0.flex.justify-between.pb-0\\.5.pe-2\\.5.ps-1\\.5 > .flex.gap-2.items-center:last-child",
-    strategyClass: "DefaultStrategy", // Uses default strategy (no custom class needed)
+    strategyClass: "CopilotStrategy", // Uses dedicated CopilotStrategy for React integration
     hostnamePatterns: ["copilot.microsoft"],
     brandColors: {
       enabled: "bg-[#0e111b] text-white shadow-sm",
       disabled: DISABLED_STATE,
     },
   },
-};
+});
 
 /**
  * Helper functions for accessing platform configuration

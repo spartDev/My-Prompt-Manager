@@ -747,43 +747,129 @@ export class ElementPicker {
       existingWarning.remove();
     }
     
-    let warningSection = '';
+    // Clear existing content safely
+    this.infoBox.textContent = '';
+
+    // Create warning section if needed
     if (blockCheck?.blocked) {
-      warningSection = `
-        <div class="warning" style="color: #ef4444; font-size: 12px; margin-bottom: 8px; padding: 6px; background: rgba(239, 68, 68, 0.1); border-radius: 4px; border: 1px solid #dc2626;">
-          <span style="font-weight: 600;">⚠️ Sensitive Field</span><br>
-          <span style="font-size: 11px;">${blockCheck.reason || 'Cannot select this element'}</span>
-        </div>
-      `;
+      const warningDiv = document.createElement('div');
+      warningDiv.className = 'warning';
+      Object.assign(warningDiv.style, {
+        color: '#ef4444',
+        fontSize: '12px',
+        marginBottom: '8px',
+        padding: '6px',
+        background: 'rgba(239, 68, 68, 0.1)',
+        borderRadius: '4px',
+        border: '1px solid #dc2626'
+      });
+
+      const warningTitle = document.createElement('span');
+      warningTitle.style.fontWeight = '600';
+      warningTitle.textContent = '⚠️ Sensitive Field';
+
+      const warningReason = document.createElement('span');
+      warningReason.style.fontSize = '11px';
+      warningReason.textContent = blockCheck.reason || 'Cannot select this element';
+
+      warningDiv.appendChild(warningTitle);
+      warningDiv.appendChild(document.createElement('br'));
+      warningDiv.appendChild(warningReason);
+      this.infoBox.appendChild(warningDiv);
     }
-    
-    this.infoBox.innerHTML = `
-      <div style="font-weight: 600; margin-bottom: 4px; color: #a78bfa;">Element Info</div>
-      ${warningSection}
-      <div style="margin-bottom: 2px;">
-        <span style="color: #6b7280;">Type:</span> 
-        <span style="color: #fbbf24; font-family: monospace;">${tagName}</span>
-      </div>
-      ${id ? `
-      <div style="margin-bottom: 2px;">
-        <span style="color: #6b7280;">ID:</span> 
-        <span style="color: #34d399; font-family: monospace;">${id}</span>
-      </div>` : ''}
-      ${className ? `
-      <div style="margin-bottom: 2px;">
-        <span style="color: #6b7280;">Class:</span> 
-        <span style="color: #60a5fa; font-family: monospace; word-break: break-all;">${className}</span>
-      </div>` : ''}
-      <div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #374151;">
-        <span style="color: #6b7280;">Selector:</span>
-        <div style="color: #e5e7eb; font-family: monospace; font-size: 11px; margin-top: 2px; word-break: break-all;">
-          ${selector}
-        </div>
-      </div>
-      <div style="color: #9ca3af; font-size: 11px; margin-top: 8px;">
-        ${blockCheck?.blocked ? 'Element blocked for security • ESC to cancel' : 'Click to select • ESC to cancel'}
-      </div>
-    `;
+
+    // Title
+    const title = document.createElement('div');
+    Object.assign(title.style, {
+      fontWeight: '600',
+      marginBottom: '4px',
+      color: '#a78bfa'
+    });
+    title.textContent = 'Element Info';
+    this.infoBox.appendChild(title);
+
+    // Type row
+    const typeRow = this._createInfoRow('Type:', tagName, '#fbbf24');
+    this.infoBox.appendChild(typeRow);
+
+    // ID row (if exists)
+    if (id) {
+      const idRow = this._createInfoRow('ID:', id, '#34d399');
+      this.infoBox.appendChild(idRow);
+    }
+
+    // Class row (if exists)
+    if (className) {
+      const classRow = this._createInfoRow('Class:', className, '#60a5fa');
+      const valueSpan = classRow.querySelector('span:last-child');
+      if (valueSpan) {
+        const currentStyle = valueSpan.getAttribute('style') || '';
+        valueSpan.setAttribute('style', currentStyle + '; word-break: break-all;');
+      }
+      this.infoBox.appendChild(classRow);
+    }
+
+    // Selector section
+    const selectorSection = document.createElement('div');
+    Object.assign(selectorSection.style, {
+      marginTop: '6px',
+      paddingTop: '6px',
+      borderTop: '1px solid #374151'
+    });
+
+    const selectorLabel = document.createElement('span');
+    selectorLabel.style.color = '#6b7280';
+    selectorLabel.textContent = 'Selector:';
+
+    const selectorValue = document.createElement('div');
+    Object.assign(selectorValue.style, {
+      color: '#e5e7eb',
+      fontFamily: 'monospace',
+      fontSize: '11px',
+      marginTop: '2px',
+      wordBreak: 'break-all'
+    });
+    selectorValue.textContent = selector;
+
+    selectorSection.appendChild(selectorLabel);
+    selectorSection.appendChild(selectorValue);
+    this.infoBox.appendChild(selectorSection);
+
+    // Footer message
+    const footer = document.createElement('div');
+    Object.assign(footer.style, {
+      color: '#9ca3af',
+      fontSize: '11px',
+      marginTop: '8px'
+    });
+    footer.textContent = blockCheck?.blocked
+      ? 'Element blocked for security • ESC to cancel'
+      : 'Click to select • ESC to cancel';
+    this.infoBox.appendChild(footer);
+  }
+
+  /**
+   * Create an info row with label and value
+   * Uses textContent for XSS protection
+   */
+  private _createInfoRow(label: string, value: string, valueColor: string): HTMLDivElement {
+    const row = document.createElement('div');
+    row.style.marginBottom = '2px';
+
+    const labelSpan = document.createElement('span');
+    labelSpan.style.color = '#6b7280';
+    labelSpan.textContent = label;
+
+    const valueSpan = document.createElement('span');
+    Object.assign(valueSpan.style, {
+      color: valueColor,
+      fontFamily: 'monospace'
+    });
+    valueSpan.textContent = ' ' + value;
+
+    row.appendChild(labelSpan);
+    row.appendChild(valueSpan);
+    return row;
   }
 
   /**

@@ -39,7 +39,8 @@ vi.mock('../../utils/storage', () => ({
 vi.mock('../../../config/platforms', () => ({
   getPlatformByHostname: vi.fn().mockReturnValue(null),
   getPlatformById: vi.fn(),
-  getDefaultEnabledPlatforms: vi.fn().mockReturnValue([])
+  getDefaultEnabledPlatforms: vi.fn().mockReturnValue([]),
+  SUPPORTED_PLATFORMS: {}
 }));
 
 
