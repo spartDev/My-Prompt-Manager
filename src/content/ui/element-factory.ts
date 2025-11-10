@@ -277,12 +277,18 @@ export class UIElementFactory {
    * Creates Microsoft Copilot-specific icon matching native button styling
    * Follows Copilot's design: rounded-2xl, border, transparent background with hover
    * Uses shared prompt-library-integrated-icon class for E2E test compatibility
+   *
+   * Theme Detection:
+   * - Uses Tailwind's dark: prefix for automatic theme support
+   * - Adapts to system preference (prefers-color-scheme) or explicit dark class
+   * - Ensures visibility in both light and dark modes without custom CSS
    */
   createCopilotIcon(): HTMLElement {
     const icon = document.createElement('button');
 
     // Use shared integrated icon class + Copilot-specific Tailwind classes
     // Matches Copilot's native button styling with rounded corners and subtle borders
+    // Theme-aware colors: light mode (gray-200/700) vs dark mode (gray-700/300)
     icon.className = 'prompt-library-integrated-icon flex items-center gap-2 px-3 h-10 rounded-2xl border border-gray-200 dark:border-gray-700 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800 active:scale-[0.98] transition-all duration-200 text-gray-700 dark:text-gray-300';
 
     icon.setAttribute('type', 'button');

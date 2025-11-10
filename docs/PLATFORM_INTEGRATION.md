@@ -431,10 +431,65 @@ async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
   element.focus();
   element.click();
   await new Promise(resolve => setTimeout(resolve, 50));
-  
+
   // Proceed with insertion...
 }
 ```
+
+### 5. Theme Detection and Styling
+
+Different platforms handle theme switching in different ways. Use Tailwind's `dark:` prefix for automatic theme support:
+
+```typescript
+// ✅ RECOMMENDED: Tailwind dark mode (automatic)
+icon.className = 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300';
+```
+
+**Theme Detection Methods by Platform:**
+
+| Platform | Method | Implementation |
+|----------|--------|----------------|
+| **Copilot** | Tailwind `dark:` prefix | Adapts to system `prefers-color-scheme` or explicit `dark` class |
+| **Claude** | Tailwind `dark:` prefix | Automatic detection via Tailwind config |
+| **ChatGPT** | Tailwind `dark:` prefix | Standard Tailwind dark mode |
+| **Gemini** | Tailwind `dark:` prefix | Matches Google's theme system |
+| **Perplexity** | Tailwind `dark:` prefix | Standard implementation |
+
+**Why Tailwind `dark:` prefix?**
+- ✅ No custom CSS required
+- ✅ Works with both media queries and class-based dark mode
+- ✅ Consistent across all platforms
+- ✅ Automatically handles theme changes
+- ✅ Easier to maintain and test
+
+**Example Icon with Theme Support:**
+
+```typescript
+createPlatformIcon(): HTMLElement {
+  const icon = document.createElement('button');
+
+  // Theme-aware styling using Tailwind classes
+  icon.className = `
+    prompt-library-integrated-icon
+    flex items-center gap-2 px-3 h-10
+    rounded-2xl border
+    border-gray-200 dark:border-gray-700
+    bg-transparent
+    hover:bg-gray-100 dark:hover:bg-gray-800
+    text-gray-700 dark:text-gray-300
+    transition-all duration-200
+  `.trim().replace(/\s+/g, ' ');
+
+  return icon;
+}
+```
+
+**Key Points:**
+- Light mode: Use gray-200/300/700 for borders and text
+- Dark mode: Use gray-700/800/300 for contrast
+- Always test both themes before deploying
+- Background should be `transparent` or semi-transparent for integration
+- Hover states must work in both themes
 
 ## Examples
 
