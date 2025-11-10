@@ -171,25 +171,37 @@ describe('CopilotStrategy', () => {
         return originalGetOwnPropertyDescriptor.call(Object, obj, prop);
       }) as any;
 
-      await strategy.insert(mockTextarea, 'test content');
+      // Reset cached setter and create new strategy to pick up mocked descriptor
+      (CopilotStrategy as any).nativeValueSetter = null;
+      const testStrategy = new CopilotStrategy();
+
+      await testStrategy.insert(mockTextarea, 'test content');
 
       expect(mockSetter).toHaveBeenCalledWith('test content');
 
       // Restore
       Object.getOwnPropertyDescriptor = originalGetOwnPropertyDescriptor;
+      // Reset cache for subsequent tests
+      (CopilotStrategy as any).nativeValueSetter = null;
     });
 
     it('should handle case when native value setter is not available', async () => {
       const originalGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
       Object.getOwnPropertyDescriptor = vi.fn(() => undefined) as any;
 
-      const result = await strategy.insert(mockTextarea, 'test content');
+      // Reset cached setter and create new strategy to pick up mocked descriptor
+      (CopilotStrategy as any).nativeValueSetter = null;
+      const testStrategy = new CopilotStrategy();
+
+      const result = await testStrategy.insert(mockTextarea, 'test content');
 
       expect(result.success).toBe(true);
       expect(mockTextarea.value).toBe('test content');
 
       // Restore
       Object.getOwnPropertyDescriptor = originalGetOwnPropertyDescriptor;
+      // Reset cache for subsequent tests
+      (CopilotStrategy as any).nativeValueSetter = null;
     });
 
     it('should handle errors gracefully', async () => {

@@ -5,6 +5,10 @@ model: opus
 
 # Research Codebase
 
+> **⚠️ SECURITY WARNING**: This command executes file read operations and bash commands.
+> Only use in trusted repositories. Code examples in generated documentation are for
+> reference only - never execute untrusted code from documentation.
+
 You are tasked with conducting comprehensive research across the codebase to answer user questions by spawning parallel sub-agents and synthesizing their findings.
 
 ## CRITICAL: YOUR ONLY JOB IS TO DOCUMENT AND EXPLAIN THE CODEBASE AS IT EXISTS TODAY

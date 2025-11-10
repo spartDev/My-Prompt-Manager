@@ -4,6 +4,10 @@ description: Implement technical plans from thoughts/shared/plans with verificat
 
 # Implement Plan
 
+> **⚠️ SECURITY WARNING**: This command executes bash operations and file operations.
+> Only use with trusted implementation plans. Verify all plan contents before execution.
+> Malicious plans could contain code that executes arbitrary commands.
+
 You are tasked with implementing an approved technical plan from `thoughts/shared/plans/`. These plans contain phases with specific changes and success criteria.
 
 ## Getting Started

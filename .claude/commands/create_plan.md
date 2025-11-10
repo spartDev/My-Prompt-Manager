@@ -5,6 +5,10 @@ model: opus
 
 # Implementation Plan
 
+> **⚠️ SECURITY WARNING**: This command executes bash operations with user-provided parameters.
+> Only use trusted input. Never execute this command with untrusted or external data.
+> Parameters are passed directly to shell commands - malicious input could execute arbitrary code.
+
 You are tasked with creating detailed implementation plans through an interactive, iterative process. You should be skeptical, thorough, and work collaboratively with the user to produce high-quality technical specifications.
 
 ## Initial Response

@@ -36,6 +36,13 @@ export class StorageManager {
     SETTINGS: 'settings'
   } as const;
 
+  // Hard limits for storage quota enforcement
+  private readonly STORAGE_LIMITS = {
+    MAX_PROMPTS: 5000,            // Maximum number of prompts
+    MAX_PROMPT_SIZE: 10000,       // Maximum size per prompt (10KB)
+    MAX_TOTAL_SIZE: 8000000       // Maximum total storage (8MB, leaving 2MB buffer)
+  } as const;
+
   // Mutex for preventing concurrent storage operations
   private operationLocks = new Map<string, Promise<unknown>>();
 
@@ -52,8 +59,47 @@ export class StorageManager {
   async savePrompt(prompt: Omit<Prompt, 'id' | 'createdAt' | 'updatedAt' | 'usageCount' | 'lastUsedAt'>): Promise<Prompt> {
     return this.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
       try {
-        // Proactive quota check BEFORE attempting write
+        const existingPrompts = await this.getPrompts();
+
+        // HARD LIMIT: Enforce maximum prompt count
+        if (existingPrompts.length >= this.STORAGE_LIMITS.MAX_PROMPTS) {
+          throw new StorageError({
+            message: `Maximum prompt limit reached (${String(this.STORAGE_LIMITS.MAX_PROMPTS)}). Please delete old prompts.`,
+            type: 'STORAGE_QUOTA_EXCEEDED',
+            details: {
+              current: existingPrompts.length,
+              max: this.STORAGE_LIMITS.MAX_PROMPTS
+            }
+          });
+        }
+
+        // HARD LIMIT: Enforce individual prompt size
         const estimatedSize = estimatePromptSize(prompt.title, prompt.content, prompt.category);
+        if (estimatedSize > this.STORAGE_LIMITS.MAX_PROMPT_SIZE) {
+          throw new StorageError({
+            message: `Prompt exceeds maximum size limit (${String(this.STORAGE_LIMITS.MAX_PROMPT_SIZE)} bytes)`,
+            type: 'VALIDATION_ERROR',
+            details: {
+              size: estimatedSize,
+              max: this.STORAGE_LIMITS.MAX_PROMPT_SIZE
+            }
+          });
+        }
+
+        // HARD LIMIT: Check total storage before write
+        const totalSize = estimatePromptsArraySize(existingPrompts) + estimatedSize;
+        if (totalSize > this.STORAGE_LIMITS.MAX_TOTAL_SIZE) {
+          throw new StorageError({
+            message: 'Storage quota exceeded. Please delete old prompts to free up space.',
+            type: 'STORAGE_QUOTA_EXCEEDED',
+            details: {
+              total: totalSize,
+              max: this.STORAGE_LIMITS.MAX_TOTAL_SIZE
+            }
+          });
+        }
+
+        // Proactive quota check BEFORE attempting write (Chrome API check)
         await this.checkQuotaBeforeWrite(estimatedSize);
 
         const timestamp = Date.now();
@@ -67,7 +113,6 @@ export class StorageManager {
           lastUsedAt: timestamp
         };
 
-        const existingPrompts = await this.getPrompts();
         const updatedPrompts = [...existingPrompts, newPrompt];
 
         await this.setStorageData(this.STORAGE_KEYS.PROMPTS, updatedPrompts);

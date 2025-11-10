@@ -42,8 +42,11 @@ export interface PlatformDefinition {
  *
  * IMPORTANT: When adding a new platform, only update this configuration.
  * All other files will automatically pick up the changes.
+ *
+ * NOTE: This object is frozen to prevent runtime mutations that could
+ * compromise platform detection and security.
  */
-export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
+export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefinition>>> = Object.freeze({
   claude: {
     id: "claude",
     hostname: "claude.ai",
@@ -168,7 +171,7 @@ export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
       disabled: DISABLED_STATE,
     },
   },
-};
+});
 
 /**
  * Helper functions for accessing platform configuration

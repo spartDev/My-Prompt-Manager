@@ -33,8 +33,8 @@ describe('Copilot Platform Configuration', () => {
     expect(selectors).toContain('textarea[placeholder*="Message"]');
   });
 
-  it('should use DefaultStrategy', () => {
-    expect(SUPPORTED_PLATFORMS.copilot.strategyClass).toBe('DefaultStrategy');
+  it('should use CopilotStrategy', () => {
+    expect(SUPPORTED_PLATFORMS.copilot.strategyClass).toBe('CopilotStrategy');
   });
 
   it('should be included in default enabled platforms', () => {
