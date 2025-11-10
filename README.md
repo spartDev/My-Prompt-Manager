@@ -40,6 +40,7 @@ Transform your AI interactions with a powerful personal prompt library that inte
 | Google Gemini | ✅ Fully Supported | gemini.google.com | 85 |
 | Mistral LeChat | ✅ Fully Supported | chat.mistral.ai | 85 |
 | Perplexity | ✅ Fully Supported | www.perplexity.ai | 80 |
+| Microsoft Copilot | ✅ Fully Supported | copilot.microsoft.com | 80 |
 | Custom Sites | ✅ Configurable | User-defined | Variable |
 
 See our [Platform Integration Guide](docs/PLATFORM_INTEGRATION.md) to add your own platforms.

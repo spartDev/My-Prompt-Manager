@@ -121,7 +121,12 @@ export class PlatformManager {
       // TypeScript knows registry is complete, but we check defensively for runtime safety
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       if (!StrategyConstructor) {
-        warn(`No strategy found for platform: ${platform.id}`, { hostname });
+        // Only warn if the platform doesn't explicitly use DefaultStrategy
+        if (platform.strategyClass !== 'DefaultStrategy') {
+          warn(`No strategy found for platform: ${platform.id}`, { hostname });
+        } else {
+          debug(`Platform ${platform.id} uses DefaultStrategy (no custom strategy needed)`, { hostname });
+        }
       } else {
         try {
           strategies.push(new StrategyConstructor(hostname));
@@ -304,7 +309,13 @@ export class PlatformManager {
     if (!this.isInitialized) {
       return null;
     }
-    
+
+    // Special handling for platforms that use DefaultStrategy but need custom icons
+    // Copilot uses DefaultStrategy for insertion but needs custom icon styling
+    if (this.hostname === 'copilot.microsoft.com') {
+      return uiFactory.createCopilotIcon();
+    }
+
     // Use the highest priority strategy to create the icon
     for (const strategy of this.strategies) {
       const icon = strategy.createIcon?.(uiFactory);
@@ -313,7 +324,7 @@ export class PlatformManager {
         return icon;
       }
     }
-    
+
     // Fallback to default floating icon
     return uiFactory.createFloatingIcon();
   }

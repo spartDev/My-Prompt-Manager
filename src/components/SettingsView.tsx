@@ -9,7 +9,7 @@ import { DEFAULT_SETTINGS } from '../types';
 import type { ToastSettings } from '../types/hooks';
 import { Logger, toError } from '../utils';
 
-import { ClaudeIcon, ChatGPTIcon, PerplexityIcon, MistralIcon, GeminiIcon } from './icons/SiteIcons';
+import { ClaudeIcon, ChatGPTIcon, PerplexityIcon, MistralIcon, GeminiIcon, CopilotIcon } from './icons/SiteIcons';
 import AboutSection from './settings/AboutSection';
 import AdvancedSection from './settings/AdvancedSection';
 import AppearanceSection from './settings/AppearanceSection';
@@ -115,6 +115,11 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
       name: 'Mistral AI',
       description: 'Mistral\'s conversational AI',
       icon: (isEnabled: boolean) => <MistralIcon disabled={!isEnabled} />
+    },
+    'copilot.microsoft.com': {
+      name: 'Microsoft Copilot',
+      description: 'Microsoft\'s AI assistant',
+      icon: (isEnabled: boolean) => <CopilotIcon disabled={!isEnabled} className="scale-75" />
     }
   }), []);
 

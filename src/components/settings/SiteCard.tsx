@@ -1,44 +1,9 @@
 import { FC, ReactNode } from 'react';
 
+import { getBrandColors } from '../../constants/brandColors';
+
 import ExportButton from './ExportButton';
 import ToggleSwitch from './ToggleSwitch';
-
-// Function to get brand-specific background colors
-const getBrandColors = (hostname: string) => {
-  switch (hostname) {
-    case 'www.perplexity.ai':
-      return {
-        enabled: 'bg-[#2d808c] text-white shadow-sm',
-        disabled: 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
-      };
-    case 'claude.ai':
-      return {
-        enabled: 'bg-[#d37354] text-white shadow-sm',
-        disabled: 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
-      };
-    case 'chatgpt.com':
-      return {
-        enabled: 'bg-white text-gray-800 shadow-sm border border-gray-200',
-        disabled: 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
-      };
-    case 'chat.mistral.ai':
-      return {
-        enabled: 'bg-gray-700 text-white shadow-sm',
-        disabled: 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
-      };
-    case 'gemini.google.com':
-      return {
-        enabled: 'bg-white text-gray-800 shadow-sm border border-gray-200',
-        disabled: 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
-      };
-    default:
-      // Fallback for custom sites - use the original green gradient
-      return {
-        enabled: 'bg-gradient-to-br from-green-500 to-emerald-600 text-white shadow-sm',
-        disabled: 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
-      };
-  }
-};
 
 interface SiteCardProps {
   hostname: string;

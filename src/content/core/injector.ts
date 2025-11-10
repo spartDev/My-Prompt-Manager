@@ -782,6 +782,50 @@ export class PromptLibraryInjector {
       const containerSelector = this.platformManager.getButtonContainerSelector();
       let injected = false;
 
+      debug(`Current hostname: ${this.state.hostname}, containerSelector: ${containerSelector ?? 'none'}`);
+
+      // For Copilot, find the microphone button and insert our icon before it
+      // Run this FIRST before checking containerSelector
+      if (this.state.hostname === 'copilot.microsoft.com') {
+        debug('Attempting Copilot-specific icon injection');
+
+        // Find the "Talk to Copilot" microphone button
+        const micButton = document.querySelector('button[data-testid="audio-call-button"]') ||
+                         document.querySelector('button[aria-label*="Talk to Copilot"]');
+
+        debug(`Microphone button found: ${micButton ? 'yes' : 'no'}`);
+
+        if (micButton) {
+          // Find the parent .relative wrapper first
+          const micWrapper = micButton.closest('div.relative');
+          debug(`Microphone wrapper found: ${micWrapper ? 'yes' : 'no'}`);
+
+          if (micWrapper) {
+            // Get the grandparent flex container
+            const micButtonContainer = micWrapper.parentElement;
+            debug(`Microphone button container found: ${micButtonContainer ? 'yes' : 'no'}, classes: ${micButtonContainer?.className ?? 'none'}`);
+
+            // If we found the container, insert our icon wrapper before the mic button wrapper
+            if (micButtonContainer) {
+              // Ensure the icon doesn't have absolute positioning class
+              icon.classList.remove('prompt-library-icon-absolute');
+
+              // Create a wrapper div for our icon to match Copilot's structure
+              const iconWrapper = document.createElement('div');
+              iconWrapper.className = 'relative';
+              iconWrapper.appendChild(icon);
+
+              // Insert our icon before the microphone button wrapper
+              micButtonContainer.insertBefore(iconWrapper, micWrapper);
+              injected = true;
+              debug('Icon injected before "Talk to Copilot" microphone button');
+            }
+          }
+        } else {
+          debug('Microphone button not found, will use fallback positioning');
+        }
+      }
+
       if (containerSelector) {
         // For Claude, find the clock/history button and inject after it
         if (this.state.hostname === 'claude.ai') {
@@ -880,7 +924,7 @@ export class PromptLibraryInjector {
             }
           }
         }
-        
+
         // Fallback to generic container selector
         if (!injected) {
           const container = document.querySelector(containerSelector);
