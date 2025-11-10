@@ -161,7 +161,7 @@ export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
     // Target the container with microphone button - more specific than generic .flex.gap-2
     buttonContainerSelector:
       ".relative.bottom-0.flex.justify-between.pb-0\\.5.pe-2\\.5.ps-1\\.5 > .flex.gap-2.items-center:last-child",
-    strategyClass: "DefaultStrategy", // Uses default strategy (no custom class needed)
+    strategyClass: "CopilotStrategy", // Uses dedicated CopilotStrategy for React integration
     hostnamePatterns: ["copilot.microsoft"],
     brandColors: {
       enabled: "bg-[#0e111b] text-white shadow-sm",

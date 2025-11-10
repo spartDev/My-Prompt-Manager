@@ -15,6 +15,7 @@ import { getSettings, type CustomSite } from '../utils/storage';
 import type { PlatformStrategy } from './base-strategy';
 import { ChatGPTStrategy } from './chatgpt-strategy';
 import { ClaudeStrategy } from './claude-strategy';
+import { CopilotStrategy } from './copilot-strategy';
 import { DefaultStrategy } from './default-strategy';
 import { GeminiStrategy } from './gemini-strategy';
 import { MistralStrategy } from './mistral-strategy';
@@ -28,6 +29,7 @@ export class PlatformManager {
   private static readonly STRATEGY_REGISTRY: Record<string, new (hostname?: string) => PlatformStrategy> = {
     'claude': ClaudeStrategy,
     'chatgpt': ChatGPTStrategy,
+    'copilot': CopilotStrategy,
     'gemini': GeminiStrategy,
     'mistral': MistralStrategy,
     'perplexity': PerplexityStrategy
