@@ -10,6 +10,7 @@ import type { InsertionResult } from '../types/index';
 import type { UIElementFactory } from '../ui/element-factory';
 
 import { PlatformStrategy } from './base-strategy';
+import { MAX_CONTENT_LENGTHS } from './constants';
 
 // Extended HTMLTextAreaElement interface for React property setter
 interface ReactTextAreaElement extends HTMLTextAreaElement {
@@ -24,6 +25,17 @@ export class CopilotStrategy extends PlatformStrategy {
    * Avoids repeated Object.getOwnPropertyDescriptor calls (~90% overhead reduction)
    */
   private static nativeValueSetter: ((this: HTMLTextAreaElement, value: string) => void) | null = null;
+
+  /**
+   * Type guard to validate a function is a valid HTMLTextAreaElement value setter
+   * @param fn - The function to validate
+   * @returns True if fn is a valid value setter function
+   */
+  private static isValueSetter(
+    fn: unknown
+  ): fn is (this: HTMLTextAreaElement, value: string) => void {
+    return typeof fn === 'function';
+  }
 
   constructor(hostname?: string) {
     const platform = getPlatformById('copilot');
@@ -46,10 +58,11 @@ export class CopilotStrategy extends PlatformStrategy {
         'value'
       );
       // Store the setter - we call it with .call(element, value) to provide correct `this` context
-      if (descriptor?.set) {
-        // Safe: We explicitly control `this` binding at call site using .call()
+      // Safe: We explicitly control `this` binding at call site using .call()
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      if (descriptor?.set && CopilotStrategy.isValueSetter(descriptor.set)) {
         // eslint-disable-next-line @typescript-eslint/unbound-method
-        CopilotStrategy.nativeValueSetter = descriptor.set as (this: HTMLTextAreaElement, value: string) => void;
+        CopilotStrategy.nativeValueSetter = descriptor.set;
       } else {
         CopilotStrategy.nativeValueSetter = null;
       }
@@ -79,12 +92,11 @@ export class CopilotStrategy extends PlatformStrategy {
       }
 
       // Security: Enforce maximum length (Copilot typically has ~4000 char limit)
-      const MAX_CONTENT_LENGTH = 50000; // 50KB safety limit
-      if (content.length > MAX_CONTENT_LENGTH) {
-        this._warn(`Content exceeds maximum length (${String(content.length)} > ${String(MAX_CONTENT_LENGTH)})`);
+      if (content.length > MAX_CONTENT_LENGTHS.COPILOT) {
+        this._warn(`Content exceeds maximum length (${String(content.length)} > ${String(MAX_CONTENT_LENGTHS.COPILOT)})`);
         return Promise.resolve({
           success: false,
-          error: `Content exceeds maximum length of ${String(MAX_CONTENT_LENGTH)} characters`
+          error: `Content exceeds maximum length of ${String(MAX_CONTENT_LENGTHS.COPILOT)} characters`
         });
       }
 
