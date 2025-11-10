@@ -440,5 +440,368 @@ async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
 
 ### Example 1: Gemini (Google AI)
 
+```typescript
+export class GeminiStrategy extends PlatformStrategy {
+  constructor(hostname?: string) {
+    super('gemini', 85, {
+      selectors: [
+        'div.ql-editor[contenteditable="true"][role="textbox"]',
+        'rich-textarea .ql-editor',
+        '[data-placeholder*="Gemini"]',
+        'div[contenteditable="true"]'
+      ],
+      buttonContainerSelector: '.input-buttons-wrapper-bottom',
+      priority: 85
+    }, hostname);
+  }
+
+  canHandle(_element: HTMLElement): boolean {
+    return this.hostname === getPlatformById('gemini')?.hostname;
+  }
+
+  async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
+    try {
+      element.focus();
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      // Gemini uses Quill editor with contenteditable
+      if (element.contentEditable === 'true') {
+        // Clear existing content
+        element.textContent = '';
+
+        // Insert using execCommand for Quill compatibility
+        const inserted = document.execCommand('insertText', false, content);
+
+        if (inserted) {
+          element.dispatchEvent(new InputEvent('input', {
+            bubbles: true,
+            cancelable: true,
+            inputType: 'insertText',
+            data: content
+          }));
+
+          return { success: true, method: 'gemini-execCommand' };
+        }
+      }
+
+      return { success: false, error: 'Unsupported element type' };
+    } catch (error) {
+      this._error('Insertion failed', error as Error);
+      return { success: false, error: (error as Error).message };
+    }
+  }
+
+  createIcon(uiFactory: UIElementFactory): HTMLElement | null {
+    return uiFactory.createGeminiIcon();
+  }
+}
 ```
+
+**Key Points:**
+- Gemini uses Quill editor (`.ql-editor` class)
+- Requires `execCommand` for proper Quill integration
+- Material Design 3 icon styling
+- Multiple selector fallbacks for robustness
+
+### Example 2: Microsoft Copilot
+
+```typescript
+export class CopilotStrategy extends PlatformStrategy {
+  constructor(hostname?: string) {
+    super('copilot', 80, {
+      selectors: [
+        'textarea[data-testid="composer-input"]', // Primary selector
+        'textarea#userInput', // Fallback ID selector
+        'textarea[placeholder*="Message"]', // Pattern match fallback
+        'textarea[placeholder*="Copilot"]'
+      ],
+      buttonContainerSelector: '.relative.bottom-0.flex.justify-between > .flex.gap-2.items-center:last-child',
+      priority: 80
+    }, hostname);
+  }
+
+  canHandle(_element: HTMLElement): boolean {
+    return this.hostname === getPlatformById('copilot')?.hostname;
+  }
+
+  async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
+    try {
+      element.focus();
+      element.click();
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      // Copilot uses standard textarea
+      if (element.tagName === 'TEXTAREA') {
+        (element as HTMLTextAreaElement).value = content;
+
+        // Trigger comprehensive events
+        element.dispatchEvent(new Event('input', { bubbles: true }));
+        element.dispatchEvent(new Event('change', { bubbles: true }));
+
+        return { success: true, method: 'copilot-textarea' };
+      }
+
+      return { success: false, error: 'Unsupported element type' };
+    } catch (error) {
+      this._error('Insertion failed', error as Error);
+      return { success: false, error: (error as Error).message };
+    }
+  }
+
+  createIcon(uiFactory: UIElementFactory): HTMLElement | null {
+    return uiFactory.createCopilotIcon();
+  }
+}
 ```
+
+**Key Points:**
+- Uses standard textarea (simpler than Gemini)
+- Specific button container selector for proper icon placement
+- Custom icon with Microsoft brand styling
+- Positioned before microphone button
+
+### Example 3: Mistral LeChat
+
+```typescript
+export class MistralStrategy extends PlatformStrategy {
+  constructor(hostname?: string) {
+    super('mistral', 85, {
+      selectors: [
+        'div[contenteditable="true"]',
+        'textarea[placeholder*="chat"]',
+        '[role="textbox"]'
+      ],
+      buttonContainerSelector: [
+        '.flex.w-full.max-w-full.items-center.justify-start.gap-3',
+        '.flex.w-full.items-center.justify-start.gap-3',
+        '.flex.items-center.justify-start.gap-3'
+      ].join(', '),
+      priority: 85
+    }, hostname);
+  }
+
+  canHandle(_element: HTMLElement): boolean {
+    return this.hostname === getPlatformById('mistral')?.hostname;
+  }
+
+  async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
+    try {
+      element.focus();
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Try contenteditable first (primary method)
+      if (element.contentEditable === 'true') {
+        element.textContent = '';
+        const inserted = document.execCommand('insertText', false, content);
+
+        if (inserted) {
+          element.dispatchEvent(new InputEvent('input', {
+            bubbles: true,
+            inputType: 'insertText',
+            data: content
+          }));
+          return { success: true, method: 'mistral-execCommand' };
+        }
+      }
+
+      // Fallback to textarea
+      if (element.tagName === 'TEXTAREA') {
+        (element as HTMLTextAreaElement).value = content;
+        element.dispatchEvent(new Event('input', { bubbles: true }));
+        return { success: true, method: 'mistral-textarea' };
+      }
+
+      return { success: false, error: 'Unsupported element type' };
+    } catch (error) {
+      this._error('Insertion failed', error as Error);
+      return { success: false, error: (error as Error).message };
+    }
+  }
+
+  createIcon(uiFactory: UIElementFactory): HTMLElement | null {
+    return uiFactory.createMistralIcon();
+  }
+}
+```
+
+**Key Points:**
+- Multiple button container selectors for responsive design
+- Longer timeout (100ms) for initialization
+- Both contenteditable and textarea support
+- Icon styled to match Mistral's Research/Think buttons
+
+## 🐛 Troubleshooting
+
+### Button Doesn't Appear
+
+**Symptoms:** Icon doesn't show up on the target platform
+
+**Possible Causes:**
+1. `canHandle()` returns false for the domain
+2. Selectors don't match actual DOM elements
+3. Strategy not registered in platform-manager.ts
+4. Content script not injected properly
+
+**Solutions:**
+```javascript
+// In browser console, test your selectors:
+document.querySelectorAll('your-selector-here')
+
+// Check if strategy is loaded:
+window.__promptLibraryDebug?.strategies
+
+// Verify hostname matching:
+window.location.hostname
+```
+
+### Button Appears in Wrong Location
+
+**Symptoms:** Icon visible but poorly positioned or overlapping with other elements
+
+**Possible Causes:**
+1. Incorrect `buttonContainerSelector`
+2. Platform UI changed after integration
+3. Missing or dynamic container element
+
+**Solutions:**
+```typescript
+// Try multiple container selectors for fallbacks:
+buttonContainerSelector: [
+  '.primary-container',   // Most specific
+  '.fallback-container',  // Less specific
+  '.generic-container'    // Generic fallback
+].join(', ')
+
+// Or use DOM-based positioning in injector.ts
+// for platform-specific placement logic
+```
+
+### Content Doesn't Insert
+
+**Symptoms:** Icon works, prompt selector opens, but content doesn't appear in input
+
+**Possible Causes:**
+1. Wrong element type (textarea vs contenteditable)
+2. Missing event triggers
+3. Platform uses custom input handling
+4. React/Vue component state not updating
+
+**Solutions:**
+```typescript
+// Try multiple insertion methods:
+async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
+  // Method 1: execCommand (most compatible)
+  const execResult = await this._tryExecCommand(element, content);
+  if (execResult.success) return execResult;
+
+  // Method 2: Direct assignment
+  const directResult = this._tryDirectAssignment(element, content);
+  if (directResult.success) return directResult;
+
+  // Method 3: DOM manipulation
+  return this._tryDOMManipulation(element, content);
+}
+
+// Trigger comprehensive events:
+private _triggerEvents(element: HTMLElement): void {
+  const events = ['input', 'change', 'keyup', 'compositionend', 'blur', 'focus'];
+  events.forEach(eventType => {
+    element.dispatchEvent(new Event(eventType, { bubbles: true }));
+  });
+}
+```
+
+### Platform Doesn't Recognize Content
+
+**Symptoms:** Text appears in input but submit button stays disabled or platform doesn't recognize it
+
+**Possible Causes:**
+1. Missing specific events the platform expects
+2. React/Vue internal state not updated
+3. Platform uses custom validation logic
+
+**Solutions:**
+```typescript
+// For React-based platforms, trigger React's internal events:
+private _setReactValue(element: HTMLTextAreaElement, value: string): void {
+  const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+    window.HTMLTextAreaElement.prototype,
+    'value'
+  )?.set;
+
+  if (nativeInputValueSetter) {
+    nativeInputValueSetter.call(element, value);
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+}
+
+// Add composition events for IME compatibility:
+element.dispatchEvent(new CompositionEvent('compositionstart'));
+element.dispatchEvent(new CompositionEvent('compositionend'));
+```
+
+### TypeScript Errors
+
+**Symptoms:** Build fails with type errors after adding new platform
+
+**Solutions:**
+```typescript
+// 1. Add platform to PlatformName type in src/content/types/platform.ts:
+export type PlatformName = 'claude' | 'chatgpt' | 'mistral' | 'perplexity' | 'gemini' | 'copilot' | 'yourplatform' | 'default';
+
+// 2. Ensure strategy extends PlatformStrategy properly:
+export class YourPlatformStrategy extends PlatformStrategy {
+  // Must implement all required methods
+}
+
+// 3. Update SUPPORTED_PLATFORMS in src/config/platforms.ts:
+yourplatform: {
+  // All required fields...
+}
+```
+
+### Tests Failing
+
+**Symptoms:** `npm test` fails after adding new platform
+
+**Common Issues:**
+```typescript
+// 1. Missing test file - create one:
+// src/content/platforms/__tests__/yourplatform-strategy.test.ts
+
+// 2. DOM elements not properly set up:
+describe('insert', () => {
+  it('inserts content', async () => {
+    const textarea = document.createElement('textarea');
+    document.body.appendChild(textarea); // ← Must add to DOM
+
+    const result = await strategy.insert(textarea, 'Test');
+
+    expect(result.success).toBe(true);
+
+    document.body.removeChild(textarea); // ← Clean up
+  });
+});
+
+// 3. Strategy not properly mocked:
+vi.mock('../../config/platforms', () => ({
+  getPlatformById: vi.fn((id) => {
+    if (id === 'yourplatform') {
+      return { hostname: 'your-platform.com' };
+    }
+    return undefined;
+  })
+}));
+```
+
+## Need Help?
+
+- **Issues:** [GitHub Issues](https://github.com/spartDev/My-Prompt-Manager/issues)
+- **Documentation:** [Architecture Guide](ARCHITECTURE.md)
+- **Examples:** Check `src/content/platforms/` for reference implementations
+- **Community:** Tag your questions with `platform-integration`
+
+---
+
+**Last Updated:** 2025-11-10
+**Version:** 2.0.0 (Centralized Configuration)
