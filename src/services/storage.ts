@@ -65,7 +65,7 @@ export class StorageManager {
         if (existingPrompts.length >= this.STORAGE_LIMITS.MAX_PROMPTS) {
           throw new StorageError({
             message: `Maximum prompt limit reached (${String(this.STORAGE_LIMITS.MAX_PROMPTS)}). Please delete old prompts.`,
-            type: 'STORAGE_QUOTA_EXCEEDED',
+            type: ErrorType.STORAGE_QUOTA_EXCEEDED,
             details: {
               current: existingPrompts.length,
               max: this.STORAGE_LIMITS.MAX_PROMPTS
@@ -78,7 +78,7 @@ export class StorageManager {
         if (estimatedSize > this.STORAGE_LIMITS.MAX_PROMPT_SIZE) {
           throw new StorageError({
             message: `Prompt exceeds maximum size limit (${String(this.STORAGE_LIMITS.MAX_PROMPT_SIZE)} bytes)`,
-            type: 'VALIDATION_ERROR',
+            type: ErrorType.VALIDATION_ERROR,
             details: {
               size: estimatedSize,
               max: this.STORAGE_LIMITS.MAX_PROMPT_SIZE
@@ -91,7 +91,7 @@ export class StorageManager {
         if (totalSize > this.STORAGE_LIMITS.MAX_TOTAL_SIZE) {
           throw new StorageError({
             message: 'Storage quota exceeded. Please delete old prompts to free up space.',
-            type: 'STORAGE_QUOTA_EXCEEDED',
+            type: ErrorType.STORAGE_QUOTA_EXCEEDED,
             details: {
               total: totalSize,
               max: this.STORAGE_LIMITS.MAX_TOTAL_SIZE
