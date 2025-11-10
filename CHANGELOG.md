@@ -1,6 +1,35 @@
 ## [Unreleased]
 
 
+## [1.8.0] - 2025-11-10
+
+
+### 🔒 Security
+
+-  add new agents for data integrity, performance analysis, style editing, and security auditing ([3872bd9](https://github.com/spartDev/My-Prompt-Manager/commit/3872bd9417b302d756a9bd42a22677009595575a))
+
+
+### ✨ Added
+
+-  Add Microsoft Copilot platform support  ([#160](https://github.com/spartDev/My-Prompt-Manager/pull/160))
+-  Usage Counter & Smart Sorting with Session Persistence  ([#141](https://github.com/spartDev/My-Prompt-Manager/pull/141))
+-  Enhance dropdown menu UX with distinct selected and focused states  ([#128](https://github.com/spartDev/My-Prompt-Manager/pull/128))
+-  🎨 Implement Custom Dropdown Component with Flexible Pattern  ([#126](https://github.com/spartDev/My-Prompt-Manager/pull/126))
+
+
+### 🔄 Changed
+
+-  Add Claude Code slash commands and platform integration guide  ([#163](https://github.com/spartDev/My-Prompt-Manager/pull/163))
+-  update documentation for project structure and best practices ([ac0a032](https://github.com/spartDev/My-Prompt-Manager/commit/ac0a03243af59b56d431f7a741f6cd8a5cca9348))
+
+
+### 🐛 Fixed
+
+-  category badge colors were not accessible  ([#145](https://github.com/spartDev/My-Prompt-Manager/pull/145))
+-  correct heredoc syntax in release workflow summary ([5401c06](https://github.com/spartDev/My-Prompt-Manager/commit/5401c0644948a6dc2b1c76815417ad562441445e))
+
+[1.8.0]: https://github.com/spartDev/My-Prompt-Manager/compare/v1.7.0...v1.8.0
+
 ## Release v1.7.0
 
 ### ✨ Added
