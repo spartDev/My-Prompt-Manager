@@ -29,6 +29,7 @@ Before starting, ensure you have:
 1. The target platform URL (e.g., `gemini.google.com`)
 2. Browser DevTools open on the target platform
 3. Understanding of the input element type (textarea vs contenteditable)
+4. Preferred Tailwind classes for the platform badge styling (optional but recommended)
 
 ## 10-Step Integration Workflow
 
@@ -76,16 +77,40 @@ export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
     ],
     buttonContainerSelector: '.toolbar-container', // Where to place icon (optional)
     strategyClass: 'YourPlatformStrategy',        // Strategy class name
-    hostnamePatterns: ['yourplatform', 'your-ai'] // Additional hostname patterns
+    hostnamePatterns: ['yourplatform', 'your-ai'], // Additional hostname patterns
+    brandColors: {                                // Tailwind classes for badge styling
+      enabled: 'bg-[#123456] text-white shadow-sm',
+      disabled: 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+    }
   }
 };
 ```
+
+> ℹ️ If you omit `brandColors`, the UI falls back to a green gradient badge so the integration still renders correctly.
 
 **Priority Guidelines:**
 - 100: Premium platforms (Claude, ChatGPT)
 - 80-90: Major platforms (Perplexity, Mistral, Gemini)
 - 60-79: Secondary platforms (new additions)
 - < 60: Experimental/beta platforms
+
+### Step 2.1: Update SiteCard UI (Optional)
+
+Add or update the platform card shown in settings so users can enable/disable the integration.
+
+**When to do this:**
+- You're adding a core platform (not just a custom site).
+- You want the new platform visible in the Settings UI.
+
+**File:** `src/components/settings/SiteCard.tsx`
+
+**Actions:**
+1. Add an icon component in `src/components/icons/SiteIcons.tsx` (or reuse an existing one).
+2. Update `src/components/settings/SiteCardList.tsx` (or wherever cards are listed) to include the new platform with the right icon.
+3. Make sure the new card passes the correct hostname and uses `getBrandColors(hostname)`.
+4. Verify the badge colors/labels look correct; adjust `brandColors` if needed.
+
+**Tip:** The label for the platform name comes from `displayName` in `SUPPORTED_PLATFORMS`. Keep them in sync.
 
 ### Step 3: Create the Platform Strategy
 
@@ -384,9 +409,91 @@ npm run lint:fix
 
 ### Step 9: Create Platform Icon (Optional)
 
+**When to create a custom icon:**
+- Platform has unique UI styling that requires custom integration
+- You want to match the platform's native button design
+- The generic floating icon doesn't fit the platform's visual language
+
+**When to use the generic icon:**
+- Platform has simple UI without specific styling requirements
+- You want quick integration (just call `uiFactory.createFloatingIcon()`)
+- Platform uses standard button patterns
+
+#### Option A: Custom Platform Icon (Recommended for Major Platforms)
+
+**File:** `src/content/ui/element-factory.ts`
+
+**Action:** Add a custom icon creation method following the modern pattern:
+
+```typescript
+/**
+ * Creates Your Platform-specific icon matching native button styling
+ * Uses shared prompt-library-integrated-icon class for E2E test compatibility
+ */
+createYourPlatformIcon(): HTMLElement {
+  const icon = document.createElement('button');
+
+  // IMPORTANT: Always include 'prompt-library-integrated-icon' for E2E test compatibility
+  // Add platform-specific Tailwind classes after the shared class
+  icon.className = 'prompt-library-integrated-icon flex items-center gap-2 px-3 h-10 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-all duration-200 text-gray-700 dark:text-gray-300';
+
+  // Required attributes
+  icon.setAttribute('type', 'button');
+  icon.setAttribute('aria-label', 'Open my prompt manager - Access your saved prompts');
+  icon.setAttribute('title', 'My Prompt Manager - Access your saved prompts');
+  icon.setAttribute('data-instance-id', this.instanceId);
+  icon.setAttribute('tabindex', '0');
+  icon.setAttribute('data-dashlane-label', 'true');
+
+  // Create SVG using secure utility (STANDARD SIZE: 18x18)
+  const svg = createSVGElement('svg', {
+    xmlns: 'http://www.w3.org/2000/svg',
+    width: '18',  // Standard size - use 18x18 for consistency
+    height: '18',
+    viewBox: '0 0 24 24',
+    fill: 'currentColor',
+    'aria-hidden': 'true',
+    style: 'flex-shrink: 0;'
+  });
+
+  // Standard chat bubble icon with three dots (consistent across platforms)
+  const path = createSVGElement('path', {
+    d: 'M5.65 9.42C5.93 9.42 6.17 9.32 6.36 9.13C6.55 8.94 6.65 8.69 6.65 8.4C6.65 8.1 6.55 7.85 6.36 7.66C6.17 7.47 5.93 7.37 5.65 7.37C5.37 7.37 5.13 7.47 4.94 7.66C4.75 7.85 4.65 8.1 4.65 8.4C4.65 8.69 4.75 8.94 4.94 9.13C5.13 9.32 5.37 9.42 5.65 9.42ZM10.08 9.42C10.36 9.42 10.6 9.32 10.79 9.13C10.98 8.94 11.08 8.69 11.08 8.4C11.08 8.1 10.98 7.85 10.79 7.66C10.6 7.47 10.36 7.37 10.08 7.37C9.8 7.37 9.56 7.47 9.37 7.66C9.18 7.85 9.08 8.1 9.08 8.4C9.08 8.69 9.18 8.94 9.37 9.13C9.56 9.32 9.8 9.42 10.08 9.42ZM14.32 9.42C14.6 9.42 14.84 9.32 15.03 9.13C15.22 8.94 15.32 8.69 15.32 8.4C15.32 8.1 15.22 7.85 15.03 7.66C14.84 7.47 14.6 7.37 14.32 7.37C14.04 7.37 13.8 7.47 13.61 7.66C13.42 7.85 13.32 8.1 13.32 8.4C13.32 8.69 13.42 8.94 13.61 9.13C13.8 9.32 14.04 9.42 14.32 9.42ZM0 19.21V1.58C0 1.18 0.15 0.81 0.45 0.49C0.75 0.16 1.1 0 1.5 0H18.5C18.88 0 19.23 0.16 19.54 0.49C19.85 0.81 20 1.18 20 1.58V15.3C20 15.7 19.85 16.07 19.54 16.39C19.23 16.72 18.88 16.88 18.5 16.88H4L1.28 19.76C1.04 20.01 0.77 20.06 0.46 19.93C0.15 19.8 0 19.56 0 19.21ZM1.5 17.28L3.37 15.3H18.5V1.58H1.5V17.28ZM1.5 1.58V15.3V17.28V1.58Z'
+  });
+
+  svg.appendChild(path);
+  icon.appendChild(svg);
+
+  // Add text label (optional - include for button-style integrations)
+  const textElement = createElement('span', {
+    class: 'text-sm font-medium whitespace-nowrap'
+  });
+  textElement.textContent = 'My Prompts';
+  icon.appendChild(textElement);
+
+  return icon;
+}
+```
+
+**Key Patterns to Follow:**
+
+1. **Always include `prompt-library-integrated-icon` class** - Required for E2E test selectors
+2. **Use Tailwind classes** - No custom CSS needed, all styling via Tailwind utilities
+3. **Standard 18x18 SVG sizing** - Consistent across all platforms
+4. **Use `createElement` and `createSVGElement`** - Secure DOM construction (never `innerHTML`)
+5. **Include dark mode classes** - Use `dark:` variants for all styles
+6. **Text label optional** - Include for button-style integrations (Claude, Perplexity, Mistral, Copilot)
+
+**Reference Examples:**
+- Button with text: See `createClaudeIcon()`, `createPerplexityIcon()`, `createCopilotIcon()`
+- Icon only: See `createChatGPTIcon()`, `createGeminiIcon()`
+- Generic floating: See `createFloatingIcon()`
+
+#### Option B: React Icon Component (for Settings UI)
+
 **File:** `src/components/icons/SiteIcons.tsx`
 
-**Action:** Add a custom icon component:
+**Action:** Add a React icon component for the settings UI:
 
 ```typescript
 export const YourPlatformIcon: React.FC<{ className?: string; disabled?: boolean }> = ({
@@ -403,23 +510,6 @@ export const YourPlatformIcon: React.FC<{ className?: string; disabled?: boolean
     </svg>
   );
 };
-```
-
-**File:** `src/content/ui/element-factory.ts`
-
-**Action:** Add icon creation method:
-
-```typescript
-createYourPlatformIcon(): HTMLElement {
-  const button = this._createBaseButton();
-  button.innerHTML = `
-    <svg class="prompt-library-icon" viewBox="0 0 24 24">
-      <!-- Your platform's SVG path -->
-    </svg>
-    <span class="prompt-library-tooltip">My Prompts</span>
-  `;
-  return button;
-}
 ```
 
 ### Step 10: Update Documentation
@@ -652,6 +742,7 @@ Use this checklist when adding a new platform:
 
 - [ ] **Step 1:** Identified input element selector
 - [ ] **Step 2:** Added platform to `src/config/platforms.ts`
+- [ ] **Step 2.1:** Updated SiteCard UI (optional)
 - [ ] **Step 3:** Created strategy class in `src/content/platforms/`
 - [ ] **Step 4:** Registered strategy in `platform-manager.ts` and `index.ts`
 - [ ] **Step 5:** Updated manifest permissions (if needed)
@@ -686,5 +777,5 @@ Your platform integration is complete when:
 
 ---
 
-**Last Updated:** 2025-10-18
-**Skill Version:** 1.0.0
+**Last Updated:** 2025-11-10
+**Skill Version:** 1.1.0
