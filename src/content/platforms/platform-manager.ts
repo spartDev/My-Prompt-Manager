@@ -309,7 +309,13 @@ export class PlatformManager {
     if (!this.isInitialized) {
       return null;
     }
-    
+
+    // Special handling for platforms that use DefaultStrategy but need custom icons
+    // Copilot uses DefaultStrategy for insertion but needs custom icon styling
+    if (this.hostname === 'copilot.microsoft.com') {
+      return uiFactory.createCopilotIcon();
+    }
+
     // Use the highest priority strategy to create the icon
     for (const strategy of this.strategies) {
       const icon = strategy.createIcon?.(uiFactory);
@@ -318,7 +324,7 @@ export class PlatformManager {
         return icon;
       }
     }
-    
+
     // Fallback to default floating icon
     return uiFactory.createFloatingIcon();
   }

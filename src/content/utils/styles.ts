@@ -3,39 +3,39 @@
  * Handles CSS injection and style management
  */
 
-import { debug, error as logError } from './logger';
+import { debug, error as logError } from "./logger";
 
-const STYLE_ID = 'prompt-library-styles';
+const STYLE_ID = "prompt-library-styles";
 
 /**
  * Inject CSS styles into the document head
  * Only injects once per page load
  */
 export function injectCSS(): void {
-    try {
-      // Check if styles are already injected
-      if (document.getElementById(STYLE_ID)) {
-        debug('CSS styles already injected, skipping');
-        return;
-      }
-
-      const style = document.createElement('style');
-      style.id = STYLE_ID;
-      style.textContent = getCSS();
-
-      document.head.appendChild(style);
-      debug('CSS styles injected successfully');
-    } catch (err) {
-      logError('Failed to inject CSS styles', err as Error);
+  try {
+    // Check if styles are already injected
+    if (document.getElementById(STYLE_ID)) {
+      debug("CSS styles already injected, skipping");
+      return;
     }
+
+    const style = document.createElement("style");
+    style.id = STYLE_ID;
+    style.textContent = getCSS();
+
+    document.head.appendChild(style);
+    debug("CSS styles injected successfully");
+  } catch (err) {
+    logError("Failed to inject CSS styles", err as Error);
   }
+}
 
 /**
  * Get the CSS string for the prompt library
  * @returns The complete CSS string
  */
 export function getCSS(): string {
-    return `
+  return `
     /* Base Prompt Manager Icon Styles */
     .prompt-library-icon-base {
       min-width: 32px;
@@ -64,7 +64,7 @@ export function getCSS(): string {
     .prompt-library-icon {
       position: absolute;
       width: 32px;
-      height: 32px;  
+      height: 32px;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       border-radius: 8px;
       display: flex;
@@ -90,13 +90,83 @@ export function getCSS(): string {
       background: #ffffff14;
     }
 
-
-
     .prompt-library-icon-base:focus-visible,
     .prompt-library-icon:focus-visible {
       outline: none;
       border-color: #60a5fa;
       box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.4);
+    }
+
+    /* Copilot-specific icon styles */
+    /* Matches Microsoft Copilot's native button design with light/dark mode support */
+    .prompt-library-icon-copilot {
+      width: 40px;
+      height: 40px;
+      border-radius: 16px; /* rounded-2xl */
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      backdrop-filter: blur(8px);
+    }
+
+    /* Copilot icon - Light mode (default) */
+    html[data-theme="light"] .prompt-library-icon-copilot,
+    .prompt-library-icon-copilot {
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid rgba(0, 0, 0, 0.12);
+      color: #000000;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    }
+
+    /* Copilot icon hover - light mode */
+    html[data-theme="light"] .prompt-library-icon-copilot:hover,
+    .prompt-library-icon-copilot:hover {
+      background: rgba(0, 0, 0, 0.06);
+      border-color: rgba(0, 0, 0, 0.18);
+      color: #000000;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+    }
+
+    /* Copilot icon active - light mode */
+    html[data-theme="light"] .prompt-library-icon-copilot:active,
+    .prompt-library-icon-copilot:active {
+      background: rgba(0, 0, 0, 0.12);
+      color: #000000;
+      transform: scale(0.97);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    }
+
+    /* Copilot icon - dark mode (using data-theme attribute) */
+    html[data-theme="dark"] .prompt-library-icon-copilot {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.12);
+      color: #e8e8e8;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    }
+
+    html[data-theme="dark"] .prompt-library-icon-copilot:hover {
+      background: rgba(255, 255, 255, 0.14);
+      border-color: rgba(255, 255, 255, 0.2);
+      color: #ffffff;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    html[data-theme="dark"] .prompt-library-icon-copilot:active {
+      background: rgba(255, 255, 255, 0.18);
+      color: #ffffff;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Copilot icon focus state */
+    .prompt-library-icon-copilot:focus-visible {
+      outline: 2px solid #0078d4;
+      outline-offset: 2px;
+      border-color: #0078d4;
+      box-shadow: 0 0 0 4px rgba(0, 120, 212, 0.1);
+    }
+
+    /* Copilot icon SVG sizing */
+    .prompt-library-icon-copilot svg {
+      width: 20px;
+      height: 20px;
     }
 
     .prompt-library-icon-base svg,
@@ -291,43 +361,43 @@ export function getCSS(): string {
       background: #1f2937;
       border-color: #374151;
     }
-    
+
     .prompt-library-selector.dark-theme .prompt-selector-header {
       background: #111827;
       border-color: #374151;
     }
-    
+
     .prompt-library-selector.dark-theme .prompt-selector-header h3 {
       color: #f9fafb;
     }
-    
+
     .prompt-library-selector.dark-theme .close-selector {
       color: #9ca3af;
     }
-    
+
     .prompt-library-selector.dark-theme .close-selector:hover {
       background: #374151;
       color: #f3f4f6;
     }
-    
+
     .prompt-library-selector.dark-theme .prompt-search {
       border-color: #374151;
     }
-    
+
     .prompt-library-selector.dark-theme .search-input {
       background: #374151;
       border-color: #4b5563;
       color: #f9fafb;
     }
-    
+
     .prompt-library-selector.dark-theme .search-input:focus {
       border-color: #6366f1;
     }
-    
+
     .prompt-library-selector.dark-theme .prompt-item {
       border-color: #374151;
     }
-    
+
     .prompt-library-selector.dark-theme .prompt-item:hover {
       background: #374151;
     }
@@ -341,20 +411,20 @@ export function getCSS(): string {
       background: #374151;
       box-shadow: 0 0 0 2px #6366f1;
     }
-    
+
     .prompt-library-selector.dark-theme .prompt-title {
       color: #f9fafb;
     }
-    
+
     .prompt-library-selector.dark-theme .prompt-category {
       background: #312e81;
       color: #c7d2fe;
     }
-    
+
     .prompt-library-selector.dark-theme .prompt-preview {
       color: #9ca3af;
     }
-    
+
     .prompt-library-selector.dark-theme .no-prompts {
       color: #9ca3af;
     }
@@ -364,43 +434,43 @@ export function getCSS(): string {
       background: white;
       border-color: #e5e7eb;
     }
-    
+
     .prompt-library-selector.light-theme .prompt-selector-header {
       background: #f9fafb;
       border-color: #e5e7eb;
     }
-    
+
     .prompt-library-selector.light-theme .prompt-selector-header h3 {
       color: #111827;
     }
-    
+
     .prompt-library-selector.light-theme .close-selector {
       color: #6b7280;
     }
-    
+
     .prompt-library-selector.light-theme .close-selector:hover {
       background: #e5e7eb;
       color: #374151;
     }
-    
+
     .prompt-library-selector.light-theme .prompt-search {
       border-color: #e5e7eb;
     }
-    
+
     .prompt-library-selector.light-theme .search-input {
       background: white;
       border-color: #d1d5db;
       color: #111827;
     }
-    
+
     .prompt-library-selector.light-theme .search-input:focus {
       border-color: #4f46e5;
     }
-    
+
     .prompt-library-selector.light-theme .prompt-item {
       border-color: #f3f4f6;
     }
-    
+
     .prompt-library-selector.light-theme .prompt-item:hover {
       background: #f9fafb;
     }
@@ -414,20 +484,20 @@ export function getCSS(): string {
       background: #f0f0f3;
       box-shadow: 0 0 0 2px #4f46e5;
     }
-    
+
     .prompt-library-selector.light-theme .prompt-title {
       color: #111827;
     }
-    
+
     .prompt-library-selector.light-theme .prompt-category {
       background: #eef2ff;
       color: #4f46e5;
     }
-    
+
     .prompt-library-selector.light-theme .prompt-preview {
       color: #6b7280;
     }
-    
+
     .prompt-library-selector.light-theme .no-prompts {
       color: #6b7280;
     }
@@ -519,10 +589,10 @@ export function removeCSS(): void {
     const existingStyle = document.getElementById(STYLE_ID);
     if (existingStyle) {
       existingStyle.remove();
-      debug('CSS styles removed successfully');
+      debug("CSS styles removed successfully");
     }
   } catch (err) {
-    logError('Failed to remove CSS styles', err as Error);
+    logError("Failed to remove CSS styles", err as Error);
   }
 }
 

@@ -280,9 +280,9 @@ export class UIElementFactory {
   createCopilotIcon(): HTMLElement {
     const icon = document.createElement('button');
 
-    // Use the base classes for consistency with the desired output
-    // The wrapper div will have class="relative", so the button doesn't need positioning classes
-    icon.className = 'prompt-library-icon-base prompt-library-cleanup-target';
+    // Copilot-specific classes to match native button styling
+    // Matches the rounded buttons in Copilot's composer toolbar
+    icon.className = 'prompt-library-icon-base prompt-library-icon-copilot prompt-library-cleanup-target';
 
     icon.setAttribute('type', 'button');
     icon.setAttribute('aria-label', 'Open my prompt manager - Access your saved prompts');
@@ -291,11 +291,11 @@ export class UIElementFactory {
     icon.setAttribute('tabindex', '0');
     icon.setAttribute('data-dashlane-label', 'true');
 
-    // Create icon SVG (18px consistent sizing)
+    // Create icon SVG (20px to match Copilot's button icons)
     const svg = createSVGElement('svg', {
       xmlns: 'http://www.w3.org/2000/svg',
-      width: '18',
-      height: '18',
+      width: '20',
+      height: '20',
       viewBox: '0 0 24 24',
       fill: 'currentColor',
       'aria-hidden': 'true',

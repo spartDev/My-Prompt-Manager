@@ -6,9 +6,10 @@
  * to avoid configuration drift across multiple files.
  */
 
-import type { BrandColorScheme } from '../constants/brandColors';
+import type { BrandColorScheme } from "../constants/brandColors";
 
-const DISABLED_STATE = 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400';
+const DISABLED_STATE =
+  "bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400";
 
 /**
  * Interface for comprehensive platform configuration
@@ -44,126 +45,129 @@ export interface PlatformDefinition {
  */
 export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
   claude: {
-    id: 'claude',
-    hostname: 'claude.ai',
-    displayName: 'Claude',
+    id: "claude",
+    hostname: "claude.ai",
+    displayName: "Claude",
     priority: 100,
     defaultEnabled: true,
-    selectors: [
-      'div[contenteditable="true"][role="textbox"].ProseMirror'
-    ],
-    buttonContainerSelector: '.relative.flex-1.flex.items-center.gap-2.shrink.min-w-0',
-    strategyClass: 'ClaudeStrategy',
-    hostnamePatterns: ['claude'],
+    selectors: ['div[contenteditable="true"][role="textbox"].ProseMirror'],
+    buttonContainerSelector:
+      ".relative.flex-1.flex.items-center.gap-2.shrink.min-w-0",
+    strategyClass: "ClaudeStrategy",
+    hostnamePatterns: ["claude"],
     brandColors: {
-      enabled: 'bg-[#d37354] text-white shadow-sm',
-      disabled: DISABLED_STATE
-    }
+      enabled: "bg-[#d37354] text-white shadow-sm",
+      disabled: DISABLED_STATE,
+    },
   },
 
   chatgpt: {
-    id: 'chatgpt',
-    hostname: 'chatgpt.com',
-    displayName: 'ChatGPT',
+    id: "chatgpt",
+    hostname: "chatgpt.com",
+    displayName: "ChatGPT",
     priority: 90,
     defaultEnabled: true,
     selectors: [
       'textarea[data-testid="chat-input"]',
-      'textarea[placeholder*="Message"]'
+      'textarea[placeholder*="Message"]',
     ],
-    buttonContainerSelector: 'div[data-testid="composer-trailing-actions"] .ms-auto.flex.items-center',
-    strategyClass: 'ChatGPTStrategy',
-    hostnamePatterns: ['openai', 'chatgpt'],
+    buttonContainerSelector:
+      'div[data-testid="composer-trailing-actions"] .ms-auto.flex.items-center',
+    strategyClass: "ChatGPTStrategy",
+    hostnamePatterns: ["openai", "chatgpt"],
     brandColors: {
-      enabled: 'bg-white text-gray-800 shadow-sm border border-gray-200',
-      disabled: DISABLED_STATE
-    }
+      enabled: "bg-white text-gray-800 shadow-sm border border-gray-200",
+      disabled: DISABLED_STATE,
+    },
   },
 
   mistral: {
-    id: 'mistral',
-    hostname: 'chat.mistral.ai',
-    displayName: 'Mistral LeChat',
+    id: "mistral",
+    hostname: "chat.mistral.ai",
+    displayName: "Mistral LeChat",
     priority: 85,
     defaultEnabled: true,
     selectors: [
       'div[contenteditable="true"]',
       'textarea[placeholder*="chat"]',
-      '[role="textbox"]'
+      '[role="textbox"]',
     ],
     buttonContainerSelector: [
-      '.flex.w-full.max-w-full.items-center.justify-start.gap-3', // Main chat interface
-      '.flex.w-full.items-center.justify-start.gap-3',           // Compact view
-      '.flex.items-center.justify-start.gap-3'                   // Mobile fallback
-    ].join(', '),
-    strategyClass: 'MistralStrategy',
-    hostnamePatterns: ['mistral'],
+      ".flex.w-full.max-w-full.items-center.justify-start.gap-3", // Main chat interface
+      ".flex.w-full.items-center.justify-start.gap-3", // Compact view
+      ".flex.items-center.justify-start.gap-3", // Mobile fallback
+    ].join(", "),
+    strategyClass: "MistralStrategy",
+    hostnamePatterns: ["mistral"],
     brandColors: {
-      enabled: 'bg-gray-700 text-white shadow-sm',
-      disabled: DISABLED_STATE
-    }
+      enabled: "bg-gray-700 text-white shadow-sm",
+      disabled: DISABLED_STATE,
+    },
   },
 
   perplexity: {
-    id: 'perplexity',
-    hostname: 'www.perplexity.ai',
-    displayName: 'Perplexity',
+    id: "perplexity",
+    hostname: "www.perplexity.ai",
+    displayName: "Perplexity",
     priority: 80,
     defaultEnabled: true,
     selectors: [
       'textarea[placeholder*="Ask"]',
-      'textarea[placeholder*="follow"]'
+      'textarea[placeholder*="follow"]',
     ],
-    buttonContainerSelector: '.bg-background-50.dark\\:bg-offsetDark.flex.items-center',
-    strategyClass: 'PerplexityStrategy',
-    hostnamePatterns: ['perplexity'],
+    buttonContainerSelector:
+      ".bg-background-50.dark\\:bg-offsetDark.flex.items-center",
+    strategyClass: "PerplexityStrategy",
+    hostnamePatterns: ["perplexity"],
     brandColors: {
-      enabled: 'bg-[#2d808c] text-white shadow-sm',
-      disabled: DISABLED_STATE
-    }
+      enabled: "bg-[#2d808c] text-white shadow-sm",
+      disabled: DISABLED_STATE,
+    },
   },
 
   gemini: {
-    id: 'gemini',
-    hostname: 'gemini.google.com',
-    displayName: 'Google Gemini',
+    id: "gemini",
+    hostname: "gemini.google.com",
+    displayName: "Google Gemini",
     priority: 85,
     defaultEnabled: true,
     selectors: [
       'div.ql-editor[contenteditable="true"][role="textbox"]',
-      'rich-textarea .ql-editor',
+      "rich-textarea .ql-editor",
       '[data-placeholder*="Gemini"]',
-      'div[contenteditable="true"]'
+      'div[contenteditable="true"]',
     ],
-    buttonContainerSelector: '.input-buttons-wrapper-bottom',
-    strategyClass: 'GeminiStrategy',
-    hostnamePatterns: ['gemini'],
+    buttonContainerSelector: ".input-buttons-wrapper-bottom",
+    strategyClass: "GeminiStrategy",
+    hostnamePatterns: ["gemini"],
     brandColors: {
-      enabled: 'bg-white text-gray-800 shadow-sm border border-gray-200',
-      disabled: DISABLED_STATE
-    }
+      enabled: "bg-white text-gray-800 shadow-sm border border-gray-200",
+      disabled: DISABLED_STATE,
+    },
   },
 
   copilot: {
-    id: 'copilot',
-    hostname: 'copilot.microsoft.com',
-    displayName: 'Microsoft Copilot',
+    id: "copilot",
+    hostname: "copilot.microsoft.com",
+    displayName: "Microsoft Copilot",
     priority: 80,
     defaultEnabled: true,
     selectors: [
-      'textarea[data-testid="composer-input"]',  // Primary selector - most specific
-      'textarea#userInput',                      // Fallback - ID selector
-      'textarea[placeholder*="Message"]',        // Pattern match fallback
-      'textarea[placeholder*="Copilot"]'         // Additional pattern match
+      'textarea[data-testid="composer-input"]', // Primary selector - most specific
+      "textarea#userInput", // Fallback - ID selector
+      'textarea[placeholder*="Message"]', // Pattern match fallback
+      'textarea[placeholder*="Copilot"]', // Additional pattern match
     ],
-    buttonContainerSelector: '.flex.gap-2.items-center', // Second occurrence with "Talk to Copilot"
-    strategyClass: 'DefaultStrategy',  // Uses default strategy (no custom class needed)
-    hostnamePatterns: ['copilot.microsoft'],
+    // Target the container with microphone button - more specific than generic .flex.gap-2
+    buttonContainerSelector:
+      ".relative.bottom-0.flex.justify-between.pb-0\\.5.pe-2\\.5.ps-1\\.5 > .flex.gap-2.items-center:last-child",
+    strategyClass: "DefaultStrategy", // Uses default strategy (no custom class needed)
+    hostnamePatterns: ["copilot.microsoft"],
     brandColors: {
-      enabled: 'bg-[#0e111b] text-white shadow-sm',
-      disabled: DISABLED_STATE
-    }
-  }
+      enabled: "bg-[#0e111b] text-white shadow-sm",
+      disabled: DISABLED_STATE,
+    },
+  },
 };
 
 /**
@@ -176,16 +180,20 @@ export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
  */
 export function getDefaultEnabledPlatforms(): string[] {
   return Object.values(SUPPORTED_PLATFORMS)
-    .filter(platform => platform.defaultEnabled)
+    .filter((platform) => platform.defaultEnabled)
     .sort((a, b) => b.priority - a.priority) // Sort by priority (highest first)
-    .map(platform => platform.hostname);
+    .map((platform) => platform.hostname);
 }
 
 /**
  * Get platform definition by hostname
  */
-export function getPlatformByHostname(hostname: string): PlatformDefinition | undefined {
-  return Object.values(SUPPORTED_PLATFORMS).find(platform => platform.hostname === hostname);
+export function getPlatformByHostname(
+  hostname: string,
+): PlatformDefinition | undefined {
+  return Object.values(SUPPORTED_PLATFORMS).find(
+    (platform) => platform.hostname === hostname,
+  );
 }
 
 /**
@@ -199,7 +207,9 @@ export function getPlatformById(id: string): PlatformDefinition | undefined {
  * Get all supported platform hostnames
  */
 export function getAllSupportedHostnames(): string[] {
-  return Object.values(SUPPORTED_PLATFORMS).map(platform => platform.hostname);
+  return Object.values(SUPPORTED_PLATFORMS).map(
+    (platform) => platform.hostname,
+  );
 }
 
 /**
@@ -208,7 +218,7 @@ export function getAllSupportedHostnames(): string[] {
 export function getAllHostnamePatterns(): string[] {
   const patterns: string[] = [];
 
-  Object.values(SUPPORTED_PLATFORMS).forEach(platform => {
+  Object.values(SUPPORTED_PLATFORMS).forEach((platform) => {
     // Add exact hostname
     patterns.push(platform.hostname);
 
@@ -232,22 +242,30 @@ export function isHostnameSupported(hostname: string): boolean {
 
   // Pattern matching
   const patterns = getAllHostnamePatterns();
-  return patterns.some(pattern => hostname.includes(pattern));
+  return patterns.some((pattern) => hostname.includes(pattern));
 }
 
 /**
  * Get platforms sorted by priority (highest first)
  */
 export function getPlatformsByPriority(): PlatformDefinition[] {
-  return Object.values(SUPPORTED_PLATFORMS)
-    .sort((a, b) => b.priority - a.priority);
+  return Object.values(SUPPORTED_PLATFORMS).sort(
+    (a, b) => b.priority - a.priority,
+  );
 }
 
 /**
  * Legacy compatibility: Get platform names as union type
  * @deprecated Use PlatformDefinition.id instead
  */
-export type PlatformName = 'claude' | 'chatgpt' | 'mistral' | 'perplexity' | 'gemini' | 'copilot' | 'default';
+export type PlatformName =
+  | "claude"
+  | "chatgpt"
+  | "mistral"
+  | "perplexity"
+  | "gemini"
+  | "copilot"
+  | "default";
 
 /**
  * Get all platform IDs for TypeScript union types
