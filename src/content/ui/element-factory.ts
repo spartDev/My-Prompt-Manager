@@ -276,13 +276,14 @@ export class UIElementFactory {
   /**
    * Creates Microsoft Copilot-specific icon matching native button styling
    * Follows Copilot's design: rounded-2xl, border, transparent background with hover
+   * Uses shared prompt-library-integrated-icon class for E2E test compatibility
    */
   createCopilotIcon(): HTMLElement {
     const icon = document.createElement('button');
 
-    // Copilot-specific classes to match native button styling
-    // Matches the rounded buttons in Copilot's composer toolbar
-    icon.className = 'prompt-library-icon-base prompt-library-icon-copilot prompt-library-cleanup-target';
+    // Use shared integrated icon class + Copilot-specific Tailwind classes
+    // Matches Copilot's native button styling with rounded corners and subtle borders
+    icon.className = 'prompt-library-integrated-icon flex items-center gap-2 px-3 h-10 rounded-2xl border border-gray-200 dark:border-gray-700 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800 active:scale-[0.98] transition-all duration-200 text-gray-700 dark:text-gray-300';
 
     icon.setAttribute('type', 'button');
     icon.setAttribute('aria-label', 'Open my prompt manager - Access your saved prompts');
@@ -291,11 +292,11 @@ export class UIElementFactory {
     icon.setAttribute('tabindex', '0');
     icon.setAttribute('data-dashlane-label', 'true');
 
-    // Create icon SVG (20px to match Copilot's button icons)
+    // Create icon SVG (18px for consistency with other platforms)
     const svg = createSVGElement('svg', {
       xmlns: 'http://www.w3.org/2000/svg',
-      width: '20',
-      height: '20',
+      width: '18',
+      height: '18',
       viewBox: '0 0 24 24',
       fill: 'currentColor',
       'aria-hidden': 'true',
@@ -310,7 +311,12 @@ export class UIElementFactory {
     svg.appendChild(path);
     icon.appendChild(svg);
 
-    // No text label for Copilot - just the icon
+    // Add text label to match Claude/Perplexity pattern
+    const textElement = createElement('span', {
+      class: 'text-sm font-medium whitespace-nowrap'
+    });
+    textElement.textContent = 'My Prompts';
+    icon.appendChild(textElement);
 
     return icon;
   }
