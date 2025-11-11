@@ -3,6 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import type { Mock } from 'vitest';
 
 import type { InsertionResult } from '../../types/index';
 import type { UIElementFactory } from '../../ui/element-factory';
@@ -187,7 +188,10 @@ describe('PlatformManager', () => {
     manager = new PlatformManager();
     mockElement = document.createElement('div');
     mockUIFactory = {
-      createFloatingIcon: vi.fn().mockReturnValue(document.createElement('button'))
+      createFloatingIcon: vi.fn().mockReturnValue(document.createElement('button')),
+      createCopilotIcon: vi.fn().mockReturnValue(document.createElement('button')),
+      createGeminiIcon: vi.fn().mockReturnValue(document.createElement('button')),
+      createMistralIcon: vi.fn().mockReturnValue(document.createElement('button'))
     } as any;
 
     vi.clearAllMocks();
@@ -398,6 +402,36 @@ describe('PlatformManager', () => {
       const icon = manager.createIcon(mockUIFactory);
       expect(mockUIFactory.createFloatingIcon).toHaveBeenCalled();
       expect(icon).toBeInstanceOf(HTMLElement);
+    });
+
+    it('should use configured iconMethod when available', async () => {
+      const { getPlatformByHostname } = await import('../../../config/platforms');
+      const mockedGetPlatformByHostname = getPlatformByHostname as unknown as Mock;
+
+      const hostname = 'copilot.microsoft.com';
+      mockLocation.hostname = hostname;
+
+      mockedGetPlatformByHostname.mockReturnValue({
+        id: 'copilot',
+        hostname,
+        displayName: 'Microsoft Copilot',
+        priority: 80,
+        defaultEnabled: true,
+        selectors: [],
+        strategyClass: 'DefaultStrategy',
+        iconMethod: 'createCopilotIcon'
+      });
+
+      const freshManager = new PlatformManager();
+      await freshManager.initializeStrategies();
+
+      const icon = freshManager.createIcon(mockUIFactory);
+
+      expect(mockUIFactory.createCopilotIcon).toHaveBeenCalled();
+      expect(icon).toBeInstanceOf(HTMLElement);
+      expect(freshManager.getActiveStrategy()).not.toBeNull();
+
+      mockedGetPlatformByHostname.mockReturnValue(null);
     });
   });
 

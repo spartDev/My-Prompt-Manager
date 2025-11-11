@@ -69,6 +69,10 @@ describe('Copilot Platform Configuration', () => {
     );
   });
 
+  it('should define iconMethod for custom Copilot icon styling', () => {
+    expect(SUPPORTED_PLATFORMS.copilot.iconMethod).toBe('createCopilotIcon');
+  });
+
   it('should be included in all supported hostnames', () => {
     const hostnames = getAllSupportedHostnames();
     expect(hostnames).toContain('copilot.microsoft.com');
@@ -111,5 +115,11 @@ describe('Platform Configuration - General', () => {
       expect(platform.selectors.length).toBeGreaterThan(0);
       expect(platform.strategyClass).toBeDefined();
     });
+  });
+
+  it('should configure icon methods for platforms with custom UI', () => {
+    expect(SUPPORTED_PLATFORMS.mistral.iconMethod).toBe('createMistralIcon');
+    expect(SUPPORTED_PLATFORMS.gemini.iconMethod).toBe('createGeminiIcon');
+    expect(SUPPORTED_PLATFORMS.copilot.iconMethod).toBe('createCopilotIcon');
   });
 });
