@@ -31,7 +31,7 @@ vi.mock('../../utils/logger', () => ({
 }));
 
 // Mock window.location.hostname
-const mockLocation = setMockHostname('copilot.microsoft.com');
+setMockHostname('copilot.microsoft.com');
 
 describe('CopilotStrategy', () => {
   let strategy: CopilotStrategy;
