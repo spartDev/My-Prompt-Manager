@@ -9,6 +9,7 @@ import { getPlatformByHostname, SUPPORTED_PLATFORMS } from '../../config/platfor
 import type { InsertionResult } from '../types/index';
 import type { PlatformManagerOptions } from '../types/platform';
 import type { UIElementFactory } from '../ui/element-factory';
+import type { IconCreationResult } from '../types/ui';
 import { debug, warn } from '../utils/logger';
 import { getSettings, type CustomSite } from '../utils/storage';
 
@@ -370,7 +371,35 @@ export class PlatformManager {
       return null;
     }
 
-    // Use the highest priority strategy to create the icon
+    // Get platform configuration
+    const platform = getPlatformByHostname(this.hostname);
+
+    // Use platform-specific icon method if specified
+    if (platform?.iconMethod) {
+      const iconMethodName = platform.iconMethod;
+
+      // Type-safe method lookup
+      if (typeof uiFactory[iconMethodName] === 'function') {
+        const iconMethod = uiFactory[iconMethodName] as () => HTMLElement | IconCreationResult;
+        const result = iconMethod();
+
+        // Handle special case: createClaudeIcon returns IconCreationResult
+        if (iconMethodName === 'createClaudeIcon') {
+          const iconResult = result as IconCreationResult;
+          return iconResult.container;
+        }
+
+        // All other icon methods return HTMLElement directly
+        return result as HTMLElement;
+      } else {
+        warn(`Icon method '${iconMethodName}' not found in UIElementFactory`, {
+          platform: platform.id,
+          hostname: this.hostname
+        });
+      }
+    }
+
+    // Fallback: Try strategy-specific icon creation
     for (const strategy of this.strategies) {
       const icon = strategy.createIcon?.(uiFactory);
       if (icon) {
@@ -379,7 +408,7 @@ export class PlatformManager {
       }
     }
 
-    // Fallback to default floating icon
+    // Final fallback: Create default floating icon
     return uiFactory.createFloatingIcon();
   }
 

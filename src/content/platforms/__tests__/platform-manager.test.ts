@@ -399,6 +399,154 @@ describe('PlatformManager', () => {
       expect(mockUIFactory.createFloatingIcon).toHaveBeenCalled();
       expect(icon).toBeInstanceOf(HTMLElement);
     });
+
+    it('should use iconMethod when specified in platform config', async () => {
+      const { getPlatformByHostname } = await import('../../../config/platforms');
+      const mockCopilotIcon = document.createElement('button');
+      const mockUIFactoryWithMethods = {
+        ...mockUIFactory,
+        createCopilotIcon: vi.fn().mockReturnValue(mockCopilotIcon)
+      } as any;
+
+      vi.mocked(getPlatformByHostname).mockReturnValue({
+        id: 'copilot',
+        hostname: 'copilot.microsoft.com',
+        displayName: 'Microsoft Copilot',
+        priority: 80,
+        defaultEnabled: true,
+        selectors: [],
+        strategyClass: 'CopilotStrategy',
+        iconMethod: 'createCopilotIcon'
+      } as any);
+
+      mockLocation.hostname = 'copilot.microsoft.com';
+      const freshManager = new PlatformManager();
+      await freshManager.initializeStrategies();
+
+      const icon = freshManager.createIcon(mockUIFactoryWithMethods);
+      
+      expect(mockUIFactoryWithMethods.createCopilotIcon).toHaveBeenCalled();
+      expect(icon).toBe(mockCopilotIcon);
+    });
+
+    it('should handle createClaudeIcon special case (returns IconCreationResult)', async () => {
+      const { getPlatformByHostname } = await import('../../../config/platforms');
+      const mockContainer = document.createElement('div');
+      const mockIcon = document.createElement('button');
+      const mockUIFactoryWithClaude = {
+        ...mockUIFactory,
+        createClaudeIcon: vi.fn().mockReturnValue({
+          container: mockContainer,
+          icon: mockIcon
+        })
+      } as any;
+
+      vi.mocked(getPlatformByHostname).mockReturnValue({
+        id: 'claude',
+        hostname: 'claude.ai',
+        displayName: 'Claude',
+        priority: 100,
+        defaultEnabled: true,
+        selectors: [],
+        strategyClass: 'ClaudeStrategy',
+        iconMethod: 'createClaudeIcon'
+      } as any);
+
+      mockLocation.hostname = 'claude.ai';
+      const freshManager = new PlatformManager();
+      await freshManager.initializeStrategies();
+
+      const icon = freshManager.createIcon(mockUIFactoryWithClaude);
+      
+      expect(mockUIFactoryWithClaude.createClaudeIcon).toHaveBeenCalled();
+      expect(icon).toBe(mockContainer); // Should return container, not icon
+    });
+
+    it('should fallback to strategy icon when iconMethod is not specified', async () => {
+      const { getPlatformByHostname } = await import('../../../config/platforms');
+      const testStrategy = new TestStrategy();
+      const mockIcon = document.createElement('div');
+      vi.spyOn(testStrategy, 'createIcon').mockReturnValue(mockIcon);
+
+      vi.mocked(getPlatformByHostname).mockReturnValue({
+        id: 'test',
+        hostname: 'test.com',
+        displayName: 'Test Platform',
+        priority: 50,
+        defaultEnabled: true,
+        selectors: [],
+        strategyClass: 'TestStrategy'
+        // No iconMethod specified
+      } as any);
+
+      mockLocation.hostname = 'test.com';
+      const freshManager = new PlatformManager();
+      await freshManager.initializeStrategies();
+      freshManager.registerStrategy(testStrategy);
+
+      const icon = freshManager.createIcon(mockUIFactory);
+      
+      expect(testStrategy.createIcon).toHaveBeenCalled();
+      expect(icon).toBe(mockIcon);
+    });
+
+    it('should warn when iconMethod references non-existent method', async () => {
+      const { getPlatformByHostname } = await import('../../../config/platforms');
+      const { warn } = await import('../../utils/logger');
+
+      vi.mocked(getPlatformByHostname).mockReturnValue({
+        id: 'test',
+        hostname: 'test.com',
+        displayName: 'Test Platform',
+        priority: 50,
+        defaultEnabled: true,
+        selectors: [],
+        strategyClass: 'TestStrategy',
+        iconMethod: 'nonExistentMethod' as any
+      } as any);
+
+      mockLocation.hostname = 'test.com';
+      const freshManager = new PlatformManager();
+      await freshManager.initializeStrategies();
+
+      freshManager.createIcon(mockUIFactory);
+      
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining("Icon method 'nonExistentMethod' not found"),
+        expect.objectContaining({
+          platform: 'test',
+          hostname: 'test.com'
+        })
+      );
+    });
+
+    it('should fallback to floating icon when iconMethod fails and no strategy creates icon', async () => {
+      const { getPlatformByHostname } = await import('../../../config/platforms');
+      const mockFloatingIcon = document.createElement('button');
+      const mockUIFactoryWithFloating = {
+        createFloatingIcon: vi.fn().mockReturnValue(mockFloatingIcon)
+      } as any;
+
+      vi.mocked(getPlatformByHostname).mockReturnValue({
+        id: 'test',
+        hostname: 'test.com',
+        displayName: 'Test Platform',
+        priority: 50,
+        defaultEnabled: true,
+        selectors: [],
+        strategyClass: 'TestStrategy',
+        iconMethod: 'createNonExistentIcon' as any
+      } as any);
+
+      mockLocation.hostname = 'test.com';
+      const freshManager = new PlatformManager();
+      await freshManager.initializeStrategies();
+
+      const icon = freshManager.createIcon(mockUIFactoryWithFloating);
+      
+      expect(mockUIFactoryWithFloating.createFloatingIcon).toHaveBeenCalled();
+      expect(icon).toBe(mockFloatingIcon);
+    });
   });
 
   describe('insertContent', () => {

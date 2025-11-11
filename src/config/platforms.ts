@@ -35,6 +35,8 @@ export interface PlatformDefinition {
   hostnamePatterns?: string[];
   /** Brand color scheme for UI elements (optional, defaults to green gradient when omitted) */
   brandColors?: BrandColorScheme;
+  /** Icon creation method name from UIElementFactory (optional, falls back to strategy icon creation) */
+  iconMethod?: 'createClaudeIcon' | 'createChatGPTIcon' | 'createMistralIcon' | 'createPerplexityIcon' | 'createGeminiIcon' | 'createCopilotIcon' | 'createFloatingIcon';
 }
 
 /**
@@ -62,6 +64,7 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
       enabled: "bg-[#d37354] text-white shadow-sm",
       disabled: DISABLED_STATE,
     },
+    iconMethod: "createClaudeIcon",
   },
 
   chatgpt: {
@@ -82,6 +85,7 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
       enabled: "bg-white text-gray-800 shadow-sm border border-gray-200",
       disabled: DISABLED_STATE,
     },
+    iconMethod: "createChatGPTIcon",
   },
 
   mistral: {
@@ -106,6 +110,7 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
       enabled: "bg-gray-700 text-white shadow-sm",
       disabled: DISABLED_STATE,
     },
+    iconMethod: "createMistralIcon",
   },
 
   perplexity: {
@@ -126,6 +131,7 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
       enabled: "bg-[#2d808c] text-white shadow-sm",
       disabled: DISABLED_STATE,
     },
+    iconMethod: "createPerplexityIcon",
   },
 
   gemini: {
@@ -147,6 +153,7 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
       enabled: "bg-white text-gray-800 shadow-sm border border-gray-200",
       disabled: DISABLED_STATE,
     },
+    iconMethod: "createGeminiIcon",
   },
 
   copilot: {
@@ -170,6 +177,7 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
       enabled: "bg-[#0e111b] text-white shadow-sm",
       disabled: DISABLED_STATE,
     },
+    iconMethod: "createCopilotIcon",
   },
 });
 
