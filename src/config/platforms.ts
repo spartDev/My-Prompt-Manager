@@ -35,6 +35,8 @@ export interface PlatformDefinition {
   hostnamePatterns?: string[];
   /** Brand color scheme for UI elements (optional, defaults to green gradient when omitted) */
   brandColors?: BrandColorScheme;
+  /** Icon creation method from UIElementFactory - specifies which icon method to use */
+  iconMethod?: 'createClaudeIcon' | 'createChatGPTIcon' | 'createPerplexityIcon' | 'createMistralIcon' | 'createGeminiIcon' | 'createCopilotIcon' | 'createFloatingIcon';
 }
 
 /**
@@ -58,6 +60,7 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
       ".relative.flex-1.flex.items-center.gap-2.shrink.min-w-0",
     strategyClass: "ClaudeStrategy",
     hostnamePatterns: ["claude"],
+    iconMethod: "createClaudeIcon",
     brandColors: {
       enabled: "bg-[#d37354] text-white shadow-sm",
       disabled: DISABLED_STATE,
@@ -78,6 +81,7 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
       'div[data-testid="composer-trailing-actions"] .ms-auto.flex.items-center',
     strategyClass: "ChatGPTStrategy",
     hostnamePatterns: ["openai", "chatgpt"],
+    iconMethod: "createChatGPTIcon",
     brandColors: {
       enabled: "bg-white text-gray-800 shadow-sm border border-gray-200",
       disabled: DISABLED_STATE,
@@ -102,6 +106,7 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
     ].join(", "),
     strategyClass: "MistralStrategy",
     hostnamePatterns: ["mistral"],
+    iconMethod: "createMistralIcon",
     brandColors: {
       enabled: "bg-gray-700 text-white shadow-sm",
       disabled: DISABLED_STATE,
@@ -122,6 +127,7 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
       ".bg-background-50.dark\\:bg-offsetDark.flex.items-center",
     strategyClass: "PerplexityStrategy",
     hostnamePatterns: ["perplexity"],
+    iconMethod: "createPerplexityIcon",
     brandColors: {
       enabled: "bg-[#2d808c] text-white shadow-sm",
       disabled: DISABLED_STATE,
@@ -143,6 +149,7 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
     buttonContainerSelector: ".input-buttons-wrapper-bottom",
     strategyClass: "GeminiStrategy",
     hostnamePatterns: ["gemini"],
+    iconMethod: "createGeminiIcon",
     brandColors: {
       enabled: "bg-white text-gray-800 shadow-sm border border-gray-200",
       disabled: DISABLED_STATE,
@@ -166,6 +173,7 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
       ".relative.bottom-0.flex.justify-between.pb-0\\.5.pe-2\\.5.ps-1\\.5 > .flex.gap-2.items-center:last-child",
     strategyClass: "CopilotStrategy", // Uses dedicated CopilotStrategy for React integration
     hostnamePatterns: ["copilot.microsoft"],
+    iconMethod: "createCopilotIcon",
     brandColors: {
       enabled: "bg-[#0e111b] text-white shadow-sm",
       disabled: DISABLED_STATE,

@@ -361,6 +361,8 @@ export class PlatformManager {
 
   /**
    * Creates platform-specific icon
+   * Uses platform configuration's iconMethod field for data-driven icon creation.
+   * Falls back to strategy-specific icon creation if iconMethod is not defined.
    * @param uiFactory - UI factory instance
    * @returns Platform-specific icon or null if not initialized
    */
@@ -370,16 +372,56 @@ export class PlatformManager {
       return null;
     }
 
-    // Use the highest priority strategy to create the icon
+    // Try to get platform definition and use iconMethod if specified
+    const platform = getPlatformByHostname(this.hostname);
+    if (platform?.iconMethod) {
+      const iconMethodName = platform.iconMethod;
+
+      // Type-safe method lookup: check if the method exists in UIElementFactory
+      if (typeof (uiFactory as Record<string, unknown>)[iconMethodName] === 'function') {
+        try {
+          const icon = (uiFactory[iconMethodName as keyof UIElementFactory] as () => HTMLElement)();
+          if (icon) {
+            // Set active strategy to first strategy for consistency
+            if (this.strategies.length > 0) {
+              this.activeStrategy = this.strategies[0];
+            }
+            debug('Icon created using platform-specific iconMethod', {
+              platform: platform.id,
+              iconMethod: iconMethodName
+            });
+            return icon;
+          }
+        } catch (error) {
+          warn(`Failed to execute icon method '${iconMethodName}' for platform ${platform.id}`, {
+            error,
+            hostname: this.hostname
+          });
+        }
+      } else {
+        warn(`Icon method '${iconMethodName}' not found in UIElementFactory`, {
+          platform: platform.id,
+          hostname: this.hostname,
+          availableMethods: Object.getOwnPropertyNames(Object.getPrototypeOf(uiFactory))
+        });
+      }
+    }
+
+    // Fallback: Try strategy-specific icon creation
     for (const strategy of this.strategies) {
       const icon = strategy.createIcon?.(uiFactory);
       if (icon) {
         this.activeStrategy = strategy;
+        debug('Icon created using strategy-specific createIcon method', {
+          strategy: strategy.name,
+          hostname: this.hostname
+        });
         return icon;
       }
     }
 
-    // Fallback to default floating icon
+    // Final fallback: Create default floating icon
+    debug('Using default floating icon', { hostname: this.hostname });
     return uiFactory.createFloatingIcon();
   }
 

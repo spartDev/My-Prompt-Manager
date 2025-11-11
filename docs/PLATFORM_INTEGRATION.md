@@ -43,10 +43,34 @@ export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
     brandColors: {
       enabled: 'bg-[#123456] text-white shadow-sm', // Matches platform brand styling
       disabled: 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
-    }
+    },
+    iconMethod: 'createFloatingIcon' // Optional: Specify which icon method to use
   }
 };
 ```
+
+#### Adding Custom Platform-Specific Icons
+
+If you want a custom icon for your platform (instead of the generic floating icon):
+
+1. **Add the icon method to `src/content/ui/element-factory.ts`:**
+   ```typescript
+   createYourPlatformIcon(): HTMLElement {
+     const icon = document.createElement('button');
+     // Your custom icon implementation
+     return icon;
+   }
+   ```
+
+2. **Reference it in your platform configuration:**
+   ```typescript
+   yourplatform: {
+     // ... other fields ...
+     iconMethod: 'createYourPlatformIcon'
+   }
+   ```
+
+The `iconMethod` field follows a data-driven approach that eliminates the need for hardcoded hostname checks. The `PlatformManager` will automatically call the specified method when creating icons for your platform.
 
 ### Step 2: Test Your Integration
 
@@ -76,6 +100,7 @@ export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
 | `strategyClass` | string | ✅ | Class name for custom strategy (future use) |
 | `hostnamePatterns` | string[] | ❌ | Additional hostname patterns for detection |
 | `brandColors` | BrandColorScheme | ❌ | Tailwind class strings for enabled/disabled badges; defaults to green gradient when omitted |
+| `iconMethod` | string | ❌ | UIElementFactory method to use for icon creation (e.g., `'createCopilotIcon'`, `'createGeminiIcon'`); defaults to generic floating icon if not specified |
 
 ### Priority Guidelines
 

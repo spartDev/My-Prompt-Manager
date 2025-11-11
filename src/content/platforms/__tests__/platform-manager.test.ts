@@ -381,6 +381,139 @@ describe('PlatformManager', () => {
   });
 
   describe('createIcon', () => {
+    it('should return null when not initialized', () => {
+      const icon = manager.createIcon(mockUIFactory);
+      expect(icon).toBeNull();
+    });
+
+    it('should create icon using platform-specific iconMethod when defined', async () => {
+      await manager.initializeStrategies();
+      
+      // Mock getPlatformByHostname to return a platform with iconMethod
+      const { getPlatformByHostname } = await import('../../../config/platforms');
+      vi.mocked(getPlatformByHostname).mockReturnValue({
+        id: 'claude',
+        hostname: 'claude.ai',
+        displayName: 'Claude',
+        priority: 100,
+        defaultEnabled: true,
+        selectors: ['div[role="textbox"]'],
+        buttonContainerSelector: '.button-container',
+        strategyClass: 'ClaudeStrategy',
+        iconMethod: 'createClaudeIcon' // Specify icon method
+      } as any);
+      
+      // Create a new manager with the mocked platform
+      const newManager = new PlatformManager();
+      await newManager.initializeStrategies();
+      
+      // Mock the UIElementFactory to have createClaudeIcon method
+      const mockClaudeIcon = document.createElement('button');
+      const uiFactory = {
+        createClaudeIcon: vi.fn().mockReturnValue(mockClaudeIcon),
+        createFloatingIcon: vi.fn().mockReturnValue(document.createElement('div'))
+      } as any;
+      
+      const icon = newManager.createIcon(uiFactory);
+      
+      expect(uiFactory.createClaudeIcon).toHaveBeenCalled();
+      expect(icon).toBe(mockClaudeIcon);
+    });
+
+    it('should fallback to strategy createIcon when iconMethod is not available', async () => {
+      await manager.initializeStrategies();
+      
+      // Mock getPlatformByHostname to return null (unknown platform)
+      const { getPlatformByHostname } = await import('../../../config/platforms');
+      vi.mocked(getPlatformByHostname).mockReturnValue(null);
+      
+      const testStrategy = new TestStrategy();
+      const mockIcon = document.createElement('div');
+      vi.spyOn(testStrategy, 'createIcon').mockReturnValue(mockIcon);
+      manager.registerStrategy(testStrategy);
+      
+      const icon = manager.createIcon(mockUIFactory);
+      
+      expect(testStrategy.createIcon).toHaveBeenCalled();
+      expect(icon).toBe(mockIcon);
+      expect(manager.getActiveStrategy()).toBe(testStrategy);
+    });
+
+    it('should fallback to floating icon when iconMethod call fails', async () => {
+      await manager.initializeStrategies();
+      
+      // Mock getPlatformByHostname to return a platform with invalid iconMethod
+      const { getPlatformByHostname } = await import('../../../config/platforms');
+      vi.mocked(getPlatformByHostname).mockReturnValue({
+        id: 'test',
+        hostname: 'test.com',
+        displayName: 'Test',
+        priority: 50,
+        defaultEnabled: true,
+        selectors: ['div'],
+        strategyClass: 'DefaultStrategy',
+        iconMethod: 'nonExistentMethod' // Invalid method
+      } as any);
+      
+      const newManager = new PlatformManager();
+      await newManager.initializeStrategies();
+      
+      const icon = newManager.createIcon(mockUIFactory);
+      
+      expect(mockUIFactory.createFloatingIcon).toHaveBeenCalled();
+      expect(icon).toBeInstanceOf(HTMLElement);
+    });
+
+    it('should fallback to floating icon when no strategy creates icon', async () => {
+      await manager.initializeStrategies(); // Initialize strategies for testing
+      
+      const { getPlatformByHostname } = await import('../../../config/platforms');
+      vi.mocked(getPlatformByHostname).mockReturnValue(null);
+      
+      const icon = manager.createIcon(mockUIFactory);
+      expect(mockUIFactory.createFloatingIcon).toHaveBeenCalled();
+      expect(icon).toBeInstanceOf(HTMLElement);
+    });
+
+    it('should create icon using highest priority strategy when iconMethod throws', async () => {
+      await manager.initializeStrategies();
+      
+      // Mock getPlatformByHostname to return platform with icon method that throws
+      const { getPlatformByHostname } = await import('../../../config/platforms');
+      vi.mocked(getPlatformByHostname).mockReturnValue({
+        id: 'test',
+        hostname: 'test.com',
+        displayName: 'Test',
+        priority: 50,
+        defaultEnabled: true,
+        selectors: ['div'],
+        strategyClass: 'DefaultStrategy',
+        iconMethod: 'createTestIcon'
+      } as any);
+      
+      const newManager = new PlatformManager();
+      await newManager.initializeStrategies();
+      
+      // Mock UIElementFactory where createTestIcon throws
+      const uiFactory = {
+        createTestIcon: vi.fn().mockImplementation(() => {
+          throw new Error('Factory error');
+        }),
+        createFloatingIcon: vi.fn().mockReturnValue(document.createElement('div'))
+      } as any;
+      
+      // Add a strategy that can create icon
+      const testStrategy = new TestStrategy();
+      const mockStrategyIcon = document.createElement('span');
+      vi.spyOn(testStrategy, 'createIcon').mockReturnValue(mockStrategyIcon);
+      newManager.registerStrategy(testStrategy);
+      
+      const icon = newManager.createIcon(uiFactory);
+      
+      // Should fallback to strategy icon after iconMethod throws
+      expect(icon).toBe(mockStrategyIcon);
+    });
+
     it('should create icon using highest priority strategy', async () => {
       await manager.initializeStrategies(); // Initialize strategies for testing
       const testStrategy = new TestStrategy();
@@ -388,16 +521,12 @@ describe('PlatformManager', () => {
       vi.spyOn(testStrategy, 'createIcon').mockReturnValue(mockIcon);
       manager.registerStrategy(testStrategy);
       
+      const { getPlatformByHostname } = await import('../../../config/platforms');
+      vi.mocked(getPlatformByHostname).mockReturnValue(null);
+      
       const icon = manager.createIcon(mockUIFactory);
       expect(icon).toBe(mockIcon);
       expect(manager.getActiveStrategy()).toBe(testStrategy);
-    });
-
-    it('should fallback to floating icon when no strategy creates icon', async () => {
-      await manager.initializeStrategies(); // Initialize strategies for testing
-      const icon = manager.createIcon(mockUIFactory);
-      expect(mockUIFactory.createFloatingIcon).toHaveBeenCalled();
-      expect(icon).toBeInstanceOf(HTMLElement);
     });
   });
 
