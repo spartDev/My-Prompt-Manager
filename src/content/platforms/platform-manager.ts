@@ -370,6 +370,35 @@ export class PlatformManager {
       return null;
     }
 
+    const platform = getPlatformByHostname(this.hostname);
+
+    if (platform?.iconMethod) {
+      const iconMethodName = platform.iconMethod;
+      const iconCreator = uiFactory[iconMethodName as keyof UIElementFactory];
+
+      if (typeof iconCreator === 'function') {
+        try {
+          const icon = (iconCreator as () => HTMLElement).call(uiFactory);
+          if (this.strategies.length > 0) {
+            this.activeStrategy = this.strategies[0];
+          }
+          return icon;
+        } catch (error) {
+          warn('Failed to create icon via configured iconMethod', {
+            error,
+            hostname: this.hostname,
+            platformId: platform.id,
+            iconMethod: iconMethodName
+          });
+        }
+      } else {
+        warn(`Icon method '${iconMethodName}' not found in UIElementFactory`, {
+          hostname: this.hostname,
+          platformId: platform.id
+        });
+      }
+    }
+
     // Use the highest priority strategy to create the icon
     for (const strategy of this.strategies) {
       const icon = strategy.createIcon?.(uiFactory);

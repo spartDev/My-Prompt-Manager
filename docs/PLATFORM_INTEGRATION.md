@@ -76,6 +76,7 @@ export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
 | `strategyClass` | string | ✅ | Class name for custom strategy (future use) |
 | `hostnamePatterns` | string[] | ❌ | Additional hostname patterns for detection |
 | `brandColors` | BrandColorScheme | ❌ | Tailwind class strings for enabled/disabled badges; defaults to green gradient when omitted |
+| `iconMethod` | PlatformIconMethod | ❌ | Optional UIElementFactory method for rendering a platform-specific icon (`createFloatingIcon` is used when omitted) |
 
 ### Priority Guidelines
 
@@ -88,6 +89,20 @@ export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
 ## 🔧 Advanced Integration
 
 For platforms that need custom insertion logic or special handling, you'll need to create a custom strategy class.
+
+#### Icon Method Reference
+
+When your platform needs bespoke icon styling, set the `iconMethod` field to one of the supported UI factory helpers:
+
+- `createFloatingIcon` – default floating action button (no additional config required)
+- `createAbsoluteIcon` / `createRelativeIcon` – positioning-specific variants
+- `createChatGPTIcon`
+- `createPerplexityIcon`
+- `createMistralIcon`
+- `createCopilotIcon`
+- `createGeminiIcon`
+
+If `iconMethod` is omitted, the manager falls back to `createFloatingIcon`. This keeps icon selection fully data-driven without modifying `PlatformManager`.
 
 ### Architecture Overview
 
