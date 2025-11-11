@@ -7,6 +7,19 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { UIElementFactory } from '../../ui/element-factory';
 import { CopilotStrategy } from '../copilot-strategy';
 
+import {
+  createCopilotTextarea,
+  createMockUIFactory,
+  setMockHostname,
+  resetMockHostname,
+  setupDispatchEventMock,
+  setupNativeValueSetterMock,
+  createReactTextarea,
+  COPILOT_SELECTORS,
+  COPILOT_BUTTON_CONTAINER_SELECTOR,
+  COPILOT_CONFIG
+} from './fixtures/copilot-fixtures';
+
 // Mock Logger
 vi.mock('../../utils/logger', () => ({
   info: vi.fn(),
@@ -18,13 +31,7 @@ vi.mock('../../utils/logger', () => ({
 }));
 
 // Mock window.location.hostname
-const mockLocation = {
-  hostname: 'copilot.microsoft.com'
-};
-Object.defineProperty(window, 'location', {
-  value: mockLocation,
-  writable: true
-});
+const mockLocation = setMockHostname('copilot.microsoft.com');
 
 describe('CopilotStrategy', () => {
   let strategy: CopilotStrategy;
@@ -34,16 +41,9 @@ describe('CopilotStrategy', () => {
 
   beforeEach(() => {
     strategy = new CopilotStrategy();
-    mockTextarea = document.createElement('textarea');
-    mockTextarea.setAttribute('data-testid', 'composer-input');
-    // Ensure focus method exists for spying
-    mockTextarea.focus = vi.fn();
-
+    mockTextarea = createCopilotTextarea('primary');
     mockDiv = document.createElement('div');
-
-    mockUIFactory = {
-      createCopilotIcon: vi.fn().mockReturnValue(document.createElement('button'))
-    } as any;
+    mockUIFactory = createMockUIFactory();
 
     vi.clearAllMocks();
   });
@@ -54,23 +54,22 @@ describe('CopilotStrategy', () => {
 
   describe('constructor', () => {
     it('should create Copilot strategy with correct configuration', () => {
-      expect(strategy.name).toBe('copilot');
-      expect(strategy.priority).toBe(80);
-      expect(strategy.getSelectors()).toContain('textarea[data-testid="composer-input"]');
-      expect(strategy.getSelectors()).toContain('textarea#userInput');
+      expect(strategy.name).toBe(COPILOT_CONFIG.name);
+      expect(strategy.priority).toBe(COPILOT_CONFIG.priority);
+      expect(strategy.getSelectors()).toContain(COPILOT_SELECTORS[0]);
+      expect(strategy.getSelectors()).toContain(COPILOT_SELECTORS[1]);
     });
 
     it('should include all configured selectors', () => {
       const selectors = strategy.getSelectors();
-      expect(selectors).toContain('textarea[data-testid="composer-input"]');
-      expect(selectors).toContain('textarea#userInput');
-      expect(selectors).toContain('textarea[placeholder*="Message"]');
-      expect(selectors).toContain('textarea[placeholder*="Copilot"]');
+      COPILOT_SELECTORS.forEach((selector) => {
+        expect(selectors).toContain(selector);
+      });
     });
 
     it('should have correct button container selector', () => {
       const buttonSelector = strategy.getButtonContainerSelector();
-      expect(buttonSelector).toBe('.relative.bottom-0.flex.justify-between.pb-0\\.5.pe-2\\.5.ps-1\\.5 > .flex.gap-2.items-center:last-child');
+      expect(buttonSelector).toBe(COPILOT_BUTTON_CONTAINER_SELECTOR);
     });
   });
 
@@ -84,24 +83,24 @@ describe('CopilotStrategy', () => {
     });
 
     it('should return false for textarea elements not on copilot.microsoft.com', () => {
-      mockLocation.hostname = 'example.com';
+      setMockHostname('example.com');
       const newStrategy = new CopilotStrategy();
       expect(newStrategy.canHandle(mockTextarea)).toBe(false);
+      resetMockHostname();
     });
   });
 
   describe('getSelectors', () => {
     it('should return Copilot-specific selectors', () => {
       const selectors = strategy.getSelectors();
-      expect(selectors).toContain('textarea[data-testid="composer-input"]');
-      expect(selectors).toContain('textarea#userInput');
-      expect(selectors).toContain('textarea[placeholder*="Message"]');
-      expect(selectors).toContain('textarea[placeholder*="Copilot"]');
+      COPILOT_SELECTORS.forEach((selector) => {
+        expect(selectors).toContain(selector);
+      });
     });
 
     it('should prioritize most specific selector first', () => {
       const selectors = strategy.getSelectors();
-      expect(selectors[0]).toBe('textarea[data-testid="composer-input"]');
+      expect(selectors[0]).toBe(COPILOT_SELECTORS[0]);
     });
   });
 
@@ -118,16 +117,7 @@ describe('CopilotStrategy', () => {
     beforeEach(() => {
       // Mock DOM methods
       vi.spyOn(mockTextarea, 'focus').mockImplementation(() => {});
-      vi.spyOn(mockTextarea, 'dispatchEvent').mockImplementation(() => true);
-
-      // Mock the native value setter
-      const mockSetter = vi.fn();
-      vi.spyOn(Object, 'getOwnPropertyDescriptor').mockReturnValue({
-        set: mockSetter,
-        get: vi.fn(),
-        enumerable: true,
-        configurable: true
-      });
+      setupDispatchEventMock(mockTextarea);
     });
 
     it('should insert content using React-compatible methods', async () => {
@@ -157,19 +147,7 @@ describe('CopilotStrategy', () => {
     });
 
     it('should use native value setter when available', async () => {
-      const mockSetter = vi.fn();
-      const originalGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
-      Object.getOwnPropertyDescriptor = vi.fn((obj: any, prop: PropertyKey) => {
-        if (obj === HTMLTextAreaElement.prototype && prop === 'value') {
-          return {
-            set: mockSetter,
-            get: vi.fn(),
-            enumerable: true,
-            configurable: true
-          };
-        }
-        return originalGetOwnPropertyDescriptor.call(Object, obj, prop);
-      }) as any;
+      const { mockSetter, restore } = setupNativeValueSetterMock();
 
       // Reset cached setter and create new strategy to pick up mocked descriptor
       (CopilotStrategy as any).nativeValueSetter = null;
@@ -180,14 +158,13 @@ describe('CopilotStrategy', () => {
       expect(mockSetter).toHaveBeenCalledWith('test content');
 
       // Restore
-      Object.getOwnPropertyDescriptor = originalGetOwnPropertyDescriptor;
+      restore();
       // Reset cache for subsequent tests
       (CopilotStrategy as any).nativeValueSetter = null;
     });
 
     it('should handle case when native value setter is not available', async () => {
-      const originalGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
-      Object.getOwnPropertyDescriptor = vi.fn(() => undefined) as any;
+      const { restore } = setupNativeValueSetterMock({ unavailable: true });
 
       // Reset cached setter and create new strategy to pick up mocked descriptor
       (CopilotStrategy as any).nativeValueSetter = null;
@@ -199,7 +176,7 @@ describe('CopilotStrategy', () => {
       expect(mockTextarea.value).toBe('test content');
 
       // Restore
-      Object.getOwnPropertyDescriptor = originalGetOwnPropertyDescriptor;
+      restore();
       // Reset cache for subsequent tests
       (CopilotStrategy as any).nativeValueSetter = null;
     });
@@ -244,11 +221,7 @@ describe('CopilotStrategy', () => {
 
   describe('React integration', () => {
     it('should work with React textarea elements', async () => {
-      // Simulate a React textarea with value tracker
-      const reactTextarea = mockTextarea as any;
-      reactTextarea._valueTracker = {
-        setValue: vi.fn()
-      };
+      const reactTextarea = createReactTextarea('primary');
 
       const result = await strategy.insert(reactTextarea, 'react content');
 
@@ -271,22 +244,22 @@ describe('CopilotStrategy', () => {
   describe('Copilot-specific behavior', () => {
     it('should only handle elements on copilot.microsoft.com domain', () => {
       // Reset hostname to copilot.microsoft.com for this test
-      mockLocation.hostname = 'copilot.microsoft.com';
+      resetMockHostname();
       const copilotStrategy = new CopilotStrategy();
       expect(copilotStrategy.canHandle(mockTextarea)).toBe(true);
 
       // Change hostname
-      mockLocation.hostname = 'claude.ai';
+      setMockHostname('claude.ai');
       const newStrategy = new CopilotStrategy();
       expect(newStrategy.canHandle(mockTextarea)).toBe(false);
 
       // Reset for other tests
-      mockLocation.hostname = 'copilot.microsoft.com';
+      resetMockHostname();
     });
 
     it('should prioritize textarea elements over other input types', () => {
       // Reset hostname to copilot.microsoft.com for this test
-      mockLocation.hostname = 'copilot.microsoft.com';
+      resetMockHostname();
       const copilotStrategy = new CopilotStrategy();
 
       const input = document.createElement('input');
@@ -300,18 +273,18 @@ describe('CopilotStrategy', () => {
   describe('selector fallback chain', () => {
     it('should have primary selector as most specific', () => {
       const selectors = strategy.getSelectors();
-      expect(selectors[0]).toBe('textarea[data-testid="composer-input"]');
+      expect(selectors[0]).toBe(COPILOT_SELECTORS[0]);
     });
 
     it('should have ID-based fallback as second option', () => {
       const selectors = strategy.getSelectors();
-      expect(selectors[1]).toBe('textarea#userInput');
+      expect(selectors[1]).toBe(COPILOT_SELECTORS[1]);
     });
 
     it('should include pattern match fallbacks', () => {
       const selectors = strategy.getSelectors();
-      expect(selectors).toContain('textarea[placeholder*="Message"]');
-      expect(selectors).toContain('textarea[placeholder*="Copilot"]');
+      expect(selectors).toContain(COPILOT_SELECTORS[2]);
+      expect(selectors).toContain(COPILOT_SELECTORS[3]);
     });
   });
 
