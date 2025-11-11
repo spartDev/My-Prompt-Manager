@@ -379,14 +379,10 @@ export class PlatformManager {
       if (typeof iconCreator === 'function') {
         try {
           const icon = (iconCreator as () => HTMLElement).call(uiFactory);
-
-          if (icon) {
-            const primaryStrategy = this.strategies[0];
-            if (primaryStrategy) {
-              this.activeStrategy = primaryStrategy;
-            }
-            return icon;
+          if (this.strategies.length > 0) {
+            this.activeStrategy = this.strategies[0];
           }
+          return icon;
         } catch (error) {
           warn('Failed to create icon via configured iconMethod', {
             error,
