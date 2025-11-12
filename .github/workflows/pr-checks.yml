@@ -387,7 +387,7 @@ jobs:
         continue-on-error: false # Fail on security vulnerabilities
 
       - name: 🔍 Dependency Review
-        uses: actions/dependency-review-action@45529485b5eb76184ced07362d2331fd9d26f03f # v4
+        uses: actions/dependency-review-action@3c4e3dcb1aa7874d2c16be7d79418e9b7efd6261 # v4
         with:
           fail-on-severity: moderate
           # DOMPurify is dual-licensed (Apache-2.0 OR MPL-2.0) but npm metadata includes GPL-2.0-only
