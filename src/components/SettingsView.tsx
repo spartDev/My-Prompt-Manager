@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { FC, ReactNode } from 'react';
 
 import manifest from '../../manifest.json';
-import { getDefaultEnabledPlatforms } from '../config/platforms';
+import { getDefaultEnabledPlatforms, getLinkedPlatformHostnames } from '../config/platforms';
 import { StorageManager } from '../services/storage';
 import type { Prompt, Category, Settings as UserSettings } from '../types';
 import { DEFAULT_SETTINGS } from '../types';
@@ -251,14 +251,8 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
 
   // Handle site toggle
   const handleSiteToggle = (hostname: string, enabled: boolean) => {
-    // Group hostnames that should be toggled together
-    const linkedSites: Record<string, string[]> = {
-      'copilot.microsoft.com': ['copilot.microsoft.com', 'm365.cloud.microsoft'],
-      'm365.cloud.microsoft': ['copilot.microsoft.com', 'm365.cloud.microsoft']
-    };
-
-    // Get all hostnames to toggle (either the linked group or just the single hostname)
-    const hostnamesToToggle = linkedSites[hostname] ?? [hostname];
+    // Get all hostnames to toggle (includes linked platforms from configuration)
+    const hostnamesToToggle = getLinkedPlatformHostnames(hostname);
 
     // Use functional setState to avoid stale closure reads during rapid clicks
     setSettings(prev => {

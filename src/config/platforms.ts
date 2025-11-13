@@ -50,6 +50,8 @@ export interface PlatformDefinition {
   brandColors?: BrandColorScheme;
   /** Optional icon creation method for explicit UI factory integration */
   iconMethod?: PlatformIconMethod;
+  /** Platform IDs that should toggle together (bidirectional relationship) */
+  linkedPlatforms?: string[];
 }
 
 /**
@@ -188,6 +190,7 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
       disabled: DISABLED_STATE,
     },
     iconMethod: "createCopilotIcon",
+    linkedPlatforms: ['m365copilot'],
   },
 
   m365copilot: {
@@ -212,8 +215,34 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
       disabled: DISABLED_STATE,
     },
     iconMethod: "createCopilotIcon",
+    linkedPlatforms: ['copilot'],
   },
 });
+
+/**
+ * Validate that all linked platforms exist in SUPPORTED_PLATFORMS
+ *
+ * This function runs at module load time to catch configuration errors early.
+ * Throws an error if any platform references a non-existent linked platform.
+ *
+ * @throws {Error} If a platform references a non-existent linked platform
+ */
+function validateLinkedPlatforms(): void {
+  Object.entries(SUPPORTED_PLATFORMS).forEach(([platformId, platform]) => {
+    if (platform.linkedPlatforms) {
+      platform.linkedPlatforms.forEach((linkedId) => {
+        if (!(linkedId in SUPPORTED_PLATFORMS)) {
+          throw new Error(
+            `Platform ${platformId} references non-existent linked platform: ${linkedId}`,
+          );
+        }
+      });
+    }
+  });
+}
+
+// Run validation at module load time
+validateLinkedPlatforms();
 
 /**
  * Helper functions for accessing platform configuration
@@ -297,6 +326,55 @@ export function getPlatformsByPriority(): PlatformDefinition[] {
   return Object.values(SUPPORTED_PLATFORMS).sort(
     (a, b) => b.priority - a.priority,
   );
+}
+
+/**
+ * Get all linked platform hostnames for a given hostname
+ *
+ * Returns an array containing the original hostname plus all hostnames of linked platforms.
+ * This is used for toggling related platforms together (e.g., Microsoft Copilot and M365 Copilot).
+ *
+ * @param hostname - The hostname to get linked platforms for
+ * @returns Array of hostnames including the original and all linked platforms (deduplicated)
+ *
+ * @example
+ * ```typescript
+ * getLinkedPlatformHostnames('copilot.microsoft.com')
+ * // Returns: ['copilot.microsoft.com', 'm365.cloud.microsoft']
+ *
+ * getLinkedPlatformHostnames('claude.ai')
+ * // Returns: ['claude.ai'] (no linked platforms)
+ * ```
+ */
+export function getLinkedPlatformHostnames(hostname: string): string[] {
+  // Find the platform for this hostname
+  const platform = Object.values(SUPPORTED_PLATFORMS).find(
+    (p) => p.hostname === hostname,
+  );
+
+  if (!platform) {
+    return [hostname]; // Unknown platform, just return itself
+  }
+
+  if (!platform.linkedPlatforms || platform.linkedPlatforms.length === 0) {
+    return [hostname]; // No linked platforms
+  }
+
+  // Get hostnames of all linked platforms
+  const linkedHostnames = platform.linkedPlatforms
+    .map((platformId) => {
+      if (!(platformId in SUPPORTED_PLATFORMS)) {
+        console.error(
+          `Linked platform ${platformId} not found in SUPPORTED_PLATFORMS`,
+        );
+        return null;
+      }
+      return SUPPORTED_PLATFORMS[platformId].hostname;
+    })
+    .filter((h): h is string => h !== null);
+
+  // Return original hostname + all linked hostnames (deduplicated)
+  return [...new Set([hostname, ...linkedHostnames])];
 }
 
 /**
