@@ -108,23 +108,66 @@ If `iconMethod` is omitted, the manager falls back to `createFloatingIcon`. This
 
 ```
 src/
-├── config/platforms.ts           # ⭐ Centralized configuration
+├── config/platforms.ts             # ⭐ Centralized configuration
 ├── content/platforms/
-│   ├── base-strategy.ts          # Base class with common functionality
-│   ├── claude-strategy.ts        # Claude.ai implementation
-│   ├── chatgpt-strategy.ts       # ChatGPT implementation
-│   ├── mistral-strategy.ts       # Mistral LeChat implementation
-│   ├── perplexity-strategy.ts    # Perplexity implementation
-│   ├── your-platform-strategy.ts # Your custom strategy
-│   └── platform-manager.ts      # Registers and manages strategies
-└── background/background.ts      # Uses centralized config
+│   ├── base-strategy.ts            # Base class with common functionality
+│   ├── react-platform-strategy.ts  # React-specific base class
+│   ├── claude-strategy.ts          # Claude.ai implementation
+│   ├── chatgpt-strategy.ts         # ChatGPT implementation
+│   ├── mistral-strategy.ts         # Mistral LeChat implementation
+│   ├── perplexity-strategy.ts      # Perplexity implementation
+│   ├── copilot-strategy.ts         # Microsoft Copilot (extends React)
+│   ├── m365copilot-strategy.ts     # M365 Copilot (extends React)
+│   ├── your-platform-strategy.ts   # Your custom strategy
+│   └── platform-manager.ts         # Registers and manages strategies
+└── background/background.ts        # Uses centralized config
 ```
 
 ## Step-by-Step Guide
 
-### Step 1: Create the Platform Strategy
+### Step 1: Choose Your Base Class
 
-Create a new file: `src/content/platforms/your-platform-strategy.ts`
+Before creating your strategy, determine which base class to use:
+
+**🔍 Decision: Is the platform's input field powered by React?**
+
+```
+Is the platform using React for input management?
+│
+├─ ✅ YES → Use ReactPlatformStrategy
+│   │
+│   ├─ How to detect:
+│   │   • Check DevTools: Look for __reactFiber$ or __reactProps$ on textarea
+│   │   • Test: element.value = 'test' doesn't update UI → it's React
+│   │   • React DevTools shows component wrapping the input
+│   │
+│   ├─ Examples:
+│   │   • Microsoft Copilot (copilot.microsoft.com)
+│   │   • M365 Copilot (m365.cloud.microsoft)
+│   │
+│   └─ Benefits:
+│       • ✅ Automatic React event handling
+│       • ✅ Native value setter caching (~90% faster)
+│       • ✅ Built-in content validation
+│       • ✅ Consistent error handling
+│
+└─ ❌ NO → Use PlatformStrategy
+    │
+    ├─ Examples:
+    │   • Claude (claude.ai) - Custom contenteditable
+    │   • ChatGPT (chatgpt.com) - ProseMirror editor
+    │   • Gemini (gemini.google.com) - Quill editor
+    │
+    └─ Implementation:
+        • Full manual control
+        • Platform-specific insertion logic
+```
+
+---
+
+### Step 2a: Create Strategy (Standard Platform)
+
+**For non-React platforms**, create: `src/content/platforms/your-platform-strategy.ts`
 
 ```typescript
 import type { InsertionResult } from '../types/index';
@@ -201,15 +244,119 @@ export class YourPlatformStrategy extends PlatformStrategy {
 }
 ```
 
-### Step 2: Register the Strategy
+---
 
-#### 2a. Add to exports in `src/content/platforms/index.ts`:
+### Step 2b: Create Strategy (React Platform)
+
+**For React-based platforms**, create: `src/content/platforms/your-react-platform-strategy.ts`
+
+```typescript
+import { getPlatformById } from '../../config/platforms';
+import type { InsertionResult } from '../types/index';
+import type { UIElementFactory } from '../ui/element-factory';
+
+import { MAX_CONTENT_LENGTHS } from './constants';
+import { ReactPlatformStrategy } from './react-platform-strategy';
+
+export class YourReactPlatformStrategy extends ReactPlatformStrategy {
+  constructor(hostname?: string) {
+    const platform = getPlatformById('yourreactplatform');
+
+    super('yourreactplatform', 85, {
+      selectors: platform?.selectors || [
+        'textarea[data-testid="input"]',
+        'textarea.react-input'
+      ],
+      buttonContainerSelector: platform?.buttonContainerSelector,
+      priority: 85
+    }, hostname);
+
+    // REQUIRED: Initialize React native value setter cache
+    ReactPlatformStrategy.initializeNativeValueSetter();
+  }
+
+  /**
+   * Determines if this strategy should handle elements on this domain
+   */
+  canHandle(element: HTMLElement): boolean {
+    const isCorrectHostname = this.hostname === getPlatformById('yourreactplatform')?.hostname;
+    const isTextarea = element.tagName === 'TEXTAREA';
+
+    return isCorrectHostname && isTextarea;
+  }
+
+  /**
+   * Inserts content using React-compatible methods
+   */
+  async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
+    try {
+      // Validate and sanitize using base class method
+      const validation = this.validateAndSanitize(content, MAX_CONTENT_LENGTHS.COPILOT);
+      if (!validation.valid || !validation.sanitized) {
+        return await Promise.resolve({
+          success: false,
+          error: validation.error || 'Validation failed'
+        });
+      }
+
+      // Insert using base class React-compatible method
+      return await this.insertIntoReactTextarea(
+        element as HTMLTextAreaElement,
+        validation.sanitized,
+        'YourReactPlatform',
+        'yourreactplatform-textarea'
+      );
+    } catch (error) {
+      this._warn('React insertion failed', error as Error);
+      return await Promise.resolve({
+        success: false,
+        error: (error as Error).message
+      });
+    }
+  }
+
+  /**
+   * Gets selectors for finding input elements
+   */
+  getSelectors(): string[] {
+    return this.config?.selectors || [];
+  }
+
+  /**
+   * Creates platform-specific icon (optional)
+   */
+  createIcon(uiFactory: UIElementFactory): HTMLElement | null {
+    const { element, cleanup } = uiFactory.createFloatingIcon();
+    (element as HTMLElement & { __cleanup?: () => void }).__cleanup = cleanup;
+    return element;
+  }
+}
+```
+
+**✨ Key Benefits of ReactPlatformStrategy**:
+1. **Automatic React Compatibility**: No need to manually handle React's value setter
+2. **Built-in Validation**: `validateAndSanitize()` handles content validation
+3. **Performance**: Native setter caching provides ~90% performance improvement
+4. **Consistent Error Handling**: Try-catch patterns are standardized
+5. **Security**: Control character sanitization is automatic
+
+**⚠️ Important**:
+- **Must call** `ReactPlatformStrategy.initializeNativeValueSetter()` in constructor
+- **Always await** `Promise.resolve()` returns for proper error handling
+- **Use** `this.validateAndSanitize()` for content validation
+- **Use** `this.insertIntoReactTextarea()` for insertion
+
+---
+
+### Step 3: Register the Strategy
+
+#### 3a. Add to exports in `src/content/platforms/index.ts`:
 
 ```typescript
 export { YourPlatformStrategy } from './your-platform-strategy';
 ```
 
-#### 2b. Register in `src/content/platforms/platform-manager.ts`:
+#### 3b. Register in `src/content/platforms/platform-manager.ts`:
 
 ```typescript
 // Add import at top
@@ -228,7 +375,7 @@ constructor(options: PlatformManagerOptions = {}) {
 }
 ```
 
-### Step 3: Test the Integration
+### Step 4: Test the Integration
 
 1. **Build the extension**: `npm run build`
 2. **Load in Chrome**: Load unpacked from `dist/` folder
@@ -236,7 +383,7 @@ constructor(options: PlatformManagerOptions = {}) {
 4. **Check button appears**: Look for the prompt library button
 5. **Test insertion**: Click button, select a prompt, verify it inserts
 
-### Step 4: Debug and Refine
+### Step 5: Debug and Refine
 
 Use the browser console to debug:
 

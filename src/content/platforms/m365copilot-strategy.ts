@@ -9,34 +9,10 @@ import { getPlatformById } from '../../config/platforms';
 import type { InsertionResult } from '../types/index';
 import type { UIElementFactory } from '../ui/element-factory';
 
-import { PlatformStrategy } from './base-strategy';
 import { MAX_CONTENT_LENGTHS } from './constants';
+import { ReactPlatformStrategy } from './react-platform-strategy';
 
-// Extended HTMLTextAreaElement interface for React property setter
-interface ReactTextAreaElement extends HTMLTextAreaElement {
-  _valueTracker?: {
-    setValue: (value: string) => void;
-  };
-}
-
-export class M365CopilotStrategy extends PlatformStrategy {
-  /**
-   * Cached native value setter for performance optimization
-   * Avoids repeated Object.getOwnPropertyDescriptor calls (~90% overhead reduction)
-   */
-  private static nativeValueSetter: ((this: HTMLTextAreaElement, value: string) => void) | null = null;
-
-  /**
-   * Type guard to validate a function is a valid HTMLTextAreaElement value setter
-   * @param fn - The function to validate
-   * @returns True if fn is a valid value setter function
-   */
-  private static isValueSetter(
-    fn: unknown
-  ): fn is (this: HTMLTextAreaElement, value: string) => void {
-    return typeof fn === 'function';
-  }
-
+export class M365CopilotStrategy extends ReactPlatformStrategy {
   constructor(hostname?: string) {
     const platform = getPlatformById('m365copilot');
 
@@ -52,22 +28,8 @@ export class M365CopilotStrategy extends PlatformStrategy {
       priority: 80
     }, hostname);
 
-    // Cache the native setter on first instantiation
-    if (!M365CopilotStrategy.nativeValueSetter) {
-      const descriptor = Object.getOwnPropertyDescriptor(
-        window.HTMLTextAreaElement.prototype,
-        'value'
-      );
-      // Store the setter - we call it with .call(element, value) to provide correct `this` context
-      // Safe: We explicitly control `this` binding at call site using .call()
-      // eslint-disable-next-line @typescript-eslint/unbound-method
-      if (descriptor?.set && M365CopilotStrategy.isValueSetter(descriptor.set)) {
-        // eslint-disable-next-line @typescript-eslint/unbound-method
-        M365CopilotStrategy.nativeValueSetter = descriptor.set;
-      } else {
-        M365CopilotStrategy.nativeValueSetter = null;
-      }
-    }
+    // Initialize React native value setter cache
+    ReactPlatformStrategy.initializeNativeValueSetter();
   }
 
   /**
@@ -86,72 +48,50 @@ export class M365CopilotStrategy extends PlatformStrategy {
    * Inserts content using React-compatible methods
    * Handles both textarea and contenteditable (Lexical) elements
    */
-  insert(element: HTMLElement, content: string): Promise<InsertionResult> {
+  async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
     try {
-      // Security: Validate input
-      if (typeof content !== 'string') {
-        return Promise.resolve({
+      // Validate and sanitize content
+      const validation = this.validateAndSanitize(content, MAX_CONTENT_LENGTHS.COPILOT);
+      if (!validation.valid) {
+        return await Promise.resolve({
           success: false,
-          error: 'Invalid content type'
+          error: validation.error
         });
       }
 
-      // Security: Enforce maximum length (M365 Copilot typically has ~4000 char limit)
-      if (content.length > MAX_CONTENT_LENGTHS.COPILOT) {
-        this._warn(`Content exceeds maximum length (${String(content.length)} > ${String(MAX_CONTENT_LENGTHS.COPILOT)})`);
-        return Promise.resolve({
+      // Validation ensures sanitized is defined (allow empty strings)
+      if (typeof validation.sanitized !== 'string') {
+        return await Promise.resolve({
           success: false,
-          error: `Content exceeds maximum length of ${String(MAX_CONTENT_LENGTHS.COPILOT)} characters`
+          error: 'Content sanitization failed'
         });
       }
 
-      // Security: Sanitize control characters (preserve newlines, tabs, carriage returns)
-      // eslint-disable-next-line no-control-regex
-      const sanitized = content.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F-\x9F]/g, '');
-
-      // Focus the element first
-      element.focus();
+      const sanitized = validation.sanitized;
 
       // Handle based on element type
       if (element.tagName === 'TEXTAREA') {
-        return this._insertIntoTextarea(element as ReactTextAreaElement, sanitized);
+        // Use shared React textarea insertion from base class (includes focus)
+        return await this.insertIntoReactTextarea(
+          element as HTMLTextAreaElement,
+          sanitized,
+          'M365 Copilot textarea',
+          'm365copilot-textarea'
+        );
       } else if (element.getAttribute('contenteditable') === 'true') {
-        return this._insertIntoContentEditable(element, sanitized);
+        // Focus the element first for contenteditable
+        element.focus();
+        // Use M365-specific contenteditable insertion
+        return await this._insertIntoContentEditable(element, sanitized);
       } else {
-        return Promise.resolve({
+        return await Promise.resolve({
           success: false,
           error: 'Unsupported element type'
         });
       }
     } catch (error) {
       this._warn('Insertion failed', error as Error);
-      return Promise.resolve({ success: false, error: (error as Error).message });
-    }
-  }
-
-  /**
-   * Inserts content into textarea elements using React-compatible methods
-   * @private
-   */
-  private _insertIntoTextarea(element: ReactTextAreaElement, content: string): Promise<InsertionResult> {
-    try {
-      // Set the sanitized value
-      element.value = content;
-
-      // Trigger React events for M365 Copilot using cached native setter
-      if (M365CopilotStrategy.nativeValueSetter) {
-        M365CopilotStrategy.nativeValueSetter.call(element, content);
-      }
-
-      // Dispatch events that React expects
-      element.dispatchEvent(new Event('input', { bubbles: true }));
-      element.dispatchEvent(new Event('change', { bubbles: true }));
-
-      this._debug('M365 Copilot textarea insertion successful');
-      return Promise.resolve({ success: true, method: 'm365copilot-textarea' });
-    } catch (error) {
-      this._warn('Textarea insertion failed', error as Error);
-      return Promise.resolve({ success: false, error: (error as Error).message });
+      return await Promise.resolve({ success: false, error: (error as Error).message });
     }
   }
 

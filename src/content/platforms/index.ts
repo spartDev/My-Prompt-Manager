@@ -3,6 +3,7 @@
  */
 
 export { PlatformStrategy } from './base-strategy';
+export { ReactPlatformStrategy } from './react-platform-strategy';
 export { ClaudeStrategy } from './claude-strategy';
 export { ChatGPTStrategy } from './chatgpt-strategy';
 export { GeminiStrategy } from './gemini-strategy';
