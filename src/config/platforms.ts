@@ -189,6 +189,30 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
     },
     iconMethod: "createCopilotIcon",
   },
+
+  m365copilot: {
+    id: "m365copilot",
+    hostname: "m365.cloud.microsoft",
+    displayName: "Microsoft 365 Copilot",
+    priority: 80,
+    defaultEnabled: true,
+    selectors: [
+      'span[id="m365-chat-editor-target-element"]', // Primary selector - specific ID
+      'span[data-lexical-editor="true"][contenteditable="true"]', // Lexical editor
+      'span[role="combobox"][contenteditable="true"]', // Combobox role
+      'div[contenteditable="true"]', // Generic contenteditable fallback
+      'textarea[placeholder*="Message"]', // Legacy textarea fallback
+    ],
+    buttonContainerSelector:
+      '.fai-ChatInput__actions > span.___11i0s0y, .fai-ChatInput__actions',
+    strategyClass: "M365CopilotStrategy",
+    hostnamePatterns: ["m365.cloud.microsoft"],
+    brandColors: {
+      enabled: "bg-[#0e111b] text-white shadow-sm",
+      disabled: DISABLED_STATE,
+    },
+    iconMethod: "createCopilotIcon",
+  },
 });
 
 /**
@@ -286,6 +310,7 @@ export type PlatformName =
   | "perplexity"
   | "gemini"
   | "copilot"
+  | "m365copilot"
   | "default";
 
 /**

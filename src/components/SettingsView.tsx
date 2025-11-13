@@ -224,15 +224,34 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
 
   // Handle site toggle
   const handleSiteToggle = async (hostname: string, enabled: boolean) => {
-    const newEnabledSites = enabled 
-      ? [...settings.enabledSites, hostname]
-      : settings.enabledSites.filter(site => site !== hostname);
-    
+    // Group hostnames that should be toggled together
+    const linkedSites: Record<string, string[]> = {
+      'copilot.microsoft.com': ['copilot.microsoft.com', 'm365.cloud.microsoft'],
+      'm365.cloud.microsoft': ['copilot.microsoft.com', 'm365.cloud.microsoft']
+    };
+
+    // Get all hostnames to toggle (either the linked group or just the single hostname)
+    const hostnamesToToggle = linkedSites[hostname] ?? [hostname];
+
+    let newEnabledSites: string[];
+    if (enabled) {
+      // Add all linked hostnames
+      newEnabledSites = [...settings.enabledSites];
+      for (const site of hostnamesToToggle) {
+        if (!newEnabledSites.includes(site)) {
+          newEnabledSites.push(site);
+        }
+      }
+    } else {
+      // Remove all linked hostnames
+      newEnabledSites = settings.enabledSites.filter(site => !hostnamesToToggle.includes(site));
+    }
+
     const newSettings = {
       ...settings,
       enabledSites: newEnabledSites
     };
-    
+
     setSettings(newSettings);
     await saveSettings(newSettings);
   };

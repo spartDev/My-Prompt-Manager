@@ -93,15 +93,16 @@ describe('Copilot Platform Configuration', () => {
 });
 
 describe('Platform Configuration - General', () => {
-  it('should have 6 total platforms', () => {
+  it('should have 7 total platforms', () => {
     const platformKeys = Object.keys(SUPPORTED_PLATFORMS);
-    expect(platformKeys).toHaveLength(6);
+    expect(platformKeys).toHaveLength(7);
     expect(platformKeys).toContain('claude');
     expect(platformKeys).toContain('chatgpt');
     expect(platformKeys).toContain('gemini');
     expect(platformKeys).toContain('mistral');
     expect(platformKeys).toContain('perplexity');
     expect(platformKeys).toContain('copilot');
+    expect(platformKeys).toContain('m365copilot');
   });
 
   it('should have all platforms with required fields', () => {
