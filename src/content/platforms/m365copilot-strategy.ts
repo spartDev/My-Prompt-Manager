@@ -157,11 +157,28 @@ export class M365CopilotStrategy extends PlatformStrategy {
 
   /**
    * Inserts content into contenteditable elements (Lexical editor)
+   * Clears existing content before inserting to replace rather than append
    * @private
    */
   private _insertIntoContentEditable(element: HTMLElement, content: string): Promise<InsertionResult> {
     try {
-      // Method 1: Try execCommand (works in most browsers)
+      // Get or create selection
+      const selection = window.getSelection();
+      if (!selection) {
+        return Promise.resolve({
+          success: false,
+          error: 'Could not get selection'
+        });
+      }
+
+      // Select all existing content in the editor to replace it
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      selection.removeAllRanges();
+      selection.addRange(range);
+
+      // Method 1: Try execCommand with selected content (works in most browsers)
+      // This will replace the selected content with the new prompt
       const execCommandSuccess = document.execCommand('insertText', false, content);
 
       if (execCommandSuccess) {
@@ -174,33 +191,25 @@ export class M365CopilotStrategy extends PlatformStrategy {
       }
 
       // Method 2: Direct DOM manipulation fallback
-      const selection = window.getSelection();
-      if (selection && selection.rangeCount > 0) {
-        const range = selection.getRangeAt(0);
-        range.deleteContents();
+      // First delete all selected content (which is everything in the editor)
+      range.deleteContents();
 
-        // Insert text node
-        const textNode = document.createTextNode(content);
-        range.insertNode(textNode);
+      // Insert text node
+      const textNode = document.createTextNode(content);
+      range.insertNode(textNode);
 
-        // Move cursor to end
-        range.setStartAfter(textNode);
-        range.setEndAfter(textNode);
-        selection.removeAllRanges();
-        selection.addRange(range);
+      // Move cursor to end
+      range.setStartAfter(textNode);
+      range.setEndAfter(textNode);
+      selection.removeAllRanges();
+      selection.addRange(range);
 
-        // Dispatch events
-        element.dispatchEvent(new Event('input', { bubbles: true }));
-        element.dispatchEvent(new Event('change', { bubbles: true }));
+      // Dispatch events
+      element.dispatchEvent(new Event('input', { bubbles: true }));
+      element.dispatchEvent(new Event('change', { bubbles: true }));
 
-        this._debug('M365 Copilot contenteditable insertion successful (DOM)');
-        return Promise.resolve({ success: true, method: 'm365copilot-contenteditable-dom' });
-      }
-
-      return Promise.resolve({
-        success: false,
-        error: 'Failed to insert content into contenteditable element'
-      });
+      this._debug('M365 Copilot contenteditable insertion successful (DOM)');
+      return Promise.resolve({ success: true, method: 'm365copilot-contenteditable-dom' });
     } catch (error) {
       this._warn('Contenteditable insertion failed', error as Error);
       return Promise.resolve({ success: false, error: (error as Error).message });
