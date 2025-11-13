@@ -140,6 +140,9 @@ export class CopilotStrategy extends PlatformStrategy {
    * Creates Copilot-specific icon using the UI factory
    */
   createIcon(uiFactory: UIElementFactory): HTMLElement | null {
-    return uiFactory.createCopilotIcon();
+    const { element, cleanup } = uiFactory.createCopilotIcon();
+    // Store cleanup function on element for later retrieval by injector
+    (element as HTMLElement & { __cleanup?: () => void }).__cleanup = cleanup;
+    return element;
   }
 }

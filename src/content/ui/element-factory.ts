@@ -247,8 +247,9 @@ export class UIElementFactory {
    * Creates Microsoft Copilot-specific icon matching native Fluent UI button styling
    * Uses Fluent UI 9 classes to match native M365 Copilot buttons exactly
    * Uses shared prompt-library-integrated-icon class for E2E test compatibility
+   * Returns both the icon element and a cleanup function to disconnect the MutationObserver
    */
-  createCopilotIcon(): HTMLElement {
+  createCopilotIcon(): { element: HTMLElement; cleanup: () => void } {
     const icon = document.createElement('button');
 
     // Match native Fluent UI button styling exactly
@@ -350,7 +351,13 @@ export class UIElementFactory {
     iconSpan.appendChild(svg);
     icon.appendChild(iconSpan);
 
-    return icon;
+    // Return both element and cleanup function to prevent memory leak
+    return {
+      element: icon,
+      cleanup: () => {
+        observer.disconnect();
+      }
+    };
   }
 
   /**

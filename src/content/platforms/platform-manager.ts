@@ -380,7 +380,9 @@ export class PlatformManager {
 
       if (typeof iconCreator === 'function') {
         try {
-          const icon = (iconCreator as () => HTMLElement).call(uiFactory);
+          const result = (iconCreator as () => HTMLElement | { element: HTMLElement; cleanup: () => void }).call(uiFactory);
+          // Handle both old (HTMLElement) and new ({ element, cleanup }) return formats
+          const icon = 'element' in result ? result.element : result;
           if (this.strategies.length > 0) {
             this.activeStrategy = this.strategies[0];
           }

@@ -146,7 +146,10 @@ export function cleanupElement(element: HTMLElement | null): void {
  */
 export function createMockUIFactory(): UIElementFactory {
   return {
-    createCopilotIcon: vi.fn().mockReturnValue(document.createElement('button'))
+    createCopilotIcon: vi.fn().mockReturnValue({
+      element: document.createElement('button'),
+      cleanup: vi.fn()
+    })
   } as any;
 }
 
