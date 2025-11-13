@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { FC, ReactNode } from 'react';
 
 import manifest from '../../manifest.json';
@@ -90,6 +90,9 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
 
   const storageManager = StorageManager.getInstance();
 
+  // Track initial mount to skip saving on first render
+  const isInitialMount = useRef(true);
+
   const siteConfigs: Record<string, SiteConfig> = useMemo(() => ({
     'www.perplexity.ai': {
       name: 'Perplexity',
@@ -172,6 +175,30 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
     void loadSettings();
   }, [loadSettings]);
 
+  // Debounced persistence: save settings after user stops making changes
+  useEffect(() => {
+    // Skip saving on initial mount (when settings are loaded)
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+
+    // Debounce: wait 150ms after last change before saving
+    const timeoutId = setTimeout(() => {
+      saveSettings(settings).catch((err: unknown) => {
+        Logger.error('Failed to save settings', toError(err), {
+          component: 'SettingsView',
+          operation: 'persist'
+        });
+      });
+    }, 150);
+
+    // Cleanup: cancel pending save if settings change again
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [settings]);
+
   // Save settings
   const saveSettings = async (newSettings: Settings) => {
     setSaving(true);
@@ -223,7 +250,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
   };
 
   // Handle site toggle
-  const handleSiteToggle = async (hostname: string, enabled: boolean) => {
+  const handleSiteToggle = (hostname: string, enabled: boolean) => {
     // Group hostnames that should be toggled together
     const linkedSites: Record<string, string[]> = {
       'copilot.microsoft.com': ['copilot.microsoft.com', 'm365.cloud.microsoft'],
@@ -233,27 +260,31 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
     // Get all hostnames to toggle (either the linked group or just the single hostname)
     const hostnamesToToggle = linkedSites[hostname] ?? [hostname];
 
-    let newEnabledSites: string[];
-    if (enabled) {
-      // Add all linked hostnames
-      newEnabledSites = [...settings.enabledSites];
-      for (const site of hostnamesToToggle) {
-        if (!newEnabledSites.includes(site)) {
-          newEnabledSites.push(site);
+    // Use functional setState to avoid stale closure reads during rapid clicks
+    setSettings(prev => {
+      let newEnabledSites: string[];
+
+      if (enabled) {
+        // Add all linked hostnames, avoiding duplicates
+        newEnabledSites = [...prev.enabledSites];
+        for (const site of hostnamesToToggle) {
+          if (!newEnabledSites.includes(site)) {
+            newEnabledSites.push(site);
+          }
         }
+      } else {
+        // Remove all linked hostnames
+        newEnabledSites = prev.enabledSites.filter(
+          site => !hostnamesToToggle.includes(site)
+        );
       }
-    } else {
-      // Remove all linked hostnames
-      newEnabledSites = settings.enabledSites.filter(site => !hostnamesToToggle.includes(site));
-    }
 
-    const newSettings = {
-      ...settings,
-      enabledSites: newEnabledSites
-    };
-
-    setSettings(newSettings);
-    await saveSettings(newSettings);
+      return {
+        ...prev,
+        enabledSites: newEnabledSites
+      };
+    });
+    // Persistence now handled by debounced useEffect
   };
 
   // Handle custom site toggle
@@ -455,7 +486,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
             customSites={settings.customSites}
             siteConfigs={siteConfigs}
             interfaceMode={interfaceMode}
-            onSiteToggle={(hostname, enabled) => void handleSiteToggle(hostname, enabled)}
+            onSiteToggle={(hostname, enabled) => { handleSiteToggle(hostname, enabled); }}
             onCustomSiteToggle={(hostname, enabled) => void handleCustomSiteToggle(hostname, enabled)}
             onRemoveCustomSite={(hostname) => void handleRemoveCustomSite(hostname)}
             onAddCustomSite={(siteData) => void handleAddCustomSite(siteData as Omit<CustomSite, 'dateAdded'>)}
