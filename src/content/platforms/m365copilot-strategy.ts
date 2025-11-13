@@ -102,8 +102,8 @@ export class M365CopilotStrategy extends ReactPlatformStrategy {
    */
   private _insertIntoContentEditable(element: HTMLElement, content: string): Promise<InsertionResult> {
     try {
-      // Get or create selection
-      const selection = window.getSelection();
+      // Prepare selection - select all content for replacement
+      const selection = this._prepareSelection(element);
       if (!selection) {
         return Promise.resolve({
           success: false,
@@ -111,49 +111,110 @@ export class M365CopilotStrategy extends ReactPlatformStrategy {
         });
       }
 
-      // Select all existing content in the editor to replace it
-      const range = document.createRange();
-      range.selectNodeContents(element);
-      selection.removeAllRanges();
-      selection.addRange(range);
-
-      // Method 1: Try execCommand with selected content (works in most browsers)
-      // This will replace the selected content with the new prompt
-      const execCommandSuccess = document.execCommand('insertText', false, content);
-
-      if (execCommandSuccess) {
-        // Dispatch events that Lexical expects
-        element.dispatchEvent(new Event('input', { bubbles: true }));
-        element.dispatchEvent(new Event('change', { bubbles: true }));
-
-        this._debug('M365 Copilot contenteditable insertion successful (execCommand)');
-        return Promise.resolve({ success: true, method: 'm365copilot-contenteditable-execCommand' });
+      // Try execCommand first (better browser support)
+      const execResult = this._tryExecCommandInsertion(element, content, selection);
+      if (execResult.success) {
+        return Promise.resolve(execResult);
       }
 
-      // Method 2: Direct DOM manipulation fallback
-      // First delete all selected content (which is everything in the editor)
-      range.deleteContents();
-
-      // Insert text node
-      const textNode = document.createTextNode(content);
-      range.insertNode(textNode);
-
-      // Move cursor to end
-      range.setStartAfter(textNode);
-      range.setEndAfter(textNode);
-      selection.removeAllRanges();
-      selection.addRange(range);
-
-      // Dispatch events
-      element.dispatchEvent(new Event('input', { bubbles: true }));
-      element.dispatchEvent(new Event('change', { bubbles: true }));
-
-      this._debug('M365 Copilot contenteditable insertion successful (DOM)');
-      return Promise.resolve({ success: true, method: 'm365copilot-contenteditable-dom' });
+      // Fallback to direct DOM manipulation
+      return Promise.resolve(this._tryDOMInsertion(element, content, selection));
     } catch (error) {
       this._warn('Contenteditable insertion failed', error as Error);
       return Promise.resolve({ success: false, error: (error as Error).message });
     }
+  }
+
+  /**
+   * Dispatches input and change events for Lexical editor synchronization
+   * @private
+   */
+  private _dispatchInputEvents(element: HTMLElement): void {
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  /**
+   * Prepares selection by selecting all content in the editor
+   * This is intentional - replaces all existing content rather than inserting at cursor
+   * @private
+   * @returns Selection object or null if unavailable
+   */
+  private _prepareSelection(element: HTMLElement): Selection | null {
+    const selection = window.getSelection();
+    if (!selection) {
+      return null;
+    }
+
+    // Select all existing content in the editor to replace it
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    selection.removeAllRanges();
+    selection.addRange(range);
+
+    return selection;
+  }
+
+  /**
+   * Attempts to insert content using execCommand API
+   * This is the preferred method as it works in most browsers
+   * @private
+   * @returns Insertion result with success status and method identifier
+   */
+  private _tryExecCommandInsertion(
+    element: HTMLElement,
+    content: string,
+    _selection: Selection
+  ): InsertionResult {
+    // Try execCommand with selected content (works in most browsers)
+    // This will replace the selected content with the new prompt
+    const success = document.execCommand('insertText', false, content);
+
+    if (success) {
+      this._dispatchInputEvents(element);
+      this._debug('M365 Copilot contenteditable insertion successful (execCommand)');
+      return {
+        success: true,
+        method: 'm365copilot-contenteditable-execCommand'
+      };
+    }
+
+    return { success: false };
+  }
+
+  /**
+   * Inserts content using direct DOM manipulation as fallback
+   * Used when execCommand is not supported or fails
+   * @private
+   * @returns Insertion result with success status and method identifier
+   */
+  private _tryDOMInsertion(
+    element: HTMLElement,
+    content: string,
+    selection: Selection
+  ): InsertionResult {
+    const range = selection.getRangeAt(0);
+
+    // First delete all selected content (which is everything in the editor)
+    range.deleteContents();
+
+    // Insert text node
+    const textNode = document.createTextNode(content);
+    range.insertNode(textNode);
+
+    // Move cursor to end
+    range.setStartAfter(textNode);
+    range.setEndAfter(textNode);
+    selection.removeAllRanges();
+    selection.addRange(range);
+
+    this._dispatchInputEvents(element);
+    this._debug('M365 Copilot contenteditable insertion successful (DOM)');
+
+    return {
+      success: true,
+      method: 'm365copilot-contenteditable-dom'
+    };
   }
 
   /**

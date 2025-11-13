@@ -694,4 +694,203 @@ describe('M365CopilotStrategy', () => {
       cleanupElement(combobox);
     });
   });
+
+  describe('Helper Methods - _dispatchInputEvents', () => {
+    it('should dispatch both input and change events', () => {
+      // Arrange
+      const dispatchSpy = setupDispatchEventMock(mockLexicalEditor);
+
+      // Act
+      strategy['_dispatchInputEvents'](mockLexicalEditor);
+
+      // Assert
+      expect(dispatchSpy).toHaveBeenCalledTimes(2);
+      expect(dispatchSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'input', bubbles: true })
+      );
+      expect(dispatchSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'change', bubbles: true })
+      );
+    });
+
+    it('should dispatch events in correct order (input then change)', () => {
+      // Arrange
+      const events: string[] = [];
+      mockLexicalEditor.addEventListener('input', () => events.push('input'));
+      mockLexicalEditor.addEventListener('change', () => events.push('change'));
+
+      // Act
+      strategy['_dispatchInputEvents'](mockLexicalEditor);
+
+      // Assert
+      expect(events).toEqual(['input', 'change']);
+    });
+  });
+
+  describe('Helper Methods - _prepareSelection', () => {
+    it('should return selection object when available', () => {
+      // Arrange
+      setupGetSelectionMock(true);
+
+      // Act
+      const selection = strategy['_prepareSelection'](mockLexicalEditor);
+
+      // Assert
+      expect(selection).toBeDefined();
+      expect(selection).not.toBeNull();
+    });
+
+    it('should return null when selection is unavailable', () => {
+      // Arrange
+      setupGetSelectionMock(false);
+
+      // Act
+      const selection = strategy['_prepareSelection'](mockLexicalEditor);
+
+      // Assert
+      expect(selection).toBeNull();
+    });
+
+    it('should select all content in the element', () => {
+      // Arrange
+      const getSelectionSpy = setupGetSelectionMock(true);
+      const mockSelection = window.getSelection();
+
+      // Act
+      strategy['_prepareSelection'](mockLexicalEditor);
+
+      // Assert
+      expect(getSelectionSpy).toHaveBeenCalled();
+      expect(mockSelection?.removeAllRanges).toHaveBeenCalled();
+      expect(mockSelection?.addRange).toHaveBeenCalled();
+    });
+  });
+
+  describe('Helper Methods - _tryExecCommandInsertion', () => {
+    it('should return success when execCommand works', () => {
+      // Arrange
+      setupExecCommandMock(true);
+      const selection = setupGetSelectionMock(true);
+      const mockSelection = window.getSelection();
+      expect(mockSelection).toBeDefined();
+
+      // Act
+      const result = strategy['_tryExecCommandInsertion'](mockLexicalEditor, 'test content', mockSelection as Selection);
+
+      // Assert
+      expect(result.success).toBe(true);
+      expect(result.method).toBe('m365copilot-contenteditable-execCommand');
+    });
+
+    it('should return failure when execCommand fails', () => {
+      // Arrange
+      setupExecCommandMock(false);
+      const selection = setupGetSelectionMock(true);
+      const mockSelection = window.getSelection();
+      expect(mockSelection).toBeDefined();
+
+      // Act
+      const result = strategy['_tryExecCommandInsertion'](mockLexicalEditor, 'test content', mockSelection as Selection);
+
+      // Assert
+      expect(result.success).toBe(false);
+    });
+
+    it('should call execCommand with correct parameters', () => {
+      // Arrange
+      const execCommandSpy = setupExecCommandMock(true);
+      const selection = setupGetSelectionMock(true);
+      const mockSelection = window.getSelection();
+      expect(mockSelection).toBeDefined();
+      const content = 'Test prompt content';
+
+      // Act
+      strategy['_tryExecCommandInsertion'](mockLexicalEditor, content, mockSelection as Selection);
+
+      // Assert
+      expect(execCommandSpy).toHaveBeenCalledWith('insertText', false, content);
+    });
+
+    it('should dispatch events when successful', () => {
+      // Arrange
+      setupExecCommandMock(true);
+      const selection = setupGetSelectionMock(true);
+      const mockSelection = window.getSelection();
+      expect(mockSelection).toBeDefined();
+      const dispatchSpy = setupDispatchEventMock(mockLexicalEditor);
+
+      // Act
+      strategy['_tryExecCommandInsertion'](mockLexicalEditor, 'test', mockSelection as Selection);
+
+      // Assert
+      expect(dispatchSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it('should not dispatch events when execCommand fails', () => {
+      // Arrange
+      setupExecCommandMock(false);
+      const selection = setupGetSelectionMock(true);
+      const mockSelection = window.getSelection();
+      expect(mockSelection).toBeDefined();
+      const dispatchSpy = setupDispatchEventMock(mockLexicalEditor);
+
+      // Act
+      strategy['_tryExecCommandInsertion'](mockLexicalEditor, 'test', mockSelection as Selection);
+
+      // Assert
+      expect(dispatchSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Helper Methods - _tryDOMInsertion', () => {
+    it('should successfully insert content using DOM manipulation', () => {
+      // Arrange
+      const selection = setupGetSelectionMock(true);
+      const mockSelection = window.getSelection();
+      expect(mockSelection).toBeDefined();
+      const content = 'DOM inserted content';
+
+      // Act
+      const result = strategy['_tryDOMInsertion'](mockLexicalEditor, content, mockSelection as Selection);
+
+      // Assert
+      expect(result.success).toBe(true);
+      expect(result.method).toBe('m365copilot-contenteditable-dom');
+    });
+
+    it('should create text node with correct content', () => {
+      // Arrange
+      const selection = setupGetSelectionMock(true);
+      const mockSelection = window.getSelection();
+      expect(mockSelection).toBeDefined();
+      const content = 'Test content';
+      const createTextNodeSpy = vi.spyOn(document, 'createTextNode');
+
+      // Act
+      strategy['_tryDOMInsertion'](mockLexicalEditor, content, mockSelection as Selection);
+
+      // Assert
+      expect(createTextNodeSpy).toHaveBeenCalledWith(content);
+    });
+
+    it('should dispatch events after DOM insertion', () => {
+      // Arrange
+      const selection = setupGetSelectionMock(true);
+      const mockSelection = window.getSelection();
+      expect(mockSelection).toBeDefined();
+      const dispatchSpy = setupDispatchEventMock(mockLexicalEditor);
+
+      // Act
+      strategy['_tryDOMInsertion'](mockLexicalEditor, 'test', mockSelection as Selection);
+
+      // Assert
+      expect(dispatchSpy).toHaveBeenCalledTimes(2);
+      expect(dispatchSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'input', bubbles: true })
+      );
+      expect(dispatchSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'change', bubbles: true })
+      );
+    });
+  });
 });
