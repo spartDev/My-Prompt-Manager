@@ -7,19 +7,31 @@
 
 import { vi } from 'vitest';
 
-import type { UIElementFactory } from '../../../ui/element-factory';
+// Import and re-export shared utilities
+import {
+  cleanupElement,
+  createMockUIFactory,
+  setMockHostname,
+  setupDispatchEventMock,
+  setupNativeValueSetterMock,
+  type MockLocation,
+  type NativeValueSetterConfig
+} from './shared-fixtures';
+
+export {
+  cleanupElement,
+  createMockUIFactory,
+  setMockHostname,
+  setupDispatchEventMock,
+  setupNativeValueSetterMock,
+  type MockLocation,
+  type NativeValueSetterConfig
+};
 
 /**
  * Type for Copilot textarea variants
  */
 export type CopilotTextareaType = 'primary' | 'userInput' | 'generic';
-
-/**
- * Mock location object for hostname manipulation
- */
-export interface MockLocation {
-  hostname: string;
-}
 
 /**
  * Configuration for creating mock textareas
@@ -115,65 +127,6 @@ export function createCopilotTextareaWithConfig(
 }
 
 /**
- * Removes an element from the DOM if it has a parent
- *
- * @param element - Element to remove from DOM
- *
- * @example
- * ```typescript
- * const textarea = createCopilotTextarea('primary', true);
- * // ... test logic ...
- * cleanupElement(textarea);
- * ```
- */
-export function cleanupElement(element: HTMLElement | null): void {
-  if (element?.parentNode) {
-    element.parentNode.removeChild(element);
-  }
-}
-
-/**
- * Creates a mock UIElementFactory for Copilot tests
- *
- * @returns A mocked UIElementFactory with createCopilotIcon method
- *
- * @example
- * ```typescript
- * const mockUIFactory = createMockUIFactory();
- * const icon = strategy.createIcon(mockUIFactory);
- * expect(mockUIFactory.createCopilotIcon).toHaveBeenCalled();
- * ```
- */
-export function createMockUIFactory(): UIElementFactory {
-  return {
-    createCopilotIcon: vi.fn().mockReturnValue(document.createElement('button'))
-  } as any;
-}
-
-/**
- * Sets the mock window.location.hostname for testing
- *
- * @param hostname - Hostname to set
- * @returns The mock location object
- *
- * @example
- * ```typescript
- * setMockHostname('copilot.microsoft.com');
- * const strategy = new CopilotStrategy();
- * expect(strategy.canHandle(textarea)).toBe(true);
- * ```
- */
-export function setMockHostname(hostname: string): MockLocation {
-  const mockLocation: MockLocation = { hostname };
-  Object.defineProperty(window, 'location', {
-    value: mockLocation,
-    writable: true,
-    configurable: true
-  });
-  return mockLocation;
-}
-
-/**
  * Resets mock window.location.hostname to Copilot's default
  *
  * @returns The mock location object set to copilot.microsoft.com
@@ -186,81 +139,6 @@ export function setMockHostname(hostname: string): MockLocation {
  */
 export function resetMockHostname(): MockLocation {
   return setMockHostname('copilot.microsoft.com');
-}
-
-/**
- * Sets up mock for textarea dispatchEvent method
- *
- * @param textarea - Textarea element to mock
- * @returns The mocked dispatchEvent function
- *
- * @example
- * ```typescript
- * const textarea = createCopilotTextarea();
- * const dispatchSpy = setupDispatchEventMock(textarea);
- * await strategy.insert(textarea, 'content');
- * expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'input' }));
- * ```
- */
-export function setupDispatchEventMock(textarea: HTMLTextAreaElement): ReturnType<typeof vi.fn> {
-  const dispatchSpy = vi.spyOn(textarea, 'dispatchEvent').mockImplementation(() => true);
-  return dispatchSpy;
-}
-
-/**
- * Configuration for native value setter mock
- */
-export interface NativeValueSetterConfig {
-  /**
-   * Whether to simulate the setter being unavailable
-   */
-  unavailable?: boolean;
-}
-
-/**
- * Sets up mock for native value setter on HTMLTextAreaElement
- *
- * @param config - Configuration for the mock
- * @returns Object containing the mock setter function and restore function
- *
- * @example
- * ```typescript
- * const { mockSetter, restore } = setupNativeValueSetterMock();
- * await strategy.insert(textarea, 'content');
- * expect(mockSetter).toHaveBeenCalledWith('content');
- * restore();
- * ```
- */
-export function setupNativeValueSetterMock(
-  config: NativeValueSetterConfig = {}
-): {
-  mockSetter: ReturnType<typeof vi.fn> | null;
-  restore: () => void;
-} {
-  const { unavailable = false } = config;
-  const originalGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
-  const mockSetter = unavailable ? null : vi.fn();
-
-  Object.getOwnPropertyDescriptor = vi.fn((obj: any, prop: PropertyKey) => {
-    if (obj === HTMLTextAreaElement.prototype && prop === 'value') {
-      if (unavailable) {
-        return undefined;
-      }
-      return {
-        set: mockSetter,
-        get: vi.fn(),
-        enumerable: true,
-        configurable: true
-      };
-    }
-    return originalGetOwnPropertyDescriptor.call(Object, obj, prop);
-  }) as any;
-
-  const restore = () => {
-    Object.getOwnPropertyDescriptor = originalGetOwnPropertyDescriptor;
-  };
-
-  return { mockSetter, restore };
 }
 
 /**

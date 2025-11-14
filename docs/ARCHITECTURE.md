@@ -86,14 +86,17 @@ My Prompt Manager is a Chrome extension built with a modular, extensible archite
 **File Structure**:
 ```
 src/content/platforms/
-├── base-strategy.ts           # Abstract base class
-├── claude-strategy.ts         # Claude.ai implementation
-├── chatgpt-strategy.ts        # ChatGPT implementation
-├── gemini-strategy.ts         # Google Gemini implementation
-├── mistral-strategy.ts        # Mistral.ai implementation
-├── perplexity-strategy.ts     # Perplexity implementation
-├── default-strategy.ts        # Fallback for unknown sites
-└── platform-manager.ts        # Strategy orchestration
+├── base-strategy.ts            # Abstract base class
+├── react-platform-strategy.ts  # React-specific base class
+├── claude-strategy.ts          # Claude.ai implementation
+├── chatgpt-strategy.ts         # ChatGPT implementation
+├── gemini-strategy.ts          # Google Gemini implementation
+├── mistral-strategy.ts         # Mistral.ai implementation
+├── perplexity-strategy.ts      # Perplexity implementation
+├── copilot-strategy.ts         # Microsoft Copilot (extends React)
+├── m365copilot-strategy.ts     # M365 Copilot (extends React)
+├── default-strategy.ts         # Fallback for unknown sites
+└── platform-manager.ts         # Strategy orchestration
 ```
 
 **Key Interfaces**:
@@ -123,6 +126,62 @@ export abstract class PlatformStrategy {
 - Easy to add new platforms without modifying existing code (Open/Closed Principle)
 - Each strategy encapsulates platform-specific quirks
 - Testable in isolation with dependency injection
+
+#### React Platform Strategy (Specialized Base Class)
+
+**Purpose**: Provide shared functionality for React-based AI platforms
+
+**When to Use**: Platforms that use React for their input controls (e.g., Microsoft Copilot, M365 Copilot)
+
+**Implementation**: `ReactPlatformStrategy` extends `PlatformStrategy` and provides:
+
+1. **Native Value Setter Caching**: Caches React's native HTMLTextAreaElement value setter for 90% performance improvement
+2. **Content Validation**: Centralized validation and sanitization logic
+3. **React-Compatible Insertion**: Handles React's synthetic events and state updates
+
+**Example**:
+
+```typescript
+// copilot-strategy.ts
+import { ReactPlatformStrategy } from './react-platform-strategy';
+import { MAX_CONTENT_LENGTHS } from './constants';
+
+export class CopilotStrategy extends ReactPlatformStrategy {
+  constructor(hostname?: string) {
+    super('copilot', 80, { selectors, buttonContainerSelector }, hostname);
+
+    // Initialize native value setter cache
+    ReactPlatformStrategy.initializeNativeValueSetter();
+  }
+
+  async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
+    // Validate using base class method
+    const validation = this.validateAndSanitize(content, MAX_CONTENT_LENGTHS.COPILOT);
+    if (!validation.valid || !validation.sanitized) {
+      return await Promise.resolve({ success: false, error: validation.error });
+    }
+
+    // Insert using base class React-compatible method
+    return await this.insertIntoReactTextarea(
+      element as HTMLTextAreaElement,
+      validation.sanitized,
+      'Copilot React',
+      'copilot-react'
+    );
+  }
+}
+```
+
+**Shared Methods**:
+- `initializeNativeValueSetter()`: Static initialization method
+- `validateAndSanitize(content, maxLength)`: Content validation and sanitization
+- `insertIntoReactTextarea(element, content, platformName, methodName?)`: React-compatible textarea insertion
+
+**Benefits**:
+- **Code Reuse**: 120+ lines eliminated across Copilot strategies
+- **Single Source of Truth**: React patterns centralized
+- **Future Scalability**: Easy to add new React-based platforms
+- **Consistent Behavior**: All React platforms use same validated insertion logic
 
 ---
 
@@ -484,9 +543,49 @@ export const SUPPORTED_PLATFORMS = {
 
 ---
 
-#### 2. Create Strategy Class
+#### 2. Choose the Right Base Class
+
+**Decision Tree**: Which base class should your strategy extend?
+
+```
+Is the platform's input field powered by React?
+│
+├─ YES → Use ReactPlatformStrategy
+│   │
+│   └─ Examples:
+│       • Microsoft Copilot (copilot.microsoft.com)
+│       • M365 Copilot (m365.cloud.microsoft)
+│       • Any platform with React-managed textarea/input
+│   │
+│   └─ Benefits:
+│       • Automatic React event handling
+│       • Native value setter caching (~90% faster)
+│       • Built-in content validation
+│
+└─ NO → Use PlatformStrategy
+    │
+    └─ Examples:
+        • Claude (claude.ai) - Custom contenteditable
+        • ChatGPT (chatgpt.com) - Custom ProseMirror editor
+        • Gemini (gemini.google.com) - Quill editor
+    │
+    └─ Implementation:
+        • Full manual control over insertion logic
+        • No React-specific assumptions
+```
+
+**How to Detect React Input Fields**:
+1. Check browser DevTools: Look for `__reactFiber$` or `__reactProps$` on the textarea element
+2. Monitor value changes: React inputs often use property setters instead of native DOM events
+3. Test insertion: If `element.value = 'test'` doesn't trigger UI updates, it's likely React-controlled
+
+---
+
+#### 3a. Create Strategy Class (Standard Platform)
 
 **File**: `src/content/platforms/newplatform-strategy.ts`
+
+**Use this template for non-React platforms**:
 
 ```typescript
 import { PlatformStrategy } from './base-strategy';
@@ -670,7 +769,112 @@ export class NewPlatformStrategy extends PlatformStrategy {
 
 ---
 
-#### 3. Register Strategy in Factory
+#### 3b. Create Strategy Class (React Platform)
+
+**File**: `src/content/platforms/newreactplatform-strategy.ts`
+
+**Use this template for React-based platforms**:
+
+```typescript
+import { getPlatformById } from '../../config/platforms';
+import type { InsertionResult } from '../types/index';
+import type { UIElementFactory } from '../ui/element-factory';
+
+import { MAX_CONTENT_LENGTHS } from './constants';
+import { ReactPlatformStrategy } from './react-platform-strategy';
+
+export class NewReactPlatformStrategy extends ReactPlatformStrategy {
+  constructor(hostname?: string) {
+    const platform = getPlatformById('newreactplatform');
+
+    super('newreactplatform', 85, {
+      selectors: platform?.selectors || [
+        'textarea[data-testid="input"]',
+        'textarea.react-input'
+      ],
+      buttonContainerSelector: platform?.buttonContainerSelector,
+      priority: 85
+    }, hostname);
+
+    // Initialize React native value setter cache (REQUIRED)
+    ReactPlatformStrategy.initializeNativeValueSetter();
+  }
+
+  /**
+   * Determines if this strategy can handle the given element
+   */
+  canHandle(element: HTMLElement): boolean {
+    const isCorrectHostname = this.hostname === getPlatformById('newreactplatform')?.hostname;
+    const isTextarea = element.tagName === 'TEXTAREA';
+
+    return isCorrectHostname && isTextarea;
+  }
+
+  /**
+   * Inserts content using React-compatible methods
+   */
+  async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
+    try {
+      // Validate and sanitize using base class method
+      const validation = this.validateAndSanitize(content, MAX_CONTENT_LENGTHS.COPILOT);
+      if (!validation.valid || !validation.sanitized) {
+        return await Promise.resolve({
+          success: false,
+          error: validation.error || 'Validation failed'
+        });
+      }
+
+      // Insert using base class React-compatible method
+      return await this.insertIntoReactTextarea(
+        element as HTMLTextAreaElement,
+        validation.sanitized,
+        'NewReactPlatform',
+        'newreactplatform-textarea'
+      );
+    } catch (error) {
+      this._warn('React insertion failed', error as Error);
+      return await Promise.resolve({
+        success: false,
+        error: (error as Error).message
+      });
+    }
+  }
+
+  /**
+   * Gets selectors for finding input elements
+   */
+  getSelectors(): string[] {
+    return this.config?.selectors || [];
+  }
+
+  /**
+   * Creates platform-specific icon (optional)
+   */
+  createIcon(uiFactory: UIElementFactory): HTMLElement | null {
+    const { element, cleanup } = uiFactory.createDefaultIcon();
+    (element as HTMLElement & { __cleanup?: () => void }).__cleanup = cleanup;
+    return element;
+  }
+}
+```
+
+**Key Points for React Platforms**:
+1. **Must call** `ReactPlatformStrategy.initializeNativeValueSetter()` in constructor
+2. **Use** `validateAndSanitize()` for content validation
+3. **Use** `insertIntoReactTextarea()` for insertion (handles all React events)
+4. **Handle errors** with try-catch and proper async/await
+5. **Custom logging**: Pass platform name to `insertIntoReactTextarea()` for branded logs
+
+**What You Get for Free**:
+- ✅ React event handling (input, change)
+- ✅ Native value setter caching (~90% performance boost)
+- ✅ Content validation and sanitization
+- ✅ Consistent error handling
+- ✅ Security: Control character removal
+
+---
+
+#### 4. Register Strategy in Factory
 
 **File**: `src/content/platforms/platform-manager.ts`
 
@@ -697,7 +901,7 @@ export class PlatformManager {
 
 ---
 
-#### 4. Create Platform-Specific Icon (Optional)
+#### 5. Create Platform-Specific Icon (Optional)
 
 **File**: `src/content/ui/element-factory.ts`
 
@@ -752,7 +956,7 @@ export const NewPlatformIcon: FC<NewPlatformIconProps> = ({
 
 ---
 
-#### 5. Update Settings UI
+#### 6. Update Settings UI
 
 **File**: `src/components/SettingsView.tsx`
 
@@ -776,7 +980,7 @@ const SettingsView: FC<SettingsViewProps> = ({ ... }) => {
 
 ---
 
-#### 6. Update Manifest Permissions
+#### 7. Update Manifest Permissions
 
 **File**: `manifest.json`
 
@@ -804,7 +1008,7 @@ const SettingsView: FC<SettingsViewProps> = ({ ... }) => {
 
 ---
 
-#### 7. Write Comprehensive Tests
+#### 8. Write Comprehensive Tests
 
 **File**: `src/content/platforms/__tests__/newplatform-strategy.test.ts`
 
@@ -909,7 +1113,7 @@ describe('NewPlatformStrategy', () => {
 
 ---
 
-#### 8. Create Manual QA Document
+#### 9. Create Manual QA Document
 
 **File**: `docs/NEWPLATFORM_MANUAL_QA.md`
 
@@ -956,7 +1160,7 @@ describe('NewPlatformStrategy', () => {
 
 ---
 
-#### 9. Build and Test
+#### 10. Build and Test
 
 ```bash
 # Run unit tests
@@ -978,7 +1182,7 @@ npm run build
 
 ---
 
-#### 10. Update Documentation
+#### 11. Update Documentation
 
 **Files to update**:
 - `README.md` - Add to supported platforms table

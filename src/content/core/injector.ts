@@ -68,6 +68,7 @@ export class PromptLibraryInjector {
   private lastCacheTime: number;
   private readonly cacheTimeout: number = 2000;
   private floatingUICleanups: WeakMap<HTMLElement, () => void>;
+  private iconCleanups: WeakMap<HTMLElement, () => void>;
 
   constructor() {
     const hostname = window.location.hostname || '';
@@ -124,6 +125,9 @@ export class PromptLibraryInjector {
 
     // Floating UI cleanup tracking (prevents memory leaks)
     this.floatingUICleanups = new WeakMap();
+
+    // Icon cleanup tracking (prevents MutationObserver memory leaks)
+    this.iconCleanups = new WeakMap();
 
     // Note: initialize() is now called externally to handle async site enablement checking
   }
@@ -687,6 +691,24 @@ export class PromptLibraryInjector {
         }
       });
 
+      // Clean up Copilot icon MutationObservers
+      const copilotIcons = document.querySelectorAll('.prompt-library-copilot-icon');
+      let copilotIconsCleanedUp = 0;
+      copilotIcons.forEach(icon => {
+        try {
+          // Call cleanup function if it exists (disconnects MutationObserver)
+          const cleanup = this.iconCleanups.get(icon as HTMLElement);
+          if (cleanup && typeof cleanup === 'function') {
+            cleanup();
+            this.iconCleanups.delete(icon as HTMLElement);
+            copilotIconsCleanedUp++;
+          }
+        } catch (error) {
+          // Log unexpected errors during cleanup
+          debug('Failed to clean up Copilot icon observer', { error: String(error) });
+        }
+      });
+
       // Clean up Floating UI elements and subscriptions
       const floatingUIIcons = document.querySelectorAll('[data-positioning-method="floating-ui"]');
       let floatingUICleanedUp = 0;
@@ -733,6 +755,7 @@ export class PromptLibraryInjector {
         floatingIconsRemoved: floatingIcons.length,
         cssAnchorIconsRemoved: cssAnchorIcons.length,
         cssAnchorCleanedUp,
+        copilotIconsCleanedUp,
         floatingUIIconsRemoved: floatingUIIcons.length,
         floatingUICleanedUp,
         selectorsRemoved: existingSelectors.length
@@ -765,6 +788,13 @@ export class PromptLibraryInjector {
 
       this.state.icon = icon;
       debug('Icon created successfully');
+
+      // Store cleanup function if present (for Copilot icons with MutationObserver)
+      const iconWithCleanup = icon as HTMLElement & { __cleanup?: () => void };
+      if (iconWithCleanup.__cleanup) {
+        this.iconCleanups.set(icon, iconWithCleanup.__cleanup);
+        delete iconWithCleanup.__cleanup; // Clean up the property reference
+      }
 
       // Mark icon with identifying attributes for cleanup (using non-conflicting class)
       icon.classList.add('prompt-library-cleanup-target');

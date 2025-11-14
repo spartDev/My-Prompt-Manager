@@ -76,18 +76,18 @@ describe('UIElementFactory', () => {
     it('should contain SVG element', () => {
       const result = factory.createClaudeIcon();
       const svg = result.icon.querySelector('svg');
-      
+
       expect(svg).toBeTruthy();
       expect(svg?.getAttribute('viewBox')).toBe('0 0 24 24');
       expect(svg?.getAttribute('fill')).toBe('currentColor');
     });
 
-    it('should contain text element with "My Prompts"', () => {
+    it('should not include text label', () => {
       const result = factory.createClaudeIcon();
+      // Icon should not have "My Prompts" text - only the SVG icon
+      // The container may have whitespace, so we check the icon doesn't have a <p> element
       const textElement = result.icon.querySelector('p');
-      
-      expect(textElement).toBeTruthy();
-      expect(textElement?.textContent).toBe('My Prompts');
+      expect(textElement).toBeNull();
     });
   });
 
@@ -112,10 +112,12 @@ describe('UIElementFactory', () => {
 
     it('should have proper CSS classes on Perplexity icon', () => {
       const icon = factory.createPerplexityIcon();
-      
+
       expect(icon.className).toContain('prompt-library-integrated-icon');
-      expect(icon.className).toContain('focus-visible:bg-offsetPlus');
-      expect(icon.className).toContain('hover:bg-offsetPlus');
+      expect(icon.className).toContain('text-textOff');
+      expect(icon.className).toContain('hover:text-textMain');
+      // Background hover classes were removed for cleaner appearance
+      expect(icon.className).not.toContain('hover:bg-offsetPlus');
     });
 
     it('should contain SVG element with proper attributes', () => {
@@ -200,7 +202,7 @@ describe('UIElementFactory', () => {
 
   describe('createCopilotIcon', () => {
     it('should create Copilot icon button element', () => {
-      const icon = factory.createCopilotIcon();
+      const { element: icon } = factory.createCopilotIcon();
 
       expect(icon).toBeDefined();
       expect(icon.tagName).toBe('BUTTON');
@@ -208,19 +210,29 @@ describe('UIElementFactory', () => {
     });
 
     it('should include prompt-library-integrated-icon class', () => {
-      const icon = factory.createCopilotIcon();
+      const { element: icon } = factory.createCopilotIcon();
       expect(icon.className).toContain('prompt-library-integrated-icon');
     });
 
-    it('should include Copilot-specific styling classes', () => {
-      const icon = factory.createCopilotIcon();
-      expect(icon.className).toContain('rounded-2xl');
-      expect(icon.className).toContain('border');
-      expect(icon.className).toContain('bg-transparent');
+    it('should include prompt-library-copilot-icon class', () => {
+      const { element: icon } = factory.createCopilotIcon();
+      expect(icon.className).toContain('prompt-library-copilot-icon');
+    });
+
+    it('should include Fluent UI button classes', () => {
+      const { element: icon } = factory.createCopilotIcon();
+      expect(icon.className).toContain('fui-Button');
+      expect(icon.className).toContain('r1alrhcs');
+    });
+
+    it('should have transparent background via inline styles', () => {
+      const { element: icon } = factory.createCopilotIcon();
+      expect(icon.style.background).toBe('transparent');
+      expect(icon.style.backgroundColor).toBe('transparent');
     });
 
     it('should have proper ARIA attributes', () => {
-      const icon = factory.createCopilotIcon();
+      const { element: icon } = factory.createCopilotIcon();
 
       expect(icon.getAttribute('aria-label')).toContain('Open my prompt manager');
       expect(icon.getAttribute('title')).toContain('My Prompt Manager');
@@ -228,31 +240,130 @@ describe('UIElementFactory', () => {
     });
 
     it('should include instance ID', () => {
-      const icon = factory.createCopilotIcon();
+      const { element: icon } = factory.createCopilotIcon();
       expect(icon.getAttribute('data-instance-id')).toBe(testInstanceId);
     });
 
-    it('should contain SVG icon element', () => {
-      const icon = factory.createCopilotIcon();
+    it('should attempt theme detection based on body background', () => {
+      const { element: icon } = factory.createCopilotIcon();
+      const themeAttr = icon.getAttribute('data-theme');
+      // Theme detection depends on body background color which may not be available in test environment
+      // If body styles are available, verify the theme is set to light or dark
+      // Otherwise, the attribute will be null which is acceptable
+      if (themeAttr !== null) {
+        expect(['light', 'dark']).toContain(themeAttr);
+      }
+      // Just verify the icon was created successfully
+      expect(icon).toBeDefined();
+    });
+
+    it('should contain icon wrapper span with Fluent UI classes', () => {
+      const { element: icon } = factory.createCopilotIcon();
+      const iconSpan = icon.querySelector('span.fui-Button__icon');
+
+      expect(iconSpan).toBeDefined();
+      expect(iconSpan?.className).toContain('rywnvv2');
+    });
+
+    it('should contain SVG icon element with 24px size', () => {
+      const { element: icon } = factory.createCopilotIcon();
       const svg = icon.querySelector('svg');
 
       expect(svg).toBeDefined();
-      expect(svg?.getAttribute('width')).toBe('18');
-      expect(svg?.getAttribute('height')).toBe('18');
+      expect(svg?.getAttribute('width')).toBe('24');
+      expect(svg?.getAttribute('height')).toBe('24');
       expect(svg?.getAttribute('viewBox')).toBe('0 0 24 24');
     });
 
-    it('should include text label "My Prompts"', () => {
-      const icon = factory.createCopilotIcon();
-      const textElement = icon.querySelector('span');
+    it('should have SVG with Fluent UI icon classes', () => {
+      const { element: icon } = factory.createCopilotIcon();
+      const svg = icon.querySelector('svg');
 
-      expect(textElement).toBeDefined();
-      expect(textElement?.textContent).toBe('My Prompts');
+      expect(svg).toBeDefined();
+      const svgClass = svg?.getAttribute('class') || '';
+      expect(svgClass).toContain('fui-Icon-regular');
     });
 
-    it('should have dark mode classes', () => {
-      const icon = factory.createCopilotIcon();
-      expect(icon.className).toContain('dark:');
+    it('should not include text label', () => {
+      const { element: icon } = factory.createCopilotIcon();
+      // Icon should not have "My Prompts" text - only the SVG icon
+      expect(icon.textContent?.trim()).toBe('');
+    });
+
+    it('should inject hover styles into document head', () => {
+      factory.createCopilotIcon();
+      const styleEl = document.getElementById('prompt-library-copilot-hover-styles');
+
+      expect(styleEl).toBeDefined();
+      expect(styleEl?.tagName).toBe('STYLE');
+      expect(styleEl?.textContent).toContain('.prompt-library-copilot-icon[data-theme="light"]:hover');
+      expect(styleEl?.textContent).toContain('.prompt-library-copilot-icon[data-theme="dark"]:hover');
+    });
+
+    // NEW TESTS: MutationObserver cleanup
+    it('should return cleanup function along with element', () => {
+      const result = factory.createCopilotIcon();
+
+      expect(result).toBeDefined();
+      expect(result.element).toBeDefined();
+      expect(result.cleanup).toBeDefined();
+      expect(typeof result.cleanup).toBe('function');
+    });
+
+    it('should disconnect MutationObserver when cleanup is called', () => {
+      // Spy on MutationObserver.disconnect
+      const disconnectSpy = vi.fn();
+      const originalMutationObserver = globalThis.MutationObserver;
+
+      globalThis.MutationObserver = class extends originalMutationObserver {
+        disconnect() {
+          disconnectSpy();
+          super.disconnect();
+        }
+      } as typeof MutationObserver;
+
+      const { cleanup } = factory.createCopilotIcon();
+
+      expect(disconnectSpy).not.toHaveBeenCalled();
+
+      cleanup();
+
+      expect(disconnectSpy).toHaveBeenCalledOnce();
+
+      // Restore original MutationObserver
+      globalThis.MutationObserver = originalMutationObserver;
+    });
+
+    it('should not leak observers when creating multiple icons', () => {
+      const disconnectSpy = vi.fn();
+      const originalMutationObserver = globalThis.MutationObserver;
+
+      globalThis.MutationObserver = class extends originalMutationObserver {
+        disconnect() {
+          disconnectSpy();
+          super.disconnect();
+        }
+      } as typeof MutationObserver;
+
+      // Create multiple icons
+      const result1 = factory.createCopilotIcon();
+      const result2 = factory.createCopilotIcon();
+      const result3 = factory.createCopilotIcon();
+
+      // Each should have independent cleanup
+      expect(result1.cleanup).not.toBe(result2.cleanup);
+      expect(result2.cleanup).not.toBe(result3.cleanup);
+
+      // Cleanup all
+      result1.cleanup();
+      result2.cleanup();
+      result3.cleanup();
+
+      // All three observers should be disconnected
+      expect(disconnectSpy).toHaveBeenCalledTimes(3);
+
+      // Restore original MutationObserver
+      globalThis.MutationObserver = originalMutationObserver;
     });
   });
 

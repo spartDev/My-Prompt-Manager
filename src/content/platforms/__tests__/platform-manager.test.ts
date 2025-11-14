@@ -189,7 +189,10 @@ describe('PlatformManager', () => {
     mockElement = document.createElement('div');
     mockUIFactory = {
       createFloatingIcon: vi.fn().mockReturnValue(document.createElement('button')),
-      createCopilotIcon: vi.fn().mockReturnValue(document.createElement('button')),
+      createCopilotIcon: vi.fn().mockReturnValue({
+        element: document.createElement('button'),
+        cleanup: vi.fn()
+      }),
       createGeminiIcon: vi.fn().mockReturnValue(document.createElement('button')),
       createMistralIcon: vi.fn().mockReturnValue(document.createElement('button'))
     } as any;

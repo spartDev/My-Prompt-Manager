@@ -157,13 +157,13 @@ describe('SettingsView', () => {
 
     await waitFor(() => {
       // enabledSites should match the default platforms sorted by priority (highest first)
-      // Claude (100), ChatGPT (90), Mistral (85), Gemini (85), Perplexity (80), Copilot (80)
+      // Claude (100), ChatGPT (90), Mistral (85), Gemini (85), Perplexity (80), Copilot (80), M365Copilot (80)
       // Note: When priorities are equal, order depends on Object.values() iteration
       const call = (chromeMock.storage.local.set as Mock).mock.calls[0][0];
       const enabledSites = call.promptLibrarySettings.enabledSites;
 
       // Verify count
-      expect(enabledSites).toHaveLength(6);
+      expect(enabledSites).toHaveLength(7);
 
       // Verify exact order based on priority (highest first)
       expect(enabledSites[0]).toBe('claude.ai');        // Priority 100
@@ -171,9 +171,10 @@ describe('SettingsView', () => {
       // Priorities 85: mistral comes before gemini in SUPPORTED_PLATFORMS object order
       expect(enabledSites[2]).toBe('chat.mistral.ai');  // Priority 85
       expect(enabledSites[3]).toBe('gemini.google.com'); // Priority 85
-      // Priorities 80: perplexity comes before copilot in SUPPORTED_PLATFORMS object order
+      // Priorities 80: perplexity, copilot, m365copilot in SUPPORTED_PLATFORMS object order
       expect(enabledSites[4]).toBe('www.perplexity.ai'); // Priority 80
       expect(enabledSites[5]).toBe('copilot.microsoft.com'); // Priority 80
+      expect(enabledSites[6]).toBe('m365.cloud.microsoft'); // Priority 80
 
       expect(call.promptLibrarySettings.customSites).toEqual([]);
       expect(call.promptLibrarySettings.debugMode).toBe(false);

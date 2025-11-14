@@ -149,8 +149,11 @@ describe('CopilotStrategy', () => {
     it('should use native value setter when available', async () => {
       const { mockSetter, restore } = setupNativeValueSetterMock();
 
+      // Import ReactPlatformStrategy to access the static cache
+      const { ReactPlatformStrategy } = await import('../react-platform-strategy');
+
       // Reset cached setter and create new strategy to pick up mocked descriptor
-      (CopilotStrategy as any).nativeValueSetter = null;
+      (ReactPlatformStrategy as any).nativeValueSetter = null;
       const testStrategy = new CopilotStrategy();
 
       await testStrategy.insert(mockTextarea, 'test content');
@@ -160,14 +163,17 @@ describe('CopilotStrategy', () => {
       // Restore
       restore();
       // Reset cache for subsequent tests
-      (CopilotStrategy as any).nativeValueSetter = null;
+      (ReactPlatformStrategy as any).nativeValueSetter = null;
     });
 
     it('should handle case when native value setter is not available', async () => {
       const { restore } = setupNativeValueSetterMock({ unavailable: true });
 
+      // Import ReactPlatformStrategy to access the static cache
+      const { ReactPlatformStrategy } = await import('../react-platform-strategy');
+
       // Reset cached setter and create new strategy to pick up mocked descriptor
-      (CopilotStrategy as any).nativeValueSetter = null;
+      (ReactPlatformStrategy as any).nativeValueSetter = null;
       const testStrategy = new CopilotStrategy();
 
       const result = await testStrategy.insert(mockTextarea, 'test content');
@@ -178,7 +184,7 @@ describe('CopilotStrategy', () => {
       // Restore
       restore();
       // Reset cache for subsequent tests
-      (CopilotStrategy as any).nativeValueSetter = null;
+      (ReactPlatformStrategy as any).nativeValueSetter = null;
     });
 
     it('should handle errors gracefully', async () => {
