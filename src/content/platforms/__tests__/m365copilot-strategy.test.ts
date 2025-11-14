@@ -770,7 +770,7 @@ describe('M365CopilotStrategy', () => {
     it('should return success when execCommand works', () => {
       // Arrange
       setupExecCommandMock(true);
-      const selection = setupGetSelectionMock(true);
+      setupGetSelectionMock(true);
       const mockSelection = window.getSelection();
       expect(mockSelection).toBeDefined();
 
@@ -785,7 +785,7 @@ describe('M365CopilotStrategy', () => {
     it('should return failure when execCommand fails', () => {
       // Arrange
       setupExecCommandMock(false);
-      const selection = setupGetSelectionMock(true);
+      setupGetSelectionMock(true);
       const mockSelection = window.getSelection();
       expect(mockSelection).toBeDefined();
 
@@ -799,7 +799,7 @@ describe('M365CopilotStrategy', () => {
     it('should call execCommand with correct parameters', () => {
       // Arrange
       const execCommandSpy = setupExecCommandMock(true);
-      const selection = setupGetSelectionMock(true);
+      setupGetSelectionMock(true);
       const mockSelection = window.getSelection();
       expect(mockSelection).toBeDefined();
       const content = 'Test prompt content';
@@ -814,7 +814,7 @@ describe('M365CopilotStrategy', () => {
     it('should dispatch events when successful', () => {
       // Arrange
       setupExecCommandMock(true);
-      const selection = setupGetSelectionMock(true);
+      setupGetSelectionMock(true);
       const mockSelection = window.getSelection();
       expect(mockSelection).toBeDefined();
       const dispatchSpy = setupDispatchEventMock(mockLexicalEditor);
@@ -829,7 +829,7 @@ describe('M365CopilotStrategy', () => {
     it('should not dispatch events when execCommand fails', () => {
       // Arrange
       setupExecCommandMock(false);
-      const selection = setupGetSelectionMock(true);
+      setupGetSelectionMock(true);
       const mockSelection = window.getSelection();
       expect(mockSelection).toBeDefined();
       const dispatchSpy = setupDispatchEventMock(mockLexicalEditor);
@@ -845,7 +845,7 @@ describe('M365CopilotStrategy', () => {
   describe('Helper Methods - _tryDOMInsertion', () => {
     it('should successfully insert content using DOM manipulation', () => {
       // Arrange
-      const selection = setupGetSelectionMock(true);
+      setupGetSelectionMock(true);
       const mockSelection = window.getSelection();
       expect(mockSelection).toBeDefined();
       const content = 'DOM inserted content';
@@ -860,7 +860,7 @@ describe('M365CopilotStrategy', () => {
 
     it('should create text node with correct content', () => {
       // Arrange
-      const selection = setupGetSelectionMock(true);
+      setupGetSelectionMock(true);
       const mockSelection = window.getSelection();
       expect(mockSelection).toBeDefined();
       const content = 'Test content';
@@ -875,7 +875,7 @@ describe('M365CopilotStrategy', () => {
 
     it('should dispatch events after DOM insertion', () => {
       // Arrange
-      const selection = setupGetSelectionMock(true);
+      setupGetSelectionMock(true);
       const mockSelection = window.getSelection();
       expect(mockSelection).toBeDefined();
       const dispatchSpy = setupDispatchEventMock(mockLexicalEditor);

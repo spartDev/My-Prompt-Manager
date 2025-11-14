@@ -291,7 +291,7 @@ describe('UIElementFactory', () => {
     });
 
     it('should inject hover styles into document head', () => {
-      const { element: icon } = factory.createCopilotIcon();
+      factory.createCopilotIcon();
       const styleEl = document.getElementById('prompt-library-copilot-hover-styles');
 
       expect(styleEl).toBeDefined();

@@ -7,8 +7,6 @@
 
 import { vi } from 'vitest';
 
-import type { UIElementFactory } from '../../../ui/element-factory';
-
 // Import and re-export shared utilities
 import {
   cleanupElement,
