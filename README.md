@@ -1,9 +1,9 @@
 # My Prompt Manager - Chrome Extension
 
-[![Version](https://img.shields.io/badge/version-1.8.0-blue.svg)](https://github.com/spartDev/My-Prompt-Manager)
+[![Version](https://img.shields.io/badge/version-1.8.1-blue.svg)](https://github.com/spartDev/My-Prompt-Manager)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Chrome](https://img.shields.io/badge/Chrome-114%2B-yellow.svg)](https://www.google.com/chrome/)
-[![Tests](https://img.shields.io/badge/tests-1169%20passing-brightgreen.svg)](https://github.com/spartDev/My-Prompt-Manager)
+[![Tests](https://img.shields.io/badge/tests-1453%20passing-brightgreen.svg)](https://github.com/spartDev/My-Prompt-Manager)
 
 Transform your AI interactions with a powerful personal prompt library that integrates seamlessly with Claude, ChatGPT, Gemini, and Perplexity. Store, organize, share, and instantly insert your best prompts with one click.
 
@@ -52,11 +52,11 @@ See our [Platform Integration Guide](docs/PLATFORM_INTEGRATION.md) to add your o
 | **React** | UI Framework | 19.2.0 |
 | **TypeScript** | Type Safety | 5.9.3 |
 | **Tailwind CSS** | Styling | 3.4.18 |
-| **Vite** | Build Tool | 7.1.11 |
-| **Vitest** | Testing Framework | 3.2.4 |
+| **Vite** | Build Tool | 7.2.2 |
+| **Vitest** | Testing Framework | 4.0.5 |
 | **DOMPurify** | XSS Protection | 3.3.0 |
 | **Husky** | Git Hooks | 9.1.7 |
-| **@crxjs/vite-plugin** | Chrome Extension Support | 2.2.0 |
+| **@crxjs/vite-plugin** | Chrome Extension Support | 2.2.1 |
 
 ## 📦 Installation
 
@@ -112,7 +112,7 @@ See our [Platform Integration Guide](docs/PLATFORM_INTEGRATION.md) to add your o
 |---------|-------------|--------|
 | `npm run dev` | Start development server with HMR | Development |
 | `npm run build` | Create production build | Deployment |
-| `npm test` | Run test suite (1169+ tests) | Testing |
+| `npm test` | Run test suite (1453+ tests) | Testing |
 | `npm run test:ui` | Run tests with Vitest UI | Interactive Testing |
 | `npm run test:coverage` | Generate coverage report | Code Coverage |
 | `npm run lint` | Run ESLint checks | Code Quality |
@@ -224,7 +224,7 @@ The extension automatically detects your system theme preference. You can also t
 
 ## 🧪 Testing
 
-The project includes a comprehensive test suite with 1169+ tests across 56 test files.
+The project includes a comprehensive test suite with 1453+ tests across 63 test files.
 
 ### Running Tests
 
@@ -264,7 +264,7 @@ npm test -- src/content/platforms/__tests__/claude-strategy.test.ts
    ```bash
    npm run package
    ```
-   This creates `prompt-library-extension-v1.8.0.zip`
+   This creates `prompt-library-extension-v1.8.1.zip`
 
 4. **Upload to Chrome Web Store:**
    - Go to [Chrome Web Store Developer Dashboard](https://chrome.google.com/webstore/developer/dashboard)

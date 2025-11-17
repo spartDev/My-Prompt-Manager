@@ -415,6 +415,47 @@ const setupDomMocks = (): void => {
     document.execCommand = vi.fn().mockReturnValue(false) as unknown as typeof document.execCommand;
   }
 
+  // Mock localStorage if not available or missing methods
+  const localStorageMock: Storage = {
+    length: 0,
+    clear: vi.fn(() => {
+      const keys = Object.keys(localStorageMock);
+      keys.forEach(key => {
+        if (key !== 'clear' && key !== 'getItem' && key !== 'setItem' && key !== 'removeItem' && key !== 'key' && key !== 'length') {
+          Reflect.deleteProperty(localStorageMock, key);
+        }
+      });
+      (localStorageMock as any).length = 0;
+    }),
+    getItem: vi.fn((key: string) => {
+      return (localStorageMock as any)[key] || null;
+    }),
+    setItem: vi.fn((key: string, value: string) => {
+      (localStorageMock as any)[key] = value;
+      (localStorageMock as any).length = Object.keys(localStorageMock).filter(k =>
+        k !== 'clear' && k !== 'getItem' && k !== 'setItem' && k !== 'removeItem' && k !== 'key' && k !== 'length'
+      ).length;
+    }),
+    removeItem: vi.fn((key: string) => {
+      Reflect.deleteProperty(localStorageMock, key);
+      (localStorageMock as any).length = Object.keys(localStorageMock).filter(k =>
+        k !== 'clear' && k !== 'getItem' && k !== 'setItem' && k !== 'removeItem' && k !== 'key' && k !== 'length'
+      ).length;
+    }),
+    key: vi.fn((index: number) => {
+      const keys = Object.keys(localStorageMock).filter(k =>
+        k !== 'clear' && k !== 'getItem' && k !== 'setItem' && k !== 'removeItem' && k !== 'key' && k !== 'length'
+      );
+      return keys[index] || null;
+    })
+  };
+
+  Object.defineProperty(globalThis, 'localStorage', {
+    value: localStorageMock,
+    writable: true,
+    configurable: true
+  });
+
   Object.defineProperty(globalThis, 'fetch', {
     value: vi.fn().mockResolvedValue({ ok: true }) as typeof fetch,
     writable: true,

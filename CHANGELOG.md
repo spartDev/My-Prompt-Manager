@@ -1,6 +1,37 @@
 ## [Unreleased]
 
 
+## [1.8.1] - 2025-11-17
+
+
+### 🐛 Fixed
+
+-  Add Microsoft 365 Copilot support and enhance icon styling ([#173](https://github.com/spartDev/My-Prompt-Manager/pull/173))
+-  replace WeakMap with Map for icon cleanup tracking ([a09332d](https://github.com/spartDev/My-Prompt-Manager/commit/a09332d))
+
+
+### 🔄 Changed
+
+-  use color-scheme property for Copilot theme detection ([a6d8b1e](https://github.com/spartDev/My-Prompt-Manager/commit/a6d8b1e))
+-  Add iconMethod field to PlatformManager to eliminate special case ([#165](https://github.com/spartDev/My-Prompt-Manager/pull/165))
+
+
+### 🧪 Testing
+
+-  Consolidate repeated mock configurations in Copilot tests ([#168](https://github.com/spartDev/My-Prompt-Manager/pull/168))
+-  Add localStorage mock to test setup for improved compatibility
+
+
+### 📦 Dependencies
+
+-  update typescript and linting to 8.46.4 ([#176](https://github.com/spartDev/My-Prompt-Manager/pull/176))
+-  update autoprefixer to 10.4.22 ([#175](https://github.com/spartDev/My-Prompt-Manager/pull/175))
+-  update github/codeql-action digest to 014f16e ([#174](https://github.com/spartDev/My-Prompt-Manager/pull/174))
+-  update actions/dependency-review-action digest to 3c4e3dc ([#170](https://github.com/spartDev/My-Prompt-Manager/pull/170))
+
+[1.8.1]: https://github.com/spartDev/My-Prompt-Manager/compare/v1.8.0...v1.8.1
+
+
 ## [1.8.0] - 2025-11-10
 
 
