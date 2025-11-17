@@ -68,7 +68,7 @@ export class PromptLibraryInjector {
   private lastCacheTime: number;
   private readonly cacheTimeout: number = 2000;
   private floatingUICleanups: WeakMap<HTMLElement, () => void>;
-  private iconCleanups: WeakMap<HTMLElement, () => void>;
+  private iconCleanups: Map<HTMLElement, () => void>;
 
   constructor() {
     const hostname = window.location.hostname || '';
@@ -127,7 +127,7 @@ export class PromptLibraryInjector {
     this.floatingUICleanups = new WeakMap();
 
     // Icon cleanup tracking (prevents MutationObserver memory leaks)
-    this.iconCleanups = new WeakMap();
+    this.iconCleanups = new Map();
 
     // Note: initialize() is now called externally to handle async site enablement checking
   }
