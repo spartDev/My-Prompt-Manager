@@ -260,38 +260,45 @@ export class UIElementFactory {
     icon.style.background = 'transparent';
     icon.style.backgroundColor = 'transparent';
 
-    // Detect theme by checking body background color
-    const updateThemeClass = () => {
-      const bodyBgColor = window.getComputedStyle(document.body).backgroundColor;
+    // Get the M365 container that has color-scheme property
+    // Fallback chain: primary container -> any element with color-scheme -> body (RGB parsing)
+    const container: Element = document.getElementById('officehome-scroll-container') ||
+                                 document.querySelector('[style*="color-scheme"]') ||
+                                 document.body;
 
-      // Parse RGB values
+    // Detect theme from color-scheme property or fallback to RGB parsing
+    const updateThemeClass = () => {
+      // Try color-scheme property first (simpler, more semantic)
+      if (container !== document.body && 'style' in container) {
+        const htmlContainer = container as HTMLElement;
+        if (htmlContainer.style.colorScheme) {
+          const isDark = htmlContainer.style.colorScheme === 'dark';
+          icon.setAttribute('data-theme', isDark ? 'dark' : 'light');
+          return;
+        }
+      }
+
+      // Fallback: RGB parsing for body background color (backward compatibility)
+      const bodyBgColor = window.getComputedStyle(document.body).backgroundColor;
       const rgbMatch = bodyBgColor.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
       if (rgbMatch) {
         const r = parseInt(rgbMatch[1], 10);
         const g = parseInt(rgbMatch[2], 10);
         const b = parseInt(rgbMatch[3], 10);
-
-        // Light mode: rgb(255, 255, 255) or similar light colors (> 200)
-        // Dark mode: rgb(31, 31, 31) or similar dark colors (< 100)
         const isLightMode = r > 200 && g > 200 && b > 200;
-
-        if (isLightMode) {
-          icon.setAttribute('data-theme', 'light');
-        } else {
-          icon.setAttribute('data-theme', 'dark');
-        }
+        icon.setAttribute('data-theme', isLightMode ? 'light' : 'dark');
       }
     };
 
     // Initial theme detection
     updateThemeClass();
 
-    // Watch for theme changes by observing body style attribute
+    // Watch for theme changes on the container (or body as fallback)
     const observer = new MutationObserver(() => {
       updateThemeClass();
     });
 
-    observer.observe(document.body, {
+    observer.observe(container, {
       attributes: true,
       attributeFilter: ['style']
     });

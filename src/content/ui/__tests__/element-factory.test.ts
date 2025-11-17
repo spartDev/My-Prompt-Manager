@@ -365,6 +365,79 @@ describe('UIElementFactory', () => {
       // Restore original MutationObserver
       globalThis.MutationObserver = originalMutationObserver;
     });
+
+    // NEW TESTS: color-scheme property detection
+    it('should detect dark theme from color-scheme property', () => {
+      const container = document.createElement('div');
+      container.id = 'officehome-scroll-container';
+      container.style.colorScheme = 'dark';
+      document.body.appendChild(container);
+
+      const { element } = factory.createCopilotIcon();
+
+      expect(element.getAttribute('data-theme')).toBe('dark');
+
+      // Cleanup
+      container.remove();
+    });
+
+    it('should detect light theme from color-scheme property', () => {
+      const container = document.createElement('div');
+      container.id = 'officehome-scroll-container';
+      container.style.colorScheme = 'light';
+      document.body.appendChild(container);
+
+      const { element } = factory.createCopilotIcon();
+
+      expect(element.getAttribute('data-theme')).toBe('light');
+
+      // Cleanup
+      container.remove();
+    });
+
+    it('should fallback to RGB parsing when container is not found', () => {
+      // Set body background to light color
+      document.body.style.backgroundColor = 'rgb(255, 255, 255)';
+
+      const { element } = factory.createCopilotIcon();
+
+      expect(element.getAttribute('data-theme')).toBe('light');
+
+      // Cleanup
+      document.body.style.backgroundColor = '';
+    });
+
+    it('should fallback to RGB parsing when color-scheme is not set', () => {
+      const container = document.createElement('div');
+      container.id = 'officehome-scroll-container';
+      // No color-scheme set
+      document.body.appendChild(container);
+
+      // Set body background to dark color
+      document.body.style.backgroundColor = 'rgb(31, 31, 31)';
+
+      const { element } = factory.createCopilotIcon();
+
+      expect(element.getAttribute('data-theme')).toBe('dark');
+
+      // Cleanup
+      container.remove();
+      document.body.style.backgroundColor = '';
+    });
+
+    it('should use any element with color-scheme as fallback', () => {
+      const container = document.createElement('div');
+      container.style.colorScheme = 'dark';
+      container.setAttribute('data-test', 'color-scheme-container');
+      document.body.appendChild(container);
+
+      const { element } = factory.createCopilotIcon();
+
+      expect(element.getAttribute('data-theme')).toBe('dark');
+
+      // Cleanup
+      container.remove();
+    });
   });
 
   describe('Storage integration', () => {
