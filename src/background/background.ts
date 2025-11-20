@@ -3,13 +3,19 @@
  * Handles message passing, content script injection, and coordination between popup and content scripts
  */
 
-import { getDefaultEnabledPlatforms, getAllHostnamePatterns } from '../config/platforms';
-import { StorageManager } from '../services/storage';
-import type { ElementFingerprint } from '../types';
-import { Logger, toError, getErrorMessage } from '../utils';
+import {
+  getDefaultEnabledPlatforms,
+  getAllHostnamePatterns,
+} from "../config/platforms";
+import { StorageManager } from "../services/storage";
+import type { ElementFingerprint } from "../types";
+import { Logger, toError, getErrorMessage } from "../utils";
 
 // Track active element picker sessions
-const activePickerSessions = new Map<number, { tabId: number; windowId: number }>();
+const activePickerSessions = new Map<
+  number,
+  { tabId: number; windowId: number }
+>();
 
 const storageManager = StorageManager.getInstance();
 
@@ -56,19 +62,26 @@ export class ContentScriptInjector {
         if (tab.url) {
           const url = new URL(tab.url);
           const hostname = url.hostname;
-          
+
           // For custom sites, always verify actual injection state
-          const settings = await chrome.storage.local.get(['promptLibrarySettings']);
-          const promptLibrarySettings = settings.promptLibrarySettings as {
-            customSites?: Array<{ hostname: string; enabled: boolean }>;
-          } | undefined;
-          
+          const settings = await chrome.storage.local.get([
+            "promptLibrarySettings",
+          ]);
+          const promptLibrarySettings = settings.promptLibrarySettings as
+            | {
+                customSites?: Array<{ hostname: string; enabled: boolean }>;
+              }
+            | undefined;
+
           const customSites = promptLibrarySettings?.customSites || [];
-          const isCustomSite = customSites.some(site => site.hostname === hostname && site.enabled);
-          
+          const isCustomSite = customSites.some(
+            (site) => site.hostname === hostname && site.enabled,
+          );
+
           if (isCustomSite) {
             // For custom sites, verify the content script is actually there
-            const isActuallyInjected = await this.isContentScriptInjected(tabId);
+            const isActuallyInjected =
+              await this.isContentScriptInjected(tabId);
             if (!isActuallyInjected) {
               // It's not there, remove from our tracking and continue to inject
               this.injectedTabs.delete(tabId);
@@ -87,7 +100,7 @@ export class ContentScriptInjector {
       }
     }
 
-    let hostname = 'unknown';
+    let hostname = "unknown";
     try {
       const tab = await chrome.tabs.get(tabId);
       if (!tab.url) {
@@ -120,17 +133,17 @@ export class ContentScriptInjector {
    */
   private isRestrictedUrl(url: string): boolean {
     const restrictedPatterns = [
-      'chrome://',
-      'chrome-extension://',
-      'moz-extension://',
-      'edge-extension://',
-      'about:',
-      'data:',
-      'file://',
-      'ftp://',
+      "chrome://",
+      "chrome-extension://",
+      "moz-extension://",
+      "edge-extension://",
+      "about:",
+      "data:",
+      "file://",
+      "ftp://",
     ];
 
-    return restrictedPatterns.some(pattern => url.startsWith(pattern));
+    return restrictedPatterns.some((pattern) => url.startsWith(pattern));
   }
 
   /**
@@ -144,18 +157,23 @@ export class ContentScriptInjector {
         return false;
       }
 
-      const settings = await chrome.storage.local.get(['promptLibrarySettings']);
-      const promptLibrarySettings = settings.promptLibrarySettings as {
-        enabledSites?: string[];
-        customSites?: Array<{ hostname: string; enabled: boolean }>;
-      } | undefined;
-      
+      const settings = await chrome.storage.local.get([
+        "promptLibrarySettings",
+      ]);
+      const promptLibrarySettings = settings.promptLibrarySettings as
+        | {
+            enabledSites?: string[];
+            customSites?: Array<{ hostname: string; enabled: boolean }>;
+          }
+        | undefined;
+
       if (!promptLibrarySettings) {
         return getDefaultEnabledPlatforms().includes(hostname);
       }
-      
+
       // Get enabled sites and custom sites from settings
-      const enabledSites = promptLibrarySettings.enabledSites || getDefaultEnabledPlatforms();
+      const enabledSites =
+        promptLibrarySettings.enabledSites || getDefaultEnabledPlatforms();
       const customSites = promptLibrarySettings.customSites || [];
 
       // Check default enabled sites
@@ -164,8 +182,8 @@ export class ContentScriptInjector {
       }
 
       // Check custom sites
-      const customSite = customSites.find((site) => 
-        site.hostname === hostname && site.enabled
+      const customSite = customSites.find(
+        (site) => site.hostname === hostname && site.enabled,
       );
       if (customSite) {
         return true;
@@ -173,7 +191,10 @@ export class ContentScriptInjector {
 
       return false;
     } catch (error) {
-      Logger.error('Error checking site enablement', toError(error), { component: 'ContentScriptInjector', hostname });
+      Logger.error("Error checking site enablement", toError(error), {
+        component: "ContentScriptInjector",
+        hostname,
+      });
       return false;
     }
   }
@@ -183,15 +204,12 @@ export class ContentScriptInjector {
    */
   private async hasPermissionForHostname(hostname: string): Promise<boolean> {
     try {
-      const origins = [
-        `https://${hostname}/*`,
-        `http://${hostname}/*`
-      ];
+      const origins = [`https://${hostname}/*`, `http://${hostname}/*`];
 
       // Check if we have permission for any of the origins
       for (const origin of origins) {
         const hasPermission = await chrome.permissions.contains({
-          origins: [origin]
+          origins: [origin],
         });
         if (hasPermission) {
           return true;
@@ -200,7 +218,10 @@ export class ContentScriptInjector {
 
       return false;
     } catch (error) {
-      Logger.error(`[ContentScriptInjector] Error checking permissions for ${hostname}`, toError(error));
+      Logger.error(
+        `[ContentScriptInjector] Error checking permissions for ${hostname}`,
+        toError(error),
+      );
       return false;
     }
   }
@@ -211,21 +232,23 @@ export class ContentScriptInjector {
   private async canInjectIntoTab(tabId: number): Promise<boolean> {
     try {
       const tab = await chrome.tabs.get(tabId);
-      
+
       // Check if tab is in a valid state
-      if (!tab.url || tab.status !== 'complete') {
+      if (!tab.url || tab.status !== "complete") {
         return false;
       }
-      
+
       // Don't try to inject into restricted URLs
       if (this.isRestrictedUrl(tab.url)) {
         return false;
       }
-      
+
       // Try to execute a minimal script to test access
       await chrome.scripting.executeScript({
         target: { tabId },
-        func: () => { return true; } // Minimal function that just returns true
+        func: () => {
+          return true;
+        }, // Minimal function that just returns true
       });
       return true;
     } catch {
@@ -236,31 +259,44 @@ export class ContentScriptInjector {
   /**
    * Classify injection error types for appropriate handling
    */
-  private classifyInjectionError(error: Error, tabId: number): 'permission' | 'tab_access_denied' | 'orphaned_tab' | 'network' | 'tab_closed' | 'security' | 'unknown' {
+  private classifyInjectionError(
+    error: Error,
+    tabId: number,
+  ):
+    | "permission"
+    | "tab_access_denied"
+    | "orphaned_tab"
+    | "network"
+    | "tab_closed"
+    | "security"
+    | "unknown" {
     const message = error.message;
-    
+
     // Check if this is an orphaned tab from before extension reload
-    if (this.isLikelyOrphanedTab(tabId) && message.includes('tab access denied')) {
-      return 'orphaned_tab';
+    if (
+      this.isLikelyOrphanedTab(tabId) &&
+      message.includes("tab access denied")
+    ) {
+      return "orphaned_tab";
     }
-    
-    if (message.includes('No permission to inject into')) {
-      return 'permission';
+
+    if (message.includes("No permission to inject into")) {
+      return "permission";
     }
-    if (message.includes('tab access denied')) {
-      return 'tab_access_denied';
+    if (message.includes("tab access denied")) {
+      return "tab_access_denied";
     }
-    if (message.includes('interrupted by user')) {
-      return 'network';
+    if (message.includes("interrupted by user")) {
+      return "network";
     }
-    if (message.includes('No tab with id')) {
-      return 'tab_closed';
+    if (message.includes("No tab with id")) {
+      return "tab_closed";
     }
-    if (message.includes('violates CSP')) {
-      return 'security';
+    if (message.includes("violates CSP")) {
+      return "security";
     }
-    
-    return 'unknown';
+
+    return "unknown";
   }
 
   /**
@@ -280,21 +316,23 @@ export class ContentScriptInjector {
       // Get tab info for permission double-check
       const tab = await chrome.tabs.get(tabId);
       if (!tab.url) {
-        throw new Error('Tab has no URL');
+        throw new Error("Tab has no URL");
       }
-      
+
       const hostname = new URL(tab.url).hostname;
-      
+
       // Double-check permissions right before injection
       const hasPermission = await this.hasPermissionForHostname(hostname);
       if (!hasPermission) {
         throw new Error(`No permission to inject into ${hostname}`);
       }
-      
+
       // More robust check: test if we can actually inject into this specific tab
       const canInject = await this.canInjectIntoTab(tabId);
       if (!canInject) {
-        throw new Error(`Cannot inject into tab ${tabId.toString()} for ${hostname} - tab access denied`);
+        throw new Error(
+          `Cannot inject into tab ${tabId.toString()} for ${hostname} - tab access denied`,
+        );
       }
 
       // Check if already injected by testing for marker
@@ -308,41 +346,48 @@ export class ContentScriptInjector {
       const contentScriptFile = await this.getContentScriptFilename();
       await chrome.scripting.executeScript({
         target: { tabId },
-        files: [contentScriptFile]
+        files: [contentScriptFile],
       });
-
     } catch (error) {
       const hostname = await this.getTabHostname(tabId);
-      
+
       // Classify error and handle appropriately
       const errorType = this.classifyInjectionError(toError(error), tabId);
-      
+
       switch (errorType) {
-        case 'permission':
+        case "permission":
           // Expected for most sites - suppress logging for cleaner console
           break;
-        case 'orphaned_tab':
+        case "orphaned_tab":
           // Expected after extension reload - suppress logging and mark as orphaned
           this.orphanedTabs.add(tabId);
           break;
-        case 'tab_access_denied':
+        case "tab_access_denied":
           // Log warning for unexpected access issues (not orphaned tabs)
           if (!this.isLikelyOrphanedTab(tabId)) {
-            Logger.warn(`Tab access denied for tab ${tabId.toString()}`, { component: 'ContentScriptInjector', hostname, tabId });
+            Logger.warn(`Tab access denied for tab ${tabId.toString()}`, {
+              component: "ContentScriptInjector",
+              hostname,
+              tabId,
+            });
           }
           break;
-        case 'network':
-        case 'tab_closed':
+        case "network":
+        case "tab_closed":
           // Transient errors - suppress logging
           break;
-        case 'security':
-        case 'unknown':
+        case "security":
+        case "unknown":
         default:
           // Unexpected errors - always log
-          Logger.error(`Unexpected injection failure for tab ${tabId.toString()}`, toError(error), { component: 'ContentScriptInjector', hostname, errorType });
+          Logger.error(
+            `Unexpected injection failure for tab ${tabId.toString()}`,
+            toError(error),
+            { component: "ContentScriptInjector", hostname, errorType },
+          );
           break;
       }
-      
+
       throw error;
     }
   }
@@ -356,55 +401,65 @@ export class ContentScriptInjector {
       const [result] = await chrome.scripting.executeScript({
         target: { tabId },
         func: () => {
-          const isInjected = (window as { __promptLibraryInjected?: boolean }).__promptLibraryInjected === true;
-          
+          const isInjected =
+            (window as { __promptLibraryInjected?: boolean })
+              .__promptLibraryInjected === true;
+
           // If not injected, clean up any orphaned DOM elements from previous extension versions
           if (!isInjected) {
             try {
               // Remove any orphaned icons
-              const orphanedIcons = document.querySelectorAll('.prompt-library-cleanup-target, [data-prompt-library-icon]');
-              orphanedIcons.forEach(icon => {
+              const orphanedIcons = document.querySelectorAll(
+                ".prompt-library-cleanup-target, [data-prompt-library-icon]",
+              );
+              orphanedIcons.forEach((icon) => {
                 try {
                   icon.remove();
                 } catch {
                   // Element might already be removed
                 }
               });
-              
+
               // Remove any orphaned selectors
-              const orphanedSelectors = document.querySelectorAll('.prompt-library-selector');
-              orphanedSelectors.forEach(selector => {
+              const orphanedSelectors = document.querySelectorAll(
+                ".prompt-library-selector",
+              );
+              orphanedSelectors.forEach((selector) => {
                 try {
                   selector.remove();
                 } catch {
                   // Element might already be removed
                 }
               });
-              
+
               // Return cleanup info along with injection status
               return {
                 isInjected: false,
-                orphanedElements: orphanedIcons.length + orphanedSelectors.length
+                orphanedElements:
+                  orphanedIcons.length + orphanedSelectors.length,
               };
             } catch {
               return { isInjected: false, orphanedElements: 0 };
             }
           }
-          
+
           return { isInjected: true, orphanedElements: 0 };
-        }
+        },
       });
-      
-      if (typeof result.result === 'boolean') {
+
+      if (typeof result.result === "boolean") {
         // Legacy response format
         return result.result;
-      } else if (result.result && typeof result.result === 'object') {
+      } else if (result.result && typeof result.result === "object") {
         // New response format with cleanup info
-        const { isInjected } = result.result as { isInjected: boolean; orphanedElements: number };
+        const { isInjected } = result.result as {
+          isInjected: boolean;
+          orphanedElements: number;
+        };
         // Silent cleanup - no logging needed for expected orphaned element removal
         return isInjected;
       }
-      
+
       return false;
     } catch {
       return false;
@@ -414,7 +469,9 @@ export class ContentScriptInjector {
   /**
    * Force inject content script (used by activeTab clicks)
    */
-  async forceInjectContentScript(tabId: number): Promise<{ success: boolean; error?: string }> {
+  async forceInjectContentScript(
+    tabId: number,
+  ): Promise<{ success: boolean; error?: string }> {
     try {
       // Remove from injected and orphaned tabs to force re-injection
       this.injectedTabs.delete(tabId);
@@ -425,35 +482,39 @@ export class ContentScriptInjector {
     } catch (error) {
       const hostname = await this.getTabHostname(tabId);
       const errorType = this.classifyInjectionError(toError(error), tabId);
-      
+
       // Handle different error types appropriately
       switch (errorType) {
-        case 'permission':
-          return { 
-            success: false, 
-            error: `Permission required for ${hostname}. Please grant permission to use the extension on this site.`
-          };
-        case 'orphaned_tab':
+        case "permission":
           return {
             success: false,
-            error: `Please refresh this tab and try again. The extension was recently reloaded.`
+            error: `Permission required for ${hostname}. Please grant permission to use the extension on this site.`,
           };
-        case 'tab_access_denied':
+        case "orphaned_tab":
           return {
             success: false,
-            error: `Cannot access this tab. Please refresh the page and try again.`
+            error: `Please refresh this tab and try again. The extension was recently reloaded.`,
           };
-        case 'tab_closed':
+        case "tab_access_denied":
           return {
             success: false,
-            error: `Tab is no longer available.`
+            error: `Cannot access this tab. Please refresh the page and try again.`,
+          };
+        case "tab_closed":
+          return {
+            success: false,
+            error: `Tab is no longer available.`,
           };
         default:
           // Log unexpected errors
-          Logger.error(`Force injection failed for tab ${tabId.toString()}`, toError(error), { component: 'ContentScriptInjector', hostname, errorType });
+          Logger.error(
+            `Force injection failed for tab ${tabId.toString()}`,
+            toError(error),
+            { component: "ContentScriptInjector", hostname, errorType },
+          );
           return {
             success: false,
-            error: getErrorMessage(error)
+            error: getErrorMessage(error),
           };
       }
     }
@@ -486,55 +547,78 @@ export class ContentScriptInjector {
           return contentScriptPath;
         } catch {
           // File doesn't exist, continue to fallbacks
-          Logger.warn('Manifest content script path not accessible', { component: 'ContentScriptInjector', contentScriptPath });
+          Logger.warn("Manifest content script path not accessible", {
+            component: "ContentScriptInjector",
+            contentScriptPath,
+          });
         }
       }
     } catch (error) {
-      Logger.error('Failed to read manifest', toError(error), { component: 'ContentScriptInjector' });
+      Logger.error("Failed to read manifest", toError(error), {
+        component: "ContentScriptInjector",
+      });
     }
 
     try {
       // Secondary: Try to fetch the build manifest (works in development/local builds)
-      const manifestResponse = await fetch(chrome.runtime.getURL('.vite/manifest.json'));
-      const buildManifest = await manifestResponse.json() as Record<string, { file?: string } | undefined>;
+      const manifestResponse = await fetch(
+        chrome.runtime.getURL(".vite/manifest.json"),
+      );
+      const buildManifest = (await manifestResponse.json()) as Record<
+        string,
+        { file?: string } | undefined
+      >;
 
       // Look for the content script entry
-      const contentEntry = buildManifest['src/content/index.ts'];
+      const contentEntry = buildManifest["src/content/index.ts"];
       if (contentEntry?.file) {
         // Verify the file exists
         try {
           await fetch(chrome.runtime.getURL(contentEntry.file));
           return contentEntry.file;
         } catch {
-          Logger.warn('Build manifest content script not accessible', { component: 'ContentScriptInjector', file: contentEntry.file });
+          Logger.warn("Build manifest content script not accessible", {
+            component: "ContentScriptInjector",
+            file: contentEntry.file,
+          });
         }
       }
 
       // Fallback: try to find any file matching content-*.js pattern in build manifest
       const contentFiles = Object.values(buildManifest)
         .filter((entry): entry is { file: string } =>
-          Boolean(entry?.file && entry.file.includes('content-') && entry.file.endsWith('.js'))
+          Boolean(
+            entry?.file &&
+              entry.file.includes("content-") &&
+              entry.file.endsWith(".js"),
+          ),
         )
-        .map(entry => entry.file);
+        .map((entry) => entry.file);
 
       if (contentFiles.length > 0) {
         try {
           await fetch(chrome.runtime.getURL(contentFiles[0]));
           return contentFiles[0];
         } catch {
-          Logger.warn('Build manifest content file not accessible', { component: 'ContentScriptInjector', file: contentFiles[0] });
+          Logger.warn("Build manifest content file not accessible", {
+            component: "ContentScriptInjector",
+            file: contentFiles[0],
+          });
         }
       }
     } catch {
       // .vite/manifest.json doesn't exist (expected in Chrome Web Store builds)
-      Logger.info('Build manifest not available, trying direct file discovery', { component: 'ContentScriptInjector' });
+      Logger.info(
+        "Build manifest not available, trying direct file discovery",
+        { component: "ContentScriptInjector" },
+      );
     }
 
     // Tertiary: Ultimate fallback - try common patterns
     const fallbackFiles = [
-      'assets/content.js',
-      'src/content/index.js',
-      'content.js'
+      "assets/content.js",
+      "src/content/index.js",
+      "content.js",
     ];
 
     // Try each fallback in order
@@ -548,18 +632,23 @@ export class ContentScriptInjector {
       }
     }
 
-    throw new Error('Unable to locate content script file');
+    throw new Error("Unable to locate content script file");
   }
 
   /**
    * Get injection status for debugging
    */
-  getInjectionStatus(): { injectedTabs: number[]; activePromises: number[]; orphanedTabs: number[]; extensionUptime: number } {
+  getInjectionStatus(): {
+    injectedTabs: number[];
+    activePromises: number[];
+    orphanedTabs: number[];
+    extensionUptime: number;
+  } {
     return {
       injectedTabs: Array.from(this.injectedTabs),
       activePromises: Array.from(this.injectionPromises.keys()),
       orphanedTabs: Array.from(this.orphanedTabs),
-      extensionUptime: Date.now() - this.extensionStartTime
+      extensionUptime: Date.now() - this.extensionStartTime,
     };
   }
 
@@ -575,7 +664,7 @@ export class ContentScriptInjector {
     } catch {
       // Tab might have been closed or is inaccessible
     }
-    return 'unknown';
+    return "unknown";
   }
 }
 
@@ -583,7 +672,7 @@ export class ContentScriptInjector {
 const injector = new ContentScriptInjector();
 
 // Interface mode types
-type InterfaceMode = 'popup' | 'sidepanel';
+type InterfaceMode = "popup" | "sidepanel";
 
 // ===============================
 // TAB LIFECYCLE MANAGEMENT
@@ -591,7 +680,7 @@ type InterfaceMode = 'popup' | 'sidepanel';
 
 // Inject when tab is updated (navigation)
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.status === 'complete' && tab.url) {
+  if (changeInfo.status === "complete" && tab.url) {
     void injector.injectIfNeeded(tabId);
   }
 });
@@ -613,7 +702,11 @@ chrome.action.onClicked.addListener((tab) => {
         await injector.forceInjectContentScript(tabId);
         // Content script injected via activeTab
       } catch (error) {
-        Logger.error('Failed to inject via activeTab', toError(error), { component: 'Background', tabId, url: tab.url });
+        Logger.error("Failed to inject via activeTab", toError(error), {
+          component: "Background",
+          tabId,
+          url: tab.url,
+        });
       }
     })();
   }
@@ -625,7 +718,11 @@ void (async () => {
     const mode = await getInterfaceMode();
     await updateActionBehavior(mode);
   } catch (error) {
-    Logger.error('Error during initial setup', toError(error), { component: 'Background', phase: 'initialization', action: 'updateActionBehavior' });
+    Logger.error("Error during initial setup", toError(error), {
+      component: "Background",
+      phase: "initialization",
+      action: "updateActionBehavior",
+    });
   }
 })();
 
@@ -636,16 +733,16 @@ let originalTabId: number | null = null;
 // Message types for element picker and injection
 interface BackgroundMessage {
   type:
-    | 'START_ELEMENT_PICKER'
-    | 'STOP_ELEMENT_PICKER'
-    | 'ELEMENT_SELECTED'
-    | 'PICKER_CANCELLED'
-    | 'OPEN_PICKER_WINDOW'
-    | 'GET_INTERFACE_MODE'
-    | 'REQUEST_INJECTION'
-    | 'SETTINGS_UPDATED'
-    | 'REQUEST_PERMISSION'
-    | 'PROMPT_USAGE_INCREMENT';
+    | "START_ELEMENT_PICKER"
+    | "STOP_ELEMENT_PICKER"
+    | "ELEMENT_SELECTED"
+    | "PICKER_CANCELLED"
+    | "OPEN_PICKER_WINDOW"
+    | "GET_INTERFACE_MODE"
+    | "REQUEST_INJECTION"
+    | "SETTINGS_UPDATED"
+    | "REQUEST_PERMISSION"
+    | "PROMPT_USAGE_INCREMENT";
   data?: {
     fingerprint?: ElementFingerprint; // Element fingerprint for robust identification
     selector?: string;
@@ -660,76 +757,91 @@ interface BackgroundMessage {
 }
 
 // Handle messages from popup and content scripts
-chrome.runtime.onMessage.addListener((message: BackgroundMessage, sender, sendResponse) => {
-  switch (message.type) {
-    case 'START_ELEMENT_PICKER':
-      void handleStartElementPicker(message.data?.tabId, sender, sendResponse);
-      break;
-      
-    case 'OPEN_PICKER_WINDOW':
-      void handleOpenPickerWindow(message.data?.tabId, sendResponse);
-      break;
+chrome.runtime.onMessage.addListener(
+  (message: BackgroundMessage, sender, sendResponse) => {
+    switch (message.type) {
+      case "START_ELEMENT_PICKER":
+        void handleStartElementPicker(
+          message.data?.tabId,
+          sender,
+          sendResponse,
+        );
+        break;
 
-    case 'ELEMENT_SELECTED':
-      void handleElementSelected(message.data, sender, sendResponse);
-      break;
+      case "OPEN_PICKER_WINDOW":
+        void handleOpenPickerWindow(message.data?.tabId, sendResponse);
+        break;
 
-    case 'STOP_ELEMENT_PICKER':
-    case 'PICKER_CANCELLED':
-      void handleStopElementPicker(undefined, sender, sendResponse);
-      break;
+      case "ELEMENT_SELECTED":
+        void handleElementSelected(message.data, sender, sendResponse);
+        break;
 
-    case 'GET_INTERFACE_MODE':
-      void handleGetInterfaceMode(sendResponse);
-      break;
+      case "STOP_ELEMENT_PICKER":
+      case "PICKER_CANCELLED":
+        void handleStopElementPicker(undefined, sender, sendResponse);
+        break;
 
-    case 'REQUEST_INJECTION':
-      void handleRequestInjection(message.data?.tabId, sendResponse);
-      break;
+      case "GET_INTERFACE_MODE":
+        void handleGetInterfaceMode(sendResponse);
+        break;
 
-    case 'SETTINGS_UPDATED':
-      void handleSettingsUpdated(message.data?.settings, sendResponse);
-      break;
+      case "REQUEST_INJECTION":
+        void handleRequestInjection(message.data?.tabId, sendResponse);
+        break;
 
-    case 'REQUEST_PERMISSION':
-      void handleRequestPermission(message.data?.origins || [], sendResponse);
-      break;
+      case "SETTINGS_UPDATED":
+        void handleSettingsUpdated(message.data?.settings, sendResponse);
+        break;
 
-    case 'PROMPT_USAGE_INCREMENT':
-      void handlePromptUsageIncrement(message.data?.promptId, sendResponse);
-      break;
+      case "REQUEST_PERMISSION":
+        void handleRequestPermission(message.data?.origins || [], sendResponse);
+        break;
 
-    default:
-      break;
-  }
+      case "PROMPT_USAGE_INCREMENT":
+        void handlePromptUsageIncrement(message.data?.promptId, sendResponse);
+        break;
 
-  // Return true to indicate async response
-  return true;
-});
+      default:
+        break;
+    }
+
+    // Return true to indicate async response
+    return true;
+  },
+);
 
 /**
  * Handle manual injection requests from popup/side panel
  */
-async function handleRequestInjection(tabId: number | undefined, sendResponse: (response?: { success: boolean; error?: string }) => void) {
+async function handleRequestInjection(
+  tabId: number | undefined,
+  sendResponse: (response?: { success: boolean; error?: string }) => void,
+) {
   let targetTabId = tabId;
 
   try {
     if (!targetTabId) {
-      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      const tabs = await chrome.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
       if (tabs.length > 0 && tabs[0]?.id) {
         targetTabId = tabs[0].id;
       }
     }
 
     if (!targetTabId) {
-      sendResponse({ success: false, error: 'No valid tab found' });
+      sendResponse({ success: false, error: "No valid tab found" });
       return;
     }
 
     await injector.forceInjectContentScript(targetTabId);
     sendResponse({ success: true });
   } catch (error) {
-    Logger.error('Manual injection failed', toError(error), { component: 'Background', tabId: targetTabId });
+    Logger.error("Manual injection failed", toError(error), {
+      component: "Background",
+      tabId: targetTabId,
+    });
     sendResponse({ success: false, error: getErrorMessage(error) });
   }
 }
@@ -737,12 +849,15 @@ async function handleRequestInjection(tabId: number | undefined, sendResponse: (
 /**
  * Handle settings updates that might affect injection
  */
-async function handleSettingsUpdated(_settings: unknown, sendResponse: (response?: { success: boolean }) => void) {
+async function handleSettingsUpdated(
+  _settings: unknown,
+  sendResponse: (response?: { success: boolean }) => void,
+) {
   try {
     const tabs = await chrome.tabs.query({});
 
     // Filter tabs that might need injection to avoid unnecessary checks
-    const relevantTabs = tabs.filter(tab => {
+    const relevantTabs = tabs.filter((tab) => {
       if (!tab.id || !tab.url) {
         return false;
       }
@@ -752,8 +867,10 @@ async function handleSettingsUpdated(_settings: unknown, sendResponse: (response
         const hostname = url.hostname;
 
         // Quick hostname check - only process tabs that could potentially need injection
-        return getDefaultEnabledPlatforms().includes(hostname) ||
-               getAllHostnamePatterns().some(pattern => hostname.includes(pattern));
+        return (
+          getDefaultEnabledPlatforms().includes(hostname) ||
+          getAllHostnamePatterns().some((pattern) => hostname.includes(pattern))
+        );
       } catch {
         return false; // Invalid URL
       }
@@ -771,14 +888,20 @@ async function handleSettingsUpdated(_settings: unknown, sendResponse: (response
           }
         } catch (error) {
           // Log error but don't fail the entire operation for individual tab failures
-          Logger.error('Failed to process tab during settings update', toError(error), { component: 'Background', tabId: tab.id, url: tab.url });
+          Logger.error(
+            "Failed to process tab during settings update",
+            toError(error),
+            { component: "Background", tabId: tab.id, url: tab.url },
+          );
         }
-      })
+      }),
     );
 
     sendResponse({ success: true });
   } catch (error) {
-    Logger.error('Settings update handling failed', toError(error), { component: 'Background' });
+    Logger.error("Settings update handling failed", toError(error), {
+      component: "Background",
+    });
     sendResponse({ success: false });
   }
 }
@@ -786,23 +909,27 @@ async function handleSettingsUpdated(_settings: unknown, sendResponse: (response
 /**
  * Handle dynamic permission requests for custom sites
  */
-async function handleRequestPermission(origins: string[], sendResponse: (response?: { success: boolean; error?: string }) => void) {
+async function handleRequestPermission(
+  origins: string[],
+  sendResponse: (response?: { success: boolean; error?: string }) => void,
+) {
   try {
     const granted = await chrome.permissions.request({
-      origins: origins
+      origins: origins,
     });
 
     if (granted) {
       // Store the permission grant for tracking
-      const settings = await chrome.storage.local.get(['grantedPermissions']);
-      const grantedPermissions = (settings.grantedPermissions as string[] | undefined) || [];
-      
+      const settings = await chrome.storage.local.get(["grantedPermissions"]);
+      const grantedPermissions =
+        (settings.grantedPermissions as string[] | undefined) || [];
+
       for (const origin of origins) {
         if (!grantedPermissions.includes(origin)) {
           grantedPermissions.push(origin);
         }
       }
-      
+
       await chrome.storage.local.set({ grantedPermissions });
 
       // Immediately inject into any matching tabs
@@ -810,11 +937,11 @@ async function handleRequestPermission(origins: string[], sendResponse: (respons
       for (const tab of tabs) {
         if (tab.id && tab.url) {
           const url = new URL(tab.url);
-          const matchesOrigin = origins.some(origin => {
+          const matchesOrigin = origins.some((origin) => {
             const originUrl = new URL(origin);
             return url.hostname === originUrl.hostname;
           });
-          
+
           if (matchesOrigin) {
             await injector.injectIfNeeded(tab.id);
           }
@@ -824,14 +951,20 @@ async function handleRequestPermission(origins: string[], sendResponse: (respons
 
     sendResponse({ success: granted });
   } catch (error) {
-    Logger.error('Permission request failed', toError(error), { component: 'Background', origins });
+    Logger.error("Permission request failed", toError(error), {
+      component: "Background",
+      origins,
+    });
     sendResponse({ success: false, error: getErrorMessage(error) });
   }
 }
 
-async function handlePromptUsageIncrement(promptId: string | undefined, sendResponse: (response?: { success: boolean; error?: string }) => void) {
+async function handlePromptUsageIncrement(
+  promptId: string | undefined,
+  sendResponse: (response?: { success: boolean; error?: string }) => void,
+) {
   if (!promptId) {
-    sendResponse({ success: false, error: 'Prompt ID is required' });
+    sendResponse({ success: false, error: "Prompt ID is required" });
     return;
   }
 
@@ -839,7 +972,10 @@ async function handlePromptUsageIncrement(promptId: string | undefined, sendResp
     await storageManager.incrementUsageCount(promptId);
     sendResponse({ success: true });
   } catch (error) {
-    Logger.error('Failed to increment prompt usage', toError(error), { component: 'Background', promptId });
+    Logger.error("Failed to increment prompt usage", toError(error), {
+      component: "Background",
+      promptId,
+    });
     sendResponse({ success: false, error: getErrorMessage(error) });
   }
 }
@@ -850,36 +986,43 @@ async function handlePromptUsageIncrement(promptId: string | undefined, sendResp
  */
 async function handleExtensionUpdate(): Promise<void> {
   try {
-    const settings = await chrome.storage.local.get(['promptLibrarySettings']);
-    const promptLibrarySettings = settings.promptLibrarySettings as {
-      enabledSites?: string[];
-      customSites?: Array<{ hostname: string; enabled: boolean }>;
-    } | undefined;
-    const enabledSites = promptLibrarySettings?.enabledSites || getDefaultEnabledPlatforms();
+    const settings = await chrome.storage.local.get(["promptLibrarySettings"]);
+    const promptLibrarySettings = settings.promptLibrarySettings as
+      | {
+          enabledSites?: string[];
+          customSites?: Array<{ hostname: string; enabled: boolean }>;
+        }
+      | undefined;
+    const enabledSites =
+      promptLibrarySettings?.enabledSites || getDefaultEnabledPlatforms();
     const customSites = promptLibrarySettings?.customSites || [];
 
     const allEnabledHosts = [
       ...enabledSites,
-      ...customSites.filter((s) => s.enabled).map((s) => s.hostname)
+      ...customSites.filter((s) => s.enabled).map((s) => s.hostname),
     ];
 
     // Get all tabs and identify those that need re-injection
     const tabs = await chrome.tabs.query({});
-    const reinjectionResults: Array<{ tabId: number; hostname: string; success: boolean }> = [];
-    
+    const reinjectionResults: Array<{
+      tabId: number;
+      hostname: string;
+      success: boolean;
+    }> = [];
+
     for (const tab of tabs) {
       if (tab.id && tab.url) {
         try {
           const url = new URL(tab.url);
           const hostname = url.hostname;
-          
+
           if (allEnabledHosts.includes(hostname)) {
             // Try to inject - this will be handled gracefully for orphaned tabs
             const result = await injector.forceInjectContentScript(tab.id);
-            reinjectionResults.push({ 
-              tabId: tab.id, 
-              hostname, 
-              success: result.success 
+            reinjectionResults.push({
+              tabId: tab.id,
+              hostname,
+              success: result.success,
             });
           }
         } catch {
@@ -888,29 +1031,35 @@ async function handleExtensionUpdate(): Promise<void> {
         }
       }
     }
-    
+
     // Only log if there were actual issues during re-injection
-    const failedReinjections = reinjectionResults.filter(r => !r.success);
+    const failedReinjections = reinjectionResults.filter((r) => !r.success);
     if (failedReinjections.length > 0) {
       Logger.warn(
         `Some tabs could not be re-injected after extension update (${failedReinjections.length.toString()}/${reinjectionResults.length.toString()} failed). This is normal for orphaned tabs - they will work after refresh.`,
         {
-          component: 'ContentScriptInjector',
+          component: "ContentScriptInjector",
           failedCount: failedReinjections.length,
           totalTabs: reinjectionResults.length,
-          failedTabIds: failedReinjections.map(r => r.tabId)
-        }
+          failedTabIds: failedReinjections.map((r) => r.tabId),
+        },
       );
     } else if (reinjectionResults.length > 0) {
-      Logger.info(`Successfully re-injected content scripts in ${reinjectionResults.length.toString()} tabs after extension update`, {
-        component: 'ContentScriptInjector',
-        totalTabs: reinjectionResults.length
-      });
+      Logger.info(
+        `Successfully re-injected content scripts in ${reinjectionResults.length.toString()} tabs after extension update`,
+        {
+          component: "ContentScriptInjector",
+          totalTabs: reinjectionResults.length,
+        },
+      );
     }
 
     // Extension update processing complete
   } catch (error) {
-    Logger.error('Error handling extension update', toError(error), { component: 'Background', phase: 'extension_update' });
+    Logger.error("Error handling extension update", toError(error), {
+      component: "Background",
+      phase: "extension_update",
+    });
   }
 }
 
@@ -918,28 +1067,29 @@ async function handleExtensionUpdate(): Promise<void> {
  * Get the current interface mode from storage
  */
 async function getInterfaceMode(): Promise<InterfaceMode> {
-  const result = await chrome.storage.local.get('interfaceMode');
-  return (result.interfaceMode as InterfaceMode | undefined) || 'sidepanel';
+  const result = await chrome.storage.local.get("interfaceMode");
+  return (result.interfaceMode as InterfaceMode | undefined) || "sidepanel";
 }
-
 
 /**
  * Update the action button behavior based on interface mode
  */
 async function updateActionBehavior(mode: InterfaceMode): Promise<void> {
-  if (mode === 'popup') {
+  if (mode === "popup") {
     // Set popup for action button
-    await chrome.action.setPopup({ popup: 'src/popup.html' });
+    await chrome.action.setPopup({ popup: "src/popup.html" });
   } else {
     // Clear popup to enable onClicked event for side panel
-    await chrome.action.setPopup({ popup: '' });
+    await chrome.action.setPopup({ popup: "" });
   }
 }
 
 /**
  * Handle getting the interface mode
  */
-async function handleGetInterfaceMode(sendResponse: (response?: { mode: InterfaceMode }) => void) {
+async function handleGetInterfaceMode(
+  sendResponse: (response?: { mode: InterfaceMode }) => void,
+) {
   const mode = await getInterfaceMode();
   sendResponse({ mode });
 }
@@ -947,12 +1097,15 @@ async function handleGetInterfaceMode(sendResponse: (response?: { mode: Interfac
 /**
  * Open picker in a new window to prevent popup from closing
  */
-async function handleOpenPickerWindow(targetTabId: number | undefined, sendResponse: (response?: { success: boolean; error?: string }) => void) {
+async function handleOpenPickerWindow(
+  targetTabId: number | undefined,
+  sendResponse: (response?: { success: boolean; error?: string }) => void,
+) {
   try {
     // Store the original tab that we're picking from
-    let originalUrl = '';
-    let originalHostname = '';
-    
+    let originalUrl = "";
+    let originalHostname = "";
+
     if (targetTabId) {
       originalTabId = targetTabId;
       const tab = await chrome.tabs.get(targetTabId);
@@ -966,7 +1119,10 @@ async function handleOpenPickerWindow(targetTabId: number | undefined, sendRespo
         }
       }
     } else {
-      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      const tabs = await chrome.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
       if (tabs.length > 0 && tabs[0]) {
         const activeTab = tabs[0];
         originalTabId = activeTab.id || null;
@@ -981,29 +1137,32 @@ async function handleOpenPickerWindow(targetTabId: number | undefined, sendRespo
         }
       }
     }
-    
+
     // Create URL with original tab info as parameters
     const params = new URLSearchParams({
-      picker: 'true',
+      picker: "true",
       originalUrl: originalUrl,
       originalHostname: originalHostname,
-      originalTabId: String(originalTabId || '')
+      originalTabId: String(originalTabId || ""),
     });
-    
+
     // Create a new window with the popup HTML and original tab info
     const window = await chrome.windows.create({
       url: chrome.runtime.getURL(`src/popup.html?${params.toString()}`),
-      type: 'popup',
+      type: "popup",
       width: 400,
       height: 600,
       left: 100,
-      top: 100
+      top: 100,
     });
 
     pickerWindowId = window?.id ?? null;
     sendResponse({ success: true });
   } catch (error) {
-    Logger.error('Error opening picker window', toError(error), { component: 'Background', originalTabId });
+    Logger.error("Error opening picker window", toError(error), {
+      component: "Background",
+      originalTabId,
+    });
     sendResponse({ success: false, error: getErrorMessage(error) });
   }
 }
@@ -1011,11 +1170,19 @@ async function handleOpenPickerWindow(targetTabId: number | undefined, sendRespo
 /**
  * Start element picker mode
  */
-async function handleStartElementPicker(passedTabId: number | undefined, sender: chrome.runtime.MessageSender, sendResponse: (response?: { success: boolean; error?: string; tabId?: number }) => void) {
+async function handleStartElementPicker(
+  passedTabId: number | undefined,
+  sender: chrome.runtime.MessageSender,
+  sendResponse: (response?: {
+    success: boolean;
+    error?: string;
+    tabId?: number;
+  }) => void,
+) {
   try {
     // Determine which tab to activate picker on
     let targetTabId: number | null = null;
-    
+
     // First priority: Use the explicitly passed tab ID (from picker window)
     if (passedTabId) {
       targetTabId = passedTabId;
@@ -1025,37 +1192,43 @@ async function handleStartElementPicker(passedTabId: number | undefined, sender:
       targetTabId = originalTabId;
     } else {
       // Otherwise, get the active tab (but not the popup itself)
-      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      const tabs = await chrome.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
       if (tabs.length > 0 && tabs[0]) {
         const activeTab = tabs[0];
         // Don't activate on extension pages
-        if (activeTab.url && !activeTab.url.startsWith('chrome-extension://')) {
+        if (activeTab.url && !activeTab.url.startsWith("chrome-extension://")) {
           targetTabId = activeTab.id || null;
         }
       }
     }
-    
+
     if (!targetTabId) {
-      sendResponse({ success: false, error: 'No valid tab found for element picking' });
+      sendResponse({
+        success: false,
+        error: "No valid tab found for element picking",
+      });
       return;
     }
 
     // Get the tab details
     const tab = await chrome.tabs.get(targetTabId);
     if (!tab.url) {
-      sendResponse({ success: false, error: 'Cannot access tab URL' });
+      sendResponse({ success: false, error: "Cannot access tab URL" });
       return;
     }
 
     // Store picker session
     activePickerSessions.set(targetTabId, {
       tabId: targetTabId,
-      windowId: sender.tab?.windowId || 0
+      windowId: sender.tab?.windowId || 0,
     });
 
     // Switch to the target tab
     await chrome.tabs.update(targetTabId, { active: true });
-    
+
     // Focus on the tab's window
     if (tab.windowId) {
       await chrome.windows.update(tab.windowId, { focused: true });
@@ -1065,27 +1238,34 @@ async function handleStartElementPicker(passedTabId: number | undefined, sender:
     try {
       // Check if content script is already injected
       const isInjected = await injector.isContentScriptInjected(targetTabId);
-      
+
       if (!isInjected) {
         // Force inject the content script
-        const injectionResult = await injector.forceInjectContentScript(targetTabId);
-        
+        const injectionResult =
+          await injector.forceInjectContentScript(targetTabId);
+
         if (!injectionResult.success) {
-          sendResponse({ 
-            success: false, 
-            error: injectionResult.error || 'Failed to inject content script. Please refresh the page and try again.' 
+          sendResponse({
+            success: false,
+            error:
+              injectionResult.error ||
+              "Failed to inject content script. Please refresh the page and try again.",
           });
           return;
         }
-        
+
         // Wait a bit for the script to initialize
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise((resolve) => setTimeout(resolve, 100));
       }
     } catch (error) {
-      Logger.error('Error checking/injecting content script', toError(error), { component: 'Background', tabId: targetTabId });
+      Logger.error("Error checking/injecting content script", toError(error), {
+        component: "Background",
+        tabId: targetTabId,
+      });
       sendResponse({
         success: false,
-        error: 'Failed to initialize content script. Please refresh the page and try again.'
+        error:
+          "Failed to initialize content script. Please refresh the page and try again.",
       });
       return;
     }
@@ -1093,16 +1273,27 @@ async function handleStartElementPicker(passedTabId: number | undefined, sender:
     // Now send the message to activate element picker
     try {
       await chrome.tabs.sendMessage(targetTabId, {
-        type: 'ACTIVATE_ELEMENT_PICKER',
-        source: 'background'
+        type: "ACTIVATE_ELEMENT_PICKER",
+        source: "background",
       });
       sendResponse({ success: true, tabId: targetTabId });
     } catch (messageError) {
-      Logger.error('Failed to activate element picker', toError(messageError), { component: 'Background', tabId: targetTabId });
-      sendResponse({ success: false, error: 'Failed to activate element picker. Please refresh the page and try again.' });
+      Logger.error("Failed to activate element picker", toError(messageError), {
+        component: "Background",
+        tabId: targetTabId,
+      });
+      sendResponse({
+        success: false,
+        error:
+          "Failed to activate element picker. Please refresh the page and try again.",
+      });
     }
   } catch (error) {
-    Logger.error('Error starting element picker', toError(error), { component: 'Background', passedTabId, senderTabId: sender.tab?.id });
+    Logger.error("Error starting element picker", toError(error), {
+      component: "Background",
+      passedTabId,
+      senderTabId: sender.tab?.id,
+    });
     sendResponse({ success: false, error: getErrorMessage(error) });
   }
 }
@@ -1110,12 +1301,16 @@ async function handleStartElementPicker(passedTabId: number | undefined, sender:
 /**
  * Handle element selection from content script
  */
-async function handleElementSelected(data: BackgroundMessage['data'], sender: chrome.runtime.MessageSender, sendResponse: (response?: { success: boolean; error?: string }) => void) {
+async function handleElementSelected(
+  data: BackgroundMessage["data"],
+  sender: chrome.runtime.MessageSender,
+  sendResponse: (response?: { success: boolean; error?: string }) => void,
+) {
   try {
     const tabId = sender.tab?.id;
-    
+
     if (!tabId || !activePickerSessions.has(tabId)) {
-      sendResponse({ success: false, error: 'No active picker session' });
+      sendResponse({ success: false, error: "No active picker session" });
       return;
     }
 
@@ -1124,16 +1319,16 @@ async function handleElementSelected(data: BackgroundMessage['data'], sender: ch
 
     // Forward selected element data to all popup instances and the picker window
     void chrome.runtime.sendMessage({
-      type: 'ELEMENT_PICKER_RESULT',
+      type: "ELEMENT_PICKER_RESULT",
       data: {
         fingerprint: data?.fingerprint, // NEW: Forward fingerprint
         selector: data?.selector,
         elementType: data?.elementType,
         elementInfo: data?.elementInfo,
-        hostname: data?.hostname
-      }
+        hostname: data?.hostname,
+      },
     });
-    
+
     // If we have a picker window, focus it
     if (pickerWindowId) {
       try {
@@ -1143,13 +1338,16 @@ async function handleElementSelected(data: BackgroundMessage['data'], sender: ch
         pickerWindowId = null;
       }
     }
-    
+
     // Clear the original tab reference
     originalTabId = null;
 
     sendResponse({ success: true });
   } catch (error) {
-    Logger.error('Error handling element selection', toError(error), { component: 'Background', senderTabId: sender.tab?.id });
+    Logger.error("Error handling element selection", toError(error), {
+      component: "Background",
+      senderTabId: sender.tab?.id,
+    });
     sendResponse({ success: false, error: getErrorMessage(error) });
   }
 }
@@ -1157,22 +1355,31 @@ async function handleElementSelected(data: BackgroundMessage['data'], sender: ch
 /**
  * Stop element picker mode
  */
-async function handleStopElementPicker(_passedTabId: number | undefined, _sender: chrome.runtime.MessageSender, sendResponse: (response?: { success: boolean; error?: string }) => void) {
+async function handleStopElementPicker(
+  _passedTabId: number | undefined,
+  _sender: chrome.runtime.MessageSender,
+  sendResponse: (response?: { success: boolean; error?: string }) => void,
+) {
   try {
     // Clear all active sessions
     for (const [tabId] of activePickerSessions) {
-      await chrome.tabs.sendMessage(tabId, {
-        type: 'DEACTIVATE_ELEMENT_PICKER',
-        source: 'background'
-      }).catch(() => {
-        // Tab might be closed, ignore error
-      });
+      await chrome.tabs
+        .sendMessage(tabId, {
+          type: "DEACTIVATE_ELEMENT_PICKER",
+          source: "background",
+        })
+        .catch(() => {
+          // Tab might be closed, ignore error
+        });
     }
 
     activePickerSessions.clear();
     sendResponse({ success: true });
   } catch (error) {
-    Logger.error('Error stopping element picker', toError(error), { component: 'Background', activeSessionCount: activePickerSessions.size });
+    Logger.error("Error stopping element picker", toError(error), {
+      component: "Background",
+      activeSessionCount: activePickerSessions.size,
+    });
     sendResponse({ success: false, error: getErrorMessage(error) });
   }
 }
@@ -1190,16 +1397,24 @@ chrome.windows.onRemoved.addListener((windowId) => {
     pickerWindowId = null;
     originalTabId = null;
     // Stop any active picker sessions
-    void handleStopElementPicker(undefined, { tab: undefined } as chrome.runtime.MessageSender, () => undefined);
+    void handleStopElementPicker(
+      undefined,
+      { tab: undefined } as chrome.runtime.MessageSender,
+      () => undefined,
+    );
   }
 });
 
 // Handle connection for keeping popup alive
 chrome.runtime.onConnect.addListener((port) => {
-  if (port.name === 'popup-keep-alive') {
+  if (port.name === "popup-keep-alive") {
     port.onDisconnect.addListener(() => {
       // Cleanup any active picker sessions when popup closes
-      void handleStopElementPicker(undefined, { tab: undefined } as chrome.runtime.MessageSender, () => undefined);
+      void handleStopElementPicker(
+        undefined,
+        { tab: undefined } as chrome.runtime.MessageSender,
+        () => undefined,
+      );
     });
   }
 });
@@ -1212,12 +1427,16 @@ chrome.runtime.onInstalled.addListener((details) => {
       await updateActionBehavior(mode);
 
       // Re-inject content scripts after extension updates
-      if (details.reason === chrome.runtime.OnInstalledReason.UPDATE as string) {
+      if (details.reason === "update") {
         // Extension updated, re-injecting content scripts
         await handleExtensionUpdate();
       }
     } catch (error) {
-      Logger.error('Error initializing interface mode on install', toError(error), { component: 'Background', reason: details.reason });
+      Logger.error(
+        "Error initializing interface mode on install",
+        toError(error),
+        { component: "Background", reason: details.reason },
+      );
     }
   })();
 });
@@ -1229,7 +1448,11 @@ chrome.runtime.onStartup.addListener(() => {
       const mode = await getInterfaceMode();
       await updateActionBehavior(mode);
     } catch (error) {
-      Logger.error('Error initializing interface mode on startup', toError(error), { component: 'Background', phase: 'startup' });
+      Logger.error(
+        "Error initializing interface mode on startup",
+        toError(error),
+        { component: "Background", phase: "startup" },
+      );
     }
   })();
 });
@@ -1242,14 +1465,18 @@ chrome.action.onClicked.addListener((tab) => {
     try {
       void chrome.sidePanel.open({ windowId: tab.windowId });
     } catch (error) {
-      Logger.error('Error opening side panel', toError(error), { component: 'Background', windowId: tab.windowId, tabId: tab.id });
+      Logger.error("Error opening side panel", toError(error), {
+        component: "Background",
+        windowId: tab.windowId,
+        tabId: tab.id,
+      });
     }
   }
 });
 
 // Listen for storage changes to update interface mode
 chrome.storage.onChanged.addListener((changes, areaName) => {
-  if (areaName === 'local' && 'interfaceMode' in changes) {
+  if (areaName === "local" && "interfaceMode" in changes) {
     const interfaceModeChange = changes.interfaceMode;
     if (interfaceModeChange.newValue) {
       void (async () => {
@@ -1257,7 +1484,10 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
           const newMode = interfaceModeChange.newValue as InterfaceMode;
           await updateActionBehavior(newMode);
         } catch (error) {
-          Logger.error('Error updating interface mode', toError(error), { component: 'Background', newMode: interfaceModeChange.newValue });
+          Logger.error("Error updating interface mode", toError(error), {
+            component: "Background",
+            newMode: interfaceModeChange.newValue,
+          });
         }
       })();
     }
