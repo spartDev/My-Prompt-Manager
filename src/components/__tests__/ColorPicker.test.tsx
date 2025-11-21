@@ -1,15 +1,14 @@
 
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
 
-import { PRESET_COLORS } from '../../constants/colors';
 import ColorPicker from '../ColorPicker';
 
 describe('ColorPicker', () => {
   const mockOnChange = vi.fn();
   const defaultProps = {
-    value: '#FF0000',
+    value: '#DC2626', // Red from preset colors
     onChange: mockOnChange,
     label: 'Select Color'
   };
@@ -17,26 +16,30 @@ describe('ColorPicker', () => {
   it('renders color picker with label and current color', () => {
     render(<ColorPicker {...defaultProps} />);
 
-    expect(screen.getByText('Select Color')).toBeInTheDocument();
+    // Verify the label is present
+    const label = screen.getByText('Select Color');
+    expect(label).toBeInTheDocument();
 
-    // The trigger button shows the color name if available
-    const currentColorName = PRESET_COLORS.find(c => c.value === '#FF0000')?.name;
-    if (currentColorName) {
-      expect(screen.getByText(currentColorName)).toBeInTheDocument();
-    }
+    // The trigger button should display the color name (for the known preset color)
+    const trigger = screen.getByRole('button');
+    expect(trigger).toBeInTheDocument();
+
+    // In non-compact mode, the color name should be visible
+    expect(trigger).toHaveTextContent('Red');
   });
 
   it('renders compact mode correctly', () => {
     render(<ColorPicker {...defaultProps} compact={true} />);
 
-    // Should not show label text inside the button in compact mode
-    const currentColorName = PRESET_COLORS.find(c => c.value === '#FF0000')?.name;
-    if (currentColorName) {
-      expect(screen.queryByText(currentColorName)).not.toBeInTheDocument();
-    }
-
-    // But the label prop should still render above if provided
+    // The label prop should still render above in compact mode
     expect(screen.getByText('Select Color')).toBeInTheDocument();
+
+    // Trigger button should exist with only the swatch (no text)
+    const trigger = screen.getByRole('button');
+    expect(trigger).toBeInTheDocument();
+
+    // In compact mode, the button should have a title attribute with color name
+    expect(trigger).toHaveAttribute('title', 'Red');
   });
 
   it('opens dropdown on click', async () => {
@@ -55,16 +58,15 @@ describe('ColorPicker', () => {
     // Open dropdown
     await userEvent.click(screen.getByRole('button'));
 
-    // Find a different preset color
-    const targetColor = PRESET_COLORS.find(c => c.value !== '#FF0000');
-    expect(targetColor).toBeDefined();
+    // Wait for dropdown to open and show preset colors
+    expect(await screen.findByText('Preset Colors')).toBeInTheDocument();
 
-    if (targetColor) {
-      const colorButton = screen.getByTitle(targetColor.name);
-      await userEvent.click(colorButton);
+    // Select a different color by its accessible title
+    const colorButton = screen.getByTitle('Ocean Blue');
+    await userEvent.click(colorButton);
 
-      expect(mockOnChange).toHaveBeenCalledWith(targetColor.value);
-    }
+    // Verify onChange was called with the new color value
+    expect(mockOnChange).toHaveBeenCalledWith('#2563EB');
   });
 
   it('allows entering hex code manually', async () => {
@@ -105,14 +107,14 @@ describe('ColorPicker', () => {
   it('syncs internal state when value prop changes', () => {
     const { rerender } = render(<ColorPicker {...defaultProps} />);
 
-    // Update prop
-    rerender(<ColorPicker {...defaultProps} value="#0000FF" />);
+    // Initially displays Red
+    expect(screen.getByRole('button')).toHaveTextContent('Red');
 
-    // Check if displayed color name updated
-    const newColorName = PRESET_COLORS.find(c => c.value === '#0000FF')?.name;
-    if (newColorName) {
-      expect(screen.getByText(newColorName)).toBeInTheDocument();
-    }
+    // Update prop to a different color
+    rerender(<ColorPicker {...defaultProps} value="#1E40AF" />);
+
+    // Check if displayed color name updated to Navy
+    expect(screen.getByRole('button')).toHaveTextContent('Navy');
   });
 
   it('disables the picker when disabled prop is true', () => {
@@ -127,47 +129,58 @@ describe('ColorPicker', () => {
 
      await userEvent.click(screen.getByRole('button'));
 
-     // Check for color input (it's hidden but accessible via label)
-     const colorInput = document.querySelector('input[type="color"]');
-     expect(colorInput).toBeInTheDocument();
+     // Wait for dropdown to open
+     expect(await screen.findByText('Custom Color')).toBeInTheDocument();
 
      // Verify "Pick Custom Color" label exists
-     expect(screen.getAllByText('Pick Custom Color')[0]).toBeInTheDocument();
+     const customColorButton = screen.getByText('Pick Custom Color');
+     expect(customColorButton).toBeInTheDocument();
+
+     // Verify the label is properly structured as a clickable element
+     const label = customColorButton.closest('label');
+     expect(label).not.toBeNull();
+     expect(label).toHaveAttribute('aria-label', 'Pick custom color');
   });
 
   it('shows checkmark on currently selected preset color', async () => {
     render(<ColorPicker {...defaultProps} value="#DC2626" />); // Red
 
-    // Open dropdown
-    const trigger = screen.getByText('Red').closest('button');
-    expect(trigger).not.toBeNull();
-    if (trigger) {
-      await userEvent.click(trigger);
-    }
+    // Open dropdown using the accessible button
+    const trigger = screen.getByRole('button');
+    expect(trigger).toHaveTextContent('Red');
+    await userEvent.click(trigger);
 
-    // Find the Red option and verify it has the checkmark
+    // Wait for dropdown to open
+    expect(await screen.findByText('Preset Colors')).toBeInTheDocument();
+
+    // Find the Red option and verify it has a child element (the checkmark SVG)
     const redOption = screen.getByTitle('Red');
-    expect(redOption.querySelector('svg')).toBeInTheDocument();
+    expect(redOption.children.length).toBeGreaterThan(0);
+    expect(redOption.children[0].tagName).toBe('svg');
   });
 
   it('updates checkmark when selected color changes', async () => {
     const { rerender } = render(<ColorPicker {...defaultProps} value="#DC2626" />); // Red
 
     // Open dropdown
-    const trigger = screen.getByText('Red').closest('button');
-    if (trigger) {
-      await userEvent.click(trigger);
-    }
+    const trigger = screen.getByRole('button');
+    await userEvent.click(trigger);
+
+    // Wait for dropdown to open
+    expect(await screen.findByText('Preset Colors')).toBeInTheDocument();
 
     // Change to Ocean Blue
     rerender(<ColorPicker {...defaultProps} value="#2563EB" />);
 
-    // Verify checkmark moved from Red to Blue
+    // Verify checkmark moved from Red to Ocean Blue
     const redBtn = screen.getByTitle('Red');
     const blueBtn = screen.getByTitle('Ocean Blue');
 
-    expect(redBtn.querySelector('svg')).not.toBeInTheDocument();
-    expect(blueBtn.querySelector('svg')).toBeInTheDocument();
+    // Red button should not have checkmark (no child elements)
+    expect(redBtn.children.length).toBe(0);
+    // Ocean Blue button should have checkmark (has SVG child)
+    expect(blueBtn.children.length).toBeGreaterThan(0);
+    expect(blueBtn.children[0].tagName).toBe('svg');
   });
 
   it('handles custom color input changes', async () => {
@@ -175,9 +188,22 @@ describe('ColorPicker', () => {
 
     await userEvent.click(screen.getByRole('button'));
 
-    // Find hidden color input
-    const colorInput = document.querySelector('input[type="color"]') as HTMLInputElement;
+    // Wait for dropdown to open
+    expect(await screen.findByText('Custom Color')).toBeInTheDocument();
+
+    // Get the label element and find its associated input via htmlFor
+    const label = screen.getByText('Pick Custom Color').closest('label');
+    expect(label).not.toBeNull();
+    const inputId = label?.getAttribute('for');
+    expect(inputId).toBeTruthy();
+
+    // Query the input by its ID
+    if (!inputId) {
+      throw new Error('Expected inputId to be defined');
+    }
+    const colorInput = document.getElementById(inputId) as HTMLInputElement;
     expect(colorInput).toBeInTheDocument();
+    expect(colorInput).toHaveAttribute('type', 'color');
 
     // Simulate change event directly on the input
     fireEvent.change(colorInput, { target: { value: '#123456' } });
@@ -209,18 +235,23 @@ describe('ColorPicker', () => {
 
     await userEvent.click(screen.getByRole('button'));
 
-    // Verify the label exists and is associated with the color input
-    const label = screen.getAllByText('Pick Custom Color')[0].closest('label');
-    expect(label).toBeDefined();
+    // Wait for dropdown to open
+    expect(await screen.findByText('Custom Color')).toBeInTheDocument();
 
-    if (label) {
-      const forAttr = label.getAttribute('for');
-      expect(forAttr).not.toBeNull();
+    // Get the label and verify it has proper htmlFor attribute
+    const label = screen.getByText('Pick Custom Color').closest('label');
+    expect(label).not.toBeNull();
+    expect(label).toHaveAttribute('aria-label', 'Pick custom color');
 
-      // Verify the input exists and has matching ID
-      const colorInput = document.querySelector('input[type="color"]');
-      expect(colorInput).toBeInTheDocument();
-      expect(colorInput?.id).toBe(forAttr);
+    const inputId = label?.getAttribute('for');
+    expect(inputId).toBeTruthy();
+
+    // Verify the input exists and has the matching ID
+    if (!inputId) {
+      throw new Error('Expected inputId to be defined');
     }
+    const colorInput = document.getElementById(inputId);
+    expect(colorInput).toBeInTheDocument();
+    expect(colorInput?.id).toBe(inputId);
   });
 });
