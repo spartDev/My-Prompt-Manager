@@ -43,6 +43,18 @@ const renderSettings = async () => {
   await screen.findByRole('heading', { name: /settings/i });
 };
 
+// Helper to find the reset call among multiple storage.local.set calls
+const findResetCall = (calls: Array<any>) =>
+  calls.find(call =>
+    call[0]?.promptLibrarySettings?.enabledSites &&
+    call[0]?.interfaceMode
+  );
+
+// Helper to assert that a priority group contains all expected sites
+const assertPriorityGroup = (sites: string[], group: string[]) => {
+  group.forEach(site => expect(sites).toContain(site));
+};
+
 describe('SettingsView', () => {
   beforeEach(() => {
     // Ensure window.alert exists for spying
@@ -160,12 +172,9 @@ describe('SettingsView', () => {
     });
 
     // The component makes multiple chrome.storage.local.set calls during its lifecycle.
-    // The reset call has a specific signature: both promptLibrarySettings and interfaceMode.
+    // Use helper to find the reset call with the specific signature.
     const calls = (chromeMock.storage.local.set as Mock).mock.calls;
-    const resetCall = calls.find(call =>
-      call[0]?.promptLibrarySettings?.enabledSites &&
-      call[0]?.interfaceMode
-    );
+    const resetCall = findResetCall(calls);
 
     expect(resetCall).toBeDefined();
     // TypeScript doesn't narrow types after toBeDefined(), so we assert the type
@@ -179,14 +188,12 @@ describe('SettingsView', () => {
     expect(promptLibrarySettings.enabledSites[0]).toBe('claude.ai'); // Priority 100
     expect(promptLibrarySettings.enabledSites[1]).toBe('chatgpt.com'); // Priority 90
 
+    // Use helper to assert priority groups contain expected sites
     const p85 = promptLibrarySettings.enabledSites.slice(2, 4); // Priority 85
-    expect(p85).toContain('chat.mistral.ai');
-    expect(p85).toContain('gemini.google.com');
+    assertPriorityGroup(p85, ['chat.mistral.ai', 'gemini.google.com']);
 
     const p80 = promptLibrarySettings.enabledSites.slice(4, 7); // Priority 80
-    expect(p80).toContain('www.perplexity.ai');
-    expect(p80).toContain('copilot.microsoft.com');
-    expect(p80).toContain('m365.cloud.microsoft');
+    assertPriorityGroup(p80, ['www.perplexity.ai', 'copilot.microsoft.com', 'm365.cloud.microsoft']);
 
     // Verify other reset values
     expect(promptLibrarySettings.customSites).toEqual([]);
