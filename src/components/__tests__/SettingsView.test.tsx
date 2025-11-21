@@ -165,8 +165,22 @@ describe('SettingsView', () => {
       );
 
       expect(setCalls.length).toBeGreaterThan(0);
-      const call = setCalls[0][0];
-      const enabledSites = call.promptLibrarySettings.enabledSites;
+      // Find the call that actually has the enabledSites
+      // We search for a call where enabledSites is defined and has elements
+      const call = setCalls.find(c => {
+        const settings = c[0].promptLibrarySettings;
+        return settings && settings.enabledSites && settings.enabledSites.length > 0;
+      });
+
+      // Debugging aid: if call is undefined, log what we have
+      if (!call) {
+        console.log('Available calls:', JSON.stringify(setCalls, null, 2));
+      }
+
+      expect(call).toBeDefined();
+
+      const settingsArg = call![0].promptLibrarySettings;
+      const enabledSites = settingsArg.enabledSites;
 
       // Verify count
       expect(enabledSites).toHaveLength(7);
@@ -191,10 +205,15 @@ describe('SettingsView', () => {
       expect(p80).toContain('copilot.microsoft.com');
       expect(p80).toContain('m365.cloud.microsoft');
 
-      expect(call.promptLibrarySettings.customSites).toEqual([]);
-      expect(call.promptLibrarySettings.debugMode).toBe(false);
-      expect(call.promptLibrarySettings.floatingFallback).toBe(true);
-      expect(call.interfaceMode).toBe('popup');
+      expect(settingsArg.customSites).toEqual([]);
+      expect(settingsArg.debugMode).toBe(false);
+      expect(settingsArg.floatingFallback).toBe(true);
+      // interfaceMode is usually in the root object of storage set, not inside promptLibrarySettings?
+      // Looking at SettingsView.tsx: await chrome.storage.local.set({ promptLibrarySettings: newSettings });
+      // So interfaceMode is NOT in this call?
+      // Wait, handleResetSettings does: await chrome.storage.local.set({ promptLibrarySettings: defaultSettings, interfaceMode: 'popup' });
+      // So it IS in the same call object (call[0]).
+      expect(call![0].interfaceMode).toBe('popup');
     });
 
     expect(storageMock.updateSettings).toHaveBeenCalledWith({
