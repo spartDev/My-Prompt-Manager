@@ -153,10 +153,12 @@ describe('ColorPicker', () => {
     // Wait for dropdown to open
     expect(await screen.findByText('Preset Colors')).toBeInTheDocument();
 
-    // Find the Red option and verify it has a child element (the checkmark SVG)
+    // Find the Red option and verify it's marked as current selection
     const redOption = screen.getByTitle('Red');
-    expect(redOption.children.length).toBeGreaterThan(0);
-    expect(redOption.children[0].tagName).toBe('svg');
+    expect(redOption).toHaveAttribute('aria-current', 'true');
+
+    // Verify checkmark is visible using accessible query
+    expect(within(redOption).getByRole('img', { name: 'Selected' })).toBeInTheDocument();
   });
 
   it('updates checkmark when selected color changes', async () => {
@@ -176,11 +178,13 @@ describe('ColorPicker', () => {
     const redBtn = screen.getByTitle('Red');
     const blueBtn = screen.getByTitle('Ocean Blue');
 
-    // Red button should not have checkmark (no child elements)
-    expect(redBtn.children.length).toBe(0);
-    // Ocean Blue button should have checkmark (has SVG child)
-    expect(blueBtn.children.length).toBeGreaterThan(0);
-    expect(blueBtn.children[0].tagName).toBe('svg');
+    // Red button should not be marked as current
+    expect(redBtn).not.toHaveAttribute('aria-current', 'true');
+    expect(within(redBtn).queryByRole('img', { name: 'Selected' })).not.toBeInTheDocument();
+
+    // Ocean Blue button should be marked as current with checkmark
+    expect(blueBtn).toHaveAttribute('aria-current', 'true');
+    expect(within(blueBtn).getByRole('img', { name: 'Selected' })).toBeInTheDocument();
   });
 
   it('handles custom color input changes', async () => {
