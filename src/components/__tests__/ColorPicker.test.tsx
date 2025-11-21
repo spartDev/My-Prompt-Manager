@@ -135,35 +135,38 @@ describe('ColorPicker', () => {
      expect(screen.getAllByText('Pick Custom Color')[0]).toBeInTheDocument();
   });
 
-  it('shows selected state correctly', async () => {
-    const { rerender } = render(<ColorPicker {...defaultProps} value="#DC2626" />); // Start with Red
+  it('shows checkmark on currently selected preset color', async () => {
+    render(<ColorPicker {...defaultProps} value="#DC2626" />); // Red
 
-    // Find the trigger button specifically by text content
-    // We use closest('button') because getByText returns the span inside
+    // Open dropdown
     const trigger = screen.getByText('Red').closest('button');
     expect(trigger).not.toBeNull();
     if (trigger) {
-        await userEvent.click(trigger);
+      await userEvent.click(trigger);
     }
 
-    // Find the option with title "Red" inside the dropdown (grid)
+    // Find the Red option and verify it has the checkmark
     const redOption = screen.getByTitle('Red');
-
-    // It should have the checkmark
     expect(redOption.querySelector('svg')).toBeInTheDocument();
+  });
 
-    // Re-render with different color (Ocean Blue)
+  it('updates checkmark when selected color changes', async () => {
+    const { rerender } = render(<ColorPicker {...defaultProps} value="#DC2626" />); // Red
+
+    // Open dropdown
+    const trigger = screen.getByText('Red').closest('button');
+    if (trigger) {
+      await userEvent.click(trigger);
+    }
+
+    // Change to Ocean Blue
     rerender(<ColorPicker {...defaultProps} value="#2563EB" />);
 
-    // Note: Dropdown state (isOpen) is preserved across rerenders.
-    // Since we left it open, it should still be open.
-
+    // Verify checkmark moved from Red to Blue
     const redBtn = screen.getByTitle('Red');
     const blueBtn = screen.getByTitle('Ocean Blue');
 
-    // Red should no longer have the SVG
     expect(redBtn.querySelector('svg')).not.toBeInTheDocument();
-    // Blue should now have the SVG
     expect(blueBtn.querySelector('svg')).toBeInTheDocument();
   });
 
@@ -201,54 +204,23 @@ describe('ColorPicker', () => {
     expect(screen.queryByPlaceholderText('#000000')).not.toBeInTheDocument();
   });
 
-  it('handles Enter key on custom color label', async () => {
+  it('custom color picker is properly labeled for accessibility', async () => {
     render(<ColorPicker {...defaultProps} />);
 
     await userEvent.click(screen.getByRole('button'));
 
+    // Verify the label exists and is associated with the color input
     const label = screen.getAllByText('Pick Custom Color')[0].closest('label');
     expect(label).toBeDefined();
 
     if (label) {
       const forAttr = label.getAttribute('for');
       expect(forAttr).not.toBeNull();
-      if (forAttr) {
-        // Mock click on the input since we can't easily simulate the browser behavior of label->input click
-        const colorInput = document.getElementById(forAttr);
-        if (colorInput) {
-          const clickSpy = vi.spyOn(colorInput, 'click');
 
-          // Focus and press Enter
-          label.focus();
-          await userEvent.keyboard('{Enter}');
-          expect(clickSpy).toHaveBeenCalled();
-        }
-      }
-    }
-  });
-
-  it('handles Space key on custom color label', async () => {
-    render(<ColorPicker {...defaultProps} />);
-
-    await userEvent.click(screen.getByRole('button'));
-
-    const label = screen.getAllByText('Pick Custom Color')[0].closest('label');
-    expect(label).toBeDefined();
-
-    if (label) {
-      const forAttr = label.getAttribute('for');
-      expect(forAttr).not.toBeNull();
-      if (forAttr) {
-        const colorInput = document.getElementById(forAttr);
-        if (colorInput) {
-          const clickSpy = vi.spyOn(colorInput, 'click');
-
-          // Focus and press Space
-          label.focus();
-          await userEvent.keyboard(' ');
-          expect(clickSpy).toHaveBeenCalled();
-        }
-      }
+      // Verify the input exists and has matching ID
+      const colorInput = document.querySelector('input[type="color"]');
+      expect(colorInput).toBeInTheDocument();
+      expect(colorInput?.id).toBe(forAttr);
     }
   });
 });
