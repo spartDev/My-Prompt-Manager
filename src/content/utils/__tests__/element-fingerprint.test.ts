@@ -1,5 +1,6 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+
 import { getElementFingerprintGenerator } from '../element-fingerprint';
 
 describe('ElementFingerprintGenerator', () => {

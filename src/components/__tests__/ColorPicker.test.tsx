@@ -3,8 +3,8 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
 
-import ColorPicker from '../ColorPicker';
 import { PRESET_COLORS } from '../../constants/colors';
+import ColorPicker from '../ColorPicker';
 
 describe('ColorPicker', () => {
   const mockOnChange = vi.fn();
@@ -201,15 +201,21 @@ describe('ColorPicker', () => {
     const label = screen.getAllByText('Pick Custom Color')[0].closest('label');
     expect(label).toBeDefined();
 
-    // Mock click on the input since we can't easily simulate the browser behavior of label->input click
-    const colorInput = document.getElementById(label!.getAttribute('for')!);
-    const clickSpy = vi.spyOn(colorInput!, 'click');
-
-    // Focus and press Enter
     if (label) {
-      label.focus();
-      await userEvent.keyboard('{Enter}');
-      expect(clickSpy).toHaveBeenCalled();
+      const forAttr = label.getAttribute('for');
+      expect(forAttr).not.toBeNull();
+      if (forAttr) {
+        // Mock click on the input since we can't easily simulate the browser behavior of label->input click
+        const colorInput = document.getElementById(forAttr);
+        if (colorInput) {
+          const clickSpy = vi.spyOn(colorInput, 'click');
+
+          // Focus and press Enter
+          label.focus();
+          await userEvent.keyboard('{Enter}');
+          expect(clickSpy).toHaveBeenCalled();
+        }
+      }
     }
   });
 
@@ -221,14 +227,20 @@ describe('ColorPicker', () => {
     const label = screen.getAllByText('Pick Custom Color')[0].closest('label');
     expect(label).toBeDefined();
 
-    const colorInput = document.getElementById(label!.getAttribute('for')!);
-    const clickSpy = vi.spyOn(colorInput!, 'click');
-
-    // Focus and press Space
     if (label) {
-      label.focus();
-      await userEvent.keyboard(' ');
-      expect(clickSpy).toHaveBeenCalled();
+      const forAttr = label.getAttribute('for');
+      expect(forAttr).not.toBeNull();
+      if (forAttr) {
+        const colorInput = document.getElementById(forAttr);
+        if (colorInput) {
+          const clickSpy = vi.spyOn(colorInput, 'click');
+
+          // Focus and press Space
+          label.focus();
+          await userEvent.keyboard(' ');
+          expect(clickSpy).toHaveBeenCalled();
+        }
+      }
     }
   });
 });
