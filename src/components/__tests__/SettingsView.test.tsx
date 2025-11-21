@@ -159,31 +159,17 @@ describe('SettingsView', () => {
       // enabledSites should match the default platforms sorted by priority (highest first)
       // Claude (100), ChatGPT (90), Mistral (85), Gemini (85), Perplexity (80), Copilot (80), M365Copilot (80)
       // Note: When priorities are equal, order depends on Object.values() iteration
-      // Filter out non-set calls
-      const setCalls = (chromeMock.storage.local.set as Mock).mock.calls.filter(
-        call => call[0] && call[0].promptLibrarySettings
-      );
-
-      expect(setCalls.length).toBeGreaterThan(0);
-      // Find the call that actually has the enabledSites
-      // We search for a call where enabledSites is defined and has elements
-      const call = setCalls.find(c => {
-        const settings = c[0].promptLibrarySettings;
-        return settings && settings.enabledSites && settings.enabledSites.length > 0;
-      });
-
-      // Debugging aid: if call is undefined, log what we have
-      if (!call) {
-        console.log('Available calls:', JSON.stringify(setCalls, null, 2));
-      }
+      // Get the last set call that contains enabledSites
+      const call = (chromeMock.storage.local.set as Mock).mock.calls
+        .reverse()
+        .find(c => c[0]?.promptLibrarySettings?.enabledSites?.length > 0);
 
       expect(call).toBeDefined();
       if (!call) {
         throw new Error('Expected call to be defined');
       }
 
-      const settingsArg = call[0].promptLibrarySettings;
-      const enabledSites = settingsArg.enabledSites;
+      const { enabledSites } = call[0].promptLibrarySettings;
 
       // Verify count
       expect(enabledSites).toHaveLength(7);
@@ -208,9 +194,10 @@ describe('SettingsView', () => {
       expect(p80).toContain('copilot.microsoft.com');
       expect(p80).toContain('m365.cloud.microsoft');
 
-      expect(settingsArg.customSites).toEqual([]);
-      expect(settingsArg.debugMode).toBe(false);
-      expect(settingsArg.floatingFallback).toBe(true);
+      const { promptLibrarySettings } = call[0];
+      expect(promptLibrarySettings.customSites).toEqual([]);
+      expect(promptLibrarySettings.debugMode).toBe(false);
+      expect(promptLibrarySettings.floatingFallback).toBe(true);
       // interfaceMode is usually in the root object of storage set, not inside promptLibrarySettings?
       // Looking at SettingsView.tsx: await chrome.storage.local.set({ promptLibrarySettings: newSettings });
       // So interfaceMode is NOT in this call?
