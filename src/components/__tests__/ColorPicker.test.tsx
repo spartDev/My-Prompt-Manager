@@ -140,9 +140,9 @@ describe('ColorPicker', () => {
 
     await userEvent.click(screen.getByRole('button'));
 
-    // The current color should have a ring/border indicating selection
+    // The current color should have a checkmark SVG indicating selection
     const selectedColorBtn = screen.getByTitle('Red');
-    expect(selectedColorBtn.className).toContain('border-purple-500');
+    expect(selectedColorBtn.querySelector('svg')).toBeInTheDocument();
 
     // Re-render with different color
     rerender(<ColorPicker {...defaultProps} value="#0000FF" />); // Blue
@@ -153,8 +153,10 @@ describe('ColorPicker', () => {
     const redBtn = screen.getByTitle('Red');
     const blueBtn = screen.getByTitle('Blue');
 
-    expect(redBtn.className).not.toContain('border-purple-500');
-    expect(blueBtn.className).toContain('border-purple-500');
+    // Red should no longer have the SVG
+    expect(redBtn.querySelector('svg')).not.toBeInTheDocument();
+    // Blue should now have the SVG
+    expect(blueBtn.querySelector('svg')).toBeInTheDocument();
   });
 
   it('handles custom color input changes', async () => {
