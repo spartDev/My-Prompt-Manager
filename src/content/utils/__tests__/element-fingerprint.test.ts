@@ -185,9 +185,6 @@ describe('ElementFingerprintGenerator', () => {
 
       const found = generator.findElement(fingerprint);
 
-      if (found) {
-        throw new Error('Expected no element to be found');
-      }
       expect(found).toBeNull();
     });
 
