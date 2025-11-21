@@ -136,22 +136,30 @@ describe('ColorPicker', () => {
   });
 
   it('shows selected state correctly', async () => {
-    const { rerender } = render(<ColorPicker {...defaultProps} />);
+    const { rerender } = render(<ColorPicker {...defaultProps} value="#DC2626" />); // Start with Red
 
-    await userEvent.click(screen.getByRole('button'));
+    // Find the trigger button specifically by text content
+    // We use closest('button') because getByText returns the span inside
+    const trigger = screen.getByText('Red').closest('button');
+    expect(trigger).not.toBeNull();
+    if (trigger) {
+        await userEvent.click(trigger);
+    }
 
-    // The current color should have a checkmark SVG indicating selection
-    const selectedColorBtn = screen.getByTitle('Red');
-    expect(selectedColorBtn.querySelector('svg')).toBeInTheDocument();
+    // Find the option with title "Red" inside the dropdown (grid)
+    const redOption = screen.getByTitle('Red');
 
-    // Re-render with different color
-    rerender(<ColorPicker {...defaultProps} value="#0000FF" />); // Blue
+    // It should have the checkmark
+    expect(redOption.querySelector('svg')).toBeInTheDocument();
 
-    // Open dropdown again
-    await userEvent.click(screen.getByRole('button'));
+    // Re-render with different color (Ocean Blue)
+    rerender(<ColorPicker {...defaultProps} value="#2563EB" />);
+
+    // Note: Dropdown state (isOpen) is preserved across rerenders.
+    // Since we left it open, it should still be open.
 
     const redBtn = screen.getByTitle('Red');
-    const blueBtn = screen.getByTitle('Blue');
+    const blueBtn = screen.getByTitle('Ocean Blue');
 
     // Red should no longer have the SVG
     expect(redBtn.querySelector('svg')).not.toBeInTheDocument();
