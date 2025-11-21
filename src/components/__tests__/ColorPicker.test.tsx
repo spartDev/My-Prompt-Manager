@@ -202,10 +202,9 @@ describe('ColorPicker', () => {
     expect(inputId).toBeTruthy();
 
     // Query the input by its ID
-    if (!inputId) {
-      throw new Error('Expected inputId to be defined');
-    }
-    const colorInput = document.getElementById(inputId) as HTMLInputElement;
+    expect(inputId).toBeTruthy();
+    const colorInput = document.getElementById(inputId as string);
+    expect(colorInput).toBeInstanceOf(HTMLInputElement);
     expect(colorInput).toBeInTheDocument();
     expect(colorInput).toHaveAttribute('type', 'color');
 
@@ -251,10 +250,9 @@ describe('ColorPicker', () => {
     expect(inputId).toBeTruthy();
 
     // Verify the input exists and has the matching ID
-    if (!inputId) {
-      throw new Error('Expected inputId to be defined');
-    }
-    const colorInput = document.getElementById(inputId);
+    expect(inputId).toBeTruthy();
+    const colorInput = document.getElementById(inputId as string);
+    expect(colorInput).toBeInstanceOf(HTMLInputElement);
     expect(colorInput).toBeInTheDocument();
     expect(colorInput?.id).toBe(inputId);
   });
