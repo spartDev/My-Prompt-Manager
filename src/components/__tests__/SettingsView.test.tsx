@@ -156,55 +156,43 @@ describe('SettingsView', () => {
     await userEvent.click(confirmButton);
 
     await waitFor(() => {
-      // enabledSites should match the default platforms sorted by priority (highest first)
-      // Claude (100), ChatGPT (90), Mistral (85), Gemini (85), Perplexity (80), Copilot (80), M365Copilot (80)
-      // Note: When priorities are equal, order depends on Object.values() iteration
-      // Get the last set call that contains enabledSites
-      const call = (chromeMock.storage.local.set as Mock).mock.calls
-        .reverse()
-        .find(c => c[0]?.promptLibrarySettings?.enabledSites?.length > 0);
-
-      expect(call).toBeDefined();
-      if (!call) {
-        throw new Error('Expected call to be defined');
-      }
-
-      const { enabledSites } = call[0].promptLibrarySettings;
-
-      // Verify count
-      expect(enabledSites).toHaveLength(7);
-
-      // The order is non-deterministic for equal priorities in some environments
-      // So we verify priority groups instead
-
-      // Priority 100
-      expect(enabledSites[0]).toBe('claude.ai');
-
-      // Priority 90
-      expect(enabledSites[1]).toBe('chatgpt.com');
-
-      // Priority 85
-      const p85 = enabledSites.slice(2, 4);
-      expect(p85).toContain('chat.mistral.ai');
-      expect(p85).toContain('gemini.google.com');
-
-      // Priority 80
-      const p80 = enabledSites.slice(4, 7);
-      expect(p80).toContain('www.perplexity.ai');
-      expect(p80).toContain('copilot.microsoft.com');
-      expect(p80).toContain('m365.cloud.microsoft');
-
-      const { promptLibrarySettings } = call[0];
-      expect(promptLibrarySettings.customSites).toEqual([]);
-      expect(promptLibrarySettings.debugMode).toBe(false);
-      expect(promptLibrarySettings.floatingFallback).toBe(true);
-      // interfaceMode is usually in the root object of storage set, not inside promptLibrarySettings?
-      // Looking at SettingsView.tsx: await chrome.storage.local.set({ promptLibrarySettings: newSettings });
-      // So interfaceMode is NOT in this call?
-      // Wait, handleResetSettings does: await chrome.storage.local.set({ promptLibrarySettings: defaultSettings, interfaceMode: 'popup' });
-      // So it IS in the same call object (call[0]).
-      expect(call[0].interfaceMode).toBe('popup');
+      expect(chromeMock.storage.local.set).toHaveBeenCalled();
     });
+
+    // The component makes multiple chrome.storage.local.set calls during its lifecycle.
+    // The reset call has a specific signature: both promptLibrarySettings and interfaceMode.
+    const calls = (chromeMock.storage.local.set as Mock).mock.calls;
+    const resetCall = calls.find(call =>
+      call[0]?.promptLibrarySettings?.enabledSites &&
+      call[0]?.interfaceMode
+    );
+
+    expect(resetCall).toBeDefined();
+    // TypeScript doesn't narrow types after toBeDefined(), so we assert the type
+    const { promptLibrarySettings, interfaceMode } = (resetCall as typeof calls[0])[0];
+
+    // Verify enabledSites contains all default platforms sorted by priority
+    // Claude (100), ChatGPT (90), Mistral (85), Gemini (85), Perplexity (80), Copilot (80), M365Copilot (80)
+    expect(promptLibrarySettings.enabledSites).toHaveLength(7);
+
+    // Priority groups (equal priorities may have non-deterministic order)
+    expect(promptLibrarySettings.enabledSites[0]).toBe('claude.ai'); // Priority 100
+    expect(promptLibrarySettings.enabledSites[1]).toBe('chatgpt.com'); // Priority 90
+
+    const p85 = promptLibrarySettings.enabledSites.slice(2, 4); // Priority 85
+    expect(p85).toContain('chat.mistral.ai');
+    expect(p85).toContain('gemini.google.com');
+
+    const p80 = promptLibrarySettings.enabledSites.slice(4, 7); // Priority 80
+    expect(p80).toContain('www.perplexity.ai');
+    expect(p80).toContain('copilot.microsoft.com');
+    expect(p80).toContain('m365.cloud.microsoft');
+
+    // Verify other reset values
+    expect(promptLibrarySettings.customSites).toEqual([]);
+    expect(promptLibrarySettings.debugMode).toBe(false);
+    expect(promptLibrarySettings.floatingFallback).toBe(true);
+    expect(interfaceMode).toBe('popup');
 
     expect(storageMock.updateSettings).toHaveBeenCalledWith({
       ...DEFAULT_SETTINGS,
