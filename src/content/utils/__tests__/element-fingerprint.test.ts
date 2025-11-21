@@ -207,4 +207,75 @@ describe('ElementFingerprintGenerator', () => {
        expect(found).toBe(btn2);
     });
   });
+
+  describe('Edge Cases', () => {
+    it('should handle element with no attributes', () => {
+      const element = document.createElement('span');
+      container.appendChild(element);
+
+      const fingerprint = generator.generate(element);
+      const found = generator.findElement(fingerprint);
+
+      // With no attributes, confidence will be low
+      expect(fingerprint.meta.confidence).toBe('low');
+      // It might still find it if it's the only span, but we should verify it doesn't crash
+      if (found) {
+        expect(found.tagName).toBe('SPAN');
+      }
+    });
+
+    it('should handle deeply nested elements', () => {
+      let current = container;
+      for (let i = 0; i < 15; i++) {
+        const div = document.createElement('div');
+        div.id = `level-${i}`;
+        current.appendChild(div);
+        current = div;
+      }
+
+      const target = document.createElement('button');
+      target.id = 'deep-target';
+      current.appendChild(target);
+
+      const fingerprint = generator.generate(target);
+      expect(fingerprint.context.depth).toBeGreaterThan(10);
+
+      const found = generator.findElement(fingerprint);
+      expect(found).toBe(target);
+    });
+
+    it('should handle large number of similar elements efficiently', () => {
+      const count = 200;
+      const elements: HTMLElement[] = [];
+
+      // Create many similar elements
+      for (let i = 0; i < count; i++) {
+        const btn = document.createElement('button');
+        btn.className = 'common-btn';
+        btn.textContent = `Button ${i}`;
+        // Add attributes to ensuring confident matching (score > 30)
+        // tagName(5) + textContent(8) + class(2) + type(10) + role(8) = 33
+        btn.setAttribute('type', 'button');
+        btn.setAttribute('role', 'button');
+        container.appendChild(btn);
+        elements.push(btn);
+      }
+
+      // Pick one in the middle
+      const targetIndex = Math.floor(count / 2);
+      const target = elements[targetIndex];
+
+      const fingerprint = generator.generate(target);
+
+      const startTime = performance.now();
+      const found = generator.findElement(fingerprint);
+      const duration = performance.now() - startTime;
+
+      expect(found).toBe(target);
+
+      // Performance assertion: should be reasonably fast (under 50ms for 200 elements)
+      // Note: This might be flaky in CI, so we use a generous threshold
+      expect(duration).toBeLessThan(100);
+    });
+  });
 });
