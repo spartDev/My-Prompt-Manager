@@ -178,8 +178,9 @@ describe('SettingsView', () => {
       }
 
       expect(call).toBeDefined();
-
-      if (!call) { return; }
+      if (!call) {
+        throw new Error('Expected call to be defined');
+      }
 
       const settingsArg = call[0].promptLibrarySettings;
       const enabledSites = settingsArg.enabledSites;
