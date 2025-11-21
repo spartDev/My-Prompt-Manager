@@ -179,7 +179,9 @@ describe('SettingsView', () => {
 
       expect(call).toBeDefined();
 
-      const settingsArg = call![0].promptLibrarySettings;
+      if (!call) { return; }
+
+      const settingsArg = call[0].promptLibrarySettings;
       const enabledSites = settingsArg.enabledSites;
 
       // Verify count
@@ -213,7 +215,7 @@ describe('SettingsView', () => {
       // So interfaceMode is NOT in this call?
       // Wait, handleResetSettings does: await chrome.storage.local.set({ promptLibrarySettings: defaultSettings, interfaceMode: 'popup' });
       // So it IS in the same call object (call[0]).
-      expect(call![0].interfaceMode).toBe('popup');
+      expect(call[0].interfaceMode).toBe('popup');
     });
 
     expect(storageMock.updateSettings).toHaveBeenCalledWith({
