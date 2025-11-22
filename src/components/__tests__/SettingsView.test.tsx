@@ -43,6 +43,18 @@ const renderSettings = async () => {
   await screen.findByRole('heading', { name: /settings/i });
 };
 
+// Helper to find the reset call among multiple storage.local.set calls
+const findResetCall = (calls: Array<any>) =>
+  calls.find(call =>
+    call[0]?.promptLibrarySettings?.enabledSites &&
+    call[0]?.interfaceMode
+  );
+
+// Helper to assert that a priority group contains all expected sites
+const assertPriorityGroup = (sites: string[], group: string[]) => {
+  group.forEach(site => expect(sites).toContain(site));
+};
+
 describe('SettingsView', () => {
   beforeEach(() => {
     // Ensure window.alert exists for spying
@@ -156,31 +168,38 @@ describe('SettingsView', () => {
     await userEvent.click(confirmButton);
 
     await waitFor(() => {
-      // enabledSites should match the default platforms sorted by priority (highest first)
-      // Claude (100), ChatGPT (90), Mistral (85), Gemini (85), Perplexity (80), Copilot (80), M365Copilot (80)
-      // Note: When priorities are equal, order depends on Object.values() iteration
-      const call = (chromeMock.storage.local.set as Mock).mock.calls[0][0];
-      const enabledSites = call.promptLibrarySettings.enabledSites;
-
-      // Verify count
-      expect(enabledSites).toHaveLength(7);
-
-      // Verify exact order based on priority (highest first)
-      expect(enabledSites[0]).toBe('claude.ai');        // Priority 100
-      expect(enabledSites[1]).toBe('chatgpt.com');      // Priority 90
-      // Priorities 85: mistral comes before gemini in SUPPORTED_PLATFORMS object order
-      expect(enabledSites[2]).toBe('chat.mistral.ai');  // Priority 85
-      expect(enabledSites[3]).toBe('gemini.google.com'); // Priority 85
-      // Priorities 80: perplexity, copilot, m365copilot in SUPPORTED_PLATFORMS object order
-      expect(enabledSites[4]).toBe('www.perplexity.ai'); // Priority 80
-      expect(enabledSites[5]).toBe('copilot.microsoft.com'); // Priority 80
-      expect(enabledSites[6]).toBe('m365.cloud.microsoft'); // Priority 80
-
-      expect(call.promptLibrarySettings.customSites).toEqual([]);
-      expect(call.promptLibrarySettings.debugMode).toBe(false);
-      expect(call.promptLibrarySettings.floatingFallback).toBe(true);
-      expect(call.interfaceMode).toBe('popup');
+      expect(chromeMock.storage.local.set).toHaveBeenCalled();
     });
+
+    // The component makes multiple chrome.storage.local.set calls during its lifecycle.
+    // Use helper to find the reset call with the specific signature.
+    const calls = (chromeMock.storage.local.set as Mock).mock.calls;
+    const resetCall = findResetCall(calls);
+
+    expect(resetCall).toBeDefined();
+    // TypeScript doesn't narrow types after toBeDefined(), so we assert the type
+    const { promptLibrarySettings, interfaceMode } = (resetCall as typeof calls[0])[0];
+
+    // Verify enabledSites contains all default platforms sorted by priority
+    // Claude (100), ChatGPT (90), Mistral (85), Gemini (85), Perplexity (80), Copilot (80), M365Copilot (80)
+    expect(promptLibrarySettings.enabledSites).toHaveLength(7);
+
+    // Priority groups (equal priorities may have non-deterministic order)
+    expect(promptLibrarySettings.enabledSites[0]).toBe('claude.ai'); // Priority 100
+    expect(promptLibrarySettings.enabledSites[1]).toBe('chatgpt.com'); // Priority 90
+
+    // Use helper to assert priority groups contain expected sites
+    const p85 = promptLibrarySettings.enabledSites.slice(2, 4); // Priority 85
+    assertPriorityGroup(p85, ['chat.mistral.ai', 'gemini.google.com']);
+
+    const p80 = promptLibrarySettings.enabledSites.slice(4, 7); // Priority 80
+    assertPriorityGroup(p80, ['www.perplexity.ai', 'copilot.microsoft.com', 'm365.cloud.microsoft']);
+
+    // Verify other reset values
+    expect(promptLibrarySettings.customSites).toEqual([]);
+    expect(promptLibrarySettings.debugMode).toBe(false);
+    expect(promptLibrarySettings.floatingFallback).toBe(true);
+    expect(interfaceMode).toBe('popup');
 
     expect(storageMock.updateSettings).toHaveBeenCalledWith({
       ...DEFAULT_SETTINGS,

@@ -96,6 +96,7 @@ const ColorPickerContent: FC<{
               `}
               style={{ backgroundColor: color.value }}
               title={color.name}
+              aria-current={value === color.value ? 'true' : undefined}
             >
               {value === color.value && (
                 <svg
@@ -103,6 +104,8 @@ const ColorPickerContent: FC<{
                   fill="none"
                   stroke={color.textColor || '#FFFFFF'}
                   viewBox="0 0 24 24"
+                  role="img"
+                  aria-label="Selected"
                 >
                   <path
                     strokeLinecap="round"

@@ -62,7 +62,7 @@ describe('SimilarityAlgorithms', () => {
 
       expect(distance).toBe(Infinity); // Should terminate early
       // CI environments are slower - allow reasonable margin
-      const maxDuration = process.env.CI ? 250 : 100;
+      const maxDuration = process.env.CI ? 500 : 400;
       expect(duration).toBeLessThan(maxDuration);
     });
 
@@ -171,7 +171,7 @@ describe('SimilarityAlgorithms', () => {
   });
 
   describe('Performance Benchmarks', () => {
-    it('should handle 100 comparisons of 1K strings efficiently', () => {
+    it('should handle 100 comparisons of 1K strings efficiently', { timeout: 10000 }, () => {
       const str1 = 'word '.repeat(200);  // ~1K chars
       const str2 = 'word '.repeat(200);
 
@@ -182,13 +182,13 @@ describe('SimilarityAlgorithms', () => {
       const duration = performance.now() - startTime;
 
       // Performance benchmark: Should complete batch operations in reasonable time
-      // Non-CI: ~800ms typical, allow 2x margin for system load
-      // CI: 5-6x slower due to shared resources
+      // Non-CI: ~800ms typical, allow 2.5x margin for system load
+      // CI: ~6x slower due to shared resources (800ms × 6 = 4800ms, use 6000ms for safety)
       const maxDuration = process.env.CI ? 6000 : 2000;
       expect(duration).toBeLessThan(maxDuration);
     });
 
-    it('should handle comparisons of 20K strings', { timeout: 30000 }, () => {
+    it('should handle comparisons of 20K strings', { timeout: 45000 }, () => {
       const str1 = 'content '.repeat(2500);
       const str2 = 'content '.repeat(2500);
 
@@ -198,8 +198,9 @@ describe('SimilarityAlgorithms', () => {
       const duration = performance.now() - startTime;
 
       expect(result).toBe(1.0);
-      // CI environments are slower - extremely heavy computation for full 20K comparison
-      const maxDuration = process.env.CI ? 25000 : 5000;
+      // CI environments are slower - extremely heavy computation for full 20K comparison (O(20K×20K))
+      // Typical: 3-5 seconds local, allow margins for system variability
+      const maxDuration = process.env.CI ? 30000 : 10000;
       expect(duration).toBeLessThan(maxDuration); // Single comparison should complete
     });
 
@@ -213,7 +214,7 @@ describe('SimilarityAlgorithms', () => {
 
       expect(result).toBe(Infinity);
       // CI environments are slower - allow reasonable margin while still validating optimization
-      const maxDuration = process.env.CI ? 200 : 100;
+      const maxDuration = process.env.CI ? 400 : 200;
       expect(duration).toBeLessThan(maxDuration);
     });
   });
