@@ -209,7 +209,7 @@ describe('ColorPicker', () => {
     expect(colorInput).toHaveAttribute('type', 'color');
 
     // Simulate change event directly on the input
-    fireEvent.change(colorInput, { target: { value: '#123456' } });
+    fireEvent.change(colorInput as HTMLElement, { target: { value: '#123456' } });
 
     // Should call onChange immediately for custom color picker
     expect(mockOnChange).toHaveBeenCalledWith('#123456');
