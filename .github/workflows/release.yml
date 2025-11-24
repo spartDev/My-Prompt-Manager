@@ -137,7 +137,7 @@ jobs:
           npm audit --audit-level=moderate
 
       - name: 🔍 CodeQL Analysis
-        uses: github/codeql-action/analyze@e12f0178983d466f2f6028f5cc7a6d786fd97f4b # v4
+        uses: github/codeql-action/analyze@fdbfb4d2750291e159f0156def62b853c2798ca2 # v4
         if: success() || failure()
         continue-on-error: true
 
