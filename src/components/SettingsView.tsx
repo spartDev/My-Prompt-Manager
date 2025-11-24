@@ -415,37 +415,29 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
   };
 
   // Handle custom site toggle
-  const handleCustomSiteToggle = async (hostname: string, enabled: boolean) => {
-    const newCustomSites = settings.customSites.map(site => 
-      site.hostname === hostname ? { ...site, enabled } : site
-    );
-    
-    const newSettings = {
-      ...settings,
-      customSites: newCustomSites
-    };
-    
-    setSettings(newSettings);
-    await saveSettings(newSettings);
-    
-    // Notify tabs about the change
-    await notifyCustomSiteChange(hostname);
+  const handleCustomSiteToggle = (hostname: string, enabled: boolean) => {
+    setSettings(prev => ({
+      ...prev,
+      customSites: prev.customSites.map(site =>
+        site.hostname === hostname ? { ...site, enabled } : site
+      )
+    }));
+
+    // Notify tabs about the change (void async call as it's fire-and-forget)
+    void notifyCustomSiteChange(hostname);
+    // Persistence handled by debounced useEffect
   };
 
   // Handle remove custom site
-  const handleRemoveCustomSite = async (hostname: string) => {
-    const newCustomSites = settings.customSites.filter(site => site.hostname !== hostname);
-    
-    const newSettings = {
-      ...settings,
-      customSites: newCustomSites
-    };
-    
-    setSettings(newSettings);
-    await saveSettings(newSettings);
-    
-    // Notify tabs about the removal
-    await notifyCustomSiteChange(hostname);
+  const handleRemoveCustomSite = (hostname: string) => {
+    setSettings(prev => ({
+      ...prev,
+      customSites: prev.customSites.filter(site => site.hostname !== hostname)
+    }));
+
+    // Notify tabs about the removal (void async call as it's fire-and-forget)
+    void notifyCustomSiteChange(hostname);
+    // Persistence handled by debounced useEffect
   };
 
   // Notify custom site change
@@ -473,33 +465,28 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
   };
 
   // Handle add custom site
-  const handleAddCustomSite = async (siteData: Omit<CustomSite, 'dateAdded'>) => {
+  const handleAddCustomSite = (siteData: Omit<CustomSite, 'dateAdded'>) => {
     const newSite: CustomSite = {
       ...siteData,
       dateAdded: Date.now()
     };
 
-    const newSettings = {
-      ...settings,
-      customSites: [...settings.customSites, newSite]
-    };
+    setSettings(prev => ({
+      ...prev,
+      customSites: [...prev.customSites, newSite]
+    }));
 
-    setSettings(newSettings);
-    await saveSettings(newSettings);
-    
-    // Notify any open tabs to reinitialize
-    await notifyCustomSiteChange(newSite.hostname);
+    // Notify any open tabs to reinitialize (void async call as it's fire-and-forget)
+    void notifyCustomSiteChange(newSite.hostname);
+    // Persistence handled by debounced useEffect
   };
 
   // Handle debug mode toggle
-  const handleDebugModeChange = async (enabled: boolean) => {
-    const newSettings = {
-      ...settings,
+  const handleDebugModeChange = (enabled: boolean) => {
+    setSettings(prev => ({
+      ...prev,
       debugMode: enabled
-    };
-
-    setSettings(newSettings);
-    await saveSettings(newSettings);
+    }));
 
     // Update localStorage for immediate effect
     if (enabled) {
@@ -507,6 +494,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
     } else {
       localStorage.removeItem('prompt-library-debug');
     }
+    // Persistence handled by debounced useEffect
   };
 
   // Handle import data
@@ -614,9 +602,9 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
             siteConfigs={siteConfigs}
             interfaceMode={interfaceMode}
             onSiteToggle={(hostname, enabled) => { handleSiteToggle(hostname, enabled); }}
-            onCustomSiteToggle={(hostname, enabled) => void handleCustomSiteToggle(hostname, enabled)}
-            onRemoveCustomSite={(hostname) => void handleRemoveCustomSite(hostname)}
-            onAddCustomSite={(siteData) => void handleAddCustomSite(siteData as Omit<CustomSite, 'dateAdded'>)}
+            onCustomSiteToggle={handleCustomSiteToggle}
+            onRemoveCustomSite={handleRemoveCustomSite}
+            onAddCustomSite={(siteData) => { handleAddCustomSite(siteData as Omit<CustomSite, 'dateAdded'>); }}
             saving={saving}
             onShowToast={showToast}
           />
@@ -643,7 +631,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
           {/* Advanced Section */}
           <AdvancedSection
             debugMode={settings.debugMode}
-            onDebugModeChange={(enabled) => void handleDebugModeChange(enabled)}
+            onDebugModeChange={handleDebugModeChange}
             saving={saving}
           />
 
