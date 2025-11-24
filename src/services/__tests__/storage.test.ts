@@ -285,6 +285,231 @@ describe('StorageManager', () => {
       expect(updated1.title).toBe('Updated 1');
       expect(updated2.title).toBe('Updated 2');
     });
+
+    describe('Mutex Race Condition Fix Verification', () => {
+      it('should prevent race condition in lock acquisition timing gap', async () => {
+        // This test specifically targets the bug scenario where two operations
+        // check for locks simultaneously before either has set their lock
+
+        const executionOrder: string[] = [];
+
+        // Create prompts with controlled execution timing - all launched immediately
+        const operation1 = storageManager.savePrompt({
+          title: 'Prompt 1',
+          content: 'Content 1',
+          category: DEFAULT_CATEGORY
+        }).then((result) => {
+          executionOrder.push('op1-complete');
+          return result;
+        });
+
+        const operation2 = storageManager.savePrompt({
+          title: 'Prompt 2',
+          content: 'Content 2',
+          category: DEFAULT_CATEGORY
+        }).then((result) => {
+          executionOrder.push('op2-complete');
+          return result;
+        });
+
+        const operation3 = storageManager.savePrompt({
+          title: 'Prompt 3',
+          content: 'Content 3',
+          category: DEFAULT_CATEGORY
+        }).then((result) => {
+          executionOrder.push('op3-complete');
+          return result;
+        });
+
+        // Wait for all operations
+        const results = await Promise.all([operation1, operation2, operation3]);
+
+        // Verify all operations completed in order (sequential, not parallel)
+        expect(executionOrder).toEqual(['op1-complete', 'op2-complete', 'op3-complete']);
+
+        // Verify all prompts were saved
+        const prompts = await storageManager.getPrompts();
+        expect(prompts).toHaveLength(3);
+
+        // Verify each prompt exists with unique ID
+        expect(results[0].id).not.toBe(results[1].id);
+        expect(results[1].id).not.toBe(results[2].id);
+        expect(results[0].id).not.toBe(results[2].id);
+      });
+
+      it('should handle rapid concurrent category imports without data loss', async () => {
+        // This test simulates the exact bug scenario: 3 concurrent category imports
+        // where the middle one (cat2) was lost due to race condition
+
+        const categories = [
+          { id: 'cat1', name: 'Category 1' },
+          { id: 'cat2', name: 'Category 2' },
+          { id: 'cat3', name: 'Category 3' }
+        ];
+
+        // Import all 3 categories simultaneously (mimics parallel import bug)
+        const importPromises = categories.map(cat =>
+          storageManager.importCategory(cat)
+        );
+
+        const results = await Promise.all(importPromises);
+
+        // Verify all 3 categories were imported successfully
+        expect(results).toHaveLength(3);
+        expect(results[0].name).toBe('Category 1');
+        expect(results[1].name).toBe('Category 2');
+        expect(results[2].name).toBe('Category 3');
+
+        // Verify all categories exist in storage (the critical check)
+        const storedCategories = await storageManager.getCategories();
+        const categoryNames = storedCategories.map(c => c.name);
+
+        // Should have all 3 imported categories plus the default category
+        expect(storedCategories).toHaveLength(4);
+        expect(categoryNames).toContain('Category 1');
+        expect(categoryNames).toContain('Category 2');
+        expect(categoryNames).toContain('Category 3');
+        expect(categoryNames).toContain(DEFAULT_CATEGORY);
+      });
+
+      it('should maintain lock queue integrity when operations fail', async () => {
+        // Test that failed operations don't break the lock queue for subsequent operations
+
+        const executionOrder: string[] = [];
+
+        // Operation 1: Will succeed
+        const operation1 = storageManager.savePrompt({
+          title: 'Success 1',
+          content: 'Content 1',
+          category: DEFAULT_CATEGORY
+        }).then(() => {
+          executionOrder.push('op1-success');
+        });
+
+        // Operation 2: Will fail (updating non-existent prompt)
+        const operation2 = storageManager.updatePrompt('non-existent-id', {
+          title: 'Updated'
+        }).catch(() => {
+          executionOrder.push('op2-failed');
+        });
+
+        // Operation 3: Should still succeed even though op2 failed
+        const operation3 = storageManager.savePrompt({
+          title: 'Success 2',
+          content: 'Content 2',
+          category: DEFAULT_CATEGORY
+        }).then(() => {
+          executionOrder.push('op3-success');
+        });
+
+        await Promise.all([operation1, operation2, operation3]);
+
+        // Verify execution order is maintained despite failure
+        expect(executionOrder).toEqual(['op1-success', 'op2-failed', 'op3-success']);
+
+        // Verify both successful prompts were saved
+        const prompts = await storageManager.getPrompts();
+        expect(prompts).toHaveLength(2);
+        expect(prompts.map(p => p.title)).toContain('Success 1');
+        expect(prompts.map(p => p.title)).toContain('Success 2');
+      });
+
+      it('should handle 10 concurrent operations without data corruption', async () => {
+        // Stress test: Verify mutex scales to many concurrent operations
+
+        const operationCount = 10;
+        const operations = Array.from({ length: operationCount }, (_, i) =>
+          storageManager.savePrompt({
+            title: `Concurrent Prompt ${i + 1}`,
+            content: `Content ${i + 1}`,
+            category: DEFAULT_CATEGORY
+          })
+        );
+
+        const results = await Promise.all(operations);
+
+        // Verify all operations completed successfully
+        expect(results).toHaveLength(operationCount);
+
+        // Verify all prompts have unique IDs
+        const ids = results.map(p => p.id);
+        const uniqueIds = new Set(ids);
+        expect(uniqueIds.size).toBe(operationCount);
+
+        // Verify all prompts were saved to storage
+        const prompts = await storageManager.getPrompts();
+        expect(prompts).toHaveLength(operationCount);
+
+        // Verify each prompt exists with correct title
+        for (let i = 1; i <= operationCount; i++) {
+          const expectedTitle = `Concurrent Prompt ${i}`;
+          expect(prompts.some(p => p.title === expectedTitle)).toBe(true);
+        }
+      });
+
+      it('should prevent interleaved execution across different lock keys', async () => {
+        // Verify that different lock keys (prompts vs categories) can run in parallel
+        // but operations on the SAME key remain sequential
+
+        const executionLog: Array<{ time: number; operation: string }> = [];
+
+        // These should run in parallel (different lock keys)
+        const promptOp1 = storageManager.savePrompt({
+          title: 'Prompt A',
+          content: 'Content A',
+          category: DEFAULT_CATEGORY
+        }).then(() => {
+          executionLog.push({ time: Date.now(), operation: 'prompt-A' });
+        });
+
+        const categoryOp1 = storageManager.saveCategory({
+          name: 'Category A'
+        }).then(() => {
+          executionLog.push({ time: Date.now(), operation: 'category-A' });
+        });
+
+        // These should run sequentially AFTER their respective first operations
+        const promptOp2 = storageManager.savePrompt({
+          title: 'Prompt B',
+          content: 'Content B',
+          category: DEFAULT_CATEGORY
+        }).then(() => {
+          executionLog.push({ time: Date.now(), operation: 'prompt-B' });
+        });
+
+        const categoryOp2 = storageManager.saveCategory({
+          name: 'Category B'
+        }).then(() => {
+          executionLog.push({ time: Date.now(), operation: 'category-B' });
+        });
+
+        await Promise.all([promptOp1, categoryOp1, promptOp2, categoryOp2]);
+
+        // Verify all operations completed
+        expect(executionLog).toHaveLength(4);
+
+        // Verify sequential ordering within each lock key
+        const promptOps = executionLog.filter(log => log.operation.startsWith('prompt'));
+        const categoryOps = executionLog.filter(log => log.operation.startsWith('category'));
+
+        // Prompt operations should be in order: A then B
+        expect(promptOps[0].operation).toBe('prompt-A');
+        expect(promptOps[1].operation).toBe('prompt-B');
+        expect(promptOps[1].time).toBeGreaterThanOrEqual(promptOps[0].time);
+
+        // Category operations should be in order: A then B
+        expect(categoryOps[0].operation).toBe('category-A');
+        expect(categoryOps[1].operation).toBe('category-B');
+        expect(categoryOps[1].time).toBeGreaterThanOrEqual(categoryOps[0].time);
+
+        // Verify data integrity
+        const prompts = await storageManager.getPrompts();
+        const categories = await storageManager.getCategories();
+        expect(prompts).toHaveLength(2);
+        expect(categories.map(c => c.name)).toContain('Category A');
+        expect(categories.map(c => c.name)).toContain('Category B');
+      });
+    });
   });
 
   describe('Error Handling', () => {
