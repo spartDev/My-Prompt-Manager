@@ -737,24 +737,41 @@ export class StorageManager {
     };
   }
 
-  // Mutex implementation for preventing race conditions
+  // Mutex implementation for preventing race conditions using queue-based approach
   private async withLock<T>(lockKey: string, operation: () => Promise<T>): Promise<T> {
-    // Wait for any existing operation with the same key
+    // Create a promise that will resolve when this operation gets to run
+    let resolveQueue: (() => void) | undefined;
+    const queuePromise = new Promise<void>(resolve => {
+      resolveQueue = resolve;
+    });
+
+    // Get or create the queue for this lock key
     const existingLock = this.operationLocks.get(lockKey);
-    if (existingLock) {
-      await existingLock.catch(() => {}); // Ignore errors from previous operations
-    }
 
-    // Create new operation promise
-    const operationPromise = operation();
-    this.operationLocks.set(lockKey, operationPromise);
+    // Chain this operation after the existing lock (or resolve immediately if none)
+    const chainedPromise = existingLock
+      ? existingLock.then(() => {}, () => {}) // Wait for previous, ignore its result/error
+      : Promise.resolve();
 
+    // Set our queue promise as the new lock BEFORE awaiting the chain
+    // This ensures the next operation will wait for us
+    this.operationLocks.set(lockKey, queuePromise);
+
+    // Wait for our turn (previous operation to complete)
+    await chainedPromise;
+
+    // Now we have exclusive access - execute the operation
     try {
-      const result = await operationPromise;
+      const result = await operation();
       return result;
     } finally {
-      // Clean up the lock if this was the current operation
-      if (this.operationLocks.get(lockKey) === operationPromise) {
+      // Signal that we're done (release the lock for next operation)
+      if (resolveQueue) {
+        resolveQueue();
+      }
+
+      // Clean up if we're still the current lock holder
+      if (this.operationLocks.get(lockKey) === queuePromise) {
         this.operationLocks.delete(lockKey);
       }
     }
