@@ -229,6 +229,101 @@ describe('SettingsView', () => {
   });
 
   describe('Parallel Import Performance', () => {
+    it('imports multiple categories in parallel', async () => {
+      const storageMock = getMockStorageManager();
+      const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+
+      // Track call order to ensure parallelism
+      const callOrder: string[] = [];
+      storageMock.importCategory.mockImplementation(async (category: Category) => {
+        callOrder.push(`category-${category.id}-start`);
+        await new Promise(resolve => setTimeout(resolve, 10)); // Simulate async work
+        callOrder.push(`category-${category.id}-end`);
+        return category;
+      });
+
+      await renderSettings();
+      await waitFor(() => {
+        expect(storageMock.getPrompts).toHaveBeenCalled();
+      });
+
+      const fileInput = document.querySelector<HTMLInputElement>('input[type="file"]');
+      expect(fileInput).not.toBeNull();
+
+      const categories: Category[] = [
+        { id: 'c1', name: 'Category 1' },
+        { id: 'c2', name: 'Category 2' },
+        { id: 'c3', name: 'Category 3' }
+      ];
+      const prompts: Prompt[] = [
+        { id: 'p1', title: 'Test Prompt', content: 'Test Content', category: 'Category 1', createdAt: 1, updatedAt: 1 }
+      ];
+      const backupContents = JSON.stringify({ prompts, categories, version: '1.0' });
+      const file = createJsonFile(backupContents);
+
+      await userEvent.upload(fileInput as HTMLInputElement, file);
+
+      await waitFor(() => {
+        expect(storageMock.importCategory).toHaveBeenCalledTimes(3);
+        expect(alertSpy).toHaveBeenCalledWith(expect.stringMatching(/successfully imported/i));
+      });
+
+      // Verify parallel execution: all starts should happen before any ends
+      const startCount = callOrder.filter(c => c.endsWith('-start')).length;
+      const firstEndIndex = callOrder.findIndex(c => c.endsWith('-end'));
+      const startsBeforeFirstEnd = callOrder.slice(0, firstEndIndex).filter(c => c.endsWith('-start')).length;
+
+      // If truly parallel, multiple starts should occur before first end
+      expect(startsBeforeFirstEnd).toBeGreaterThan(1);
+      alertSpy.mockRestore();
+    });
+
+    it('imports multiple prompts in parallel', async () => {
+      const storageMock = getMockStorageManager();
+      const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+
+      // Track call order
+      const callOrder: string[] = [];
+      storageMock.importPrompt.mockImplementation(async (prompt: Prompt) => {
+        callOrder.push(`prompt-${prompt.id}-start`);
+        await new Promise(resolve => setTimeout(resolve, 10)); // Simulate async work
+        callOrder.push(`prompt-${prompt.id}-end`);
+        return prompt;
+      });
+
+      await renderSettings();
+      await waitFor(() => {
+        expect(storageMock.getPrompts).toHaveBeenCalled();
+      });
+
+      const fileInput = document.querySelector<HTMLInputElement>('input[type="file"]');
+      expect(fileInput).not.toBeNull();
+
+      const categories: Category[] = [{ id: 'c1', name: 'Uncategorized' }];
+      const prompts: Prompt[] = [
+        { id: 'p1', title: 'Prompt 1', content: 'Content 1', category: 'Uncategorized', createdAt: 1, updatedAt: 1 },
+        { id: 'p2', title: 'Prompt 2', content: 'Content 2', category: 'Uncategorized', createdAt: 1, updatedAt: 1 },
+        { id: 'p3', title: 'Prompt 3', content: 'Content 3', category: 'Uncategorized', createdAt: 1, updatedAt: 1 }
+      ];
+      const backupContents = JSON.stringify({ prompts, categories, version: '1.0' });
+      const file = createJsonFile(backupContents);
+
+      await userEvent.upload(fileInput as HTMLInputElement, file);
+
+      await waitFor(() => {
+        expect(storageMock.importPrompt).toHaveBeenCalledTimes(3);
+        expect(alertSpy).toHaveBeenCalledWith(expect.stringMatching(/successfully imported/i));
+      });
+
+      // Verify parallel execution
+      const startCount = callOrder.filter(c => c.endsWith('-start')).length;
+      const firstEndIndex = callOrder.findIndex(c => c.endsWith('-end'));
+      const startsBeforeFirstEnd = callOrder.slice(0, firstEndIndex).filter(c => c.endsWith('-start')).length;
+
+      expect(startsBeforeFirstEnd).toBeGreaterThan(1);
+      alertSpy.mockRestore();
+    });
+
     it('handles partial category import failures correctly', async () => {
       const storageMock = getMockStorageManager();
       const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});

@@ -848,4 +848,172 @@ describe('StorageManager', () => {
       expect(settings).toEqual(initialSettings);
     });
   });
+
+  describe('Concurrent Import Operations', () => {
+    it('should handle concurrent category imports without data corruption', async () => {
+      const timestamp = FIXED_TIME.getTime();
+      const categories: Category[] = [
+        { id: 'cat1', name: 'Work' },
+        { id: 'cat2', name: 'Personal' },
+        { id: 'cat3', name: 'Learning' },
+        { id: 'cat4', name: 'Projects' },
+        { id: 'cat5', name: 'Templates' }
+      ];
+
+      // Import all categories in parallel
+      const results = await Promise.all(
+        categories.map(cat => storageManager.importCategory(cat))
+      );
+
+      // Verify all imports succeeded
+      expect(results).toHaveLength(5);
+      results.forEach((result, idx) => {
+        expect(result.id).toBe(categories[idx].id);
+        expect(result.name).toBe(categories[idx].name);
+      });
+
+      // Verify all categories are stored
+      const storedCategories = await storageManager.getCategories();
+      categories.forEach(cat => {
+        expect(storedCategories.some(s => s.id === cat.id && s.name === cat.name)).toBe(true);
+      });
+    });
+
+    it('should handle concurrent prompt imports without data corruption', async () => {
+      const timestamp = FIXED_TIME.getTime();
+      const prompts: Prompt[] = Array.from({ length: 10 }, (_, i) => ({
+        id: `prompt${i}`,
+        title: `Test Prompt ${i}`,
+        content: `Content ${i}`,
+        category: DEFAULT_CATEGORY,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        usageCount: 0,
+        lastUsedAt: timestamp
+      }));
+
+      // Import all prompts in parallel
+      const results = await Promise.all(
+        prompts.map(prompt => storageManager.importPrompt(prompt))
+      );
+
+      // Verify all imports succeeded
+      expect(results).toHaveLength(10);
+      results.forEach((result, idx) => {
+        expect(result.id).toBe(prompts[idx].id);
+        expect(result.title).toBe(prompts[idx].title);
+      });
+
+      // Verify all prompts are stored
+      const storedPrompts = await storageManager.getPrompts();
+      expect(storedPrompts).toHaveLength(10);
+      prompts.forEach(prompt => {
+        expect(storedPrompts.some(s => s.id === prompt.id && s.title === prompt.title)).toBe(true);
+      });
+    });
+
+    it('should handle mixed concurrent imports and updates', async () => {
+      const timestamp = FIXED_TIME.getTime();
+
+      // Setup: Create initial prompt
+      const initialPrompt: Prompt = {
+        id: 'test-prompt',
+        title: 'Original',
+        content: 'Original Content',
+        category: DEFAULT_CATEGORY,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        usageCount: 0,
+        lastUsedAt: timestamp
+      };
+      await chrome.storage.local.set({ prompts: [initialPrompt] });
+
+      // Concurrent operations: import (update) and create new
+      const updatedPrompt: Prompt = {
+        ...initialPrompt,
+        title: 'Updated',
+        content: 'Updated Content'
+      };
+      const newPrompt: Prompt = {
+        id: 'new-prompt',
+        title: 'New',
+        content: 'New Content',
+        category: DEFAULT_CATEGORY,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        usageCount: 0,
+        lastUsedAt: timestamp
+      };
+
+      // Execute concurrent import operations
+      const [result1, result2] = await Promise.all([
+        storageManager.importPrompt(updatedPrompt),
+        storageManager.importPrompt(newPrompt)
+      ]);
+
+      // Verify both operations succeeded
+      expect(result1.title).toBe('Updated');
+      expect(result2.title).toBe('New');
+
+      // Verify storage state
+      const storedPrompts = await storageManager.getPrompts();
+      expect(storedPrompts).toHaveLength(2);
+      expect(storedPrompts.some(p => p.id === 'test-prompt' && p.title === 'Updated')).toBe(true);
+      expect(storedPrompts.some(p => p.id === 'new-prompt' && p.title === 'New')).toBe(true);
+    });
+
+    it('should maintain data integrity with 100 concurrent category imports', async () => {
+      const categories: Category[] = Array.from({ length: 100 }, (_, i) => ({
+        id: `cat${i}`,
+        name: `Category ${i}`
+      }));
+
+      // Import all 100 categories in parallel
+      const startTime = Date.now();
+      await Promise.all(categories.map(cat => storageManager.importCategory(cat)));
+      const duration = Date.now() - startTime;
+
+      // Verify all categories stored
+      const storedCategories = await storageManager.getCategories();
+      // +1 for default category
+      expect(storedCategories.length).toBeGreaterThanOrEqual(100);
+
+      categories.forEach(cat => {
+        expect(storedCategories.some(s => s.id === cat.id && s.name === cat.name)).toBe(true);
+      });
+
+      // Log performance (for manual verification during development)
+      console.log(`100 concurrent category imports completed in ${duration}ms`);
+    });
+
+    it('should maintain data integrity with 100 concurrent prompt imports', async () => {
+      const timestamp = FIXED_TIME.getTime();
+      const prompts: Prompt[] = Array.from({ length: 100 }, (_, i) => ({
+        id: `p${i}`,
+        title: `Prompt ${i}`,
+        content: `Content ${i}`,
+        category: DEFAULT_CATEGORY,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        usageCount: 0,
+        lastUsedAt: timestamp
+      }));
+
+      // Import all 100 prompts in parallel
+      const startTime = Date.now();
+      await Promise.all(prompts.map(prompt => storageManager.importPrompt(prompt)));
+      const duration = Date.now() - startTime;
+
+      // Verify all prompts stored
+      const storedPrompts = await storageManager.getPrompts();
+      expect(storedPrompts).toHaveLength(100);
+
+      prompts.forEach(prompt => {
+        expect(storedPrompts.some(s => s.id === prompt.id && s.title === prompt.title)).toBe(true);
+      });
+
+      // Log performance
+      console.log(`100 concurrent prompt imports completed in ${duration}ms`);
+    });
+  });
 });
