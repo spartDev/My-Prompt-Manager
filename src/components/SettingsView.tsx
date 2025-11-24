@@ -500,19 +500,68 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
   // Handle import data
   const handleImportData = async (data: { prompts: Prompt[]; categories: Category[] }) => {
     try {
-      // Import categories first (prompts reference categories)
-      for (const category of data.categories) {
-        await storageManager.importCategory(category);
+      // Import categories in parallel (must complete before prompts)
+      const categoryResults = await Promise.allSettled(
+        data.categories.map((category) => storageManager.importCategory(category))
+      );
+
+      // Collect category failures with context
+      const categoryFailures: Array<{ category: Category; error: unknown }> = [];
+      categoryResults.forEach((result, index) => {
+        if (result.status === 'rejected') {
+          categoryFailures.push({
+            category: data.categories[index],
+            error: result.reason
+          });
+        }
+      });
+
+      if (categoryFailures.length > 0) {
+        const failureMessages = categoryFailures
+          .map(({ category, error }) => {
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            return `Category "${category.name}" (${category.id}): ${errorMsg}`;
+          })
+          .join('\n');
+
+        throw new Error(
+          `Failed to import ${categoryFailures.length.toString()} of ${data.categories.length.toString()} categories:\n${failureMessages}`
+        );
       }
-      
-      // Import prompts
-      for (const prompt of data.prompts) {
-        await storageManager.importPrompt(prompt);
+
+      // Import prompts in parallel (categories must exist first)
+      const promptResults = await Promise.allSettled(
+        data.prompts.map((prompt) => storageManager.importPrompt(prompt))
+      );
+
+      // Collect prompt failures with context
+      const promptFailures: Array<{ prompt: Prompt; error: unknown }> = [];
+      promptResults.forEach((result, index) => {
+        if (result.status === 'rejected') {
+          promptFailures.push({
+            prompt: data.prompts[index],
+            error: result.reason
+          });
+        }
+      });
+
+      if (promptFailures.length > 0) {
+        const failureMessages = promptFailures
+          .map(({ prompt, error }) => {
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            return `Prompt "${prompt.title}" (${prompt.id}): ${errorMsg}`;
+          })
+          .join('\n');
+
+        const successCount = data.prompts.length - promptFailures.length;
+        throw new Error(
+          `Failed to import ${promptFailures.length.toString()} of ${data.prompts.length.toString()} prompts (${successCount.toString()} succeeded):\n${failureMessages}`
+        );
       }
-      
+
       // Reload data
       await loadSettings();
-      
+
       alert(`Successfully imported ${data.prompts.length.toString()} prompts and ${data.categories.length.toString()} categories!`);
     } catch (error) {
       Logger.error('Import failed', toError(error));

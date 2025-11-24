@@ -227,4 +227,88 @@ describe('SettingsView', () => {
       expect(chromeMock.storage.local.set).toHaveBeenCalledWith({ interfaceMode: 'sidepanel' });
     });
   });
+
+  describe('Parallel Import Performance', () => {
+    it('handles partial category import failures correctly', async () => {
+      const storageMock = getMockStorageManager();
+      const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+
+      // Make second category fail
+      storageMock.importCategory.mockImplementation(async (category: Category) => {
+        if (category.id === 'c2') {
+          throw new Error('Duplicate category name');
+        }
+        return category;
+      });
+
+      await renderSettings();
+      await waitFor(() => {
+        expect(storageMock.getPrompts).toHaveBeenCalled();
+      });
+
+      const fileInput = document.querySelector<HTMLInputElement>('input[type="file"]');
+      expect(fileInput).not.toBeNull();
+
+      const categories: Category[] = [
+        { id: 'c1', name: 'Category 1' },
+        { id: 'c2', name: 'Category 2' },
+        { id: 'c3', name: 'Category 3' }
+      ];
+      const prompts: Prompt[] = [];
+      const backupContents = JSON.stringify({ prompts, categories, version: '1.0' });
+      const file = createJsonFile(backupContents);
+
+      await userEvent.upload(fileInput as HTMLInputElement, file);
+
+      await waitFor(() => {
+        expect(alertSpy).toHaveBeenCalledWith(
+          expect.stringMatching(/failed to import.*1 of 3 categories/i)
+        );
+      });
+
+      // Prompts should not be imported if categories failed
+      expect(storageMock.importPrompt).not.toHaveBeenCalled();
+      alertSpy.mockRestore();
+    });
+
+    it('handles partial prompt import failures correctly', async () => {
+      const storageMock = getMockStorageManager();
+      const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+
+      // Make second prompt fail (by ID, not by call count)
+      storageMock.importPrompt.mockImplementation(async (prompt: Prompt) => {
+        if (prompt.id === 'p2') {
+          throw new Error('Quota exceeded');
+        }
+        return prompt;
+      });
+
+      await renderSettings();
+      await waitFor(() => {
+        expect(storageMock.getPrompts).toHaveBeenCalled();
+      });
+
+      const fileInput = document.querySelector<HTMLInputElement>('input[type="file"]');
+      expect(fileInput).not.toBeNull();
+
+      const categories: Category[] = [{ id: 'c1', name: 'Uncategorized' }];
+      const prompts: Prompt[] = [
+        { id: 'p1', title: 'Prompt 1', content: 'Content 1', category: 'Uncategorized', createdAt: 1, updatedAt: 1 },
+        { id: 'p2', title: 'Prompt 2', content: 'Content 2', category: 'Uncategorized', createdAt: 1, updatedAt: 1 },
+        { id: 'p3', title: 'Prompt 3', content: 'Content 3', category: 'Uncategorized', createdAt: 1, updatedAt: 1 }
+      ];
+      const backupContents = JSON.stringify({ prompts, categories, version: '1.0' });
+      const file = createJsonFile(backupContents);
+
+      await userEvent.upload(fileInput as HTMLInputElement, file);
+
+      await waitFor(() => {
+        expect(alertSpy).toHaveBeenCalledWith(
+          expect.stringMatching(/failed to import.*1 of 3 prompts.*2 succeeded/i)
+        );
+      });
+
+      alertSpy.mockRestore();
+    });
+  });
 });
