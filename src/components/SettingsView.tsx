@@ -93,6 +93,15 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
   // Track initial mount to skip saving on first render
   const isInitialMount = useRef(true);
 
+  // Debounce timer for tab notifications
+  const notificationTimerRef = useRef<number | null>(null);
+
+  // Track previous settings to detect disabled sites
+  const previousSettingsRef = useRef<{
+    enabledSites: string[];
+    customSites: CustomSite[];
+  } | null>(null);
+
   const siteConfigs: Record<string, SiteConfig> = useMemo(() => ({
     'www.perplexity.ai': {
       name: 'Perplexity',
@@ -175,6 +184,15 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
     void loadSettings();
   }, [loadSettings]);
 
+  // Cleanup notification timer on unmount
+  useEffect(() => {
+    return () => {
+      if (notificationTimerRef.current !== null) {
+        clearTimeout(notificationTimerRef.current);
+      }
+    };
+  }, []);
+
   // Debounced persistence: save settings after user stops making changes
   useEffect(() => {
     // Skip saving on initial mount (when settings are loaded)
@@ -197,33 +215,148 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
     return () => {
       clearTimeout(timeoutId);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings]);
+
+  // Build URL patterns from enabled sites
+  const buildUrlPatterns = useCallback((settingsToUse: Settings): string[] => {
+    const patterns: string[] = [];
+
+    // Add patterns from enabledSites
+    for (const hostname of settingsToUse.enabledSites) {
+      patterns.push(`*://${hostname}/*`);
+    }
+
+    // Add patterns from enabled customSites
+    for (const site of settingsToUse.customSites) {
+      if (site.enabled) {
+        patterns.push(`*://${site.hostname}/*`);
+      }
+    }
+
+    return patterns;
+  }, []);
+
+  // Notify tabs with debouncing and optimized querying
+  const notifyTabs = useCallback((newSettings: Settings) => {
+    // Clear existing notification timer
+    if (notificationTimerRef.current !== null) {
+      clearTimeout(notificationTimerRef.current);
+    }
+
+    // Debounce notifications by 200ms to batch rapid changes
+    notificationTimerRef.current = window.setTimeout(() => {
+      // Build patterns for currently enabled sites
+      const currentPatterns = buildUrlPatterns(newSettings);
+      const previousPatterns: string[] = [];
+
+      if (previousSettingsRef.current) {
+        // Build sets of enabled hostnames for comparison
+        const prevEnabled = new Set([
+          ...previousSettingsRef.current.enabledSites,
+          ...previousSettingsRef.current.customSites
+            .filter(s => s.enabled)
+            .map(s => s.hostname)
+        ]);
+
+        const currentEnabled = new Set([
+          ...newSettings.enabledSites,
+          ...newSettings.customSites
+            .filter(s => s.enabled)
+            .map(s => s.hostname)
+        ]);
+
+        // Find sites that were enabled but are now disabled
+        for (const hostname of prevEnabled) {
+          if (!currentEnabled.has(hostname)) {
+            previousPatterns.push(`*://${hostname}/*`);
+          }
+        }
+      }
+
+      // Combine current and previous patterns, removing duplicates
+      const allPatterns = [...new Set([...currentPatterns, ...previousPatterns])];
+
+      // Skip notification if no sites to notify
+      if (allPatterns.length === 0) {
+        Logger.debug('No sites to notify, skipping tab notification', {
+          component: 'SettingsView'
+        });
+        return;
+      }
+
+      // Query tabs matching both enabled and recently disabled sites
+      chrome.tabs.query({ url: allPatterns })
+        .then(tabs => {
+          if (tabs.length === 0) {
+            Logger.debug('No matching tabs found for notification', {
+              component: 'SettingsView',
+              patternCount: allPatterns.length
+            });
+            // Update previous settings even if no tabs found
+            previousSettingsRef.current = {
+              enabledSites: [...newSettings.enabledSites],
+              customSites: [...newSettings.customSites]
+            };
+            return;
+          }
+
+          Logger.debug('Notifying tabs of settings update', {
+            component: 'SettingsView',
+            tabCount: tabs.length,
+            patternCount: allPatterns.length,
+            currentPatterns: currentPatterns.length,
+            previousPatterns: previousPatterns.length
+          });
+
+          // Send messages in parallel with Promise.allSettled
+          const messagePromises = tabs
+            .filter(tab => tab.id !== undefined)
+            .map(tab => {
+              // TypeScript knows tab.id is defined here due to the filter
+              const tabId = tab.id as number;
+              return chrome.tabs.sendMessage(tabId, {
+                action: 'settingsUpdated',
+                settings: newSettings
+              }).catch(() => {
+                // Tab might not have content script loaded, ignore error
+                // Using catch instead of try/catch for cleaner parallel execution
+              });
+            });
+
+          return Promise.allSettled(messagePromises).then(() => {
+            // Update previous settings after successful notification
+            previousSettingsRef.current = {
+              enabledSites: [...newSettings.enabledSites],
+              customSites: [...newSettings.customSites]
+            };
+          });
+        })
+        .catch((err: unknown) => {
+          Logger.error('Failed to notify tabs of settings update', toError(err), {
+            component: 'SettingsView',
+            operation: 'notifyTabs'
+          });
+        });
+    }, 200);
+  }, [buildUrlPatterns]);
 
   // Save settings
   const saveSettings = async (newSettings: Settings) => {
     setSaving(true);
     try {
-      await chrome.storage.local.set({ 
-        promptLibrarySettings: newSettings 
+      // Persist settings to storage
+      await chrome.storage.local.set({
+        promptLibrarySettings: newSettings
       });
-      
-      // Notify content scripts of changes
-      const tabs = await chrome.tabs.query({});
-      
-      for (const tab of tabs) {
-        if (tab.id && tab.url && (tab.url.startsWith('http://') || tab.url.startsWith('https://'))) {
-          try {
-            await chrome.tabs.sendMessage(tab.id, {
-              action: 'settingsUpdated',
-              settings: newSettings
-            });
-          } catch {
-            // Tab might not have content script loaded, ignore error
-          }
-        }
-      }
+
+      // Notify content scripts of changes (debounced and optimized)
+      notifyTabs(newSettings);
     } catch (error) {
-      Logger.error('Failed to save settings', toError(error));
+      Logger.error('Failed to save settings', toError(error), {
+        component: 'SettingsView',
+        operation: 'saveSettings'
+      });
     } finally {
       setSaving(false);
     }
