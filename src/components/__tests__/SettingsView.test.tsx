@@ -235,7 +235,7 @@ describe('SettingsView', () => {
 
       // Track call order to ensure parallelism
       const callOrder: string[] = [];
-      storageMock.importCategory.mockImplementation(async (category: Category) => {
+      (storageMock.importCategory as Mock).mockImplementation(async (category: Category) => {
         callOrder.push(`category-${category.id}-start`);
         await new Promise(resolve => setTimeout(resolve, 10)); // Simulate async work
         callOrder.push(`category-${category.id}-end`);
@@ -269,7 +269,6 @@ describe('SettingsView', () => {
       });
 
       // Verify parallel execution: all starts should happen before any ends
-      const startCount = callOrder.filter(c => c.endsWith('-start')).length;
       const firstEndIndex = callOrder.findIndex(c => c.endsWith('-end'));
       const startsBeforeFirstEnd = callOrder.slice(0, firstEndIndex).filter(c => c.endsWith('-start')).length;
 
@@ -284,7 +283,7 @@ describe('SettingsView', () => {
 
       // Track call order
       const callOrder: string[] = [];
-      storageMock.importPrompt.mockImplementation(async (prompt: Prompt) => {
+      (storageMock.importPrompt as Mock).mockImplementation(async (prompt: Prompt) => {
         callOrder.push(`prompt-${prompt.id}-start`);
         await new Promise(resolve => setTimeout(resolve, 10)); // Simulate async work
         callOrder.push(`prompt-${prompt.id}-end`);
@@ -316,7 +315,6 @@ describe('SettingsView', () => {
       });
 
       // Verify parallel execution
-      const startCount = callOrder.filter(c => c.endsWith('-start')).length;
       const firstEndIndex = callOrder.findIndex(c => c.endsWith('-end'));
       const startsBeforeFirstEnd = callOrder.slice(0, firstEndIndex).filter(c => c.endsWith('-start')).length;
 
@@ -329,7 +327,7 @@ describe('SettingsView', () => {
       const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
 
       // Make second category fail
-      storageMock.importCategory.mockImplementation(async (category: Category) => {
+      (storageMock.importCategory as Mock).mockImplementation(async (category: Category) => {
         if (category.id === 'c2') {
           throw new Error('Duplicate category name');
         }
@@ -371,7 +369,7 @@ describe('SettingsView', () => {
       const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
 
       // Make second prompt fail (by ID, not by call count)
-      storageMock.importPrompt.mockImplementation(async (prompt: Prompt) => {
+      (storageMock.importPrompt as Mock).mockImplementation(async (prompt: Prompt) => {
         if (prompt.id === 'p2') {
           throw new Error('Quota exceeded');
         }

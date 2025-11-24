@@ -851,7 +851,6 @@ describe('StorageManager', () => {
 
   describe('Concurrent Import Operations', () => {
     it('should handle concurrent category imports without data corruption', async () => {
-      const timestamp = FIXED_TIME.getTime();
       const categories: Category[] = [
         { id: 'cat1', name: 'Work' },
         { id: 'cat2', name: 'Personal' },
