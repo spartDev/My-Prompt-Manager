@@ -96,6 +96,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
   // Refs for flush-on-unmount pattern
   const saveTimeoutRef = useRef<number | null>(null);
   const hasPendingChanges = useRef(false);
+  const settingsRef = useRef<Settings>(settings); // Always holds latest settings for unmount flush
 
   // Debounce timer for tab notifications
   const notificationTimerRef = useRef<number | null>(null);
@@ -210,7 +211,12 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
     };
   }, []);
 
-  // Debounced persistence with flush-on-unmount: save settings after user stops making changes
+  // Keep settingsRef in sync with latest settings for unmount flush
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
+
+  // Debounced persistence: save settings after user stops making changes
   useEffect(() => {
     // Skip saving on initial mount (when settings are loaded)
     if (isInitialMount.current) {
@@ -242,9 +248,24 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
         });
     }, 150);
 
-    // Cleanup: flush pending changes on unmount
+    // Cleanup: only cancel the timeout, do NOT flush here
+    // Flushing in this cleanup would execute on every settings change (not just unmount)
+    // because React runs cleanup when dependencies change, and the closure would capture
+    // stale settings values from the previous render.
     return () => {
-      // Cancel scheduled save to prevent duplicate
+      if (saveTimeoutRef.current !== null) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings]);
+
+  // Unmount-only flush: save any pending changes when component unmounts
+  // This effect has empty dependencies, so its cleanup only runs on actual unmount.
+  // We use settingsRef.current to always access the latest settings value.
+  useEffect(() => {
+    return () => {
+      // Cancel any scheduled save to prevent duplicate
       if (saveTimeoutRef.current !== null) {
         clearTimeout(saveTimeoutRef.current);
       }
@@ -255,8 +276,8 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
       // complete, but in rare cases (immediate tab close), the save may not finish.
       if (hasPendingChanges.current) {
         hasPendingChanges.current = false;
-        // Fire-and-forget with error handling
-        void saveSettings(settings).catch((err: unknown) => {
+        // Use settingsRef.current for the latest settings value
+        void saveSettings(settingsRef.current).catch((err: unknown) => {
           Logger.error('Failed to flush settings on unmount', toError(err), {
             component: 'SettingsView',
             operation: 'flush-on-unmount',
@@ -266,7 +287,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings]);
+  }, []);
 
   // Build URL patterns from enabled sites
   const buildUrlPatterns = useCallback((settingsToUse: Settings): string[] => {
