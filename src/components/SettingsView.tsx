@@ -263,6 +263,8 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
   // Unmount-only flush: save any pending changes when component unmounts
   // This effect has empty dependencies, so its cleanup only runs on actual unmount.
   // We use settingsRef.current to always access the latest settings value.
+  // We use persistSettings (not saveSettings) to avoid stale closure issues and
+  // because tab notifications aren't needed on unmount (tabs will reload fresh settings).
   useEffect(() => {
     return () => {
       // Cancel any scheduled save to prevent duplicate
@@ -276,8 +278,8 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
       // complete, but in rare cases (immediate tab close), the save may not finish.
       if (hasPendingChanges.current) {
         hasPendingChanges.current = false;
-        // Use settingsRef.current for the latest settings value
-        void saveSettings(settingsRef.current).catch((err: unknown) => {
+        // Use persistSettings (stable, no closure dependencies) with settingsRef.current
+        void persistSettings(settingsRef.current).catch((err: unknown) => {
           Logger.error('Failed to flush settings on unmount', toError(err), {
             component: 'SettingsView',
             operation: 'flush-on-unmount',
@@ -286,7 +288,6 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
         });
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Build URL patterns from enabled sites
@@ -412,14 +413,29 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
     }, 200);
   }, [buildUrlPatterns]);
 
-  // Save settings
+  // Raw storage persistence without tab notifications
+  // This is a stable function that doesn't depend on other callbacks,
+  // safe to use in the unmount-only flush effect
+  const persistSettings = async (newSettings: Settings) => {
+    try {
+      await chrome.storage.local.set({
+        promptLibrarySettings: newSettings
+      });
+    } catch (error) {
+      Logger.error('Failed to persist settings', toError(error), {
+        component: 'SettingsView',
+        operation: 'persistSettings'
+      });
+      throw error;
+    }
+  };
+
+  // Save settings with tab notifications
   const saveSettings = async (newSettings: Settings) => {
     setSaving(true);
     try {
       // Persist settings to storage
-      await chrome.storage.local.set({
-        promptLibrarySettings: newSettings
-      });
+      await persistSettings(newSettings);
 
       // Notify content scripts of changes (debounced and optimized)
       notifyTabs(newSettings);
@@ -493,10 +509,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
         site.hostname === hostname ? { ...site, enabled } : site
       )
     }));
-
-    // Notify tabs about the change (void async call as it's fire-and-forget)
-    void notifyCustomSiteChange(hostname);
-    // Persistence handled by debounced useEffect
+    // Persistence and tab notification handled by debounced useEffect
   };
 
   // Handle remove custom site
@@ -505,34 +518,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
       ...prev,
       customSites: prev.customSites.filter(site => site.hostname !== hostname)
     }));
-
-    // Notify tabs about the removal (void async call as it's fire-and-forget)
-    void notifyCustomSiteChange(hostname);
-    // Persistence handled by debounced useEffect
-  };
-
-  // Notify custom site change
-  const notifyCustomSiteChange = async (hostname: string) => {
-    try {
-      // Since we're using universal content script, just notify existing tabs
-      const tabs = await chrome.tabs.query({ url: `*://${hostname}/*` });
-      
-      for (const tab of tabs) {
-        if (tab.id) {
-          try {
-            // Notify the content script to reinitialize
-            await chrome.tabs.sendMessage(tab.id, {
-              action: 'reinitialize',
-              reason: 'custom_site_added'
-            });
-          } catch {
-            // Tab might not have content script loaded yet, ignore error
-          }
-        }
-      }
-    } catch (error) {
-      Logger.error('Failed to notify custom site change', toError(error));
-    }
+    // Persistence and tab notification handled by debounced useEffect
   };
 
   // Handle add custom site
@@ -546,10 +532,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
       ...prev,
       customSites: [...prev.customSites, newSite]
     }));
-
-    // Notify any open tabs to reinitialize (void async call as it's fire-and-forget)
-    void notifyCustomSiteChange(newSite.hostname);
-    // Persistence handled by debounced useEffect
+    // Persistence and tab notification handled by debounced useEffect
   };
 
   // Handle debug mode toggle
