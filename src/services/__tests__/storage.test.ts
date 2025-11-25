@@ -968,9 +968,7 @@ describe('StorageManager', () => {
       }));
 
       // Import all 100 categories in parallel
-      const startTime = Date.now();
       await Promise.all(categories.map(cat => storageManager.importCategory(cat)));
-      const duration = Date.now() - startTime;
 
       // Verify all categories stored
       const storedCategories = await storageManager.getCategories();
@@ -996,9 +994,7 @@ describe('StorageManager', () => {
       }));
 
       // Import all 100 prompts in parallel
-      const startTime = Date.now();
       await Promise.all(prompts.map(prompt => storageManager.importPrompt(prompt)));
-      const duration = Date.now() - startTime;
 
       // Verify all prompts stored
       const storedPrompts = await storageManager.getPrompts();
