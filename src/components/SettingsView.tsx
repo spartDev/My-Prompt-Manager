@@ -216,6 +216,25 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
     settingsRef.current = settings;
   }, [settings]);
 
+  // Build URL patterns from enabled sites (defined early for use in unmount flush)
+  const buildUrlPatterns = useCallback((settingsToUse: Settings): string[] => {
+    const patterns: string[] = [];
+
+    // Add patterns from enabledSites
+    for (const hostname of settingsToUse.enabledSites) {
+      patterns.push(`*://${hostname}/*`);
+    }
+
+    // Add patterns from enabled customSites
+    for (const site of settingsToUse.customSites) {
+      if (site.enabled) {
+        patterns.push(`*://${site.hostname}/*`);
+      }
+    }
+
+    return patterns;
+  }, []);
+
   // Debounced persistence: save settings after user stops making changes
   useEffect(() => {
     // Skip saving on initial mount (when settings are loaded)
@@ -263,13 +282,17 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
   // Unmount-only flush: save any pending changes when component unmounts
   // This effect has empty dependencies, so its cleanup only runs on actual unmount.
   // We use settingsRef.current to always access the latest settings value.
-  // We use persistSettings (not saveSettings) to avoid stale closure issues and
-  // because tab notifications aren't needed on unmount (tabs will reload fresh settings).
+  // CRITICAL: We must notify tabs immediately during unmount to keep content scripts in sync.
   useEffect(() => {
     return () => {
       // Cancel any scheduled save to prevent duplicate
       if (saveTimeoutRef.current !== null) {
         clearTimeout(saveTimeoutRef.current);
+      }
+
+      // Cancel any scheduled notification to prevent duplicate
+      if (notificationTimerRef.current !== null) {
+        clearTimeout(notificationTimerRef.current);
       }
 
       // If we have pending changes that weren't saved, flush them now
@@ -278,36 +301,82 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
       // complete, but in rare cases (immediate tab close), the save may not finish.
       if (hasPendingChanges.current) {
         hasPendingChanges.current = false;
-        // Use persistSettings (stable, no closure dependencies) with settingsRef.current
-        void persistSettings(settingsRef.current).catch((err: unknown) => {
+        const currentSettings = settingsRef.current;
+
+        // Persist settings to storage
+        void persistSettings(currentSettings).catch((err: unknown) => {
           Logger.error('Failed to flush settings on unmount', toError(err), {
             component: 'SettingsView',
             operation: 'flush-on-unmount',
             context: 'Component unmounted with pending changes'
           });
         });
+
+        // CRITICAL: Notify tabs immediately (without debounce) to keep content scripts in sync
+        // Build patterns for currently enabled sites
+        const currentPatterns = buildUrlPatterns(currentSettings);
+        const previousPatterns: string[] = [];
+
+        if (previousSettingsRef.current) {
+          // Build sets of enabled hostnames for comparison
+          const prevEnabled = new Set([
+            ...previousSettingsRef.current.enabledSites,
+            ...previousSettingsRef.current.customSites
+              .filter(s => s.enabled)
+              .map(s => s.hostname)
+          ]);
+
+          const currentEnabled = new Set([
+            ...currentSettings.enabledSites,
+            ...currentSettings.customSites
+              .filter(s => s.enabled)
+              .map(s => s.hostname)
+          ]);
+
+          // Find sites that were enabled but are now disabled
+          for (const hostname of prevEnabled) {
+            if (!currentEnabled.has(hostname)) {
+              previousPatterns.push(`*://${hostname}/*`);
+            }
+          }
+        }
+
+        // Combine current and previous patterns, removing duplicates
+        const allPatterns = [...new Set([...currentPatterns, ...previousPatterns])];
+
+        // Notify tabs if there are any patterns to notify
+        if (allPatterns.length > 0) {
+          void chrome.tabs.query({ url: allPatterns })
+            .then(tabs => {
+              if (tabs.length === 0) {
+                return;
+              }
+
+              // Send messages in parallel with Promise.allSettled
+              const messagePromises = tabs
+                .filter(tab => tab.id !== undefined)
+                .map(tab => {
+                  const tabId = tab.id as number;
+                  return chrome.tabs.sendMessage(tabId, {
+                    action: 'settingsUpdated',
+                    settings: currentSettings
+                  }).catch(() => {
+                    // Tab might not have content script loaded, ignore error
+                  });
+                });
+
+              return Promise.allSettled(messagePromises);
+            })
+            .catch((err: unknown) => {
+              Logger.error('Failed to notify tabs during unmount flush', toError(err), {
+                component: 'SettingsView',
+                operation: 'flush-on-unmount-notify'
+              });
+            });
+        }
       }
     };
-  }, []);
-
-  // Build URL patterns from enabled sites
-  const buildUrlPatterns = useCallback((settingsToUse: Settings): string[] => {
-    const patterns: string[] = [];
-
-    // Add patterns from enabledSites
-    for (const hostname of settingsToUse.enabledSites) {
-      patterns.push(`*://${hostname}/*`);
-    }
-
-    // Add patterns from enabled customSites
-    for (const site of settingsToUse.customSites) {
-      if (site.enabled) {
-        patterns.push(`*://${site.hostname}/*`);
-      }
-    }
-
-    return patterns;
-  }, []);
+  }, [buildUrlPatterns]);
 
   // Notify tabs with debouncing and optimized querying
   const notifyTabs = useCallback((newSettings: Settings) => {
