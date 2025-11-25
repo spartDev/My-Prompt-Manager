@@ -97,6 +97,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
   const saveTimeoutRef = useRef<number | null>(null);
   const hasPendingChanges = useRef(false);
   const settingsRef = useRef<Settings>(settings); // Always holds latest settings for unmount flush
+  const lastPersistedSettingsRef = useRef<Settings | null>(null); // Tracks last successfully persisted settings
 
   // Debounce timer for tab notifications
   const notificationTimerRef = useRef<number | null>(null);
@@ -165,6 +166,9 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
         customSites: [...loadedSettings.customSites]
       };
 
+      // Initialize lastPersistedSettingsRef with the loaded settings
+      lastPersistedSettingsRef.current = { ...loadedSettings };
+
       // Load interface mode
       const savedInterfaceMode = result.interfaceMode as 'popup' | 'sidepanel' | undefined;
       setInterfaceMode(savedInterfaceMode ?? (DEFAULT_SETTINGS.interfaceMode as 'popup' | 'sidepanel'));
@@ -191,6 +195,9 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
         enabledSites: [...defaultSettings.enabledSites],
         customSites: []
       };
+
+      // Initialize lastPersistedSettingsRef even on error
+      lastPersistedSettingsRef.current = { ...defaultSettings };
 
       setInterfaceMode(DEFAULT_SETTINGS.interfaceMode as 'popup' | 'sidepanel');
     } finally {
@@ -299,18 +306,29 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
       // NOTE: React cleanup functions cannot be async, so this is fire-and-forget.
       // The Chrome extension lifecycle typically allows enough time for the save to
       // complete, but in rare cases (immediate tab close), the save may not finish.
-      if (hasPendingChanges.current) {
+      // CRITICAL: Check if settings have changed by comparing with last persisted settings,
+      // not just relying on hasPendingChanges flag (which may not be set if unmount
+      // happens before the debounced effect runs)
+      const currentSettings = settingsRef.current;
+      const hasActualChanges = lastPersistedSettingsRef.current !== null &&
+        JSON.stringify(currentSettings) !== JSON.stringify(lastPersistedSettingsRef.current);
+
+      if (hasPendingChanges.current || hasActualChanges) {
         hasPendingChanges.current = false;
-        const currentSettings = settingsRef.current;
 
         // Persist settings to storage
-        void persistSettings(currentSettings).catch((err: unknown) => {
-          Logger.error('Failed to flush settings on unmount', toError(err), {
-            component: 'SettingsView',
-            operation: 'flush-on-unmount',
-            context: 'Component unmounted with pending changes'
+        void persistSettings(currentSettings)
+          .then(() => {
+            // Update last persisted settings after successful unmount flush
+            lastPersistedSettingsRef.current = { ...currentSettings };
+          })
+          .catch((err: unknown) => {
+            Logger.error('Failed to flush settings on unmount', toError(err), {
+              component: 'SettingsView',
+              operation: 'flush-on-unmount',
+              context: 'Component unmounted with pending changes'
+            });
           });
-        });
 
         // CRITICAL: Notify tabs immediately (without debounce) to keep content scripts in sync
         // Build patterns for currently enabled sites
@@ -505,6 +523,9 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
     try {
       // Persist settings to storage
       await persistSettings(newSettings);
+
+      // Update last persisted settings ref after successful save
+      lastPersistedSettingsRef.current = { ...newSettings };
 
       // Notify content scripts of changes (debounced and optimized)
       notifyTabs(newSettings);
