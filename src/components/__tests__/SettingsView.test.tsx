@@ -404,4 +404,342 @@ describe('SettingsView', () => {
       alertSpy.mockRestore();
     });
   });
+
+  describe('Debounced Settings Persistence', () => {
+    describe('Flush-on-unmount behavior', () => {
+      it('flushes pending changes for debounced settings on unmount', async () => {
+        const chromeMock = getChromeMockFunctions();
+        const storageMock = getMockStorageManager();
+
+        const { unmount } = render(
+          <ThemeProvider>
+            <SettingsView
+              onBack={vi.fn()}
+              showToast={vi.fn()}
+              toastSettings={{
+                position: 'top-right',
+                enabledTypes: { success: true, error: true, info: true, warning: true },
+                enableGrouping: true,
+                groupingWindow: 500
+              }}
+              onToastSettingsChange={vi.fn()}
+            />
+          </ThemeProvider>
+        );
+
+        // Wait for initial load
+        await waitFor(() => {
+          expect(storageMock.getPrompts).toHaveBeenCalled();
+        });
+
+        const initialCallCount = (chromeMock.storage.local.set as Mock).mock.calls.length;
+
+        // Expand Advanced section
+        const advancedToggle = await screen.findByRole('button', { name: /advanced/i });
+        await userEvent.click(advancedToggle);
+
+        // Toggle debug mode (triggers debounced save)
+        const debugToggle = await screen.findByRole('switch', { name: /debug mode/i });
+        await userEvent.click(debugToggle);
+
+        // Unmount IMMEDIATELY (before 150ms debounce expires) - should flush pending changes
+        unmount();
+
+        // Wait for flush operation to complete
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Verify that flush occurred
+        const calls = (chromeMock.storage.local.set as Mock).mock.calls;
+        expect(calls.length).toBeGreaterThanOrEqual(initialCallCount + 1);
+
+        // Verify the flushed data contains debug mode change
+        const lastCall = calls[calls.length - 1][0];
+        expect(lastCall.promptLibrarySettings.debugMode).toBe(true);
+      });
+
+      it('does not flush again if debounced save already completed', async () => {
+        const chromeMock = getChromeMockFunctions();
+        const storageMock = getMockStorageManager();
+
+        // Setup initial state with custom site
+        (chromeMock.storage.local.get as Mock).mockResolvedValue({
+          promptLibrarySettings: {
+            enabledSites: ['chatgpt.com'],
+            customSites: [{
+              hostname: 'example.com',
+              displayName: 'Example',
+              enabled: true,
+              dateAdded: Date.now()
+            }],
+            debugMode: false,
+            floatingFallback: true
+          },
+          interfaceMode: 'popup',
+          settings: DEFAULT_SETTINGS
+        });
+
+        const { unmount } = render(
+          <ThemeProvider>
+            <SettingsView
+              onBack={vi.fn()}
+              showToast={vi.fn()}
+              toastSettings={{
+                position: 'top-right',
+                enabledTypes: { success: true, error: true, info: true, warning: true },
+                enableGrouping: true,
+                groupingWindow: 500
+              }}
+              onToastSettingsChange={vi.fn()}
+            />
+          </ThemeProvider>
+        );
+
+        // Wait for initial load
+        await waitFor(() => {
+          expect(storageMock.getPrompts).toHaveBeenCalled();
+        });
+
+        // Wait for any initial debounced saves to complete
+        await new Promise(resolve => setTimeout(resolve, 200));
+
+        const initialCallCount = (chromeMock.storage.local.set as Mock).mock.calls.length;
+
+        // Toggle custom site OFF (triggers debounced save)
+        const customSiteToggle = await screen.findByRole('switch', { name: /example/i });
+        await userEvent.click(customSiteToggle);
+
+        // Wait for debounce to complete (200ms - longer than 150ms debounce)
+        await new Promise(resolve => setTimeout(resolve, 200));
+
+        // Verify debounced save occurred
+        await waitFor(() => {
+          expect((chromeMock.storage.local.set as Mock).mock.calls.length).toBe(initialCallCount + 1);
+        });
+
+        const callCountAfterSave = (chromeMock.storage.local.set as Mock).mock.calls.length;
+
+        // Verify the save contains correct data
+        const saveCall = (chromeMock.storage.local.set as Mock).mock.calls[callCountAfterSave - 1][0];
+        expect(saveCall.promptLibrarySettings.customSites[0].enabled).toBe(false);
+
+        // Unmount component - should NOT save again (hasPendingChanges is false)
+        unmount();
+
+        // Wait to ensure no additional save
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Verify no additional save occurred
+        expect((chromeMock.storage.local.set as Mock).mock.calls.length).toBe(callCountAfterSave);
+      });
+
+      it('persists debug mode toggle on immediate navigation', async () => {
+        const chromeMock = getChromeMockFunctions();
+        const storageMock = getMockStorageManager();
+
+        const { unmount } = render(
+          <ThemeProvider>
+            <SettingsView
+              onBack={vi.fn()}
+              showToast={vi.fn()}
+              toastSettings={{
+                position: 'top-right',
+                enabledTypes: { success: true, error: true, info: true, warning: true },
+                enableGrouping: true,
+                groupingWindow: 500
+              }}
+              onToastSettingsChange={vi.fn()}
+            />
+          </ThemeProvider>
+        );
+
+        // Wait for initial load
+        await waitFor(() => {
+          expect(storageMock.getPrompts).toHaveBeenCalled();
+        });
+
+        const initialCallCount = (chromeMock.storage.local.set as Mock).mock.calls.length;
+
+        // Expand Advanced section
+        const advancedToggle = await screen.findByRole('button', { name: /advanced/i });
+        await userEvent.click(advancedToggle);
+
+        // Toggle debug mode ON
+        const debugToggle = await screen.findByRole('switch', { name: /debug mode/i });
+        await userEvent.click(debugToggle);
+
+        // Immediate navigation (10ms - well before 150ms debounce expires)
+        await new Promise(resolve => setTimeout(resolve, 10));
+        unmount();
+
+        // Verify flush occurred
+        await waitFor(() => {
+          const calls = (chromeMock.storage.local.set as Mock).mock.calls;
+          expect(calls.length).toBeGreaterThanOrEqual(initialCallCount + 1);
+
+          // Verify Chrome storage contains debug mode change
+          const lastCall = calls[calls.length - 1][0];
+          expect(lastCall.promptLibrarySettings.debugMode).toBe(true);
+        });
+
+        // Verify localStorage was also updated
+        expect(localStorage.getItem('prompt-library-debug')).toBe('true');
+      });
+    });
+
+    describe('Debounce timing', () => {
+      it('persists debug mode changes after 150ms debounce window', async () => {
+        const chromeMock = getChromeMockFunctions();
+        const storageMock = getMockStorageManager();
+
+        render(
+          <ThemeProvider>
+            <SettingsView
+              onBack={vi.fn()}
+              showToast={vi.fn()}
+              toastSettings={{
+                position: 'top-right',
+                enabledTypes: { success: true, error: true, info: true, warning: true },
+                enableGrouping: true,
+                groupingWindow: 500
+              }}
+              onToastSettingsChange={vi.fn()}
+            />
+          </ThemeProvider>
+        );
+
+        await waitFor(() => {
+          expect(storageMock.getPrompts).toHaveBeenCalled();
+        });
+
+        const initialCallCount = (chromeMock.storage.local.set as Mock).mock.calls.length;
+
+        // Expand advanced section
+        const advancedToggle = await screen.findByRole('button', { name: /advanced/i });
+        await userEvent.click(advancedToggle);
+
+        // Toggle debug mode
+        const debugToggle = await screen.findByRole('switch', { name: /debug mode/i });
+        await userEvent.click(debugToggle);
+
+        // Wait for debounce to complete (150ms + buffer)
+        await new Promise(resolve => setTimeout(resolve, 200));
+
+        // Verify save occurred
+        await waitFor(() => {
+          const calls = (chromeMock.storage.local.set as Mock).mock.calls;
+          expect(calls.length).toBeGreaterThanOrEqual(initialCallCount + 1);
+
+          // Verify the saved data contains debug mode change
+          const lastCall = calls[calls.length - 1][0];
+          expect(lastCall.promptLibrarySettings.debugMode).toBe(true);
+        });
+      });
+
+      it('resets debounce timer on rapid consecutive changes', async () => {
+        const chromeMock = getChromeMockFunctions();
+        const storageMock = getMockStorageManager();
+
+        render(
+          <ThemeProvider>
+            <SettingsView
+              onBack={vi.fn()}
+              showToast={vi.fn()}
+              toastSettings={{
+                position: 'top-right',
+                enabledTypes: { success: true, error: true, info: true, warning: true },
+                enableGrouping: true,
+                groupingWindow: 500
+              }}
+              onToastSettingsChange={vi.fn()}
+            />
+          </ThemeProvider>
+        );
+
+        await waitFor(() => {
+          expect(storageMock.getPrompts).toHaveBeenCalled();
+        });
+
+        const initialCallCount = (chromeMock.storage.local.set as Mock).mock.calls.length;
+
+        // Find Claude toggle (site integration section is always expanded)
+        const claudeToggle = await screen.findByRole('switch', { name: /claude/i });
+
+        // Make rapid changes (3 clicks within 120ms)
+        // Initial state: Claude is disabled (not in enabledSites)
+        await userEvent.click(claudeToggle); // Click 1: Enable
+        await new Promise(resolve => setTimeout(resolve, 40));
+
+        await userEvent.click(claudeToggle); // Click 2: Disable
+        await new Promise(resolve => setTimeout(resolve, 40));
+
+        await userEvent.click(claudeToggle); // Click 3: Enable
+
+        // Wait for debounce to complete (150ms + buffer)
+        await new Promise(resolve => setTimeout(resolve, 200));
+
+        await waitFor(() => {
+          const calls = (chromeMock.storage.local.set as Mock).mock.calls;
+          // Should have saved the final state (Claude enabled after 3 clicks)
+          expect(calls.length).toBeGreaterThanOrEqual(initialCallCount + 1);
+
+          // Verify final state: Claude should be enabled (3 clicks from initial disabled state)
+          const lastCall = calls[calls.length - 1][0];
+          expect(lastCall.promptLibrarySettings.enabledSites).toContain('claude.ai');
+        });
+      });
+    });
+
+    describe('Error handling', () => {
+      it('handles save errors gracefully without crashing', async () => {
+        const chromeMock = getChromeMockFunctions();
+        const storageMock = getMockStorageManager();
+
+        // Make first save fail, then succeed
+        (chromeMock.storage.local.set as Mock)
+          .mockRejectedValueOnce(new Error('Storage quota exceeded'))
+          .mockResolvedValue(undefined);
+
+        const { unmount } = render(
+          <ThemeProvider>
+            <SettingsView
+              onBack={vi.fn()}
+              showToast={vi.fn()}
+              toastSettings={{
+                position: 'top-right',
+                enabledTypes: { success: true, error: true, info: true, warning: true },
+                enableGrouping: true,
+                groupingWindow: 500
+              }}
+              onToastSettingsChange={vi.fn()}
+            />
+          </ThemeProvider>
+        );
+
+        await waitFor(() => {
+          expect(storageMock.getPrompts).toHaveBeenCalled();
+        });
+
+        const initialCallCount = (chromeMock.storage.local.set as Mock).mock.calls.length;
+
+        // Expand advanced section
+        const advancedToggle = await screen.findByRole('button', { name: /advanced/i });
+        await userEvent.click(advancedToggle);
+
+        // Toggle debug mode
+        const debugToggle = await screen.findByRole('switch', { name: /debug mode/i });
+        await userEvent.click(debugToggle);
+
+        // Wait for debounce (this save will fail but error is caught)
+        await new Promise(resolve => setTimeout(resolve, 200));
+
+        await waitFor(() => {
+          // Save attempt should have been made even though it failed
+          expect((chromeMock.storage.local.set as Mock).mock.calls.length).toBeGreaterThanOrEqual(initialCallCount + 1);
+        });
+
+        // Component should not crash, unmount should work normally
+        expect(() => unmount()).not.toThrow();
+      });
+    });
+  });
 });

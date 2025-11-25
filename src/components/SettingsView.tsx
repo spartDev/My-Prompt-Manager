@@ -93,6 +93,10 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
   // Track initial mount to skip saving on first render
   const isInitialMount = useRef(true);
 
+  // Refs for flush-on-unmount pattern
+  const saveTimeoutRef = useRef<number | null>(null);
+  const hasPendingChanges = useRef(false);
+
   // Debounce timer for tab notifications
   const notificationTimerRef = useRef<number | null>(null);
 
@@ -193,7 +197,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
     };
   }, []);
 
-  // Debounced persistence: save settings after user stops making changes
+  // Debounced persistence with flush-on-unmount: save settings after user stops making changes
   useEffect(() => {
     // Skip saving on initial mount (when settings are loaded)
     if (isInitialMount.current) {
@@ -201,19 +205,49 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
       return;
     }
 
-    // Debounce: wait 150ms after last change before saving
-    const timeoutId = setTimeout(() => {
-      saveSettings(settings).catch((err: unknown) => {
-        Logger.error('Failed to save settings', toError(err), {
-          component: 'SettingsView',
-          operation: 'persist'
+    // Mark that we have pending changes
+    hasPendingChanges.current = true;
+
+    // Clear existing timeout to reset debounce
+    if (saveTimeoutRef.current !== null) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    // Schedule new save after 150ms of inactivity
+    saveTimeoutRef.current = window.setTimeout(() => {
+      saveSettings(settings)
+        .then(() => {
+          // Clear pending flag on successful save
+          hasPendingChanges.current = false;
+        })
+        .catch((err: unknown) => {
+          Logger.error('Failed to save settings', toError(err), {
+            component: 'SettingsView',
+            operation: 'persist'
+          });
+          // Keep hasPendingChanges as true on error so unmount will retry
         });
-      });
     }, 150);
 
-    // Cleanup: cancel pending save if settings change again
+    // Cleanup: flush pending changes on unmount
     return () => {
-      clearTimeout(timeoutId);
+      // Cancel scheduled save to prevent duplicate
+      if (saveTimeoutRef.current !== null) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+
+      // If we have pending changes that weren't saved, flush them now
+      if (hasPendingChanges.current) {
+        hasPendingChanges.current = false;
+        // Fire-and-forget with error handling
+        void saveSettings(settings).catch((err: unknown) => {
+          Logger.error('Failed to flush settings on unmount', toError(err), {
+            component: 'SettingsView',
+            operation: 'flush-on-unmount',
+            context: 'Component unmounted with pending changes'
+          });
+        });
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings]);
