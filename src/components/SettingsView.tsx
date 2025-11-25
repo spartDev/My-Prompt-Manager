@@ -665,10 +665,9 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
    */
   const handleImportData = async (data: { prompts: Prompt[]; categories: Category[] }) => {
     try {
-      // Import categories in parallel (must complete before prompts)
-      const categoryResults = await Promise.allSettled(
-        data.categories.map((category) => storageManager.importCategory(category))
-      );
+      // CRITICAL: Use batch imports to acquire lock once instead of serializing each import
+      // Import categories first (categories must exist before prompts)
+      const categoryResults = await storageManager.importCategoriesBatch(data.categories);
 
       // Collect category failures with context
       const categoryFailures: Array<{ category: Category; error: unknown }> = [];
@@ -694,10 +693,8 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
         );
       }
 
-      // Import prompts in parallel (categories must exist first)
-      const promptResults = await Promise.allSettled(
-        data.prompts.map((prompt) => storageManager.importPrompt(prompt))
-      );
+      // Import prompts in batch (categories must exist first)
+      const promptResults = await storageManager.importPromptsBatch(data.prompts);
 
       // Collect prompt failures with context
       const promptFailures: Array<{ prompt: Prompt; error: unknown }> = [];

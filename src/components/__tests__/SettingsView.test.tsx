@@ -101,8 +101,8 @@ describe('SettingsView', () => {
     await userEvent.upload(fileInput as HTMLInputElement, file);
 
     await waitFor(() => {
-      expect(storageMock.importCategory).toHaveBeenCalledWith(categories[0]);
-      expect(storageMock.importPrompt).toHaveBeenCalledWith(prompts[0]);
+      expect(storageMock.importCategoriesBatch).toHaveBeenCalledWith(categories);
+      expect(storageMock.importPromptsBatch).toHaveBeenCalledWith(prompts);
     });
 
     expect(alertSpy).toHaveBeenCalledWith(expect.stringMatching(/successfully imported/i));
@@ -128,7 +128,7 @@ describe('SettingsView', () => {
     await waitFor(() => {
       expect(alertSpy).toHaveBeenCalledWith(expect.stringMatching(/invalid json/i));
     });
-    expect(storageMock.importPrompt).not.toHaveBeenCalled();
+    expect(storageMock.importPromptsBatch).not.toHaveBeenCalled();
     alertSpy.mockRestore();
   });
 
@@ -233,13 +233,9 @@ describe('SettingsView', () => {
       const storageMock = getMockStorageManager();
       const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
 
-      // Track call order to ensure parallelism
-      const callOrder: string[] = [];
-      (storageMock.importCategory as Mock).mockImplementation(async (category: Category) => {
-        callOrder.push(`category-${category.id}-start`);
-        await new Promise(resolve => setTimeout(resolve, 10)); // Simulate async work
-        callOrder.push(`category-${category.id}-end`);
-        return category;
+      // Mock batch import (real implementation processes all in one lock)
+      (storageMock.importCategoriesBatch as Mock).mockImplementation(async (categories: Category[]) => {
+        return categories.map(cat => ({ status: 'fulfilled' as const, value: cat }));
       });
 
       await renderSettings();
@@ -264,16 +260,11 @@ describe('SettingsView', () => {
       await userEvent.upload(fileInput as HTMLInputElement, file);
 
       await waitFor(() => {
-        expect(storageMock.importCategory).toHaveBeenCalledTimes(3);
+        expect(storageMock.importCategoriesBatch).toHaveBeenCalledTimes(1);
+        expect(storageMock.importCategoriesBatch).toHaveBeenCalledWith(categories);
         expect(alertSpy).toHaveBeenCalledWith(expect.stringMatching(/successfully imported/i));
       });
 
-      // Verify parallel execution: all starts should happen before any ends
-      const firstEndIndex = callOrder.findIndex(c => c.endsWith('-end'));
-      const startsBeforeFirstEnd = callOrder.slice(0, firstEndIndex).filter(c => c.endsWith('-start')).length;
-
-      // If truly parallel, multiple starts should occur before first end
-      expect(startsBeforeFirstEnd).toBeGreaterThan(1);
       alertSpy.mockRestore();
     });
 
@@ -281,13 +272,9 @@ describe('SettingsView', () => {
       const storageMock = getMockStorageManager();
       const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
 
-      // Track call order
-      const callOrder: string[] = [];
-      (storageMock.importPrompt as Mock).mockImplementation(async (prompt: Prompt) => {
-        callOrder.push(`prompt-${prompt.id}-start`);
-        await new Promise(resolve => setTimeout(resolve, 10)); // Simulate async work
-        callOrder.push(`prompt-${prompt.id}-end`);
-        return prompt;
+      // Mock batch import
+      (storageMock.importPromptsBatch as Mock).mockImplementation(async (prompts: Prompt[]) => {
+        return prompts.map(prompt => ({ status: 'fulfilled' as const, value: prompt }));
       });
 
       await renderSettings();
@@ -310,15 +297,11 @@ describe('SettingsView', () => {
       await userEvent.upload(fileInput as HTMLInputElement, file);
 
       await waitFor(() => {
-        expect(storageMock.importPrompt).toHaveBeenCalledTimes(3);
+        expect(storageMock.importPromptsBatch).toHaveBeenCalledTimes(1);
+        expect(storageMock.importPromptsBatch).toHaveBeenCalledWith(prompts);
         expect(alertSpy).toHaveBeenCalledWith(expect.stringMatching(/successfully imported/i));
       });
 
-      // Verify parallel execution
-      const firstEndIndex = callOrder.findIndex(c => c.endsWith('-end'));
-      const startsBeforeFirstEnd = callOrder.slice(0, firstEndIndex).filter(c => c.endsWith('-start')).length;
-
-      expect(startsBeforeFirstEnd).toBeGreaterThan(1);
       alertSpy.mockRestore();
     });
 
@@ -327,11 +310,13 @@ describe('SettingsView', () => {
       const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
 
       // Make second category fail
-      (storageMock.importCategory as Mock).mockImplementation(async (category: Category) => {
-        if (category.id === 'c2') {
-          throw new Error('Duplicate category name');
-        }
-        return category;
+      (storageMock.importCategoriesBatch as Mock).mockImplementation(async (categories: Category[]) => {
+        return categories.map(cat => {
+          if (cat.id === 'c2') {
+            return { status: 'rejected' as const, reason: new Error('Duplicate category name') };
+          }
+          return { status: 'fulfilled' as const, value: cat };
+        });
       });
 
       await renderSettings();
@@ -360,7 +345,7 @@ describe('SettingsView', () => {
       });
 
       // Prompts should not be imported if categories failed
-      expect(storageMock.importPrompt).not.toHaveBeenCalled();
+      expect(storageMock.importPromptsBatch).not.toHaveBeenCalled();
       alertSpy.mockRestore();
     });
 
@@ -369,11 +354,13 @@ describe('SettingsView', () => {
       const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
 
       // Make second prompt fail (by ID, not by call count)
-      (storageMock.importPrompt as Mock).mockImplementation(async (prompt: Prompt) => {
-        if (prompt.id === 'p2') {
-          throw new Error('Quota exceeded');
-        }
-        return prompt;
+      (storageMock.importPromptsBatch as Mock).mockImplementation(async (prompts: Prompt[]) => {
+        return prompts.map(prompt => {
+          if (prompt.id === 'p2') {
+            return { status: 'rejected' as const, reason: new Error('Quota exceeded') };
+          }
+          return { status: 'fulfilled' as const, value: prompt };
+        });
       });
 
       await renderSettings();
@@ -408,9 +395,12 @@ describe('SettingsView', () => {
       const storageMock = getMockStorageManager();
       const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
 
-      (storageMock.importCategory as Mock).mockRejectedValue(
-        new Error('Category import failed')
-      );
+      (storageMock.importCategoriesBatch as Mock).mockImplementation(async (categories: Category[]) => {
+        return categories.map(() => ({
+          status: 'rejected' as const,
+          reason: new Error('Category import failed')
+        }));
+      });
 
       await renderSettings();
       await waitFor(() => {
@@ -436,7 +426,7 @@ describe('SettingsView', () => {
       });
 
       // Critical: prompts should NOT be imported if categories fail
-      expect(storageMock.importPrompt).not.toHaveBeenCalled();
+      expect(storageMock.importPromptsBatch).not.toHaveBeenCalled();
       alertSpy.mockRestore();
     });
   });
