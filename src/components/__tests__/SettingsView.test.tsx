@@ -971,7 +971,6 @@ describe('SettingsView', () => {
     describe('Edge cases', () => {
       it('handles previousSettingsRef initialization when loading fails', async () => {
         const chromeMock = getChromeMockFunctions();
-        const storageMock = getMockStorageManager();
 
         // Force loading error
         (chromeMock.storage.local.get as Mock).mockRejectedValue(
