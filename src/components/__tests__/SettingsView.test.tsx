@@ -778,4 +778,289 @@ describe('SettingsView', () => {
       });
     });
   });
+
+  describe('Settings Notification System', () => {
+    describe('First-time change notifications', () => {
+      it('notifies tabs when disabling a site as the first action', async () => {
+        const chromeMock = getChromeMockFunctions();
+        const storageMock = getMockStorageManager();
+
+        // Setup: ChatGPT is enabled initially
+        (chromeMock.storage.local.get as Mock).mockResolvedValue({
+          promptLibrarySettings: {
+            enabledSites: ['chatgpt.com'],
+            customSites: [],
+            debugMode: false,
+            floatingFallback: true
+          },
+          interfaceMode: 'popup',
+          settings: DEFAULT_SETTINGS
+        });
+
+        // Mock open tab on ChatGPT
+        const mockTab = { id: 123, url: 'https://chatgpt.com/chat' };
+        (chromeMock.tabs.query as Mock).mockResolvedValue([mockTab]);
+        (chromeMock.tabs.sendMessage as Mock).mockResolvedValue(undefined);
+
+        await renderSettings();
+
+        // Wait for settings to load
+        await waitFor(() => {
+          expect(storageMock.getPrompts).toHaveBeenCalled();
+        });
+
+        // Find and click ChatGPT toggle to disable it (FIRST ACTION)
+        const chatgptToggle = await screen.findByRole('switch', { name: /chatgpt/i });
+        expect(chatgptToggle).toBeChecked(); // Initially enabled
+
+        await userEvent.click(chatgptToggle);
+
+        // Wait for debounce (200ms) + persistence (150ms)
+        await new Promise(resolve => setTimeout(resolve, 400));
+
+        // Verify chrome.tabs.query was called with correct pattern
+        await waitFor(() => {
+          expect(chromeMock.tabs.query).toHaveBeenCalledWith({
+            url: expect.arrayContaining(['*://chatgpt.com/*'])
+          });
+        });
+
+        // Verify chrome.tabs.sendMessage was called for the ChatGPT tab
+        await waitFor(() => {
+          expect(chromeMock.tabs.sendMessage).toHaveBeenCalledWith(
+            123,
+            expect.objectContaining({
+              action: 'settingsUpdated',
+              settings: expect.objectContaining({
+                enabledSites: expect.not.arrayContaining(['chatgpt.com'])
+              })
+            })
+          );
+        });
+      });
+
+      it('notifies tabs when disabling a custom site as the first action', async () => {
+        const chromeMock = getChromeMockFunctions();
+        const storageMock = getMockStorageManager();
+
+        // Setup: Custom site is enabled initially
+        const customSite = {
+          hostname: 'custom.example.com',
+          displayName: 'Custom Site',
+          enabled: true,
+          dateAdded: Date.now()
+        };
+
+        (chromeMock.storage.local.get as Mock).mockResolvedValue({
+          promptLibrarySettings: {
+            enabledSites: ['chatgpt.com'],
+            customSites: [customSite],
+            debugMode: false,
+            floatingFallback: true
+          },
+          interfaceMode: 'popup',
+          settings: DEFAULT_SETTINGS
+        });
+
+        // Mock open tab on custom site
+        const mockTab = { id: 456, url: 'https://custom.example.com/page' };
+        (chromeMock.tabs.query as Mock).mockResolvedValue([mockTab]);
+        (chromeMock.tabs.sendMessage as Mock).mockResolvedValue(undefined);
+
+        await renderSettings();
+
+        // Wait for settings to load
+        await waitFor(() => {
+          expect(storageMock.getPrompts).toHaveBeenCalled();
+        });
+
+        // Find and click custom site toggle to disable it (FIRST ACTION)
+        const customToggle = await screen.findByRole('switch', { name: /custom site/i });
+        expect(customToggle).toBeChecked(); // Initially enabled
+
+        await userEvent.click(customToggle);
+
+        // Wait for debounce (200ms) + persistence (150ms)
+        await new Promise(resolve => setTimeout(resolve, 400));
+
+        // Verify chrome.tabs.query was called with custom site pattern
+        await waitFor(() => {
+          expect(chromeMock.tabs.query).toHaveBeenCalledWith({
+            url: expect.arrayContaining(['*://custom.example.com/*'])
+          });
+        });
+
+        // Verify chrome.tabs.sendMessage was called
+        await waitFor(() => {
+          expect(chromeMock.tabs.sendMessage).toHaveBeenCalledWith(
+            456,
+            expect.objectContaining({
+              action: 'settingsUpdated',
+              settings: expect.objectContaining({
+                customSites: expect.arrayContaining([
+                  expect.objectContaining({
+                    hostname: 'custom.example.com',
+                    enabled: false
+                  })
+                ])
+              })
+            })
+          );
+        });
+      });
+
+      it('notifies tabs when enabling a site as the first action', async () => {
+        const chromeMock = getChromeMockFunctions();
+        const storageMock = getMockStorageManager();
+
+        // Setup: Claude is disabled initially (not in enabledSites)
+        (chromeMock.storage.local.get as Mock).mockResolvedValue({
+          promptLibrarySettings: {
+            enabledSites: ['chatgpt.com'],
+            customSites: [],
+            debugMode: false,
+            floatingFallback: true
+          },
+          interfaceMode: 'popup',
+          settings: DEFAULT_SETTINGS
+        });
+
+        // Mock open tab on Claude (even though it's disabled)
+        const mockTab = { id: 789, url: 'https://claude.ai/chat' };
+        (chromeMock.tabs.query as Mock).mockResolvedValue([mockTab]);
+        (chromeMock.tabs.sendMessage as Mock).mockResolvedValue(undefined);
+
+        await renderSettings();
+
+        // Wait for settings to load
+        await waitFor(() => {
+          expect(storageMock.getPrompts).toHaveBeenCalled();
+        });
+
+        // Find and click Claude toggle to enable it (FIRST ACTION)
+        const claudeToggle = await screen.findByRole('switch', { name: /claude/i });
+        expect(claudeToggle).not.toBeChecked(); // Initially disabled
+
+        await userEvent.click(claudeToggle);
+
+        // Wait for debounce (200ms) + persistence (150ms)
+        await new Promise(resolve => setTimeout(resolve, 400));
+
+        // Verify chrome.tabs.query was called with Claude pattern
+        await waitFor(() => {
+          expect(chromeMock.tabs.query).toHaveBeenCalledWith({
+            url: expect.arrayContaining(['*://claude.ai/*'])
+          });
+        });
+
+        // Verify chrome.tabs.sendMessage was called
+        await waitFor(() => {
+          expect(chromeMock.tabs.sendMessage).toHaveBeenCalledWith(
+            789,
+            expect.objectContaining({
+              action: 'settingsUpdated',
+              settings: expect.objectContaining({
+                enabledSites: expect.arrayContaining(['claude.ai', 'chatgpt.com'])
+              })
+            })
+          );
+        });
+      });
+    });
+
+    describe('Edge cases', () => {
+      it('handles previousSettingsRef initialization when loading fails', async () => {
+        const chromeMock = getChromeMockFunctions();
+        const storageMock = getMockStorageManager();
+
+        // Force loading error
+        (chromeMock.storage.local.get as Mock).mockRejectedValue(
+          new Error('Storage not available')
+        );
+
+        await renderSettings();
+
+        // Wait for component to finish loading (loading state goes false)
+        await waitFor(() => {
+          expect(screen.queryByText(/loading/i)).not.toBeInTheDocument();
+        });
+
+        // Reset mocks and allow saving
+        (chromeMock.storage.local.get as Mock).mockResolvedValue({
+          promptLibrarySettings: {
+            enabledSites: [],
+            customSites: [],
+            debugMode: false,
+            floatingFallback: true
+          },
+          interfaceMode: 'popup',
+          settings: DEFAULT_SETTINGS
+        });
+
+        const mockTab = { id: 123, url: 'https://chatgpt.com/chat' };
+        (chromeMock.tabs.query as Mock).mockResolvedValue([mockTab]);
+        (chromeMock.tabs.sendMessage as Mock).mockResolvedValue(undefined);
+
+        // Try to enable ChatGPT (first action after error)
+        const chatgptToggle = await screen.findByRole('switch', { name: /chatgpt/i });
+        await userEvent.click(chatgptToggle);
+        await new Promise(resolve => setTimeout(resolve, 400));
+
+        // Should still notify tabs even though initial load failed
+        await waitFor(() => {
+          expect(chromeMock.tabs.query).toHaveBeenCalledWith({
+            url: expect.arrayContaining(['*://chatgpt.com/*'])
+          });
+        });
+      });
+
+      it('handles rapid toggle changes correctly', async () => {
+        const chromeMock = getChromeMockFunctions();
+        const storageMock = getMockStorageManager();
+
+        (chromeMock.storage.local.get as Mock).mockResolvedValue({
+          promptLibrarySettings: {
+            enabledSites: ['chatgpt.com'],
+            customSites: [],
+            debugMode: false,
+            floatingFallback: true
+          },
+          interfaceMode: 'popup',
+          settings: DEFAULT_SETTINGS
+        });
+
+        const mockTab = { id: 123, url: 'https://chatgpt.com/chat' };
+        (chromeMock.tabs.query as Mock).mockResolvedValue([mockTab]);
+        (chromeMock.tabs.sendMessage as Mock).mockResolvedValue(undefined);
+
+        await renderSettings();
+        await waitFor(() => {
+          expect(storageMock.getPrompts).toHaveBeenCalled();
+        });
+
+        // Rapidly toggle ChatGPT 3 times
+        const chatgptToggle = await screen.findByRole('switch', { name: /chatgpt/i });
+
+        await userEvent.click(chatgptToggle); // Disable
+        await new Promise(resolve => setTimeout(resolve, 50));
+
+        await userEvent.click(chatgptToggle); // Enable
+        await new Promise(resolve => setTimeout(resolve, 50));
+
+        await userEvent.click(chatgptToggle); // Disable
+
+        // Wait for final debounce and notification
+        await new Promise(resolve => setTimeout(resolve, 400));
+
+        // Should notify with final state (disabled)
+        await waitFor(() => {
+          const sendMessageCalls = (chromeMock.tabs.sendMessage as Mock).mock.calls;
+          expect(sendMessageCalls.length).toBeGreaterThan(0);
+
+          const lastCall = sendMessageCalls[sendMessageCalls.length - 1];
+          expect(lastCall[1].settings.enabledSites).not.toContain('chatgpt.com');
+        });
+      });
+    });
+  });
 });

@@ -157,7 +157,13 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
         ...(savedSettings ?? {})
       };
       setSettings(loadedSettings);
-      
+
+      // Initialize previousSettingsRef to track changes from this point forward
+      previousSettingsRef.current = {
+        enabledSites: [...loadedSettings.enabledSites],
+        customSites: [...loadedSettings.customSites]
+      };
+
       // Load interface mode
       const savedInterfaceMode = result.interfaceMode as 'popup' | 'sidepanel' | undefined;
       setInterfaceMode(savedInterfaceMode ?? (DEFAULT_SETTINGS.interfaceMode as 'popup' | 'sidepanel'));
@@ -178,6 +184,13 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
     } catch (error) {
       Logger.error('Failed to load settings', toError(error));
       setSettings(defaultSettings);
+
+      // Initialize previousSettingsRef even on error to prevent null checks
+      previousSettingsRef.current = {
+        enabledSites: [...defaultSettings.enabledSites],
+        customSites: []
+      };
+
       setInterfaceMode(DEFAULT_SETTINGS.interfaceMode as 'popup' | 'sidepanel');
     } finally {
       setLoading(false);
