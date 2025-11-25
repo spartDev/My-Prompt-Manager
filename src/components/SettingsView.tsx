@@ -237,6 +237,9 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
       }
 
       // If we have pending changes that weren't saved, flush them now
+      // NOTE: React cleanup functions cannot be async, so this is fire-and-forget.
+      // The Chrome extension lifecycle typically allows enough time for the save to
+      // complete, but in rare cases (immediate tab close), the save may not finish.
       if (hasPendingChanges.current) {
         hasPendingChanges.current = false;
         // Fire-and-forget with error handling
@@ -531,7 +534,18 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
     // Persistence handled by debounced useEffect
   };
 
-  // Handle import data
+  /**
+   * Imports data with parallel processing for better performance.
+   *
+   * Categories are imported first (in parallel), followed by prompts (in parallel).
+   * This ensures referential integrity since prompts reference categories.
+   *
+   * Uses Promise.allSettled to collect all failures before throwing, providing
+   * detailed error messages for partial import scenarios.
+   *
+   * @param data - The backup data containing prompts and categories
+   * @throws {Error} If any category or prompt import fails (with detailed context)
+   */
   const handleImportData = async (data: { prompts: Prompt[]; categories: Category[] }) => {
     try {
       // Import categories in parallel (must complete before prompts)
@@ -598,7 +612,13 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
 
       alert(`Successfully imported ${data.prompts.length.toString()} prompts and ${data.categories.length.toString()} categories!`);
     } catch (error) {
-      Logger.error('Import failed', toError(error));
+      Logger.error('Import failed', toError(error), {
+        component: 'SettingsView',
+        operation: 'handleImportData',
+        categoryCount: data.categories.length,
+        promptCount: data.prompts.length,
+        errorType: error instanceof Error ? error.constructor.name : typeof error
+      });
       throw error;
     }
   };

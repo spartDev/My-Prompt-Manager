@@ -403,6 +403,42 @@ describe('SettingsView', () => {
 
       alertSpy.mockRestore();
     });
+
+    it('should not import prompts if category import fails', async () => {
+      const storageMock = getMockStorageManager();
+      const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+
+      (storageMock.importCategory as Mock).mockRejectedValue(
+        new Error('Category import failed')
+      );
+
+      await renderSettings();
+      await waitFor(() => {
+        expect(storageMock.getPrompts).toHaveBeenCalled();
+      });
+
+      const fileInput = document.querySelector<HTMLInputElement>('input[type="file"]');
+      expect(fileInput).not.toBeNull();
+
+      const categories: Category[] = [{ id: 'c1', name: 'Category 1' }];
+      const prompts: Prompt[] = [
+        { id: 'p1', title: 'Test Prompt', content: 'Test Content', category: 'Category 1', createdAt: 1, updatedAt: 1 }
+      ];
+      const backupContents = JSON.stringify({ prompts, categories, version: '1.0' });
+      const file = createJsonFile(backupContents);
+
+      await userEvent.upload(fileInput as HTMLInputElement, file);
+
+      await waitFor(() => {
+        expect(alertSpy).toHaveBeenCalledWith(
+          expect.stringMatching(/failed to import.*categories/i)
+        );
+      });
+
+      // Critical: prompts should NOT be imported if categories fail
+      expect(storageMock.importPrompt).not.toHaveBeenCalled();
+      alertSpy.mockRestore();
+    });
   });
 
   describe('Debounced Settings Persistence', () => {

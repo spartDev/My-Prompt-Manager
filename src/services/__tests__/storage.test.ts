@@ -980,9 +980,6 @@ describe('StorageManager', () => {
       categories.forEach(cat => {
         expect(storedCategories.some(s => s.id === cat.id && s.name === cat.name)).toBe(true);
       });
-
-      // Log performance (for manual verification during development)
-      console.log(`100 concurrent category imports completed in ${duration}ms`);
     });
 
     it('should maintain data integrity with 100 concurrent prompt imports', async () => {
@@ -1010,9 +1007,6 @@ describe('StorageManager', () => {
       prompts.forEach(prompt => {
         expect(storedPrompts.some(s => s.id === prompt.id && s.title === prompt.title)).toBe(true);
       });
-
-      // Log performance
-      console.log(`100 concurrent prompt imports completed in ${duration}ms`);
     });
   });
 });
