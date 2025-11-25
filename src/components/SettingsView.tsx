@@ -218,10 +218,19 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
     };
   }, []);
 
-  // Keep settingsRef in sync with latest settings for unmount flush
-  useEffect(() => {
-    settingsRef.current = settings;
-  }, [settings]);
+  // CRITICAL: Update settingsRef during render (not in effect) to guarantee it's always current
+  // This ensures unmount flush sees latest settings even if unmount happens before effects run
+  settingsRef.current = settings;
+
+  // CRITICAL: Detect pending changes during render by comparing with last persisted settings
+  // This ensures unmount flush knows about unsaved changes even if unmount happens before effects run
+  const hasUnsavedChanges = lastPersistedSettingsRef.current !== null &&
+    JSON.stringify(settings) !== JSON.stringify(lastPersistedSettingsRef.current);
+
+  // Update hasPendingChanges flag during render if we detect unsaved changes
+  if (hasUnsavedChanges && !hasPendingChanges.current) {
+    hasPendingChanges.current = true;
+  }
 
   // Build URL patterns from enabled sites (defined early for use in unmount flush)
   const buildUrlPatterns = useCallback((settingsToUse: Settings): string[] => {
