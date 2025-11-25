@@ -444,6 +444,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
         component: 'SettingsView',
         operation: 'saveSettings'
       });
+      throw error;  // Re-throw so debounce effect's .catch() runs
     } finally {
       setSaving(false);
     }
