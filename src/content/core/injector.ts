@@ -2167,11 +2167,11 @@ export class PromptLibraryInjector {
       this.state.mutationObserver = null;
     }
 
-    // Clean up UI elements
-    if (this.state.icon) {
-      this.state.icon.remove();
-      this.state.icon = null;
-    }
+    // Remove ALL existing icons comprehensively (not just this.state.icon)
+    this.removeAllExistingIcons();
+
+    // Clear the icon reference (removal already done by removeAllExistingIcons)
+    this.state.icon = null;
 
     this.closePromptSelector();
 

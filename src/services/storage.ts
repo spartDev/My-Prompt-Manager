@@ -309,12 +309,88 @@ export class StorageManager {
     });
   }
 
+  /**
+   * Batch import multiple prompts in parallel within a single lock acquisition.
+   * This is significantly faster than calling importPrompt() multiple times
+   * because it acquires the lock only once instead of serializing each import.
+   *
+   * @param prompts Array of prompts to import
+   * @returns Array of PromiseSettledResult with imported prompts or errors
+   */
+  async importPromptsBatch(prompts: Prompt[]): Promise<PromiseSettledResult<Prompt>[]> {
+    return this.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
+      try {
+        const existingPrompts = await this.getPrompts();
+        const results: PromiseSettledResult<Prompt>[] = [];
+        const modifiedPrompts = [...existingPrompts];
+        let totalSizeDelta = 0;
+
+        // Process all prompts and collect size deltas
+        for (const prompt of prompts) {
+          try {
+            const existingIndex = modifiedPrompts.findIndex(p => p.id === prompt.id);
+
+            if (existingIndex >= 0) {
+              // Update existing prompt
+              const oldPrompt = modifiedPrompts[existingIndex];
+              const oldSize = estimatePromptSize(oldPrompt.title, oldPrompt.content, oldPrompt.category);
+              const newSize = estimatePromptSize(prompt.title, prompt.content, prompt.category);
+              const sizeDelta = newSize - oldSize;
+
+              if (sizeDelta > 0) {
+                totalSizeDelta += sizeDelta;
+              }
+
+              const updatedPrompt = this.normalizePrompt({
+                ...modifiedPrompts[existingIndex],
+                ...prompt,
+                updatedAt: Date.now()
+              });
+              modifiedPrompts[existingIndex] = updatedPrompt;
+              results.push({ status: 'fulfilled', value: updatedPrompt });
+            } else {
+              // Add new prompt
+              const promptSize = estimatePromptSize(prompt.title, prompt.content, prompt.category);
+              totalSizeDelta += promptSize;
+
+              const timestamp = Date.now();
+              const newPrompt = this.normalizePrompt({
+                ...prompt,
+                createdAt: prompt.createdAt || timestamp,
+                updatedAt: prompt.updatedAt || timestamp
+              });
+              modifiedPrompts.push(newPrompt);
+              results.push({ status: 'fulfilled', value: newPrompt });
+            }
+          } catch (error) {
+            results.push({
+              status: 'rejected',
+              reason: error instanceof Error ? error : new Error(String(error))
+            });
+          }
+        }
+
+        // Check quota for total size delta before committing
+        if (totalSizeDelta > 0) {
+          await this.checkQuotaBeforeWrite(totalSizeDelta);
+        }
+
+        // Commit all changes in a single write
+        await this.setStorageData(this.STORAGE_KEYS.PROMPTS, modifiedPrompts);
+
+        return results;
+      } catch (error) {
+        throw this.handleStorageError(error);
+      }
+    });
+  }
+
   async importCategory(category: Category): Promise<Category> {
     return this.withLock(this.STORAGE_KEYS.CATEGORIES, async () => {
       try {
         const existingCategories = await this.getCategories();
         const existingIndex = existingCategories.findIndex(c => c.id === category.id);
-        
+
         if (existingIndex >= 0) {
           // Update existing category
           existingCategories[existingIndex] = category;
@@ -325,7 +401,7 @@ export class StorageManager {
           const duplicateNameIndex = existingCategories.findIndex(
             c => c.name.toLowerCase() === category.name.toLowerCase()
           );
-          
+
           if (duplicateNameIndex >= 0) {
             // Update the existing category with the same name, preserving the existing ID
             const updatedCategory: Category = {
@@ -342,6 +418,68 @@ export class StorageManager {
             return category;
           }
         }
+      } catch (error) {
+        throw this.handleStorageError(error);
+      }
+    });
+  }
+
+  /**
+   * Batch import multiple categories in parallel within a single lock acquisition.
+   * This is significantly faster than calling importCategory() multiple times
+   * because it acquires the lock only once instead of serializing each import.
+   *
+   * @param categories Array of categories to import
+   * @returns Array of PromiseSettledResult with imported categories or errors
+   */
+  async importCategoriesBatch(categories: Category[]): Promise<PromiseSettledResult<Category>[]> {
+    return this.withLock(this.STORAGE_KEYS.CATEGORIES, async () => {
+      try {
+        const existingCategories = await this.getCategories();
+        const results: PromiseSettledResult<Category>[] = [];
+        const modifiedCategories = [...existingCategories];
+
+        // Process all categories
+        for (const category of categories) {
+          try {
+            const existingIndex = modifiedCategories.findIndex(c => c.id === category.id);
+
+            if (existingIndex >= 0) {
+              // Update existing category
+              modifiedCategories[existingIndex] = category;
+              results.push({ status: 'fulfilled', value: category });
+            } else {
+              // Check for duplicate names
+              const duplicateNameIndex = modifiedCategories.findIndex(
+                c => c.name.toLowerCase() === category.name.toLowerCase()
+              );
+
+              if (duplicateNameIndex >= 0) {
+                // Update existing category with same name, preserve existing ID
+                const updatedCategory: Category = {
+                  ...category,
+                  id: modifiedCategories[duplicateNameIndex].id
+                };
+                modifiedCategories[duplicateNameIndex] = updatedCategory;
+                results.push({ status: 'fulfilled', value: updatedCategory });
+              } else {
+                // Add new category
+                modifiedCategories.push(category);
+                results.push({ status: 'fulfilled', value: category });
+              }
+            }
+          } catch (error) {
+            results.push({
+              status: 'rejected',
+              reason: error instanceof Error ? error : new Error(String(error))
+            });
+          }
+        }
+
+        // Commit all changes in a single write
+        await this.setStorageData(this.STORAGE_KEYS.CATEGORIES, modifiedCategories);
+
+        return results;
       } catch (error) {
         throw this.handleStorageError(error);
       }

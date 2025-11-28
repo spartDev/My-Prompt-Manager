@@ -93,6 +93,21 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
   // Track initial mount to skip saving on first render
   const isInitialMount = useRef(true);
 
+  // Refs for flush-on-unmount pattern
+  const saveTimeoutRef = useRef<number | null>(null);
+  const hasPendingChanges = useRef(false);
+  const settingsRef = useRef<Settings>(settings); // Always holds latest settings for unmount flush
+  const lastPersistedSettingsRef = useRef<Settings | null>(null); // Tracks last successfully persisted settings
+
+  // Debounce timer for tab notifications
+  const notificationTimerRef = useRef<number | null>(null);
+
+  // Track previous settings to detect disabled sites
+  const previousSettingsRef = useRef<{
+    enabledSites: string[];
+    customSites: CustomSite[];
+  } | null>(null);
+
   const siteConfigs: Record<string, SiteConfig> = useMemo(() => ({
     'www.perplexity.ai': {
       name: 'Perplexity',
@@ -144,7 +159,16 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
         ...(savedSettings ?? {})
       };
       setSettings(loadedSettings);
-      
+
+      // Initialize previousSettingsRef to track changes from this point forward
+      previousSettingsRef.current = {
+        enabledSites: [...loadedSettings.enabledSites],
+        customSites: [...loadedSettings.customSites]
+      };
+
+      // Initialize lastPersistedSettingsRef with the loaded settings
+      lastPersistedSettingsRef.current = { ...loadedSettings };
+
       // Load interface mode
       const savedInterfaceMode = result.interfaceMode as 'popup' | 'sidepanel' | undefined;
       setInterfaceMode(savedInterfaceMode ?? (DEFAULT_SETTINGS.interfaceMode as 'popup' | 'sidepanel'));
@@ -165,6 +189,16 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
     } catch (error) {
       Logger.error('Failed to load settings', toError(error));
       setSettings(defaultSettings);
+
+      // Initialize previousSettingsRef even on error to prevent null checks
+      previousSettingsRef.current = {
+        enabledSites: [...defaultSettings.enabledSites],
+        customSites: []
+      };
+
+      // Initialize lastPersistedSettingsRef even on error
+      lastPersistedSettingsRef.current = { ...defaultSettings };
+
       setInterfaceMode(DEFAULT_SETTINGS.interfaceMode as 'popup' | 'sidepanel');
     } finally {
       setLoading(false);
@@ -175,6 +209,48 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
     void loadSettings();
   }, [loadSettings]);
 
+  // Cleanup notification timer on unmount
+  useEffect(() => {
+    return () => {
+      if (notificationTimerRef.current !== null) {
+        clearTimeout(notificationTimerRef.current);
+      }
+    };
+  }, []);
+
+  // CRITICAL: Update settingsRef during render (not in effect) to guarantee it's always current
+  // This ensures unmount flush sees latest settings even if unmount happens before effects run
+  settingsRef.current = settings;
+
+  // CRITICAL: Detect pending changes during render by comparing with last persisted settings
+  // This ensures unmount flush knows about unsaved changes even if unmount happens before effects run
+  const hasUnsavedChanges = lastPersistedSettingsRef.current !== null &&
+    JSON.stringify(settings) !== JSON.stringify(lastPersistedSettingsRef.current);
+
+  // Update hasPendingChanges flag during render if we detect unsaved changes
+  if (hasUnsavedChanges && !hasPendingChanges.current) {
+    hasPendingChanges.current = true;
+  }
+
+  // Build URL patterns from enabled sites (defined early for use in unmount flush)
+  const buildUrlPatterns = useCallback((settingsToUse: Settings): string[] => {
+    const patterns: string[] = [];
+
+    // Add patterns from enabledSites
+    for (const hostname of settingsToUse.enabledSites) {
+      patterns.push(`*://${hostname}/*`);
+    }
+
+    // Add patterns from enabled customSites
+    for (const site of settingsToUse.customSites) {
+      if (site.enabled) {
+        patterns.push(`*://${site.hostname}/*`);
+      }
+    }
+
+    return patterns;
+  }, []);
+
   // Debounced persistence: save settings after user stops making changes
   useEffect(() => {
     // Skip saving on initial mount (when settings are loaded)
@@ -183,47 +259,291 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
       return;
     }
 
-    // Debounce: wait 150ms after last change before saving
-    const timeoutId = setTimeout(() => {
-      saveSettings(settings).catch((err: unknown) => {
-        Logger.error('Failed to save settings', toError(err), {
-          component: 'SettingsView',
-          operation: 'persist'
+    // Mark that we have pending changes
+    hasPendingChanges.current = true;
+
+    // Clear existing timeout to reset debounce
+    if (saveTimeoutRef.current !== null) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    // Schedule new save after 150ms of inactivity
+    saveTimeoutRef.current = window.setTimeout(() => {
+      saveSettings(settings)
+        .then(() => {
+          // Clear pending flag on successful save
+          hasPendingChanges.current = false;
+        })
+        .catch((err: unknown) => {
+          Logger.error('Failed to save settings', toError(err), {
+            component: 'SettingsView',
+            operation: 'persist'
+          });
+          // Keep hasPendingChanges as true on error so unmount will retry
         });
-      });
     }, 150);
 
-    // Cleanup: cancel pending save if settings change again
+    // Cleanup: only cancel the timeout, do NOT flush here
+    // Flushing in this cleanup would execute on every settings change (not just unmount)
+    // because React runs cleanup when dependencies change, and the closure would capture
+    // stale settings values from the previous render.
     return () => {
-      clearTimeout(timeoutId);
+      if (saveTimeoutRef.current !== null) {
+        clearTimeout(saveTimeoutRef.current);
+      }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings]);
 
-  // Save settings
-  const saveSettings = async (newSettings: Settings) => {
-    setSaving(true);
-    try {
-      await chrome.storage.local.set({ 
-        promptLibrarySettings: newSettings 
-      });
-      
-      // Notify content scripts of changes
-      const tabs = await chrome.tabs.query({});
-      
-      for (const tab of tabs) {
-        if (tab.id && tab.url && (tab.url.startsWith('http://') || tab.url.startsWith('https://'))) {
-          try {
-            await chrome.tabs.sendMessage(tab.id, {
-              action: 'settingsUpdated',
-              settings: newSettings
+  // Unmount-only flush: save any pending changes when component unmounts
+  // This effect has empty dependencies, so its cleanup only runs on actual unmount.
+  // We use settingsRef.current to always access the latest settings value.
+  // CRITICAL: We must notify tabs immediately during unmount to keep content scripts in sync.
+  useEffect(() => {
+    return () => {
+      // Cancel any scheduled save to prevent duplicate
+      if (saveTimeoutRef.current !== null) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+
+      // Cancel any scheduled notification to prevent duplicate
+      if (notificationTimerRef.current !== null) {
+        clearTimeout(notificationTimerRef.current);
+      }
+
+      // If we have pending changes that weren't saved, flush them now
+      // NOTE: React cleanup functions cannot be async, so this is fire-and-forget.
+      // The Chrome extension lifecycle typically allows enough time for the save to
+      // complete, but in rare cases (immediate tab close), the save may not finish.
+      // CRITICAL: Check if settings have changed by comparing with last persisted settings,
+      // not just relying on hasPendingChanges flag (which may not be set if unmount
+      // happens before the debounced effect runs)
+      const currentSettings = settingsRef.current;
+      const hasActualChanges = lastPersistedSettingsRef.current !== null &&
+        JSON.stringify(currentSettings) !== JSON.stringify(lastPersistedSettingsRef.current);
+
+      if (hasPendingChanges.current || hasActualChanges) {
+        hasPendingChanges.current = false;
+
+        // Persist settings to storage
+        void persistSettings(currentSettings)
+          .then(() => {
+            // Update last persisted settings after successful unmount flush
+            lastPersistedSettingsRef.current = { ...currentSettings };
+          })
+          .catch((err: unknown) => {
+            Logger.error('Failed to flush settings on unmount', toError(err), {
+              component: 'SettingsView',
+              operation: 'flush-on-unmount',
+              context: 'Component unmounted with pending changes'
             });
-          } catch {
-            // Tab might not have content script loaded, ignore error
+          });
+
+        // CRITICAL: Notify tabs immediately (without debounce) to keep content scripts in sync
+        // Build patterns for currently enabled sites
+        const currentPatterns = buildUrlPatterns(currentSettings);
+        const previousPatterns: string[] = [];
+
+        if (previousSettingsRef.current) {
+          // Build sets of enabled hostnames for comparison
+          const prevEnabled = new Set([
+            ...previousSettingsRef.current.enabledSites,
+            ...previousSettingsRef.current.customSites
+              .filter(s => s.enabled)
+              .map(s => s.hostname)
+          ]);
+
+          const currentEnabled = new Set([
+            ...currentSettings.enabledSites,
+            ...currentSettings.customSites
+              .filter(s => s.enabled)
+              .map(s => s.hostname)
+          ]);
+
+          // Find sites that were enabled but are now disabled
+          for (const hostname of prevEnabled) {
+            if (!currentEnabled.has(hostname)) {
+              previousPatterns.push(`*://${hostname}/*`);
+            }
+          }
+        }
+
+        // Combine current and previous patterns, removing duplicates
+        const allPatterns = [...new Set([...currentPatterns, ...previousPatterns])];
+
+        // Notify tabs if there are any patterns to notify
+        if (allPatterns.length > 0) {
+          void chrome.tabs.query({ url: allPatterns })
+            .then(tabs => {
+              if (tabs.length === 0) {
+                return;
+              }
+
+              // Send messages in parallel with Promise.allSettled
+              const messagePromises = tabs
+                .filter(tab => tab.id !== undefined)
+                .map(tab => {
+                  const tabId = tab.id as number;
+                  return chrome.tabs.sendMessage(tabId, {
+                    action: 'settingsUpdated',
+                    settings: currentSettings
+                  }).catch(() => {
+                    // Tab might not have content script loaded, ignore error
+                  });
+                });
+
+              return Promise.allSettled(messagePromises);
+            })
+            .catch((err: unknown) => {
+              Logger.error('Failed to notify tabs during unmount flush', toError(err), {
+                component: 'SettingsView',
+                operation: 'flush-on-unmount-notify'
+              });
+            });
+        }
+      }
+    };
+  }, [buildUrlPatterns]);
+
+  // Notify tabs with debouncing and optimized querying
+  const notifyTabs = useCallback((newSettings: Settings) => {
+    // Clear existing notification timer
+    if (notificationTimerRef.current !== null) {
+      clearTimeout(notificationTimerRef.current);
+    }
+
+    // Debounce notifications by 200ms to batch rapid changes
+    notificationTimerRef.current = window.setTimeout(() => {
+      // Build patterns for currently enabled sites
+      const currentPatterns = buildUrlPatterns(newSettings);
+      const previousPatterns: string[] = [];
+
+      if (previousSettingsRef.current) {
+        // Build sets of enabled hostnames for comparison
+        const prevEnabled = new Set([
+          ...previousSettingsRef.current.enabledSites,
+          ...previousSettingsRef.current.customSites
+            .filter(s => s.enabled)
+            .map(s => s.hostname)
+        ]);
+
+        const currentEnabled = new Set([
+          ...newSettings.enabledSites,
+          ...newSettings.customSites
+            .filter(s => s.enabled)
+            .map(s => s.hostname)
+        ]);
+
+        // Find sites that were enabled but are now disabled
+        for (const hostname of prevEnabled) {
+          if (!currentEnabled.has(hostname)) {
+            previousPatterns.push(`*://${hostname}/*`);
           }
         }
       }
+
+      // Combine current and previous patterns, removing duplicates
+      const allPatterns = [...new Set([...currentPatterns, ...previousPatterns])];
+
+      // Skip notification if no sites to notify
+      if (allPatterns.length === 0) {
+        Logger.debug('No sites to notify, skipping tab notification', {
+          component: 'SettingsView'
+        });
+        return;
+      }
+
+      // Query tabs matching both enabled and recently disabled sites
+      chrome.tabs.query({ url: allPatterns })
+        .then(tabs => {
+          if (tabs.length === 0) {
+            Logger.debug('No matching tabs found for notification', {
+              component: 'SettingsView',
+              patternCount: allPatterns.length
+            });
+            // Update previous settings even if no tabs found
+            previousSettingsRef.current = {
+              enabledSites: [...newSettings.enabledSites],
+              customSites: [...newSettings.customSites]
+            };
+            return;
+          }
+
+          Logger.debug('Notifying tabs of settings update', {
+            component: 'SettingsView',
+            tabCount: tabs.length,
+            patternCount: allPatterns.length,
+            currentPatterns: currentPatterns.length,
+            previousPatterns: previousPatterns.length
+          });
+
+          // Send messages in parallel with Promise.allSettled
+          const messagePromises = tabs
+            .filter(tab => tab.id !== undefined)
+            .map(tab => {
+              // TypeScript knows tab.id is defined here due to the filter
+              const tabId = tab.id as number;
+              return chrome.tabs.sendMessage(tabId, {
+                action: 'settingsUpdated',
+                settings: newSettings
+              }).catch(() => {
+                // Tab might not have content script loaded, ignore error
+                // Using catch instead of try/catch for cleaner parallel execution
+              });
+            });
+
+          return Promise.allSettled(messagePromises).then(() => {
+            // Update previous settings after successful notification
+            previousSettingsRef.current = {
+              enabledSites: [...newSettings.enabledSites],
+              customSites: [...newSettings.customSites]
+            };
+          });
+        })
+        .catch((err: unknown) => {
+          Logger.error('Failed to notify tabs of settings update', toError(err), {
+            component: 'SettingsView',
+            operation: 'notifyTabs'
+          });
+        });
+    }, 200);
+  }, [buildUrlPatterns]);
+
+  // Raw storage persistence without tab notifications
+  // This is a stable function that doesn't depend on other callbacks,
+  // safe to use in the unmount-only flush effect
+  const persistSettings = async (newSettings: Settings) => {
+    try {
+      await chrome.storage.local.set({
+        promptLibrarySettings: newSettings
+      });
     } catch (error) {
-      Logger.error('Failed to save settings', toError(error));
+      Logger.error('Failed to persist settings', toError(error), {
+        component: 'SettingsView',
+        operation: 'persistSettings'
+      });
+      throw error;
+    }
+  };
+
+  // Save settings with tab notifications
+  const saveSettings = async (newSettings: Settings) => {
+    setSaving(true);
+    try {
+      // Persist settings to storage
+      await persistSettings(newSettings);
+
+      // Update last persisted settings ref after successful save
+      lastPersistedSettingsRef.current = { ...newSettings };
+
+      // Notify content scripts of changes (debounced and optimized)
+      notifyTabs(newSettings);
+    } catch (error) {
+      Logger.error('Failed to save settings', toError(error), {
+        component: 'SettingsView',
+        operation: 'saveSettings'
+      });
+      throw error;  // Re-throw so debounce effect's .catch() runs
     } finally {
       setSaving(false);
     }
@@ -282,91 +602,45 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
   };
 
   // Handle custom site toggle
-  const handleCustomSiteToggle = async (hostname: string, enabled: boolean) => {
-    const newCustomSites = settings.customSites.map(site => 
-      site.hostname === hostname ? { ...site, enabled } : site
-    );
-    
-    const newSettings = {
-      ...settings,
-      customSites: newCustomSites
-    };
-    
-    setSettings(newSettings);
-    await saveSettings(newSettings);
-    
-    // Notify tabs about the change
-    await notifyCustomSiteChange(hostname);
+  const handleCustomSiteToggle = (hostname: string, enabled: boolean) => {
+    setSettings(prev => ({
+      ...prev,
+      customSites: prev.customSites.map(site =>
+        site.hostname === hostname ? { ...site, enabled } : site
+      )
+    }));
+    // Persistence and tab notification handled by debounced useEffect
   };
 
   // Handle remove custom site
-  const handleRemoveCustomSite = async (hostname: string) => {
-    const newCustomSites = settings.customSites.filter(site => site.hostname !== hostname);
-    
-    const newSettings = {
-      ...settings,
-      customSites: newCustomSites
-    };
-    
-    setSettings(newSettings);
-    await saveSettings(newSettings);
-    
-    // Notify tabs about the removal
-    await notifyCustomSiteChange(hostname);
-  };
-
-  // Notify custom site change
-  const notifyCustomSiteChange = async (hostname: string) => {
-    try {
-      // Since we're using universal content script, just notify existing tabs
-      const tabs = await chrome.tabs.query({ url: `*://${hostname}/*` });
-      
-      for (const tab of tabs) {
-        if (tab.id) {
-          try {
-            // Notify the content script to reinitialize
-            await chrome.tabs.sendMessage(tab.id, {
-              action: 'reinitialize',
-              reason: 'custom_site_added'
-            });
-          } catch {
-            // Tab might not have content script loaded yet, ignore error
-          }
-        }
-      }
-    } catch (error) {
-      Logger.error('Failed to notify custom site change', toError(error));
-    }
+  const handleRemoveCustomSite = (hostname: string) => {
+    setSettings(prev => ({
+      ...prev,
+      customSites: prev.customSites.filter(site => site.hostname !== hostname)
+    }));
+    // Persistence and tab notification handled by debounced useEffect
   };
 
   // Handle add custom site
-  const handleAddCustomSite = async (siteData: Omit<CustomSite, 'dateAdded'>) => {
+  const handleAddCustomSite = (siteData: Omit<CustomSite, 'dateAdded'>) => {
     const newSite: CustomSite = {
       ...siteData,
       dateAdded: Date.now()
     };
 
-    const newSettings = {
-      ...settings,
-      customSites: [...settings.customSites, newSite]
-    };
-
-    setSettings(newSettings);
-    await saveSettings(newSettings);
-    
-    // Notify any open tabs to reinitialize
-    await notifyCustomSiteChange(newSite.hostname);
+    setSettings(prev => ({
+      ...prev,
+      customSites: [...prev.customSites, newSite]
+    }));
+    // Persistence and tab notification handled by debounced useEffect
   };
 
   // Handle debug mode toggle
-  const handleDebugModeChange = async (enabled: boolean) => {
-    const newSettings = {
-      ...settings,
+  const handleDebugModeChange = (enabled: boolean) => {
+    setSettings(prev => ({
+      ...prev,
       debugMode: enabled
-    };
-
-    setSettings(newSettings);
-    await saveSettings(newSettings);
+    }));
 
     // Update localStorage for immediate effect
     if (enabled) {
@@ -374,27 +648,91 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
     } else {
       localStorage.removeItem('prompt-library-debug');
     }
+    // Persistence handled by debounced useEffect
   };
 
-  // Handle import data
+  /**
+   * Imports data with parallel processing for better performance.
+   *
+   * Categories are imported first (in parallel), followed by prompts (in parallel).
+   * This ensures referential integrity since prompts reference categories.
+   *
+   * Uses Promise.allSettled to collect all failures before throwing, providing
+   * detailed error messages for partial import scenarios.
+   *
+   * @param data - The backup data containing prompts and categories
+   * @throws {Error} If any category or prompt import fails (with detailed context)
+   */
   const handleImportData = async (data: { prompts: Prompt[]; categories: Category[] }) => {
     try {
-      // Import categories first (prompts reference categories)
-      for (const category of data.categories) {
-        await storageManager.importCategory(category);
+      // CRITICAL: Use batch imports to acquire lock once instead of serializing each import
+      // Import categories first (categories must exist before prompts)
+      const categoryResults = await storageManager.importCategoriesBatch(data.categories);
+
+      // Collect category failures with context
+      const categoryFailures: Array<{ category: Category; error: unknown }> = [];
+      categoryResults.forEach((result, index) => {
+        if (result.status === 'rejected') {
+          categoryFailures.push({
+            category: data.categories[index],
+            error: result.reason
+          });
+        }
+      });
+
+      if (categoryFailures.length > 0) {
+        const failureMessages = categoryFailures
+          .map(({ category, error }) => {
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            return `Category "${category.name}" (${category.id}): ${errorMsg}`;
+          })
+          .join('\n');
+
+        throw new Error(
+          `Failed to import ${categoryFailures.length.toString()} of ${data.categories.length.toString()} categories:\n${failureMessages}`
+        );
       }
-      
-      // Import prompts
-      for (const prompt of data.prompts) {
-        await storageManager.importPrompt(prompt);
+
+      // Import prompts in batch (categories must exist first)
+      const promptResults = await storageManager.importPromptsBatch(data.prompts);
+
+      // Collect prompt failures with context
+      const promptFailures: Array<{ prompt: Prompt; error: unknown }> = [];
+      promptResults.forEach((result, index) => {
+        if (result.status === 'rejected') {
+          promptFailures.push({
+            prompt: data.prompts[index],
+            error: result.reason
+          });
+        }
+      });
+
+      if (promptFailures.length > 0) {
+        const failureMessages = promptFailures
+          .map(({ prompt, error }) => {
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            return `Prompt "${prompt.title}" (${prompt.id}): ${errorMsg}`;
+          })
+          .join('\n');
+
+        const successCount = data.prompts.length - promptFailures.length;
+        throw new Error(
+          `Failed to import ${promptFailures.length.toString()} of ${data.prompts.length.toString()} prompts (${successCount.toString()} succeeded):\n${failureMessages}`
+        );
       }
-      
+
       // Reload data
       await loadSettings();
-      
+
       alert(`Successfully imported ${data.prompts.length.toString()} prompts and ${data.categories.length.toString()} categories!`);
     } catch (error) {
-      Logger.error('Import failed', toError(error));
+      Logger.error('Import failed', toError(error), {
+        component: 'SettingsView',
+        operation: 'handleImportData',
+        categoryCount: data.categories.length,
+        promptCount: data.prompts.length,
+        errorType: error instanceof Error ? error.constructor.name : typeof error
+      });
       throw error;
     }
   };
@@ -481,9 +819,9 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
             siteConfigs={siteConfigs}
             interfaceMode={interfaceMode}
             onSiteToggle={(hostname, enabled) => { handleSiteToggle(hostname, enabled); }}
-            onCustomSiteToggle={(hostname, enabled) => void handleCustomSiteToggle(hostname, enabled)}
-            onRemoveCustomSite={(hostname) => void handleRemoveCustomSite(hostname)}
-            onAddCustomSite={(siteData) => void handleAddCustomSite(siteData as Omit<CustomSite, 'dateAdded'>)}
+            onCustomSiteToggle={handleCustomSiteToggle}
+            onRemoveCustomSite={handleRemoveCustomSite}
+            onAddCustomSite={(siteData) => { handleAddCustomSite(siteData as Omit<CustomSite, 'dateAdded'>); }}
             saving={saving}
             onShowToast={showToast}
           />
@@ -510,7 +848,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
           {/* Advanced Section */}
           <AdvancedSection
             debugMode={settings.debugMode}
-            onDebugModeChange={(enabled) => void handleDebugModeChange(enabled)}
+            onDebugModeChange={handleDebugModeChange}
             saving={saving}
           />
 
