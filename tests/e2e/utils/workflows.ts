@@ -41,7 +41,12 @@ export const promptWorkflows = {
     }
     await page.getByLabel('Content *').fill(promptData.content);
     if (promptData.category) {
-      await page.getByLabel('Category').selectOption(promptData.category);
+      // Click the dropdown button to open it
+      await page.getByLabel('Category').click();
+      // Wait for the menu to appear
+      await page.getByRole('menu', { name: 'Select category' }).waitFor();
+      // Click the desired category option
+      await page.getByRole('menuitem', { name: promptData.category }).click();
     }
 
     // Save and verify
@@ -73,7 +78,12 @@ export const promptWorkflows = {
       await contentField.fill(updates.content);
     }
     if (updates.category) {
-      await page.getByLabel('Category').selectOption(updates.category);
+      // Click the dropdown button to open it
+      await page.getByLabel('Category').click();
+      // Wait for the menu to appear
+      await page.getByRole('menu', { name: 'Select category' }).waitFor();
+      // Click the desired category option
+      await page.getByRole('menuitem', { name: updates.category }).click();
     }
 
     // Save and verify

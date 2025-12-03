@@ -28,7 +28,15 @@ export class PromptFormPage extends BasePage {
    * Select a category from the dropdown
    */
   async selectCategory(category: string): Promise<void> {
-    await this.page.getByLabel('Category').selectOption(category);
+    // Click the dropdown button to open it
+    const categoryButton = this.page.getByLabel('Category');
+    await categoryButton.click();
+
+    // Wait for the menu to appear
+    await this.page.getByRole('menu', { name: 'Select category' }).waitFor();
+
+    // Click the desired category option
+    await this.page.getByRole('menuitem', { name: category }).click();
   }
 
   /**
@@ -93,7 +101,7 @@ export class PromptFormPage extends BasePage {
   }
 
   /**
-   * Get the category dropdown
+   * Get the category dropdown button
    */
   getCategorySelect(): Locator {
     return this.page.getByLabel('Category');
@@ -188,7 +196,8 @@ export class PromptFormPage extends BasePage {
     }
 
     if (expected.category !== undefined) {
-      await expect(this.getCategorySelect()).toHaveValue(expected.category);
+      // For the custom dropdown, check the button text content
+      await expect(this.getCategorySelect()).toHaveText(expected.category);
     }
   }
 }

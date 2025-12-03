@@ -118,8 +118,9 @@ test.describe('Category Management - Integration with Prompt System', () => {
       await sidepanelPage.getByLabel('Content *').fill('Add console.log statements to trace execution flow');
 
       // Select "Coding" category from dropdown
-      const categorySelect = sidepanelPage.getByLabel('Category');
-      await categorySelect.selectOption('Coding');
+      await sidepanelPage.getByLabel('Category').click();
+      await sidepanelPage.getByRole('menu', { name: 'Select category' }).waitFor();
+      await sidepanelPage.getByRole('menuitem', { name: 'Coding' }).click();
 
       await sidepanelPage.getByRole('button', { name: 'Save Prompt' }).click();
       await expect(sidepanelPage.getByText('Prompt created successfully').first()).toBeVisible();
@@ -129,8 +130,9 @@ test.describe('Category Management - Integration with Prompt System', () => {
       await sidepanelPage.getByLabel('Title (optional)').fill('Blog Post Outline');
       await sidepanelPage.getByLabel('Content *').fill('Create a structured outline for a technical blog post');
 
-      const categorySelect2 = sidepanelPage.getByLabel('Category');
-      await categorySelect2.selectOption('Writing');
+      await sidepanelPage.getByLabel('Category').click();
+      await sidepanelPage.getByRole('menu', { name: 'Select category' }).waitFor();
+      await sidepanelPage.getByRole('menuitem', { name: 'Writing' }).click();
 
       await sidepanelPage.getByRole('button', { name: 'Save Prompt' }).click();
       await expect(sidepanelPage.getByText('Prompt created successfully').first()).toBeVisible();
@@ -278,19 +280,25 @@ test.describe('Category Management - Integration with Prompt System', () => {
       await sidepanelPage.getByLabel('Content *').fill('Test content');
 
       // Verify only "Uncategorized" is available in category dropdown
-      const categorySelect = sidepanelPage.getByLabel('Category');
+      const categoryButton = sidepanelPage.getByLabel('Category');
 
-      // Verify no other category options exist by checking the select element
-      const categoryOptions = categorySelect.locator('option');
-      const optionCount = await categoryOptions.count();
-      expect(optionCount).toBe(1);
+      // Verify the dropdown shows "Uncategorized" as the only available option
+      await expect(categoryButton).toHaveText(DEFAULT_CATEGORY);
 
-      // Verify the option is "Uncategorized"
-      const optionText = categoryOptions.first();
-      await expect(optionText).toHaveText(DEFAULT_CATEGORY);
+      // Open the dropdown to verify no other options
+      await categoryButton.click();
+      await sidepanelPage.getByRole('menu', { name: 'Select category' }).waitFor();
 
-      // Select Uncategorized and save
-      await categorySelect.selectOption(DEFAULT_CATEGORY);
+      // Count the menuitem elements
+      const menuItems = sidepanelPage.getByRole('menuitem');
+      const itemCount = await menuItems.count();
+      expect(itemCount).toBe(1);
+
+      // Verify the only menuitem is "Uncategorized"
+      await expect(menuItems.first()).toHaveText(DEFAULT_CATEGORY);
+
+      // Select Uncategorized (which should already be selected, but click to close dropdown)
+      await menuItems.first().click();
       await sidepanelPage.getByRole('button', { name: 'Save Prompt' }).click();
 
       // Verify prompt was created in Uncategorized
@@ -335,15 +343,15 @@ test.describe('Category Management - Integration with Prompt System', () => {
       await sidepanelPage.getByRole('button', { name: 'More actions for Editable Prompt' }).click();
       await sidepanelPage.getByRole('menuitem', { name: 'Edit' }).click();
 
-      // Change category to the valid one
+      // Change category to the valid one using native select (EditPromptForm uses native select)
       const categorySelect = sidepanelPage.getByLabel('Category');
 
       // Verify both options exist
-      const categoryOptions = categorySelect.locator('option');
-      const optionCount = await categoryOptions.count();
+      const options = categorySelect.locator('option');
+      const optionCount = await options.count();
       expect(optionCount).toBe(2);
 
-      // Select Valid Category
+      // Select Valid Category using native selectOption
       await categorySelect.selectOption('Valid Category');
       await sidepanelPage.getByRole('button', { name: 'Save Changes' }).click();
 
