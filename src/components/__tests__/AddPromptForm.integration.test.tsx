@@ -99,7 +99,7 @@ describe('AddPromptForm - Import Integration Tests', () => {
     }, { timeout: 600 });
 
     // Verify category dropdown trigger falls back to default
-    const categoryButton = document.getElementById('import-category') as HTMLButtonElement;
+    const categoryButton = screen.getByRole('button', { name: /import to category/i });
     expect(categoryButton).toBeInTheDocument();
     expect(categoryButton).toHaveTextContent('Uncategorized');
 
@@ -136,7 +136,7 @@ describe('AddPromptForm - Import Integration Tests', () => {
     }, { timeout: 600 });
 
     // Open category dropdown and select 'Personal'
-    const categoryButton = document.getElementById('import-category') as HTMLButtonElement;
+    const categoryButton = screen.getByRole('button', { name: /import to category/i });
     await userEvent.click(categoryButton);
     const personalOption = await screen.findByRole('menuitem', { name: /personal/i });
     await userEvent.click(personalOption);

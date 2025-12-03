@@ -47,7 +47,7 @@ describe('AddPromptForm - Create Mode', () => {
     await userEvent.type(screen.getByLabelText(/content/i), 'My Content');
 
     // Open category dropdown and select 'Work'
-    const categoryButton = document.getElementById('category') as HTMLButtonElement;
+    const categoryButton = screen.getByRole('button', { name: /category/i });
     await userEvent.click(categoryButton);
     const workOption = await screen.findByRole('menuitem', { name: /work/i });
     await userEvent.click(workOption);
@@ -211,7 +211,7 @@ describe('AddPromptForm - Import Mode', () => {
 
     // Check that category dropdown trigger shows original category
     // The trigger button shows the selected category name
-    const categoryButton = document.getElementById('import-category') as HTMLButtonElement;
+    const categoryButton = screen.getByRole('button', { name: /import to category/i });
     expect(categoryButton).toBeInTheDocument();
     expect(categoryButton).toHaveTextContent('Work');
     expect(screen.getByText(/using original category/i)).toBeInTheDocument();
@@ -240,7 +240,7 @@ describe('AddPromptForm - Import Mode', () => {
     }, { timeout: 500 });
 
     // Check that category dropdown trigger falls back to default
-    const categoryButton = document.getElementById('import-category') as HTMLButtonElement;
+    const categoryButton = screen.getByRole('button', { name: /import to category/i });
     expect(categoryButton).toBeInTheDocument();
     expect(categoryButton).toHaveTextContent('Uncategorized');
   });
@@ -262,7 +262,7 @@ describe('AddPromptForm - Import Mode', () => {
     }, { timeout: 500 });
 
     // Open category dropdown and select 'Personal'
-    const categoryButton = document.getElementById('import-category') as HTMLButtonElement;
+    const categoryButton = screen.getByRole('button', { name: /import to category/i });
     await userEvent.click(categoryButton);
     const personalOption = await screen.findByRole('menuitem', { name: /personal/i });
     await userEvent.click(personalOption);
@@ -288,7 +288,7 @@ describe('AddPromptForm - Import Mode', () => {
     }, { timeout: 500 });
 
     // Open category dropdown and select 'Personal'
-    const categoryButton = document.getElementById('import-category') as HTMLButtonElement;
+    const categoryButton = screen.getByRole('button', { name: /import to category/i });
     await userEvent.click(categoryButton);
     const personalOption = await screen.findByRole('menuitem', { name: /personal/i });
     await userEvent.click(personalOption);

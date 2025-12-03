@@ -1,4 +1,4 @@
-import { forwardRef, useActionState, useEffect, useRef, useState } from 'react';
+import { forwardRef, useActionState, useEffect, useMemo, useRef, useState } from 'react';
 import type { FC } from 'react';
 
 import { MAX_CONTENT_LENGTH, MAX_TITLE_LENGTH, formatCharacterCount } from '../constants/validation';
@@ -12,6 +12,42 @@ import ViewHeader from './ViewHeader';
 
 // Form mode type
 type FormMode = 'create' | 'import';
+
+// Category dropdown trigger button component props
+interface CategoryTriggerProps {
+  selectedCategory: string;
+  disabled?: boolean;
+  id?: string;
+  onClick?: React.MouseEventHandler<HTMLButtonElement>;
+  onKeyDown?: React.KeyboardEventHandler<HTMLButtonElement>;
+  'aria-expanded'?: boolean;
+  'aria-haspopup'?: 'menu' | 'dialog' | 'listbox' | 'tree' | 'grid' | boolean;
+  'aria-controls'?: string;
+  'aria-labelledby'?: string;
+}
+
+// Category dropdown trigger button component
+// Uses forwardRef to allow Dropdown to attach ref and event handlers
+const CategoryTrigger = forwardRef<HTMLButtonElement, CategoryTriggerProps>(
+  ({ selectedCategory, disabled, id, onClick, onKeyDown, ...ariaProps }, ref) => (
+    <button
+      ref={ref}
+      type="button"
+      id={id}
+      disabled={disabled}
+      onClick={onClick}
+      onKeyDown={onKeyDown}
+      {...ariaProps}
+      className="w-full px-4 py-3 border border-purple-200 dark:border-gray-600 rounded-xl focus-input bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 font-medium cursor-pointer text-gray-900 dark:text-gray-100 text-left flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
+    >
+      <span>{selectedCategory}</span>
+      <svg className="w-4 h-4 text-purple-400 dark:text-purple-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+      </svg>
+    </button>
+  )
+);
+CategoryTrigger.displayName = 'CategoryTrigger';
 
 const AddPromptForm: FC<AddPromptFormProps> = ({
   categories,
@@ -208,52 +244,25 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
     null // Initial error state
   );
 
-  // Category dropdown trigger button component
-  // Uses forwardRef to allow Dropdown to attach ref and event handlers
-  const CategoryTrigger = forwardRef<
-    HTMLButtonElement,
-    {
-      selectedCategory: string;
-      disabled?: boolean;
-      id?: string;
-      onClick?: React.MouseEventHandler<HTMLButtonElement>;
-      onKeyDown?: React.KeyboardEventHandler<HTMLButtonElement>;
-      'aria-expanded'?: boolean;
-      'aria-haspopup'?: 'menu' | 'dialog' | 'listbox' | 'tree' | 'grid' | boolean;
-      'aria-controls'?: string;
-    }
-  >(({ selectedCategory, disabled, id, onClick, onKeyDown, ...ariaProps }, ref) => (
-    <button
-      ref={ref}
-      type="button"
-      id={id}
-      disabled={disabled}
-      onClick={onClick}
-      onKeyDown={onKeyDown}
-      {...ariaProps}
-      className="w-full px-4 py-3 border border-purple-200 dark:border-gray-600 rounded-xl focus-input bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 font-medium cursor-pointer text-gray-900 dark:text-gray-100 text-left flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
-    >
-      <span>{selectedCategory}</span>
-      <svg className="w-4 h-4 text-purple-400 dark:text-purple-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-      </svg>
-    </button>
-  ));
-  CategoryTrigger.displayName = 'CategoryTrigger';
-
   // Generate dropdown items from categories
-  const createCategoryItems: DropdownItem[] = categories.map(cat => ({
-    id: cat.id,
-    label: cat.name,
-    onSelect: () => { setCreateCategory(cat.name); }
-  }));
+  const createCategoryItems = useMemo<DropdownItem[]>(
+    () => categories.map(cat => ({
+      id: cat.id,
+      label: cat.name,
+      onSelect: () => { setCreateCategory(cat.name); }
+    })),
+    [categories]
+  );
 
   // Generate dropdown items for import mode
-  const importCategoryItems: DropdownItem[] = categories.map(cat => ({
-    id: cat.id,
-    label: cat.name,
-    onSelect: () => { setSelectedCategory(cat.name); }
-  }));
+  const importCategoryItems = useMemo<DropdownItem[]>(
+    () => categories.map(cat => ({
+      id: cat.id,
+      label: cat.name,
+      onSelect: () => { setSelectedCategory(cat.name); }
+    })),
+    [categories]
+  );
 
   return (
     <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900">
@@ -463,7 +472,8 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
                 {/* Category Selector for Import */}
                 {decodedPrompt && !validationError && (
                   <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5">
-                    <label htmlFor="import-category" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                    {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
+                    <label id="import-category-label" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
                       Import to Category
                     </label>
                     <Dropdown
@@ -472,6 +482,7 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
                           selectedCategory={selectedCategory}
                           disabled={isPending}
                           id="import-category"
+                          aria-labelledby="import-category-label"
                         />
                       }
                       items={importCategoryItems}
@@ -526,7 +537,8 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
 
             {/* Category */}
             <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5">
-              <label htmlFor="category" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+              {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
+              <label id="category-label" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
                 Category
               </label>
               <Dropdown
@@ -535,6 +547,7 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
                     selectedCategory={createCategory}
                     disabled={isPending}
                     id="category"
+                    aria-labelledby="category-label"
                   />
                 }
                 items={createCategoryItems}
