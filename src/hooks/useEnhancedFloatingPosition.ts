@@ -22,6 +22,8 @@ export interface FloatingOptions {
   maxHeight?: number;
   /** Padding from viewport edges when shifting */
   shiftPadding?: number;
+  /** Match the width of the reference element */
+  matchWidth?: boolean;
 }
 
 /**
@@ -61,7 +63,8 @@ export const useEnhancedFloatingPosition = (
     enableShift = true,
     enableFlip = true,
     maxHeight = 400,
-    shiftPadding = 8
+    shiftPadding = 8,
+    matchWidth = false
   } = options;
 
   useEffect(() => {
@@ -94,13 +97,18 @@ export const useEnhancedFloatingPosition = (
 
       // Constrain size to available space
       size({
-        apply({ availableHeight, elements }) {
+        apply({ availableHeight, elements, rects }) {
           // Only mutate DOM if component is still mounted
           if (isMounted) {
-            Object.assign(elements.floating.style, {
+            const styles: Record<string, string> = {
               maxHeight: `${String(Math.min(availableHeight - 16, maxHeight))}px`,
               overflow: 'auto'
-            });
+            };
+            // Match width of reference element if enabled
+            if (matchWidth) {
+              styles.minWidth = `${String(rects.reference.width)}px`;
+            }
+            Object.assign(elements.floating.style, styles);
           }
         },
         padding: shiftPadding
@@ -138,5 +146,5 @@ export const useEnhancedFloatingPosition = (
       isMounted = false;
       cleanup();
     };
-  }, [isOpen, referenceRef, floatingRef, placement, offsetValue, enableShift, enableFlip, maxHeight, shiftPadding]);
+  }, [isOpen, referenceRef, floatingRef, placement, offsetValue, enableShift, enableFlip, maxHeight, shiftPadding, matchWidth]);
 };

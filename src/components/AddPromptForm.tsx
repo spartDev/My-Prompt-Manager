@@ -1,16 +1,42 @@
-import { useActionState, useEffect, useRef, useState } from 'react';
+import { forwardRef, useActionState, useEffect, useMemo, useRef, useState } from 'react';
 import type { FC } from 'react';
 
 import { MAX_CONTENT_LENGTH, MAX_TITLE_LENGTH, formatCharacterCount } from '../constants/validation';
 import { decode } from '../services/promptEncoder';
-import { DEFAULT_CATEGORY, Category, SharedPromptData } from '../types';
+import { DEFAULT_CATEGORY, SharedPromptData } from '../types';
 import { AddPromptFormProps } from '../types/components';
 import { Logger, toError, validatePromptFields, type FieldErrors } from '../utils';
 
+import { Dropdown, type DropdownItem } from './Dropdown';
 import ViewHeader from './ViewHeader';
 
 // Form mode type
 type FormMode = 'create' | 'import';
+
+// Category dropdown trigger button component props
+// Extends ButtonHTMLAttributes to inherit all standard button props (onClick, disabled, aria-*, etc.)
+interface CategoryTriggerProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  selectedCategory: string;
+}
+
+// Category dropdown trigger button component
+// Uses forwardRef to allow Dropdown to attach ref and event handlers
+const CategoryTrigger = forwardRef<HTMLButtonElement, CategoryTriggerProps>(
+  ({ selectedCategory, className, ...rest }, ref) => (
+    <button
+      ref={ref}
+      type="button"
+      {...rest}
+      className={className ?? "w-full px-4 py-3 border border-purple-200 dark:border-gray-600 rounded-xl focus-input bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 font-medium cursor-pointer text-gray-900 dark:text-gray-100 text-left flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"}
+    >
+      <span>{selectedCategory}</span>
+      <svg className="w-4 h-4 text-purple-400 dark:text-purple-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+      </svg>
+    </button>
+  )
+);
+CategoryTrigger.displayName = 'CategoryTrigger';
 
 const AddPromptForm: FC<AddPromptFormProps> = ({
   categories,
@@ -26,6 +52,9 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
   const [validationError, setValidationError] = useState<string>('');
   const [isValidating, setIsValidating] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>(DEFAULT_CATEGORY);
+
+  // Create mode state
+  const [createCategory, setCreateCategory] = useState<string>(DEFAULT_CATEGORY);
 
   // Character count state for validation feedback
   const [titleLength, setTitleLength] = useState(0);
@@ -164,7 +193,7 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
         // Create mode - extract from form data
         title = formData.get('title') as string;
         content = formData.get('content') as string;
-        category = formData.get('category') as string;
+        category = createCategory;
 
         // Validation for create mode using shared utility
         const validationErrors = validatePromptFields(title, content, {
@@ -202,6 +231,26 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
       }
     },
     null // Initial error state
+  );
+
+  // Generate dropdown items from categories
+  const createCategoryItems = useMemo<DropdownItem[]>(
+    () => categories.map(cat => ({
+      id: cat.id,
+      label: cat.name,
+      onSelect: () => { setCreateCategory(cat.name); }
+    })),
+    [categories]
+  );
+
+  // Generate dropdown items for import mode
+  const importCategoryItems = useMemo<DropdownItem[]>(
+    () => categories.map(cat => ({
+      id: cat.id,
+      label: cat.name,
+      onSelect: () => { setSelectedCategory(cat.name); }
+    })),
+    [categories]
   );
 
   return (
@@ -412,31 +461,27 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
                 {/* Category Selector for Import */}
                 {decodedPrompt && !validationError && (
                   <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5">
-                    <label htmlFor="import-category" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                    {/* Label uses aria-labelledby on the button instead of htmlFor -
+                        this is the correct accessible pattern for custom dropdown triggers
+                        since buttons don't respond to label clicks like native form controls */}
+                    {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
+                    <label id="import-category-label" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
                       Import to Category
                     </label>
-                    <div className="relative">
-                      <select
-                        id="import-category"
-                        value={selectedCategory}
-                        onChange={(e) => {
-                          setSelectedCategory(e.target.value);
-                        }}
-                        className="w-full px-4 py-3 pr-10 border border-purple-200 dark:border-gray-600 rounded-xl focus-input bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 font-medium appearance-none cursor-pointer text-gray-900 dark:text-gray-100"
-                        disabled={isPending}
-                      >
-                        {categories.map((category: Category) => (
-                          <option key={category.id} value={category.name}>
-                            {category.name}
-                          </option>
-                        ))}
-                      </select>
-                      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                        <svg className="w-4 h-4 text-purple-400 dark:text-purple-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </div>
-                    </div>
+                    <Dropdown
+                      trigger={
+                        <CategoryTrigger
+                          selectedCategory={selectedCategory}
+                          disabled={isPending}
+                          id="import-category"
+                          aria-labelledby="import-category-label"
+                        />
+                      }
+                      items={importCategoryItems}
+                      placement="bottom-start"
+                      ariaLabel="Select import category"
+                      matchWidth
+                    />
                     <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
                       {selectedCategory === decodedPrompt.category
                         ? 'Using original category'
@@ -484,29 +529,27 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
 
             {/* Category */}
             <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5">
-              <label htmlFor="category" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+              {/* Label uses aria-labelledby on the button instead of htmlFor -
+                  this is the correct accessible pattern for custom dropdown triggers
+                  since buttons don't respond to label clicks like native form controls */}
+              {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
+              <label id="category-label" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
                 Category
               </label>
-              <div className="relative">
-                <select
-                  id="category"
-                  name="category"
-                  defaultValue={DEFAULT_CATEGORY}
-                  className="w-full px-4 py-3 pr-10 border border-purple-200 dark:border-gray-600 rounded-xl focus-input bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 font-medium appearance-none cursor-pointer text-gray-900 dark:text-gray-100"
-                  disabled={isPending}
-                >
-                  {(categories).map((category: Category) => (
-                    <option key={category.id} value={category.name}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
-                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                  <svg className="w-4 h-4 text-purple-400 dark:text-purple-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-              </div>
+              <Dropdown
+                trigger={
+                  <CategoryTrigger
+                    selectedCategory={createCategory}
+                    disabled={isPending}
+                    id="category"
+                    aria-labelledby="category-label"
+                  />
+                }
+                items={createCategoryItems}
+                placement="bottom-start"
+                ariaLabel="Select category"
+                matchWidth
+              />
             </div>
 
             {/* Content */}
