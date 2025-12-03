@@ -74,6 +74,8 @@ export interface DropdownProps {
   focusTriggerOnClose?: boolean;
   /** Optional aria-label for the dropdown menu */
   ariaLabel?: string;
+  /** Match the width of the trigger element */
+  matchWidth?: boolean;
 }
 
 /**
@@ -112,7 +114,8 @@ export const Dropdown: FC<DropdownProps> = ({
   offset = 4,
   closeOnEscape = true,
   focusTriggerOnClose = true,
-  ariaLabel
+  ariaLabel,
+  matchWidth = false
 }) => {
   // State management - support both controlled and uncontrolled modes
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
@@ -150,7 +153,8 @@ export const Dropdown: FC<DropdownProps> = ({
     offset,
     enableShift: true,
     enableFlip: true,
-    maxHeight: 400
+    maxHeight: 400,
+    matchWidth
   });
 
   // Use close detection hook

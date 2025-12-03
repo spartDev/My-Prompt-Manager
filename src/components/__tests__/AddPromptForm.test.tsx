@@ -45,7 +45,12 @@ describe('AddPromptForm - Create Mode', () => {
 
     await userEvent.type(screen.getByLabelText(/title/i), 'My Title');
     await userEvent.type(screen.getByLabelText(/content/i), 'My Content');
-    await userEvent.selectOptions(screen.getByLabelText(/category/i), 'Work');
+
+    // Open category dropdown and select 'Work'
+    const categoryButton = document.getElementById('category') as HTMLButtonElement;
+    await userEvent.click(categoryButton);
+    const workOption = await screen.findByRole('menuitem', { name: /work/i });
+    await userEvent.click(workOption);
 
     const saveButton = screen.getByRole('button', { name: /save prompt/i });
     await userEvent.click(saveButton);
@@ -204,9 +209,11 @@ describe('AddPromptForm - Import Mode', () => {
       expect(screen.getByText(/valid sharing code detected/i)).toBeInTheDocument();
     }, { timeout: 500 });
 
-    // Check that category selector shows original category
-    const categorySelect = screen.getByLabelText(/import to category/i);
-    expect(categorySelect).toHaveValue('Work');
+    // Check that category dropdown trigger shows original category
+    // The trigger button shows the selected category name
+    const categoryButton = document.getElementById('import-category') as HTMLButtonElement;
+    expect(categoryButton).toBeInTheDocument();
+    expect(categoryButton).toHaveTextContent('Work');
     expect(screen.getByText(/using original category/i)).toBeInTheDocument();
   });
 
@@ -232,9 +239,10 @@ describe('AddPromptForm - Import Mode', () => {
       expect(screen.getByText(/valid sharing code detected/i)).toBeInTheDocument();
     }, { timeout: 500 });
 
-    // Check that category selector falls back to default
-    const categorySelect = screen.getByLabelText(/import to category/i);
-    expect(categorySelect).toHaveValue('Uncategorized');
+    // Check that category dropdown trigger falls back to default
+    const categoryButton = document.getElementById('import-category') as HTMLButtonElement;
+    expect(categoryButton).toBeInTheDocument();
+    expect(categoryButton).toHaveTextContent('Uncategorized');
   });
 
   it('allows changing the import category', async () => {
@@ -253,9 +261,11 @@ describe('AddPromptForm - Import Mode', () => {
       expect(screen.getByText(/valid sharing code detected/i)).toBeInTheDocument();
     }, { timeout: 500 });
 
-    // Change category
-    const categorySelect = screen.getByLabelText(/import to category/i);
-    await userEvent.selectOptions(categorySelect, 'Personal');
+    // Open category dropdown and select 'Personal'
+    const categoryButton = document.getElementById('import-category') as HTMLButtonElement;
+    await userEvent.click(categoryButton);
+    const personalOption = await screen.findByRole('menuitem', { name: /personal/i });
+    await userEvent.click(personalOption);
 
     // Check that the help text reflects the change
     expect(screen.getByText(/importing to "personal" instead of "work"/i)).toBeInTheDocument();
@@ -277,9 +287,11 @@ describe('AddPromptForm - Import Mode', () => {
       expect(screen.getByText(/valid sharing code detected/i)).toBeInTheDocument();
     }, { timeout: 500 });
 
-    // Change category
-    const categorySelect = screen.getByLabelText(/import to category/i);
-    await userEvent.selectOptions(categorySelect, 'Personal');
+    // Open category dropdown and select 'Personal'
+    const categoryButton = document.getElementById('import-category') as HTMLButtonElement;
+    await userEvent.click(categoryButton);
+    const personalOption = await screen.findByRole('menuitem', { name: /personal/i });
+    await userEvent.click(personalOption);
 
     // Submit
     const submitButton = screen.getByRole('button', { name: /import prompt/i });

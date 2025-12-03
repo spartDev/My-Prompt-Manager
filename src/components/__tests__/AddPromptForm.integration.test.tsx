@@ -98,9 +98,10 @@ describe('AddPromptForm - Import Integration Tests', () => {
       expect(screen.getByText(/valid sharing code detected/i)).toBeInTheDocument();
     }, { timeout: 600 });
 
-    // Verify category selector falls back to default
-    const categorySelect = screen.getByLabelText(/import to category/i);
-    expect(categorySelect).toHaveValue('Uncategorized');
+    // Verify category dropdown trigger falls back to default
+    const categoryButton = document.getElementById('import-category') as HTMLButtonElement;
+    expect(categoryButton).toBeInTheDocument();
+    expect(categoryButton).toHaveTextContent('Uncategorized');
 
     // Submit the import
     const submitButton = screen.getByRole('button', { name: /import prompt/i });
@@ -134,9 +135,11 @@ describe('AddPromptForm - Import Integration Tests', () => {
       expect(screen.getByText(/valid sharing code detected/i)).toBeInTheDocument();
     }, { timeout: 600 });
 
-    // Change the category from Work to Personal
-    const categorySelect = screen.getByLabelText(/import to category/i);
-    await userEvent.selectOptions(categorySelect, 'Personal');
+    // Open category dropdown and select 'Personal'
+    const categoryButton = document.getElementById('import-category') as HTMLButtonElement;
+    await userEvent.click(categoryButton);
+    const personalOption = await screen.findByRole('menuitem', { name: /personal/i });
+    await userEvent.click(personalOption);
 
     // Verify the help text shows the change
     expect(screen.getByText(/importing to "personal" instead of "work"/i)).toBeInTheDocument();

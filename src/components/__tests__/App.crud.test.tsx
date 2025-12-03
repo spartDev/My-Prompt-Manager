@@ -61,8 +61,11 @@ describe('App prompt workflows', () => {
     const contentInput = screen.getByLabelText(/content/i);
     await userEvent.type(contentInput, 'Hello testers');
 
-    const categorySelect = screen.getByLabelText(/category/i);
-    await userEvent.selectOptions(categorySelect, 'Work');
+    // Open category dropdown and select 'Work'
+    const categoryButton = document.getElementById('category') as HTMLButtonElement;
+    await userEvent.click(categoryButton);
+    const workOption = await screen.findByRole('menuitem', { name: /work/i });
+    await userEvent.click(workOption);
 
     const saveButton = await screen.findByRole('button', { name: /save prompt/i });
     await userEvent.click(saveButton);
