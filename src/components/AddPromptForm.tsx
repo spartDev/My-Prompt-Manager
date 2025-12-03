@@ -14,31 +14,20 @@ import ViewHeader from './ViewHeader';
 type FormMode = 'create' | 'import';
 
 // Category dropdown trigger button component props
-interface CategoryTriggerProps {
+// Extends ButtonHTMLAttributes to inherit all standard button props (onClick, disabled, aria-*, etc.)
+interface CategoryTriggerProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   selectedCategory: string;
-  disabled?: boolean;
-  id?: string;
-  onClick?: React.MouseEventHandler<HTMLButtonElement>;
-  onKeyDown?: React.KeyboardEventHandler<HTMLButtonElement>;
-  'aria-expanded'?: boolean;
-  'aria-haspopup'?: 'menu' | 'dialog' | 'listbox' | 'tree' | 'grid' | boolean;
-  'aria-controls'?: string;
-  'aria-labelledby'?: string;
 }
 
 // Category dropdown trigger button component
 // Uses forwardRef to allow Dropdown to attach ref and event handlers
 const CategoryTrigger = forwardRef<HTMLButtonElement, CategoryTriggerProps>(
-  ({ selectedCategory, disabled, id, onClick, onKeyDown, ...ariaProps }, ref) => (
+  ({ selectedCategory, className, ...rest }, ref) => (
     <button
       ref={ref}
       type="button"
-      id={id}
-      disabled={disabled}
-      onClick={onClick}
-      onKeyDown={onKeyDown}
-      {...ariaProps}
-      className="w-full px-4 py-3 border border-purple-200 dark:border-gray-600 rounded-xl focus-input bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 font-medium cursor-pointer text-gray-900 dark:text-gray-100 text-left flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
+      {...rest}
+      className={className ?? "w-full px-4 py-3 border border-purple-200 dark:border-gray-600 rounded-xl focus-input bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 font-medium cursor-pointer text-gray-900 dark:text-gray-100 text-left flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"}
     >
       <span>{selectedCategory}</span>
       <svg className="w-4 h-4 text-purple-400 dark:text-purple-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -472,6 +461,9 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
                 {/* Category Selector for Import */}
                 {decodedPrompt && !validationError && (
                   <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5">
+                    {/* Label uses aria-labelledby on the button instead of htmlFor -
+                        this is the correct accessible pattern for custom dropdown triggers
+                        since buttons don't respond to label clicks like native form controls */}
                     {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
                     <label id="import-category-label" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
                       Import to Category
@@ -537,6 +529,9 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
 
             {/* Category */}
             <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5">
+              {/* Label uses aria-labelledby on the button instead of htmlFor -
+                  this is the correct accessible pattern for custom dropdown triggers
+                  since buttons don't respond to label clicks like native form controls */}
               {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
               <label id="category-label" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
                 Category
