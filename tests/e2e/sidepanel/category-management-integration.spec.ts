@@ -128,7 +128,7 @@ test.describe('Category Management - Integration with Prompt System', () => {
       // Create another prompt in "Writing" category
       await sidepanelPage.getByRole('button', { name: 'Add new prompt' }).click();
       await sidepanelPage.getByLabel('Title (optional)').fill('Blog Post Outline');
-      await sidepanelPage.getByLabel('Content *').fill('Create a structured outline-solid for a technical blog post');
+      await sidepanelPage.getByLabel('Content *').fill('Create a structured outline for a technical blog post');
 
       await sidepanelPage.getByLabel('Category').click();
       await sidepanelPage.getByRole('menu', { name: 'Select category' }).waitFor();

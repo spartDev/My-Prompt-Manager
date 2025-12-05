@@ -73,7 +73,7 @@ test.describe('Prompt creation flow', () => {
     await expect(page.getByRole('heading', { name: 'Add New Prompt' })).toBeVisible();
 
     await page.getByLabel('Title (optional)').fill('Focus Mode Kickoff');
-    await page.getByLabel('Content *').fill('Take three deep breaths and outline-solid the top task.');
+    await page.getByLabel('Content *').fill('Take three deep breaths and outline the top task.');
 
     const savePromptButton = page.getByRole('button', { name: 'Save Prompt' });
     await expect(savePromptButton).toBeEnabled();
@@ -87,7 +87,7 @@ test.describe('Prompt creation flow', () => {
       expect.arrayContaining([
         expect.objectContaining({
           title: 'Focus Mode Kickoff',
-          content: 'Take three deep breaths and outline-solid the top task.',
+          content: 'Take three deep breaths and outline the top task.',
           category: DEFAULT_CATEGORY,
         }),
       ])
@@ -123,7 +123,7 @@ test.describe('Prompt management', () => {
     await expect(page.getByRole('heading', { name: 'Edit Prompt' })).toBeVisible();
 
     await page.getByLabel('Title').fill('Focus Mode Kickoff');
-    await page.getByLabel('Content *').fill('Take three deep breaths and outline-solid the top task.');
+    await page.getByLabel('Content *').fill('Take three deep breaths and outline the top task.');
 
     const saveButton = page.getByRole('button', { name: 'Save Changes' });
     await expect(saveButton).toBeEnabled();
@@ -138,7 +138,7 @@ test.describe('Prompt management', () => {
         expect.objectContaining({
           id: originalPrompt.id,
           title: 'Focus Mode Kickoff',
-          content: 'Take three deep breaths and outline-solid the top task.',
+          content: 'Take three deep breaths and outline the top task.',
           category: DEFAULT_CATEGORY,
         }),
       ])
