@@ -453,7 +453,7 @@ createYourPlatformIcon(): HTMLElement {
     viewBox: '0 0 24 24',
     fill: 'currentColor',
     'aria-hidden': 'true',
-    style: 'shrink: 0;'
+    style: 'flex-shrink: 0;'
   });
 
   // Standard chat bubble icon with three dots (consistent across platforms)
@@ -635,7 +635,7 @@ private _triggerEvents(element: HTMLElement, content: string): void {
   }));
 
   // Secondary events
-  const events = ['change', 'keyup', 'compositionend', 'blur-sm', 'focus'];
+  const events = ['change', 'keyup', 'compositionend', 'blur', 'focus'];
   events.forEach(eventType => {
     element.dispatchEvent(new Event(eventType, { bubbles: true }));
   });
