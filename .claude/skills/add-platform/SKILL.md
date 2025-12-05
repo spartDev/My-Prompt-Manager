@@ -79,7 +79,7 @@ export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
     strategyClass: 'YourPlatformStrategy',        // Strategy class name
     hostnamePatterns: ['yourplatform', 'your-ai'], // Additional hostname patterns
     brandColors: {                                // Tailwind classes for badge styling
-      enabled: 'bg-[#123456] text-white shadow-sm',
+      enabled: 'bg-[#123456] text-white shadow-xs',
       disabled: 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
     }
   }
@@ -453,7 +453,7 @@ createYourPlatformIcon(): HTMLElement {
     viewBox: '0 0 24 24',
     fill: 'currentColor',
     'aria-hidden': 'true',
-    style: 'flex-shrink: 0;'
+    style: 'shrink: 0;'
   });
 
   // Standard chat bubble icon with three dots (consistent across platforms)
@@ -635,7 +635,7 @@ private _triggerEvents(element: HTMLElement, content: string): void {
   }));
 
   // Secondary events
-  const events = ['change', 'keyup', 'compositionend', 'blur', 'focus'];
+  const events = ['change', 'keyup', 'compositionend', 'blur-sm', 'focus'];
   events.forEach(eventType => {
     element.dispatchEvent(new Event(eventType, { bubbles: true }));
   });

@@ -123,7 +123,7 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
         <div
           role="alert"
           aria-live="polite"
-          className="flex-shrink-0 p-4 text-sm text-red-600 dark:text-red-400 bg-red-50/80 dark:bg-red-900/20 backdrop-blur-sm border-b border-red-200 dark:border-red-700 font-medium"
+          className="shrink-0 p-4 text-sm text-red-600 dark:text-red-400 bg-red-50/80 dark:bg-red-900/20 backdrop-blur-xs border-b border-red-200 dark:border-red-700 font-medium"
         >
           ⚠️ {errors.general}
         </div>
@@ -133,7 +133,7 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
       <div className="flex-1 overflow-auto custom-scrollbar">
         <form id="edit-prompt-form" action={submitAction}>
           {/* Title Section */}
-          <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5">
+          <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xs border-b border-purple-100 dark:border-gray-700 p-5">
             <div className="flex items-center space-x-2 mb-4">
               <label htmlFor="title" className="block text-sm font-bold text-gray-900 dark:text-gray-100">
                 Title
@@ -147,7 +147,7 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
               defaultValue={prompt.title}
               onChange={(e) => { handleFieldChange('title', e.target.value); }}
               placeholder="Enter a descriptive title"
-              className={`w-full px-4 py-3 border rounded-xl focus-input bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 text-sm text-gray-900 dark:text-gray-100 ${
+              className={`w-full px-4 py-3 border rounded-xl focus-input bg-white/60 dark:bg-gray-700/60 backdrop-blur-xs transition-all duration-200 text-sm text-gray-900 dark:text-gray-100 ${
                 errors?.title ? 'border-red-300 dark:border-red-500' : 'border-purple-200 dark:border-gray-600'
               }`}
               disabled={isPending}
@@ -162,7 +162,7 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
           </div>
 
           {/* Category Section */}
-          <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5">
+          <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xs border-b border-purple-100 dark:border-gray-700 p-5">
             <div className="flex items-center space-x-2 mb-4">
               <label htmlFor="category" className="block text-sm font-bold text-gray-900 dark:text-gray-100">
                 Category
@@ -173,7 +173,7 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
                 id="category"
                 name="category"
                 defaultValue={prompt.category}
-                className="w-full px-4 py-3 pr-10 border border-purple-200 dark:border-gray-600 rounded-xl focus-input bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 text-sm text-gray-900 dark:text-gray-100 appearance-none cursor-pointer"
+                className="w-full px-4 py-3 pr-10 border border-purple-200 dark:border-gray-600 rounded-xl focus-input bg-white/60 dark:bg-gray-700/60 backdrop-blur-xs transition-all duration-200 text-sm text-gray-900 dark:text-gray-100 appearance-none cursor-pointer"
                 disabled={isPending}
               >
                 {(categories).map((category: Category) => (
@@ -191,7 +191,7 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
           </div>
 
           {/* Content Section */}
-          <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5">
+          <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xs border-b border-purple-100 dark:border-gray-700 p-5">
             <div className="flex items-center space-x-2 mb-4">
               <label htmlFor="content" className="block text-sm font-bold text-gray-900 dark:text-gray-100">
                 Content *
@@ -205,7 +205,7 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
               onChange={(e) => { handleFieldChange('content', e.target.value); }}
               placeholder="Enter your prompt content here..."
               rows={10}
-              className={`w-full px-4 py-3 border rounded-xl focus-input resize-none bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 text-sm text-gray-900 dark:text-gray-100 ${
+              className={`w-full px-4 py-3 border rounded-xl focus-input resize-none bg-white/60 dark:bg-gray-700/60 backdrop-blur-xs transition-all duration-200 text-sm text-gray-900 dark:text-gray-100 ${
                 errors?.content ? 'border-red-300 dark:border-red-500' : 'border-purple-200 dark:border-gray-600'
               }`}
               disabled={isPending}
@@ -222,7 +222,7 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
         </form>
         
         {/* Metadata */}
-        <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5">
+        <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xs border-b border-purple-100 dark:border-gray-700 p-5">
           <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Prompt Information</h4>
           <div className="text-xs text-gray-600 dark:text-gray-400 space-y-2 font-medium">
             <div className="flex items-center space-x-2">
@@ -238,10 +238,10 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
       </div>
 
       {/* Footer */}
-      <div className="flex-shrink-0 p-6 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-t border-purple-100 dark:border-gray-700">
+      <div className="shrink-0 p-6 bg-white/80 dark:bg-gray-800/80 backdrop-blur-xs border-t border-purple-100 dark:border-gray-700">
         {/* Unsaved changes indicator */}
         {hasUnsavedChanges && !isPending && (
-          <div className="mb-4 text-xs text-amber-600 dark:text-amber-400 font-medium flex items-center space-x-2 bg-amber-50/80 dark:bg-amber-900/20 backdrop-blur-sm border border-amber-200 dark:border-amber-700 rounded-lg px-3 py-2">
+          <div className="mb-4 text-xs text-amber-600 dark:text-amber-400 font-medium flex items-center space-x-2 bg-amber-50/80 dark:bg-amber-900/20 backdrop-blur-xs border border-amber-200 dark:border-amber-700 rounded-lg px-3 py-2">
             <span>⚡</span>
             <span>You have unsaved changes</span>
           </div>
@@ -252,7 +252,7 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
           <button
             type="button"
             onClick={onCancel}
-            className="flex-1 px-6 py-3 text-sm font-semibold text-gray-700 dark:text-gray-300 bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm border border-purple-200 dark:border-gray-600 rounded-xl hover:bg-white/80 dark:hover:bg-gray-700/80 transition-all duration-200 focus-secondary"
+            className="flex-1 px-6 py-3 text-sm font-semibold text-gray-700 dark:text-gray-300 bg-white/60 dark:bg-gray-700/60 backdrop-blur-xs border border-purple-200 dark:border-gray-600 rounded-xl hover:bg-white/80 dark:hover:bg-gray-700/80 transition-all duration-200 focus-secondary"
             disabled={isPending}
           >
             Cancel
@@ -260,7 +260,7 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
           <button
             type="submit"
             form="edit-prompt-form"
-            className="flex-1 px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 focus-primary"
+            className="flex-1 px-6 py-3 text-sm font-semibold text-white bg-linear-to-r from-purple-600 to-indigo-600 rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 focus-primary"
             disabled={isPending}
           >
             {isPending ? (

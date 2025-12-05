@@ -43,7 +43,7 @@ test.describe('User Journey: Power User Prompt Management & Organization', () =>
       createPromptSeed({
         id: 'work-5',
         title: 'Client Proposal Outline',
-        content: 'Create a compelling proposal outline that addresses client needs and demonstrates our value proposition.',
+        content: 'Create a compelling proposal outline-solid that addresses client needs and demonstrates our value proposition.',
         category: 'Work'
       }),
 

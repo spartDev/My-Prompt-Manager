@@ -149,13 +149,13 @@ const CategoryManager: FC<CategoryManagerProps> = ({
       <div className="flex-1 overflow-auto">
           {/* Error Display */}
           {error && (
-            <div className="p-5 text-sm text-red-600 dark:text-red-400 bg-red-50/80 dark:bg-red-900/20 backdrop-blur-sm border-b border-red-200 dark:border-red-700 font-medium">
+            <div className="p-5 text-sm text-red-600 dark:text-red-400 bg-red-50/80 dark:bg-red-900/20 backdrop-blur-xs border-b border-red-200 dark:border-red-700 font-medium">
               ⚠️ {error}
             </div>
           )}
 
           {/* Add New Category Form */}
-          <div className="relative bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5">
+          <div className="relative bg-white/70 dark:bg-gray-800/70 backdrop-blur-xs border-b border-purple-100 dark:border-gray-700 p-5">
             <form onSubmit={(e) => { void handleCreateCategory(e); }} className="space-y-4">
               <h3 className="font-bold text-gray-900 dark:text-gray-100 flex items-center space-x-2">
                 <svg className="w-5 h-5 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -174,14 +174,14 @@ const CategoryManager: FC<CategoryManagerProps> = ({
                       setError(null);
                     }}
                     placeholder="Enter category name..."
-                    className="flex-1 px-4 py-3 h-12 border border-purple-200 dark:border-gray-600 rounded-xl focus:outline-none focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-purple-500 text-sm text-gray-900 dark:text-gray-100 bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 placeholder-gray-400 dark:placeholder-gray-500"
+                    className="flex-1 px-4 py-3 h-12 border border-purple-200 dark:border-gray-600 rounded-xl focus:outline-hidden focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-purple-500 text-sm text-gray-900 dark:text-gray-100 bg-white/60 dark:bg-gray-700/60 backdrop-blur-xs transition-all duration-200 placeholder-gray-400 dark:placeholder-gray-500"
                     disabled={loading}
                     maxLength={MAX_CATEGORY_NAME_LENGTH}
                   />
                   
                   <button
                     type="submit"
-                    className="px-6 py-3 h-12 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 text-sm font-semibold shadow-lg hover:shadow-xl disabled:opacity-50 flex items-center justify-center flex-shrink-0 min-w-[80px]"
+                    className="px-6 py-3 h-12 bg-linear-to-r from-purple-600 to-indigo-600 text-white rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 text-sm font-semibold shadow-lg hover:shadow-xl disabled:opacity-50 flex items-center justify-center shrink-0 min-w-[80px]"
                     disabled={loading || !newCategoryName.trim()}
                   >
                     {loading ? (
@@ -211,7 +211,7 @@ const CategoryManager: FC<CategoryManagerProps> = ({
 
           {/* Category List */}
           <div>
-            <h3 className="font-bold text-gray-900 dark:text-gray-100 flex items-center justify-between p-5 bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700">
+            <h3 className="font-bold text-gray-900 dark:text-gray-100 flex items-center justify-between p-5 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xs border-b border-purple-100 dark:border-gray-700">
               <div className="flex items-center space-x-2">
                 <svg className="w-5 h-5 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
@@ -232,12 +232,12 @@ const CategoryManager: FC<CategoryManagerProps> = ({
               </div>
             ) : (
               categories.map((category) => (
-                <div key={category.id} className="relative group flex items-center justify-between p-5 bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 hover:bg-white/90 dark:hover:bg-gray-800/90 transition-all duration-200">
+                <div key={category.id} className="relative group flex items-center justify-between p-5 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xs border-b border-purple-100 dark:border-gray-700 hover:bg-white/90 dark:hover:bg-gray-800/90 transition-all duration-200">
                   {editingCategory?.category.id === category.id ? (
                     // Edit Mode - Show both color and name editors
                     <div className="flex-1">
                       <div className="flex items-center space-x-3">
-                        <div className="relative flex-shrink-0" style={{ zIndex: 100 }}>
+                        <div className="relative shrink-0" style={{ zIndex: 100 }}>
                           <ColorPicker
                             value={editingCategory.color}
                             onChange={(newColor) => { setEditingCategory({ ...editingCategory, color: newColor }); }}
@@ -268,15 +268,15 @@ const CategoryManager: FC<CategoryManagerProps> = ({
                             ignoreBlurRef.current = false;
                           }}
                           placeholder="Category name"
-                          className="flex-1 text-sm border border-purple-200 dark:border-gray-600 rounded-lg px-3 py-2.5 focus:outline-none focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-purple-500 bg-white/80 dark:bg-gray-700/80 backdrop-blur-sm font-medium text-gray-900 dark:text-gray-100"
+                          className="flex-1 text-sm border border-purple-200 dark:border-gray-600 rounded-lg px-3 py-2.5 focus:outline-hidden focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-purple-500 bg-white/80 dark:bg-gray-700/80 backdrop-blur-xs font-medium text-gray-900 dark:text-gray-100"
                           maxLength={MAX_CATEGORY_NAME_LENGTH}
                           disabled={loading}
                         />
-                        <div className="flex items-center space-x-1 flex-shrink-0">
+                        <div className="flex items-center space-x-1 shrink-0">
                           <button
                             onClick={() => { void handleUpdateCategory(); }}
                             onMouseDown={() => { ignoreBlurRef.current = true; }}
-                            className="p-2 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-lg transition-all shadow-sm hover:shadow disabled:opacity-50"
+                            className="p-2 bg-linear-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-lg transition-all shadow-xs hover:shadow-sm disabled:opacity-50"
                             disabled={loading || !editingCategory.name.trim()}
                             title="Save changes (Enter)"
                             type="button"
@@ -303,7 +303,7 @@ const CategoryManager: FC<CategoryManagerProps> = ({
                     // Display Mode - Show color swatch and name
                     <div className="flex items-center space-x-4 flex-1">
                       <div
-                        className="w-8 h-8 rounded-lg border-2 border-white dark:border-gray-700 shadow-sm"
+                        className="w-8 h-8 rounded-lg border-2 border-white dark:border-gray-700 shadow-xs"
                         style={{ backgroundColor: category.color || '#6B7280' }}
                         title={getColorName(category.color || '#6B7280')}
                       />

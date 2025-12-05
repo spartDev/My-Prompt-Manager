@@ -446,7 +446,7 @@ export class PromptLibraryInjector {
       // Highlight the target element temporarily
       const originalOutline = element.style.outline;
       const originalTransition = element.style.transition;
-      element.style.transition = 'outline 0.2s ease';
+      element.style.transition = 'outline-solid 0.2s ease';
       element.style.outline = '3px solid #10b981';
 
       // Remove highlights after 3 seconds
@@ -899,7 +899,7 @@ export class PromptLibraryInjector {
           if (clockButtonContainer && clockButtonContainer.parentElement) {
             // Create a similar wrapper div structure for our button
             const buttonWrapper = document.createElement('div');
-            buttonWrapper.className = 'flex shrink min-w-8 !shrink-0';
+            buttonWrapper.className = 'flex shrink min-w-8 shrink-0!';
             buttonWrapper.setAttribute('data-state', 'closed');
             buttonWrapper.style.opacity = '1';
             buttonWrapper.style.transform = 'none';

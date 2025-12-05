@@ -352,7 +352,7 @@ export class GeminiStrategy extends PlatformStrategy {
 
     if (eventType === 'comprehensive') {
       // Additional events for DOM manipulation fallback
-      element.dispatchEvent(new Event('blur', { bubbles: true }));
+      element.dispatchEvent(new Event('blur-sm', { bubbles: true }));
       element.dispatchEvent(new Event('focus', { bubbles: true }));
     } else {
       // Quill-specific events

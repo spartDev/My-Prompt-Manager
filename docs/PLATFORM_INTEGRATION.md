@@ -41,7 +41,7 @@ export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
     strategyClass: 'YourPlatformStrategy', // For future custom logic
     hostnamePatterns: ['yourplatform'], // For hostname matching
     brandColors: {
-      enabled: 'bg-[#123456] text-white shadow-sm', // Matches platform brand styling
+      enabled: 'bg-[#123456] text-white shadow-xs', // Matches platform brand styling
       disabled: 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
     }
   }
@@ -921,7 +921,7 @@ async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
 
 // Trigger comprehensive events:
 private _triggerEvents(element: HTMLElement): void {
-  const events = ['input', 'change', 'keyup', 'compositionend', 'blur', 'focus'];
+  const events = ['input', 'change', 'keyup', 'compositionend', 'blur-sm', 'focus'];
   events.forEach(eventType => {
     element.dispatchEvent(new Event(eventType, { bubbles: true }));
   });

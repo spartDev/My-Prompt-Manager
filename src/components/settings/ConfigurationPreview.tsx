@@ -44,7 +44,7 @@ const ConfigurationPreview: FC<ConfigurationPreviewProps> = ({
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" aria-hidden="true" onClick={onClose}></div>
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-xs" aria-hidden="true" onClick={onClose}></div>
       <div className="relative max-w-lg w-full bg-gray-50 dark:bg-gray-800/95 rounded-2xl shadow-2xl border-2 border-gray-300 dark:border-gray-600 overflow-hidden">
         {/* Header */}
         <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">

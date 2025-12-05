@@ -163,7 +163,7 @@ export class PerplexityStrategy extends PlatformStrategy {
     element.dispatchEvent(inputEvent);
     
     // Additional events that Perplexity might listen for
-    const events = ['change', 'keyup', 'compositionend', 'blur', 'focus'];
+    const events = ['change', 'keyup', 'compositionend', 'blur-sm', 'focus'];
     events.forEach(eventType => {
       element.dispatchEvent(new Event(eventType, { bubbles: true }));
     });

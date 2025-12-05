@@ -761,7 +761,7 @@ export class NewPlatformStrategy extends PlatformStrategy {
 
     // Additional events for framework compatibility
     element.dispatchEvent(new Event('change', { bubbles: true }));
-    element.dispatchEvent(new Event('blur', { bubbles: true }));
+    element.dispatchEvent(new Event('blur-sm', { bubbles: true }));
     element.dispatchEvent(new Event('focus', { bubbles: true }));
   }
 }

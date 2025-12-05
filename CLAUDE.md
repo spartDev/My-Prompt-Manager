@@ -317,7 +317,7 @@ Always include a `component` field to identify the source:
 - **Typography**: system-ui font stack, text-sm (14px) for body, font-semibold for emphasis
 - **Spacing**: Use p-5 for cards, p-6 for containers, space-x-3 for button groups
 - **Borders**: rounded-xl (12px) for all cards, inputs, buttons
-- **Effects**: backdrop-blur-sm with semi-transparent backgrounds (bg-white/70 dark:bg-gray-800/70)
+- **Effects**: backdrop-blur-xs with semi-transparent backgrounds (bg-white/70 dark:bg-gray-800/70)
 - **Dark Mode**: MUST include dark: variants for all styles
 - **Focus States**: Use predefined classes (.focus-primary, .focus-input, .focus-interactive)
 - **Transitions**: transition-all duration-200 for smooth interactions
@@ -334,7 +334,7 @@ Always include a `component` field to identify the source:
 ```tsx
 <button className="
   px-6 py-3 text-sm font-semibold text-white
-  bg-gradient-to-r from-purple-600 to-indigo-600
+  bg-linear-to-r from-purple-600 to-indigo-600
   rounded-xl hover:from-purple-700 hover:to-indigo-700
   transition-all duration-200 shadow-lg hover:shadow-xl
   disabled:opacity-50 focus-primary

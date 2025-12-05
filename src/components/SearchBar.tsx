@@ -33,7 +33,7 @@ const SearchBar: FC<SearchBarProps> = ({
         value={value}
         onChange={(e) => { onChange(e.target.value); }}
         placeholder={placeholder}
-        className="w-full pl-12 pr-12 py-3 bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm border border-purple-200 dark:border-gray-600 rounded-xl focus-input text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 shadow-sm hover:bg-white/80 dark:hover:bg-gray-700/80 transition-all duration-200"
+        className="w-full pl-12 pr-12 py-3 bg-white/60 dark:bg-gray-700/60 backdrop-blur-xs border border-purple-200 dark:border-gray-600 rounded-xl focus-input text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 shadow-xs hover:bg-white/80 dark:hover:bg-gray-700/80 transition-all duration-200"
         aria-label="Search prompts"
         role="searchbox"
       />
@@ -47,7 +47,7 @@ const SearchBar: FC<SearchBarProps> = ({
               (onClear as () => void)();
             }
           }}
-          className="absolute inset-y-0 right-0 pr-4 flex items-center hover:text-purple-600 dark:hover:text-purple-400 transition-colors focus-interactive rounded"
+          className="absolute inset-y-0 right-0 pr-4 flex items-center hover:text-purple-600 dark:hover:text-purple-400 transition-colors focus-interactive rounded-xs"
           aria-label="Clear search"
           title="Clear search"
         >

@@ -164,7 +164,7 @@ const ToastItem: FC<{ toast: Toast; onDismiss: (id: string) => void }> = ({ toas
       }}
     >
       <div className="px-5 py-3 flex items-center space-x-3">
-        <div className="flex-shrink-0">
+        <div className="shrink-0">
           {getIcon()}
         </div>
         <div className="flex-1 min-w-0">
@@ -177,7 +177,7 @@ const ToastItem: FC<{ toast: Toast; onDismiss: (id: string) => void }> = ({ toas
               }}
               className={`
                 mt-2 text-xs font-medium px-3 py-1.5 rounded-lg
-                transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400
+                transition-colors focus:outline-hidden focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400
                 ${toast.action.variant === 'secondary'
                   ? 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200'
                   : 'bg-purple-500 hover:bg-purple-600 text-white'
@@ -190,7 +190,7 @@ const ToastItem: FC<{ toast: Toast; onDismiss: (id: string) => void }> = ({ toas
         </div>
         <button
           onClick={handleDismiss}
-          className="flex-shrink-0 ml-2 p-1 rounded-md text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400"
+          className="shrink-0 ml-2 p-1 rounded-md text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors focus:outline-hidden focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400"
           aria-label="Dismiss notification"
         >
           <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
@@ -300,7 +300,7 @@ const MemoizedToastContainer: FC<ToastContainerProps> = ({ toasts, onDismiss, po
             flex items-center space-x-2
             animate-in fade-in duration-200
             border border-purple-200 dark:border-purple-800
-            shadow-sm
+            shadow-xs
           "
         >
           <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">

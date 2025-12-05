@@ -121,7 +121,7 @@ const ConfirmDialog: FC<ConfirmDialogProps> = ({
     >
       {/* Backdrop */}
       <div 
-        className="absolute inset-0 bg-black bg-opacity-50 transition-opacity"
+        className="absolute inset-0 bg-black/50 transition-opacity"
         onClick={onCancel}
         aria-hidden="true"
       />
@@ -129,10 +129,10 @@ const ConfirmDialog: FC<ConfirmDialogProps> = ({
       {/* Modal panel */}
       <div 
         ref={dialogRef}
-        className="relative bg-white dark:bg-gray-800 rounded-xl p-3 shadow-xl transform transition-all max-w-xs w-full mx-2 backdrop-blur-sm border border-purple-100 dark:border-gray-700"
+        className="relative bg-white dark:bg-gray-800 rounded-xl p-3 shadow-xl transform transition-all max-w-xs w-full mx-2 backdrop-blur-xs border border-purple-100 dark:border-gray-700"
       >
         <div className="flex items-start">
-          <div className={`flex-shrink-0 flex items-center justify-center h-8 w-8 rounded-full ${styles.iconBg}`}>
+          <div className={`shrink-0 flex items-center justify-center h-8 w-8 rounded-full ${styles.iconBg}`}>
             <div className="scale-75">
               {styles.icon}
             </div>
@@ -159,7 +159,7 @@ const ConfirmDialog: FC<ConfirmDialogProps> = ({
             ref={confirmButtonRef}
             type="button"
             onClick={onConfirm}
-            className={`inline-flex justify-center rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-sm focus-secondary transition-colors ${styles.confirmButton}`}
+            className={`inline-flex justify-center rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-xs focus-secondary transition-colors ${styles.confirmButton}`}
           >
             {confirmText}
           </button>
@@ -167,7 +167,7 @@ const ConfirmDialog: FC<ConfirmDialogProps> = ({
             ref={cancelButtonRef}
             type="button"
             onClick={onCancel}
-            className="inline-flex justify-center rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-gray-300 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-600 focus-secondary transition-colors"
+            className="inline-flex justify-center rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-gray-300 shadow-xs hover:bg-gray-50 dark:hover:bg-gray-600 focus-secondary transition-colors"
           >
             {cancelText}
           </button>

@@ -126,7 +126,7 @@ export const PROMPT_FIXTURES = {
     }),
     createPromptSeed({
       title: 'Client Proposal Draft',
-      content: 'Draft a professional proposal outline for client presentation.',
+      content: 'Draft a professional proposal outline-solid for client presentation.',
       category: 'Work',
     }),
     createPromptSeed({
