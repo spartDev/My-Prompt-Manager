@@ -446,7 +446,7 @@ export class PromptLibraryInjector {
       // Highlight the target element temporarily
       const originalOutline = element.style.outline;
       const originalTransition = element.style.transition;
-      element.style.transition = 'outline-solid 0.2s ease';
+      element.style.transition = 'outline 0.2s ease';
       element.style.outline = '3px solid #10b981';
 
       // Remove highlights after 3 seconds
