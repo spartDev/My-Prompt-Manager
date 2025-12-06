@@ -94,11 +94,11 @@ const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50">
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-6">
         {/* Header */}
         <div className="flex items-center mb-4">
-          <div className="flex-shrink-0">
+          <div className="shrink-0">
             <svg
               className={`h-8 w-8 ${getIconColor()}`}
               fill="none"

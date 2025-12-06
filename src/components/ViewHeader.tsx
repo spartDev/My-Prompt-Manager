@@ -433,7 +433,7 @@ const ViewHeaderFC: FC<ViewHeaderProps> = ({
 
     return (
       <div
-        className="w-10 h-10 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center text-white"
+        className="w-10 h-10 bg-linear-to-br from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center text-white"
         role="img"
         aria-label={`${title} icon`}
       >
@@ -562,7 +562,7 @@ const ViewHeaderFC: FC<ViewHeaderProps> = ({
 
   return (
     <header
-      className={`flex-shrink-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 ${className}`}
+      className={`shrink-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-xs border-b border-purple-100 dark:border-gray-700 ${className}`}
       role="banner"
     >
       <div className="p-6">

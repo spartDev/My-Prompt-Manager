@@ -141,7 +141,7 @@ No new data models required. The component will use existing state management:
   @apply relative p-4 rounded-xl border transition-all duration-200;
   @apply border-gray-200 dark:border-gray-700;
   @apply bg-white dark:bg-gray-800;
-  @apply hover:shadow-sm hover:border-purple-300 dark:hover:border-purple-600;
+  @apply hover:shadow-xs hover:border-purple-300 dark:hover:border-purple-600;
   @apply cursor-pointer;
 }
 

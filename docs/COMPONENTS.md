@@ -758,7 +758,7 @@ All components adhere to design guidelines from `docs/DESIGN_GUIDELINES.md`:
 - **Typography**: text-sm (14px) for body, font-semibold for emphasis
 - **Spacing**: p-5 for cards, p-6 for containers
 - **Borders**: rounded-xl (12px) consistently
-- **Effects**: backdrop-blur-sm with semi-transparent backgrounds
+- **Effects**: backdrop-blur-xs with semi-transparent backgrounds
 - **Dark Mode**: All components include dark: variants
 - **Focus States**: Use predefined classes (.focus-primary, .focus-input)
 - **Transitions**: transition-all duration-200
@@ -792,7 +792,7 @@ interface YourComponentProps {
 const YourComponent: FC<YourComponentProps> = ({ ...props }) => {
   return (
     <div className="
-      bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm
+      bg-white/70 dark:bg-gray-800/70 backdrop-blur-xs
       border border-purple-100 dark:border-gray-700
       rounded-xl p-5
       transition-all duration-200

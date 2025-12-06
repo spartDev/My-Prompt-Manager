@@ -808,10 +808,10 @@ const StatsView: FC = () => {
   return (
     <div className="h-full overflow-auto bg-white dark:bg-gray-900">
       {/* Header */}
-      <div className="flex-shrink-0 p-6 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700">
+      <div className="shrink-0 p-6 bg-white/80 dark:bg-gray-800/80 backdrop-blur-xs border-b border-purple-100 dark:border-gray-700">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center">
+            <div className="w-10 h-10 bg-linear-to-br from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center">
               <svg className="w-6 h-6 text-white" /* Chart icon */ />
             </div>
             <div>
@@ -855,7 +855,7 @@ const StatsView: FC = () => {
         </div>
 
         {/* Weekly Chart */}
-        <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border border-purple-100 dark:border-gray-700 rounded-xl p-5">
+        <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xs border border-purple-100 dark:border-gray-700 rounded-xl p-5">
           <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">
             Last 7 Days Activity
           </h3>
@@ -865,7 +865,7 @@ const StatsView: FC = () => {
         {/* Two Column Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Top Prompts */}
-          <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border border-purple-100 dark:border-gray-700 rounded-xl p-5">
+          <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xs border border-purple-100 dark:border-gray-700 rounded-xl p-5">
             <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">
               Most Used Prompts
             </h3>
@@ -873,7 +873,7 @@ const StatsView: FC = () => {
           </div>
 
           {/* Platform Breakdown */}
-          <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border border-purple-100 dark:border-gray-700 rounded-xl p-5">
+          <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xs border border-purple-100 dark:border-gray-700 rounded-xl p-5">
             <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">
               Platform Usage
             </h3>
@@ -882,7 +882,7 @@ const StatsView: FC = () => {
         </div>
 
         {/* Achievements */}
-        <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border border-purple-100 dark:border-gray-700 rounded-xl p-5">
+        <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xs border border-purple-100 dark:border-gray-700 rounded-xl p-5">
           <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">
             Achievements
           </h3>
@@ -893,13 +893,13 @@ const StatsView: FC = () => {
         <div className="flex justify-end space-x-3">
           <button
             onClick={handleExport}
-            className="px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-300 bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm border border-purple-200 dark:border-gray-600 rounded-xl hover:bg-white/80 dark:hover:bg-gray-700/80 transition-all duration-200 focus-secondary"
+            className="px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-300 bg-white/60 dark:bg-gray-700/60 backdrop-blur-xs border border-purple-200 dark:border-gray-600 rounded-xl hover:bg-white/80 dark:hover:bg-gray-700/80 transition-all duration-200 focus-secondary"
           >
             Export Stats
           </button>
           <button
             onClick={handleClear}
-            className="px-4 py-2 text-sm font-semibold text-red-600 dark:text-red-400 bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm border border-red-200 dark:border-red-800 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 transition-all duration-200 focus-danger"
+            className="px-4 py-2 text-sm font-semibold text-red-600 dark:text-red-400 bg-white/60 dark:bg-gray-700/60 backdrop-blur-xs border border-red-200 dark:border-red-800 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 transition-all duration-200 focus-danger"
           >
             Clear All Stats
           </button>
@@ -916,7 +916,7 @@ export default StatsView;
 
 #### Streak Display
 ```tsx
-<div className="bg-gradient-to-r from-orange-500 to-red-500 rounded-xl p-5 shadow-lg">
+<div className="bg-linear-to-r from-orange-500 to-red-500 rounded-xl p-5 shadow-lg">
   <div className="flex items-center justify-between">
     <div className="flex items-center space-x-4">
       <span className="text-6xl">🔥</span>
@@ -943,7 +943,7 @@ export default StatsView;
 
 #### Stat Card
 ```tsx
-<div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border border-purple-100 dark:border-gray-700 rounded-xl p-5 hover:shadow-md transition-all duration-200">
+<div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xs border border-purple-100 dark:border-gray-700 rounded-xl p-5 hover:shadow-md transition-all duration-200">
   <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
     {title}
   </p>
@@ -973,7 +973,7 @@ export default StatsView;
 ```tsx
 <div className={`
   relative group
-  bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm
+  bg-white/70 dark:bg-gray-800/70 backdrop-blur-xs
   border-2 rounded-xl p-4
   transition-all duration-200
   ${unlocked

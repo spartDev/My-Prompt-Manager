@@ -1,6 +1,6 @@
 ---
 name: Design System Compliance
-description: Ensure all UI components follow the design guidelines including purple-indigo gradient, rounded-xl borders, backdrop-blur effects, dark mode support, and accessibility requirements
+description: Ensure all UI components follow the design guidelines including purple-indigo gradient, rounded-xl borders, backdrop-blur-sm effects, dark mode support, and accessibility requirements
 ---
 
 # Design System Compliance
@@ -38,7 +38,7 @@ From `docs/DESIGN_GUIDELINES.md`:
 **Primary Colors:**
 ```css
 /* Purple-Indigo Gradient (Brand) */
-bg-gradient-to-r from-purple-600 to-indigo-600
+bg-linear-to-r from-purple-600 to-indigo-600
 
 /* Hover state */
 hover:from-purple-700 hover:to-indigo-700
@@ -147,12 +147,12 @@ rounded-full /* Pills, badges, toggle knobs */
 
 **Glassmorphism (Signature Effect):**
 ```css
-bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm
+bg-white/70 dark:bg-gray-800/70 backdrop-blur-xs
 ```
 
 **Shadow Scale:**
 ```css
-shadow-sm  /* Subtle elevation */
+shadow-xs  /* Subtle elevation */
 shadow-lg  /* Primary buttons, elevated cards */
 shadow-xl  /* Modals, dialogs */
 ```
@@ -171,7 +171,7 @@ transition-all duration-200  /* Default for all interactive elements */
 <button className="
   px-6 py-3
   text-sm font-semibold text-white
-  bg-gradient-to-r from-purple-600 to-indigo-600
+  bg-linear-to-r from-purple-600 to-indigo-600
   rounded-xl
   hover:from-purple-700 hover:to-indigo-700
   transition-all duration-200
@@ -194,7 +194,7 @@ transition-all duration-200  /* Default for all interactive elements */
 **Focus Class (Predefined in Tailwind config):**
 ```css
 .focus-primary {
-  @apply focus:outline-none focus:ring-2 focus:ring-purple-500
+  @apply focus:outline-hidden focus:ring-2 focus:ring-purple-500
          focus:ring-offset-2 focus:ring-offset-white
          dark:focus:ring-offset-gray-900;
 }
@@ -208,7 +208,7 @@ transition-all duration-200  /* Default for all interactive elements */
   px-6 py-3
   text-sm font-semibold
   text-gray-700 dark:text-gray-300
-  bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm
+  bg-white/60 dark:bg-gray-700/60 backdrop-blur-xs
   border border-purple-200 dark:border-gray-600
   rounded-xl
   hover:bg-white/80 dark:hover:bg-gray-700/80
@@ -236,7 +236,7 @@ transition-all duration-200  /* Default for all interactive elements */
     border border-purple-200 dark:border-gray-600
     rounded-xl
     focus-input
-    bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm
+    bg-white/60 dark:bg-gray-700/60 backdrop-blur-xs
     transition-all duration-200
     text-gray-900 dark:text-gray-100
     placeholder-gray-500 dark:placeholder-gray-400
@@ -255,7 +255,7 @@ transition-all duration-200  /* Default for all interactive elements */
     rounded-xl
     focus-input
     resize-none
-    bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm
+    bg-white/60 dark:bg-gray-700/60 backdrop-blur-xs
     transition-all duration-200
     text-gray-900 dark:text-gray-100
   "
@@ -269,7 +269,7 @@ transition-all duration-200  /* Default for all interactive elements */
   className="
     w-full px-4 py-3
     border rounded-xl focus-input
-    bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm
+    bg-white/60 dark:bg-gray-700/60 backdrop-blur-xs
     transition-all duration-200
     text-gray-900 dark:text-gray-100
     border-red-300 dark:border-red-500
@@ -285,7 +285,7 @@ transition-all duration-200  /* Default for all interactive elements */
 **Focus Class:**
 ```css
 .focus-input {
-  @apply focus:outline-none focus:ring-2 focus:ring-purple-500
+  @apply focus:outline-hidden focus:ring-2 focus:ring-purple-500
          focus:border-purple-500 dark:focus:ring-purple-400
          dark:focus:border-purple-400;
 }
@@ -296,7 +296,7 @@ transition-all duration-200  /* Default for all interactive elements */
 **Prompt Card:**
 ```tsx
 <article className="
-  bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm
+  bg-white/70 dark:bg-gray-800/70 backdrop-blur-xs
   border-b border-purple-100 dark:border-gray-700
   p-5
   hover:bg-white/90 dark:hover:bg-gray-800/90
@@ -315,7 +315,7 @@ transition-all duration-200  /* Default for all interactive elements */
 **Settings Card:**
 ```tsx
 <div className="
-  bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm
+  bg-white/70 dark:bg-gray-800/70 backdrop-blur-xs
   border border-purple-100 dark:border-gray-700
   rounded-xl
   p-5
@@ -358,7 +358,7 @@ transition-all duration-200  /* Default for all interactive elements */
     shadow-xl
     transform transition-all
     max-w-xs w-full mx-2
-    backdrop-blur-sm
+    backdrop-blur-xs
     border border-purple-100 dark:border-gray-700
   ">
     {/* Modal content */}
@@ -372,7 +372,7 @@ transition-all duration-200  /* Default for all interactive elements */
   <div className="flex items-start">
     {/* Icon */}
     <div className="
-      flex-shrink-0 flex items-center justify-center
+      shrink-0 flex items-center justify-center
       h-8 w-8
       rounded-full
       bg-red-100 dark:bg-red-900/20
@@ -397,7 +397,7 @@ transition-all duration-200  /* Default for all interactive elements */
       px-3 py-1.5
       text-xs font-semibold text-white
       bg-red-600 hover:bg-red-700
-      rounded-lg shadow-sm
+      rounded-lg shadow-xs
       transition-colors
       focus-danger
     ">
@@ -434,14 +434,14 @@ transition-all duration-200  /* Default for all interactive elements */
     type="text"
     className="
       w-full pl-12 pr-12 py-3
-      bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm
+      bg-white/60 dark:bg-gray-700/60 backdrop-blur-xs
       border border-purple-200 dark:border-gray-600
       rounded-xl
       focus-input
       text-sm
       text-gray-900 dark:text-gray-100
       placeholder-gray-500 dark:placeholder-gray-400
-      shadow-sm
+      shadow-xs
       hover:bg-white/80 dark:hover:bg-gray-700/80
       transition-all duration-200
     "
@@ -464,9 +464,9 @@ transition-all duration-200  /* Default for all interactive elements */
     relative inline-flex items-center
     rounded-full
     transition-all duration-200
-    focus:outline-none focus:ring-4 focus:ring-purple-300 dark:focus:ring-purple-800
+    focus:outline-hidden focus:ring-4 focus:ring-purple-300 dark:focus:ring-purple-800
     ${checked
-      ? 'bg-gradient-to-r from-purple-600 to-indigo-600 shadow-sm'
+      ? 'bg-linear-to-r from-purple-600 to-indigo-600 shadow-xs'
       : 'bg-gray-200 dark:bg-gray-700'
     }
     ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
@@ -475,7 +475,7 @@ transition-all duration-200  /* Default for all interactive elements */
   <span className={`
     h-5 w-5
     inline-block transform
-    rounded-full bg-white shadow-sm
+    rounded-full bg-white shadow-xs
     transition-transform duration-200
     border border-gray-300 dark:border-gray-600
     ${checked ? 'translate-x-6' : 'translate-x-[2px]'}
@@ -505,7 +505,7 @@ transition-all duration-200  /* Default for all interactive elements */
 **Focus Class:**
 ```css
 .focus-interactive {
-  @apply focus:outline-none focus:ring-2 focus:ring-purple-500
+  @apply focus:outline-hidden focus:ring-2 focus:ring-purple-500
          focus:ring-offset-1 focus:ring-offset-white
          dark:focus:ring-offset-gray-800 dark:focus:ring-purple-400;
 }
@@ -594,7 +594,7 @@ focus:ring-offset-white dark:focus:ring-offset-gray-900
 For primary action buttons:
 ```css
 .focus-primary {
-  @apply focus:outline-none focus:ring-2 focus:ring-purple-500
+  @apply focus:outline-hidden focus:ring-2 focus:ring-purple-500
          focus:ring-offset-2 focus:ring-offset-white
          dark:focus:ring-offset-gray-900;
 }
@@ -604,7 +604,7 @@ For primary action buttons:
 For secondary buttons and menu items:
 ```css
 .focus-secondary {
-  @apply focus:outline-none focus:ring-2 focus:ring-purple-500
+  @apply focus:outline-hidden focus:ring-2 focus:ring-purple-500
          focus:ring-offset-1 focus:ring-offset-white
          dark:focus:ring-offset-gray-800;
 }
@@ -614,7 +614,7 @@ For secondary buttons and menu items:
 For delete/danger buttons:
 ```css
 .focus-danger {
-  @apply focus:outline-none focus:ring-2 focus:ring-red-500
+  @apply focus:outline-hidden focus:ring-2 focus:ring-red-500
          focus:ring-offset-2 focus:ring-offset-white
          dark:focus:ring-offset-gray-900;
 }
@@ -624,7 +624,7 @@ For delete/danger buttons:
 For input fields:
 ```css
 .focus-input {
-  @apply focus:outline-none focus:ring-2 focus:ring-purple-500
+  @apply focus:outline-hidden focus:ring-2 focus:ring-purple-500
          focus:border-purple-500 dark:focus:ring-purple-400
          dark:focus:border-purple-400;
 }
@@ -634,7 +634,7 @@ For input fields:
 For icon buttons and interactive elements:
 ```css
 .focus-interactive {
-  @apply focus:outline-none focus:ring-2 focus:ring-purple-500
+  @apply focus:outline-hidden focus:ring-2 focus:ring-purple-500
          focus:ring-offset-1 focus:ring-offset-white
          dark:focus:ring-offset-gray-800 dark:focus:ring-purple-400;
 }
@@ -702,7 +702,7 @@ For icon buttons and interactive elements:
 <button className="focus-primary">Save</button>
 
 {/* ❌ WRONG - No focus state */}
-<button className="outline-none">Save</button>
+<button className="outline-hidden">Save</button>
 ```
 
 ## Common Mistakes & Fixes
@@ -740,14 +740,14 @@ For icon buttons and interactive elements:
 
 **Fix:**
 ```tsx
-<button className="bg-gradient-to-r from-purple-600 to-indigo-600">Save</button>
+<button className="bg-linear-to-r from-purple-600 to-indigo-600">Save</button>
 ```
 
 ### Mistake 4: Custom Focus Styles
 
 **Problem:**
 ```tsx
-<button className="focus:outline-none focus:ring-2 focus:ring-blue-500">
+<button className="focus:outline-hidden focus:ring-2 focus:ring-blue-500">
 ```
 
 **Fix:**
@@ -759,12 +759,12 @@ For icon buttons and interactive elements:
 
 **Problem:**
 ```tsx
-<div className="bg-white/70">  {/* Missing backdrop-blur */}
+<div className="bg-white/70">  {/* Missing backdrop-blur-sm */}
 ```
 
 **Fix:**
 ```tsx
-<div className="bg-white/70 backdrop-blur-sm">
+<div className="bg-white/70 backdrop-blur-xs">
 ```
 
 ### Mistake 6: Wrong Transition Duration
@@ -802,7 +802,7 @@ When creating a new component, verify:
 - [ ] Uses purple-indigo gradient for primary actions
 - [ ] All borders use rounded-xl (12px)
 - [ ] Includes dark mode variants for ALL styles
-- [ ] Uses backdrop-blur-sm with semi-transparent backgrounds
+- [ ] Uses backdrop-blur-xs with semi-transparent backgrounds
 - [ ] Uses predefined focus classes (.focus-primary, .focus-input, etc.)
 - [ ] All interactive elements have ARIA labels
 - [ ] Keyboard navigation works (Tab, Enter, Escape)
@@ -844,7 +844,7 @@ dark:text-gray-100, dark:text-gray-300, dark:text-gray-400
 **Primary Button:**
 ```
 px-6 py-3 text-sm font-semibold text-white
-bg-gradient-to-r from-purple-600 to-indigo-600
+bg-linear-to-r from-purple-600 to-indigo-600
 rounded-xl hover:from-purple-700 hover:to-indigo-700
 transition-all duration-200 shadow-lg hover:shadow-xl
 disabled:opacity-50 focus-primary
@@ -855,14 +855,14 @@ disabled:opacity-50 focus-primary
 w-full px-4 py-3
 border border-purple-200 dark:border-gray-600
 rounded-xl focus-input
-bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm
+bg-white/60 dark:bg-gray-700/60 backdrop-blur-xs
 transition-all duration-200
 text-gray-900 dark:text-gray-100
 ```
 
 **Card:**
 ```
-bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm
+bg-white/70 dark:bg-gray-800/70 backdrop-blur-xs
 border-b border-purple-100 dark:border-gray-700
 p-5 hover:bg-white/90 dark:hover:bg-gray-800/90
 transition-all duration-200

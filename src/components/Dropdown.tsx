@@ -340,7 +340,7 @@ export const Dropdown: FC<DropdownProps> = ({
       aria-label={ariaLabel}
       aria-labelledby={!ariaLabel ? triggerHandlers.id : undefined}
       className={cn(
-        'absolute z-50 min-w-[8rem] overflow-hidden',
+        'absolute z-50 min-w-32 overflow-hidden',
         'rounded-xl border bg-white shadow-lg',
         'dark:bg-gray-800 dark:border-gray-700',
         'animate-in fade-in-0 zoom-in-95',
@@ -379,7 +379,7 @@ export const Dropdown: FC<DropdownProps> = ({
                   'text-gray-700 dark:text-gray-300',
                   'hover:bg-gray-100 dark:hover:bg-gray-700',
                   'focus:bg-gray-100 dark:focus:bg-gray-700',
-                  'focus:outline-none transition-colors',
+                  'focus:outline-hidden transition-colors',
                   'disabled:opacity-50 disabled:cursor-not-allowed',
                   item.disabled && 'hover:bg-transparent dark:hover:bg-transparent',
                   item.className,
@@ -387,7 +387,7 @@ export const Dropdown: FC<DropdownProps> = ({
                 )}
               >
                 {item.icon && (
-                  <span className="mr-2 flex-shrink-0">{item.icon}</span>
+                  <span className="mr-2 shrink-0">{item.icon}</span>
                 )}
                 <span className="text-left flex-1">{item.label}</span>
               </button>

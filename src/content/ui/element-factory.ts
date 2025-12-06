@@ -28,7 +28,7 @@ export class UIElementFactory {
     shrinkDiv.style.transform = 'none';
     
     const icon = document.createElement('button');
-    icon.className = `prompt-library-integrated-icon inline-flex items-center justify-center relative shrink-0 can-focus select-none disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none disabled:drop-shadow-none transition-all h-8 min-w-8 rounded-lg flex items-center px-[7.5px] group !pointer-events-auto !outline-offset-1 text-text-300 active:scale-[0.98] hover:text-text-200/90`;
+    icon.className = `prompt-library-integrated-icon inline-flex items-center justify-center relative shrink-0 can-focus select-none disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none disabled:drop-shadow-none transition-all h-8 min-w-8 rounded-lg flex items-center px-[7.5px] group pointer-events-auto! outline-offset-1! text-text-300 active:scale-[0.98] hover:text-text-200/90`;
     icon.setAttribute('type', 'button');
     icon.setAttribute('aria-label', 'Open my prompt manager - Access your saved prompts');
     icon.setAttribute('title', 'My Prompt Manager - Access your saved prompts');
@@ -63,7 +63,7 @@ export class UIElementFactory {
 
   createPerplexityIcon(): HTMLElement {
     const icon = document.createElement('button');
-    icon.className = `prompt-library-integrated-icon text-textOff hover:text-textMain dark:hover:text-textMainDark font-sans focus:outline-none outline-none outline-transparent transition duration-300 ease-out font-sans select-none items-center relative group/button justify-center text-center items-center rounded-lg cursor-pointer active:scale-[0.97] active:duration-150 active:ease-outExpo origin-center whitespace-nowrap inline-flex text-sm h-8 px-3`;
+    icon.className = `prompt-library-integrated-icon text-textOff hover:text-textMain dark:hover:text-textMainDark font-sans focus:outline-hidden outline-hidden outline-transparent transition duration-300 ease-out font-sans select-none items-center relative group/button justify-center text-center items-center rounded-lg cursor-pointer active:scale-[0.97] active:duration-150 active:ease-outExpo origin-center whitespace-nowrap inline-flex text-sm h-8 px-3`;
     icon.setAttribute('type', 'button');
     icon.setAttribute('aria-label', 'Open my prompt manager - Access your saved prompts');
     icon.setAttribute('title', 'My Prompt Manager - Access your saved prompts');
@@ -138,7 +138,7 @@ export class UIElementFactory {
   createMistralIcon(): HTMLElement {
     const icon = document.createElement('button');
     // Match Mistral's native button styling exactly like Research/Think buttons
-    icon.className = `prompt-library-integrated-icon flex items-center font-medium transition-all focus-visible:outline-3 outline-default outline-offset-1 justify-center whitespace-nowrap text-subtle hover:text-default data-[state=on]:text-basic-blue-strong px-2 text-sm rounded-sm h-9 gap-0`;
+    icon.className = `prompt-library-integrated-icon flex items-center font-medium transition-all focus-visible:outline-3 outline-default outline-offset-1 justify-center whitespace-nowrap text-subtle hover:text-default data-[state=on]:text-basic-blue-strong px-2 text-sm rounded-xs h-9 gap-0`;
     icon.setAttribute('type', 'button');
     icon.setAttribute('aria-label', 'Open my prompt manager - Access your saved prompts');
     icon.setAttribute('title', 'My Prompt Manager - Access your saved prompts');

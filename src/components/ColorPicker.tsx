@@ -175,7 +175,7 @@ const ColorPickerContent: FC<{
               {/* Color Preview showing current custom selection */}
               <div className="flex items-center space-x-2">
                 <div
-                  className="w-10 h-10 rounded-lg border-2 border-gray-200 dark:border-gray-700 flex-shrink-0"
+                  className="w-10 h-10 rounded-lg border-2 border-gray-200 dark:border-gray-700 shrink-0"
                   style={{ backgroundColor: customColor }}
                   title={customColor !== value ? "New selection" : "Current color"}
                 />
@@ -251,7 +251,7 @@ const ColorPickerContent: FC<{
 
               {/* Color Preview */}
               <div
-                className="w-10 h-10 rounded-lg border-2 border-gray-200 dark:border-gray-700 flex-shrink-0"
+                className="w-10 h-10 rounded-lg border-2 border-gray-200 dark:border-gray-700 shrink-0"
                 style={{ backgroundColor: value }}
               />
             </div>
@@ -265,10 +265,10 @@ const ColorPickerContent: FC<{
                   handleHexInputChange(e.target.value.toUpperCase());
                 }}
                 placeholder="#000000"
-                className="flex-1 min-w-0 px-3 py-2 text-sm border border-purple-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-mono"
+                className="flex-1 min-w-0 px-3 py-2 text-sm border border-purple-200 dark:border-gray-600 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-mono"
                 maxLength={MAX_HEX_COLOR_LENGTH}
               />
-              <div className="flex items-center gap-1 flex-shrink-0">
+              <div className="flex items-center gap-1 shrink-0">
                 <button
                   type="button"
                   onClick={handleCustomColorSubmit}
@@ -349,7 +349,7 @@ const ColorPicker: FC<ColorPickerProps> = ({
               title={compact ? currentColorName : undefined}
             >
               <div
-                className={`${compact ? 'w-8 h-8' : 'w-6 h-6'} rounded-md border-2 border-white dark:border-gray-800 shadow-sm`}
+                className={`${compact ? 'w-8 h-8' : 'w-6 h-6'} rounded-md border-2 border-white dark:border-gray-800 shadow-xs`}
                 style={{ backgroundColor: value }}
               />
               {!compact && (

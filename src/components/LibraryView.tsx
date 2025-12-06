@@ -130,7 +130,7 @@ const LibraryView: FC<LibraryViewProps> = ({
                 <p className="text-gray-500 dark:text-gray-400 mb-4 text-sm leading-relaxed">Create your first prompt to start building your personal collection of reusable content.</p>
                 <button
                   onClick={onAddNew}
-                  className="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl focus-primary"
+                  className="px-6 py-2.5 bg-linear-to-r from-purple-600 to-indigo-600 text-white rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl focus-primary"
                   aria-label="Create your first prompt"
                 >
                   Create First Prompt
@@ -168,7 +168,7 @@ const LibraryView: FC<LibraryViewProps> = ({
 
       {/* Footer with stats */}
       {!loading && (prompts).length > 0 && (
-        <footer className="flex-shrink-0 px-4 py-2 bg-gray-100 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 text-xs text-gray-600 dark:text-gray-400" role="contentinfo" aria-label="Library statistics">
+        <footer className="shrink-0 px-4 py-2 bg-gray-100 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 text-xs text-gray-600 dark:text-gray-400" role="contentinfo" aria-label="Library statistics">
           <span aria-live="polite" aria-atomic="true">
             {finalFilteredPrompts.length === (prompts).length ? (
               `${String((prompts).length)} prompt${(prompts).length !== 1 ? 's' : ''}`
@@ -188,7 +188,7 @@ const LibraryView: FC<LibraryViewProps> = ({
             onAddNew();
           }
         }}
-        className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-full hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 shadow-2xl hover:shadow-3xl transform hover:scale-110 z-50 flex items-center justify-center focus-primary disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+        className="fixed bottom-6 right-6 w-14 h-14 bg-linear-to-r from-purple-600 to-indigo-600 text-white rounded-full hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 shadow-2xl hover:shadow-3xl transform hover:scale-110 z-50 flex items-center justify-center focus-primary disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
         disabled={loading}
         aria-label="Add new prompt"
         title="Add New Prompt"

@@ -45,7 +45,7 @@ const PromptCard: FC<PromptCardProps> = ({
       
       // Add highlighted match - using stable key with prompt ID and match position
       parts.push(
-        <mark key={`highlight-${prompt.id}-${String(index)}-${searchTerm}`} className="bg-yellow-200 dark:bg-yellow-800/40 px-1 rounded">
+        <mark key={`highlight-${prompt.id}-${String(index)}-${searchTerm}`} className="bg-yellow-200 dark:bg-yellow-800/40 px-1 rounded-xs">
           {sanitizedText.substring(index, index + searchTerm.length)}
         </mark>
       );
@@ -128,7 +128,7 @@ const PromptCard: FC<PromptCardProps> = ({
 
 
   return (
-    <article className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5 hover:bg-white/90 dark:hover:bg-gray-800/90 transition-all duration-200 relative group" aria-labelledby={`prompt-title-${prompt.id}`}>
+    <article className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xs border-b border-purple-100 dark:border-gray-700 p-5 hover:bg-white/90 dark:hover:bg-gray-800/90 transition-all duration-200 relative group" aria-labelledby={`prompt-title-${prompt.id}`}>
       <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-4 items-center">
         {/* Title and metadata */}
         <div className="pr-3">
@@ -163,7 +163,7 @@ const PromptCard: FC<PromptCardProps> = ({
         </div>
         
         {/* Actions */}
-        <div className="flex items-center space-x-2 flex-shrink-0">
+        <div className="flex items-center space-x-2 shrink-0">
           {/* Copy Button */}
           <button
             onClick={handleCopyClick}

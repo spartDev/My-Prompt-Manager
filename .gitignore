@@ -142,6 +142,9 @@ temp/
 # manifest.json (only if generated)
 # public/icons/ (only if generated automatically)
 
+# Baseline files for migration
+baseline-*.txt
+
 # Claude
 .claude/settings.local.json
 
