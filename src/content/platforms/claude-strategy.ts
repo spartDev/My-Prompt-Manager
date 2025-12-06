@@ -250,7 +250,7 @@ export class ClaudeStrategy extends PlatformStrategy {
       
       // Additional events that Claude might listen to
       element.dispatchEvent(new Event('change', { bubbles: true }));
-      element.dispatchEvent(new Event('blur-sm', { bubbles: true }));
+      element.dispatchEvent(new Event('blur', { bubbles: true }));
       element.dispatchEvent(new Event('focus', { bubbles: true }));
       
       return { success: true, method: 'dom-manipulation' };

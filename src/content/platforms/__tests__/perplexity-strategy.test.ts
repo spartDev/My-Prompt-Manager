@@ -126,7 +126,7 @@ describe('PerplexityStrategy', () => {
     it('should dispatch comprehensive event set', async () => {
       await strategy.insert(mockContentEditableDiv, 'test content');
       
-      const expectedEvents = ['input', 'change', 'keyup', 'compositionend', 'blur-sm', 'focus'];
+      const expectedEvents = ['input', 'change', 'keyup', 'compositionend', 'blur', 'focus'];
       expectedEvents.forEach(eventType => {
         expect(mockContentEditableDiv.dispatchEvent).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -247,7 +247,7 @@ describe('PerplexityStrategy', () => {
 
       const eventTypes = eventSpy.mock.calls.map(call => call[0].type);
       // Check that required events are present and maintain relative order (deduplicated)
-      const requiredEvents = ['input', 'change', 'keyup', 'compositionend', 'blur-sm', 'focus'];
+      const requiredEvents = ['input', 'change', 'keyup', 'compositionend', 'blur', 'focus'];
       const filteredEvents = eventTypes.filter(type => requiredEvents.includes(type));
       // Remove duplicates while preserving first occurrence order
       const uniqueEvents = [...new Set(filteredEvents)];
