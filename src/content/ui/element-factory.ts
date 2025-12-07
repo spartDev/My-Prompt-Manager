@@ -28,7 +28,7 @@ export class UIElementFactory {
     shrinkDiv.style.transform = 'none';
     
     const icon = document.createElement('button');
-    icon.className = `prompt-library-integrated-icon inline-flex items-center justify-center relative shrink-0 can-focus select-none disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none disabled:drop-shadow-none transition-all h-8 min-w-8 rounded-lg flex items-center px-[7.5px] group pointer-events-auto! outline-offset-1! text-text-300 active:scale-[0.98] hover:text-text-200/90`;
+    icon.className = `prompt-library-integrated-icon inline-flex items-center justify-center relative shrink-0 can-focus select-none disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none disabled:drop-shadow-none transition-all h-8 min-w-8 rounded-lg flex items-center px-[7.5px] group !pointer-events-auto !outline-offset-1 text-text-300 active:scale-[0.98] hover:text-text-200/90`;
     icon.setAttribute('type', 'button');
     icon.setAttribute('aria-label', 'Open my prompt manager - Access your saved prompts');
     icon.setAttribute('title', 'My Prompt Manager - Access your saved prompts');
