@@ -899,7 +899,7 @@ export class PromptLibraryInjector {
           if (clockButtonContainer && clockButtonContainer.parentElement) {
             // Create a similar wrapper div structure for our button
             const buttonWrapper = document.createElement('div');
-            buttonWrapper.className = 'flex shrink min-w-8 shrink-0!';
+            buttonWrapper.className = 'flex min-w-8 !shrink-0';
             buttonWrapper.setAttribute('data-state', 'closed');
             buttonWrapper.style.opacity = '1';
             buttonWrapper.style.transform = 'none';
