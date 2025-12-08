@@ -276,7 +276,7 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
             }}
             className={`flex-1 px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 focus-interactive ${
               mode === 'create'
-                ? 'bg-white dark:bg-gray-600 text-purple-600 dark:text-purple-400 shadow-xs'
+                ? 'bg-white dark:bg-gray-600 text-purple-600 dark:text-purple-400 shadow-sm'
                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
             }`}
             disabled={isPending}
@@ -297,7 +297,7 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
             }}
             className={`flex-1 px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 focus-interactive ${
               mode === 'import'
-                ? 'bg-white dark:bg-gray-600 text-purple-600 dark:text-purple-400 shadow-xs'
+                ? 'bg-white dark:bg-gray-600 text-purple-600 dark:text-purple-400 shadow-sm'
                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
             }`}
             disabled={isPending}
@@ -603,7 +603,7 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
           <button
             type="submit"
             form="add-prompt-form"
-            className="flex-1 px-6 py-3 text-sm font-semibold text-white bg-linear-to-r from-purple-600 to-indigo-600 rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 focus-primary"
+            className="flex-1 px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 focus-primary"
             disabled={isPending || (mode === 'import' && (!decodedPrompt || !!validationError || isValidating))}
           >
             {isPending ? (

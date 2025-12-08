@@ -60,7 +60,7 @@ const InterfaceModeSelector: FC<InterfaceModeSelectorProps> = ({
             {/* Selection indicator */}
             {value === 'popup' && (
               <div className="absolute top-2 right-2">
-                <div className="w-5 h-5 bg-linear-to-br from-purple-600 to-indigo-600 rounded-full flex items-center justify-center">
+                <div className="w-5 h-5 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-full flex items-center justify-center">
                   <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
@@ -97,7 +97,7 @@ const InterfaceModeSelector: FC<InterfaceModeSelectorProps> = ({
 
             {/* Mode Icon */}
             <div className="flex justify-center mb-2">
-              <div className="w-8 h-8 bg-linear-to-br from-purple-600 to-indigo-600 rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-lg flex items-center justify-center">
                 <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                 </svg>
@@ -139,7 +139,7 @@ const InterfaceModeSelector: FC<InterfaceModeSelectorProps> = ({
             {/* Selection indicator */}
             {value === 'sidepanel' && (
               <div className="absolute top-2 right-2">
-                <div className="w-5 h-5 bg-linear-to-br from-purple-600 to-indigo-600 rounded-full flex items-center justify-center">
+                <div className="w-5 h-5 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-full flex items-center justify-center">
                   <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
@@ -176,7 +176,7 @@ const InterfaceModeSelector: FC<InterfaceModeSelectorProps> = ({
 
             {/* Mode Icon */}
             <div className="flex justify-center mb-2">
-              <div className="w-8 h-8 bg-linear-to-br from-purple-600 to-indigo-600 rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-lg flex items-center justify-center">
                 <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 17V7m0 10l-3-3m3 3l3-3m5 3V7m0 10l-3-3m3 3l3-3" />
                 </svg>

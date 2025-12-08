@@ -30,7 +30,7 @@ const DISABLED_STATE = 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gra
  * Uses the original green gradient for custom/unrecognized platforms
  */
 const DEFAULT_BRAND_COLORS: BrandColorScheme = {
-  enabled: 'bg-linear-to-br from-green-500 to-emerald-600 text-white shadow-xs',
+  enabled: 'bg-gradient-to-br from-green-500 to-emerald-600 text-white shadow-sm',
   disabled: DISABLED_STATE
 };
 

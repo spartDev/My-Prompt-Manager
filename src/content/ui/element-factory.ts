@@ -63,7 +63,7 @@ export class UIElementFactory {
 
   createPerplexityIcon(): HTMLElement {
     const icon = document.createElement('button');
-    icon.className = `prompt-library-integrated-icon text-textOff hover:text-textMain dark:hover:text-textMainDark font-sans focus:outline-hidden outline-hidden outline-transparent transition duration-300 ease-out font-sans select-none items-center relative group/button justify-center text-center items-center rounded-lg cursor-pointer active:scale-[0.97] active:duration-150 active:ease-outExpo origin-center whitespace-nowrap inline-flex text-sm h-8 px-3`;
+    icon.className = `prompt-library-integrated-icon text-textOff hover:text-textMain dark:hover:text-textMainDark font-sans focus:outline-none outline-none outline-transparent transition duration-300 ease-out font-sans select-none items-center relative group/button justify-center text-center items-center rounded-lg cursor-pointer active:scale-[0.97] active:duration-150 active:ease-outExpo origin-center whitespace-nowrap inline-flex text-sm h-8 px-3`;
     icon.setAttribute('type', 'button');
     icon.setAttribute('aria-label', 'Open my prompt manager - Access your saved prompts');
     icon.setAttribute('title', 'My Prompt Manager - Access your saved prompts');

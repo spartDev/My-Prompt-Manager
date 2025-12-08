@@ -40,8 +40,8 @@ const SiteCard: FC<SiteCardProps> = ({
     <div className={`
       relative p-4 rounded-xl border transition-all duration-200
       ${isEnabled 
-        ? 'border-gray-200 dark:border-gray-700 bg-green-50/30 dark:bg-green-900/10 shadow-xs' 
-        : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:shadow-xs'
+        ? 'border-gray-200 dark:border-gray-700 bg-green-50/30 dark:bg-green-900/10 shadow-sm'
+        : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:shadow-sm'
       }
     `}>
       {/* Site Icon and Info */}

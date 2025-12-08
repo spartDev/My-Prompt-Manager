@@ -76,7 +76,7 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
     strategyClass: "ClaudeStrategy",
     hostnamePatterns: ["claude"],
     brandColors: {
-      enabled: "bg-[#d37354] text-white shadow-xs",
+      enabled: "bg-[#d37354] text-white shadow-sm",
       disabled: DISABLED_STATE,
     },
   },
@@ -96,7 +96,7 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
     strategyClass: "ChatGPTStrategy",
     hostnamePatterns: ["openai", "chatgpt"],
     brandColors: {
-      enabled: "bg-white text-gray-800 shadow-xs border border-gray-200",
+      enabled: "bg-white text-gray-800 shadow-sm border border-gray-200",
       disabled: DISABLED_STATE,
     },
   },
@@ -120,7 +120,7 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
     strategyClass: "MistralStrategy",
     hostnamePatterns: ["mistral"],
     brandColors: {
-      enabled: "bg-gray-700 text-white shadow-xs",
+      enabled: "bg-gray-700 text-white shadow-sm",
       disabled: DISABLED_STATE,
     },
     iconMethod: "createMistralIcon",
@@ -141,7 +141,7 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
     strategyClass: "PerplexityStrategy",
     hostnamePatterns: ["perplexity"],
     brandColors: {
-      enabled: "bg-[#2d808c] text-white shadow-xs",
+      enabled: "bg-[#2d808c] text-white shadow-sm",
       disabled: DISABLED_STATE,
     },
   },
@@ -162,7 +162,7 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
     strategyClass: "GeminiStrategy",
     hostnamePatterns: ["gemini"],
     brandColors: {
-      enabled: "bg-white text-gray-800 shadow-xs border border-gray-200",
+      enabled: "bg-white text-gray-800 shadow-sm border border-gray-200",
       disabled: DISABLED_STATE,
     },
     iconMethod: "createGeminiIcon",
@@ -186,7 +186,7 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
     strategyClass: "CopilotStrategy", // Uses dedicated CopilotStrategy for React integration
     hostnamePatterns: ["copilot.microsoft"],
     brandColors: {
-      enabled: "bg-[#0e111b] text-white shadow-xs",
+      enabled: "bg-[#0e111b] text-white shadow-sm",
       disabled: DISABLED_STATE,
     },
     iconMethod: "createCopilotIcon",
@@ -211,7 +211,7 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
     strategyClass: "M365CopilotStrategy",
     hostnamePatterns: ["m365.cloud.microsoft"],
     brandColors: {
-      enabled: "bg-[#0e111b] text-white shadow-xs",
+      enabled: "bg-[#0e111b] text-white shadow-sm",
       disabled: DISABLED_STATE,
     },
     iconMethod: "createCopilotIcon",

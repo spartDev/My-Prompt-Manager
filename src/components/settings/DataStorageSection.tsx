@@ -184,7 +184,7 @@ const DataStorageSection: FC<DataStorageSectionProps> = ({
           </div>
           <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
             <div
-              className="h-full bg-linear-to-r from-purple-600 to-indigo-600 transition-all duration-300"
+              className="h-full bg-gradient-to-r from-purple-600 to-indigo-600 transition-all duration-300"
               style={{ width: `${storagePercentage.toFixed(1)}%` }}
             />
           </div>
@@ -202,7 +202,7 @@ const DataStorageSection: FC<DataStorageSectionProps> = ({
           <div className="flex gap-2">
             <button
               onClick={handleExport}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-linear-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 focus-primary"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 focus-primary"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />

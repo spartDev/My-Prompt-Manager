@@ -30,9 +30,9 @@ const ToggleSwitch: FC<ToggleSwitchProps> = ({
       className={`
         ${sizeClasses.container}
         relative inline-flex items-center rounded-full transition-all duration-200
-        focus:outline-hidden focus:ring-4 focus:ring-purple-300 dark:focus:ring-purple-800
+        focus:outline-none focus:ring-4 focus:ring-purple-300 dark:focus:ring-purple-800
         ${checked
-          ? 'bg-linear-to-r from-purple-600 to-indigo-600 shadow-xs'
+          ? 'bg-gradient-to-r from-purple-600 to-indigo-600 shadow-sm'
           : 'bg-gray-200 dark:bg-gray-700'
         }
         ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
@@ -41,7 +41,7 @@ const ToggleSwitch: FC<ToggleSwitchProps> = ({
       <span
         className={`
           ${sizeClasses.knob}
-          inline-block transform rounded-full bg-white shadow-xs transition-transform duration-200
+          inline-block transform rounded-full bg-white shadow-sm transition-transform duration-200
           border border-gray-300 dark:border-gray-600
           ${checked ? sizeClasses.translate : 'translate-x-[2px]'}
         `}

@@ -57,13 +57,13 @@ interface SettingsViewProps {
 const SectionSeparator: FC = () => (
   <div className="flex items-center justify-center my-8">
     <div className="flex items-center gap-3">
-      <div className="h-px w-12 bg-linear-to-r from-transparent to-gray-300 dark:to-gray-600"></div>
+      <div className="h-px w-12 bg-gradient-to-r from-transparent to-gray-300 dark:to-gray-600"></div>
       <div className="flex gap-1.5">
         <div className="w-1 h-1 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
         <div className="w-1 h-1 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
         <div className="w-1 h-1 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
       </div>
-      <div className="h-px w-12 bg-linear-to-l from-transparent to-gray-300 dark:to-gray-600"></div>
+      <div className="h-px w-12 bg-gradient-to-l from-transparent to-gray-300 dark:to-gray-600"></div>
     </div>
   </div>
 );

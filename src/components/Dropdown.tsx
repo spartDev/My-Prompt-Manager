@@ -379,7 +379,7 @@ export const Dropdown: FC<DropdownProps> = ({
                   'text-gray-700 dark:text-gray-300',
                   'hover:bg-gray-100 dark:hover:bg-gray-700',
                   'focus:bg-gray-100 dark:focus:bg-gray-700',
-                  'focus:outline-hidden transition-colors',
+                  'focus:outline-none transition-colors',
                   'disabled:opacity-50 disabled:cursor-not-allowed',
                   item.disabled && 'hover:bg-transparent dark:hover:bg-transparent',
                   item.className,
