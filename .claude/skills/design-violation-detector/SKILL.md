@@ -199,7 +199,7 @@ DO NOT use this skill for:
 
 **Backdrop Blur (Glassmorphism):**
 ```tsx
-className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xs"
+className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm"
 ```
 
 **Shadows:**
@@ -322,7 +322,7 @@ className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xs"
   w-full px-4 py-3
   border border-purple-200 dark:border-gray-600
   rounded-xl focus-input
-  bg-white/60 dark:bg-gray-700/60 backdrop-blur-xs
+  bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm
   transition-all duration-200
   text-gray-900 dark:text-gray-100
   placeholder-gray-500 dark:placeholder-gray-400
@@ -332,7 +332,7 @@ className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xs"
 **Card Container Pattern:**
 ```tsx
 <article className="
-  bg-white/70 dark:bg-gray-800/70 backdrop-blur-xs
+  bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm
   border-b border-purple-100 dark:border-gray-700
   p-5 hover:bg-white/90 dark:hover:bg-gray-800/90
   transition-all duration-200
@@ -438,7 +438,7 @@ Run these checks in order:
     - Suggest: Refactor to match established patterns
 
 11. **Glassmorphism Pattern**
-    - Scan for: `bg-white/` without `backdrop-blur-xs`
+    - Scan for: `bg-white/` without `backdrop-blur-sm`
     - Suggest: Add backdrop blur for glassmorphism effect
 
 ### Phase 4: Report Generation

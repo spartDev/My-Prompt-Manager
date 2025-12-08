@@ -317,7 +317,7 @@ Always include a `component` field to identify the source:
 - **Typography**: system-ui font stack, text-sm (14px) for body, font-semibold for emphasis
 - **Spacing**: Use p-5 for cards, p-6 for containers, space-x-3 for button groups
 - **Borders**: rounded-xl (12px) for all cards, inputs, buttons
-- **Effects**: backdrop-blur-xs with semi-transparent backgrounds (bg-white/70 dark:bg-gray-800/70)
+- **Effects**: backdrop-blur-sm with semi-transparent backgrounds (bg-white/70 dark:bg-gray-800/70)
 - **Dark Mode**: MUST include dark: variants for all styles
 - **Focus States**: Use predefined classes (.focus-primary, .focus-input, .focus-interactive)
 - **Transitions**: transition-all duration-200 for smooth interactions

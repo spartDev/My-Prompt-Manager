@@ -147,7 +147,7 @@ rounded-full /* Pills, badges, toggle knobs */
 
 **Glassmorphism (Signature Effect):**
 ```css
-bg-white/70 dark:bg-gray-800/70 backdrop-blur-xs
+bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm
 ```
 
 **Shadow Scale:**
@@ -208,7 +208,7 @@ transition-all duration-200  /* Default for all interactive elements */
   px-6 py-3
   text-sm font-semibold
   text-gray-700 dark:text-gray-300
-  bg-white/60 dark:bg-gray-700/60 backdrop-blur-xs
+  bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm
   border border-purple-200 dark:border-gray-600
   rounded-xl
   hover:bg-white/80 dark:hover:bg-gray-700/80
@@ -236,7 +236,7 @@ transition-all duration-200  /* Default for all interactive elements */
     border border-purple-200 dark:border-gray-600
     rounded-xl
     focus-input
-    bg-white/60 dark:bg-gray-700/60 backdrop-blur-xs
+    bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm
     transition-all duration-200
     text-gray-900 dark:text-gray-100
     placeholder-gray-500 dark:placeholder-gray-400
@@ -255,7 +255,7 @@ transition-all duration-200  /* Default for all interactive elements */
     rounded-xl
     focus-input
     resize-none
-    bg-white/60 dark:bg-gray-700/60 backdrop-blur-xs
+    bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm
     transition-all duration-200
     text-gray-900 dark:text-gray-100
   "
@@ -269,7 +269,7 @@ transition-all duration-200  /* Default for all interactive elements */
   className="
     w-full px-4 py-3
     border rounded-xl focus-input
-    bg-white/60 dark:bg-gray-700/60 backdrop-blur-xs
+    bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm
     transition-all duration-200
     text-gray-900 dark:text-gray-100
     border-red-300 dark:border-red-500
@@ -296,7 +296,7 @@ transition-all duration-200  /* Default for all interactive elements */
 **Prompt Card:**
 ```tsx
 <article className="
-  bg-white/70 dark:bg-gray-800/70 backdrop-blur-xs
+  bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm
   border-b border-purple-100 dark:border-gray-700
   p-5
   hover:bg-white/90 dark:hover:bg-gray-800/90
@@ -315,7 +315,7 @@ transition-all duration-200  /* Default for all interactive elements */
 **Settings Card:**
 ```tsx
 <div className="
-  bg-white/70 dark:bg-gray-800/70 backdrop-blur-xs
+  bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm
   border border-purple-100 dark:border-gray-700
   rounded-xl
   p-5
@@ -358,7 +358,7 @@ transition-all duration-200  /* Default for all interactive elements */
     shadow-xl
     transform transition-all
     max-w-xs w-full mx-2
-    backdrop-blur-xs
+    backdrop-blur-sm
     border border-purple-100 dark:border-gray-700
   ">
     {/* Modal content */}
@@ -434,7 +434,7 @@ transition-all duration-200  /* Default for all interactive elements */
     type="text"
     className="
       w-full pl-12 pr-12 py-3
-      bg-white/60 dark:bg-gray-700/60 backdrop-blur-xs
+      bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm
       border border-purple-200 dark:border-gray-600
       rounded-xl
       focus-input
@@ -764,7 +764,7 @@ For icon buttons and interactive elements:
 
 **Fix:**
 ```tsx
-<div className="bg-white/70 backdrop-blur-xs">
+<div className="bg-white/70 backdrop-blur-sm">
 ```
 
 ### Mistake 6: Wrong Transition Duration
@@ -802,7 +802,7 @@ When creating a new component, verify:
 - [ ] Uses purple-indigo gradient for primary actions
 - [ ] All borders use rounded-xl (12px)
 - [ ] Includes dark mode variants for ALL styles
-- [ ] Uses backdrop-blur-xs with semi-transparent backgrounds
+- [ ] Uses backdrop-blur-sm with semi-transparent backgrounds
 - [ ] Uses predefined focus classes (.focus-primary, .focus-input, etc.)
 - [ ] All interactive elements have ARIA labels
 - [ ] Keyboard navigation works (Tab, Enter, Escape)
@@ -855,14 +855,14 @@ disabled:opacity-50 focus-primary
 w-full px-4 py-3
 border border-purple-200 dark:border-gray-600
 rounded-xl focus-input
-bg-white/60 dark:bg-gray-700/60 backdrop-blur-xs
+bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm
 transition-all duration-200
 text-gray-900 dark:text-gray-100
 ```
 
 **Card:**
 ```
-bg-white/70 dark:bg-gray-800/70 backdrop-blur-xs
+bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm
 border-b border-purple-100 dark:border-gray-700
 p-5 hover:bg-white/90 dark:hover:bg-gray-800/90
 transition-all duration-200

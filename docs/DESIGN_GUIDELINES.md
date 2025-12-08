@@ -154,12 +154,12 @@ dark:border-gray-600  /* #4b5563 - Input borders */
 bg-white/60 dark:bg-gray-700/60  /* 60% opacity */
 bg-white/70 dark:bg-gray-800/70  /* 70% opacity */
 bg-white/80 dark:bg-gray-800/80  /* 80% opacity */
-backdrop-blur-xs                  /* Blur effect */
+backdrop-blur-sm                  /* Blur effect */
 ```
 
 **Usage Example:**
 ```tsx
-<div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xs">
+<div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm">
   {/* Content */}
 </div>
 ```
@@ -408,7 +408,7 @@ box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.4); /* Blue */
 ### Backdrop Effects
 
 ```css
-backdrop-blur-xs  /* 4px blur - Glassmorphism effect */
+backdrop-blur-sm  /* 4px blur - Glassmorphism effect */
 backdrop-filter: blur(8px);  /* Content script modals */
 ```
 
@@ -430,7 +430,7 @@ backdrop-filter: blur(8px);  /* Content script modals */
 
 **Modal/Dialog:**
 ```tsx
-<div className="shadow-xl backdrop-blur-xs">
+<div className="shadow-xl backdrop-blur-sm">
   {/* Modal content */}
 </div>
 ```
@@ -475,7 +475,7 @@ backdrop-filter: blur(8px);  /* Content script modals */
   px-6 py-3
   text-sm font-semibold
   text-gray-700 dark:text-gray-300
-  bg-white/60 dark:bg-gray-700/60 backdrop-blur-xs
+  bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm
   border border-purple-200 dark:border-gray-600
   rounded-xl
   hover:bg-white/80 dark:hover:bg-gray-700/80
@@ -587,7 +587,7 @@ backdrop-filter: blur(8px);  /* Content script modals */
     border border-purple-200 dark:border-gray-600
     rounded-xl
     focus-input
-    bg-white/60 dark:bg-gray-700/60 backdrop-blur-xs
+    bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm
     transition-all duration-200
     text-gray-900 dark:text-gray-100
     placeholder-gray-500 dark:placeholder-gray-400
@@ -612,7 +612,7 @@ backdrop-filter: blur(8px);  /* Content script modals */
   className="
     w-full px-4 py-3
     border rounded-xl focus-input
-    bg-white/60 dark:bg-gray-700/60 backdrop-blur-xs
+    bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm
     transition-all duration-200
     text-gray-900 dark:text-gray-100
     border-red-300 dark:border-red-500
@@ -636,7 +636,7 @@ backdrop-filter: blur(8px);  /* Content script modals */
     rounded-xl
     focus-input
     resize-none
-    bg-white/60 dark:bg-gray-700/60 backdrop-blur-xs
+    bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm
     transition-all duration-200
     text-gray-900 dark:text-gray-100
   "
@@ -653,7 +653,7 @@ backdrop-filter: blur(8px);  /* Content script modals */
     border border-purple-200 dark:border-gray-600
     rounded-xl
     focus-input
-    bg-white/60 dark:bg-gray-700/60 backdrop-blur-xs
+    bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm
     transition-all duration-200
     font-medium
     appearance-none
@@ -683,7 +683,7 @@ backdrop-filter: blur(8px);  /* Content script modals */
     type="text"
     className="
       w-full pl-12 pr-12 py-3
-      bg-white/60 dark:bg-gray-700/60 backdrop-blur-xs
+      bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm
       border border-purple-200 dark:border-gray-600
       rounded-xl
       focus-input
@@ -706,7 +706,7 @@ backdrop-filter: blur(8px);  /* Content script modals */
 
 ```tsx
 <article className="
-  bg-white/70 dark:bg-gray-800/70 backdrop-blur-xs
+  bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm
   border-b border-purple-100 dark:border-gray-700
   p-5
   hover:bg-white/90 dark:hover:bg-gray-800/90
@@ -721,7 +721,7 @@ backdrop-filter: blur(8px);  /* Content script modals */
 
 ```tsx
 <div className="
-  bg-white/70 dark:bg-gray-800/70 backdrop-blur-xs
+  bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm
   border border-purple-100 dark:border-gray-700
   rounded-xl
   p-5
@@ -792,7 +792,7 @@ backdrop-filter: blur(8px);  /* Content script modals */
     shadow-xl
     transform transition-all
     max-w-xs w-full mx-2
-    backdrop-blur-xs
+    backdrop-blur-sm
     border border-purple-100 dark:border-gray-700
   ">
     {/* Modal content */}
@@ -922,7 +922,7 @@ backdrop-filter: blur(8px);  /* Content script modals */
       <div className="
         absolute right-0 top-full mt-1
         w-28
-        bg-white dark:bg-gray-800 backdrop-blur-xs
+        bg-white dark:bg-gray-800 backdrop-blur-sm
         rounded-xl
         shadow-xl
         border border-purple-200 dark:border-gray-700
@@ -965,7 +965,7 @@ backdrop-filter: blur(8px);  /* Content script modals */
 ```tsx
 <div className="
   shrink-0 p-6
-  bg-white/80 dark:bg-gray-800/80 backdrop-blur-xs
+  bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm
   border-b border-purple-100 dark:border-gray-700
 ">
   <div className="flex items-center justify-between">
@@ -1473,14 +1473,14 @@ disabled:opacity-50 focus-primary
 w-full px-4 py-3
 border border-purple-200 dark:border-gray-600
 rounded-xl focus-input
-bg-white/60 dark:bg-gray-700/60 backdrop-blur-xs
+bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm
 transition-all duration-200
 text-gray-900 dark:text-gray-100
 ```
 
 **Card Container:**
 ```
-bg-white/70 dark:bg-gray-800/70 backdrop-blur-xs
+bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm
 border-b border-purple-100 dark:border-gray-700
 p-5 hover:bg-white/90 dark:hover:bg-gray-800/90
 transition-all duration-200
@@ -1489,7 +1489,7 @@ transition-all duration-200
 **Section Header:**
 ```
 shrink-0 p-6
-bg-white/80 dark:bg-gray-800/80 backdrop-blur-xs
+bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm
 border-b border-purple-100 dark:border-gray-700
 ```
 
@@ -1535,7 +1535,7 @@ z-1000002  /* Content script debug */
 ### Complete Form Section
 
 ```tsx
-<div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xs border-b border-purple-100 dark:border-gray-700 p-5">
+<div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5">
   <label
     htmlFor="title"
     className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3"
@@ -1548,7 +1548,7 @@ z-1000002  /* Content script debug */
     value={formData.title}
     onChange={(e) => handleChange('title', e.target.value)}
     placeholder="Enter a descriptive title"
-    className="w-full px-4 py-3 border rounded-xl focus-input bg-white/60 dark:bg-gray-700/60 backdrop-blur-xs transition-all duration-200 text-gray-900 dark:text-gray-100 border-purple-200 dark:border-gray-600"
+    className="w-full px-4 py-3 border rounded-xl focus-input bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 text-gray-900 dark:text-gray-100 border-purple-200 dark:border-gray-600"
   />
   <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
     {formData.title.length}/100 characters
@@ -1559,12 +1559,12 @@ z-1000002  /* Content script debug */
 ### Complete Action Buttons
 
 ```tsx
-<div className="shrink-0 p-6 bg-white/80 dark:bg-gray-800/80 backdrop-blur-xs border-t border-purple-100 dark:border-gray-700">
+<div className="shrink-0 p-6 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-t border-purple-100 dark:border-gray-700">
   <div className="flex space-x-3">
     <button
       type="button"
       onClick={onCancel}
-      className="flex-1 px-6 py-3 text-sm font-semibold text-gray-700 dark:text-gray-300 bg-white/60 dark:bg-gray-700/60 backdrop-blur-xs border border-purple-200 dark:border-gray-600 rounded-xl hover:bg-white/80 dark:hover:bg-gray-700/80 transition-all duration-200 focus-secondary"
+      className="flex-1 px-6 py-3 text-sm font-semibold text-gray-700 dark:text-gray-300 bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm border border-purple-200 dark:border-gray-600 rounded-xl hover:bg-white/80 dark:hover:bg-gray-700/80 transition-all duration-200 focus-secondary"
     >
       Cancel
     </button>

@@ -129,7 +129,7 @@ const ConfirmDialog: FC<ConfirmDialogProps> = ({
       {/* Modal panel */}
       <div 
         ref={dialogRef}
-        className="relative bg-white dark:bg-gray-800 rounded-xl p-3 shadow-xl transform transition-all max-w-xs w-full mx-2 backdrop-blur-xs border border-purple-100 dark:border-gray-700"
+        className="relative bg-white dark:bg-gray-800 rounded-xl p-3 shadow-xl transform transition-all max-w-xs w-full mx-2 backdrop-blur-sm border border-purple-100 dark:border-gray-700"
       >
         <div className="flex items-start">
           <div className={`shrink-0 flex items-center justify-center h-8 w-8 rounded-full ${styles.iconBg}`}>

@@ -180,7 +180,7 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
                 h-11 px-3
                 flex items-center space-x-2
                 text-gray-700 dark:text-gray-300
-                bg-white/60 dark:bg-gray-700/60 backdrop-blur-xs
+                bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm
                 border border-purple-200 dark:border-gray-600
                 rounded-lg
                 hover:bg-white/80 dark:hover:bg-gray-700/80
@@ -237,7 +237,7 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
                 w-11 h-11
                 flex items-center justify-center
                 text-gray-700 dark:text-gray-300
-                bg-white/60 dark:bg-gray-700/60 backdrop-blur-xs
+                bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm
                 border border-purple-200 dark:border-gray-600
                 rounded-lg
                 hover:bg-white/80 dark:hover:bg-gray-700/80
