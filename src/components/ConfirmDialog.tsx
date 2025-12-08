@@ -159,7 +159,7 @@ const ConfirmDialog: FC<ConfirmDialogProps> = ({
             ref={confirmButtonRef}
             type="button"
             onClick={onConfirm}
-            className={`inline-flex justify-center rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-xs focus-secondary transition-colors ${styles.confirmButton}`}
+            className={`inline-flex justify-center rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-sm focus-secondary transition-colors ${styles.confirmButton}`}
           >
             {confirmText}
           </button>
@@ -167,7 +167,7 @@ const ConfirmDialog: FC<ConfirmDialogProps> = ({
             ref={cancelButtonRef}
             type="button"
             onClick={onCancel}
-            className="inline-flex justify-center rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-gray-300 shadow-xs hover:bg-gray-50 dark:hover:bg-gray-600 focus-secondary transition-colors"
+            className="inline-flex justify-center rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-gray-300 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-600 focus-secondary transition-colors"
           >
             {cancelText}
           </button>
