@@ -562,7 +562,7 @@ const ViewHeaderFC: FC<ViewHeaderProps> = ({
 
   return (
     <header
-      className={`flex-shrink-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 ${className}`}
+      className={`shrink-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 ${className}`}
       role="banner"
     >
       <div className="p-6">

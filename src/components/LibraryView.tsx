@@ -168,7 +168,7 @@ const LibraryView: FC<LibraryViewProps> = ({
 
       {/* Footer with stats */}
       {!loading && (prompts).length > 0 && (
-        <footer className="flex-shrink-0 px-4 py-2 bg-gray-100 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 text-xs text-gray-600 dark:text-gray-400" role="contentinfo" aria-label="Library statistics">
+        <footer className="shrink-0 px-4 py-2 bg-gray-100 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 text-xs text-gray-600 dark:text-gray-400" role="contentinfo" aria-label="Library statistics">
           <span aria-live="polite" aria-atomic="true">
             {finalFilteredPrompts.length === (prompts).length ? (
               `${String((prompts).length)} prompt${(prompts).length !== 1 ? 's' : ''}`

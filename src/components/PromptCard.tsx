@@ -45,7 +45,7 @@ const PromptCard: FC<PromptCardProps> = ({
       
       // Add highlighted match - using stable key with prompt ID and match position
       parts.push(
-        <mark key={`highlight-${prompt.id}-${String(index)}-${searchTerm}`} className="bg-yellow-200 dark:bg-yellow-800/40 px-1 rounded">
+        <mark key={`highlight-${prompt.id}-${String(index)}-${searchTerm}`} className="bg-yellow-200 dark:bg-yellow-800/40 px-1 rounded-sm">
           {sanitizedText.substring(index, index + searchTerm.length)}
         </mark>
       );
@@ -163,7 +163,7 @@ const PromptCard: FC<PromptCardProps> = ({
         </div>
         
         {/* Actions */}
-        <div className="flex items-center space-x-2 flex-shrink-0">
+        <div className="flex items-center space-x-2 shrink-0">
           {/* Copy Button */}
           <button
             onClick={handleCopyClick}

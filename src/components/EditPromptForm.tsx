@@ -123,7 +123,7 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
         <div
           role="alert"
           aria-live="polite"
-          className="flex-shrink-0 p-4 text-sm text-red-600 dark:text-red-400 bg-red-50/80 dark:bg-red-900/20 backdrop-blur-sm border-b border-red-200 dark:border-red-700 font-medium"
+          className="shrink-0 p-4 text-sm text-red-600 dark:text-red-400 bg-red-50/80 dark:bg-red-900/20 backdrop-blur-sm border-b border-red-200 dark:border-red-700 font-medium"
         >
           ⚠️ {errors.general}
         </div>
@@ -238,7 +238,7 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
       </div>
 
       {/* Footer */}
-      <div className="flex-shrink-0 p-6 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-t border-purple-100 dark:border-gray-700">
+      <div className="shrink-0 p-6 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-t border-purple-100 dark:border-gray-700">
         {/* Unsaved changes indicator */}
         {hasUnsavedChanges && !isPending && (
           <div className="mb-4 text-xs text-amber-600 dark:text-amber-400 font-medium flex items-center space-x-2 bg-amber-50/80 dark:bg-amber-900/20 backdrop-blur-sm border border-amber-200 dark:border-amber-700 rounded-lg px-3 py-2">

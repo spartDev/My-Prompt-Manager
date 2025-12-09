@@ -181,7 +181,7 @@ const CategoryManager: FC<CategoryManagerProps> = ({
                   
                   <button
                     type="submit"
-                    className="px-6 py-3 h-12 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 text-sm font-semibold shadow-lg hover:shadow-xl disabled:opacity-50 flex items-center justify-center flex-shrink-0 min-w-[80px]"
+                    className="px-6 py-3 h-12 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 text-sm font-semibold shadow-lg hover:shadow-xl disabled:opacity-50 flex items-center justify-center shrink-0 min-w-[80px]"
                     disabled={loading || !newCategoryName.trim()}
                   >
                     {loading ? (
@@ -237,7 +237,7 @@ const CategoryManager: FC<CategoryManagerProps> = ({
                     // Edit Mode - Show both color and name editors
                     <div className="flex-1">
                       <div className="flex items-center space-x-3">
-                        <div className="relative flex-shrink-0" style={{ zIndex: 100 }}>
+                        <div className="relative shrink-0" style={{ zIndex: 100 }}>
                           <ColorPicker
                             value={editingCategory.color}
                             onChange={(newColor) => { setEditingCategory({ ...editingCategory, color: newColor }); }}
@@ -272,11 +272,11 @@ const CategoryManager: FC<CategoryManagerProps> = ({
                           maxLength={MAX_CATEGORY_NAME_LENGTH}
                           disabled={loading}
                         />
-                        <div className="flex items-center space-x-1 flex-shrink-0">
+                        <div className="flex items-center space-x-1 shrink-0">
                           <button
                             onClick={() => { void handleUpdateCategory(); }}
                             onMouseDown={() => { ignoreBlurRef.current = true; }}
-                            className="p-2 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-lg transition-all shadow-sm hover:shadow disabled:opacity-50"
+                            className="p-2 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-lg transition-all shadow-sm hover:shadow-md disabled:opacity-50"
                             disabled={loading || !editingCategory.name.trim()}
                             title="Save changes (Enter)"
                             type="button"

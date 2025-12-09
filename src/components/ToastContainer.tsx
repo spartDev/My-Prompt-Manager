@@ -164,7 +164,7 @@ const ToastItem: FC<{ toast: Toast; onDismiss: (id: string) => void }> = ({ toas
       }}
     >
       <div className="px-5 py-3 flex items-center space-x-3">
-        <div className="flex-shrink-0">
+        <div className="shrink-0">
           {getIcon()}
         </div>
         <div className="flex-1 min-w-0">
@@ -190,7 +190,7 @@ const ToastItem: FC<{ toast: Toast; onDismiss: (id: string) => void }> = ({ toas
         </div>
         <button
           onClick={handleDismiss}
-          className="flex-shrink-0 ml-2 p-1 rounded-md text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400"
+          className="shrink-0 ml-2 p-1 rounded-md text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400"
           aria-label="Dismiss notification"
         >
           <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">

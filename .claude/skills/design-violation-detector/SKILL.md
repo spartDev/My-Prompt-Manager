@@ -42,7 +42,7 @@ DO NOT use this skill for:
 
 **Exceptions:**
 - `bg-transparent`, `text-inherit`, `border-none` don't need dark variants
-- Utility classes like `bg-gradient-to-r` don't need dark variants
+- Utility classes like `bg-linear-to-r` don't need dark variants
 - White text on colored backgrounds: `text-white` (no dark variant needed)
 
 **Examples:**
@@ -64,7 +64,7 @@ DO NOT use this skill for:
 **Rule**: Use only predefined color palette, no arbitrary colors.
 
 **Primary Actions:**
-- Must use: `bg-gradient-to-r from-purple-600 to-indigo-600`
+- Must use: `bg-linear-to-r from-purple-600 to-indigo-600`
 - Hover: `hover:from-purple-700 hover:to-indigo-700`
 - Text: `text-white` (on gradient backgrounds)
 
@@ -98,7 +98,7 @@ DO NOT use this skill for:
 
 ✅ **CORRECT:**
 ```tsx
-<button className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white">Save</button>
+<button className="bg-linear-to-r from-purple-600 to-indigo-600 text-white">Save</button>
 ```
 
 ❌ **VIOLATION:**
@@ -204,7 +204,7 @@ className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm"
 
 **Shadows:**
 - Buttons: `shadow-lg hover:shadow-xl`
-- Cards: `shadow-sm` (subtle) or none
+- Cards: `shadow-xs` (subtle) or none
 - Modals: `shadow-xl`
 
 **Transitions:**
@@ -307,7 +307,7 @@ className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm"
 ```tsx
 <button className="
   px-6 py-3 text-sm font-semibold text-white
-  bg-gradient-to-r from-purple-600 to-indigo-600
+  bg-linear-to-r from-purple-600 to-indigo-600
   rounded-xl hover:from-purple-700 hover:to-indigo-700
   transition-all duration-200 shadow-lg hover:shadow-xl
   disabled:opacity-50 focus-primary
@@ -412,8 +412,8 @@ Run these checks in order:
 #### ⚠️ WARNING CHECKS (Should Fix)
 
 5. **Border Radius Inconsistencies**
-   - Scan for: `rounded-sm`, `rounded-md`, `rounded-lg` on cards/inputs/buttons
-   - Suggest: Use `rounded-xl` for standard components
+   - Scan for: `rounded-md`, `rounded-lg` on cards/inputs/buttons (Note: `rounded-xs` doesn't exist in Tailwind v4 - use `rounded-sm` for small radii)
+   - Suggest: Use `rounded-xl` for standard components, `rounded-sm` for small UI elements
 
 6. **Spacing Inconsistencies**
    - Scan for: `p-3`, `p-4`, `p-7` on cards
@@ -429,7 +429,7 @@ Run these checks in order:
 
 9. **Shadow Misuse**
    - Scan for: Non-standard shadow classes
-   - Suggest: `shadow-lg hover:shadow-xl` (buttons), `shadow-sm` (cards)
+   - Suggest: `shadow-lg hover:shadow-xl` (buttons), `shadow-xs` (cards)
 
 #### ℹ️ INFO CHECKS (Consider)
 

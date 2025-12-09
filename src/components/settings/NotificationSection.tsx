@@ -36,7 +36,7 @@ const NotificationTypeRow: FC<NotificationTypeRowProps> = ({
       }
     `}>
       <div className="flex items-center space-x-3">
-        <div className={`w-1 h-8 rounded transition-colors duration-200 ${enabled ? color : 'bg-gray-400 dark:bg-gray-600'}`}></div>
+        <div className={`w-1 h-8 rounded-sm transition-colors duration-200 ${enabled ? color : 'bg-gray-400 dark:bg-gray-600'}`}></div>
         <div>
           <div className={`text-sm font-medium transition-colors duration-200 ${enabled ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-500'}`}>
             {label}
@@ -129,7 +129,7 @@ const NotificationSection: FC<NotificationSectionProps> = ({
         aria-expanded={isExpanded}
       >
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0">
+          <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-lg flex items-center justify-center shrink-0">
             <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
             </svg>
@@ -182,7 +182,7 @@ const NotificationSection: FC<NotificationSectionProps> = ({
                   </svg>
                 )}
               </div>
-              <div className="relative h-12 bg-gray-100 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600">
+              <div className="relative h-12 bg-gray-100 dark:bg-gray-700 rounded-sm border border-gray-200 dark:border-gray-600">
                 <div className="absolute top-1 right-1 w-16 h-3 bg-purple-500 rounded-sm"></div>
               </div>
             </button>
@@ -207,7 +207,7 @@ const NotificationSection: FC<NotificationSectionProps> = ({
                   </svg>
                 )}
               </div>
-              <div className="relative h-12 bg-gray-100 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600">
+              <div className="relative h-12 bg-gray-100 dark:bg-gray-700 rounded-sm border border-gray-200 dark:border-gray-600">
                 <div className="absolute bottom-1 right-1 w-16 h-3 bg-purple-500 rounded-sm"></div>
               </div>
             </button>

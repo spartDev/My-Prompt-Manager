@@ -303,9 +303,9 @@ mt-1, mt-2, mt-3  /* Same as mb */
 **Full Height Container:**
 ```tsx
 <div className="h-full flex flex-col">
-  <header className="flex-shrink-0">Header</header>
+  <header className="shrink-0">Header</header>
   <main className="flex-1 overflow-auto">Content</main>
-  <footer className="flex-shrink-0">Footer</footer>
+  <footer className="shrink-0">Footer</footer>
 </div>
 ```
 
@@ -447,7 +447,7 @@ backdrop-filter: blur(8px);  /* Content script modals */
 <button className="
   px-6 py-3
   text-sm font-semibold text-white
-  bg-gradient-to-r from-purple-600 to-indigo-600
+  bg-linear-to-r from-purple-600 to-indigo-600
   rounded-xl
   hover:from-purple-700 hover:to-indigo-700
   transition-all duration-200
@@ -526,7 +526,7 @@ backdrop-filter: blur(8px);  /* Content script modals */
 <button className="
   inline-flex items-center
   px-2 py-1
-  bg-gradient-to-r from-purple-500 to-indigo-500
+  bg-linear-to-r from-purple-500 to-indigo-500
   text-white
   rounded-md
   hover:from-purple-600 hover:to-indigo-600
@@ -806,7 +806,7 @@ backdrop-filter: blur(8px);  /* Content script modals */
 <div className="flex items-start">
   {/* Icon */}
   <div className="
-    flex-shrink-0 flex items-center justify-center
+    shrink-0 flex items-center justify-center
     h-8 w-8
     rounded-full
     bg-red-100 dark:bg-red-900/20
@@ -847,7 +847,7 @@ backdrop-filter: blur(8px);  /* Content script modals */
     transition-all duration-200
     focus:outline-none focus:ring-4 focus:ring-purple-300 dark:focus:ring-purple-800
     ${checked
-      ? 'bg-gradient-to-r from-purple-600 to-indigo-600 shadow-sm'
+      ? 'bg-linear-to-r from-purple-600 to-indigo-600 shadow-sm'
       : 'bg-gray-200 dark:bg-gray-700'
     }
     ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
@@ -878,7 +878,7 @@ backdrop-filter: blur(8px);  /* Content script modals */
   border-purple-200 dark:border-purple-800
 ">
   {/* Icon */}
-  <div className="flex-shrink-0">
+  <div className="shrink-0">
     <svg className="h-5 w-5 text-purple-500">{/* Icon */}</svg>
   </div>
 
@@ -888,7 +888,7 @@ backdrop-filter: blur(8px);  /* Content script modals */
   </div>
 
   {/* Dismiss */}
-  <button className="ml-4 flex-shrink-0">
+  <button className="ml-4 shrink-0">
     <svg className="h-4 w-4">{/* X icon */}</svg>
   </button>
 
@@ -927,7 +927,7 @@ backdrop-filter: blur(8px);  /* Content script modals */
         shadow-xl
         border border-purple-200 dark:border-gray-700
         overflow-hidden
-        z-[1001]
+        z-1001
       ">
         <button className="
           block w-full text-left
@@ -964,7 +964,7 @@ backdrop-filter: blur(8px);  /* Content script modals */
 
 ```tsx
 <div className="
-  flex-shrink-0 p-6
+  shrink-0 p-6
   bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm
   border-b border-purple-100 dark:border-gray-700
 ">
@@ -973,7 +973,7 @@ backdrop-filter: blur(8px);  /* Content script modals */
       {/* Icon */}
       <div className="
         w-10 h-10
-        bg-gradient-to-br from-purple-600 to-indigo-600
+        bg-linear-to-br from-purple-600 to-indigo-600
         rounded-xl
         flex items-center justify-center
       ">
@@ -1074,7 +1074,7 @@ animation: promptSelectorFadeIn 0.2s ease-out;
 **Button Hover:**
 ```tsx
 <button className="
-  bg-gradient-to-r from-purple-600 to-indigo-600
+  bg-linear-to-r from-purple-600 to-indigo-600
   hover:from-purple-700 hover:to-indigo-700
   shadow-lg hover:shadow-xl
   transition-all duration-200
@@ -1190,7 +1190,7 @@ All components MUST be tested in both light and dark modes to ensure:
 - Readable text on all backgrounds
 - Visible borders and dividers
 - Consistent hover/focus states
-- Proper backdrop-blur rendering
+- Proper backdrop-blur-sm rendering
 
 ---
 
@@ -1268,7 +1268,7 @@ import { ClaudeIcon, ChatGPTIcon } from './components/icons/SiteIcons';
 ```tsx
 <div className="
   w-10 h-10
-  bg-gradient-to-br from-purple-600 to-indigo-600
+  bg-linear-to-br from-purple-600 to-indigo-600
   rounded-xl
   flex items-center justify-center
 ">
@@ -1409,7 +1409,7 @@ All interactive elements MUST have appropriate ARIA labels:
 <span className="text-red-500">Error</span>
 
 // Use the purple-indigo gradient for primary actions
-<button className="bg-gradient-to-r from-purple-600 to-indigo-600">
+<button className="bg-linear-to-r from-purple-600 to-indigo-600">
 ```
 
 **DON'T:**
@@ -1462,7 +1462,7 @@ All interactive elements MUST have appropriate ARIA labels:
 **Primary Button:**
 ```
 px-6 py-3 text-sm font-semibold text-white
-bg-gradient-to-r from-purple-600 to-indigo-600
+bg-linear-to-r from-purple-600 to-indigo-600
 rounded-xl hover:from-purple-700 hover:to-indigo-700
 transition-all duration-200 shadow-lg hover:shadow-xl
 disabled:opacity-50 focus-primary
@@ -1488,7 +1488,7 @@ transition-all duration-200
 
 **Section Header:**
 ```
-flex-shrink-0 p-6
+shrink-0 p-6
 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm
 border-b border-purple-100 dark:border-gray-700
 ```
@@ -1522,10 +1522,10 @@ transition-colors focus-interactive
 ```css
 z-10         /* Relative positioned elements */
 z-50         /* Modal overlays */
-z-[999999]   /* Content script icon */
-z-[1000000]  /* Content script modal */
-z-[1000001]  /* Content script feedback */
-z-[1000002]  /* Content script debug */
+z-999999   /* Content script icon */
+z-1000000  /* Content script modal */
+z-1000001  /* Content script feedback */
+z-1000002  /* Content script debug */
 ```
 
 ---
@@ -1559,7 +1559,7 @@ z-[1000002]  /* Content script debug */
 ### Complete Action Buttons
 
 ```tsx
-<div className="flex-shrink-0 p-6 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-t border-purple-100 dark:border-gray-700">
+<div className="shrink-0 p-6 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-t border-purple-100 dark:border-gray-700">
   <div className="flex space-x-3">
     <button
       type="button"
@@ -1570,7 +1570,7 @@ z-[1000002]  /* Content script debug */
     </button>
     <button
       type="submit"
-      className="flex-1 px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 focus-primary"
+      className="flex-1 px-6 py-3 text-sm font-semibold text-white bg-linear-to-r from-purple-600 to-indigo-600 rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 focus-primary"
       disabled={isLoading}
     >
       {isLoading ? 'Saving...' : 'Save Prompt'}

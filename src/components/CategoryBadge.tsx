@@ -46,7 +46,7 @@ export const CategoryBadge: FC<CategoryBadgeProps> = ({
   if (variant === 'dot') {
     return (
       <span
-        className={`w-3 h-3 rounded-full flex-shrink-0 ${className}`}
+        className={`w-3 h-3 rounded-full shrink-0 ${className}`}
         style={{ backgroundColor }}
         aria-label={`Category: ${category.name}`}
         title={category.name}

@@ -808,10 +808,10 @@ const StatsView: FC = () => {
   return (
     <div className="h-full overflow-auto bg-white dark:bg-gray-900">
       {/* Header */}
-      <div className="flex-shrink-0 p-6 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700">
+      <div className="shrink-0 p-6 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center">
+            <div className="w-10 h-10 bg-linear-to-br from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center">
               <svg className="w-6 h-6 text-white" /* Chart icon */ />
             </div>
             <div>
@@ -916,7 +916,7 @@ export default StatsView;
 
 #### Streak Display
 ```tsx
-<div className="bg-gradient-to-r from-orange-500 to-red-500 rounded-xl p-5 shadow-lg">
+<div className="bg-linear-to-r from-orange-500 to-red-500 rounded-xl p-5 shadow-lg">
   <div className="flex items-center justify-between">
     <div className="flex items-center space-x-4">
       <span className="text-6xl">🔥</span>

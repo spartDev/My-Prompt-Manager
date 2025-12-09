@@ -1,46 +1,31 @@
 ---
 name: commit
+allowed-tools: Bash(git :*)
 description: Generate an AI-powered conventional commit message from your git diff and commit changes
-model: claude-sonnet-4-5-20250929
+model: haiku
 ---
 
-You are an expert at analyzing code changes and writing clear, conventional commit messages.
+You are an expert at analyzing code changes and writing minimal, clear, conventional commit messages for a tidy git history.
 
-# Mission
+## Goal
 Analyze the current git diff and generate a professional conventional commit message following best practices.
 
-# Process
+## Context
 
-## 1. Check Git Status
-```bash
-git status
-```
+- current git status: !`git status`
+- current git diff: !`git diff HEAD`
+- current git diff --cached: !`git diff --cached`
+- current branch: !`git branch --show-current`
+- recent commits: !`git log --oneline -n 10`
 
-If there are no changes staged or unstaged, inform the user:
-```
-No changes to commit. Stage your changes with:
-  git add <files>
-```
+## Workflow
 
-## 2. Analyze Changes
-
-Get both staged and unstaged changes:
-```bash
-git diff HEAD
-```
-
-If there are only staged changes:
-```bash
-git diff --cached
-```
-
-## 3. Analyze the Diff
-
-Look for:
-- **Type of change**: feat, fix, docs, style, refactor, perf, test, build, ci, chore
-- **Scope**: Which part of the codebase (optional but recommended)
-- **Breaking changes**: API changes, removed features
-- **Impact**: How significant are the changes
+1. Analyze the diff
+2. Analyze the git history
+3. **Determine the scope**: MANDATORY - identify which part of the codebase is affected by the changes (e.g., auth, user, dashboard, api, ui, etc.)
+4. **Determine the type of change**: MANDATORY - feat, fix, docs, style, refactor, perf, test, build, ci, chore
+5. Generate a commit message exactly in the format: `<type>(<scope>): <subject>` (max 72 characters)
+6. Show the to the user the commit message
 
 ### Type Guidelines
 - `feat`: New feature or functionality
@@ -54,9 +39,9 @@ Look for:
 - `ci`: CI/CD changes
 - `chore`: Maintenance tasks
 
-## 4. Generate Commit Message
+## Commit Message Rules
 
-Format:
+**MANDATORY Format**:
 ```
 <type>(<scope>): <subject>
 
@@ -68,7 +53,7 @@ Format:
 **Subject** (required):
 - Imperative mood: "add feature" not "added feature"
 - No period at end
-- 50 characters or less
+- 72 characters or less
 - Lowercase after type
 
 **Body** (optional but recommended):
@@ -79,44 +64,6 @@ Format:
 **Footer** (if applicable):
 - Breaking changes: `BREAKING CHANGE: description`
 - Issue references: `Closes #123`, `Fixes #456`
-
-## 5. Present Options
-
-Show the user 3 commit message options:
-
-**Option 1: Concise** (subject only)
-```
-feat(api): add user authentication endpoint
-```
-
-**Option 2: Detailed** (with body)
-```
-feat(api): add user authentication endpoint
-
-Implement JWT-based authentication with email/password login.
-Includes password hashing with bcrypt and token refresh logic.
-```
-
-**Option 3: Comprehensive** (with body and footer)
-```
-feat(api): add user authentication endpoint
-
-Implement JWT-based authentication with email/password login.
-Includes password hashing with bcrypt and token refresh logic.
-
-Closes #42
-```
-
-## 6. Confirm and Commit
-
-Ask the user which option they prefer (1, 2, or 3), or if they want to customize.
-
-Once confirmed, commit with:
-```bash
-git commit -m "<commit message>"
-```
-
-If the commit includes multiple files across different areas, consider suggesting to split into multiple commits.
 
 # Examples
 
@@ -161,7 +108,7 @@ BREAKING CHANGE: All API responses now use new format.
 Update clients to access data via response.data field.
 ```
 
-# Best Practices
+## Best Practices
 
 1. **Be specific**: "add user auth" not just "add feature"
 2. **Use imperative mood**: "fix bug" not "fixed bug"
@@ -170,29 +117,13 @@ Update clients to access data via response.data field.
 5. **Reference issues**: Link to issue tracker
 6. **Note breaking changes**: Always document in footer
 
-# Quick Mode
+## Quick Mode
 
 If user provides custom message with the command:
 `/commit "fix: resolve login bug"`
 
 Skip analysis and commit directly with their message.
 
-# Advanced Features
-
-**Amend last commit** (if requested):
-```bash
-git commit --amend -m "<new message>"
-```
-
-**Sign commit** (if GPG configured):
-```bash
-git commit -S -m "<message>"
-```
-
-**Empty commit** (for CI triggers):
-```bash
-git commit --allow-empty -m "<message>"
-```
 
 # Error Handling
 
@@ -212,28 +143,15 @@ Found changes in:
   - tests/auth.test.ts
 
 📝 Generated commit messages:
+feat(auth): add user authentication endpoint
 
-Option 1 (Concise):
-  feat(auth): add user authentication
+Implement JWT-based authentication with email/password login.
+Includes password hashing with bcrypt and token refresh logic.
 
-Option 2 (Detailed):
-  feat(auth): add user authentication
-
-  Implement JWT-based authentication with email/password login.
-  Includes password hashing and token refresh logic.
-
-Option 3 (Comprehensive):
-  feat(auth): add user authentication
-
-  Implement JWT-based authentication with email/password login.
-  Includes password hashing and token refresh logic.
-
-  Closes #42
-
-Which option? (1/2/3 or 'custom'):
+Closes #42
 ```
 
-After user selects, commit and show:
+
 ```
 ✅ Committed successfully!
 

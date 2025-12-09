@@ -121,7 +121,7 @@ const ConfirmDialog: FC<ConfirmDialogProps> = ({
     >
       {/* Backdrop */}
       <div 
-        className="absolute inset-0 bg-black bg-opacity-50 transition-opacity"
+        className="absolute inset-0 bg-black/50 transition-opacity"
         onClick={onCancel}
         aria-hidden="true"
       />
@@ -132,7 +132,7 @@ const ConfirmDialog: FC<ConfirmDialogProps> = ({
         className="relative bg-white dark:bg-gray-800 rounded-xl p-3 shadow-xl transform transition-all max-w-xs w-full mx-2 backdrop-blur-sm border border-purple-100 dark:border-gray-700"
       >
         <div className="flex items-start">
-          <div className={`flex-shrink-0 flex items-center justify-center h-8 w-8 rounded-full ${styles.iconBg}`}>
+          <div className={`shrink-0 flex items-center justify-center h-8 w-8 rounded-full ${styles.iconBg}`}>
             <div className="scale-75">
               {styles.icon}
             </div>

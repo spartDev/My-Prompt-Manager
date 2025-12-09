@@ -47,7 +47,7 @@ const SearchBar: FC<SearchBarProps> = ({
               (onClear as () => void)();
             }
           }}
-          className="absolute inset-y-0 right-0 pr-4 flex items-center hover:text-purple-600 dark:hover:text-purple-400 transition-colors focus-interactive rounded"
+          className="absolute inset-y-0 right-0 pr-4 flex items-center hover:text-purple-600 dark:hover:text-purple-400 transition-colors focus-interactive rounded-sm"
           aria-label="Clear search"
           title="Clear search"
         >
