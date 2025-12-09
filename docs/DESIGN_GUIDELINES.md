@@ -381,7 +381,7 @@ rounded-full /* 9999px          - Pills, badges, toggle knobs */
 ### Shadow Scale
 
 ```css
-shadow-xs  /* 0 1px 2px rgba(0, 0, 0, 0.05) - Subtle elevation */
+shadow-sm  /* 0 1px 2px rgba(0, 0, 0, 0.05) - Subtle elevation */
 shadow     /* 0 1px 3px rgba(0, 0, 0, 0.1)  - Default cards */
 shadow-lg  /* 0 10px 15px rgba(0, 0, 0, 0.1) - Elevated cards */
 shadow-xl  /* 0 20px 25px rgba(0, 0, 0, 0.1) - Modals, dialogs */
@@ -462,7 +462,7 @@ backdrop-filter: blur(8px);  /* Content script modals */
 **Focus Class:**
 ```css
 .focus-primary {
-  @apply focus:outline-hidden focus:ring-2 focus:ring-purple-500
+  @apply focus:outline-none focus:ring-2 focus:ring-purple-500
          focus:ring-offset-2 focus:ring-offset-white
          dark:focus:ring-offset-gray-900;
 }
@@ -489,7 +489,7 @@ backdrop-filter: blur(8px);  /* Content script modals */
 **Focus Class:**
 ```css
 .focus-secondary {
-  @apply focus:outline-hidden focus:ring-2 focus:ring-purple-500
+  @apply focus:outline-none focus:ring-2 focus:ring-purple-500
          focus:ring-offset-1 focus:ring-offset-white
          dark:focus:ring-offset-gray-800;
 }
@@ -503,7 +503,7 @@ backdrop-filter: blur(8px);  /* Content script modals */
   text-xs font-semibold text-white
   bg-red-600 hover:bg-red-700
   rounded-lg
-  shadow-xs
+  shadow-sm
   transition-colors
   focus-danger
 ">
@@ -514,7 +514,7 @@ backdrop-filter: blur(8px);  /* Content script modals */
 **Focus Class:**
 ```css
 .focus-danger {
-  @apply focus:outline-hidden focus:ring-2 focus:ring-red-500
+  @apply focus:outline-none focus:ring-2 focus:ring-red-500
          focus:ring-offset-2 focus:ring-offset-white
          dark:focus:ring-offset-gray-900;
 }
@@ -558,7 +558,7 @@ backdrop-filter: blur(8px);  /* Content script modals */
 **Focus Class:**
 ```css
 .focus-interactive {
-  @apply focus:outline-hidden focus:ring-2 focus:ring-purple-500
+  @apply focus:outline-none focus:ring-2 focus:ring-purple-500
          focus:ring-offset-1 focus:ring-offset-white
          dark:focus:ring-offset-gray-800 dark:focus:ring-purple-400;
 }
@@ -599,7 +599,7 @@ backdrop-filter: blur(8px);  /* Content script modals */
 **Focus Class:**
 ```css
 .focus-input {
-  @apply focus:outline-hidden focus:ring-2 focus:ring-purple-500
+  @apply focus:outline-none focus:ring-2 focus:ring-purple-500
          focus:border-purple-500 dark:focus:ring-purple-400
          dark:focus:border-purple-400;
 }
@@ -690,7 +690,7 @@ backdrop-filter: blur(8px);  /* Content script modals */
       text-sm
       text-gray-900 dark:text-gray-100
       placeholder-gray-500 dark:placeholder-gray-400
-      shadow-xs
+      shadow-sm
       hover:bg-white/80 dark:hover:bg-gray-700/80
       transition-all duration-200
     "
@@ -845,9 +845,9 @@ backdrop-filter: blur(8px);  /* Content script modals */
     relative inline-flex items-center
     rounded-full
     transition-all duration-200
-    focus:outline-hidden focus:ring-4 focus:ring-purple-300 dark:focus:ring-purple-800
+    focus:outline-none focus:ring-4 focus:ring-purple-300 dark:focus:ring-purple-800
     ${checked
-      ? 'bg-linear-to-r from-purple-600 to-indigo-600 shadow-xs'
+      ? 'bg-linear-to-r from-purple-600 to-indigo-600 shadow-sm'
       : 'bg-gray-200 dark:bg-gray-700'
     }
     ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
@@ -856,7 +856,7 @@ backdrop-filter: blur(8px);  /* Content script modals */
   <span className={`
     h-5 w-5
     inline-block transform
-    rounded-full bg-white shadow-xs
+    rounded-full bg-white shadow-sm
     transition-transform duration-200
     border border-gray-300 dark:border-gray-600
     ${checked ? 'translate-x-6' : 'translate-x-[2px]'}
