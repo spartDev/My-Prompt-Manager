@@ -36,7 +36,7 @@ const NotificationTypeRow: FC<NotificationTypeRowProps> = ({
       }
     `}>
       <div className="flex items-center space-x-3">
-        <div className={`w-1 h-8 rounded-xs transition-colors duration-200 ${enabled ? color : 'bg-gray-400 dark:bg-gray-600'}`}></div>
+        <div className={`w-1 h-8 rounded-sm transition-colors duration-200 ${enabled ? color : 'bg-gray-400 dark:bg-gray-600'}`}></div>
         <div>
           <div className={`text-sm font-medium transition-colors duration-200 ${enabled ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-500'}`}>
             {label}
@@ -182,8 +182,8 @@ const NotificationSection: FC<NotificationSectionProps> = ({
                   </svg>
                 )}
               </div>
-              <div className="relative h-12 bg-gray-100 dark:bg-gray-700 rounded-xs border border-gray-200 dark:border-gray-600">
-                <div className="absolute top-1 right-1 w-16 h-3 bg-purple-500 rounded-xs"></div>
+              <div className="relative h-12 bg-gray-100 dark:bg-gray-700 rounded-sm border border-gray-200 dark:border-gray-600">
+                <div className="absolute top-1 right-1 w-16 h-3 bg-purple-500 rounded-sm"></div>
               </div>
             </button>
 
@@ -207,8 +207,8 @@ const NotificationSection: FC<NotificationSectionProps> = ({
                   </svg>
                 )}
               </div>
-              <div className="relative h-12 bg-gray-100 dark:bg-gray-700 rounded-xs border border-gray-200 dark:border-gray-600">
-                <div className="absolute bottom-1 right-1 w-16 h-3 bg-purple-500 rounded-xs"></div>
+              <div className="relative h-12 bg-gray-100 dark:bg-gray-700 rounded-sm border border-gray-200 dark:border-gray-600">
+                <div className="absolute bottom-1 right-1 w-16 h-3 bg-purple-500 rounded-sm"></div>
               </div>
             </button>
           </div>

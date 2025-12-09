@@ -412,8 +412,8 @@ Run these checks in order:
 #### ⚠️ WARNING CHECKS (Should Fix)
 
 5. **Border Radius Inconsistencies**
-   - Scan for: `rounded-xs`, `rounded-md`, `rounded-lg` on cards/inputs/buttons
-   - Suggest: Use `rounded-xl` for standard components
+   - Scan for: `rounded-md`, `rounded-lg` on cards/inputs/buttons (Note: `rounded-xs` doesn't exist in Tailwind v4 - use `rounded-sm` for small radii)
+   - Suggest: Use `rounded-xl` for standard components, `rounded-sm` for small UI elements
 
 6. **Spacing Inconsistencies**
    - Scan for: `p-3`, `p-4`, `p-7` on cards

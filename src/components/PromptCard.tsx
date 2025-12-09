@@ -45,7 +45,7 @@ const PromptCard: FC<PromptCardProps> = ({
       
       // Add highlighted match - using stable key with prompt ID and match position
       parts.push(
-        <mark key={`highlight-${prompt.id}-${String(index)}-${searchTerm}`} className="bg-yellow-200 dark:bg-yellow-800/40 px-1 rounded-xs">
+        <mark key={`highlight-${prompt.id}-${String(index)}-${searchTerm}`} className="bg-yellow-200 dark:bg-yellow-800/40 px-1 rounded-sm">
           {sanitizedText.substring(index, index + searchTerm.length)}
         </mark>
       );

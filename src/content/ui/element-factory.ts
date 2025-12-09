@@ -138,7 +138,7 @@ export class UIElementFactory {
   createMistralIcon(): HTMLElement {
     const icon = document.createElement('button');
     // Match Mistral's native button styling exactly like Research/Think buttons
-    icon.className = `prompt-library-integrated-icon flex items-center font-medium transition-all focus-visible:outline-3 outline-default outline-offset-1 justify-center whitespace-nowrap text-subtle hover:text-default data-[state=on]:text-basic-blue-strong px-2 text-sm rounded-xs h-9 gap-0`;
+    icon.className = `prompt-library-integrated-icon flex items-center font-medium transition-all focus-visible:outline-3 outline-default outline-offset-1 justify-center whitespace-nowrap text-subtle hover:text-default data-[state=on]:text-basic-blue-strong px-2 text-sm rounded-sm h-9 gap-0`;
     icon.setAttribute('type', 'button');
     icon.setAttribute('aria-label', 'Open my prompt manager - Access your saved prompts');
     icon.setAttribute('title', 'My Prompt Manager - Access your saved prompts');
