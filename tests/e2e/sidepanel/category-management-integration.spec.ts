@@ -69,8 +69,8 @@ test.describe('Category Management - Integration with Prompt System', () => {
       await expect(sidepanelPage.getByText('Research')).toBeHidden();
 
       // Go back to main view
-      const closeButton = sidepanelPage.locator('button').filter({ has: sidepanelPage.locator('path[d="M10 19l-7-7m0 0l7-7m-7 7h18"]') }).first();
-      await closeButton.click();
+      const backButton = sidepanelPage.getByTestId('back-button').first();
+      await backButton.click();
       await expect(sidepanelPage.getByRole('heading', { name: 'My Prompt Manager' })).toBeVisible();
 
       // Verify prompts still exist and are now categorized as "Analysis"
@@ -238,8 +238,8 @@ test.describe('Category Management - Integration with Prompt System', () => {
       await editInput.press('Enter');
 
       // Go back to main view
-      const closeButton = sidepanelPage.locator('button').filter({ has: sidepanelPage.locator('path[d="M10 19l-7-7m0 0l7-7m-7 7h18"]') }).first();
-      await closeButton.click();
+      const backButton2 = sidepanelPage.getByTestId('back-button').first();
+      await backButton2.click();
 
       // Verify category filter dropdown now shows "Programming" instead of "Development"
       // Check options by trying to select them

@@ -20,6 +20,7 @@ export default defineConfig({
     video: 'retain-on-failure',
     navigationTimeout: isCI ? 30_000 : 30_000,
     actionTimeout: isCI ? 15_000 : 15_000,
+    testIdAttribute: 'data-testid',
   },
   projects: [
     {

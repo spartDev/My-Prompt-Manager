@@ -64,10 +64,10 @@ test.describe('Category Manager - UI/UX Tests', () => {
       await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
       await expect(sidepanelPage.getByRole('heading', { name: 'Manage Categories' })).toBeVisible();
 
-      // Find and click the close button
-      const closeButton = sidepanelPage.locator('button').filter({ has: sidepanelPage.locator('path[d="M10 19l-7-7m0 0l7-7m-7 7h18"]') }).first();
-      await expect(closeButton).toBeVisible();
-      await closeButton.click();
+      // Find and click the back button
+      const backButton = sidepanelPage.getByTestId('back-button').first();
+      await expect(backButton).toBeVisible();
+      await backButton.click();
 
       // Verify return to main library view
       await expect(sidepanelPage.getByRole('heading', { name: 'My Prompt Manager' })).toBeVisible();
