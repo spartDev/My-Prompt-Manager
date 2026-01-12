@@ -44,7 +44,7 @@ export class PromptFormPage extends BasePage {
    */
   async savePrompt(): Promise<void> {
     await this.page.getByRole('button', { name: 'Save Prompt' }).click();
-    await this.expectSuccessMessage('Prompt created successfully');
+    await expect(this.getSuccessMessage('Prompt created successfully')).toBeVisible();
   }
 
   /**
@@ -52,7 +52,7 @@ export class PromptFormPage extends BasePage {
    */
   async saveChanges(): Promise<void> {
     await this.page.getByRole('button', { name: 'Save Changes' }).click();
-    await this.expectSuccessMessage('Prompt updated successfully');
+    await expect(this.getSuccessMessage('Prompt updated successfully')).toBeVisible();
   }
 
   /**

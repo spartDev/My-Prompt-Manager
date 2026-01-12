@@ -1,9 +1,11 @@
 import type { Page, Locator } from '@playwright/test';
 
-import { expect } from '../fixtures/extension';
-
 /**
  * Base page class containing common functionality used across all pages
+ *
+ * Note: Following Page Object Model best practices, this class provides
+ * locator-returning methods rather than assertion methods. Assertions
+ * should be performed in test files or using utilities from assertions.ts.
  */
 export abstract class BasePage {
   constructor(protected page: Page) {}
@@ -16,33 +18,27 @@ export abstract class BasePage {
   }
 
   /**
-   * Expect a success message to be visible
+   * Get a success message locator
+   * Usage in tests: await expect(page.getSuccessMessage('Created')).toBeVisible()
    */
-  async expectSuccessMessage(message: string): Promise<void> {
-    await expect(this.page.getByText(message).first()).toBeVisible();
+  getSuccessMessage(message: string): Locator {
+    return this.page.getByText(message).first();
   }
 
   /**
-   * Expect an error message to be visible
+   * Get an error message locator
+   * Usage in tests: await expect(page.getErrorMessage('Error')).toBeVisible()
    */
-  async expectErrorMessage(message: string): Promise<void> {
-    await expect(this.page.getByText(message)).toBeVisible();
+  getErrorMessage(message: string): Locator {
+    return this.page.getByText(message);
   }
 
   /**
-   * Expect an element to be visible
+   * Get an element locator from a string selector or pass through existing Locator
+   * Usage in tests: await expect(page.getElement('.selector')).toBeVisible()
    */
-  async expectElementVisible(locator: string | Locator): Promise<void> {
-    const element = typeof locator === 'string' ? this.page.locator(locator) : locator;
-    await expect(element).toBeVisible();
-  }
-
-  /**
-   * Expect an element to be hidden
-   */
-  async expectElementHidden(locator: string | Locator): Promise<void> {
-    const element = typeof locator === 'string' ? this.page.locator(locator) : locator;
-    await expect(element).toBeHidden();
+  getElement(locator: string | Locator): Locator {
+    return typeof locator === 'string' ? this.page.locator(locator) : locator;
   }
 
   /**
@@ -79,7 +75,7 @@ export abstract class BasePage {
    */
   async closeModal(): Promise<void> {
     const closeButton = this.getCloseButton();
-    await expect(closeButton).toBeVisible();
+    await closeButton.waitFor({ state: 'visible' });
     await closeButton.click();
   }
 }

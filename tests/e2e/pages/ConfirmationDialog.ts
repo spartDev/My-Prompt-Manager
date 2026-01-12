@@ -50,7 +50,7 @@ export class ConfirmationDialog extends BasePage {
   async confirmDeletion(itemType: 'Prompt' | 'Category'): Promise<void> {
     await this.expectVisible(`Delete ${itemType}`);
     await this.confirm();
-    await this.expectSuccessMessage(`${itemType} deleted successfully`);
+    await expect(this.getSuccessMessage(`${itemType} deleted successfully`)).toBeVisible();
   }
 
   /**

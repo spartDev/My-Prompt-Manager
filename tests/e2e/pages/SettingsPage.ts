@@ -57,7 +57,7 @@ export class SettingsPage extends BasePage {
   async importData(filePath: string): Promise<void> {
     const fileInput = this.page.locator('input[type="file"]');
     await fileInput.setInputFiles(filePath);
-    await this.expectSuccessMessage('Import successful');
+    await expect(this.getSuccessMessage('Import successful')).toBeVisible();
   }
 
   /**
@@ -141,7 +141,7 @@ export class SettingsPage extends BasePage {
     if (confirm) {
       await expect(this.page.getByText('This will permanently delete')).toBeVisible();
       await this.page.getByRole('button', { name: 'Yes, Clear All Data' }).click();
-      await this.expectSuccessMessage('Data cleared successfully');
+      await expect(this.getSuccessMessage('Data cleared successfully')).toBeVisible();
     } else {
       await this.page.getByRole('button', { name: 'Cancel' }).click();
     }
