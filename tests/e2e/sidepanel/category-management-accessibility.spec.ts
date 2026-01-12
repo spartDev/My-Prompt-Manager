@@ -155,9 +155,9 @@ test.describe('Category Manager - Keyboard Navigation and Accessibility', () => 
       const deleteButton = categoryRow.getByRole('button', { name: 'Delete category' });
       await expect(deleteButton).toBeVisible();
 
-      // Verify close button has proper labeling
-      const closeButton = sidepanelPage.locator('button').filter({ has: sidepanelPage.locator('path[d="M10 19l-7-7m0 0l7-7m-7 7h18"]') }).first();
-      await expect(closeButton).toBeVisible();
+      // Verify back button has proper labeling
+      const backButton = sidepanelPage.getByTestId('back-button').first();
+      await expect(backButton).toBeVisible();
     });
   });
 

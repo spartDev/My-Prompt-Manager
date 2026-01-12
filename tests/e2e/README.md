@@ -258,8 +258,8 @@ test('create category', async ({ page }) => {
   await page.getByPlaceholder('Enter category name...').fill('Test Category');
   await page.getByRole('button', { name: 'Add' }).click();
   await expect(page.getByText('Category created successfully')).toBeVisible();
-  const closeButton = page.locator('button').filter({ has: page.locator('path[d="M6 18L18 6M6 6l12 12"]') });
-  await closeButton.click();
+  const backButton = page.getByTestId('back-button');
+  await backButton.click();
 });
 ```
 

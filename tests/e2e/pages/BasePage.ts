@@ -61,21 +61,17 @@ export abstract class BasePage {
   }
 
   /**
-   * Get close button using the standard X icon SVG path selector
+   * Get close button using data-testid attribute
    */
   protected getCloseButton(): Locator {
-    return this.page.locator('button').filter({
-      has: this.page.locator('path[d="M6 18L18 6M6 6l12 12"]')
-    }).first();
+    return this.page.getByTestId('close-modal').first();
   }
 
   /**
-   * Get back button using the standard arrow icon SVG path selector
+   * Get back button using data-testid attribute
    */
   protected getBackButton(): Locator {
-    return this.page.locator('button').filter({
-      has: this.page.locator('path[d="M10 19l-7-7m0 0l7-7m-7 7h18"]')
-    }).first();
+    return this.page.getByTestId('back-button').first();
   }
 
   /**

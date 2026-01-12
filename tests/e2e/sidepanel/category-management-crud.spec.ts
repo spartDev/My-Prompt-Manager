@@ -470,8 +470,8 @@ test.describe('Category Management - Core CRUD Operations', () => {
       await confirmDialog.getByRole('button', { name: 'Delete' }).click();
 
       // Go back to main view to verify prompts moved to Uncategorized
-      // Find and click the X button in the category manager header
-      const closeButton = sidepanelPage.locator('button').filter({ has: sidepanelPage.locator('path[d="M10 19l-7-7m0 0l7-7m-7 7h18"]') });
+      // Find and click the back button in the category manager header
+      const closeButton = sidepanelPage.getByTestId('back-button');
       await closeButton.click();
       await expect(sidepanelPage.getByRole('heading', { name: 'My Prompt Manager' })).toBeVisible();
 

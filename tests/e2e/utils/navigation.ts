@@ -216,9 +216,7 @@ export const modalNavigation = {
    * Close any modal using the standard close button
    */
   closeModal: async (page: Page): Promise<void> => {
-    const closeButton = page.locator('button').filter({
-      has: page.locator('path[d="M6 18L18 6M6 6l12 12"]')
-    }).first();
+    const closeButton = page.getByTestId('close-modal').first();
     await closeButton.click();
   },
 
