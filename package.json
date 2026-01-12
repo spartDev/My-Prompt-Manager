@@ -1,6 +1,6 @@
 {
   "name": "prompt-library-extension",
-  "version": "1.8.1",
+  "version": "1.8.2",
   "description": "Chrome extension for managing personal prompt library",
   "license": "MIT",
   "type": "module",
