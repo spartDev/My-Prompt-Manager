@@ -40,7 +40,7 @@ export const E2EUtils = {
   },
 
   // Utilities
-  Selectors: () => import('./selectors').then(m => ({ SELECTORS: m.SELECTORS, createSelectors: m.createSelectors })),
+  Selectors: () => import('./selectors').then(m => ({ createSelectors: m.createSelectors })),
   Assertions: () => import('./assertions').then(m => m.assertions),
   Workflows: () => import('./workflows').then(m => m.workflows),
   Navigation: () => import('./navigation').then(m => m.navigation),
