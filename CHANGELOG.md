@@ -1,6 +1,44 @@
 ## [Unreleased]
 
 
+## [1.8.2] - 2026-01-12
+
+
+### ✨ Added
+
+-  Migrate to Tailwind CSS v4 for improved styling and performance ([#211](https://github.com/spartDev/My-Prompt-Manager/pull/211))
+-  Replace native select with custom Dropdown component in AddPromptForm ([#205](https://github.com/spartDev/My-Prompt-Manager/pull/205))
+
+
+### 🐛 Fixed
+
+-  Increase MAX_PROMPT_SIZE and add validation on update ([#230](https://github.com/spartDev/My-Prompt-Manager/pull/230))
+-  Resolve race condition in StorageManager mutex implementation ([#197](https://github.com/spartDev/My-Prompt-Manager/pull/197))
+
+
+### 🧪 Testing
+
+-  Add comprehensive E2E tests for MAX_PROMPT_SIZE fix
+-  Improve test coverage and stability ([#192](https://github.com/spartDev/My-Prompt-Manager/pull/192))
+
+
+### 📚 Documentation
+
+-  Optimize CLAUDE.md for AI agent onboarding ([#215](https://github.com/spartDev/My-Prompt-Manager/pull/215))
+
+
+### 📦 Dependencies
+
+-  Update React packages to 19.2.3 ([#227](https://github.com/spartDev/My-Prompt-Manager/pull/227))
+-  Update TypeScript and linting to 8.52.0 ([#228](https://github.com/spartDev/My-Prompt-Manager/pull/228))
+-  Update ESLint to 9.39.2 ([#226](https://github.com/spartDev/My-Prompt-Manager/pull/226))
+-  Update DOMPurify to 3.3.1 ([#217](https://github.com/spartDev/My-Prompt-Manager/pull/217))
+-  Update Vite to 7.2.7 ([#216](https://github.com/spartDev/My-Prompt-Manager/pull/216))
+-  Update Playwright monorepo to 1.57.0 ([#202](https://github.com/spartDev/My-Prompt-Manager/pull/202))
+
+[1.8.2]: https://github.com/spartDev/My-Prompt-Manager/compare/v1.8.1...v1.8.2
+
+
 ## [1.8.1] - 2025-11-17
 
 

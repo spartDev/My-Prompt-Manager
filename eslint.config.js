@@ -200,7 +200,8 @@ export default [
       'playwright-report/**',
       'test-results/**',
       '.claude/**',
-      '.conductor/**'
+      '.conductor/**',
+      '.worktrees/**'
     ],
   },
 ];
