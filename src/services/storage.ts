@@ -39,7 +39,7 @@ export class StorageManager {
   // Hard limits for storage quota enforcement
   private readonly STORAGE_LIMITS = {
     MAX_PROMPTS: 5000,            // Maximum number of prompts
-    MAX_PROMPT_SIZE: 10000,       // Maximum size per prompt (10KB)
+    MAX_PROMPT_SIZE: 50000,       // Maximum size per prompt (50KB) - accounts for 20K chars × 2 bytes/char + overhead
     MAX_TOTAL_SIZE: 8000000       // Maximum total storage (8MB, leaving 2MB buffer)
   } as const;
 
@@ -170,6 +170,18 @@ export class StorageManager {
         const oldSize = estimatePromptSize(oldPrompt.title, oldPrompt.content, oldPrompt.category);
         const newSize = estimatePromptSize(updatedPrompt.title, updatedPrompt.content, updatedPrompt.category);
         const sizeDelta = newSize - oldSize;
+
+        // HARD LIMIT: Enforce individual prompt size (same check as savePrompt)
+        if (newSize > this.STORAGE_LIMITS.MAX_PROMPT_SIZE) {
+          throw new StorageError({
+            message: `Prompt exceeds maximum size limit (${String(this.STORAGE_LIMITS.MAX_PROMPT_SIZE)} bytes)`,
+            type: ErrorType.VALIDATION_ERROR,
+            details: {
+              size: newSize,
+              max: this.STORAGE_LIMITS.MAX_PROMPT_SIZE
+            }
+          });
+        }
 
         // Only check quota if size is increasing
         if (sizeDelta > 0) {
