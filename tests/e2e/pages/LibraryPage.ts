@@ -9,16 +9,6 @@ import { BasePage } from './BasePage';
  * This is the primary interface users interact with
  */
 export class LibraryPage extends BasePage {
-  // Selectors
-  private readonly headingSelector = 'heading[name="My Prompt Manager"]';
-  private readonly addNewPromptButton = 'button[name="Add new prompt"]';
-  private readonly manageCategoriesButton = 'button[name="Manage categories"]';
-  private readonly settingsButton = 'button[name="Settings"]';
-  private readonly searchInput = 'input[placeholder="Search your prompts..."]';
-  private readonly categoryFilter = 'select';
-  private readonly promptCards = 'article';
-
-
   /**
    * Navigate to the settings page
    */
@@ -79,17 +69,19 @@ export class LibraryPage extends BasePage {
   }
 
   /**
-   * Get all prompt cards
+   * Get all prompt cards using data-testid
    */
   getPromptCards(): Locator {
-    return this.page.locator('article');
+    return this.page.getByTestId('prompt-card');
   }
 
   /**
-   * Get a specific prompt card by title
+   * Get a specific prompt card by title using role-based locators
    */
   getPromptCard(title: string): Locator {
-    return this.page.locator('article').filter({ hasText: title }).first();
+    return this.page.getByTestId('prompt-card')
+      .filter({ has: this.page.getByRole('heading', { name: title }) })
+      .first();
   }
 
   /**

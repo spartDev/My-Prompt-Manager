@@ -194,7 +194,7 @@ test.describe('Category Manager - UI/UX Tests', () => {
       await expect(sidepanelPage.getByText('3 categories')).toBeVisible();
 
       // Delete a category (Testing)
-      const testingCategoryRow = sidepanelPage.locator('div').filter({ hasText: 'Testing' }).first();
+      const testingCategoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Testing', { exact: true }) }).first();
       await testingCategoryRow.hover();
       await testingCategoryRow.getByRole('button', { name: 'Delete category' }).first().click();
 
@@ -237,7 +237,7 @@ test.describe('Category Manager - UI/UX Tests', () => {
       await expect(sidepanelPage.getByText('Design')).toBeVisible();
 
       // Find the color swatch for the Design category
-      const designCategoryRow = sidepanelPage.locator('div').filter({ hasText: 'Design' }).first();
+      const designCategoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Design', { exact: true }) }).first();
       const colorSwatch = designCategoryRow.locator('div[style*="background-color"]').first();
       await expect(colorSwatch).toBeVisible();
     });
@@ -265,19 +265,19 @@ test.describe('Category Manager - UI/UX Tests', () => {
       await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
 
       // Verify each category has its color swatch visible
-      const redCategoryRow = sidepanelPage.locator('div').filter({ hasText: 'Red Category' }).first();
+      const redCategoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Red Category', { exact: true }) }).first();
       // Find the color swatch with the specific background color inline style
       const redSwatch = redCategoryRow.locator('div[style*="background-color: rgb(239, 68, 68)"]').first();
       await expect(redSwatch).toBeVisible();
       // Verify the background color is applied
       await expect(redSwatch).toHaveCSS('background-color', 'rgb(239, 68, 68)');
 
-      const blueCategoryRow = sidepanelPage.locator('div').filter({ hasText: 'Blue Category' }).first();
+      const blueCategoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Blue Category', { exact: true }) }).first();
       const blueSwatch = blueCategoryRow.locator('div[style*="background-color: rgb(59, 130, 246)"]').first();
       await expect(blueSwatch).toBeVisible();
       await expect(blueSwatch).toHaveCSS('background-color', 'rgb(59, 130, 246)');
 
-      const greenCategoryRow = sidepanelPage.locator('div').filter({ hasText: 'Green Category' }).first();
+      const greenCategoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Green Category', { exact: true }) }).first();
       const greenSwatch = greenCategoryRow.locator('div[style*="background-color: rgb(16, 185, 129)"]').first();
       await expect(greenSwatch).toBeVisible();
       await expect(greenSwatch).toHaveCSS('background-color', 'rgb(16, 185, 129)');
@@ -301,12 +301,12 @@ test.describe('Category Manager - UI/UX Tests', () => {
       await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
 
       // Start editing the category
-      const categoryRow = sidepanelPage.locator('div').filter({ hasText: 'Color Test' }).first();
+      const categoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Color Test', { exact: true }) }).first();
       await categoryRow.hover();
       await categoryRow.getByRole('button', { name: 'Edit category' }).click();
 
       // Verify we're in edit mode and color picker is visible
-      const editInput = sidepanelPage.locator('input[placeholder="Category name"]');
+      const editInput = sidepanelPage.getByPlaceholder('Category name', { exact: true });
       await expect(editInput).toBeVisible();
       await expect(editInput).toHaveValue('Color Test');
 

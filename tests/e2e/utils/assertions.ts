@@ -46,7 +46,7 @@ export const promptAssertions = {
    * Expect a specific number of prompts to be visible
    */
   count: async (page: Page, count: number): Promise<void> => {
-    await expect(page.locator('article')).toHaveCount(count);
+    await expect(page.getByTestId('prompt-card')).toHaveCount(count);
   },
 
   /**
@@ -289,31 +289,34 @@ export const storageAssertions = {
 
 /**
  * Content script assertions
+ * Note: These assertions use CSS class selectors because they target elements
+ * injected by our content script into third-party websites (Claude, ChatGPT, etc.).
+ * Role-based selectors are not applicable for these custom injected components.
  */
 export const contentScriptAssertions = {
   /**
-   * Expect toolbar to be injected
+   * Expect toolbar to be injected (content script component)
    */
   toolbarInjected: async (page: Page): Promise<void> => {
     await expect(page.locator('.prompt-library-integrated-icon')).toBeVisible();
   },
 
   /**
-   * Expect prompt selector to be visible
+   * Expect prompt selector to be visible (content script component)
    */
   selectorVisible: async (page: Page): Promise<void> => {
     await expect(page.locator('.prompt-library-selector')).toBeVisible();
   },
 
   /**
-   * Expect prompt selector to be hidden
+   * Expect prompt selector to be hidden (content script component)
    */
   selectorHidden: async (page: Page): Promise<void> => {
     await expect(page.locator('.prompt-library-selector')).toBeHidden();
   },
 
   /**
-   * Expect text to be inserted into editor
+   * Expect text to be inserted into editor (third-party site element)
    */
   textInserted: async (page: Page, content: string, editorSelector: string): Promise<void> => {
     await expect(page.locator(editorSelector)).toContainText(content);

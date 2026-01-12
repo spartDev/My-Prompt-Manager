@@ -146,7 +146,7 @@ test.describe('User Journey: Power User Prompt Management & Organization', () =>
     await expect(sidepanelPage.getByRole('heading', { name: 'My Prompt Manager' })).toBeVisible();
 
     // Verify initial state: 17 total prompts (15 + 2 defaults)
-    await expect(sidepanelPage.locator('article')).toHaveCount(17);
+    await expect(sidepanelPage.getByTestId('prompt-card')).toHaveCount(17);
 
     // Scenario 1: Bulk category reorganization
     console.log('[TEST] Starting Scenario 1: Bulk category reorganization');
@@ -157,12 +157,12 @@ test.describe('User Journey: Power User Prompt Management & Organization', () =>
 
     // Rename "Work" category to "Professional"
     // Use specific selector to target only category rows (contains both text and color swatch)
-    const workCategoryRow = sidepanelPage.locator('div.group').filter({ hasText: 'Work' }).filter({ has: sidepanelPage.locator('div[style*="background-color"]') }).first();
+    const workCategoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Work', { exact: true }) }).first();
     await workCategoryRow.hover();
     await workCategoryRow.getByRole('button', { name: 'Edit category' }).click();
 
     // Target the specific edit input (not the create input)
-    const nameInput = sidepanelPage.locator('input[placeholder="Category name"]');
+    const nameInput = sidepanelPage.getByPlaceholder('Category name', { exact: true });
     await nameInput.clear();
     await nameInput.fill('Professional');
 
@@ -182,7 +182,7 @@ test.describe('User Journey: Power User Prompt Management & Organization', () =>
     await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
     await sidepanelPage.getByRole('menu', { name: 'Category filter menu' }).waitFor();
     await sidepanelPage.getByRole('menuitem', { name: 'Professional' }).click();
-    await expect(sidepanelPage.locator('article')).toHaveCount(5); // 5 work prompts
+    await expect(sidepanelPage.getByTestId('prompt-card')).toHaveCount(5); // 5 work prompts
 
     // Verify specific prompts show new category
     await expect(sidepanelPage.getByText('Meeting Summary Template')).toBeVisible();
@@ -200,10 +200,10 @@ test.describe('User Journey: Power User Prompt Management & Organization', () =>
     await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
     await sidepanelPage.getByRole('menu', { name: 'Category filter menu' }).waitFor();
     await sidepanelPage.getByRole('menuitem', { name: 'Marketing' }).click();
-    await expect(sidepanelPage.locator('article')).toHaveCount(2); // 2 marketing prompts
+    await expect(sidepanelPage.getByTestId('prompt-card')).toHaveCount(2); // 2 marketing prompts
 
     // Edit first marketing prompt to change category
-    const socialMediaCard = sidepanelPage.locator('article').filter({ hasText: 'Social Media Content' }).first();
+    const socialMediaCard = sidepanelPage.getByTestId('prompt-card').filter({ hasText: 'Social Media Content' }).first();
     await socialMediaCard.getByRole('button', { name: 'More actions' }).click();
     await sidepanelPage.getByRole('menuitem', { name: 'Edit' }).click();
 
@@ -213,7 +213,7 @@ test.describe('User Journey: Power User Prompt Management & Organization', () =>
     await expect(sidepanelPage.getByText('Prompt updated successfully').first()).toBeVisible();
 
     // Edit second marketing prompt
-    const campaignAnalysisCard = sidepanelPage.locator('article').filter({ hasText: 'Campaign Analysis' }).first();
+    const campaignAnalysisCard = sidepanelPage.getByTestId('prompt-card').filter({ hasText: 'Campaign Analysis' }).first();
     await campaignAnalysisCard.getByRole('button', { name: 'More actions' }).click();
     await sidepanelPage.getByRole('menuitem', { name: 'Edit' }).click();
 
@@ -232,11 +232,11 @@ test.describe('User Journey: Power User Prompt Management & Organization', () =>
     await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
     await sidepanelPage.getByRole('menu', { name: 'Category filter menu' }).waitFor();
     await sidepanelPage.getByRole('menuitem', { name: 'Professional' }).click();
-    await expect(sidepanelPage.locator('article')).toHaveCount(7); // 5 original + 2 moved
+    await expect(sidepanelPage.getByTestId('prompt-card')).toHaveCount(7); // 5 original + 2 moved
 
     // Delete empty Marketing category
     await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
-    const marketingCategoryRow = sidepanelPage.locator('div.group').filter({ hasText: 'Marketing' }).filter({ has: sidepanelPage.locator('div[style*="background-color"]') }).first();
+    const marketingCategoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Marketing', { exact: true }) }).first();
     await marketingCategoryRow.hover();
     await marketingCategoryRow.getByRole('button', { name: 'Delete category' }).click();
 
@@ -264,7 +264,7 @@ test.describe('User Journey: Power User Prompt Management & Organization', () =>
     await searchInput.fill('review');
 
     // Should find all prompts containing "review": Performance Review Notes, Code Review Checklist, Literature Review Helper
-    await expect(sidepanelPage.locator('article')).toHaveCount(3);
+    await expect(sidepanelPage.getByTestId('prompt-card')).toHaveCount(3);
     await expect(sidepanelPage.getByText('Performance Review Notes')).toBeVisible();
     await expect(sidepanelPage.getByText('Code Review Checklist')).toBeVisible();
     await expect(sidepanelPage.getByText('Literature Review Helper')).toBeVisible();
@@ -277,7 +277,7 @@ test.describe('User Journey: Power User Prompt Management & Organization', () =>
     await sidepanelPage.getByRole('menuitem', { name: 'Professional' }).click();
 
     // Should find prompts with "template" in Professional category
-    await expect(sidepanelPage.locator('article')).toHaveCount(2); // Meeting Summary Template, Email Response Template
+    await expect(sidepanelPage.getByTestId('prompt-card')).toHaveCount(2); // Meeting Summary Template, Email Response Template
     await expect(sidepanelPage.getByText('Meeting Summary Template')).toBeVisible();
     await expect(sidepanelPage.getByText('Email Response Template')).toBeVisible();
 
@@ -298,13 +298,13 @@ test.describe('User Journey: Power User Prompt Management & Organization', () =>
     await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
     await sidepanelPage.getByRole('menu', { name: 'Category filter menu' }).waitFor();
     await sidepanelPage.getByRole('menuitem', { name: 'Development' }).click();
-    await expect(sidepanelPage.locator('article')).toHaveCount(4);
+    await expect(sidepanelPage.getByTestId('prompt-card')).toHaveCount(4);
 
     // Simulate moving multiple Development prompts to Professional category
     const devPrompts = ['Code Review Checklist', 'Bug Report Template', 'API Documentation Helper'];
 
     for (const promptTitle of devPrompts) {
-      const promptCard = sidepanelPage.locator('article').filter({ hasText: promptTitle }).first();
+      const promptCard = sidepanelPage.getByTestId('prompt-card').filter({ hasText: promptTitle }).first();
       await promptCard.getByRole('button', { name: 'More actions' }).click();
       await sidepanelPage.getByRole('menuitem', { name: 'Edit' }).click();
 
@@ -318,21 +318,21 @@ test.describe('User Journey: Power User Prompt Management & Organization', () =>
     await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
     await sidepanelPage.getByRole('menu', { name: 'Category filter menu' }).waitFor();
     await sidepanelPage.getByRole('menuitem', { name: 'Development' }).click();
-    await expect(sidepanelPage.locator('article')).toHaveCount(1);
+    await expect(sidepanelPage.getByTestId('prompt-card')).toHaveCount(1);
     await expect(sidepanelPage.getByText('Database Query Optimizer')).toBeVisible();
 
     // Verify Professional category now has the moved prompts (7 + 3 = 10)
     await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
     await sidepanelPage.getByRole('menu', { name: 'Category filter menu' }).waitFor();
     await sidepanelPage.getByRole('menuitem', { name: 'Professional' }).click();
-    await expect(sidepanelPage.locator('article')).toHaveCount(10);
+    await expect(sidepanelPage.getByTestId('prompt-card')).toHaveCount(10);
 
     // Test bulk delete simulation - delete remaining Development prompts
     await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
     await sidepanelPage.getByRole('menu', { name: 'Category filter menu' }).waitFor();
     await sidepanelPage.getByRole('menuitem', { name: 'Development' }).click();
 
-    const lastDevPrompt = sidepanelPage.locator('article').filter({ hasText: 'Database Query Optimizer' }).first();
+    const lastDevPrompt = sidepanelPage.getByTestId('prompt-card').filter({ hasText: 'Database Query Optimizer' }).first();
     await lastDevPrompt.getByRole('button', { name: 'More actions' }).click();
     await sidepanelPage.getByRole('menuitem', { name: 'Delete' }).click();
 
@@ -416,21 +416,21 @@ test.describe('User Journey: Power User Prompt Management & Organization', () =>
     await expect(backButton).toBeVisible();
     await backButton.click();
     // Wait for the prompt list to become visible again
-    await expect(sidepanelPage.locator('article').first()).toBeVisible();
+    await expect(sidepanelPage.getByTestId('prompt-card').first()).toBeVisible();
 
     // Final verification: Check current state matches expectations
-    const finalPromptCount = await sidepanelPage.locator('article').count();
+    const finalPromptCount = await sidepanelPage.getByTestId('prompt-card').count();
     expect(finalPromptCount).toBe(16); // Total after all operations
 
     // Verify Professional category has consolidated prompts
     await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
     await sidepanelPage.getByRole('menu', { name: 'Category filter menu' }).waitFor();
     await sidepanelPage.getByRole('menuitem', { name: 'Professional' }).click();
-    await expect(sidepanelPage.locator('article')).toHaveCount(10);
+    await expect(sidepanelPage.getByTestId('prompt-card')).toHaveCount(10);
 
     // Test one final search to ensure everything still works
     await searchInput.fill('summary');
-    await expect(sidepanelPage.locator('article')).toHaveCount(1); // Meeting Summary Template
+    await expect(sidepanelPage.getByTestId('prompt-card')).toHaveCount(1); // Meeting Summary Template
     await expect(sidepanelPage.getByText('Meeting Summary Template')).toBeVisible();
 
     console.log('[TEST] All power user scenarios validated successfully! 🎉');

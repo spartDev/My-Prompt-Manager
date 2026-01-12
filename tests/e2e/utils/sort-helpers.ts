@@ -14,6 +14,7 @@ import { Page } from '@playwright/test';
  *
  * Extracts all visible prompt titles in their current display order.
  * Works for both popup and sidepanel contexts.
+ * Uses data-testid for prompt cards and role for headings.
  *
  * @param page - Playwright Page object
  * @returns Array of prompt titles in display order
@@ -23,7 +24,7 @@ import { Page } from '@playwright/test';
  * expect(titles).toEqual(['High Usage', 'Medium Usage', 'Low Usage']);
  */
 export async function getSortedPromptTitles(page: Page): Promise<string[]> {
-  return page.locator('article h3').allTextContents();
+  return page.getByTestId('prompt-card').getByRole('heading').allTextContents();
 }
 
 /**

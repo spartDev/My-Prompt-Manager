@@ -128,7 +128,7 @@ const PromptCard: FC<PromptCardProps> = ({
 
 
   return (
-    <article className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5 hover:bg-white/90 dark:hover:bg-gray-800/90 transition-all duration-200 relative group" aria-labelledby={`prompt-title-${prompt.id}`}>
+    <article data-testid="prompt-card" className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5 hover:bg-white/90 dark:hover:bg-gray-800/90 transition-all duration-200 relative group" aria-labelledby={`prompt-title-${prompt.id}`}>
       <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-4 items-center">
         {/* Title and metadata */}
         <div className="pr-3">

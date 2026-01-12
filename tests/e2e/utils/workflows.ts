@@ -178,7 +178,7 @@ export const categoryWorkflows = {
     await categoryRow.getByRole('button', { name: 'Edit category' }).click();
 
     // Edit name
-    const editInput = page.locator('input[placeholder="Category name"]');
+    const editInput = page.getByPlaceholder('Category name', { exact: true });
     await editInput.clear();
     await editInput.fill(newName);
     await page.getByRole('button', { name: 'Save changes (Enter)' }).click();

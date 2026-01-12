@@ -1,113 +1,39 @@
 /**
  * Centralized selectors for E2E tests
  *
- * This module provides consistent selectors used across multiple test files
- * to reduce duplication and improve maintainability.
+ * This module provides role-based and testid-based selectors following Playwright's
+ * recommended locator priority:
+ * 1. getByRole() - buttons, headings, links, etc.
+ * 2. getByLabel() - form inputs with labels
+ * 3. getByPlaceholder() - inputs with placeholder text
+ * 4. getByText() - visible text content
+ * 5. getByTestId() - only when above options don't work
  */
 
 import type { Page } from '@playwright/test';
 
-export const SELECTORS = {
-  // Main headings
-  headings: {
-    promptManager: 'heading[name="My Prompt Manager"]',
-    manageCategories: 'heading[name="Manage Categories"]',
-    settings: 'heading[name="Settings"]',
-    addNewPrompt: 'heading[name="Add New Prompt"]',
-    editPrompt: 'heading[name="Edit Prompt"]',
-  },
-
-  // Primary action buttons
-  buttons: {
-    addNewPrompt: 'button[name="Add new prompt"]',
-    manageCategories: 'button[name="Manage categories"]',
-    settings: 'button[name="Settings"]',
-    library: 'button[name="Library"]',
-    savePrompt: 'button[name="Save Prompt"]',
-    saveChanges: 'button[name="Save Changes"]',
-    cancel: 'button[name="Cancel"]',
-    export: 'button[name="Export"]',
-    import: 'button[name="Import"]',
-  },
-
-  // Form elements
-  forms: {
-    promptTitle: 'label[name="Title (optional)"]',
-    promptContent: 'label[name="Content *"]',
-    categoryDropdown: 'label[name="Category"]',
-    categoryNameInput: 'input[placeholder="Enter category name..."]',
-    searchInput: 'input[placeholder="Search your prompts..."]',
-    addCategoryButton: 'button[name="Add"]',
-  },
-
-  // Category management
-  categories: {
-    editButton: 'button[name="Edit category"]',
-    deleteButton: 'button[name="Delete category"]',
-    categoryNameEdit: 'input[placeholder="Category name"]',
-    saveButton: 'button[name="Save changes (Enter)"]',
-  },
-
-  // Content script elements
-  contentScript: {
-    toolbarIcon: '.prompt-library-integrated-icon',
-    promptSelector: '.prompt-library-selector',
-    promptItem: '.prompt-item',
-    searchInput: '.search-input',
-    closeButton: '.close-button',
-  },
-
-  // Platform-specific selectors
-  platforms: {
-    claude: {
-      editor: '.ProseMirror[contenteditable="true"]',
-      sendButton: '.send-button',
-    },
-    chatgpt: {
-      textarea: '#prompt-textarea',
-      sendButton: '#send-button',
-    },
-  },
-
-  // Common UI patterns
-  common: {
-    closeButton: '[data-testid="close-modal"]',
-    backButton: '[data-testid="back-button"]',
-    promptCards: 'article',
-    moreActionsButton: 'button[name="More actions"]',
-    loadingSpinner: '[class*="spinner"], [class*="loading"]',
-    emptyState: 'text="No matches found"',
-    successMessage: '[class*="success"], [role="status"]',
-    errorMessage: '[class*="error"], [role="alert"]',
-  },
-
-  // Confirmation dialogs
-  dialogs: {
-    deletePrompt: 'heading[name="Delete Prompt"]',
-    deleteCategory: 'heading[name="Delete Category"]',
-    confirmDelete: 'button[name="Delete"][exact]',
-    cancelDelete: 'button[name="Cancel"]',
-  },
-} as const;
-
 /**
- * Helper functions for creating locators with common patterns
+ * Helper functions for creating role-based locators
  */
 export const createSelectors = (page: Page) => ({
   /**
-   * Get a category row by name with proper filtering
+   * Get a category row by name using data-testid attribute
    */
   categoryRow: (name: string) =>
-    page.locator('div.group')
-      .filter({ hasText: name })
-      .filter({ has: page.locator('div[style*="background-color"]') })
-      .first(),
+    page.getByTestId('category-row').filter({ has: page.getByText(name, { exact: true }) }).first(),
 
   /**
-   * Get a prompt card by title
+   * Get a prompt card by title using role-based locators
+   * Filters articles that contain a heading with the specified title
    */
   promptCard: (title: string) =>
-    page.locator('article').filter({ hasText: title }).first(),
+    page.getByTestId('prompt-card').filter({ has: page.getByRole('heading', { name: title }) }).first(),
+
+  /**
+   * Get all prompt cards
+   */
+  promptCards: () =>
+    page.getByTestId('prompt-card'),
 
   /**
    * Get close button using data-testid attribute
@@ -150,6 +76,25 @@ export const createSelectors = (page: Page) => ({
    */
   allByRole: (role: 'button' | 'heading' | 'textbox' | 'link' | 'article' | 'main' | 'navigation' | 'banner' | 'contentinfo' | 'region') =>
     page.getByRole(role),
+
+  /**
+   * Get the category name edit input by placeholder
+   */
+  categoryNameEditInput: () =>
+    page.getByPlaceholder('Category name', { exact: true }),
+
+  /**
+   * Get the storage bar using data-testid
+   */
+  storageBar: () =>
+    page.getByTestId('storage-bar'),
+
+  /**
+   * Get prompt titles in display order
+   * Uses role-based locators to find headings within prompt cards
+   */
+  promptTitles: () =>
+    page.getByTestId('prompt-card').getByRole('heading'),
 });
 
 /**

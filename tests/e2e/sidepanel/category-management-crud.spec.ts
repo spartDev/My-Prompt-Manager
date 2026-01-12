@@ -180,7 +180,7 @@ test.describe('Category Management - Core CRUD Operations', () => {
       await expect(sidepanelPage.getByText('Research')).toBeVisible();
 
       // Hover to reveal edit button and click it
-      const categoryRow = sidepanelPage.locator('div').filter({ hasText: 'Research' }).first();
+      const categoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Research', { exact: true }) }).first();
       await categoryRow.hover();
 
       const editButton = categoryRow.getByRole('button', { name: 'Edit category' });
@@ -188,7 +188,7 @@ test.describe('Category Management - Core CRUD Operations', () => {
       await editButton.click();
 
       // Verify edit mode activated - input should be visible and focused
-      const editInput = sidepanelPage.locator('input[placeholder="Category name"]');
+      const editInput = sidepanelPage.getByPlaceholder('Category name', { exact: true });
       await expect(editInput).toBeVisible();
       await expect(editInput).toHaveValue('Research');
 
@@ -235,12 +235,12 @@ test.describe('Category Management - Core CRUD Operations', () => {
       await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
 
       // Start editing
-      const categoryRow = sidepanelPage.locator('div').filter({ hasText: 'Original Name' }).first();
+      const categoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Original Name', { exact: true }) }).first();
       await categoryRow.hover();
       await categoryRow.getByRole('button', { name: 'Edit category' }).click();
 
       // Make changes
-      const editInput = sidepanelPage.locator('input[placeholder="Category name"]');
+      const editInput = sidepanelPage.getByPlaceholder('Category name', { exact: true });
       await editInput.clear();
       await editInput.fill('Changed Name');
 
@@ -282,12 +282,12 @@ test.describe('Category Management - Core CRUD Operations', () => {
       await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
 
       // Start editing
-      const categoryRow = sidepanelPage.locator('div').filter({ hasText: 'Old Name' }).first();
+      const categoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Old Name', { exact: true }) }).first();
       await categoryRow.hover();
       await categoryRow.getByRole('button', { name: 'Edit category' }).click();
 
       // Make changes and press Enter
-      const editInput = sidepanelPage.locator('input[placeholder="Category name"]');
+      const editInput = sidepanelPage.getByPlaceholder('Category name', { exact: true });
       await editInput.clear();
       await editInput.fill('New Name');
       await editInput.press('Enter');
@@ -332,7 +332,7 @@ test.describe('Category Management - Core CRUD Operations', () => {
       await expect(sidepanelPage.getByText('2 categories')).toBeVisible();
 
       // Hover to reveal delete button and click it
-      const categoryRow = sidepanelPage.locator('div').filter({ hasText: 'Temporary Category' }).first();
+      const categoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Temporary Category', { exact: true }) }).first();
       await categoryRow.hover();
 
       const deleteButton = categoryRow.getByRole('button', { name: 'Delete category' });
@@ -350,7 +350,7 @@ test.describe('Category Management - Core CRUD Operations', () => {
       await confirmDeleteButton.click();
 
       // Verify category removed from list (not from dialog which should be closed)
-      await expect(sidepanelPage.locator('.text-sm.font-semibold').filter({ hasText: 'Temporary Category' })).toBeHidden();
+      await expect(sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Temporary Category', { exact: true }) })).toBeHidden();
       await expect(sidepanelPage.getByText('1 category')).toBeVisible(); // Only "Uncategorized" remains
 
       // Verify storage updated
@@ -370,7 +370,7 @@ test.describe('Category Management - Core CRUD Operations', () => {
       await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
 
       // Find the Uncategorized category row
-      const uncategorizedRow = sidepanelPage.locator('div').filter({ hasText: 'Uncategorized' }).filter({ hasText: 'Default' }).first();
+      const uncategorizedRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Uncategorized', { exact: true }) }).first();
       await expect(uncategorizedRow).toBeVisible();
 
       // Hover over it
@@ -399,7 +399,7 @@ test.describe('Category Management - Core CRUD Operations', () => {
       await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
 
       // Click delete button
-      const categoryRow = sidepanelPage.locator('div').filter({ hasText: 'Keep This Category' }).first();
+      const categoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Keep This Category', { exact: true }) }).first();
       await categoryRow.hover();
       await categoryRow.getByRole('button', { name: 'Delete category' }).click();
 
@@ -461,7 +461,7 @@ test.describe('Category Management - Core CRUD Operations', () => {
       await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
 
       // Delete the "Work" category
-      const categoryRow = sidepanelPage.locator('div').filter({ hasText: 'Work' }).first();
+      const categoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Work', { exact: true }) }).first();
       await categoryRow.hover();
       await categoryRow.getByRole('button', { name: 'Delete category' }).click();
 

@@ -83,19 +83,23 @@ export const mockSiteNavigation = {
 
   /**
    * Navigate to Claude.ai with mock
+   * Note: Uses CSS selector for third-party site element (Claude's ProseMirror editor)
    */
   navigateToClaudeMock: async (page: Page): Promise<void> => {
     await page.goto('https://claude.ai/', { waitUntil: 'domcontentloaded' });
     // Wait for mock to be fully loaded and interactive
+    // Using CSS selector since this is a third-party site's DOM structure
     await expect(page.locator('.ProseMirror')).toBeVisible();
   },
 
   /**
    * Navigate to ChatGPT with mock
+   * Note: Uses CSS selector for third-party site element (ChatGPT's textarea)
    */
   navigateToChatGPTMock: async (page: Page): Promise<void> => {
     await page.goto('https://chat.openai.com/', { waitUntil: 'domcontentloaded' });
     // Wait for mock to be fully loaded
+    // Using CSS selector since this is a third-party site's DOM structure
     await expect(page.locator('#prompt-textarea')).toBeVisible();
   },
 
@@ -232,7 +236,9 @@ export const modalNavigation = {
    * Open prompt edit form
    */
   openPromptEditForm: async (page: Page, promptTitle: string): Promise<void> => {
-    const promptCard = page.locator('article').filter({ hasText: promptTitle }).first();
+    const promptCard = page.getByTestId('prompt-card')
+      .filter({ has: page.getByRole('heading', { name: promptTitle }) })
+      .first();
     await promptCard.getByRole('button', { name: 'More actions' }).click();
     await page.getByRole('menuitem', { name: 'Edit' }).click();
     await expect(page.getByRole('heading', { name: 'Edit Prompt' })).toBeVisible();

@@ -65,12 +65,12 @@ test.describe('Category Manager - Keyboard Navigation and Accessibility', () => 
       // Open category manager and start editing
       await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
 
-      const categoryRow = sidepanelPage.locator('div').filter({ hasText: 'Edit Test' }).first();
+      const categoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Edit Test', { exact: true }) }).first();
       await categoryRow.hover();
       await categoryRow.getByRole('button', { name: 'Edit category' }).click();
 
       // Make changes
-      const editInput = sidepanelPage.locator('input[placeholder="Category name"]');
+      const editInput = sidepanelPage.getByPlaceholder('Category name', { exact: true });
       await editInput.clear();
       await editInput.fill('Changed Name');
 
@@ -100,12 +100,12 @@ test.describe('Category Manager - Keyboard Navigation and Accessibility', () => 
       // Open category manager and start editing
       await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
 
-      const categoryRow = sidepanelPage.locator('div').filter({ hasText: 'Save Test' }).first();
+      const categoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Save Test', { exact: true }) }).first();
       await categoryRow.hover();
       await categoryRow.getByRole('button', { name: 'Edit category' }).click();
 
       // Make changes and press Enter
-      const editInput = sidepanelPage.locator('input[placeholder="Category name"]');
+      const editInput = sidepanelPage.getByPlaceholder('Category name', { exact: true });
       await editInput.clear();
       await editInput.fill('Updated Name');
       await editInput.press('Enter');
@@ -146,7 +146,7 @@ test.describe('Category Manager - Keyboard Navigation and Accessibility', () => 
       await expect(categoryNameInput).toBeVisible();
 
       // Verify buttons have descriptive names/titles
-      const categoryRow = sidepanelPage.locator('div').filter({ hasText: 'Accessibility Test' }).first();
+      const categoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Accessibility Test', { exact: true }) }).first();
       await categoryRow.hover();
 
       const editButton = categoryRow.getByRole('button', { name: 'Edit category' });
@@ -207,7 +207,7 @@ test.describe('Category Manager - Keyboard Navigation and Accessibility', () => 
       // Open category manager
       await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
 
-      const categoryRow = sidepanelPage.locator('div').filter({ hasText: 'Hover Test' }).first();
+      const categoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Hover Test', { exact: true }) }).first();
 
       // Initially, action buttons should not be visible (opacity-0)
       const editButton = categoryRow.getByRole('button', { name: 'Edit category' });

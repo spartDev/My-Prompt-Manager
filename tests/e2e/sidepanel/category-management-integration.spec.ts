@@ -54,12 +54,12 @@ test.describe('Category Management - Integration with Prompt System', () => {
       await expect(sidepanelPage.getByText('Research')).toBeVisible();
 
       // Start editing the Research category
-      const categoryRow = sidepanelPage.locator('div').filter({ hasText: 'Research' }).first();
+      const categoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Research', { exact: true }) }).first();
       await categoryRow.hover();
       await categoryRow.getByRole('button', { name: 'Edit category' }).click();
 
       // Change name to "Analysis"
-      const editInput = sidepanelPage.locator('input[placeholder="Category name"]');
+      const editInput = sidepanelPage.getByPlaceholder('Category name', { exact: true });
       await editInput.clear();
       await editInput.fill('Analysis');
       await editInput.press('Enter');
@@ -228,11 +228,11 @@ test.describe('Category Management - Integration with Prompt System', () => {
 
       // Now rename the category
       await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
-      const categoryRow = sidepanelPage.locator('div').filter({ hasText: 'Development' }).first();
+      const categoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Development', { exact: true }) }).first();
       await categoryRow.hover();
       await categoryRow.getByRole('button', { name: 'Edit category' }).click();
 
-      const editInput = sidepanelPage.locator('input[placeholder="Category name"]');
+      const editInput = sidepanelPage.getByPlaceholder('Category name', { exact: true });
       await editInput.clear();
       await editInput.fill('Programming');
       await editInput.press('Enter');

@@ -182,7 +182,7 @@ const DataStorageSection: FC<DataStorageSectionProps> = ({
               {(storageUsed / 1024).toFixed(1)} KB / 5 MB
             </span>
           </div>
-          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+          <div data-testid="storage-bar" role="progressbar" aria-valuenow={storagePercentage} aria-valuemin={0} aria-valuemax={100} aria-label="Storage usage" className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
             <div
               className="h-full bg-gradient-to-r from-purple-600 to-indigo-600 transition-all duration-300"
               style={{ width: `${storagePercentage.toFixed(1)}%` }}

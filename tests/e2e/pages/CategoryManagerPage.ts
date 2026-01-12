@@ -60,7 +60,7 @@ export class CategoryManagerPage extends BasePage {
     await categoryRow.getByRole('button', { name: 'Edit category' }).click();
 
     // Fill new name in the edit input
-    const editInput = this.page.locator('input[placeholder="Category name"]');
+    const editInput = this.page.getByPlaceholder('Category name', { exact: true });
     await editInput.clear();
     await editInput.fill(newName);
 
@@ -92,12 +92,11 @@ export class CategoryManagerPage extends BasePage {
   }
 
   /**
-   * Get a category row by name
+   * Get a category row by name using data-testid attribute
    */
   getCategoryRow(name: string): Locator {
-    return this.page.locator('div.group')
-      .filter({ hasText: name })
-      .filter({ has: this.page.locator('div[style*="background-color"]') })
+    return this.page.getByTestId('category-row')
+      .filter({ has: this.page.getByText(name, { exact: true }) })
       .first();
   }
 

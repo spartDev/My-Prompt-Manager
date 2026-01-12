@@ -52,6 +52,7 @@ export class SettingsPage extends BasePage {
 
   /**
    * Import data from file
+   * Note: File inputs require special handling as they don't have accessible roles
    */
   async importData(filePath: string): Promise<void> {
     const fileInput = this.page.locator('input[type="file"]');
@@ -106,7 +107,7 @@ export class SettingsPage extends BasePage {
    */
   async expectStorageUsageVisible(): Promise<void> {
     await expect(this.page.getByText('Storage Usage')).toBeVisible();
-    await expect(this.page.locator('.storage-bar, [class*="storage"], [class*="progress"]')).toBeVisible();
+    await expect(this.page.getByTestId('storage-bar')).toBeVisible();
   }
 
   /**

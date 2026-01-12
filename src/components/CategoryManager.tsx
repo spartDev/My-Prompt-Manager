@@ -232,7 +232,7 @@ const CategoryManager: FC<CategoryManagerProps> = ({
               </div>
             ) : (
               categories.map((category) => (
-                <div key={category.id} className="relative group flex items-center justify-between p-5 bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 hover:bg-white/90 dark:hover:bg-gray-800/90 transition-all duration-200">
+                <div key={category.id} data-testid="category-row" data-category-name={category.name} className="relative group flex items-center justify-between p-5 bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 hover:bg-white/90 dark:hover:bg-gray-800/90 transition-all duration-200">
                   {editingCategory?.category.id === category.id ? (
                     // Edit Mode - Show both color and name editors
                     <div className="flex-1">
