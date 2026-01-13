@@ -10,3 +10,4 @@ export {
 } from './base64';
 export { validatePromptFields, type FieldErrors } from './validation';
 export { cn } from './cn';
+export { formatPlatformName } from './formatPlatformName';

@@ -2,6 +2,7 @@ import { FC, useState, useMemo, useRef, useEffect } from 'react';
 
 import { useUsageStats } from '../../hooks/useUsageStats';
 import { PromptUsageSummary } from '../../types/hooks';
+import { formatPlatformName } from '../../utils';
 
 import {
   UsageLineChart,
@@ -77,22 +78,6 @@ function formatRelativeTime(timestamp: number, now: number): string {
     return `${String(minutes)}m ago`;
   }
   return 'Just now';
-}
-
-/**
- * Format platform name for display
- */
-function formatPlatformName(name: string): string {
-  const platformNames: Record<string, string> = {
-    claude: 'Claude',
-    chatgpt: 'ChatGPT',
-    gemini: 'Gemini',
-    perplexity: 'Perplexity',
-    copilot: 'Copilot',
-    mistral: 'Mistral',
-    custom: 'Custom Site'
-  };
-  return platformNames[name.toLowerCase()] ?? name;
 }
 
 /**

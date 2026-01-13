@@ -9,6 +9,7 @@ import {
 } from 'recharts';
 
 import { PlatformBreakdown } from '../../../types/hooks';
+import { formatPlatformName } from '../../../utils';
 
 export interface PlatformPieChartProps {
   /** Platform breakdown data */
@@ -40,20 +41,6 @@ const FALLBACK_COLORS = [
   '#ef4444', // red-500
   '#22c55e', // green-500
 ];
-
-// Format platform name for display
-const formatPlatformName = (name: string): string => {
-  const platformNames: Record<string, string> = {
-    claude: 'Claude',
-    chatgpt: 'ChatGPT',
-    gemini: 'Gemini',
-    perplexity: 'Perplexity',
-    copilot: 'Copilot',
-    mistral: 'Mistral',
-    custom: 'Custom Site'
-  };
-  return platformNames[name.toLowerCase()] ?? name;
-};
 
 /**
  * Donut chart showing platform usage breakdown

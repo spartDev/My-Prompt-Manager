@@ -2,6 +2,7 @@ import { FC, useMemo, useRef, useEffect, useState } from 'react';
 
 import { useUsageStats } from '../../hooks/useUsageStats';
 import { PromptUsageSummary } from '../../types/hooks';
+import { formatPlatformName } from '../../utils';
 import ViewHeader from '../ViewHeader';
 
 import SummaryCard from './SummaryCard';
@@ -131,20 +132,6 @@ const AnalyticsTab: FC<AnalyticsTabProps> = ({
     }, 60000);
     return () => { clearInterval(interval); };
   }, []);
-
-  // Format platform name for display
-  const formatPlatformName = (name: string): string => {
-    const platformNames: Record<string, string> = {
-      claude: 'Claude',
-      chatgpt: 'ChatGPT',
-      gemini: 'Gemini',
-      perplexity: 'Perplexity',
-      copilot: 'Copilot',
-      mistral: 'Mistral',
-      custom: 'Custom Site'
-    };
-    return platformNames[name.toLowerCase()] ?? name;
-  };
 
   // Handle clear history with confirmation
   const handleClearHistory = async (): Promise<void> => {
