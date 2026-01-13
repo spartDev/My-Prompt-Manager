@@ -5,7 +5,7 @@
  * handles loading and error states, and displays top prompts.
  */
 
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { useUsageStats } from '../../../hooks/useUsageStats';
@@ -477,6 +477,121 @@ describe('AnalyticsTab', () => {
       render(<AnalyticsTab />);
 
       expect(screen.getByRole('list')).toBeInTheDocument();
+    });
+  });
+
+  describe('Clear History', () => {
+    it('should show clear history button when there is data', () => {
+      mockUseUsageStats.mockReturnValue(createMockReturn());
+
+      render(<AnalyticsTab />);
+
+      expect(screen.getByRole('button', { name: /clear history/i })).toBeInTheDocument();
+    });
+
+    it('should not show clear history button when there is no data', () => {
+      mockUseUsageStats.mockReturnValue(createMockReturn({
+        stats: createMockStats({ totalUses: 0 })
+      }));
+
+      render(<AnalyticsTab />);
+
+      expect(screen.queryByRole('button', { name: /clear history/i })).not.toBeInTheDocument();
+    });
+
+    it('should show confirmation modal when clear history button is clicked', () => {
+      mockUseUsageStats.mockReturnValue(createMockReturn());
+
+      render(<AnalyticsTab />);
+
+      fireEvent.click(screen.getByRole('button', { name: /clear history/i }));
+
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+      expect(screen.getByText('Clear Usage History?')).toBeInTheDocument();
+    });
+
+    it('should close confirmation modal when cancel is clicked', () => {
+      mockUseUsageStats.mockReturnValue(createMockReturn());
+
+      render(<AnalyticsTab />);
+
+      fireEvent.click(screen.getByRole('button', { name: /clear history/i }));
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('should call clearHistory when confirm is clicked', async () => {
+      const mockClearHistory = vi.fn().mockResolvedValue(undefined);
+      mockUseUsageStats.mockReturnValue(createMockReturn({
+        clearHistory: mockClearHistory
+      }));
+
+      render(<AnalyticsTab />);
+
+      fireEvent.click(screen.getByRole('button', { name: /clear history/i }));
+      const dialog = screen.getByRole('dialog');
+      fireEvent.click(within(dialog).getByRole('button', { name: /^clear history$/i }));
+
+      await vi.waitFor(() => {
+        expect(mockClearHistory).toHaveBeenCalled();
+      });
+    });
+
+    it('should close modal after successful clear', async () => {
+      const mockClearHistory = vi.fn().mockResolvedValue(undefined);
+      mockUseUsageStats.mockReturnValue(createMockReturn({
+        clearHistory: mockClearHistory
+      }));
+
+      render(<AnalyticsTab />);
+
+      fireEvent.click(screen.getByRole('button', { name: /clear history/i }));
+      const dialog = screen.getByRole('dialog');
+      fireEvent.click(within(dialog).getByRole('button', { name: /^clear history$/i }));
+
+      await vi.waitFor(() => {
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      });
+    });
+
+    it('should show clearing state while clearing', async () => {
+      let resolvePromise: (() => void) | undefined;
+      const clearPromise = new Promise<void>(resolve => {
+        resolvePromise = resolve;
+      });
+      const mockClearHistory = vi.fn().mockReturnValue(clearPromise);
+      mockUseUsageStats.mockReturnValue(createMockReturn({
+        clearHistory: mockClearHistory
+      }));
+
+      render(<AnalyticsTab />);
+
+      fireEvent.click(screen.getByRole('button', { name: /clear history/i }));
+      const dialog = screen.getByRole('dialog');
+      fireEvent.click(within(dialog).getByRole('button', { name: /^clear history$/i }));
+
+      expect(screen.getByText('Clearing...')).toBeInTheDocument();
+
+      if (resolvePromise) {
+        resolvePromise();
+      }
+      await vi.waitFor(() => {
+        expect(screen.queryByText('Clearing...')).not.toBeInTheDocument();
+      });
+    });
+
+    it('should close modal when clicking backdrop', () => {
+      mockUseUsageStats.mockReturnValue(createMockReturn());
+
+      render(<AnalyticsTab />);
+
+      fireEvent.click(screen.getByRole('button', { name: /clear history/i }));
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByLabelText('Close modal'));
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
   });
 });

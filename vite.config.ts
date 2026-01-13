@@ -20,6 +20,7 @@ export default defineConfig({
       input: {
         popup: 'src/popup.html',
         sidepanel: 'src/sidepanel.html',
+        analytics: 'src/analytics.html',
         content: 'src/content/index.ts'
       }
     },

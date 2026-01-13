@@ -1,4 +1,4 @@
-import { FC, useMemo, useRef, useEffect } from 'react';
+import { FC, useMemo, useRef, useEffect, useState } from 'react';
 
 import { useUsageStats } from '../../hooks/useUsageStats';
 import { PromptUsageSummary } from '../../types/hooks';
@@ -59,6 +59,12 @@ const TrophyIcon: FC<{ className?: string }> = ({ className }) => (
   </svg>
 );
 
+const TrashIcon: FC<{ className?: string }> = ({ className }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+  </svg>
+);
+
 export interface AnalyticsTabProps {
   /** Callback when user wants to expand to full dashboard */
   onExpandDashboard?: () => void;
@@ -70,7 +76,9 @@ const AnalyticsTab: FC<AnalyticsTabProps> = ({
   onExpandDashboard,
   context = 'sidepanel'
 }) => {
-  const { stats, loading, error } = useUsageStats();
+  const { stats, loading, error, clearHistory } = useUsageStats();
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
 
   // Compute summary metrics
   const summaryMetrics = useMemo(() => {
@@ -109,7 +117,6 @@ const AnalyticsTab: FC<AnalyticsTabProps> = ({
   }, [stats]);
 
   // Capture current time once on mount for relative time calculations
-  // eslint-disable-next-line react-hooks/purity -- Date.now() is needed for initial time reference
   const nowRef = useRef<number>(Date.now());
 
   // Set initial time and update periodically (every minute) for accurate relative times
@@ -133,6 +140,19 @@ const AnalyticsTab: FC<AnalyticsTabProps> = ({
       custom: 'Custom Site'
     };
     return platformNames[name.toLowerCase()] ?? name;
+  };
+
+  // Handle clear history with confirmation
+  const handleClearHistory = async (): Promise<void> => {
+    setIsClearing(true);
+    try {
+      await clearHistory();
+      setShowClearConfirm(false);
+    } catch {
+      // Error is handled by the hook
+    } finally {
+      setIsClearing(false);
+    }
   };
 
   if (error) {
@@ -306,9 +326,73 @@ const AnalyticsTab: FC<AnalyticsTabProps> = ({
                 </div>
               )}
             </section>
+
+            {/* Clear History Action */}
+            {hasData && (
+              <div className="text-center pt-2">
+                <button
+                  onClick={() => { setShowClearConfirm(true); }}
+                  className="text-xs text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 transition-colors inline-flex items-center gap-1"
+                >
+                  <TrashIcon className="w-3 h-3" />
+                  Clear history
+                </button>
+              </div>
+            )}
           </div>
         )}
       </main>
+
+      {/* Clear History Confirmation Modal */}
+      {showClearConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+          role="presentation"
+        >
+          {/* Backdrop - closes modal on click */}
+          <button
+            type="button"
+            className="absolute inset-0 w-full h-full cursor-default"
+            onClick={() => { setShowClearConfirm(false); }}
+            aria-label="Close modal"
+            tabIndex={-1}
+          />
+          <div
+            className="relative bg-white dark:bg-gray-800 rounded-xl p-6 max-w-sm mx-4 shadow-xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="clear-history-title"
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center shrink-0">
+                <TrashIcon className="w-5 h-5 text-red-500" />
+              </div>
+              <h3 id="clear-history-title" className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                Clear Usage History?
+              </h3>
+            </div>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+              This will permanently delete all your usage analytics data. This action cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setShowClearConfirm(false); }}
+                className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors focus-interactive"
+                disabled={isClearing}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => { void handleClearHistory(); }}
+                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-red-500 rounded-xl hover:bg-red-600 transition-colors focus-interactive disabled:opacity-50"
+                disabled={isClearing}
+              >
+                {isClearing ? 'Clearing...' : 'Clear History'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

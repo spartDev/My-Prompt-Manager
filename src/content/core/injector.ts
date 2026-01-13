@@ -1944,9 +1944,17 @@ export class PromptLibraryInjector {
 
       if (result.success) {
         try {
+          // Get platform name from active strategy
+          const activeStrategy = this.platformManager.getActiveStrategy();
+          const platform = activeStrategy?.name ?? window.location.hostname;
+
           await chrome.runtime.sendMessage({
             type: 'PROMPT_USAGE_INCREMENT',
-            data: { promptId: prompt.id }
+            data: {
+              promptId: prompt.id,
+              platform,
+              categoryId: prompt.category || null
+            }
           });
         } catch (sendMessageError) {
           debug('[CONTENT] Failed to report prompt usage', {
