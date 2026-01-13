@@ -184,17 +184,6 @@ const AnalyticsTab: FC<AnalyticsTabProps> = ({
         subtitle="Last 30 days of usage"
         onBack={onBack}
         context={context}
-        actions={
-          onExpandDashboard && context === 'sidepanel' ? (
-            <button
-              onClick={onExpandDashboard}
-              className="px-4 py-2 text-sm font-medium text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 rounded-xl hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors focus-interactive"
-              aria-label="View full analytics dashboard"
-            >
-              View Full Dashboard
-            </button>
-          ) : undefined
-        }
       />
 
       {/* Content */}
@@ -338,6 +327,22 @@ const AnalyticsTab: FC<AnalyticsTabProps> = ({
           </div>
         )}
       </main>
+
+      {/* Footer with View Full Dashboard */}
+      {hasData && onExpandDashboard && context === 'sidepanel' && (
+        <footer className="shrink-0 px-4 py-2 bg-gray-100 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between" role="contentinfo" aria-label="Analytics footer">
+          <span className="text-xs text-gray-600 dark:text-gray-400" aria-live="polite" aria-atomic="true">
+            {String(summaryMetrics.totalUses)} prompt {summaryMetrics.totalUses === 1 ? 'use' : 'uses'}
+          </span>
+          <button
+            onClick={onExpandDashboard}
+            className="px-3 py-1.5 text-xs font-medium text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors focus-interactive"
+            aria-label="View full analytics dashboard"
+          >
+            View Full Dashboard
+          </button>
+        </footer>
+      )}
 
       {/* Clear History Confirmation Modal */}
       {showClearConfirm && (

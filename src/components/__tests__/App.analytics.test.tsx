@@ -3,8 +3,38 @@ import userEvent from '@testing-library/user-event';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 import App from '../../App';
+import { useUsageStats } from '../../hooks/useUsageStats';
 import { getMockStorageManager, getChromeMock } from '../../test/mocks';
 import type { Category } from '../../types';
+import type { UseUsageStatsReturn, UsageStats } from '../../types/hooks';
+
+// Mock the useUsageStats hook
+vi.mock('../../hooks/useUsageStats', () => ({
+  useUsageStats: vi.fn()
+}));
+
+const mockUseUsageStats = vi.mocked(useUsageStats);
+
+const createMockStats = (): UsageStats => ({
+  totalUses: 42,
+  dailyUsage: [],
+  platformBreakdown: [{ platform: 'claude', count: 25, percentage: 100 }],
+  dayOfWeekDistribution: [{ day: 'Mon', dayIndex: 1, count: 15 }],
+  timeOfDayDistribution: [],
+  categoryDistribution: [{ categoryId: '1', name: 'Development', count: 20 }],
+  topPrompts: [{ promptId: 'p1', title: 'Test Prompt', category: 'Development', count: 15, lastUsed: Date.now() }],
+  recentPrompts: [],
+  forgottenPrompts: []
+});
+
+const createMockReturn = (): UseUsageStatsReturn => ({
+  stats: createMockStats(),
+  history: [],
+  loading: false,
+  error: null,
+  refresh: vi.fn(),
+  clearHistory: vi.fn()
+});
 
 const defaultCategories: Category[] = [
   { id: 'default', name: 'Uncategorized', color: '#888888' },
@@ -22,6 +52,8 @@ describe('App analytics integration', () => {
     const storageMock = getMockStorageManager();
     storageMock.getCategories.mockResolvedValue([...defaultCategories]);
     storageMock.getPrompts.mockResolvedValue([]);
+    // Mock usage stats with data so footer shows
+    mockUseUsageStats.mockReturnValue(createMockReturn());
   });
 
   describe('Analytics navigation', () => {
