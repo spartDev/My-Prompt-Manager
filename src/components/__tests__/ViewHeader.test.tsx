@@ -686,7 +686,85 @@ describe('ViewHeader', () => {
       });
     });
 
-    describe('Backward Compatibility', () => {
+    describe('ViewHeader.AnalyticsButton', () => {
+      it('renders analytics button with composable API', () => {
+        const onAnalytics = vi.fn();
+
+        render(
+          <ViewHeader title="Test">
+            <ViewHeader.Actions>
+              <ViewHeader.AnalyticsButton onClick={onAnalytics} />
+            </ViewHeader.Actions>
+          </ViewHeader>
+        );
+
+        expect(screen.getByRole('button', { name: /view analytics/i })).toBeInTheDocument();
+      });
+
+      it('calls onClick when clicked', async () => {
+        const user = userEvent.setup();
+        const onAnalytics = vi.fn();
+
+        render(
+          <ViewHeader title="Test">
+            <ViewHeader.Actions>
+              <ViewHeader.AnalyticsButton onClick={onAnalytics} />
+            </ViewHeader.Actions>
+          </ViewHeader>
+        );
+
+        await user.click(screen.getByRole('button', { name: /view analytics/i }));
+        expect(onAnalytics).toHaveBeenCalledTimes(1);
+      });
+
+      it('supports disabled state', () => {
+        const onAnalytics = vi.fn();
+
+        render(
+          <ViewHeader title="Test">
+            <ViewHeader.Actions>
+              <ViewHeader.AnalyticsButton onClick={onAnalytics} disabled />
+            </ViewHeader.Actions>
+          </ViewHeader>
+        );
+
+        const button = screen.getByRole('button', { name: /view analytics/i });
+        expect(button).toBeDisabled();
+      });
+
+      it('has correct title attribute', () => {
+        const onAnalytics = vi.fn();
+
+        render(
+          <ViewHeader title="Test">
+            <ViewHeader.Actions>
+              <ViewHeader.AnalyticsButton onClick={onAnalytics} />
+            </ViewHeader.Actions>
+          </ViewHeader>
+        );
+
+        const button = screen.getByRole('button', { name: /view analytics/i });
+        expect(button).toHaveAttribute('title', 'Analytics');
+      });
+
+      it('renders chart icon with aria-hidden', () => {
+        const onAnalytics = vi.fn();
+
+        const { container } = render(
+          <ViewHeader title="Test">
+            <ViewHeader.Actions>
+              <ViewHeader.AnalyticsButton onClick={onAnalytics} />
+            </ViewHeader.Actions>
+          </ViewHeader>
+        );
+
+        const button = container.querySelector('[aria-label="View analytics"]');
+        const svg = button?.querySelector('svg');
+        expect(svg).toHaveAttribute('aria-hidden', 'true');
+      });
+    });
+
+  describe('Backward Compatibility', () => {
       it('legacy callback API still works', () => {
         const onBack = vi.fn();
         const onSettings = vi.fn();
