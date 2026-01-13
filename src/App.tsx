@@ -2,6 +2,7 @@ import { useState, useOptimistic, useTransition, useCallback } from 'react';
 import type { FC } from 'react';
 
 import AddPromptForm from './components/AddPromptForm';
+import { AnalyticsTab } from './components/analytics';
 import CategoryManager from './components/CategoryManager';
 import EditPromptForm from './components/EditPromptForm';
 import LibraryView from './components/LibraryView';
@@ -13,7 +14,7 @@ import { usePrompts, useCategories, useClipboard, useToast, useSearchWithDebounc
 import { Prompt, ErrorType, AppError } from './types';
 import { Logger, toError } from './utils';
 
-type ViewType = 'library' | 'add' | 'edit' | 'categories' | 'settings';
+type ViewType = 'library' | 'add' | 'edit' | 'categories' | 'settings' | 'analytics';
 
 interface AppProps {
   context?: 'popup' | 'sidepanel';
@@ -220,6 +221,10 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
     setCurrentView('settings');
   }, []);
 
+  const handleAnalytics = useCallback(() => {
+    setCurrentView('analytics');
+  }, []);
+
   const handleBackToLibrary = useCallback(() => {
     setCurrentView('library');
   }, []);
@@ -230,6 +235,11 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
     void refreshPrompts();
     void refreshCategories();
   }, [refreshPrompts, refreshCategories]);
+
+  const handleExpandDashboard = useCallback(() => {
+    // Open full analytics dashboard in a new tab
+    void chrome.tabs.create({ url: chrome.runtime.getURL('analytics.html') });
+  }, []);
 
   const handleCloseStorageWarning = useCallback(() => {
     setShowStorageWarning(false);
@@ -267,6 +277,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
           onCategoryChange={setSelectedCategory}
           onManageCategories={handleManageCategories}
           onSettings={handleSettings}
+          onAnalytics={handleAnalytics}
           loading={loading}
           context={context}
         />
@@ -306,6 +317,14 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
           showToast={showToast}
           toastSettings={settings}
           onToastSettingsChange={updateSettings}
+        />
+      )}
+
+      {currentView === 'analytics' && (
+        <AnalyticsTab
+          onBack={handleBackToLibrary}
+          onExpandDashboard={handleExpandDashboard}
+          context={context}
         />
       )}
 

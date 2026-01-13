@@ -325,6 +325,7 @@ const mockChrome = {
       return Promise.resolve(result);
     }),
     get: vi.fn().mockResolvedValue(undefined),
+    create: vi.fn().mockResolvedValue({ id: 1, url: 'analytics.html' }),
     sendMessage: vi.fn().mockResolvedValue(undefined),
     onUpdated: {
       addListener: vi.fn()
@@ -521,6 +522,7 @@ const resetChromeMocks = (): void => {
     return Promise.resolve(result);
   });
   (mockChrome.tabs.get as any).mockResolvedValue({ id: 1, url: 'https://example.com', status: 'complete' } as unknown as chrome.tabs.Tab);
+  (mockChrome.tabs.create as any).mockResolvedValue({ id: 1, url: 'analytics.html' });
   (mockChrome.tabs.sendMessage as any).mockResolvedValue(undefined);
   (mockChrome.scripting.executeScript as any).mockResolvedValue([{ result: true }]);
 };

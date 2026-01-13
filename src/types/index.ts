@@ -9,6 +9,17 @@ export interface Prompt {
   lastUsedAt?: number; // timestamp of the last usage (defaults to createdAt)
 }
 
+// Usage Analytics types
+export interface UsageEvent {
+  promptId: string;        // Reference to the prompt
+  timestamp: number;       // Unix milliseconds
+  platform: string;        // 'claude' | 'chatgpt' | 'gemini' | 'perplexity' | 'copilot' | 'mistral' | 'custom'
+  categoryId: string | null;
+}
+
+export const USAGE_RETENTION_DAYS = 30;
+export const USAGE_STORAGE_KEY = 'usageHistory';
+
 export interface Category {
   id: string; // uuid-v4-string
   name: string; // max 50 chars

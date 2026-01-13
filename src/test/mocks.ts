@@ -42,6 +42,7 @@ export const getChromeMockFunctions = () => {
     tabs: {
       query: chromeApi.tabs.query,
       get: chromeApi.tabs.get,
+      create: chromeApi.tabs.create,
       sendMessage: chromeApi.tabs.sendMessage,
     },
     runtime: {

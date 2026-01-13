@@ -8,6 +8,7 @@ import {
   getAllHostnamePatterns,
 } from "../config/platforms";
 import { StorageManager } from "../services/storage";
+import { UsageTracker } from "../services/UsageTracker";
 import type { ElementFingerprint } from "../types";
 import { Logger, toError, getErrorMessage } from "../utils";
 
@@ -798,7 +799,7 @@ chrome.runtime.onMessage.addListener(
         break;
 
       case "PROMPT_USAGE_INCREMENT":
-        void handlePromptUsageIncrement(message.data?.promptId, sendResponse);
+        void handlePromptUsageIncrement(message.data, sendResponse);
         break;
 
       default:
@@ -960,21 +961,31 @@ async function handleRequestPermission(
 }
 
 async function handlePromptUsageIncrement(
-  promptId: string | undefined,
+  data: { promptId?: string; platform?: string; categoryId?: string | null } | undefined,
   sendResponse: (response?: { success: boolean; error?: string }) => void,
 ) {
+  const promptId = data?.promptId;
+  const platform = data?.platform;
+  const categoryId = data?.categoryId ?? null;
+
   if (!promptId) {
     sendResponse({ success: false, error: "Prompt ID is required" });
     return;
   }
 
   try {
-    await storageManager.incrementUsageCount(promptId);
+    // Record analytics event (parallel operations)
+    const usageTracker = UsageTracker.getInstance();
+    await Promise.all([
+      storageManager.incrementUsageCount(promptId),
+      platform ? usageTracker.record(promptId, platform, categoryId) : Promise.resolve()
+    ]);
     sendResponse({ success: true });
   } catch (error) {
     Logger.error("Failed to increment prompt usage", toError(error), {
       component: "Background",
       promptId,
+      platform,
     });
     sendResponse({ success: false, error: getErrorMessage(error) });
   }
