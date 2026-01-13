@@ -4,13 +4,13 @@ import { Children, isValidElement } from 'react';
 import { useExtensionContext } from '../hooks';
 import { Logger } from '../utils';
 
-import { AddIcon, EditIcon, LogoIcon, SettingsIcon } from './icons/HeaderIcons';
+import { AddIcon, AnalyticsIcon, EditIcon, LogoIcon, SettingsIcon } from './icons/HeaderIcons';
 
 /**
  * Predefined icon types for the ViewHeader component.
- * @typedef {'logo' | 'add' | 'edit' | 'settings'} IconType
+ * @typedef {'logo' | 'add' | 'edit' | 'settings' | 'analytics'} IconType
  */
-type IconType = 'logo' | 'add' | 'edit' | 'settings';
+type IconType = 'logo' | 'add' | 'edit' | 'settings' | 'analytics';
 
 /**
  * Props for the ViewHeader component.
@@ -204,6 +204,24 @@ interface SettingsButtonProps {
 }
 
 /**
+ * Props for the AnalyticsButton subcomponent.
+ */
+interface AnalyticsButtonProps {
+  /**
+   * Callback fired when the analytics button is clicked.
+   * @example
+   * onClick={() => openAnalytics()}
+   */
+  onClick: () => void;
+
+  /**
+   * Whether the button is disabled.
+   * @default false
+   */
+  disabled?: boolean;
+}
+
+/**
  * Props for the CloseButton subcomponent.
  */
 interface CloseButtonProps {
@@ -253,7 +271,8 @@ const ICON_COMPONENT_MAP: Record<IconType, FC> = {
   logo: LogoIcon,
   add: AddIcon,
   edit: EditIcon,
-  settings: SettingsIcon
+  settings: SettingsIcon,
+  analytics: AnalyticsIcon
 };
 
 /**
@@ -329,6 +348,32 @@ const SettingsButton: FC<SettingsButtonProps> = ({ onClick, disabled = false }) 
 };
 
 /**
+ * Analytics button subcomponent.
+ * Displays a bar chart icon button for opening analytics.
+ *
+ * @example
+ * <ViewHeader.AnalyticsButton onClick={() => setView('analytics')} />
+ *
+ * @example
+ * <ViewHeader.AnalyticsButton onClick={openAnalytics} disabled={isLoading} />
+ */
+const AnalyticsButton: FC<AnalyticsButtonProps> = ({ onClick, disabled = false }) => {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors focus-interactive disabled:opacity-50 disabled:cursor-not-allowed"
+      title="Analytics"
+      aria-label="View analytics"
+    >
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+      </svg>
+    </button>
+  );
+};
+
+/**
  * Close button subcomponent.
  * Displays an X icon button for closing the view.
  * The aria-label and title adapt based on context (popup vs sidepanel).
@@ -390,6 +435,12 @@ interface ViewHeaderComponent extends FC<ViewHeaderProps> {
    * @see {@link SettingsButton}
    */
   SettingsButton: FC<SettingsButtonProps>;
+
+  /**
+   * Analytics button subcomponent.
+   * @see {@link AnalyticsButton}
+   */
+  AnalyticsButton: FC<AnalyticsButtonProps>;
 
   /**
    * Close button subcomponent.
@@ -673,6 +724,7 @@ const ViewHeader = ViewHeaderFC as ViewHeaderComponent;
 ViewHeader.Actions = Actions;
 ViewHeader.BackButton = BackButton;
 ViewHeader.SettingsButton = SettingsButton;
+ViewHeader.AnalyticsButton = AnalyticsButton;
 ViewHeader.CloseButton = CloseButton;
 
 export default ViewHeader;

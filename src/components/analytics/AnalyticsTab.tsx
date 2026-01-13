@@ -68,12 +68,15 @@ const TrashIcon: FC<{ className?: string }> = ({ className }) => (
 export interface AnalyticsTabProps {
   /** Callback when user wants to expand to full dashboard */
   onExpandDashboard?: () => void;
+  /** Callback when user wants to go back to previous view */
+  onBack?: () => void;
   /** Current context (popup or sidepanel) */
   context?: 'popup' | 'sidepanel';
 }
 
 const AnalyticsTab: FC<AnalyticsTabProps> = ({
   onExpandDashboard,
+  onBack,
   context = 'sidepanel'
 }) => {
   const { stats, loading, error, clearHistory } = useUsageStats();
@@ -177,6 +180,20 @@ const AnalyticsTab: FC<AnalyticsTabProps> = ({
       <header className="shrink-0 p-6 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
+            {onBack && (
+              <button
+                onClick={onBack}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors focus-interactive"
+                title="Go back"
+                aria-label="Go back"
+                data-testid="back-button"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                <span>Back</span>
+              </button>
+            )}
             <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center">
               <UsageIcon className="w-6 h-6 text-white" />
             </div>

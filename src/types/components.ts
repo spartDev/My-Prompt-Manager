@@ -47,6 +47,7 @@ export interface LibraryViewProps {
   onCategoryChange: (category: string | null) => void;
   onManageCategories: () => void;
   onSettings: () => void;
+  onAnalytics: () => void;
   loading?: boolean;
   context?: 'popup' | 'sidepanel';
 }
