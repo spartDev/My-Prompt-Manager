@@ -183,7 +183,7 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
       <header className="sticky top-0 z-10 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        <div className="px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               {onBack && (
@@ -214,7 +214,7 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
       </header>
 
       {/* Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main className="px-4 sm:px-6 lg:px-8 py-6">
         {!hasData && !loading ? (
           /* Empty state */
           <div className="flex flex-col items-center justify-center py-24 text-center" role="region" aria-label="Empty analytics">
