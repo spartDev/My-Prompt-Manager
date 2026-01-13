@@ -2,6 +2,7 @@ import { FC, useMemo, useRef, useEffect, useState } from 'react';
 
 import { useUsageStats } from '../../hooks/useUsageStats';
 import { PromptUsageSummary } from '../../types/hooks';
+import ViewHeader from '../ViewHeader';
 
 import SummaryCard from './SummaryCard';
 
@@ -177,36 +178,14 @@ const AnalyticsTab: FC<AnalyticsTabProps> = ({
   return (
     <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900">
       {/* Header */}
-      <header className="shrink-0 p-6 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            {onBack && (
-              <button
-                onClick={onBack}
-                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors focus-interactive"
-                title="Go back"
-                aria-label="Go back"
-                data-testid="back-button"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                </svg>
-                <span>Back</span>
-              </button>
-            )}
-            <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center">
-              <UsageIcon className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
-                Analytics
-              </h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Last 30 days of usage
-              </p>
-            </div>
-          </div>
-          {onExpandDashboard && context === 'sidepanel' && (
+      <ViewHeader
+        icon="analytics"
+        title="Analytics"
+        subtitle="Last 30 days of usage"
+        onBack={onBack}
+        context={context}
+        actions={
+          onExpandDashboard && context === 'sidepanel' ? (
             <button
               onClick={onExpandDashboard}
               className="px-4 py-2 text-sm font-medium text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 rounded-xl hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors focus-interactive"
@@ -214,9 +193,9 @@ const AnalyticsTab: FC<AnalyticsTabProps> = ({
             >
               View Full Dashboard
             </button>
-          )}
-        </div>
-      </header>
+          ) : undefined
+        }
+      />
 
       {/* Content */}
       <main className="flex-1 overflow-auto custom-scrollbar p-4">
@@ -349,9 +328,9 @@ const AnalyticsTab: FC<AnalyticsTabProps> = ({
               <div className="text-center pt-2">
                 <button
                   onClick={() => { setShowClearConfirm(true); }}
-                  className="text-xs text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 transition-colors inline-flex items-center gap-1"
+                  className="text-sm text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 px-3 py-1.5 rounded-lg transition-colors inline-flex items-center gap-1.5"
                 >
-                  <TrashIcon className="w-3 h-3" />
+                  <TrashIcon className="w-4 h-4" />
                   Clear history
                 </button>
               </div>
