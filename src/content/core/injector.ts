@@ -6,6 +6,7 @@
  * all the modular components.
  */
 
+import { getPlatformByHostname } from '../../config/platforms';
 import type { ElementFingerprint } from '../../types/index';
 import type { Prompt, InsertionResult } from '../types/index';
 import { UIElementFactory } from '../ui/element-factory';
@@ -1944,9 +1945,8 @@ export class PromptLibraryInjector {
 
       if (result.success) {
         try {
-          // Get platform name from active strategy
-          const activeStrategy = this.platformManager.getActiveStrategy();
-          const platform = activeStrategy?.name ?? window.location.hostname;
+          // Get platform name from hostname lookup for accurate analytics
+          const platform = getPlatformByHostname(window.location.hostname)?.id ?? window.location.hostname;
 
           await chrome.runtime.sendMessage({
             type: 'PROMPT_USAGE_INCREMENT',
