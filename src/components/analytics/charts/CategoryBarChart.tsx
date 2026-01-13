@@ -125,6 +125,9 @@ const CategoryBarChart: FC<CategoryBarChartProps> = ({
               color: isDarkMode ? '#f3f4f6' : '#111827',
               fontWeight: 600
             }}
+            itemStyle={{
+              color: isDarkMode ? '#f3f4f6' : '#111827'
+            }}
             cursor={{ fill: isDarkMode ? 'rgba(156, 163, 175, 0.1)' : 'rgba(107, 114, 128, 0.1)' }}
           />
           <Bar dataKey="count" radius={[0, 4, 4, 0]}>

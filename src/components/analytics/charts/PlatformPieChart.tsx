@@ -118,6 +118,9 @@ const PlatformPieChart: FC<PlatformPieChartProps> = ({
               color: textColor,
               fontWeight: 600
             }}
+            itemStyle={{
+              color: isDarkMode ? '#f3f4f6' : '#111827'
+            }}
           />
           {showLegend && (
             <Legend
