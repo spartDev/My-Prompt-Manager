@@ -39,6 +39,10 @@ body {
   background: #ffffff;
 }
 
+.dark body {
+  background: #111827; /* gray-900 */
+}
+
 #root {
   width: 100%;
   height: 100%;

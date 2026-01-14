@@ -382,7 +382,7 @@ describe('AnalyticsTab', () => {
       expect(screen.getByText(expected)).toBeInTheDocument();
     });
 
-    it('should keep unknown platform names as-is', () => {
+    it('should capitalize and format unknown platform names', () => {
       const stats = createMockStats({
         platformBreakdown: [{ platform: 'new-platform', count: 10, percentage: 100 }]
       });
@@ -391,7 +391,7 @@ describe('AnalyticsTab', () => {
 
       render(<AnalyticsTab />);
 
-      expect(screen.getByText('new-platform')).toBeInTheDocument();
+      expect(screen.getByText('New-platform')).toBeInTheDocument();
     });
   });
 

@@ -238,7 +238,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
 
   const handleExpandDashboard = useCallback(() => {
     // Open full analytics dashboard in a new tab
-    void chrome.tabs.create({ url: chrome.runtime.getURL('analytics.html') });
+    void chrome.tabs.create({ url: chrome.runtime.getURL('src/analytics.html') });
   }, []);
 
   const handleCloseStorageWarning = useCallback(() => {
