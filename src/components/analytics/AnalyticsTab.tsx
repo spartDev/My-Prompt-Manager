@@ -333,15 +333,14 @@ const AnalyticsTab: FC<AnalyticsTabProps> = ({
           role="presentation"
         >
           {/* Backdrop - closes modal on click */}
-          <button
-            type="button"
-            className="absolute inset-0 w-full h-full cursor-default"
+          <div
+            className="absolute inset-0"
             onClick={() => { setShowClearConfirm(false); }}
-            aria-label="Close modal"
-            tabIndex={-1}
+            aria-hidden="true"
+            data-testid="modal-backdrop"
           />
           <div
-            className="relative bg-white dark:bg-gray-800 rounded-xl p-6 max-w-sm mx-4 shadow-xl"
+            className="relative z-10 bg-white dark:bg-gray-800 rounded-xl p-6 max-w-sm mx-4 shadow-xl"
             role="dialog"
             aria-modal="true"
             aria-labelledby="clear-history-title"

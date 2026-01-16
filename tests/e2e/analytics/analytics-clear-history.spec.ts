@@ -106,8 +106,9 @@ test.describe('Analytics clear history', () => {
       await analyticsPage.getClearHistoryButton().click();
       await analyticsAssertions.clearHistoryModalVisible(page);
 
-      // Click backdrop (the button with aria-label="Close modal")
-      await page.getByRole('button', { name: 'Close modal' }).click();
+      // Click backdrop (the div with aria-hidden="true" that's behind the dialog)
+      // We click at a position that's on the backdrop but not on the dialog
+      await page.locator('div[role="presentation"]').click({ position: { x: 5, y: 5 } });
 
       // Verify modal is closed
       await analyticsAssertions.clearHistoryModalHidden(page);

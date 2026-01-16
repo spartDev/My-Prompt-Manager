@@ -422,10 +422,22 @@ export const analyticsWorkflows = {
 
   /**
    * Navigate to the full analytics dashboard from the Analytics tab
+   * Note: The dashboard opens in a new tab, so we need to wait for it and switch context
    */
-  navigateToFullDashboard: async (page: Page): Promise<void> => {
-    await page.getByRole('button', { name: 'View full analytics dashboard' }).click();
-    await expect(page.getByRole('heading', { name: 'Analytics Dashboard' })).toBeVisible();
+  navigateToFullDashboard: async (page: Page): Promise<Page> => {
+    const context = page.context();
+
+    // Wait for the new page to open when button is clicked
+    const [newPage] = await Promise.all([
+      context.waitForEvent('page'),
+      page.getByRole('button', { name: 'View full analytics dashboard' }).click()
+    ]);
+
+    // Wait for the new page to load
+    await newPage.waitForLoadState('domcontentloaded');
+    await expect(newPage.getByRole('heading', { name: 'Analytics Dashboard' })).toBeVisible();
+
+    return newPage;
   },
 
   /**
@@ -479,10 +491,11 @@ export const analyticsWorkflows = {
 
   /**
    * Open analytics dashboard (combines navigation to tab and then to full dashboard)
+   * Returns the new page where the dashboard is opened
    */
-  openAnalyticsDashboard: async (page: Page): Promise<void> => {
+  openAnalyticsDashboard: async (page: Page): Promise<Page> => {
     await analyticsWorkflows.navigateToAnalyticsTab(page);
-    await analyticsWorkflows.navigateToFullDashboard(page);
+    return await analyticsWorkflows.navigateToFullDashboard(page);
   },
 };
 

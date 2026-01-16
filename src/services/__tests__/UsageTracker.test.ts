@@ -143,9 +143,9 @@ describe('UsageTracker', () => {
       // Clear history
       await usageTracker.clearHistory();
 
-      // Verify storage is cleared
+      // Verify storage is set to empty array
       const result = await chrome.storage.local.get(USAGE_STORAGE_KEY);
-      expect(result[USAGE_STORAGE_KEY]).toBeUndefined();
+      expect(result[USAGE_STORAGE_KEY]).toEqual([]);
 
       // Verify getHistory returns empty
       const history = await usageTracker.getHistory();

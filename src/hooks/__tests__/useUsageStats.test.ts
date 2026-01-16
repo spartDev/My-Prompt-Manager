@@ -516,8 +516,9 @@ describe('useUsageStats', () => {
         expect(result.current.loading).toBe(false);
       });
 
-      const removeSpy = vi.spyOn(chrome.storage.local, 'remove');
-      removeSpy.mockRejectedValueOnce(new Error('Failed to clear'));
+      // Mock set to fail since clearHistory now uses setHistory([]) instead of remove()
+      const setSpy = vi.spyOn(chrome.storage.local, 'set');
+      setSpy.mockRejectedValueOnce(new Error('Failed to clear'));
 
       await act(async () => {
         await expect(result.current.clearHistory()).rejects.toThrow();
@@ -525,7 +526,7 @@ describe('useUsageStats', () => {
 
       expect(result.current.error).toBeTruthy();
 
-      removeSpy.mockRestore();
+      setSpy.mockRestore();
     });
   });
 

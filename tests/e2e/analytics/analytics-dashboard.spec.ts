@@ -20,8 +20,9 @@ test.describe('Analytics dashboard', () => {
       const page = await context.newPage();
       await page.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
-      const analyticsPage = new AnalyticsPage(page);
-      await analyticsWorkflows.openAnalyticsDashboard(page);
+      // Open dashboard - it opens in a new tab, so we get the new page
+      const dashboardPage = await analyticsWorkflows.openAnalyticsDashboard(page);
+      const analyticsPage = new AnalyticsPage(dashboardPage);
 
       // Verify dashboard header
       await expect(analyticsPage.getDashboardHeader()).toBeVisible();
@@ -70,8 +71,8 @@ test.describe('Analytics dashboard', () => {
       const page = await context.newPage();
       await page.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
-      const analyticsPage = new AnalyticsPage(page);
-      await analyticsWorkflows.openAnalyticsDashboard(page);
+      const dashboardPage = await analyticsWorkflows.openAnalyticsDashboard(page);
+      const analyticsPage = new AnalyticsPage(dashboardPage);
 
       // Verify usage trend chart section is visible
       await expect(analyticsPage.getUsageTrendSection()).toBeVisible();
@@ -89,8 +90,8 @@ test.describe('Analytics dashboard', () => {
       const page = await context.newPage();
       await page.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
-      const analyticsPage = new AnalyticsPage(page);
-      await analyticsWorkflows.openAnalyticsDashboard(page);
+      const dashboardPage = await analyticsWorkflows.openAnalyticsDashboard(page);
+      const analyticsPage = new AnalyticsPage(dashboardPage);
 
       // Verify breakdown section (contains platform pie chart and day of week chart)
       await expect(analyticsPage.getBreakdownSection()).toBeVisible();
@@ -108,8 +109,8 @@ test.describe('Analytics dashboard', () => {
       const page = await context.newPage();
       await page.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
-      const analyticsPage = new AnalyticsPage(page);
-      await analyticsWorkflows.openAnalyticsDashboard(page);
+      const dashboardPage = await analyticsWorkflows.openAnalyticsDashboard(page);
+      const analyticsPage = new AnalyticsPage(dashboardPage);
 
       // Verify breakdown section which contains day of week data
       await expect(analyticsPage.getBreakdownSection()).toBeVisible();
@@ -129,8 +130,8 @@ test.describe('Analytics dashboard', () => {
       const page = await context.newPage();
       await page.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
-      const analyticsPage = new AnalyticsPage(page);
-      await analyticsWorkflows.openAnalyticsDashboard(page);
+      const dashboardPage = await analyticsWorkflows.openAnalyticsDashboard(page);
+      const analyticsPage = new AnalyticsPage(dashboardPage);
 
       // Verify Most Used tab is selected by default
       await expect(analyticsPage.getTab('Most Used')).toHaveAttribute('aria-selected', 'true');
@@ -148,8 +149,8 @@ test.describe('Analytics dashboard', () => {
       const page = await context.newPage();
       await page.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
-      const analyticsPage = new AnalyticsPage(page);
-      await analyticsWorkflows.openAnalyticsDashboard(page);
+      const dashboardPage = await analyticsWorkflows.openAnalyticsDashboard(page);
+      const analyticsPage = new AnalyticsPage(dashboardPage);
 
       // Switch to Recently Used tab
       await analyticsPage.switchTab('Recently Used');
@@ -171,8 +172,8 @@ test.describe('Analytics dashboard', () => {
       const page = await context.newPage();
       await page.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
-      const analyticsPage = new AnalyticsPage(page);
-      await analyticsWorkflows.openAnalyticsDashboard(page);
+      const dashboardPage = await analyticsWorkflows.openAnalyticsDashboard(page);
+      const analyticsPage = new AnalyticsPage(dashboardPage);
 
       // Switch to Forgotten tab
       await analyticsPage.switchTab('Forgotten');
@@ -194,8 +195,8 @@ test.describe('Analytics dashboard', () => {
       const page = await context.newPage();
       await page.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
-      const analyticsPage = new AnalyticsPage(page);
-      await analyticsWorkflows.openAnalyticsDashboard(page);
+      const dashboardPage = await analyticsWorkflows.openAnalyticsDashboard(page);
+      const analyticsPage = new AnalyticsPage(dashboardPage);
 
       // Start with Most Used (default)
       await expect(analyticsPage.getTab('Most Used')).toHaveAttribute('aria-selected', 'true');
@@ -227,18 +228,20 @@ test.describe('Analytics dashboard', () => {
       const page = await context.newPage();
       await page.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
-      const analyticsPage = new AnalyticsPage(page);
-      await analyticsWorkflows.openAnalyticsDashboard(page);
+      const dashboardPage = await analyticsWorkflows.openAnalyticsDashboard(page);
+      const analyticsPage = new AnalyticsPage(dashboardPage);
 
       // Verify we are on the dashboard
       await expect(analyticsPage.getDashboardHeader()).toBeVisible();
 
-      // Click back button
+      // Click back button - this closes the tab and returns to the sidepanel
       await expect(analyticsPage.getBackButton()).toBeVisible();
       await analyticsPage.navigateBack();
 
-      // Verify we are back on the Analytics tab
-      await expect(analyticsPage.getAnalyticsHeader()).toBeVisible();
+      // The dashboard page closes when back is clicked (window.close())
+      // So we verify the tab is closed
+      expect(dashboardPage).toHaveProperty('isClosed', expect.any(Function));
+      expect(dashboardPage.isClosed()).toBe(true);
     });
 
     test('back button is visible on dashboard', async ({ context, storage, extensionId }) => {
@@ -253,8 +256,8 @@ test.describe('Analytics dashboard', () => {
       const page = await context.newPage();
       await page.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
-      const analyticsPage = new AnalyticsPage(page);
-      await analyticsWorkflows.openAnalyticsDashboard(page);
+      const dashboardPage = await analyticsWorkflows.openAnalyticsDashboard(page);
+      const analyticsPage = new AnalyticsPage(dashboardPage);
 
       // Verify back button is visible
       await expect(analyticsPage.getBackButton()).toBeVisible();

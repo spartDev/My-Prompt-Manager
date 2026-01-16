@@ -590,7 +590,7 @@ describe('AnalyticsTab', () => {
       fireEvent.click(screen.getByRole('button', { name: /clear history/i }));
       expect(screen.getByRole('dialog')).toBeInTheDocument();
 
-      fireEvent.click(screen.getByLabelText('Close modal'));
+      fireEvent.click(screen.getByTestId('modal-backdrop'));
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
   });

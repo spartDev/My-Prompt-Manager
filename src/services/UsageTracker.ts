@@ -99,7 +99,7 @@ export class UsageTracker {
    */
   async clearHistory(): Promise<void> {
     try {
-      await chrome.storage.local.remove(USAGE_STORAGE_KEY);
+      await this.setHistory([]);
     } catch (error) {
       throw this.handleError(error);
     }
