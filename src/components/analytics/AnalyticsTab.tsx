@@ -315,14 +315,14 @@ const AnalyticsTab: FC<AnalyticsTabProps> = ({
         )}
       </main>
 
-      {/* Floating Action Button for View Full Dashboard */}
+      {/* Floating Action Button for Full Dashboard */}
       {hasData && onExpandDashboard && context === 'sidepanel' && (
         <button
           onClick={onExpandDashboard}
           className="absolute bottom-4 right-4 px-4 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl shadow-lg hover:shadow-xl hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 focus-primary"
           aria-label="View full analytics dashboard"
         >
-          View Full Dashboard
+          Full Dashboard
         </button>
       )}
 
