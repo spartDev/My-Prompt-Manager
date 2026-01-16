@@ -39,7 +39,7 @@ jobs:
 
       - name: 📦 Cache Dependencies
         id: cache-deps
-        uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5
+        uses: actions/cache@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5
         with:
           path: |
             ~/.npm
@@ -75,7 +75,7 @@ jobs:
           cache: "npm"
 
       - name: "📦 Restore Dependencies"
-        uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5
+        uses: actions/cache@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5
         with:
           path: |
             ~/.npm
@@ -125,7 +125,7 @@ jobs:
           cache: "npm"
 
       - name: 📦 Restore Dependencies
-        uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5
+        uses: actions/cache@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5
         with:
           path: |
             ~/.npm
@@ -137,7 +137,7 @@ jobs:
         run: npm ci --prefer-offline --no-audit
 
       - name: 📋 Cache ESLint Results
-        uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5
+        uses: actions/cache@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5
         with:
           path: .eslintcache
           key: ${{ runner.os }}-eslint-${{ hashFiles('.eslintrc.*', 'eslint.config.*', 'src/**/*.{ts,tsx}') }}
@@ -178,7 +178,7 @@ jobs:
           cache: "npm"
 
       - name: 📦 Restore Dependencies
-        uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5
+        uses: actions/cache@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5
         with:
           path: |
             ~/.npm
@@ -235,7 +235,7 @@ jobs:
           cache: "npm"
 
       - name: 📦 Restore Dependencies
-        uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5
+        uses: actions/cache@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5
         with:
           path: |
             ~/.npm
@@ -247,7 +247,7 @@ jobs:
         run: npm ci --prefer-offline --no-audit
 
       - name: 📋 Cache Build Assets
-        uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5
+        uses: actions/cache@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5
         with:
           path: |
             dist
@@ -310,7 +310,7 @@ jobs:
           cache: "npm"
 
       - name: 📦 Restore Dependencies
-        uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5
+        uses: actions/cache@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5
         with:
           path: |
             ~/.npm
@@ -323,7 +323,7 @@ jobs:
 
       - name: 📥 Cache Playwright Browsers
         id: playwright-cache
-        uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5
+        uses: actions/cache@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5
         with:
           path: |
             ~/.cache/ms-playwright
@@ -369,7 +369,7 @@ jobs:
           cache: "npm"
 
       - name: 📦 Restore Dependencies
-        uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5
+        uses: actions/cache@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5
         with:
           path: |
             ~/.npm
