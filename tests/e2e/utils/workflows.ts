@@ -433,10 +433,15 @@ export const analyticsWorkflows = {
       page.getByRole('button', { name: 'View full analytics dashboard' }).click()
     ]);
 
-    // Wait for the new page to fully load (including all resources)
-    // CI environments are slower, so we wait for 'load' state and use a longer
-    // timeout for the React component to render
+    // Wait for the page to navigate to the analytics URL
+    // In CI, the new tab may initially be about:blank before navigating
+    await newPage.waitForURL(/analytics\.html/, { timeout: 30000 });
+
+    // Wait for the page to fully load (including all resources)
     await newPage.waitForLoadState('load');
+
+    // Wait for React to render the dashboard component
+    // CI environments are slower, so we use a longer timeout
     await expect(newPage.getByRole('heading', { name: 'Analytics Dashboard' })).toBeVisible({ timeout: 30000 });
 
     return newPage;
