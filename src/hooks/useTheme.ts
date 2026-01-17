@@ -49,6 +49,15 @@ export const useTheme = (): UseThemeReturn => {
 
   // Listen for storage changes to update theme when changed from settings
   useEffect(() => {
+    // Safety check: chrome.storage.onChanged may not be available in all contexts
+    // (e.g., when analytics.html opens in a new tab before extension context is ready)
+    // Use runtime check to avoid crash when chrome API is partially available
+    const storageApi = typeof chrome !== 'undefined' ? chrome.storage : undefined;
+    const onChangedApi = storageApi ? storageApi.onChanged : undefined;
+    if (!onChangedApi) {
+      return;
+    }
+
     const handleStorageChange = (changes: { [key: string]: chrome.storage.StorageChange }, areaName: string) => {
       if (areaName === 'local' && 'settings' in changes) {
         const newSettings = changes.settings.newValue as { theme?: Theme } | undefined;
@@ -58,9 +67,9 @@ export const useTheme = (): UseThemeReturn => {
       }
     };
 
-    chrome.storage.onChanged.addListener(handleStorageChange);
+    onChangedApi.addListener(handleStorageChange);
     return () => {
-      chrome.storage.onChanged.removeListener(handleStorageChange);
+      onChangedApi.removeListener(handleStorageChange);
     };
   }, [theme]);
 
