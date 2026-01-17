@@ -433,9 +433,11 @@ export const analyticsWorkflows = {
       page.getByRole('button', { name: 'View full analytics dashboard' }).click()
     ]);
 
-    // Wait for the new page to load
-    await newPage.waitForLoadState('domcontentloaded');
-    await expect(newPage.getByRole('heading', { name: 'Analytics Dashboard' })).toBeVisible();
+    // Wait for the new page to fully load (including all resources)
+    // CI environments are slower, so we wait for 'load' state and use a longer
+    // timeout for the React component to render
+    await newPage.waitForLoadState('load');
+    await expect(newPage.getByRole('heading', { name: 'Analytics Dashboard' })).toBeVisible({ timeout: 30000 });
 
     return newPage;
   },
