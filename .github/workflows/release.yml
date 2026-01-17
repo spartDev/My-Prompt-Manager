@@ -84,7 +84,7 @@ jobs:
 
       - name: 📦 Cache Node Modules (Multi-level Strategy)
         id: cache-deps
-        uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5
+        uses: actions/cache@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5
         with:
           path: |
             ~/.npm
@@ -160,7 +160,7 @@ jobs:
           registry-url: "https://registry.npmjs.org"
 
       - name: 📦 Restore Cache (Multi-level Strategy)
-        uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5
+        uses: actions/cache@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5
         with:
           path: |
             ~/.npm
@@ -179,7 +179,7 @@ jobs:
           npm ci --prefer-offline --no-audit --no-fund --silent
 
       - name: 📋 Cache Build Assets
-        uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5
+        uses: actions/cache@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5
         with:
           path: |
             dist
