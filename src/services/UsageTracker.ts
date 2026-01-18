@@ -85,10 +85,35 @@ export class UsageTracker {
   }
 
   /**
+   * Wait for chrome.storage.local to be available
+   * In some contexts (e.g., analytics.html in a new tab), the chrome API
+   * may not be immediately available when the page first loads
+   */
+  private async ensureStorageAvailable(): Promise<void> {
+    const maxAttempts = 50;
+    const delayMs = 100;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+        return;
+      }
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+
+    throw new UsageTrackerError({
+      type: ErrorType.STORAGE_UNAVAILABLE,
+      message: 'Chrome storage API is not available. Please ensure you are running within a Chrome extension context.',
+      details: { maxAttempts, delayMs }
+    });
+  }
+
+  /**
    * Get raw history from storage without filtering
    * Used internally for operations that need all events
    */
   private async getRawHistory(): Promise<UsageEvent[]> {
+    await this.ensureStorageAvailable();
     const result = await chrome.storage.local.get([USAGE_STORAGE_KEY]);
     const history = result[USAGE_STORAGE_KEY] as UsageEvent[] | undefined;
     return history ?? [];
@@ -164,6 +189,7 @@ export class UsageTracker {
    * Save usage history to storage
    */
   private async setHistory(history: UsageEvent[]): Promise<void> {
+    await this.ensureStorageAvailable();
     await chrome.storage.local.set({ [USAGE_STORAGE_KEY]: history });
   }
 

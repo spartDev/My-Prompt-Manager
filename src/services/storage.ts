@@ -675,12 +675,39 @@ export class StorageManager {
   }
 
   // Private helper methods
+
+  /**
+   * Wait for chrome.storage.local to be available
+   * In some contexts (e.g., analytics.html in a new tab), the chrome API
+   * may not be immediately available when the page first loads
+   */
+  private async ensureStorageAvailable(): Promise<void> {
+    const maxAttempts = 50;
+    const delayMs = 100;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+        return;
+      }
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+
+    throw new StorageError({
+      type: ErrorType.STORAGE_UNAVAILABLE,
+      message: 'Chrome storage API is not available. Please ensure you are running within a Chrome extension context.',
+      details: { maxAttempts, delayMs }
+    });
+  }
+
   private async getStorageData<T>(key: string): Promise<T | null> {
+    await this.ensureStorageAvailable();
     const result = await chrome.storage.local.get([key]);
     return (result[key] as T) || null;
   }
 
   private async setStorageData(key: string, data: unknown): Promise<void> {
+    await this.ensureStorageAvailable();
     await chrome.storage.local.set({ [key]: data });
   }
 
