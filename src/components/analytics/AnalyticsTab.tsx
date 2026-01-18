@@ -163,7 +163,7 @@ const AnalyticsTab: FC<AnalyticsTabProps> = ({
   const hasData = stats && stats.totalUses > 0;
 
   return (
-    <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900">
+    <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900 relative">
       {/* Header */}
       <ViewHeader
         icon="analytics"
@@ -174,7 +174,7 @@ const AnalyticsTab: FC<AnalyticsTabProps> = ({
       />
 
       {/* Content */}
-      <main className="flex-1 overflow-auto custom-scrollbar p-4">
+      <main className="flex-1 overflow-auto custom-scrollbar p-4 pb-16">
         {!hasData && !loading ? (
           /* Empty state */
           <div className="flex flex-col items-center justify-center h-full text-center px-6" role="region" aria-label="Empty analytics">
@@ -315,20 +315,15 @@ const AnalyticsTab: FC<AnalyticsTabProps> = ({
         )}
       </main>
 
-      {/* Footer with View Full Dashboard */}
+      {/* Floating Action Button for Full Dashboard */}
       {hasData && onExpandDashboard && context === 'sidepanel' && (
-        <footer className="shrink-0 px-4 py-2 bg-gray-100 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between" role="contentinfo" aria-label="Analytics footer">
-          <span className="text-xs text-gray-600 dark:text-gray-400" aria-live="polite" aria-atomic="true">
-            {String(summaryMetrics.totalUses)} prompt {summaryMetrics.totalUses === 1 ? 'use' : 'uses'}
-          </span>
-          <button
-            onClick={onExpandDashboard}
-            className="px-3 py-1.5 text-xs font-medium text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors focus-interactive"
-            aria-label="View full analytics dashboard"
-          >
-            View Full Dashboard
-          </button>
-        </footer>
+        <button
+          onClick={onExpandDashboard}
+          className="absolute bottom-4 right-4 px-4 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl shadow-lg hover:shadow-xl hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 focus-primary"
+          aria-label="View full analytics dashboard"
+        >
+          Full Dashboard
+        </button>
       )}
 
       {/* Clear History Confirmation Modal */}
@@ -338,15 +333,14 @@ const AnalyticsTab: FC<AnalyticsTabProps> = ({
           role="presentation"
         >
           {/* Backdrop - closes modal on click */}
-          <button
-            type="button"
-            className="absolute inset-0 w-full h-full cursor-default"
+          <div
+            className="absolute inset-0"
             onClick={() => { setShowClearConfirm(false); }}
-            aria-label="Close modal"
-            tabIndex={-1}
+            aria-hidden="true"
+            data-testid="modal-backdrop"
           />
           <div
-            className="relative bg-white dark:bg-gray-800 rounded-xl p-6 max-w-sm mx-4 shadow-xl"
+            className="relative z-10 bg-white dark:bg-gray-800 rounded-xl p-6 max-w-sm mx-4 shadow-xl"
             role="dialog"
             aria-modal="true"
             aria-labelledby="clear-history-title"

@@ -330,7 +330,7 @@ describe('AnalyticsTab', () => {
 
       render(<AnalyticsTab onExpandDashboard={onExpand} context="sidepanel" />);
 
-      const button = screen.getByText('View Full Dashboard');
+      const button = screen.getByText('Full Dashboard');
       expect(button).toBeInTheDocument();
     });
 
@@ -340,7 +340,7 @@ describe('AnalyticsTab', () => {
 
       render(<AnalyticsTab onExpandDashboard={onExpand} context="sidepanel" />);
 
-      fireEvent.click(screen.getByText('View Full Dashboard'));
+      fireEvent.click(screen.getByText('Full Dashboard'));
       expect(onExpand).toHaveBeenCalledTimes(1);
     });
 
@@ -349,7 +349,7 @@ describe('AnalyticsTab', () => {
 
       render(<AnalyticsTab onExpandDashboard={vi.fn()} context="popup" />);
 
-      expect(screen.queryByText('View Full Dashboard')).not.toBeInTheDocument();
+      expect(screen.queryByText('Full Dashboard')).not.toBeInTheDocument();
     });
 
     it('should not show expand button when no callback provided', () => {
@@ -357,7 +357,7 @@ describe('AnalyticsTab', () => {
 
       render(<AnalyticsTab context="sidepanel" />);
 
-      expect(screen.queryByText('View Full Dashboard')).not.toBeInTheDocument();
+      expect(screen.queryByText('Full Dashboard')).not.toBeInTheDocument();
     });
   });
 
@@ -590,7 +590,7 @@ describe('AnalyticsTab', () => {
       fireEvent.click(screen.getByRole('button', { name: /clear history/i }));
       expect(screen.getByRole('dialog')).toBeInTheDocument();
 
-      fireEvent.click(screen.getByLabelText('Close modal'));
+      fireEvent.click(screen.getByTestId('modal-backdrop'));
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
   });

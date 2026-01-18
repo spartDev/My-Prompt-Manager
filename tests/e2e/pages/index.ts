@@ -5,6 +5,7 @@
  * UI interactions and provide clean, reusable methods for testing.
  */
 
+export { AnalyticsPage } from './AnalyticsPage';
 export { BasePage } from './BasePage';
 export { LibraryPage } from './LibraryPage';
 export { CategoryManagerPage } from './CategoryManagerPage';

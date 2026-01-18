@@ -409,6 +409,104 @@ export const userJourneyWorkflows = {
 };
 
 /**
+ * Analytics workflows
+ */
+export const analyticsWorkflows = {
+  /**
+   * Navigate to the Analytics tab
+   */
+  navigateToAnalyticsTab: async (page: Page): Promise<void> => {
+    await page.getByRole('button', { name: 'Analytics' }).click();
+    await expect(page.getByRole('heading', { name: 'Analytics' })).toBeVisible();
+  },
+
+  /**
+   * Navigate to the full analytics dashboard from the Analytics tab
+   * Note: The dashboard opens in a new tab, so we need to wait for it and switch context
+   */
+  navigateToFullDashboard: async (page: Page): Promise<Page> => {
+    const context = page.context();
+
+    // Wait for the new page to open when button is clicked
+    const [newPage] = await Promise.all([
+      context.waitForEvent('page'),
+      page.getByRole('button', { name: 'View full analytics dashboard' }).click()
+    ]);
+
+    // Wait for the page to navigate to the analytics URL
+    // In CI, the new tab may initially be about:blank before navigating
+    await newPage.waitForURL(/analytics\.html/, { timeout: 30000 });
+
+    // Wait for the page to fully load (including all resources)
+    await newPage.waitForLoadState('load');
+
+    // Wait for React to render the dashboard component
+    // CI environments are slower, so we use a longer timeout
+    await expect(newPage.getByRole('heading', { name: 'Analytics Dashboard' })).toBeVisible({ timeout: 30000 });
+
+    return newPage;
+  },
+
+  /**
+   * Clear usage history and confirm the action
+   */
+  clearHistory: async (page: Page): Promise<void> => {
+    // Click the clear history button
+    await page.getByRole('button', { name: 'Clear history' }).click();
+    // Wait for confirmation modal
+    await expect(page.getByRole('heading', { name: 'Clear Usage History?' })).toBeVisible();
+    // Confirm clearing
+    await page.getByRole('button', { name: 'Clear History' }).click();
+    // Wait for modal to close
+    await expect(page.getByRole('heading', { name: 'Clear Usage History?' })).toBeHidden();
+  },
+
+  /**
+   * Cancel clearing usage history
+   */
+  cancelClearHistory: async (page: Page): Promise<void> => {
+    // Click the clear history button
+    await page.getByRole('button', { name: 'Clear history' }).click();
+    // Wait for confirmation modal
+    await expect(page.getByRole('heading', { name: 'Clear Usage History?' })).toBeVisible();
+    // Cancel
+    await page.getByRole('button', { name: 'Cancel' }).click();
+    // Wait for modal to close
+    await expect(page.getByRole('heading', { name: 'Clear Usage History?' })).toBeHidden();
+  },
+
+  /**
+   * Switch between prompt tabs in the full dashboard
+   */
+  switchTab: async (page: Page, tabName: 'Most Used' | 'Recently Used' | 'Forgotten'): Promise<void> => {
+    await page.getByRole('tab', { name: tabName }).click();
+    await expect(page.getByRole('tab', { name: tabName })).toHaveAttribute('aria-selected', 'true');
+  },
+
+  /**
+   * Verify the analytics summary section is visible with expected cards
+   */
+  verifyAnalyticsSummary: async (page: Page): Promise<void> => {
+    const summarySection = page.getByRole('region', { name: 'Usage summary' });
+    await expect(summarySection).toBeVisible();
+    // Verify the four summary cards are present
+    await expect(summarySection.getByText('Total Uses')).toBeVisible();
+    await expect(summarySection.getByText('Top Platform')).toBeVisible();
+    await expect(summarySection.getByText('Peak Day')).toBeVisible();
+    await expect(summarySection.getByText('Top Category')).toBeVisible();
+  },
+
+  /**
+   * Open analytics dashboard (combines navigation to tab and then to full dashboard)
+   * Returns the new page where the dashboard is opened
+   */
+  openAnalyticsDashboard: async (page: Page): Promise<Page> => {
+    await analyticsWorkflows.navigateToAnalyticsTab(page);
+    return await analyticsWorkflows.navigateToFullDashboard(page);
+  },
+};
+
+/**
  * All workflows combined for easy import
  */
 export const workflows = {
@@ -418,4 +516,5 @@ export const workflows = {
   navigation: navigationWorkflows,
   settings: settingsWorkflows,
   userJourneys: userJourneyWorkflows,
+  analytics: analyticsWorkflows,
 };

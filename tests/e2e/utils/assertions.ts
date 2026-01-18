@@ -343,6 +343,132 @@ export const dialogAssertions = {
 };
 
 /**
+ * Analytics-related assertions
+ */
+export const analyticsAssertions = {
+  /**
+   * Expect analytics tab to be loaded (AnalyticsTab component)
+   */
+  tabLoaded: async (page: Page): Promise<void> => {
+    await expect(page.getByRole('heading', { name: 'Analytics' })).toBeVisible();
+  },
+
+  /**
+   * Expect full analytics dashboard to be loaded (AnalyticsDashboard component)
+   */
+  dashboardLoaded: async (page: Page): Promise<void> => {
+    await expect(page.getByRole('heading', { name: 'Analytics Dashboard' })).toBeVisible();
+  },
+
+  /**
+   * Expect empty state when no usage data exists
+   */
+  emptyState: async (page: Page): Promise<void> => {
+    await expect(page.getByText('No usage data yet')).toBeVisible();
+  },
+
+  /**
+   * Expect total uses summary card to show specific value
+   */
+  totalUses: async (page: Page, count: number): Promise<void> => {
+    const summarySection = page.locator('section[aria-label="Usage summary"]');
+    await expect(summarySection.getByText(String(count))).toBeVisible();
+  },
+
+  /**
+   * Expect top platform summary card to show specific platform name
+   */
+  topPlatform: async (page: Page, platformName: string): Promise<void> => {
+    const summarySection = page.locator('section[aria-label="Usage summary"]');
+    await expect(summarySection.getByText(platformName)).toBeVisible();
+  },
+
+  /**
+   * Expect peak day summary card to show specific day
+   */
+  peakDay: async (page: Page, day: string): Promise<void> => {
+    const summarySection = page.locator('section[aria-label="Usage summary"]');
+    await expect(summarySection.getByText(day)).toBeVisible();
+  },
+
+  /**
+   * Expect top category summary card to show specific category name
+   */
+  topCategory: async (page: Page, categoryName: string): Promise<void> => {
+    const summarySection = page.locator('section[aria-label="Usage summary"]');
+    await expect(summarySection.getByText(categoryName)).toBeVisible();
+  },
+
+  /**
+   * Expect a prompt to appear in the top prompts list
+   */
+  promptInTopList: async (page: Page, promptTitle: string): Promise<void> => {
+    const topPromptsSection = page.locator('section[aria-label="Top prompts"]');
+    await expect(topPromptsSection.getByText(promptTitle)).toBeVisible();
+  },
+
+  /**
+   * Expect specific number of prompts in the top prompts list
+   */
+  topPromptsCount: async (page: Page, count: number): Promise<void> => {
+    const topPromptsSection = page.locator('section[aria-label="Top prompts"]');
+    await expect(topPromptsSection.locator('li')).toHaveCount(count);
+  },
+
+  /**
+   * Expect trophy icons to be visible for top 3 prompts
+   */
+  trophyIconsVisible: async (page: Page): Promise<void> => {
+    // Trophy icons are SVGs with the sparkle/trophy path, rendered for first 3 items
+    const topPromptsSection = page.locator('section[aria-label="Top prompts"]');
+    const trophyIcons = topPromptsSection.locator('svg[aria-hidden="true"]');
+    await expect(trophyIcons.first()).toBeVisible();
+  },
+
+  /**
+   * Expect clear history confirmation modal to be visible
+   */
+  clearHistoryModalVisible: async (page: Page): Promise<void> => {
+    await expect(page.getByRole('dialog', { name: /Clear Usage History/i })).toBeVisible();
+  },
+
+  /**
+   * Expect clear history confirmation modal to be hidden
+   */
+  clearHistoryModalHidden: async (page: Page): Promise<void> => {
+    await expect(page.getByRole('dialog', { name: /Clear Usage History/i })).toBeHidden();
+  },
+
+  /**
+   * Expect "View Full Dashboard" expand button to be visible
+   */
+  expandButtonVisible: async (page: Page): Promise<void> => {
+    await expect(page.getByRole('button', { name: 'View full analytics dashboard' })).toBeVisible();
+  },
+
+  /**
+   * Expect "View Full Dashboard" expand button to be hidden
+   */
+  expandButtonHidden: async (page: Page): Promise<void> => {
+    await expect(page.getByRole('button', { name: 'View full analytics dashboard' })).toBeHidden();
+  },
+
+  /**
+   * Expect a specific tab to be selected in the dashboard prompt tables
+   */
+  tabSelected: async (page: Page, tabName: 'Most Used' | 'Recently Used' | 'Forgotten'): Promise<void> => {
+    await expect(page.getByRole('tab', { name: tabName, selected: true })).toBeVisible();
+  },
+
+  /**
+   * Expect a chart section to be visible (Usage Trend, Platforms, etc.)
+   */
+  chartVisible: async (page: Page, chartLabel: string): Promise<void> => {
+    await expect(page.locator(`section[aria-label="${chartLabel}"]`)).toBeVisible();
+  },
+};
+
+/**
  * Comprehensive assertion helper that combines all assertion types
  */
 export const assertions = {
@@ -355,4 +481,5 @@ export const assertions = {
   storage: storageAssertions,
   contentScript: contentScriptAssertions,
   dialogs: dialogAssertions,
+  analytics: analyticsAssertions,
 };

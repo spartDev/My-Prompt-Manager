@@ -5,8 +5,18 @@
  * multiple test files to ensure consistency and reduce duplication.
  */
 
-import { DEFAULT_SETTINGS } from '../../../src/types';
+import { DEFAULT_SETTINGS, UsageEvent } from '../../../src/types';
 import { createPromptSeed, createCategorySeed } from '../utils/storage';
+
+/**
+ * Helper to create a usage event with defaults
+ */
+export const createUsageEventSeed = (overrides: Partial<UsageEvent>): UsageEvent => ({
+  promptId: overrides.promptId ?? `prompt-${Math.random().toString(36).slice(2, 10)}`,
+  timestamp: overrides.timestamp ?? Date.now(),
+  platform: overrides.platform ?? 'claude',
+  categoryId: overrides.categoryId ?? null,
+});
 
 /**
  * Standard color palette for categories
@@ -427,7 +437,208 @@ export const testDataHelpers = {
     sets.flat(),
 };
 
+/**
+ * Analytics fixtures for testing usage analytics scenarios
+ */
+export const ANALYTICS_FIXTURES = {
+  /**
+   * Empty - no usage history
+   */
+  EMPTY: {
+    prompts: PROMPT_FIXTURES.EMPTY,
+    categories: CATEGORY_FIXTURES.EMPTY,
+    usageHistory: [] as UsageEvent[],
+  },
+
+  /**
+   * Single usage event - minimal analytics data
+   */
+  SINGLE_USAGE: {
+    prompts: PROMPT_FIXTURES.SINGLE,
+    categories: CATEGORY_FIXTURES.EMPTY,
+    usageHistory: [
+      createUsageEventSeed({
+        promptId: 'single-prompt-id',
+        timestamp: Date.now() - 1000 * 60 * 60, // 1 hour ago
+        platform: 'claude',
+        categoryId: null,
+      }),
+    ],
+  },
+
+  /**
+   * Varied usage - different prompts, platforms, categories, and time distribution
+   */
+  VARIED_USAGE: {
+    prompts: [
+      createPromptSeed({
+        id: 'prompt-work-1',
+        title: 'Work Email Template',
+        content: 'Draft a professional email...',
+        category: 'Work',
+      }),
+      createPromptSeed({
+        id: 'prompt-dev-1',
+        title: 'Code Review Helper',
+        content: 'Review this code for bugs...',
+        category: 'Development',
+      }),
+      createPromptSeed({
+        id: 'prompt-personal-1',
+        title: 'Recipe Finder',
+        content: 'Find healthy recipes...',
+        category: 'Personal',
+      }),
+      createPromptSeed({
+        id: 'prompt-work-2',
+        title: 'Meeting Notes',
+        content: 'Summarize meeting notes...',
+        category: 'Work',
+      }),
+    ],
+    categories: CATEGORY_FIXTURES.COMPREHENSIVE,
+    usageHistory: (() => {
+      const now = Date.now();
+      const DAY = 24 * 60 * 60 * 1000;
+      const HOUR = 60 * 60 * 1000;
+
+      return [
+        // Work prompt used multiple times on different days
+        createUsageEventSeed({
+          promptId: 'prompt-work-1',
+          timestamp: now - 1 * DAY - 9 * HOUR, // Yesterday morning
+          platform: 'claude',
+          categoryId: 'work-cat-id',
+        }),
+        createUsageEventSeed({
+          promptId: 'prompt-work-1',
+          timestamp: now - 2 * DAY - 14 * HOUR, // 2 days ago afternoon
+          platform: 'chatgpt',
+          categoryId: 'work-cat-id',
+        }),
+        createUsageEventSeed({
+          promptId: 'prompt-work-1',
+          timestamp: now - 5 * DAY - 10 * HOUR, // 5 days ago morning
+          platform: 'claude',
+          categoryId: 'work-cat-id',
+        }),
+
+        // Dev prompt used a few times
+        createUsageEventSeed({
+          promptId: 'prompt-dev-1',
+          timestamp: now - 3 * DAY - 15 * HOUR, // 3 days ago afternoon
+          platform: 'gemini',
+          categoryId: 'dev-cat-id',
+        }),
+        createUsageEventSeed({
+          promptId: 'prompt-dev-1',
+          timestamp: now - 7 * DAY - 20 * HOUR, // 7 days ago evening
+          platform: 'claude',
+          categoryId: 'dev-cat-id',
+        }),
+
+        // Personal prompt rarely used
+        createUsageEventSeed({
+          promptId: 'prompt-personal-1',
+          timestamp: now - 10 * DAY - 12 * HOUR, // 10 days ago midday
+          platform: 'perplexity',
+          categoryId: 'personal-cat-id',
+        }),
+
+        // Recent uses
+        createUsageEventSeed({
+          promptId: 'prompt-work-2',
+          timestamp: now - 2 * HOUR, // 2 hours ago
+          platform: 'claude',
+          categoryId: 'work-cat-id',
+        }),
+        createUsageEventSeed({
+          promptId: 'prompt-work-1',
+          timestamp: now - 30 * 60 * 1000, // 30 minutes ago
+          platform: 'chatgpt',
+          categoryId: 'work-cat-id',
+        }),
+      ];
+    })(),
+  },
+
+  /**
+   * Multi-platform usage - tests platform distribution charts
+   */
+  MULTI_PLATFORM: {
+    prompts: [
+      createPromptSeed({
+        id: 'mp-prompt-1',
+        title: 'Multi-Platform Prompt 1',
+        content: 'A prompt used across multiple platforms',
+        category: 'Work',
+      }),
+      createPromptSeed({
+        id: 'mp-prompt-2',
+        title: 'Multi-Platform Prompt 2',
+        content: 'Another cross-platform prompt',
+        category: 'Development',
+      }),
+    ],
+    categories: CATEGORY_FIXTURES.BASIC,
+    usageHistory: (() => {
+      const now = Date.now();
+      const DAY = 24 * 60 * 60 * 1000;
+      const HOUR = 60 * 60 * 1000;
+
+      const platforms = ['claude', 'chatgpt', 'gemini', 'perplexity', 'copilot', 'mistral', 'custom'];
+      const events: UsageEvent[] = [];
+
+      // Create usage events spread across all platforms
+      platforms.forEach((platform, index) => {
+        // Claude gets the most usage
+        const usageCount = platform === 'claude' ? 5 : platform === 'chatgpt' ? 3 : 1;
+
+        for (let i = 0; i < usageCount; i++) {
+          events.push(
+            createUsageEventSeed({
+              promptId: i % 2 === 0 ? 'mp-prompt-1' : 'mp-prompt-2',
+              timestamp: now - (index + i) * DAY - (index * 2) * HOUR,
+              platform,
+              categoryId: i % 2 === 0 ? 'work-cat-id' : 'dev-cat-id',
+            })
+          );
+        }
+      });
+
+      return events;
+    })(),
+  },
+} as const;
+
+/**
+ * Create an analytics scenario with prompts, categories, and usage history
+ * @param scenario - The analytics fixture scenario name
+ * @returns Object containing prompts, categories, usageHistory, and settings
+ */
+export const createAnalyticsScenario = (
+  scenario: keyof typeof ANALYTICS_FIXTURES
+): {
+  prompts: ReturnType<typeof createPromptSeed>[];
+  categories: ReturnType<typeof createCategorySeed>[];
+  usageHistory: UsageEvent[];
+  settings: typeof DEFAULT_SETTINGS & { interfaceMode: 'sidepanel' };
+} => {
+  const fixture = ANALYTICS_FIXTURES[scenario];
+
+  return {
+    prompts: [...fixture.prompts],
+    categories: [...fixture.categories],
+    usageHistory: [...fixture.usageHistory],
+    settings: {
+      ...DEFAULT_SETTINGS,
+      interfaceMode: 'sidepanel' as const,
+    },
+  };
+};
+
 // Type exports for TypeScript support
 export type TestScenario = typeof SCENARIO_FIXTURES[keyof typeof SCENARIO_FIXTURES];
 export type PromptFixture = typeof PROMPT_FIXTURES[keyof typeof PROMPT_FIXTURES];
 export type CategoryFixture = typeof CATEGORY_FIXTURES[keyof typeof CATEGORY_FIXTURES];
+export type AnalyticsFixture = typeof ANALYTICS_FIXTURES[keyof typeof ANALYTICS_FIXTURES];
