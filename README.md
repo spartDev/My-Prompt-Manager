@@ -41,6 +41,7 @@ Transform your AI interactions with a powerful personal prompt library that inte
 | Mistral LeChat | ✅ Fully Supported | chat.mistral.ai | 85 |
 | Perplexity | ✅ Fully Supported | www.perplexity.ai | 80 |
 | Microsoft Copilot | ✅ Fully Supported | copilot.microsoft.com | 80 |
+| Microsoft 365 Copilot | ✅ Fully Supported | m365.cloud.microsoft | 80 |
 | Custom Sites | ✅ Configurable | User-defined | Variable |
 
 See our [Platform Integration Guide](docs/PLATFORM_INTEGRATION.md) to add your own platforms.
