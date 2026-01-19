@@ -1,6 +1,6 @@
 # My Prompt Manager - Chrome Extension
 
-[![Version](https://img.shields.io/badge/version-1.8.2-blue.svg)](https://github.com/spartDev/My-Prompt-Manager)
+[![Version](https://img.shields.io/badge/version-1.9.0-blue.svg)](https://github.com/spartDev/My-Prompt-Manager)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Chrome](https://img.shields.io/badge/Chrome-114%2B-yellow.svg)](https://www.google.com/chrome/)
 [![Tests](https://img.shields.io/badge/tests-1692%20passing-brightgreen.svg)](https://github.com/spartDev/My-Prompt-Manager)
@@ -62,7 +62,7 @@ See our [Platform Integration Guide](docs/PLATFORM_INTEGRATION.md) to add your o
 | **TypeScript** | Type Safety | 5.9.3 |
 | **Tailwind CSS** | Styling | 4.1.17 |
 | **Vite** | Build Tool | 7.3.1 |
-| **Vitest** | Testing Framework | 4.0.5 |
+| **Vitest** | Testing Framework | 4.0.17 |
 | **DOMPurify** | XSS Protection | 3.3.1 |
 | **Husky** | Git Hooks | 9.1.7 |
 | **@crxjs/vite-plugin** | Chrome Extension Support | 2.3.0 |
@@ -294,7 +294,7 @@ npm test -- src/content/platforms/__tests__/claude-strategy.test.ts
    ```bash
    npm run package
    ```
-   This creates `prompt-library-extension-v1.8.2.zip`
+   This creates `prompt-library-extension-v1.9.0.zip`
 
 4. **Upload to Chrome Web Store:**
    - Go to [Chrome Web Store Developer Dashboard](https://chrome.google.com/webstore/developer/dashboard)
@@ -451,7 +451,7 @@ window.__promptLibraryDebug?.testInsertion?.('test content')
 
 ## 📈 Roadmap
 
-### Version 1.8 (Current)
+### Version 1.9 (Current)
 - [x] Core prompt management
 - [x] Multi-platform AI integration (8 platforms)
 - [x] Dark mode support
@@ -461,7 +461,7 @@ window.__promptLibraryDebug?.testInsertion?.('test content')
 - [x] Enhanced Security Architecture
 - [x] Import/Export functionality (JSON)
 - [x] Programmatic Content Script Injection
-- [x] Analytics Dashboard with usage tracking
+- [x] Analytics Dashboard with usage tracking and visual charts
 - [x] Element Fingerprinting for custom sites
 - [x] Floating Action Button for quick access
 
