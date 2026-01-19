@@ -1,6 +1,48 @@
 ## [Unreleased]
 
 
+## [1.9.0] - 2026-01-19
+
+
+### ✨ Added
+
+-  Usage Analytics Dashboard with interactive charts and visualizations ([#241](https://github.com/spartDev/My-Prompt-Manager/pull/241))
+-  Recharts integration for usage tracking charts ([#241](https://github.com/spartDev/My-Prompt-Manager/pull/241))
+-  UsageTracker service for tracking prompt usage across platforms
+-  AnalyticsTab component for displaying usage statistics
+-  Floating action button for quick access to analytics ([#244](https://github.com/spartDev/My-Prompt-Manager/pull/244))
+
+
+### 🔄 Changed
+
+-  Replace footer navigation with floating action button for better UX ([#244](https://github.com/spartDev/My-Prompt-Manager/pull/244))
+-  Refactor E2E tests for improved reliability and maintainability ([#233](https://github.com/spartDev/My-Prompt-Manager/pull/233))
+
+
+### 🐛 Fixed
+
+-  Remove reference to non-existent SELECTORS export in E2E tests
+
+
+### 📚 Documentation
+
+-  Add Microsoft 365 Copilot to supported platforms table
+-  Update README to reflect current codebase state ([#247](https://github.com/spartDev/My-Prompt-Manager/pull/247))
+-  Add beads workflow guide and session completion protocol
+
+
+### 📦 Dependencies
+
+-  Update TypeScript and linting to 8.53.0 ([#243](https://github.com/spartDev/My-Prompt-Manager/pull/243))
+-  Update testing libraries (Vitest 4.0.17, Testing Library 16.3.1) ([#153](https://github.com/spartDev/My-Prompt-Manager/pull/153))
+-  Update happy-dom to 20.3.1 ([#240](https://github.com/spartDev/My-Prompt-Manager/pull/240))
+-  Update @types/react to 19.2.8 ([#239](https://github.com/spartDev/My-Prompt-Manager/pull/239))
+-  Update @types/chrome to 0.1.33 ([#237](https://github.com/spartDev/My-Prompt-Manager/pull/237))
+-  Pin dependencies for reproducible builds ([#214](https://github.com/spartDev/My-Prompt-Manager/pull/214))
+
+[1.9.0]: https://github.com/spartDev/My-Prompt-Manager/compare/v1.8.2...v1.9.0
+
+
 ## [1.8.2] - 2026-01-12
 
 
