@@ -23,6 +23,16 @@ function createTestPrompt(overrides: Partial<Prompt> = {}): Prompt {
   };
 }
 
+// Helper to capture thrown error for property assertions
+function captureError(fn: () => void): Error {
+  try {
+    fn();
+    throw new Error('Expected function to throw');
+  } catch (err) {
+    return err as Error;
+  }
+}
+
 describe('PromptEncoder', () => {
   describe('sanitizeText', () => {
     it('should remove HTML tags', () => {
@@ -62,34 +72,25 @@ describe('PromptEncoder', () => {
     it('should throw PromptEncoderError for empty title', () => {
       const data = { title: '', content: 'Content', category: 'Category' };
       expect(() => validatePromptData(data)).toThrow('Title is required');
-      try {
-        validatePromptData(data);
-      } catch (err) {
-        expect(err).toHaveProperty('type', ErrorType.VALIDATION_ERROR);
-        expect(err).toHaveProperty('name', 'PromptEncoderError');
-      }
+      const err = captureError(() => validatePromptData(data));
+      expect(err).toHaveProperty('type', ErrorType.VALIDATION_ERROR);
+      expect(err).toHaveProperty('name', 'PromptEncoderError');
     });
 
     it('should throw PromptEncoderError for empty content', () => {
       const data = { title: 'Title', content: '', category: 'Category' };
       expect(() => validatePromptData(data)).toThrow('Content is required');
-      try {
-        validatePromptData(data);
-      } catch (err) {
-        expect(err).toHaveProperty('type', ErrorType.VALIDATION_ERROR);
-        expect(err).toHaveProperty('name', 'PromptEncoderError');
-      }
+      const err = captureError(() => validatePromptData(data));
+      expect(err).toHaveProperty('type', ErrorType.VALIDATION_ERROR);
+      expect(err).toHaveProperty('name', 'PromptEncoderError');
     });
 
     it('should throw PromptEncoderError for empty category', () => {
       const data = { title: 'Title', content: 'Content', category: '' };
       expect(() => validatePromptData(data)).toThrow('Category is required');
-      try {
-        validatePromptData(data);
-      } catch (err) {
-        expect(err).toHaveProperty('type', ErrorType.VALIDATION_ERROR);
-        expect(err).toHaveProperty('name', 'PromptEncoderError');
-      }
+      const err = captureError(() => validatePromptData(data));
+      expect(err).toHaveProperty('type', ErrorType.VALIDATION_ERROR);
+      expect(err).toHaveProperty('name', 'PromptEncoderError');
     });
 
     it('should throw PromptEncoderError for whitespace-only title', () => {
@@ -211,12 +212,9 @@ describe('PromptEncoder', () => {
 
     it('should throw PromptEncoderError for invalid encoded string', () => {
       expect(() => decode('invalid')).toThrow('Invalid sharing code format');
-      try {
-        decode('invalid');
-      } catch (err) {
-        expect(err).toHaveProperty('type', ErrorType.DATA_CORRUPTION);
-        expect(err).toHaveProperty('name', 'PromptEncoderError');
-      }
+      const err = captureError(() => decode('invalid'));
+      expect(err).toHaveProperty('type', ErrorType.DATA_CORRUPTION);
+      expect(err).toHaveProperty('name', 'PromptEncoderError');
     });
 
     it('should throw PromptEncoderError for corrupted encoded string', () => {

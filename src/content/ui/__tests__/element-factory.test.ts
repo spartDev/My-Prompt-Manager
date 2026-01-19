@@ -250,9 +250,8 @@ describe('UIElementFactory', () => {
       // Theme detection depends on body background color which may not be available in test environment
       // If body styles are available, verify the theme is set to light or dark
       // Otherwise, the attribute will be null which is acceptable
-      if (themeAttr !== null) {
-        expect(['light', 'dark']).toContain(themeAttr);
-      }
+      const validThemes = ['light', 'dark', null];
+      expect(validThemes).toContain(themeAttr);
       // Just verify the icon was created successfully
       expect(icon).toBeDefined();
     });

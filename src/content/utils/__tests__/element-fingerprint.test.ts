@@ -220,12 +220,9 @@ describe('ElementFingerprintGenerator', () => {
       // With no attributes, confidence will be low
       expect(fingerprint.meta.confidence).toBe('low');
       // It might still find it if it's the only span, but we should verify it doesn't crash
-      if (found) {
-        expect(found.tagName).toBe('SPAN');
-      } else {
-        // Both outcomes (found or not found) are acceptable for low-confidence matches
-        expect(found).toBeNull();
-      }
+      // Both outcomes (found with correct tagName or not found) are acceptable for low-confidence matches
+      const isValidResult = found === null || found.tagName === 'SPAN';
+      expect(isValidResult).toBe(true);
     });
 
     it('should handle deeply nested elements', () => {
@@ -278,9 +275,11 @@ describe('ElementFingerprintGenerator', () => {
       expect(found).toBe(target);
 
       // Performance assertion: skip in CI to avoid flakiness
-      if (!process.env.CI) {
-        // Should be reasonably fast in local development (under 100ms for 200 elements)
-        expect(duration).toBeLessThan(100);
+      // Local development: should be reasonably fast (under 100ms for 200 elements)
+      // CI environments: skip this check as timing varies significantly
+      if (!process.env.CI && duration >= 100) {
+        // Use fail() pattern to avoid conditional expect
+        throw new Error(`Performance regression: findElement took ${duration}ms, expected < 100ms`);
       }
     });
   });

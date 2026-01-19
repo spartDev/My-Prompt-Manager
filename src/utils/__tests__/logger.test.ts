@@ -171,6 +171,15 @@ describe('Logger', () => {
         '    at Object.method6 (/path/to/file6.js:60:70)',
       ].join('\n');
 
+      // In production, should preserve error message + first 3 frames + truncation indicator
+      const truncatedStack = [
+        'Error: Test error message',
+        '    at Object.method1 (/path/to/file1.js:10:20)',
+        '    at Object.method2 (/path/to/file2.js:20:30)',
+        '    at Object.method3 (/path/to/file3.js:30:40)',
+        '... (stack truncated)',
+      ].join('\n');
+
       const error = new Error('Test error message');
       error.stack = longStack;
 
@@ -180,24 +189,13 @@ describe('Logger', () => {
       const callArgs = mockConsole.error.mock.calls[0];
       const loggedStack = callArgs[2].error.stack;
 
-      if (!import.meta.env.DEV) {
-        // In production, should preserve error message + first 3 frames + truncation indicator
-        const expectedStack = [
-          'Error: Test error message',
-          '    at Object.method1 (/path/to/file1.js:10:20)',
-          '    at Object.method2 (/path/to/file2.js:20:30)',
-          '    at Object.method3 (/path/to/file3.js:30:40)',
-          '... (stack truncated)',
-        ].join('\n');
+      // Compute expected values based on environment
+      const expectedStack = import.meta.env.DEV ? longStack : truncatedStack;
+      const shouldContainTruncationIndicator = !import.meta.env.DEV;
 
-        expect(loggedStack).toBe(expectedStack);
-        expect(loggedStack).toContain('... (stack truncated)');
-        expect(loggedStack).toContain('Error: Test error message');
-      } else {
-        // In development, should keep full stack
-        expect(loggedStack).toBe(longStack);
-        expect(loggedStack).not.toContain('... (stack truncated)');
-      }
+      expect(loggedStack).toBe(expectedStack);
+      expect(loggedStack.includes('... (stack truncated)')).toBe(shouldContainTruncationIndicator);
+      expect(loggedStack).toContain('Error: Test error message');
     });
 
     it('should preserve error message integrity when truncating', () => {
@@ -218,13 +216,11 @@ describe('Logger', () => {
       const callArgs = mockConsole.error.mock.calls[0];
       const loggedStack = callArgs[2].error.stack;
 
-      if (!import.meta.env.DEV) {
-        // Error message line must be completely preserved
-        expect(loggedStack).toContain('Error: This is a very important error message that must not be cut');
-        // Should not cut mid-message
-        const firstLine = loggedStack.split('\n')[0];
-        expect(firstLine).toBe('Error: This is a very important error message that must not be cut');
-      }
+      // Error message line must be completely preserved in both dev and prod
+      expect(loggedStack).toContain('Error: This is a very important error message that must not be cut');
+      // Should not cut mid-message - first line should always be the full error message
+      const firstLine = loggedStack.split('\n')[0];
+      expect(firstLine).toBe('Error: This is a very important error message that must not be cut');
     });
 
     it('should not truncate short stacks', () => {
@@ -692,10 +688,10 @@ describe('Logger', () => {
       const componentName: string = context.component;
       expect(componentName).toBe('Storage');
 
-      // Can use component in type guards
-      if (context.component === 'Storage') {
-        expect(context.operation).toBe('save');
-      }
+      // Can use component in type guards - the condition is always true here
+      // but demonstrates the pattern for type narrowing
+      expect(context.component).toBe('Storage');
+      expect(context.operation).toBe('save');
     });
   });
 });

@@ -231,13 +231,14 @@ describe('SearchIndex', () => {
     });
 
     it('should sort results by relevance (highest first)', () => {
+      expect.assertions(1);
       const results = searchIndex.search('programming', { maxResults: 10 });
 
-      if (results.length > 1) {
-        for (let i = 0; i < results.length - 1; i++) {
-          expect(results[i].relevance).toBeGreaterThanOrEqual(results[i + 1].relevance);
-        }
-      }
+      // Verify results are sorted by relevance (descending)
+      const isSorted = results.every((result, i) =>
+        i === 0 || results[i - 1].relevance >= result.relevance
+      );
+      expect(isSorted).toBe(true);
     });
 
     it('should handle multi-term queries', () => {

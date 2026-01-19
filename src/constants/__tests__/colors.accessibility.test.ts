@@ -167,11 +167,8 @@ describe('Color Contrast Accessibility', () => {
       const whiteContrast = getContrastRatio('#FFFFFF', '#888888');
       const blackContrast = getContrastRatio('#000000', '#888888');
 
-      if (whiteContrast > blackContrast) {
-        expect(textColor).toBe('#FFFFFF');
-      } else {
-        expect(textColor).toBe('#000000');
-      }
+      const expectedColor = whiteContrast > blackContrast ? '#FFFFFF' : '#000000';
+      expect(textColor).toBe(expectedColor);
     });
   });
 

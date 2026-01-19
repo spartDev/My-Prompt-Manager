@@ -68,29 +68,23 @@ describe('CategoryBadge', () => {
         const badge = container.querySelector('span');
 
         expect(badge).toBeTruthy();
-
-        if (badge) {
-          const style = badge.style;
-          const backgroundColor = style.backgroundColor;
-          const textColor = style.color;
-
-          // Should have both colors set
-          expect(backgroundColor).toBeTruthy();
-          expect(textColor).toBeTruthy();
-
-          // Text color should be either white or black for accessibility
-          // We check the RGB values since styles might be in rgb() format
-          const rgbMatch = textColor.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
-          if (rgbMatch) {
-            const [, r, g, b] = rgbMatch.map(Number);
-
-            // Should be white (255,255,255) or black (0,0,0)
-            const isWhite = r === 255 && g === 255 && b === 255;
-            const isBlack = r === 0 && g === 0 && b === 0;
-
-            expect(isWhite || isBlack).toBe(true);
-          }
+        if (!badge) {
+          throw new Error('Badge should exist');
         }
+        const style = badge.style;
+        const backgroundColor = style.backgroundColor;
+        const textColor = style.color;
+
+        // Should have both colors set
+        expect(backgroundColor).toBeTruthy();
+        expect(textColor).toBeTruthy();
+
+        // Text color should be either white or black for accessibility
+        // Check both hex and rgb formats (happy-dom may not convert hex to rgb)
+        const isWhite = textColor === '#FFFFFF' || textColor === '#ffffff' || textColor === 'rgb(255, 255, 255)';
+        const isBlack = textColor === '#000000' || textColor === '#000000' || textColor === 'rgb(0, 0, 0)';
+
+        expect(isWhite || isBlack).toBe(true);
       });
     });
 
@@ -116,20 +110,13 @@ describe('CategoryBadge', () => {
         } : null;
       };
 
+      // Verify badge has the expected text color (check both hex and rgb formats)
+      const actualColor = badge.style.color;
+      const isExpectedHex = actualColor === expectedTextColor || actualColor === expectedTextColor.toLowerCase();
       const expected = hexToRgb(expectedTextColor);
-      expect(expected).toBeTruthy();
+      const isExpectedRgb = expected && actualColor === `rgb(${expected.r}, ${expected.g}, ${expected.b})`;
 
-      if (expected) {
-        const style = window.getComputedStyle(badge);
-        const rgbMatch = style.color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
-
-        if (rgbMatch) {
-          const [, r, g, b] = rgbMatch.map(Number);
-          expect(r).toBe(expected.r);
-          expect(g).toBe(expected.g);
-          expect(b).toBe(expected.b);
-        }
-      }
+      expect(isExpectedHex || isExpectedRgb).toBe(true);
     });
 
     it('should use black text for yellow background', () => {
@@ -144,11 +131,9 @@ describe('CategoryBadge', () => {
 
       expect(badge).toBeTruthy();
 
-      if (badge) {
-        // Should use black text for yellow
-        const expectedTextColor = getAccessibleTextColor('#EAB308');
-        expect(expectedTextColor).toBe('#000000');
-      }
+      // Should use black text for yellow
+      const expectedTextColor = getAccessibleTextColor('#EAB308');
+      expect(expectedTextColor).toBe('#000000');
     });
 
     it('should use black text for amber background', () => {
@@ -163,10 +148,8 @@ describe('CategoryBadge', () => {
 
       expect(badge).toBeTruthy();
 
-      if (badge) {
-        const expectedTextColor = getAccessibleTextColor('#F59E0B');
-        expect(expectedTextColor).toBe('#000000');
-      }
+      const expectedTextColor = getAccessibleTextColor('#F59E0B');
+      expect(expectedTextColor).toBe('#000000');
     });
   });
 
