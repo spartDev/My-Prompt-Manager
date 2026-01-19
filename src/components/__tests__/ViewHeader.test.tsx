@@ -365,7 +365,7 @@ describe('ViewHeader', () => {
       const buttons = container.querySelectorAll('button');
       const svgs = Array.from(buttons)
         .map(button => button.querySelector('svg'))
-        .filter((svg): svg is SVGElement => svg !== null);
+        .filter((svg): svg is SVGSVGElement => svg !== null);
 
       expect(svgs.length).toBeGreaterThan(0);
       svgs.forEach(svg => {

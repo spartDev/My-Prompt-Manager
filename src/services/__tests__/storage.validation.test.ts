@@ -949,9 +949,12 @@ describe("StorageManager - Import Validation", () => {
         },
       });
 
-      const error = await storageManager
-        .importData(invalidData)
-        .catch((e: unknown) => e as Error & { details?: { errors?: string[] } });
+      const error = await storageManager.importData(invalidData).then(
+        () => {
+          throw new Error("Expected importData to reject, but it resolved");
+        },
+        (e: unknown) => e as Error & { details?: { errors?: string[] } },
+      );
 
       expect(error.message).toContain("Import validation failed");
       expect(error.details?.errors).toBeDefined();
