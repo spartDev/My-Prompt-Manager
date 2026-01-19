@@ -42,8 +42,6 @@ test.describe('Usage Counter & Smart Sorting - Logic', () => {
       // Verify ascending in popup
       const popupPromptHeadings = popupPage.locator('article h3');
       await expect(popupPromptHeadings).toHaveText(['Low', 'High']);
-      let titles = await popupPromptHeadings.allTextContents();
-      expect(titles).toEqual(['Low', 'High']);
 
       // Verify button shows "Least Used"
       sortButton = popupPage.getByRole('button', { name: /Sort order: Least Used/i });
@@ -59,8 +57,7 @@ test.describe('Usage Counter & Smart Sorting - Logic', () => {
       // Verify sort persisted
       await expect(sidepanelPage.getByRole('button', { name: /Sort order: Least Used/i })).toBeVisible();
 
-      titles = await sidepanelPage.locator('article h3').allTextContents();
-      expect(titles).toEqual(['Low', 'High']); // Still ascending
+      await expect(sidepanelPage.locator('article h3')).toHaveText(['Low', 'High']); // Still ascending
 
       // Verify storage has correct values
       const settings = await storage.getSettings();

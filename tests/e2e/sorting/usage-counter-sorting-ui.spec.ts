@@ -403,8 +403,7 @@ test.describe('Usage Counter & Smart Sorting - UI Display', () => {
           await newPage.waitForLoadState('domcontentloaded');
 
           // Verify sort direction persisted
-          const newTitles = await newPage.locator('article h3').allTextContents();
-          expect(newTitles).toEqual(['Low', 'High']); // Should still be ascending
+          await expect(newPage.locator('article h3')).toHaveText(['Low', 'High']); // Should still be ascending
 
           // Verify button label shows "Least Used"
           const newSortButton = newPage.getByRole('button', { name: /Sort order: Least Used/i });
