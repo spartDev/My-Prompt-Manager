@@ -3,9 +3,9 @@
 [![Version](https://img.shields.io/badge/version-1.8.2-blue.svg)](https://github.com/spartDev/My-Prompt-Manager)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Chrome](https://img.shields.io/badge/Chrome-114%2B-yellow.svg)](https://www.google.com/chrome/)
-[![Tests](https://img.shields.io/badge/tests-1505%20passing-brightgreen.svg)](https://github.com/spartDev/My-Prompt-Manager)
+[![Tests](https://img.shields.io/badge/tests-1692%20passing-brightgreen.svg)](https://github.com/spartDev/My-Prompt-Manager)
 
-Transform your AI interactions with a powerful personal prompt library that integrates seamlessly with Claude, ChatGPT, Gemini, and Perplexity. Store, organize, share, and instantly insert your best prompts with one click.
+Transform your AI interactions with a powerful personal prompt library that integrates seamlessly with Claude, ChatGPT, Gemini, Mistral, Perplexity, and Microsoft Copilot. Store, organize, share, and instantly insert your best prompts with one click.
 
 **Author:** Thomas Roux  
 **Repository:** [github.com/spartDev/My-Prompt-Manager](https://github.com/spartDev/My-Prompt-Manager)
@@ -23,13 +23,21 @@ Transform your AI interactions with a powerful personal prompt library that inte
 ✅ **Import/Export:** JSON backup and restore functionality with data portability
 
 ### AI Platform Integration
-✅ **Native Integration:** Library icon appears seamlessly in AI chat interfaces  
-✅ **Smart Positioning:** Context-aware popup placement for optimal UX  
-✅ **Universal Compatibility:** Works with textarea and contenteditable elements  
-✅ **Keyboard Navigation:** Full keyboard support for accessibility  
-✅ **Custom Sites:** Add support for any AI platform through settings  
-✅ **Theme Synchronization:** Matches the host platform's theme automatically  
+✅ **Native Integration:** Library icon appears seamlessly in AI chat interfaces
+✅ **Smart Positioning:** Context-aware popup placement for optimal UX
+✅ **Universal Compatibility:** Works with textarea and contenteditable elements
+✅ **Keyboard Navigation:** Full keyboard support for accessibility
+✅ **Custom Sites:** Add support for any AI platform through settings
+✅ **Theme Synchronization:** Matches the host platform's theme automatically
 ✅ **Side Panel Support:** Chrome 114+ dual interface mode (popup or side panel)
+
+### Analytics Dashboard (New in v1.8)
+✅ **Usage Tracking:** Track prompt usage across all platforms
+✅ **Visual Analytics:** Interactive charts showing usage patterns
+✅ **Time Analysis:** View usage by day of week and time of day
+✅ **Category Insights:** See which prompt categories you use most
+✅ **Platform Stats:** Understand which AI platforms you prefer
+✅ **Floating Dashboard:** Quick access via floating action button
 
 ## 🎯 Supported Platforms
 
@@ -53,11 +61,15 @@ See our [Platform Integration Guide](docs/PLATFORM_INTEGRATION.md) to add your o
 | **React** | UI Framework | 19.2.3 |
 | **TypeScript** | Type Safety | 5.9.3 |
 | **Tailwind CSS** | Styling | 4.1.17 |
-| **Vite** | Build Tool | 7.2.7 |
+| **Vite** | Build Tool | 7.3.1 |
 | **Vitest** | Testing Framework | 4.0.5 |
 | **DOMPurify** | XSS Protection | 3.3.1 |
 | **Husky** | Git Hooks | 9.1.7 |
 | **@crxjs/vite-plugin** | Chrome Extension Support | 2.3.0 |
+| **Recharts** | Analytics Charts | 3.6.0 |
+| **@floating-ui/dom** | Floating UI | 1.7.4 |
+| **uuid** | UUID Generation | 13.0.0 |
+| **lz-string** | String Compression | 1.5.0 |
 
 ## 📦 Installation
 
@@ -113,11 +125,13 @@ See our [Platform Integration Guide](docs/PLATFORM_INTEGRATION.md) to add your o
 |---------|-------------|--------|
 | `npm run dev` | Start development server with HMR | Development |
 | `npm run build` | Create production build | Deployment |
-| `npm test` | Run test suite (1505+ tests) | Testing |
+| `npm test` | Run test suite (1692 tests) | Testing |
 | `npm run test:ui` | Run tests with Vitest UI | Interactive Testing |
 | `npm run test:coverage` | Generate coverage report | Code Coverage |
 | `npm run lint` | Run ESLint checks | Code Quality |
 | `npm run lint:fix` | Auto-fix ESLint issues | Code Formatting |
+| `npm run typecheck` | TypeScript type checking | Code Quality |
+| `npm run test:e2e` | Run Playwright E2E tests | E2E Testing |
 | `npm run package` | Package extension for distribution | Chrome Web Store |
 
 ## 🏗️ Architecture
@@ -129,18 +143,25 @@ graph TD
     A[Chrome Extension] --> B[Popup Interface]
     A --> C[Content Script]
     A --> D[Background Service Worker]
-    
-    B --> E[React Components]
-    B --> F[Chrome Storage API]
-    
-    C --> G[Platform Strategies]
-    C --> H[UI Injection]
-    C --> I[Event Management]
-    
-    G --> J[Claude Strategy]
-    G --> K[ChatGPT Strategy]
-    G --> L[Mistral Strategy]
-    G --> M[Perplexity Strategy]
+    A --> E[Analytics Dashboard]
+
+    B --> F[React Components]
+    B --> G[Chrome Storage API]
+
+    E --> H[Usage Charts]
+    E --> I[Statistics]
+
+    C --> J[Platform Strategies]
+    C --> K[UI Injection]
+    C --> L[Event Management]
+
+    J --> M[Claude Strategy]
+    J --> N[ChatGPT Strategy]
+    J --> O[Gemini Strategy]
+    J --> P[Mistral Strategy]
+    J --> Q[Perplexity Strategy]
+    J --> R[Copilot Strategy]
+    J --> S[Default Strategy]
 ```
 
 ### Content Script Architecture (TypeScript Modules)
@@ -151,12 +172,15 @@ src/content/
 ├── types/                      # TypeScript definitions
 │   ├── platform.ts            # Platform interfaces
 │   └── ui.ts                  # UI component types
+├── modules/                    # Feature modules
+│   └── element-picker.ts      # Custom site element picker
 ├── utils/                      # Utility modules
 │   ├── logger.ts              # Debug logging
 │   ├── storage.ts             # Chrome storage wrapper
 │   ├── dom.ts                 # DOM utilities
 │   ├── styles.ts              # Style injection
-│   └── theme-manager.ts       # Theme synchronization
+│   ├── theme-manager.ts       # Theme synchronization
+│   └── element-fingerprint.ts # Element fingerprinting
 ├── ui/                         # UI components
 │   ├── element-factory.ts     # Element creation
 │   ├── keyboard-navigation.ts # Keyboard support
@@ -165,8 +189,13 @@ src/content/
 │   ├── base-strategy.ts       # Abstract base class
 │   ├── claude-strategy.ts     # Claude.ai implementation
 │   ├── chatgpt-strategy.ts    # ChatGPT implementation
+│   ├── gemini-strategy.ts     # Google Gemini implementation
 │   ├── mistral-strategy.ts    # Mistral LeChat implementation
 │   ├── perplexity-strategy.ts # Perplexity implementation
+│   ├── copilot-strategy.ts    # Microsoft Copilot implementation
+│   ├── m365copilot-strategy.ts # M365 Copilot implementation
+│   ├── react-platform-strategy.ts # React-based platforms
+│   ├── default-strategy.ts    # Default fallback strategy
 │   └── platform-manager.ts    # Strategy coordinator
 └── core/                       # Core functionality
     ├── injector.ts            # Icon injection logic
@@ -225,7 +254,7 @@ The extension automatically detects your system theme preference. You can also t
 
 ## 🧪 Testing
 
-The project includes a comprehensive test suite with 1453+ tests across 63 test files.
+The project includes a comprehensive test suite with 1692 tests across 607 test files.
 
 ### Running Tests
 
@@ -265,7 +294,7 @@ npm test -- src/content/platforms/__tests__/claude-strategy.test.ts
    ```bash
    npm run package
    ```
-   This creates `prompt-library-extension-v1.8.1.zip`
+   This creates `prompt-library-extension-v1.8.2.zip`
 
 4. **Upload to Chrome Web Store:**
    - Go to [Chrome Web Store Developer Dashboard](https://chrome.google.com/webstore/developer/dashboard)
@@ -422,23 +451,26 @@ window.__promptLibraryDebug?.testInsertion?.('test content')
 
 ## 📈 Roadmap
 
-### Version 1.1 (Current)
+### Version 1.8 (Current)
 - [x] Core prompt management
-- [x] Multi-platform AI integration
+- [x] Multi-platform AI integration (8 platforms)
 - [x] Dark mode support
 - [x] Custom site configuration
-- [x] Comprehensive testing
+- [x] Comprehensive testing (1692 tests)
 - [x] Side Panel Support (Chrome 114+)
 - [x] Enhanced Security Architecture
 - [x] Import/Export functionality (JSON)
 - [x] Programmatic Content Script Injection
+- [x] Analytics Dashboard with usage tracking
+- [x] Element Fingerprinting for custom sites
+- [x] Floating Action Button for quick access
 
-### Version 1.2 (Planned)
+### Future Enhancements (Planned)
 - [ ] Prompt templates with variables
 - [ ] Keyboard shortcuts customization
-- [ ] Prompt usage analytics
 - [ ] Enhanced CSV export options
 - [ ] Prompt sharing and synchronization
+- [ ] Cloud backup (optional)
 
 ## 📄 License
 
