@@ -316,16 +316,14 @@ describe('getErrorMessage', () => {
         // Our helper
         const helperResult = getErrorMessage(testCase);
 
-        // Manual pattern
-        const manualResult = testCase instanceof Error ? testCase.message : String(testCase);
+        // Expected result depends on whether it's an Error object
+        // For Error objects: both manual and toError return the same message
+        // For non-Error: our helper uses toError which wraps it properly
+        const expectedResult = testCase instanceof Error
+          ? testCase.message
+          : toError(testCase).message;
 
-        // They should be equivalent when dealing with actual Error objects
-        if (testCase instanceof Error) {
-          expect(helperResult).toBe(manualResult);
-        } else {
-          // Our helper uses toError which creates proper Error objects
-          expect(helperResult).toBe(toError(testCase).message);
-        }
+        expect(helperResult).toBe(expectedResult);
       });
     });
 
@@ -343,18 +341,16 @@ describe('getErrorMessage', () => {
     });
 
     it('should handle catch blocks cleanly', () => {
-      try {
-        throw new Error('Test error');
-      } catch (error) {
-        // Old pattern
-        const oldMessage = error instanceof Error ? error.message : 'Unknown error';
+      const thrownError = new Error('Test error');
 
-        // New pattern
-        const newMessage = getErrorMessage(error);
+      // Old pattern
+      const oldMessage = thrownError instanceof Error ? thrownError.message : 'Unknown error';
 
-        expect(newMessage).toBe(oldMessage);
-        expect(newMessage).toBe('Test error');
-      }
+      // New pattern
+      const newMessage = getErrorMessage(thrownError);
+
+      expect(newMessage).toBe(oldMessage);
+      expect(newMessage).toBe('Test error');
     });
   });
 

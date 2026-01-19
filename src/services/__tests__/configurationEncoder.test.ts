@@ -228,13 +228,11 @@ describe('ConfigurationEncoder', () => {
       }
     };
 
-    try {
-      await ConfigurationEncoder.encode(maliciousSite);
-      throw new Error('Expected encoding to fail for unsafe selector');
-    } catch (error) {
-      expect(error).toBeInstanceOf(ConfigurationEncoderError);
-      expect(['SECURITY_VIOLATION', 'VALIDATION_ERROR']).toContain((error as ConfigurationEncoderError).code);
-    }
+    await expect(ConfigurationEncoder.encode(maliciousSite)).rejects.toSatisfy(
+      (error: ConfigurationEncoderError) =>
+        error instanceof ConfigurationEncoderError &&
+        ['SECURITY_VIOLATION', 'VALIDATION_ERROR'].includes(error.code)
+    );
   });
 
   it('supports configurations that rely solely on fingerprints', async () => {

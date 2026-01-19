@@ -26,7 +26,7 @@ describe('PromptCard - Basic Rendering', () => {
     onEdit: vi.fn(),
     onDelete: vi.fn(),
     onCopy: vi.fn(),
-    showToast: vi.fn(),
+    showToast: vi.fn<(message: string, type: 'success' | 'error' | 'info' | 'warning') => void>(),
     searchQuery: ''
   };
 
@@ -112,7 +112,7 @@ describe('PromptCard - Share Button', () => {
     { id: '1', name: 'Test Category', color: '#FF0000' }
   ];
 
-  let mockShowToast: ReturnType<typeof vi.fn>;
+  let mockShowToast: ReturnType<typeof vi.fn<(message: string, type: 'success' | 'error' | 'info' | 'warning') => void>>;
   let mockWriteText: ReturnType<typeof vi.fn>;
    
   let mockEncode: any;
@@ -124,7 +124,7 @@ describe('PromptCard - Share Button', () => {
   });
 
   beforeEach(() => {
-    mockShowToast = vi.fn();
+    mockShowToast = vi.fn<(message: string, type: 'success' | 'error' | 'info' | 'warning') => void>();
     mockWriteText = vi.fn().mockResolvedValue(undefined);
     mockEncode = vi.spyOn(promptEncoder, 'encode');
 

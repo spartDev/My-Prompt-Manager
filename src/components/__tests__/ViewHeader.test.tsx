@@ -363,11 +363,13 @@ describe('ViewHeader', () => {
 
       // Get all SVGs within buttons (excluding the main icon)
       const buttons = container.querySelectorAll('button');
-      buttons.forEach(button => {
-        const svg = button.querySelector('svg');
-        if (svg) {
-          expect(svg).toHaveAttribute('aria-hidden', 'true');
-        }
+      const svgs = Array.from(buttons)
+        .map(button => button.querySelector('svg'))
+        .filter((svg): svg is SVGSVGElement => svg !== null);
+
+      expect(svgs.length).toBeGreaterThan(0);
+      svgs.forEach(svg => {
+        expect(svg).toHaveAttribute('aria-hidden', 'true');
       });
     });
   });
