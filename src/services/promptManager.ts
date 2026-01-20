@@ -406,25 +406,81 @@ export class PromptManager {
     }
   }
 
-  // Duplicate detection
+  // Duplicate detection constants
+  private static readonly DUPLICATE_DETECTION_DEFAULTS = {
+    MAX_PROMPTS_AUTO: 1000,
+    TIMEOUT_MS: 10000,
+    YIELD_INTERVAL_MS: 50,
+    HASH_BUCKET_SIZE: 100
+  } as const;
+
+  /**
+   * Finds groups of similar/duplicate prompts using content similarity analysis.
+   *
+   * @param options - Configuration options for duplicate detection
+   * @param options.timeoutMs - Maximum execution time in milliseconds (default: 10000)
+   * @param options.maxPrompts - Maximum prompts to process without explicit opt-in (default: 1000)
+   * @param options.allowLargeDatasets - Set to true to bypass maxPrompts limit
+   * @param options.yieldIntervalMs - How often to yield to UI thread (default: 50ms)
+   * @param options.onProgress - Progress callback for UI updates.
+   *   **Note:** Progress values are normalized to reach 100%. Due to the length-bucket
+   *   optimization that skips impossible comparisons, the `current` and `total` values
+   *   may not reflect actual comparisons performed. Use the `progress` percentage for
+   *   UI display rather than computing it from `current/total`.
+   * @returns Array of duplicate groups, each containing an original prompt and its duplicates
+   */
   async findDuplicatePrompts(options?: {
     timeoutMs?: number;
+    maxPrompts?: number;
+    allowLargeDatasets?: boolean;
+    yieldIntervalMs?: number;
+    /**
+     * Progress callback. Values are normalized to ensure progress reaches 100%.
+     * Due to length-bucket optimization, `current` and `total` may not reflect
+     * actual comparison counts. Use `progress` percentage for UI display.
+     */
     onProgress?: (progress: number, current: number, total: number) => void;
   }): Promise<{ original: Prompt; duplicates: Prompt[] }[]> {
-    const { timeoutMs = 30000, onProgress } = options || {};
+    const {
+      timeoutMs = PromptManager.DUPLICATE_DETECTION_DEFAULTS.TIMEOUT_MS,
+      maxPrompts = PromptManager.DUPLICATE_DETECTION_DEFAULTS.MAX_PROMPTS_AUTO,
+      allowLargeDatasets = false,
+      yieldIntervalMs = PromptManager.DUPLICATE_DETECTION_DEFAULTS.YIELD_INTERVAL_MS,
+      onProgress
+    } = options || {};
 
     try {
       const allPrompts = await this.storageManager.getPrompts();
+
+      // Safeguard: Check prompt count before starting O(n²) operation
+      if (allPrompts.length > maxPrompts && !allowLargeDatasets) {
+        throw new PromptManagerError({
+          type: ErrorType.VALIDATION_ERROR,
+          message: `Duplicate detection limited to ${String(maxPrompts)} prompts. You have ${String(allPrompts.length)} prompts. Set allowLargeDatasets: true to process larger collections.`,
+          details: {
+            promptCount: allPrompts.length,
+            maxPrompts,
+            estimatedComparisons: (allPrompts.length * (allPrompts.length - 1)) / 2
+          }
+        });
+      }
+
+      // Group prompts by content length bucket for faster filtering
+      const lengthBuckets = this.groupByLengthBucket(allPrompts);
+
       const duplicateGroups: { original: Prompt; duplicates: Prompt[] }[] = [];
       const processedIds = new Set<string>();
 
       const startTime = performance.now();
+      let lastYieldTime = startTime;
       const totalComparisons = (allPrompts.length * (allPrompts.length - 1)) / 2;
       let completedComparisons = 0;
 
       for (let i = 0; i < allPrompts.length; i++) {
+        const currentTime = performance.now();
+
         // Check timeout every outer loop iteration
-        if (performance.now() - startTime > timeoutMs) {
+        if (currentTime - startTime > timeoutMs) {
           throw new PromptManagerError({
             type: ErrorType.VALIDATION_ERROR,
             message: `Duplicate detection timed out after ${String(timeoutMs)}ms. Try with fewer prompts or increase timeout.`,
@@ -436,6 +492,12 @@ export class PromptManager {
           });
         }
 
+        // Yield to UI to keep it responsive
+        if (currentTime - lastYieldTime > yieldIntervalMs) {
+          await this.yieldToUI();
+          lastYieldTime = performance.now();
+        }
+
         const prompt = allPrompts[i];
 
         if (processedIds.has(prompt.id)) {
@@ -444,11 +506,14 @@ export class PromptManager {
 
         const duplicates: Prompt[] = [];
 
-        // Compare with remaining prompts
-        for (let j = i + 1; j < allPrompts.length; j++) {
-          const other = allPrompts[j];
+        // Get candidates from same and adjacent length buckets (within 10% length)
+        // Only returns prompts with index > i to ensure each pair is compared exactly once
+        const candidates = this.getCandidatesFromBuckets(prompt, i, lengthBuckets, processedIds);
 
-          if (!processedIds.has(other.id) && this.areSimilarPrompts(prompt, other)) {
+        // Compare only with candidates (filtered by length bucket)
+        // Note: candidates are guaranteed to have index > i, so other !== prompt
+        for (const other of candidates) {
+          if (this.areSimilarPrompts(prompt, other)) {
             duplicates.push(other);
           }
 
@@ -456,10 +521,14 @@ export class PromptManager {
 
           // Report progress every 100 comparisons
           if (onProgress && completedComparisons % 100 === 0) {
-            const progress = (completedComparisons / totalComparisons) * 100;
+            const progress = Math.min((completedComparisons / totalComparisons) * 100, 99);
             onProgress(progress, completedComparisons, totalComparisons);
           }
         }
+
+        // Account for skipped comparisons in progress
+        const skippedComparisons = (allPrompts.length - i - 1) - candidates.length;
+        completedComparisons += skippedComparisons;
 
         if (duplicates.length > 0) {
           duplicateGroups.push({ original: prompt, duplicates });
@@ -477,6 +546,64 @@ export class PromptManager {
     } catch (error) {
       throw this.handleError(error);
     }
+  }
+
+  // Group prompts by content length for O(n²) optimization
+  // Stores index alongside prompt to enable forward-only comparisons
+  private groupByLengthBucket(prompts: Prompt[]): Map<number, { prompt: Prompt; index: number }[]> {
+    const buckets = new Map<number, { prompt: Prompt; index: number }[]>();
+    const bucketSize = PromptManager.DUPLICATE_DETECTION_DEFAULTS.HASH_BUCKET_SIZE;
+
+    for (let i = 0; i < prompts.length; i++) {
+      const prompt = prompts[i];
+      const bucket = Math.floor(prompt.content.length / bucketSize);
+      const existing = buckets.get(bucket) || [];
+      existing.push({ prompt, index: i });
+      buckets.set(bucket, existing);
+    }
+
+    return buckets;
+  }
+
+  // Get candidate prompts from length buckets within similarity range
+  // Only returns prompts with index > currentIndex to avoid double comparisons
+  private getCandidatesFromBuckets(
+    prompt: Prompt,
+    currentIndex: number,
+    buckets: Map<number, { prompt: Prompt; index: number }[]>,
+    processedIds: Set<string>
+  ): Prompt[] {
+    const bucketSize = PromptManager.DUPLICATE_DETECTION_DEFAULTS.HASH_BUCKET_SIZE;
+    const len = prompt.content.length;
+    const promptBucket = Math.floor(len / bucketSize);
+
+    // For 90% similarity threshold, valid candidate lengths range from 0.9*len to len/0.9.
+    // The upper bound len/0.9 = len * 1.1111... is asymmetric (11.11% above, not 11%).
+    // To ensure we never miss edge cases, we use len/9 (exact) rather than len*0.11 (truncated).
+    // Example: 9090-char prompt needs to compare with 10100-char (ratio=0.9, bucket 101),
+    // requiring ceil(9090/9/100) = 11 buckets, not ceil(9090*0.11/100) = 10.
+    const bucketsToCheck = Math.max(1, Math.ceil(len / (9 * bucketSize)));
+    const candidates: Prompt[] = [];
+
+    for (let b = promptBucket - bucketsToCheck; b <= promptBucket + bucketsToCheck; b++) {
+      const bucketed = buckets.get(b);
+      if (bucketed) {
+        for (const entry of bucketed) {
+          // Only compare forward (index > currentIndex) to avoid double comparisons
+          // Also skip already-processed prompts (duplicates found in earlier iterations)
+          if (entry.index > currentIndex && !processedIds.has(entry.prompt.id)) {
+            candidates.push(entry.prompt);
+          }
+        }
+      }
+    }
+
+    return candidates;
+  }
+
+  // Yield to UI event loop to prevent blocking
+  private yieldToUI(): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, 0));
   }
 
   // Private helper methods
