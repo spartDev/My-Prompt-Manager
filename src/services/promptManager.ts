@@ -577,16 +577,12 @@ export class PromptManager {
     const len = prompt.content.length;
     const promptBucket = Math.floor(len / bucketSize);
 
-    // For 90% similarity threshold, content lengths must be within ~11% of each other.
-    // Valid candidate range: [0.9 * len, len / 0.9] = [0.9 * len, ~1.11 * len]
-    // The spread is ~0.21 * len, so we need to check ceil(0.11 * len / bucketSize) buckets
-    // on each side. For small prompts (< 900 chars) this is 1; for longer prompts it scales.
-    //
-    // Note: We considered making HASH_BUCKET_SIZE adaptive (e.g., based on average prompt
-    // length), but dynamic bucket range is simpler and avoids recomputing buckets. The fixed
-    // 100-char bucket size provides good granularity for typical prompts while the adaptive
-    // range handles edge cases with longer content.
-    const bucketsToCheck = Math.max(1, Math.ceil((len * 0.11) / bucketSize));
+    // For 90% similarity threshold, valid candidate lengths range from 0.9*len to len/0.9.
+    // The upper bound len/0.9 = len * 1.1111... is asymmetric (11.11% above, not 11%).
+    // To ensure we never miss edge cases, we use len/9 (exact) rather than len*0.11 (truncated).
+    // Example: 9090-char prompt needs to compare with 10100-char (ratio=0.9, bucket 101),
+    // requiring ceil(9090/9/100) = 11 buckets, not ceil(9090*0.11/100) = 10.
+    const bucketsToCheck = Math.max(1, Math.ceil(len / (9 * bucketSize)));
     const candidates: Prompt[] = [];
 
     for (let b = promptBucket - bucketsToCheck; b <= promptBucket + bucketsToCheck; b++) {
