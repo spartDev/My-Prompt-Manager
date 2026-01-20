@@ -111,8 +111,8 @@ export class StorageManager {
           id: uuidv4(),
           createdAt: timestamp,
           updatedAt: timestamp,
-          usageCount: 0,
-          lastUsedAt: timestamp
+          usageCount: 0
+          // lastUsedAt intentionally omitted - semantically wrong to set on unused prompts
         };
 
         const updatedPrompts = [...existingPrompts, newPrompt];

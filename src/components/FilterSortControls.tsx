@@ -24,7 +24,6 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
   sortDirection,
   onCategoryChange,
   onSortChange,
-  onManageCategories,
   loading = false
 }) => {
   // Derived values for active state text
@@ -167,9 +166,7 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
   }, [sortOrder, sortDirection, handleSortSelect]);
 
   return (
-    <div className="flex items-center justify-between">
-      {/* Left: Filter + Sort + Active State */}
-      <div className="flex items-center space-x-2" role="group" aria-label="Filter and sort controls">
+    <div className="flex items-center space-x-2" role="group" aria-label="Filter and sort controls">
         {/* Filter Dropdown */}
         <Dropdown
           trigger={
@@ -267,36 +264,6 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
           className="min-w-[200px] max-h-[400px] overflow-y-auto custom-scrollbar"
           itemClassName="px-4 py-3 text-sm font-medium"
         />
-      </div>
-
-      {/* Right: Manage Categories Button */}
-      <button
-        onClick={onManageCategories}
-        disabled={loading}
-        className="
-          flex items-center space-x-2
-          px-3 py-2
-          text-purple-600 dark:text-purple-400
-          hover:text-purple-700 dark:hover:text-purple-300
-          bg-purple-50/50 dark:bg-purple-900/10
-          hover:bg-purple-50 dark:hover:bg-purple-900/20
-          rounded-lg
-          text-xs font-semibold
-          transition-colors
-          focus-interactive
-          disabled:opacity-50 disabled:cursor-not-allowed
-        "
-        aria-label="Manage categories"
-        title="Manage Categories"
-      >
-        {/* Folder/archive icon - always visible */}
-        <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-        </svg>
-
-        {/* Text - desktop only (>= 375px) */}
-        <span className="hidden min-[375px]:inline">Categories</span>
-      </button>
     </div>
   );
 };
@@ -321,7 +288,6 @@ const arePropsEqual = (
     prev.sortDirection === next.sortDirection &&
     prev.onCategoryChange === next.onCategoryChange &&
     prev.onSortChange === next.onSortChange &&
-    prev.onManageCategories === next.onManageCategories &&
     prev.loading === next.loading
   );
 };

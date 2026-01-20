@@ -23,7 +23,6 @@ const LibraryView: FC<LibraryViewProps> = ({
   onCopyPrompt,
   showToast,
   onCategoryChange,
-  onManageCategories,
   onSettings,
   onAnalytics,
   loading,
@@ -106,7 +105,6 @@ const LibraryView: FC<LibraryViewProps> = ({
             sortDirection={sortDirection}
             onCategoryChange={onCategoryChange}
             onSortChange={handleSortChange}
-            onManageCategories={onManageCategories}
             loading={loading}
           />
         </div>

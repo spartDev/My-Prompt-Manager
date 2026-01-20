@@ -19,9 +19,7 @@ describe('FilterSortControls', () => {
     sortDirection: 'desc' as SortDirection,
     onCategoryChange: vi.fn(),
     onSortChange: vi.fn(),
-    onManageCategories: vi.fn(),
-    loading: false,
-    context: 'popup' as const
+    loading: false
   };
 
   beforeEach(() => {
@@ -33,9 +31,7 @@ describe('FilterSortControls', () => {
       render(<FilterSortControls {...defaultProps} />);
 
       expect(screen.getByLabelText(/filter by category/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/sort order/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/manage categories/i)).toBeInTheDocument();
-    });
+      expect(screen.getByLabelText(/sort order/i)).toBeInTheDocument();    });
 
     it('shows active state text', () => {
       render(<FilterSortControls {...defaultProps} />);
@@ -472,9 +468,7 @@ describe('FilterSortControls', () => {
       render(<FilterSortControls {...defaultProps} loading={true} />);
 
       expect(screen.getByLabelText(/filter by category/i)).toBeDisabled();
-      expect(screen.getByLabelText(/sort order/i)).toBeDisabled();
-      expect(screen.getByLabelText(/manage categories/i)).toBeDisabled();
-    });
+      expect(screen.getByLabelText(/sort order/i)).toBeDisabled();    });
 
     it('prevents dropdown from opening when loading', async () => {
       const user = userEvent.setup();
@@ -532,56 +526,6 @@ describe('FilterSortControls', () => {
     });
   });
 
-  describe('Manage Categories Button', () => {
-    it('shows "Categories" text on desktop viewport', () => {
-      render(<FilterSortControls {...defaultProps} />);
-
-      const manageButton = screen.getByLabelText(/manage categories/i);
-      expect(manageButton.textContent).toContain('Categories');
-    });
-
-    it('calls onManageCategories when manage button is clicked', async () => {
-      const user = userEvent.setup();
-      const onManageCategories = vi.fn();
-      render(<FilterSortControls {...defaultProps} onManageCategories={onManageCategories} />);
-
-      const manageButton = screen.getByLabelText(/manage categories/i);
-      await user.click(manageButton);
-
-      expect(onManageCategories).toHaveBeenCalledTimes(1);
-    });
-
-    it('calls onManageCategories with Enter key', async () => {
-      const user = userEvent.setup();
-      const onManageCategories = vi.fn();
-      render(<FilterSortControls {...defaultProps} onManageCategories={onManageCategories} />);
-
-      const manageButton = screen.getByLabelText(/manage categories/i);
-      manageButton.focus();
-      await user.keyboard('{Enter}');
-
-      expect(onManageCategories).toHaveBeenCalledTimes(1);
-    });
-
-    it('calls onManageCategories with Space key', async () => {
-      const user = userEvent.setup();
-      const onManageCategories = vi.fn();
-      render(<FilterSortControls {...defaultProps} onManageCategories={onManageCategories} />);
-
-      const manageButton = screen.getByLabelText(/manage categories/i);
-      manageButton.focus();
-      await user.keyboard(' ');
-
-      expect(onManageCategories).toHaveBeenCalledTimes(1);
-    });
-
-    it('is disabled when loading', () => {
-      render(<FilterSortControls {...defaultProps} loading={true} />);
-
-      const manageButton = screen.getByLabelText(/manage categories/i);
-      expect(manageButton).toBeDisabled();
-    });
-  });
 
   describe('Active State Display', () => {
     it('displays selected category name in active state', () => {
@@ -738,9 +682,6 @@ describe('FilterSortControls', () => {
 
       const sortButton = screen.getByLabelText(/sort order/i);
       expect(sortButton).toHaveAttribute('title', 'Sort: Newest');
-
-      const manageButton = screen.getByLabelText(/manage categories/i);
-      expect(manageButton).toHaveAttribute('title', 'Manage Categories');
     });
   });
 
