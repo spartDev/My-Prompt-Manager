@@ -15,9 +15,9 @@ describe('PromptManager - findDuplicatePrompts safeguards', () => {
   let storageManagerMock: StorageManagerMock;
 
   // Helper to create a prompt with specific content length (unique content per prompt)
-  const createPrompt = (id: string, contentLength: number, titleSuffix: string = ''): Prompt => ({
+  const createPrompt = (id: string, contentLength: number): Prompt => ({
     id,
-    title: `Test Prompt ${titleSuffix || id}`,
+    title: `Test Prompt ${id}`,
     // Use unique content per prompt to avoid false duplicate detection
     content: `Content ${id}: ${'x'.repeat(Math.max(0, contentLength - 15 - id.length))}`,
     category: 'Test',

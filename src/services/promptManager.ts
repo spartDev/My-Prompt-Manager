@@ -511,8 +511,9 @@ export class PromptManager {
         const candidates = this.getCandidatesFromBuckets(prompt, i, lengthBuckets, processedIds);
 
         // Compare only with candidates (filtered by length bucket)
+        // Note: candidates are guaranteed to have index > i, so other !== prompt
         for (const other of candidates) {
-          if (other.id !== prompt.id && this.areSimilarPrompts(prompt, other)) {
+          if (this.areSimilarPrompts(prompt, other)) {
             duplicates.push(other);
           }
 
