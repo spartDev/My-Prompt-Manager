@@ -378,14 +378,20 @@ export class PromptManager {
       
       for (let i = 6; i >= 0; i--) {
         const date = new Date(now - (i * 24 * 60 * 60 * 1000));
-        const dateString = date.toISOString().split('T')[0];
-        const dayStart = date.setHours(0, 0, 0, 0);
-        const dayEnd = date.setHours(23, 59, 59, 999);
-        
-        const count = allPrompts.filter(prompt => 
+        // Use local time consistently for both dateString and filtering
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const dateString = `${String(year)}-${month}-${day}`;
+
+        // Create separate Date objects for start/end to avoid mutation issues
+        const dayStart = new Date(year, date.getMonth(), date.getDate(), 0, 0, 0, 0).getTime();
+        const dayEnd = new Date(year, date.getMonth(), date.getDate(), 23, 59, 59, 999).getTime();
+
+        const count = allPrompts.filter(prompt =>
           prompt.createdAt >= dayStart && prompt.createdAt <= dayEnd
         ).length;
-        
+
         recentActivity.push({ date: dateString, count });
       }
 
