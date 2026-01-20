@@ -208,6 +208,8 @@ export class SearchIndex {
       }
 
       // Check for partial term matches (prefix search)
+      // PERF: O(V) per term where V = vocabulary size. Currently acceptable (<2ms with
+      // ~12K vocabulary). If vocabulary grows significantly (100K+), consider a trie.
       for (const [indexedTerm, promptIds] of this.index.terms.entries()) {
         if (indexedTerm.startsWith(term) && indexedTerm !== term) {
           for (const promptId of promptIds) {
