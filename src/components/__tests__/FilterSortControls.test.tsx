@@ -31,7 +31,8 @@ describe('FilterSortControls', () => {
       render(<FilterSortControls {...defaultProps} />);
 
       expect(screen.getByLabelText(/filter by category/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/sort order/i)).toBeInTheDocument();    });
+      expect(screen.getByLabelText(/sort order/i)).toBeInTheDocument();
+    });
 
     it('shows active state text', () => {
       render(<FilterSortControls {...defaultProps} />);
@@ -468,7 +469,8 @@ describe('FilterSortControls', () => {
       render(<FilterSortControls {...defaultProps} loading={true} />);
 
       expect(screen.getByLabelText(/filter by category/i)).toBeDisabled();
-      expect(screen.getByLabelText(/sort order/i)).toBeDisabled();    });
+      expect(screen.getByLabelText(/sort order/i)).toBeDisabled();
+    });
 
     it('prevents dropdown from opening when loading', async () => {
       const user = userEvent.setup();
@@ -525,7 +527,6 @@ describe('FilterSortControls', () => {
       expect(sortButton).toBeInTheDocument();
     });
   });
-
 
   describe('Active State Display', () => {
     it('displays selected category name in active state', () => {
