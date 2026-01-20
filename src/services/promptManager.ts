@@ -414,12 +414,31 @@ export class PromptManager {
     HASH_BUCKET_SIZE: 100
   } as const;
 
-  // Duplicate detection
+  /**
+   * Finds groups of similar/duplicate prompts using content similarity analysis.
+   *
+   * @param options - Configuration options for duplicate detection
+   * @param options.timeoutMs - Maximum execution time in milliseconds (default: 10000)
+   * @param options.maxPrompts - Maximum prompts to process without explicit opt-in (default: 1000)
+   * @param options.allowLargeDatasets - Set to true to bypass maxPrompts limit
+   * @param options.yieldIntervalMs - How often to yield to UI thread (default: 50ms)
+   * @param options.onProgress - Progress callback for UI updates.
+   *   **Note:** Progress values are normalized to reach 100%. Due to the length-bucket
+   *   optimization that skips impossible comparisons, the `current` and `total` values
+   *   may not reflect actual comparisons performed. Use the `progress` percentage for
+   *   UI display rather than computing it from `current/total`.
+   * @returns Array of duplicate groups, each containing an original prompt and its duplicates
+   */
   async findDuplicatePrompts(options?: {
     timeoutMs?: number;
     maxPrompts?: number;
     allowLargeDatasets?: boolean;
     yieldIntervalMs?: number;
+    /**
+     * Progress callback. Values are normalized to ensure progress reaches 100%.
+     * Due to length-bucket optimization, `current` and `total` may not reflect
+     * actual comparison counts. Use `progress` percentage for UI display.
+     */
     onProgress?: (progress: number, current: number, total: number) => void;
   }): Promise<{ original: Prompt; duplicates: Prompt[] }[]> {
     const {
@@ -549,13 +568,22 @@ export class PromptManager {
     processedIds: Set<string>
   ): Prompt[] {
     const bucketSize = PromptManager.DUPLICATE_DETECTION_DEFAULTS.HASH_BUCKET_SIZE;
-    const promptBucket = Math.floor(prompt.content.length / bucketSize);
+    const len = prompt.content.length;
+    const promptBucket = Math.floor(len / bucketSize);
 
-    // For 90% similarity, content lengths must be within ~11% of each other
-    // Check current bucket and one bucket on each side
+    // For 90% similarity threshold, content lengths must be within ~11% of each other.
+    // Valid candidate range: [0.9 * len, len / 0.9] = [0.9 * len, ~1.11 * len]
+    // The spread is ~0.21 * len, so we need to check ceil(0.11 * len / bucketSize) buckets
+    // on each side. For small prompts (< 900 chars) this is 1; for longer prompts it scales.
+    //
+    // Note: We considered making HASH_BUCKET_SIZE adaptive (e.g., based on average prompt
+    // length), but dynamic bucket range is simpler and avoids recomputing buckets. The fixed
+    // 100-char bucket size provides good granularity for typical prompts while the adaptive
+    // range handles edge cases with longer content.
+    const bucketsToCheck = Math.max(1, Math.ceil((len * 0.11) / bucketSize));
     const candidates: Prompt[] = [];
 
-    for (let b = promptBucket - 1; b <= promptBucket + 1; b++) {
+    for (let b = promptBucket - bucketsToCheck; b <= promptBucket + bucketsToCheck; b++) {
       const bucketed = buckets.get(b);
       if (bucketed) {
         for (const p of bucketed) {
