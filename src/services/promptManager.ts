@@ -406,25 +406,62 @@ export class PromptManager {
     }
   }
 
+  // Duplicate detection constants
+  private static readonly DUPLICATE_DETECTION_DEFAULTS = {
+    MAX_PROMPTS_AUTO: 1000,
+    TIMEOUT_MS: 10000,
+    YIELD_INTERVAL_MS: 50,
+    HASH_BUCKET_SIZE: 100
+  } as const;
+
   // Duplicate detection
   async findDuplicatePrompts(options?: {
     timeoutMs?: number;
+    maxPrompts?: number;
+    allowLargeDatasets?: boolean;
+    yieldIntervalMs?: number;
     onProgress?: (progress: number, current: number, total: number) => void;
   }): Promise<{ original: Prompt; duplicates: Prompt[] }[]> {
-    const { timeoutMs = 30000, onProgress } = options || {};
+    const {
+      timeoutMs = PromptManager.DUPLICATE_DETECTION_DEFAULTS.TIMEOUT_MS,
+      maxPrompts = PromptManager.DUPLICATE_DETECTION_DEFAULTS.MAX_PROMPTS_AUTO,
+      allowLargeDatasets = false,
+      yieldIntervalMs = PromptManager.DUPLICATE_DETECTION_DEFAULTS.YIELD_INTERVAL_MS,
+      onProgress
+    } = options || {};
 
     try {
       const allPrompts = await this.storageManager.getPrompts();
+
+      // Safeguard: Check prompt count before starting O(n²) operation
+      if (allPrompts.length > maxPrompts && !allowLargeDatasets) {
+        throw new PromptManagerError({
+          type: ErrorType.VALIDATION_ERROR,
+          message: `Duplicate detection limited to ${String(maxPrompts)} prompts. You have ${String(allPrompts.length)} prompts. Set allowLargeDatasets: true to process larger collections.`,
+          details: {
+            promptCount: allPrompts.length,
+            maxPrompts,
+            estimatedComparisons: (allPrompts.length * (allPrompts.length - 1)) / 2
+          }
+        });
+      }
+
+      // Group prompts by content length bucket for faster filtering
+      const lengthBuckets = this.groupByLengthBucket(allPrompts);
+
       const duplicateGroups: { original: Prompt; duplicates: Prompt[] }[] = [];
       const processedIds = new Set<string>();
 
       const startTime = performance.now();
+      let lastYieldTime = startTime;
       const totalComparisons = (allPrompts.length * (allPrompts.length - 1)) / 2;
       let completedComparisons = 0;
 
       for (let i = 0; i < allPrompts.length; i++) {
+        const currentTime = performance.now();
+
         // Check timeout every outer loop iteration
-        if (performance.now() - startTime > timeoutMs) {
+        if (currentTime - startTime > timeoutMs) {
           throw new PromptManagerError({
             type: ErrorType.VALIDATION_ERROR,
             message: `Duplicate detection timed out after ${String(timeoutMs)}ms. Try with fewer prompts or increase timeout.`,
@@ -436,6 +473,12 @@ export class PromptManager {
           });
         }
 
+        // Yield to UI to keep it responsive
+        if (currentTime - lastYieldTime > yieldIntervalMs) {
+          await this.yieldToUI();
+          lastYieldTime = performance.now();
+        }
+
         const prompt = allPrompts[i];
 
         if (processedIds.has(prompt.id)) {
@@ -444,11 +487,12 @@ export class PromptManager {
 
         const duplicates: Prompt[] = [];
 
-        // Compare with remaining prompts
-        for (let j = i + 1; j < allPrompts.length; j++) {
-          const other = allPrompts[j];
+        // Get candidates from same and adjacent length buckets (within 10% length)
+        const candidates = this.getCandidatesFromBuckets(prompt, lengthBuckets, processedIds);
 
-          if (!processedIds.has(other.id) && this.areSimilarPrompts(prompt, other)) {
+        // Compare only with candidates (filtered by length bucket)
+        for (const other of candidates) {
+          if (other.id !== prompt.id && this.areSimilarPrompts(prompt, other)) {
             duplicates.push(other);
           }
 
@@ -456,10 +500,14 @@ export class PromptManager {
 
           // Report progress every 100 comparisons
           if (onProgress && completedComparisons % 100 === 0) {
-            const progress = (completedComparisons / totalComparisons) * 100;
+            const progress = Math.min((completedComparisons / totalComparisons) * 100, 99);
             onProgress(progress, completedComparisons, totalComparisons);
           }
         }
+
+        // Account for skipped comparisons in progress
+        const skippedComparisons = (allPrompts.length - i - 1) - candidates.length;
+        completedComparisons += skippedComparisons;
 
         if (duplicates.length > 0) {
           duplicateGroups.push({ original: prompt, duplicates });
@@ -477,6 +525,53 @@ export class PromptManager {
     } catch (error) {
       throw this.handleError(error);
     }
+  }
+
+  // Group prompts by content length for O(n²) optimization
+  private groupByLengthBucket(prompts: Prompt[]): Map<number, Prompt[]> {
+    const buckets = new Map<number, Prompt[]>();
+    const bucketSize = PromptManager.DUPLICATE_DETECTION_DEFAULTS.HASH_BUCKET_SIZE;
+
+    for (const prompt of prompts) {
+      const bucket = Math.floor(prompt.content.length / bucketSize);
+      const existing = buckets.get(bucket) || [];
+      existing.push(prompt);
+      buckets.set(bucket, existing);
+    }
+
+    return buckets;
+  }
+
+  // Get candidate prompts from length buckets within similarity range
+  private getCandidatesFromBuckets(
+    prompt: Prompt,
+    buckets: Map<number, Prompt[]>,
+    processedIds: Set<string>
+  ): Prompt[] {
+    const bucketSize = PromptManager.DUPLICATE_DETECTION_DEFAULTS.HASH_BUCKET_SIZE;
+    const promptBucket = Math.floor(prompt.content.length / bucketSize);
+
+    // For 90% similarity, content lengths must be within ~11% of each other
+    // Check current bucket and one bucket on each side
+    const candidates: Prompt[] = [];
+
+    for (let b = promptBucket - 1; b <= promptBucket + 1; b++) {
+      const bucketed = buckets.get(b);
+      if (bucketed) {
+        for (const p of bucketed) {
+          if (!processedIds.has(p.id)) {
+            candidates.push(p);
+          }
+        }
+      }
+    }
+
+    return candidates;
+  }
+
+  // Yield to UI event loop to prevent blocking
+  private yieldToUI(): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, 0));
   }
 
   // Private helper methods
