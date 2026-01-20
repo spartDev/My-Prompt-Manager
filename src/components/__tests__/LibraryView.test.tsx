@@ -64,6 +64,7 @@ const defaultProps = {
   onCopyPrompt: vi.fn(),
   showToast: vi.fn(),
   onCategoryChange: vi.fn(),
+  onManageCategories: vi.fn(),
   onSettings: vi.fn(),
   onAnalytics: vi.fn(),
   loading: false,

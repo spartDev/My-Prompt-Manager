@@ -213,6 +213,10 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   };
 
   // Memoized callbacks to prevent unnecessary re-renders
+  const handleManageCategories = useCallback(() => {
+    setCurrentView('categories');
+  }, []);
+
   const handleSettings = useCallback(() => {
     setCurrentView('settings');
   }, []);
@@ -271,6 +275,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
           onCopyPrompt={(content: string) => { void handleCopyPrompt(content); }}
           showToast={showToast}
           onCategoryChange={setSelectedCategory}
+          onManageCategories={handleManageCategories}
           onSettings={handleSettings}
           onAnalytics={handleAnalytics}
           loading={loading}
