@@ -5,6 +5,8 @@ import {
   ErrorType,
   AppError
 } from '../types';
+import { AsyncMutex } from '../utils/asyncMutex';
+import { ensureStorageAvailable } from '../utils/chromeStorage';
 import * as Logger from '../utils/logger';
 
 class UsageTrackerError extends Error implements AppError {
@@ -30,7 +32,7 @@ export class UsageTracker {
   private static instance: UsageTracker | undefined;
 
   // Mutex for preventing concurrent storage operations
-  private operationLock: Promise<unknown> | null = null;
+  private readonly mutex = new AsyncMutex();
 
   // Storage quota protection limits
   // At ~100 bytes per event, 10,000 events = ~1MB (leaving plenty of buffer)
@@ -54,7 +56,7 @@ export class UsageTracker {
    * @param categoryId - The category ID of the prompt (null if uncategorized)
    */
   async record(promptId: string, platform: string, categoryId: string | null): Promise<void> {
-    return this.withLock(async () => {
+    return this.mutex.withLock(async () => {
       try {
         const event: UsageEvent = {
           promptId,
@@ -127,35 +129,11 @@ export class UsageTracker {
   }
 
   /**
-   * Wait for chrome.storage.local to be available
-   * In some contexts (e.g., analytics.html in a new tab), the chrome API
-   * may not be immediately available when the page first loads
-   */
-  private async ensureStorageAvailable(): Promise<void> {
-    const maxAttempts = 50;
-    const delayMs = 100;
-
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-      if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-        return;
-      }
-      await new Promise(resolve => setTimeout(resolve, delayMs));
-    }
-
-    throw new UsageTrackerError({
-      type: ErrorType.STORAGE_UNAVAILABLE,
-      message: 'Chrome storage API is not available. Please ensure you are running within a Chrome extension context.',
-      details: { maxAttempts, delayMs }
-    });
-  }
-
-  /**
    * Get raw history from storage without filtering
    * Used internally for operations that need all events
    */
   private async getRawHistory(): Promise<UsageEvent[]> {
-    await this.ensureStorageAvailable();
+    await ensureStorageAvailable();
     const result = await chrome.storage.local.get([USAGE_STORAGE_KEY]);
     const history = result[USAGE_STORAGE_KEY] as UsageEvent[] | undefined;
     return history ?? [];
@@ -165,7 +143,7 @@ export class UsageTracker {
    * Clear all usage history
    */
   async clearHistory(): Promise<void> {
-    return this.withLock(async () => {
+    return this.mutex.withLock(async () => {
       try {
         await this.setHistory([]);
       } catch (error) {
@@ -179,7 +157,7 @@ export class UsageTracker {
    * Should be called on extension initialization
    */
   async cleanup(): Promise<void> {
-    return this.withLock(async () => {
+    return this.mutex.withLock(async () => {
       try {
         const history = await this.getRawHistory();
 
@@ -233,46 +211,8 @@ export class UsageTracker {
    * Save usage history to storage
    */
   private async setHistory(history: UsageEvent[]): Promise<void> {
-    await this.ensureStorageAvailable();
+    await ensureStorageAvailable();
     await chrome.storage.local.set({ [USAGE_STORAGE_KEY]: history });
-  }
-
-  /**
-   * Mutex implementation for preventing race conditions using queue-based approach
-   */
-  private async withLock<T>(operation: () => Promise<T>): Promise<T> {
-    // Create a promise that will resolve when this operation gets to run
-    let resolveQueue: (() => void) | undefined;
-    const queuePromise = new Promise<void>(resolve => {
-      resolveQueue = resolve;
-    });
-
-    // Chain this operation after the existing lock (or resolve immediately if none)
-    const chainedPromise = this.operationLock
-      ? this.operationLock.then(() => {}, () => {}) // Wait for previous, ignore its result/error
-      : Promise.resolve();
-
-    // Set our queue promise as the new lock BEFORE awaiting the chain
-    this.operationLock = queuePromise;
-
-    // Wait for our turn (previous operation to complete)
-    await chainedPromise;
-
-    // Now we have exclusive access - execute the operation
-    try {
-      const result = await operation();
-      return result;
-    } finally {
-      // Signal that we're done (release the lock for next operation)
-      if (resolveQueue) {
-        resolveQueue();
-      }
-
-      // Clean up if we're still the current lock holder
-      if (this.operationLock === queuePromise) {
-        this.operationLock = null;
-      }
-    }
   }
 
   private handleError(error: unknown): UsageTrackerError {
