@@ -123,11 +123,13 @@ export class UsageTracker {
    * Clear all usage history
    */
   async clearHistory(): Promise<void> {
-    try {
-      await this.setHistory([]);
-    } catch (error) {
-      throw this.handleError(error);
-    }
+    return this.withLock(async () => {
+      try {
+        await this.setHistory([]);
+      } catch (error) {
+        throw this.handleError(error);
+      }
+    });
   }
 
   /**
