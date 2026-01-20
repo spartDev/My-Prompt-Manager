@@ -10,7 +10,6 @@ import type { Page, BrowserContext, Download } from '@playwright/test';
 import { expect } from '../fixtures/extension';
 
 import { assertions } from './assertions';
-import { createSelectors } from './selectors';
 
 export interface PromptData {
   title?: string;
@@ -58,10 +57,9 @@ export const promptWorkflows = {
    * Complete workflow to edit an existing prompt
    */
   edit: async (page: Page, originalTitle: string, updates: Partial<PromptData>): Promise<void> => {
-    const selectors = createSelectors(page);
 
     // Open actions menu and click edit
-    const promptCard = selectors.promptCard(originalTitle);
+    const promptCard = page.getByTestId('prompt-card').filter({ has: page.getByRole('heading', { name: originalTitle }) }).first();
     await promptCard.getByRole('button', { name: 'More actions' }).click();
     await page.getByRole('menuitem', { name: 'Edit' }).click();
     await assertions.navigation.promptFormEdit(page);
@@ -95,10 +93,9 @@ export const promptWorkflows = {
    * Complete workflow to delete a prompt
    */
   delete: async (page: Page, promptTitle: string, confirm: boolean = true): Promise<void> => {
-    const selectors = createSelectors(page);
 
     // Open actions menu and click delete
-    const promptCard = selectors.promptCard(promptTitle);
+    const promptCard = page.getByTestId('prompt-card').filter({ has: page.getByRole('heading', { name: promptTitle }) }).first();
     await promptCard.getByRole('button', { name: 'More actions' }).click();
     await page.getByRole('menuitem', { name: 'Delete' }).click();
 
@@ -140,8 +137,7 @@ export const categoryWorkflows = {
    * CategoryManager uses a Back button, not a Close button
    */
   closeManager: async (page: Page): Promise<void> => {
-    const selectors = createSelectors(page);
-    const backButton = selectors.backButton();
+    const backButton = page.getByTestId('back-button').first();
     await expect(backButton).toBeVisible();
     await backButton.click();
     await assertions.navigation.onLibraryPage(page);
@@ -169,9 +165,7 @@ export const categoryWorkflows = {
    */
   edit: async (page: Page, currentName: string, newName: string): Promise<void> => {
     await categoryWorkflows.openManager(page);
-
-    const selectors = createSelectors(page);
-    const categoryRow = selectors.categoryRow(currentName);
+    const categoryRow = page.getByTestId('category-row').filter({ has: page.getByText(currentName, { exact: true }) }).first();
 
     // Hover and click edit
     await categoryRow.hover();
@@ -192,9 +186,7 @@ export const categoryWorkflows = {
    */
   delete: async (page: Page, categoryName: string, confirm: boolean = true): Promise<void> => {
     await categoryWorkflows.openManager(page);
-
-    const selectors = createSelectors(page);
-    const categoryRow = selectors.categoryRow(categoryName);
+    const categoryRow = page.getByTestId('category-row').filter({ has: page.getByText(categoryName, { exact: true }) }).first();
 
     // Hover and click delete
     await categoryRow.hover();
@@ -280,8 +272,7 @@ export const navigationWorkflows = {
    * Uses back button since views no longer have "Library" navigation button
    */
   toLibrary: async (page: Page): Promise<void> => {
-    const selectors = createSelectors(page);
-    const backButton = selectors.backButton();
+    const backButton = page.getByTestId('back-button').first();
     await expect(backButton).toBeVisible();
     await backButton.click();
     await assertions.navigation.onLibraryPage(page);
