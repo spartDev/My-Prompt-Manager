@@ -9,7 +9,6 @@
 export * from '../pages';
 
 // Core utilities
-export * from './selectors';
 export * from './assertions';
 export * from './workflows';
 export * from './navigation';
@@ -40,7 +39,6 @@ export const E2EUtils = {
   },
 
   // Utilities
-  Selectors: () => import('./selectors').then(m => ({ createSelectors: m.createSelectors })),
   Assertions: () => import('./assertions').then(m => m.assertions),
   Workflows: () => import('./workflows').then(m => m.workflows),
   Navigation: () => import('./navigation').then(m => m.navigation),

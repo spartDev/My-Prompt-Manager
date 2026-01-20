@@ -681,7 +681,8 @@ export class StorageManager {
   private async getStorageData<T>(key: string): Promise<T | null> {
     await ensureStorageAvailable();
     const result = await chrome.storage.local.get([key]);
-    return (result[key] as T) || null;
+    const value = result[key] as T;
+    return value !== undefined ? value : null;
   }
 
   private async setStorageData(key: string, data: unknown): Promise<void> {
