@@ -507,7 +507,8 @@ export class PromptManager {
         const duplicates: Prompt[] = [];
 
         // Get candidates from same and adjacent length buckets (within 10% length)
-        const candidates = this.getCandidatesFromBuckets(prompt, lengthBuckets, processedIds);
+        // Only returns prompts with index > i to ensure each pair is compared exactly once
+        const candidates = this.getCandidatesFromBuckets(prompt, i, lengthBuckets, processedIds);
 
         // Compare only with candidates (filtered by length bucket)
         for (const other of candidates) {
@@ -547,14 +548,16 @@ export class PromptManager {
   }
 
   // Group prompts by content length for O(n²) optimization
-  private groupByLengthBucket(prompts: Prompt[]): Map<number, Prompt[]> {
-    const buckets = new Map<number, Prompt[]>();
+  // Stores index alongside prompt to enable forward-only comparisons
+  private groupByLengthBucket(prompts: Prompt[]): Map<number, { prompt: Prompt; index: number }[]> {
+    const buckets = new Map<number, { prompt: Prompt; index: number }[]>();
     const bucketSize = PromptManager.DUPLICATE_DETECTION_DEFAULTS.HASH_BUCKET_SIZE;
 
-    for (const prompt of prompts) {
+    for (let i = 0; i < prompts.length; i++) {
+      const prompt = prompts[i];
       const bucket = Math.floor(prompt.content.length / bucketSize);
       const existing = buckets.get(bucket) || [];
-      existing.push(prompt);
+      existing.push({ prompt, index: i });
       buckets.set(bucket, existing);
     }
 
@@ -562,9 +565,11 @@ export class PromptManager {
   }
 
   // Get candidate prompts from length buckets within similarity range
+  // Only returns prompts with index > currentIndex to avoid double comparisons
   private getCandidatesFromBuckets(
     prompt: Prompt,
-    buckets: Map<number, Prompt[]>,
+    currentIndex: number,
+    buckets: Map<number, { prompt: Prompt; index: number }[]>,
     processedIds: Set<string>
   ): Prompt[] {
     const bucketSize = PromptManager.DUPLICATE_DETECTION_DEFAULTS.HASH_BUCKET_SIZE;
@@ -586,9 +591,11 @@ export class PromptManager {
     for (let b = promptBucket - bucketsToCheck; b <= promptBucket + bucketsToCheck; b++) {
       const bucketed = buckets.get(b);
       if (bucketed) {
-        for (const p of bucketed) {
-          if (!processedIds.has(p.id)) {
-            candidates.push(p);
+        for (const entry of bucketed) {
+          // Only compare forward (index > currentIndex) to avoid double comparisons
+          // Also skip already-processed prompts (duplicates found in earlier iterations)
+          if (entry.index > currentIndex && !processedIds.has(entry.prompt.id)) {
+            candidates.push(entry.prompt);
           }
         }
       }

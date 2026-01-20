@@ -572,5 +572,34 @@ describe('PromptManager - findDuplicatePrompts safeguards', () => {
 
       expect(Array.isArray(result)).toBe(true);
     });
+
+    it('should only compare each pair once (no double comparisons)', async () => {
+      // Create 5 prompts all in the same length bucket (all ~50 chars)
+      // to ensure they're all candidates for each other
+      const prompts: Prompt[] = Array.from({ length: 5 }, (_, i) => ({
+        id: String(i),
+        title: `Unique Title ${i}`,
+        content: `Unique content number ${i} padding`.padEnd(50, `${i}`),
+        category: 'Test',
+        createdAt: Date.now() + i,
+        updatedAt: Date.now() + i
+      }));
+
+      storageManagerMock.getPrompts.mockResolvedValue(prompts);
+
+      const progressCallback = vi.fn();
+      await promptManager.findDuplicatePrompts({
+        onProgress: progressCallback
+      });
+
+      // With 5 prompts, forward-only comparison gives: 4+3+2+1+0 = 10 comparisons
+      // Double comparison would give: 4+4+4+4+4 = 20 comparisons
+      // The final onProgress call reports totalComparisons = n*(n-1)/2 = 10
+      const lastCall = progressCallback.mock.calls[progressCallback.mock.calls.length - 1];
+      const totalComparisons = lastCall[2] as number;
+
+      // n*(n-1)/2 = 5*4/2 = 10
+      expect(totalComparisons).toBe(10);
+    });
   });
 });
