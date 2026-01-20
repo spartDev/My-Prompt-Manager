@@ -1,7 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 import { UsageEvent, USAGE_STORAGE_KEY, USAGE_RETENTION_DAYS } from '../../types';
+import * as Logger from '../../utils/logger';
 import { UsageTracker } from '../UsageTracker';
+
+vi.mock('../../utils/logger', () => ({
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn()
+}));
 
 const FIXED_TIME = new Date('2025-01-15T12:00:00Z');
 const FIXED_TIMESTAMP = FIXED_TIME.getTime();
@@ -28,6 +36,12 @@ describe('UsageTracker', () => {
 
     // Clear storage before each test
     await chrome.storage.local.remove(USAGE_STORAGE_KEY);
+
+    // Clear Logger mocks
+    vi.mocked(Logger.info).mockClear();
+    vi.mocked(Logger.warn).mockClear();
+    vi.mocked(Logger.error).mockClear();
+    vi.mocked(Logger.debug).mockClear();
   });
 
   afterEach(() => {
@@ -321,6 +335,114 @@ describe('UsageTracker', () => {
 
       expect(history).toHaveLength(5);
     });
+
+    it('should handle concurrent clearHistory and record operations', async () => {
+      // Pre-populate storage with some events
+      const initialEvents: UsageEvent[] = [
+        buildUsageEvent({ promptId: 'initial-1', timestamp: FIXED_TIMESTAMP - 1000 }),
+        buildUsageEvent({ promptId: 'initial-2', timestamp: FIXED_TIMESTAMP - 2000 }),
+        buildUsageEvent({ promptId: 'initial-3', timestamp: FIXED_TIMESTAMP - 3000 })
+      ];
+      await chrome.storage.local.set({ [USAGE_STORAGE_KEY]: initialEvents });
+
+      // Launch clearHistory and multiple record calls concurrently
+      const promises = [
+        usageTracker.clearHistory(),
+        usageTracker.record('new-prompt-1', 'claude', null),
+        usageTracker.record('new-prompt-2', 'chatgpt', null),
+        usageTracker.record('new-prompt-3', 'gemini', null)
+      ];
+
+      // All operations should complete without error
+      await expect(Promise.all(promises)).resolves.not.toThrow();
+
+      // Final state should be consistent - either:
+      // - clearHistory ran last: history is empty
+      // - some records ran after clearHistory: history has those new records
+      // - clearHistory ran first then all records: history has 3 new records
+      const history = await usageTracker.getHistory();
+
+      // History length should be 0, 1, 2, or 3 depending on execution order
+      // (clearHistory could run at any point in the serialized queue)
+      expect(history.length).toBeGreaterThanOrEqual(0);
+      expect(history.length).toBeLessThanOrEqual(3);
+
+      // If there are events, they should only be the new ones (not initial)
+      // because clearHistory sets to empty array
+      const promptIds = history.map(e => e.promptId);
+      expect(promptIds).not.toContain('initial-1');
+      expect(promptIds).not.toContain('initial-2');
+      expect(promptIds).not.toContain('initial-3');
+    });
+
+    it('should handle concurrent clearHistory and cleanup operations', async () => {
+      const retentionMs = USAGE_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+
+      // Pre-populate storage with mix of expired and fresh events
+      const mixedEvents: UsageEvent[] = [
+        buildUsageEvent({ promptId: 'fresh-1', timestamp: FIXED_TIMESTAMP }),
+        buildUsageEvent({ promptId: 'fresh-2', timestamp: FIXED_TIMESTAMP - 1000 }),
+        buildUsageEvent({ promptId: 'expired-1', timestamp: FIXED_TIMESTAMP - retentionMs - 1000 }),
+        buildUsageEvent({ promptId: 'expired-2', timestamp: FIXED_TIMESTAMP - retentionMs - 2000 })
+      ];
+      await chrome.storage.local.set({ [USAGE_STORAGE_KEY]: mixedEvents });
+
+      // Launch clearHistory and cleanup concurrently
+      const promises = [
+        usageTracker.clearHistory(),
+        usageTracker.cleanup()
+      ];
+
+      // All operations should complete without error
+      await expect(Promise.all(promises)).resolves.not.toThrow();
+
+      // Final state should be consistent:
+      // - If clearHistory runs last: history is empty
+      // - If cleanup runs last after clearHistory: history is still empty (nothing to clean)
+      // - If cleanup runs first: only fresh events remain, then clearHistory empties it
+      // - If clearHistory runs first: empty, then cleanup does nothing (no events)
+      const history = await usageTracker.getHistory();
+
+      // Either empty (clearHistory won) or contains only fresh events
+      // Since mutex serializes, clearHistory will likely run and set to empty,
+      // and cleanup either runs before (leaving fresh events that get cleared)
+      // or after (nothing to clean from empty array)
+      expect(history.length).toBeGreaterThanOrEqual(0);
+      expect(history.length).toBeLessThanOrEqual(2); // At most the 2 fresh events
+
+      // If there are any events, they must be fresh (not expired)
+      const promptIds = history.map(e => e.promptId);
+      expect(promptIds).not.toContain('expired-1');
+      expect(promptIds).not.toContain('expired-2');
+    });
+
+    it('should handle multiple concurrent clearHistory calls', async () => {
+      // Pre-populate storage with events
+      const events: UsageEvent[] = [
+        buildUsageEvent({ promptId: 'event-1', timestamp: FIXED_TIMESTAMP }),
+        buildUsageEvent({ promptId: 'event-2', timestamp: FIXED_TIMESTAMP - 1000 }),
+        buildUsageEvent({ promptId: 'event-3', timestamp: FIXED_TIMESTAMP - 2000 }),
+        buildUsageEvent({ promptId: 'event-4', timestamp: FIXED_TIMESTAMP - 3000 }),
+        buildUsageEvent({ promptId: 'event-5', timestamp: FIXED_TIMESTAMP - 4000 })
+      ];
+      await chrome.storage.local.set({ [USAGE_STORAGE_KEY]: events });
+
+      // Launch multiple clearHistory calls concurrently
+      const promises = [
+        usageTracker.clearHistory(),
+        usageTracker.clearHistory(),
+        usageTracker.clearHistory(),
+        usageTracker.clearHistory(),
+        usageTracker.clearHistory()
+      ];
+
+      // All operations should complete without error
+      await expect(Promise.all(promises)).resolves.not.toThrow();
+
+      // Final state should be empty - all clearHistory calls set to empty array
+      const history = await usageTracker.getHistory();
+      expect(history).toEqual([]);
+    });
   });
 
   describe('Retention Period', () => {
@@ -342,6 +464,130 @@ describe('UsageTracker', () => {
       expect(history.map(e => e.promptId)).toContain('exactly-30-days');
       expect(history.map(e => e.promptId)).toContain('29-days');
       expect(history.map(e => e.promptId)).not.toContain('31-days');
+    });
+  });
+
+  describe('Quota Protection', () => {
+    const CLEANUP_THRESHOLD = 9000;
+    const MAX_EVENTS = 10000;
+
+    it('should trigger proactive cleanup when reaching threshold', async () => {
+      // Pre-populate storage with exactly CLEANUP_THRESHOLD events (all within retention)
+      const events: UsageEvent[] = Array.from({ length: CLEANUP_THRESHOLD }, (_, i) =>
+        buildUsageEvent({
+          promptId: `prompt-${i}`,
+          timestamp: FIXED_TIMESTAMP - i * 1000 // All within retention period
+        })
+      );
+      await chrome.storage.local.set({ [USAGE_STORAGE_KEY]: events });
+
+      // Record one more event to trigger proactive cleanup
+      await usageTracker.record('new-prompt', 'claude', null);
+
+      // Verify proactive cleanup was logged
+      expect(Logger.info).toHaveBeenCalledWith(
+        'UsageTracker: Proactive cleanup triggered',
+        expect.objectContaining({
+          component: 'UsageTracker',
+          originalCount: CLEANUP_THRESHOLD,
+          threshold: CLEANUP_THRESHOLD
+        })
+      );
+
+      // Verify history contains events (trimOldEvents keeps all within retention)
+      const history = await usageTracker.getHistory();
+      // All events were within retention, so trimOldEvents doesn't remove any
+      // Plus the new event we just added
+      expect(history.length).toBe(CLEANUP_THRESHOLD + 1);
+    });
+
+    it('should enforce hard limit by removing oldest events', async () => {
+      // Pre-populate storage with MAX_EVENTS events all within retention period
+      const events: UsageEvent[] = Array.from({ length: MAX_EVENTS }, (_, i) =>
+        buildUsageEvent({
+          promptId: `prompt-${i}`,
+          // Space events 1 second apart, all within retention
+          timestamp: FIXED_TIMESTAMP - i * 1000
+        })
+      );
+      await chrome.storage.local.set({ [USAGE_STORAGE_KEY]: events });
+
+      // Record one more event to trigger hard limit
+      await usageTracker.record('new-prompt', 'claude', null);
+
+      // Verify hard limit warning was logged
+      expect(Logger.warn).toHaveBeenCalledWith(
+        'UsageTracker: Hard limit reached, removed oldest events',
+        expect.objectContaining({
+          component: 'UsageTracker',
+          eventsRemoved: 1,
+          maxEvents: MAX_EVENTS
+        })
+      );
+
+      // Verify total events is now exactly MAX_EVENTS (oldest removed to make room for new)
+      const history = await usageTracker.getHistory();
+      expect(history.length).toBe(MAX_EVENTS);
+
+      // Verify the oldest event was removed (prompt-9999 had the oldest timestamp)
+      const promptIds = history.map(e => e.promptId);
+      expect(promptIds).not.toContain('prompt-9999');
+
+      // Verify the new event is present
+      expect(promptIds).toContain('new-prompt');
+    });
+
+    it('should filter expired events during proactive cleanup via trimOldEvents', async () => {
+      const retentionMs = USAGE_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+
+      // Create events where half are expired (outside 30 day retention)
+      // Total count exceeds CLEANUP_THRESHOLD to trigger proactive cleanup
+      const freshEvents: UsageEvent[] = Array.from({ length: 5000 }, (_, i) =>
+        buildUsageEvent({
+          promptId: `fresh-${i}`,
+          timestamp: FIXED_TIMESTAMP - i * 1000 // Within retention
+        })
+      );
+
+      const expiredEvents: UsageEvent[] = Array.from({ length: 5000 }, (_, i) =>
+        buildUsageEvent({
+          promptId: `expired-${i}`,
+          // Outside retention period (31+ days ago)
+          timestamp: FIXED_TIMESTAMP - retentionMs - (i + 1) * 1000
+        })
+      );
+
+      // Mix fresh and expired events
+      const events = [...freshEvents, ...expiredEvents];
+      await chrome.storage.local.set({ [USAGE_STORAGE_KEY]: events });
+
+      // Record one more event to trigger proactive cleanup
+      await usageTracker.record('trigger-prompt', 'claude', null);
+
+      // Verify proactive cleanup was triggered
+      expect(Logger.info).toHaveBeenCalledWith(
+        'UsageTracker: Proactive cleanup triggered',
+        expect.objectContaining({
+          component: 'UsageTracker',
+          originalCount: 10000,
+          newCount: 5000 // trimOldEvents removed the 5000 expired events
+        })
+      );
+
+      // Verify only fresh events remain (plus the new trigger event)
+      const history = await usageTracker.getHistory();
+      expect(history.length).toBe(5001); // 5000 fresh + 1 new
+
+      // Verify no expired events remain
+      const expiredPromptIds = history.filter(e => e.promptId.startsWith('expired-'));
+      expect(expiredPromptIds).toHaveLength(0);
+
+      // Verify fresh events are still there
+      const freshPromptIds = history.filter(e => e.promptId.startsWith('fresh-'));
+      expect(freshPromptIds).toHaveLength(5000);
+
+      // Verify the trigger event is present
+      expect(history.map(e => e.promptId)).toContain('trigger-prompt');
     });
   });
 });

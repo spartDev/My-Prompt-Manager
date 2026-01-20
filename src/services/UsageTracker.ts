@@ -5,6 +5,7 @@ import {
   ErrorType,
   AppError
 } from '../types';
+import * as Logger from '../utils/logger';
 
 class UsageTrackerError extends Error implements AppError {
   public type: ErrorType;
@@ -31,6 +32,12 @@ export class UsageTracker {
   // Mutex for preventing concurrent storage operations
   private operationLock: Promise<unknown> | null = null;
 
+  // Storage quota protection limits
+  // At ~100 bytes per event, 10,000 events = ~1MB (leaving plenty of buffer)
+  private static readonly MAX_EVENTS = 10000;
+  // Cleanup threshold: when we hit this, trim to keep newest events within retention period
+  private static readonly CLEANUP_THRESHOLD = 9000;
+
   private constructor() {}
 
   static getInstance(): UsageTracker {
@@ -56,7 +63,33 @@ export class UsageTracker {
           categoryId
         };
 
-        const history = await this.getRawHistory();
+        let history = await this.getRawHistory();
+
+        // Quota protection: trim old events if approaching limit
+        if (history.length >= UsageTracker.CLEANUP_THRESHOLD) {
+          const originalLength = history.length;
+          history = this.trimOldEvents(history);
+          Logger.info('UsageTracker: Proactive cleanup triggered', {
+            component: 'UsageTracker',
+            originalCount: originalLength,
+            newCount: history.length,
+            threshold: UsageTracker.CLEANUP_THRESHOLD
+          });
+        }
+
+        // Hard limit: if still at max, remove oldest events to make room
+        if (history.length >= UsageTracker.MAX_EVENTS) {
+          const eventsToRemove = history.length - UsageTracker.MAX_EVENTS + 1;
+          // Sort by timestamp ascending (oldest first) and remove oldest
+          history.sort((a, b) => a.timestamp - b.timestamp);
+          history = history.slice(eventsToRemove);
+          Logger.warn('UsageTracker: Hard limit reached, removed oldest events', {
+            component: 'UsageTracker',
+            eventsRemoved: eventsToRemove,
+            maxEvents: UsageTracker.MAX_EVENTS
+          });
+        }
+
         history.push(event);
 
         await this.setHistory(history);
@@ -64,6 +97,15 @@ export class UsageTracker {
         throw this.handleError(error);
       }
     });
+  }
+
+  /**
+   * Trim old events that are outside the retention period
+   * Used for proactive cleanup to prevent storage quota issues
+   */
+  private trimOldEvents(history: UsageEvent[]): UsageEvent[] {
+    const cutoffTime = this.getRetentionCutoff();
+    return history.filter(event => event.timestamp >= cutoffTime);
   }
 
   /**
@@ -123,11 +165,13 @@ export class UsageTracker {
    * Clear all usage history
    */
   async clearHistory(): Promise<void> {
-    try {
-      await this.setHistory([]);
-    } catch (error) {
-      throw this.handleError(error);
-    }
+    return this.withLock(async () => {
+      try {
+        await this.setHistory([]);
+      } catch (error) {
+        throw this.handleError(error);
+      }
+    });
   }
 
   /**
