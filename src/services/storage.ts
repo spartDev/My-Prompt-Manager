@@ -10,6 +10,8 @@ import {
   ErrorType,
   AppError
 } from '../types';
+import { AsyncMutex } from '../utils/asyncMutex';
+import { ensureStorageAvailable } from '../utils/chromeStorage';
 import {
   checkQuotaAvailability,
   estimatePromptSize,
@@ -44,7 +46,7 @@ export class StorageManager {
   } as const;
 
   // Mutex for preventing concurrent storage operations
-  private operationLocks = new Map<string, Promise<unknown>>();
+  private readonly mutex = new AsyncMutex();
 
   private constructor() {}
 
@@ -57,7 +59,7 @@ export class StorageManager {
 
   // Prompt operations
   async savePrompt(prompt: Omit<Prompt, 'id' | 'createdAt' | 'updatedAt' | 'usageCount' | 'lastUsedAt'>): Promise<Prompt> {
-    return this.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
+    return this.mutex.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
       try {
         const existingPrompts = await this.getPrompts();
 
@@ -150,7 +152,7 @@ export class StorageManager {
   }
 
   async updatePrompt(id: string, updates: Partial<Omit<Prompt, 'id' | 'createdAt'>>): Promise<Prompt> {
-    return this.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
+    return this.mutex.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
       try {
         const existingPrompts = await this.getPrompts();
         const promptIndex = existingPrompts.findIndex(p => p.id === id);
@@ -199,7 +201,7 @@ export class StorageManager {
   }
 
   async deletePrompt(id: string): Promise<void> {
-    return this.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
+    return this.mutex.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
       try {
         const existingPrompts = await this.getPrompts();
         const filteredPrompts = existingPrompts.filter(p => p.id !== id);
@@ -216,7 +218,7 @@ export class StorageManager {
   }
 
   async incrementUsageCount(id: string): Promise<Prompt> {
-    return this.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
+    return this.mutex.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
       try {
         const existingPrompts = await this.getPrompts();
         const promptIndex = existingPrompts.findIndex(p => p.id === id);
@@ -249,7 +251,7 @@ export class StorageManager {
 
   // Category operations
   async saveCategory(category: Omit<Category, 'id'>): Promise<Category> {
-    return this.withLock(this.STORAGE_KEYS.CATEGORIES, async () => {
+    return this.mutex.withLock(this.STORAGE_KEYS.CATEGORIES, async () => {
       try {
         const newCategory: Category = {
           ...category,
@@ -275,7 +277,7 @@ export class StorageManager {
 
   // Import operations for backup/restore functionality
   async importPrompt(prompt: Prompt): Promise<Prompt> {
-    return this.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
+    return this.mutex.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
       try {
         const existingPrompts = await this.getPrompts();
         const existingIndex = existingPrompts.findIndex(p => p.id === prompt.id);
@@ -322,7 +324,7 @@ export class StorageManager {
   }
 
   async importCategory(category: Category): Promise<Category> {
-    return this.withLock(this.STORAGE_KEYS.CATEGORIES, async () => {
+    return this.mutex.withLock(this.STORAGE_KEYS.CATEGORIES, async () => {
       try {
         const existingCategories = await this.getCategories();
         const existingIndex = existingCategories.findIndex(c => c.id === category.id);
@@ -383,7 +385,7 @@ export class StorageManager {
 
   async updateCategory(id: string, updates: Partial<Omit<Category, 'id'>>): Promise<Category> {
     // Lock CATEGORIES first (always modified), then PROMPTS if name changes
-    return this.withLock(this.STORAGE_KEYS.CATEGORIES, async () => {
+    return this.mutex.withLock(this.STORAGE_KEYS.CATEGORIES, async () => {
       try {
         const existingCategories = await this.getCategories();
         const categoryIndex = existingCategories.findIndex(c => c.id === id);
@@ -415,7 +417,7 @@ export class StorageManager {
 
         // If the category name changed, also lock PROMPTS to update references
         if (updates.name && updates.name !== oldCategory.name) {
-          return await this.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
+          return await this.mutex.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
             const prompts = await this.getPrompts();
             const updatedPrompts = prompts.map(prompt =>
               prompt.category === oldCategory.name
@@ -444,7 +446,7 @@ export class StorageManager {
 
   async deleteCategory(id: string): Promise<void> {
     // Lock CATEGORIES first (always modified), then PROMPTS if prompts need updating
-    await this.withLock(this.STORAGE_KEYS.CATEGORIES, async () => {
+    await this.mutex.withLock(this.STORAGE_KEYS.CATEGORIES, async () => {
       try {
         const existingCategories = await this.getCategories();
         const categoryToDelete = existingCategories.find(c => c.id === id);
@@ -462,7 +464,7 @@ export class StorageManager {
 
         // Check if any prompts need to be updated
         // Lock PROMPTS only if we need to modify prompts
-        await this.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
+        await this.mutex.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
           const prompts = await this.getPrompts();
           const hasPromptsToUpdate = prompts.some(p => p.category === categoryToDelete.name);
 
@@ -676,38 +678,14 @@ export class StorageManager {
 
   // Private helper methods
 
-  /**
-   * Wait for chrome.storage.local to be available
-   * In some contexts (e.g., analytics.html in a new tab), the chrome API
-   * may not be immediately available when the page first loads
-   */
-  private async ensureStorageAvailable(): Promise<void> {
-    const maxAttempts = 50;
-    const delayMs = 100;
-
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-      if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-        return;
-      }
-      await new Promise(resolve => setTimeout(resolve, delayMs));
-    }
-
-    throw new StorageError({
-      type: ErrorType.STORAGE_UNAVAILABLE,
-      message: 'Chrome storage API is not available. Please ensure you are running within a Chrome extension context.',
-      details: { maxAttempts, delayMs }
-    });
-  }
-
   private async getStorageData<T>(key: string): Promise<T | null> {
-    await this.ensureStorageAvailable();
+    await ensureStorageAvailable();
     const result = await chrome.storage.local.get([key]);
     return (result[key] as T) || null;
   }
 
   private async setStorageData(key: string, data: unknown): Promise<void> {
-    await this.ensureStorageAvailable();
+    await ensureStorageAvailable();
     await chrome.storage.local.set({ [key]: data });
   }
 
@@ -774,46 +752,6 @@ export class StorageManager {
       usageCount,
       lastUsedAt
     };
-  }
-
-  // Mutex implementation for preventing race conditions using queue-based approach
-  private async withLock<T>(lockKey: string, operation: () => Promise<T>): Promise<T> {
-    // Create a promise that will resolve when this operation gets to run
-    let resolveQueue: (() => void) | undefined;
-    const queuePromise = new Promise<void>(resolve => {
-      resolveQueue = resolve;
-    });
-
-    // Get or create the queue for this lock key
-    const existingLock = this.operationLocks.get(lockKey);
-
-    // Chain this operation after the existing lock (or resolve immediately if none)
-    const chainedPromise = existingLock
-      ? existingLock.then(() => {}, () => {}) // Wait for previous, ignore its result/error
-      : Promise.resolve();
-
-    // Set our queue promise as the new lock BEFORE awaiting the chain
-    // This ensures the next operation will wait for us
-    this.operationLocks.set(lockKey, queuePromise);
-
-    // Wait for our turn (previous operation to complete)
-    await chainedPromise;
-
-    // Now we have exclusive access - execute the operation
-    try {
-      const result = await operation();
-      return result;
-    } finally {
-      // Signal that we're done (release the lock for next operation)
-      if (resolveQueue) {
-        resolveQueue();
-      }
-
-      // Clean up if we're still the current lock holder
-      if (this.operationLocks.get(lockKey) === queuePromise) {
-        this.operationLocks.delete(lockKey);
-      }
-    }
   }
 
   private handleStorageError(error: unknown): StorageError {
