@@ -6,6 +6,7 @@ import { getDefaultEnabledPlatforms, getLinkedPlatformHostnames } from '../confi
 import { StorageManager } from '../services/storage';
 import type { Prompt, Category, Settings as UserSettings } from '../types';
 import { DEFAULT_SETTINGS } from '../types';
+import type { ToastType } from '../types/components';
 import type { ToastSettings } from '../types/hooks';
 import { Logger, toError } from '../utils';
 
@@ -49,7 +50,7 @@ interface Settings {
 
 interface SettingsViewProps {
   onBack: () => void;
-  showToast: (message: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
+  showToast: (message: string, type?: ToastType) => void;
   toastSettings: ToastSettings;
   onToastSettingsChange: (settings: Partial<ToastSettings>) => void;
 }

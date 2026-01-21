@@ -3,6 +3,7 @@ import { FC, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useClipboard } from '../../hooks/useClipboard';
 import { ConfigurationEncoder, ConfigurationEncoderError } from '../../services/configurationEncoder';
 import { CustomSite, CustomSiteConfiguration, SecurityWarning, ElementFingerprint } from '../../types';
+import { ToastType } from '../../types/components';
 import { Logger, toError } from '../../utils';
 import { CustomSiteIcon } from '../icons/SiteIcons';
 
@@ -23,7 +24,7 @@ interface SiteIntegrationSectionProps {
   onEditCustomSite?: (hostname: string) => void;
   interfaceMode?: 'popup' | 'sidepanel';
   saving?: boolean;
-  onShowToast?: (message: string, type?: 'success' | 'error' | 'info') => void;
+  onShowToast?: (message: string, type?: ToastType) => void;
 }
 
 interface PendingImport {
@@ -72,7 +73,7 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
   const [showImportDrawer, setShowImportDrawer] = useState(false);
   const [showAddMethodChooser, setShowAddMethodChooser] = useState(false);
 
-  const notify = useCallback((message: string, type: 'success' | 'error' | 'info' = 'info') => {
+  const notify = useCallback((message: string, type: ToastType = 'info') => {
     if (onShowToast) {
       onShowToast(message, type);
     }

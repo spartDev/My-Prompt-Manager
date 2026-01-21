@@ -1,5 +1,6 @@
 import { FC, useState } from 'react';
 
+import { ToastType } from '../../types/components';
 import { ToastSettings } from '../../types/hooks';
 
 import ToggleSwitch from './ToggleSwitch';
@@ -7,11 +8,11 @@ import ToggleSwitch from './ToggleSwitch';
 interface NotificationSectionProps {
   settings?: ToastSettings;
   onSettingsChange: (settings: Partial<ToastSettings>) => void;
-  onTestToast: (type: 'success' | 'error' | 'info' | 'warning') => void;
+  onTestToast: (type: ToastType) => void;
 }
 
 interface NotificationTypeRowProps {
-  type: 'success' | 'error' | 'warning' | 'info';
+  type: ToastType;
   label: string;
   description: string;
   color: string;
