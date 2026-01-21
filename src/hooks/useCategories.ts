@@ -24,7 +24,8 @@ export const useCategories = (): UseCategoriesReturn => {
     } finally {
       setLoading(false);
     }
-  }, [storageManager]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Singleton storageManager never changes, omitted to prevent infinite loop
 
   const createCategory = useCallback(async (category: Omit<Category, 'id'>) => {
     try {
@@ -46,7 +47,8 @@ export const useCategories = (): UseCategoriesReturn => {
     } finally {
       setLoading(false);
     }
-  }, [storageManager, promptManager]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Singletons storageManager/promptManager never change, omitted to prevent infinite loop
 
   const updateCategory = useCallback(async (id: string, updates: Partial<Category>) => {
     try {
@@ -70,7 +72,8 @@ export const useCategories = (): UseCategoriesReturn => {
     } finally {
       setLoading(false);
     }
-  }, [storageManager, promptManager]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Singletons storageManager/promptManager never change, omitted to prevent infinite loop
 
   const deleteCategory = useCallback(async (id: string) => {
     try {
@@ -86,7 +89,8 @@ export const useCategories = (): UseCategoriesReturn => {
     } finally {
       setLoading(false);
     }
-  }, [storageManager]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Singleton storageManager never changes, omitted to prevent infinite loop
 
   // Initial load
   useEffect(() => {
