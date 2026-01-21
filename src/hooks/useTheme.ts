@@ -1,7 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 
 import { StorageManager } from '../services/storage';
+import type { CustomSite } from '../types';
 import { Logger, toError } from '../utils';
+
+interface PromptLibrarySettings {
+  customSites?: CustomSite[];
+}
 
 export type Theme = 'light' | 'dark' | 'system';
 
@@ -86,10 +91,32 @@ export const useTheme = (): UseThemeReturn => {
       await storageManager.updateSettings({ theme: newTheme });
       setThemeState(newTheme);
       
-      // Notify content scripts about theme change
+      // Notify content scripts about theme change (only query tabs matching content script URLs)
       if (typeof chrome !== 'undefined') {
-        chrome.tabs.query({}, (tabs) => {
-          tabs.forEach((tab) => {
+        // Built-in platform URLs from manifest.json content_scripts.matches
+        const builtInUrls = [
+          'https://claude.ai/*',
+          'https://chatgpt.com/*',
+          'https://gemini.google.com/*',
+          'https://www.perplexity.ai/*',
+          'https://chat.mistral.ai/*',
+          'https://copilot.microsoft.com/*',
+          'https://m365.cloud.microsoft/*'
+        ];
+
+        // Get custom site URLs from storage and query all relevant tabs
+        void (async () => {
+          const result: { promptLibrarySettings?: PromptLibrarySettings } =
+            await chrome.storage.local.get(['promptLibrarySettings']);
+          const customSites: CustomSite[] = result.promptLibrarySettings?.customSites ?? [];
+          const customUrls = customSites
+            .filter((site: CustomSite) => site.enabled)
+            .map((site: CustomSite) => `https://${site.hostname}/*`);
+
+          const allUrls = [...builtInUrls, ...customUrls];
+          const tabs = await chrome.tabs.query({ url: allUrls });
+
+          for (const tab of tabs) {
             if (tab.id) {
               void chrome.tabs.sendMessage(tab.id, {
                 type: 'themeChanged',
@@ -98,8 +125,8 @@ export const useTheme = (): UseThemeReturn => {
                 // Ignore errors for tabs without content script
               });
             }
-          });
-        });
+          }
+        })();
       }
     } catch (error) {
       Logger.error('Failed to update theme', toError(error));
