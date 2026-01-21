@@ -19,6 +19,46 @@ interface UseThemeReturn {
 
 const THEME_STORAGE_KEY = 'prompt-library-theme';
 
+/**
+ * Notifies content scripts about theme changes.
+ * Fire-and-forget: errors are silently ignored for tabs without content scripts.
+ */
+async function notifyContentScriptsOfThemeChange(newTheme: Theme): Promise<void> {
+  if (typeof chrome === 'undefined') { return; }
+
+  // Built-in platform URLs from manifest.json content_scripts.matches
+  const builtInUrls = [
+    'https://claude.ai/*',
+    'https://chatgpt.com/*',
+    'https://gemini.google.com/*',
+    'https://www.perplexity.ai/*',
+    'https://chat.mistral.ai/*',
+    'https://copilot.microsoft.com/*',
+    'https://m365.cloud.microsoft/*'
+  ];
+
+  const result: { promptLibrarySettings?: PromptLibrarySettings } =
+    await chrome.storage.local.get(['promptLibrarySettings']);
+  const customSites: CustomSite[] = result.promptLibrarySettings?.customSites ?? [];
+  const customUrls = customSites
+    .filter((site: CustomSite) => site.enabled)
+    .map((site: CustomSite) => `https://${site.hostname}/*`);
+
+  const allUrls = [...builtInUrls, ...customUrls];
+  const tabs = await chrome.tabs.query({ url: allUrls });
+
+  for (const tab of tabs) {
+    if (tab.id) {
+      void chrome.tabs.sendMessage(tab.id, {
+        type: 'themeChanged',
+        theme: newTheme
+      }).catch(() => {
+        // Ignore errors for tabs without content script
+      });
+    }
+  }
+}
+
 export const useTheme = (): UseThemeReturn => {
   const [theme, setThemeState] = useState<Theme>('system');
 
@@ -90,44 +130,9 @@ export const useTheme = (): UseThemeReturn => {
       const storageManager = StorageManager.getInstance();
       await storageManager.updateSettings({ theme: newTheme });
       setThemeState(newTheme);
-      
-      // Notify content scripts about theme change (only query tabs matching content script URLs)
-      if (typeof chrome !== 'undefined') {
-        // Built-in platform URLs from manifest.json content_scripts.matches
-        const builtInUrls = [
-          'https://claude.ai/*',
-          'https://chatgpt.com/*',
-          'https://gemini.google.com/*',
-          'https://www.perplexity.ai/*',
-          'https://chat.mistral.ai/*',
-          'https://copilot.microsoft.com/*',
-          'https://m365.cloud.microsoft/*'
-        ];
 
-        // Get custom site URLs from storage and query all relevant tabs
-        void (async () => {
-          const result: { promptLibrarySettings?: PromptLibrarySettings } =
-            await chrome.storage.local.get(['promptLibrarySettings']);
-          const customSites: CustomSite[] = result.promptLibrarySettings?.customSites ?? [];
-          const customUrls = customSites
-            .filter((site: CustomSite) => site.enabled)
-            .map((site: CustomSite) => `https://${site.hostname}/*`);
-
-          const allUrls = [...builtInUrls, ...customUrls];
-          const tabs = await chrome.tabs.query({ url: allUrls });
-
-          for (const tab of tabs) {
-            if (tab.id) {
-              void chrome.tabs.sendMessage(tab.id, {
-                type: 'themeChanged',
-                theme: newTheme
-              }).catch(() => {
-                // Ignore errors for tabs without content script
-              });
-            }
-          }
-        })();
-      }
+      // Notify content scripts about theme change (fire-and-forget)
+      void notifyContentScriptsOfThemeChange(newTheme);
     } catch (error) {
       Logger.error('Failed to update theme', toError(error));
     }
