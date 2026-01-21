@@ -10,10 +10,15 @@ export interface Prompt {
 }
 
 // Usage Analytics types
+// Known platform IDs with autocomplete support
+export type KnownPlatformType = 'claude' | 'chatgpt' | 'gemini' | 'perplexity' | 'copilot' | 'mistral' | 'm365copilot' | 'custom';
+// PlatformType allows known platforms plus arbitrary hostnames for custom site analytics
+export type PlatformType = KnownPlatformType | (string & {});
+
 export interface UsageEvent {
   promptId: string;        // Reference to the prompt
   timestamp: number;       // Unix milliseconds
-  platform: string;        // 'claude' | 'chatgpt' | 'gemini' | 'perplexity' | 'copilot' | 'mistral' | 'custom'
+  platform: PlatformType;
   categoryId: string | null;
 }
 

@@ -1946,6 +1946,7 @@ export class PromptLibraryInjector {
       if (result.success) {
         try {
           // Get platform name from hostname lookup for accurate analytics
+          // Falls back to hostname for custom sites to enable per-site analytics
           const platform = getPlatformByHostname(window.location.hostname)?.id ?? window.location.hostname;
 
           await chrome.runtime.sendMessage({

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-import { UsageEvent, USAGE_STORAGE_KEY, USAGE_RETENTION_DAYS } from '../../types';
+import { UsageEvent, PlatformType, USAGE_STORAGE_KEY, USAGE_RETENTION_DAYS } from '../../types';
 import * as Logger from '../../utils/logger';
 import { UsageTracker } from '../UsageTracker';
 
@@ -95,7 +95,7 @@ describe('UsageTracker', () => {
     });
 
     it('should record events for different platforms', async () => {
-      const platforms = ['claude', 'chatgpt', 'gemini', 'perplexity', 'copilot', 'mistral', 'custom'];
+      const platforms: PlatformType[] = ['claude', 'chatgpt', 'gemini', 'perplexity', 'copilot', 'mistral', 'm365copilot', 'custom'];
 
       for (const platform of platforms) {
         await usageTracker.record('prompt-1', platform, null);
