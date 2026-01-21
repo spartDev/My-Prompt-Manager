@@ -3,7 +3,11 @@ import { useEffect } from 'react';
 export interface UseDropdownCloseOptions {
   /** Whether the dropdown is currently open */
   isOpen: boolean;
-  /** Callback to close the dropdown */
+  /**
+   * Callback to close the dropdown.
+   * **Important:** This callback should be stable (memoized with `useCallback`)
+   * to avoid re-running the effect on every render.
+   */
   onClose: () => void;
   /** Ref to the dropdown trigger button */
   triggerRef: { readonly current: HTMLElement | null };
@@ -27,9 +31,12 @@ export interface UseDropdownCloseOptions {
  * const buttonRef = useRef<HTMLButtonElement>(null);
  * const menuRef = useRef<HTMLDivElement>(null);
  *
+ * // Memoize onClose to prevent effect from re-running on every render
+ * const handleClose = useCallback(() => setIsOpen(false), []);
+ *
  * useDropdownClose({
  *   isOpen,
- *   onClose: () => setIsOpen(false),
+ *   onClose: handleClose,
  *   triggerRef: buttonRef,
  *   menuRef: menuRef,
  *   closeOnEscape: true
