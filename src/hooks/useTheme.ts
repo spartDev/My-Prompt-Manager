@@ -10,6 +10,9 @@ interface PromptLibrarySettings {
 
 export type Theme = 'light' | 'dark' | 'system';
 
+const isTheme = (value: string): value is Theme =>
+  ['light', 'dark', 'system'].includes(value);
+
 interface UseThemeReturn {
   theme: Theme;
   resolvedTheme: 'light' | 'dark';
@@ -32,11 +35,10 @@ export const useTheme = (): UseThemeReturn => {
         // Check if we need to migrate from localStorage
         if (settings.theme === 'system') {
           const localStorageTheme = localStorage.getItem(THEME_STORAGE_KEY);
-          if (localStorageTheme && ['light', 'dark', 'system'].includes(localStorageTheme)) {
-            const migratedTheme = localStorageTheme as Theme;
-            await storageManager.updateSettings({ theme: migratedTheme });
+          if (localStorageTheme && isTheme(localStorageTheme)) {
+            await storageManager.updateSettings({ theme: localStorageTheme });
             localStorage.removeItem(THEME_STORAGE_KEY); // Clean up old storage
-            setThemeState(migratedTheme);
+            setThemeState(localStorageTheme);
             return;
           }
         }
