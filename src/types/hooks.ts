@@ -33,7 +33,6 @@ export interface UseSearchReturn {
   query: string;
   filteredPrompts: Prompt[];
   highlightedResults: HighlightedPrompt[];
-  clearSearch: () => void;
 }
 
 export interface UseSearchWithDebounceReturn {
