@@ -2,6 +2,9 @@ import { UseSearchWithDebounceReturn } from './hooks';
 
 import { Prompt, Category, SortOrder, SortDirection } from './index';
 
+// Shared toast type for consistent usage across components
+export type ToastType = 'success' | 'error' | 'info' | 'warning';
+
 // Component prop interfaces
 export interface PromptCardProps {
   prompt: Prompt;
@@ -9,7 +12,7 @@ export interface PromptCardProps {
   onEdit: (prompt: Prompt) => void;
   onDelete: (id: string) => void;
   onCopy: (content: string) => void;
-  showToast: (message: string, type: 'success' | 'error' | 'info' | 'warning') => void;
+  showToast: (message: string, type: ToastType) => void;
   isSelected?: boolean;
   searchQuery?: string;
 }
@@ -43,7 +46,7 @@ export interface LibraryViewProps {
   onEditPrompt: (prompt: Prompt) => void;
   onDeletePrompt: (id: string) => void;
   onCopyPrompt: (content: string) => void;
-  showToast: (message: string, type: 'success' | 'error' | 'info' | 'warning') => void;
+  showToast: (message: string, type: ToastType) => void;
   onCategoryChange: (category: string | null) => void;
   onManageCategories: () => void;
   onSettings: () => void;
@@ -61,7 +64,7 @@ export interface ModalProps {
 
 export interface ToastProps {
   message: string;
-  type: 'success' | 'error' | 'info';
+  type: ToastType;
   duration?: number;
   onClose: () => void;
 }

@@ -1,3 +1,5 @@
+import { ToastType } from './components';
+
 import { Prompt, Category, AppError, UsageEvent } from './index';
 
 // Hook return types
@@ -75,7 +77,7 @@ export interface ToastAction {
 export interface Toast {
   id: string;
   message: string;
-  type: 'success' | 'error' | 'info' | 'warning';
+  type: ToastType;
   duration?: number;
   action?: ToastAction;
   groupKey?: string; // For grouping similar toasts
