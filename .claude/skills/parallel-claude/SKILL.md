@@ -45,7 +45,32 @@ Use this skill when you want to:
 
 - **tmux** must be installed (`brew install tmux`)
 - **Git worktrees** support (built into git)
-- **beads** initialized in the project
+- **beads** initialized in the project (`bd init`)
+- **Clean working tree** - No uncommitted changes in main repo
+- **Main branch up to date** - Run `git pull` before starting
+
+## Selecting Issues for Parallel Work
+
+### Good Candidates
+- Issues in different files/components (no merge conflicts)
+- Same priority level (P0s together, P1s together)
+- Independent work with no dependencies between them
+- Issues you can verify independently
+
+### Avoid Parallelizing
+- Issues that touch the same files
+- Issues with dependencies (`bd show <id>` shows "Blocked by")
+- Large architectural changes
+- Issues requiring shared state changes
+
+### Check for Dependencies
+```bash
+# View what blocks an issue
+bd show <id> | grep -A5 "Dependencies:"
+
+# List all blocked issues
+bd blocked
+```
 
 ## AI Assistant Workflow
 
@@ -70,6 +95,16 @@ Which tasks do you want to tackle in parallel?
 Enter task IDs separated by spaces or commas (e.g., "ics gpy f8t")
 ```
 
+### Step 2.5: Claim Selected Issues
+
+Before launching, claim all selected issues to prevent conflicts:
+
+```bash
+bd update ics --status in_progress
+bd update gpy --status in_progress
+bd update f8t --status in_progress
+```
+
 ### Step 3: Launch Parallel Instances
 
 Once the user selects tasks, run the helper script with the selected IDs:
@@ -89,6 +124,39 @@ The script will:
 3. Launch Claude in each pane with task-specific prompts
 
 **Worktree location:** `$HOME/.claude-worktrees/<repo-name>/fix-<issue-id>`
+
+## Monitoring Parallel Progress
+
+### tmux Navigation
+- `Ctrl+B, arrow keys` - Switch between panes
+- `Ctrl+B, z` - Zoom/unzoom current pane (full screen)
+- `Ctrl+B, [` - Enter scroll mode (q to exit)
+- `Ctrl+B, d` - Detach (instances keep running)
+
+### Reattach to Session
+```bash
+tmux attach-session -t claude-parallel
+```
+
+### Check Status Without Attaching
+```bash
+# List all tmux sessions
+tmux list-sessions
+
+# Preview session content
+tmux capture-pane -t claude-parallel:0.0 -p | tail -20
+```
+
+## Branch Naming Convention
+
+The script uses `fix-<id>` by default. For more descriptive names:
+
+| Issue Type | Branch Prefix | Example |
+|------------|--------------|---------|
+| bug        | `fix-`       | `fix-ics` |
+| feature    | `feat-`      | `feat-ics` |
+| task       | `task-`      | `task-ics` |
+| refactor   | `refactor-`  | `refactor-ics` |
 
 ## Manual Workflow (without helper script)
 
@@ -206,6 +274,75 @@ tmux split-window -v -t "$SESSION:0.0" -c "$BASE_DIR/fix-f8t" \
 tmux attach-session -t "$SESSION"
 ```
 
+## Post-Completion Workflow
+
+After all Claude instances complete:
+
+### 1. Review Each Branch
+```bash
+for branch in fix-ics fix-gpy fix-f8t; do
+  echo "=== $branch ==="
+  git log main..$branch --oneline
+  git diff main..$branch --stat
+done
+```
+
+### 2. Run Verification on Each Branch
+```bash
+cd "$HOME/.claude-worktrees/My-Prompt-Manager/fix-ics"
+npm test && npm run lint && npm run typecheck
+# Repeat for each branch
+```
+
+### 3. Create Pull Requests (NOT Direct Merge)
+
+**IMPORTANT**: Never merge directly into main. Create PRs for code review.
+
+For each completed branch:
+```bash
+cd "$HOME/.claude-worktrees/My-Prompt-Manager/fix-ics"
+git push -u origin fix-ics
+
+# Create PR with detailed description
+gh pr create --title "fix(ics): <clear title>" --body "$(cat <<'EOF'
+## Summary
+- What the issue was
+- How this PR fixes it
+
+## Changes Made
+- List specific code changes
+- Explain WHY each change was made (not just what)
+
+## Technical Details
+- Any architectural decisions
+- Why this approach over alternatives
+
+## Testing
+- [ ] Unit tests pass
+- [ ] Lint passes
+- [ ] TypeScript checks pass
+- [ ] Manual testing done (describe)
+
+## Related
+- Fixes issue ics
+- See `bd show ics` for full context
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+EOF
+)"
+```
+
+### 4. Close Issues & Sync (MANDATORY)
+```bash
+# Close issues (PRs will merge later after review)
+bd close ics gpy f8t
+bd sync
+git push  # Push beads changes
+git status  # MUST show "up to date with origin"
+```
+
+**CRITICAL**: Work is NOT complete until all branches are pushed and PRs are created.
+
 ## Cleanup
 
 After parallel work is complete:
@@ -221,22 +358,35 @@ git worktree remove "$HOME/.claude-worktrees/My-Prompt-Manager/fix-ics"
 git worktree prune
 ```
 
-## Merging Results
+## Error Recovery
 
-After parallel Claude instances complete:
+### If One Instance Fails
 
-1. Review each branch's changes
-2. Merge into main one at a time:
-   ```bash
-   git checkout main
-   git merge fix-ics --no-ff
-   git merge fix-gpy --no-ff
-   ```
-3. Close beads issues:
-   ```bash
-   bd close ics gpy f8t
-   bd sync
-   ```
+1. **Don't panic** - Other instances continue working
+2. **Review the failure** in that pane
+3. **Options**:
+   - Fix manually in that worktree
+   - Kill that pane and retry: `tmux kill-pane -t claude-parallel:0.1`
+   - Start fresh for that issue:
+     ```bash
+     git worktree remove "$HOME/.claude-worktrees/My-Prompt-Manager/fix-ics" --force
+     .claude/skills/parallel-claude/scripts/launch-parallel-claude.sh ics
+     ```
+
+### If tmux Session Dies
+
+Worktrees persist. Resume with:
+```bash
+.claude/skills/parallel-claude/scripts/launch-parallel-claude.sh ics gpy f8t
+```
+The script detects existing worktrees and reuses them.
+
+## Limitations
+
+- **Max ~4 concurrent instances** - More than 4 becomes hard to monitor
+- **No automatic conflict resolution** - Manual merge required
+- **Shared npm/build cache** - May cause occasional conflicts
+- **Each instance uses full context** - Consider API costs
 
 ## Troubleshooting
 
@@ -262,4 +412,4 @@ tmux kill-session -t claude-parallel
 ---
 
 **Last Updated:** 2026-01-21
-**Skill Version:** 1.0.0
+**Skill Version:** 1.1.0
