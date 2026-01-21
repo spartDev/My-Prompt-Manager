@@ -131,7 +131,7 @@ launch_tmux() {
     local first_priority=$(get_issue_priority "$first_issue")
 
     tmux new-session -d -s "$SESSION" -c "$first_path" \
-        "echo -e '${GREEN}[$first_priority]${NC} $first_title ($first_issue)'; echo ''; claude '$first_prompt'; exec bash"
+        "echo -e '${GREEN}[$first_priority]${NC} $first_title ($first_issue)'; echo ''; claude --dangerously-skip-permissions '$first_prompt'; exec bash"
 
     # Add additional panes
     for ((i=1; i<count; i++)); do
@@ -146,23 +146,23 @@ launch_tmux() {
         if [ "$count" -le 2 ]; then
             # Horizontal split for 2 panes
             tmux split-window -h -t "$SESSION" -c "$path" \
-                "echo -e '${GREEN}[$priority]${NC} $title ($issue)'; echo ''; claude '$prompt'; exec bash"
+                "echo -e '${GREEN}[$priority]${NC} $title ($issue)'; echo ''; claude --dangerously-skip-permissions '$prompt'; exec bash"
         elif [ "$count" -le 4 ]; then
             # Create 2x2 grid for 3-4 panes
             if [ "$i" -eq 1 ]; then
                 tmux split-window -h -t "$SESSION" -c "$path" \
-                    "echo -e '${GREEN}[$priority]${NC} $title ($issue)'; echo ''; claude '$prompt'; exec bash"
+                    "echo -e '${GREEN}[$priority]${NC} $title ($issue)'; echo ''; claude --dangerously-skip-permissions '$prompt'; exec bash"
             elif [ "$i" -eq 2 ]; then
                 tmux split-window -v -t "$SESSION:0.0" -c "$path" \
-                    "echo -e '${GREEN}[$priority]${NC} $title ($issue)'; echo ''; claude '$prompt'; exec bash"
+                    "echo -e '${GREEN}[$priority]${NC} $title ($issue)'; echo ''; claude --dangerously-skip-permissions '$prompt'; exec bash"
             elif [ "$i" -eq 3 ]; then
                 tmux split-window -v -t "$SESSION:0.1" -c "$path" \
-                    "echo -e '${GREEN}[$priority]${NC} $title ($issue)'; echo ''; claude '$prompt'; exec bash"
+                    "echo -e '${GREEN}[$priority]${NC} $title ($issue)'; echo ''; claude --dangerously-skip-permissions '$prompt'; exec bash"
             fi
         else
             # For more than 4, just keep splitting
             tmux split-window -t "$SESSION" -c "$path" \
-                "echo -e '${GREEN}[$priority]${NC} $title ($issue)'; echo ''; claude '$prompt'; exec bash"
+                "echo -e '${GREEN}[$priority]${NC} $title ($issue)'; echo ''; claude --dangerously-skip-permissions '$prompt'; exec bash"
         fi
     done
 

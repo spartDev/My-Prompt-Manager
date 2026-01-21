@@ -114,11 +114,11 @@ fi
 
 # Create tmux session with first pane
 tmux new-session -d -s "$SESSION" -c "$BASE_DIR/$BRANCH1" \
-  "claude 'Fix issue ics: <task description>. Run tests when done.'"
+  "claude --dangerously-skip-permissions 'Fix issue ics: <task description>. Run tests when done.'"
 
 # Add more panes for additional tasks...
 tmux split-window -h -t "$SESSION" -c "$BASE_DIR/$BRANCH2" \
-  "claude 'Fix issue gpy: <task description>. Run tests when done.'"
+  "claude --dangerously-skip-permissions 'Fix issue gpy: <task description>. Run tests when done.'"
 
 # Attach to session
 tmux attach-session -t "$SESSION"
@@ -192,15 +192,15 @@ done
 
 # Create tmux session with first pane (P0: clipboard memory leak)
 tmux new-session -d -s "$SESSION" -c "$BASE_DIR/fix-ics" \
-  "echo 'P0: Fix memory leak in useClipboard (ics)'; claude 'Fix issue ics: useClipboard.ts - setTimeout not cleaned up on unmount. Store timeout IDs in refs and clear on cleanup. Run tests when done.'"
+  "echo 'P0: Fix memory leak in useClipboard (ics)'; claude --dangerously-skip-permissions 'Fix issue ics: useClipboard.ts - setTimeout not cleaned up on unmount. Store timeout IDs in refs and clear on cleanup. Run tests when done.'"
 
 # Split horizontally for second pane (P1: clearSearch)
 tmux split-window -h -t "$SESSION" -c "$BASE_DIR/fix-gpy" \
-  "echo 'P1: Fix no-op clearSearch (gpy)'; claude 'Fix issue gpy: useSearch.ts - clearSearch does nothing. Remove it from the hook since parent handles clearing. Run tests when done.'"
+  "echo 'P1: Fix no-op clearSearch (gpy)'; claude --dangerously-skip-permissions 'Fix issue gpy: useSearch.ts - clearSearch does nothing. Remove it from the hook since parent handles clearing. Run tests when done.'"
 
 # Split first pane vertically for third pane (P2: dependency arrays)
 tmux split-window -v -t "$SESSION:0.0" -c "$BASE_DIR/fix-f8t" \
-  "echo 'P2: Fix dependency arrays (f8t)'; claude 'Fix issue f8t: useCategories.ts vs usePrompts.ts - inconsistent dependency arrays. Align the patterns. Run tests when done.'"
+  "echo 'P2: Fix dependency arrays (f8t)'; claude --dangerously-skip-permissions 'Fix issue f8t: useCategories.ts vs usePrompts.ts - inconsistent dependency arrays. Align the patterns. Run tests when done.'"
 
 # Attach to session
 tmux attach-session -t "$SESSION"
