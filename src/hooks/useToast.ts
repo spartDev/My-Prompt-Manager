@@ -23,6 +23,12 @@ export const useToast = (): UseToastReturn => {
   const [queue, setQueue] = useState<Toast[]>([]);
   const [settings, setSettings] = useState<ToastSettings>(DEFAULT_SETTINGS);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const toastsCountRef = useRef(0);
+
+  // Keep ref in sync with toasts length for use in callbacks
+  useEffect(() => {
+    toastsCountRef.current = toasts.length;
+  }, [toasts.length]);
 
   // Load settings from Chrome storage on mount
   useEffect(() => {
@@ -51,6 +57,7 @@ export const useToast = (): UseToastReturn => {
           }
 
           const nextToast = prevQueue[0];
+          toastsCountRef.current = 1; // Update ref synchronously
           setToasts([nextToast]);
           return prevQueue.slice(1);
         });
@@ -103,17 +110,15 @@ export const useToast = (): UseToastReturn => {
       action
     };
 
-    // Use functional setState to check current state and decide whether to show or queue
-    setToasts(currentToasts => {
-      if (currentToasts.length === 0) {
-        // No toast showing, show immediately
-        return [toast];
-      } else {
-        // Toast already showing, queue this one
-        setQueue(prev => [...prev, toast]);
-        return currentToasts;
-      }
-    });
+    // Check state via ref and call appropriate setter (avoids nested setState anti-pattern)
+    if (toastsCountRef.current === 0) {
+      // No toast showing, show immediately
+      toastsCountRef.current = 1; // Update ref synchronously for rapid successive calls
+      setToasts([toast]);
+    } else {
+      // Toast already showing, queue this one
+      setQueue(prev => [...prev, toast]);
+    }
   }, [settings.enabledTypes]);
 
   const hideToast = useCallback((id: string) => {
@@ -121,7 +126,11 @@ export const useToast = (): UseToastReturn => {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
     }
-    setToasts(prev => prev.filter(toast => toast.id !== id));
+    setToasts(prev => {
+      const filtered = prev.filter(toast => toast.id !== id);
+      toastsCountRef.current = filtered.length; // Update ref synchronously
+      return filtered;
+    });
   }, []);
 
   const clearAllToasts = useCallback(() => {
@@ -129,6 +138,7 @@ export const useToast = (): UseToastReturn => {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
     }
+    toastsCountRef.current = 0; // Update ref synchronously
     setToasts([]);
     setQueue([]);
   }, []);
