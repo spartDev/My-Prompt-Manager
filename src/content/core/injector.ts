@@ -1946,7 +1946,8 @@ export class PromptLibraryInjector {
       if (result.success) {
         try {
           // Get platform name from hostname lookup for accurate analytics
-          const platform = getPlatformByHostname(window.location.hostname)?.id ?? window.location.hostname;
+          // Falls back to 'custom' for unknown sites to maintain type safety
+          const platform = getPlatformByHostname(window.location.hostname)?.id ?? 'custom';
 
           await chrome.runtime.sendMessage({
             type: 'PROMPT_USAGE_INCREMENT',

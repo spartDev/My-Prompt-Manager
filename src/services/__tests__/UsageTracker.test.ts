@@ -95,7 +95,7 @@ describe('UsageTracker', () => {
     });
 
     it('should record events for different platforms', async () => {
-      const platforms: PlatformType[] = ['claude', 'chatgpt', 'gemini', 'perplexity', 'copilot', 'mistral', 'custom'];
+      const platforms: PlatformType[] = ['claude', 'chatgpt', 'gemini', 'perplexity', 'copilot', 'mistral', 'm365copilot', 'custom'];
 
       for (const platform of platforms) {
         await usageTracker.record('prompt-1', platform, null);

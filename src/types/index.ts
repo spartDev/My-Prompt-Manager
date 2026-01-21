@@ -10,7 +10,7 @@ export interface Prompt {
 }
 
 // Usage Analytics types
-export type PlatformType = 'claude' | 'chatgpt' | 'gemini' | 'perplexity' | 'copilot' | 'mistral' | 'custom';
+export type PlatformType = 'claude' | 'chatgpt' | 'gemini' | 'perplexity' | 'copilot' | 'mistral' | 'm365copilot' | 'custom';
 
 export interface UsageEvent {
   promptId: string;        // Reference to the prompt
