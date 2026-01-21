@@ -1,5 +1,6 @@
 import {
   UsageEvent,
+  PlatformType,
   USAGE_RETENTION_DAYS,
   USAGE_STORAGE_KEY,
   ErrorType,
@@ -55,7 +56,7 @@ export class UsageTracker {
    * @param platform - The platform where the prompt was inserted
    * @param categoryId - The category ID of the prompt (null if uncategorized)
    */
-  async record(promptId: string, platform: string, categoryId: string | null): Promise<void> {
+  async record(promptId: string, platform: PlatformType, categoryId: string | null): Promise<void> {
     return this.mutex.withLock(async () => {
       try {
         const event: UsageEvent = {

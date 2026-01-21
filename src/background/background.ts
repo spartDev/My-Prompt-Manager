@@ -9,7 +9,7 @@ import {
 } from "../config/platforms";
 import { StorageManager } from "../services/storage";
 import { UsageTracker } from "../services/UsageTracker";
-import type { ElementFingerprint } from "../types";
+import type { ElementFingerprint, PlatformType } from "../types";
 import { Logger, toError, getErrorMessage } from "../utils";
 
 // Track active element picker sessions
@@ -961,7 +961,7 @@ async function handleRequestPermission(
 }
 
 async function handlePromptUsageIncrement(
-  data: { promptId?: string; platform?: string; categoryId?: string | null } | undefined,
+  data: { promptId?: string; platform?: PlatformType; categoryId?: string | null } | undefined,
   sendResponse: (response?: { success: boolean; error?: string }) => void,
 ) {
   const promptId = data?.promptId;

@@ -10,10 +10,12 @@ export interface Prompt {
 }
 
 // Usage Analytics types
+export type PlatformType = 'claude' | 'chatgpt' | 'gemini' | 'perplexity' | 'copilot' | 'mistral' | 'custom';
+
 export interface UsageEvent {
   promptId: string;        // Reference to the prompt
   timestamp: number;       // Unix milliseconds
-  platform: string;        // 'claude' | 'chatgpt' | 'gemini' | 'perplexity' | 'copilot' | 'mistral' | 'custom'
+  platform: PlatformType;
   categoryId: string | null;
 }
 
