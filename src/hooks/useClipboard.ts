@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 
 import { UseClipboardReturn } from '../types/hooks';
 import { Logger, toError } from '../utils';
@@ -6,6 +6,16 @@ import { Logger, toError } from '../utils';
 export const useClipboard = (): UseClipboardReturn => {
   const [lastCopied, setLastCopied] = useState<string | null>(null);
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copying' | 'success' | 'error'>('idle');
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current !== null) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
 
   const copyToClipboard = useCallback(async (text: string): Promise<boolean> => {
     if (!text.trim()) {
@@ -41,9 +51,12 @@ export const useClipboard = (): UseClipboardReturn => {
       
       setLastCopied(text);
       setCopyStatus('success');
-      
-      // Reset status after a delay
-      setTimeout(() => {
+
+      // Reset status after a delay (clear any existing timeout first)
+      if (timeoutRef.current !== null) {
+        clearTimeout(timeoutRef.current);
+      }
+      timeoutRef.current = setTimeout(() => {
         setCopyStatus('idle');
       }, 2000);
 
@@ -51,12 +64,15 @@ export const useClipboard = (): UseClipboardReturn => {
     } catch (error) {
       Logger.error('Failed to copy text to clipboard', toError(error));
       setCopyStatus('error');
-      
-      // Reset status after a delay
-      setTimeout(() => {
+
+      // Reset status after a delay (clear any existing timeout first)
+      if (timeoutRef.current !== null) {
+        clearTimeout(timeoutRef.current);
+      }
+      timeoutRef.current = setTimeout(() => {
         setCopyStatus('idle');
       }, 2000);
-      
+
       return false;
     }
   }, []);
