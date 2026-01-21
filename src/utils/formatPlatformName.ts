@@ -8,6 +8,7 @@ const PLATFORM_DISPLAY_NAMES: Record<string, string> = {
   perplexity: 'Perplexity',
   copilot: 'Copilot',
   mistral: 'Mistral',
+  m365copilot: 'M365 Copilot',
   custom: 'Custom Site'
 };
 
