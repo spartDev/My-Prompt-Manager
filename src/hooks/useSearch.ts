@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useMemo } from 'react';
 
 import { Prompt } from '../types';
 import { UseSearchReturn } from '../types/hooks';
@@ -36,14 +36,9 @@ export const useSearch = (prompts: Prompt[], query: string): UseSearchReturn => 
     }));
   }, [filteredPrompts, query]);
 
-  const clearSearch = useCallback(() => {
-    // This will be handled by the parent component
-  }, []);
-
   return {
     query,
     filteredPrompts,
-    highlightedResults,
-    clearSearch
+    highlightedResults
   };
 };
