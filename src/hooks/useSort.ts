@@ -2,6 +2,11 @@ import { useState, useCallback } from 'react';
 
 import { SortOrder, SortDirection } from '../types';
 
+interface SortState {
+  order: SortOrder;
+  direction: SortDirection;
+}
+
 export interface UseSortReturn {
   sortOrder: SortOrder;
   sortDirection: SortDirection;
@@ -34,17 +39,26 @@ export const useSort = (
   initialOrder: SortOrder = 'updatedAt',
   initialDirection: SortDirection = 'desc'
 ): UseSortReturn => {
-  const [sortOrder, setSortOrder] = useState<SortOrder>(initialOrder);
-  const [sortDirection, setSortDirection] = useState<SortDirection>(initialDirection);
+  const [sortState, setSortState] = useState<SortState>({
+    order: initialOrder,
+    direction: initialDirection,
+  });
+
+  const setSortOrder = useCallback((order: SortOrder) => {
+    setSortState((prev) => ({ ...prev, order }));
+  }, []);
+
+  const setSortDirection = useCallback((direction: SortDirection) => {
+    setSortState((prev) => ({ ...prev, direction }));
+  }, []);
 
   const handleSortChange = useCallback((order: SortOrder, direction: SortDirection) => {
-    setSortOrder(order);
-    setSortDirection(direction);
+    setSortState({ order, direction });
   }, []);
 
   return {
-    sortOrder,
-    sortDirection,
+    sortOrder: sortState.order,
+    sortDirection: sortState.direction,
     setSortOrder,
     setSortDirection,
     handleSortChange,
