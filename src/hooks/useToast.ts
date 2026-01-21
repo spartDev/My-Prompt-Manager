@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 
 import { Toast, UseToastReturn, ToastSettings, ToastAction } from '../types/hooks';
@@ -22,7 +22,6 @@ export const useToast = (): UseToastReturn => {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [queue, setQueue] = useState<Toast[]>([]);
   const [settings, setSettings] = useState<ToastSettings>(DEFAULT_SETTINGS);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const toastsCountRef = useRef(0);
 
   // Keep ref in sync with toasts length for use in callbacks
@@ -63,12 +62,6 @@ export const useToast = (): UseToastReturn => {
         });
       });
     }
-
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
   }, [toasts.length, queue.length]);
 
   const showToast = useCallback((
@@ -122,10 +115,6 @@ export const useToast = (): UseToastReturn => {
   }, [settings.enabledTypes]);
 
   const hideToast = useCallback((id: string) => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
     setToasts(prev => {
       const filtered = prev.filter(toast => toast.id !== id);
       toastsCountRef.current = filtered.length; // Update ref synchronously
@@ -134,10 +123,6 @@ export const useToast = (): UseToastReturn => {
   }, []);
 
   const clearAllToasts = useCallback(() => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
     toastsCountRef.current = 0; // Update ref synchronously
     setToasts([]);
     setQueue([]);
