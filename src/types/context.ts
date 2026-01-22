@@ -1,4 +1,4 @@
-import { Prompt, Category, Settings, AppError } from './index';
+import { Prompt, Category, Settings, AppError, ViewType } from './index';
 
 // App Context types
 export interface AppContextType {
@@ -6,7 +6,7 @@ export interface AppContextType {
   prompts: Prompt[];
   categories: Category[];
   settings: Settings;
-  currentView: 'library' | 'add' | 'edit';
+  currentView: ViewType;
   selectedPrompt: Prompt | null;
   searchQuery: string;
   selectedCategory: string | null;
@@ -14,7 +14,7 @@ export interface AppContextType {
   error: AppError | null;
 
   // Actions
-  setCurrentView: (view: 'library' | 'add' | 'edit') => void;
+  setCurrentView: (view: ViewType) => void;
   setSelectedPrompt: (prompt: Prompt | null) => void;
   setSearchQuery: (query: string) => void;
   setSelectedCategory: (category: string | null) => void;

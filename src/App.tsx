@@ -11,10 +11,10 @@ import StorageWarning from './components/StorageWarning';
 import ToastContainer from './components/ToastContainer';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { usePrompts, useCategories, useClipboard, useToast, useSearchWithDebounce } from './hooks';
-import { Prompt, ErrorType, AppError } from './types';
+import { Prompt, ErrorType, AppError, ViewType } from './types';
 import { Logger, toError } from './utils';
 
-type ViewType = 'library' | 'add' | 'edit' | 'categories' | 'settings' | 'analytics';
+type ExtendedViewType = ViewType | 'categories' | 'settings' | 'analytics';
 
 interface AppProps {
   context?: 'popup' | 'sidepanel';
@@ -25,7 +25,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   const urlParams = new URLSearchParams(window.location.search);
   const isPickerMode = urlParams.get('picker') === 'true';
   
-  const [currentView, setCurrentView] = useState<ViewType>(isPickerMode ? 'settings' : 'library');
+  const [currentView, setCurrentView] = useState<ExtendedViewType>(isPickerMode ? 'settings' : 'library');
   const [selectedPrompt, setSelectedPrompt] = useState<Prompt | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [showStorageWarning, setShowStorageWarning] = useState<boolean>(false);
