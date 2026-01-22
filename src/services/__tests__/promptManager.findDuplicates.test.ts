@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { getMockStorageManager, type StorageManagerMock } from '../../test/mocks';
-import { ErrorType, type Prompt } from '../../types';
+import type { Prompt } from '../../types';
 import { PromptManager } from '../promptManager';
 
 /**
@@ -82,7 +82,7 @@ describe('PromptManager - findDuplicatePrompts safeguards', () => {
       await expect(
         promptManager.findDuplicatePrompts({ maxPrompts: 10 })
       ).rejects.toMatchObject({
-        type: ErrorType.VALIDATION_ERROR,
+        type: 'VALIDATION_ERROR',
         message: expect.stringContaining('Duplicate detection limited to 10 prompts'),
         details: expect.objectContaining({
           promptCount: 15,
@@ -175,7 +175,7 @@ describe('PromptManager - findDuplicatePrompts safeguards', () => {
       await expect(
         promptManager.findDuplicatePrompts()
       ).rejects.toMatchObject({
-        type: ErrorType.VALIDATION_ERROR,
+        type: 'VALIDATION_ERROR',
         message: expect.stringContaining('limited to 1000 prompts')
       });
     });

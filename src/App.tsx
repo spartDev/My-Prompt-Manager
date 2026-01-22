@@ -11,7 +11,7 @@ import StorageWarning from './components/StorageWarning';
 import ToastContainer from './components/ToastContainer';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { usePrompts, useCategories, useClipboard, useToast, useSearchWithDebounce } from './hooks';
-import { Prompt, ErrorType, AppError, ViewType } from './types';
+import { Prompt, AppError, ViewType } from './types';
 import { Logger, toError } from './utils';
 
 type ExtendedViewType = ViewType | 'categories' | 'settings' | 'analytics';
@@ -158,7 +158,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
         category: data.category
       });
 
-      if (appError.type === ErrorType.STORAGE_QUOTA_EXCEEDED) {
+      if (appError.type === 'STORAGE_QUOTA_EXCEEDED') {
         setShowStorageWarning(true);
       } else {
         showToast(appError.message || 'Failed to save prompt', 'error');
@@ -177,7 +177,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
       showToast('Category created successfully', 'success');
     } catch (error: unknown) {
       const appError = error as AppError;
-      if (appError.type === ErrorType.STORAGE_QUOTA_EXCEEDED) {
+      if (appError.type === 'STORAGE_QUOTA_EXCEEDED') {
         setShowStorageWarning(true);
       } else {
         showToast(appError.message || 'Failed to create category', 'error');

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { getMockStorageManager, type StorageManagerMock } from '../../test/mocks';
-import { DEFAULT_CATEGORY, VALIDATION_LIMITS, ErrorType } from '../../types';
+import { DEFAULT_CATEGORY, VALIDATION_LIMITS } from '../../types';
 import { PromptManager } from '../promptManager';
 
 describe('PromptManager - Working Tests', () => {
@@ -59,7 +59,7 @@ describe('PromptManager - Working Tests', () => {
 
       expect(error).toBeDefined();
       expect(error?.message).toBe('Prompt content cannot be empty');
-      expect(error?.type).toBe(ErrorType.VALIDATION_ERROR);
+      expect(error?.type).toBe('VALIDATION_ERROR');
     });
 
     it('should validate title length', () => {
@@ -214,7 +214,7 @@ describe('PromptManager - Working Tests', () => {
     it('should throw validation error for invalid data', async () => {
       await expect(promptManager.createPrompt('', ''))
         .rejects.toMatchObject({
-          type: ErrorType.VALIDATION_ERROR,
+          type: 'VALIDATION_ERROR',
           message: 'Prompt content cannot be empty'
         });
     });
@@ -228,14 +228,14 @@ describe('PromptManager - Working Tests', () => {
         content: 'Valid content'
       });
       expect(error1).toBeDefined();
-      expect(error1?.type).toBe(ErrorType.VALIDATION_ERROR);
+      expect(error1?.type).toBe('VALIDATION_ERROR');
 
       const error2 = promptManager.validatePromptData({
         title: 'Valid title',
         content: 'a'.repeat(VALIDATION_LIMITS.PROMPT_CONTENT_MAX + 1)
       });
       expect(error2).toBeDefined();
-      expect(error2?.type).toBe(ErrorType.VALIDATION_ERROR);
+      expect(error2?.type).toBe('VALIDATION_ERROR');
     });
 
     it('should throw error when storage fails', async () => {

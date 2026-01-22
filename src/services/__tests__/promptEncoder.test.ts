@@ -2,7 +2,7 @@ import LZString from 'lz-string';
 import { describe, it, expect } from 'vitest';
 
 import { testEncoderRoundtrip } from '../../test/helpers/encoder-helpers';
-import { Prompt, ErrorType } from '../../types';
+import type { Prompt } from '../../types';
 import {
   encode,
   decode,
@@ -73,7 +73,7 @@ describe('PromptEncoder', () => {
       const data = { title: '', content: 'Content', category: 'Category' };
       expect(() => validatePromptData(data)).toThrow('Title is required');
       const err = captureError(() => validatePromptData(data));
-      expect(err).toHaveProperty('type', ErrorType.VALIDATION_ERROR);
+      expect(err).toHaveProperty('type', 'VALIDATION_ERROR');
       expect(err).toHaveProperty('name', 'PromptEncoderError');
     });
 
@@ -81,7 +81,7 @@ describe('PromptEncoder', () => {
       const data = { title: 'Title', content: '', category: 'Category' };
       expect(() => validatePromptData(data)).toThrow('Content is required');
       const err = captureError(() => validatePromptData(data));
-      expect(err).toHaveProperty('type', ErrorType.VALIDATION_ERROR);
+      expect(err).toHaveProperty('type', 'VALIDATION_ERROR');
       expect(err).toHaveProperty('name', 'PromptEncoderError');
     });
 
@@ -89,7 +89,7 @@ describe('PromptEncoder', () => {
       const data = { title: 'Title', content: 'Content', category: '' };
       expect(() => validatePromptData(data)).toThrow('Category is required');
       const err = captureError(() => validatePromptData(data));
-      expect(err).toHaveProperty('type', ErrorType.VALIDATION_ERROR);
+      expect(err).toHaveProperty('type', 'VALIDATION_ERROR');
       expect(err).toHaveProperty('name', 'PromptEncoderError');
     });
 
@@ -213,7 +213,7 @@ describe('PromptEncoder', () => {
     it('should throw PromptEncoderError for invalid encoded string', () => {
       expect(() => decode('invalid')).toThrow('Invalid sharing code format');
       const err = captureError(() => decode('invalid'));
-      expect(err).toHaveProperty('type', ErrorType.DATA_CORRUPTION);
+      expect(err).toHaveProperty('type', 'DATA_CORRUPTION');
       expect(err).toHaveProperty('name', 'PromptEncoderError');
     });
 

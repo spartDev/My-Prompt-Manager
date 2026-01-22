@@ -9,7 +9,6 @@ import { render, screen, fireEvent, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { useUsageStats } from '../../../hooks/useUsageStats';
-import { ErrorType } from '../../../types';
 import type { UseUsageStatsReturn, UsageStats } from '../../../types/hooks';
 import AnalyticsTab from '../AnalyticsTab';
 
@@ -274,7 +273,7 @@ describe('AnalyticsTab', () => {
     it('should display error message when error occurs', () => {
       const errorReturn = createMockReturn({
         stats: null,
-        error: { type: ErrorType.STORAGE_UNAVAILABLE, message: 'Storage is unavailable' }
+        error: { type: 'STORAGE_UNAVAILABLE', message: 'Storage is unavailable' }
       });
 
       mockUseUsageStats.mockReturnValue(errorReturn);
@@ -288,7 +287,7 @@ describe('AnalyticsTab', () => {
     it('should have alert role on error', () => {
       const errorReturn = createMockReturn({
         stats: null,
-        error: { type: ErrorType.VALIDATION_ERROR, message: 'Test error' }
+        error: { type: 'VALIDATION_ERROR', message: 'Test error' }
       });
 
       mockUseUsageStats.mockReturnValue(errorReturn);

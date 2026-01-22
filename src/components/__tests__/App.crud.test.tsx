@@ -4,7 +4,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 import App from '../../App';
 import { getMockPromptManager, getMockStorageManager } from '../../test/mocks';
-import { ErrorType, type Prompt, type Category, type AppError } from '../../types';
+import type { Prompt, Category, AppError } from '../../types';
 
 const defaultCategories: Category[] = [
   { id: 'default', name: 'Uncategorized', color: '#888888' },
@@ -170,7 +170,7 @@ describe('App prompt workflows', () => {
 
     const promptMock = getMockPromptManager();
     const quotaError: AppError = {
-      type: ErrorType.STORAGE_QUOTA_EXCEEDED,
+      type: 'STORAGE_QUOTA_EXCEEDED',
       message: 'Quota reached'
     };
     (promptMock.createPrompt as any).mockRejectedValue(quotaError);
@@ -199,7 +199,7 @@ describe('App prompt workflows', () => {
 
     const promptMock = getMockPromptManager();
     const validationError: AppError = {
-      type: ErrorType.VALIDATION_ERROR,
+      type: 'VALIDATION_ERROR',
       message: 'Title is required'
     };
     (promptMock.updatePrompt as any).mockRejectedValue(validationError);
