@@ -111,8 +111,8 @@ export function getStorageChangeTrigger(): (
 export interface MockMediaQueryList {
   matches: boolean;
   media: string;
-  addEventListener: ReturnType<typeof import('vitest').vi.fn>;
-  removeEventListener: ReturnType<typeof import('vitest').vi.fn>;
+  addEventListener: Mock;
+  removeEventListener: Mock;
 }
 
 /**
