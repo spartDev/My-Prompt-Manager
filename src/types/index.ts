@@ -149,15 +149,14 @@ export interface AppState {
   error: string | null;
 }
 
-// Error types
-export enum ErrorType {
-  STORAGE_QUOTA_EXCEEDED = 'STORAGE_QUOTA_EXCEEDED',
-  STORAGE_UNAVAILABLE = 'STORAGE_UNAVAILABLE',
-  DATA_CORRUPTION = 'DATA_CORRUPTION',
-  VALIDATION_ERROR = 'VALIDATION_ERROR',
-  PERMISSION_DENIED = 'PERMISSION_DENIED',
-  EXTENSION_CONTEXT_LOST = 'EXTENSION_CONTEXT_LOST'
-}
+// Error types (string union for better tree-shaking - erased at compile time)
+export type ErrorType =
+  | 'STORAGE_QUOTA_EXCEEDED'
+  | 'STORAGE_UNAVAILABLE'
+  | 'DATA_CORRUPTION'
+  | 'VALIDATION_ERROR'
+  | 'PERMISSION_DENIED'
+  | 'EXTENSION_CONTEXT_LOST';
 
 export interface AppError {
   type: ErrorType;

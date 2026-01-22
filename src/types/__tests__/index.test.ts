@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 
-import { 
-  DEFAULT_CATEGORY, 
-  DEFAULT_SETTINGS, 
+import {
+  DEFAULT_CATEGORY,
+  DEFAULT_SETTINGS,
   VALIDATION_LIMITS,
-  ErrorType 
+  type ErrorType
 } from '../index';
 
 describe('Type Definitions', () => {
@@ -32,13 +32,21 @@ describe('Type Definitions', () => {
   });
 
   describe('Error Types', () => {
-    it('should have all error types defined', () => {
-      expect(ErrorType.STORAGE_QUOTA_EXCEEDED).toBe('STORAGE_QUOTA_EXCEEDED');
-      expect(ErrorType.STORAGE_UNAVAILABLE).toBe('STORAGE_UNAVAILABLE');
-      expect(ErrorType.DATA_CORRUPTION).toBe('DATA_CORRUPTION');
-      expect(ErrorType.VALIDATION_ERROR).toBe('VALIDATION_ERROR');
-      expect(ErrorType.PERMISSION_DENIED).toBe('PERMISSION_DENIED');
-      expect(ErrorType.EXTENSION_CONTEXT_LOST).toBe('EXTENSION_CONTEXT_LOST');
+    it('should have valid ErrorType string literals', () => {
+      // ErrorType is now a string union type (erased at compile time)
+      // Verify that valid error type strings are assignable to the type
+      const errorTypes: ErrorType[] = [
+        'STORAGE_QUOTA_EXCEEDED',
+        'STORAGE_UNAVAILABLE',
+        'DATA_CORRUPTION',
+        'VALIDATION_ERROR',
+        'PERMISSION_DENIED',
+        'EXTENSION_CONTEXT_LOST'
+      ];
+      expect(errorTypes).toHaveLength(6);
+      errorTypes.forEach(errorType => {
+        expect(typeof errorType).toBe('string');
+      });
     });
   });
 

@@ -2,7 +2,7 @@ import {
   Prompt,
   VALIDATION_LIMITS,
   DEFAULT_CATEGORY,
-  ErrorType,
+  type ErrorType,
   AppError,
   SortOrder,
   SortDirection
@@ -208,7 +208,7 @@ export class PromptManager {
           // without handling it in the switch statement
           const _exhaustiveCheck: never = order;
           throw new PromptManagerError({
-            type: ErrorType.VALIDATION_ERROR,
+            type: 'VALIDATION_ERROR',
             message: `Unknown sort order: ${String(_exhaustiveCheck)}`
           });
         }
@@ -288,7 +288,7 @@ export class PromptManager {
     if (title !== undefined) {
       if (title.length > VALIDATION_LIMITS.PROMPT_TITLE_MAX) {
         return new PromptManagerError({
-          type: ErrorType.VALIDATION_ERROR,
+          type: 'VALIDATION_ERROR',
           message: `Title cannot exceed ${String(VALIDATION_LIMITS.PROMPT_TITLE_MAX)} characters`
         });
       }
@@ -297,14 +297,14 @@ export class PromptManager {
     if (content !== undefined) {
       if (!content.trim()) {
         return new PromptManagerError({
-          type: ErrorType.VALIDATION_ERROR,
+          type: 'VALIDATION_ERROR',
           message: 'Prompt content cannot be empty'
         });
       }
 
       if (content.length > VALIDATION_LIMITS.PROMPT_CONTENT_MAX) {
         return new PromptManagerError({
-          type: ErrorType.VALIDATION_ERROR,
+          type: 'VALIDATION_ERROR',
           message: `Content cannot exceed ${String(VALIDATION_LIMITS.PROMPT_CONTENT_MAX)} characters`
         });
       }
@@ -313,7 +313,7 @@ export class PromptManager {
     if (category !== undefined) {
       if (category.length > VALIDATION_LIMITS.CATEGORY_NAME_MAX) {
         return new PromptManagerError({
-          type: ErrorType.VALIDATION_ERROR,
+          type: 'VALIDATION_ERROR',
           message: `Category name cannot exceed ${String(VALIDATION_LIMITS.CATEGORY_NAME_MAX)} characters`
         });
       }
@@ -328,14 +328,14 @@ export class PromptManager {
     if (name !== undefined) {
       if (!name.trim()) {
         return new PromptManagerError({
-          type: ErrorType.VALIDATION_ERROR,
+          type: 'VALIDATION_ERROR',
           message: 'Category name cannot be empty'
         });
       }
 
       if (name.length > VALIDATION_LIMITS.CATEGORY_NAME_MAX) {
         return new PromptManagerError({
-          type: ErrorType.VALIDATION_ERROR,
+          type: 'VALIDATION_ERROR',
           message: `Category name cannot exceed ${String(VALIDATION_LIMITS.CATEGORY_NAME_MAX)} characters`
         });
       }
@@ -345,7 +345,7 @@ export class PromptManager {
       const hexColorRegex = /^#[0-9A-F]{6}$/i;
       if (!hexColorRegex.test(color)) {
         return new PromptManagerError({
-          type: ErrorType.VALIDATION_ERROR,
+          type: 'VALIDATION_ERROR',
           message: 'Color must be a valid hex color code (e.g., #FF0000)'
         });
       }
@@ -455,7 +455,7 @@ export class PromptManager {
       // Safeguard: Check prompt count before starting O(n²) operation
       if (allPrompts.length > maxPrompts && !allowLargeDatasets) {
         throw new PromptManagerError({
-          type: ErrorType.VALIDATION_ERROR,
+          type: 'VALIDATION_ERROR',
           message: `Duplicate detection limited to ${String(maxPrompts)} prompts. You have ${String(allPrompts.length)} prompts. Set allowLargeDatasets: true to process larger collections.`,
           details: {
             promptCount: allPrompts.length,
@@ -482,7 +482,7 @@ export class PromptManager {
         // Check timeout every outer loop iteration
         if (currentTime - startTime > timeoutMs) {
           throw new PromptManagerError({
-            type: ErrorType.VALIDATION_ERROR,
+            type: 'VALIDATION_ERROR',
             message: `Duplicate detection timed out after ${String(timeoutMs)}ms. Try with fewer prompts or increase timeout.`,
             details: {
               processedPrompts: i,
@@ -646,7 +646,7 @@ export class PromptManager {
 
     const errorMessage = error instanceof Error ? error.message : String(error);
     return new PromptManagerError({
-      type: ErrorType.VALIDATION_ERROR,
+      type: 'VALIDATION_ERROR',
       message: errorMessage || 'An unknown error occurred in PromptManager',
       details: error
     });

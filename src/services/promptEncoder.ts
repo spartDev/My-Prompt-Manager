@@ -17,7 +17,7 @@ import {
   SharedPromptData,
   PROMPT_SHARING_SIZE_LIMITS,
   Prompt,
-  ErrorType,
+  type ErrorType,
   AppError
 } from '../types';
 import { Logger, toError } from '../utils';
@@ -64,21 +64,21 @@ function validatePromptData(data: SharedPromptData): void {
   // Check required fields
   if (!title.trim()) {
     throw new PromptEncoderError({
-      type: ErrorType.VALIDATION_ERROR,
+      type: 'VALIDATION_ERROR',
       message: 'Title is required',
       details: { field: 'title' }
     });
   }
   if (!content.trim()) {
     throw new PromptEncoderError({
-      type: ErrorType.VALIDATION_ERROR,
+      type: 'VALIDATION_ERROR',
       message: 'Content is required',
       details: { field: 'content' }
     });
   }
   if (!category.trim()) {
     throw new PromptEncoderError({
-      type: ErrorType.VALIDATION_ERROR,
+      type: 'VALIDATION_ERROR',
       message: 'Category is required',
       details: { field: 'category' }
     });
@@ -87,21 +87,21 @@ function validatePromptData(data: SharedPromptData): void {
   // Check size limits
   if (title.length > PROMPT_SHARING_SIZE_LIMITS.TITLE_MAX) {
     throw new PromptEncoderError({
-      type: ErrorType.VALIDATION_ERROR,
+      type: 'VALIDATION_ERROR',
       message: `Title too long (max ${String(PROMPT_SHARING_SIZE_LIMITS.TITLE_MAX)} characters)`,
       details: { field: 'title', length: title.length, max: PROMPT_SHARING_SIZE_LIMITS.TITLE_MAX }
     });
   }
   if (content.length > PROMPT_SHARING_SIZE_LIMITS.CONTENT_MAX) {
     throw new PromptEncoderError({
-      type: ErrorType.VALIDATION_ERROR,
+      type: 'VALIDATION_ERROR',
       message: `Content too long (max ${String(PROMPT_SHARING_SIZE_LIMITS.CONTENT_MAX)} characters)`,
       details: { field: 'content', length: content.length, max: PROMPT_SHARING_SIZE_LIMITS.CONTENT_MAX }
     });
   }
   if (category.length > PROMPT_SHARING_SIZE_LIMITS.CATEGORY_MAX) {
     throw new PromptEncoderError({
-      type: ErrorType.VALIDATION_ERROR,
+      type: 'VALIDATION_ERROR',
       message: `Category too long (max ${String(PROMPT_SHARING_SIZE_LIMITS.CATEGORY_MAX)} characters)`,
       details: { field: 'category', length: category.length, max: PROMPT_SHARING_SIZE_LIMITS.CATEGORY_MAX }
     });
@@ -138,7 +138,7 @@ export function encode(prompt: Prompt): string {
     // 4. Verify size limit
     if (encoded.length > PROMPT_SHARING_SIZE_LIMITS.ENCODED_MAX) {
       const error = new PromptEncoderError({
-        type: ErrorType.VALIDATION_ERROR,
+        type: 'VALIDATION_ERROR',
         message: 'Prompt too large to share',
         details: process.env.NODE_ENV === 'development'
           ? { encodedLength: encoded.length, max: PROMPT_SHARING_SIZE_LIMITS.ENCODED_MAX }
@@ -160,7 +160,7 @@ export function encode(prompt: Prompt): string {
     }
 
     const error = new PromptEncoderError({
-      type: ErrorType.VALIDATION_ERROR,
+      type: 'VALIDATION_ERROR',
       message: 'Failed to encode prompt',
       details: err
     });
@@ -192,7 +192,7 @@ export function decode(encoded: string): SharedPromptData {
     // 1. Check encoded size BEFORE decompression
     if (encoded.length > PROMPT_SHARING_SIZE_LIMITS.ENCODED_MAX) {
       const error = new PromptEncoderError({
-        type: ErrorType.VALIDATION_ERROR,
+        type: 'VALIDATION_ERROR',
         message: 'Sharing code too large',
         details: process.env.NODE_ENV === 'development'
           ? { encodedLength: encoded.length, max: PROMPT_SHARING_SIZE_LIMITS.ENCODED_MAX }
@@ -209,7 +209,7 @@ export function decode(encoded: string): SharedPromptData {
     const json = LZString.decompressFromEncodedURIComponent(encoded);
     if (!json) {
       const error = new PromptEncoderError({
-        type: ErrorType.DATA_CORRUPTION,
+        type: 'DATA_CORRUPTION',
         message: 'Invalid sharing code format',
         details: { step: 'decompression' }
       });
@@ -223,7 +223,7 @@ export function decode(encoded: string): SharedPromptData {
     // 3. Check decompressed size (prevent decompression bombs)
     if (json.length > PROMPT_SHARING_SIZE_LIMITS.ENCODED_MAX * 2) {
       const error = new PromptEncoderError({
-        type: ErrorType.VALIDATION_ERROR,
+        type: 'VALIDATION_ERROR',
         message: 'Decompressed data too large',
         details: process.env.NODE_ENV === 'development'
           ? { decompressedLength: json.length, max: PROMPT_SHARING_SIZE_LIMITS.ENCODED_MAX * 2 }
@@ -242,7 +242,7 @@ export function decode(encoded: string): SharedPromptData {
       data = JSON.parse(json);
     } catch (parseErr) {
       const error = new PromptEncoderError({
-        type: ErrorType.DATA_CORRUPTION,
+        type: 'DATA_CORRUPTION',
         message: 'Invalid sharing code format',
         details: { step: 'json-parse', error: parseErr }
       });
@@ -256,7 +256,7 @@ export function decode(encoded: string): SharedPromptData {
     // 5. Validate structure
     if (!data || typeof data !== 'object' || !('title' in data) || !('content' in data) || !('category' in data)) {
       throw new PromptEncoderError({
-        type: ErrorType.DATA_CORRUPTION,
+        type: 'DATA_CORRUPTION',
         message: 'Invalid sharing code format',
         details: { step: 'structure-validation' }
       });
@@ -279,7 +279,7 @@ export function decode(encoded: string): SharedPromptData {
     }
 
     const error = new PromptEncoderError({
-      type: ErrorType.DATA_CORRUPTION,
+      type: 'DATA_CORRUPTION',
       message: 'Failed to decode sharing code',
       details: err
     });

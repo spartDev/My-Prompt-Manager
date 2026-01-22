@@ -3,7 +3,7 @@ import {
   PlatformType,
   USAGE_RETENTION_DAYS,
   USAGE_STORAGE_KEY,
-  ErrorType,
+  type ErrorType,
   AppError
 } from '../types';
 import { AsyncMutex } from '../utils/asyncMutex';
@@ -225,7 +225,7 @@ export class UsageTracker {
 
     if (errorMessage.includes('QUOTA_EXCEEDED')) {
       return new UsageTrackerError({
-        type: ErrorType.STORAGE_QUOTA_EXCEEDED,
+        type: 'STORAGE_QUOTA_EXCEEDED',
         message: 'Storage quota exceeded. Usage history may need to be cleared.',
         details: error
       });
@@ -233,14 +233,14 @@ export class UsageTracker {
 
     if (errorMessage.includes('storage API')) {
       return new UsageTrackerError({
-        type: ErrorType.STORAGE_UNAVAILABLE,
+        type: 'STORAGE_UNAVAILABLE',
         message: 'Storage API is unavailable. Please try again later.',
         details: error
       });
     }
 
     return new UsageTrackerError({
-      type: ErrorType.VALIDATION_ERROR,
+      type: 'VALIDATION_ERROR',
       message: errorMessage || 'An unknown error occurred in UsageTracker.',
       details: error
     });

@@ -1,4 +1,4 @@
-import { ErrorType } from '../types';
+import type { ErrorType } from '../types';
 
 export interface StorageAvailabilityOptions {
   maxAttempts?: number;
@@ -33,7 +33,7 @@ export async function ensureStorageAvailable(
   const error = new Error(
     'Chrome storage API is not available. Please ensure you are running within a Chrome extension context.'
   );
-  (error as Error & { type: ErrorType; details: unknown }).type = ErrorType.STORAGE_UNAVAILABLE;
+  (error as Error & { type: ErrorType; details: unknown }).type = 'STORAGE_UNAVAILABLE';
   (error as Error & { type: ErrorType; details: unknown }).details = { maxAttempts, delayMs };
   throw error;
 }

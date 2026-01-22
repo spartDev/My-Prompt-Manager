@@ -7,7 +7,7 @@ import {
   StorageData,
   DEFAULT_SETTINGS,
   DEFAULT_CATEGORY,
-  ErrorType,
+  type ErrorType,
   AppError
 } from '../types';
 import { AsyncMutex } from '../utils/asyncMutex';
@@ -67,7 +67,7 @@ export class StorageManager {
         if (existingPrompts.length >= this.STORAGE_LIMITS.MAX_PROMPTS) {
           throw new StorageError({
             message: `Maximum prompt limit reached (${String(this.STORAGE_LIMITS.MAX_PROMPTS)}). Please delete old prompts.`,
-            type: ErrorType.STORAGE_QUOTA_EXCEEDED,
+            type: 'STORAGE_QUOTA_EXCEEDED',
             details: {
               current: existingPrompts.length,
               max: this.STORAGE_LIMITS.MAX_PROMPTS
@@ -80,7 +80,7 @@ export class StorageManager {
         if (estimatedSize > this.STORAGE_LIMITS.MAX_PROMPT_SIZE) {
           throw new StorageError({
             message: `Prompt exceeds maximum size limit (${String(this.STORAGE_LIMITS.MAX_PROMPT_SIZE)} bytes)`,
-            type: ErrorType.VALIDATION_ERROR,
+            type: 'VALIDATION_ERROR',
             details: {
               size: estimatedSize,
               max: this.STORAGE_LIMITS.MAX_PROMPT_SIZE
@@ -93,7 +93,7 @@ export class StorageManager {
         if (totalSize > this.STORAGE_LIMITS.MAX_TOTAL_SIZE) {
           throw new StorageError({
             message: 'Storage quota exceeded. Please delete old prompts to free up space.',
-            type: ErrorType.STORAGE_QUOTA_EXCEEDED,
+            type: 'STORAGE_QUOTA_EXCEEDED',
             details: {
               total: totalSize,
               max: this.STORAGE_LIMITS.MAX_TOTAL_SIZE
@@ -177,7 +177,7 @@ export class StorageManager {
         if (newSize > this.STORAGE_LIMITS.MAX_PROMPT_SIZE) {
           throw new StorageError({
             message: `Prompt exceeds maximum size limit (${String(this.STORAGE_LIMITS.MAX_PROMPT_SIZE)} bytes)`,
-            type: ErrorType.VALIDATION_ERROR,
+            type: 'VALIDATION_ERROR',
             details: {
               size: newSize,
               max: this.STORAGE_LIMITS.MAX_PROMPT_SIZE
@@ -613,7 +613,7 @@ export class StorageManager {
       const quota = chrome.storage.local.QUOTA_BYTES;
       if (totalEstimatedSize > quota) {
         throw new StorageError({
-          type: ErrorType.STORAGE_QUOTA_EXCEEDED,
+          type: 'STORAGE_QUOTA_EXCEEDED',
           message: `Import size (${Math.round(totalEstimatedSize / 1024).toString()} KB) exceeds storage quota (${Math.round(quota / 1024).toString()} KB).`,
           details: {
             estimatedSize: totalEstimatedSize,
@@ -706,7 +706,7 @@ export class StorageManager {
 
       if (!quotaCheck.canWrite) {
         throw new StorageError({
-          type: ErrorType.STORAGE_QUOTA_EXCEEDED,
+          type: 'STORAGE_QUOTA_EXCEEDED',
           message: quotaCheck.reason || 'Storage quota would be exceeded by this operation.',
           details: {
             estimatedSize,
@@ -765,7 +765,7 @@ export class StorageManager {
 
     if (errorMessage.includes('QUOTA_EXCEEDED')) {
       return new StorageError({
-        type: ErrorType.STORAGE_QUOTA_EXCEEDED,
+        type: 'STORAGE_QUOTA_EXCEEDED',
         message: 'Storage quota exceeded. Please delete some prompts to free up space.',
         details: error
       });
@@ -773,7 +773,7 @@ export class StorageManager {
 
     if (errorMessage.includes('storage API')) {
       return new StorageError({
-        type: ErrorType.STORAGE_UNAVAILABLE,
+        type: 'STORAGE_UNAVAILABLE',
         message: 'Storage API is unavailable. Please try again later.',
         details: error
       });
@@ -781,14 +781,14 @@ export class StorageManager {
 
     if (error instanceof SyntaxError) {
       return new StorageError({
-        type: ErrorType.DATA_CORRUPTION,
+        type: 'DATA_CORRUPTION',
         message: 'Data corruption detected. Some data may need to be recovered.',
         details: error
       });
     }
 
     return new StorageError({
-      type: ErrorType.VALIDATION_ERROR,
+      type: 'VALIDATION_ERROR',
       message: errorMessage || 'An unknown storage error occurred.',
       details: error
     });
@@ -800,7 +800,7 @@ export class StorageManager {
     // Basic structure validation
     if (!data || typeof data !== 'object') {
       throw new StorageError({
-        type: ErrorType.VALIDATION_ERROR,
+        type: 'VALIDATION_ERROR',
         message: 'Import data must be a valid JSON object',
         details: { errors: ['Data is not an object'] }
       });
@@ -830,7 +830,7 @@ export class StorageManager {
     // If structure is invalid, throw immediately
     if (errors.length > 0) {
       throw new StorageError({
-        type: ErrorType.VALIDATION_ERROR,
+        type: 'VALIDATION_ERROR',
         message: `Invalid import data structure: ${errors.join('; ')}`,
         details: { errors }
       });
@@ -907,7 +907,7 @@ export class StorageManager {
     // If any validation errors occurred, throw with all errors
     if (errors.length > 0) {
       throw new StorageError({
-        type: ErrorType.VALIDATION_ERROR,
+        type: 'VALIDATION_ERROR',
         message: `Import validation failed with ${String(errors.length)} error(s)`,
         details: { errors, errorCount: errors.length }
       });

@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-import { ErrorType } from '../../types';
 import { ensureStorageAvailable } from '../chromeStorage';
 
 describe('ensureStorageAvailable', () => {
@@ -45,7 +44,7 @@ describe('ensureStorageAvailable', () => {
 
     expect(thrownError).toMatchObject({
       message: expect.stringContaining('Chrome storage API is not available'),
-      type: ErrorType.STORAGE_UNAVAILABLE,
+      type: 'STORAGE_UNAVAILABLE',
       details: { maxAttempts: 3, delayMs: 10 }
     });
   });
@@ -66,7 +65,7 @@ describe('ensureStorageAvailable', () => {
     try { await promise; } catch { /* expected */ }
 
     expect(thrownError).toMatchObject({
-      type: ErrorType.STORAGE_UNAVAILABLE
+      type: 'STORAGE_UNAVAILABLE'
     });
   });
 
@@ -86,7 +85,7 @@ describe('ensureStorageAvailable', () => {
     try { await promise; } catch { /* expected */ }
 
     expect(thrownError).toMatchObject({
-      type: ErrorType.STORAGE_UNAVAILABLE
+      type: 'STORAGE_UNAVAILABLE'
     });
   });
 
@@ -139,7 +138,7 @@ describe('ensureStorageAvailable', () => {
     try { await promise; } catch { /* expected */ }
 
     expect(thrownError).toMatchObject({
-      type: ErrorType.STORAGE_UNAVAILABLE,
+      type: 'STORAGE_UNAVAILABLE',
       details: { maxAttempts: 50, delayMs: 100 }
     });
   });
