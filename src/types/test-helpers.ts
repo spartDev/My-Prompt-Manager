@@ -9,6 +9,8 @@ import type { Mock } from 'vitest';
 
 import type { StorageManagerMock, PromptManagerMock } from '../test/setup';
 
+import type { Settings } from './index';
+
 /**
  * Chrome API Mock Types
  *
@@ -76,7 +78,7 @@ export function isGlobalWithMocks(global: typeof globalThis): global is GlobalWi
  * Type for updateSettings mock function
  */
 export type UpdateSettingsMock = Mock<
-  (updates: Partial<chrome.storage.StorageChange['newValue']>) => Promise<chrome.storage.StorageChange['newValue']>
+  (updates: Partial<Settings>) => Promise<Settings>
 >;
 
 /**
