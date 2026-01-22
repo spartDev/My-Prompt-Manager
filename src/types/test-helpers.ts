@@ -85,7 +85,10 @@ export type UpdateSettingsMock = Mock<
  * Helper to get properly typed chrome mock from globalThis
  */
 export function getChromeMock(): typeof chrome {
-  return (globalThis as GlobalWithMocks).chrome;
+  if (!isGlobalWithMocks(globalThis)) {
+    throw new Error('Chrome mock not initialized. Ensure setup.ts has been executed.');
+  }
+  return globalThis.chrome;
 }
 
 /**
