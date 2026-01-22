@@ -31,17 +31,17 @@ export interface Category {
   color?: string; // hex color code (optional)
 }
 
+// Sort order types for prompts
+export type SortOrder = 'createdAt' | 'updatedAt' | 'title' | 'usageCount' | 'lastUsedAt';
+export type SortDirection = 'asc' | 'desc';
+
 export interface Settings {
   defaultCategory: string;
-  sortOrder: 'createdAt' | 'updatedAt' | 'title' | 'usageCount' | 'lastUsedAt';
-  sortDirection: 'asc' | 'desc';
+  sortOrder: SortOrder;
+  sortDirection: SortDirection;
   theme: 'light' | 'dark' | 'system';
   interfaceMode?: 'popup' | 'sidepanel';
 }
-
-// Sort order type for prompts
-export type SortOrder = 'createdAt' | 'updatedAt' | 'title' | 'usageCount' | 'lastUsedAt';
-export type SortDirection = 'asc' | 'desc';
 
 export interface StorageData {
   prompts: Prompt[];
