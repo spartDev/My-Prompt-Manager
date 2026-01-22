@@ -127,11 +127,14 @@ export interface EncodedCustomSitePayloadV1 {
   c: string;
 }
 
+// View type for navigation state
+export type ViewType = 'library' | 'add' | 'edit';
+
 // UI state interfaces
 export interface AppState {
   prompts: Prompt[];
   categories: Category[];
-  currentView: 'library' | 'add' | 'edit';
+  currentView: ViewType;
   selectedPrompt: Prompt | null;
   searchQuery: string;
   selectedCategory: string | null;
