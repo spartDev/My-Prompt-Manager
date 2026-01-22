@@ -78,9 +78,16 @@ export interface CustomSite {
     offset?: { x: number; y: number };
     zIndex?: number;
     description?: string;
-    // For backward compatibility with existing signature-based system
+    /**
+     * @deprecated Legacy field for backward compatibility. Use `fingerprint` instead.
+     * Tracking anchor ID used by the old element positioning system.
+     */
     anchorId?: string;
-    signature?: unknown;
+    /**
+     * @deprecated Legacy field for backward compatibility. Use `fingerprint` instead.
+     * Element signature from the old positioning system, now superseded by ElementFingerprint.
+     */
+    signature?: ElementFingerprint;
   };
 }
 
