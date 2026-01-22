@@ -2,6 +2,26 @@ import { ToastType } from './components';
 
 import { Prompt, Category, AppError, UsageEvent } from './index';
 
+/**
+ * Type guard function that validates an unknown value is of type T.
+ * Used for runtime type validation in storage operations.
+ *
+ * @example
+ * ```typescript
+ * // Simple type guard
+ * const isString: TypeGuard<string> = (value): value is string =>
+ *   typeof value === 'string';
+ *
+ * // Object type guard
+ * const isPrompt: TypeGuard<Prompt> = (value): value is Prompt =>
+ *   value !== null &&
+ *   typeof value === 'object' &&
+ *   typeof (value as Prompt).id === 'string' &&
+ *   typeof (value as Prompt).title === 'string';
+ * ```
+ */
+export type TypeGuard<T> = (value: unknown) => value is T;
+
 // Hook return types
 export interface UsePromptsReturn {
   prompts: Prompt[];
@@ -50,7 +70,27 @@ export interface UseSearchWithDebounceReturn {
 export interface UseStorageReturn {
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters -- Generic provides caller type inference and API consistency with loadData
   saveData: <T>(key: string, data: T) => Promise<void>;
-  loadData: <T>(key: string) => Promise<T | null>;
+  /**
+   * Load data from storage with optional runtime type validation.
+   *
+   * @param key - Storage key to retrieve data from
+   * @param validator - Optional type guard function for runtime validation.
+   *                    If provided and validation fails, returns null.
+   *                    If not provided, returns data cast to T (unsafe, TypeScript-only).
+   * @returns Promise resolving to validated data of type T, or null if not found/invalid
+   *
+   * @example
+   * ```typescript
+   * // Without validator (TypeScript-only safety)
+   * const data = await loadData<Settings>('settings');
+   *
+   * // With validator (runtime safety)
+   * const isSettings: TypeGuard<Settings> = (v): v is Settings =>
+   *   v !== null && typeof v === 'object' && 'theme' in v;
+   * const data = await loadData<Settings>('settings', isSettings);
+   * ```
+   */
+  loadData: <T>(key: string, validator?: TypeGuard<T>) => Promise<T | null>;
   removeData: (key: string) => Promise<void>;
   clearAll: () => Promise<void>;
   getStorageUsage: () => Promise<{ used: number; total: number }>;

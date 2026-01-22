@@ -8,6 +8,17 @@ export {
   decodeObjectFromBase64UrlSafe,
   isValidBase64UrlSafe
 } from './base64';
-export { validatePromptFields, type FieldErrors } from './validation';
+export {
+  validatePromptFields,
+  type FieldErrors,
+  // Type guards for runtime validation with loadData
+  isPrompt,
+  isCategory,
+  isSettings,
+  isStorageData,
+  isUsageEvent,
+  isCustomSite,
+  isArrayOf,
+} from './validation';
 export { cn } from './cn';
 export { formatPlatformName } from './formatPlatformName';
