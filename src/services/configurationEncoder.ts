@@ -523,6 +523,21 @@ const decode = async (encodedString: string): Promise<CustomSiteConfiguration> =
     if (!legacyMatch && !fallbackMatch) {
       throw new ConfigurationEncoderError('Configuration integrity check failed. The code may have been modified or corrupted during copying. Please copy the code again carefully.', 'CHECKSUM_FAILED');
     }
+
+    // Log deprecation warning for legacy checksum formats
+    if (legacyMatch) {
+      Logger.warn('[DEPRECATION] Legacy 8-character checksum format detected. This format will be removed in a future version. Please re-share the configuration to upgrade to the new 16-character SHA-256 checksum format.', {
+        component: 'ConfigurationEncoder',
+        hostname: rest.h,
+        checksumLength: receivedChecksum.length
+      });
+    } else if (fallbackMatch) {
+      Logger.warn('[DEPRECATION] Fallback checksum format detected (SubtleCrypto unavailable during encoding). Consider re-sharing the configuration in an environment with SubtleCrypto support for improved security.', {
+        component: 'ConfigurationEncoder',
+        hostname: rest.h,
+        checksumLength: receivedChecksum.length
+      });
+    }
   }
 
   const decodedConfig = payloadToConfig(rest);
