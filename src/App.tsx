@@ -10,7 +10,11 @@ import SettingsView from './components/SettingsView';
 import StorageWarning from './components/StorageWarning';
 import ToastContainer from './components/ToastContainer';
 import { ThemeProvider } from './contexts/ThemeContext';
-import { usePrompts, useCategories, useClipboard, useToast, useSearchWithDebounce } from './hooks';
+import { useCategories } from './hooks/useCategories';
+import { useClipboard } from './hooks/useClipboard';
+import { usePrompts } from './hooks/usePrompts';
+import { useSearchWithDebounce } from './hooks/useSearchWithDebounce';
+import { useToast } from './hooks/useToast';
 import { Prompt, AppError, ViewType } from './types';
 import { Logger, toError } from './utils';
 
