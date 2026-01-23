@@ -1,4 +1,4 @@
-import { FC } from 'react';
+import { FC, ReactNode } from 'react';
 
 interface InterfaceModeSelectorProps {
   value: 'popup' | 'sidepanel';
@@ -6,6 +6,81 @@ interface InterfaceModeSelectorProps {
   disabled?: boolean;
   loading?: boolean;
 }
+
+/**
+ * Selection indicator badge - displayed when a mode is selected.
+ * Hoisted to module scope per Vercel rendering-hoist-jsx best practice.
+ */
+const SelectionIndicator: FC<{ selected: boolean }> = ({ selected }) =>
+  selected ? (
+    <div className="absolute top-2 right-2">
+      <div className="w-5 h-5 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-full flex items-center justify-center">
+        <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+        </svg>
+      </div>
+    </div>
+  ) : null;
+
+/**
+ * Static SVG preview for popup window mode.
+ * Hoisted to module scope to avoid recreation on each render.
+ */
+const POPUP_PREVIEW_SVG: ReactNode = (
+  <svg
+    className="w-20 h-20"
+    viewBox="0 0 80 80"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    {/* Browser window background */}
+    <rect x="10" y="20" width="60" height="40" rx="2" className="fill-gray-200 dark:fill-gray-700" />
+    <rect x="10" y="20" width="60" height="6" className="fill-gray-300 dark:fill-gray-600" />
+    <circle cx="16" cy="23" r="1.5" className="fill-red-400" />
+    <circle cx="21" cy="23" r="1.5" className="fill-yellow-400" />
+    <circle cx="26" cy="23" r="1.5" className="fill-green-400" />
+
+    {/* Popup window */}
+    <rect x="35" y="35" width="30" height="25" rx="3" className="fill-white dark:fill-gray-800 stroke-purple-500" strokeWidth="2" />
+    <rect x="35" y="35" width="30" height="6" rx="3" className="fill-gradient-to-r from-purple-600 to-indigo-600" />
+    <rect x="40" y="45" width="20" height="2" rx="1" className="fill-gray-300 dark:fill-gray-600" />
+    <rect x="40" y="50" width="15" height="2" rx="1" className="fill-gray-300 dark:fill-gray-600" />
+    <rect x="40" y="55" width="18" height="2" rx="1" className="fill-gray-300 dark:fill-gray-600" />
+
+    {/* Shadow effect */}
+    <rect x="37" y="37" width="30" height="25" rx="3" className="fill-black opacity-10" transform="translate(1, 1)" />
+  </svg>
+);
+
+/**
+ * Static SVG preview for side panel mode.
+ * Hoisted to module scope to avoid recreation on each render.
+ */
+const SIDE_PANEL_PREVIEW_SVG: ReactNode = (
+  <svg
+    className="w-20 h-20"
+    viewBox="0 0 80 80"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    {/* Browser window */}
+    <rect x="10" y="20" width="45" height="40" rx="2" className="fill-gray-200 dark:fill-gray-700" />
+    <rect x="10" y="20" width="45" height="6" className="fill-gray-300 dark:fill-gray-600" />
+    <circle cx="16" cy="23" r="1.5" className="fill-red-400" />
+    <circle cx="21" cy="23" r="1.5" className="fill-yellow-400" />
+    <circle cx="26" cy="23" r="1.5" className="fill-green-400" />
+
+    {/* Side panel */}
+    <rect x="55" y="20" width="15" height="40" className="fill-white dark:fill-gray-800 stroke-purple-500" strokeWidth="2" />
+    <rect x="55" y="20" width="15" height="6" className="fill-gradient-to-r from-purple-600 to-indigo-600" />
+    <rect x="58" y="30" width="9" height="2" rx="1" className="fill-gray-300 dark:fill-gray-600" />
+    <rect x="58" y="35" width="7" height="2" rx="1" className="fill-gray-300 dark:fill-gray-600" />
+    <rect x="58" y="40" width="8" height="2" rx="1" className="fill-gray-300 dark:fill-gray-600" />
+    <rect x="58" y="45" width="9" height="2" rx="1" className="fill-gray-300 dark:fill-gray-600" />
+    <rect x="58" y="50" width="6" height="2" rx="1" className="fill-gray-300 dark:fill-gray-600" />
+    <rect x="58" y="55" width="8" height="2" rx="1" className="fill-gray-300 dark:fill-gray-600" />
+  </svg>
+);
 
 const InterfaceModeSelector: FC<InterfaceModeSelectorProps> = ({
   value,
@@ -57,42 +132,11 @@ const InterfaceModeSelector: FC<InterfaceModeSelectorProps> = ({
               ${!disabled && !loading ? 'hover:border-purple-300 dark:hover:border-purple-600 hover:shadow-lg hover:scale-[1.02]' : ''}
             `}
           >
-            {/* Selection indicator */}
-            {value === 'popup' && (
-              <div className="absolute top-2 right-2">
-                <div className="w-5 h-5 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-full flex items-center justify-center">
-                  <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                </div>
-              </div>
-            )}
+            <SelectionIndicator selected={value === 'popup'} />
 
             {/* Visual Preview */}
             <div className="mb-3 flex justify-center">
-              <svg
-                className="w-20 h-20"
-                viewBox="0 0 80 80"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                {/* Browser window background */}
-                <rect x="10" y="20" width="60" height="40" rx="2" className="fill-gray-200 dark:fill-gray-700" />
-                <rect x="10" y="20" width="60" height="6" className="fill-gray-300 dark:fill-gray-600" />
-                <circle cx="16" cy="23" r="1.5" className="fill-red-400" />
-                <circle cx="21" cy="23" r="1.5" className="fill-yellow-400" />
-                <circle cx="26" cy="23" r="1.5" className="fill-green-400" />
-                
-                {/* Popup window */}
-                <rect x="35" y="35" width="30" height="25" rx="3" className="fill-white dark:fill-gray-800 stroke-purple-500" strokeWidth="2" />
-                <rect x="35" y="35" width="30" height="6" rx="3" className="fill-gradient-to-r from-purple-600 to-indigo-600" />
-                <rect x="40" y="45" width="20" height="2" rx="1" className="fill-gray-300 dark:fill-gray-600" />
-                <rect x="40" y="50" width="15" height="2" rx="1" className="fill-gray-300 dark:fill-gray-600" />
-                <rect x="40" y="55" width="18" height="2" rx="1" className="fill-gray-300 dark:fill-gray-600" />
-                
-                {/* Shadow effect */}
-                <rect x="37" y="37" width="30" height="25" rx="3" className="fill-black opacity-10" transform="translate(1, 1)" />
-              </svg>
+              {POPUP_PREVIEW_SVG}
             </div>
 
             {/* Mode Icon */}
@@ -136,42 +180,11 @@ const InterfaceModeSelector: FC<InterfaceModeSelectorProps> = ({
               ${!disabled && !loading ? 'hover:border-purple-300 dark:hover:border-purple-600 hover:shadow-lg hover:scale-[1.02]' : ''}
             `}
           >
-            {/* Selection indicator */}
-            {value === 'sidepanel' && (
-              <div className="absolute top-2 right-2">
-                <div className="w-5 h-5 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-full flex items-center justify-center">
-                  <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                </div>
-              </div>
-            )}
+            <SelectionIndicator selected={value === 'sidepanel'} />
 
             {/* Visual Preview */}
             <div className="mb-3 flex justify-center">
-              <svg
-                className="w-20 h-20"
-                viewBox="0 0 80 80"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                {/* Browser window */}
-                <rect x="10" y="20" width="45" height="40" rx="2" className="fill-gray-200 dark:fill-gray-700" />
-                <rect x="10" y="20" width="45" height="6" className="fill-gray-300 dark:fill-gray-600" />
-                <circle cx="16" cy="23" r="1.5" className="fill-red-400" />
-                <circle cx="21" cy="23" r="1.5" className="fill-yellow-400" />
-                <circle cx="26" cy="23" r="1.5" className="fill-green-400" />
-                
-                {/* Side panel */}
-                <rect x="55" y="20" width="15" height="40" className="fill-white dark:fill-gray-800 stroke-purple-500" strokeWidth="2" />
-                <rect x="55" y="20" width="15" height="6" className="fill-gradient-to-r from-purple-600 to-indigo-600" />
-                <rect x="58" y="30" width="9" height="2" rx="1" className="fill-gray-300 dark:fill-gray-600" />
-                <rect x="58" y="35" width="7" height="2" rx="1" className="fill-gray-300 dark:fill-gray-600" />
-                <rect x="58" y="40" width="8" height="2" rx="1" className="fill-gray-300 dark:fill-gray-600" />
-                <rect x="58" y="45" width="9" height="2" rx="1" className="fill-gray-300 dark:fill-gray-600" />
-                <rect x="58" y="50" width="6" height="2" rx="1" className="fill-gray-300 dark:fill-gray-600" />
-                <rect x="58" y="55" width="8" height="2" rx="1" className="fill-gray-300 dark:fill-gray-600" />
-              </svg>
+              {SIDE_PANEL_PREVIEW_SVG}
             </div>
 
             {/* Mode Icon */}
