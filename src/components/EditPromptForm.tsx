@@ -22,8 +22,18 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
   const [titleLength, setTitleLength] = useState(prompt.title.length);
   const [contentLength, setContentLength] = useState(prompt.content.length);
 
-  // Track form dirty state (has unsaved changes)
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  // Track current form values for dirty checking
+  const [currentValues, setCurrentValues] = useState({
+    title: prompt.title,
+    content: prompt.content,
+    category: prompt.category,
+  });
+
+  // Derive hasUnsavedChanges by comparing current values to original
+  const hasUnsavedChanges =
+    currentValues.title !== prompt.title ||
+    currentValues.content !== prompt.content ||
+    currentValues.category !== prompt.category;
 
   // React 19 useActionState for automatic loading/error handling
   const [errors, submitAction, isPending] = useActionState(
@@ -86,12 +96,7 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
 
   // Track form changes to show unsaved changes indicator
   const handleFieldChange = (field: 'title' | 'content' | 'category', value: string) => {
-    const isDirty =
-      field === 'title' ? value !== prompt.title :
-      field === 'content' ? value !== prompt.content :
-      value !== prompt.category;
-
-    setHasUnsavedChanges(isDirty || hasUnsavedChanges);
+    setCurrentValues(prev => ({ ...prev, [field]: value }));
 
     // Update character counts when title or content changes
     if (field === 'title') {
@@ -173,6 +178,7 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
                 id="category"
                 name="category"
                 defaultValue={prompt.category}
+                onChange={(e) => { handleFieldChange('category', e.target.value); }}
                 className="w-full px-4 py-3 pr-10 border border-purple-200 dark:border-gray-600 rounded-xl focus-input bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 text-sm text-gray-900 dark:text-gray-100 appearance-none cursor-pointer"
                 disabled={isPending}
               >
