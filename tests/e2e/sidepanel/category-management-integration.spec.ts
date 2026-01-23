@@ -343,16 +343,20 @@ test.describe('Category Management - Integration with Prompt System', () => {
       await sidepanelPage.getByRole('button', { name: 'More actions for Editable Prompt' }).click();
       await sidepanelPage.getByRole('menuitem', { name: 'Edit' }).click();
 
-      // Change category to the valid one using native select (EditPromptForm uses native select)
-      const categorySelect = sidepanelPage.getByLabel('Category');
+      // Change category to the valid one using the custom dropdown
+      const categoryButton = sidepanelPage.getByLabel('Category');
+
+      // Open the category dropdown
+      await categoryButton.click();
+      await sidepanelPage.getByRole('menu', { name: 'Select category' }).waitFor();
 
       // Verify both options exist
-      const options = categorySelect.locator('option');
-      const optionCount = await options.count();
-      expect(optionCount).toBe(2);
+      const menuItems = sidepanelPage.getByRole('menuitem');
+      const itemCount = await menuItems.count();
+      expect(itemCount).toBe(2);
 
-      // Select Valid Category using native selectOption
-      await categorySelect.selectOption('Valid Category');
+      // Select Valid Category
+      await sidepanelPage.getByRole('menuitem', { name: 'Valid Category' }).click();
       await sidepanelPage.getByRole('button', { name: 'Save Changes' }).click();
 
       // Verify update succeeded

@@ -207,7 +207,9 @@ test.describe('Power User Prompt Management', () => {
     await sidepanelPage.getByRole('menuitem', { name: 'Edit' }).click();
 
     await expect(sidepanelPage.getByRole('heading', { name: 'Edit Prompt' })).toBeVisible();
-    await sidepanelPage.getByLabel('Category').selectOption('Work');
+    await sidepanelPage.getByLabel('Category').click();
+    await sidepanelPage.getByRole('menu', { name: 'Select category' }).waitFor();
+    await sidepanelPage.getByRole('menuitem', { name: 'Work' }).click();
     await sidepanelPage.getByRole('button', { name: 'Save Changes' }).click();
     await expect(sidepanelPage.getByText('Prompt updated successfully').first()).toBeVisible();
 
@@ -217,7 +219,9 @@ test.describe('Power User Prompt Management', () => {
     await sidepanelPage.getByRole('menuitem', { name: 'Edit' }).click();
 
     await expect(sidepanelPage.getByRole('heading', { name: 'Edit Prompt' })).toBeVisible();
-    await sidepanelPage.getByLabel('Category').selectOption('Work');
+    await sidepanelPage.getByLabel('Category').click();
+    await sidepanelPage.getByRole('menu', { name: 'Select category' }).waitFor();
+    await sidepanelPage.getByRole('menuitem', { name: 'Work' }).click();
     await sidepanelPage.getByRole('button', { name: 'Save Changes' }).click();
     await expect(sidepanelPage.getByText('Prompt updated successfully').first()).toBeVisible();
 
@@ -317,7 +321,9 @@ test.describe('Power User Prompt Management', () => {
       await sidepanelPage.getByRole('menuitem', { name: 'Edit' }).click();
 
       await expect(sidepanelPage.getByRole('heading', { name: 'Edit Prompt' })).toBeVisible();
-      await sidepanelPage.getByLabel('Category').selectOption('Work');
+      await sidepanelPage.getByLabel('Category').click();
+      await sidepanelPage.getByRole('menu', { name: 'Select category' }).waitFor();
+      await sidepanelPage.getByRole('menuitem', { name: 'Work' }).click();
       await sidepanelPage.getByRole('button', { name: 'Save Changes' }).click();
       await expect(sidepanelPage.getByText('Prompt updated successfully').first()).toBeVisible();
     }
