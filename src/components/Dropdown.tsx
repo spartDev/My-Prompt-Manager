@@ -43,6 +43,36 @@ export interface DropdownItem {
   type?: 'item' | 'separator';
 }
 
+// Interface for trigger element props we need to extract
+interface TriggerHandlers {
+  onClick?: (e: React.MouseEvent) => void;
+  onKeyDown?: (e: React.KeyboardEvent) => void;
+  id?: string;
+}
+
+// Type guards for proper function signature validation
+const isMouseEventHandler = (fn: unknown): fn is (e: React.MouseEvent) => void => {
+  return typeof fn === 'function';
+};
+
+const isKeyboardEventHandler = (fn: unknown): fn is (e: React.KeyboardEvent) => void => {
+  return typeof fn === 'function';
+};
+
+// Helper to safely extract trigger handlers with runtime validation
+const extractTriggerHandlers = (props: unknown): TriggerHandlers => {
+  if (!props || typeof props !== 'object') {
+    return { onClick: undefined, onKeyDown: undefined, id: undefined };
+  }
+
+  const obj = props as Record<string, unknown>;
+  return {
+    onClick: isMouseEventHandler(obj.onClick) ? obj.onClick : undefined,
+    onKeyDown: isKeyboardEventHandler(obj.onKeyDown) ? obj.onKeyDown : undefined,
+    id: typeof obj.id === 'string' ? obj.id : undefined
+  };
+};
+
 // Main dropdown props
 export interface DropdownProps {
   /** The trigger element (button, etc.) */
@@ -244,36 +274,6 @@ export const Dropdown: FC<DropdownProps> = ({
       contentElement.removeEventListener('keydown', handleKeyDown);
     };
   }, [isOpen, items]);
-
-  // Define interface for trigger element props we need to extract
-  interface TriggerHandlers {
-    onClick?: (e: React.MouseEvent) => void;
-    onKeyDown?: (e: React.KeyboardEvent) => void;
-    id?: string;
-  }
-
-  // Type guards for proper function signature validation
-  const isMouseEventHandler = (fn: unknown): fn is (e: React.MouseEvent) => void => {
-    return typeof fn === 'function';
-  };
-
-  const isKeyboardEventHandler = (fn: unknown): fn is (e: React.KeyboardEvent) => void => {
-    return typeof fn === 'function';
-  };
-
-  // Helper to safely extract trigger handlers with runtime validation
-  const extractTriggerHandlers = (props: unknown): TriggerHandlers => {
-    if (!props || typeof props !== 'object') {
-      return { onClick: undefined, onKeyDown: undefined, id: undefined };
-    }
-
-    const obj = props as Record<string, unknown>;
-    return {
-      onClick: isMouseEventHandler(obj.onClick) ? obj.onClick : undefined,
-      onKeyDown: isKeyboardEventHandler(obj.onKeyDown) ? obj.onKeyDown : undefined,
-      id: typeof obj.id === 'string' ? obj.id : undefined
-    };
-  };
 
   // Extract trigger props with runtime validation
   const triggerHandlers = extractTriggerHandlers(trigger.props);
