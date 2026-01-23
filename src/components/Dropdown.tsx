@@ -199,8 +199,12 @@ export const Dropdown: FC<DropdownProps> = ({
   });
 
   // Handle keyboard navigation for items mode
+  // Use primitive dependencies to avoid re-runs when items array reference changes
+  const hasItems = !!items;
+  const itemCount = items?.length ?? 0;
+
   useEffect(() => {
-    if (!isOpen || !items || !contentRef.current) {
+    if (!isOpen || !hasItems || !contentRef.current) {
       return;
     }
 
@@ -259,7 +263,7 @@ export const Dropdown: FC<DropdownProps> = ({
     contentElement.addEventListener('keydown', handleKeyDown);
 
     // Focus first item when opened with keyboard
-    if (items.length > 0) {
+    if (itemCount > 0) {
       const firstItem = contentElement.querySelector<HTMLButtonElement>(
         'button[role="menuitem"]:not([disabled])'
       );
@@ -273,7 +277,7 @@ export const Dropdown: FC<DropdownProps> = ({
     return () => {
       contentElement.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isOpen, items]);
+  }, [isOpen, hasItems, itemCount]);
 
   // Extract trigger props with runtime validation
   const triggerHandlers = extractTriggerHandlers(trigger.props);
