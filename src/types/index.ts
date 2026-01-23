@@ -22,8 +22,15 @@ export interface UsageEvent {
   categoryId: string | null;
 }
 
-export const USAGE_RETENTION_DAYS = 30;
-export const USAGE_STORAGE_KEY = 'usageHistory';
+// Re-export constants from centralized location for backward compatibility
+export {
+  USAGE_RETENTION_DAYS,
+  USAGE_STORAGE_KEY,
+  VALIDATION_LIMITS,
+  DEFAULT_CATEGORY,
+  DEFAULT_SETTINGS,
+  PROMPT_SHARING_SIZE_LIMITS,
+} from '../constants';
 
 export interface Category {
   id: string; // uuid-v4-string
@@ -164,23 +171,6 @@ export interface AppError {
   details?: unknown;
 }
 
-// Validation constants
-export const VALIDATION_LIMITS = {
-  PROMPT_TITLE_MAX: 100,
-  PROMPT_CONTENT_MAX: 20000,
-  CATEGORY_NAME_MAX: 50,
-  TITLE_GENERATION_LENGTH: 50
-} as const;
-
-// Default values
-export const DEFAULT_CATEGORY = 'Uncategorized';
-export const DEFAULT_SETTINGS: Settings = {
-  defaultCategory: DEFAULT_CATEGORY,
-  sortOrder: 'updatedAt',
-  sortDirection: 'desc',
-  theme: 'system',
-  interfaceMode: 'sidepanel'
-};
 
 // Prompt Sharing types
 export interface SharedPromptData {
@@ -189,12 +179,6 @@ export interface SharedPromptData {
   category: string;
 }
 
-export const PROMPT_SHARING_SIZE_LIMITS = {
-  TITLE_MAX: 100,
-  CONTENT_MAX: 20_000,
-  CATEGORY_MAX: 50,
-  ENCODED_MAX: 40_000,
-} as const;
 
 // Element Fingerprinting for robust element identification
 export interface ElementFingerprint {
