@@ -132,14 +132,12 @@ describe('ColorPicker', () => {
      // Wait for dropdown to open
      expect(await screen.findByText('Custom Color')).toBeInTheDocument();
 
-     // Verify "Pick Custom Color" label exists
-     const customColorButton = screen.getByText('Pick Custom Color');
+     // Verify "Pick Custom Color" button exists
+     const customColorButton = screen.getByText('Pick Custom Color').closest('button');
      expect(customColorButton).toBeInTheDocument();
 
-     // Verify the label is properly structured as a clickable element
-     const label = customColorButton.closest('label');
-     expect(label).not.toBeNull();
-     expect(label).toHaveAttribute('aria-label', 'Pick custom color');
+     // Verify the button is properly accessible
+     expect(customColorButton).toHaveAttribute('aria-label', 'Pick custom color');
   });
 
   it('shows checkmark on currently selected preset color', async () => {
@@ -195,18 +193,10 @@ describe('ColorPicker', () => {
     // Wait for dropdown to open
     expect(await screen.findByText('Custom Color')).toBeInTheDocument();
 
-    // Get the label element and find its associated input via htmlFor
-    const label = screen.getByText('Pick Custom Color').closest('label');
-    expect(label).not.toBeNull();
-    const inputId = label?.getAttribute('for');
-    expect(inputId).toBeTruthy();
-
-    // Query the input by its ID
-    expect(inputId).toBeTruthy();
-    const colorInput = document.getElementById(inputId as string);
+    // Find the hidden color input (type="color")
+    const colorInput = document.querySelector('input[type="color"]');
     expect(colorInput).toBeInstanceOf(HTMLInputElement);
     expect(colorInput).toBeInTheDocument();
-    expect(colorInput).toHaveAttribute('type', 'color');
 
     // Simulate change event directly on the input
     fireEvent.change(colorInput as HTMLElement, { target: { value: '#123456' } });
@@ -241,19 +231,15 @@ describe('ColorPicker', () => {
     // Wait for dropdown to open
     expect(await screen.findByText('Custom Color')).toBeInTheDocument();
 
-    // Get the label and verify it has proper htmlFor attribute
-    const label = screen.getByText('Pick Custom Color').closest('label');
-    expect(label).not.toBeNull();
-    expect(label).toHaveAttribute('aria-label', 'Pick custom color');
+    // Get the button and verify it has proper aria-label attribute
+    const button = screen.getByText('Pick Custom Color').closest('button');
+    expect(button).not.toBeNull();
+    expect(button).toHaveAttribute('aria-label', 'Pick custom color');
+    expect(button).toHaveAttribute('type', 'button');
 
-    const inputId = label?.getAttribute('for');
-    expect(inputId).toBeTruthy();
-
-    // Verify the input exists and has the matching ID
-    expect(inputId).toBeTruthy();
-    const colorInput = document.getElementById(inputId as string);
+    // Verify the hidden color input exists
+    const colorInput = document.querySelector('input[type="color"]');
     expect(colorInput).toBeInstanceOf(HTMLInputElement);
     expect(colorInput).toBeInTheDocument();
-    expect(colorInput?.id).toBe(inputId);
   });
 });

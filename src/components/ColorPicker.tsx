@@ -134,18 +134,21 @@ const ColorPickerContent: FC<{
             {/* Button and Color Preview Side by Side */}
             <div className="flex items-center space-x-3">
               {/* Native Color Input (Hidden but functional) */}
-              {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
-              <label
-                htmlFor={colorInputId}
+              <input
+                id={colorInputId}
+                type="color"
+                value={customColor}
+                onChange={handleCustomColorChange}
                 onClick={(e) => { e.stopPropagation(); }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    document.getElementById(colorInputId)?.click();
-                  }
+                className="sr-only"
+              />
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  document.getElementById(colorInputId)?.click();
                 }}
                 className="flex items-center space-x-2 px-3 py-2 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/30 cursor-pointer transition-colors"
-                tabIndex={0}  // eslint-disable-line jsx-a11y/no-noninteractive-tabindex
                 aria-label="Pick custom color"
               >
                 <svg
@@ -162,15 +165,7 @@ const ColorPickerContent: FC<{
                   />
                 </svg>
                 <span className="text-sm font-medium">Pick Custom Color</span>
-              </label>
-              <input
-                id={colorInputId}
-                type="color"
-                value={customColor}
-                onChange={handleCustomColorChange}
-                onClick={(e) => { e.stopPropagation(); }}
-                className="sr-only"
-              />
+              </button>
 
               {/* Color Preview showing current custom selection */}
               <div className="flex items-center space-x-2">
@@ -211,18 +206,21 @@ const ColorPickerContent: FC<{
           <div className="space-y-3">
             {/* Button and Color Preview Side by Side */}
             <div className="flex items-center space-x-3">
-              {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
-              <label
-                htmlFor={colorInputId}
+              <input
+                id={colorInputId}
+                type="color"
+                value={customColor}
+                onChange={handleCustomColorChange}
                 onClick={(e) => { e.stopPropagation(); }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    document.getElementById(colorInputId)?.click();
-                  }
+                className="sr-only"
+              />
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  document.getElementById(colorInputId)?.click();
                 }}
                 className="flex items-center space-x-2 px-3 py-2 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/30 cursor-pointer transition-colors"
-                tabIndex={0}  // eslint-disable-line jsx-a11y/no-noninteractive-tabindex
                 aria-label="Pick custom color"
               >
                 <svg
@@ -239,15 +237,7 @@ const ColorPickerContent: FC<{
                   />
                 </svg>
                 <span className="text-sm font-medium">Pick Custom Color</span>
-              </label>
-              <input
-                id={colorInputId}
-                type="color"
-                value={customColor}
-                onChange={handleCustomColorChange}
-                onClick={(e) => { e.stopPropagation(); }}
-                className="sr-only"
-              />
+              </button>
 
               {/* Color Preview */}
               <div
