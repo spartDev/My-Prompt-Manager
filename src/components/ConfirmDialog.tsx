@@ -1,6 +1,44 @@
 import { useEffect, useRef } from 'react';
-import type { FC } from 'react';
+import type { FC, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+
+export type ConfirmDialogVariant = 'danger' | 'warning' | 'info';
+
+interface VariantStyle {
+  icon: ReactNode;
+  confirmButton: string;
+  iconBg: string;
+}
+
+const variantStyles: Record<ConfirmDialogVariant, VariantStyle> = {
+  danger: {
+    icon: (
+      <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+      </svg>
+    ),
+    confirmButton: 'bg-red-600 hover:bg-red-700',
+    iconBg: 'bg-red-100 dark:bg-red-900/20'
+  },
+  warning: {
+    icon: (
+      <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+      </svg>
+    ),
+    confirmButton: 'bg-yellow-600 hover:bg-yellow-700',
+    iconBg: 'bg-yellow-100 dark:bg-yellow-900/20'
+  },
+  info: {
+    icon: (
+      <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+    confirmButton: 'bg-blue-600 hover:bg-blue-700',
+    iconBg: 'bg-blue-100 dark:bg-blue-900/20'
+  }
+};
 
 export interface ConfirmDialogProps {
   isOpen: boolean;
@@ -10,7 +48,7 @@ export interface ConfirmDialogProps {
   message: string;
   confirmText?: string;
   cancelText?: string;
-  variant?: 'danger' | 'warning' | 'info';
+  variant?: ConfirmDialogVariant;
 }
 
 const ConfirmDialog: FC<ConfirmDialogProps> = ({
@@ -69,36 +107,6 @@ const ConfirmDialog: FC<ConfirmDialogProps> = ({
   }, [isOpen, onCancel]);
 
   if (!isOpen) {return null;}
-
-  const variantStyles = {
-    danger: {
-      icon: (
-        <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-        </svg>
-      ),
-      confirmButton: 'bg-red-600 hover:bg-red-700',
-      iconBg: 'bg-red-100 dark:bg-red-900/20'
-    },
-    warning: {
-      icon: (
-        <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-        </svg>
-      ),
-      confirmButton: 'bg-yellow-600 hover:bg-yellow-700',
-      iconBg: 'bg-yellow-100 dark:bg-yellow-900/20'
-    },
-    info: {
-      icon: (
-        <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      ),
-      confirmButton: 'bg-blue-600 hover:bg-blue-700',
-      iconBg: 'bg-blue-100 dark:bg-blue-900/20'
-    }
-  };
 
   const styles = variantStyles[variant];
 
