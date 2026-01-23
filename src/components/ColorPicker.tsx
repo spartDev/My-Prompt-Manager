@@ -133,7 +133,7 @@ const ColorPickerContent: FC<{
           <div className="space-y-3">
             {/* Button and Color Preview Side by Side */}
             <div className="flex items-center space-x-3">
-              {/* Native Color Input (Hidden but functional) */}
+              {/* Native Color Input (Hidden from accessibility tree, triggered by button) */}
               <input
                 id={colorInputId}
                 type="color"
@@ -141,6 +141,8 @@ const ColorPickerContent: FC<{
                 onChange={handleCustomColorChange}
                 onClick={(e) => { e.stopPropagation(); }}
                 className="sr-only"
+                aria-hidden="true"
+                tabIndex={-1}
               />
               <button
                 type="button"
@@ -206,6 +208,7 @@ const ColorPickerContent: FC<{
           <div className="space-y-3">
             {/* Button and Color Preview Side by Side */}
             <div className="flex items-center space-x-3">
+              {/* Native Color Input (Hidden from accessibility tree, triggered by button) */}
               <input
                 id={colorInputId}
                 type="color"
@@ -213,6 +216,8 @@ const ColorPickerContent: FC<{
                 onChange={handleCustomColorChange}
                 onClick={(e) => { e.stopPropagation(); }}
                 className="sr-only"
+                aria-hidden="true"
+                tabIndex={-1}
               />
               <button
                 type="button"
