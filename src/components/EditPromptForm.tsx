@@ -1,12 +1,35 @@
-import { useActionState, useState } from 'react';
+import { forwardRef, useActionState, useMemo, useState } from 'react';
 import type { FC } from 'react';
 
 import { MAX_CONTENT_LENGTH, MAX_TITLE_LENGTH, formatCharacterCount } from '../constants/validation';
-import { Category } from '../types';
 import { EditPromptFormProps } from '../types/components';
 import { Logger, toError, validatePromptFields, type FieldErrors } from '../utils';
 
+import { Dropdown, type DropdownItem } from './Dropdown';
 import ViewHeader from './ViewHeader';
+
+// Category dropdown trigger button component props
+interface CategoryTriggerProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  selectedCategory: string;
+}
+
+// Category dropdown trigger button component
+const CategoryTrigger = forwardRef<HTMLButtonElement, CategoryTriggerProps>(
+  ({ selectedCategory, className, ...rest }, ref) => (
+    <button
+      ref={ref}
+      type="button"
+      {...rest}
+      className={className ?? "w-full px-4 py-3 border border-purple-200 dark:border-gray-600 rounded-xl focus-input bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 font-medium cursor-pointer text-gray-900 dark:text-gray-100 text-left flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"}
+    >
+      <span>{selectedCategory}</span>
+      <svg className="w-4 h-4 text-purple-400 dark:text-purple-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+      </svg>
+    </button>
+  )
+);
+CategoryTrigger.displayName = 'CategoryTrigger';
 
 const EditPromptForm: FC<EditPromptFormProps> = ({
   prompt,
@@ -102,6 +125,16 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
     }
   };
 
+  // Generate dropdown items from categories
+  const categoryItems = useMemo<DropdownItem[]>(
+    () => categories.map(cat => ({
+      id: cat.id,
+      label: cat.name,
+      onSelect: () => { handleFieldChange('category', cat.name); }
+    })),
+    [categories]
+  );
+
   const formatDate = (timestamp: number) => {
     return new Date(timestamp).toLocaleString();
   };
@@ -164,31 +197,30 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
           {/* Category Section */}
           <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5">
             <div className="flex items-center space-x-2 mb-4">
-              <label htmlFor="category" className="block text-sm font-bold text-gray-900 dark:text-gray-100">
+              {/* Label uses aria-labelledby on the button instead of htmlFor -
+                  this is the correct accessible pattern for custom dropdown triggers
+                  since buttons don't respond to label clicks like native form controls */}
+              {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
+              <label id="category-label" className="block text-sm font-bold text-gray-900 dark:text-gray-100">
                 Category
               </label>
             </div>
-            <div className="relative">
-              <select
-                id="category"
-                name="category"
-                defaultValue={prompt.category}
-                onChange={(e) => { handleFieldChange('category', e.target.value); }}
-                className="w-full px-4 py-3 pr-10 border border-purple-200 dark:border-gray-600 rounded-xl focus-input bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 text-sm text-gray-900 dark:text-gray-100 appearance-none cursor-pointer"
-                disabled={isPending}
-              >
-                {(categories).map((category: Category) => (
-                  <option key={category.id} value={category.name}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
-            </div>
+            <Dropdown
+              trigger={
+                <CategoryTrigger
+                  selectedCategory={currentValues.category}
+                  disabled={isPending}
+                  id="category"
+                  aria-labelledby="category-label"
+                />
+              }
+              items={categoryItems}
+              placement="bottom-start"
+              ariaLabel="Select category"
+              matchWidth
+            />
+            {/* Hidden input to submit category value with form */}
+            <input type="hidden" name="category" value={currentValues.category} />
           </div>
 
           {/* Content Section */}
