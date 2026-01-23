@@ -6,6 +6,7 @@ import { PromptManager } from '../services/promptManager';
 import { StorageManager } from '../services/storage';
 import { Prompt, SortOrder, SortDirection } from '../types';
 import { LibraryViewProps } from '../types/components';
+import { Logger, toError } from '../utils';
 
 import FilterSortControls from './FilterSortControls';
 import PromptCard from './PromptCard';
@@ -40,7 +41,7 @@ const LibraryView: FC<LibraryViewProps> = ({
         const settings = await storageManager.getSettings();
         internalHandleSortChange(settings.sortOrder, settings.sortDirection);
       } catch (error) {
-        console.error('Failed to load sort settings:', error);
+        Logger.error('Failed to load sort settings', toError(error), { component: 'LibraryView' });
       }
     };
     void loadSortSettings();
@@ -52,7 +53,7 @@ const LibraryView: FC<LibraryViewProps> = ({
     // Persist to storage asynchronously (fire-and-forget)
     const storageManager = StorageManager.getInstance();
     void storageManager.updateSettings({ sortOrder: order, sortDirection: direction }).catch((error: unknown) => {
-      console.error('Failed to persist sort settings:', error);
+      Logger.error('Failed to persist sort settings', toError(error), { component: 'LibraryView' });
     });
   }, [internalHandleSortChange]);
 
