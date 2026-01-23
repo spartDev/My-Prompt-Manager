@@ -1,4 +1,4 @@
-import { useActionState, useRef, useState } from 'react';
+import { useActionState, useState } from 'react';
 import type { FC } from 'react';
 
 import { MAX_CONTENT_LENGTH, MAX_TITLE_LENGTH, formatCharacterCount } from '../constants/validation';
@@ -14,10 +14,6 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
   onSubmit,
   onCancel
 }) => {
-  // Refs to form elements (for focus management if needed)
-  const titleRef = useRef<HTMLInputElement>(null);
-  const contentRef = useRef<HTMLTextAreaElement>(null);
-
   // Track character counts in state (updated on change)
   const [titleLength, setTitleLength] = useState(prompt.title.length);
   const [contentLength, setContentLength] = useState(prompt.content.length);
@@ -145,7 +141,6 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
               </label>
             </div>
             <input
-              ref={titleRef}
               type="text"
               id="title"
               name="title"
@@ -204,7 +199,6 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
               </label>
             </div>
             <textarea
-              ref={contentRef}
               id="content"
               name="content"
               defaultValue={prompt.content}
