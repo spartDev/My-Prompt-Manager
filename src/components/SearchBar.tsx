@@ -40,13 +40,7 @@ const SearchBar: FC<SearchBarProps> = ({
       
       {value && (
         <button
-          onClick={onClear as () => void}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              (onClear as () => void)();
-            }
-          }}
+          onClick={onClear}
           className="absolute inset-y-0 right-0 pr-4 flex items-center hover:text-purple-600 dark:hover:text-purple-400 transition-colors focus-interactive rounded-sm"
           aria-label="Clear search"
           title="Clear search"
