@@ -185,12 +185,6 @@ const LibraryView: FC<LibraryViewProps> = ({
       {/* Floating Add Button */}
       <button
         onClick={onAddNew}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            onAddNew();
-          }
-        }}
         className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-full hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 shadow-2xl hover:shadow-3xl transform hover:scale-110 z-50 flex items-center justify-center focus-primary disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
         disabled={loading}
         aria-label="Add new prompt"

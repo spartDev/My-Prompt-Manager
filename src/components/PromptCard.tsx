@@ -167,12 +167,6 @@ const PromptCard: FC<PromptCardProps> = ({
           {/* Copy Button */}
           <button
             onClick={handleCopyClick}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                handleCopyClick();
-              }
-            }}
             className="p-2 text-gray-400 dark:text-gray-500 hover:text-purple-600 dark:hover:text-purple-400 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors focus-interactive"
             aria-label={`Copy content of ${prompt.title} to clipboard`}
             title="Copy to clipboard"
@@ -190,12 +184,6 @@ const PromptCard: FC<PromptCardProps> = ({
           {/* Share Button */}
           <button
             onClick={(e) => { void handleShare(e); }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                void handleShare();
-              }
-            }}
             disabled={isSharing}
             className="p-2 text-gray-400 dark:text-gray-500 hover:text-purple-600 dark:hover:text-purple-400 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors focus-interactive disabled:opacity-50 disabled:cursor-not-allowed"
             aria-label={isSharing ? `Sharing ${prompt.title}...` : `Share ${prompt.title}`}
