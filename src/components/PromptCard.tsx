@@ -3,7 +3,7 @@ import { useState, memo } from 'react';
 import type { FC, MouseEvent, ReactNode } from 'react';
 
 import { encode } from '../services/promptEncoder';
-import { PromptCardProps } from '../types/components';
+import type { PromptCardProps } from '../types/components';
 import { Logger, toError } from '../utils';
 
 import CategoryBadge from './CategoryBadge';
