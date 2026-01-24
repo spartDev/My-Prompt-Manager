@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import type { FC, FormEvent } from 'react';
 
 import { DEFAULT_CATEGORY_COLOR, getColorName } from '../constants/colors';
@@ -38,9 +38,9 @@ const CategoryManager: FC<CategoryManagerProps> = ({
   });
   const ignoreBlurRef = useRef(false);
 
-  const handleCreateCategory = async (e: FormEvent) => {
+  const handleCreateCategory = useCallback(async (e: FormEvent) => {
     e.preventDefault();
-    
+
     if (!newCategoryName.trim()) {
       setError('Category name is required');
       return;
@@ -54,12 +54,12 @@ const CategoryManager: FC<CategoryManagerProps> = ({
     try {
       setLoading(true);
       setError(null);
-      
+
       await onCreateCategory({
         name: newCategoryName.trim(),
         color: newCategoryColor
       });
-      
+
       setNewCategoryName('');
       setNewCategoryColor(DEFAULT_CATEGORY_COLOR);
     } catch {
@@ -67,27 +67,27 @@ const CategoryManager: FC<CategoryManagerProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [newCategoryName, newCategoryColor, categories, onCreateCategory]);
 
-  const handleUpdateCategory = async () => {
+  const handleUpdateCategory = useCallback(async () => {
     if (!editingCategory) {return;}
-    
+
     const { category, name, color } = editingCategory;
-    
+
     // Check if there are actual changes
     if (name === category.name && color === (category.color || DEFAULT_CATEGORY_COLOR)) {
       setEditingCategory(null);
       return;
     }
-    
+
     try {
       setLoading(true);
       setError(null);
-      
+
       const updates: Partial<Category> = {};
       if (name !== category.name) {updates.name = name.trim();}
       if (color !== category.color) {updates.color = color;}
-      
+
       await onUpdateCategory(category.id, updates);
       setEditingCategory(null);
     } catch {
@@ -95,24 +95,24 @@ const CategoryManager: FC<CategoryManagerProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [editingCategory, onUpdateCategory]);
 
-  const handleDeleteCategory = (category: Category) => {
+  const handleDeleteCategory = useCallback((category: Category) => {
     if (category.name === 'Uncategorized') {
       setError('Cannot delete the default category');
       return;
     }
 
     setDeleteConfirm({ isOpen: true, category });
-  };
+  }, []);
 
-  const handleConfirmDelete = async () => {
+  const handleConfirmDelete = useCallback(async () => {
     if (!deleteConfirm.category) {return;}
 
     try {
       setLoading(true);
       setError(null);
-      
+
       await onDeleteCategory(deleteConfirm.category.id);
       setDeleteConfirm({ isOpen: false, category: null });
     } catch {
@@ -120,11 +120,11 @@ const CategoryManager: FC<CategoryManagerProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [deleteConfirm.category, onDeleteCategory]);
 
-  const handleCancelDelete = () => {
+  const handleCancelDelete = useCallback(() => {
     setDeleteConfirm({ isOpen: false, category: null });
-  };
+  }, []);
 
   if (!isOpen) {return null;}
 
