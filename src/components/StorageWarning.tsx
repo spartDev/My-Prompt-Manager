@@ -6,6 +6,22 @@ import { Logger, toError } from '../utils';
 
 import ConfirmDialog from './ConfirmDialog';
 
+const WarningIcon: FC<{ className?: string }> = ({ className }) => (
+  <svg
+    className={className}
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 15.5c-.77.833.192 2.5 1.732 2.5z"
+    />
+  </svg>
+);
+
 interface StorageWarningProps {
   onClose: () => void;
 }
@@ -38,22 +54,20 @@ const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
     setShowClearConfirm(true);
   };
 
-  const handleConfirmClear = () => {
+  const handleConfirmClear = async () => {
     setShowClearConfirm(false);
-    void (async () => {
-      try {
-        setIsLoading(true);
-        const storageManager = StorageManager.getInstance();
-        await storageManager.clearAllData();
-        onClose();
-        // Reload the extension
-        window.location.reload();
-      } catch (error) {
-        Logger.error('Failed to clear data', toError(error));
-      } finally {
-        setIsLoading(false);
-      }
-    })();
+    try {
+      setIsLoading(true);
+      const storageManager = StorageManager.getInstance();
+      await storageManager.clearAllData();
+      onClose();
+      // Reload the extension
+      window.location.reload();
+    } catch (error) {
+      Logger.error('Failed to clear data', toError(error));
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleCancelClear = () => {
@@ -99,19 +113,7 @@ const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
         {/* Header */}
         <div className="flex items-center mb-4">
           <div className="shrink-0">
-            <svg
-              className={`h-8 w-8 ${getIconColor()}`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 15.5c-.77.833.192 2.5 1.732 2.5z"
-              />
-            </svg>
+            <WarningIcon className={`h-8 w-8 ${getIconColor()}`} />
           </div>
           <div className="ml-3">
             <h3 className="text-lg font-medium text-gray-900 dark:text-white">
@@ -201,7 +203,7 @@ const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
       {/* Clear Data Confirmation Dialog */}
       <ConfirmDialog
         isOpen={showClearConfirm}
-        onConfirm={handleConfirmClear}
+        onConfirm={() => { void handleConfirmClear(); }}
         onCancel={handleCancelClear}
         title="Clear All Data"
         message="Are you sure you want to clear all data? This will permanently delete all your prompts and categories. This action cannot be undone."
