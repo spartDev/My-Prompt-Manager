@@ -11,6 +11,13 @@ import ConfirmDialog from './ConfirmDialog';
 import { Dropdown, DropdownItem } from './Dropdown';
 
 /**
+ * Formats a timestamp as a localized date string.
+ * Pure function hoisted to module scope to avoid recreation on every render.
+ */
+const formatDate = (timestamp: number): string =>
+  new Date(timestamp).toLocaleDateString();
+
+/**
  * Highlights matching text in a string based on a search query.
  * Pure function hoisted to module scope to avoid recreation on every render.
  */
@@ -107,14 +114,6 @@ const PromptCard: FC<PromptCardProps> = ({
     }
   };
 
-  const formatDate = (timestamp: number) => {
-    return new Date(timestamp).toLocaleDateString();
-  };
-
-  const getCategory = (categoryName: string) => {
-    return categories.find(cat => cat.name === categoryName);
-  };
-
   // Menu items for dropdown
   const menuItems: DropdownItem[] = [
     {
@@ -147,7 +146,7 @@ const PromptCard: FC<PromptCardProps> = ({
           </h3>
           <div className="flex items-center space-x-2 mt-1">
             {(() => {
-              const category = getCategory((prompt).category);
+              const category = categories.find(cat => cat.name === prompt.category);
               return category ? (
                 <CategoryBadge
                   category={category}
