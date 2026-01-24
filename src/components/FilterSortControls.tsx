@@ -30,9 +30,9 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
   // Derived values for active state text
   const categoryLabel = selectedCategory || 'All';
 
-  const getSortLabel = (): string => {
+  const sortLabel = useMemo(() => {
     const option = SORT_OPTIONS.find(opt => opt.value === sortOrder);
-    if (!option) {return 'A→Z';}
+    if (!option) { return 'A→Z'; }
 
     if (sortOrder === 'title') {
       return sortDirection === 'asc' ? 'A→Z' : 'Z→A';
@@ -47,9 +47,7 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
     }
 
     return sortDirection === 'desc' ? 'Newest' : 'Oldest';
-  };
-
-  const sortLabel = getSortLabel();
+  }, [sortOrder, sortDirection]);
 
   // Get the active sort icon - memoized to prevent re-computation on every render
   const ActiveSortIcon = useMemo(
