@@ -10,6 +10,50 @@ import CategoryBadge from './CategoryBadge';
 import ConfirmDialog from './ConfirmDialog';
 import { Dropdown, DropdownItem } from './Dropdown';
 
+/**
+ * Highlights matching text in a string based on a search query.
+ * Pure function hoisted to module scope to avoid recreation on every render.
+ */
+const highlightText = (text: string, query: string, promptId: string): ReactNode => {
+  if (!query.trim()) {return text;}
+
+  // Sanitize both text and query to prevent XSS
+
+  const sanitizedText = DOMPurify.sanitize(text, { ALLOWED_TAGS: [] });
+
+  const sanitizedQuery = DOMPurify.sanitize(query, { ALLOWED_TAGS: [] });
+
+  const searchTerm = sanitizedQuery.toLowerCase().trim();
+  const lowerText = sanitizedText.toLowerCase();
+  const parts: ReactNode[] = [];
+  let lastIndex = 0;
+  let index = lowerText.indexOf(searchTerm);
+
+  while (index !== -1) {
+    // Add text before the match
+    if (index > lastIndex) {
+      parts.push(sanitizedText.substring(lastIndex, index));
+    }
+
+    // Add highlighted match - using stable key with prompt ID and match position
+    parts.push(
+      <mark key={`highlight-${promptId}-${String(index)}-${searchTerm}`} className="bg-yellow-200 dark:bg-yellow-800/40 px-1 rounded-sm">
+        {sanitizedText.substring(index, index + searchTerm.length)}
+      </mark>
+    );
+
+    lastIndex = index + searchTerm.length;
+    index = lowerText.indexOf(searchTerm, lastIndex);
+  }
+
+  // Add remaining text
+  if (lastIndex < sanitizedText.length) {
+    parts.push(sanitizedText.substring(lastIndex));
+  }
+
+  return parts;
+};
+
 const PromptCard: FC<PromptCardProps> = ({
   prompt,
   categories,
@@ -21,46 +65,6 @@ const PromptCard: FC<PromptCardProps> = ({
 }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
-
-  const highlightText = (text: string, query: string): ReactNode => {
-    if (!query.trim()) {return text;}
-    
-    // Sanitize both text and query to prevent XSS
-     
-    const sanitizedText = DOMPurify.sanitize(text, { ALLOWED_TAGS: [] });
-     
-    const sanitizedQuery = DOMPurify.sanitize(query, { ALLOWED_TAGS: [] });
-    
-    const searchTerm = sanitizedQuery.toLowerCase().trim();
-    const lowerText = sanitizedText.toLowerCase();
-    const parts: ReactNode[] = [];
-    let lastIndex = 0;
-    let index = lowerText.indexOf(searchTerm);
-    
-    while (index !== -1) {
-      // Add text before the match
-      if (index > lastIndex) {
-        parts.push(sanitizedText.substring(lastIndex, index));
-      }
-      
-      // Add highlighted match - using stable key with prompt ID and match position
-      parts.push(
-        <mark key={`highlight-${prompt.id}-${String(index)}-${searchTerm}`} className="bg-yellow-200 dark:bg-yellow-800/40 px-1 rounded-sm">
-          {sanitizedText.substring(index, index + searchTerm.length)}
-        </mark>
-      );
-      
-      lastIndex = index + searchTerm.length;
-      index = lowerText.indexOf(searchTerm, lastIndex);
-    }
-    
-    // Add remaining text
-    if (lastIndex < sanitizedText.length) {
-      parts.push(sanitizedText.substring(lastIndex));
-    }
-    
-    return parts;
-  };
 
   const handleCopyClick = (e?: MouseEvent | KeyboardEvent) => {
     e?.stopPropagation();
@@ -139,7 +143,7 @@ const PromptCard: FC<PromptCardProps> = ({
             title={(prompt).title}
             aria-label={prompt.title}
           >
-            {highlightText((prompt).title, searchQuery)}
+            {highlightText((prompt).title, searchQuery, prompt.id)}
           </h3>
           <div className="flex items-center space-x-2 mt-1">
             {(() => {
