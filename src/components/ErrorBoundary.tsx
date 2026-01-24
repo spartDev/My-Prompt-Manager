@@ -3,6 +3,22 @@ import type { ReactNode, ErrorInfo } from 'react';
 
 import { Logger } from '../utils';
 
+const WarningIcon = (
+  <svg
+    className="h-8 w-8 text-red-400"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 15.5c-.77.833.192 2.5 1.732 2.5z"
+    />
+  </svg>
+);
+
 interface Props {
   children: ReactNode;
   fallback?: ReactNode;
@@ -92,36 +108,24 @@ class ErrorBoundary extends Component<Props, State> {
       }
 
       return (
-        <div className="h-full w-full bg-gray-50 flex items-center justify-center p-4">
-          <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-6">
+        <div className="h-full w-full bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
+          <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
             <div className="flex items-center mb-4">
               <div className="shrink-0">
-                <svg
-                  className="h-8 w-8 text-red-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 15.5c-.77.833.192 2.5 1.732 2.5z"
-                  />
-                </svg>
+                {WarningIcon}
               </div>
               <div className="ml-3">
-                <h2 className="text-lg font-medium text-gray-900">
+                <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
                   Something went wrong
                 </h2>
               </div>
             </div>
 
             <div className="mb-4">
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-gray-600 dark:text-gray-300">
                 The application encountered an unexpected error. This might be due to:
               </p>
-              <ul className="mt-2 text-sm text-gray-600 list-disc list-inside space-y-1">
+              <ul className="mt-2 text-sm text-gray-600 dark:text-gray-300 list-disc list-inside space-y-1">
                 <li>Corrupted data in storage</li>
                 <li>Browser compatibility issues</li>
                 <li>Extension context problems</li>
@@ -129,8 +133,8 @@ class ErrorBoundary extends Component<Props, State> {
             </div>
 
             {this.state.error && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-xs font-mono text-red-800 break-all">
+              <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg">
+                <p className="text-xs font-mono text-red-800 dark:text-red-300 break-all">
                   {this.state.error.message}
                 </p>
               </div>
@@ -151,7 +155,7 @@ class ErrorBoundary extends Component<Props, State> {
               </button>
             </div>
 
-            <div className="mt-4 text-xs text-gray-500">
+            <div className="mt-4 text-xs text-gray-500 dark:text-gray-400">
               <p>
                 If the problem persists, try reloading the extension or contact support.
               </p>
