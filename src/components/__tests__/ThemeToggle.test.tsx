@@ -65,6 +65,9 @@ const renderThemeToggle = async (initialTheme: 'light' | 'dark' | 'system' = 'li
 };
 
 describe('ThemeToggle', () => {
+  // Save original window.matchMedia for restoration after tests that stub it
+  const originalMatchMedia = window.matchMedia;
+
   beforeEach(() => {
     const chromeMock = getChromeMockFunctions();
     (chromeMock.tabs.query as Mock).mockResolvedValue([]);
@@ -72,7 +75,9 @@ describe('ThemeToggle', () => {
   });
 
   afterEach(() => {
-    // Restore any stubbed globals (e.g., matchMedia) to prevent test pollution
+    // Restore window.matchMedia to prevent test pollution across files
+    // In happy-dom, window is separate from globalThis, so we must restore both
+    window.matchMedia = originalMatchMedia;
     vi.unstubAllGlobals();
   });
 
@@ -173,8 +178,9 @@ describe('ThemeToggle', () => {
       const storageMock = getMockStorageManager();
 
       // Mock matchMedia to return light mode (matches: false for dark scheme)
-      // Using vi.stubGlobal for proper cleanup in afterEach
-      vi.stubGlobal('matchMedia', vi.fn().mockImplementation((query: string) => ({
+      // Must stub window.matchMedia directly since useTheme uses window.matchMedia()
+      // (in happy-dom, window is separate from globalThis)
+      window.matchMedia = vi.fn().mockImplementation((query: string) => ({
         matches: false, // Light mode
         media: query,
         addEventListener: vi.fn(),
@@ -183,7 +189,7 @@ describe('ThemeToggle', () => {
         addListener: vi.fn(),
         removeListener: vi.fn(),
         dispatchEvent: vi.fn()
-      })));
+      }));
 
       (chromeMock.storage.local.get as Mock).mockResolvedValue({
         settings: {
@@ -228,8 +234,9 @@ describe('ThemeToggle', () => {
       const storageMock = getMockStorageManager();
 
       // Mock matchMedia to return dark mode (matches: true for dark scheme)
-      // Using vi.stubGlobal for proper cleanup in afterEach
-      vi.stubGlobal('matchMedia', vi.fn().mockImplementation((query: string) => ({
+      // Must stub window.matchMedia directly since useTheme uses window.matchMedia()
+      // (in happy-dom, window is separate from globalThis)
+      window.matchMedia = vi.fn().mockImplementation((query: string) => ({
         matches: true, // Dark mode
         media: query,
         addEventListener: vi.fn(),
@@ -238,7 +245,7 @@ describe('ThemeToggle', () => {
         addListener: vi.fn(),
         removeListener: vi.fn(),
         dispatchEvent: vi.fn()
-      })));
+      }));
 
       (chromeMock.storage.local.get as Mock).mockResolvedValue({
         settings: {
