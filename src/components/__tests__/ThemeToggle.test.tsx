@@ -71,6 +71,11 @@ describe('ThemeToggle', () => {
     vi.mocked(Logger.error).mockReset();
   });
 
+  afterEach(() => {
+    // Restore any stubbed globals (e.g., matchMedia) to prevent test pollution
+    vi.unstubAllGlobals();
+  });
+
   describe('Rendering', () => {
     it('renders a button with correct styling', async () => {
       await renderThemeToggle('light');
@@ -168,20 +173,17 @@ describe('ThemeToggle', () => {
       const storageMock = getMockStorageManager();
 
       // Mock matchMedia to return light mode (matches: false for dark scheme)
-      Object.defineProperty(window, 'matchMedia', {
-        writable: true,
-        configurable: true,
-        value: vi.fn().mockImplementation((query: string) => ({
-          matches: false, // Light mode
-          media: query,
-          addEventListener: vi.fn(),
-          removeEventListener: vi.fn(),
-          onchange: null,
-          addListener: vi.fn(),
-          removeListener: vi.fn(),
-          dispatchEvent: vi.fn()
-        }))
-      });
+      // Using vi.stubGlobal for proper cleanup in afterEach
+      vi.stubGlobal('matchMedia', vi.fn().mockImplementation((query: string) => ({
+        matches: false, // Light mode
+        media: query,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn()
+      })));
 
       (chromeMock.storage.local.get as Mock).mockResolvedValue({
         settings: {
@@ -226,20 +228,17 @@ describe('ThemeToggle', () => {
       const storageMock = getMockStorageManager();
 
       // Mock matchMedia to return dark mode (matches: true for dark scheme)
-      Object.defineProperty(window, 'matchMedia', {
-        writable: true,
-        configurable: true,
-        value: vi.fn().mockImplementation((query: string) => ({
-          matches: true, // Dark mode
-          media: query,
-          addEventListener: vi.fn(),
-          removeEventListener: vi.fn(),
-          onchange: null,
-          addListener: vi.fn(),
-          removeListener: vi.fn(),
-          dispatchEvent: vi.fn()
-        }))
-      });
+      // Using vi.stubGlobal for proper cleanup in afterEach
+      vi.stubGlobal('matchMedia', vi.fn().mockImplementation((query: string) => ({
+        matches: true, // Dark mode
+        media: query,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn()
+      })));
 
       (chromeMock.storage.local.get as Mock).mockResolvedValue({
         settings: {
