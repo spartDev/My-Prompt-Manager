@@ -48,9 +48,18 @@ const renderThemeToggle = async (initialTheme: 'light' | 'dark' | 'system' = 'li
     </ThemeProvider>
   );
 
-  await waitFor(() => {
-    expect(screen.getByRole('button')).toBeInTheDocument();
-  });
+  // Wait for theme initialization to complete by checking for theme-specific aria-label
+  // This prevents race conditions where assertions run before async theme init finishes
+  if (initialTheme === 'dark') {
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /switch to light theme/i })).toBeInTheDocument();
+    });
+  } else {
+    // 'light' or 'system' (which defaults to light in test environment)
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /switch to dark theme/i })).toBeInTheDocument();
+    });
+  }
 
   return { user, chromeMock, storageMock };
 };
@@ -199,8 +208,9 @@ describe('ThemeToggle', () => {
         </ThemeProvider>
       );
 
+      // Wait for theme init: system + light resolved shows "switch to dark"
       await waitFor(() => {
-        expect(screen.getByRole('button')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /switch to dark theme/i })).toBeInTheDocument();
       });
 
       const button = screen.getByRole('button');
@@ -256,8 +266,9 @@ describe('ThemeToggle', () => {
         </ThemeProvider>
       );
 
+      // Wait for theme init: system + dark resolved shows "switch to light"
       await waitFor(() => {
-        expect(screen.getByRole('button')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /switch to light theme/i })).toBeInTheDocument();
       });
 
       const button = screen.getByRole('button');
