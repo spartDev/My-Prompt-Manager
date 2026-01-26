@@ -1,5 +1,6 @@
 import { FC, useState, useMemo, useRef, useEffect, useCallback } from 'react';
 
+import { useSummaryMetrics } from '../../hooks/useSummaryMetrics';
 import { useUsageStats } from '../../hooks/useUsageStats';
 import { PromptUsageSummary } from '../../types/hooks';
 import { formatPlatformName, formatRelativeTime } from '../../utils';
@@ -52,38 +53,8 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
     return () => { clearInterval(interval); };
   }, []);
 
-  // Compute summary metrics
-  const summaryMetrics = useMemo(() => {
-    if (!stats) {
-      return {
-        totalUses: 0,
-        topPlatform: null as { name: string; count: number } | null,
-        peakDay: null as { day: string; count: number } | null,
-        topCategory: null as { name: string; count: number } | null
-      };
-    }
-
-    const topPlatform = stats.platformBreakdown.length > 0
-      ? { name: stats.platformBreakdown[0].platform, count: stats.platformBreakdown[0].count }
-      : null;
-
-    const sortedDays = [...stats.dayOfWeekDistribution].sort((a, b) => b.count - a.count);
-    const peakDayData = sortedDays.length > 0 ? sortedDays[0] : null;
-    const peakDay = peakDayData && peakDayData.count > 0
-      ? { day: peakDayData.day, count: peakDayData.count }
-      : null;
-
-    const topCategory = stats.categoryDistribution.length > 0
-      ? { name: stats.categoryDistribution[0].name, count: stats.categoryDistribution[0].count }
-      : null;
-
-    return {
-      totalUses: stats.totalUses,
-      topPlatform,
-      peakDay,
-      topCategory
-    };
-  }, [stats]);
+  // Compute summary metrics using shared hook
+  const summaryMetrics = useSummaryMetrics(stats);
 
   // Get prompts for active tab
   const activePrompts = useMemo((): PromptUsageSummary[] => {

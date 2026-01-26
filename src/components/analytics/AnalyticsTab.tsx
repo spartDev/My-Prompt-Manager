@@ -1,5 +1,6 @@
-import { FC, useMemo, useRef, useEffect, useState } from 'react';
+import { FC, useRef, useEffect, useState } from 'react';
 
+import { useSummaryMetrics } from '../../hooks/useSummaryMetrics';
 import { useUsageStats } from '../../hooks/useUsageStats';
 import { PromptUsageSummary } from '../../types/hooks';
 import { formatPlatformName, formatRelativeTime } from '../../utils';
@@ -33,41 +34,8 @@ const AnalyticsTab: FC<AnalyticsTabProps> = ({
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
 
-  // Compute summary metrics
-  const summaryMetrics = useMemo(() => {
-    if (!stats) {
-      return {
-        totalUses: 0,
-        topPlatform: null as { name: string; count: number } | null,
-        peakDay: null as { day: string; count: number } | null,
-        topCategory: null as { name: string; count: number } | null
-      };
-    }
-
-    // Top platform
-    const topPlatform = stats.platformBreakdown.length > 0
-      ? { name: stats.platformBreakdown[0].platform, count: stats.platformBreakdown[0].count }
-      : null;
-
-    // Peak day (day of week with most usage)
-    const sortedDays = [...stats.dayOfWeekDistribution].sort((a, b) => b.count - a.count);
-    const peakDayData = sortedDays.length > 0 ? sortedDays[0] : null;
-    const peakDay = peakDayData && peakDayData.count > 0
-      ? { day: peakDayData.day, count: peakDayData.count }
-      : null;
-
-    // Top category
-    const topCategory = stats.categoryDistribution.length > 0
-      ? { name: stats.categoryDistribution[0].name, count: stats.categoryDistribution[0].count }
-      : null;
-
-    return {
-      totalUses: stats.totalUses,
-      topPlatform,
-      peakDay,
-      topCategory
-    };
-  }, [stats]);
+  // Compute summary metrics using shared hook
+  const summaryMetrics = useSummaryMetrics(stats);
 
   // Capture current time once on mount for relative time calculations
   const nowRef = useRef<number>(Date.now());
