@@ -1,6 +1,6 @@
-import { FC } from 'react';
+import { FC, useCallback } from 'react';
 
-import { useThemeContext } from '../../contexts/ThemeContext';
+import { useThemeContext, Theme } from '../../contexts/ThemeContext';
 import InterfaceModeSelector from '../InterfaceModeSelector';
 
 import SettingsSection from './SettingsSection';
@@ -19,6 +19,14 @@ const AppearanceSection: FC<AppearanceSectionProps> = ({
   interfaceModeChanging = false
 }) => {
   const { theme, setTheme } = useThemeContext();
+
+  const handleThemeClick = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    const themeValue = e.currentTarget.dataset.theme as Theme | undefined;
+    if (themeValue) {
+      void setTheme(themeValue);
+    }
+  }, [setTheme]);
+
   const icon = (
     <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
@@ -69,7 +77,8 @@ const AppearanceSection: FC<AppearanceSectionProps> = ({
             ].map((option) => (
               <button
                 key={option.value}
-                onClick={() => { void setTheme(option.value); }}
+                data-theme={option.value}
+                onClick={handleThemeClick}
                 disabled={saving}
                 className={`
                   relative p-3 rounded-lg border-2 transition-all duration-200
