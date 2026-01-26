@@ -1,4 +1,4 @@
-import { FC, useState } from 'react';
+import { FC, useCallback, useState } from 'react';
 
 import { Logger, toError } from '../../utils';
 
@@ -12,7 +12,7 @@ const AboutSection: FC<AboutSectionProps> = ({ version, onReset }) => {
   const [resetting, setResetting] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const handleReset = async () => {
+  const handleReset = useCallback(async () => {
     if (!showResetConfirm) {
       setShowResetConfirm(true);
       return;
@@ -27,7 +27,7 @@ const AboutSection: FC<AboutSectionProps> = ({ version, onReset }) => {
     } finally {
       setResetting(false);
     }
-  };
+  }, [showResetConfirm, onReset]);
 
   return (
     <section className="border-t border-gray-200 dark:border-gray-700 pt-6">
