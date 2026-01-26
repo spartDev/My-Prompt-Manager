@@ -221,3 +221,72 @@ export function isArrayOf<T>(itemGuard: TypeGuard<T>): TypeGuard<T[]> {
     return Array.isArray(value) && value.every(itemGuard);
   };
 }
+
+// ============================================================================
+// Import Data Validation
+// ============================================================================
+// These validators are used for validating imported backup data which may have
+// a more lenient structure than the full type definitions (e.g., missing IDs
+// that will be generated during import).
+
+/**
+ * Validates that a value is a valid prompt for import purposes.
+ * Import prompts must have title, content, and category strings.
+ * Other fields (id, createdAt, etc.) may be generated during import.
+ */
+export function isValidImportPrompt(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return false;
+  }
+  const p = value as Record<string, unknown>;
+  return (
+    typeof p.title === 'string' &&
+    typeof p.content === 'string' &&
+    typeof p.category === 'string'
+  );
+}
+
+/**
+ * Validates that a value is a valid category for import purposes.
+ * Import categories must have a name string.
+ * Other fields (id, color) may be optional or generated during import.
+ */
+export function isValidImportCategory(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return false;
+  }
+  const c = value as Record<string, unknown>;
+  return typeof c.name === 'string';
+}
+
+/**
+ * Finds the first invalid prompt in an array for import validation.
+ * Returns undefined if all prompts are valid.
+ *
+ * @example
+ * ```ts
+ * const invalid = findInvalidImportPrompt(data.prompts);
+ * if (invalid) {
+ *   throw new Error('Invalid prompt structure');
+ * }
+ * ```
+ */
+export function findInvalidImportPrompt(prompts: unknown[]): unknown {
+  return prompts.find(prompt => !isValidImportPrompt(prompt));
+}
+
+/**
+ * Finds the first invalid category in an array for import validation.
+ * Returns undefined if all categories are valid.
+ *
+ * @example
+ * ```ts
+ * const invalid = findInvalidImportCategory(data.categories);
+ * if (invalid) {
+ *   throw new Error('Invalid category structure');
+ * }
+ * ```
+ */
+export function findInvalidImportCategory(categories: unknown[]): unknown {
+  return categories.find(category => !isValidImportCategory(category));
+}

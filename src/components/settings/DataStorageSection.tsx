@@ -1,7 +1,7 @@
 import { FC, useState, useRef, useMemo } from 'react';
 
 import type { Prompt, Category } from '../../types';
-import { Logger, toError } from '../../utils';
+import { Logger, toError, findInvalidImportPrompt, findInvalidImportCategory } from '../../utils';
 
 import SettingsSection from './SettingsSection';
 
@@ -87,38 +87,13 @@ const DataStorageSection: FC<DataStorageSectionProps> = ({
       }
 
       // Validate prompt structure
-      const invalidPrompt = (typedData.prompts as unknown[]).find((prompt) => {
-        if (typeof prompt !== 'object' || prompt === null || Array.isArray(prompt)) {
-          return true;
-        }
-        const p = prompt as Record<string, unknown>;
-        if (typeof p.title !== 'string' || typeof p.content !== 'string') {
-          return true;
-        }
-        if (typeof p.category !== 'string') {
-          return true;
-        }
-        return false;
-      });
-
-      if (invalidPrompt) {
+      if (findInvalidImportPrompt(typedData.prompts as unknown[])) {
         throw new Error('Invalid backup file: one or more prompts have invalid structure.');
       }
 
       // Validate category structure if present
       if (typedData.categories && typedData.categories.length > 0) {
-        const invalidCategory = (typedData.categories as unknown[]).find(category => {
-          if (typeof category !== 'object' || category === null || Array.isArray(category)) {
-            return true;
-          }
-          const c = category as Record<string, unknown>;
-          if (typeof c.name !== 'string') {
-            return true;
-          }
-          return false;
-        });
-
-        if (invalidCategory) {
+        if (findInvalidImportCategory(typedData.categories as unknown[])) {
           throw new Error('Invalid backup file: one or more categories have invalid structure.');
         }
       }
