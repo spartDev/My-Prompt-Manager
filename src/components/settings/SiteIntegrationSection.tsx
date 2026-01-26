@@ -595,17 +595,19 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
         await Promise.resolve(onAddCustomSite(siteData));
       }
 
-      // Inject content script immediately if tabs are open with this hostname
+      // Inject content script immediately if tabs are open with this hostname (parallel)
       try {
         const tabs = await chrome.tabs.query({ url: `*://${hostname}/*` });
-        for (const tab of tabs) {
-          if (tab.id) {
-            await chrome.runtime.sendMessage({
-              type: 'REQUEST_INJECTION',
-              data: { tabId: tab.id }
-            });
-          }
-        }
+        await Promise.allSettled(
+          tabs
+            .filter((tab): tab is chrome.tabs.Tab & { id: number } => tab.id !== undefined)
+            .map((tab) =>
+              chrome.runtime.sendMessage({
+                type: 'REQUEST_INJECTION',
+                data: { tabId: tab.id }
+              })
+            )
+        );
       } catch {
         // Failed to inject content script into existing tabs - not critical, continue
       }
