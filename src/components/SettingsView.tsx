@@ -89,7 +89,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
 
-  const storageManager = StorageManager.getInstance();
+  const storageManager = useMemo(() => StorageManager.getInstance(), []);
 
   // Track initial mount to skip saving on first render
   const isInitialMount = useRef(true);
