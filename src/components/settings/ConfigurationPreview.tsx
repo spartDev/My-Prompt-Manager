@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import type { FC } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -15,6 +15,8 @@ interface ConfigurationPreviewProps {
   isProcessing?: boolean;
 }
 
+const FOCUSABLE_SELECTOR = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 const ConfigurationPreview: FC<ConfigurationPreviewProps> = ({
   isOpen,
   config,
@@ -25,27 +27,86 @@ const ConfigurationPreview: FC<ConfigurationPreviewProps> = ({
   onConfirm,
   isProcessing = false
 }) => {
+  const modalRef = useRef<HTMLDivElement>(null);
+  const previousActiveElement = useRef<HTMLElement | null>(null);
+
+  // Get all focusable elements within the modal
+  const getFocusableElements = useCallback(() => {
+    if (!modalRef.current) {return [];}
+    return Array.from(modalRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+  }, []);
+
+  // Store the previously focused element and focus the first focusable element when opened
+  useEffect(() => {
+    if (isOpen) {
+      previousActiveElement.current = document.activeElement as HTMLElement;
+      // Focus the first focusable element (close button) after a brief delay to ensure modal is rendered
+      requestAnimationFrame(() => {
+        const focusable = getFocusableElements();
+        if (focusable.length > 0) {
+          focusable[0].focus();
+        }
+      });
+    }
+
+    return () => {
+      // Restore focus when modal closes
+      if (previousActiveElement.current && typeof previousActiveElement.current.focus === 'function') {
+        previousActiveElement.current.focus();
+      }
+    };
+  }, [isOpen, getFocusableElements]);
+
+  // Handle ESC key and trap focus
   useEffect(() => {
     if (!isOpen) {return;}
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         onClose();
+      } else if (event.key === 'Tab') {
+        const focusableElements = getFocusableElements();
+        if (focusableElements.length === 0) {return;}
+
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        if (event.shiftKey) {
+          // Shift+Tab: if on first element, wrap to last
+          if (document.activeElement === firstElement) {
+            event.preventDefault();
+            lastElement.focus();
+          }
+        } else {
+          // Tab: if on last element, wrap to first
+          if (document.activeElement === lastElement) {
+            event.preventDefault();
+            firstElement.focus();
+          }
+        }
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => { document.removeEventListener('keydown', handleKeyDown); };
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, getFocusableElements]);
 
   if (!isOpen || !config) {
     return null;
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="configuration-preview-title"
+    >
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" aria-hidden="true" onClick={onClose}></div>
-      <div className="relative max-w-lg w-full bg-gray-50 dark:bg-gray-800/95 rounded-2xl shadow-2xl border-2 border-gray-300 dark:border-gray-600 overflow-hidden">
+      <div
+        ref={modalRef}
+        className="relative max-w-lg w-full bg-gray-50 dark:bg-gray-800/95 rounded-2xl shadow-2xl border-2 border-gray-300 dark:border-gray-600 overflow-hidden"
+      >
         {/* Header */}
         <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
           <div className="flex items-center justify-between">
@@ -56,7 +117,7 @@ const ConfigurationPreview: FC<ConfigurationPreviewProps> = ({
                 </svg>
               </div>
               <div>
-                <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                <h3 id="configuration-preview-title" className="text-base font-semibold text-gray-900 dark:text-gray-100">
                   Review Configuration
                 </h3>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
