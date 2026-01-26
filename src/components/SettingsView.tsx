@@ -4,7 +4,7 @@ import type { FC, ReactNode } from 'react';
 import manifest from '../../manifest.json';
 import { getDefaultEnabledPlatforms, getLinkedPlatformHostnames } from '../config/platforms';
 import { StorageManager } from '../services/storage';
-import type { Prompt, Category, Settings as UserSettings } from '../types';
+import type { Prompt, Category, Settings as UserSettings, CustomSite as ImportedCustomSite } from '../types';
 import { DEFAULT_SETTINGS } from '../types';
 import type { ToastType } from '../types/components';
 import type { ToastSettings } from '../types/hooks';
@@ -231,14 +231,14 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
 
 
   // Handle interface mode change
-  const handleInterfaceModeChange = async (mode: 'popup' | 'sidepanel') => {
+  const handleInterfaceModeChange = useCallback(async (mode: 'popup' | 'sidepanel') => {
     try {
       setSaving(true);
       setInterfaceModeChanging(true);
-      
+
       await chrome.storage.local.set({ interfaceMode: mode });
       setInterfaceMode(mode);
-      
+
       setTimeout(() => {
         setInterfaceModeChanging(false);
       }, 3000);
@@ -247,7 +247,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
     } finally {
       setSaving(false);
     }
-  };
+  }, []);
 
   // Handle site toggle
   const handleSiteToggle = (hostname: string, enabled: boolean) => {
@@ -281,42 +281,8 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
     // Persistence now handled by debounced useEffect
   };
 
-  // Handle custom site toggle
-  const handleCustomSiteToggle = async (hostname: string, enabled: boolean) => {
-    const newCustomSites = settings.customSites.map(site => 
-      site.hostname === hostname ? { ...site, enabled } : site
-    );
-    
-    const newSettings = {
-      ...settings,
-      customSites: newCustomSites
-    };
-    
-    setSettings(newSettings);
-    await saveSettings(newSettings);
-    
-    // Notify tabs about the change
-    await notifyCustomSiteChange(hostname);
-  };
-
-  // Handle remove custom site
-  const handleRemoveCustomSite = async (hostname: string) => {
-    const newCustomSites = settings.customSites.filter(site => site.hostname !== hostname);
-    
-    const newSettings = {
-      ...settings,
-      customSites: newCustomSites
-    };
-    
-    setSettings(newSettings);
-    await saveSettings(newSettings);
-    
-    // Notify tabs about the removal
-    await notifyCustomSiteChange(hostname);
-  };
-
   // Notify custom site change
-  const notifyCustomSiteChange = async (hostname: string) => {
+  const notifyCustomSiteChange = useCallback(async (hostname: string) => {
     try {
       // Since we're using universal content script, just notify existing tabs
       const tabs = await chrome.tabs.query({ url: `*://${hostname}/*` });
@@ -334,10 +300,44 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
     } catch (error) {
       Logger.error('Failed to notify custom site change', toError(error));
     }
-  };
+  }, []);
+
+  // Handle custom site toggle
+  const handleCustomSiteToggle = useCallback(async (hostname: string, enabled: boolean) => {
+    const newCustomSites = settings.customSites.map(site =>
+      site.hostname === hostname ? { ...site, enabled } : site
+    );
+
+    const newSettings = {
+      ...settings,
+      customSites: newCustomSites
+    };
+
+    setSettings(newSettings);
+    await saveSettings(newSettings);
+
+    // Notify tabs about the change
+    await notifyCustomSiteChange(hostname);
+  }, [settings, saveSettings, notifyCustomSiteChange]);
+
+  // Handle remove custom site
+  const handleRemoveCustomSite = useCallback(async (hostname: string) => {
+    const newCustomSites = settings.customSites.filter(site => site.hostname !== hostname);
+
+    const newSettings = {
+      ...settings,
+      customSites: newCustomSites
+    };
+
+    setSettings(newSettings);
+    await saveSettings(newSettings);
+
+    // Notify tabs about the removal
+    await notifyCustomSiteChange(hostname);
+  }, [settings, saveSettings, notifyCustomSiteChange]);
 
   // Handle add custom site
-  const handleAddCustomSite = async (siteData: Omit<CustomSite, 'dateAdded'>) => {
+  const handleAddCustomSite = useCallback(async (siteData: Omit<CustomSite, 'dateAdded'>) => {
     const newSite: CustomSite = {
       ...siteData,
       dateAdded: Date.now()
@@ -350,13 +350,13 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
 
     setSettings(newSettings);
     await saveSettings(newSettings);
-    
+
     // Notify any open tabs to reinitialize
     await notifyCustomSiteChange(newSite.hostname);
-  };
+  }, [settings, saveSettings, notifyCustomSiteChange]);
 
   // Handle debug mode toggle
-  const handleDebugModeChange = async (enabled: boolean) => {
+  const handleDebugModeChange = useCallback(async (enabled: boolean) => {
     const newSettings = {
       ...settings,
       debugMode: enabled
@@ -371,7 +371,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
     } else {
       localStorage.removeItem('prompt-library-debug');
     }
-  };
+  }, [settings, saveSettings]);
 
   // Handle import data
   const handleImportData = async (data: { prompts: Prompt[]; categories: Category[] }) => {
@@ -434,6 +434,49 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
     }
   };
 
+  // Memoized callback wrappers for child components to prevent unnecessary re-renders
+  const handleInterfaceModeChangeCallback = useCallback(
+    (mode: 'popup' | 'sidepanel') => {
+      void handleInterfaceModeChange(mode);
+    },
+    [handleInterfaceModeChange]
+  );
+
+  const handleCustomSiteToggleCallback = useCallback(
+    (hostname: string, enabled: boolean) => {
+      void handleCustomSiteToggle(hostname, enabled);
+    },
+    [handleCustomSiteToggle]
+  );
+
+  const handleRemoveCustomSiteCallback = useCallback(
+    (hostname: string) => {
+      void handleRemoveCustomSite(hostname);
+    },
+    [handleRemoveCustomSite]
+  );
+
+  const handleAddCustomSiteCallback = useCallback(
+    (siteData: Omit<ImportedCustomSite, 'dateAdded'> & { positioning?: ImportedCustomSite['positioning'] }) => {
+      void handleAddCustomSite(siteData as Omit<CustomSite, 'dateAdded'>);
+    },
+    [handleAddCustomSite]
+  );
+
+  const handleTestToastCallback = useCallback(
+    (type: ToastType) => {
+      showToast(`This is a ${type} notification`, type);
+    },
+    [showToast]
+  );
+
+  const handleDebugModeChangeCallback = useCallback(
+    (enabled: boolean) => {
+      void handleDebugModeChange(enabled);
+    },
+    [handleDebugModeChange]
+  );
+
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center bg-gray-50 dark:bg-gray-900">
@@ -464,7 +507,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
           {/* Appearance Section */}
           <AppearanceSection
             interfaceMode={interfaceMode}
-            onInterfaceModeChange={(mode) => void handleInterfaceModeChange(mode)}
+            onInterfaceModeChange={handleInterfaceModeChangeCallback}
             saving={saving}
             interfaceModeChanging={interfaceModeChanging}
           />
@@ -477,10 +520,10 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
             customSites={settings.customSites}
             siteConfigs={siteConfigs}
             interfaceMode={interfaceMode}
-            onSiteToggle={(hostname, enabled) => { handleSiteToggle(hostname, enabled); }}
-            onCustomSiteToggle={(hostname, enabled) => void handleCustomSiteToggle(hostname, enabled)}
-            onRemoveCustomSite={(hostname) => void handleRemoveCustomSite(hostname)}
-            onAddCustomSite={(siteData) => void handleAddCustomSite(siteData as Omit<CustomSite, 'dateAdded'>)}
+            onSiteToggle={handleSiteToggle}
+            onCustomSiteToggle={handleCustomSiteToggleCallback}
+            onRemoveCustomSite={handleRemoveCustomSiteCallback}
+            onAddCustomSite={handleAddCustomSiteCallback}
             saving={saving}
             onShowToast={showToast}
           />
@@ -499,15 +542,13 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
           <NotificationSection
             settings={toastSettings}
             onSettingsChange={onToastSettingsChange}
-            onTestToast={(type) => {
-              showToast(`This is a ${type} notification`, type);
-            }}
+            onTestToast={handleTestToastCallback}
           />
 
           {/* Advanced Section */}
           <AdvancedSection
             debugMode={settings.debugMode}
-            onDebugModeChange={(enabled) => void handleDebugModeChange(enabled)}
+            onDebugModeChange={handleDebugModeChangeCallback}
             saving={saving}
           />
 
