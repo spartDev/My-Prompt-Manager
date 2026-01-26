@@ -176,6 +176,35 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
     void loadSettings();
   }, [loadSettings]);
 
+  // Save settings
+  const saveSettings = useCallback(async (newSettings: Settings) => {
+    setSaving(true);
+    try {
+      await chrome.storage.local.set({
+        promptLibrarySettings: newSettings
+      });
+
+      // Notify content scripts of changes in parallel
+      const tabs = await chrome.tabs.query({});
+      const httpTabs = tabs.filter(
+        (tab): tab is chrome.tabs.Tab & { id: number } =>
+          tab.id !== undefined && tab.url !== undefined &&
+          (tab.url.startsWith('http://') || tab.url.startsWith('https://'))
+      );
+
+      await Promise.allSettled(
+        httpTabs.map(tab => chrome.tabs.sendMessage(tab.id, {
+          action: 'settingsUpdated',
+          settings: newSettings
+        }))
+      );
+    } catch (error) {
+      Logger.error('Failed to save settings', toError(error));
+    } finally {
+      setSaving(false);
+    }
+  }, []);
+
   // Debounced persistence: save settings after user stops making changes
   useEffect(() => {
     // Skip saving on initial mount (when settings are loaded)
@@ -198,36 +227,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
     return () => {
       clearTimeout(timeoutId);
     };
-  }, [settings]);
-
-  // Save settings
-  const saveSettings = async (newSettings: Settings) => {
-    setSaving(true);
-    try {
-      await chrome.storage.local.set({ 
-        promptLibrarySettings: newSettings 
-      });
-      
-      // Notify content scripts of changes in parallel
-      const tabs = await chrome.tabs.query({});
-      const httpTabs = tabs.filter(
-        (tab): tab is chrome.tabs.Tab & { id: number } =>
-          tab.id !== undefined && tab.url !== undefined &&
-          (tab.url.startsWith('http://') || tab.url.startsWith('https://'))
-      );
-
-      await Promise.allSettled(
-        httpTabs.map(tab => chrome.tabs.sendMessage(tab.id, {
-          action: 'settingsUpdated',
-          settings: newSettings
-        }))
-      );
-    } catch (error) {
-      Logger.error('Failed to save settings', toError(error));
-    } finally {
-      setSaving(false);
-    }
-  };
+  }, [settings, saveSettings]);
 
 
   // Handle interface mode change
