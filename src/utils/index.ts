@@ -22,3 +22,4 @@ export {
 } from './validation';
 export { cn } from './cn';
 export { formatPlatformName } from './formatPlatformName';
+export { formatRelativeTime } from './formatRelativeTime';
