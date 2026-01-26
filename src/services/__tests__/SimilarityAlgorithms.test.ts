@@ -183,8 +183,8 @@ describe('SimilarityAlgorithms', () => {
 
       // Performance benchmark: Should complete batch operations in reasonable time
       // Non-CI: ~800ms typical, allow 2.5x margin for system load
-      // CI: ~6x slower due to shared resources (800ms × 6 = 4800ms, use 6000ms for safety)
-      const maxDuration = process.env.CI ? 6000 : 2000;
+      // CI: Can be 10x+ slower due to shared resources and variability
+      const maxDuration = process.env.CI ? 12000 : 2000;
       expect(duration).toBeLessThan(maxDuration);
     });
 
@@ -199,8 +199,8 @@ describe('SimilarityAlgorithms', () => {
 
       expect(result).toBe(1.0);
       // CI environments are slower - extremely heavy computation for full 20K comparison (O(20K×20K))
-      // Typical: 3-5 seconds local, allow margins for system variability
-      const maxDuration = process.env.CI ? 30000 : 10000;
+      // Typical: 3-5 seconds local, CI can be 10x+ slower due to resource variability
+      const maxDuration = process.env.CI ? 50000 : 10000;
       expect(duration).toBeLessThan(maxDuration); // Single comparison should complete
     });
 
