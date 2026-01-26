@@ -3,6 +3,8 @@ import type { FC, ReactNode } from 'react';
 
 import { useTheme, Theme } from '../hooks/useTheme';
 
+export type { Theme };
+
 interface ThemeContextType {
   theme: Theme;
   resolvedTheme: 'light' | 'dark';
