@@ -1,4 +1,4 @@
-import { FC, useState } from 'react';
+import { FC, useMemo, useState } from 'react';
 
 import { ToastType } from '../../types/components';
 import { ToastSettings } from '../../types/hooks';
@@ -93,8 +93,8 @@ const NotificationSection: FC<NotificationSectionProps> = ({
   const [isExpanded, setIsExpanded] = useState(false);
   const [currentTestTypeIndex, setCurrentTestTypeIndex] = useState(0);
 
-  // Helper to get enabledTypes with defaults
-  const getEnabledTypes = () => {
+  // Memoize enabledTypes with defaults
+  const currentEnabledTypes = useMemo(() => {
     const types = settings?.enabledTypes;
     return {
       success: types?.success ?? true,
@@ -102,9 +102,7 @@ const NotificationSection: FC<NotificationSectionProps> = ({
       info: types?.info ?? true,
       warning: types?.warning ?? true
     };
-  };
-
-  const currentEnabledTypes = getEnabledTypes();
+  }, [settings?.enabledTypes]);
 
   // Get list of enabled notification types
   const enabledTypes = (['success', 'error', 'warning', 'info'] as const).filter(
