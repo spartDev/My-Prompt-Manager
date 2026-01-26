@@ -1,4 +1,4 @@
-import { FC, useState, useCallback } from 'react';
+import { FC, useReducer, useCallback } from 'react';
 
 import { useClipboard } from '../../hooks/useClipboard';
 import { usePickerWindow } from '../../hooks/usePickerWindow';
@@ -17,6 +17,119 @@ import SettingsSection from './SettingsSection';
 import SiteImportDrawer from './SiteImportDrawer';
 import SupportedSitesList, { SiteConfig } from './SupportedSitesList';
 
+// ============================================================================
+// View State Reducer - manages which view is currently displayed
+// ============================================================================
+type ViewMode = 'list' | 'method-chooser' | 'manual-form' | 'import-drawer';
+
+interface ViewState {
+  mode: ViewMode;
+}
+
+type ViewAction =
+  | { type: 'SHOW_METHOD_CHOOSER' }
+  | { type: 'SHOW_MANUAL_FORM' }
+  | { type: 'SHOW_IMPORT_DRAWER' }
+  | { type: 'CLOSE_ALL' };
+
+const viewInitialState: ViewState = { mode: 'list' };
+
+function viewReducer(state: ViewState, action: ViewAction): ViewState {
+  switch (action.type) {
+    case 'SHOW_METHOD_CHOOSER':
+      return { mode: 'method-chooser' };
+    case 'SHOW_MANUAL_FORM':
+      return { mode: 'manual-form' };
+    case 'SHOW_IMPORT_DRAWER':
+      return { mode: 'import-drawer' };
+    case 'CLOSE_ALL':
+      return { mode: 'list' };
+    default:
+      return state;
+  }
+}
+
+// ============================================================================
+// Import State Reducer - manages import/export flow
+// ============================================================================
+interface PendingImport {
+  config: CustomSiteConfiguration;
+  warnings: SecurityWarning[];
+  duplicate: boolean;
+  existingSite?: CustomSite;
+}
+
+interface ImportState {
+  code: string;
+  error: string | null;
+  isDecoding: boolean;
+  isConfirming: boolean;
+  previewOpen: boolean;
+  pendingImport: PendingImport | null;
+  exportingHostname: string | null;
+}
+
+type ImportAction =
+  | { type: 'SET_CODE'; payload: string }
+  | { type: 'SET_ERROR'; payload: string | null }
+  | { type: 'START_DECODE' }
+  | { type: 'DECODE_SUCCESS'; payload: PendingImport }
+  | { type: 'DECODE_FAILURE'; payload: string }
+  | { type: 'START_CONFIRM' }
+  | { type: 'CONFIRM_SUCCESS' }
+  | { type: 'CONFIRM_FAILURE'; payload: string }
+  | { type: 'CLOSE_PREVIEW' }
+  | { type: 'CLEAR' }
+  | { type: 'START_EXPORT'; payload: string }
+  | { type: 'END_EXPORT' }
+  | { type: 'EXPORT_FALLBACK'; payload: string };
+
+const importInitialState: ImportState = {
+  code: '',
+  error: null,
+  isDecoding: false,
+  isConfirming: false,
+  previewOpen: false,
+  pendingImport: null,
+  exportingHostname: null,
+};
+
+function importReducer(state: ImportState, action: ImportAction): ImportState {
+  switch (action.type) {
+    case 'SET_CODE':
+      return { ...state, code: action.payload, error: null };
+    case 'SET_ERROR':
+      return { ...state, error: action.payload };
+    case 'START_DECODE':
+      return { ...state, isDecoding: true, error: null, pendingImport: null, previewOpen: false };
+    case 'DECODE_SUCCESS':
+      return { ...state, isDecoding: false, pendingImport: action.payload, previewOpen: true };
+    case 'DECODE_FAILURE':
+      return { ...state, isDecoding: false, error: action.payload };
+    case 'START_CONFIRM':
+      return { ...state, isConfirming: true };
+    case 'CONFIRM_SUCCESS':
+      return { ...importInitialState };
+    case 'CONFIRM_FAILURE':
+      return { ...state, isConfirming: false, error: action.payload };
+    case 'CLOSE_PREVIEW':
+      return { ...state, previewOpen: false, pendingImport: null };
+    case 'CLEAR':
+      return { ...importInitialState, exportingHostname: state.exportingHostname };
+    case 'START_EXPORT':
+      return { ...state, exportingHostname: action.payload };
+    case 'END_EXPORT':
+      return { ...state, exportingHostname: null };
+    case 'EXPORT_FALLBACK':
+      return { ...state, exportingHostname: null, code: action.payload, error: 'Clipboard access was blocked. The configuration code is now in the import field for manual copying.' };
+    default:
+      return state;
+  }
+}
+
+// ============================================================================
+// Component
+// ============================================================================
 interface SiteIntegrationSectionProps {
   enabledSites: string[];
   customSites: CustomSite[];
@@ -29,13 +142,6 @@ interface SiteIntegrationSectionProps {
   interfaceMode?: 'popup' | 'sidepanel';
   saving?: boolean;
   onShowToast?: (message: string, type?: ToastType) => void;
-}
-
-interface PendingImport {
-  config: CustomSiteConfiguration;
-  warnings: SecurityWarning[];
-  duplicate: boolean;
-  existingSite?: CustomSite;
 }
 
 const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
@@ -51,22 +157,17 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
   saving = false,
   onShowToast,
 }) => {
-  // View state
-  const [showAddSite, setShowAddSite] = useState(false);
-  const [showImportDrawer, setShowImportDrawer] = useState(false);
-  const [showAddMethodChooser, setShowAddMethodChooser] = useState(false);
+  // Consolidated state management
+  const [viewState, viewDispatch] = useReducer(viewReducer, viewInitialState);
+  const [importState, importDispatch] = useReducer(importReducer, importInitialState);
 
-  // Import state
+  // Derived view flags for cleaner JSX
+  const showAddMethodChooser = viewState.mode === 'method-chooser';
+  const showAddSite = viewState.mode === 'manual-form';
+  const showImportDrawer = viewState.mode === 'import-drawer';
+
+  // External hooks
   const { copyToClipboard } = useClipboard();
-  const [exportingHostname, setExportingHostname] = useState<string | null>(null);
-  const [importCode, setImportCode] = useState('');
-  const [importError, setImportError] = useState<string | null>(null);
-  const [importingConfig, setImportingConfig] = useState(false);
-  const [confirmingImport, setConfirmingImport] = useState(false);
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
-
-  // Picker window hook
   const {
     pickerWindowState,
     pickerState,
@@ -78,7 +179,6 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
     siteConfigs,
     customSites,
   });
-
   const { requestSitePermission } = useSitePermissions();
 
   const notify = useCallback(
@@ -93,54 +193,44 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
   // Navigation callbacks
   const openAddMethodSelector = useCallback(() => {
     resetPickerState();
-    setShowImportDrawer(false);
-    setShowAddSite(false);
-    setShowAddMethodChooser(true);
+    viewDispatch({ type: 'SHOW_METHOD_CHOOSER' });
   }, [resetPickerState]);
 
   const openManualFlow = useCallback(() => {
     resetPickerState();
-    setShowImportDrawer(false);
-    setShowAddMethodChooser(false);
-    setShowAddSite(true);
+    viewDispatch({ type: 'SHOW_MANUAL_FORM' });
   }, [resetPickerState]);
 
   const openImportFlow = useCallback(() => {
-    setShowAddMethodChooser(false);
-    setShowAddSite(false);
-    setShowImportDrawer(true);
+    viewDispatch({ type: 'SHOW_IMPORT_DRAWER' });
   }, []);
 
   const closeAllForms = useCallback(() => {
     resetPickerState();
-    setShowAddSite(false);
-    setShowAddMethodChooser(false);
-    setShowImportDrawer(false);
-    setImportCode('');
-    setImportError(null);
+    viewDispatch({ type: 'CLOSE_ALL' });
+    importDispatch({ type: 'CLEAR' });
   }, [resetPickerState]);
 
   // Export functionality
   const handleExportCustomSite = useCallback(
     async (site: CustomSite) => {
       try {
-        setExportingHostname(site.hostname);
+        importDispatch({ type: 'START_EXPORT', payload: site.hostname });
         const encoded = await ConfigurationEncoder.encode(site);
         const copied = await copyToClipboard(encoded);
 
         if (copied) {
+          importDispatch({ type: 'END_EXPORT' });
           notify('Configuration copied to clipboard', 'success');
         } else {
-          setImportCode(encoded);
+          importDispatch({ type: 'EXPORT_FALLBACK', payload: encoded });
           openImportFlow();
-          setImportError('Clipboard access was blocked. The configuration code is now in the import field for manual copying.');
           notify('Clipboard access was blocked. The configuration code has been added to the import field.', 'error');
         }
       } catch (error) {
+        importDispatch({ type: 'END_EXPORT' });
         const message = error instanceof ConfigurationEncoderError ? error.message : 'Failed to export configuration';
         notify(message, 'error');
-      } finally {
-        setExportingHostname(null);
       }
     },
     [copyToClipboard, notify, openImportFlow]
@@ -164,68 +254,64 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
   };
 
   const handleClearImport = useCallback(() => {
-    setImportCode('');
-    setImportError(null);
-    setPendingImport(null);
+    importDispatch({ type: 'CLEAR' });
   }, []);
 
   const handlePreviewImport = useCallback(async () => {
-    if (!importCode.trim()) {
-      setImportError('Enter a configuration code to continue.');
+    if (!importState.code.trim()) {
+      importDispatch({ type: 'SET_ERROR', payload: 'Enter a configuration code to continue.' });
       return;
     }
 
-    setImportError(null);
-    setPendingImport(null);
-    setPreviewOpen(false);
-    setImportingConfig(true);
+    importDispatch({ type: 'START_DECODE' });
     openImportFlow();
 
     try {
-      const decodedConfig = await ConfigurationEncoder.decode(importCode.trim());
+      const decodedConfig = await ConfigurationEncoder.decode(importState.code.trim());
       const validation = ConfigurationEncoder.validate(decodedConfig);
       const existingCustomSite = customSites.find((site) => site.hostname === validation.sanitizedConfig.hostname);
       const isBuiltIn = Object.prototype.hasOwnProperty.call(siteConfigs, validation.sanitizedConfig.hostname);
 
       if (isBuiltIn) {
         const message = 'This hostname already has a built-in integration and cannot be imported as custom.';
-        setImportError(message);
+        importDispatch({ type: 'DECODE_FAILURE', payload: message });
         notify(message, 'error');
         return;
       }
 
-      setPendingImport({
-        config: validation.sanitizedConfig,
-        warnings: validation.warnings.filter((warning) => warning.severity !== 'error'),
-        duplicate: Boolean(existingCustomSite),
-        existingSite: existingCustomSite,
+      importDispatch({
+        type: 'DECODE_SUCCESS',
+        payload: {
+          config: validation.sanitizedConfig,
+          warnings: validation.warnings.filter((warning) => warning.severity !== 'error'),
+          duplicate: Boolean(existingCustomSite),
+          existingSite: existingCustomSite,
+        },
       });
-      setPreviewOpen(true);
     } catch (error) {
       const message =
         error instanceof ConfigurationEncoderError
           ? mapEncoderErrorToMessage(error)
           : 'Failed to decode configuration. Please verify the code and try again.';
-      setImportError(message);
+      importDispatch({ type: 'DECODE_FAILURE', payload: message });
       notify(message, 'error');
-    } finally {
-      setImportingConfig(false);
     }
-  }, [importCode, customSites, siteConfigs, notify, openImportFlow]);
+  }, [importState.code, customSites, siteConfigs, notify, openImportFlow]);
 
   const handleConfirmImport = useCallback(async () => {
+    const { pendingImport } = importState;
     if (!pendingImport) {
       return;
     }
 
-    setConfirmingImport(true);
+    importDispatch({ type: 'START_CONFIRM' });
 
     try {
       const granted = await requestSitePermission(pendingImport.config.hostname);
 
       if (!granted) {
         const message = 'Permission denied. Please allow access to the site and try again.';
-        setImportError(message);
+        importDispatch({ type: 'CONFIRM_FAILURE', payload: message });
         notify(message, 'error');
         return;
       }
@@ -245,18 +331,15 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
         await Promise.resolve(onAddCustomSite(siteData));
       }
 
-      setImportError(null);
+      importDispatch({ type: 'CONFIRM_SUCCESS' });
       closeAllForms();
       notify('Configuration imported successfully', 'success');
-      setPreviewOpen(false);
-      setPendingImport(null);
     } catch (error) {
       Logger.error('Failed to import configuration', toError(error));
+      importDispatch({ type: 'CONFIRM_FAILURE', payload: 'Failed to import configuration. Please try again.' });
       notify('Failed to import configuration. Please try again.', 'error');
-    } finally {
-      setConfirmingImport(false);
     }
-  }, [pendingImport, requestSitePermission, onRemoveCustomSite, onAddCustomSite, notify, closeAllForms]);
+  }, [importState, requestSitePermission, onRemoveCustomSite, onAddCustomSite, notify, closeAllForms]);
 
   // Computed values
   const { isPickerWindow } = pickerWindowState;
@@ -303,26 +386,25 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
               <AddMethodChooser
                 onManualClick={openManualFlow}
                 onImportClick={openImportFlow}
-                onCancel={() => { setShowAddMethodChooser(false); }}
+                onCancel={() => { viewDispatch({ type: 'CLOSE_ALL' }); }}
               />
             )}
 
             {showImportDrawer && (
               <SiteImportDrawer
-                importCode={importCode}
+                importCode={importState.code}
                 onImportCodeChange={(value) => {
-                  setImportCode(value);
-                  setImportError(null);
+                  importDispatch({ type: 'SET_CODE', payload: value });
                 }}
                 onPreview={() => {
                   void handlePreviewImport();
                 }}
                 onClear={() => {
                   handleClearImport();
-                  setShowImportDrawer(false);
+                  viewDispatch({ type: 'CLOSE_ALL' });
                 }}
-                loading={importingConfig}
-                error={importError}
+                loading={importState.isDecoding}
+                error={importState.error}
               />
             )}
 
@@ -348,7 +430,7 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
                 onEditCustomSite={onEditCustomSite}
                 onExportCustomSite={handleExportCustomSite}
                 onAddClick={openAddMethodSelector}
-                exportingHostname={exportingHostname}
+                exportingHostname={importState.exportingHostname}
                 saving={saving}
                 addActionDisabled={addActionDisabled}
                 addCardTooltip={addCardTooltip}
@@ -369,21 +451,20 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
         </div>
       </SettingsSection>
       <ConfigurationPreview
-        isOpen={previewOpen}
-        config={pendingImport?.config ?? null}
-        warnings={pendingImport?.warnings ?? []}
-        duplicate={Boolean(pendingImport?.duplicate)}
-        existingDisplayName={pendingImport?.existingSite?.displayName}
+        isOpen={importState.previewOpen}
+        config={importState.pendingImport?.config ?? null}
+        warnings={importState.pendingImport?.warnings ?? []}
+        duplicate={Boolean(importState.pendingImport?.duplicate)}
+        existingDisplayName={importState.pendingImport?.existingSite?.displayName}
         onClose={() => {
-          if (!confirmingImport) {
-            setPreviewOpen(false);
-            setPendingImport(null);
+          if (!importState.isConfirming) {
+            importDispatch({ type: 'CLOSE_PREVIEW' });
           }
         }}
         onConfirm={() => {
           void handleConfirmImport();
         }}
-        isProcessing={confirmingImport}
+        isProcessing={importState.isConfirming}
       />
     </>
   );
