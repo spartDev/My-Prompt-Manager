@@ -1,4 +1,4 @@
-import { FC } from 'react';
+import { FC, memo } from 'react';
 import {
   BarChart,
   Bar,
@@ -28,7 +28,7 @@ export interface DayOfWeekChartProps {
 /**
  * Vertical bar chart showing usage distribution across days of the week
  */
-const DayOfWeekChart: FC<DayOfWeekChartProps> = ({
+const DayOfWeekChart: FC<DayOfWeekChartProps> = memo(({
   data,
   height = 200,
   showGrid = true,
@@ -116,6 +116,8 @@ const DayOfWeekChart: FC<DayOfWeekChartProps> = ({
       </ResponsiveContainer>
     </div>
   );
-};
+});
+
+DayOfWeekChart.displayName = 'DayOfWeekChart';
 
 export default DayOfWeekChart;

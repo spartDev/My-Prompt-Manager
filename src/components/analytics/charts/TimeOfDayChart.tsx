@@ -1,4 +1,4 @@
-import { FC } from 'react';
+import { FC, memo } from 'react';
 import {
   BarChart,
   Bar,
@@ -44,7 +44,7 @@ const TIME_BUCKET_ICONS: Record<string, string> = {
 /**
  * Bar chart showing usage distribution across time of day buckets
  */
-const TimeOfDayChart: FC<TimeOfDayChartProps> = ({
+const TimeOfDayChart: FC<TimeOfDayChartProps> = memo(({
   data,
   height = 200,
   showGrid = true,
@@ -136,6 +136,8 @@ const TimeOfDayChart: FC<TimeOfDayChartProps> = ({
       </ResponsiveContainer>
     </div>
   );
-};
+});
+
+TimeOfDayChart.displayName = 'TimeOfDayChart';
 
 export default TimeOfDayChart;

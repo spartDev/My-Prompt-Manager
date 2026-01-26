@@ -1,4 +1,4 @@
-import { FC, ReactNode } from 'react';
+import { FC, memo, ReactNode } from 'react';
 
 export interface SummaryCardProps {
   /** Label for the metric */
@@ -15,7 +15,7 @@ export interface SummaryCardProps {
   loading?: boolean;
 }
 
-const SummaryCard: FC<SummaryCardProps> = ({
+const SummaryCard: FC<SummaryCardProps> = memo(({
   label,
   value,
   subtitle,
@@ -81,6 +81,8 @@ const SummaryCard: FC<SummaryCardProps> = ({
       )}
     </article>
   );
-};
+});
+
+SummaryCard.displayName = 'SummaryCard';
 
 export default SummaryCard;
