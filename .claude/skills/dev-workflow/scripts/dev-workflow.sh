@@ -145,55 +145,46 @@ $details
 
 ## Your Mission
 
-1. **Understand the issue**: Read the task details above carefully
-2. **Implement the fix/feature**: Make the necessary code changes
-3. **Verify your changes**:
-   - Run tests: npm test
-   - Run lint: npm run lint
-   - Run typecheck: npm run typecheck
-4. **Commit your changes**: Use a descriptive conventional commit message
-5. **Push your branch**: git push -u origin $branch_name
-6. **Create a detailed Pull Request** using the template below
-7. **Close the issue**: bd close $issue_id
+1. **Implement**: Make the necessary code changes
+2. **Verify**: Run npm test && npm run lint && npm run typecheck
+3. **Commit**: Use a conventional commit message
+4. **Push**: git push -u origin $branch_name
+5. **Create PR**: Use gh pr create (see command below)
+6. **Close issue**: bd close $issue_id
 
-## PR Creation Command
+## MANDATORY: Create Pull Request
 
-After pushing, create the PR with:
+After pushing, you MUST create a PR. Use this command:
 
-gh pr create --title "$prefix($issue_id): $title" --body "\$(cat <<'EOF'
-## Summary
-- Brief description of the problem/feature
-- High-level approach taken
+gh pr create --title "$prefix($issue_id): $title" --body "## Summary
+<describe what was fixed/added>
 
-## Changes Made
-- List specific code changes
-- Explain WHY each change was made (not just what)
-
-## Technical Details
-- Any architectural decisions
-- Why this approach over alternatives
+## Changes
+<list changes with reasoning>
 
 ## Testing
-- [ ] Unit tests pass
-- [ ] Lint passes
-- [ ] TypeScript checks pass
-- [ ] Manual testing: (describe what was tested)
+- [x] npm test passes
+- [x] npm run lint passes
+- [x] npm run typecheck passes
 
-## Related
-- Fixes issue $issue_id
-- See \\\`bd show $issue_id\\\` for full context
+Fixes issue $issue_id
 
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
-EOF
-)"
+Generated with Claude Code"
 
-## Important Rules
-- Work ONLY in this worktree (you're already in it)
+## Rules
+- Work ONLY in this worktree
 - Do NOT merge to main - create PR only
-- Do NOT modify files in other worktrees
-- If blocked, document what's blocking you before stopping
+- Do NOT close issue until PR is created
 
-Start by exploring the codebase to understand the context, then implement the solution.
+## CRITICAL: Completion Checklist
+
+Your work is NOT complete until ALL of these are done:
+[ ] Code changes committed
+[ ] Branch pushed to origin
+[ ] Pull request created (you should see a PR URL)
+[ ] Issue closed with bd close $issue_id
+
+DO NOT stop or say you are done until you have created the PR and see the PR URL.
 PROMPT
 }
 

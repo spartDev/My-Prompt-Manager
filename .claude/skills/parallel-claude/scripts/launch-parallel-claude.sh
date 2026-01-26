@@ -100,11 +100,28 @@ create_worktree() {
 generate_prompt() {
     local issue_id="$1"
     local title=$(get_issue_title "$issue_id")
+    local branch_name="fix-$issue_id"
 
-    # Get detailed description from bd show
-    local description=$(bd show "$issue_id" 2>/dev/null | grep -A 50 "^Description:" | head -20)
+    cat <<EOF
+You are working on issue $issue_id: $title
 
-    echo "Fix issue $issue_id: $title. Review the issue details with 'bd show $issue_id'. Implement the fix, run tests with 'npm test', and close the issue with 'bd close $issue_id' when done."
+## Your Mission
+1. Run bd show $issue_id to understand the task
+2. Implement the fix/feature
+3. Verify: npm test && npm run lint && npm run typecheck
+4. Commit with conventional commit message
+5. Push: git push -u origin $branch_name
+6. Create PR: gh pr create --title "fix($issue_id): $title" --body "## Summary\n<describe changes>\n\n## Testing\n- [x] Tests pass\n\nFixes $issue_id\n\nGenerated with Claude Code"
+7. Close issue: bd close $issue_id
+
+## CRITICAL
+Work is NOT complete until you:
+- Push the branch
+- Create the PR (you must see the PR URL)
+- Close the issue
+
+DO NOT stop until PR is created.
+EOF
 }
 
 # Launch tmux session with panes
