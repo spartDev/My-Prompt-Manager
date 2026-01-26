@@ -1,4 +1,4 @@
-import { FC, useState, useRef } from 'react';
+import { FC, useState, useRef, useMemo } from 'react';
 
 import type { Prompt, Category } from '../../types';
 import { Logger, toError } from '../../utils';
@@ -161,9 +161,15 @@ const DataStorageSection: FC<DataStorageSectionProps> = ({
   };
 
   // Calculate storage usage (rough estimate)
-  const storageUsed = JSON.stringify({ prompts, categories }).length;
   const storageMax = 5 * 1024 * 1024; // 5MB Chrome storage limit
-  const storagePercentage = Math.min((storageUsed / storageMax) * 100, 100);
+  const storageUsed = useMemo(
+    () => JSON.stringify({ prompts, categories }).length,
+    [prompts, categories]
+  );
+  const storagePercentage = useMemo(
+    () => Math.min((storageUsed / storageMax) * 100, 100),
+    [storageUsed, storageMax]
+  );
 
   return (
     <SettingsSection
