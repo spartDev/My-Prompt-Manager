@@ -58,38 +58,38 @@ const ConfigurationPreview: FC<ConfigurationPreviewProps> = ({
   }, [isOpen, getFocusableElements]);
 
   // Handle ESC key and trap focus
+  const handleKeyDown = useCallback((event: KeyboardEvent) => {
+    if (event.key === 'Escape') {
+      onClose();
+    } else if (event.key === 'Tab') {
+      const focusableElements = getFocusableElements();
+      if (focusableElements.length === 0) {return;}
+
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
+
+      if (event.shiftKey) {
+        // Shift+Tab: if on first element, wrap to last
+        if (document.activeElement === firstElement) {
+          event.preventDefault();
+          lastElement.focus();
+        }
+      } else {
+        // Tab: if on last element, wrap to first
+        if (document.activeElement === lastElement) {
+          event.preventDefault();
+          firstElement.focus();
+        }
+      }
+    }
+  }, [onClose, getFocusableElements]);
+
   useEffect(() => {
     if (!isOpen) {return;}
 
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        onClose();
-      } else if (event.key === 'Tab') {
-        const focusableElements = getFocusableElements();
-        if (focusableElements.length === 0) {return;}
-
-        const firstElement = focusableElements[0];
-        const lastElement = focusableElements[focusableElements.length - 1];
-
-        if (event.shiftKey) {
-          // Shift+Tab: if on first element, wrap to last
-          if (document.activeElement === firstElement) {
-            event.preventDefault();
-            lastElement.focus();
-          }
-        } else {
-          // Tab: if on last element, wrap to first
-          if (document.activeElement === lastElement) {
-            event.preventDefault();
-            firstElement.focus();
-          }
-        }
-      }
-    };
-
     document.addEventListener('keydown', handleKeyDown);
     return () => { document.removeEventListener('keydown', handleKeyDown); };
-  }, [isOpen, onClose, getFocusableElements]);
+  }, [isOpen, handleKeyDown]);
 
   if (!isOpen || !config) {
     return null;
