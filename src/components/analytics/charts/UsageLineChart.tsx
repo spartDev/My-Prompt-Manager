@@ -1,4 +1,4 @@
-import { FC } from 'react';
+import { FC, memo } from 'react';
 import {
   LineChart,
   Line,
@@ -25,7 +25,7 @@ export interface UsageLineChartProps {
 /**
  * Line chart showing 30-day usage trend
  */
-const UsageLineChart: FC<UsageLineChartProps> = ({
+const UsageLineChart: FC<UsageLineChartProps> = memo(({
   data,
   height = 200,
   showGrid = true,
@@ -117,6 +117,8 @@ const UsageLineChart: FC<UsageLineChartProps> = ({
       </ResponsiveContainer>
     </div>
   );
-};
+});
+
+UsageLineChart.displayName = 'UsageLineChart';
 
 export default UsageLineChart;

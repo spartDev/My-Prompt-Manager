@@ -1,4 +1,4 @@
-import { FC, useCallback } from 'react';
+import { FC, memo, useCallback } from 'react';
 import {
   PieChart,
   Pie,
@@ -45,7 +45,7 @@ const FALLBACK_COLORS = [
 /**
  * Donut chart showing platform usage breakdown
  */
-const PlatformPieChart: FC<PlatformPieChartProps> = ({
+const PlatformPieChart: FC<PlatformPieChartProps> = memo(({
   data,
   height = 200,
   showLegend = true,
@@ -139,6 +139,8 @@ const PlatformPieChart: FC<PlatformPieChartProps> = ({
       </ResponsiveContainer>
     </div>
   );
-};
+});
+
+PlatformPieChart.displayName = 'PlatformPieChart';
 
 export default PlatformPieChart;

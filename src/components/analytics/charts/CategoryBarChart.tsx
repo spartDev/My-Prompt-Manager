@@ -1,4 +1,4 @@
-import { FC } from 'react';
+import { FC, memo } from 'react';
 import {
   BarChart,
   Bar,
@@ -42,7 +42,7 @@ const CATEGORY_COLORS = [
 /**
  * Horizontal bar chart showing category usage distribution
  */
-const CategoryBarChart: FC<CategoryBarChartProps> = ({
+const CategoryBarChart: FC<CategoryBarChartProps> = memo(({
   data,
   height = 200,
   maxCategories = 5,
@@ -142,6 +142,8 @@ const CategoryBarChart: FC<CategoryBarChartProps> = ({
       </ResponsiveContainer>
     </div>
   );
-};
+});
+
+CategoryBarChart.displayName = 'CategoryBarChart';
 
 export default CategoryBarChart;
