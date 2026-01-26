@@ -393,7 +393,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
       // Reload data
       await loadSettings();
       
-      alert(`Successfully imported ${data.prompts.length.toString()} prompts and ${data.categories.length.toString()} categories!`);
+      showToast(`Successfully imported ${data.prompts.length.toString()} prompts and ${data.categories.length.toString()} categories!`, 'success');
     } catch (error) {
       Logger.error('Import failed', toError(error));
       throw error;
@@ -405,7 +405,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
     try {
       await chrome.storage.local.clear();
       await loadSettings();
-      alert('All data has been cleared.');
+      showToast('All data has been cleared.', 'success');
     } catch (error) {
       Logger.error('Failed to clear data', toError(error));
       throw error;
@@ -431,7 +431,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
       }
       
       await loadSettings();
-      alert('Settings have been reset to defaults.');
+      showToast('Settings have been reset to defaults.', 'success');
     } catch (error) {
       Logger.error('Failed to reset settings', toError(error));
       throw error;

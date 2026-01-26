@@ -16,7 +16,7 @@ const createJsonFile = (contents: string): File => {
   return file;
 };
 
-const renderSettings = async () => {
+const renderSettings = async (showToastMock = vi.fn()) => {
   const mockToastSettings = {
     position: 'top-right' as const,
     enabledTypes: {
@@ -33,7 +33,7 @@ const renderSettings = async () => {
     <ThemeProvider>
       <SettingsView
         onBack={vi.fn()}
-        showToast={vi.fn()}
+        showToast={showToastMock}
         toastSettings={mockToastSettings}
         onToastSettingsChange={vi.fn()}
       />
@@ -41,6 +41,7 @@ const renderSettings = async () => {
   );
 
   await screen.findByRole('heading', { name: /settings/i });
+  return { showToastMock };
 };
 
 // Helper to find the reset call among multiple storage.local.set calls
@@ -80,9 +81,9 @@ describe('SettingsView', () => {
   it('imports prompts and categories from a valid backup', async () => {
     const storageMock = getMockStorageManager();
     const chromeMock = getChromeMockFunctions();
-    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    const showToastMock = vi.fn();
 
-    await renderSettings();
+    await renderSettings(showToastMock);
     await waitFor(() => {
       expect(storageMock.getPrompts).toHaveBeenCalled();
       expect(storageMock.getCategories).toHaveBeenCalled();
@@ -105,9 +106,8 @@ describe('SettingsView', () => {
       expect(storageMock.importPrompt).toHaveBeenCalledWith(prompts[0]);
     });
 
-    expect(alertSpy).toHaveBeenCalledWith(expect.stringMatching(/successfully imported/i));
+    expect(showToastMock).toHaveBeenCalledWith(expect.stringMatching(/successfully imported/i), 'success');
     expect((chromeMock.storage.local.get as Mock).mock.calls.length).toBeGreaterThanOrEqual(2);
-    alertSpy.mockRestore();
   });
 
   it('alerts when import JSON is invalid', async () => {
@@ -135,7 +135,7 @@ describe('SettingsView', () => {
   it('resets settings to defaults after confirmation', async () => {
     const chromeMock = getChromeMockFunctions();
     const storageMock = getMockStorageManager();
-    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    const showToastMock = vi.fn();
 
     (chromeMock.storage.local.get as Mock).mockResolvedValue({
       promptLibrarySettings: { enabledSites: [], customSites: [] },
@@ -148,7 +148,7 @@ describe('SettingsView', () => {
       }
     });
 
-    await renderSettings();
+    await renderSettings(showToastMock);
     await waitFor(() => {
       expect(storageMock.getPrompts).toHaveBeenCalled();
       expect(storageMock.getCategories).toHaveBeenCalled();
@@ -208,8 +208,7 @@ describe('SettingsView', () => {
       defaultCategory: 'Uncategorized'
     });
 
-    expect(alertSpy).toHaveBeenCalledWith(expect.stringMatching(/reset to defaults/i));
-    alertSpy.mockRestore();
+    expect(showToastMock).toHaveBeenCalledWith(expect.stringMatching(/reset to defaults/i), 'success');
   });
 
   it('changes the interface mode when a different option is selected', async () => {
