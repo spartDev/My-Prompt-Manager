@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 
 import { ElementFingerprint, CustomSite } from '../types';
 import { Logger, toError } from '../utils';
@@ -51,13 +51,17 @@ export function usePickerWindow({
   const [currentTabTitle, setCurrentTabTitle] = useState<string | null>(null);
   const [isCurrentSiteIntegrated, setIsCurrentSiteIntegrated] = useState(false);
 
-  // Check if we're in picker window mode
-  const urlParams = new URLSearchParams(window.location.search);
-  const isPickerWindow = urlParams.get('picker') === 'true';
-  const originalTabIdStr = urlParams.get('originalTabId');
-  const originalTabId = originalTabIdStr ? parseInt(originalTabIdStr, 10) : null;
-  const originalUrl = urlParams.get('originalUrl');
-  const originalHostname = urlParams.get('originalHostname');
+  // Check if we're in picker window mode - memoize since URL params don't change during component lifecycle
+  const { isPickerWindow, originalTabId, originalUrl, originalHostname } = useMemo(() => {
+    const params = new URLSearchParams(window.location.search);
+    const originalTabIdStr = params.get('originalTabId');
+    return {
+      isPickerWindow: params.get('picker') === 'true',
+      originalTabId: originalTabIdStr ? parseInt(originalTabIdStr, 10) : null,
+      originalUrl: params.get('originalUrl'),
+      originalHostname: params.get('originalHostname'),
+    };
+  }, []);
 
   const pickerWindowState: PickerWindowState = {
     isPickerWindow,
