@@ -208,21 +208,20 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
         promptLibrarySettings: newSettings 
       });
       
-      // Notify content scripts of changes
+      // Notify content scripts of changes in parallel
       const tabs = await chrome.tabs.query({});
-      
-      for (const tab of tabs) {
-        if (tab.id && tab.url && (tab.url.startsWith('http://') || tab.url.startsWith('https://'))) {
-          try {
-            await chrome.tabs.sendMessage(tab.id, {
-              action: 'settingsUpdated',
-              settings: newSettings
-            });
-          } catch {
-            // Tab might not have content script loaded, ignore error
-          }
-        }
-      }
+      const httpTabs = tabs.filter(
+        (tab): tab is chrome.tabs.Tab & { id: number } =>
+          tab.id !== undefined && tab.url !== undefined &&
+          (tab.url.startsWith('http://') || tab.url.startsWith('https://'))
+      );
+
+      await Promise.allSettled(
+        httpTabs.map(tab => chrome.tabs.sendMessage(tab.id, {
+          action: 'settingsUpdated',
+          settings: newSettings
+        }))
+      );
     } catch (error) {
       Logger.error('Failed to save settings', toError(error));
     } finally {
@@ -321,20 +320,17 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
     try {
       // Since we're using universal content script, just notify existing tabs
       const tabs = await chrome.tabs.query({ url: `*://${hostname}/*` });
-      
-      for (const tab of tabs) {
-        if (tab.id) {
-          try {
-            // Notify the content script to reinitialize
-            await chrome.tabs.sendMessage(tab.id, {
-              action: 'reinitialize',
-              reason: 'custom_site_added'
-            });
-          } catch {
-            // Tab might not have content script loaded yet, ignore error
-          }
-        }
-      }
+      const tabsWithIds = tabs.filter(
+        (tab): tab is chrome.tabs.Tab & { id: number } => tab.id !== undefined
+      );
+
+      // Notify all tabs in parallel
+      await Promise.allSettled(
+        tabsWithIds.map(tab => chrome.tabs.sendMessage(tab.id, {
+          action: 'reinitialize',
+          reason: 'custom_site_added'
+        }))
+      );
     } catch (error) {
       Logger.error('Failed to notify custom site change', toError(error));
     }
