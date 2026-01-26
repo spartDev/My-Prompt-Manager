@@ -52,11 +52,6 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
     return () => { clearInterval(interval); };
   }, []);
 
-  // Handler for tab switching - memoized to prevent re-creation on each render
-  const handleTabChange = useCallback((tab: PromptTab) => {
-    setActiveTab(tab);
-  }, []);
-
   // Compute summary metrics
   const summaryMetrics = useMemo(() => {
     if (!stats) {
@@ -102,6 +97,12 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
         return stats.forgottenPrompts;
     }
   }, [stats, activeTab]);
+
+  // Memoized tab click handler to avoid creating new function references on each render
+  const handleTabClick = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    const tab = e.currentTarget.dataset.tab as PromptTab;
+    setActiveTab(tab);
+  }, []);
 
   if (error) {
     return (
@@ -306,7 +307,8 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
                 <div className="border-b border-purple-100 dark:border-gray-700">
                   <nav className="flex -mb-px" aria-label="Prompt tabs">
                     <button
-                      onClick={() => { handleTabChange('most-used'); }}
+                      data-tab="most-used"
+                      onClick={handleTabClick}
                       className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
                         activeTab === 'most-used'
                           ? 'border-purple-600 text-purple-600 dark:text-purple-400'
@@ -318,7 +320,8 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
                       Most Used
                     </button>
                     <button
-                      onClick={() => { handleTabChange('recently-used'); }}
+                      data-tab="recently-used"
+                      onClick={handleTabClick}
                       className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
                         activeTab === 'recently-used'
                           ? 'border-purple-600 text-purple-600 dark:text-purple-400'
@@ -330,7 +333,8 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
                       Recently Used
                     </button>
                     <button
-                      onClick={() => { handleTabChange('forgotten'); }}
+                      data-tab="forgotten"
+                      onClick={handleTabClick}
                       className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
                         activeTab === 'forgotten'
                           ? 'border-purple-600 text-purple-600 dark:text-purple-400'
