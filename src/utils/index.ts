@@ -19,6 +19,11 @@ export {
   isUsageEvent,
   isCustomSite,
   isArrayOf,
+  // Import data validation
+  isValidImportPrompt,
+  isValidImportCategory,
+  findInvalidImportPrompt,
+  findInvalidImportCategory,
 } from './validation';
 export { cn } from './cn';
 export { formatPlatformName } from './formatPlatformName';
