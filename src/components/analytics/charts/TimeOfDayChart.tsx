@@ -10,6 +10,7 @@ import {
   Cell
 } from 'recharts';
 
+import { useChartTheme } from '../../../hooks/useChartTheme';
 import { TimeOfDayDistribution } from '../../../types/hooks';
 
 export interface TimeOfDayChartProps {
@@ -19,8 +20,6 @@ export interface TimeOfDayChartProps {
   height?: number;
   /** Whether to show grid lines */
   showGrid?: boolean;
-  /** Whether the chart is in dark mode */
-  isDarkMode?: boolean;
   /** Whether to highlight the peak time */
   highlightPeak?: boolean;
 }
@@ -48,13 +47,9 @@ const TimeOfDayChart: FC<TimeOfDayChartProps> = memo(({
   data,
   height = 200,
   showGrid = true,
-  isDarkMode = false,
   highlightPeak = true
 }) => {
-  const gridColor = isDarkMode ? '#374151' : '#e5e7eb';
-  const textColor = isDarkMode ? '#9ca3af' : '#6b7280';
-  const tooltipBg = isDarkMode ? '#1f2937' : '#ffffff';
-  const tooltipBorder = isDarkMode ? '#374151' : '#e5e7eb';
+  const { gridColor, textColor, tooltipBg, tooltipBorder, tooltipLabelColor, cursorColor } = useChartTheme();
 
   if (data.length === 0) {
     return (
@@ -115,13 +110,13 @@ const TimeOfDayChart: FC<TimeOfDayChartProps> = memo(({
               fontSize: '12px'
             }}
             labelStyle={{
-              color: isDarkMode ? '#f3f4f6' : '#111827',
+              color: tooltipLabelColor,
               fontWeight: 600
             }}
             itemStyle={{
-              color: isDarkMode ? '#f3f4f6' : '#111827'
+              color: tooltipLabelColor
             }}
-            cursor={{ fill: isDarkMode ? 'rgba(156, 163, 175, 0.1)' : 'rgba(107, 114, 128, 0.1)' }}
+            cursor={{ fill: cursorColor }}
           />
           <Bar dataKey="count" radius={[4, 4, 0, 0]}>
             {chartData.map((entry, index) => {

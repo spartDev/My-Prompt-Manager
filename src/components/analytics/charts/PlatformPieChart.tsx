@@ -8,6 +8,7 @@ import {
   Legend
 } from 'recharts';
 
+import { useChartTheme } from '../../../hooks/useChartTheme';
 import { PlatformBreakdown } from '../../../types/hooks';
 import { formatPlatformName } from '../../../utils';
 
@@ -18,8 +19,6 @@ export interface PlatformPieChartProps {
   height?: number;
   /** Whether to show legend */
   showLegend?: boolean;
-  /** Whether the chart is in dark mode */
-  isDarkMode?: boolean;
 }
 
 // Colors for each platform - using design guideline colors
@@ -59,12 +58,9 @@ const getColor = (platform: string, index: number): string => {
 const PlatformPieChart: FC<PlatformPieChartProps> = memo(({
   data,
   height = 200,
-  showLegend = true,
-  isDarkMode = false
+  showLegend = true
 }) => {
-  const tooltipBg = isDarkMode ? '#1f2937' : '#ffffff';
-  const tooltipBorder = isDarkMode ? '#374151' : '#e5e7eb';
-  const textColor = isDarkMode ? '#f3f4f6' : '#111827';
+  const { tooltipBg, tooltipBorder, tooltipLabelColor, isDarkMode } = useChartTheme();
 
   // Prepare data with formatted names
   const chartData = data.map((item, index) => ({
@@ -117,11 +113,11 @@ const PlatformPieChart: FC<PlatformPieChartProps> = memo(({
               fontSize: '12px'
             }}
             labelStyle={{
-              color: textColor,
+              color: tooltipLabelColor,
               fontWeight: 600
             }}
             itemStyle={{
-              color: isDarkMode ? '#f3f4f6' : '#111827'
+              color: tooltipLabelColor
             }}
           />
           {showLegend && (

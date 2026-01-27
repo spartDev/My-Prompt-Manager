@@ -9,6 +9,7 @@ import {
   ResponsiveContainer
 } from 'recharts';
 
+import { useChartTheme } from '../../../hooks/useChartTheme';
 import { DailyUsage } from '../../../types/hooks';
 
 export interface UsageLineChartProps {
@@ -18,8 +19,6 @@ export interface UsageLineChartProps {
   height?: number;
   /** Whether to show grid lines */
   showGrid?: boolean;
-  /** Whether the chart is in dark mode */
-  isDarkMode?: boolean;
 }
 
 /**
@@ -28,9 +27,10 @@ export interface UsageLineChartProps {
 const UsageLineChart: FC<UsageLineChartProps> = memo(({
   data,
   height = 200,
-  showGrid = true,
-  isDarkMode = false
+  showGrid = true
 }) => {
+  const { gridColor, textColor, tooltipBg, tooltipBorder, tooltipLabelColor } = useChartTheme();
+
   // Format date for X axis (e.g., "Jan 13")
   const formatDate = (dateStr: string): string => {
     const date = new Date(dateStr);
@@ -39,10 +39,6 @@ const UsageLineChart: FC<UsageLineChartProps> = memo(({
 
   // Colors based on design guidelines
   const lineColor = '#9333ea'; // purple-600
-  const gridColor = isDarkMode ? '#374151' : '#e5e7eb'; // gray-700 : gray-200
-  const textColor = isDarkMode ? '#9ca3af' : '#6b7280'; // gray-400 : gray-500
-  const tooltipBg = isDarkMode ? '#1f2937' : '#ffffff'; // gray-800 : white
-  const tooltipBorder = isDarkMode ? '#374151' : '#e5e7eb';
 
   if (data.length === 0) {
     return (
@@ -98,7 +94,7 @@ const UsageLineChart: FC<UsageLineChartProps> = memo(({
               fontSize: '12px'
             }}
             labelStyle={{
-              color: isDarkMode ? '#f3f4f6' : '#111827',
+              color: tooltipLabelColor,
               fontWeight: 600
             }}
             itemStyle={{

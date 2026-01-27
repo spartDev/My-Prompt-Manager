@@ -10,6 +10,7 @@ import {
   Cell
 } from 'recharts';
 
+import { useChartTheme } from '../../../hooks/useChartTheme';
 import { CategoryDistribution } from '../../../types/hooks';
 
 export interface CategoryBarChartProps {
@@ -21,8 +22,6 @@ export interface CategoryBarChartProps {
   maxCategories?: number;
   /** Whether to show grid lines */
   showGrid?: boolean;
-  /** Whether the chart is in dark mode */
-  isDarkMode?: boolean;
 }
 
 // Colors for categories - using design guideline colors
@@ -46,13 +45,9 @@ const CategoryBarChart: FC<CategoryBarChartProps> = memo(({
   data,
   height = 200,
   maxCategories = 5,
-  showGrid = true,
-  isDarkMode = false
+  showGrid = true
 }) => {
-  const gridColor = isDarkMode ? '#374151' : '#e5e7eb';
-  const textColor = isDarkMode ? '#9ca3af' : '#6b7280';
-  const tooltipBg = isDarkMode ? '#1f2937' : '#ffffff';
-  const tooltipBorder = isDarkMode ? '#374151' : '#e5e7eb';
+  const { gridColor, textColor, tooltipBg, tooltipBorder, tooltipLabelColor, cursorColor } = useChartTheme();
 
   // Limit to top N categories
   const chartData = data.slice(0, maxCategories);
@@ -122,13 +117,13 @@ const CategoryBarChart: FC<CategoryBarChartProps> = memo(({
               fontSize: '12px'
             }}
             labelStyle={{
-              color: isDarkMode ? '#f3f4f6' : '#111827',
+              color: tooltipLabelColor,
               fontWeight: 600
             }}
             itemStyle={{
-              color: isDarkMode ? '#f3f4f6' : '#111827'
+              color: tooltipLabelColor
             }}
-            cursor={{ fill: isDarkMode ? 'rgba(156, 163, 175, 0.1)' : 'rgba(107, 114, 128, 0.1)' }}
+            cursor={{ fill: cursorColor }}
           />
           <Bar dataKey="count" radius={[0, 4, 4, 0]}>
             {chartData.map((_, index) => (

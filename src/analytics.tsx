@@ -1,27 +1,22 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import ReactDOM from 'react-dom/client';
 
 import { AnalyticsDashboard } from './components/analytics';
 import ErrorBoundary from './components/ErrorBoundary';
-import { ThemeProvider, useThemeContext } from './contexts/ThemeContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import './popup.css';
 
 /**
  * Analytics page wrapper
  */
 function AnalyticsPage(): React.ReactElement {
-  const { resolvedTheme } = useThemeContext();
-
-  const handleBack = (): void => {
+  const handleBack = useCallback((): void => {
     // Close the tab when back is clicked
     window.close();
-  };
+  }, []);
 
   return (
-    <AnalyticsDashboard
-      onBack={handleBack}
-      isDarkMode={resolvedTheme === 'dark'}
-    />
+    <AnalyticsDashboard onBack={handleBack} />
   );
 }
 

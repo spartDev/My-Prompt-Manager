@@ -27,16 +27,13 @@ type PromptTab = 'most-used' | 'recently-used' | 'forgotten';
 export interface AnalyticsDashboardProps {
   /** Callback when user wants to go back */
   onBack?: () => void;
-  /** Whether the dashboard is in dark mode */
-  isDarkMode?: boolean;
 }
 
 /**
  * Full-page analytics dashboard with charts and prompt tables
  */
 const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
-  onBack,
-  isDarkMode = false
+  onBack
 }) => {
   const { stats, loading, error } = useUsageStats();
   const [activeTab, setActiveTab] = useState<PromptTab>('most-used');
@@ -189,7 +186,6 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
                   <UsageLineChart
                     data={stats?.dailyUsage ?? []}
                     height={250}
-                    isDarkMode={isDarkMode}
                   />
                 )}
               </div>
@@ -212,7 +208,6 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
                     <PlatformPieChart
                       data={stats?.platformBreakdown ?? []}
                       height={200}
-                      isDarkMode={isDarkMode}
                     />
                   )}
                 </div>
@@ -228,7 +223,6 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
                     <DayOfWeekChart
                       data={stats?.dayOfWeekDistribution ?? []}
                       height={200}
-                      isDarkMode={isDarkMode}
                     />
                   )}
                 </div>
@@ -245,7 +239,6 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
                       data={stats?.categoryDistribution ?? []}
                       height={200}
                       maxCategories={6}
-                      isDarkMode={isDarkMode}
                     />
                   )}
                 </div>
@@ -261,7 +254,6 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
                     <TimeOfDayChart
                       data={stats?.timeOfDayDistribution ?? []}
                       height={200}
-                      isDarkMode={isDarkMode}
                     />
                   )}
                 </div>
