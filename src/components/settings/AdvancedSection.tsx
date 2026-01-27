@@ -1,4 +1,4 @@
-import { FC, useState } from 'react';
+import { FC, useCallback, useState } from 'react';
 
 import ToggleSwitch from './ToggleSwitch';
 
@@ -15,10 +15,12 @@ const AdvancedSection: FC<AdvancedSectionProps> = ({
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
+  const toggleExpanded = useCallback(() => { setIsExpanded(prev => !prev); }, []);
+
   return (
     <section className="border-t border-gray-200 dark:border-gray-700 pt-6">
       <button
-        onClick={() => { setIsExpanded(!isExpanded); }}
+        onClick={toggleExpanded}
         className="w-full flex items-center justify-between text-left mb-4 group"
         aria-expanded={isExpanded}
       >
