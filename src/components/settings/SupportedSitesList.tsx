@@ -5,7 +5,7 @@ import SiteCard from './SiteCard';
 export interface SiteConfig {
   name: string;
   description: string;
-  icon: ReactNode | ((isEnabled: boolean) => ReactNode);
+  icon: (isEnabled: boolean) => ReactNode;
 }
 
 interface SupportedSitesListProps {
@@ -35,7 +35,7 @@ const SupportedSitesList: FC<SupportedSitesListProps> = ({
               hostname={hostname}
               name={config.name}
               description={config.description}
-              icon={typeof config.icon === 'function' ? config.icon(isEnabled) : config.icon}
+              icon={config.icon(isEnabled)}
               isEnabled={isEnabled}
               onToggle={onSiteToggle}
               saving={saving}

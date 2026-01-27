@@ -22,7 +22,7 @@ import ViewHeader from './ViewHeader';
 interface SiteConfig {
   name: string;
   description: string;
-  icon: ReactNode | ((isEnabled: boolean) => ReactNode);
+  icon: (isEnabled: boolean) => ReactNode;
 }
 
 interface CustomSite {
@@ -98,17 +98,17 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
     'www.perplexity.ai': {
       name: 'Perplexity',
       description: 'AI-powered search engine',
-      icon: <PerplexityIcon />
+      icon: (_isEnabled: boolean) => <PerplexityIcon />
     },
     'claude.ai': {
       name: 'Claude',
       description: 'Anthropic\'s AI assistant',
-      icon: <ClaudeIcon />
+      icon: (_isEnabled: boolean) => <ClaudeIcon />
     },
     'chatgpt.com': {
       name: 'ChatGPT',
       description: 'OpenAI\'s conversational AI',
-      icon: <ChatGPTIcon />
+      icon: (_isEnabled: boolean) => <ChatGPTIcon />
     },
     'gemini.google.com': {
       name: 'Google Gemini',
