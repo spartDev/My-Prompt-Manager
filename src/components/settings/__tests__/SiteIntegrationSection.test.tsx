@@ -9,7 +9,7 @@ const baseSiteConfigs = {
   'claude.ai': {
     name: 'Claude.ai',
     description: 'Claude integration',
-    icon: <span>Claude</span>
+    icon: () => <span>Claude</span>
   }
 };
 
