@@ -57,7 +57,7 @@ const TimeOfDayChart: FC<TimeOfDayChartProps> = memo(({
   const tooltipBorder = isDarkMode ? '#374151' : '#e5e7eb';
 
   // Find peak time
-  const maxCount = Math.max(...data.map(d => d.count));
+  const maxCount = data.length > 0 ? Math.max(...data.map(d => d.count)) : 0;
 
   // Prepare data with time ranges
   const chartData = data.map(item => ({
