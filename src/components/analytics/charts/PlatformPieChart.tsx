@@ -1,4 +1,4 @@
-import { FC, memo, useCallback } from 'react';
+import { FC, memo } from 'react';
 import {
   PieChart,
   Pie,
@@ -43,6 +43,17 @@ const FALLBACK_COLORS = [
 ];
 
 /**
+ * Get color for a platform based on predefined colors or fallback palette
+ */
+const getColor = (platform: string, index: number): string => {
+  const lowerPlatform = platform.toLowerCase();
+  if (PLATFORM_COLORS[lowerPlatform]) {
+    return PLATFORM_COLORS[lowerPlatform];
+  }
+  return FALLBACK_COLORS[index % FALLBACK_COLORS.length];
+};
+
+/**
  * Donut chart showing platform usage breakdown
  */
 const PlatformPieChart: FC<PlatformPieChartProps> = memo(({
@@ -54,15 +65,6 @@ const PlatformPieChart: FC<PlatformPieChartProps> = memo(({
   const tooltipBg = isDarkMode ? '#1f2937' : '#ffffff';
   const tooltipBorder = isDarkMode ? '#374151' : '#e5e7eb';
   const textColor = isDarkMode ? '#f3f4f6' : '#111827';
-
-  // Get color for a platform
-  const getColor = useCallback((platform: string, index: number): string => {
-    const lowerPlatform = platform.toLowerCase();
-    if (PLATFORM_COLORS[lowerPlatform]) {
-      return PLATFORM_COLORS[lowerPlatform];
-    }
-    return FALLBACK_COLORS[index % FALLBACK_COLORS.length];
-  }, []);
 
   // Prepare data with formatted names
   const chartData = data.map((item, index) => ({
