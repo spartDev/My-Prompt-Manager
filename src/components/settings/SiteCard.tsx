@@ -1,4 +1,4 @@
-import { FC, ReactNode } from 'react';
+import { FC, ReactNode, useCallback } from 'react';
 
 import { getBrandColors } from '../../constants/brandColors';
 
@@ -35,6 +35,31 @@ const SiteCard: FC<SiteCardProps> = ({
   saving = false
 }) => {
   const brandColors = getBrandColors(hostname);
+
+  const handleToggle = useCallback(
+    (checked: boolean) => {
+      void onToggle(hostname, checked);
+    },
+    [hostname, onToggle]
+  );
+
+  const handleExport = useCallback(() => {
+    if (onExport) {
+      void onExport(hostname);
+    }
+  }, [hostname, onExport]);
+
+  const handleEdit = useCallback(() => {
+    if (onEdit) {
+      void onEdit(hostname);
+    }
+  }, [hostname, onEdit]);
+
+  const handleRemove = useCallback(() => {
+    if (onRemove) {
+      void onRemove(hostname);
+    }
+  }, [hostname, onRemove]);
   
   return (
     <div className={`
@@ -80,7 +105,7 @@ const SiteCard: FC<SiteCardProps> = ({
         {/* Toggle Switch */}
         <ToggleSwitch
           checked={isEnabled}
-          onChange={(checked) => { void onToggle(hostname, checked); }}
+          onChange={handleToggle}
           disabled={saving}
           ariaLabel={`Enable ${name} integration`}
           size="medium"
@@ -92,14 +117,14 @@ const SiteCard: FC<SiteCardProps> = ({
         <div className="flex gap-1 flex-wrap mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
           {onExport && (
             <ExportButton
-              onClick={() => { void onExport(hostname); }}
+              onClick={handleExport}
               disabled={saving}
               loading={exporting}
             />
           )}
           {onEdit && (
             <button
-              onClick={() => { void onEdit(hostname); }}
+              onClick={handleEdit}
               disabled={saving}
               className="flex-1 flex items-center justify-center gap-1 px-2 py-1 text-xs font-medium text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-sm transition-colors"
             >
@@ -111,7 +136,7 @@ const SiteCard: FC<SiteCardProps> = ({
           )}
           {onRemove && (
             <button
-              onClick={() => { void onRemove(hostname); }}
+              onClick={handleRemove}
               disabled={saving}
               className="flex-1 flex items-center justify-center gap-1 px-2 py-1 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-sm transition-colors"
             >
