@@ -90,7 +90,7 @@ const UsageLineChart: FC<UsageLineChartProps> = memo(({
           />
           <Tooltip
             formatter={(value: number | undefined) => [value ?? 0, 'Uses']}
-            labelFormatter={(label: string) => formatDate(label)}
+            labelFormatter={(label) => formatDate(String(label))}
             contentStyle={{
               backgroundColor: tooltipBg,
               border: `1px solid ${tooltipBorder}`,
