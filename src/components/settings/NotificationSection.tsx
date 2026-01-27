@@ -5,6 +5,37 @@ import { ToastSettings } from '../../types/hooks';
 
 import ToggleSwitch from './ToggleSwitch';
 
+// Hoisted static JSX - avoids recreation on every render
+const NotificationIcon = (
+  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+  </svg>
+);
+
+const ChevronIcon = (
+  <svg
+    className="w-5 h-5 text-gray-400"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2}
+    viewBox="0 0 24 24"
+  >
+    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+  </svg>
+);
+
+const CheckCircleIcon = (
+  <svg className="w-5 h-5 text-purple-500" fill="currentColor" viewBox="0 0 20 20">
+    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+  </svg>
+);
+
+const TestNotificationIcon = (
+  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+    <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
+  </svg>
+);
+
 interface NotificationSectionProps {
   settings?: ToastSettings;
   onSettingsChange: (settings: Partial<ToastSettings>) => void;
@@ -129,9 +160,7 @@ const NotificationSection: FC<NotificationSectionProps> = ({
       >
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-lg flex items-center justify-center shrink-0">
-            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-            </svg>
+            {NotificationIcon}
           </div>
           <div>
             <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
@@ -142,15 +171,9 @@ const NotificationSection: FC<NotificationSectionProps> = ({
             </p>
           </div>
         </div>
-        <svg
-          className={`w-5 h-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2}
-          viewBox="0 0 24 24"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-        </svg>
+        <span className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
+          {ChevronIcon}
+        </span>
       </button>
 
       {isExpanded && (
@@ -175,11 +198,7 @@ const NotificationSection: FC<NotificationSectionProps> = ({
                 <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
                   Top Right
                 </span>
-                {(settings?.position ?? 'top-right') === 'top-right' && (
-                  <svg className="w-5 h-5 text-purple-500" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                )}
+                {(settings?.position ?? 'top-right') === 'top-right' && CheckCircleIcon}
               </div>
               <div className="relative h-12 bg-gray-100 dark:bg-gray-700 rounded-sm border border-gray-200 dark:border-gray-600">
                 <div className="absolute top-1 right-1 w-16 h-3 bg-purple-500 rounded-sm"></div>
@@ -200,11 +219,7 @@ const NotificationSection: FC<NotificationSectionProps> = ({
                 <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
                   Bottom Right
                 </span>
-                {settings?.position === 'bottom-right' && (
-                  <svg className="w-5 h-5 text-purple-500" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                )}
+                {settings?.position === 'bottom-right' && CheckCircleIcon}
               </div>
               <div className="relative h-12 bg-gray-100 dark:bg-gray-700 rounded-sm border border-gray-200 dark:border-gray-600">
                 <div className="absolute bottom-1 right-1 w-16 h-3 bg-purple-500 rounded-sm"></div>
@@ -236,9 +251,7 @@ const NotificationSection: FC<NotificationSectionProps> = ({
                 }
               `}
             >
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
-              </svg>
+              {TestNotificationIcon}
               <span>Test</span>
             </button>
           </div>
