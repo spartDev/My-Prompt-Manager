@@ -56,15 +56,6 @@ const TimeOfDayChart: FC<TimeOfDayChartProps> = memo(({
   const tooltipBg = isDarkMode ? '#1f2937' : '#ffffff';
   const tooltipBorder = isDarkMode ? '#374151' : '#e5e7eb';
 
-  // Find peak time
-  const maxCount = Math.max(...data.map(d => d.count));
-
-  // Prepare data with time ranges
-  const chartData = data.map(item => ({
-    ...item,
-    timeRange: TIME_BUCKET_ICONS[item.bucket] ?? ''
-  }));
-
   if (data.length === 0) {
     return (
       <div
@@ -77,6 +68,15 @@ const TimeOfDayChart: FC<TimeOfDayChartProps> = memo(({
       </div>
     );
   }
+
+  // Find peak time (safe to call after empty check)
+  const maxCount = Math.max(...data.map(d => d.count));
+
+  // Prepare data with time ranges
+  const chartData = data.map(item => ({
+    ...item,
+    timeRange: TIME_BUCKET_ICONS[item.bucket] ?? ''
+  }));
 
   return (
     <div

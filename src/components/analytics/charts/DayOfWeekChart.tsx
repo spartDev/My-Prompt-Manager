@@ -43,9 +43,6 @@ const DayOfWeekChart: FC<DayOfWeekChartProps> = memo(({
   const tooltipBg = isDarkMode ? '#1f2937' : '#ffffff';
   const tooltipBorder = isDarkMode ? '#374151' : '#e5e7eb';
 
-  // Find peak day
-  const maxCount = Math.max(...data.map(d => d.count));
-
   if (data.length === 0) {
     return (
       <div
@@ -58,6 +55,9 @@ const DayOfWeekChart: FC<DayOfWeekChartProps> = memo(({
       </div>
     );
   }
+
+  // Find peak day (safe to call after empty check)
+  const maxCount = Math.max(...data.map(d => d.count));
 
   return (
     <div
