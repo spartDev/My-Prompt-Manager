@@ -49,6 +49,8 @@ const AboutSection: FC<AboutSectionProps> = ({ version, onReset }) => {
   const [resetting, setResetting] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
 
+  const toggleExpanded = useCallback(() => { setIsExpanded(prev => !prev); }, []);
+
   const handleReset = useCallback(async () => {
     if (!showResetConfirm) {
       setShowResetConfirm(true);
@@ -69,7 +71,7 @@ const AboutSection: FC<AboutSectionProps> = ({ version, onReset }) => {
   return (
     <section className="border-t border-gray-200 dark:border-gray-700 pt-6">
       <button
-        onClick={() => { setIsExpanded(!isExpanded); }}
+        onClick={toggleExpanded}
         className="w-full flex items-center justify-between text-left mb-4 group"
         aria-expanded={isExpanded}
       >

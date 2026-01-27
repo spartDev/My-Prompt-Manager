@@ -1,4 +1,4 @@
-import { FC, useMemo, useState } from 'react';
+import { FC, useCallback, useMemo, useState } from 'react';
 
 import { ToastType } from '../../types/components';
 import { ToastSettings } from '../../types/hooks';
@@ -124,6 +124,8 @@ const NotificationSection: FC<NotificationSectionProps> = ({
   const [isExpanded, setIsExpanded] = useState(false);
   const [currentTestTypeIndex, setCurrentTestTypeIndex] = useState(0);
 
+  const toggleExpanded = useCallback(() => { setIsExpanded(prev => !prev); }, []);
+
   // Memoize enabledTypes with defaults
   const currentEnabledTypes = useMemo(() => {
     const types = settings?.enabledTypes;
@@ -154,7 +156,7 @@ const NotificationSection: FC<NotificationSectionProps> = ({
   return (
     <section className="border-t border-gray-200 dark:border-gray-700 pt-6">
       <button
-        onClick={() => { setIsExpanded(!isExpanded); }}
+        onClick={toggleExpanded}
         className="w-full flex items-center justify-between text-left mb-4 group"
         aria-expanded={isExpanded}
       >
