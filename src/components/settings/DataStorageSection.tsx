@@ -1,6 +1,7 @@
-import { FC, useState, useRef, useMemo } from 'react';
+import { FC, useState, useRef, useMemo, useCallback } from 'react';
 
 import type { Prompt, Category } from '../../types';
+import type {} from '../../types/file-system-access-api';
 import { Logger, toError, findInvalidImportPrompt, findInvalidImportCategory } from '../../utils';
 
 import SettingsSection from './SettingsSection';
@@ -42,7 +43,7 @@ const DataStorageSection: FC<DataStorageSectionProps> = ({
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleExport = () => {
+  const handleExport = useCallback(async () => {
     const data = {
       version: '1.0',
       exportDate: new Date().toISOString(),
@@ -50,16 +51,40 @@ const DataStorageSection: FC<DataStorageSectionProps> = ({
       categories
     };
 
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const content = JSON.stringify(data, null, 2);
+    const filename = `prompt-library-backup-${new Date().toISOString().split('T')[0]}.json`;
+
+    // Use File System Access API if available (modern browsers)
+    if (window.showSaveFilePicker) {
+      try {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: filename,
+          types: [{ description: 'JSON file', accept: { 'application/json': ['.json'] } }]
+        });
+        const writable = await handle.createWritable();
+        await writable.write(content);
+        await writable.close();
+        return;
+      } catch (error) {
+        // User cancelled the dialog - not an error
+        if ((error as Error).name === 'AbortError') {
+          return;
+        }
+        Logger.warn('File System Access API failed, falling back to legacy method', { component: 'DataStorageSection', error: toError(error) });
+      }
+    }
+
+    // Fallback to legacy DOM manipulation
+    const blob = new Blob([content], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `prompt-library-backup-${new Date().toISOString().split('T')[0]}.json`;
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  };
+  }, [prompts, categories]);
 
   const handleImportClick = () => {
     fileInputRef.current?.click();
@@ -195,7 +220,7 @@ const DataStorageSection: FC<DataStorageSectionProps> = ({
           </h3>
           <div className="flex gap-2">
             <button
-              onClick={handleExport}
+              onClick={() => void handleExport()}
               className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 focus-primary"
             >
               {ExportIcon}
