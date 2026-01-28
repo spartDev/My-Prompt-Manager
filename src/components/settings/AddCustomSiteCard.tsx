@@ -1,5 +1,7 @@
 import { FC, useId } from 'react';
 
+import { cn } from '../../utils/cn';
+
 interface AddCustomSiteCardProps {
   onClick: () => void;
   disabled?: boolean;
@@ -41,11 +43,11 @@ const AddCustomSiteCard: FC<AddCustomSiteCardProps> = ({
       aria-disabled={disabled}
       aria-label="Add new custom site integration"
       aria-describedby={descriptionId}
-      className={`${baseClasses} ${stateClasses} ${className}`}
+      className={cn(baseClasses, stateClasses, className)}
       title={tooltip}
     >
       <div className="flex items-start gap-3">
-        <span className={`flex h-10 w-10 items-center justify-center rounded-lg transition-colors duration-200 ${iconClasses}`}>
+        <span className={cn('flex h-10 w-10 items-center justify-center rounded-lg transition-colors duration-200', iconClasses)}>
           <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
           </svg>
