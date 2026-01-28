@@ -12,6 +12,7 @@ import { type FC } from 'react';
 
 import { getAccessibleTextColor, DEFAULT_CATEGORY_COLOR } from '../constants/colors';
 import { type Category } from '../types';
+import { cn } from '../utils/cn';
 
 interface CategoryBadgeProps {
   /** Category object with name and optional color */
@@ -46,7 +47,7 @@ export const CategoryBadge: FC<CategoryBadgeProps> = ({
   if (variant === 'dot') {
     return (
       <span
-        className={`w-3 h-3 rounded-full shrink-0 ${className}`}
+        className={cn('w-3 h-3 rounded-full shrink-0', className)}
         style={{ backgroundColor }}
         aria-label={`Category: ${category.name}`}
         title={category.name}
@@ -69,7 +70,7 @@ export const CategoryBadge: FC<CategoryBadgeProps> = ({
 
   return (
     <span
-      className={`${badgeBaseClasses} ${sizeClasses} ${interactiveClasses} ${className}`}
+      className={cn(badgeBaseClasses, sizeClasses, interactiveClasses, className)}
       style={{
         backgroundColor,
         color: textColor
