@@ -71,6 +71,8 @@ export function usePickerWindow({
   };
 
   // Element picker message handler
+  // Empty deps intentional: we want a single message listener for the component
+  // lifecycle. State setters (setCustomSelector, etc.) are stable references.
   useEffect(() => {
     const handleMessage = (message: { type?: string; data?: unknown }) => {
       if (message.type === 'ELEMENT_PICKER_RESULT') {
