@@ -48,7 +48,7 @@ interface NotificationTypeRowProps {
   description: string;
   color: string;
   enabled: boolean;
-  onToggle: (checked: boolean) => void;
+  onToggle: (type: ToastType, checked: boolean) => void;
 }
 
 const NotificationTypeRow: FC<NotificationTypeRowProps> = ({
@@ -80,7 +80,7 @@ const NotificationTypeRow: FC<NotificationTypeRowProps> = ({
       </div>
       <ToggleSwitch
         checked={enabled}
-        onChange={onToggle}
+        onChange={(checked) => { onToggle(type, checked); }}
         ariaLabel={`Enable ${type} notifications`}
         size="small"
       />
@@ -141,6 +141,16 @@ const NotificationSection: FC<NotificationSectionProps> = ({
   const enabledTypes = (['success', 'error', 'warning', 'info'] as const).filter(
     type => currentEnabledTypes[type]
   );
+
+  // Memoized handler for notification type toggles
+  const handleTypeToggle = useCallback((type: ToastType, checked: boolean) => {
+    onSettingsChange({
+      enabledTypes: {
+        ...currentEnabledTypes,
+        [type]: checked
+      }
+    });
+  }, [onSettingsChange, currentEnabledTypes]);
 
   // Handle test button click - cycles through enabled types
   const handleTestClick = () => {
@@ -266,14 +276,7 @@ const NotificationSection: FC<NotificationSectionProps> = ({
                 description={description}
                 color={color}
                 enabled={currentEnabledTypes[type]}
-                onToggle={(checked) => {
-                  onSettingsChange({
-                    enabledTypes: {
-                      ...currentEnabledTypes,
-                      [type]: checked
-                    }
-                  });
-                }}
+                onToggle={handleTypeToggle}
               />
             ))}
           </div>
