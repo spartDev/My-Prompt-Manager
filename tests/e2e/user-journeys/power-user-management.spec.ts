@@ -358,6 +358,12 @@ test.describe('Power User Prompt Management', () => {
     await sidepanelPage.getByRole('button', { name: 'Settings' }).click();
     await expect(sidepanelPage.getByRole('heading', { name: 'Settings' })).toBeVisible();
 
+    // Remove File System Access API to force legacy download fallback
+    // (showSaveFilePicker opens native OS dialog that Playwright can't interact with)
+    await sidepanelPage.evaluate(() => {
+      delete (window as Record<string, unknown>).showSaveFilePicker;
+    });
+
     // Test export functionality
     const downloadPromise = sidepanelPage.waitForEvent('download');
     await sidepanelPage.getByRole('button', { name: 'Export' }).click();
