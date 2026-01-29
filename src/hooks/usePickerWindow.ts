@@ -153,6 +153,12 @@ export function usePickerWindow({
     setPickerError(null);
   }, []);
 
+  /**
+   * Initiates the element picker to select a DOM element for custom positioning.
+   * Determines the target tab (original tab in picker window mode, or active tab otherwise),
+   * requests site permission if needed, and sends the appropriate message to start the picker.
+   * In popup mode, opens a dedicated picker window and closes the popup.
+   */
   const startElementPicker = useCallback(async () => {
     setPickingElement(true);
     setPickerError(null);
