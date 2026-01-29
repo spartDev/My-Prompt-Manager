@@ -25,6 +25,8 @@ interface FileSystemWritableFileStream extends WritableStream {
   write(data: BufferSource | Blob | string): Promise<void>;
   seek(position: number): Promise<void>;
   truncate(size: number): Promise<void>;
+  close(): Promise<void>;
+  abort(reason?: unknown): Promise<void>;
 }
 
 interface FileSystemFileHandle {
