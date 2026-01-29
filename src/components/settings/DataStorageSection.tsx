@@ -3,27 +3,9 @@ import { FC, useState, useRef, useMemo, useCallback } from 'react';
 import type { Prompt, Category } from '../../types';
 import type {} from '../../types/file-system-access-api';
 import { Logger, toError, findInvalidImportPrompt, findInvalidImportCategory } from '../../utils';
+import { DatabaseIcon, ExportIcon, ImportIcon } from '../icons/SettingsIcons';
 
 import SettingsSection from './SettingsSection';
-
-// Hoisted static JSX - avoids recreation on every render
-const DataStorageIcon = (
-  <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
-  </svg>
-);
-
-const ExportIcon = (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
-  </svg>
-);
-
-const ImportIcon = (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-  </svg>
-);
 
 interface DataStorageSectionProps {
   prompts: Prompt[];
@@ -186,7 +168,7 @@ const DataStorageSection: FC<DataStorageSectionProps> = ({
 
   return (
     <SettingsSection
-      icon={DataStorageIcon}
+      icon={<DatabaseIcon />}
       title="Data & Storage"
       description="Manage your prompts and storage"
     >
@@ -223,7 +205,7 @@ const DataStorageSection: FC<DataStorageSectionProps> = ({
               onClick={() => void handleExport()}
               className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 focus-primary"
             >
-              {ExportIcon}
+              <ExportIcon />
               <span className="text-sm font-medium">Export</span>
             </button>
             
@@ -239,7 +221,7 @@ const DataStorageSection: FC<DataStorageSectionProps> = ({
                 </>
               ) : (
                 <>
-                  {ImportIcon}
+                  <ImportIcon />
                   <span className="text-sm font-medium">Import</span>
                 </>
               )}
