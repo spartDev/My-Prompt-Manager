@@ -7,6 +7,7 @@ import { FilterSortControlsProps } from '../types/components';
 
 import CategoryBadge from './CategoryBadge';
 import { Dropdown, DropdownItem } from './Dropdown';
+import { ChevronDownIcon, FunnelIcon, SortIcon, FolderIcon } from './icons/SettingsIcons';
 import { CheckIcon, ClockIcon, CalendarIcon, AlphabeticalIcon, StarIcon, HistoryIcon } from './icons/UIIcons';
 
 const SORT_OPTIONS: Array<{ value: SortOrder; label: string; icon: FC<{ className?: string }> }> = [
@@ -192,9 +193,7 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
               title={`Filter: ${categoryLabel}`}
             >
               {/* Funnel icon */}
-              <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-              </svg>
+              <FunnelIcon className="w-4 h-4 shrink-0" />
 
               {/* Filter label */}
               <span className="text-sm font-semibold truncate max-w-[100px]">
@@ -202,9 +201,7 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
               </span>
 
               {/* Dropdown arrow */}
-              <svg className="w-4 h-4 text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
+              <ChevronDownIcon className="w-4 h-4 text-gray-500 shrink-0" />
 
               {/* Badge indicator when category selected */}
               {selectedCategory && (
@@ -248,9 +245,7 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
               title={`Sort: ${sortLabel}`}
             >
               {/* Sort icon */}
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-              </svg>
+              <SortIcon />
 
               {/* Active sort badge indicator */}
               <span
@@ -288,9 +283,7 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
         title="Manage Categories"
       >
         {/* Folder/archive icon - always visible */}
-        <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-        </svg>
+        <FolderIcon className="w-4 h-4 shrink-0" />
 
         {/* Text - desktop only (>= 375px) */}
         <span className="hidden min-[375px]:inline">Categories</span>
