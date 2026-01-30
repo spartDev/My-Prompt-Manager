@@ -3,6 +3,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { ElementFingerprint, CustomSite } from '../types';
 import { Logger, toError } from '../utils';
 
+import { useSitePermissions } from './useSitePermissions';
+
 export interface PickerWindowState {
   isPickerWindow: boolean;
   originalTabId: number | null;
@@ -50,6 +52,8 @@ export function usePickerWindow({
   const [currentTabUrl, setCurrentTabUrl] = useState<string | null>(null);
   const [currentTabTitle, setCurrentTabTitle] = useState<string | null>(null);
   const [isCurrentSiteIntegrated, setIsCurrentSiteIntegrated] = useState(false);
+
+  const { checkPermissionForOrigin, requestPermissionForOrigin } = useSitePermissions();
 
   // Check if we're in picker window mode - memoize since URL params don't change during component lifecycle
   const { isPickerWindow, originalTabId, originalUrl, originalHostname } = useMemo(() => {
@@ -201,25 +205,13 @@ export function usePickerWindow({
           targetTab.url.startsWith('https://chat.mistral.ai/');
 
         if (!isAllowedOrigin) {
-          const hasPermission = await chrome.permissions.contains({
-            origins: [origin],
-          });
+          const hasPermission = await checkPermissionForOrigin(origin);
 
           if (!hasPermission) {
-            try {
-              const granted = await chrome.permissions.request({
-                origins: [origin],
-              });
+            const granted = await requestPermissionForOrigin(origin);
 
-              if (!granted) {
-                throw new Error('Permission denied. Please grant access to use the element picker on this site.');
-              }
-            } catch (permissionError) {
-              if (permissionError instanceof Error) {
-                throw permissionError;
-              } else {
-                throw new Error('Permission request failed. Please try again.');
-              }
+            if (!granted) {
+              throw new Error('Permission denied. Please grant access to use the element picker on this site.');
             }
           }
         }
@@ -262,7 +254,7 @@ export function usePickerWindow({
       setPickerError(errorMessage);
       setPickingElement(false);
     }
-  }, [isPickerWindow, originalTabId, interfaceMode]);
+  }, [isPickerWindow, originalTabId, interfaceMode, checkPermissionForOrigin, requestPermissionForOrigin]);
 
   return {
     pickerWindowState,
