@@ -98,6 +98,12 @@ const AddCustomSiteForm: FC<AddCustomSiteFormProps> = ({
     }
   }, [currentTabUrl, currentTabTitle, isCurrentSiteIntegrated, newSiteUrl]);
 
+  /**
+   * Validates input, requests site permission, and adds a new custom site.
+   * Parses the URL, checks for duplicates, requests permission for the origin,
+   * constructs the site data with optional custom positioning, and triggers
+   * content script injection on any already-open matching tabs.
+   */
   const handleAddSite = useCallback(async () => {
     if (!newSiteUrl.trim()) {
       setUrlError('Please enter a URL');

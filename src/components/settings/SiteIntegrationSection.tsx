@@ -211,7 +211,11 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
     importDispatch({ type: 'CLEAR' });
   }, [resetPickerState]);
 
-  // Export functionality
+  /**
+   * Exports a custom site configuration to clipboard as an encoded string.
+   * Falls back to showing the encoded config in the import field if clipboard access is blocked.
+   * @param site - The custom site configuration to export
+   */
   const handleExportCustomSite = useCallback(
     async (site: CustomSite) => {
       try {
@@ -257,6 +261,11 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
     importDispatch({ type: 'CLEAR' });
   }, []);
 
+  /**
+   * Validates and prepares an imported configuration for preview.
+   * Decodes the configuration string, validates its structure, checks for duplicate
+   * hostnames and built-in site conflicts, and identifies any security warnings.
+   */
   const handlePreviewImport = useCallback(async () => {
     if (!importState.code.trim()) {
       importDispatch({ type: 'SET_ERROR', payload: 'Enter a configuration code to continue.' });
@@ -298,6 +307,11 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
     }
   }, [importState.code, customSites, siteConfigs, notify, openImportFlow]);
 
+  /**
+   * Confirms and completes the import of a validated configuration.
+   * Requests site permission, removes any existing duplicate site, creates the new
+   * custom site entry, and notifies the user of success or failure.
+   */
   const handleConfirmImport = useCallback(async () => {
     const { pendingImport } = importState;
     if (!pendingImport) {

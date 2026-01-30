@@ -176,7 +176,11 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
     void loadSettings();
   }, [loadSettings]);
 
-  // Save settings
+  /**
+   * Persists settings to chrome.storage.local and notifies all content scripts of changes.
+   * Broadcasts a 'settingsUpdated' message to all HTTP/HTTPS tabs so they can update their behavior.
+   * @param newSettings - The complete settings object to save
+   */
   const saveSettings = useCallback(async (newSettings: Settings) => {
     setSaving(true);
     try {
@@ -281,7 +285,11 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
     // Persistence now handled by debounced useEffect
   };
 
-  // Notify custom site change
+  /**
+   * Notifies all tabs matching a hostname to reinitialize their content scripts.
+   * Called after adding, removing, or modifying a custom site configuration.
+   * @param hostname - The hostname of the custom site that changed
+   */
   const notifyCustomSiteChange = useCallback(async (hostname: string) => {
     try {
       // Since we're using universal content script, just notify existing tabs
