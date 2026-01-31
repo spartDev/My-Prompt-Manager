@@ -3,6 +3,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { ElementFingerprint, CustomSite } from '../types';
 import { Logger, toError } from '../utils';
 
+import { useSitePermissions } from './useSitePermissions';
+
 export interface PickerWindowState {
   isPickerWindow: boolean;
   originalTabId: number | null;
@@ -38,6 +40,14 @@ export interface UsePickerWindowReturn {
   resetPickerState: () => void;
 }
 
+// Built-in origins that always have permission (manifest declared)
+const BUILT_IN_ORIGINS = [
+  'https://claude.ai/',
+  'https://chatgpt.com/',
+  'https://www.perplexity.ai/',
+  'https://chat.mistral.ai/',
+];
+
 export function usePickerWindow({
   interfaceMode,
   siteConfigs,
@@ -50,6 +60,8 @@ export function usePickerWindow({
   const [currentTabUrl, setCurrentTabUrl] = useState<string | null>(null);
   const [currentTabTitle, setCurrentTabTitle] = useState<string | null>(null);
   const [isCurrentSiteIntegrated, setIsCurrentSiteIntegrated] = useState(false);
+
+  const { checkPermission, requestPermissionForOrigin } = useSitePermissions();
 
   // Check if we're in picker window mode - memoize since URL params don't change during component lifecycle
   const { isPickerWindow, originalTabId, originalUrl, originalHostname } = useMemo(() => {
@@ -193,33 +205,17 @@ export function usePickerWindow({
         const url = new URL(targetTab.url);
         const origin = `${url.protocol}//${url.hostname}/*`;
 
-        // Skip permission check for already allowed origins
-        const isAllowedOrigin =
-          targetTab.url.startsWith('https://claude.ai/') ||
-          targetTab.url.startsWith('https://chatgpt.com/') ||
-          targetTab.url.startsWith('https://www.perplexity.ai/') ||
-          targetTab.url.startsWith('https://chat.mistral.ai/');
+        // Skip permission check for built-in origins declared in manifest
+        const isBuiltInOrigin = BUILT_IN_ORIGINS.some((builtIn) => targetTab.url?.startsWith(builtIn));
 
-        if (!isAllowedOrigin) {
-          const hasPermission = await chrome.permissions.contains({
-            origins: [origin],
-          });
+        if (!isBuiltInOrigin) {
+          const hasPermission = await checkPermission(targetTab.url);
 
           if (!hasPermission) {
-            try {
-              const granted = await chrome.permissions.request({
-                origins: [origin],
-              });
+            const granted = await requestPermissionForOrigin(origin);
 
-              if (!granted) {
-                throw new Error('Permission denied. Please grant access to use the element picker on this site.');
-              }
-            } catch (permissionError) {
-              if (permissionError instanceof Error) {
-                throw permissionError;
-              } else {
-                throw new Error('Permission request failed. Please try again.');
-              }
+            if (!granted) {
+              throw new Error('Permission denied. Please grant access to use the element picker on this site.');
             }
           }
         }
@@ -262,7 +258,7 @@ export function usePickerWindow({
       setPickerError(errorMessage);
       setPickingElement(false);
     }
-  }, [isPickerWindow, originalTabId, interfaceMode]);
+  }, [isPickerWindow, originalTabId, interfaceMode, checkPermission, requestPermissionForOrigin]);
 
   return {
     pickerWindowState,
