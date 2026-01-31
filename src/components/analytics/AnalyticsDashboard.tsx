@@ -4,6 +4,7 @@ import { useSummaryMetrics } from '../../hooks/useSummaryMetrics';
 import { useUsageStats } from '../../hooks/useUsageStats';
 import { PromptUsageSummary } from '../../types/hooks';
 import { formatPlatformName, formatRelativeTime } from '../../utils';
+import ErrorBoundary from '../ErrorBoundary';
 import {
   UsageIcon,
   PlatformIcon,
@@ -21,6 +22,34 @@ import {
   TimeOfDayChart
 } from './charts';
 import SummaryCard from './SummaryCard';
+
+/** Fallback UI for chart rendering errors */
+const ChartErrorFallback: FC<{ height: number }> = ({ height }) => (
+  <div
+    className="flex items-center justify-center bg-gray-100 dark:bg-gray-700/50 rounded-xl"
+    style={{ height }}
+    role="alert"
+    aria-label="Chart unavailable"
+  >
+    <div className="text-center">
+      <svg
+        className="w-8 h-8 text-gray-400 dark:text-gray-500 mx-auto mb-2"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={1.5}
+          d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+        />
+      </svg>
+      <p className="text-sm text-gray-500 dark:text-gray-400">Chart unavailable</p>
+    </div>
+  </div>
+);
 
 type PromptTab = 'most-used' | 'recently-used' | 'forgotten';
 
@@ -183,10 +212,12 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
                 {loading ? (
                   <div className="animate-pulse bg-gray-200 dark:bg-gray-700 rounded-xl h-[250px]" />
                 ) : (
-                  <UsageLineChart
-                    data={stats?.dailyUsage ?? []}
-                    height={250}
-                  />
+                  <ErrorBoundary fallback={<ChartErrorFallback height={250} />}>
+                    <UsageLineChart
+                      data={stats?.dailyUsage ?? []}
+                      height={250}
+                    />
+                  </ErrorBoundary>
                 )}
               </div>
             </section>
@@ -205,10 +236,12 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
                   {loading ? (
                     <div className="animate-pulse bg-gray-200 dark:bg-gray-700 rounded-xl h-[200px]" />
                   ) : (
-                    <PlatformPieChart
-                      data={stats?.platformBreakdown ?? []}
-                      height={200}
-                    />
+                    <ErrorBoundary fallback={<ChartErrorFallback height={200} />}>
+                      <PlatformPieChart
+                        data={stats?.platformBreakdown ?? []}
+                        height={200}
+                      />
+                    </ErrorBoundary>
                   )}
                 </div>
 
@@ -220,10 +253,12 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
                   {loading ? (
                     <div className="animate-pulse bg-gray-200 dark:bg-gray-700 rounded-xl h-[200px]" />
                   ) : (
-                    <DayOfWeekChart
-                      data={stats?.dayOfWeekDistribution ?? []}
-                      height={200}
-                    />
+                    <ErrorBoundary fallback={<ChartErrorFallback height={200} />}>
+                      <DayOfWeekChart
+                        data={stats?.dayOfWeekDistribution ?? []}
+                        height={200}
+                      />
+                    </ErrorBoundary>
                   )}
                 </div>
 
@@ -235,11 +270,13 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
                   {loading ? (
                     <div className="animate-pulse bg-gray-200 dark:bg-gray-700 rounded-xl h-[200px]" />
                   ) : (
-                    <CategoryBarChart
-                      data={stats?.categoryDistribution ?? []}
-                      height={200}
-                      maxCategories={6}
-                    />
+                    <ErrorBoundary fallback={<ChartErrorFallback height={200} />}>
+                      <CategoryBarChart
+                        data={stats?.categoryDistribution ?? []}
+                        height={200}
+                        maxCategories={6}
+                      />
+                    </ErrorBoundary>
                   )}
                 </div>
 
@@ -251,10 +288,12 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
                   {loading ? (
                     <div className="animate-pulse bg-gray-200 dark:bg-gray-700 rounded-xl h-[200px]" />
                   ) : (
-                    <TimeOfDayChart
-                      data={stats?.timeOfDayDistribution ?? []}
-                      height={200}
-                    />
+                    <ErrorBoundary fallback={<ChartErrorFallback height={200} />}>
+                      <TimeOfDayChart
+                        data={stats?.timeOfDayDistribution ?? []}
+                        height={200}
+                      />
+                    </ErrorBoundary>
                   )}
                 </div>
               </div>
