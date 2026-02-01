@@ -1,5 +1,6 @@
-import { FC, useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { FC, useState, useMemo, useCallback } from 'react';
 
+import { useNow } from '../../hooks/useNow';
 import { useSummaryMetrics } from '../../hooks/useSummaryMetrics';
 import { useUsageStats } from '../../hooks/useUsageStats';
 import { PromptUsageSummary } from '../../types/hooks';
@@ -67,17 +68,8 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
   const { stats, loading, error } = useUsageStats();
   const [activeTab, setActiveTab] = useState<PromptTab>('most-used');
 
-  // Capture current time for relative time calculations
-  // eslint-disable-next-line react-hooks/purity -- Date.now() is needed for initial time reference
-  const nowRef = useRef<number>(Date.now());
-
-  useEffect(() => {
-    nowRef.current = Date.now();
-    const interval = setInterval(() => {
-      nowRef.current = Date.now();
-    }, 60000);
-    return () => { clearInterval(interval); };
-  }, []);
+  // Current time for relative time calculations - updates every minute to trigger re-renders
+  const now = useNow(60000);
 
   // Compute summary metrics using shared hook
   const summaryMetrics = useSummaryMetrics(stats);
@@ -393,7 +385,7 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
                                   {prompt.count} {prompt.count === 1 ? 'use' : 'uses'}
                                 </span>
                                 <span className="text-xs text-gray-400 dark:text-gray-500">
-                                  {formatRelativeTime(prompt.lastUsed, nowRef.current)}
+                                  {formatRelativeTime(prompt.lastUsed, now)}
                                 </span>
                                 {prompt.category && (
                                   <span className="text-xs px-2 py-0.5 bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300 rounded-full">
