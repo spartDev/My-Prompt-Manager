@@ -1,5 +1,6 @@
-import { FC, useRef, useEffect, useState } from 'react';
+import { FC, useState } from 'react';
 
+import { useNow } from '../../hooks/useNow';
 import { useSummaryMetrics } from '../../hooks/useSummaryMetrics';
 import { useUsageStats } from '../../hooks/useUsageStats';
 import { PromptUsageSummary } from '../../types/hooks';
@@ -37,17 +38,8 @@ const AnalyticsTab: FC<AnalyticsTabProps> = ({
   // Compute summary metrics using shared hook
   const summaryMetrics = useSummaryMetrics(stats);
 
-  // Capture current time once on mount for relative time calculations
-  const nowRef = useRef<number>(Date.now());
-
-  // Set initial time and update periodically (every minute) for accurate relative times
-  useEffect(() => {
-    nowRef.current = Date.now();
-    const interval = setInterval(() => {
-      nowRef.current = Date.now();
-    }, 60000);
-    return () => { clearInterval(interval); };
-  }, []);
+  // Current time for relative time calculations - updates every minute to trigger re-renders
+  const now = useNow(60000);
 
   // Handle clear history with confirmation
   const handleClearHistory = async (): Promise<void> => {
@@ -198,7 +190,7 @@ const AnalyticsTab: FC<AnalyticsTabProps> = ({
                               {prompt.count} {prompt.count === 1 ? 'use' : 'uses'}
                             </span>
                             <span className="text-xs text-gray-400 dark:text-gray-500">
-                              {formatRelativeTime(prompt.lastUsed, nowRef.current)}
+                              {formatRelativeTime(prompt.lastUsed, now)}
                             </span>
                           </div>
                         </div>
