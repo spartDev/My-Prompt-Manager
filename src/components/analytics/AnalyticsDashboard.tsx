@@ -1,4 +1,4 @@
-import { FC, useState, useMemo, useCallback } from 'react';
+import { FC, useState, useMemo, useCallback, useRef } from 'react';
 
 import { useNow } from '../../hooks/useNow';
 import { useSummaryMetrics } from '../../hooks/useSummaryMetrics';
@@ -60,6 +60,12 @@ const PROMPT_TABS = {
 
 type PromptTab = typeof PROMPT_TABS[keyof typeof PROMPT_TABS];
 
+const TAB_LABELS: Record<PromptTab, string> = {
+  [PROMPT_TABS.MOST_USED]: 'Most Used',
+  [PROMPT_TABS.RECENTLY_USED]: 'Recently Used',
+  [PROMPT_TABS.FORGOTTEN]: 'Forgotten',
+};
+
 export interface AnalyticsDashboardProps {
   /** Callback when user wants to go back */
   onBack?: () => void;
@@ -73,6 +79,7 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
 }) => {
   const { stats, loading, error } = useUsageStats();
   const [activeTab, setActiveTab] = useState<PromptTab>(PROMPT_TABS.MOST_USED);
+  const tabRefs = useRef<Map<PromptTab, HTMLButtonElement>>(new Map());
 
   // Current time for relative time calculations - updates every minute to trigger re-renders
   const now = useNow(60000);
@@ -124,9 +131,8 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
 
     e.preventDefault();
     setActiveTab(tabs[newIndex]);
-    // Focus the new tab button
-    const newTabButton = document.getElementById(`tab-${tabs[newIndex]}`);
-    newTabButton?.focus();
+    // Focus the new tab button using ref
+    tabRefs.current.get(tabs[newIndex])?.focus();
   }, [activeTab]);
 
   if (error) {
@@ -336,57 +342,31 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
                 {/* Tabs */}
                 <div className="border-b border-purple-100 dark:border-gray-700">
                   <div className="flex -mb-px" role="tablist" aria-label="Prompt tabs">
-                    <button
-                      id={`tab-${PROMPT_TABS.MOST_USED}`}
-                      data-tab={PROMPT_TABS.MOST_USED}
-                      onClick={handleTabClick}
-                      onKeyDown={handleTabKeyDown}
-                      className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-                        activeTab === PROMPT_TABS.MOST_USED
-                          ? 'border-purple-600 text-purple-600 dark:text-purple-400'
-                          : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
-                      }`}
-                      aria-selected={activeTab === PROMPT_TABS.MOST_USED}
-                      aria-controls={`tabpanel-${PROMPT_TABS.MOST_USED}`}
-                      tabIndex={activeTab === PROMPT_TABS.MOST_USED ? 0 : -1}
-                      role="tab"
-                    >
-                      Most Used
-                    </button>
-                    <button
-                      id={`tab-${PROMPT_TABS.RECENTLY_USED}`}
-                      data-tab={PROMPT_TABS.RECENTLY_USED}
-                      onClick={handleTabClick}
-                      onKeyDown={handleTabKeyDown}
-                      className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-                        activeTab === PROMPT_TABS.RECENTLY_USED
-                          ? 'border-purple-600 text-purple-600 dark:text-purple-400'
-                          : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
-                      }`}
-                      aria-selected={activeTab === PROMPT_TABS.RECENTLY_USED}
-                      aria-controls={`tabpanel-${PROMPT_TABS.RECENTLY_USED}`}
-                      tabIndex={activeTab === PROMPT_TABS.RECENTLY_USED ? 0 : -1}
-                      role="tab"
-                    >
-                      Recently Used
-                    </button>
-                    <button
-                      id={`tab-${PROMPT_TABS.FORGOTTEN}`}
-                      data-tab={PROMPT_TABS.FORGOTTEN}
-                      onClick={handleTabClick}
-                      onKeyDown={handleTabKeyDown}
-                      className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-                        activeTab === PROMPT_TABS.FORGOTTEN
-                          ? 'border-purple-600 text-purple-600 dark:text-purple-400'
-                          : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
-                      }`}
-                      aria-selected={activeTab === PROMPT_TABS.FORGOTTEN}
-                      aria-controls={`tabpanel-${PROMPT_TABS.FORGOTTEN}`}
-                      tabIndex={activeTab === PROMPT_TABS.FORGOTTEN ? 0 : -1}
-                      role="tab"
-                    >
-                      Forgotten
-                    </button>
+                    {Object.values(PROMPT_TABS).map((tab) => (
+                      <button
+                        key={tab}
+                        ref={(el) => {
+                          if (el) {
+                            tabRefs.current.set(tab, el);
+                          }
+                        }}
+                        id={`tab-${tab}`}
+                        data-tab={tab}
+                        onClick={handleTabClick}
+                        onKeyDown={handleTabKeyDown}
+                        className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
+                          activeTab === tab
+                            ? 'border-purple-600 text-purple-600 dark:text-purple-400'
+                            : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
+                        }`}
+                        aria-selected={activeTab === tab}
+                        aria-controls={`tabpanel-${tab}`}
+                        tabIndex={activeTab === tab ? 0 : -1}
+                        role="tab"
+                      >
+                        {TAB_LABELS[tab]}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
