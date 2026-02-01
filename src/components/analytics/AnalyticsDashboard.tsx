@@ -99,6 +99,36 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
     setActiveTab(tab);
   }, []);
 
+  // Keyboard navigation for tabs (Arrow keys, Home, End)
+  const handleTabKeyDown = useCallback((e: React.KeyboardEvent<HTMLButtonElement>) => {
+    const tabs = Object.values(PROMPT_TABS);
+    const currentIndex = tabs.indexOf(activeTab);
+    let newIndex = currentIndex;
+
+    switch (e.key) {
+      case 'ArrowLeft':
+        newIndex = currentIndex > 0 ? currentIndex - 1 : tabs.length - 1;
+        break;
+      case 'ArrowRight':
+        newIndex = currentIndex < tabs.length - 1 ? currentIndex + 1 : 0;
+        break;
+      case 'Home':
+        newIndex = 0;
+        break;
+      case 'End':
+        newIndex = tabs.length - 1;
+        break;
+      default:
+        return;
+    }
+
+    e.preventDefault();
+    setActiveTab(tabs[newIndex]);
+    // Focus the new tab button
+    const newTabButton = document.getElementById(`tab-${tabs[newIndex]}`);
+    newTabButton?.focus();
+  }, [activeTab]);
+
   if (error) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col items-center justify-center p-6" role="alert">
@@ -305,51 +335,68 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
               <div className="bg-white dark:bg-gray-800 rounded-xl border border-purple-100 dark:border-gray-700 overflow-hidden">
                 {/* Tabs */}
                 <div className="border-b border-purple-100 dark:border-gray-700">
-                  <nav className="flex -mb-px" aria-label="Prompt tabs">
+                  <div className="flex -mb-px" role="tablist" aria-label="Prompt tabs">
                     <button
+                      id={`tab-${PROMPT_TABS.MOST_USED}`}
                       data-tab={PROMPT_TABS.MOST_USED}
                       onClick={handleTabClick}
+                      onKeyDown={handleTabKeyDown}
                       className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
                         activeTab === PROMPT_TABS.MOST_USED
                           ? 'border-purple-600 text-purple-600 dark:text-purple-400'
                           : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                       }`}
                       aria-selected={activeTab === PROMPT_TABS.MOST_USED}
+                      aria-controls={`tabpanel-${PROMPT_TABS.MOST_USED}`}
+                      tabIndex={activeTab === PROMPT_TABS.MOST_USED ? 0 : -1}
                       role="tab"
                     >
                       Most Used
                     </button>
                     <button
+                      id={`tab-${PROMPT_TABS.RECENTLY_USED}`}
                       data-tab={PROMPT_TABS.RECENTLY_USED}
                       onClick={handleTabClick}
+                      onKeyDown={handleTabKeyDown}
                       className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
                         activeTab === PROMPT_TABS.RECENTLY_USED
                           ? 'border-purple-600 text-purple-600 dark:text-purple-400'
                           : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                       }`}
                       aria-selected={activeTab === PROMPT_TABS.RECENTLY_USED}
+                      aria-controls={`tabpanel-${PROMPT_TABS.RECENTLY_USED}`}
+                      tabIndex={activeTab === PROMPT_TABS.RECENTLY_USED ? 0 : -1}
                       role="tab"
                     >
                       Recently Used
                     </button>
                     <button
+                      id={`tab-${PROMPT_TABS.FORGOTTEN}`}
                       data-tab={PROMPT_TABS.FORGOTTEN}
                       onClick={handleTabClick}
+                      onKeyDown={handleTabKeyDown}
                       className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
                         activeTab === PROMPT_TABS.FORGOTTEN
                           ? 'border-purple-600 text-purple-600 dark:text-purple-400'
                           : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                       }`}
                       aria-selected={activeTab === PROMPT_TABS.FORGOTTEN}
+                      aria-controls={`tabpanel-${PROMPT_TABS.FORGOTTEN}`}
+                      tabIndex={activeTab === PROMPT_TABS.FORGOTTEN ? 0 : -1}
                       role="tab"
                     >
                       Forgotten
                     </button>
-                  </nav>
+                  </div>
                 </div>
 
                 {/* Tab Content */}
-                <div className="p-4" role="tabpanel">
+                <div
+                  id={`tabpanel-${activeTab}`}
+                  className="p-4"
+                  role="tabpanel"
+                  aria-labelledby={`tab-${activeTab}`}
+                >
                   {loading ? (
                     <div className="space-y-3">
                       {[1, 2, 3, 4, 5].map((i) => (
