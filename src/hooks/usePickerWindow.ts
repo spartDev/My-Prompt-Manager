@@ -40,6 +40,14 @@ export interface UsePickerWindowReturn {
   resetPickerState: () => void;
 }
 
+// Built-in origins that always have permission (manifest declared)
+const BUILT_IN_ORIGINS = [
+  'https://claude.ai/',
+  'https://chatgpt.com/',
+  'https://www.perplexity.ai/',
+  'https://chat.mistral.ai/',
+];
+
 export function usePickerWindow({
   interfaceMode,
   siteConfigs,
@@ -197,14 +205,10 @@ export function usePickerWindow({
         const url = new URL(targetTab.url);
         const origin = `${url.protocol}//${url.hostname}/*`;
 
-        // Skip permission check for already allowed origins
-        const isAllowedOrigin =
-          targetTab.url.startsWith('https://claude.ai/') ||
-          targetTab.url.startsWith('https://chatgpt.com/') ||
-          targetTab.url.startsWith('https://www.perplexity.ai/') ||
-          targetTab.url.startsWith('https://chat.mistral.ai/');
+        // Skip permission check for built-in origins declared in manifest
+        const isBuiltInOrigin = BUILT_IN_ORIGINS.some((builtIn) => targetTab.url?.startsWith(builtIn));
 
-        if (!isAllowedOrigin) {
+        if (!isBuiltInOrigin) {
           const hasPermission = await checkPermissionForOrigin(origin);
 
           if (!hasPermission) {
