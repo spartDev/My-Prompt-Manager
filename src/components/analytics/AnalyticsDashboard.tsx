@@ -52,7 +52,13 @@ const ChartErrorFallback: FC<{ height: number }> = ({ height }) => (
   </div>
 );
 
-type PromptTab = 'most-used' | 'recently-used' | 'forgotten';
+const PROMPT_TABS = {
+  MOST_USED: 'most-used',
+  RECENTLY_USED: 'recently-used',
+  FORGOTTEN: 'forgotten',
+} as const;
+
+type PromptTab = typeof PROMPT_TABS[keyof typeof PROMPT_TABS];
 
 export interface AnalyticsDashboardProps {
   /** Callback when user wants to go back */
@@ -66,7 +72,7 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
   onBack
 }) => {
   const { stats, loading, error } = useUsageStats();
-  const [activeTab, setActiveTab] = useState<PromptTab>('most-used');
+  const [activeTab, setActiveTab] = useState<PromptTab>(PROMPT_TABS.MOST_USED);
 
   // Current time for relative time calculations - updates every minute to trigger re-renders
   const now = useNow(60000);
@@ -78,11 +84,11 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
   const activePrompts = useMemo((): PromptUsageSummary[] => {
     if (!stats) { return []; }
     switch (activeTab) {
-      case 'most-used':
+      case PROMPT_TABS.MOST_USED:
         return stats.topPrompts;
-      case 'recently-used':
+      case PROMPT_TABS.RECENTLY_USED:
         return stats.recentPrompts;
-      case 'forgotten':
+      case PROMPT_TABS.FORGOTTEN:
         return stats.forgottenPrompts;
     }
   }, [stats, activeTab]);
@@ -301,40 +307,40 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
                 <div className="border-b border-purple-100 dark:border-gray-700">
                   <nav className="flex -mb-px" aria-label="Prompt tabs">
                     <button
-                      data-tab="most-used"
+                      data-tab={PROMPT_TABS.MOST_USED}
                       onClick={handleTabClick}
                       className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-                        activeTab === 'most-used'
+                        activeTab === PROMPT_TABS.MOST_USED
                           ? 'border-purple-600 text-purple-600 dark:text-purple-400'
                           : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                       }`}
-                      aria-selected={activeTab === 'most-used'}
+                      aria-selected={activeTab === PROMPT_TABS.MOST_USED}
                       role="tab"
                     >
                       Most Used
                     </button>
                     <button
-                      data-tab="recently-used"
+                      data-tab={PROMPT_TABS.RECENTLY_USED}
                       onClick={handleTabClick}
                       className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-                        activeTab === 'recently-used'
+                        activeTab === PROMPT_TABS.RECENTLY_USED
                           ? 'border-purple-600 text-purple-600 dark:text-purple-400'
                           : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                       }`}
-                      aria-selected={activeTab === 'recently-used'}
+                      aria-selected={activeTab === PROMPT_TABS.RECENTLY_USED}
                       role="tab"
                     >
                       Recently Used
                     </button>
                     <button
-                      data-tab="forgotten"
+                      data-tab={PROMPT_TABS.FORGOTTEN}
                       onClick={handleTabClick}
                       className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-                        activeTab === 'forgotten'
+                        activeTab === PROMPT_TABS.FORGOTTEN
                           ? 'border-purple-600 text-purple-600 dark:text-purple-400'
                           : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                       }`}
-                      aria-selected={activeTab === 'forgotten'}
+                      aria-selected={activeTab === PROMPT_TABS.FORGOTTEN}
                       role="tab"
                     >
                       Forgotten
@@ -362,15 +368,15 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
                         >
                           <div className="flex items-start gap-4">
                             <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                              activeTab === 'most-used' && index === 0
+                              activeTab === PROMPT_TABS.MOST_USED && index === 0
                                 ? 'bg-gradient-to-br from-yellow-400 to-orange-500 text-white'
-                                : activeTab === 'most-used' && index === 1
+                                : activeTab === PROMPT_TABS.MOST_USED && index === 1
                                 ? 'bg-gradient-to-br from-gray-300 to-gray-400 text-white'
-                                : activeTab === 'most-used' && index === 2
+                                : activeTab === PROMPT_TABS.MOST_USED && index === 2
                                 ? 'bg-gradient-to-br from-amber-600 to-amber-700 text-white'
                                 : 'bg-gray-200 dark:bg-gray-600 text-gray-500 dark:text-gray-400'
                             }`}>
-                              {activeTab === 'most-used' && index < 3 ? (
+                              {activeTab === PROMPT_TABS.MOST_USED && index < 3 ? (
                                 <TrophyIcon className="w-4 h-4" />
                               ) : (
                                 <span className="text-xs font-bold">{index + 1}</span>
@@ -401,7 +407,7 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
                   ) : (
                     <div className="text-center py-8">
                       <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {activeTab === 'forgotten'
+                        {activeTab === PROMPT_TABS.FORGOTTEN
                           ? 'No forgotten prompts - you are using all your prompts!'
                           : 'No prompts to display'}
                       </p>
