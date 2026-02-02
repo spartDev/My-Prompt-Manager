@@ -11,6 +11,7 @@ import {
 import { useChartTheme } from '../../../hooks/useChartTheme';
 import { PlatformBreakdown } from '../../../types/hooks';
 import { formatPlatformName } from '../../../utils';
+import { PIE_CHART, PIE_LEGEND } from '../constants';
 
 export interface PlatformPieChartProps {
   /** Platform breakdown data */
@@ -94,9 +95,9 @@ const PlatformPieChart: FC<PlatformPieChartProps> = memo(({
             data={chartData}
             cx="50%"
             cy="50%"
-            innerRadius={50}
-            outerRadius={70}
-            paddingAngle={2}
+            innerRadius={PIE_CHART.INNER_RADIUS}
+            outerRadius={PIE_CHART.OUTER_RADIUS}
+            paddingAngle={PIE_CHART.PADDING_ANGLE}
             dataKey="count"
             nameKey="name"
           >
@@ -123,9 +124,9 @@ const PlatformPieChart: FC<PlatformPieChartProps> = memo(({
           {showLegend && (
             <Legend
               verticalAlign="bottom"
-              height={36}
+              height={PIE_LEGEND.HEIGHT}
               iconType="circle"
-              iconSize={8}
+              iconSize={PIE_LEGEND.ICON_SIZE}
               formatter={(value: string) => (
                 <span style={{ color: isDarkMode ? '#d1d5db' : '#4b5563', fontSize: '11px' }}>
                   {value}
