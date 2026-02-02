@@ -11,6 +11,7 @@ import {
 } from 'recharts';
 
 import { useChartTheme } from '../../../hooks/useChartTheme';
+import { CATEGORY_COLORS } from '../../../theme/chartColors';
 import { CategoryDistribution } from '../../../types/hooks';
 
 export interface CategoryBarChartProps {
@@ -23,20 +24,6 @@ export interface CategoryBarChartProps {
   /** Whether to show grid lines */
   showGrid?: boolean;
 }
-
-// Colors for categories - using design guideline colors
-const CATEGORY_COLORS = [
-  '#9333ea', // purple-600
-  '#6366f1', // indigo-500
-  '#3b82f6', // blue-500
-  '#0ea5e9', // sky-500
-  '#10b981', // emerald-500
-  '#14b8a6', // teal-500
-  '#f59e0b', // amber-500
-  '#f97316', // orange-500
-  '#ec4899', // pink-500
-  '#8b5cf6', // violet-500
-];
 
 /**
  * Horizontal bar chart showing category usage distribution

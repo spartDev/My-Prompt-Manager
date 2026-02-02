@@ -11,6 +11,7 @@ import {
 } from 'recharts';
 
 import { useChartTheme } from '../../../hooks/useChartTheme';
+import { DAY_OF_WEEK_COLORS } from '../../../theme/chartColors';
 import { DayOfWeekDistribution } from '../../../types/hooks';
 
 export interface DayOfWeekChartProps {
@@ -34,10 +35,6 @@ const DayOfWeekChart: FC<DayOfWeekChartProps> = memo(({
   highlightPeak = true
 }) => {
   const { gridColor, textColor, tooltipBg, tooltipBorder, tooltipLabelColor, cursorColor } = useChartTheme();
-
-  // Colors based on design guidelines
-  const barColor = '#6366f1'; // indigo-500
-  const peakColor = '#9333ea'; // purple-600
 
   if (data.length === 0) {
     return (
@@ -104,7 +101,7 @@ const DayOfWeekChart: FC<DayOfWeekChartProps> = memo(({
             {data.map((entry, index) => (
               <Cell
                 key={`cell-${String(index)}`}
-                fill={highlightPeak && entry.count === maxCount && maxCount > 0 ? peakColor : barColor}
+                fill={highlightPeak && entry.count === maxCount && maxCount > 0 ? DAY_OF_WEEK_COLORS.PEAK : DAY_OF_WEEK_COLORS.BAR}
               />
             ))}
           </Bar>

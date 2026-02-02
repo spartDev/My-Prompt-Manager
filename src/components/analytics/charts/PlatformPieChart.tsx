@@ -9,6 +9,7 @@ import {
 } from 'recharts';
 
 import { useChartTheme } from '../../../hooks/useChartTheme';
+import { getPlatformColor } from '../../../theme/chartColors';
 import { PlatformBreakdown } from '../../../types/hooks';
 import { formatPlatformName } from '../../../utils';
 import { PIE_CHART, PIE_LEGEND } from '../constants';
@@ -21,37 +22,6 @@ export interface PlatformPieChartProps {
   /** Whether to show legend */
   showLegend?: boolean;
 }
-
-// Colors for each platform - using design guideline colors
-const PLATFORM_COLORS: Record<string, string> = {
-  claude: '#9333ea',     // purple-600
-  chatgpt: '#10b981',    // emerald-500
-  gemini: '#3b82f6',     // blue-500
-  perplexity: '#6366f1', // indigo-500
-  copilot: '#f59e0b',    // amber-500
-  mistral: '#f97316',    // orange-500
-  custom: '#6b7280'      // gray-500
-};
-
-// Fallback colors for unknown platforms
-const FALLBACK_COLORS = [
-  '#ec4899', // pink-500
-  '#14b8a6', // teal-500
-  '#8b5cf6', // violet-500
-  '#ef4444', // red-500
-  '#22c55e', // green-500
-];
-
-/**
- * Get color for a platform based on predefined colors or fallback palette
- */
-const getColor = (platform: string, index: number): string => {
-  const lowerPlatform = platform.toLowerCase();
-  if (PLATFORM_COLORS[lowerPlatform]) {
-    return PLATFORM_COLORS[lowerPlatform];
-  }
-  return FALLBACK_COLORS[index % FALLBACK_COLORS.length];
-};
 
 /**
  * Donut chart showing platform usage breakdown
@@ -67,7 +37,7 @@ const PlatformPieChart: FC<PlatformPieChartProps> = memo(({
   const chartData = data.map((item, index) => ({
     ...item,
     name: formatPlatformName(item.platform),
-    color: getColor(item.platform, index)
+    color: getPlatformColor(item.platform, index)
   }));
 
   if (data.length === 0) {

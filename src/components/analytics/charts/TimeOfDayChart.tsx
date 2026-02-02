@@ -11,6 +11,7 @@ import {
 } from 'recharts';
 
 import { useChartTheme } from '../../../hooks/useChartTheme';
+import { CHART_PRIMARY, TIME_BUCKET_COLORS } from '../../../theme/chartColors';
 import { TimeOfDayDistribution } from '../../../types/hooks';
 
 export interface TimeOfDayChartProps {
@@ -23,14 +24,6 @@ export interface TimeOfDayChartProps {
   /** Whether to highlight the peak time */
   highlightPeak?: boolean;
 }
-
-// Colors for time buckets - transitioning from night to day to night
-const TIME_BUCKET_COLORS: Record<string, string> = {
-  Night: '#6366f1',    // indigo-500 (dark)
-  Morning: '#f59e0b',  // amber-500 (sunrise)
-  Afternoon: '#eab308', // yellow-500 (peak sun)
-  Evening: '#f97316'   // orange-500 (sunset)
-};
 
 // Icons for time buckets (as simple text representations)
 const TIME_BUCKET_ICONS: Record<string, string> = {
@@ -122,7 +115,7 @@ const TimeOfDayChart: FC<TimeOfDayChartProps> = memo(({
             {chartData.map((entry, index) => {
               const baseColor = TIME_BUCKET_COLORS[entry.bucket] ?? '#6b7280';
               const color = highlightPeak && entry.count === maxCount && maxCount > 0
-                ? '#9333ea' // purple-600 for peak
+                ? CHART_PRIMARY.PRIMARY
                 : baseColor;
               return <Cell key={`cell-${String(index)}`} fill={color} />;
             })}
