@@ -1,4 +1,4 @@
-import { FC, useState, useMemo, useCallback } from 'react';
+import { FC, useState, useCallback, useRef } from 'react';
 
 import { useNow } from '../../hooks/useNow';
 import { useSummaryMetrics } from '../../hooks/useSummaryMetrics';
@@ -60,6 +60,12 @@ const PROMPT_TABS = {
 
 type PromptTab = typeof PROMPT_TABS[keyof typeof PROMPT_TABS];
 
+const TAB_LABELS: Record<PromptTab, string> = {
+  [PROMPT_TABS.MOST_USED]: 'Most Used',
+  [PROMPT_TABS.RECENTLY_USED]: 'Recently Used',
+  [PROMPT_TABS.FORGOTTEN]: 'Forgotten',
+};
+
 export interface AnalyticsDashboardProps {
   /** Callback when user wants to go back */
   onBack?: () => void;
@@ -73,6 +79,7 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
 }) => {
   const { stats, loading, error } = useUsageStats();
   const [activeTab, setActiveTab] = useState<PromptTab>(PROMPT_TABS.MOST_USED);
+  const tabRefs = useRef<Map<PromptTab, HTMLButtonElement>>(new Map());
 
   // Current time for relative time calculations - updates every minute to trigger re-renders
   const now = useNow(60000);
@@ -80,10 +87,10 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
   // Compute summary metrics using shared hook
   const summaryMetrics = useSummaryMetrics(stats);
 
-  // Get prompts for active tab
-  const activePrompts = useMemo((): PromptUsageSummary[] => {
+  // Get prompts for a specific tab
+  const getPromptsForTab = useCallback((tab: PromptTab): PromptUsageSummary[] => {
     if (!stats) { return []; }
-    switch (activeTab) {
+    switch (tab) {
       case PROMPT_TABS.MOST_USED:
         return stats.topPrompts;
       case PROMPT_TABS.RECENTLY_USED:
@@ -91,13 +98,42 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
       case PROMPT_TABS.FORGOTTEN:
         return stats.forgottenPrompts;
     }
-  }, [stats, activeTab]);
+  }, [stats]);
 
   // Memoized tab click handler to avoid creating new function references on each render
   const handleTabClick = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
     const tab = e.currentTarget.dataset.tab as PromptTab;
     setActiveTab(tab);
   }, []);
+
+  // Keyboard navigation for tabs (Arrow keys, Home, End)
+  const handleTabKeyDown = useCallback((e: React.KeyboardEvent<HTMLButtonElement>) => {
+    const tabs = Object.values(PROMPT_TABS);
+    const currentIndex = tabs.indexOf(activeTab);
+    let newIndex = currentIndex;
+
+    switch (e.key) {
+      case 'ArrowLeft':
+        newIndex = currentIndex > 0 ? currentIndex - 1 : tabs.length - 1;
+        break;
+      case 'ArrowRight':
+        newIndex = currentIndex < tabs.length - 1 ? currentIndex + 1 : 0;
+        break;
+      case 'Home':
+        newIndex = 0;
+        break;
+      case 'End':
+        newIndex = tabs.length - 1;
+        break;
+      default:
+        return;
+    }
+
+    e.preventDefault();
+    setActiveTab(tabs[newIndex]);
+    // Focus the new tab button using ref
+    tabRefs.current.get(tabs[newIndex])?.focus();
+  }, [activeTab]);
 
   if (error) {
     return (
@@ -305,115 +341,114 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
               <div className="bg-white dark:bg-gray-800 rounded-xl border border-purple-100 dark:border-gray-700 overflow-hidden">
                 {/* Tabs */}
                 <div className="border-b border-purple-100 dark:border-gray-700">
-                  <nav className="flex -mb-px" aria-label="Prompt tabs">
-                    <button
-                      data-tab={PROMPT_TABS.MOST_USED}
-                      onClick={handleTabClick}
-                      className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-                        activeTab === PROMPT_TABS.MOST_USED
-                          ? 'border-purple-600 text-purple-600 dark:text-purple-400'
-                          : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
-                      }`}
-                      aria-selected={activeTab === PROMPT_TABS.MOST_USED}
-                      role="tab"
-                    >
-                      Most Used
-                    </button>
-                    <button
-                      data-tab={PROMPT_TABS.RECENTLY_USED}
-                      onClick={handleTabClick}
-                      className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-                        activeTab === PROMPT_TABS.RECENTLY_USED
-                          ? 'border-purple-600 text-purple-600 dark:text-purple-400'
-                          : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
-                      }`}
-                      aria-selected={activeTab === PROMPT_TABS.RECENTLY_USED}
-                      role="tab"
-                    >
-                      Recently Used
-                    </button>
-                    <button
-                      data-tab={PROMPT_TABS.FORGOTTEN}
-                      onClick={handleTabClick}
-                      className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-                        activeTab === PROMPT_TABS.FORGOTTEN
-                          ? 'border-purple-600 text-purple-600 dark:text-purple-400'
-                          : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
-                      }`}
-                      aria-selected={activeTab === PROMPT_TABS.FORGOTTEN}
-                      role="tab"
-                    >
-                      Forgotten
-                    </button>
-                  </nav>
+                  <div className="flex -mb-px" role="tablist" aria-label="Prompt tabs">
+                    {Object.values(PROMPT_TABS).map((tab) => (
+                      <button
+                        key={tab}
+                        ref={(el) => {
+                          if (el) {
+                            tabRefs.current.set(tab, el);
+                          }
+                        }}
+                        id={`tab-${tab}`}
+                        data-tab={tab}
+                        onClick={handleTabClick}
+                        onKeyDown={handleTabKeyDown}
+                        className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
+                          activeTab === tab
+                            ? 'border-purple-600 text-purple-600 dark:text-purple-400'
+                            : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
+                        }`}
+                        aria-selected={activeTab === tab}
+                        aria-controls={`tabpanel-${tab}`}
+                        tabIndex={activeTab === tab ? 0 : -1}
+                        role="tab"
+                      >
+                        {TAB_LABELS[tab]}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
-                {/* Tab Content */}
-                <div className="p-4" role="tabpanel">
-                  {loading ? (
-                    <div className="space-y-3">
-                      {[1, 2, 3, 4, 5].map((i) => (
-                        <div key={i} className="animate-pulse bg-gray-100 dark:bg-gray-700 rounded-xl p-4">
-                          <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-3/4 mb-2" />
-                          <div className="h-3 bg-gray-200 dark:bg-gray-600 rounded w-1/4" />
+                {/* Tab Content - render all panels, hide inactive for valid aria-controls */}
+                {Object.values(PROMPT_TABS).map((tab) => {
+                  const isActive = activeTab === tab;
+                  const tabPrompts = getPromptsForTab(tab);
+                  return (
+                    <div
+                      key={tab}
+                      id={`tabpanel-${tab}`}
+                      className="p-4"
+                      role="tabpanel"
+                      aria-labelledby={`tab-${tab}`}
+                      hidden={!isActive}
+                    >
+                      {loading ? (
+                        <div className="space-y-3">
+                          {[1, 2, 3, 4, 5].map((i) => (
+                            <div key={i} className="animate-pulse bg-gray-100 dark:bg-gray-700 rounded-xl p-4">
+                              <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-3/4 mb-2" />
+                              <div className="h-3 bg-gray-200 dark:bg-gray-600 rounded w-1/4" />
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                  ) : activePrompts.length > 0 ? (
-                    <ul className="space-y-2">
-                      {activePrompts.map((prompt, index) => (
-                        <li
-                          key={prompt.promptId}
-                          className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                        >
-                          <div className="flex items-start gap-4">
-                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                              activeTab === PROMPT_TABS.MOST_USED && index === 0
-                                ? 'bg-gradient-to-br from-yellow-400 to-orange-500 text-white'
-                                : activeTab === PROMPT_TABS.MOST_USED && index === 1
-                                ? 'bg-gradient-to-br from-gray-300 to-gray-400 text-white'
-                                : activeTab === PROMPT_TABS.MOST_USED && index === 2
-                                ? 'bg-gradient-to-br from-amber-600 to-amber-700 text-white'
-                                : 'bg-gray-200 dark:bg-gray-600 text-gray-500 dark:text-gray-400'
-                            }`}>
-                              {activeTab === PROMPT_TABS.MOST_USED && index < 3 ? (
-                                <TrophyIcon className="w-4 h-4" />
-                              ) : (
-                                <span className="text-xs font-bold">{index + 1}</span>
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                                {prompt.title}
-                              </h4>
-                              <div className="flex items-center gap-3 mt-1">
-                                <span className="text-xs text-purple-600 dark:text-purple-400 font-medium">
-                                  {prompt.count} {prompt.count === 1 ? 'use' : 'uses'}
-                                </span>
-                                <span className="text-xs text-gray-400 dark:text-gray-500">
-                                  {formatRelativeTime(prompt.lastUsed, now)}
-                                </span>
-                                {prompt.category && (
-                                  <span className="text-xs px-2 py-0.5 bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300 rounded-full">
-                                    {prompt.category}
-                                  </span>
-                                )}
+                      ) : tabPrompts.length > 0 ? (
+                        <ul className="space-y-2">
+                          {tabPrompts.map((prompt, index) => (
+                            <li
+                              key={prompt.promptId}
+                              className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                            >
+                              <div className="flex items-start gap-4">
+                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                                  tab === PROMPT_TABS.MOST_USED && index === 0
+                                    ? 'bg-gradient-to-br from-yellow-400 to-orange-500 text-white'
+                                    : tab === PROMPT_TABS.MOST_USED && index === 1
+                                    ? 'bg-gradient-to-br from-gray-300 to-gray-400 text-white'
+                                    : tab === PROMPT_TABS.MOST_USED && index === 2
+                                    ? 'bg-gradient-to-br from-amber-600 to-amber-700 text-white'
+                                    : 'bg-gray-200 dark:bg-gray-600 text-gray-500 dark:text-gray-400'
+                                }`}>
+                                  {tab === PROMPT_TABS.MOST_USED && index < 3 ? (
+                                    <TrophyIcon className="w-4 h-4" />
+                                  ) : (
+                                    <span className="text-xs font-bold">{index + 1}</span>
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                                    {prompt.title}
+                                  </h4>
+                                  <div className="flex items-center gap-3 mt-1">
+                                    <span className="text-xs text-purple-600 dark:text-purple-400 font-medium">
+                                      {prompt.count} {prompt.count === 1 ? 'use' : 'uses'}
+                                    </span>
+                                    <span className="text-xs text-gray-400 dark:text-gray-500">
+                                      {formatRelativeTime(prompt.lastUsed, now)}
+                                    </span>
+                                    {prompt.category && (
+                                      <span className="text-xs px-2 py-0.5 bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300 rounded-full">
+                                        {prompt.category}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
-                            </div>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <div className="text-center py-8">
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {activeTab === PROMPT_TABS.FORGOTTEN
-                          ? 'No forgotten prompts - you are using all your prompts!'
-                          : 'No prompts to display'}
-                      </p>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <div className="text-center py-8">
+                          <p className="text-sm text-gray-500 dark:text-gray-400">
+                            {tab === PROMPT_TABS.FORGOTTEN
+                              ? 'No forgotten prompts - you are using all your prompts!'
+                              : 'No prompts to display'}
+                          </p>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
+                  );
+                })}
               </div>
             </section>
           </div>
