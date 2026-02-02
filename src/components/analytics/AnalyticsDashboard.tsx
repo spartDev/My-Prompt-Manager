@@ -22,6 +22,7 @@ import {
   CategoryBarChart,
   TimeOfDayChart
 } from './charts';
+import { CHART_HEIGHT, MAX_CATEGORIES_DISPLAY, REFRESH_INTERVAL_MS } from './constants';
 import SummaryCard from './SummaryCard';
 
 /** Fallback UI for chart rendering errors */
@@ -82,7 +83,7 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
   const tabRefs = useRef<Map<PromptTab, HTMLButtonElement>>(new Map());
 
   // Current time for relative time calculations - updates every minute to trigger re-renders
-  const now = useNow(60000);
+  const now = useNow(REFRESH_INTERVAL_MS);
 
   // Compute summary metrics using shared hook
   const summaryMetrics = useSummaryMetrics(stats);
@@ -244,12 +245,12 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
               </h2>
               <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-purple-100 dark:border-gray-700">
                 {loading ? (
-                  <div className="animate-pulse bg-gray-200 dark:bg-gray-700 rounded-xl h-[250px]" />
+                  <div className="animate-pulse bg-gray-200 dark:bg-gray-700 rounded-xl" style={{ height: CHART_HEIGHT.MEDIUM }} />
                 ) : (
-                  <ErrorBoundary fallback={<ChartErrorFallback height={250} />}>
+                  <ErrorBoundary fallback={<ChartErrorFallback height={CHART_HEIGHT.MEDIUM} />}>
                     <UsageLineChart
                       data={stats?.dailyUsage ?? []}
-                      height={250}
+                      height={CHART_HEIGHT.MEDIUM}
                     />
                   </ErrorBoundary>
                 )}
@@ -268,12 +269,12 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
                     Platforms
                   </h3>
                   {loading ? (
-                    <div className="animate-pulse bg-gray-200 dark:bg-gray-700 rounded-xl h-[200px]" />
+                    <div className="animate-pulse bg-gray-200 dark:bg-gray-700 rounded-xl" style={{ height: CHART_HEIGHT.SMALL }} />
                   ) : (
-                    <ErrorBoundary fallback={<ChartErrorFallback height={200} />}>
+                    <ErrorBoundary fallback={<ChartErrorFallback height={CHART_HEIGHT.SMALL} />}>
                       <PlatformPieChart
                         data={stats?.platformBreakdown ?? []}
-                        height={200}
+                        height={CHART_HEIGHT.SMALL}
                       />
                     </ErrorBoundary>
                   )}
@@ -285,12 +286,12 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
                     Day of Week
                   </h3>
                   {loading ? (
-                    <div className="animate-pulse bg-gray-200 dark:bg-gray-700 rounded-xl h-[200px]" />
+                    <div className="animate-pulse bg-gray-200 dark:bg-gray-700 rounded-xl" style={{ height: CHART_HEIGHT.SMALL }} />
                   ) : (
-                    <ErrorBoundary fallback={<ChartErrorFallback height={200} />}>
+                    <ErrorBoundary fallback={<ChartErrorFallback height={CHART_HEIGHT.SMALL} />}>
                       <DayOfWeekChart
                         data={stats?.dayOfWeekDistribution ?? []}
-                        height={200}
+                        height={CHART_HEIGHT.SMALL}
                       />
                     </ErrorBoundary>
                   )}
@@ -302,13 +303,13 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
                     Categories
                   </h3>
                   {loading ? (
-                    <div className="animate-pulse bg-gray-200 dark:bg-gray-700 rounded-xl h-[200px]" />
+                    <div className="animate-pulse bg-gray-200 dark:bg-gray-700 rounded-xl" style={{ height: CHART_HEIGHT.SMALL }} />
                   ) : (
-                    <ErrorBoundary fallback={<ChartErrorFallback height={200} />}>
+                    <ErrorBoundary fallback={<ChartErrorFallback height={CHART_HEIGHT.SMALL} />}>
                       <CategoryBarChart
                         data={stats?.categoryDistribution ?? []}
-                        height={200}
-                        maxCategories={6}
+                        height={CHART_HEIGHT.SMALL}
+                        maxCategories={MAX_CATEGORIES_DISPLAY}
                       />
                     </ErrorBoundary>
                   )}
@@ -320,12 +321,12 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
                     Time of Day
                   </h3>
                   {loading ? (
-                    <div className="animate-pulse bg-gray-200 dark:bg-gray-700 rounded-xl h-[200px]" />
+                    <div className="animate-pulse bg-gray-200 dark:bg-gray-700 rounded-xl" style={{ height: CHART_HEIGHT.SMALL }} />
                   ) : (
-                    <ErrorBoundary fallback={<ChartErrorFallback height={200} />}>
+                    <ErrorBoundary fallback={<ChartErrorFallback height={CHART_HEIGHT.SMALL} />}>
                       <TimeOfDayChart
                         data={stats?.timeOfDayDistribution ?? []}
-                        height={200}
+                        height={CHART_HEIGHT.SMALL}
                       />
                     </ErrorBoundary>
                   )}

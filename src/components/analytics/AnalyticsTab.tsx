@@ -15,6 +15,7 @@ import {
 } from '../icons/UIIcons';
 import ViewHeader from '../ViewHeader';
 
+import { REFRESH_INTERVAL_MS } from './constants';
 import SummaryCard from './SummaryCard';
 
 export interface AnalyticsTabProps {
@@ -39,7 +40,7 @@ const AnalyticsTab: FC<AnalyticsTabProps> = ({
   const summaryMetrics = useSummaryMetrics(stats);
 
   // Current time for relative time calculations - updates every minute to trigger re-renders
-  const now = useNow(60000);
+  const now = useNow(REFRESH_INTERVAL_MS);
 
   // Handle clear history with confirmation
   const handleClearHistory = async (): Promise<void> => {
