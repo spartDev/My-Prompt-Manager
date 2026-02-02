@@ -614,7 +614,7 @@ jobs:
             ### 🚀 Next Steps
             - Chrome Web Store: Package is ready for submission
             - GitHub Release: Available at [releases page](https://github.com/${{ github.repository }}/releases/tag/v${{ needs.validate-release.outputs.version }})
-            SUMMARY_EOF
+SUMMARY_EOF
           else
             echo "❌ 🚨 RELEASE PROCESS FAILED!"
             echo "🔧 Please check failed jobs and retry the release"
@@ -631,8 +631,8 @@ jobs:
 
             ### 🔧 Troubleshooting
             Please check the failed job logs and retry the release after fixing issues.
-            SUMMARY_EOF
-            
+SUMMARY_EOF
+
             exit 1
           fi
 
