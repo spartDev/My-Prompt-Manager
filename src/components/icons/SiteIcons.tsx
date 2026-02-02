@@ -197,65 +197,67 @@ export const CopilotIcon: FC<CopilotIconProps> = ({ className = '', disabled = f
           fill="url(#paint5_linear_copilot)"
         />
       )}
-      <defs>
-      <radialGradient
-        id="paint0_radial_copilot"
-        cx="0" cy="0" r="1"
-        gradientUnits="userSpaceOnUse"
-        gradientTransform="matrix(-7.37821 -8.55084 -7.96607 7.17216 25.5747 13.5466)"
-      >
-        <stop offset="0.0955758" stopColor="#00AEFF"/>
-        <stop offset="0.773185" stopColor="#2253CE"/>
-        <stop offset="1" stopColor="#0736C4"/>
-      </radialGradient>
-      <radialGradient
-        id="paint1_radial_copilot"
-        cx="0" cy="0" r="1"
-        gradientUnits="userSpaceOnUse"
-        gradientTransform="matrix(6.61516 7.92888 7.80904 -6.47171 7.1753 21.9482)"
-      >
-        <stop stopColor="#FFB657"/>
-        <stop offset="0.633728" stopColor="#FF5F3D"/>
-        <stop offset="0.923392" stopColor="#C02B3C"/>
-      </radialGradient>
-      <radialGradient
-        id="paint2_radial_copilot"
-        cx="0" cy="0" r="1"
-        gradientUnits="userSpaceOnUse"
-        gradientTransform="matrix(-0.990905 -17.2799 98.0282 -5.51056 8.54161 22.4952)"
-      >
-        <stop offset="0.03" stopColor="#FFC800"/>
-        <stop offset="0.31" stopColor="#98BD42"/>
-        <stop offset="0.49" stopColor="#52B471"/>
-        <stop offset="0.843838" stopColor="#0D91E1"/>
-      </radialGradient>
-      <linearGradient
-        id="paint3_linear_copilot"
-        x1="9.52186" y1="3" x2="10.3572" y2="22.5029"
-        gradientUnits="userSpaceOnUse"
-      >
-        <stop stopColor="#3DCBFF"/>
-        <stop offset="0.246674" stopColor="#0588F7" stopOpacity="0"/>
-      </linearGradient>
-      <radialGradient
-        id="paint4_radial_copilot"
-        cx="0" cy="0" r="1"
-        gradientUnits="userSpaceOnUse"
-        gradientTransform="matrix(-8.64067 24.4636 -29.4075 -10.797 27.8096 7.58585)"
-      >
-        <stop offset="0.0661714" stopColor="#8C48FF"/>
-        <stop offset="0.5" stopColor="#F2598A"/>
-        <stop offset="0.895833" stopColor="#FFB152"/>
-      </radialGradient>
-      <linearGradient
-        id="paint5_linear_copilot"
-        x1="28.6736" y1="8.30469" x2="28.6627" y2="13.617"
-        gradientUnits="userSpaceOnUse"
-      >
-        <stop offset="0.0581535" stopColor="#F8ADFA"/>
-        <stop offset="0.708063" stopColor="#A86EDD" stopOpacity="0"/>
-      </linearGradient>
-    </defs>
+      {!disabled && (
+        <defs>
+          <radialGradient
+            id="paint0_radial_copilot"
+            cx="0" cy="0" r="1"
+            gradientUnits="userSpaceOnUse"
+            gradientTransform="matrix(-7.37821 -8.55084 -7.96607 7.17216 25.5747 13.5466)"
+          >
+            <stop offset="0.0955758" stopColor="#00AEFF"/>
+            <stop offset="0.773185" stopColor="#2253CE"/>
+            <stop offset="1" stopColor="#0736C4"/>
+          </radialGradient>
+          <radialGradient
+            id="paint1_radial_copilot"
+            cx="0" cy="0" r="1"
+            gradientUnits="userSpaceOnUse"
+            gradientTransform="matrix(6.61516 7.92888 7.80904 -6.47171 7.1753 21.9482)"
+          >
+            <stop stopColor="#FFB657"/>
+            <stop offset="0.633728" stopColor="#FF5F3D"/>
+            <stop offset="0.923392" stopColor="#C02B3C"/>
+          </radialGradient>
+          <radialGradient
+            id="paint2_radial_copilot"
+            cx="0" cy="0" r="1"
+            gradientUnits="userSpaceOnUse"
+            gradientTransform="matrix(-0.990905 -17.2799 98.0282 -5.51056 8.54161 22.4952)"
+          >
+            <stop offset="0.03" stopColor="#FFC800"/>
+            <stop offset="0.31" stopColor="#98BD42"/>
+            <stop offset="0.49" stopColor="#52B471"/>
+            <stop offset="0.843838" stopColor="#0D91E1"/>
+          </radialGradient>
+          <linearGradient
+            id="paint3_linear_copilot"
+            x1="9.52186" y1="3" x2="10.3572" y2="22.5029"
+            gradientUnits="userSpaceOnUse"
+          >
+            <stop stopColor="#3DCBFF"/>
+            <stop offset="0.246674" stopColor="#0588F7" stopOpacity="0"/>
+          </linearGradient>
+          <radialGradient
+            id="paint4_radial_copilot"
+            cx="0" cy="0" r="1"
+            gradientUnits="userSpaceOnUse"
+            gradientTransform="matrix(-8.64067 24.4636 -29.4075 -10.797 27.8096 7.58585)"
+          >
+            <stop offset="0.0661714" stopColor="#8C48FF"/>
+            <stop offset="0.5" stopColor="#F2598A"/>
+            <stop offset="0.895833" stopColor="#FFB152"/>
+          </radialGradient>
+          <linearGradient
+            id="paint5_linear_copilot"
+            x1="28.6736" y1="8.30469" x2="28.6627" y2="13.617"
+            gradientUnits="userSpaceOnUse"
+          >
+            <stop offset="0.0581535" stopColor="#F8ADFA"/>
+            <stop offset="0.708063" stopColor="#A86EDD" stopOpacity="0"/>
+          </linearGradient>
+        </defs>
+      )}
   </svg>
   );
 };
