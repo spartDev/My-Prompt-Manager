@@ -63,7 +63,7 @@ const SummaryCard: FC<SummaryCardProps> = memo(({
       </div>
 
       <div className="flex items-baseline gap-2">
-        <span className={`text-2xl font-bold text-gray-900 dark:text-gray-100 ${trend ? getTrendColor() : ''}`}>
+        <span className={`text-2xl font-bold ${trend ? getTrendColor() : 'text-gray-900 dark:text-gray-100'}`}>
           {value}
         </span>
         {trend && (
