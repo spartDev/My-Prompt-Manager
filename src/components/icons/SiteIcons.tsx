@@ -4,15 +4,7 @@ interface IconProps {
   className?: string;
 }
 
-interface MistralIconProps extends IconProps {
-  disabled?: boolean;
-}
-
-interface GeminiIconProps extends IconProps {
-  disabled?: boolean;
-}
-
-interface CopilotIconProps extends IconProps {
+interface DisableableIconProps extends IconProps {
   disabled?: boolean;
 }
 
@@ -57,7 +49,7 @@ export const PerplexityIcon: FC<IconProps> = ({ className = '' }) => (
   </svg>
 );
 
-export const MistralIcon: FC<MistralIconProps> = ({ className = '', disabled = false }) => {
+export const MistralIcon: FC<DisableableIconProps> = ({ className = '', disabled = false }) => {
   // When disabled, use grayscale colors; otherwise use the brand gradient
   const colors = disabled
     ? {
@@ -95,7 +87,7 @@ export const MistralIcon: FC<MistralIconProps> = ({ className = '', disabled = f
   );
 };
 
-export const GeminiIcon: FC<GeminiIconProps> = ({ className = '', disabled = false }) => {
+export const GeminiIcon: FC<DisableableIconProps> = ({ className = '', disabled = false }) => {
   // When disabled, use grayscale; otherwise use the brand colors
   const baseColor = disabled ? '#9ca3af' : '#3186FF';
 
@@ -147,7 +139,7 @@ export const GeminiIcon: FC<GeminiIconProps> = ({ className = '', disabled = fal
   );
 };
 
-export const CopilotIcon: FC<CopilotIconProps> = ({ className = '', disabled = false }) => {
+export const CopilotIcon: FC<DisableableIconProps> = ({ className = '', disabled = false }) => {
   // When disabled, use currentColor (gray); otherwise use gradients
   const fillColor = disabled ? 'currentColor' : undefined;
 
