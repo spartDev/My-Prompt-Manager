@@ -323,9 +323,11 @@ cleanup() {
         for dir in "$BASE_DIR"/*; do
             if [ -d "$dir" ]; then
                 local name=$(basename "$dir")
-                git -C "$REPO_DIR" worktree remove "$dir" --force 2>/dev/null && \
-                    print_status "Removed: $name" || \
+                if git -C "$REPO_DIR" worktree remove "$dir" --force 2>/dev/null; then
+                    print_status "Removed: $name"
+                else
                     print_warning "Could not remove: $name"
+                fi
             fi
         done
 
