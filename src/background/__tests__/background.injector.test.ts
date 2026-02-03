@@ -17,7 +17,19 @@ describe('ContentScriptInjector integration', () => {
       url: 'https://chatgpt.com',
       status: 'complete'
     } as chrome.tabs.Tab);
-    chromeMock.permissions.contains.mockImplementation(async ({ origins }: chrome.permissions.Permissions) => origins?.[0]?.startsWith('https://chatgpt.com') ?? false);
+    chromeMock.permissions.contains.mockImplementation(
+      async ({ origins }: chrome.permissions.Permissions) => {
+        if (!origins?.[0]) {
+          return false;
+        }
+        try {
+          const url = new URL(origins[0].replace('/*', ''));
+          return url.hostname === 'chatgpt.com';
+        } catch {
+          return false;
+        }
+      }
+    );
     chromeMock.runtime.getManifest.mockReturnValue({ content_scripts: [{ js: ['content.js'] }] });
     chromeMock.runtime.getURL.mockImplementation((path: string) => path);
     chromeMock.scripting.executeScript.mockResolvedValue([{ result: true }]);
