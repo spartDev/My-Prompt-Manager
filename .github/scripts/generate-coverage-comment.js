@@ -55,7 +55,8 @@ async function generateCoverageComment(github, context) {
     coverageData = JSON.parse(fs.readFileSync(coveragePath, 'utf8'));
 
     // Validate expected structure
-    if (!coverageData?.total?.lines?.pct ||
+    if (coverageData?.total?.lines?.pct === undefined ||
+        coverageData?.total?.lines?.pct === null ||
         typeof coverageData.total.lines.pct !== 'number') {
       throw new Error('Invalid coverage data structure: missing total.lines.pct');
     }
@@ -63,7 +64,10 @@ async function generateCoverageComment(github, context) {
     // Validate all required metrics exist
     const requiredMetrics = ['statements', 'branches', 'functions', 'lines'];
     for (const metric of requiredMetrics) {
-      if (!coverageData.total[metric] ||
+      if (coverageData.total[metric] === undefined ||
+          coverageData.total[metric] === null ||
+          coverageData.total[metric].pct === undefined ||
+          coverageData.total[metric].pct === null ||
           typeof coverageData.total[metric].pct !== 'number') {
         throw new Error(`Invalid coverage data: missing total.${metric}.pct`);
       }
