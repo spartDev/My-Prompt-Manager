@@ -30,7 +30,7 @@ async function generateCoverageComment(github, context) {
   console.log(`Found PR #${prNumber}`);
 
   // Check if coverage file exists
-  const coveragePath = 'coverage-summary.json';
+  const coveragePath = 'coverage/coverage-summary.json';
   if (!fs.existsSync(coveragePath)) {
     console.error('Coverage summary file not found - artifact may not have been downloaded');
     console.error('Check that the coverage-reports artifact was uploaded in pr-checks.yml');
