@@ -13,7 +13,7 @@ const COVERAGE_THRESHOLDS = {
   EXCELLENT: 80,
   GOOD: 60,
   FAIR: 40,
-  MINIMUM: 50 // From vitest.config.ts
+  MINIMUM: 80 // From vitest.config.ts
 };
 
 async function generateCoverageComment(github, context) {
@@ -181,7 +181,7 @@ async function generateCoverageComment(github, context) {
 
 Current threshold: **${COVERAGE_THRESHOLDS.MINIMUM}% statements** (configured in \`vitest.config.ts\`)
 
-${overallPct >= COVERAGE_THRESHOLDS.MINIMUM ? '✅ Meeting threshold requirements' : '⚠️ Below threshold - consider increasing coverage'}
+${total.statements.pct >= COVERAGE_THRESHOLDS.MINIMUM ? '✅ Meeting threshold requirements' : '⚠️ Below threshold - consider increasing coverage'}
 
 ${fileTable}
 
