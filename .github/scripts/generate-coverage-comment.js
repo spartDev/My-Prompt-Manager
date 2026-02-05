@@ -41,7 +41,7 @@ async function generateCoverageComment(github, context) {
         owner: context.repo.owner,
         repo: context.repo.repo,
         issue_number: prNumber,
-        body: '⚠️ **Coverage Report Unavailable**\n\nThe coverage artifact could not be found. This may happen if:\n- Tests did not run on Node 22.x\n- Coverage generation failed\n- Artifact download timed out\n\nCheck the [workflow logs](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.payload.workflow_run.id}) for details.'
+        body: `⚠️ **Coverage Report Unavailable**\n\nThe coverage artifact could not be found. This may happen if:\n- Tests did not run on Node 22.x\n- Coverage generation failed\n- Artifact download timed out\n\nCheck the [workflow logs](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.payload.workflow_run.id}) for details.`
       });
     } catch (error) {
       console.error(`Failed to post missing coverage comment: ${error.message}`);
