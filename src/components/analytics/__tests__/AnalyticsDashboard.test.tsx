@@ -382,7 +382,7 @@ describe('AnalyticsDashboard', () => {
     it('should show loading skeletons for tab panel content', () => {
       setupDefaultMocks({ loading: true });
 
-      const { container } = render(<AnalyticsDashboard />);
+      render(<AnalyticsDashboard />);
 
       // The tab panels should contain loading skeletons
       const tabPanels = screen.getAllByRole('tabpanel');
@@ -699,7 +699,7 @@ describe('AnalyticsDashboard', () => {
       });
       setupDefaultMocks({ stats });
 
-      const { container } = render(<AnalyticsDashboard />);
+      render(<AnalyticsDashboard />);
 
       // The active tab panel (most-used) should have list items
       const activePanel = getActivePanel(screen.getAllByRole('tabpanel'));
@@ -863,7 +863,7 @@ describe('AnalyticsDashboard', () => {
 
       render(<AnalyticsDashboard />);
 
-      const panels = screen.getAllByRole('tabpanel', { hidden: true });
+      screen.getAllByRole('tabpanel', { hidden: true });
       // getAllByRole with hidden: true returns all panels (including hidden ones)
       // We need to check the hidden attribute directly
       const mostUsedPanel = getElementByIdSafe('tabpanel-most-used');
