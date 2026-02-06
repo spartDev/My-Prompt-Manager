@@ -334,9 +334,10 @@ describe('SettingsView', () => {
     // Verify that chrome.storage.local.set was called with the updated settings
     await waitFor(() => {
       const setCalls = (chromeMock.storage.local.set as Mock).mock.calls;
-      const saveCall = setCalls.find(
-        (call: any[]) => call[0]?.promptLibrarySettings && !call[0]?.promptLibrarySettings?.enabledSites?.includes('chatgpt.com')
-      );
+      const saveCall = setCalls.find((call: any[]) => {
+        const sites: string[] | undefined = call[0]?.promptLibrarySettings?.enabledSites;
+        return call[0]?.promptLibrarySettings && (!sites || !sites.includes('chatgpt.com'));
+      });
       expect(saveCall).toBeDefined();
     });
 
