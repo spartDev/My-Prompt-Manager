@@ -13,6 +13,7 @@ on:
 
 # Minimal permissions following principle of least privilege
 permissions:
+  actions: read         # Required to download artifacts from workflow_run
   contents: read        # Required to checkout repository
   pull-requests: write  # Required to post/delete PR comments
 
