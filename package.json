@@ -27,7 +27,7 @@
     "@testing-library/user-event": "14.6.1",
     "@types/chrome": "0.1.36",
     "@types/jsdom": "27.0.0",
-    "@types/node": "24.10.9",
+    "@types/node": "24.10.10",
     "@types/react": "19.2.10",
     "@types/react-dom": "19.2.3",
     "@typescript-eslint/eslint-plugin": "8.54.0",
