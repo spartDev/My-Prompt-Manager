@@ -207,7 +207,9 @@ jobs:
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: coverage-reports
-          path: coverage/
+          path: |
+            coverage/coverage-summary.json
+            coverage/
           retention-days: 7
 
       - name: 📋 Coverage Summary
