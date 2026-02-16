@@ -71,6 +71,12 @@ async function generateCoverageComment(github, context) {
           typeof coverageData.total[metric].pct !== 'number') {
         throw new Error(`Invalid coverage data: missing total.${metric}.pct`);
       }
+      // SECURITY: Validate covered/total are numbers to prevent markdown injection
+      // via crafted artifact from fork PRs (artifact poisoning)
+      if (typeof coverageData.total[metric].covered !== 'number' ||
+          typeof coverageData.total[metric].total !== 'number') {
+        throw new Error(`Invalid coverage data: non-numeric total.${metric}.covered/total`);
+      }
     }
   } catch (error) {
     console.error(`Failed to parse coverage data: ${error.message}`);
@@ -139,10 +145,11 @@ async function generateCoverageComment(github, context) {
     .filter(([key]) => key !== 'total')
     .map(([file, metrics]) => ({
       file: file.replace(/^.*\/src\//, 'src/'),
-      lines: metrics.lines.pct,
-      statements: metrics.statements.pct,
-      functions: metrics.functions.pct,
-      branches: metrics.branches.pct
+      // SECURITY: Coerce to number to prevent markdown injection via crafted artifact
+      lines: Number(metrics.lines?.pct) || 0,
+      statements: Number(metrics.statements?.pct) || 0,
+      functions: Number(metrics.functions?.pct) || 0,
+      branches: Number(metrics.branches?.pct) || 0
     }))
     .sort((a, b) => a.lines - b.lines)
     .slice(0, 10);
