@@ -115,7 +115,8 @@ async function generateCoverageComment(github, context) {
 
   // Helper function to format coverage bar
   const formatBar = (pct) => {
-    const filled = Math.round(pct / 5);
+    const clamped = Math.max(0, Math.min(100, pct));
+    const filled = Math.round(clamped / 5);
     const empty = 20 - filled;
     return '█'.repeat(filled) + '░'.repeat(empty);
   };
