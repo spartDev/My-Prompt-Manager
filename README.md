@@ -75,7 +75,7 @@ See our [Platform Integration Guide](docs/PLATFORM_INTEGRATION.md) to add your o
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) 18+ (LTS recommended)
+- [Node.js](https://nodejs.org/) 22+ (LTS recommended)
 - [Chrome Browser](https://www.google.com/chrome/) 114+
 - [Git](https://git-scm.com/) for cloning the repository
 
