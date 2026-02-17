@@ -4,8 +4,6 @@
  * @file
  */
 
-/* global require, module, console */
-
 const fs = require('fs');
 
 // Coverage threshold constants - sync with vitest.config.ts
