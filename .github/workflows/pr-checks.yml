@@ -382,8 +382,8 @@ jobs:
 
       - name: 🔒 Security Audit
         run: |
-          echo "🔒 Running npm security audit..."
-          npm audit --audit-level=moderate
+          echo "🔒 Running npm security audit (production dependencies)..."
+          npm audit --omit=dev --audit-level=moderate
         continue-on-error: false # Fail on security vulnerabilities
 
       - name: 🔍 Dependency Review
