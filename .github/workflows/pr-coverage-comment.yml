@@ -35,6 +35,7 @@ jobs:
         id: download-artifact
         with:
           name: coverage-reports
+          path: coverage
           github-token: ${{ secrets.GITHUB_TOKEN }}
           run-id: ${{ github.event.workflow_run.id }}
         continue-on-error: true
