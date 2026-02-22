@@ -209,8 +209,7 @@ ${fileTable}
   // SECURITY: Filter by exact bot username to avoid deleting comments from other bots
   const coverageComments = comments.filter(comment =>
     comment.user.login === 'github-actions[bot]' &&
-    comment.body.startsWith('## ') &&
-    comment.body.includes('Test Coverage Report')
+    comment.body.includes('Coverage Report')
   );
 
   // Delete old coverage comments
