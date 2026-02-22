@@ -1,0 +1,50 @@
+name: 📊 Coverage Report Comment
+
+# SECURITY: workflow_run trigger runs in the base repository context
+# This is safe for untrusted PRs (including forks) because:
+# - It doesn't execute code from the PR
+# - It runs after PR checks complete in a separate, trusted context
+# - Artifacts are downloaded from the completed workflow
+on:
+  workflow_run:
+    workflows: ["🔍 Pull Request Checks"]
+    types:
+      - completed
+
+# Minimal permissions following principle of least privilege
+permissions:
+  actions: read         # Required to download artifacts from workflow_run
+  contents: read        # Required to checkout repository
+  pull-requests: write  # Required to post/delete PR comments
+
+jobs:
+  coverage-comment:
+    name: 📊 Post Coverage Report
+    runs-on: ubuntu-latest
+    # IMPORTANT: Only run on successful PR workflows to avoid posting on failed runs
+    if: >
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success'
+
+    steps:
+      - name: 🛎️ Checkout Repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: 📥 Download Coverage Artifact
+        uses: actions/download-artifact@6e448e04c1fea8d8c4ed3f8af84d0bd5e2f1aaef # v4.1.8
+        id: download-artifact
+        with:
+          name: coverage-reports
+          path: coverage
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+        continue-on-error: true
+        # Note: continue-on-error allows graceful handling when artifact is missing
+        # The script will post an explanatory comment if coverage-summary.json is not found
+
+      - name: 📊 Generate and Post Coverage Comment
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.1
+        with:
+          script: |
+            const script = require('./.github/scripts/generate-coverage-comment.cjs');
+            await script.generateCoverageComment(github, context);

@@ -64,5 +64,8 @@
   },
   "lint-staged": {
     "*.{ts,tsx}": "eslint --fix"
+  },
+  "overrides": {
+    "minimatch": ">=10.2.1"
   }
 }
