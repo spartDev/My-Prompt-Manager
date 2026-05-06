@@ -60,7 +60,7 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "recharts": "3.7.0",
-    "uuid": "13.0.0"
+    "uuid": "13.0.1"
   },
   "lint-staged": {
     "*.{ts,tsx}": "eslint --fix"
