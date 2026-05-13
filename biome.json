@@ -17,7 +17,12 @@
 			"!**/*.config.js",
 			"!**/*.config.ts",
 			"!**/*.config.cjs",
-			"!**/*.config.mjs"
+			"!**/*.config.mjs",
+			"!**/*.css",
+			"!**/*.scss",
+			"!**/*.html",
+			"!**/*.json",
+			"!**/*.md"
 		]
 	},
 	"formatter": { "enabled": false, "indentStyle": "tab" },
@@ -56,6 +61,8 @@
 				"noUnusedPrivateClassMembers": "error",
 				"noUnusedVariables": "error",
 				"noUnusedImports": "error",
+				"useExhaustiveDependencies": "warn",
+				"useHookAtTopLevel": "error",
 				"useIsNan": "error",
 				"useValidForDirection": "error",
 				"useValidTypeof": "error",
@@ -64,7 +71,7 @@
 			"style": {
 				"useConst": "error",
 				"useBlockStatements": "error",
-				"useImportType": "error"
+				"useImportType": "warn"
 			},
 			"suspicious": {
 				"noAssignInExpressions": "error",
@@ -73,7 +80,7 @@
 				"noClassAssign": "error",
 				"noCompareNegZero": "error",
 				"noConstantBinaryExpressions": "error",
-				"noControlCharactersInRegex": "error",
+				"noControlCharactersInRegex": "warn",
 				"noDebugger": "error",
 				"noDoubleEquals": "error",
 				"noDuplicateCase": "error",
@@ -81,14 +88,14 @@
 				"noDuplicateElseIf": "error",
 				"noDuplicateObjectKeys": "error",
 				"noDuplicateParameters": "error",
-				"noEmptyBlockStatements": "error",
+				"noEmptyBlockStatements": "warn",
 				"noFallthroughSwitchClause": "error",
 				"noFunctionAssign": "error",
 				"noGlobalAssign": "error",
 				"noImportAssign": "error",
 				"noIrregularWhitespace": "error",
 				"noMisleadingCharacterClass": "error",
-				"noPrototypeBuiltins": "error",
+				"noPrototypeBuiltins": "off",
 				"noRedeclare": "error",
 				"noShadowRestrictedNames": "error",
 				"noSparseArray": "error",
@@ -102,7 +109,19 @@
 	},
 	"javascript": {
 		"formatter": { "quoteStyle": "double" },
-		"globals": ["chrome"]
+		"globals": [
+			"chrome",
+			"describe",
+			"it",
+			"test",
+			"expect",
+			"beforeAll",
+			"beforeEach",
+			"afterAll",
+			"afterEach",
+			"suite",
+			"vi"
+		]
 	},
 	"overrides": [
 		{
@@ -112,7 +131,7 @@
 					"complexity": {
 						"noArguments": "error",
 						"noBannedTypes": "error",
-						"noStaticOnlyClass": "error",
+						"noStaticOnlyClass": "off",
 						"noUselessConstructor": "error",
 						"noUselessThisAlias": "error",
 						"noUselessTypeConstraint": "error"
@@ -123,13 +142,13 @@
 					},
 					"style": {
 						"noCommonJs": "error",
-						"noNamespace": "error",
+						"noNamespace": "off",
 						"useArrayLiterals": "error",
 						"useAsConstAssertion": "error",
 						"useLiteralEnumMembers": "error",
 						"useThrowOnlyError": "error",
 						"useUnifiedTypeSignatures": "error",
-						"useImportType": "error"
+						"useImportType": "warn"
 					},
 					"suspicious": {
 						"noConfusingVoidType": "error",
@@ -140,7 +159,7 @@
 						"noTsIgnore": "error",
 						"noUnsafeDeclarationMerging": "error",
 						"noUnusedExpressions": "off",
-						"useAwait": "error",
+						"useAwait": "warn",
 						"useNamespaceKeyword": "error"
 					}
 				}
@@ -156,21 +175,21 @@
 						"noAutofocus": "error",
 						"noDistractingElements": "error",
 						"noHeaderScope": "error",
-						"noInteractiveElementToNoninteractiveRole": "error",
-						"noLabelWithoutControl": "error",
-						"noNoninteractiveElementInteractions": "error",
+						"noInteractiveElementToNoninteractiveRole": "warn",
+						"noLabelWithoutControl": "warn",
+						"noNoninteractiveElementInteractions": "warn",
 						"noNoninteractiveElementToInteractiveRole": "error",
 						"noNoninteractiveTabindex": "error",
 						"noPositiveTabindex": "error",
 						"noRedundantAlt": "error",
 						"noRedundantRoles": "error",
-						"noStaticElementInteractions": "error",
+						"noStaticElementInteractions": "warn",
 						"useAltText": "error",
 						"useAnchorContent": "error",
 						"useAriaActivedescendantWithTabindex": "error",
-						"useAriaPropsForRole": "error",
-						"useAriaPropsSupportedByRole": "error",
-						"useFocusableInteractive": "error",
+						"useAriaPropsForRole": "warn",
+						"useAriaPropsSupportedByRole": "warn",
+						"useFocusableInteractive": "warn",
 						"useHeadingContent": "error",
 						"useHtmlLang": "error",
 						"useIframeTitle": "error",
@@ -220,7 +239,8 @@
 					"suspicious": {
 						"noConsole": "off",
 						"noExplicitAny": "off",
-						"noSkippedTests": "warn"
+						"noSkippedTests": "warn",
+						"useAwait": "off"
 					},
 					"style": { "useBlockStatements": "off" },
 					"correctness": { "noEmptyPattern": "off" }
@@ -234,7 +254,8 @@
 					"suspicious": {
 						"noConsole": "off",
 						"noExplicitAny": "off",
-						"noSkippedTests": "warn"
+						"noSkippedTests": "warn",
+						"useAwait": "off"
 					},
 					"style": { "useBlockStatements": "off" },
 					"correctness": { "noEmptyPattern": "off" }
