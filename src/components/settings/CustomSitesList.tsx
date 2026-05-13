@@ -1,7 +1,7 @@
-import { FC } from 'react';
+import type { FC } from 'react';
 
 import { useClipboard } from '../../hooks/useClipboard';
-import { CustomSite } from '../../types';
+import type { CustomSite } from '../../types';
 import { CustomSiteIcon } from '../icons/SiteIcons';
 
 import AddCustomSiteCard from './AddCustomSiteCard';

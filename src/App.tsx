@@ -15,7 +15,7 @@ import { useClipboard } from './hooks/useClipboard';
 import { usePrompts } from './hooks/usePrompts';
 import { useSearchWithDebounce } from './hooks/useSearchWithDebounce';
 import { useToast } from './hooks/useToast';
-import { Prompt, AppError, ViewType } from './types';
+import type { Prompt, AppError, ViewType } from './types';
 import { Logger, toError } from './utils';
 
 type ExtendedViewType = ViewType | 'categories' | 'settings' | 'analytics';

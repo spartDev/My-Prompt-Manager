@@ -2,7 +2,7 @@ import { forwardRef, useActionState, useMemo, useState } from 'react';
 import type { FC } from 'react';
 
 import { MAX_CONTENT_LENGTH, MAX_TITLE_LENGTH, formatCharacterCount } from '../constants/validation';
-import { EditPromptFormProps } from '../types/components';
+import type { EditPromptFormProps } from '../types/components';
 import { Logger, toError, validatePromptFields, type FieldErrors } from '../utils';
 
 import { Dropdown, type DropdownItem } from './Dropdown';

@@ -2,7 +2,7 @@
  * Text highlighting utilities for search functionality
  */
 
-import { TextHighlight } from '../types/hooks';
+import type { TextHighlight } from '../types/hooks';
 
 /**
  * Find all occurrences of a search term in text and return highlight positions

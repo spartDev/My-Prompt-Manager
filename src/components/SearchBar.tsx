@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import type { FC } from 'react';
 
-import { SearchBarProps } from '../types/components';
+import type { SearchBarProps } from '../types/components';
 
 const SearchBar: FC<SearchBarProps> = ({
   value,

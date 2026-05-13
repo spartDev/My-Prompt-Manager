@@ -1,4 +1,4 @@
-import { FC, memo, ReactNode } from 'react';
+import { type FC, memo, type ReactNode } from 'react';
 
 export interface SummaryCardProps {
   /** Label for the metric */

@@ -5,7 +5,7 @@
  * multiple test files to ensure consistency and reduce duplication.
  */
 
-import { DEFAULT_SETTINGS, UsageEvent } from '../../../src/types';
+import { DEFAULT_SETTINGS, type UsageEvent } from '../../../src/types';
 import { createPromptSeed, createCategorySeed } from '../utils/storage';
 
 /**

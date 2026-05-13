@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 
 import { PromptManager } from '../services/promptManager';
 import { StorageManager } from '../services/storage';
-import { Category, AppError } from '../types';
-import { UseCategoriesReturn } from '../types/hooks';
+import type { Category, AppError } from '../types';
+import type { UseCategoriesReturn } from '../types/hooks';
 
 export const useCategories = (): UseCategoriesReturn => {
   const [categories, setCategories] = useState<Category[]>([]);

@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 
 import { PromptManager } from '../services/promptManager';
 import { StorageManager } from '../services/storage';
-import { Prompt, AppError } from '../types';
-import { UsePromptsReturn } from '../types/hooks';
+import type { Prompt, AppError } from '../types';
+import type { UsePromptsReturn } from '../types/hooks';
 
 export const usePrompts = (): UsePromptsReturn => {
   const [prompts, setPrompts] = useState<Prompt[]>([]);

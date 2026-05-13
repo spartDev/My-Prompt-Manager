@@ -1,4 +1,4 @@
-import { FC, memo } from 'react';
+import { type FC, memo } from 'react';
 import {
   BarChart,
   Bar,
@@ -12,7 +12,7 @@ import {
 
 import { useChartTheme } from '../../../hooks/useChartTheme';
 import { CHART_PRIMARY, TIME_BUCKET_COLORS } from '../../../theme/chartColors';
-import { TimeOfDayDistribution } from '../../../types/hooks';
+import type { TimeOfDayDistribution } from '../../../types/hooks';
 
 export interface TimeOfDayChartProps {
   /** Time of day distribution data */

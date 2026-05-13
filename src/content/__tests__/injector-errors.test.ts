@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, Mock } from 'vitest';
+import { describe, it, expect, beforeEach, type Mock } from 'vitest';
 
 import { ContentScriptInjector } from '../../background/background';
 import { getChromeMockFunctions } from '../../test/mocks';

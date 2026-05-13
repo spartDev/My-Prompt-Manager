@@ -1,14 +1,14 @@
 import { v4 as uuidv4 } from 'uuid';
 
 import {
-  Prompt,
-  Category,
-  Settings,
-  StorageData,
+  type Prompt,
+  type Category,
+  type Settings,
+  type StorageData,
   DEFAULT_SETTINGS,
   DEFAULT_CATEGORY,
   type ErrorType,
-  AppError
+  type AppError
 } from '../types';
 import { AsyncMutex } from '../utils/asyncMutex';
 import { ensureStorageAvailable } from '../utils/chromeStorage';

@@ -1,4 +1,4 @@
-import { FC, useState, useRef, useMemo, useCallback } from 'react';
+import { type FC, useState, useRef, useMemo, useCallback } from 'react';
 
 import type { Prompt, Category } from '../../types';
 import type {} from '../../types/file-system-access-api';

@@ -5,9 +5,9 @@ import {
   shift,
   size,
   autoUpdate,
-  Placement
+  type Placement
 } from '@floating-ui/dom';
-import { useEffect, RefObject } from 'react';
+import { useEffect, type RefObject } from 'react';
 
 export interface FloatingOptions {
   /** Placement of the floating element relative to reference */

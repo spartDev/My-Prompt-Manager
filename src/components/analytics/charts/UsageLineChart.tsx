@@ -1,4 +1,4 @@
-import { FC, memo } from 'react';
+import { type FC, memo } from 'react';
 import {
   LineChart,
   Line,
@@ -10,7 +10,7 @@ import {
 } from 'recharts';
 
 import { useChartTheme } from '../../../hooks/useChartTheme';
-import { DailyUsage } from '../../../types/hooks';
+import type { DailyUsage } from '../../../types/hooks';
 
 export interface UsageLineChartProps {
   /** Daily usage data for the chart */

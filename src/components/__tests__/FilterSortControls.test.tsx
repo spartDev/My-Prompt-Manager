@@ -2,7 +2,7 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-import { Category, SortOrder, SortDirection } from '../../types';
+import type { Category, SortOrder, SortDirection } from '../../types';
 import FilterSortControls from '../FilterSortControls';
 
 const mockCategories: Category[] = [

@@ -1,10 +1,10 @@
 import {
-  UsageEvent,
-  PlatformType,
+  type UsageEvent,
+  type PlatformType,
   USAGE_RETENTION_DAYS,
   USAGE_STORAGE_KEY,
   type ErrorType,
-  AppError
+  type AppError
 } from '../types';
 import { AsyncMutex } from '../utils/asyncMutex';
 import { ensureStorageAvailable } from '../utils/chromeStorage';

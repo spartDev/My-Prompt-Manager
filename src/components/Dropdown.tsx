@@ -1,8 +1,8 @@
 import type { Placement } from '@floating-ui/dom';
 import {
-  FC,
-  ReactElement,
-  ReactNode,
+  type FC,
+  type ReactElement,
+  type ReactNode,
   cloneElement,
   useRef,
   useState,

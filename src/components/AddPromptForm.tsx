@@ -3,8 +3,8 @@ import type { FC } from 'react';
 
 import { MAX_CONTENT_LENGTH, MAX_TITLE_LENGTH, formatCharacterCount } from '../constants/validation';
 import { decode } from '../services/promptEncoder';
-import { DEFAULT_CATEGORY, SharedPromptData } from '../types';
-import { AddPromptFormProps } from '../types/components';
+import { DEFAULT_CATEGORY, type SharedPromptData } from '../types';
+import type { AddPromptFormProps } from '../types/components';
 import { Logger, toError, validatePromptFields, type FieldErrors } from '../utils';
 
 import { Dropdown, type DropdownItem } from './Dropdown';

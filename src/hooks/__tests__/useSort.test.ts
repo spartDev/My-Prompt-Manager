@@ -1,7 +1,7 @@
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 
-import { SortOrder, SortDirection } from '../../types';
+import type { SortOrder, SortDirection } from '../../types';
 import { useSort } from '../useSort';
 
 describe('useSort', () => {

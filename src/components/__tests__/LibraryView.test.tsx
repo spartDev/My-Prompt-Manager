@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import type { Prompt, Category } from '../../types';
-import { UseSearchWithDebounceReturn } from '../../types/hooks';
+import type { UseSearchWithDebounceReturn } from '../../types/hooks';
 import LibraryView from '../LibraryView';
 
 // Mock the storage and prompt manager singletons

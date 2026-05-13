@@ -1,4 +1,4 @@
-import { FC, useId } from 'react';
+import { type FC, useId } from 'react';
 
 import { cn } from '../../utils/cn';
 

@@ -1,7 +1,7 @@
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-import { Toast } from '../../types/hooks';
+import type { Toast } from '../../types/hooks';
 import ToastContainer from '../ToastContainer';
 
 describe('ToastContainer', () => {

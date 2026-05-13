@@ -1,9 +1,9 @@
-import { FC, useState, useCallback, useRef } from 'react';
+import { type FC, useState, useCallback, useRef } from 'react';
 
 import { useNow } from '../../hooks/useNow';
 import { useSummaryMetrics } from '../../hooks/useSummaryMetrics';
 import { useUsageStats } from '../../hooks/useUsageStats';
-import { PromptUsageSummary } from '../../types/hooks';
+import type { PromptUsageSummary } from '../../types/hooks';
 import { formatPlatformName, formatRelativeTime } from '../../utils';
 import ErrorBoundary from '../ErrorBoundary';
 import {

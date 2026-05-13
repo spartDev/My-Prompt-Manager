@@ -2,11 +2,11 @@ import type { FC } from 'react';
 import { memo, useMemo, useCallback } from 'react';
 
 import { DEFAULT_COLORS } from '../constants/ui';
-import { SortOrder } from '../types';
-import { FilterSortControlsProps } from '../types/components';
+import type { SortOrder } from '../types';
+import type { FilterSortControlsProps } from '../types/components';
 
 import CategoryBadge from './CategoryBadge';
-import { Dropdown, DropdownItem } from './Dropdown';
+import { Dropdown, type DropdownItem } from './Dropdown';
 import { ChevronDownIcon, FunnelIcon, SortIcon, FolderIcon } from './icons/SettingsIcons';
 import { CheckIcon, ClockIcon, CalendarIcon, AlphabeticalIcon, StarIcon, HistoryIcon } from './icons/UIIcons';
 

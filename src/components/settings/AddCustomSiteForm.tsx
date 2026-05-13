@@ -1,7 +1,7 @@
-import { FC, useState, useEffect, useCallback } from 'react';
+import { type FC, useState, useEffect, useCallback } from 'react';
 
 import { useSitePermissions } from '../../hooks/useSitePermissions';
-import { CustomSite, ElementFingerprint } from '../../types';
+import type { CustomSite, ElementFingerprint } from '../../types';
 
 interface AddCustomSiteFormProps {
   siteConfigs: Record<string, unknown>;

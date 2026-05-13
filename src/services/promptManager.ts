@@ -1,13 +1,13 @@
 import {
-  Prompt,
+  type Prompt,
   VALIDATION_LIMITS,
   DEFAULT_CATEGORY,
   type ErrorType,
-  AppError,
-  SortOrder,
-  SortDirection
+  type AppError,
+  type SortOrder,
+  type SortDirection
 } from '../types';
-import { HighlightedPrompt } from '../types/hooks';
+import type { HighlightedPrompt } from '../types/hooks';
 import { findTextHighlights } from '../utils/textHighlight';
 
 import { getSearchIndex } from './SearchIndex';

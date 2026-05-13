@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 
-import { UseClipboardReturn } from '../types/hooks';
+import type { UseClipboardReturn } from '../types/hooks';
 import { Logger, toError } from '../utils';
 
 export const useClipboard = (): UseClipboardReturn => {

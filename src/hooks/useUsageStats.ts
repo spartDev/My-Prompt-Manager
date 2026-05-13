@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 
 import { StorageManager } from '../services/storage';
 import { UsageTracker } from '../services/UsageTracker';
-import { UsageEvent, AppError, Prompt, USAGE_RETENTION_DAYS } from '../types';
-import {
+import { type UsageEvent, type AppError, type Prompt, USAGE_RETENTION_DAYS } from '../types';
+import type {
   UsageStats,
   UseUsageStatsReturn,
   DailyUsage,

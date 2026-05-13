@@ -7,7 +7,7 @@
  * @module tests/e2e/utils/sort-helpers
  */
 
-import { Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 
 /**
  * Get sorted prompt titles from the page

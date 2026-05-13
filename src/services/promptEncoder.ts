@@ -14,11 +14,11 @@ import DOMPurify from 'dompurify';
 import LZString from 'lz-string';
 
 import {
-  SharedPromptData,
+  type SharedPromptData,
   PROMPT_SHARING_SIZE_LIMITS,
-  Prompt,
+  type Prompt,
   type ErrorType,
-  AppError
+  type AppError
 } from '../types';
 import { Logger, toError } from '../utils';
 

@@ -1,6 +1,6 @@
 import { MAX_CONTENT_LENGTH, MAX_TITLE_LENGTH, VALIDATION_MESSAGES } from '../constants/validation';
-import { Prompt, Category, Settings, StorageData, UsageEvent, CustomSite } from '../types';
-import { TypeGuard } from '../types/hooks';
+import type { Prompt, Category, Settings, StorageData, UsageEvent, CustomSite } from '../types';
+import type { TypeGuard } from '../types/hooks';
 
 import * as Logger from './logger';
 

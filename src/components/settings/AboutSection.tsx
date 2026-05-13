@@ -1,4 +1,4 @@
-import { FC, useCallback, useState } from 'react';
+import { type FC, useCallback, useState } from 'react';
 
 import { Logger, toError } from '../../utils';
 import { ChevronDownIcon, DocumentationIcon, GitHubIcon, InfoCircleIcon, IssueIcon } from '../icons/SettingsIcons';
