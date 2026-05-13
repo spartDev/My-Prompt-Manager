@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 
-import { UseClipboardReturn } from '../types/hooks';
+import type { UseClipboardReturn } from '../types/hooks';
 import { Logger, toError } from '../utils';
 
 export const useClipboard = (): UseClipboardReturn => {
@@ -27,7 +27,6 @@ export const useClipboard = (): UseClipboardReturn => {
       setCopyStatus('copying');
       
       // Use the modern Clipboard API if available
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       if (navigator.clipboard && window.isSecureContext) {
         await navigator.clipboard.writeText(text);
       } else {

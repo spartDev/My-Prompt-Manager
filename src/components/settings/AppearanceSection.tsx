@@ -1,6 +1,6 @@
-import { FC, useCallback } from 'react';
+import { type FC, useCallback } from 'react';
 
-import { useThemeContext, Theme } from '../../contexts/ThemeContext';
+import { useThemeContext, type Theme } from '../../contexts/ThemeContext';
 import InterfaceModeSelector from '../InterfaceModeSelector';
 
 import SettingsSection from './SettingsSection';

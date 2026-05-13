@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-// eslint-disable-next-line import/order
 import type { UIElementFactory } from '../../ui/element-factory';
 
 // Mock the sanitization function using proper factory

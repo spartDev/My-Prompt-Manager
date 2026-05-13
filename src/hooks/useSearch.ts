@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 
-import { Prompt } from '../types';
-import { UseSearchReturn } from '../types/hooks';
+import type { Prompt } from '../types';
+import type { UseSearchReturn } from '../types/hooks';
 import { findTextHighlights } from '../utils/textHighlight';
 
 export const useSearch = (prompts: Prompt[], query: string): UseSearchReturn => {

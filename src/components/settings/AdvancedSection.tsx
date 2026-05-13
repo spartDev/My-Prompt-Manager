@@ -1,4 +1,4 @@
-import { FC, useCallback, useState } from 'react';
+import { type FC, useCallback, useState } from 'react';
 
 import { ChevronDownIcon, DebugInfoIcon, GearIcon, HelpIcon } from '../icons/SettingsIcons';
 

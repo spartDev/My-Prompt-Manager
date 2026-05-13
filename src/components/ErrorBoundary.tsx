@@ -91,7 +91,6 @@ class ErrorBoundary extends Component<Props, State> {
 
   private handleReset = () => {
     // Clear extension storage and reload
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (chrome?.storage?.local) {
       chrome.storage.local.clear(() => {
         this.handleReload();

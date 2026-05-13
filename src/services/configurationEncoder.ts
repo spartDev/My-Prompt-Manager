@@ -19,7 +19,7 @@
  */
 import { compressToEncodedURIComponent, decompressFromEncodedURIComponent } from 'lz-string';
 
-import {
+import type {
   CustomSite,
   CustomSiteConfiguration,
   ConfigurationValidationResult,

@@ -1,4 +1,4 @@
-import { FC, memo } from 'react';
+import { type FC, memo } from 'react';
 import {
   BarChart,
   Bar,
@@ -12,7 +12,7 @@ import {
 
 import { useChartTheme } from '../../../hooks/useChartTheme';
 import { CATEGORY_COLORS } from '../../../theme/chartColors';
-import { CategoryDistribution } from '../../../types/hooks';
+import type { CategoryDistribution } from '../../../types/hooks';
 
 export interface CategoryBarChartProps {
   /** Category distribution data */

@@ -1,4 +1,4 @@
-import { FC, memo } from 'react';
+import { type FC, memo } from 'react';
 import {
   BarChart,
   Bar,
@@ -12,7 +12,7 @@ import {
 
 import { useChartTheme } from '../../../hooks/useChartTheme';
 import { DAY_OF_WEEK_COLORS } from '../../../theme/chartColors';
-import { DayOfWeekDistribution } from '../../../types/hooks';
+import type { DayOfWeekDistribution } from '../../../types/hooks';
 
 export interface DayOfWeekChartProps {
   /** Day of week distribution data */

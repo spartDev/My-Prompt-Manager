@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-import { UsageEvent, PlatformType, USAGE_STORAGE_KEY, USAGE_RETENTION_DAYS } from '../../types';
+import { type UsageEvent, type PlatformType, USAGE_STORAGE_KEY, USAGE_RETENTION_DAYS } from '../../types';
 import * as Logger from '../../utils/logger';
 import { UsageTracker } from '../UsageTracker';
 

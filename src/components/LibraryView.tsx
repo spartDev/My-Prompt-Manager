@@ -4,8 +4,8 @@ import type { FC } from 'react';
 import { useSort } from '../hooks/useSort';
 import { PromptManager } from '../services/promptManager';
 import { StorageManager } from '../services/storage';
-import { Prompt, SortOrder, SortDirection } from '../types';
-import { LibraryViewProps } from '../types/components';
+import type { Prompt, SortOrder, SortDirection } from '../types';
+import type { LibraryViewProps } from '../types/components';
 import { Logger, toError } from '../utils';
 
 import FilterSortControls from './FilterSortControls';

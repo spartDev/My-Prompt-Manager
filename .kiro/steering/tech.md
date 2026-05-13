@@ -109,7 +109,7 @@ inclusion: always
 ### Quality Gates (Run After Each Task)
 ```bash
 npm test           # Must pass - maintain 470+ tests
-npm run lint       # Must pass - no ESLint errors
+npm run lint       # Must pass - no Biome lint errors
 npm run typecheck  # Must pass - TypeScript strict mode
 ```
 

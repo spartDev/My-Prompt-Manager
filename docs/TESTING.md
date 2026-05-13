@@ -741,7 +741,7 @@ screen.logTestingPlaygroundURL(); // Get query suggestions
 {
   "lint-staged": {
     "*.{ts,tsx}": [
-      "eslint --fix",
+      "biome lint --write",
       "vitest related --run"
     ]
   }

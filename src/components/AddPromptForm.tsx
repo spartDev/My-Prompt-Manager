@@ -3,8 +3,8 @@ import type { FC } from 'react';
 
 import { MAX_CONTENT_LENGTH, MAX_TITLE_LENGTH, formatCharacterCount } from '../constants/validation';
 import { decode } from '../services/promptEncoder';
-import { DEFAULT_CATEGORY, SharedPromptData } from '../types';
-import { AddPromptFormProps } from '../types/components';
+import { DEFAULT_CATEGORY, type SharedPromptData } from '../types';
+import type { AddPromptFormProps } from '../types/components';
 import { Logger, toError, validatePromptFields, type FieldErrors } from '../utils';
 
 import { Dropdown, type DropdownItem } from './Dropdown';
@@ -464,7 +464,6 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
                     {/* Label uses aria-labelledby on the button instead of htmlFor -
                         this is the correct accessible pattern for custom dropdown triggers
                         since buttons don't respond to label clicks like native form controls */}
-                    {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
                     <label id="import-category-label" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
                       Import to Category
                     </label>
@@ -532,7 +531,6 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
               {/* Label uses aria-labelledby on the button instead of htmlFor -
                   this is the correct accessible pattern for custom dropdown triggers
                   since buttons don't respond to label clicks like native form controls */}
-              {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
               <label id="category-label" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
                 Category
               </label>

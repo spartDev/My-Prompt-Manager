@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 
-import { SortOrder, SortDirection } from '../types';
+import type { SortOrder, SortDirection } from '../types';
 
 interface SortState {
   order: SortOrder;

@@ -8,7 +8,7 @@ import { Logger, toError } from '../utils';
 
 import CategoryBadge from './CategoryBadge';
 import ConfirmDialog from './ConfirmDialog';
-import { Dropdown, DropdownItem } from './Dropdown';
+import { Dropdown, type DropdownItem } from './Dropdown';
 
 /**
  * Formats a timestamp as a localized date string.

@@ -22,7 +22,7 @@ inclusion: always
 
 ```bash
 npm test           # Must pass - maintain 470+ tests
-npm run lint       # Must pass - zero ESLint errors
+npm run lint       # Must pass - zero Biome lint errors
 npm run typecheck  # Must pass - TypeScript strict mode
 ```
 

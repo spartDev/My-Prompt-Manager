@@ -8,14 +8,14 @@
 
 import { getPlatformByHostname } from '../../config/platforms';
 import type { ElementFingerprint } from '../../types/index';
-import type { Prompt, InsertionResult } from '../types/index';
+import type { InsertionResult, Prompt } from '../types/index';
 import { UIElementFactory } from '../ui/element-factory';
 import { EventManager } from '../ui/event-manager';
 import { KeyboardNavigationManager } from '../ui/keyboard-navigation';
 import { DOMUtils } from '../utils/dom';
 import { getElementFingerprintGenerator } from '../utils/element-fingerprint';
-import { warn, error, debug, info, isDebugMode, refreshDebugMode } from '../utils/logger';
-import { getPrompts, createPromptListItem, isSiteEnabled, getSettings, type ExtensionSettings, type CustomSite } from '../utils/storage';
+import { debug, error, info, isDebugMode, refreshDebugMode, warn } from '../utils/logger';
+import { type CustomSite, createPromptListItem, type ExtensionSettings, getPrompts, getSettings, isSiteEnabled } from '../utils/storage';
 import { injectCSS } from '../utils/styles';
 import { ThemeManager } from '../utils/theme-manager';
 
@@ -1287,7 +1287,7 @@ export class PromptLibraryInjector {
       // Use existing data-mpm-anchor if present, otherwise use config anchorId or generate new
       const existingAnchorId: string | null = referenceElement.getAttribute('data-mpm-anchor');
       const fallbackAnchorId = `mpm-${String(Date.now())}-${Math.random().toString(36).substring(2, 9)}`;
-      // ESLint is confused about the type here, but TypeScript knows anchorId is string | undefined
+      // TypeScript knows anchorId is string | undefined
        
       const trackingAnchorId: string = existingAnchorId ?? anchorId ?? fallbackAnchorId;
 

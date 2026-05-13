@@ -3,7 +3,7 @@ import type { FC, FormEvent } from 'react';
 
 import { DEFAULT_CATEGORY_COLOR, getColorName } from '../constants/colors';
 import { MAX_CATEGORY_NAME_LENGTH } from '../constants/validation';
-import { Category } from '../types';
+import type { Category } from '../types';
 import { Logger, toError } from '../utils';
 
 import ColorPicker from './ColorPicker';

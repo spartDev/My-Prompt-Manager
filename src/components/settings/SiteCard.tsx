@@ -1,4 +1,4 @@
-import { FC, ReactNode, useCallback } from 'react';
+import { type FC, type ReactNode, useCallback } from 'react';
 
 import { getBrandColors } from '../../constants/brandColors';
 

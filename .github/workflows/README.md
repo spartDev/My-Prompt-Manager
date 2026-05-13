@@ -27,7 +27,7 @@ All workflows enforce the **MANDATORY** requirements from `CLAUDE.md`:
 **Features**:
 - Parallel job execution for speed
 - Matrix testing (Node.js 22.x LTS, 24.x latest)
-- Smart caching (dependencies, builds, ESLint)
+- Smart caching (dependencies, builds)
 - Fail-fast strategy
 - Chrome extension validation
 - Automated PR status comments
@@ -117,7 +117,6 @@ main:
 **Caching Strategy**:
 - 📦 Dependencies: `~/.npm`, `node_modules`
 - 🏗️ Build assets: `dist/`, `.vite/`
-- 🧹 ESLint cache: `.eslintcache`
 
 **Parallel Execution**:
 - Lint and test jobs run simultaneously

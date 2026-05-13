@@ -8,10 +8,10 @@
  *   <CategoryBadge category={category} variant="pill" size="sm" />
  */
 
-import { type FC } from 'react';
+import type { FC } from 'react';
 
 import { getAccessibleTextColor, DEFAULT_CATEGORY_COLOR } from '../constants/colors';
-import { type Category } from '../types';
+import type { Category } from '../types';
 import { cn } from '../utils/cn';
 
 interface CategoryBadgeProps {

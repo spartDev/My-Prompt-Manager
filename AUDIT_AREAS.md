@@ -29,7 +29,7 @@ package.json
 vite.config.ts
 vitest.config.ts
 tsconfig.json
-eslint.config.js
+biome.json
 playwright.config.ts
 tailwind.config.js
 postcss.config.js

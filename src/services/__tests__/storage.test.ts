@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 import { buildPrompt } from '../../test/builders';
-import { Prompt, Category, DEFAULT_CATEGORY } from '../../types';
+import { type Prompt, type Category, DEFAULT_CATEGORY } from '../../types';
 import { StorageManager } from '../storage';
 
 const FIXED_TIME = new Date('2025-01-01T00:00:00Z');

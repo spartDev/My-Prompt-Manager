@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { Prompt, Category, Settings, StorageData, UsageEvent, CustomSite } from '../../types';
+import type { Prompt, Category, Settings, StorageData, UsageEvent, CustomSite } from '../../types';
 import {
   validatePromptFields,
   isPrompt,

@@ -1,7 +1,7 @@
 import { memo, useState, useEffect, useCallback, useRef } from 'react';
 import type { FC } from 'react';
 
-import { Toast } from '../types/hooks';
+import type { Toast } from '../types/hooks';
 
 // Module-scope SVG icon constants to avoid recreation on every render
 const SuccessIcon = (

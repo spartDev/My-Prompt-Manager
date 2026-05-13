@@ -677,12 +677,10 @@ describe("useTheme", () => {
   });
 
   describe("Toggle Theme", () => {
-    // eslint-disable-next-line vitest/expect-expect -- Assertion is in testThemeToggle helper
     it("should toggle from light to dark", async () => {
       await testThemeToggle("light", "dark");
     });
 
-    // eslint-disable-next-line vitest/expect-expect -- Assertion is in testThemeToggle helper
     it("should toggle from dark to light", async () => {
       await testThemeToggle("dark", "light");
     });

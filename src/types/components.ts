@@ -1,6 +1,6 @@
-import { UseSearchWithDebounceReturn } from './hooks';
+import type { UseSearchWithDebounceReturn } from './hooks';
 
-import { Prompt, Category, SortOrder, SortDirection } from './index';
+import type { Prompt, Category, SortOrder, SortDirection } from './index';
 
 // Shared toast type for consistent usage across components
 export type ToastType = 'success' | 'error' | 'info' | 'warning';

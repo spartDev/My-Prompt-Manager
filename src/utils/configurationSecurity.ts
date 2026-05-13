@@ -1,6 +1,6 @@
 import DOMPurify from 'dompurify';
 
-import {
+import type {
   CustomSiteConfiguration,
   CustomSitePositioning,
   ElementFingerprint,

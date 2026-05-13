@@ -2,7 +2,7 @@ import { forwardRef, useActionState, useMemo, useState } from 'react';
 import type { FC } from 'react';
 
 import { MAX_CONTENT_LENGTH, MAX_TITLE_LENGTH, formatCharacterCount } from '../constants/validation';
-import { EditPromptFormProps } from '../types/components';
+import type { EditPromptFormProps } from '../types/components';
 import { Logger, toError, validatePromptFields, type FieldErrors } from '../utils';
 
 import { Dropdown, type DropdownItem } from './Dropdown';
@@ -200,7 +200,6 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
               {/* Label uses aria-labelledby on the button instead of htmlFor -
                   this is the correct accessible pattern for custom dropdown triggers
                   since buttons don't respond to label clicks like native form controls */}
-              {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
               <label id="category-label" className="block text-sm font-bold text-gray-900 dark:text-gray-100">
                 Category
               </label>

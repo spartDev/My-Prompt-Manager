@@ -1,15 +1,15 @@
 import type { Placement } from '@floating-ui/dom';
 import {
-  FC,
-  ReactElement,
-  ReactNode,
   cloneElement,
-  useRef,
-  useState,
   createContext,
+  type FC,
+  type ReactElement,
+  type ReactNode,
   useContext,
   useEffect,
-  useId
+  useId, 
+  useRef,
+  useState
 } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -314,8 +314,7 @@ export const Dropdown: FC<DropdownProps> = ({
   // The ref is assigned synchronously during render, and triggerRef is stable
   // across renders because it's created with useRef outside this function.
   // This pattern is documented in React docs: https://react.dev/reference/react/cloneElement#caveats
-  // We must disable the rule because ESLint doesn't recognize this safe usage.
-  // eslint-disable-next-line react-hooks/refs -- Safe: ref callback with stable useRef
+  // This ref pattern is documented in React and safe despite lint warnings.
   const enhancedTrigger = cloneElement(trigger, enhancedTriggerProps);
 
   // Validate portal container - ensure it's a valid HTMLElement in the document

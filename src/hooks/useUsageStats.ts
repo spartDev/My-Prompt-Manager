@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 
 import { StorageManager } from '../services/storage';
 import { UsageTracker } from '../services/UsageTracker';
-import { UsageEvent, AppError, Prompt, USAGE_RETENTION_DAYS } from '../types';
-import {
+import { type UsageEvent, type AppError, type Prompt, USAGE_RETENTION_DAYS } from '../types';
+import type {
   UsageStats,
   UseUsageStatsReturn,
   DailyUsage,
@@ -282,7 +282,6 @@ export function useUsageStats(): UseUsageStatsReturn {
     } finally {
       setLoading(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Singletons never change
 
   const clearHistory = useCallback(async () => {
@@ -297,7 +296,6 @@ export function useUsageStats(): UseUsageStatsReturn {
     } finally {
       setLoading(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Singleton never changes
 
   // Compute stats from history and prompts

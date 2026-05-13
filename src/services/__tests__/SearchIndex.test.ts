@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
-import { Prompt } from '../../types';
+import type { Prompt } from '../../types';
 import { SearchIndex, getSearchIndex, resetSearchIndex } from '../SearchIndex';
 
 describe('SearchIndex', () => {

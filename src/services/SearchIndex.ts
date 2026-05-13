@@ -4,7 +4,7 @@
  * where k = number of matching prompts (vs O(n×m) for full scan)
  */
 
-import { Prompt } from '../types';
+import type { Prompt } from '../types';
 
 /**
  * Tokenize text into searchable terms

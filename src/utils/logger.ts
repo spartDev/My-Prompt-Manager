@@ -148,7 +148,6 @@ export function error(message: string, errorObj?: Error, context?: LogContext): 
 export function warn(message: string, context?: LogContext): void {
   if (isDevelopment()) {
     const logData = formatLog('WARN', message, context);
-    // eslint-disable-next-line no-console -- Development logging only
     console.warn('[MyPromptManager]', message, logData);
   }
 }
@@ -171,7 +170,6 @@ export function warn(message: string, context?: LogContext): void {
 export function info(message: string, context?: LogContext): void {
   if (isDevelopment()) {
     const logData = formatLog('INFO', message, context);
-    // eslint-disable-next-line no-console -- Development logging only
     console.info('[MyPromptManager]', message, logData);
   }
 }
@@ -194,7 +192,6 @@ export function info(message: string, context?: LogContext): void {
 export function debug(message: string, context?: LogContext): void {
   if (isDevelopment()) {
     const logData = formatLog('DEBUG', message, context);
-    // eslint-disable-next-line no-console -- Development logging only
     console.debug('[MyPromptManager]', message, logData);
   }
 }
@@ -217,7 +214,6 @@ export function debug(message: string, context?: LogContext): void {
 export function log(message: string, context?: LogContext): void {
   if (isDevelopment()) {
     const logData = formatLog('DEBUG', message, context);
-    // eslint-disable-next-line no-console -- Development logging only
     console.log('[MyPromptManager]', message, logData);
   }
 }
@@ -238,7 +234,6 @@ export function log(message: string, context?: LogContext): void {
  */
 export function group(label: string): void {
   if (isDevelopment()) {
-    // eslint-disable-next-line no-console -- Development logging only
     console.group(`[MyPromptManager] ${label}`);
   }
 }
@@ -256,7 +251,6 @@ export function group(label: string): void {
  */
 export function groupEnd(): void {
   if (isDevelopment()) {
-    // eslint-disable-next-line no-console -- Development logging only
     console.groupEnd();
   }
 }

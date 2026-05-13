@@ -1,4 +1,4 @@
-import { FC, memo } from 'react';
+import { type FC, memo } from 'react';
 import {
   PieChart,
   Pie,
@@ -10,7 +10,7 @@ import {
 
 import { useChartTheme } from '../../../hooks/useChartTheme';
 import { getPlatformColor } from '../../../theme/chartColors';
-import { PlatformBreakdown } from '../../../types/hooks';
+import type { PlatformBreakdown } from '../../../types/hooks';
 import { formatPlatformName } from '../../../utils';
 import { PIE_CHART, PIE_LEGEND } from '../constants';
 

@@ -1,8 +1,7 @@
-/* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 
-import { ToastSettings } from '../../../types/hooks';
+import type { ToastSettings } from '../../../types/hooks';
 import NotificationSection from '../NotificationSection';
 
 describe('NotificationSection', () => {

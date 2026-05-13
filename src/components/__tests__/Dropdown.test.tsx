@@ -2,7 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-import { Dropdown, DropdownItem, DropdownSeparator, useDropdown } from '../Dropdown';
+import { Dropdown, type DropdownItem, DropdownSeparator, useDropdown } from '../Dropdown';
 
 describe('Dropdown', () => {
   const mockItems: DropdownItem[] = [

@@ -1,7 +1,7 @@
-import { FC, useCallback, useMemo, useState } from 'react';
+import { type FC, useCallback, useMemo, useState } from 'react';
 
-import { ToastType } from '../../types/components';
-import { ToastSettings } from '../../types/hooks';
+import type { ToastType } from '../../types/components';
+import type { ToastSettings } from '../../types/hooks';
 import { BellIcon, CheckCircleIcon, ChevronDownIcon, TestBellIcon } from '../icons/SettingsIcons';
 
 import ToggleSwitch from './ToggleSwitch';
