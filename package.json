@@ -12,8 +12,8 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
-    "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
-    "lint:fix": "eslint . --ext .js,.jsx,.ts,.tsx --fix",
+    "lint": "biome lint .",
+    "lint:fix": "biome lint --write .",
     "prepare": "if [ \"$CI\" = \"true\" ] || [ -n \"$GITHUB_ACTIONS\" ] || [ -n \"$JENKINS_URL\" ] || [ -n \"$BUILDKITE\" ]; then echo 'CI detected, skipping husky'; else husky; fi",
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit"
