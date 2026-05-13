@@ -58,7 +58,6 @@ export function isDebugMode(): boolean {
  */
 async function updateDebugModeCache(): Promise<void> {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
       const result = await chrome.storage.local.get(['promptLibrarySettings']);
       const settings = result.promptLibrarySettings as { debugMode?: boolean } | undefined;

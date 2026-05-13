@@ -200,7 +200,6 @@ describe('PromptEncoder', () => {
       expect(decoded.category).toBe(prompt.category);
     });
 
-    // eslint-disable-next-line vitest/expect-expect -- Assertion is in testEncoderRoundtrip helper
     it('should handle round-trip encoding/decoding', () => {
       const prompt = createTestPrompt({
         title: 'Complex Title',
@@ -298,7 +297,6 @@ describe('PromptEncoder', () => {
   });
 
   describe('Edge Cases', () => {
-    // eslint-disable-next-line vitest/expect-expect -- Assertion is in testEncoderRoundtrip helper
     it('should handle special characters', () => {
       const prompt = createTestPrompt({
         title: '!@#$%^*()_+-=[]{}|;:",?/',
@@ -308,7 +306,6 @@ describe('PromptEncoder', () => {
       testEncoderRoundtrip(prompt);
     });
 
-    // eslint-disable-next-line vitest/expect-expect -- Assertion is in testEncoderRoundtrip helper
     it('should handle unicode characters', () => {
       const prompt = createTestPrompt({
         title: '中文标题',
@@ -318,7 +315,6 @@ describe('PromptEncoder', () => {
       testEncoderRoundtrip(prompt);
     });
 
-    // eslint-disable-next-line vitest/expect-expect -- Assertion is in testEncoderRoundtrip helper
     it('should handle maximum allowed sizes', () => {
       const prompt = createTestPrompt({
         title: 'x'.repeat(100),
@@ -328,7 +324,6 @@ describe('PromptEncoder', () => {
       testEncoderRoundtrip(prompt);
     });
 
-    // eslint-disable-next-line vitest/expect-expect -- Assertion is in testEncoderRoundtrip helper
     it('should handle newlines and tabs', () => {
       const prompt = createTestPrompt({
         title: 'Title with\ttabs',

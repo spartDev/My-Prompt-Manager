@@ -24,7 +24,6 @@ export const usePrompts = (): UsePromptsReturn => {
     } finally {
       setLoading(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Singleton storageManager never changes, omitted to prevent infinite loop
 
   const createPrompt = useCallback(async (prompt: Omit<Prompt, 'id' | 'createdAt' | 'updatedAt' | 'usageCount' | 'lastUsedAt'>) => {
@@ -45,7 +44,6 @@ export const usePrompts = (): UsePromptsReturn => {
     } finally {
       setLoading(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Singleton promptManager never changes, omitted to prevent infinite loop
 
   const updatePrompt = useCallback(async (id: string, updates: Partial<Prompt>) => {
@@ -64,7 +62,6 @@ export const usePrompts = (): UsePromptsReturn => {
     } finally {
       setLoading(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Singleton promptManager never changes, omitted to prevent infinite loop
 
   const deletePrompt = useCallback(async (id: string) => {
@@ -81,7 +78,6 @@ export const usePrompts = (): UsePromptsReturn => {
     } finally {
       setLoading(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Singleton storageManager never changes, omitted to prevent infinite loop
 
   const searchPrompts = useCallback((query: string): Prompt[] => {

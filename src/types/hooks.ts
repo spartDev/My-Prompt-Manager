@@ -68,7 +68,6 @@ export interface UseSearchWithDebounceReturn {
 }
 
 export interface UseStorageReturn {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters -- Generic provides caller type inference and API consistency with loadData
   saveData: <T>(key: string, data: T) => Promise<void>;
   /**
    * Load data from storage with optional runtime type validation.

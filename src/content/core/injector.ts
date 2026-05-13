@@ -1287,7 +1287,7 @@ export class PromptLibraryInjector {
       // Use existing data-mpm-anchor if present, otherwise use config anchorId or generate new
       const existingAnchorId: string | null = referenceElement.getAttribute('data-mpm-anchor');
       const fallbackAnchorId = `mpm-${String(Date.now())}-${Math.random().toString(36).substring(2, 9)}`;
-      // ESLint is confused about the type here, but TypeScript knows anchorId is string | undefined
+      // TypeScript knows anchorId is string | undefined
        
       const trackingAnchorId: string = existingAnchorId ?? anchorId ?? fallbackAnchorId;
 

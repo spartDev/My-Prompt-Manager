@@ -1340,7 +1340,7 @@ If critical issues arise post-release:
 - [ ] All 518+ existing tests still passing
 - [ ] Manual QA checklist 100% complete
 - [ ] Documentation updated (README, ARCHITECTURE, new ANALYTICS.md)
-- [ ] No ESLint errors or warnings
+- [ ] No Biome lint errors or warnings
 - [ ] Production build size <5% increase
 - [ ] Load tested with 1000+ events
 

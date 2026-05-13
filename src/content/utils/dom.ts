@@ -5,7 +5,6 @@
 
 import { warn, error as logError } from './logger';
 
-// eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class DOMUtils {
   /**
    * Helper function to safely create DOM elements with text content

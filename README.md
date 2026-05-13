@@ -128,8 +128,8 @@ See our [Platform Integration Guide](docs/PLATFORM_INTEGRATION.md) to add your o
 | `npm test` | Run test suite (1692 tests) | Testing |
 | `npm run test:ui` | Run tests with Vitest UI | Interactive Testing |
 | `npm run test:coverage` | Generate coverage report | Code Coverage |
-| `npm run lint` | Run ESLint checks | Code Quality |
-| `npm run lint:fix` | Auto-fix ESLint issues | Code Formatting |
+| `npm run lint` | Run Biome lint checks | Code Quality |
+| `npm run lint:fix` | Auto-fix Biome lint issues | Code Formatting |
 | `npm run typecheck` | TypeScript type checking | Code Quality |
 | `npm run test:e2e` | Run Playwright E2E tests | E2E Testing |
 | `npm run package` | Package extension for distribution | Chrome Web Store |
@@ -378,7 +378,7 @@ We welcome contributions! Please follow these guidelines:
 ### Code Style Guidelines
 
 - Use TypeScript for all new code
-- Follow ESLint configuration
+- Follow Biome lint configuration
 - Write comprehensive tests
 - Document complex logic
 - Use meaningful variable names

@@ -1,4 +1,3 @@
-/* eslint-disable vitest/expect-expect */
 import { readFileSync } from "fs";
 import { join } from "path";
 

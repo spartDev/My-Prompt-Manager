@@ -48,7 +48,6 @@ function buildStrategyRegistry(): Record<string, new (hostname?: string) => Plat
   for (const [platformId, platform] of Object.entries(SUPPORTED_PLATFORMS)) {
     const StrategyConstructor = STRATEGY_CONSTRUCTORS[platform.strategyClass];
     // Runtime check needed: platform.strategyClass may reference non-existent strategy
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (StrategyConstructor) {
       registry[platformId] = StrategyConstructor;
     } else {
@@ -173,7 +172,6 @@ export class PlatformManager {
       const StrategyConstructor = PlatformManager.STRATEGY_REGISTRY[platform.id];
 
       // TypeScript knows registry is complete, but we check defensively for runtime safety
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       if (!StrategyConstructor) {
         // Only warn if the platform doesn't explicitly use DefaultStrategy
         if (platform.strategyClass !== 'DefaultStrategy') {

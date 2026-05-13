@@ -18,7 +18,7 @@ Dependencies are grouped logically to reduce PR noise:
 | Group | Packages | Rationale |
 |-------|----------|-----------|
 | **React packages** | react, react-dom, @types/react* | Core framework - test together |
-| **TypeScript & Linting** | typescript, eslint, @typescript-eslint/* | Development tooling compatibility |
+| **TypeScript & Linting** | typescript, @biomejs/* | Development tooling compatibility |
 | **Build tools** | vite, @vitejs/*, @crxjs/* | Build system integrity |
 | **Testing libraries** | vitest, @testing-library/*, jsdom | Test suite compatibility |
 | **Tailwind CSS** | tailwindcss, autoprefixer, postcss | CSS processing chain |

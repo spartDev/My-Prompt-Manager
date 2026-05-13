@@ -1024,7 +1024,7 @@ Team-wide quality standards for ALL stories:
 A story is DONE when:
 
 ### Code Quality
-- [ ] Code written and follows style guide (ESLint passes)
+- [ ] Code written and follows style guide (Biome lint passes)
 - [ ] All acceptance criteria met
 - [ ] No known bugs or defects
 

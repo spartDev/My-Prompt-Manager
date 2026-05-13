@@ -200,7 +200,6 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
               {/* Label uses aria-labelledby on the button instead of htmlFor -
                   this is the correct accessible pattern for custom dropdown triggers
                   since buttons don't respond to label clicks like native form controls */}
-              {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
               <label id="category-label" className="block text-sm font-bold text-gray-900 dark:text-gray-100">
                 Category
               </label>

@@ -1042,7 +1042,7 @@ it('should save and retrieve prompt (sociable)', async () => {
     │   Unit Tests        │ (Some - Fast, focused)
     └─────────────────────┘
   ┌───────────────────────────┐
-  │  Static Analysis          │ (Maximum - TypeScript, ESLint)
+  │  Static Analysis          │ (Maximum - TypeScript, Biome)
   └───────────────────────────┘
 ```
 

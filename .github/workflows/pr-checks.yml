@@ -136,26 +136,19 @@ jobs:
         if: needs.setup.outputs.cache-hit != 'true'
         run: npm ci --prefer-offline --no-audit
 
-      - name: 📋 Cache ESLint Results
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5
-        with:
-          path: .eslintcache
-          key: ${{ runner.os }}-eslint-${{ hashFiles('.eslintrc.*', 'eslint.config.*', 'src/**/*.{ts,tsx}') }}
-
-      - name: 🧹 Run ESLint (MANDATORY - ZERO TOLERANCE)
+      - name: 🧹 Run Biome lint (MANDATORY - ZERO TOLERANCE)
         run: |
-          echo "🚨 MANDATORY: Running ESLint with zero tolerance policy"
+          echo "🚨 MANDATORY: Running Biome lint with zero tolerance policy"
           echo "❌ Any linting errors will fail this check - NO EXCEPTIONS"
           npm run lint
         env:
-          # Ensure ESLint failures cause workflow failure
           NODE_ENV: test
 
-      - name: 📊 ESLint Report
+      - name: 📊 Biome Report
         if: always()
         run: |
-          echo "📋 ESLint Summary:"
-          npx eslint . --format=compact --max-warnings=0 || echo "⚠️ Linting issues found above"
+          echo "📋 Biome Summary:"
+          npx @biomejs/biome lint --max-diagnostics=2000 . || echo "⚠️ Linting issues found above"
 
   # Job 4: Comprehensive testing with coverage
   test:

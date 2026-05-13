@@ -23,7 +23,6 @@ export async function ensureStorageAvailable(
   const { maxAttempts, delayMs } = { ...DEFAULT_OPTIONS, ...options };
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (typeof chrome !== 'undefined' && chrome.storage?.local) {
       return;
     }

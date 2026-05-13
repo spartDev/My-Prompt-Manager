@@ -82,9 +82,7 @@ export abstract class ReactPlatformStrategy extends PlatformStrategy {
 
       // Store the setter - we call it with .call(element, value) to provide correct `this` context
       // Safe: We explicitly control `this` binding at call site using .call()
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       if (descriptor?.set && ReactPlatformStrategy.isValueSetter(descriptor.set)) {
-        // eslint-disable-next-line @typescript-eslint/unbound-method
         ReactPlatformStrategy.nativeValueSetter = descriptor.set;
       } else {
         ReactPlatformStrategy.nativeValueSetter = null;
@@ -133,7 +131,6 @@ export abstract class ReactPlatformStrategy extends PlatformStrategy {
     // - \x0B-\x0C: Vertical Tab, Form Feed
     // - \x0E-\x1F: Shift Out to Unit Separator
     // - \x7F-\x9F: Delete to Application Program Command
-    // eslint-disable-next-line no-control-regex
     const sanitized = content.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F-\x9F]/g, '');
 
     return {

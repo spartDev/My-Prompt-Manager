@@ -464,7 +464,6 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
                     {/* Label uses aria-labelledby on the button instead of htmlFor -
                         this is the correct accessible pattern for custom dropdown triggers
                         since buttons don't respond to label clicks like native form controls */}
-                    {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
                     <label id="import-category-label" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
                       Import to Category
                     </label>
@@ -532,7 +531,6 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
               {/* Label uses aria-labelledby on the button instead of htmlFor -
                   this is the correct accessible pattern for custom dropdown triggers
                   since buttons don't respond to label clicks like native form controls */}
-              {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
               <label id="category-label" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
                 Category
               </label>
