@@ -1,11 +1,11 @@
-import { FC, useReducer, useCallback } from 'react';
+import { type FC, useReducer, useCallback } from 'react';
 
 import { useClipboard } from '../../hooks/useClipboard';
 import { usePickerWindow } from '../../hooks/usePickerWindow';
 import { useSitePermissions } from '../../hooks/useSitePermissions';
 import { ConfigurationEncoder, ConfigurationEncoderError } from '../../services/configurationEncoder';
-import { CustomSite, CustomSiteConfiguration, SecurityWarning } from '../../types';
-import { ToastType } from '../../types/components';
+import type { CustomSite, CustomSiteConfiguration, SecurityWarning } from '../../types';
+import type { ToastType } from '../../types/components';
 import { Logger, toError } from '../../utils';
 
 import AddCustomSiteForm from './AddCustomSiteForm';
@@ -15,7 +15,7 @@ import CustomSitesList from './CustomSitesList';
 import EmptyCustomSitesState from './EmptyCustomSitesState';
 import SettingsSection from './SettingsSection';
 import SiteImportDrawer from './SiteImportDrawer';
-import SupportedSitesList, { SiteConfig } from './SupportedSitesList';
+import SupportedSitesList, { type SiteConfig } from './SupportedSitesList';
 
 // ============================================================================
 // View State Reducer - manages which view is currently displayed

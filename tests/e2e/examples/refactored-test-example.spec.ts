@@ -9,17 +9,14 @@ import { test, expect } from '../fixtures/extension';
 import {
   LibraryPage,
   CategoryManagerPage,
-  PromptFormPage,
   workflows,
   assertions,
   TestDataManager,
-  SCENARIO_FIXTURES
 } from '../utils';
 
 test.describe('Example: Refactored Category Management Tests', () => {
   let libraryPage: LibraryPage;
   let categoryManager: CategoryManagerPage;
-  let promptForm: PromptFormPage;
   let testDataManager: TestDataManager;
 
   test.beforeEach(async ({ context, storage, extensionId }) => {
@@ -38,7 +35,6 @@ test.describe('Example: Refactored Category Management Tests', () => {
     // Initialize Page Object Models
     libraryPage = new LibraryPage(page);
     categoryManager = new CategoryManagerPage(page);
-    promptForm = new PromptFormPage(page);
 
     // Verify we're on the library page
     await libraryPage.expectLibraryLoaded();
