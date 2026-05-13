@@ -3,9 +3,9 @@ import os from 'node:os';
 import path from 'node:path';
 
 import type { BrowserContext, Page, Worker } from '@playwright/test';
-import { chromium, test as base } from '@playwright/test';
+import { test as base, chromium } from '@playwright/test';
 
-import type { Prompt, Category, Settings } from '../../../src/types';
+import type { Category, Prompt, Settings } from '../../../src/types';
 
 const extensionPath = path.resolve(process.cwd(), 'dist');
 

@@ -1,4 +1,4 @@
-import { type FC, useReducer, useCallback } from 'react';
+import { type FC, useCallback, useReducer } from 'react';
 
 import { useClipboard } from '../../hooks/useClipboard';
 import { usePickerWindow } from '../../hooks/usePickerWindow';

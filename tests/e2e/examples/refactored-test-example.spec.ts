@@ -5,13 +5,13 @@
  * Page Object Models, utilities, and test data fixtures for better maintainability.
  */
 
-import { test, expect } from '../fixtures/extension';
+import { expect, test } from '../fixtures/extension';
 import {
-  LibraryPage,
-  CategoryManagerPage,
-  workflows,
   assertions,
+  CategoryManagerPage,
+  LibraryPage,
   TestDataManager,
+  workflows,
 } from '../utils';
 
 test.describe('Example: Refactored Category Management Tests', () => {
