@@ -1,40 +1,51 @@
-# My Prompt Manager
+# Agent Instructions
 
-Chrome extension for managing prompt libraries with React 19 popup/side panel and content script injection into AI platforms.
+This project uses **bd** (beads) for issue tracking. Run `bd prime` for full workflow context.
 
-## Verification
+> **Architecture in one line:** Issues live in a local Dolt database
+> (`.beads/dolt/`); cross-machine sync uses `bd dolt push/pull` (a
+> git-compatible protocol), stored under `refs/dolt/data` on your git
+> remote — separate from `refs/heads/*` where your code lives.
+> `.beads/issues.jsonl` is a passive export, not the wire protocol.
+>
+> See [SYNC_CONCEPTS.md](https://github.com/gastownhall/beads/blob/main/docs/SYNC_CONCEPTS.md)
+> for the one-screen overview and anti-patterns (don't treat JSONL as the
+> source of truth; don't `bd import` during normal operation; don't
+> reach for third-party Dolt hosting before trying the default).
 
-Run after every code change:
+## Quick Reference
 
 ```bash
-npm test && npm run lint && npm run typecheck
+bd ready              # Find available work
+bd show <id>          # View issue details
+bd update <id> --claim  # Claim work atomically
+bd close <id>         # Complete work
+bd dolt push          # Push beads data to remote
 ```
 
-## Critical Patterns
+## Non-Interactive Shell Commands
 
-- **Singletons**: Use `StorageManager.getInstance()`, `PromptManager.getInstance()`
-- **Logger**: Use `Logger` from `src/utils/logger.ts` (popup) or `@content/utils/logger` (content scripts) - never `console.*`
-- **React 19 forms**: Use `useActionState` for validation/submission
-- **Platform strategies**: Extend `BaseStrategy` in `src/content/platforms/`
+**ALWAYS use non-interactive flags** with file operations to avoid hanging on confirmation prompts.
 
-## Workflow
+Shell commands like `cp`, `mv`, and `rm` may be aliased to include `-i` (interactive) mode on some systems, causing the agent to hang indefinitely waiting for y/n input.
 
-- **Issue tracking**: [Beads Workflow](.claude/docs/BEADS_WORKFLOW.md)
-- **Ending sessions**: [Session Protocol](.claude/docs/SESSION_PROTOCOL.md)
+**Use these forms instead:**
+```bash
+# Force overwrite without prompting
+cp -f source dest           # NOT: cp source dest
+mv -f source dest           # NOT: mv source dest
+rm -f file                  # NOT: rm file
 
-## Documentation
+# For recursive operations
+rm -rf directory            # NOT: rm -r directory
+cp -rf source dest          # NOT: cp -r source dest
+```
 
-| Topic | Location |
-|-------|----------|
-| Architecture & data flow | `docs/ARCHITECTURE.md` |
-| Component catalog | `docs/COMPONENTS.md` |
-| React 19 form patterns | `docs/REACT_19_MIGRATION.md` |
-| Services & hooks | `docs/SERVICES_AND_HOOKS.md` |
-| UI design system | `docs/DESIGN_GUIDELINES.md` |
-| Testing patterns | `docs/TESTING.md` |
-| Adding AI platforms | `docs/PLATFORM_INTEGRATION.md` |
-| Custom site config | `docs/ELEMENT_FINGERPRINTING_DESIGN.md` |
-
+**Other commands that may prompt:**
+- `scp` - use `-o BatchMode=yes` for non-interactive
+- `ssh` - use `-o BatchMode=yes` to fail instead of prompting
+- `apt-get` - use `-y` flag
+- `brew` - use `HOMEBREW_NO_AUTO_UPDATE=1` env var
 
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:7510c1e2 -->
 ## Beads Issue Tracker
