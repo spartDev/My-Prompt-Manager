@@ -67,7 +67,7 @@
   },
   "overrides": {
     "@crxjs/vite-plugin": {
-      "rollup": "2.80.0"
+      "rollup": "4.59.0"
     }
   }
 }
