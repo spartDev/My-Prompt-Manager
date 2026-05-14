@@ -20,7 +20,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.15",
-    "@crxjs/vite-plugin": "2.3.0",
+    "@crxjs/vite-plugin": "2.4.0",
     "@playwright/test": "1.58.2",
     "@tailwindcss/postcss": "4.1.18",
     "@testing-library/jest-dom": "6.9.1",
@@ -31,7 +31,7 @@
     "@types/node": "24.10.13",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
-    "@vitejs/plugin-react": "5.1.4",
+    "@vitejs/plugin-react": "5.2.0",
     "@vitest/coverage-v8": "4.0.18",
     "happy-dom": "20.9.0",
     "husky": "9.1.7",
