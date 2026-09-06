@@ -19,7 +19,7 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.4.15",
+    "@biomejs/biome": "2.5.12",
     "@crxjs/vite-plugin": "2.3.0",
     "@playwright/test": "1.58.2",
     "@tailwindcss/postcss": "4.1.18",
