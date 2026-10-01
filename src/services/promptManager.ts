@@ -59,9 +59,10 @@ export class PromptManager {
         throw new Error(`Category "${category}" does not exist`);
       }
 
+      // Content is passed through exactly as written; Admission (in StorageManager) owns trimming
       const promptData = {
         title: finalTitle,
-        content: content.trim(),
+        content,
         category
       };
 
@@ -93,7 +94,7 @@ export class PromptManager {
         cleanUpdates.title = updates.title.trim();
       }
       if (updates.content !== undefined) {
-        cleanUpdates.content = updates.content.trim();
+        cleanUpdates.content = updates.content;
       }
       if (updates.category !== undefined) {
         cleanUpdates.category = updates.category;

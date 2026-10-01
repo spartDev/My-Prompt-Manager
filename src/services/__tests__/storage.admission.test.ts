@@ -1,0 +1,335 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+import { DEFAULT_CATEGORY } from '../../types';
+import { AdmissionRefusedError } from '../promptAdmission';
+import { StorageManager } from '../storage';
+
+/**
+ * Admission is enforced inside StorageManager's write path (ADR-001): every route that
+ * puts Prompt text or a Category name into the Library is admitted the same way.
+ */
+describe('StorageManager Admission', () => {
+  let storageManager: StorageManager;
+
+  const storedPrompts = async (): Promise<unknown> => (await chrome.storage.local.get('prompts')).prompts;
+  const storedCategories = async (): Promise<unknown> => (await chrome.storage.local.get('categories')).categories;
+
+  beforeEach(async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2025-01-01T00:00:00Z'));
+    storageManager = StorageManager.getInstance();
+
+    await chrome.storage.local.set({
+      prompts: [],
+      categories: [{ id: 'default', name: DEFAULT_CATEGORY }],
+      settings: { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt' }
+    });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  describe('savePrompt', () => {
+    it('stores the text verbatim, removing only Hidden characters', async () => {
+      const saved = await storageManager.savePrompt({
+        title: '  Meta\u200Bdata  ',
+        content: '  Summarize the metadata: use <example>x</example> tags;\u202E if onboarding = true\n',
+        category: DEFAULT_CATEGORY
+      });
+
+      expect(saved).toMatchObject({
+        title: 'Metadata',
+        content: '  Summarize the metadata: use <example>x</example> tags; if onboarding = true\n'
+      });
+      expect(await storedPrompts()).toEqual([saved]);
+    });
+
+    it('refuses text that is over the limits or empty, and leaves storage untouched', async () => {
+      const before = await storedPrompts();
+
+      const tooLong = storageManager.savePrompt({ title: 'T', content: 'x'.repeat(20_001), category: DEFAULT_CATEGORY });
+      await expect(tooLong).rejects.toBeInstanceOf(AdmissionRefusedError);
+      await expect(tooLong).rejects.toMatchObject({ errors: { content: { reason: 'too_long' } } });
+
+      const empty = storageManager.savePrompt({ title: 'T', content: ' \n ', category: DEFAULT_CATEGORY });
+      await expect(empty).rejects.toMatchObject({ errors: { content: { reason: 'empty' } } });
+
+      expect(await storedPrompts()).toEqual(before);
+    });
+  });
+
+  describe('updatePrompt', () => {
+    const seed = {
+      id: 'p1',
+      title: 'Old title',
+      content: 'Old body',
+      category: DEFAULT_CATEGORY,
+      createdAt: 1,
+      updatedAt: 1,
+      usageCount: 2,
+      lastUsedAt: 1
+    };
+
+    it('admits the edit: Hidden characters removed, content kept verbatim', async () => {
+      await chrome.storage.local.set({ prompts: [seed] });
+
+      const updated = await storageManager.updatePrompt('p1', {
+        title: ' New\u200B title ',
+        content: '  <context>x</context> metadata: \n'
+      });
+
+      expect(updated).toMatchObject({
+        id: 'p1',
+        title: 'New title',
+        content: '  <context>x</context> metadata: \n',
+        usageCount: 2,
+        updatedAt: Date.now()
+      });
+      expect(await storedPrompts()).toEqual([updated]);
+    });
+
+    it('refuses an invalid edit and leaves storage untouched', async () => {
+      await chrome.storage.local.set({ prompts: [seed] });
+
+      await expect(storageManager.updatePrompt('p1', { content: 'x'.repeat(20_001) })).rejects.toMatchObject({
+        name: 'AdmissionRefusedError',
+        errors: { content: { reason: 'too_long' } }
+      });
+      await expect(storageManager.updatePrompt('p1', { title: '  ' })).rejects.toMatchObject({
+        errors: { title: { reason: 'empty' } }
+      });
+
+      expect(await storedPrompts()).toEqual([seed]);
+    });
+
+    it('keeps a legacy over-limit Prompt whole and editable in its other fields', async () => {
+      // Over the 20,000-character text limit, but under StorageManager's separate byte limit
+      const legacy = { ...seed, content: 'y'.repeat(22_000) };
+      await chrome.storage.local.set({ prompts: [legacy] });
+
+      const updated = await storageManager.updatePrompt('p1', { title: 'Renamed' });
+
+      expect(updated.title).toBe('Renamed');
+      expect(updated.content).toBe('y'.repeat(22_000));
+    });
+  });
+
+  describe('importPrompt (Backup restore)', () => {
+    const backed = {
+      id: 'b1',
+      title: 'Restored',
+      content: 'Body',
+      category: DEFAULT_CATEGORY,
+      createdAt: 5,
+      updatedAt: 6,
+      usageCount: 4,
+      lastUsedAt: 6
+    };
+
+    it('admits a new Prompt, keeping its id, usage and timestamps', async () => {
+      const imported = await storageManager.importPrompt({
+        ...backed,
+        title: ' Restored\u{200B} ',
+        content: '  <example>x</example>\n'
+      });
+
+      expect(imported).toEqual({ ...backed, content: '  <example>x</example>\n' });
+      expect(await storedPrompts()).toEqual([imported]);
+    });
+
+    it('stamps updatedAt with the current time when it replaces an existing Prompt', async () => {
+      await chrome.storage.local.set({ prompts: [{ ...backed, title: 'Old', updatedAt: 1 }] });
+
+      const imported = await storageManager.importPrompt({ ...backed, title: 'New\u{200B}' });
+
+      expect(imported).toEqual({ ...backed, title: 'New', updatedAt: Date.now() });
+      expect(await storedPrompts()).toEqual([imported]);
+    });
+
+    it('refuses an over-limit Prompt, so the restore can skip and report it', async () => {
+      const before = await storedPrompts();
+
+      await expect(storageManager.importPrompt({ ...backed, content: 'x'.repeat(20_001) })).rejects.toBeInstanceOf(
+        AdmissionRefusedError
+      );
+
+      expect(await storedPrompts()).toEqual(before);
+    });
+
+    it('rejects something that is not a Prompt', async () => {
+      await expect(storageManager.importPrompt({ title: 'No id' } as never)).rejects.toThrow(/id, title or content/);
+    });
+  });
+
+  describe('saveCategory', () => {
+    it('admits the name: Hidden characters removed and trimmed', async () => {
+      const saved = await storageManager.saveCategory({ name: '  Wor\u{200B}k ', color: '#112233' });
+
+      expect(saved).toMatchObject({ name: 'Work', color: '#112233' });
+      expect(await storedCategories()).toContainEqual(saved);
+    });
+
+    it('treats names that differ only by a Hidden character or surrounding spaces as the same name', async () => {
+      await storageManager.saveCategory({ name: 'Work' });
+
+      await expect(storageManager.saveCategory({ name: 'Work\u{200B}' })).rejects.toThrow(/already exists/);
+      await expect(storageManager.saveCategory({ name: ' work ' })).rejects.toThrow(/already exists/);
+    });
+
+    it('refuses an empty or over-limit name and leaves storage untouched', async () => {
+      const before = await storedCategories();
+
+      await expect(storageManager.saveCategory({ name: '   ' })).rejects.toMatchObject({
+        name: 'AdmissionRefusedError',
+        errors: { category: { reason: 'empty' } }
+      });
+      await expect(storageManager.saveCategory({ name: 'x'.repeat(51) })).rejects.toMatchObject({
+        errors: { category: { reason: 'too_long' } }
+      });
+
+      expect(await storedCategories()).toEqual(before);
+    });
+  });
+
+  describe('updateCategory (rename and its cascade)', () => {
+    const prompt = (id: string, category: string) => ({
+      id,
+      title: `Title ${id}`,
+      content: 'Body',
+      category,
+      createdAt: 1,
+      updatedAt: 1,
+      usageCount: 0,
+      lastUsedAt: 1
+    });
+
+    beforeEach(async () => {
+      await chrome.storage.local.set({
+        categories: [
+          { id: 'default', name: DEFAULT_CATEGORY },
+          { id: 'c1', name: 'Work' },
+          { id: 'c2', name: 'Play' }
+        ],
+        prompts: [prompt('p1', 'Work'), prompt('p2', 'Play')]
+      });
+    });
+
+    it('admits the new name and moves the Prompts of that Category to it', async () => {
+      const renamed = await storageManager.updateCategory('c1', { name: ' Pro\u{200B}jects ' });
+
+      expect(renamed).toEqual({ id: 'c1', name: 'Projects' });
+      expect(await storedPrompts()).toEqual([
+        { ...prompt('p1', 'Projects'), updatedAt: Date.now() },
+        prompt('p2', 'Play')
+      ]);
+    });
+
+    it('compares duplicates on the admitted name', async () => {
+      await expect(storageManager.updateCategory('c2', { name: 'Work\u{200B}' })).rejects.toThrow(/already exists/);
+    });
+
+    it('refuses an empty or over-limit name and changes nothing', async () => {
+      const categories = await storedCategories();
+      const prompts = await storedPrompts();
+
+      await expect(storageManager.updateCategory('c1', { name: '  ' })).rejects.toMatchObject({
+        name: 'AdmissionRefusedError',
+        errors: { category: { reason: 'empty' } }
+      });
+      await expect(storageManager.updateCategory('c1', { name: 'x'.repeat(51) })).rejects.toMatchObject({
+        errors: { category: { reason: 'too_long' } }
+      });
+
+      expect(await storedCategories()).toEqual(categories);
+      expect(await storedPrompts()).toEqual(prompts);
+    });
+  });
+
+  describe('importCategory (Backup restore)', () => {
+    it('admits the name of a new Category', async () => {
+      const imported = await storageManager.importCategory({ id: 'c9', name: ' Re\u{200B}stored ', color: '#abcdef' });
+
+      expect(imported).toEqual({ id: 'c9', name: 'Restored', color: '#abcdef' });
+      expect(await storedCategories()).toContainEqual(imported);
+    });
+
+    it('matches an existing Category by its admitted name and keeps the existing id', async () => {
+      await chrome.storage.local.set({
+        categories: [
+          { id: 'default', name: DEFAULT_CATEGORY },
+          { id: 'c1', name: 'Work' }
+        ]
+      });
+
+      const imported = await storageManager.importCategory({ id: 'other', name: 'Work\u{200B}' });
+
+      expect(imported).toEqual({ id: 'c1', name: 'Work' });
+      expect(await storedCategories()).toEqual([
+        { id: 'default', name: DEFAULT_CATEGORY },
+        { id: 'c1', name: 'Work' }
+      ]);
+    });
+
+    it('refuses an empty or over-limit name, so the restore can skip and report it', async () => {
+      const before = await storedCategories();
+
+      await expect(storageManager.importCategory({ id: 'c9', name: ' ' })).rejects.toMatchObject({
+        name: 'AdmissionRefusedError',
+        errors: { category: { reason: 'empty' } }
+      });
+      await expect(storageManager.importCategory({ id: 'c9', name: 'x'.repeat(51) })).rejects.toMatchObject({
+        errors: { category: { reason: 'too_long' } }
+      });
+
+      expect(await storedCategories()).toEqual(before);
+    });
+  });
+
+  describe('importData (whole-library import, currently unused by the UI)', () => {
+    const settings = {
+      defaultCategory: DEFAULT_CATEGORY,
+      sortOrder: 'updatedAt' as const,
+      sortDirection: 'desc' as const,
+      theme: 'system' as const
+    };
+    const aPrompt = {
+      id: 'i1',
+      title: 'Imported',
+      content: 'Body',
+      category: DEFAULT_CATEGORY,
+      createdAt: 1,
+      updatedAt: 2,
+      usageCount: 0,
+      lastUsedAt: 1
+    };
+    const payload = (prompts: unknown[], categories: unknown[] = [{ id: 'default', name: DEFAULT_CATEGORY }]): string =>
+      JSON.stringify({ prompts, categories, settings });
+
+    it('admits every Prompt and Category before it replaces the Library', async () => {
+      await storageManager.importData(
+        payload(
+          [{ ...aPrompt, title: ' Imported\u{200B} ', content: '  <example>x</example>\n' }],
+          [{ id: 'default', name: DEFAULT_CATEGORY }, { id: 'c1', name: ' Wor\u{200B}k ' }]
+        )
+      );
+
+      expect(await storedPrompts()).toEqual([{ ...aPrompt, content: '  <example>x</example>\n' }]);
+      expect(await storedCategories()).toEqual([
+        { id: 'default', name: DEFAULT_CATEGORY },
+        { id: 'c1', name: 'Work' }
+      ]);
+    });
+
+    it('refuses the whole import if any Prompt is refused, before anything is cleared', async () => {
+      const existing = { ...aPrompt, id: 'keep-me' };
+      await chrome.storage.local.set({ prompts: [existing] });
+
+      await expect(
+        storageManager.importData(payload([aPrompt, { ...aPrompt, id: 'i2', title: '   ' }]))
+      ).rejects.toBeInstanceOf(AdmissionRefusedError);
+
+      expect(await storedPrompts()).toEqual([existing]);
+    });
+  });
+});

@@ -3,6 +3,7 @@ import type { FC, ReactNode } from 'react';
 
 import manifest from '../../manifest.json';
 import { getDefaultEnabledPlatforms, getLinkedPlatformHostnames } from '../config/platforms';
+import { AdmissionRefusedError } from '../services/promptAdmission';
 import { StorageManager } from '../services/storage';
 import type { Prompt, Category, Settings as UserSettings, CustomSite as ImportedCustomSite } from '../types';
 import { DEFAULT_SETTINGS } from '../types';
@@ -384,20 +385,56 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
   // Handle import data
   const handleImportData = async (data: { prompts: Prompt[]; categories: Category[] }) => {
     try {
+      // An item that is refused at Admission (ADR-001) is skipped and reported; the rest are restored.
+      const skipped: { label: string; reason: string }[] = [];
+
+      const importEach = async <T,>(
+        items: readonly T[],
+        label: (item: T) => string,
+        importItem: (item: T) => Promise<unknown>
+      ): Promise<number> => {
+        let imported = 0;
+        for (const item of items) {
+          try {
+            await importItem(item);
+            imported += 1;
+          } catch (error) {
+            if (!(error instanceof AdmissionRefusedError)) {
+              throw error;
+            }
+            skipped.push({ label: label(item), reason: error.message });
+          }
+        }
+        return imported;
+      };
+
       // Import categories first (prompts reference categories)
-      for (const category of data.categories) {
-        await storageManager.importCategory(category);
-      }
-      
+      const importedCategories = await importEach(
+        data.categories,
+        (category) => category.name,
+        (category) => storageManager.importCategory(category)
+      );
+
       // Import prompts
-      for (const prompt of data.prompts) {
-        await storageManager.importPrompt(prompt);
-      }
-      
+      const importedPrompts = await importEach(
+        data.prompts,
+        (prompt) => prompt.title,
+        (prompt) => storageManager.importPrompt(prompt)
+      );
+
       // Reload data
       await loadSettings();
-      
-      showToast(`Successfully imported ${data.prompts.length.toString()} prompts and ${data.categories.length.toString()} categories!`, 'success');
+
+      if (skipped.length === 0) {
+        showToast(`Successfully imported ${data.prompts.length.toString()} prompts and ${data.categories.length.toString()} categories!`, 'success');
+      } else {
+        const details = skipped.slice(0, 3).map((item) => `"${item.label}" (${item.reason})`).join('; ');
+        const more = skipped.length > 3 ? ` and ${(skipped.length - 3).toString()} more` : '';
+        showToast(
+          `Imported ${importedPrompts.toString()} prompts and ${importedCategories.toString()} categories. Skipped ${skipped.length.toString()}: ${details}${more}.`,
+          'warning'
+        );
+      }
     } catch (error) {
       Logger.error('Import failed', toError(error));
       throw error;

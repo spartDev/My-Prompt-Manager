@@ -218,6 +218,22 @@ describe('PromptManager - Working Tests', () => {
           message: 'Prompt content cannot be empty'
         });
     });
+
+    it('passes content to storage exactly as written, spaces and line breaks included', async () => {
+      await promptManager.createPrompt('Title', '  Rewrite this:\n\n', DEFAULT_CATEGORY);
+
+      expect(storageManagerMock.savePrompt).toHaveBeenCalledWith({
+        title: 'Title',
+        content: '  Rewrite this:\n\n',
+        category: DEFAULT_CATEGORY
+      });
+    });
+
+    it('passes edited content to storage exactly as written', async () => {
+      await promptManager.updatePrompt('1', { content: '  Rewrite this:\n\n' });
+
+      expect(storageManagerMock.updatePrompt).toHaveBeenCalledWith('1', { content: '  Rewrite this:\n\n' });
+    });
   });
 
   describe('Error Handling', () => {

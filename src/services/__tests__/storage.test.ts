@@ -40,7 +40,8 @@ describe('StorageManager', () => {
       expect(savedPrompt.createdAt).toBeDefined();
       expect(savedPrompt.updatedAt).toBeDefined();
       expect(savedPrompt.usageCount).toBe(0);
-      expect(savedPrompt.lastUsedAt).toBeUndefined();
+      // An unused prompt was last used when it was created (the same value every read gives it)
+      expect(savedPrompt.lastUsedAt).toBe(savedPrompt.createdAt);
 
       // Verify using chrome.storage API
       const result = await chrome.storage.local.get('prompts');

@@ -7,6 +7,7 @@
  */
 
 import { DEFAULT_CATEGORY, VALIDATION_LIMITS } from '../constants';
+import type { AppError, ErrorType } from '../types';
 
 /** Single source of truth for Prompt text limits (derived from VALIDATION_LIMITS). */
 export const PROMPT_LIMITS = {
@@ -55,7 +56,7 @@ const LABELS: Record<PromptField, string> = {
  */
 const HIDDEN_CHARACTERS =
   // biome-ignore lint/suspicious/noControlCharactersInRegex: removing control characters is the purpose of this pattern
-  /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F​‪-‮⁠-⁯﻿]/g;
+  /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\u200B\u202A-\u202E\u2060-\u206F\uFEFF]/g;
 
 const BLACK_FLAG = '\u{1F3F4}';
 
@@ -291,8 +292,14 @@ function mintAdmitted(fields: StoredFields): AdmittedPrompt {
   return fields as unknown as AdmittedPrompt;
 }
 
-/** Thrown by the write path when a route is refused. */
-export class AdmissionRefusedError extends Error {
+/**
+ * Thrown by the write path when a route is refused. It is an AppError (a validation
+ * error), so the existing error handling in PromptManager and the hooks passes it through.
+ */
+export class AdmissionRefusedError extends Error implements AppError {
+  readonly type: ErrorType = 'VALIDATION_ERROR';
+  readonly details: Refusals;
+
   constructor(readonly errors: Refusals) {
     super(
       Object.values(errors)
@@ -300,6 +307,7 @@ export class AdmissionRefusedError extends Error {
         .join('; ')
     );
     this.name = 'AdmissionRefusedError';
+    this.details = errors;
   }
 }
 
@@ -351,10 +359,15 @@ export function admitEdit(current: StoredPrompt, patch: PromptTextPatch, now: nu
 
 /**
  * Restore (Backup): admits the text of a Prompt read from a Backup, keeping its id,
- * usage and timestamps. A timestamp that is missing (0) becomes `now`. A refusal means
- * the restore skips and reports this Prompt and carries on with the rest.
+ * usage and timestamps. A timestamp that is missing (0) becomes `now`. When it replaces
+ * an existing Prompt (`replacing`), updatedAt is stamped with `now`. A refusal means the
+ * restore skips and reports this Prompt and carries on with the rest.
  */
-export function admitRestored(incoming: StoredPrompt, now: number): PromptAdmission {
+export function admitRestored(
+  incoming: StoredPrompt,
+  now: number,
+  options: { replacing?: boolean } = {}
+): PromptAdmission {
   const admission = admit({ title: incoming.title, content: incoming.content, category: incoming.category });
   if (!admission.ok) {
     return admission;
@@ -368,7 +381,7 @@ export function admitRestored(incoming: StoredPrompt, now: number): PromptAdmiss
       ...admission.text,
       id: incoming.id,
       createdAt,
-      updatedAt: incoming.updatedAt || now,
+      updatedAt: options.replacing ? now : incoming.updatedAt || now,
       usageCount: incoming.usageCount,
       lastUsedAt: Math.max(incoming.lastUsedAt, createdAt)
     })
