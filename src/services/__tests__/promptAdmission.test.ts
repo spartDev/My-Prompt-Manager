@@ -11,7 +11,8 @@ import {
   admitRestored,
   readPrompts,
   recordUse,
-  scrubStored
+  scrubStored,
+  scrubStoredCategories
 } from '../promptAdmission';
 
 const valid = { title: 'T', content: 'C', category: 'Cat' };
@@ -324,6 +325,86 @@ describe('scrubStored (the one-time upgrade pass)', () => {
 
   it('has nothing to do when the stored value is not a list', () => {
     expect(scrubStored(undefined)).toEqual({ changed: false, entries: [] });
+  });
+});
+
+describe('scrubStoredCategories (the one-time upgrade pass, Category names)', () => {
+  const work = { id: 'c1', name: 'Work', color: '#ff0000' };
+
+  it('removes Hidden characters from a Category name, and nothing else', () => {
+    expect(scrubStoredCategories([{ ...work, name: 'Wo\u{200B}rk' }])).toEqual({ changed: true, entries: [work] });
+  });
+
+  it('never trims, refuses or shortens a name', () => {
+    const padded = { ...work, name: `  ${'W'.repeat(60)}\u{200B}  ` };
+
+    expect(scrubStoredCategories([padded]).entries).toEqual([{ ...work, name: `  ${'W'.repeat(60)}  ` }]);
+  });
+
+  it('leaves entries that are not Categories untouched', () => {
+    const malformed = [null, 'text', 42, { id: 7 }, { id: 'c2', name: 7 }];
+
+    const result = scrubStoredCategories([...malformed, { ...work, name: 'Wo\u{200B}rk' }]);
+
+    expect(result.entries.slice(0, 5)).toEqual(malformed);
+    expect(result.entries[5]).toEqual(work);
+  });
+
+  it('keeps the invisible characters that are part of ordinary writing', () => {
+    const family = { ...work, name: '\u{1F468}\u{200D}\u{1F469} \u{200E}' };
+
+    expect(scrubStoredCategories([family])).toEqual({ changed: false, entries: [family] });
+  });
+
+  it('reports no change, and returns the very same entries, when there is nothing to clean', () => {
+    const entries = [work, { id: 'c2', name: 'Home' }];
+
+    const result = scrubStoredCategories(entries);
+
+    expect(result.changed).toBe(false);
+    expect(result.entries[0]).toBe(entries[0]);
+    expect(result.entries[1]).toBe(entries[1]);
+  });
+
+  it('is idempotent: a second pass finds nothing to change', () => {
+    const first = scrubStoredCategories([{ ...work, name: 'Wo\u{200B}rk' }, { id: 'c2', name: 'Work\u{FEFF}' }]);
+
+    expect(scrubStoredCategories(first.entries).changed).toBe(false);
+  });
+
+  it.each([
+    ['the later one is the one with the Hidden character', ['Work', 'Work\u{200B}'], ['Work']],
+    ['the first one is the one with the Hidden character', ['Work\u{200B}', 'Work'], ['Work']],
+    ['they differ in case as well', ['Work', 'WORK\u{200B}'], ['Work']],
+    ['both have one', ['Wo\u{200B}rk', 'Work\u{FEFF}', 'W\u{2060}ork'], ['Work']]
+  ])('merges names that become the same once cleaned, keeping the first (%s)', (_case, names, expected) => {
+    const entries = names.map((name, index) => ({ id: `c${String(index)}`, name }));
+
+    const result = scrubStoredCategories(entries);
+
+    expect(result.changed).toBe(true);
+    expect(result.entries).toEqual([{ id: 'c0', name: expected[0] }]);
+  });
+
+  it('keeps every other Category, in order, when it merges one', () => {
+    const home = { id: 'h', name: 'Home' };
+    const entries = [home, { id: 'c1', name: 'Work' }, { id: 'c2', name: 'Work\u{200B}', color: '#fff' }, { id: 'z', name: 'Zen' }];
+
+    expect(scrubStoredCategories(entries).entries).toEqual([home, { id: 'c1', name: 'Work' }, { id: 'z', name: 'Zen' }]);
+  });
+
+  it('leaves alone names that were already the same before cleaning', () => {
+    const twins = [
+      { id: 'c1', name: 'Work' },
+      { id: 'c2', name: 'work' }
+    ];
+
+    expect(scrubStoredCategories(twins)).toEqual({ changed: false, entries: twins });
+  });
+
+  it('has nothing to do when the stored value is not a list', () => {
+    expect(scrubStoredCategories(undefined)).toEqual({ changed: false, entries: [] });
+    expect(scrubStoredCategories({ name: 'Work' })).toEqual({ changed: false, entries: [] });
   });
 });
 

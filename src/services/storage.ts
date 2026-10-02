@@ -27,6 +27,8 @@ import {
   readPrompt,
   readPrompts,
   recordUse,
+  scrubStored,
+  scrubStoredCategories,
   type PromptTextPatch,
   type StoredPrompt
 } from './promptAdmission';
@@ -487,6 +489,39 @@ export class StorageManager {
     });
   }
 
+  /**
+   * The one-time upgrade pass (ADR-001, "Existing data"): cleans stored Prompts and Category
+   * names of Hidden characters. It works on the raw stored values, so it never refuses, trims,
+   * shortens or drops a Prompt, including a malformed one or one already over the limits. The
+   * only Categories it drops are later ones whose name becomes the same as an earlier one's
+   * once cleaned (their Prompts already name the kept Category). It writes nothing when there
+   * is nothing to clean, and both keys in one atomic write when both changed. Safe to run any
+   * number of times.
+   */
+  upgradeStoredData(): Promise<{ promptsChanged: boolean; categoriesChanged: boolean }> {
+    // Same lock order as updateCategory: CATEGORIES first, then PROMPTS
+    return this.mutex.withLock(this.STORAGE_KEYS.CATEGORIES, () =>
+      this.mutex.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
+        try {
+          // Raw values: getPrompts and getCategories drop malformed entries and may write
+          const prompts = scrubStored(await this.getStorageData<unknown>(this.STORAGE_KEYS.PROMPTS));
+          const categories = scrubStoredCategories(await this.getStorageData<unknown>(this.STORAGE_KEYS.CATEGORIES));
+
+          if (prompts.changed || categories.changed) {
+            await this.writeScrubbed({
+              prompts: prompts.changed ? prompts.entries : undefined,
+              categories: categories.changed ? categories.entries : undefined
+            });
+          }
+
+          return { promptsChanged: prompts.changed, categoriesChanged: categories.changed };
+        } catch (error) {
+          throw this.handleStorageError(error);
+        }
+      })
+    );
+  }
+
   // Settings operations
   async getSettings(): Promise<Settings> {
     try {
@@ -712,6 +747,23 @@ export class StorageManager {
   private async writePrompts(prompts: readonly StoredPrompt[]): Promise<void> {
     await ensureStorageAvailable();
     await chrome.storage.local.set({ [STORAGE_KEYS.PROMPTS]: prompts });
+  }
+
+  /**
+   * The single exception to "the prompts key is only written through writePrompts", used
+   * only by upgradeStoredData. The upgrade pass works on raw entries and must keep the ones
+   * that are not StoredPrompts (malformed, or already over the limits) rather than drop them.
+   * Writes only the keys given, in one atomic set.
+   */
+  private async writeScrubbed(scrubbed: {
+    prompts: readonly unknown[] | undefined;
+    categories: readonly unknown[] | undefined;
+  }): Promise<void> {
+    await ensureStorageAvailable();
+    await chrome.storage.local.set({
+      ...(scrubbed.prompts && { [STORAGE_KEYS.PROMPTS]: scrubbed.prompts }),
+      ...(scrubbed.categories && { [STORAGE_KEYS.CATEGORIES]: scrubbed.categories })
+    });
   }
 
   /** Writes categories and prompts together (one atomic set), prompts typed as above. */

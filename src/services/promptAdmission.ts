@@ -262,6 +262,56 @@ export function scrubStored(raw: unknown): { entries: unknown[]; changed: boolea
 }
 
 /**
+ * The one-time upgrade pass for Category names, the counterpart of scrubStored: removes
+ * Hidden characters from the `name` of raw stored Categories, and never trims, refuses or
+ * shortens a name or drops a malformed entry. Entries with nothing to clean are returned
+ * as the same objects.
+ *
+ * Prompts have their `category` cleaned by scrubStored, so a Category that kept its Hidden
+ * character would no longer match its Prompts. Cleaning can also make two names the same
+ * (`Work` and `Work` + U+200B); Categories never share a name, so the first is kept and the
+ * later ones are dropped. Nothing is orphaned: their Prompts already name the kept Category.
+ * Names that were already the same before cleaning are left as they are, so this pass only
+ * merges what it made equal.
+ */
+export function scrubStoredCategories(raw: unknown): { entries: unknown[]; changed: boolean } {
+  if (!Array.isArray(raw)) {
+    return { entries: [], changed: false };
+  }
+
+  let changed = false;
+  /** Cleaned name (lowercase) -> stored name (lowercase) of the first Category with that name. */
+  const firstByName = new Map<string, string>();
+
+  const entries = raw.flatMap((entry: unknown) => {
+    if (!isRecord(entry) || typeof entry.name !== 'string') {
+      return [entry];
+    }
+
+    const name = removeHiddenCharacters(entry.name);
+    const cleanedKey = name.toLowerCase();
+    const storedKey = entry.name.toLowerCase();
+    const first = firstByName.get(cleanedKey);
+
+    if (first === undefined) {
+      firstByName.set(cleanedKey, storedKey);
+    } else if (first !== storedKey) {
+      changed = true;
+      return [];
+    }
+
+    if (name === entry.name) {
+      return [entry];
+    }
+
+    changed = true;
+    return [{ ...entry, name }];
+  });
+
+  return { entries, changed };
+}
+
+/**
  * Reads the value stored under the prompts key: the one definition of a stored Prompt,
  * shared by StorageManager and the content script. Pure; reading never writes.
  */
