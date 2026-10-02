@@ -3,7 +3,7 @@
 * Status: accepted
 * Deciders: Maintainer of My Prompt Manager, in an architecture review session (with Claude)
 * Date: 2026-09-30
-* Amended: 2026-10-01 — Category names added to Admission; interface shape and compile-time enforcement recorded after a design-it-twice exercise. Nothing was implemented between the two dates.
+* Amended: 2026-10-01 — Category names added to Admission; interface shape and compile-time enforcement recorded after a design-it-twice exercise. Nothing was implemented between the two dates. Amended again 2026-10-02: the upgrade pass also cleans stored Category names (slice 3).
 
 Technical Story: Architecture review candidate "Prompt content integrity" — the content script alters Prompt text on read (reproduced: `metadata:` becomes `meta`). No ticket.
 
@@ -25,7 +25,7 @@ What this means:
 * **One reader.** `StorageManager` and the content script share one pure definition of a stored Prompt (shape, defaults, backfill). The content script no longer sanitizes, truncates, or drops Prompts on its own. Reading never writes; a stored entry with no `createdAt` falls back to `updatedAt`, then `0`, so the reader needs no clock.
 * **Interface and enforcement.** One pure module, shared by both bundles, with a small set of functions: a text-level `admit` (full text or a patch), which is also the form's dry check and live counter; one function per write route that returns a nominally typed `AdmittedPrompt`; a reader that returns nominally typed `StoredPrompt`s; and an upgrade scrub that works on raw stored entries, so it never drops a malformed one. `StorageManager`'s private write accepts only those types, so skipping Admission fails to compile. The types are classes with a private member, because a `unique symbol` brand can be forged by object spread. Non-text changes, such as a usage count, also go through the module so the result stays typed.
 * **Insertion and the prompt selector apply no content checks or escaping.** The Gemini and Mistral sanitizing, the content side of `validateAndSanitize`, and the unused `MAX_CONTENT_LENGTHS` entries are removed. The selector sets text only and passes Prompt ids through unchanged.
-* **Existing data.** Stored Prompts are cleaned of Hidden characters once on extension update. The pass is idempotent and never refuses, deletes or shortens a stored Prompt, including one already over the size limits.
+* **Existing data.** Stored Prompts are cleaned of Hidden characters once on extension update. The pass is idempotent and never refuses, deletes or shortens a stored Prompt, including one already over the size limits. Stored Category names are cleaned the same way, because a Prompt names its Category and the two must keep matching; if cleaning makes two names the same (`Work` and `Work` + U+200B), the later Category is merged into the first (its Prompts already name the kept one). Names that were already the same before cleaning are left alone.
 * **Safety property, tested at the sinks.** A shared set of hostile-looking strings (`<script>`, `<img onerror=…>`, `javascript:`) is run against the prompt selector and each insertion path, asserting the text appears literally and creates no element or handler.
 
 ### Positive Consequences
