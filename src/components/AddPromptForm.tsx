@@ -2,6 +2,7 @@ import { forwardRef, useActionState, useEffect, useMemo, useRef, useState } from
 import type { FC } from 'react';
 
 import { MAX_CONTENT_LENGTH, MAX_TITLE_LENGTH, formatCharacterCount } from '../constants/validation';
+import { admit } from '../services/promptAdmission';
 import { decode } from '../services/promptEncoder';
 import { DEFAULT_CATEGORY, type SharedPromptData } from '../types';
 import type { AddPromptFormProps } from '../types/components';
@@ -102,7 +103,24 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
     // Debounced validation (300ms)
     debounceTimerRef.current = setTimeout(() => {
       try {
-        const decoded = decode(code);
+        // Decoding only parses; whether the text is acceptable is Admission's call. Ask it now
+        // (without saving) so the user hears about a refusal straight away. The result is what
+        // will be saved, so the preview shows that rather than the raw text.
+        const admission = admit(decode(code));
+        if (!admission.ok) {
+          const message = Object.values(admission.errors)
+            .flatMap(refusal => (refusal ? [refusal.message] : []))
+            .join('; ');
+          setDecodedPrompt(null);
+          setValidationError(message);
+          Logger.warn('Import code would be refused at Admission', {
+            component: 'AddPromptForm',
+            mode: 'import',
+            fields: Object.keys(admission.errors)
+          });
+          return;
+        }
+        const decoded = admission.text;
         setDecodedPrompt(decoded);
         setValidationError('');
 
@@ -163,26 +181,6 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
         title = decodedPrompt.title;
         content = decodedPrompt.content;
         category = selectedCategory;
-
-        // Defense-in-depth: Validate decoded data against form limits
-        if (title.length > MAX_TITLE_LENGTH) {
-          Logger.warn('Import failed: Title exceeds form limit', {
-            component: 'AddPromptForm',
-            mode: 'import',
-            titleLength: title.length,
-            limit: MAX_TITLE_LENGTH
-          });
-          return { general: `Imported title exceeds maximum length (${String(MAX_TITLE_LENGTH)} characters)` };
-        }
-        if (content.length > MAX_CONTENT_LENGTH) {
-          Logger.warn('Import failed: Content exceeds form limit', {
-            component: 'AddPromptForm',
-            mode: 'import',
-            contentLength: content.length,
-            limit: MAX_CONTENT_LENGTH
-          });
-          return { general: `Imported content exceeds maximum length (${MAX_CONTENT_LENGTH.toLocaleString()} characters)` };
-        }
 
         Logger.info('Importing prompt from sharing code', {
           component: 'AddPromptForm',

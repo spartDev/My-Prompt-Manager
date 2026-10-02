@@ -10,6 +10,8 @@ import {
   isUsageEvent,
   isCustomSite,
   isArrayOf,
+  isValidImportPrompt,
+  findInvalidImportPrompt,
 } from '../validation';
 
 describe('validatePromptFields', () => {
@@ -373,5 +375,63 @@ describe('Type Guards', () => {
       expect(isStringArray(['a', 'b', 'c'])).toBe(true);
       expect(isStringArray(['a', 123, 'c'])).toBe(false);
     });
+  });
+});
+
+// A Backup is checked for structure only. What its text may contain is decided once, at
+// Admission (ADR-001), where a refused Prompt is skipped and reported while the rest are restored.
+describe('isValidImportPrompt', () => {
+  const backedUp = {
+    id: 'p1',
+    title: 'Title',
+    content: 'Content',
+    category: 'Work',
+    createdAt: 1,
+    updatedAt: 2,
+  };
+
+  it('should accept a Prompt as exported', () => {
+    expect(isValidImportPrompt(backedUp)).toBe(true);
+  });
+
+  it('should reject what the reader cannot read, so a restore never starts and then fails halfway', () => {
+    const { id: _id, ...withoutId } = backedUp;
+
+    expect(isValidImportPrompt(withoutId)).toBe(false);
+    expect(isValidImportPrompt({ ...backedUp, id: 42 })).toBe(false);
+    expect(isValidImportPrompt({ ...backedUp, title: undefined })).toBe(false);
+    expect(isValidImportPrompt({ ...backedUp, content: null })).toBe(false);
+    expect(isValidImportPrompt({ ...backedUp, category: 7 })).toBe(false);
+    expect(isValidImportPrompt(null)).toBe(false);
+    expect(isValidImportPrompt('prompt')).toBe(false);
+    expect(isValidImportPrompt([backedUp])).toBe(false);
+  });
+
+  it('should not judge the text: whitespace, tags, Hidden characters and over-limit text are Admission\'s call', () => {
+    const texts = [
+      { title: '  Padded  ', content: '\n  Padded content \n' },
+      { title: '<b>Tags</b>', content: 'Use <example>x</example> and metadata: onboarding = true' },
+      { title: 'Hid\u{200B}den', content: 'Tag\u{E0041} bidi\u{202E}' },
+      { title: '', content: '   ' },
+      { title: 'T'.repeat(500), content: 'x'.repeat(50_000) },
+    ];
+
+    for (const text of texts) {
+      expect(isValidImportPrompt({ ...backedUp, ...text })).toBe(true);
+    }
+  });
+});
+
+describe('findInvalidImportPrompt', () => {
+  const good = { id: 'p1', title: 'Title', content: 'Content', category: 'Work' };
+
+  it('should return undefined when every Prompt is structurally valid', () => {
+    expect(findInvalidImportPrompt([good, { ...good, id: 'p2' }])).toBeUndefined();
+  });
+
+  it('should return the first Prompt that is not', () => {
+    const bad = { title: 'No id', content: 'Content', category: 'Work' };
+
+    expect(findInvalidImportPrompt([good, bad, { ...good, id: 7 }])).toBe(bad);
   });
 });

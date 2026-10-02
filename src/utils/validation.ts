@@ -231,8 +231,12 @@ export function isArrayOf<T>(itemGuard: TypeGuard<T>): TypeGuard<T[]> {
 
 /**
  * Validates that a value is a valid prompt for import purposes.
- * Import prompts must have title, content, and category strings.
- * Other fields (id, createdAt, etc.) may be generated during import.
+ * Import prompts must have id, title, content, and category strings: the same shape the
+ * reader (`readPrompt`) needs, so a restore never starts and then fails halfway on a Prompt
+ * it cannot read. Other fields (createdAt, usage, etc.) are filled in on import.
+ *
+ * This checks structure only. The text itself (whitespace, tags, Hidden characters, length)
+ * is never judged or rewritten here: Admission decides, once, when each Prompt is restored.
  */
 export function isValidImportPrompt(value: unknown): boolean {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -240,6 +244,7 @@ export function isValidImportPrompt(value: unknown): boolean {
   }
   const p = value as Record<string, unknown>;
   return (
+    typeof p.id === 'string' &&
     typeof p.title === 'string' &&
     typeof p.content === 'string' &&
     typeof p.category === 'string'

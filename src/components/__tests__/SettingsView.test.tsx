@@ -180,6 +180,54 @@ describe('SettingsView', () => {
     alertSpy.mockRestore();
   });
 
+  it.each([
+    ['a null entry', null],
+    ['a Prompt without an id', { title: 'No id', content: 'Hello', category: 'Uncategorized' }]
+  ])('rejects a backup with %s before restoring anything', async (_label, badEntry) => {
+    const storageMock = getMockStorageManager();
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => undefined);
+
+    await renderSettings();
+    await waitFor(() => {
+      expect(storageMock.getPrompts).toHaveBeenCalled();
+    });
+
+    const fileInput = document.querySelector<HTMLInputElement>('input[type="file"]');
+    const good = { id: 'good', title: 'Fine', content: 'Hello', category: 'Uncategorized', createdAt: 1, updatedAt: 1 };
+    await userEvent.upload(
+      fileInput as HTMLInputElement,
+      createJsonFile(JSON.stringify({ prompts: [good, badEntry], categories: [], version: '1.0' }))
+    );
+
+    await waitFor(() => {
+      expect(alertSpy).toHaveBeenCalledWith(expect.stringMatching(/one or more prompts have invalid structure/i));
+    });
+    expect(storageMock.importPrompt).not.toHaveBeenCalled();
+    alertSpy.mockRestore();
+  });
+
+  it('rejects a backup with a null Category entry before restoring anything', async () => {
+    const storageMock = getMockStorageManager();
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => undefined);
+
+    await renderSettings();
+    await waitFor(() => {
+      expect(storageMock.getPrompts).toHaveBeenCalled();
+    });
+
+    const fileInput = document.querySelector<HTMLInputElement>('input[type="file"]');
+    await userEvent.upload(
+      fileInput as HTMLInputElement,
+      createJsonFile(JSON.stringify({ prompts: [], categories: [{ id: 'c1', name: 'Custom' }, null], version: '1.0' }))
+    );
+
+    await waitFor(() => {
+      expect(alertSpy).toHaveBeenCalledWith(expect.stringMatching(/one or more categories have invalid structure/i));
+    });
+    expect(storageMock.importCategory).not.toHaveBeenCalled();
+    alertSpy.mockRestore();
+  });
+
   it('resets settings to defaults after confirmation', async () => {
     const chromeMock = getChromeMockFunctions();
     const storageMock = getMockStorageManager();

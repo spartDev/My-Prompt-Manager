@@ -1,16 +1,21 @@
 /**
  * @file PromptEncoder Service
  * @module services/promptEncoder
- * @description Secure encoding/decoding for sharing prompts via URLs
+ * @description Encoding/decoding of Share codes (a single Prompt as compact text)
  *
- * Security features:
- * - Sanitization: Strips HTML tags using DOMPurify (XSS prevention)
- * - Validation: Enforces size limits and required fields
+ * Prompts are Verbatim (see CONTEXT.md and ADR-001): a Share code carries title, content
+ * and category exactly as given, and decoding only parses. Nothing here sanitizes, trims
+ * or judges the text; Hidden characters, trimming and the size and emptiness rules are
+ * applied once, at Admission, when the decoded Prompt is saved (and the form may ask
+ * `admit()` beforehand for early feedback).
+ *
+ * Protections kept against hostile codes:
+ * - Maximum encoded length, checked before anything is decompressed
+ * - Maximum decompressed length (decompression bombs)
+ * - JSON parsing and shape validation (three strings)
  * - Compression: LZ-string for 60-80% size reduction
- * - Defense-in-depth: Sanitizes on both encode and decode paths
  */
 
-import DOMPurify from 'dompurify';
 import LZString from 'lz-string';
 
 import {
@@ -38,104 +43,38 @@ class PromptEncoderError extends Error implements AppError {
 }
 
 /**
- * DOMPurify configuration - strips all HTML tags
- */
-const SANITIZE_CONFIG: DOMPurify.Config = {
-  ALLOWED_TAGS: [],
-  ALLOWED_ATTR: [],
-  KEEP_CONTENT: true,
-};
-
-/**
- * Sanitizes text by removing HTML tags and trimming whitespace
+ * Checks the shape of a parsed sharing code: three strings, nothing about their content
  * @internal
  */
-function sanitizeText(text: string): string {
-  return DOMPurify.sanitize(text.trim(), SANITIZE_CONFIG);
-}
-
-/**
- * Validates prompt data against size limits and required fields
- * @internal
- */
-function validatePromptData(data: SharedPromptData): void {
-  const { title, content, category } = data;
-
-  // Check required fields
-  if (!title.trim()) {
-    throw new PromptEncoderError({
-      type: 'VALIDATION_ERROR',
-      message: 'Title is required',
-      details: { field: 'title' }
-    });
+function isSharedPromptData(value: unknown): value is SharedPromptData {
+  if (typeof value !== 'object' || value === null) {
+    return false;
   }
-  if (!content.trim()) {
-    throw new PromptEncoderError({
-      type: 'VALIDATION_ERROR',
-      message: 'Content is required',
-      details: { field: 'content' }
-    });
-  }
-  if (!category.trim()) {
-    throw new PromptEncoderError({
-      type: 'VALIDATION_ERROR',
-      message: 'Category is required',
-      details: { field: 'category' }
-    });
-  }
-
-  // Check size limits
-  if (title.length > PROMPT_SHARING_SIZE_LIMITS.TITLE_MAX) {
-    throw new PromptEncoderError({
-      type: 'VALIDATION_ERROR',
-      message: `Title too long (max ${String(PROMPT_SHARING_SIZE_LIMITS.TITLE_MAX)} characters)`,
-      details: { field: 'title', length: title.length, max: PROMPT_SHARING_SIZE_LIMITS.TITLE_MAX }
-    });
-  }
-  if (content.length > PROMPT_SHARING_SIZE_LIMITS.CONTENT_MAX) {
-    throw new PromptEncoderError({
-      type: 'VALIDATION_ERROR',
-      message: `Content too long (max ${String(PROMPT_SHARING_SIZE_LIMITS.CONTENT_MAX)} characters)`,
-      details: { field: 'content', length: content.length, max: PROMPT_SHARING_SIZE_LIMITS.CONTENT_MAX }
-    });
-  }
-  if (category.length > PROMPT_SHARING_SIZE_LIMITS.CATEGORY_MAX) {
-    throw new PromptEncoderError({
-      type: 'VALIDATION_ERROR',
-      message: `Category too long (max ${String(PROMPT_SHARING_SIZE_LIMITS.CATEGORY_MAX)} characters)`,
-      details: { field: 'category', length: category.length, max: PROMPT_SHARING_SIZE_LIMITS.CATEGORY_MAX }
-    });
-  }
+  const { title, content, category } = value as Record<string, unknown>;
+  return typeof title === 'string' && typeof content === 'string' && typeof category === 'string';
 }
 
 /**
  * Encodes a prompt into a shareable URL-safe string
  *
- * Process:
- * 1. Sanitize fields (remove HTML)
- * 2. Validate size limits
- * 3. Compress to URL-safe string
+ * Title, content and category are encoded exactly as given (Verbatim): nothing is
+ * stripped, trimmed or validated. Then the result is compressed and checked against the
+ * maximum encoded length.
  *
  * @param prompt - The prompt to encode
  * @returns URL-safe compressed string
- * @throws {PromptEncoderError} If validation fails or result exceeds 20KB
+ * @throws {PromptEncoderError} If the encoded result is too large to share
  */
 export function encode(prompt: Prompt): string {
   try {
-    // 1. Sanitize all text fields
-    const sanitized: SharedPromptData = {
-      title: sanitizeText(prompt.title),
-      content: sanitizeText(prompt.content),
-      category: sanitizeText(prompt.category),
+    const shared: SharedPromptData = {
+      title: prompt.title,
+      content: prompt.content,
+      category: prompt.category,
     };
 
-    // 2. Validate sanitized data
-    validatePromptData(sanitized);
+    const encoded = LZString.compressToEncodedURIComponent(JSON.stringify(shared));
 
-    // 3. Compress to URL-safe string
-    const encoded = LZString.compressToEncodedURIComponent(JSON.stringify(sanitized));
-
-    // 4. Verify size limit
     if (encoded.length > PROMPT_SHARING_SIZE_LIMITS.ENCODED_MAX) {
       const error = new PromptEncoderError({
         type: 'VALIDATION_ERROR',
@@ -179,13 +118,16 @@ export function encode(prompt: Prompt): string {
  * Process:
  * 1. Check encoded size (prevent decompression bombs)
  * 2. Decompress the string
- * 3. Parse JSON
- * 4. Sanitize fields (defense-in-depth)
- * 5. Validate result
+ * 3. Check decompressed size
+ * 4. Parse JSON
+ * 5. Check the shape (title, content and category are strings)
+ *
+ * The fields are returned exactly as encoded. Whether they are empty or too long, and
+ * which Hidden characters they contain, is decided by Admission when the Prompt is saved.
  *
  * @param encoded - The encoded sharing code
- * @returns Sanitized and validated prompt data
- * @throws {PromptEncoderError} If decoding fails or data is invalid
+ * @returns The prompt data, as encoded
+ * @throws {PromptEncoderError} If the code is too large, cannot be decoded or has the wrong shape
  */
 export function decode(encoded: string): SharedPromptData {
   try {
@@ -254,7 +196,7 @@ export function decode(encoded: string): SharedPromptData {
     }
 
     // 5. Validate structure
-    if (!data || typeof data !== 'object' || !('title' in data) || !('content' in data) || !('category' in data)) {
+    if (!isSharedPromptData(data)) {
       throw new PromptEncoderError({
         type: 'DATA_CORRUPTION',
         message: 'Invalid sharing code format',
@@ -262,17 +204,7 @@ export function decode(encoded: string): SharedPromptData {
       });
     }
 
-    // 6. Sanitize (defense-in-depth)
-    const sanitized: SharedPromptData = {
-      title: sanitizeText(String(data.title)),
-      content: sanitizeText(String(data.content)),
-      category: sanitizeText(String(data.category)),
-    };
-
-    // 7. Validate sanitized data
-    validatePromptData(sanitized);
-
-    return sanitized;
+    return { title: data.title, content: data.content, category: data.category };
   } catch (err) {
     if (err instanceof PromptEncoderError) {
       throw err;
@@ -290,6 +222,3 @@ export function decode(encoded: string): SharedPromptData {
     throw error;
   }
 }
-
-// Export helper functions for testing
-export { sanitizeText, validatePromptData };

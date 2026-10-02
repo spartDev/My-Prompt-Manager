@@ -3,12 +3,7 @@ import { describe, it, expect } from 'vitest';
 
 import { testEncoderRoundtrip } from '../../test/helpers/encoder-helpers';
 import type { Prompt } from '../../types';
-import {
-  encode,
-  decode,
-  sanitizeText,
-  validatePromptData,
-} from '../promptEncoder';
+import { encode, decode } from '../promptEncoder';
 
 // Helper to create test prompt
 function createTestPrompt(overrides: Partial<Prompt> = {}): Prompt {
@@ -34,95 +29,21 @@ function captureError(fn: () => void): Error {
 }
 
 describe('PromptEncoder', () => {
-  describe('sanitizeText', () => {
-    it('should remove HTML tags', () => {
-      const result = sanitizeText('<script>alert("xss")</script>Test');
-      expect(result).toBe('Test');
-    });
+  describe('Verbatim', () => {
+    it('should carry tags, "metadata:" and surrounding whitespace through a round trip unchanged', () => {
+      const prompt = createTestPrompt({
+        title: '  Onboarding <helper>  ',
+        content: '\n  Summarize the metadata: use <example>text</example> tags; if count=5 and onboarding = true\n\n',
+        category: ' <b>Work</b> ',
+      });
 
-    it('should remove all HTML tags from all fields', () => {
-      expect(sanitizeText('<b>Bold</b> text')).toBe('Bold text');
-      expect(sanitizeText('<img src=x onerror=alert(1)>Cat')).toBe('Cat');
-    });
+      const decoded = decode(encode(prompt));
 
-    it('should trim whitespace', () => {
-      expect(sanitizeText('  Test  ')).toBe('Test');
-    });
-
-    it('should handle plain text', () => {
-      expect(sanitizeText('Normal text')).toBe('Normal text');
-    });
-
-    it('should handle empty strings', () => {
-      expect(sanitizeText('')).toBe('');
-      expect(sanitizeText('   ')).toBe('');
-    });
-  });
-
-  describe('validatePromptData', () => {
-    it('should pass validation for valid data', () => {
-      const validData = {
-        title: 'Test',
-        content: 'Content',
-        category: 'Category',
-      };
-      expect(() => validatePromptData(validData)).not.toThrow();
-    });
-
-    it('should throw PromptEncoderError for empty title', () => {
-      const data = { title: '', content: 'Content', category: 'Category' };
-      expect(() => validatePromptData(data)).toThrow('Title is required');
-      const err = captureError(() => validatePromptData(data));
-      expect(err).toHaveProperty('type', 'VALIDATION_ERROR');
-      expect(err).toHaveProperty('name', 'PromptEncoderError');
-    });
-
-    it('should throw PromptEncoderError for empty content', () => {
-      const data = { title: 'Title', content: '', category: 'Category' };
-      expect(() => validatePromptData(data)).toThrow('Content is required');
-      const err = captureError(() => validatePromptData(data));
-      expect(err).toHaveProperty('type', 'VALIDATION_ERROR');
-      expect(err).toHaveProperty('name', 'PromptEncoderError');
-    });
-
-    it('should throw PromptEncoderError for empty category', () => {
-      const data = { title: 'Title', content: 'Content', category: '' };
-      expect(() => validatePromptData(data)).toThrow('Category is required');
-      const err = captureError(() => validatePromptData(data));
-      expect(err).toHaveProperty('type', 'VALIDATION_ERROR');
-      expect(err).toHaveProperty('name', 'PromptEncoderError');
-    });
-
-    it('should throw PromptEncoderError for whitespace-only title', () => {
-      const data = { title: '   ', content: 'Content', category: 'Category' };
-      expect(() => validatePromptData(data)).toThrow('Title is required');
-    });
-
-    it('should throw PromptEncoderError for oversized title', () => {
-      const data = {
-        title: 'x'.repeat(150),
-        content: 'Content',
-        category: 'Category',
-      };
-      expect(() => validatePromptData(data)).toThrow('Title too long');
-    });
-
-    it('should throw PromptEncoderError for oversized content', () => {
-      const data = {
-        title: 'Title',
-        content: 'x'.repeat(25_000),
-        category: 'Category',
-      };
-      expect(() => validatePromptData(data)).toThrow('Content too long');
-    });
-
-    it('should throw PromptEncoderError for oversized category', () => {
-      const data = {
-        title: 'Title',
-        content: 'Content',
-        category: 'x'.repeat(100),
-      };
-      expect(() => validatePromptData(data)).toThrow('Category too long');
+      expect(decoded).toEqual({
+        title: prompt.title,
+        content: prompt.content,
+        category: prompt.category,
+      });
     });
   });
 
@@ -143,40 +64,51 @@ describe('PromptEncoder', () => {
       expect(encoded).not.toMatch(/[\s<>"{}|\\^`]/);
     });
 
-    it('should sanitize HTML in all fields', () => {
+    it('should not strip HTML-like tags from any field', () => {
       const prompt = createTestPrompt({
         title: '<script>alert("xss")</script>Test',
         content: '<b>Bold</b> content',
         category: '<img src=x>Cat',
       });
-      const encoded = encode(prompt);
-      const decoded = decode(encoded);
-      expect(decoded.title).toBe('Test');
-      expect(decoded.content).toBe('Bold content');
-      expect(decoded.category).toBe('Cat');
+      const decoded = decode(encode(prompt));
+      expect(decoded.title).toBe('<script>alert("xss")</script>Test');
+      expect(decoded.content).toBe('<b>Bold</b> content');
+      expect(decoded.category).toBe('<img src=x>Cat');
     });
 
-    it('should trim whitespace from all fields', () => {
+    it('should not trim whitespace from any field', () => {
       const prompt = createTestPrompt({
         title: '   Test   ',
         content: '   Content   ',
         category: '   Cat   ',
       });
-      const encoded = encode(prompt);
-      const decoded = decode(encoded);
-      expect(decoded.title).toBe('Test');
-      expect(decoded.content).toBe('Content');
-      expect(decoded.category).toBe('Cat');
+      const decoded = decode(encode(prompt));
+      expect(decoded.title).toBe('   Test   ');
+      expect(decoded.content).toBe('   Content   ');
+      expect(decoded.category).toBe('   Cat   ');
     });
 
-    it('should throw for empty title', () => {
-      const prompt = createTestPrompt({ title: '' });
-      expect(() => encode(prompt)).toThrow('Title is required');
+    it('should encode the fields exactly as given, leaving emptiness and length to Admission', () => {
+      const prompt = createTestPrompt({ title: '', content: ` ${'x'.repeat(25_000)} `, category: 'x'.repeat(100) });
+
+      expect(decode(encode(prompt))).toEqual({
+        title: '',
+        content: prompt.content,
+        category: prompt.category,
+      });
     });
 
-    it('should throw for oversized content', () => {
-      const prompt = createTestPrompt({ content: 'x'.repeat(25_000) });
-      expect(() => encode(prompt)).toThrow('too long');
+    it('should throw when the encoded code would be too large to share', () => {
+      // Incompressible text: every character is different from its neighbours
+      let seed = 1;
+      const noise = Array.from({ length: 60_000 }, () => {
+        seed = (seed * 48_271) % 2_147_483_647;
+        return String.fromCharCode(33 + (seed % 90));
+      }).join('');
+      const prompt = createTestPrompt({ content: noise });
+
+      expect(() => encode(prompt)).toThrow('Prompt too large to share');
+      expect(captureError(() => encode(prompt))).toHaveProperty('name', 'PromptEncoderError');
     });
 
     it('should produce compressed output', () => {
@@ -223,19 +155,45 @@ describe('PromptEncoder', () => {
       expect(() => decode(corrupted)).toThrow();
     });
 
-    it('should apply defense-in-depth sanitization', () => {
-      // Manually create payload with HTML (bypassing encode)
+    it('should return the fields exactly as encoded, leaving emptiness and length to Admission', () => {
       const payload = {
-        title: '<b>Test</b>',
-        content: '<script>alert(1)</script>Content',
-        category: '<img src=x>Cat',
+        title: '',
+        content: `\n ${'A'.repeat(25_000)} \n`,
+        category: 'x'.repeat(100),
       };
       const encoded = LZString.compressToEncodedURIComponent(JSON.stringify(payload));
-      const decoded = decode(encoded);
-      // HTML should be stripped even though it's in the payload
-      expect(decoded.title).toBe('Test');
-      expect(decoded.content).toBe('Content');
-      expect(decoded.category).toBe('Cat');
+
+      expect(decode(encoded)).toEqual(payload);
+    });
+
+    it('should return only title, content and category, and keep hidden characters for Admission to remove', () => {
+      const payload = {
+        title: 'Zero\u{200B}width',
+        content: 'Tag\u{E0041} and bidi\u{202E} <script>alert(1)</script>',
+        category: 'Cat',
+        isAdmin: true,
+      };
+      const encoded = LZString.compressToEncodedURIComponent(JSON.stringify(payload));
+
+      expect(decode(encoded)).toEqual({
+        title: 'Zero\u{200B}width',
+        content: 'Tag\u{E0041} and bidi\u{202E} <script>alert(1)</script>',
+        category: 'Cat',
+      });
+    });
+
+    it('should reject a payload whose fields are not all strings', () => {
+      const payloads = [
+        { title: 123, content: 'Content', category: 'Cat' },
+        { title: 'Title', content: null, category: 'Cat' },
+        { title: 'Title', content: 'Content', category: { name: 'Cat' } },
+      ];
+
+      for (const payload of payloads) {
+        const encoded = LZString.compressToEncodedURIComponent(JSON.stringify(payload));
+        expect(() => decode(encoded)).toThrow('Invalid sharing code format');
+        expect(captureError(() => decode(encoded))).toHaveProperty('type', 'DATA_CORRUPTION');
+      }
     });
 
     it('should throw PromptEncoderError for malformed JSON', () => {
@@ -243,56 +201,44 @@ describe('PromptEncoder', () => {
       expect(() => decode(malformed)).toThrow('Invalid sharing code format');
     });
 
-    it('should throw PromptEncoderError for missing required fields', () => {
-      const payload = { title: '', content: 'Content', category: 'Cat' };
+    it('should throw PromptEncoderError for missing fields', () => {
+      const payload = { title: 'Title', content: 'Content' };
       const encoded = LZString.compressToEncodedURIComponent(JSON.stringify(payload));
-      expect(() => decode(encoded)).toThrow('required');
+      expect(() => decode(encoded)).toThrow('Invalid sharing code format');
+      expect(captureError(() => decode(encoded))).toHaveProperty('type', 'DATA_CORRUPTION');
+    });
+
+    it('should throw PromptEncoderError for a payload that is not an object', () => {
+      for (const payload of [null, 'text', 42, ['Title', 'Content', 'Category']]) {
+        const encoded = LZString.compressToEncodedURIComponent(JSON.stringify(payload));
+        expect(() => decode(encoded)).toThrow('Invalid sharing code format');
+      }
     });
   });
 
   describe('Security', () => {
-    it('should prevent XSS in title', () => {
-      const prompt = createTestPrompt({
-        title: '<script>alert("xss")</script>Malicious',
-      });
-      const encoded = encode(prompt);
-      const decoded = decode(encoded);
-      expect(decoded.title).toBe('Malicious');
-      expect(decoded.title).not.toContain('<script>');
-    });
-
-    it('should prevent XSS in content', () => {
-      const prompt = createTestPrompt({
-        content: '<img src=x onerror=alert("xss")>Content',
-      });
-      const encoded = encode(prompt);
-      const decoded = decode(encoded);
-      expect(decoded.content).toBe('Content');
-      expect(decoded.content).not.toContain('<img');
-      expect(decoded.content).not.toContain('onerror');
-    });
-
-    it('should prevent XSS in category', () => {
-      const prompt = createTestPrompt({
-        category: '<iframe src="evil.com"></iframe>Category',
-      });
-      const encoded = encode(prompt);
-      const decoded = decode(encoded);
-      expect(decoded.category).toBe('Category');
-      expect(decoded.category).not.toContain('<iframe');
-    });
-
-    it('should handle multiple XSS vectors', () => {
+    // No sink in the extension interprets Prompt text as HTML (ADR-001), so markup-looking
+    // text is ordinary text: it is carried literally and never altered or executed.
+    it('should carry markup-looking text literally in every field', () => {
       const prompt = createTestPrompt({
         title: '<script>alert(1)</script><b>Test</b>',
-        content: '<img src=x onerror=alert(2)><i>Content</i>',
-        category: '<a href="javascript:alert(3)">Cat</a>',
+        content: '<img src=x onerror=alert(2)><i>Content</i> javascript:alert(3)',
+        category: '<a href="javascript:alert(4)">Cat</a>',
       });
-      const encoded = encode(prompt);
-      const decoded = decode(encoded);
-      expect(decoded.title).toBe('Test');
-      expect(decoded.content).toBe('Content');
-      expect(decoded.category).toBe('Cat');
+      const decoded = decode(encode(prompt));
+      expect(decoded.title).toBe(prompt.title);
+      expect(decoded.content).toBe(prompt.content);
+      expect(decoded.category).toBe(prompt.category);
+    });
+
+    it('should keep Hidden characters in the code, for Admission to remove when the Prompt is saved', () => {
+      const prompt = createTestPrompt({ content: 'Hidden\u{200B}zero\u{E0041}tag\u{202E}bidi' });
+      expect(decode(encode(prompt)).content).toBe(prompt.content);
+    });
+
+    it('should reject a code that is not valid JSON after decompression', () => {
+      const encoded = LZString.compressToEncodedURIComponent('<script>alert(1)</script>');
+      expect(() => decode(encoded)).toThrow('Invalid sharing code format');
     });
   });
 
@@ -343,11 +289,13 @@ describe('PromptEncoder', () => {
     it('should reject payloads exceeding decompressed size limit', () => {
       const payload = {
         title: 'Title',
-        content: 'A'.repeat(25_000), // Over 20KB content limit
+        content: 'A'.repeat(90_000), // Compresses far below the encoded limit, but is over twice as long once decompressed
         category: 'Cat',
       };
       const encoded = LZString.compressToEncodedURIComponent(JSON.stringify(payload));
-      expect(() => decode(encoded)).toThrow(/too large|too long/);
+      expect(encoded.length).toBeLessThan(40_000);
+      expect(() => decode(encoded)).toThrow('Decompressed data too large');
+      expect(captureError(() => decode(encoded))).toHaveProperty('name', 'PromptEncoderError');
     });
 
     it('should accept legitimate payloads with normal compression', () => {
