@@ -145,23 +145,8 @@ export class StorageManager {
   async getPrompts(): Promise<StoredPrompt[]> {
     try {
       const raw = await this.getStorageData<unknown>(this.STORAGE_KEYS.PROMPTS);
-      const prompts = readPrompts(raw);
-
-      // Persist backfilled usage fields (to be removed: reading should never write).
-      // Skipped when an entry could not be read, so unreadable data is never rewritten away.
-      const needsMigration =
-        Array.isArray(raw) &&
-        raw.length === prompts.length &&
-        raw.some((entry: { usageCount?: unknown; lastUsedAt?: unknown }, index) => {
-          const read = prompts[index];
-          return entry.usageCount !== read?.usageCount || entry.lastUsedAt !== read?.lastUsedAt;
-        });
-
-      if (needsMigration) {
-        await this.writePrompts(prompts);
-      }
-
-      return prompts;
+      // Reading never writes: usage fields missing from older entries are backfilled in memory only.
+      return readPrompts(raw);
     } catch (error) {
       throw this.handleStorageError(error);
     }

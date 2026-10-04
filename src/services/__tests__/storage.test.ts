@@ -62,6 +62,25 @@ describe('StorageManager', () => {
       expect(prompts).toEqual([prompt1]);
     });
 
+    it('should read a legacy prompt without writing, backfilling its usage fields in memory only', async () => {
+      const legacy = {
+        id: 'legacy',
+        title: 'Legacy',
+        content: 'Content',
+        category: DEFAULT_CATEGORY,
+        createdAt: 1000,
+        updatedAt: 2000
+      };
+      await chrome.storage.local.set({ prompts: [legacy] });
+      vi.mocked(chrome.storage.local.set).mockClear();
+
+      const prompts = await storageManager.getPrompts();
+
+      expect(prompts[0]).toMatchObject({ id: 'legacy', usageCount: 0, lastUsedAt: 1000 });
+      expect(chrome.storage.local.set).not.toHaveBeenCalled();
+      expect((await chrome.storage.local.get('prompts')).prompts).toEqual([legacy]);
+    });
+
     it('should update an existing prompt', async () => {
       const originalPrompt = buildPrompt({
         id: '1',
@@ -252,7 +271,6 @@ describe('StorageManager', () => {
       expect(savedPrompt1.id).not.toBe(savedPrompt2.id);
 
       // Verify using chrome.storage API
-      // Note: prompts may have lastUsedAt added due to auto-migration during getPrompts()
       const result = await chrome.storage.local.get('prompts');
       const prompts = result.prompts as Prompt[];
       expect(prompts).toHaveLength(2);
