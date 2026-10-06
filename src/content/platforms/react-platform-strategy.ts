@@ -2,16 +2,16 @@
  * React Platform Strategy Base Class
  *
  * Abstract base class for platforms that use React-based input controls.
- * Handles React's custom value setter, event triggering, and content validation.
+ * Handles React's custom value setter, event triggering, and the content type check.
  *
  * This class encapsulates common patterns for React-based platforms:
  * - Native value setter caching for performance
- * - Content validation and sanitization
+ * - A type check on content (the content itself is inserted exactly as given)
  * - React-compatible textarea insertion with proper event dispatch
  *
  * Derived classes should:
  * - Call initializeNativeValueSetter() in their constructor
- * - Use validateAndSanitize() to validate content before insertion
+ * - Use validateContent() to check content before insertion
  * - Use insertIntoReactTextarea() for textarea insertion
  */
 
@@ -30,16 +30,9 @@ interface ReactTextAreaElement extends HTMLTextAreaElement {
 }
 
 /**
- * Result of content validation and sanitization
+ * Result of checking content before insertion
  */
-interface ValidationResult {
-  /** Whether the content is valid */
-  valid: boolean;
-  /** Sanitized content (only present if valid is true) */
-  sanitized?: string;
-  /** Error message (only present if valid is false) */
-  error?: string;
-}
+type ValidationResult = { valid: true } | { valid: false; error: string };
 
 /**
  * Abstract base strategy for React-based platforms
@@ -91,23 +84,17 @@ export abstract class ReactPlatformStrategy extends PlatformStrategy {
   }
 
   /**
-   * Validate and sanitize content before insertion
+   * Check content before insertion
    *
-   * Performs three validation checks:
-   * 1. Type validation - ensures content is a string
-   * 2. Length validation - enforces maximum character limit
-   * 3. Sanitization - removes control characters (preserves newlines, tabs, CR)
+   * Only checks that the content is a string. Content is Verbatim (see ADR-001): it is
+   * never changed, trimmed or shortened on its way into the input, so there is no
+   * modified copy to return; insert the content you were given.
    *
-   * @param content - Content to validate
-   * @param maxLength - Maximum allowed character length
-   * @returns Validation result with sanitized content or error message
+   * @param content - Content to check
+   * @returns Whether the content may be inserted, with an error message when it may not
    * @protected
    */
-  protected validateAndSanitize(
-    content: string,
-    maxLength: number
-  ): ValidationResult {
-    // Security: Validate input type
+  protected validateContent(content: unknown): ValidationResult {
     if (typeof content !== 'string') {
       this._warn('Invalid content type', new Error('Content must be a string'));
       return {
@@ -116,27 +103,7 @@ export abstract class ReactPlatformStrategy extends PlatformStrategy {
       };
     }
 
-    // Security: Enforce maximum length
-    if (content.length > maxLength) {
-      this._warn(`Content exceeds maximum length (${String(content.length)} > ${String(maxLength)})`);
-      return {
-        valid: false,
-        error: `Content exceeds maximum length of ${String(maxLength)} characters`
-      };
-    }
-
-    // Security: Sanitize control characters (preserve newlines \n, tabs \t, carriage returns \r)
-    // Removes characters in ranges:
-    // - \x00-\x08: NULL to BACKSPACE
-    // - \x0B-\x0C: Vertical Tab, Form Feed
-    // - \x0E-\x1F: Shift Out to Unit Separator
-    // - \x7F-\x9F: Delete to Application Program Command
-    const sanitized = content.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F-\x9F]/g, '');
-
-    return {
-      valid: true,
-      sanitized
-    };
+    return { valid: true };
   }
 
   /**
@@ -152,7 +119,7 @@ export abstract class ReactPlatformStrategy extends PlatformStrategy {
    * as React uses property descriptors to intercept value changes.
    *
    * @param element - Textarea element to insert content into
-   * @param content - Content to insert (should be pre-validated and sanitized)
+   * @param content - Content to insert (inserted exactly as given)
    * @param platformName - Platform name for logging (e.g., 'Copilot React', 'M365 Copilot')
    * @param methodName - Optional custom method name for result (defaults to auto-generated from platformName)
    * @returns Promise resolving to insertion result

@@ -252,8 +252,3 @@ export const M365_COPILOT_CONFIG = {
   selectors: M365_COPILOT_SELECTORS,
   buttonContainerSelector: M365_COPILOT_BUTTON_CONTAINER_SELECTOR
 } as const;
-
-/**
- * Maximum content length for M365 Copilot (from MAX_CONTENT_LENGTHS.COPILOT)
- */
-export const M365_COPILOT_MAX_LENGTH = 50000;

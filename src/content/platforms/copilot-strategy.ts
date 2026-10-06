@@ -9,7 +9,6 @@ import { getPlatformById } from '../../config/platforms';
 import type { InsertionResult } from '../types/index';
 import type { UIElementFactory } from '../ui/element-factory';
 
-import { MAX_CONTENT_LENGTHS } from './constants';
 import { ReactPlatformStrategy } from './react-platform-strategy';
 
 export class CopilotStrategy extends ReactPlatformStrategy {
@@ -45,8 +44,7 @@ export class CopilotStrategy extends ReactPlatformStrategy {
    */
   async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
     try {
-      // Validate and sanitize content
-      const validation = this.validateAndSanitize(content, MAX_CONTENT_LENGTHS.COPILOT);
+      const validation = this.validateContent(content);
       if (!validation.valid) {
         return await Promise.resolve({
           success: false,
@@ -54,19 +52,11 @@ export class CopilotStrategy extends ReactPlatformStrategy {
         });
       }
 
-      // Validation ensures sanitized is defined (allow empty strings)
-      if (typeof validation.sanitized !== 'string') {
-        return await Promise.resolve({
-          success: false,
-          error: 'Content sanitization failed'
-        });
-      }
-
       // Insert using shared React textarea method
       // We use "Copilot React" for success logs but catch errors for custom error logging
       return await this.insertIntoReactTextarea(
         element as HTMLTextAreaElement,
-        validation.sanitized,
+        content,
         'Copilot React',
         'copilot-react'
       );
