@@ -488,7 +488,7 @@ export class StorageManager {
     return this.mutex.withLock(this.STORAGE_KEYS.CATEGORIES, () =>
       this.mutex.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
         try {
-          // Raw values: getPrompts and getCategories drop malformed entries and may write
+          // Raw values: getPrompts drops malformed entries and getCategories may write the default Category
           const prompts = scrubStored(await this.getStorageData<unknown>(this.STORAGE_KEYS.PROMPTS));
           const categories = scrubStoredCategories(await this.getStorageData<unknown>(this.STORAGE_KEYS.CATEGORIES));
 

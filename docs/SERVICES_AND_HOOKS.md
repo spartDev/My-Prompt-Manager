@@ -1,7 +1,7 @@
 # Services and Hooks
 
 **Version:** 1.5.0
-**Last Updated:** 2025-10-09
+**Last Updated:** 2026-10-12
 
 This document provides comprehensive documentation for the business logic layer, including core services, custom React hooks, and data flow patterns.
 
@@ -66,6 +66,7 @@ This document provides comprehensive documentation for the business logic layer,
 - **Storage quota monitoring** - Tracks usage (5MB limit)
 - **Import/export functionality** - Full data portability
 - **Comprehensive error handling** - Custom `StorageError` class
+- **Admission on write** - Prompt and Category text is admitted inside the text-writing methods (see [Prompt Admission](#4-prompt-admission))
 
 **API:**
 
@@ -320,7 +321,7 @@ private findTextHighlights(text: string, searchTerm: string): Highlight[] {
 ```typescript
 const VALIDATION_LIMITS = {
   PROMPT_TITLE_MAX: 100,
-  PROMPT_CONTENT_MAX: 10000,
+  PROMPT_CONTENT_MAX: 20000,
   CATEGORY_NAME_MAX: 50,
   TITLE_GENERATION_LENGTH: 50
 };
@@ -497,6 +498,74 @@ if (!validation.valid) {
   console.error('Validation errors:', validation.errors);
 }
 ```
+
+---
+
+### 4. Prompt Admission
+
+**File:** `src/services/promptAdmission.ts`
+
+**Purpose:** The one place Prompt text is checked, and the one definition of a stored Prompt. A pure module (no `chrome.*` dependency) shared by the popup, the service worker and the content script. The terms (Admission, Verbatim, Hidden character) are defined in [`CONTEXT.md`](../CONTEXT.md); the decision is recorded in [ADR-001](./adr/ADR-001-store-and-deliver-prompts-verbatim.md).
+
+**Key Features:**
+- **Admission once, at the write path** - Hidden characters removed, title and Category trimmed, empty or over-limit text refused (never shortened)
+- **Verbatim afterwards** - Text is never changed when it is read, shown, copied or inserted
+- **One reader** - `readPrompts()` is shared by `StorageManager` and the content script; reading never writes
+- **Compile-time enforcement** - `StoredPrompt` and `AdmittedPrompt` are nominal types and `StorageManager`'s private writer accepts only those, so a route that skips Admission does not compile
+
+**Exports:**
+
+| Export | Purpose |
+|--------|---------|
+| `admit(text)` / `admit(patch)` | Pure check of full text or a patch of some fields. Returns `{ ok: true, text }` or `{ ok: false, errors }` (a `Refusal` per field, with a `message` ready to show). Doubles as the form's dry check and live counter |
+| `readPrompt(raw)` | Reads one stored entry into a `StoredPrompt`, or `null` if it is not a Prompt (no string `id`, `title` or `content`). Text is never altered; missing fields are filled in deterministically, with no clock |
+| `readPrompts(raw)` | Reads the value stored under the prompts key into `StoredPrompt[]`, skipping entries that are not Prompts |
+| `scrubStored(raw)` | Upgrade pass for raw stored Prompts: removes Hidden characters from title, content and category. Never refuses, trims, shortens or drops an entry. Returns `{ entries, changed }` |
+| `scrubStoredCategories(raw)` | The same for raw stored Category names; Categories whose names become the same are merged into the first. Returns `{ entries, changed }` |
+| `admitNew(text, { id, now })` | Create route. Returns `{ ok: true, prompt }` (an `AdmittedPrompt`) or `{ ok: false, errors }` |
+| `admitEdit(current, patch, now)` | Edit route. Only the fields in the patch are checked; the rest is carried over (cleaned of Hidden characters, but not checked against the limits again, so a legacy over-limit Prompt stays editable) |
+| `admitRestored(incoming, now, { replacing? })` | Backup restore route. Keeps id, usage and timestamps; a refusal means the restore skips and reports this Prompt |
+| `recordUse(prompt, now)` | A non-text change (one more use) that keeps the result typed as a `StoredPrompt` |
+| `AdmissionRefusedError` | Thrown by the write path when a route is refused. An `AppError` of type `VALIDATION_ERROR` whose `errors` hold the per-field refusals |
+| `PROMPT_LIMITS` | `{ title: 100, content: 20000, category: 50 }`, derived from `VALIDATION_LIMITS` |
+| `StoredPrompt` / `AdmittedPrompt` | Nominal types (classes with a private member, so an object literal or spread cannot be assigned). Both widen to a plain `Prompt`; an `AdmittedPrompt` is a `StoredPrompt` whose text has just been through Admission |
+
+**Usage: the form's dry check** (nothing is saved):
+
+```typescript
+import { admit } from '../services/promptAdmission';
+
+const admission = admit({ title, content, category });
+
+if (!admission.ok) {
+  // e.g. "Content cannot exceed 20,000 characters"
+  const message = Object.values(admission.errors)
+    .flatMap((refusal) => (refusal ? [refusal.message] : []))
+    .join('; ');
+  setValidationError(message);
+} else {
+  // admission.text is exactly what would be saved
+  // (Hidden characters removed, title and category trimmed)
+  setPreview(admission.text);
+}
+```
+
+**Usage: the StorageManager write path** (every text-writing method does this before touching storage):
+
+```typescript
+// StorageManager.savePrompt (src/services/storage.ts, simplified)
+const admission = admitNew(prompt, { id: uuidv4(), now: Date.now() });
+if (!admission.ok) {
+  throw new AdmissionRefusedError(admission.errors);
+}
+
+// writePrompts() accepts only StoredPrompt / AdmittedPrompt values
+await this.writePrompts([...existingPrompts, admission.prompt]);
+```
+
+Callers see the refusal as an `AdmissionRefusedError`; it keeps its type through `StorageManager` and `PromptManager`, so a caller can check `error instanceof AdmissionRefusedError` (the Backup restore in `SettingsView` does, to skip and report a refused Prompt and restore the rest).
+
+**Upgrade pass:** `StorageManager.upgradeStoredData()` runs `scrubStored` and `scrubStoredCategories` over the raw stored values once per extension update (the service worker calls it from `chrome.runtime.onInstalled` when the reason is `update`). It is the only code that writes raw, untyped entries to the prompts key (through `writeScrubbed()` instead of the typed `writePrompts()`), because it must keep malformed or over-limit entries rather than drop them.
 
 ---
 
@@ -990,6 +1059,7 @@ interface ElementFingerprint {
 | **StorageManager** | `savePrompt`, `getPrompts`, `importData` | Chrome storage operations |
 | **PromptManager** | `searchPrompts`, `findDuplicates`, `getStatistics` | Business logic |
 | **ConfigurationEncoder** | `encode`, `decode`, `validate` | Configuration sharing |
+| **promptAdmission** | `admit`, `readPrompts`, `admitNew`, `admitEdit`, `admitRestored` | Admission of Prompt text, the one reader |
 
 ### Hook Summary
 
@@ -1006,5 +1076,5 @@ interface ElementFingerprint {
 
 ---
 
-**Last Updated:** 2025-10-09
+**Last Updated:** 2026-10-12
 **Version:** 1.5.0
