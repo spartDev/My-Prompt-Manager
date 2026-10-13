@@ -9,6 +9,7 @@ import {
 } from '../types';
 import type { HighlightedPrompt } from '../types/hooks';
 import { findTextHighlights } from '../utils/textHighlight';
+import { cutWithoutSplittingPairs } from '../utils/truncate';
 
 import { admit, type Admission, type PromptTextPatch } from './promptAdmission';
 import { getSearchIndex } from './SearchIndex';
@@ -272,7 +273,7 @@ export class PromptManager {
     }
 
     // Find the best place to cut off
-    const truncated = cleanContent.substring(0, VALIDATION_LIMITS.TITLE_GENERATION_LENGTH);
+    const truncated = cutWithoutSplittingPairs(cleanContent, VALIDATION_LIMITS.TITLE_GENERATION_LENGTH);
     const lastSpaceIndex = truncated.lastIndexOf(' ');
     
     if (lastSpaceIndex > VALIDATION_LIMITS.TITLE_GENERATION_LENGTH * 0.7) {

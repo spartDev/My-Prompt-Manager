@@ -207,6 +207,16 @@ describe('PromptManager - Working Tests', () => {
 
       expect(title).toBe('This has whitespace');
     });
+
+    it('should never cut an emoji in half when it straddles the cut', () => {
+      // 49 characters, then an emoji (a surrogate pair) across the 50-unit cut, no space to cut at
+      const content = `${'a'.repeat(49)}\u{1F600}${'b'.repeat(10)}`;
+      const title = promptManager.generateTitle(content);
+
+      expect(title).toBe(`${'a'.repeat(49)}...`);
+      // encodeURIComponent throws on a lone surrogate
+      expect(() => encodeURIComponent(title)).not.toThrow();
+    });
   });
 
   describe('Search Functionality', () => {
