@@ -104,6 +104,66 @@ describe('createPromptListItem', () => {
 
       expect(text(item, '.prompt-preview')).toBe(`${content.substring(0, 100)}...`);
     });
+
+    describe('with emoji, which take two code units each', () => {
+      const EMOJI = '\u{1F600}';
+      const HIGH_SURROGATE = String.fromCharCode(0xd83d);
+      // With the u flag a surrogate pair is one code point, so this matches only a lone surrogate
+      const LONE_SURROGATE = /[\u{D800}-\u{DFFF}]/u;
+
+      const previewOf = (content: string): string | null | undefined =>
+        text(createPromptListItem(buildPrompt({ content }), 0), '.prompt-preview');
+
+      it('should leave out an emoji that straddles the 100th code unit instead of splitting it', () => {
+        const content = `${'a'.repeat(99)}${EMOJI} and more`;
+
+        expect(previewOf(content)).toBe(`${'a'.repeat(99)}...`);
+      });
+
+      it('should leave out an emoji that ends the content one code unit past the limit', () => {
+        const content = `${'a'.repeat(99)}${EMOJI}`;
+
+        expect(previewOf(content)).toBe(`${'a'.repeat(99)}...`);
+      });
+
+      it('should keep an emoji that fits entirely in the first 100 code units', () => {
+        const content = `${'a'.repeat(98)}${EMOJI} and more`;
+
+        expect(previewOf(content)).toBe(`${'a'.repeat(98)}${EMOJI}...`);
+      });
+
+      it('should show content of exactly 100 code units that ends with an emoji in full', () => {
+        const content = `${'a'.repeat(98)}${EMOJI}`;
+
+        expect(previewOf(content)).toBe(content);
+      });
+
+      it('should show content shorter than 100 code units in full', () => {
+        const content = `${EMOJI} Summarize this ${EMOJI}`;
+
+        expect(previewOf(content)).toBe(content);
+      });
+
+      it.each([96, 97, 98, 99, 100, 101])(
+        'should never end the preview inside an emoji (emoji at code unit %i)',
+        (position) => {
+          const content = `${'a'.repeat(position)}${EMOJI}${'b'.repeat(20)}`;
+
+          const preview = previewOf(content)?.replace(/\.\.\.$/, '') ?? '';
+
+          expect(preview).not.toMatch(LONE_SURROGATE);
+          expect(content.startsWith(preview)).toBe(true);
+          expect(preview.length).toBeGreaterThanOrEqual(99);
+          expect(preview.length).toBeLessThanOrEqual(100);
+        }
+      );
+
+      it('should keep a lone surrogate that is already in the saved text, since it splits no pair', () => {
+        const content = `${'a'.repeat(99)}${HIGH_SURROGATE}bc`;
+
+        expect(previewOf(content)).toBe(`${'a'.repeat(99)}${HIGH_SURROGATE}...`);
+      });
+    });
   });
 
   describe('when something goes wrong', () => {
