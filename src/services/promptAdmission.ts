@@ -216,14 +216,28 @@ export function readPrompt(raw: unknown): StoredPrompt | null {
   });
 }
 
+const NO_RENAMES: ReadonlyMap<string, string> = new Map();
+
+/** A reference to a Category in the upgrade pass: re-pointed if its Category was merged, otherwise cleaned. */
+function scrubCategoryReference(name: string, renames: ReadonlyMap<string, string>): string {
+  return renames.get(name) ?? removeHiddenCharacters(name);
+}
+
 /**
  * The one-time upgrade pass: removes Hidden characters from the title, content and
  * category of raw stored entries. It works on the raw value, never refuses, and never
  * trims, shortens or drops anything (including over-limit and malformed entries), so
  * existing Prompts are cleaned without ever being lost. Entries with nothing to clean
  * are returned as the same objects; `changed` tells the caller whether a write is needed.
+ *
+ * `renames` are the merges reported by scrubStoredCategories: a Prompt whose category is the
+ * stored name of a merged Category is re-pointed to the Category that absorbed it. Re-pointing
+ * is not an edit; nothing else about the Prompt changes.
  */
-export function scrubStored(raw: unknown): { entries: unknown[]; changed: boolean } {
+export function scrubStored(
+  raw: unknown,
+  renames: ReadonlyMap<string, string> = NO_RENAMES
+): { entries: unknown[]; changed: boolean } {
   if (!Array.isArray(raw)) {
     return { entries: [], changed: false };
   }
@@ -243,7 +257,7 @@ export function scrubStored(raw: unknown): { entries: unknown[]; changed: boolea
         continue;
       }
 
-      const clean = removeHiddenCharacters(value);
+      const clean = field === 'category' ? scrubCategoryReference(value, renames) : removeHiddenCharacters(value);
       if (clean !== value) {
         scrubbed = scrubbed ?? { ...entry };
         scrubbed[field] = clean;
@@ -261,54 +275,133 @@ export function scrubStored(raw: unknown): { entries: unknown[]; changed: boolea
   return { entries, changed };
 }
 
+/** A Category name before and after a pass: cleaning (the upgrade pass) or Admission (a restore). */
+export interface CategoryName {
+  before: string;
+  after: string;
+}
+
+export interface CategoryMergePlan {
+  /** Positions, in the list given, of the Categories that are merged away. */
+  merged: ReadonlySet<number>;
+  /** Name (before) of each merged Category -> the exact name its Prompts must name now. */
+  renames: ReadonlyMap<string, string>;
+}
+
+/**
+ * The one rule for Categories whose names a pass made the same (ADR-001). Category names are
+ * unique ignoring case, so when cleaning or Admission makes two names the same ignoring case,
+ * the first keeps its place and its name and the later ones are merged into it. Names that
+ * were already the same ignoring case before the pass are left alone: a pass only merges what
+ * it made equal. A merged Category's Prompts are re-pointed to the kept Category whose name is
+ * exactly the merged one's new name, or else to the first kept one.
+ *
+ * Pure: it only plans. `undefined` stands for an entry that is not a Category and is skipped.
+ */
+export function planCategoryMerge(names: readonly (CategoryName | undefined)[]): CategoryMergePlan {
+  /** Name after, lowercase -> the first Category's name before (lowercase), the kept names, the merged ones. */
+  const groups = new Map<string, { first: string; kept: string[]; merged: CategoryName[] }>();
+  const merged = new Set<number>();
+
+  names.forEach((name, index) => {
+    if (name === undefined) {
+      return;
+    }
+
+    const before = name.before.toLowerCase();
+    const key = name.after.toLowerCase();
+    let group = groups.get(key);
+    if (group === undefined) {
+      group = { first: before, kept: [], merged: [] };
+      groups.set(key, group);
+    }
+
+    if (group.first === before) {
+      group.kept.push(name.after);
+    } else {
+      merged.add(index);
+      group.merged.push(name);
+    }
+  });
+
+  const renames = new Map<string, string>();
+  for (const group of groups.values()) {
+    for (const name of group.merged) {
+      renames.set(name.before, group.kept.find((kept) => kept === name.after) ?? group.kept[0]);
+    }
+  }
+
+  return { merged, renames };
+}
+
 /**
  * The one-time upgrade pass for Category names, the counterpart of scrubStored: removes
  * Hidden characters from the `name` of raw stored Categories, and never trims, refuses or
  * shortens a name or drops a malformed entry. Entries with nothing to clean are returned
  * as the same objects.
  *
- * Prompts have their `category` cleaned by scrubStored, so a Category that kept its Hidden
- * character would no longer match its Prompts. Cleaning can also make two names the same
- * (`Work` and `Work` + U+200B); Categories never share a name, so the first is kept and the
- * later ones are dropped. Nothing is orphaned: their Prompts already name the kept Category.
- * Names that were already the same before cleaning are left as they are, so this pass only
- * merges what it made equal.
+ * Cleaning can make two names the same (`Work` and `Work` + U+200B); Categories never share a
+ * name, so planCategoryMerge decides: the first is kept and the later ones are dropped, and
+ * `renames` says where their Prompts, and the default Category, must be re-pointed, which
+ * scrubStored and scrubStoredSettings do so that the same write leaves nothing orphaned.
+ * Names that were already the same before cleaning are left as they are.
  */
-export function scrubStoredCategories(raw: unknown): { entries: unknown[]; changed: boolean } {
+export function scrubStoredCategories(raw: unknown): {
+  entries: unknown[];
+  changed: boolean;
+  renames: ReadonlyMap<string, string>;
+} {
   if (!Array.isArray(raw)) {
-    return { entries: [], changed: false };
+    return { entries: [], changed: false, renames: NO_RENAMES };
   }
 
-  let changed = false;
-  /** Cleaned name (lowercase) -> stored name (lowercase) of the first Category with that name. */
-  const firstByName = new Map<string, string>();
+  const names = raw.map((entry: unknown) =>
+    isRecord(entry) && typeof entry.name === 'string'
+      ? { before: entry.name, after: removeHiddenCharacters(entry.name) }
+      : undefined
+  );
+  const plan = planCategoryMerge(names);
+  let changed = plan.merged.size > 0;
 
-  const entries = raw.flatMap((entry: unknown) => {
-    if (!isRecord(entry) || typeof entry.name !== 'string') {
+  const entries = raw.flatMap((entry: unknown, index: number) => {
+    const name = names[index];
+    if (!isRecord(entry) || name === undefined) {
       return [entry];
     }
-
-    const name = removeHiddenCharacters(entry.name);
-    const cleanedKey = name.toLowerCase();
-    const storedKey = entry.name.toLowerCase();
-    const first = firstByName.get(cleanedKey);
-
-    if (first === undefined) {
-      firstByName.set(cleanedKey, storedKey);
-    } else if (first !== storedKey) {
-      changed = true;
+    if (plan.merged.has(index)) {
       return [];
     }
-
-    if (name === entry.name) {
+    if (name.after === name.before) {
       return [entry];
     }
 
     changed = true;
-    return [{ ...entry, name }];
+    return [{ ...entry, name: name.after }];
   });
 
-  return { entries, changed };
+  return { entries, changed, renames: plan.renames };
+}
+
+/**
+ * The one-time upgrade pass for the settings: the default Category names a Category, so it is
+ * cleaned of Hidden characters and re-pointed through the same merges as the Prompts. Never
+ * trims or refuses; anything that is not a settings object with a string defaultCategory, or
+ * one with nothing to change, is returned as the same value.
+ */
+export function scrubStoredSettings(
+  raw: unknown,
+  renames: ReadonlyMap<string, string>
+): { settings: unknown; changed: boolean } {
+  if (!isRecord(raw) || typeof raw.defaultCategory !== 'string') {
+    return { settings: raw, changed: false };
+  }
+
+  const defaultCategory = scrubCategoryReference(raw.defaultCategory, renames);
+  if (defaultCategory === raw.defaultCategory) {
+    return { settings: raw, changed: false };
+  }
+
+  return { settings: { ...raw, defaultCategory }, changed: true };
 }
 
 /**
@@ -437,6 +530,7 @@ export function admitRestored(
     })
   };
 }
+
 
 /** A non-text change that keeps the result typed: counts one use. */
 export function recordUse(prompt: StoredPrompt, now: number): StoredPrompt {

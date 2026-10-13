@@ -157,6 +157,67 @@ describe('StorageManager.upgradeStoredData', () => {
       expect(await storedPrompts()).toEqual([prompt('p1', { category: 'Work' }), prompt('p2', { category: 'Work' })]);
     });
 
+    it.each([
+      ['the later one has the Hidden character', ['Work', 'work\u{200B}'], 'Work'],
+      ['the first one has the Hidden character', ['work\u{200B}', 'Work'], 'work']
+    ])("re-points the Prompts of a merged Category to the kept one's exact name, whichever is first (%s)", async (_case, [first, second], kept) => {
+      await seed({
+        categories: [{ id: 'default', name: DEFAULT_CATEGORY }, { id: 'c1', name: first }, { id: 'c2', name: second }],
+        prompts: [prompt('p1', { category: first }), prompt('p2', { category: second })]
+      });
+
+      await storageManager.upgradeStoredData();
+
+      expect(await storedCategories()).toEqual([{ id: 'default', name: DEFAULT_CATEGORY }, { id: 'c1', name: kept }]);
+      // Re-pointing is not an edit: timestamps and usage stay exactly as they were
+      expect(await storedPrompts()).toEqual([prompt('p1', { category: kept }), prompt('p2', { category: kept })]);
+    });
+
+    it.each([
+      ["'work' + U+200B goes to 'work', the case-duplicate that spells it exactly", 'work\u{200B}', 'work'],
+      ["'WORK' + U+200B goes to 'Work', the first kept one, as none spells it exactly", 'WORK\u{200B}', 'Work']
+    ])("merges a third name into 'Work' and 'work', which are left alone (%s)", async (_case, third, kept) => {
+      await seed({
+        categories: [{ id: 'c1', name: 'Work' }, { id: 'c2', name: 'work' }, { id: 'c3', name: third }],
+        prompts: [prompt('p1', { category: 'Work' }), prompt('p2', { category: 'work' }), prompt('p3', { category: third })]
+      });
+
+      await storageManager.upgradeStoredData();
+
+      expect(await storedCategories()).toEqual([{ id: 'c1', name: 'Work' }, { id: 'c2', name: 'work' }]);
+      expect(await storedPrompts()).toEqual([
+        prompt('p1', { category: 'Work' }),
+        prompt('p2', { category: 'work' }),
+        prompt('p3', { category: kept })
+      ]);
+    });
+
+    it('leaves names that were already the same ignoring case exactly as they are, and writes nothing', async () => {
+      await seed({
+        categories: [{ id: 'c1', name: 'Work' }, { id: 'c2', name: 'work' }],
+        prompts: [prompt('p1', { category: 'Work' }), prompt('p2', { category: 'work' })]
+      });
+
+      const result = await storageManager.upgradeStoredData();
+
+      expect(result).toEqual({ promptsChanged: false, categoriesChanged: false });
+      expect(chrome.storage.local.set).not.toHaveBeenCalled();
+    });
+
+    it('writes nothing on a second run after a merge', async () => {
+      await seed({
+        categories: [{ id: 'c1', name: 'Work' }, { id: 'c2', name: 'work\u{200B}' }],
+        prompts: [prompt('p1', { category: 'work\u{200B}' })]
+      });
+      await storageManager.upgradeStoredData();
+      vi.mocked(chrome.storage.local.set).mockClear();
+
+      const second = await storageManager.upgradeStoredData();
+
+      expect(second).toEqual({ promptsChanged: false, categoriesChanged: false });
+      expect(chrome.storage.local.set).not.toHaveBeenCalled();
+    });
+
     it('writes nothing, and a second run writes nothing, when the names are already clean', async () => {
       await seed({ categories: [{ id: 'c1', name: 'Wo\u{200B}rk' }] });
       await storageManager.upgradeStoredData();
@@ -213,6 +274,46 @@ describe('StorageManager.upgradeStoredData', () => {
     });
   });
 
+  describe('the default Category in settings', () => {
+    it('cleans it of Hidden characters and re-points it through the same merges, in the same write', async () => {
+      await seed({
+        categories: [{ id: 'c1', name: 'Work' }, { id: 'c2', name: 'work\u{200B}' }],
+        prompts: [prompt('p1', { category: 'Work' })],
+        settings: { defaultCategory: 'work\u{200B}', sortOrder: 'updatedAt' }
+      });
+
+      await storageManager.upgradeStoredData();
+
+      expect(chrome.storage.local.set).toHaveBeenCalledTimes(1);
+      expect(chrome.storage.local.set).toHaveBeenCalledWith({
+        categories: [{ id: 'c1', name: 'Work' }],
+        settings: { defaultCategory: 'Work', sortOrder: 'updatedAt' }
+      });
+    });
+
+    it('cleans it even when it names no Category, without trimming or refusing it', async () => {
+      await seed({ settings: { defaultCategory: ' Ho\u{200B}me ', sortOrder: 'updatedAt' } });
+
+      await storageManager.upgradeStoredData();
+
+      expect(chrome.storage.local.set).toHaveBeenCalledTimes(1);
+      expect(chrome.storage.local.set).toHaveBeenCalledWith({
+        settings: { defaultCategory: ' Home ', sortOrder: 'updatedAt' }
+      });
+    });
+
+    it('writes nothing when it is clean, when it is missing, and when there are no settings at all', async () => {
+      for (const settings of [{ defaultCategory: 'Work', sortOrder: 'updatedAt' }, { sortOrder: 'updatedAt' }, undefined]) {
+        await chrome.storage.local.remove('settings');
+        await seed(settings === undefined ? {} : { settings });
+
+        await storageManager.upgradeStoredData();
+
+        expect(chrome.storage.local.set).not.toHaveBeenCalled();
+      }
+    });
+  });
+
   describe('failures and concurrency', () => {
     it('wraps a failed write as a StorageError, through handleStorageError', async () => {
       await seed({ prompts: [prompt('p1', { title: 'Ti\u{200B}tle' })] });
@@ -233,20 +334,22 @@ describe('StorageManager.upgradeStoredData', () => {
       });
     });
 
-    it('takes the locks in the same order as updateCategory, so running together cannot deadlock', async () => {
+    it('takes the locks in the same order as updateCategory (CATEGORIES, PROMPTS, then SETTINGS), so running together cannot deadlock', async () => {
       await seed({
         categories: [
           { id: 'default', name: DEFAULT_CATEGORY },
           { id: 'c1', name: 'Work' },
           { id: 'c2', name: 'Play\u{200B}' }
         ],
-        prompts: [prompt('p1', { category: 'Work' }), prompt('p2', { category: 'Play\u{200B}' })]
+        prompts: [prompt('p1', { category: 'Work' }), prompt('p2', { category: 'Play\u{200B}' })],
+        settings: { defaultCategory: 'Play\u{200B}', sortOrder: 'updatedAt' }
       });
 
       await Promise.all([
         storageManager.upgradeStoredData(),
         storageManager.updateCategory('c1', { name: 'Projects' }),
-        storageManager.deleteCategory('c2')
+        storageManager.deleteCategory('c2'),
+        storageManager.updateSettings({ sortOrder: 'title' })
       ]);
 
       expect(await storedCategories()).toEqual([
@@ -257,6 +360,22 @@ describe('StorageManager.upgradeStoredData', () => {
         { id: 'p1', category: 'Projects' },
         { id: 'p2', category: DEFAULT_CATEGORY }
       ]);
+      expect((await chrome.storage.local.get('settings')).settings).toEqual({ defaultCategory: 'Play', sortOrder: 'title' });
+    });
+
+    it('holds the SETTINGS lock while it writes, so a concurrent updateSettings cannot write a stale copy over it', async () => {
+      await seed({ settings: { defaultCategory: 'Wo\u{200B}rk', sortOrder: 'updatedAt' } });
+      // updateSettings reads first and is slow to write: without the lock, its stale copy would land last
+      const readSettings = storageManager.getSettings.bind(storageManager);
+      vi.spyOn(storageManager, 'getSettings').mockImplementationOnce(async () => {
+        const settings = await readSettings();
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        return settings;
+      });
+
+      await Promise.all([storageManager.updateSettings({ sortOrder: 'title' }), storageManager.upgradeStoredData()]);
+
+      expect((await chrome.storage.local.get('settings')).settings).toEqual({ defaultCategory: 'Work', sortOrder: 'title' });
     });
   });
 });

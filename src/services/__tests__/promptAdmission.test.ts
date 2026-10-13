@@ -9,10 +9,12 @@ import {
   admitEdit,
   admitNew,
   admitRestored,
+  planCategoryMerge,
   readPrompts,
   recordUse,
   scrubStored,
-  scrubStoredCategories
+  scrubStoredCategories,
+  scrubStoredSettings
 } from '../promptAdmission';
 
 const valid = { title: 'T', content: 'C', category: 'Cat' };
@@ -326,13 +328,35 @@ describe('scrubStored (the one-time upgrade pass)', () => {
   it('has nothing to do when the stored value is not a list', () => {
     expect(scrubStored(undefined)).toEqual({ changed: false, entries: [] });
   });
+
+  describe('with the merges reported by scrubStoredCategories', () => {
+    const renames = new Map([['work\u{200B}', 'Work']]);
+
+    it('re-points a Prompt that named a merged Category, and changes nothing else about it', () => {
+      const merged = { ...entry, category: 'work\u{200B}' };
+
+      expect(scrubStored([merged], renames)).toEqual({ changed: true, entries: [{ ...entry, category: 'Work' }] });
+    });
+
+    it('only cleans a name that merely resembles a merged one', () => {
+      const lookalike = { ...entry, category: 'wo\u{200B}rk' };
+      const clean = { ...entry, category: 'work' };
+
+      expect(scrubStored([lookalike], renames)).toEqual({ changed: true, entries: [clean] });
+      expect(scrubStored([clean], renames)).toEqual({ changed: false, entries: [clean] });
+    });
+  });
 });
 
 describe('scrubStoredCategories (the one-time upgrade pass, Category names)', () => {
   const work = { id: 'c1', name: 'Work', color: '#ff0000' };
 
   it('removes Hidden characters from a Category name, and nothing else', () => {
-    expect(scrubStoredCategories([{ ...work, name: 'Wo\u{200B}rk' }])).toEqual({ changed: true, entries: [work] });
+    expect(scrubStoredCategories([{ ...work, name: 'Wo\u{200B}rk' }])).toEqual({
+      changed: true,
+      entries: [work],
+      renames: new Map()
+    });
   });
 
   it('never trims, refuses or shortens a name', () => {
@@ -353,7 +377,7 @@ describe('scrubStoredCategories (the one-time upgrade pass, Category names)', ()
   it('keeps the invisible characters that are part of ordinary writing', () => {
     const family = { ...work, name: '\u{1F468}\u{200D}\u{1F469} \u{200E}' };
 
-    expect(scrubStoredCategories([family])).toEqual({ changed: false, entries: [family] });
+    expect(scrubStoredCategories([family])).toEqual({ changed: false, entries: [family], renames: new Map() });
   });
 
   it('reports no change, and returns the very same entries, when there is nothing to clean', () => {
@@ -399,12 +423,192 @@ describe('scrubStoredCategories (the one-time upgrade pass, Category names)', ()
       { id: 'c2', name: 'work' }
     ];
 
-    expect(scrubStoredCategories(twins)).toEqual({ changed: false, entries: twins });
+    expect(scrubStoredCategories(twins)).toEqual({ changed: false, entries: twins, renames: new Map() });
+  });
+
+  it('reports each merge: the stored name of the merged Category, and the exact name its Prompts must name now', () => {
+    expect(scrubStoredCategories([work, { id: 'c2', name: 'work\u{200B}' }]).renames).toEqual(
+      new Map([['work\u{200B}', 'Work']])
+    );
+    expect(scrubStoredCategories([{ id: 'c1', name: 'work\u{200B}' }, { id: 'c2', name: 'Work' }]).renames).toEqual(
+      new Map([['Work', 'work']])
+    );
+    expect(scrubStoredCategories([work, { id: 'c2', name: 'Ho\u{200B}me' }]).renames).toEqual(new Map());
+  });
+
+  it("merges 'work' + U+200B into 'work', the case-duplicate that spells it exactly, leaving 'Work' and 'work' alone", () => {
+    const result = scrubStoredCategories([work, { id: 'c2', name: 'work' }, { id: 'c3', name: 'work\u{200B}' }]);
+
+    expect(result.entries).toEqual([work, { id: 'c2', name: 'work' }]);
+    expect(result.renames).toEqual(new Map([['work\u{200B}', 'work']]));
   });
 
   it('has nothing to do when the stored value is not a list', () => {
-    expect(scrubStoredCategories(undefined)).toEqual({ changed: false, entries: [] });
-    expect(scrubStoredCategories({ name: 'Work' })).toEqual({ changed: false, entries: [] });
+    expect(scrubStoredCategories(undefined)).toEqual({ changed: false, entries: [], renames: new Map() });
+    expect(scrubStoredCategories({ name: 'Work' })).toEqual({ changed: false, entries: [], renames: new Map() });
+  });
+});
+
+describe('planCategoryMerge (the one rule for Categories whose names a pass made the same)', () => {
+  const same = (name: string): { before: string; after: string } => ({ before: name, after: name });
+  const cleaned = (before: string): { before: string; after: string } => ({
+    before,
+    after: before.replace(/[\u{200B}\u{FEFF}]/gu, '').trim()
+  });
+
+  it('merges nothing when no two names are the same once cleaned', () => {
+    expect(planCategoryMerge([same('Work'), same('Home'), cleaned('Pl\u{200B}ay')])).toEqual({
+      merged: new Set(),
+      renames: new Map()
+    });
+  });
+
+  it('leaves alone names that were already the same ignoring case before the pass', () => {
+    expect(planCategoryMerge([same('Work'), same('work'), same('WORK')])).toEqual({
+      merged: new Set(),
+      renames: new Map()
+    });
+  });
+
+  it.each([
+    ['the later name had the Hidden character', [same('Work'), cleaned('work\u{200B}')], ['work\u{200B}', 'Work']],
+    ['the first name had the Hidden character', [cleaned('work\u{200B}'), same('Work')], ['Work', 'work']],
+    ['Admission trimmed the later name', [same('Work'), cleaned(' work ')], [' work ', 'Work']],
+    ['its Prompts already name the kept one', [cleaned('Work\u{200B}'), same('Work')], ['Work', 'Work']]
+  ])('merges the later one into the first when the pass made them the same (%s)', (_case, names, [from, to]) => {
+    expect(planCategoryMerge(names)).toEqual({ merged: new Set([1]), renames: new Map([[from, to]]) });
+  });
+
+  it('re-points a merged Category to the kept one that spells its new name exactly, else to the first kept one', () => {
+    expect(planCategoryMerge([same('Work'), same('work'), cleaned('work\u{200B}')])).toEqual({
+      merged: new Set([2]),
+      renames: new Map([['work\u{200B}', 'work']])
+    });
+    expect(planCategoryMerge([same('Work'), same('work'), cleaned('WORK\u{200B}')]).renames).toEqual(
+      new Map([['WORK\u{200B}', 'Work']])
+    );
+    // wherever in the list the exact spelling is
+    expect(planCategoryMerge([same('Work'), cleaned('work\u{200B}'), same('work')]).renames).toEqual(
+      new Map([['work\u{200B}', 'work']])
+    );
+  });
+
+  it('skips entries that are not Categories, which are never merged', () => {
+    expect(planCategoryMerge([undefined, same('Work'), undefined, cleaned('Work\u{FEFF}')])).toEqual({
+      merged: new Set([3]),
+      renames: new Map([['Work\u{FEFF}', 'Work']])
+    });
+  });
+
+  describe('compares names with toLowerCase, like every duplicate check in the Library', () => {
+    it('a Turkish dotted İ lowercases to two characters, so it is never an i', () => {
+      expect(planCategoryMerge([same('İş'), cleaned('iş\u{200B}')]).merged.size).toBe(0);
+      expect(planCategoryMerge([same('İş'), cleaned('İş\u{200B}')]).renames).toEqual(new Map([['İş\u{200B}', 'İş']]));
+    });
+
+    it('SS is not ß, but a capital ẞ is', () => {
+      expect(planCategoryMerge([same('Straße'), cleaned('STRASSE\u{200B}')]).merged.size).toBe(0);
+      expect(planCategoryMerge([same('Straße'), cleaned('STRAẞE\u{200B}')]).renames).toEqual(
+        new Map([['STRAẞE\u{200B}', 'Straße']])
+      );
+    });
+
+    it('a final sigma is the same letter as Σ', () => {
+      expect(planCategoryMerge([same('ΣΑΣ'), cleaned('σας\u{200B}')]).renames).toEqual(
+        new Map([['σας\u{200B}', 'ΣΑΣ']])
+      );
+    });
+  });
+});
+
+describe('scrubStoredSettings (the one-time upgrade pass, the default Category)', () => {
+  const settings = { defaultCategory: 'Work', sortOrder: 'updatedAt' };
+  const renames = new Map([['work\u{200B}', 'Work']]);
+
+  it('cleans the default Category of Hidden characters, and re-points it through the merges', () => {
+    expect(scrubStoredSettings({ ...settings, defaultCategory: 'Ho\u{200B}me' }, renames)).toEqual({
+      changed: true,
+      settings: { ...settings, defaultCategory: 'Home' }
+    });
+    expect(scrubStoredSettings({ ...settings, defaultCategory: 'work\u{200B}' }, renames)).toEqual({
+      changed: true,
+      settings
+    });
+  });
+
+  it('never trims or refuses, and returns the very same value when there is nothing to change', () => {
+    const untouched = [
+      settings,
+      { ...settings, defaultCategory: '  ' },
+      { ...settings, defaultCategory: 'x'.repeat(60) },
+      { sortOrder: 'title' },
+      undefined,
+      null,
+      'settings'
+    ];
+
+    for (const value of untouched) {
+      const result = scrubStoredSettings(value, renames);
+
+      expect(result.changed).toBe(false);
+      expect(result.settings).toBe(value);
+    }
+  });
+});
+
+describe('the upgrade pass as a whole (scrubStoredCategories, then scrubStored with its merges)', () => {
+  it('leaves no Prompt without its Category, and no two names the same ignoring case unless they already were', () => {
+    const pieces = ['Work', 'work', 'WORK', 'Home', 'İş', 'ß', ' ', '\u{200B}', '\u{FEFF}', '\u{202E}'];
+    let seed = 7;
+    const next = (): number => {
+      seed = (seed * 1664525 + 1013904223) % 4294967296;
+      return seed;
+    };
+    const pick = <T>(items: readonly T[]): T => items[next() % items.length];
+    const randomName = (): string => Array.from({ length: 1 + (next() % 3) }, () => pick(pieces)).join('');
+    const lower = (name: string): string => name.toLowerCase();
+
+    for (let run = 0; run < 1000; run++) {
+      const categories = Array.from({ length: 1 + (next() % 5) }, (_, i) => ({ id: `c${String(i)}`, name: randomName() }));
+      const prompts = Array.from({ length: next() % 8 }, (_, i) => ({
+        id: `p${String(i)}`,
+        title: 'T',
+        content: 'C',
+        category: next() % 4 === 0 ? randomName() : pick(categories).name,
+        createdAt: 1,
+        updatedAt: 2,
+        usageCount: 3,
+        lastUsedAt: 4
+      }));
+      const namesBefore = new Set(categories.map((category) => category.name));
+
+      const scrubbedCategories = scrubStoredCategories(categories);
+      const scrubbedPrompts = scrubStored(prompts, scrubbedCategories.renames);
+      const after = scrubbedCategories.entries as { id: string; name: string }[];
+      const namesAfter = new Set(after.map((category) => category.name));
+
+      scrubbedPrompts.entries.forEach((entry, index) => {
+        const prompt = entry as (typeof prompts)[number];
+        if (namesBefore.has(prompts[index].category)) {
+          expect(namesAfter.has(prompt.category)).toBe(true);
+        }
+        // Re-pointing is not an edit
+        expect(prompt).toMatchObject({ createdAt: 1, updatedAt: 2, usageCount: 3, lastUsedAt: 4 });
+      });
+
+      const nameBefore = new Map(categories.map((category) => [category.id, category.name]));
+      for (const a of after) {
+        for (const b of after) {
+          if (a !== b && lower(a.name) === lower(b.name)) {
+            expect(lower(nameBefore.get(a.id) ?? '')).toBe(lower(nameBefore.get(b.id) ?? ''));
+          }
+        }
+      }
+
+      const again = scrubStoredCategories(after);
+      expect(again).toMatchObject({ changed: false, renames: new Map() });
+      expect(scrubStored(scrubbedPrompts.entries, again.renames).changed).toBe(false);
+    }
   });
 });
 

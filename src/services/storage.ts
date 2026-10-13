@@ -30,6 +30,7 @@ import {
   recordUse,
   scrubStored,
   scrubStoredCategories,
+  scrubStoredSettings,
   type PromptTextPatch,
   type StoredPrompt
 } from './promptAdmission';
@@ -476,35 +477,42 @@ export class StorageManager {
   }
 
   /**
-   * The one-time upgrade pass (ADR-001, "Existing data"): cleans stored Prompts and Category
-   * names of Hidden characters. It works on the raw stored values, so it never refuses, trims,
-   * shortens or drops a Prompt, including a malformed one or one already over the limits. The
-   * only Categories it drops are later ones whose name becomes the same as an earlier one's
-   * once cleaned (their Prompts already name the kept Category). It writes nothing when there
-   * is nothing to clean, and both keys in one atomic write when both changed. Safe to run any
-   * number of times.
+   * The one-time upgrade pass (ADR-001, "Existing data"): cleans stored Prompts, Category names
+   * and the default Category of Hidden characters. It works on the raw stored values, so it never
+   * refuses, trims, shortens or drops a Prompt, including a malformed one or one already over the
+   * limits. The only Categories it drops are later ones whose name becomes the same as an earlier
+   * one's once cleaned; every Prompt, and the default Category, that named a dropped Category is
+   * re-pointed to the kept one in the same write. It writes nothing when there is nothing to
+   * clean, and every key that changed in one atomic write. Safe to run any number of times.
    */
   upgradeStoredData(): Promise<{ promptsChanged: boolean; categoriesChanged: boolean }> {
-    // Same lock order as updateCategory: CATEGORIES first, then PROMPTS
+    // Same lock order as updateCategory, CATEGORIES then PROMPTS, with SETTINGS last
     return this.mutex.withLock(this.STORAGE_KEYS.CATEGORIES, () =>
-      this.mutex.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
-        try {
-          // Raw values: getPrompts drops malformed entries and getCategories may write the default Category
-          const prompts = scrubStored(await this.getStorageData<unknown>(this.STORAGE_KEYS.PROMPTS));
-          const categories = scrubStoredCategories(await this.getStorageData<unknown>(this.STORAGE_KEYS.CATEGORIES));
+      this.mutex.withLock(this.STORAGE_KEYS.PROMPTS, () =>
+        this.mutex.withLock(this.STORAGE_KEYS.SETTINGS, async () => {
+          try {
+            // Raw values: getPrompts drops malformed entries and getCategories may write the default Category
+            const categories = scrubStoredCategories(await this.getStorageData<unknown>(this.STORAGE_KEYS.CATEGORIES));
+            const prompts = scrubStored(await this.getStorageData<unknown>(this.STORAGE_KEYS.PROMPTS), categories.renames);
+            const settings = scrubStoredSettings(
+              await this.getStorageData<unknown>(this.STORAGE_KEYS.SETTINGS),
+              categories.renames
+            );
 
-          if (prompts.changed || categories.changed) {
-            await this.writeScrubbed({
-              prompts: prompts.changed ? prompts.entries : undefined,
-              categories: categories.changed ? categories.entries : undefined
-            });
+            if (prompts.changed || categories.changed || settings.changed) {
+              await this.writeScrubbed({
+                prompts: prompts.changed ? prompts.entries : undefined,
+                categories: categories.changed ? categories.entries : undefined,
+                settings: settings.changed ? settings.settings : undefined
+              });
+            }
+
+            return { promptsChanged: prompts.changed, categoriesChanged: categories.changed };
+          } catch (error) {
+            throw this.handleStorageError(error);
           }
-
-          return { promptsChanged: prompts.changed, categoriesChanged: categories.changed };
-        } catch (error) {
-          throw this.handleStorageError(error);
-        }
-      })
+        })
+      )
     );
   }
 
@@ -518,16 +526,18 @@ export class StorageManager {
     }
   }
 
-  async updateSettings(updates: Partial<Settings>): Promise<Settings> {
-    try {
-      const currentSettings = await this.getSettings();
-      const updatedSettings = { ...currentSettings, ...updates };
-      
-      await this.setStorageData(this.STORAGE_KEYS.SETTINGS, updatedSettings);
-      return updatedSettings;
-    } catch (error) {
-      throw this.handleStorageError(error);
-    }
+  updateSettings(updates: Partial<Settings>): Promise<Settings> {
+    return this.mutex.withLock(this.STORAGE_KEYS.SETTINGS, async () => {
+      try {
+        const currentSettings = await this.getSettings();
+        const updatedSettings = { ...currentSettings, ...updates };
+
+        await this.setStorageData(this.STORAGE_KEYS.SETTINGS, updatedSettings);
+        return updatedSettings;
+      } catch (error) {
+        throw this.handleStorageError(error);
+      }
+    });
   }
 
   // Utility methods
@@ -739,16 +749,18 @@ export class StorageManager {
    * The single exception to "the prompts key is only written through writePrompts", used
    * only by upgradeStoredData. The upgrade pass works on raw entries and must keep the ones
    * that are not StoredPrompts (malformed, or already over the limits) rather than drop them.
-   * Writes only the keys given, in one atomic set.
+   * Writes only the keys given (`undefined` means the key is left alone), in one atomic set.
    */
   private async writeScrubbed(scrubbed: {
     prompts: readonly unknown[] | undefined;
     categories: readonly unknown[] | undefined;
+    settings: unknown;
   }): Promise<void> {
     await ensureStorageAvailable();
     await chrome.storage.local.set({
       ...(scrubbed.prompts && { [STORAGE_KEYS.PROMPTS]: scrubbed.prompts }),
-      ...(scrubbed.categories && { [STORAGE_KEYS.CATEGORIES]: scrubbed.categories })
+      ...(scrubbed.categories && { [STORAGE_KEYS.CATEGORIES]: scrubbed.categories }),
+      ...(scrubbed.settings !== undefined && { [STORAGE_KEYS.SETTINGS]: scrubbed.settings })
     });
   }
 
