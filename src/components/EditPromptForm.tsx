@@ -185,12 +185,11 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
                 errors?.title ? 'border-red-300 dark:border-red-500' : 'border-purple-200 dark:border-gray-600'
               }`}
               disabled={isPending}
-              maxLength={PROMPT_LIMITS.title}
             />
             {errors?.title && (
               <p className="mt-2 text-sm text-red-600 dark:text-red-400 font-medium">⚠️ {errors.title}</p>
             )}
-            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
+            <p className={`mt-2 text-xs font-medium ${titleLength > PROMPT_LIMITS.title ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'}`}>
               {formatCharacterCount(titleLength, PROMPT_LIMITS.title)}
             </p>
           </div>
@@ -241,13 +240,12 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
                 errors?.content ? 'border-red-300 dark:border-red-500' : 'border-purple-200 dark:border-gray-600'
               }`}
               disabled={isPending}
-              maxLength={PROMPT_LIMITS.content}
               required
             />
             {errors?.content && (
               <p className="mt-2 text-sm text-red-600 dark:text-red-400 font-medium">⚠️ {errors.content}</p>
             )}
-            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
+            <p className={`mt-2 text-xs font-medium ${contentLength > PROMPT_LIMITS.content ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'}`}>
               {formatCharacterCount(contentLength, PROMPT_LIMITS.content)}
             </p>
           </div>

@@ -178,7 +178,6 @@ const [contentLength, setContentLength] = useState(0);
 <input
   name="title"
   onChange={(e) => setTitleLength(e.target.value.length)}
-  maxLength={100}
 />
 <p>{titleLength}/100 characters</p>
 ```
@@ -509,7 +508,6 @@ const [charCount, setCharCount] = useState(0);
 <input
   name="field"
   onChange={(e) => setCharCount(e.target.value.length)}
-  maxLength={100}
 />
 <p>{charCount}/100 characters</p>
 ```

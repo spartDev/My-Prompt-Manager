@@ -2,6 +2,8 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+import { formatCharacterCount } from '../../constants/validation';
+import { PROMPT_LIMITS } from '../../services/promptAdmission';
 import * as promptEncoder from '../../services/promptEncoder';
 import type { Category } from '../../types';
 import AddPromptForm from '../AddPromptForm';
@@ -434,5 +436,58 @@ describe('AddPromptForm - Submit Button Text', () => {
     await userEvent.click(submitButton);
 
     expect(screen.getByText(/importing\.\.\./i)).toBeInTheDocument();
+  });
+});
+
+// ADR-001: over-limit text is refused, never shortened. A maxLength attribute would let the
+// browser cut a paste at the limit without a word, so the fields have none; the text stays in
+// the field, the counter turns red and the refusal is shown instead.
+describe('AddPromptForm - Limits', () => {
+  it('keeps content pasted over the limit in the field, shows the refusal and does not submit', async () => {
+    const { props } = renderForm();
+    const content = 'x'.repeat(PROMPT_LIMITS.content + 1);
+    const contentInput = screen.getByLabelText(/content/i);
+
+    await userEvent.click(contentInput);
+    await userEvent.paste(content);
+
+    expect(contentInput).toHaveValue(content);
+    expect(screen.getByText(formatCharacterCount(content.length, PROMPT_LIMITS.content))).toHaveClass('text-red-600');
+
+    await userEvent.click(screen.getByRole('button', { name: /save prompt/i }));
+
+    expect(await screen.findByText('Content cannot exceed 20,000 characters')).toBeInTheDocument();
+    expect(props.onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('keeps a title pasted over the limit in the field, shows the refusal and does not submit', async () => {
+    const { props } = renderForm();
+    const title = 't'.repeat(PROMPT_LIMITS.title + 1);
+    const titleInput = screen.getByLabelText(/title/i);
+
+    await userEvent.click(titleInput);
+    await userEvent.paste(title);
+    await userEvent.type(screen.getByLabelText(/content/i), 'Body');
+
+    expect(titleInput).toHaveValue(title);
+    expect(screen.getByText(formatCharacterCount(title.length, PROMPT_LIMITS.title))).toHaveClass('text-red-600');
+
+    await userEvent.click(screen.getByRole('button', { name: /save prompt/i }));
+
+    expect(await screen.findByText('Title cannot exceed 100 characters')).toBeInTheDocument();
+    expect(props.onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('accepts content over the limit only because of a Hidden character and hands it over unchanged', async () => {
+    const { props } = renderForm();
+    const content = `${'x'.repeat(PROMPT_LIMITS.content)}\u{200B}`;
+
+    await userEvent.click(screen.getByLabelText(/content/i));
+    await userEvent.paste(content);
+    await userEvent.click(screen.getByRole('button', { name: /save prompt/i }));
+
+    await waitFor(() => {
+      expect(props.onSubmit).toHaveBeenCalledWith({ title: '', content, category: 'Uncategorized' });
+    });
   });
 });
