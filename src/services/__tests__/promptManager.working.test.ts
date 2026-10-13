@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { getMockStorageManager, type StorageManagerMock } from '../../test/mocks';
 import { DEFAULT_CATEGORY, VALIDATION_LIMITS } from '../../types';
+import { PROMPT_LIMITS } from '../promptAdmission';
 import { PromptManager } from '../promptManager';
 
 describe('PromptManager - Working Tests', () => {
@@ -58,12 +59,12 @@ describe('PromptManager - Working Tests', () => {
       });
 
       expect(error).toBeDefined();
-      expect(error?.message).toBe('Prompt content cannot be empty');
+      expect(error?.message).toBe('Content is required');
       expect(error?.type).toBe('VALIDATION_ERROR');
     });
 
     it('should validate title length', () => {
-      const longTitle = 'a'.repeat(VALIDATION_LIMITS.PROMPT_TITLE_MAX + 1);
+      const longTitle = 'a'.repeat(PROMPT_LIMITS.title + 1);
       const error = promptManager.validatePromptData({
         title: longTitle,
         content: 'Valid content',
@@ -71,11 +72,11 @@ describe('PromptManager - Working Tests', () => {
       });
 
       expect(error).toBeDefined();
-      expect(error?.message).toBe(`Title cannot exceed ${String(VALIDATION_LIMITS.PROMPT_TITLE_MAX)} characters`);
+      expect(error?.message).toBe('Title cannot exceed 100 characters');
     });
 
     it('should validate content length', () => {
-      const longContent = 'a'.repeat(VALIDATION_LIMITS.PROMPT_CONTENT_MAX + 1);
+      const longContent = 'a'.repeat(PROMPT_LIMITS.content + 1);
       const error = promptManager.validatePromptData({
         title: 'Valid title',
         content: longContent,
@@ -83,7 +84,48 @@ describe('PromptManager - Working Tests', () => {
       });
 
       expect(error).toBeDefined();
-      expect(error?.message).toBe(`Content cannot exceed ${String(VALIDATION_LIMITS.PROMPT_CONTENT_MAX)} characters`);
+      expect(error?.message).toBe('Content cannot exceed 20,000 characters');
+    });
+
+    // Admission is the only judge of Prompt text (ADR-001): Hidden characters are removed and
+    // the title and category trimmed before the limits apply, exactly as they will be on save.
+    it('accepts a title over the limit only because of Hidden characters or surrounding spaces', () => {
+      const error = promptManager.validatePromptData({
+        title: `  ${'t'.repeat(PROMPT_LIMITS.title)}\u{200B} `,
+        content: 'Valid content',
+        category: DEFAULT_CATEGORY
+      });
+
+      expect(error).toBeNull();
+    });
+
+    it('accepts content over the limit only because of Hidden characters', () => {
+      const error = promptManager.validatePromptData({
+        content: `${'x'.repeat(PROMPT_LIMITS.content)}\u{FEFF}`
+      });
+
+      expect(error).toBeNull();
+    });
+
+    it('accepts a category over the limit only because of Hidden characters or surrounding spaces', () => {
+      const error = promptManager.validatePromptData({
+        category: ` ${'c'.repeat(PROMPT_LIMITS.category)}\u{200B}`
+      });
+
+      expect(error).toBeNull();
+    });
+
+    it('refuses content that is only Hidden characters as empty', () => {
+      const error = promptManager.validatePromptData({ content: '\u{200B}\u{FEFF}' });
+
+      expect(error?.type).toBe('VALIDATION_ERROR');
+      expect(error?.message).toBe('Content is required');
+    });
+
+    it('reports the first refusal when several fields are refused', () => {
+      const error = promptManager.validatePromptData({ title: '', content: '' });
+
+      expect(error?.message).toBe('Title is required');
     });
 
     it('should return null for valid data', () => {
@@ -103,6 +145,35 @@ describe('PromptManager - Working Tests', () => {
       });
 
       expect(error).toBeNull();
+    });
+  });
+
+  describe('Category Validation', () => {
+    it('accepts a name over the limit only because of Hidden characters or surrounding spaces', () => {
+      const error = promptManager.validateCategoryData({
+        name: ` ${'c'.repeat(PROMPT_LIMITS.category)}\u{200B} `
+      });
+
+      expect(error).toBeNull();
+    });
+
+    it("refuses a blank or Hidden-only name as empty, in Admission's words", () => {
+      expect(promptManager.validateCategoryData({ name: '   ' })?.message).toBe('Category name is required');
+      expect(promptManager.validateCategoryData({ name: '\u{200B}' })?.message).toBe('Category name is required');
+    });
+
+    it('refuses a name over the limit', () => {
+      const error = promptManager.validateCategoryData({ name: 'c'.repeat(PROMPT_LIMITS.category + 1) });
+
+      expect(error?.type).toBe('VALIDATION_ERROR');
+      expect(error?.message).toBe('Category name cannot exceed 50 characters');
+    });
+
+    it('still validates the colour', () => {
+      expect(promptManager.validateCategoryData({ name: 'Work', color: 'red' })?.message).toBe(
+        'Color must be a valid hex color code (e.g., #FF0000)'
+      );
+      expect(promptManager.validateCategoryData({ name: 'Work', color: '#FF0000' })).toBeNull();
     });
   });
 
@@ -215,8 +286,42 @@ describe('PromptManager - Working Tests', () => {
       await expect(promptManager.createPrompt('', ''))
         .rejects.toMatchObject({
           type: 'VALIDATION_ERROR',
-          message: 'Prompt content cannot be empty'
+          message: 'Content is required'
         });
+    });
+
+    it('generates a title when none is given and judges that title, not the empty one', async () => {
+      await promptManager.createPrompt('  ', 'Body text', DEFAULT_CATEGORY);
+
+      expect(storageManagerMock.savePrompt).toHaveBeenCalledWith({
+        title: 'Body text',
+        content: 'Body text',
+        category: DEFAULT_CATEGORY
+      });
+    });
+
+    it('creates a Prompt whose title is over the limit only because of a Hidden character', async () => {
+      const title = `${'T'.repeat(50)}\u{200B}${'t'.repeat(50)}`;
+
+      await promptManager.createPrompt(title, 'Body', DEFAULT_CATEGORY);
+
+      expect(storageManagerMock.savePrompt).toHaveBeenCalledWith({ title, content: 'Body', category: DEFAULT_CATEGORY });
+    });
+
+    it('edits a Prompt whose new content is over the limit only because of a Hidden character', async () => {
+      const content = `${'x'.repeat(PROMPT_LIMITS.content)}\u{200B}`;
+
+      await promptManager.updatePrompt('1', { content });
+
+      expect(storageManagerMock.updatePrompt).toHaveBeenCalledWith('1', { content });
+    });
+
+    it('refuses an empty title on edit', async () => {
+      await expect(promptManager.updatePrompt('1', { title: '   ' })).rejects.toMatchObject({
+        type: 'VALIDATION_ERROR',
+        message: 'Title is required'
+      });
+      expect(storageManagerMock.updatePrompt).not.toHaveBeenCalled();
     });
 
     it('passes content to storage exactly as written, spaces and line breaks included', async () => {
@@ -240,7 +345,7 @@ describe('PromptManager - Working Tests', () => {
     it('should handle validation errors', () => {
       // Test various validation scenarios
       const error1 = promptManager.validatePromptData({
-        title: 'a'.repeat(VALIDATION_LIMITS.PROMPT_TITLE_MAX + 1),
+        title: 'a'.repeat(PROMPT_LIMITS.title + 1),
         content: 'Valid content'
       });
       expect(error1).toBeDefined();
@@ -248,7 +353,7 @@ describe('PromptManager - Working Tests', () => {
 
       const error2 = promptManager.validatePromptData({
         title: 'Valid title',
-        content: 'a'.repeat(VALIDATION_LIMITS.PROMPT_CONTENT_MAX + 1)
+        content: 'a'.repeat(PROMPT_LIMITS.content + 1)
       });
       expect(error2).toBeDefined();
       expect(error2?.type).toBe('VALIDATION_ERROR');

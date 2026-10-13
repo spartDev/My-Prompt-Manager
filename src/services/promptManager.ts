@@ -10,6 +10,7 @@ import {
 import type { HighlightedPrompt } from '../types/hooks';
 import { findTextHighlights } from '../utils/textHighlight';
 
+import { admit, type Admission, type PromptTextPatch } from './promptAdmission';
 import { getSearchIndex } from './SearchIndex';
 import { calculateSimilarityOptimized } from './SimilarityAlgorithms';
 import { StorageManager } from './storage';
@@ -44,14 +45,13 @@ export class PromptManager {
   // Prompt creation and management
   async createPrompt(title: string, content: string, category: string = DEFAULT_CATEGORY): Promise<Prompt> {
     try {
-      // Validate input
-      const validationError = this.validatePromptData({ title, content, category });
+      // An empty title is generated from the content; Admission then judges the final text
+      const finalTitle = title.trim() || this.generateTitle(content);
+
+      const validationError = this.validatePromptData({ title: finalTitle, content, category });
       if (validationError) {
         throw validationError;
       }
-
-      // Generate title if empty
-      const finalTitle = title.trim() || this.generateTitle(content);
 
       // Ensure category exists
       const categories = await this.storageManager.getCategories();
@@ -283,62 +283,22 @@ export class PromptManager {
   }
 
   // Validation
+  /**
+   * Asks Admission whether the text would be admitted (ADR-001): Hidden characters are removed
+   * and the title and category trimmed before the limits apply, and nothing is shortened. Only
+   * the fields that are present are judged; the first refusal is returned, in Admission's words.
+   */
   validatePromptData(data: { title?: string; content?: string; category?: string }): PromptManagerError | null {
-    const { title, content, category } = data;
-
-    if (title !== undefined) {
-      if (title.length > VALIDATION_LIMITS.PROMPT_TITLE_MAX) {
-        return new PromptManagerError({
-          type: 'VALIDATION_ERROR',
-          message: `Title cannot exceed ${String(VALIDATION_LIMITS.PROMPT_TITLE_MAX)} characters`
-        });
-      }
-    }
-
-    if (content !== undefined) {
-      if (!content.trim()) {
-        return new PromptManagerError({
-          type: 'VALIDATION_ERROR',
-          message: 'Prompt content cannot be empty'
-        });
-      }
-
-      if (content.length > VALIDATION_LIMITS.PROMPT_CONTENT_MAX) {
-        return new PromptManagerError({
-          type: 'VALIDATION_ERROR',
-          message: `Content cannot exceed ${String(VALIDATION_LIMITS.PROMPT_CONTENT_MAX)} characters`
-        });
-      }
-    }
-
-    if (category !== undefined) {
-      if (category.length > VALIDATION_LIMITS.CATEGORY_NAME_MAX) {
-        return new PromptManagerError({
-          type: 'VALIDATION_ERROR',
-          message: `Category name cannot exceed ${String(VALIDATION_LIMITS.CATEGORY_NAME_MAX)} characters`
-        });
-      }
-    }
-
-    return null;
+    return this.refusalOf(admit(data));
   }
 
   validateCategoryData(data: { name?: string; color?: string }): PromptManagerError | null {
     const { name, color } = data;
 
     if (name !== undefined) {
-      if (!name.trim()) {
-        return new PromptManagerError({
-          type: 'VALIDATION_ERROR',
-          message: 'Category name cannot be empty'
-        });
-      }
-
-      if (name.length > VALIDATION_LIMITS.CATEGORY_NAME_MAX) {
-        return new PromptManagerError({
-          type: 'VALIDATION_ERROR',
-          message: `Category name cannot exceed ${String(VALIDATION_LIMITS.CATEGORY_NAME_MAX)} characters`
-        });
+      const refused = this.refusalOf(admit({ category: name }));
+      if (refused) {
+        return refused;
       }
     }
 
@@ -353,6 +313,18 @@ export class PromptManager {
     }
 
     return null;
+  }
+
+  /** The first refusal of an Admission as a PromptManagerError, or null when the text was admitted. */
+  private refusalOf(admission: Admission<PromptTextPatch>): PromptManagerError | null {
+    if (admission.ok) {
+      return null;
+    }
+
+    const refusal = Object.values(admission.errors).find((candidate) => candidate !== undefined);
+    return refusal
+      ? new PromptManagerError({ type: 'VALIDATION_ERROR', message: refusal.message, details: admission.errors })
+      : null;
   }
 
   // Statistics and analytics

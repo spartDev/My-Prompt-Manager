@@ -42,6 +42,44 @@ describe('validatePromptFields', () => {
     });
     expect(errors.title).toBeDefined();
   });
+
+  // Admission is the only judge of Prompt text (ADR-001): Hidden characters are removed and the
+  // title trimmed before the limits apply, exactly as they will be on save.
+  it('accepts content over the limit only because of Hidden characters', () => {
+    const errors = validatePromptFields('Title', `${'x'.repeat(20_000)}\u{200B}`, {
+      component: 'TestComponent',
+    });
+    expect(errors).toEqual({});
+  });
+
+  it('accepts a title over the limit only because of Hidden characters or surrounding spaces', () => {
+    const errors = validatePromptFields(`  ${'t'.repeat(100)}\u{FEFF} `, 'Content', {
+      component: 'TestComponent',
+    });
+    expect(errors).toEqual({});
+  });
+
+  it('treats a blank title as absent: the title is optional', () => {
+    expect(validatePromptFields('', 'Content', { component: 'TestComponent' })).toEqual({});
+    expect(validatePromptFields('   ', 'Content', { component: 'TestComponent' })).toEqual({});
+  });
+
+  it('refuses content that is only Hidden characters as empty', () => {
+    const errors = validatePromptFields('Title', '\u{200B}\u{202E}', { component: 'TestComponent' });
+    expect(errors.content).toBe('Content is required');
+  });
+
+  it("uses Admission's refusal wording, one message per refused field", () => {
+    const options = { component: 'TestComponent' };
+    expect(validatePromptFields('Title', '', options).content).toBe('Content is required');
+    expect(validatePromptFields('Title', 'a'.repeat(20_001), options).content).toBe(
+      'Content cannot exceed 20,000 characters'
+    );
+    expect(validatePromptFields('a'.repeat(101), '', options)).toEqual({
+      title: 'Title cannot exceed 100 characters',
+      content: 'Content is required',
+    });
+  });
 });
 
 describe('Type Guards', () => {
