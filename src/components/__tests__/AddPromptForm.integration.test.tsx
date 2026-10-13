@@ -1,3 +1,11 @@
+/**
+ * @vitest-environment jsdom
+ *
+ * Imports are sanitized with DOMPurify, which since 3.4.8 reads `nodeName`
+ * through the `Node.prototype` getter. In happy-dom that getter returns ''
+ * for every node (capricorn86/happy-dom#2182), and DOMPurify does not
+ * support happy-dom (cure53/DOMPurify#1457). jsdom implements it as browsers do.
+ */
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
