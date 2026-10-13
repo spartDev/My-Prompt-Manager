@@ -32,23 +32,6 @@ const HEADLINE =
   '  Summarize the metadata: use <example>text</example> tags; if count=5 and onboarding = true, return data: JSON\n' +
   `<context>${FAMILY} kept together</context>\n\n  `;
 
-/**
- * The content script reads storage with the callback form of chrome.storage.local.get,
- * which the shared fake (promise only) does not answer. Make it answer both ways.
- */
-function answerStorageGetCallbacks(): void {
-  const get = vi.mocked(chrome.storage.local.get);
-  const promiseGet = get.getMockImplementation() as (keys: unknown) => Promise<Record<string, unknown>>;
-
-  get.mockImplementation(((keys: unknown, callback?: (items: Record<string, unknown>) => void) => {
-    const result = promiseGet(keys);
-    if (typeof callback === 'function') {
-      void result.then(callback);
-    }
-    return result;
-  }) as typeof chrome.storage.local.get);
-}
-
 function atHostname(hostname: string): void {
   Object.defineProperty(window, 'location', {
     value: { hostname, href: `https://${hostname}/` },
@@ -62,7 +45,6 @@ describe('Prompt text reaches the chat exactly as saved', () => {
   let input: HTMLElement | undefined;
 
   beforeEach(() => {
-    answerStorageGetCallbacks();
     document.execCommand = vi.fn().mockReturnValue(false);
   });
 
