@@ -160,6 +160,42 @@ describe('StorageManager Admission', () => {
     it('rejects something that is not a Prompt', async () => {
       await expect(storageManager.importPrompt({ title: 'No id' } as never)).rejects.toThrow(/id, title or content/);
     });
+
+    describe('its Category, which the Library may spell differently', () => {
+      beforeEach(async () => {
+        await chrome.storage.local.set({
+          categories: [
+            { id: 'default', name: DEFAULT_CATEGORY },
+            { id: 'c1', name: 'Work' }
+          ]
+        });
+      });
+
+      it.each([
+        ['a different case', 'work'],
+        ['a different case once admitted', ' WORK\u{200B} ']
+      ])('takes the stored spelling when the Backup names it in %s, without counting as an edit', async (_case, category) => {
+        const imported = await storageManager.importPrompt({ ...backed, category });
+
+        expect(imported).toEqual({ ...backed, category: 'Work' });
+        expect(await storedPrompts()).toEqual([imported]);
+      });
+
+      it.each([
+        ['an exact match', 'Work'],
+        ['a name no Category has (it never invents one)', 'Play']
+      ])('leaves %s as it is', async (_case, category) => {
+        expect(await storageManager.importPrompt({ ...backed, category })).toEqual({ ...backed, category });
+      });
+
+      it('reads the Categories as stored, without creating the default Category', async () => {
+        await chrome.storage.local.set({ categories: [{ id: 'c1', name: 'Work' }] });
+
+        await storageManager.importPrompt({ ...backed, category: 'work' });
+
+        expect(await storedCategories()).toEqual([{ id: 'c1', name: 'Work' }]);
+      });
+    });
   });
 
   describe('saveCategory', () => {
@@ -284,6 +320,75 @@ describe('StorageManager Admission', () => {
 
       expect(await storedCategories()).toEqual(before);
     });
+
+    describe('a name that Admission made the same as a stored one', () => {
+      it.each([
+        ['the Backup has the Hidden character', 'Work', 'work\u{200B}'],
+        ['the Backup has the other case and the Hidden character', 'work', 'Work\u{200B}'],
+        ['the Backup has surrounding spaces', 'Work', ' work ']
+      ])('keeps the stored id and name, first wins, and takes the colour from the Backup (%s)', async (_case, stored, incoming) => {
+        await chrome.storage.local.set({
+          categories: [
+            { id: 'default', name: DEFAULT_CATEGORY },
+            { id: 'c1', name: stored, color: '#000000' }
+          ]
+        });
+
+        const imported = await storageManager.importCategory({ id: 'c2', name: incoming, color: '#abcdef' });
+
+        expect(imported).toEqual({ id: 'c1', name: stored, color: '#abcdef' });
+        expect(await storedCategories()).toEqual([{ id: 'default', name: DEFAULT_CATEGORY }, imported]);
+      });
+
+      it('still lets a name that was already the same ignoring case replace the stored casing, as before', async () => {
+        await chrome.storage.local.set({
+          categories: [
+            { id: 'default', name: DEFAULT_CATEGORY },
+            { id: 'c1', name: 'Work' }
+          ]
+        });
+
+        expect(await storageManager.importCategory({ id: 'c2', name: 'WORK' })).toEqual({ id: 'c1', name: 'WORK' });
+      });
+    });
+
+    it('gives a Category from a Backup an id when it has none, so none is ever stored without one', async () => {
+      const imported = await storageManager.importCategory({ name: 'Restored' } as never);
+
+      expect(imported.id).toMatch(/^[0-9a-f-]{36}$/);
+      expect(await storedCategories()).toContainEqual(imported);
+
+      const numbered = await storageManager.importCategory({ id: 7, name: 'Numbered' } as never);
+
+      expect(typeof numbered.id).toBe('string');
+      expect(await storedCategories()).toContainEqual(numbered);
+    });
+  });
+
+  describe('a whole Backup restored one item at a time, as SettingsView does', () => {
+    const prompt = (id: string, category: string) => ({
+      id,
+      title: `Title ${id}`,
+      content: 'Body',
+      category,
+      createdAt: 5,
+      updatedAt: 6,
+      usageCount: 1,
+      lastUsedAt: 6
+    });
+
+    it.each([
+      ['the later Category has the Hidden character', ['Work', 'work\u{200B}'], 'Work'],
+      ['the first Category has the Hidden character', ['work\u{200B}', 'Work'], 'Work']
+    ])('ends with one Category and every Prompt naming it (%s)', async (_case, [first, second], kept) => {
+      await storageManager.importCategory({ id: 'c1', name: first });
+      await storageManager.importCategory({ id: 'c2', name: second });
+      await storageManager.importPrompt(prompt('p1', first));
+      await storageManager.importPrompt(prompt('p2', second));
+
+      expect(await storedCategories()).toEqual([{ id: 'default', name: DEFAULT_CATEGORY }, { id: 'c1', name: kept }]);
+      expect(await storedPrompts()).toEqual([prompt('p1', kept), prompt('p2', kept)]);
+    });
   });
 
   describe('importData (whole-library import, currently unused by the UI)', () => {
@@ -330,6 +435,52 @@ describe('StorageManager Admission', () => {
       ).rejects.toBeInstanceOf(AdmissionRefusedError);
 
       expect(await storedPrompts()).toEqual([existing]);
+    });
+
+    it.each([
+      ['the later Category has the Hidden character', ['Work', 'work\u{200B}'], 'Work'],
+      ['the first Category has the Hidden character', ['work\u{200B}', 'Work'], 'work']
+    ])('merges Categories that Admission made the same name, first wins, and re-points their Prompts and the default Category (%s)', async (_case, [first, second], kept) => {
+      await storageManager.importData(
+        JSON.stringify({
+          prompts: [{ ...aPrompt, category: first }, { ...aPrompt, id: 'i2', category: second }],
+          categories: [
+            { id: 'default', name: DEFAULT_CATEGORY },
+            { id: 'c1', name: first, color: '#111111' },
+            { id: 'c2', name: second, color: '#222222' }
+          ],
+          settings: { ...settings, defaultCategory: second }
+        })
+      );
+
+      expect(await storedCategories()).toEqual([
+        { id: 'default', name: DEFAULT_CATEGORY },
+        { id: 'c1', name: kept, color: '#111111' }
+      ]);
+      expect(await storedPrompts()).toEqual([{ ...aPrompt, category: kept }, { ...aPrompt, id: 'i2', category: kept }]);
+      expect((await chrome.storage.local.get('settings')).settings).toEqual({ ...settings, defaultCategory: kept });
+    });
+
+    it('refuses the whole import if any Category is refused, before anything is cleared or merged', async () => {
+      await chrome.storage.local.set({ prompts: [{ ...aPrompt, id: 'keep-me' }] });
+      const before = await chrome.storage.local.get(['prompts', 'categories', 'settings']);
+
+      await expect(
+        storageManager.importData(
+          JSON.stringify({
+            prompts: [{ ...aPrompt, category: 'Work' }],
+            categories: [
+              { id: 'default', name: DEFAULT_CATEGORY },
+              { id: 'c1', name: 'Work' },
+              { id: 'c2', name: 'work\u{200B}' },
+              { id: 'c3', name: '   ' }
+            ],
+            settings
+          })
+        )
+      ).rejects.toBeInstanceOf(AdmissionRefusedError);
+
+      expect(await chrome.storage.local.get(['prompts', 'categories', 'settings'])).toEqual(before);
     });
   });
 });

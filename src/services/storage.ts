@@ -25,6 +25,8 @@ import {
   admitEdit,
   admitNew,
   admitRestored,
+  matchStoredCategory,
+  planCategoryMerge,
   readPrompt,
   readPrompts,
   recordUse,
@@ -274,7 +276,15 @@ export class StorageManager {
   async importPrompt(prompt: Prompt): Promise<Prompt> {
     return this.mutex.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
       try {
-        const incoming = readPrompt(prompt);
+        // The Library may spell the Prompt's Category differently (`Work` for `work`): the Prompt takes
+        // the stored spelling. The Categories are read raw, because getCategories() can write the
+        // default Category and the CATEGORIES lock is never taken under PROMPTS (lock order).
+        const storedCategories = await this.getStorageData<unknown>(this.STORAGE_KEYS.CATEGORIES);
+        const incoming = readPrompt(
+          typeof prompt.category === 'string'
+            ? { ...prompt, category: matchStoredCategory(prompt.category, storedCategories) }
+            : prompt
+        );
         if (!incoming) {
           throw new Error('Cannot import: the Prompt is missing its id, title or content');
         }
@@ -319,8 +329,13 @@ export class StorageManager {
   async importCategory(incoming: Category): Promise<Category> {
     return this.mutex.withLock(this.STORAGE_KEYS.CATEGORIES, async () => {
       try {
-        // Admission: the name is admitted like every other Category name
-        const category: Category = { ...incoming, name: this.admitCategoryName(incoming.name) };
+        // Admission: the name is admitted like every other Category name. A Category from a Backup
+        // may have no id (or not a string one); it is given one, so none is ever stored without.
+        const category: Category = {
+          ...incoming,
+          id: typeof incoming.id === 'string' ? incoming.id : uuidv4(),
+          name: this.admitCategoryName(incoming.name)
+        };
 
         const existingCategories = await this.getCategories();
         const existingIndex = existingCategories.findIndex(c => c.id === category.id);
@@ -337,10 +352,16 @@ export class StorageManager {
           );
 
           if (duplicateNameIndex >= 0) {
-            // Update the existing category with the same name, preserving the existing ID
+            // The stored Category keeps its id. When Admission made the two names the same (a Hidden
+            // character or surrounding spaces in the Backup), the first wins and it keeps its name
+            // too, taking the other fields (colour) from the Backup. Names that were already the same
+            // ignoring case keep the earlier behaviour: the Backup's casing replaces the stored one.
+            const existing = existingCategories[duplicateNameIndex];
+            const madeEqual = incoming.name.toLowerCase() !== existing.name.toLowerCase();
             const updatedCategory: Category = {
               ...category,
-              id: existingCategories[duplicateNameIndex].id // Keep existing ID
+              id: existing.id,
+              name: madeEqual ? existing.name : category.name
             };
             existingCategories[duplicateNameIndex] = updatedCategory;
             await this.setStorageData(this.STORAGE_KEYS.CATEGORIES, existingCategories);
@@ -629,10 +650,20 @@ export class StorageManager {
       }
 
       // Admission: every Prompt and Category name in the file is admitted before anything is
-      // cleared, so a refusal leaves the existing data untouched.
+      // cleared, so a refusal leaves the existing data untouched. Categories that Admission made
+      // the same name are merged, first wins, and their Prompts and the default Category are
+      // re-pointed to the kept one: the same plan as the upgrade pass.
       const importedAt = Date.now();
+      const categoryNames = data.categories.map(category => ({
+        before: category.name,
+        after: this.admitCategoryName(category.name)
+      }));
+      const plan = planCategoryMerge(categoryNames);
+      const admittedCategories: Category[] = data.categories.flatMap((category, index) =>
+        plan.merged.has(index) ? [] : [{ ...category, name: categoryNames[index].after }]
+      );
       const admittedPrompts: StoredPrompt[] = data.prompts.map(raw => {
-        const incoming = readPrompt(raw);
+        const incoming = readPrompt({ ...raw, category: plan.renames.get(raw.category) ?? raw.category });
         if (!incoming) {
           throw new Error('Invalid data format');
         }
@@ -642,10 +673,10 @@ export class StorageManager {
         }
         return admission.prompt;
       });
-      const admittedCategories: Category[] = data.categories.map(category => ({
-        ...category,
-        name: this.admitCategoryName(category.name)
-      }));
+      const settings: Settings = {
+        ...data.settings,
+        defaultCategory: plan.renames.get(data.settings.defaultCategory) ?? data.settings.defaultCategory
+      };
 
       // Proactive quota check BEFORE clearing data
       // Since we clear ALL existing data before import, check if import size
@@ -684,7 +715,7 @@ export class StorageManager {
         await Promise.all([
           this.writePrompts(admittedPrompts),
           this.setStorageData(this.STORAGE_KEYS.CATEGORIES, admittedCategories),
-          this.setStorageData(this.STORAGE_KEYS.SETTINGS, data.settings)
+          this.setStorageData(this.STORAGE_KEYS.SETTINGS, settings)
         ]);
       } catch (importError) {
         // Rollback: restore backup if import fails

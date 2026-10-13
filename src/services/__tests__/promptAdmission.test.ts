@@ -9,6 +9,7 @@ import {
   admitEdit,
   admitNew,
   admitRestored,
+  matchStoredCategory,
   planCategoryMerge,
   readPrompts,
   recordUse,
@@ -553,6 +554,23 @@ describe('scrubStoredSettings (the one-time upgrade pass, the default Category)'
       expect(result.changed).toBe(false);
       expect(result.settings).toBe(value);
     }
+  });
+});
+
+describe('matchStoredCategory (a restored Prompt takes the stored spelling of its Category)', () => {
+  const stored = [{ id: 'default', name: DEFAULT_CATEGORY }, { id: 'c1', name: 'Work' }, null, { id: 7 }];
+
+  it('returns the stored spelling when the name, once admitted, equals it ignoring case', () => {
+    expect(matchStoredCategory('work', stored)).toBe('Work');
+    expect(matchStoredCategory(' WORK\u{200B} ', stored)).toBe('Work');
+  });
+
+  it('leaves the name as it is when a Category has exactly that name, when none has it, or when it would be refused', () => {
+    expect(matchStoredCategory('Work', stored)).toBe('Work');
+    expect(matchStoredCategory('Work\u{200B}', stored)).toBe('Work\u{200B}');
+    expect(matchStoredCategory('Play', stored)).toBe('Play');
+    expect(matchStoredCategory('   ', stored)).toBe('   ');
+    expect(matchStoredCategory('work', undefined)).toBe('work');
   });
 });
 

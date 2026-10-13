@@ -531,6 +531,31 @@ export function admitRestored(
   };
 }
 
+/**
+ * Restore (Backup), the Category a Prompt names: a Backup names it by exact name, but the
+ * Library may spell it differently (`Work` for a Backup's `work`), because Category names are
+ * unique ignoring case. Returns the stored spelling when the name, once admitted, equals a
+ * stored Category's name ignoring case and none exactly; otherwise the name unchanged. It never
+ * invents a Category, and a name that would be refused is left for the route to refuse.
+ * `storedCategories` is the raw stored value, so reading it never writes.
+ */
+export function matchStoredCategory(name: string, storedCategories: unknown): string {
+  const admission = admit({ category: name });
+  if (!admission.ok || admission.text.category === undefined) {
+    return name;
+  }
+
+  const admitted = admission.text.category;
+  const storedNames = Array.isArray(storedCategories)
+    ? storedCategories.flatMap((entry: unknown) => (isRecord(entry) && typeof entry.name === 'string' ? [entry.name] : []))
+    : [];
+  if (storedNames.includes(admitted)) {
+    return name;
+  }
+
+  const key = admitted.toLowerCase();
+  return storedNames.find((stored) => stored.toLowerCase() === key) ?? name;
+}
 
 /** A non-text change that keeps the result typed: counts one use. */
 export function recordUse(prompt: StoredPrompt, now: number): StoredPrompt {

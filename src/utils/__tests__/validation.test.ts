@@ -12,6 +12,8 @@ import {
   isArrayOf,
   isValidImportPrompt,
   findInvalidImportPrompt,
+  isValidImportCategory,
+  findInvalidImportCategory,
 } from '../validation';
 
 describe('validatePromptFields', () => {
@@ -471,5 +473,31 @@ describe('findInvalidImportPrompt', () => {
     const bad = { title: 'No id', content: 'Content', category: 'Work' };
 
     expect(findInvalidImportPrompt([good, bad, { ...good, id: 7 }])).toBe(bad);
+  });
+});
+
+describe('isValidImportCategory', () => {
+  it('should accept a Category with or without an id, so a restore gives it one rather than dropping it', () => {
+    expect(isValidImportCategory({ id: 'c1', name: 'Work', color: '#112233' })).toBe(true);
+    expect(isValidImportCategory({ name: 'Work' })).toBe(true);
+    expect(isValidImportCategory({ id: 7, name: 'Work' })).toBe(true);
+  });
+
+  it('should reject what is not a Category', () => {
+    for (const invalid of [null, undefined, 'Work', [], { id: 'c1' }, { name: 7 }]) {
+      expect(isValidImportCategory(invalid)).toBe(false);
+    }
+  });
+});
+
+describe('findInvalidImportCategory', () => {
+  it('should return undefined when every Category is structurally valid, id or not', () => {
+    expect(findInvalidImportCategory([{ id: 'c1', name: 'Work' }, { name: 'Home' }])).toBeUndefined();
+  });
+
+  it('should return the first Category that is not', () => {
+    const bad = { id: 'c2' };
+
+    expect(findInvalidImportCategory([{ id: 'c1', name: 'Work' }, bad, null])).toBe(bad);
   });
 });
