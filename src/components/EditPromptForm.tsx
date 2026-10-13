@@ -1,7 +1,8 @@
 import { forwardRef, useActionState, useMemo, useState } from 'react';
 import type { FC } from 'react';
 
-import { MAX_CONTENT_LENGTH, MAX_TITLE_LENGTH, formatCharacterCount } from '../constants/validation';
+import { formatCharacterCount } from '../constants/validation';
+import { PROMPT_LIMITS } from '../services/promptAdmission';
 import type { EditPromptFormProps } from '../types/components';
 import { Logger, toError, validatePromptFields, type FieldErrors } from '../utils';
 
@@ -184,13 +185,13 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
                 errors?.title ? 'border-red-300 dark:border-red-500' : 'border-purple-200 dark:border-gray-600'
               }`}
               disabled={isPending}
-              maxLength={MAX_TITLE_LENGTH}
+              maxLength={PROMPT_LIMITS.title}
             />
             {errors?.title && (
               <p className="mt-2 text-sm text-red-600 dark:text-red-400 font-medium">⚠️ {errors.title}</p>
             )}
             <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
-              {formatCharacterCount(titleLength, MAX_TITLE_LENGTH)}
+              {formatCharacterCount(titleLength, PROMPT_LIMITS.title)}
             </p>
           </div>
 
@@ -240,14 +241,14 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
                 errors?.content ? 'border-red-300 dark:border-red-500' : 'border-purple-200 dark:border-gray-600'
               }`}
               disabled={isPending}
-              maxLength={MAX_CONTENT_LENGTH}
+              maxLength={PROMPT_LIMITS.content}
               required
             />
             {errors?.content && (
               <p className="mt-2 text-sm text-red-600 dark:text-red-400 font-medium">⚠️ {errors.content}</p>
             )}
             <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
-              {formatCharacterCount(contentLength, MAX_CONTENT_LENGTH)}
+              {formatCharacterCount(contentLength, PROMPT_LIMITS.content)}
             </p>
           </div>
         </form>

@@ -1,8 +1,8 @@
 import { forwardRef, useActionState, useEffect, useMemo, useRef, useState } from 'react';
 import type { FC } from 'react';
 
-import { MAX_CONTENT_LENGTH, MAX_TITLE_LENGTH, formatCharacterCount } from '../constants/validation';
-import { admit } from '../services/promptAdmission';
+import { formatCharacterCount } from '../constants/validation';
+import { admit, PROMPT_LIMITS } from '../services/promptAdmission';
 import { decode } from '../services/promptEncoder';
 import { DEFAULT_CATEGORY, type SharedPromptData } from '../types';
 import type { AddPromptFormProps } from '../types/components';
@@ -509,7 +509,7 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
                   errors?.title ? 'border-red-300 dark:border-red-500' : 'border-purple-200 dark:border-gray-600'
                 }`}
                 disabled={isPending}
-                maxLength={MAX_TITLE_LENGTH}
+                maxLength={PROMPT_LIMITS.title}
               />
               {errors?.title && (
                 <p className="mt-2 text-sm text-red-600 dark:text-red-400 font-medium flex items-center space-x-1">
@@ -520,7 +520,7 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
                 </p>
               )}
               <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
-                {formatCharacterCount(titleLength, MAX_TITLE_LENGTH)}
+                {formatCharacterCount(titleLength, PROMPT_LIMITS.title)}
               </p>
             </div>
 
@@ -564,7 +564,7 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
                   errors?.content ? 'border-red-300 dark:border-red-500' : 'border-purple-200 dark:border-gray-600'
                 }`}
                 disabled={isPending}
-                maxLength={MAX_CONTENT_LENGTH}
+                maxLength={PROMPT_LIMITS.content}
                 required
               />
               {errors?.content && (
@@ -576,7 +576,7 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
                 </p>
               )}
               <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
-                {formatCharacterCount(contentLength, MAX_CONTENT_LENGTH)}
+                {formatCharacterCount(contentLength, PROMPT_LIMITS.content)}
               </p>
             </div>
               </>

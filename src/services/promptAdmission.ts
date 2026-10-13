@@ -6,14 +6,14 @@
  * and docs/adr/ADR-001-store-and-deliver-prompts-verbatim.md.
  */
 
-import { DEFAULT_CATEGORY, VALIDATION_LIMITS } from '../constants';
+import { DEFAULT_CATEGORY } from '../constants';
 import type { AppError, ErrorType } from '../types';
 
-/** Single source of truth for Prompt text limits (derived from VALIDATION_LIMITS). */
+/** The one definition of the Prompt text limits; the forms, PromptManager and StorageManager read it here. */
 export const PROMPT_LIMITS = {
-  title: VALIDATION_LIMITS.PROMPT_TITLE_MAX,
-  content: VALIDATION_LIMITS.PROMPT_CONTENT_MAX,
-  category: VALIDATION_LIMITS.CATEGORY_NAME_MAX
+  title: 100,
+  content: 20_000,
+  category: 50
 } as const;
 
 export type PromptField = keyof typeof PROMPT_LIMITS;

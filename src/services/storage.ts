@@ -20,6 +20,7 @@ import {
 
 import {
   AdmissionRefusedError,
+  PROMPT_LIMITS,
   admit,
   admitEdit,
   admitNew,
@@ -1028,8 +1029,8 @@ export class StorageManager {
       errors.push(`${prefix}: Field "title" must be a string`);
     } else if (prompt.title.length === 0) {
       errors.push(`${prefix}: Field "title" cannot be empty`);
-    } else if (prompt.title.length > 100) {
-      errors.push(`${prefix}: Field "title" exceeds maximum length of 100 characters (got ${String(prompt.title.length)})`);
+    } else if (prompt.title.length > PROMPT_LIMITS.title) {
+      errors.push(`${prefix}: Field "title" exceeds maximum length of ${String(PROMPT_LIMITS.title)} characters (got ${String(prompt.title.length)})`);
     }
 
     // Content validation
@@ -1039,8 +1040,8 @@ export class StorageManager {
       errors.push(`${prefix}: Field "content" must be a string`);
     } else if (prompt.content.length === 0) {
       errors.push(`${prefix}: Field "content" cannot be empty`);
-    } else if (prompt.content.length > 20000) {
-      errors.push(`${prefix}: Field "content" exceeds maximum length of 20,000 characters (got ${String(prompt.content.length)})`);
+    } else if (prompt.content.length > PROMPT_LIMITS.content) {
+      errors.push(`${prefix}: Field "content" exceeds maximum length of ${PROMPT_LIMITS.content.toLocaleString('en-US')} characters (got ${String(prompt.content.length)})`);
     }
 
     // Category validation

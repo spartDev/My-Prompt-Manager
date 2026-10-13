@@ -317,13 +317,10 @@ private findTextHighlights(text: string, searchTerm: string): Highlight[] {
 }
 ```
 
-**Validation Limits:**
+**Validation Limits:** the Prompt text limits are `PROMPT_LIMITS` (see [Prompt Admission](#4-prompt-admission)); `validatePromptData` and `validateCategoryData` defer to `admit()`. PromptManager's own constant:
 ```typescript
 const VALIDATION_LIMITS = {
-  PROMPT_TITLE_MAX: 100,
-  PROMPT_CONTENT_MAX: 20000,
-  CATEGORY_NAME_MAX: 50,
-  TITLE_GENERATION_LENGTH: 50
+  TITLE_GENERATION_LENGTH: 50 // length of a title generated from content
 };
 ```
 
@@ -527,7 +524,7 @@ if (!validation.valid) {
 | `admitRestored(incoming, now, { replacing? })` | Backup restore route. Keeps id, usage and timestamps; a refusal means the restore skips and reports this Prompt |
 | `recordUse(prompt, now)` | A non-text change (one more use) that keeps the result typed as a `StoredPrompt` |
 | `AdmissionRefusedError` | Thrown by the write path when a route is refused. An `AppError` of type `VALIDATION_ERROR` whose `errors` hold the per-field refusals |
-| `PROMPT_LIMITS` | `{ title: 100, content: 20000, category: 50 }`, derived from `VALIDATION_LIMITS` |
+| `PROMPT_LIMITS` | `{ title: 100, content: 20000, category: 50 }`: the one definition of the limits, read by the forms, `PromptManager` and `StorageManager` |
 | `StoredPrompt` / `AdmittedPrompt` | Nominal types (classes with a private member, so an object literal or spread cannot be assigned). Both widen to a plain `Prompt`; an `AdmittedPrompt` is a `StoredPrompt` whose text has just been through Admission |
 
 **Usage: the form's dry check** (nothing is saved):
