@@ -17,6 +17,8 @@ import { describe, expect, it } from 'vitest';
  * Known limits (these are conventions made executable, not a security boundary):
  * - Forgery is found by name, so `type Alias = StoredPrompt` followed by `x as Alias`, or a
  *   cast to `Parameters<typeof f>[0]`, is not seen. Renamed imports and namespace imports are.
+ *   A cast to `never` or `any` names no brand and would compile anywhere a branded value is
+ *   expected, so outside test code those two casts are reported too (there are none today).
  * - A prompts-key write is found as a `<anything>.local.set(...)` call. Aliasing the storage
  *   area first (`const area = chrome.storage.local`), destructuring `set`, or `.call`/`.bind`
  *   on it is not seen; `storage.sync` and `storage.session` are not checked.
@@ -256,6 +258,20 @@ function findNominalTypeForgery(filePath: string, contents: string): Violation[]
   const violations: Violation[] = [];
 
   const visit = (node: ts.Node): void => {
+    if (
+      !isTestPath(filePath) &&
+      (ts.isAsExpression(node) || ts.isTypeAssertionExpression(node)) &&
+      (node.type.kind === ts.SyntaxKind.NeverKeyword || node.type.kind === ts.SyntaxKind.AnyKeyword)
+    ) {
+      violations.push(
+        violationAt(
+          filePath,
+          node.type,
+          `cast to ${node.type.getText()} defeats the branded types without naming them; keep a precise type, or get the value from ${ADMISSION_MODULE}`
+        )
+      );
+    }
+
     const forgery = findForgery(node, brands);
 
     if (forgery) {
@@ -299,11 +315,12 @@ const STORAGE_MANAGER = 'src/services/storage.ts';
 const PROMPT_WRITERS: readonly string[] = ['writePrompts', 'writeScrubbed', 'writeCategoriesAndPrompts'];
 
 /**
- * Files allowed to pass `storage.local.set` an argument the guard cannot see into. StorageManager
- * is the one place that writes by design; the storage helper is where a generic writer would go.
- * Nothing outside them does this today, so this stays tiny.
+ * Files allowed to pass `storage.local.set` an argument the guard cannot see into: only the
+ * storage availability helper, where a generic writer would go. StorageManager is NOT here:
+ * every one of its writes is an object literal the guard can read, so a new method that passes
+ * `set` an opaque value (`const payload = { prompts: raw }; set(payload)`) is reported.
  */
-const MAY_WRITE_OPAQUE_ARGUMENTS: readonly string[] = [STORAGE_MANAGER, 'src/utils/chromeStorage.ts'];
+const MAY_WRITE_OPAQUE_ARGUMENTS: readonly string[] = ['src/utils/chromeStorage.ts'];
 
 function isTestPath(filePath: string): boolean {
   return /(^|\/)__tests__\//.test(filePath) || /\.(test|spec)\.tsx?$/.test(filePath) || filePath.startsWith('src/test/');
@@ -649,6 +666,25 @@ describe('Admission guardrails', () => {
       expect(forge(stray, module)).toHaveLength(1);
     });
 
+    it.each([
+      ['never', 'const forged: AdmittedPrompt = raw as never;'],
+      ['any', 'const forged: readonly StoredPrompt[] = raw as any;'],
+      ['never, written as an angle-bracket assertion', 'const forged: AdmittedPrompt = <never>raw;'],
+      ['any, written as an angle-bracket assertion', 'const forged: StoredPrompt = <any>raw;']
+    ])('reports a cast to %s outside test code, because it names no brand and still compiles', (_name, source) => {
+      const found = forge(source, 'src/services/storage.ts');
+
+      expect(found).toHaveLength(1);
+      expect(found[0]?.message).toContain('defeats the branded types');
+    });
+
+    it('does not report a cast to never or any in test code', () => {
+      const source = 'const mock = { id: 1 } as any;\nconst nothing = value as never;';
+
+      expect(forge(source, 'src/services/__tests__/storage.test.ts')).toEqual([]);
+      expect(forge(source, 'src/test/helpers/mocks.ts')).toEqual([]);
+    });
+
     it('finds none in src', () => {
       expect(scan(findNominalTypeForgery)).toEqual([]);
     });
@@ -760,12 +796,27 @@ describe('Admission guardrails', () => {
       expect(writes(atTopLevel, 'src/services/storage.ts')).toHaveLength(1);
     });
 
-    it('does not ask StorageManager or the storage availability helper to prove their arguments', () => {
+    it('does not ask the storage availability helper to prove its arguments', () => {
       const source = 'async function write(payload) {\n  await chrome.storage.local.set(payload);\n}';
 
-      expect(writes(source, 'src/services/storage.ts')).toEqual([]);
       expect(writes(source, 'src/utils/chromeStorage.ts')).toEqual([]);
       expect(writes(source, 'src/utils/other.ts')).toHaveLength(1);
+    });
+
+    it('asks StorageManager to prove its arguments too: a new method cannot hide a prompts write behind a variable', () => {
+      const source = [
+        'class StorageManager {',
+        '  async importRaw(raw) {',
+        '    const payload = { prompts: raw };',
+        '    await chrome.storage.local.set(payload);',
+        '  }',
+        '}'
+      ].join('\n');
+
+      const found = writes(source, 'src/services/storage.ts');
+
+      expect(found).toHaveLength(1);
+      expect(found[0]?.message).toContain('cannot verify');
     });
 
     it('ignores test code', () => {
