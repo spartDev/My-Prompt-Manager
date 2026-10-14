@@ -41,7 +41,7 @@ This document provides comprehensive documentation for the business logic layer,
                  │
 ┌────────────────▼────────────────────────┐
 │  Storage Service (Data Layer)           │
-│  - StorageManager (with mutex locking)  │
+│  - StorageManager (cross-context locks) │
 └────────────────┬────────────────────────┘
                  │
 ┌────────────────▼────────────────────────┐
@@ -59,10 +59,10 @@ This document provides comprehensive documentation for the business logic layer,
 
 **Purpose:** Singleton service providing atomic, thread-safe operations for Chrome storage.local API.
 
-**Pattern:** Singleton with mutex locking
+**Pattern:** Singleton with keyed locks shared across contexts (Web Locks API)
 
 **Key Features:**
-- **Mutex-based concurrency control** - Prevents race conditions
+- **Cross-context locks** - `AsyncMutex({ scope: 'StorageManager' })`: the popup, the side panel and the service worker exclude each other through the Web Locks API (in-memory queue where it is missing)
 - **Storage quota monitoring** - Tracks usage (5MB limit)
 - **Import/export functionality** - Full data portability
 - **Comprehensive error handling** - Custom `StorageError` class
@@ -73,7 +73,7 @@ This document provides comprehensive documentation for the business logic layer,
 ```typescript
 class StorageManager {
   private static instance: StorageManager | null = null;
-  private operationLocks: Map<string, Promise<void>> = new Map();
+  private readonly mutex = new AsyncMutex({ scope: 'StorageManager' });
 
   static getInstance(): StorageManager;
 
@@ -100,36 +100,11 @@ class StorageManager {
   async importData(data: unknown): Promise<void>;
   async getStorageUsage(): Promise<{ used: number; total: number }>;
 
-  // Protected - Mutex Locking
-  private async withLock<T>(key: string, operation: () => Promise<T>): Promise<T>;
+  // Every write runs under this.mutex.withLock(key, operation); lock order CATEGORIES -> PROMPTS -> SETTINGS
 }
 ```
 
-**Mutex Locking Implementation:**
-
-```typescript
-private async withLock<T>(key: string, operation: () => Promise<T>): Promise<T> {
-  // Wait for any existing operation on this key
-  const existingLock = this.operationLocks.get(key);
-  if (existingLock) {
-    await existingLock;
-  }
-
-  // Create new lock
-  let resolveLock: () => void;
-  const newLock = new Promise<void>((resolve) => {
-    resolveLock = resolve;
-  });
-  this.operationLocks.set(key, newLock);
-
-  try {
-    return await operation();
-  } finally {
-    resolveLock!();
-    this.operationLocks.delete(key);
-  }
-}
-```
+**Locking:** `AsyncMutex` (`src/utils/asyncMutex.ts`) queues operations per key. Created with a `scope`, as StorageManager does, `withLock(key, operation)` runs `navigator.locks.request('StorageManager:' + key, operation)`, so the popup, the side panel and the service worker (same extension origin) exclude each other; the operation's result or error comes back unchanged and the lock is released either way. Where the Web Locks API is missing, or `request` throws synchronously, the in-memory queue is used (tests, old browsers). Nested keys are taken in the fixed order CATEGORIES → PROMPTS → SETTINGS, and nothing under a lock awaits another context. `UsageTracker` keeps a plain in-memory `AsyncMutex`.
 
 **Benefits:**
 - Prevents concurrent modifications to same data
@@ -517,15 +492,16 @@ if (!validation.valid) {
 | `admit(text)` / `admit(patch)` | Pure check of full text or a patch of some fields. Returns `{ ok: true, text }` or `{ ok: false, errors }` (a `Refusal` per field, with a `message` ready to show). Doubles as the form's dry check and live counter |
 | `readPrompt(raw)` | Reads one stored entry into a `StoredPrompt`, or `null` if it is not a Prompt (no string `id`, `title` or `content`). Text is never altered; missing fields are filled in deterministically, with no clock |
 | `readPrompts(raw)` | Reads the value stored under the prompts key into `StoredPrompt[]`, skipping entries that are not Prompts |
-| `scrubStored(raw, renames?)` | Upgrade pass for raw stored Prompts: removes Hidden characters from title, content and category. Never refuses, trims, shortens or drops an entry. Given the `renames` of `scrubStoredCategories`, a Prompt that named a merged Category is re-pointed to the Category that absorbed it (not an edit: nothing else changes). Returns `{ entries, changed }` |
-| `scrubStoredCategories(raw)` | The same for raw stored Category names; Categories whose names become the same ignoring case are merged into the first. Returns `{ entries, changed, renames }`, where `renames` maps the stored name of each merged Category to the exact name its Prompts must name now |
-| `scrubStoredSettings(raw, renames)` | Upgrade pass for the settings: `defaultCategory` is cleaned of Hidden characters and re-pointed through the same merges. Never trims or refuses. Returns `{ settings, changed }` |
-| `planCategoryMerge(names)` | The one merge rule, pure. Given each Category's name before and after a pass (cleaning, or Admission on import), says which later Categories are merged into the first one with the same name ignoring case, and where their Prompts go: the kept Category that spells the new name exactly, else the first. Names that were already the same before the pass are left alone. Used by the upgrade pass and by `importData` |
+| `scrubStored(raw, renames?)` | Upgrade pass for raw stored Prompts: removes Hidden characters from title, content and category, and trims the category (never the title or the content), as Admission does; a category that becomes empty names the default Category. Never refuses, shortens or drops an entry. Given the `renames` of `scrubStoredCategories`, a Prompt that named a merged Category is re-pointed to the Category that absorbed it (not an edit: nothing else changes). Returns `{ entries, changed }` |
+| `scrubStoredCategories(raw)` | The same for raw stored Category names, cleaned and trimmed; Categories whose names become the same ignoring case are merged into the first, and a name that becomes empty is merged into the default Category. Returns `{ entries, changed, renames }`, where `renames` maps the stored name of each merged Category to the exact name its Prompts must name now |
+| `scrubStoredSettings(raw, renames)` | Upgrade pass for the settings: `defaultCategory` is cleaned of Hidden characters, trimmed, and re-pointed through the same merges (one that becomes empty names the default Category). Never refuses. Returns `{ settings, changed }` |
+| `planCategoryMerge(names)` | The one merge rule, pure. Given each Category's name before and after a pass (cleaning and trimming, or Admission on import), says which later Categories are merged into the first one with the same name ignoring case, and where their Prompts go: the kept Category that spells the new name exactly, else the first. A name the pass empties is merged into the default Category. Names that were already the same (or already empty) before the pass are left alone. Used by the upgrade pass and by `importData` |
 | `matchStoredCategory(name, storedCategories)` | Backup restore: returns the stored spelling of the Category that `name`, once admitted, equals ignoring case (and none exactly); otherwise `name` unchanged. Never invents a Category. Takes the raw stored value, so reading never writes |
 | `admitNew(text, { id, now })` | Create route. Returns `{ ok: true, prompt }` (an `AdmittedPrompt`) or `{ ok: false, errors }` |
 | `admitEdit(current, patch, now)` | Edit route. Only the fields in the patch are checked; the rest is carried over (cleaned of Hidden characters, but not checked against the limits again, so a legacy over-limit Prompt stays editable) |
 | `admitRestored(incoming, now, { replacing? })` | Backup restore route. Keeps id, usage and timestamps; a refusal means the restore skips and reports this Prompt |
 | `recordUse(prompt, now)` | A non-text change (one more use) that keeps the result typed as a `StoredPrompt` |
+| `repointPrompt(prompt, category)` | A non-text change: moves the Prompt to a stored Category's exact name without counting as an edit (timestamps and usage stay). Used when a restore renames a Category by id |
 | `AdmissionRefusedError` | Thrown by the write path when a route is refused. An `AppError` of type `VALIDATION_ERROR` whose `errors` hold the per-field refusals |
 | `PROMPT_LIMITS` | `{ title: 100, content: 20000, category: 50 }`: the one definition of the limits, read by the forms, `PromptManager` and `StorageManager` |
 | `StoredPrompt` / `AdmittedPrompt` | Nominal types (classes with a private member, so an object literal or spread cannot be assigned). Both widen to a plain `Prompt`; an `AdmittedPrompt` is a `StoredPrompt` whose text has just been through Admission |
@@ -565,9 +541,9 @@ await this.writePrompts([...existingPrompts, admission.prompt]);
 
 Callers see the refusal as an `AdmissionRefusedError`; it keeps its type through `StorageManager` and `PromptManager`, so a caller can check `error instanceof AdmissionRefusedError` (the Backup restore in `SettingsView` does, to skip and report a refused Prompt and restore the rest).
 
-**Upgrade pass:** `StorageManager.upgradeStoredData()` runs `scrubStoredCategories`, then `scrubStored` and `scrubStoredSettings` with its merges, over the raw stored values once per extension update (the service worker calls it from `chrome.runtime.onInstalled` when the reason is `update`), under the CATEGORIES, PROMPTS and SETTINGS locks in that order, and writes every key that changed in one atomic set. It is the only code that writes raw, untyped entries to the prompts key (through `writeScrubbed()` instead of the typed `writePrompts()`), because it must keep malformed or over-limit entries rather than drop them.
+**Upgrade pass:** `StorageManager.upgradeStoredData()` runs `scrubStoredCategories`, then `scrubStored` and `scrubStoredSettings` with its merges, over the raw stored values once per extension update (the service worker calls it from `chrome.runtime.onInstalled` when the reason is `update`), under the CATEGORIES, PROMPTS and SETTINGS locks in that order (shared with the popup and the side panel through the Web Locks API, so a Prompt saved while the pass runs is not lost), and writes every key that changed in one atomic set. It never trims Prompt text; it trims the labels that Admission trims. It is the only code that writes raw, untyped entries to the prompts key (through `writeScrubbed()` instead of the typed `writePrompts()`), because it must keep malformed or over-limit entries rather than drop them.
 
-**Restore:** `importCategory` matches a Backup's Category to a stored one by admitted name; when Admission made the two names the same (a Hidden character or surrounding spaces), the stored Category keeps its id and name and takes the other fields from the Backup, and a Category without a string id is given one. `importPrompt` reads the stored Categories raw and uses `matchStoredCategory`, so a Prompt whose Category the Library spells differently takes the stored spelling. `importData` plans with `planCategoryMerge` after Admission and before the quota check, merging Categories made equal and re-pointing their Prompts and `settings.defaultCategory`.
+**Restore:** `importCategory` matches a Backup's Category to a stored one by admitted name; the stored Category then keeps its id and its name and takes the other fields (colour) from the Backup. Matched by id, it never renames the default Category and never renames a Category into another's name (the stored name stays), and a rename it does apply moves the Prompts with it through `repointPrompt`, in one atomic write under CATEGORIES then PROMPTS. A Category without a string id is given one, and a colour that is not a hex colour (`isValidHexColor`, the same test as `importData`'s) is dropped. `importPrompt` reads the stored Categories raw and uses `matchStoredCategory`, so a Prompt whose Category the Library spells differently takes the stored spelling. `importData` plans with `planCategoryMerge` after Admission and before the quota check, merging Categories made equal and re-pointing their Prompts and `settings.defaultCategory`.
 
 ---
 

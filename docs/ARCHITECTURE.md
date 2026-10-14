@@ -289,7 +289,7 @@ const strategy = new ClaudeStrategy('claude.ai'); // No mocking needed!
 
 ### 4. Singleton Pattern
 
-**Purpose**: Centralized storage access with mutex locking
+**Purpose**: Centralized storage access with keyed locks shared across contexts (Web Locks API)
 
 **Implementation**:
 
@@ -297,7 +297,8 @@ const strategy = new ClaudeStrategy('claude.ai'); // No mocking needed!
 // services/storage.ts
 export class StorageManager {
   private static instance: StorageManager | null = null;
-  private operationQueue: Promise<void> = Promise.resolve();
+  // Keyed locks shared across the popup, the side panel and the service worker (Web Locks API)
+  private readonly mutex = new AsyncMutex({ scope: 'StorageManager' });
 
   private constructor(private chrome: typeof chrome = globalThis.chrome) {}
 
@@ -310,30 +311,20 @@ export class StorageManager {
 
   // Mutex-locked operations
   async getPrompts(): Promise<StoredPrompt[]> {
-    return this.executeWithLock(async () => {
+    return this.mutex.withLock('prompts', async () => {
       const data = await this.chrome.storage.local.get('prompts');
       // Reading never writes and never changes text (see Security Architecture)
       return readPrompts(data.prompts);
     });
   }
 
-  private async executeWithLock<T>(operation: () => Promise<T>): Promise<T> {
-    const previousOperation = this.operationQueue;
-    let resolver: () => void;
-    this.operationQueue = new Promise(resolve => { resolver = resolve; });
-
-    await previousOperation;
-    try {
-      return await operation();
-    } finally {
-      resolver!();
-    }
-  }
+  // AsyncMutex (src/utils/asyncMutex.ts): navigator.locks.request('StorageManager:' + key, operation),
+  // with the in-memory queue where the Web Locks API is missing
 }
 ```
 
 **Benefits**:
-- Prevents race conditions on storage operations
+- Prevents race conditions on storage operations, within a context and across contexts
 - One write path: Prompt text is admitted (Hidden characters removed, limits enforced) inside the text-writing methods, so no route can skip it
 - Testable via constructor injection
 
@@ -419,7 +410,7 @@ src/content/
 | `PlatformInsertionManager` | Coordinate strategy selection and insertion | Mediator |
 | `PlatformManager` | Manage strategy registry and instantiation | Factory |
 | `UIElementFactory` | Create platform-specific UI elements | Factory |
-| `StorageManager` | Centralized storage with mutex locking | Singleton |
+| `StorageManager` | Centralized storage with keyed locks shared across contexts (Web Locks API) | Singleton |
 | `promptAdmission` | Admission of Prompt text, the one reader of stored Prompts, the upgrade scrubs (shared by popup, service worker and content script) | Pure module |
 | `PromptManager` | Business logic (search, validation, duplicates) | Service |
 | `KeyboardNavigationManager` | Handle keyboard interactions | Controller |
@@ -1333,22 +1324,16 @@ const handleToggle = useCallback((site: string) => {
 
 ### 3. Storage Performance
 
-**Mutex Locking for Race Conditions**:
+**Locking for Race Conditions** (`AsyncMutex`, `src/utils/asyncMutex.ts`):
 
 ```typescript
-private async executeWithLock<T>(operation: () => Promise<T>): Promise<T> {
-  const previousOperation = this.operationQueue;
-  let resolver: () => void;
+// StorageManager: one keyed lock per storage key, shared across the popup, the side panel
+// and the service worker through the Web Locks API (in-memory queue where it is missing)
+private readonly mutex = new AsyncMutex({ scope: 'StorageManager' });
 
-  this.operationQueue = new Promise(resolve => { resolver = resolve; });
-
-  await previousOperation; // Wait for previous operation
-  try {
-    return await operation();
-  } finally {
-    resolver!(); // Release lock
-  }
-}
+return this.mutex.withLock('prompts', async () => {
+  // read, decide, write: no other context can write 'prompts' in between
+});
 ```
 
 **Benefits**:

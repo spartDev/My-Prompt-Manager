@@ -37,7 +37,7 @@ The moment Prompt text or a Category name enters the Library, by any route: crea
 _Avoid_: "import" (covers only some of the routes), "sanitizing"
 
 **Hidden character**
-A character a reader cannot see but that can still carry meaning or change how text is read (for example control characters and invisible or direction-changing Unicode). Admission removes Hidden characters and nothing else; visible text, including angle-bracket tags, is never removed. The Library therefore never contains Hidden characters. Invisible characters that are part of ordinary writing are not Hidden characters and are kept: the joiners inside emoji and inside Persian or Indic words, the marks that Hebrew and Arabic need for direction, and the invisible pieces of the England, Scotland and Wales flag emoji.
+A character a reader cannot see but that can still carry meaning or change how text is read (for example control characters and invisible or direction-changing Unicode). Admission removes Hidden characters and nothing else; visible text, including angle-bracket tags, is never removed. The Library therefore never contains Hidden characters. Invisible characters that are part of ordinary writing are not Hidden characters and are kept: the joiners inside emoji and inside Persian or Indic words, the marks that Hebrew and Arabic need for direction, and the invisible pieces of the England, Scotland and Wales flag emoji. The list of Hidden characters is closed and exact: a character is a Hidden character only if it is on that list, and an invisible character that is not on it is kept, so a name that differs from another only by such a character is a different name.
 
 ## Relationships
 
