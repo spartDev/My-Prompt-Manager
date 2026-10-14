@@ -1431,10 +1431,9 @@ On extension update the service worker (`chrome.runtime.onInstalled`, reason `up
 
 ### Where DOMPurify is still used
 
-DOMPurify is not applied to Prompt text on write, on read or on insertion. Two narrow roles remain:
+DOMPurify is not applied to Prompt text on write, on read, on insertion or on display (the search highlight in `PromptCard` splits the stored title around matches and React renders every part as text). One narrow role remains:
 
 - **Configuration security** (`src/utils/configurationSecurity.ts`): text fields of custom site configurations, which can arrive through shared configuration codes, are sanitized with no tags or attributes allowed.
-- **Search highlight** (`PromptCard`): the text being highlighted (the Prompt title) and the search query are passed through DOMPurify before being split around matches. This is display only and never writes.
 
 ### Security Best Practices
 
