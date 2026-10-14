@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 
+import { isValidHexColor } from '../constants/colors';
 import {
   type Prompt,
   type Category,
@@ -30,6 +31,7 @@ import {
   readPrompt,
   readPrompts,
   recordUse,
+  repointPrompt,
   scrubStored,
   scrubStoredCategories,
   scrubStoredSettings,
@@ -332,21 +334,48 @@ export class StorageManager {
     return this.mutex.withLock(this.STORAGE_KEYS.CATEGORIES, async () => {
       try {
         // Admission: the name is admitted like every other Category name. A Category from a Backup
-        // may have no id (or not a string one); it is given one, so none is ever stored without.
+        // may have no id (or not a string one); it is given one, so none is ever stored without. A
+        // colour that is not a hex colour, by the same test as importData's, is dropped, not refused.
+        const { color, ...rest } = incoming;
         const category: Category = {
-          ...incoming,
+          ...rest,
           id: typeof incoming.id === 'string' ? incoming.id : uuidv4(),
-          name: this.admitCategoryName(incoming.name)
+          name: this.admitCategoryName(incoming.name),
+          ...(typeof color === 'string' && (color === '' || isValidHexColor(color)) && { color })
         };
 
         const existingCategories = await this.getCategories();
         const existingIndex = existingCategories.findIndex(c => c.id === category.id);
 
         if (existingIndex >= 0) {
-          // Update existing category
-          existingCategories[existingIndex] = category;
-          await this.setStorageData(this.STORAGE_KEYS.CATEGORIES, existingCategories);
-          return category;
+          // The Backup names a stored Category by id. It never renames the default Category, and
+          // never renames a Category into another's name (ignoring case): then the stored name stays
+          // and only the other fields (colour) come from the Backup. A rename it does apply moves the
+          // Prompts with it, in one atomic write, under the same locks as updateCategory.
+          const existing = existingCategories[existingIndex];
+          const taken = existingCategories.some(
+            (c, index) => index !== existingIndex && c.name.toLowerCase() === category.name.toLowerCase()
+          );
+          const updatedCategory: Category = {
+            ...category,
+            name: existing.name === DEFAULT_CATEGORY || taken ? existing.name : category.name
+          };
+          existingCategories[existingIndex] = updatedCategory;
+
+          if (updatedCategory.name === existing.name) {
+            await this.setStorageData(this.STORAGE_KEYS.CATEGORIES, existingCategories);
+            return updatedCategory;
+          }
+
+          return await this.mutex.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
+            const prompts = await this.getPrompts();
+            // Re-pointing is not an edit: timestamps and usage stay
+            const movedPrompts = prompts.map(prompt =>
+              prompt.category === existing.name ? repointPrompt(prompt, updatedCategory.name) : prompt
+            );
+            await this.writeCategoriesAndPrompts(existingCategories, movedPrompts);
+            return updatedCategory;
+          });
         } else {
           // Check for duplicate names (on the admitted name) before adding new category
           const duplicateNameIndex = existingCategories.findIndex(
@@ -354,17 +383,11 @@ export class StorageManager {
           );
 
           if (duplicateNameIndex >= 0) {
-            // The stored Category keeps its id. When Admission made the two names the same (a Hidden
-            // character or surrounding spaces in the Backup), the first wins and it keeps its name
-            // too, taking the other fields (colour) from the Backup. Names that were already the same
-            // ignoring case keep the earlier behaviour: the Backup's casing replaces the stored one.
+            // First wins: the stored Category keeps its id and its name (names are unique ignoring
+            // case, and the Library's Prompts name the stored spelling), and takes the other fields
+            // (colour) from the Backup. importPrompt snaps the Backup's Prompts to the stored spelling.
             const existing = existingCategories[duplicateNameIndex];
-            const madeEqual = incoming.name.toLowerCase() !== existing.name.toLowerCase();
-            const updatedCategory: Category = {
-              ...category,
-              id: existing.id,
-              name: madeEqual ? existing.name : category.name
-            };
+            const updatedCategory: Category = { ...category, id: existing.id, name: existing.name };
             existingCategories[duplicateNameIndex] = updatedCategory;
             await this.setStorageData(this.STORAGE_KEYS.CATEGORIES, existingCategories);
             return updatedCategory;
@@ -1190,7 +1213,7 @@ export class StorageManager {
     if ('color' in category && category.color !== undefined) {
       if (typeof category.color !== 'string') {
         errors.push(`${prefix}: Field "color" must be a string if provided`);
-      } else if (category.color.length > 0 && !category.color.match(/^#[0-9A-Fa-f]{6}$/)) {
+      } else if (category.color.length > 0 && !isValidHexColor(category.color)) {
         errors.push(`${prefix}: Field "color" must be a valid hex color (#RRGGBB format)`);
       }
     }

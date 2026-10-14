@@ -13,6 +13,7 @@ import {
   planCategoryMerge,
   readPrompts,
   recordUse,
+  repointPrompt,
   scrubStored,
   scrubStoredCategories,
   scrubStoredSettings
@@ -813,6 +814,14 @@ describe('writing a Prompt: the routes that make an AdmittedPrompt', () => {
       const current = stored();
 
       expect(recordUse(current, 777)).toEqual({ ...current, usageCount: 3, lastUsedAt: 777 });
+    });
+  });
+
+  describe('repointPrompt', () => {
+    it('moves a Prompt to a Category without counting it as an edit: timestamps and usage stay', () => {
+      const current = stored();
+
+      expect(repointPrompt(current, 'Play')).toEqual({ ...current, category: 'Play' });
     });
   });
 

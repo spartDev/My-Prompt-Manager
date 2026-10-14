@@ -321,7 +321,7 @@ describe('StorageManager Admission', () => {
       expect(await storedCategories()).toEqual(before);
     });
 
-    describe('a name that Admission made the same as a stored one', () => {
+    describe('a name that matches a stored one ignoring case', () => {
       it.each([
         ['the Backup has the Hidden character', 'Work', 'work\u{200B}'],
         ['the Backup has the other case and the Hidden character', 'work', 'Work\u{200B}'],
@@ -340,15 +340,121 @@ describe('StorageManager Admission', () => {
         expect(await storedCategories()).toEqual([{ id: 'default', name: DEFAULT_CATEGORY }, imported]);
       });
 
-      it('still lets a name that was already the same ignoring case replace the stored casing, as before', async () => {
+      it("keeps the stored id and name when only the case differs ('WORK' for 'Work'), so the Library's Prompts keep their Category", async () => {
+        const inWork = {
+          id: 'p1',
+          title: 'Title',
+          content: 'Body',
+          category: 'Work',
+          createdAt: 5,
+          updatedAt: 6,
+          usageCount: 1,
+          lastUsedAt: 6
+        };
         await chrome.storage.local.set({
           categories: [
             { id: 'default', name: DEFAULT_CATEGORY },
             { id: 'c1', name: 'Work' }
-          ]
+          ],
+          prompts: [inWork]
         });
 
-        expect(await storageManager.importCategory({ id: 'c2', name: 'WORK' })).toEqual({ id: 'c1', name: 'WORK' });
+        expect(await storageManager.importCategory({ id: 'c2', name: 'WORK', color: '#abcdef' })).toEqual({
+          id: 'c1',
+          name: 'Work',
+          color: '#abcdef'
+        });
+        expect(await storedPrompts()).toEqual([inWork]);
+      });
+    });
+
+    describe('a Backup that names a stored Category by id', () => {
+      const prompt = (id: string, category: string) => ({
+        id,
+        title: `Title ${id}`,
+        content: 'Body',
+        category,
+        createdAt: 5,
+        updatedAt: 6,
+        usageCount: 1,
+        lastUsedAt: 6
+      });
+
+      beforeEach(async () => {
+        await chrome.storage.local.set({
+          categories: [
+            { id: 'default', name: DEFAULT_CATEGORY },
+            { id: 'W', name: 'Work', color: '#000000' },
+            { id: 'H', name: 'Home' }
+          ],
+          prompts: [prompt('p1', 'Work'), prompt('p2', 'Home')]
+        });
+        vi.mocked(chrome.storage.local.set).mockClear();
+      });
+
+      it('renames it and moves its Prompts with it, without counting as an edit, in one atomic write', async () => {
+        const imported = await storageManager.importCategory({ id: 'W', name: ' Renamed\u{200B} ', color: '#123456' });
+
+        expect(imported).toEqual({ id: 'W', name: 'Renamed', color: '#123456' });
+        expect(chrome.storage.local.set).toHaveBeenCalledTimes(1);
+        expect(chrome.storage.local.set).toHaveBeenCalledWith({
+          categories: [{ id: 'default', name: DEFAULT_CATEGORY }, imported, { id: 'H', name: 'Home' }],
+          prompts: [prompt('p1', 'Renamed'), prompt('p2', 'Home')]
+        });
+      });
+
+      it.each([
+        ['exactly', 'Work'],
+        ['ignoring case', 'WORK']
+      ])("never renames it into another Category's name (%s): the stored name stays, the colour comes from the Backup", async (_case, name) => {
+        const imported = await storageManager.importCategory({ id: 'H', name, color: '#123456' });
+
+        expect(imported).toEqual({ id: 'H', name: 'Home', color: '#123456' });
+        expect(chrome.storage.local.set).toHaveBeenCalledTimes(1);
+        expect(chrome.storage.local.set).toHaveBeenCalledWith({
+          categories: [{ id: 'default', name: DEFAULT_CATEGORY }, { id: 'W', name: 'Work', color: '#000000' }, imported]
+        });
+        expect(await storedPrompts()).toEqual([prompt('p1', 'Work'), prompt('p2', 'Home')]);
+      });
+
+      it('never renames the default Category', async () => {
+        const imported = await storageManager.importCategory({ id: 'default', name: 'Everything', color: '#abcdef' });
+
+        expect(imported).toEqual({ id: 'default', name: DEFAULT_CATEGORY, color: '#abcdef' });
+        expect(await storedCategories()).toEqual([imported, { id: 'W', name: 'Work', color: '#000000' }, { id: 'H', name: 'Home' }]);
+      });
+
+      it('touches no Prompt when the name is the same', async () => {
+        const imported = await storageManager.importCategory({ id: 'W', name: 'Work', color: '#abcdef' });
+
+        expect(imported).toEqual({ id: 'W', name: 'Work', color: '#abcdef' });
+        expect(chrome.storage.local.set).toHaveBeenCalledTimes(1);
+        expect(chrome.storage.local.set).toHaveBeenCalledWith({
+          categories: [{ id: 'default', name: DEFAULT_CATEGORY }, imported, { id: 'H', name: 'Home' }]
+        });
+      });
+    });
+
+    it('drops a colour that is not a hex colour, and keeps the Category', async () => {
+      const styled = await storageManager.importCategory({
+        id: 'c9',
+        name: 'Styled',
+        color: 'red; background-image: url(javascript:alert(1))'
+      });
+
+      expect(styled).toEqual({ id: 'c9', name: 'Styled' });
+      expect(styled).not.toHaveProperty('color');
+      expect(await storedCategories()).toContainEqual({ id: 'c9', name: 'Styled' });
+
+      expect(await storageManager.importCategory({ id: 'c8', name: 'Hex', color: '#ABCDEF' })).toEqual({
+        id: 'c8',
+        name: 'Hex',
+        color: '#ABCDEF'
+      });
+      expect(await storageManager.importCategory({ id: 'c7', name: 'Blank', color: '' })).toEqual({
+        id: 'c7',
+        name: 'Blank',
+        color: ''
       });
     });
 
@@ -379,7 +485,7 @@ describe('StorageManager Admission', () => {
 
     it.each([
       ['the later Category has the Hidden character', ['Work', 'work\u{200B}'], 'Work'],
-      ['the first Category has the Hidden character', ['work\u{200B}', 'Work'], 'Work']
+      ['the first Category has the Hidden character', ['work\u{200B}', 'Work'], 'work']
     ])('ends with one Category and every Prompt naming it (%s)', async (_case, [first, second], kept) => {
       await storageManager.importCategory({ id: 'c1', name: first });
       await storageManager.importCategory({ id: 'c2', name: second });

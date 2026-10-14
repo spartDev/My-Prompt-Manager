@@ -588,3 +588,13 @@ export function matchStoredCategory(name: string, storedCategories: unknown): st
 export function recordUse(prompt: StoredPrompt, now: number): StoredPrompt {
   return mintStored({ ...prompt, usageCount: prompt.usageCount + 1, lastUsedAt: now });
 }
+
+/**
+ * A non-text change that keeps the result typed: moves the Prompt to a Category. It is not an
+ * edit (a restore or an upgrade that merges or renames a Category re-points its Prompts), so
+ * timestamps and usage stay. `category` must be the exact name of a stored Category, admitted
+ * when it was stored.
+ */
+export function repointPrompt(prompt: StoredPrompt, category: string): StoredPrompt {
+  return mintStored({ ...prompt, category });
+}
