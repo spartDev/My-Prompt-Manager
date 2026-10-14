@@ -69,8 +69,10 @@ export class StorageManager {
     MAX_TOTAL_SIZE: 8000000       // Maximum total storage (8MB, leaving 2MB buffer)
   } as const;
 
-  // Mutex for preventing concurrent storage operations
-  private readonly mutex = new AsyncMutex();
+  // Locks for the storage keys, shared with the other contexts (popup, side panel, service worker)
+  // through the Web Locks API, so a read-then-write from one context cannot overwrite a write
+  // made in between from another. Lock order: CATEGORIES -> PROMPTS -> SETTINGS.
+  private readonly mutex = new AsyncMutex({ scope: 'StorageManager' });
 
   private constructor() {}
 
