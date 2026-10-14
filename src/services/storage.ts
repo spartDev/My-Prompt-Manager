@@ -502,11 +502,14 @@ export class StorageManager {
   /**
    * The one-time upgrade pass (ADR-001, "Existing data"): cleans stored Prompts, Category names
    * and the default Category of Hidden characters. It works on the raw stored values, so it never
-   * refuses, trims, shortens or drops a Prompt, including a malformed one or one already over the
-   * limits. The only Categories it drops are later ones whose name becomes the same as an earlier
-   * one's once cleaned; every Prompt, and the default Category, that named a dropped Category is
-   * re-pointed to the kept one in the same write. It writes nothing when there is nothing to
-   * clean, and every key that changed in one atomic write. Safe to run any number of times.
+   * refuses, shortens or drops a Prompt, including a malformed one or one already over the
+   * limits, and never trims Prompt text; it trims the labels that Admission trims (Category
+   * names, a Prompt's category, the default Category). The only Categories it drops are later
+   * ones whose name becomes the same as an earlier one's once cleaned, and ones whose name
+   * becomes empty; every Prompt, and the default Category, that named a dropped Category is
+   * re-pointed to the kept one (the default Category for an emptied name) in the same write. It
+   * writes nothing when there is nothing to clean, and every key that changed in one atomic
+   * write. Safe to run any number of times.
    */
   upgradeStoredData(): Promise<{ promptsChanged: boolean; categoriesChanged: boolean }> {
     // Same lock order as updateCategory, CATEGORIES then PROMPTS, with SETTINGS last

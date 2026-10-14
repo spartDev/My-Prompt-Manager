@@ -121,7 +121,7 @@ describe('StorageManager.upgradeStoredData', () => {
   });
 
   describe('stored Categories', () => {
-    it('removes Hidden characters from Category names, and reports it', async () => {
+    it('removes Hidden characters and surrounding spaces from Category names, and reports it', async () => {
       await seed({
         categories: [
           { id: 'default', name: DEFAULT_CATEGORY },
@@ -134,8 +134,48 @@ describe('StorageManager.upgradeStoredData', () => {
       expect(result).toEqual({ promptsChanged: false, categoriesChanged: true });
       expect(await storedCategories()).toEqual([
         { id: 'default', name: DEFAULT_CATEGORY },
-        { id: 'c1', name: ' Work ', color: '#112233' }
+        { id: 'c1', name: 'Work', color: '#112233' }
       ]);
+    });
+
+    it.each([
+      ['the padded one is first', [' Work', 'Work']],
+      ['the padded one is later', ['Work', ' Work']]
+    ])("merges ' Work' and 'Work', made the same by trimming, and re-points their Prompts (%s)", async (_case, [first, second]) => {
+      await seed({
+        categories: [{ id: 'c1', name: first }, { id: 'c2', name: second }],
+        prompts: [prompt('p1', { category: first }), prompt('p2', { category: second }), prompt('p3', { category: ' Work ' })]
+      });
+
+      await storageManager.upgradeStoredData();
+
+      expect(await storedCategories()).toEqual([{ id: 'c1', name: 'Work' }]);
+      expect(await storedPrompts()).toEqual([
+        prompt('p1', { category: 'Work' }),
+        prompt('p2', { category: 'Work' }),
+        prompt('p3', { category: 'Work' })
+      ]);
+    });
+
+    it('merges a name that becomes empty into the default Category, with its Prompts and the default Category setting, in one write', async () => {
+      await seed({
+        categories: [{ id: 'default', name: DEFAULT_CATEGORY }, { id: 'c1', name: '\u{200B}' }, { id: 'c2', name: '   ' }],
+        prompts: [prompt('p1', { category: '\u{200B}' }), prompt('p2', { category: '   ' }), prompt('p3', { category: '' })],
+        settings: { defaultCategory: '\u{200B}', sortOrder: 'updatedAt' }
+      });
+
+      await storageManager.upgradeStoredData();
+
+      expect(chrome.storage.local.set).toHaveBeenCalledTimes(1);
+      expect(chrome.storage.local.set).toHaveBeenCalledWith({
+        prompts: [
+          prompt('p1', { category: DEFAULT_CATEGORY }),
+          prompt('p2', { category: DEFAULT_CATEGORY }),
+          prompt('p3', { category: '' })
+        ],
+        categories: [{ id: 'default', name: DEFAULT_CATEGORY }],
+        settings: { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt' }
+      });
     });
 
     it("merges 'Work' and 'Work' + U+200B into one Category, and no Prompt is left without its Category", async () => {
@@ -291,14 +331,14 @@ describe('StorageManager.upgradeStoredData', () => {
       });
     });
 
-    it('cleans it even when it names no Category, without trimming or refusing it', async () => {
+    it('cleans and trims it even when it names no Category, without refusing it', async () => {
       await seed({ settings: { defaultCategory: ' Ho\u{200B}me ', sortOrder: 'updatedAt' } });
 
       await storageManager.upgradeStoredData();
 
       expect(chrome.storage.local.set).toHaveBeenCalledTimes(1);
       expect(chrome.storage.local.set).toHaveBeenCalledWith({
-        settings: { defaultCategory: ' Home ', sortOrder: 'updatedAt' }
+        settings: { defaultCategory: 'Home', sortOrder: 'updatedAt' }
       });
     });
 

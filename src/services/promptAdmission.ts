@@ -218,17 +218,33 @@ export function readPrompt(raw: unknown): StoredPrompt | null {
 
 const NO_RENAMES: ReadonlyMap<string, string> = new Map();
 
-/** A reference to a Category in the upgrade pass: re-pointed if its Category was merged, otherwise cleaned. */
+/** A label (a Category name, a Prompt's category, the default Category) is cleaned and trimmed, as Admission does. */
+function cleanLabel(name: string): string {
+  return removeHiddenCharacters(name).trim();
+}
+
+/**
+ * A reference to a Category in the upgrade pass: re-pointed if its Category was merged, otherwise
+ * cleaned and trimmed; one that the pass empties names the default Category instead.
+ */
 function scrubCategoryReference(name: string, renames: ReadonlyMap<string, string>): string {
-  return renames.get(name) ?? removeHiddenCharacters(name);
+  const renamed = renames.get(name);
+  if (renamed !== undefined) {
+    return renamed;
+  }
+
+  const clean = cleanLabel(name);
+  return clean === '' && name !== '' ? DEFAULT_CATEGORY : clean;
 }
 
 /**
  * The one-time upgrade pass: removes Hidden characters from the title, content and
  * category of raw stored entries. It works on the raw value, never refuses, and never
- * trims, shortens or drops anything (including over-limit and malformed entries), so
- * existing Prompts are cleaned without ever being lost. Entries with nothing to clean
- * are returned as the same objects; `changed` tells the caller whether a write is needed.
+ * shortens or drops anything (including over-limit and malformed entries), so existing
+ * Prompts are cleaned without ever being lost. The title and the content are never trimmed;
+ * the category is a label, trimmed as Admission trims it, and one that becomes empty names
+ * the default Category instead. Entries with nothing to clean are returned as the same
+ * objects; `changed` tells the caller whether a write is needed.
  *
  * `renames` are the merges reported by scrubStoredCategories: a Prompt whose category is the
  * stored name of a merged Category is re-pointed to the Category that absorbed it. Re-pointing
@@ -294,7 +310,9 @@ export interface CategoryMergePlan {
  * the first keeps its place and its name and the later ones are merged into it. Names that
  * were already the same ignoring case before the pass are left alone: a pass only merges what
  * it made equal. A merged Category's Prompts are re-pointed to the kept Category whose name is
- * exactly the merged one's new name, or else to the first kept one.
+ * exactly the merged one's new name, or else to the first kept one. A name the pass empties
+ * (only Hidden characters, or only spaces once trimmed) is merged into the default Category;
+ * a name that was already empty is left alone.
  *
  * Pure: it only plans. `undefined` stands for an entry that is not a Category and is skipped.
  */
@@ -302,9 +320,17 @@ export function planCategoryMerge(names: readonly (CategoryName | undefined)[]):
   /** Name after, lowercase -> the first Category's name before (lowercase), the kept names, the merged ones. */
   const groups = new Map<string, { first: string; kept: string[]; merged: CategoryName[] }>();
   const merged = new Set<number>();
+  const renames = new Map<string, string>();
 
   names.forEach((name, index) => {
     if (name === undefined) {
+      return;
+    }
+
+    if (name.after === '' && name.before !== '') {
+      // A name the pass emptied is no name: the Category goes to the default Category
+      merged.add(index);
+      renames.set(name.before, DEFAULT_CATEGORY);
       return;
     }
 
@@ -324,7 +350,6 @@ export function planCategoryMerge(names: readonly (CategoryName | undefined)[]):
     }
   });
 
-  const renames = new Map<string, string>();
   for (const group of groups.values()) {
     for (const name of group.merged) {
       renames.set(name.before, group.kept.find((kept) => kept === name.after) ?? group.kept[0]);
@@ -336,15 +361,16 @@ export function planCategoryMerge(names: readonly (CategoryName | undefined)[]):
 
 /**
  * The one-time upgrade pass for Category names, the counterpart of scrubStored: removes
- * Hidden characters from the `name` of raw stored Categories, and never trims, refuses or
- * shortens a name or drops a malformed entry. Entries with nothing to clean are returned
- * as the same objects.
+ * Hidden characters from the `name` of raw stored Categories and trims it, as Admission does,
+ * and never refuses or shortens a name or drops a malformed entry. Entries with nothing to
+ * clean are returned as the same objects.
  *
- * Cleaning can make two names the same (`Work` and `Work` + U+200B); Categories never share a
- * name, so planCategoryMerge decides: the first is kept and the later ones are dropped, and
- * `renames` says where their Prompts, and the default Category, must be re-pointed, which
- * scrubStored and scrubStoredSettings do so that the same write leaves nothing orphaned.
- * Names that were already the same before cleaning are left as they are.
+ * Cleaning can make two names the same (`Work` and `Work` + U+200B, or ` Work`); Categories
+ * never share a name, so planCategoryMerge decides: the first is kept and the later ones are
+ * dropped (a name that becomes empty goes to the default Category), and `renames` says where
+ * their Prompts, and the default Category, must be re-pointed, which scrubStored and
+ * scrubStoredSettings do so that the same write leaves nothing orphaned. Names that were
+ * already the same before cleaning are left as they are.
  */
 export function scrubStoredCategories(raw: unknown): {
   entries: unknown[];
@@ -357,7 +383,7 @@ export function scrubStoredCategories(raw: unknown): {
 
   const names = raw.map((entry: unknown) =>
     isRecord(entry) && typeof entry.name === 'string'
-      ? { before: entry.name, after: removeHiddenCharacters(entry.name) }
+      ? { before: entry.name, after: cleanLabel(entry.name) }
       : undefined
   );
   const plan = planCategoryMerge(names);
@@ -384,9 +410,10 @@ export function scrubStoredCategories(raw: unknown): {
 
 /**
  * The one-time upgrade pass for the settings: the default Category names a Category, so it is
- * cleaned of Hidden characters and re-pointed through the same merges as the Prompts. Never
- * trims or refuses; anything that is not a settings object with a string defaultCategory, or
- * one with nothing to change, is returned as the same value.
+ * cleaned of Hidden characters, trimmed, and re-pointed through the same merges as the Prompts
+ * (one that becomes empty names the default Category). Never refuses; anything that is not a
+ * settings object with a string defaultCategory, or one with nothing to change, is returned as
+ * the same value.
  */
 export function scrubStoredSettings(
   raw: unknown,

@@ -330,6 +330,21 @@ describe('scrubStored (the one-time upgrade pass)', () => {
     expect(scrubStored(undefined)).toEqual({ changed: false, entries: [] });
   });
 
+  it('trims the category, as Admission does, but never the title or the content', () => {
+    const padded = { ...entry, title: ' Title ', content: ' Body ', category: ' Work ' };
+
+    expect(scrubStored([padded])).toEqual({ changed: true, entries: [{ ...padded, category: 'Work' }] });
+  });
+
+  it('sends a category that becomes empty to the default Category, and leaves one that already was empty alone', () => {
+    expect(
+      scrubStored([{ ...entry, category: '\u{200B}' }, { ...entry, category: ' ' }, { ...entry, category: '' }])
+    ).toEqual({
+      changed: true,
+      entries: [{ ...entry, category: DEFAULT_CATEGORY }, { ...entry, category: DEFAULT_CATEGORY }, { ...entry, category: '' }]
+    });
+  });
+
   describe('with the merges reported by scrubStoredCategories', () => {
     const renames = new Map([['work\u{200B}', 'Work']]);
 
@@ -360,10 +375,10 @@ describe('scrubStoredCategories (the one-time upgrade pass, Category names)', ()
     });
   });
 
-  it('never trims, refuses or shortens a name', () => {
+  it('trims a name, as Admission does, but never refuses or shortens it', () => {
     const padded = { ...work, name: `  ${'W'.repeat(60)}\u{200B}  ` };
 
-    expect(scrubStoredCategories([padded]).entries).toEqual([{ ...work, name: `  ${'W'.repeat(60)}  ` }]);
+    expect(scrubStoredCategories([padded]).entries).toEqual([{ ...work, name: 'W'.repeat(60) }]);
   });
 
   it('leaves entries that are not Categories untouched', () => {
@@ -444,6 +459,36 @@ describe('scrubStoredCategories (the one-time upgrade pass, Category names)', ()
     expect(result.renames).toEqual(new Map([['work\u{200B}', 'work']]));
   });
 
+  it("merges ' Work' into 'Work' once trimmed, whichever is first, and reports where its Prompts go", () => {
+    expect(scrubStoredCategories([work, { id: 'c2', name: ' Work' }])).toEqual({
+      changed: true,
+      entries: [work],
+      renames: new Map([[' Work', 'Work']])
+    });
+    expect(scrubStoredCategories([{ id: 'c1', name: ' Work ' }, { id: 'c2', name: 'Work' }])).toEqual({
+      changed: true,
+      entries: [{ id: 'c1', name: 'Work' }],
+      renames: new Map([['Work', 'Work']])
+    });
+  });
+
+  it('merges a name that becomes empty into the default Category, and leaves a name that already was empty alone', () => {
+    const emptied = [{ id: 'c1', name: '\u{200B}' }, { id: 'c2', name: '   ' }];
+
+    expect(scrubStoredCategories([work, ...emptied])).toEqual({
+      changed: true,
+      entries: [work],
+      renames: new Map([
+        ['\u{200B}', DEFAULT_CATEGORY],
+        ['   ', DEFAULT_CATEGORY]
+      ])
+    });
+
+    const alreadyEmpty = [{ id: 'c1', name: '' }];
+
+    expect(scrubStoredCategories(alreadyEmpty)).toEqual({ changed: false, entries: alreadyEmpty, renames: new Map() });
+  });
+
   it('has nothing to do when the stored value is not a list', () => {
     expect(scrubStoredCategories(undefined)).toEqual({ changed: false, entries: [], renames: new Map() });
     expect(scrubStoredCategories({ name: 'Work' })).toEqual({ changed: false, entries: [], renames: new Map() });
@@ -494,6 +539,16 @@ describe('planCategoryMerge (the one rule for Categories whose names a pass made
     );
   });
 
+  it('merges a name the pass emptied into the default Category, and leaves a name that was already empty alone', () => {
+    expect(planCategoryMerge([same('Work'), cleaned('\u{200B}'), cleaned('  '), same('')])).toEqual({
+      merged: new Set([1, 2]),
+      renames: new Map([
+        ['\u{200B}', DEFAULT_CATEGORY],
+        ['  ', DEFAULT_CATEGORY]
+      ])
+    });
+  });
+
   it('skips entries that are not Categories, which are never merged', () => {
     expect(planCategoryMerge([undefined, same('Work'), undefined, cleaned('Work\u{FEFF}')])).toEqual({
       merged: new Set([3]),
@@ -537,10 +592,18 @@ describe('scrubStoredSettings (the one-time upgrade pass, the default Category)'
     });
   });
 
-  it('never trims or refuses, and returns the very same value when there is nothing to change', () => {
+  it('trims the default Category, as Admission does, and sends one that becomes empty to the default Category', () => {
+    expect(scrubStoredSettings({ ...settings, defaultCategory: ' Work ' }, renames)).toEqual({ changed: true, settings });
+    expect(scrubStoredSettings({ ...settings, defaultCategory: '\u{200B}' }, renames)).toEqual({
+      changed: true,
+      settings: { ...settings, defaultCategory: DEFAULT_CATEGORY }
+    });
+  });
+
+  it('never refuses, and returns the very same value when there is nothing to change', () => {
     const untouched = [
       settings,
-      { ...settings, defaultCategory: '  ' },
+      { ...settings, defaultCategory: '' },
       { ...settings, defaultCategory: 'x'.repeat(60) },
       { sortOrder: 'title' },
       undefined,
@@ -575,7 +638,7 @@ describe('matchStoredCategory (a restored Prompt takes the stored spelling of it
 });
 
 describe('the upgrade pass as a whole (scrubStoredCategories, then scrubStored with its merges)', () => {
-  it('leaves no Prompt without its Category, and no two names the same ignoring case unless they already were', () => {
+  it('leaves no Prompt without its Category (or the default one), and no two names the same ignoring case unless they already were', () => {
     const pieces = ['Work', 'work', 'WORK', 'Home', 'İş', 'ß', ' ', '\u{200B}', '\u{FEFF}', '\u{202E}'];
     let seed = 7;
     const next = (): number => {
@@ -603,7 +666,8 @@ describe('the upgrade pass as a whole (scrubStoredCategories, then scrubStored w
       const scrubbedCategories = scrubStoredCategories(categories);
       const scrubbedPrompts = scrubStored(prompts, scrubbedCategories.renames);
       const after = scrubbedCategories.entries as { id: string; name: string }[];
-      const namesAfter = new Set(after.map((category) => category.name));
+      // A name the pass empties goes to the default Category, which getCategories() creates when it is missing
+      const namesAfter = new Set([...after.map((category) => category.name), DEFAULT_CATEGORY]);
 
       scrubbedPrompts.entries.forEach((entry, index) => {
         const prompt = entry as (typeof prompts)[number];
