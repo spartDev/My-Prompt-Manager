@@ -42,7 +42,9 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
   const [titleLength, setTitleLength] = useState(prompt.title.length);
   const [contentLength, setContentLength] = useState(prompt.content.length);
 
-  // Track current form values for dirty checking
+  // Track current form values for dirty checking. They are also the inputs' defaultValue: React 19
+  // resets a form's uncontrolled fields once its action completes, and the reset restores the
+  // defaultValue, so a refused save keeps exactly what the user typed instead of the stored text.
   const [currentValues, setCurrentValues] = useState({
     title: prompt.title,
     content: prompt.content,
@@ -178,7 +180,7 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
               type="text"
               id="title"
               name="title"
-              defaultValue={prompt.title}
+              defaultValue={currentValues.title}
               onChange={(e) => { handleFieldChange('title', e.target.value); }}
               placeholder="Enter a descriptive title"
               className={`w-full px-4 py-3 border rounded-xl focus-input bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 text-sm text-gray-900 dark:text-gray-100 ${
@@ -232,7 +234,7 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
             <textarea
               id="content"
               name="content"
-              defaultValue={prompt.content}
+              defaultValue={currentValues.content}
               onChange={(e) => { handleFieldChange('content', e.target.value); }}
               placeholder="Enter your prompt content here..."
               rows={10}

@@ -490,4 +490,39 @@ describe('AddPromptForm - Limits', () => {
       expect(props.onSubmit).toHaveBeenCalledWith({ title: '', content, category: 'Uncategorized' });
     });
   });
+
+  // React 19 resets the uncontrolled fields of a form once its action completes, so a refused
+  // save must not wipe what the user typed: the text stays, with the refusal next to it.
+  it('keeps the title, content and category exactly as typed when the save is refused, then saves the corrected text', async () => {
+    const { props } = renderForm();
+    const overLimit = 'x'.repeat(PROMPT_LIMITS.content + 1);
+
+    await userEvent.type(screen.getByLabelText(/title/i), 'My Title');
+    await userEvent.click(screen.getByRole('button', { name: /category/i }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: /work/i }));
+    await userEvent.click(screen.getByLabelText(/content/i));
+    await userEvent.paste(overLimit);
+    await userEvent.click(screen.getByRole('button', { name: /save prompt/i }));
+
+    expect(await screen.findByText('Content cannot exceed 20,000 characters')).toBeInTheDocument();
+    expect(screen.getByLabelText(/title/i)).toHaveValue('My Title');
+    expect(screen.getByLabelText(/content/i)).toHaveValue(overLimit);
+    expect(screen.getByRole('button', { name: /category/i })).toHaveTextContent('Work');
+    expect(screen.getByText(formatCharacterCount(overLimit.length, PROMPT_LIMITS.content))).toHaveClass('text-red-600');
+    expect(props.onSubmit).not.toHaveBeenCalled();
+
+    await userEvent.clear(screen.getByLabelText(/content/i));
+    await userEvent.paste('Within the limit');
+    await userEvent.click(screen.getByRole('button', { name: /save prompt/i }));
+
+    await waitFor(() => {
+      expect(props.onSubmit).toHaveBeenCalledWith({ title: 'My Title', content: 'Within the limit', category: 'Work' });
+    });
+
+    // A successful save still leaves a fresh form behind
+    await waitFor(() => {
+      expect(screen.getByLabelText(/title/i)).toHaveValue('');
+      expect(screen.getByLabelText(/content/i)).toHaveValue('');
+    });
+  });
 });

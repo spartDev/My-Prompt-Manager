@@ -83,4 +83,34 @@ describe('EditPromptForm - Limits', () => {
       expect(props.onSubmit).toHaveBeenCalledWith({ title: 'Title', content, category: 'Work' });
     });
   });
+
+  // React 19 resets the uncontrolled fields of a form once its action completes, so a refused
+  // save must not put the stored text back: what the user typed stays, with the refusal next to it.
+  it('keeps the title, content and category exactly as typed when the save is refused, then saves the corrected text', async () => {
+    const { props } = renderForm();
+    const overLimit = 'x'.repeat(PROMPT_LIMITS.content + 1);
+
+    await userEvent.clear(screen.getByLabelText(/title/i));
+    await userEvent.type(screen.getByLabelText(/title/i), 'New Title');
+    await userEvent.click(screen.getByRole('button', { name: /category/i }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: /uncategorized/i }));
+    await userEvent.clear(screen.getByLabelText(/content/i));
+    await userEvent.paste(overLimit);
+    await userEvent.click(screen.getByRole('button', { name: /save changes/i }));
+
+    expect(await screen.findByText(/Content cannot exceed 20,000 characters/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/title/i)).toHaveValue('New Title');
+    expect(screen.getByLabelText(/content/i)).toHaveValue(overLimit);
+    expect(screen.getByRole('button', { name: /category/i })).toHaveTextContent('Uncategorized');
+    expect(screen.getByText(formatCharacterCount(overLimit.length, PROMPT_LIMITS.content))).toHaveClass('text-red-600');
+    expect(props.onSubmit).not.toHaveBeenCalled();
+
+    await userEvent.clear(screen.getByLabelText(/content/i));
+    await userEvent.paste('New body');
+    await userEvent.click(screen.getByRole('button', { name: /save changes/i }));
+
+    await waitFor(() => {
+      expect(props.onSubmit).toHaveBeenCalledWith({ title: 'New Title', content: 'New body', category: 'Uncategorized' });
+    });
+  });
 });
