@@ -27,11 +27,8 @@ export const USAGE_STORAGE_KEY = 'usageHistory';
 // Validation Limits
 // ============================================================================
 
-/** Validation limits for prompts, categories, and other entities */
+/** Length of a title generated from content; the Prompt text limits are PROMPT_LIMITS (src/services/promptAdmission.ts) */
 export const VALIDATION_LIMITS = {
-  PROMPT_TITLE_MAX: 100,
-  PROMPT_CONTENT_MAX: 20000,
-  CATEGORY_NAME_MAX: 50,
   TITLE_GENERATION_LENGTH: 50
 } as const;
 
@@ -55,10 +52,7 @@ export const DEFAULT_SETTINGS: Settings = {
 // Prompt Sharing Constants
 // ============================================================================
 
-/** Size limits for prompt sharing/encoding */
+/** Size limit for an encoded Share code */
 export const PROMPT_SHARING_SIZE_LIMITS = {
-  TITLE_MAX: 100,
-  CONTENT_MAX: 20_000,
-  CATEGORY_MAX: 50,
   ENCODED_MAX: 40_000,
 } as const;

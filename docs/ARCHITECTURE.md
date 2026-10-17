@@ -136,7 +136,7 @@ export abstract class PlatformStrategy {
 **Implementation**: `ReactPlatformStrategy` extends `PlatformStrategy` and provides:
 
 1. **Native Value Setter Caching**: Caches React's native HTMLTextAreaElement value setter for 90% performance improvement
-2. **Content Validation**: Centralized validation and sanitization logic
+2. **Content Type Check**: `validateContent()` confirms the content is a string; the content itself is never changed (see [Security Architecture](#security-architecture))
 3. **React-Compatible Insertion**: Handles React's synthetic events and state updates
 
 **Example**:
@@ -144,7 +144,6 @@ export abstract class PlatformStrategy {
 ```typescript
 // copilot-strategy.ts
 import { ReactPlatformStrategy } from './react-platform-strategy';
-import { MAX_CONTENT_LENGTHS } from './constants';
 
 export class CopilotStrategy extends ReactPlatformStrategy {
   constructor(hostname?: string) {
@@ -155,16 +154,16 @@ export class CopilotStrategy extends ReactPlatformStrategy {
   }
 
   async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
-    // Validate using base class method
-    const validation = this.validateAndSanitize(content, MAX_CONTENT_LENGTHS.COPILOT);
-    if (!validation.valid || !validation.sanitized) {
+    // Check the content type using base class method
+    const validation = this.validateContent(content);
+    if (!validation.valid) {
       return await Promise.resolve({ success: false, error: validation.error });
     }
 
-    // Insert using base class React-compatible method
+    // Insert the content exactly as given, using base class React-compatible method
     return await this.insertIntoReactTextarea(
       element as HTMLTextAreaElement,
-      validation.sanitized,
+      content,
       'Copilot React',
       'copilot-react'
     );
@@ -174,14 +173,14 @@ export class CopilotStrategy extends ReactPlatformStrategy {
 
 **Shared Methods**:
 - `initializeNativeValueSetter()`: Static initialization method
-- `validateAndSanitize(content, maxLength)`: Content validation and sanitization
+- `validateContent(content)`: Type check only (the content must be a string); content is never trimmed, shortened or sanitized
 - `insertIntoReactTextarea(element, content, platformName, methodName?)`: React-compatible textarea insertion
 
 **Benefits**:
 - **Code Reuse**: 120+ lines eliminated across Copilot strategies
 - **Single Source of Truth**: React patterns centralized
 - **Future Scalability**: Easy to add new React-based platforms
-- **Consistent Behavior**: All React platforms use same validated insertion logic
+- **Consistent Behavior**: All React platforms use same insertion logic
 
 ---
 
@@ -290,7 +289,7 @@ const strategy = new ClaudeStrategy('claude.ai'); // No mocking needed!
 
 ### 4. Singleton Pattern
 
-**Purpose**: Centralized storage access with mutex locking
+**Purpose**: Centralized storage access with keyed locks shared across contexts (Web Locks API)
 
 **Implementation**:
 
@@ -298,7 +297,8 @@ const strategy = new ClaudeStrategy('claude.ai'); // No mocking needed!
 // services/storage.ts
 export class StorageManager {
   private static instance: StorageManager | null = null;
-  private operationQueue: Promise<void> = Promise.resolve();
+  // Keyed locks shared across the popup, the side panel and the service worker (Web Locks API)
+  private readonly mutex = new AsyncMutex({ scope: 'StorageManager' });
 
   private constructor(private chrome: typeof chrome = globalThis.chrome) {}
 
@@ -310,31 +310,22 @@ export class StorageManager {
   }
 
   // Mutex-locked operations
-  async getPrompts(): Promise<Prompt[]> {
-    return this.executeWithLock(async () => {
+  async getPrompts(): Promise<StoredPrompt[]> {
+    return this.mutex.withLock('prompts', async () => {
       const data = await this.chrome.storage.local.get('prompts');
-      return this.validatePromptData(data.prompts || []);
+      // Reading never writes and never changes text (see Security Architecture)
+      return readPrompts(data.prompts);
     });
   }
 
-  private async executeWithLock<T>(operation: () => Promise<T>): Promise<T> {
-    const previousOperation = this.operationQueue;
-    let resolver: () => void;
-    this.operationQueue = new Promise(resolve => { resolver = resolve; });
-
-    await previousOperation;
-    try {
-      return await operation();
-    } finally {
-      resolver!();
-    }
-  }
+  // AsyncMutex (src/utils/asyncMutex.ts): navigator.locks.request('StorageManager:' + key, operation),
+  // with the in-memory queue where the Web Locks API is missing
 }
 ```
 
 **Benefits**:
-- Prevents race conditions on storage operations
-- Centralized validation and sanitization
+- Prevents race conditions on storage operations, within a context and across contexts
+- One write path: Prompt text is admitted (Hidden characters removed, limits enforced) inside the text-writing methods, so no route can skip it
 - Testable via constructor injection
 
 ---
@@ -419,7 +410,8 @@ src/content/
 | `PlatformInsertionManager` | Coordinate strategy selection and insertion | Mediator |
 | `PlatformManager` | Manage strategy registry and instantiation | Factory |
 | `UIElementFactory` | Create platform-specific UI elements | Factory |
-| `StorageManager` | Centralized storage with mutex locking | Singleton |
+| `StorageManager` | Centralized storage with keyed locks shared across contexts (Web Locks API) | Singleton |
+| `promptAdmission` | Admission of Prompt text, the one reader of stored Prompts, the upgrade scrubs (shared by popup, service worker and content script) | Pure module |
 | `PromptManager` | Business logic (search, validation, duplicates) | Service |
 | `KeyboardNavigationManager` | Handle keyboard interactions | Controller |
 | `EventManager` | Centralized event listener cleanup | Manager |
@@ -459,7 +451,7 @@ PlatformInsertionManager.insertContent(element, content)
     ▼
 strategy.insert(element, content)
     │
-    ├─► Sanitize content (security layer)
+    ├─► Content is inserted exactly as stored (Verbatim, no sanitizing)
     │
     ├─► Platform-specific insertion logic
     │   │
@@ -488,7 +480,9 @@ Chrome Storage API (storage.local)
     │
     ├─► StorageManager (Singleton with mutex)
     │   │
-    │   ├─► Validation & Sanitization
+    │   ├─► Read: readPrompts() (shape and defaults only; never writes, never alters text)
+    │   │
+    │   ├─► Write: Admission (Hidden characters removed once, limits refused not shortened)
     │   │
     │   └─► PromptManager (Business Logic)
     │       │
@@ -560,7 +554,7 @@ Is the platform's input field powered by React?
 │   └─ Benefits:
 │       • Automatic React event handling
 │       • Native value setter caching (~90% faster)
-│       • Built-in content validation
+│       • Built-in content type check
 │
 └─ NO → Use PlatformStrategy
     │
@@ -590,7 +584,6 @@ Is the platform's input field powered by React?
 ```typescript
 import { PlatformStrategy } from './base-strategy';
 import type { InsertionResult, PlatformConfig } from '../types';
-import { sanitizeUserInput } from '../utils/storage';
 import { info, error as logError, debug } from '../utils/logger';
 
 export class NewPlatformStrategy extends PlatformStrategy {
@@ -626,27 +619,19 @@ export class NewPlatformStrategy extends PlatformStrategy {
    * Inserts content into the element using platform-specific logic
    */
   async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
-    // SECURITY: Always sanitize first
-    const sanitizedContent = sanitizeUserInput(content);
-
-    if (!sanitizedContent) {
-      return {
-        success: false,
-        error: 'Content could not be sanitized safely'
-      };
-    }
-
+    // Content is Verbatim: insert it exactly as given. Do not sanitize, trim or
+    // shorten it here; it was admitted once, when the Prompt was saved.
     try {
       // Tier 1: Native API (if available)
-      const apiResult = this._tryNativeAPI(element, sanitizedContent);
+      const apiResult = this._tryNativeAPI(element, content);
       if (apiResult.success) return apiResult;
 
       // Tier 2: execCommand fallback
-      const execResult = await this._tryExecCommand(element, sanitizedContent);
+      const execResult = await this._tryExecCommand(element, content);
       if (execResult.success) return execResult;
 
       // Tier 3: DOM manipulation (last resort)
-      return this._tryDOMManipulation(element, sanitizedContent);
+      return this._tryDOMManipulation(element, content);
 
     } catch (err) {
       logError('NewPlatform insertion failed', err as Error, {
@@ -780,7 +765,6 @@ import { getPlatformById } from '../../config/platforms';
 import type { InsertionResult } from '../types/index';
 import type { UIElementFactory } from '../ui/element-factory';
 
-import { MAX_CONTENT_LENGTHS } from './constants';
 import { ReactPlatformStrategy } from './react-platform-strategy';
 
 export class NewReactPlatformStrategy extends ReactPlatformStrategy {
@@ -815,19 +799,19 @@ export class NewReactPlatformStrategy extends ReactPlatformStrategy {
    */
   async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
     try {
-      // Validate and sanitize using base class method
-      const validation = this.validateAndSanitize(content, MAX_CONTENT_LENGTHS.COPILOT);
-      if (!validation.valid || !validation.sanitized) {
+      // Check the content type using base class method
+      const validation = this.validateContent(content);
+      if (!validation.valid) {
         return await Promise.resolve({
           success: false,
-          error: validation.error || 'Validation failed'
+          error: validation.error
         });
       }
 
-      // Insert using base class React-compatible method
+      // Insert the content exactly as given, using base class React-compatible method
       return await this.insertIntoReactTextarea(
         element as HTMLTextAreaElement,
-        validation.sanitized,
+        content,
         'NewReactPlatform',
         'newreactplatform-textarea'
       );
@@ -860,7 +844,7 @@ export class NewReactPlatformStrategy extends ReactPlatformStrategy {
 
 **Key Points for React Platforms**:
 1. **Must call** `ReactPlatformStrategy.initializeNativeValueSetter()` in constructor
-2. **Use** `validateAndSanitize()` for content validation
+2. **Use** `validateContent()` for the content type check, then insert the content exactly as given (never sanitize, trim or shorten it)
 3. **Use** `insertIntoReactTextarea()` for insertion (handles all React events)
 4. **Handle errors** with try-catch and proper async/await
 5. **Custom logging**: Pass platform name to `insertIntoReactTextarea()` for branded logs
@@ -868,9 +852,9 @@ export class NewReactPlatformStrategy extends ReactPlatformStrategy {
 **What You Get for Free**:
 - ✅ React event handling (input, change)
 - ✅ Native value setter caching (~90% performance boost)
-- ✅ Content validation and sanitization
+- ✅ Content type check
 - ✅ Consistent error handling
-- ✅ Security: Control character removal
+- ✅ Security: content is set as the textarea `value`, never parsed as markup
 
 ---
 
@@ -1014,6 +998,7 @@ const SettingsView: FC<SettingsViewProps> = ({ ... }) => {
 
 ```typescript
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { HOSTILE_TEXTS, expectNoMarkupIn } from '../../../test/helpers/hostile-text';
 import { NewPlatformStrategy } from '../newplatform-strategy';
 
 describe('NewPlatformStrategy', () => {
@@ -1057,19 +1042,20 @@ describe('NewPlatformStrategy', () => {
   });
 
   describe('Content Insertion', () => {
-    it('should sanitize content before insertion', async () => {
-      const { sanitizeUserInput } = await import('../../utils/storage');
-      await strategy.insert(mockElement, 'test content');
-      expect(sanitizeUserInput).toHaveBeenCalledWith('test content');
+    it('should insert content exactly as given', async () => {
+      const content = '  Summarize the metadata: <example>text</example>\n';
+      const result = await strategy.insert(mockElement, content);
+
+      expect(result.success).toBe(true);
+      expect((mockElement as HTMLTextAreaElement).value).toBe(content);
     });
 
-    it('should return error if sanitization results in empty content', async () => {
-      const { sanitizeUserInput } = await import('../../utils/storage');
-      vi.mocked(sanitizeUserInput).mockReturnValueOnce('');
+    it.each(HOSTILE_TEXTS)('should keep hostile-looking text %j as plain text', async (text) => {
+      const result = await strategy.insert(mockElement, text);
 
-      const result = await strategy.insert(mockElement, '<script>alert("xss")</script>');
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Content could not be sanitized safely');
+      expect(result.success).toBe(true);
+      expect((mockElement as HTMLTextAreaElement).value).toBe(text);
+      expectNoMarkupIn(document.body, ['textarea']);
     });
 
     it('should insert content into textarea elements', async () => {
@@ -1261,9 +1247,9 @@ npm run build
    - Settings persistence
 
 4. **Security Tests**
-   - Input sanitization
-   - XSS prevention
-   - Content validation
+   - Admission (Hidden characters removed, limits refused not shortened, idempotent)
+   - Verbatim delivery (text arrives exactly as stored)
+   - XSS prevention (`HOSTILE_TEXTS` run through the prompt selector and each insertion path, asserting no markup is created)
 
 ---
 
@@ -1338,22 +1324,16 @@ const handleToggle = useCallback((site: string) => {
 
 ### 3. Storage Performance
 
-**Mutex Locking for Race Conditions**:
+**Locking for Race Conditions** (`AsyncMutex`, `src/utils/asyncMutex.ts`):
 
 ```typescript
-private async executeWithLock<T>(operation: () => Promise<T>): Promise<T> {
-  const previousOperation = this.operationQueue;
-  let resolver: () => void;
+// StorageManager: one keyed lock per storage key, shared across the popup, the side panel
+// and the service worker through the Web Locks API (in-memory queue where it is missing)
+private readonly mutex = new AsyncMutex({ scope: 'StorageManager' });
 
-  this.operationQueue = new Promise(resolve => { resolver = resolve; });
-
-  await previousOperation; // Wait for previous operation
-  try {
-    return await operation();
-  } finally {
-    resolver!(); // Release lock
-  }
-}
+return this.mutex.withLock('prompts', async () => {
+  // read, decide, write: no other context can write 'prompts' in between
+});
 ```
 
 **Benefits**:
@@ -1365,51 +1345,99 @@ private async executeWithLock<T>(operation: () => Promise<T>): Promise<T> {
 
 ## Security Architecture
 
-### Defense-in-Depth Layers
+Prompt text is **Verbatim**: what the user saves is what the popup shows, what Copy copies and what Insertion delivers, with nothing stripped, escaped or shortened on the way. Safety rests on three things rather than on layers of pattern-based sanitizing: text is checked **once**, at Admission, on the write path; no place in the extension interprets Prompt text as markup; and the write path is enforced by the compiler.
+
+The terms (Prompt, Admission, Verbatim, Hidden character) are defined in [`CONTEXT.md`](../CONTEXT.md). The decision and its trade-offs are recorded in [ADR-001](./adr/ADR-001-store-and-deliver-prompts-verbatim.md).
+
+### Defense Layers
 
 ```
-User Input
+Text enters the Library
+(create, edit, Share code, Backup restore; Category create, rename, restore)
     ↓
 ┌─────────────────────────────────────┐
-│ Layer 1: Input Validation          │
-│ - Length limits (50KB max)          │
-│ - Type checking                     │
+│ Layer 1: Admission (once, on write) │
+│ - Hidden characters removed         │
+│ - Title and Category trimmed        │
+│ - Empty or over-limit text refused  │
+│   (never shortened)                 │
+└─────────────────────────────────────┘
+    ↓
+Stored Verbatim
+    ↓
+┌─────────────────────────────────────┐
+│ Layer 2: Verbatim delivery          │
+│ - Reading never writes              │
+│ - No sanitizing, trimming or        │
+│   truncating on read or insertion   │
 └─────────────────────────────────────┘
     ↓
 ┌─────────────────────────────────────┐
-│ Layer 2: Sanitization               │
-│ - HTML tag removal                  │
-│ - URL filtering (javascript:, data:)│
-│ - Event handler stripping (on*)     │
-│ - Control character removal         │
+│ Layer 3: No HTML sink for text      │
+│ - textContent / value               │
+│ - execCommand('insertText')         │
+│ - Editor text APIs, React text      │
+│ - Never innerHTML                   │
 └─────────────────────────────────────┘
     ↓
-┌─────────────────────────────────────┐
-│ Layer 3: Safe DOM Construction      │
-│ - createTextNode() for text         │
-│ - No innerHTML usage                │
-│ - Namespace handling for SVG        │
-└─────────────────────────────────────┘
-    ↓
-DOM Insertion (Safe)
+Prompt selector / chat input (text stays text)
 ```
+
+### Admission (the write path)
+
+`src/services/promptAdmission.ts` is a pure module (no `chrome.*`) shared by the popup, the service worker and the content script. Every route that puts text into the Library is admitted the same way, including text the user typed or pasted: creating or editing a Prompt, opening a Share code, restoring a Backup, and creating, renaming or restoring a Category. The check runs inside the text-writing methods of `StorageManager` (`savePrompt`, `updatePrompt`, `importPrompt`, `saveCategory`, `updateCategory`, `importCategory`), so no route can skip it. Callers handle a refusal (`AdmissionRefusedError`); a form can ask the same module whether text would be admitted, without saving, by calling the pure `admit()`.
+
+| Rule | Behaviour |
+|------|-----------|
+| **Hidden characters** | Removed, and nothing else is removed: control characters other than newline, carriage return and tab; U+200B; bidirectional embeddings, overrides and isolates; U+2060-U+206F; the byte-order mark; Unicode tag characters (U+E0000-U+E007F) except inside the England, Scotland and Wales flag emoji |
+| **Kept** | U+200C and U+200D (joiners in emoji, Persian and Indic words), U+200E and U+200F (direction marks), variation selectors, and all visible text, including angle-bracket tags such as `<example>` |
+| **Trimming** | Title and Category names are trimmed; content never is. Content that is only whitespace is refused as empty |
+| **Size limits** | `PROMPT_LIMITS`: title 100, content 20,000, Category name 50 characters. Over-limit text is refused, never shortened. A Backup restore skips and reports refused Prompts and restores the rest |
+| **Idempotent** | Admitting text that has already been admitted changes nothing |
+
+### Types and the single typed writer
+
+- `StoredPrompt` is a Prompt as read from storage; `AdmittedPrompt` is a Prompt whose text has just been through Admission. Both are classes with a private member, so they are nominal: an object literal or an object spread cannot be assigned to them (a `unique symbol` brand would survive spread and could be forged). They widen to a plain `Prompt`, so UI code is unaffected.
+- Only `readPrompt()` / `readPrompts()` make a `StoredPrompt`, and only `admitNew()`, `admitEdit()` and `admitRestored()` make an `AdmittedPrompt`.
+- `StorageManager.writePrompts()` is the only way to write the `prompts` key and accepts only those types, so a route that skips Admission does not compile.
+- The one documented exception is `StorageManager.writeScrubbed()`, used only by `upgradeStoredData()`. The upgrade pass works on raw stored entries and must keep ones that are malformed or already over the limits rather than drop them, so it cannot go through the typed writer. It writes only the keys it is given, in one atomic `set`.
+- The guarantee covers the write method, not raw `chrome.storage.local` calls, and `as unknown as` casts still compile. The types do not survive JSON or messaging, so a receiver re-parses with `readPrompts()`.
+
+### Existing data (upgrade pass)
+
+On extension update the service worker (`chrome.runtime.onInstalled`, reason `update`) calls `StorageManager.upgradeStoredData()`, which cleans stored Prompts and Category names of Hidden characters once. It works on raw stored values, never refuses, trims, shortens or deletes a Prompt (including one already over the limits), writes nothing when there is nothing to clean, and is safe to run any number of times. If cleaning makes two Category names the same, the later Category is merged into the first; its Prompts already name the kept one.
+
+### Delivery: no HTML sink for Prompt text
+
+- **Reading**: the content script reads Prompts through the shared `readPrompts()` (`getPrompts()` in `src/content/utils/storage.ts`). Reading never writes. Entries that are not Prompts at all are skipped, but no Prompt is changed, truncated or dropped because of what its text says.
+- **Prompt selector**: `createPromptListItem()` sets title, Category and preview as text and passes the Prompt id through unchanged.
+- **Insertion**: strategies only set text, through `value`, `textContent` or text nodes, `document.execCommand('insertText')`, or the editor's own text API (ProseMirror `insertText`, Quill `setText`). Nothing is parsed as markup.
+- **No HTML sink**: the only `innerHTML` assignment in the extension source sets a static help banner in the element picker, with no interpolated text.
+
+### Where DOMPurify is still used
+
+DOMPurify is not applied to Prompt text on write, on read, on insertion or on display (the search highlight in `PromptCard` splits the stored title around matches and React renders every part as text). One narrow role remains:
+
+- **Configuration security** (`src/utils/configurationSecurity.ts`): text fields of custom site configurations, which can arrive through shared configuration codes, are sanitized with no tags or attributes allowed.
 
 ### Security Best Practices
 
-1. **Never use `innerHTML`** - Always use `createTextNode()` or `textContent`
-2. **Sanitize once** - At the insertion boundary, not repeatedly
-3. **Validate all storage data** - Before processing
-4. **Use Content Security Policy** - Compatible with strict CSP
-5. **Audit sensitive operations** - Element picker logs security events
+1. **Never use `innerHTML` for Prompt text** - Always use `createTextNode()`, `textContent` or `value`
+2. **Admit once** - At the write path (`promptAdmission`), never again on read or insertion
+3. **Never rewrite Prompt text on read or insertion** - It is Verbatim; over-limit text is refused at Admission, never shortened
+4. **Never write the `prompts` key directly** - Go through `StorageManager`, whose typed writer is what makes Admission impossible to skip
+5. **Read stored Prompts with `readPrompts()`** - One definition of a stored Prompt for every bundle; entries that are not Prompts are skipped
+6. **Use Content Security Policy** - Compatible with strict CSP
+7. **Audit sensitive operations** - Element picker logs security events
 
 **Example: Secure DOM Construction**
 
 ```typescript
-// ❌ UNSAFE - Vulnerable to XSS
-element.innerHTML = userContent;
+// ❌ UNSAFE - Prompt text would be parsed as markup
+element.innerHTML = promptContent;
 
-// ✅ SAFE - Immune to XSS
-const textNode = document.createTextNode(userContent);
+// ✅ SAFE - Prompt text stays text, exactly as stored
+const textNode = document.createTextNode(promptContent);
 element.appendChild(textNode);
 ```
 
@@ -1422,12 +1450,12 @@ This architecture provides:
 - ✅ **Extensibility**: Easy to add new platforms (Strategy Pattern)
 - ✅ **Testability**: Dependency injection, modular design
 - ✅ **Performance**: Caching, throttling, efficient DOM operations
-- ✅ **Security**: Defense-in-depth, sanitization, safe DOM construction
+- ✅ **Security**: Admission once at the write path, Verbatim delivery, no HTML sink for Prompt text
 - ✅ **Maintainability**: Clear separation of concerns, comprehensive documentation
 
 Follow this guide when adding new platforms or modifying existing components to maintain architectural consistency and code quality.
 
 ---
 
-**Last Updated**: 2025-10-08
+**Last Updated**: 2026-10-12
 **Version**: 1.5.0

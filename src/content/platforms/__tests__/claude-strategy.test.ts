@@ -4,6 +4,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+import { HOSTILE_TEXTS, expectNoMarkupIn } from '../../../test/helpers/hostile-text';
 import type { UIElementFactory } from '../../ui/element-factory';
 import { ClaudeStrategy } from '../claude-strategy';
 
@@ -197,6 +198,50 @@ describe('ClaudeStrategy', () => {
           bubbles: true
         })
       );
+    });
+  });
+
+  describe.each(HOSTILE_TEXTS)('hostile-looking text %j', (text) => {
+    beforeEach(() => {
+      vi.spyOn(mockElement, 'focus').mockImplementation(() => undefined);
+      vi.spyOn(mockElement, 'click').mockImplementation(() => undefined);
+      vi.spyOn(mockElement, 'dispatchEvent').mockImplementation(() => true);
+      vi.spyOn(window, 'getSelection').mockReturnValue({ removeAllRanges: vi.fn(), addRange: vi.fn() } as any);
+      vi.spyOn(document, 'createRange').mockReturnValue({ selectNodeContents: vi.fn() } as any);
+    });
+
+    it('goes to the ProseMirror transaction as the same text', async () => {
+      const mockView = {
+        state: { tr: { insertText: vi.fn().mockReturnValue({}) }, selection: { from: 0, to: 0 } },
+        dispatch: vi.fn()
+      };
+      (mockElement as any).pmViewDesc = { view: mockView };
+
+      const result = await strategy.insert(mockElement, text);
+
+      expect(result.method).toBe('prosemirror-transaction');
+      expect(mockView.state.tr.insertText).toHaveBeenCalledWith(text, 0, 0);
+      expectNoMarkupIn(mockElement);
+    });
+
+    it('goes to execCommand as the same text', async () => {
+      (document as any).execCommand = vi.fn().mockReturnValue(true);
+
+      const result = await strategy.insert(mockElement, text);
+
+      expect(result.method).toBe('execCommand');
+      expect((document as any).execCommand).toHaveBeenCalledWith('insertText', false, text);
+      expectNoMarkupIn(mockElement);
+    });
+
+    it('is set as the text of the editor when it is filled directly', async () => {
+      (document as any).execCommand = vi.fn().mockReturnValue(false);
+
+      const result = await strategy.insert(mockElement, text);
+
+      expect(result.method).toBe('dom-manipulation');
+      expect(mockElement.textContent).toBe(text);
+      expectNoMarkupIn(mockElement);
     });
   });
 });

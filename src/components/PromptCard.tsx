@@ -1,4 +1,3 @@
-import DOMPurify from 'dompurify';
 import { useState, memo } from 'react';
 import type { FC, MouseEvent, ReactNode } from 'react';
 
@@ -20,18 +19,15 @@ const formatDate = (timestamp: number): string =>
 /**
  * Highlights matching text in a string based on a search query.
  * Pure function hoisted to module scope to avoid recreation on every render.
+ *
+ * The text is shown exactly as stored: React renders every part below as a text node, so markup
+ * in a title is displayed, never interpreted, and nothing needs to be rewritten first.
  */
 const highlightText = (text: string, query: string, promptId: string): ReactNode => {
-  if (!query.trim()) {return text;}
+  const searchTerm = query.trim().toLowerCase();
+  if (searchTerm === '') {return text;}
 
-  // Sanitize both text and query to prevent XSS
-
-  const sanitizedText = DOMPurify.sanitize(text, { ALLOWED_TAGS: [] });
-
-  const sanitizedQuery = DOMPurify.sanitize(query, { ALLOWED_TAGS: [] });
-
-  const searchTerm = sanitizedQuery.toLowerCase().trim();
-  const lowerText = sanitizedText.toLowerCase();
+  const lowerText = text.toLowerCase();
   const parts: ReactNode[] = [];
   let lastIndex = 0;
   let index = lowerText.indexOf(searchTerm);
@@ -39,13 +35,13 @@ const highlightText = (text: string, query: string, promptId: string): ReactNode
   while (index !== -1) {
     // Add text before the match
     if (index > lastIndex) {
-      parts.push(sanitizedText.substring(lastIndex, index));
+      parts.push(text.substring(lastIndex, index));
     }
 
     // Add highlighted match - using stable key with prompt ID and match position
     parts.push(
       <mark key={`highlight-${promptId}-${String(index)}-${searchTerm}`} className="bg-yellow-200 dark:bg-yellow-800/40 px-1 rounded-sm">
-        {sanitizedText.substring(index, index + searchTerm.length)}
+        {text.substring(index, index + searchTerm.length)}
       </mark>
     );
 
@@ -54,8 +50,8 @@ const highlightText = (text: string, query: string, promptId: string): ReactNode
   }
 
   // Add remaining text
-  if (lastIndex < sanitizedText.length) {
-    parts.push(sanitizedText.substring(lastIndex));
+  if (lastIndex < text.length) {
+    parts.push(text.substring(lastIndex));
   }
 
   return parts;

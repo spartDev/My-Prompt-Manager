@@ -5,6 +5,7 @@
  */
 
 export { InMemoryStorage } from './InMemoryStorage';
+export { FakeLockManager, installNavigatorLocks } from './FakeLockManager';
 
 // Re-export builders
 export { buildPrompt, buildCategory } from '../builders';

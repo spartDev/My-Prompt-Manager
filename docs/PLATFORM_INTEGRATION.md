@@ -148,7 +148,7 @@ Is the platform using React for input management?
 │   └─ Benefits:
 │       • ✅ Automatic React event handling
 │       • ✅ Native value setter caching (~90% faster)
-│       • ✅ Built-in content validation
+│       • ✅ Built-in content type check
 │       • ✅ Consistent error handling
 │
 └─ ❌ NO → Use PlatformStrategy
@@ -255,7 +255,6 @@ import { getPlatformById } from '../../config/platforms';
 import type { InsertionResult } from '../types/index';
 import type { UIElementFactory } from '../ui/element-factory';
 
-import { MAX_CONTENT_LENGTHS } from './constants';
 import { ReactPlatformStrategy } from './react-platform-strategy';
 
 export class YourReactPlatformStrategy extends ReactPlatformStrategy {
@@ -290,19 +289,19 @@ export class YourReactPlatformStrategy extends ReactPlatformStrategy {
    */
   async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
     try {
-      // Validate and sanitize using base class method
-      const validation = this.validateAndSanitize(content, MAX_CONTENT_LENGTHS.COPILOT);
-      if (!validation.valid || !validation.sanitized) {
+      // Check the content type using base class method
+      const validation = this.validateContent(content);
+      if (!validation.valid) {
         return await Promise.resolve({
           success: false,
-          error: validation.error || 'Validation failed'
+          error: validation.error
         });
       }
 
-      // Insert using base class React-compatible method
+      // Insert the content exactly as given, using base class React-compatible method
       return await this.insertIntoReactTextarea(
         element as HTMLTextAreaElement,
-        validation.sanitized,
+        content,
         'YourReactPlatform',
         'yourreactplatform-textarea'
       );
@@ -335,16 +334,17 @@ export class YourReactPlatformStrategy extends ReactPlatformStrategy {
 
 **✨ Key Benefits of ReactPlatformStrategy**:
 1. **Automatic React Compatibility**: No need to manually handle React's value setter
-2. **Built-in Validation**: `validateAndSanitize()` handles content validation
+2. **Built-in Content Type Check**: `validateContent()` confirms the content is a string
 3. **Performance**: Native setter caching provides ~90% performance improvement
 4. **Consistent Error Handling**: Try-catch patterns are standardized
-5. **Security**: Control character sanitization is automatic
+5. **Security**: Content is set as the textarea `value`, never parsed as markup
 
 **⚠️ Important**:
 - **Must call** `ReactPlatformStrategy.initializeNativeValueSetter()` in constructor
 - **Always await** `Promise.resolve()` returns for proper error handling
-- **Use** `this.validateAndSanitize()` for content validation
+- **Use** `this.validateContent()` for the content type check
 - **Use** `this.insertIntoReactTextarea()` for insertion
+- **Insert the content exactly as given**: Prompts are Verbatim. Never sanitize, trim or shorten the content in a strategy; it was admitted once, when the Prompt was saved (see `docs/ARCHITECTURE.md`, Security Architecture)
 
 ---
 
@@ -1020,5 +1020,5 @@ vi.mock('../../config/platforms', () => ({
 
 ---
 
-**Last Updated:** 2025-11-10
+**Last Updated:** 2026-10-12
 **Version:** 2.0.0 (Centralized Configuration)

@@ -114,11 +114,13 @@ test.describe('Usage Counter & Smart Sorting - Logic', () => {
   ] as const;
 
   test.describe('Data Migration', () => {
-    // Scenario 3.1: Existing Prompts Migrated Automatically
-    // Tests that old-format prompts (without usageCount/lastUsedAt) are automatically migrated
+    // Scenario 3.1: Legacy Prompts Are Read, Not Rewritten
+    // Old-format prompts (without usageCount/lastUsedAt) get their usage fields filled in memory by
+    // the shared reader (readPrompts). Reading never writes (ADR-001), so opening the UI leaves
+    // storage exactly as it was; the filled-in values show up as sort behaviour.
     for (const context of CONTEXTS) {
       test.describe(`${context.name} context`, () => {
-        test('migrates legacy prompts automatically', async ({ page, storage, extensionId }) => {
+        test('shows legacy prompts without rewriting storage', async ({ page, storage, extensionId }) => {
           // Seed old-format prompts WITHOUT usageCount/lastUsedAt fields
           // Use storage.seed() with raw data to bypass createPromptSeed's defaults
           await storage.seed({
@@ -134,29 +136,24 @@ test.describe('Usage Counter & Smart Sorting - Logic', () => {
               }
             ] as any // Type assertion needed because we're intentionally omitting fields
           });
+          const seeded = await storage.getPrompts();
 
-          // Navigate to UI - this triggers migration via normalizePrompt when getPrompts() is called
+          // Navigate to UI - prompts are read through the shared reader, which fills in missing usage fields in memory
           await page.goto(`chrome-extension://${extensionId}/${context.url}`);
           await page.waitForLoadState('domcontentloaded');
 
           // Wait for prompts to render
           await expect(page.locator('article[aria-labelledby^="prompt-title-"]').first()).toBeVisible();
 
-          // Verify migration happened by checking storage state
-          const prompts = await storage.getPrompts();
-          expect(prompts).toHaveLength(1);
-
-          const migratedPrompt = prompts[0];
-          expect(migratedPrompt.id).toBe('old-prompt-1');
-          expect(migratedPrompt.usageCount).toBe(0); // Migrated to default value
-          expect(migratedPrompt.lastUsedAt).toBe(1700000000000); // Defaults to createdAt when usageCount === 0
-
           // Verify prompt displays correctly in UI
           await expect(page.getByText('Old Prompt')).toBeVisible();
+
+          // Reading never writes: storage is exactly what was seeded
+          expect(await storage.getPrompts()).toEqual(seeded);
         });
 
         // Scenario 3.2: Partial Migration (Mixed Old and New Prompts)
-        // Tests that mixed old/new format prompts are handled correctly
+        // Mixed old/new format prompts are handled correctly: the legacy prompt counts as unused
         test('handles mixed old and new prompts', async ({ page, storage, extensionId }) => {
           // Seed mixed data: old format + new format
           await storage.seed({
@@ -183,6 +180,7 @@ test.describe('Usage Counter & Smart Sorting - Logic', () => {
               }
             ] as any
           });
+          const seeded = await storage.getPrompts();
 
           await page.goto(`chrome-extension://${extensionId}/${context.url}`);
           await page.waitForLoadState('domcontentloaded');
@@ -190,28 +188,23 @@ test.describe('Usage Counter & Smart Sorting - Logic', () => {
           // Wait for prompts to render
           await expect(page.locator('article[aria-labelledby^="prompt-title-"]').first()).toBeVisible();
 
-          // Verify both prompts migrated/preserved correctly
-          const prompts = await storage.getPrompts();
-          expect(prompts).toHaveLength(2);
-
-          const oldPrompt = prompts.find(p => p.id === 'old-1');
-          const newPrompt = prompts.find(p => p.id === 'new-1');
-
-          // Old prompt should be migrated
-          expect(oldPrompt?.usageCount).toBe(0);
-          expect(oldPrompt?.lastUsedAt).toBe(1700000000000); // Defaults to createdAt
-
-          // New prompt should keep existing values
-          expect(newPrompt?.usageCount).toBe(5);
-          expect(newPrompt?.lastUsedAt).toBe(1700100000000);
-
           // Verify both display in UI
           await expect(page.getByText('Old Prompt')).toBeVisible();
           await expect(page.getByText('New Prompt')).toBeVisible();
+
+          // The legacy prompt counts as unused (usageCount 0), so it sorts after the one used 5 times
+          await page.getByRole('button', { name: /Sort order:/i }).click();
+          await page.getByRole('menuitem', { name: /Most Used/i }).click();
+          await expect(page.locator('article h3')).toHaveText(['New Prompt', 'Old Prompt']);
+
+          // Neither reading nor sorting rewrote the prompts
+          expect(await storage.getPrompts()).toEqual(seeded);
         });
 
-        // Scenario 3.3: Migration Recovers from Corrupted Data
-        // Tests that normalizePrompt corrects invalid data (NaN, negative, floats, invalid timestamps)
+        // Scenario 3.3: Corrupted Usage Data Is Read Sanely
+        // Invalid usage values (NaN, negative, fractional, invalid timestamps) are normalized by the
+        // shared reader when read, without rewriting storage. The numeric rules themselves are unit
+        // tested in src/services/__tests__/promptAdmission.test.ts; this checks them end to end.
         test('recovers from corrupted data', async ({ page, storage, extensionId }) => {
           // Seed prompts with invalid data
           await storage.seed({
@@ -223,7 +216,7 @@ test.describe('Usage Counter & Smart Sorting - Logic', () => {
                 category: DEFAULT_CATEGORY,
                 createdAt: 1700000000000,
                 updatedAt: 1700000000000,
-                usageCount: NaN, // Invalid - should normalize to 0
+                usageCount: NaN, // Invalid - should read as 0
                 lastUsedAt: -1    // Invalid - should default to createdAt
               },
               {
@@ -233,7 +226,7 @@ test.describe('Usage Counter & Smart Sorting - Logic', () => {
                 category: DEFAULT_CATEGORY,
                 createdAt: 1700000000000,
                 updatedAt: 1700010000000,
-                usageCount: 5.7,  // Should floor to 5
+                usageCount: 5.7,  // Should read as 5 (floored)
                 lastUsedAt: null as any  // Invalid - should default to updatedAt (usageCount > 0)
               },
               {
@@ -243,11 +236,12 @@ test.describe('Usage Counter & Smart Sorting - Logic', () => {
                 category: DEFAULT_CATEGORY,
                 createdAt: 1700000000000,
                 updatedAt: 1700000000000,
-                usageCount: -10,  // Should normalize to 0
+                usageCount: -10,  // Should read as 0
                 lastUsedAt: 1700000000000
               }
             ] as any
           });
+          const seeded = await storage.getPrompts();
 
           await page.goto(`chrome-extension://${extensionId}/${context.url}`);
           await page.waitForLoadState('domcontentloaded');
@@ -255,29 +249,12 @@ test.describe('Usage Counter & Smart Sorting - Logic', () => {
           // Wait for prompts to render
           await expect(page.locator('article[aria-labelledby^="prompt-title-"]').first()).toBeVisible();
 
-          // Verify migration normalized corrupted data
-          const prompts = await storage.getPrompts();
-          expect(prompts).toHaveLength(3);
-
-          const corrupt1 = prompts.find(p => p.id === 'corrupt-1');
-          expect(corrupt1?.usageCount).toBe(0); // NaN normalized to 0
-          expect(corrupt1?.lastUsedAt).toBeGreaterThan(0);
-          expect(corrupt1?.lastUsedAt).toBe(corrupt1?.createdAt); // Defaults to createdAt when usageCount === 0
-
-          const corrupt2 = prompts.find(p => p.id === 'corrupt-2');
-          expect(corrupt2?.usageCount).toBe(5); // Floored from 5.7
-          expect(corrupt2?.lastUsedAt).toBe(corrupt2?.updatedAt); // Defaults to updatedAt when usageCount > 0
-
-          const corrupt3 = prompts.find(p => p.id === 'corrupt-3');
-          expect(corrupt3?.usageCount).toBe(0); // Negative normalized to 0
-          expect(corrupt3?.lastUsedAt).toBe(1700000000000); // Valid timestamp preserved
-
-          // Verify all prompts display correctly despite previous corruption
+          // Verify all prompts display correctly despite the corruption
           await expect(page.getByText('Invalid Usage Count')).toBeVisible();
           await expect(page.getByText('Float Usage Count')).toBeVisible();
           await expect(page.getByText('Negative Usage')).toBeVisible();
 
-          // Verify sorting works after migration/recovery
+          // Verify sorting works on the normalized values
           await page.getByRole('button', { name: /Sort order:/i }).click();
           await page.getByRole('menuitem', { name: /Most Used/i }).click();
           const sortedHeadings = page.locator('article h3');
@@ -288,6 +265,9 @@ test.describe('Usage Counter & Smart Sorting - Logic', () => {
           // The other two prompts (usageCount: 0) will follow in some order
           expect(titles.slice(1)).toContain('Invalid Usage Count');
           expect(titles.slice(1)).toContain('Negative Usage');
+
+          // Reading never writes: the corrupted values are still exactly as seeded
+          expect(await storage.getPrompts()).toEqual(seeded);
         });
       });
     }

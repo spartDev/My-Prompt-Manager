@@ -96,6 +96,34 @@ describe('PromptCard - Basic Rendering', () => {
     const highlight = screen.getByText('searchable');
     expect(highlight).toBeInTheDocument();
   });
+
+  it('should show a title with markup exactly as stored while a search is active', () => {
+    const markupPrompt: Prompt = { ...mockPrompt, title: 'Use <example>text</example> tags' };
+
+    render(<PromptCard {...mockProps} prompt={markupPrompt} searchQuery="tags" />);
+
+    const heading = screen.getByRole('heading');
+    expect(heading).toHaveTextContent('Use <example>text</example> tags');
+    expect(heading.querySelector('example')).toBeNull();
+    expect(screen.getByText('tags').tagName).toBe('MARK');
+  });
+
+  it('should show entity-like text exactly as stored while a search is active', () => {
+    const ampersandPrompt: Prompt = { ...mockPrompt, title: 'Tom & Jerry <3 &amp; co' };
+
+    render(<PromptCard {...mockProps} prompt={ampersandPrompt} searchQuery="tom" />);
+
+    expect(screen.getByRole('heading')).toHaveTextContent('Tom & Jerry <3 &amp; co');
+  });
+
+  it('should highlight a query that looks like the start of a tag, and stay responsive', () => {
+    const markupPrompt: Prompt = { ...mockPrompt, title: 'Use <example>text</example> tags' };
+
+    render(<PromptCard {...mockProps} prompt={markupPrompt} searchQuery="<e" />);
+
+    expect(screen.getAllByText('<e')[0].tagName).toBe('MARK');
+    expect(screen.getByRole('heading')).toHaveTextContent('Use <example>text</example> tags');
+  });
 });
 
 describe('PromptCard - Share Button', () => {

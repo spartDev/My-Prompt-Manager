@@ -9,7 +9,6 @@ import { getPlatformById } from '../../config/platforms';
 import type { InsertionResult } from '../types/index';
 import type { UIElementFactory } from '../ui/element-factory';
 
-import { MAX_CONTENT_LENGTHS } from './constants';
 import { ReactPlatformStrategy } from './react-platform-strategy';
 
 export class M365CopilotStrategy extends ReactPlatformStrategy {
@@ -50,8 +49,7 @@ export class M365CopilotStrategy extends ReactPlatformStrategy {
    */
   async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
     try {
-      // Validate and sanitize content
-      const validation = this.validateAndSanitize(content, MAX_CONTENT_LENGTHS.COPILOT);
+      const validation = this.validateContent(content);
       if (!validation.valid) {
         return await Promise.resolve({
           success: false,
@@ -59,22 +57,12 @@ export class M365CopilotStrategy extends ReactPlatformStrategy {
         });
       }
 
-      // Validation ensures sanitized is defined (allow empty strings)
-      if (typeof validation.sanitized !== 'string') {
-        return await Promise.resolve({
-          success: false,
-          error: 'Content sanitization failed'
-        });
-      }
-
-      const sanitized = validation.sanitized;
-
       // Handle based on element type
       if (element.tagName === 'TEXTAREA') {
         // Use shared React textarea insertion from base class (includes focus)
         return await this.insertIntoReactTextarea(
           element as HTMLTextAreaElement,
-          sanitized,
+          content,
           'M365 Copilot textarea',
           'm365copilot-textarea'
         );
@@ -82,7 +70,7 @@ export class M365CopilotStrategy extends ReactPlatformStrategy {
         // Focus the element first for contenteditable
         element.focus();
         // Use M365-specific contenteditable insertion
-        return await this._insertIntoContentEditable(element, sanitized);
+        return await this._insertIntoContentEditable(element, content);
       } else {
         return await Promise.resolve({
           success: false,

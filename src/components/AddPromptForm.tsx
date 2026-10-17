@@ -1,7 +1,8 @@
 import { forwardRef, useActionState, useEffect, useMemo, useRef, useState } from 'react';
 import type { FC } from 'react';
 
-import { MAX_CONTENT_LENGTH, MAX_TITLE_LENGTH, formatCharacterCount } from '../constants/validation';
+import { formatCharacterCount } from '../constants/validation';
+import { admit, PROMPT_LIMITS } from '../services/promptAdmission';
 import { decode } from '../services/promptEncoder';
 import { DEFAULT_CATEGORY, type SharedPromptData } from '../types';
 import type { AddPromptFormProps } from '../types/components';
@@ -56,9 +57,11 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
   // Create mode state
   const [createCategory, setCreateCategory] = useState<string>(DEFAULT_CATEGORY);
 
-  // Character count state for validation feedback
-  const [titleLength, setTitleLength] = useState(0);
-  const [contentLength, setContentLength] = useState(0);
+  // Create mode text, kept as the inputs' defaultValue: React 19 resets a form's uncontrolled
+  // fields once its action completes, and the reset restores the defaultValue, so a refused save
+  // keeps exactly what the user typed. The character counters derive from the same state.
+  const [createTitle, setCreateTitle] = useState('');
+  const [createContent, setCreateContent] = useState('');
   
   // Ref for debounce timer
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -102,7 +105,24 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
     // Debounced validation (300ms)
     debounceTimerRef.current = setTimeout(() => {
       try {
-        const decoded = decode(code);
+        // Decoding only parses; whether the text is acceptable is Admission's call. Ask it now
+        // (without saving) so the user hears about a refusal straight away. The result is what
+        // will be saved, so the preview shows that rather than the raw text.
+        const admission = admit(decode(code));
+        if (!admission.ok) {
+          const message = Object.values(admission.errors)
+            .flatMap(refusal => (refusal ? [refusal.message] : []))
+            .join('; ');
+          setDecodedPrompt(null);
+          setValidationError(message);
+          Logger.warn('Import code would be refused at Admission', {
+            component: 'AddPromptForm',
+            mode: 'import',
+            fields: Object.keys(admission.errors)
+          });
+          return;
+        }
+        const decoded = admission.text;
         setDecodedPrompt(decoded);
         setValidationError('');
 
@@ -164,26 +184,6 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
         content = decodedPrompt.content;
         category = selectedCategory;
 
-        // Defense-in-depth: Validate decoded data against form limits
-        if (title.length > MAX_TITLE_LENGTH) {
-          Logger.warn('Import failed: Title exceeds form limit', {
-            component: 'AddPromptForm',
-            mode: 'import',
-            titleLength: title.length,
-            limit: MAX_TITLE_LENGTH
-          });
-          return { general: `Imported title exceeds maximum length (${String(MAX_TITLE_LENGTH)} characters)` };
-        }
-        if (content.length > MAX_CONTENT_LENGTH) {
-          Logger.warn('Import failed: Content exceeds form limit', {
-            component: 'AddPromptForm',
-            mode: 'import',
-            contentLength: content.length,
-            limit: MAX_CONTENT_LENGTH
-          });
-          return { general: `Imported content exceeds maximum length (${MAX_CONTENT_LENGTH.toLocaleString()} characters)` };
-        }
-
         Logger.info('Importing prompt from sharing code', {
           component: 'AddPromptForm',
           mode: 'import',
@@ -219,6 +219,9 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
           category,
           hasTitle: !!title.trim()
         });
+        // The form reset that follows a successful action then clears the fields, as before
+        setCreateTitle('');
+        setCreateContent('');
         return null; // Success, no error
       } catch (err) {
         Logger.error('Failed to submit prompt form', toError(err), {
@@ -504,14 +507,13 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
                 type="text"
                 id="title"
                 name="title"
-                defaultValue=""
-                onChange={(e) => { setTitleLength(e.target.value.length); }}
+                defaultValue={createTitle}
+                onChange={(e) => { setCreateTitle(e.target.value); }}
                 placeholder="Enter a descriptive title or leave blank to auto-generate"
                 className={`w-full px-4 py-3 border rounded-xl focus-input bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 text-gray-900 dark:text-gray-100 ${
                   errors?.title ? 'border-red-300 dark:border-red-500' : 'border-purple-200 dark:border-gray-600'
                 }`}
                 disabled={isPending}
-                maxLength={MAX_TITLE_LENGTH}
               />
               {errors?.title && (
                 <p className="mt-2 text-sm text-red-600 dark:text-red-400 font-medium flex items-center space-x-1">
@@ -521,8 +523,8 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
                   <span>{errors.title}</span>
                 </p>
               )}
-              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
-                {formatCharacterCount(titleLength, MAX_TITLE_LENGTH)}
+              <p className={`mt-2 text-xs font-medium ${createTitle.length > PROMPT_LIMITS.title ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                {formatCharacterCount(createTitle.length, PROMPT_LIMITS.title)}
               </p>
             </div>
 
@@ -558,15 +560,14 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
               <textarea
                 id="content"
                 name="content"
-                defaultValue=""
-                onChange={(e) => { setContentLength(e.target.value.length); }}
+                defaultValue={createContent}
+                onChange={(e) => { setCreateContent(e.target.value); }}
                 placeholder="Enter your prompt content here..."
                 rows={8}
                 className={`w-full px-4 py-3 border rounded-xl focus-input resize-none bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 text-gray-900 dark:text-gray-100 ${
                   errors?.content ? 'border-red-300 dark:border-red-500' : 'border-purple-200 dark:border-gray-600'
                 }`}
                 disabled={isPending}
-                maxLength={MAX_CONTENT_LENGTH}
                 required
               />
               {errors?.content && (
@@ -577,8 +578,8 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
                   <span>{errors.content}</span>
                 </p>
               )}
-              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
-                {formatCharacterCount(contentLength, MAX_CONTENT_LENGTH)}
+              <p className={`mt-2 text-xs font-medium ${createContent.length > PROMPT_LIMITS.content ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                {formatCharacterCount(createContent.length, PROMPT_LIMITS.content)}
               </p>
             </div>
               </>

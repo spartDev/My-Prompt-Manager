@@ -10,6 +10,10 @@ import {
   isUsageEvent,
   isCustomSite,
   isArrayOf,
+  isValidImportPrompt,
+  findInvalidImportPrompt,
+  isValidImportCategory,
+  findInvalidImportCategory,
 } from '../validation';
 
 describe('validatePromptFields', () => {
@@ -39,6 +43,44 @@ describe('validatePromptFields', () => {
       component: 'TestComponent',
     });
     expect(errors.title).toBeDefined();
+  });
+
+  // Admission is the only judge of Prompt text (ADR-001): Hidden characters are removed and the
+  // title trimmed before the limits apply, exactly as they will be on save.
+  it('accepts content over the limit only because of Hidden characters', () => {
+    const errors = validatePromptFields('Title', `${'x'.repeat(20_000)}\u{200B}`, {
+      component: 'TestComponent',
+    });
+    expect(errors).toEqual({});
+  });
+
+  it('accepts a title over the limit only because of Hidden characters or surrounding spaces', () => {
+    const errors = validatePromptFields(`  ${'t'.repeat(100)}\u{FEFF} `, 'Content', {
+      component: 'TestComponent',
+    });
+    expect(errors).toEqual({});
+  });
+
+  it('treats a blank title as absent: the title is optional', () => {
+    expect(validatePromptFields('', 'Content', { component: 'TestComponent' })).toEqual({});
+    expect(validatePromptFields('   ', 'Content', { component: 'TestComponent' })).toEqual({});
+  });
+
+  it('refuses content that is only Hidden characters as empty', () => {
+    const errors = validatePromptFields('Title', '\u{200B}\u{202E}', { component: 'TestComponent' });
+    expect(errors.content).toBe('Content is required');
+  });
+
+  it("uses Admission's refusal wording, one message per refused field", () => {
+    const options = { component: 'TestComponent' };
+    expect(validatePromptFields('Title', '', options).content).toBe('Content is required');
+    expect(validatePromptFields('Title', 'a'.repeat(20_001), options).content).toBe(
+      'Content cannot exceed 20,000 characters'
+    );
+    expect(validatePromptFields('a'.repeat(101), '', options)).toEqual({
+      title: 'Title cannot exceed 100 characters',
+      content: 'Content is required',
+    });
   });
 });
 
@@ -373,5 +415,89 @@ describe('Type Guards', () => {
       expect(isStringArray(['a', 'b', 'c'])).toBe(true);
       expect(isStringArray(['a', 123, 'c'])).toBe(false);
     });
+  });
+});
+
+// A Backup is checked for structure only. What its text may contain is decided once, at
+// Admission (ADR-001), where a refused Prompt is skipped and reported while the rest are restored.
+describe('isValidImportPrompt', () => {
+  const backedUp = {
+    id: 'p1',
+    title: 'Title',
+    content: 'Content',
+    category: 'Work',
+    createdAt: 1,
+    updatedAt: 2,
+  };
+
+  it('should accept a Prompt as exported', () => {
+    expect(isValidImportPrompt(backedUp)).toBe(true);
+  });
+
+  it('should reject what the reader cannot read, so a restore never starts and then fails halfway', () => {
+    const { id: _id, ...withoutId } = backedUp;
+
+    expect(isValidImportPrompt(withoutId)).toBe(false);
+    expect(isValidImportPrompt({ ...backedUp, id: 42 })).toBe(false);
+    expect(isValidImportPrompt({ ...backedUp, title: undefined })).toBe(false);
+    expect(isValidImportPrompt({ ...backedUp, content: null })).toBe(false);
+    expect(isValidImportPrompt({ ...backedUp, category: 7 })).toBe(false);
+    expect(isValidImportPrompt(null)).toBe(false);
+    expect(isValidImportPrompt('prompt')).toBe(false);
+    expect(isValidImportPrompt([backedUp])).toBe(false);
+  });
+
+  it('should not judge the text: whitespace, tags, Hidden characters and over-limit text are Admission\'s call', () => {
+    const texts = [
+      { title: '  Padded  ', content: '\n  Padded content \n' },
+      { title: '<b>Tags</b>', content: 'Use <example>x</example> and metadata: onboarding = true' },
+      { title: 'Hid\u{200B}den', content: 'Tag\u{E0041} bidi\u{202E}' },
+      { title: '', content: '   ' },
+      { title: 'T'.repeat(500), content: 'x'.repeat(50_000) },
+    ];
+
+    for (const text of texts) {
+      expect(isValidImportPrompt({ ...backedUp, ...text })).toBe(true);
+    }
+  });
+});
+
+describe('findInvalidImportPrompt', () => {
+  const good = { id: 'p1', title: 'Title', content: 'Content', category: 'Work' };
+
+  it('should return undefined when every Prompt is structurally valid', () => {
+    expect(findInvalidImportPrompt([good, { ...good, id: 'p2' }])).toBeUndefined();
+  });
+
+  it('should return the first Prompt that is not', () => {
+    const bad = { title: 'No id', content: 'Content', category: 'Work' };
+
+    expect(findInvalidImportPrompt([good, bad, { ...good, id: 7 }])).toBe(bad);
+  });
+});
+
+describe('isValidImportCategory', () => {
+  it('should accept a Category with or without an id, so a restore gives it one rather than dropping it', () => {
+    expect(isValidImportCategory({ id: 'c1', name: 'Work', color: '#112233' })).toBe(true);
+    expect(isValidImportCategory({ name: 'Work' })).toBe(true);
+    expect(isValidImportCategory({ id: 7, name: 'Work' })).toBe(true);
+  });
+
+  it('should reject what is not a Category', () => {
+    for (const invalid of [null, undefined, 'Work', [], { id: 'c1' }, { name: 7 }]) {
+      expect(isValidImportCategory(invalid)).toBe(false);
+    }
+  });
+});
+
+describe('findInvalidImportCategory', () => {
+  it('should return undefined when every Category is structurally valid, id or not', () => {
+    expect(findInvalidImportCategory([{ id: 'c1', name: 'Work' }, { name: 'Home' }])).toBeUndefined();
+  });
+
+  it('should return the first Category that is not', () => {
+    const bad = { id: 'c2' };
+
+    expect(findInvalidImportCategory([{ id: 'c1', name: 'Work' }, bad, null])).toBe(bad);
   });
 });

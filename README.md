@@ -19,7 +19,7 @@ Transform your AI interactions with a powerful personal prompt library that inte
 ✅ **Quick Actions:** One-click copy to clipboard, edit in-place, and bulk operations  
 ✅ **Dark Mode Support:** Beautiful dark theme with automatic system preference detection  
 ✅ **Data Persistence:** Automatic saving using Chrome's storage API with quota monitoring  
-✅ **Security First:** DOMPurify sanitization for XSS protection  
+✅ **Security First:** Prompts are inserted exactly as written, as plain text and never as markup; hidden characters are removed when text is saved  
 ✅ **Import/Export:** JSON backup and restore functionality with data portability
 
 ### AI Platform Integration
@@ -315,7 +315,7 @@ npm test -- src/content/platforms/__tests__/claude-strategy.test.ts
 ### Security Features
 
 - **Content Security Policy (CSP):** Strict CSP prevents XSS attacks
-- **DOMPurify Integration:** All user content is sanitized
+- **DOMPurify Integration:** Used for custom site configuration security only; Prompt text is never rewritten after it is saved, on write, on read, on insertion or on display
 - **Minimal Permissions:** Only essential Chrome APIs requested
 - **Restricted Host Access:** No code execution on unrelated sites
 - **Chrome Web Store Compliance:** Follows security best practices

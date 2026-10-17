@@ -2,6 +2,8 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+import { formatCharacterCount } from '../../constants/validation';
+import { PROMPT_LIMITS } from '../../services/promptAdmission';
 import * as promptEncoder from '../../services/promptEncoder';
 import type { Category } from '../../types';
 import AddPromptForm from '../AddPromptForm';
@@ -434,5 +436,93 @@ describe('AddPromptForm - Submit Button Text', () => {
     await userEvent.click(submitButton);
 
     expect(screen.getByText(/importing\.\.\./i)).toBeInTheDocument();
+  });
+});
+
+// ADR-001: over-limit text is refused, never shortened. A maxLength attribute would let the
+// browser cut a paste at the limit without a word, so the fields have none; the text stays in
+// the field, the counter turns red and the refusal is shown instead.
+describe('AddPromptForm - Limits', () => {
+  it('keeps content pasted over the limit in the field, shows the refusal and does not submit', async () => {
+    const { props } = renderForm();
+    const content = 'x'.repeat(PROMPT_LIMITS.content + 1);
+    const contentInput = screen.getByLabelText(/content/i);
+
+    await userEvent.click(contentInput);
+    await userEvent.paste(content);
+
+    expect(contentInput).toHaveValue(content);
+    expect(screen.getByText(formatCharacterCount(content.length, PROMPT_LIMITS.content))).toHaveClass('text-red-600');
+
+    await userEvent.click(screen.getByRole('button', { name: /save prompt/i }));
+
+    expect(await screen.findByText('Content cannot exceed 20,000 characters')).toBeInTheDocument();
+    expect(props.onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('keeps a title pasted over the limit in the field, shows the refusal and does not submit', async () => {
+    const { props } = renderForm();
+    const title = 't'.repeat(PROMPT_LIMITS.title + 1);
+    const titleInput = screen.getByLabelText(/title/i);
+
+    await userEvent.click(titleInput);
+    await userEvent.paste(title);
+    await userEvent.type(screen.getByLabelText(/content/i), 'Body');
+
+    expect(titleInput).toHaveValue(title);
+    expect(screen.getByText(formatCharacterCount(title.length, PROMPT_LIMITS.title))).toHaveClass('text-red-600');
+
+    await userEvent.click(screen.getByRole('button', { name: /save prompt/i }));
+
+    expect(await screen.findByText('Title cannot exceed 100 characters')).toBeInTheDocument();
+    expect(props.onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('accepts content over the limit only because of a Hidden character and hands it over unchanged', async () => {
+    const { props } = renderForm();
+    const content = `${'x'.repeat(PROMPT_LIMITS.content)}\u{200B}`;
+
+    await userEvent.click(screen.getByLabelText(/content/i));
+    await userEvent.paste(content);
+    await userEvent.click(screen.getByRole('button', { name: /save prompt/i }));
+
+    await waitFor(() => {
+      expect(props.onSubmit).toHaveBeenCalledWith({ title: '', content, category: 'Uncategorized' });
+    });
+  });
+
+  // React 19 resets the uncontrolled fields of a form once its action completes, so a refused
+  // save must not wipe what the user typed: the text stays, with the refusal next to it.
+  it('keeps the title, content and category exactly as typed when the save is refused, then saves the corrected text', async () => {
+    const { props } = renderForm();
+    const overLimit = 'x'.repeat(PROMPT_LIMITS.content + 1);
+
+    await userEvent.type(screen.getByLabelText(/title/i), 'My Title');
+    await userEvent.click(screen.getByRole('button', { name: /category/i }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: /work/i }));
+    await userEvent.click(screen.getByLabelText(/content/i));
+    await userEvent.paste(overLimit);
+    await userEvent.click(screen.getByRole('button', { name: /save prompt/i }));
+
+    expect(await screen.findByText('Content cannot exceed 20,000 characters')).toBeInTheDocument();
+    expect(screen.getByLabelText(/title/i)).toHaveValue('My Title');
+    expect(screen.getByLabelText(/content/i)).toHaveValue(overLimit);
+    expect(screen.getByRole('button', { name: /category/i })).toHaveTextContent('Work');
+    expect(screen.getByText(formatCharacterCount(overLimit.length, PROMPT_LIMITS.content))).toHaveClass('text-red-600');
+    expect(props.onSubmit).not.toHaveBeenCalled();
+
+    await userEvent.clear(screen.getByLabelText(/content/i));
+    await userEvent.paste('Within the limit');
+    await userEvent.click(screen.getByRole('button', { name: /save prompt/i }));
+
+    await waitFor(() => {
+      expect(props.onSubmit).toHaveBeenCalledWith({ title: 'My Title', content: 'Within the limit', category: 'Work' });
+    });
+
+    // A successful save still leaves a fresh form behind
+    await waitFor(() => {
+      expect(screen.getByLabelText(/title/i)).toHaveValue('');
+      expect(screen.getByLabelText(/content/i)).toHaveValue('');
+    });
   });
 });
