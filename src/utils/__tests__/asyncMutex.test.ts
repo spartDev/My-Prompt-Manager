@@ -356,5 +356,35 @@ describe('AsyncMutex', () => {
 
       await expect(mutex.withLock('k', async () => 'ok')).resolves.toBe('ok');
     });
+
+    it('falls back to the in-memory queue when the API rejects the request without running the operation', async () => {
+      // For example a SecurityError in an opaque origin: the promise rejects, the callback never runs
+      installNavigatorLocks({
+        request: () => Promise.reject(new DOMException('The request is not allowed here', 'SecurityError'))
+      });
+      const mutex = new AsyncMutex({ scope: 's' });
+      let runs = 0;
+
+      await expect(
+        mutex.withLock('k', async () => {
+          runs += 1;
+          return 'ok';
+        })
+      ).resolves.toBe('ok');
+      expect(runs).toBe(1);
+    });
+
+    it('runs an operation that throws once, and hands its error back instead of falling back', async () => {
+      const mutex = new AsyncMutex({ scope: 's' });
+      let runs = 0;
+
+      await expect(
+        mutex.withLock('k', async () => {
+          runs += 1;
+          throw new Error('boom');
+        })
+      ).rejects.toThrow('boom');
+      expect(runs).toBe(1);
+    });
   });
 });

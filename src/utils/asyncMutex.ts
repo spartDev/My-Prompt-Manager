@@ -8,8 +8,8 @@
  * The queue lives in memory, so by itself a mutex only excludes operations of the same JS
  * context. A mutex given a `scope` is shared by every context of the extension (popup, side
  * panel, service worker) through the Web Locks API, under the lock name `${scope}:${key}`.
- * Where the API is missing, or `request` throws synchronously, it falls back to the in-memory
- * queue, which is what tests and old browsers get.
+ * Where the API is missing, or refuses the request without running the operation, it falls back
+ * to the in-memory queue, which is what tests and old browsers get.
  */
 export interface AsyncMutexOptions {
   /** Share the locks with the other contexts of the same origin, under this name. */
@@ -64,15 +64,18 @@ export class AsyncMutex {
       // The request settles with what the callback returned, the operation's own promise, which
       // await unwraps: the lock is held until the operation settles, and its result or error
       // comes back unchanged
-      let granted: Promise<Promise<T>> | undefined;
+      let started = false;
       try {
-        granted = shared.request<Promise<T>>(`${this.scope}:${lockKey}`, () => operation());
-      } catch {
-        // The API refused the request itself (the operation never ran): queue in memory instead
-        granted = undefined;
-      }
-      if (granted) {
-        return await granted;
+        return await shared.request<Promise<T>>(`${this.scope}:${lockKey}`, () => {
+          started = true;
+          return operation();
+        });
+      } catch (error) {
+        if (started) {
+          throw error;
+        }
+        // The API refused the request itself, by throwing or by rejecting (a SecurityError in an
+        // opaque origin, for example) and the operation never ran: queue in memory instead
       }
     }
 
