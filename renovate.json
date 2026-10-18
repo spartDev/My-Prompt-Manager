@@ -58,9 +58,9 @@
         "minor"
       ],
       "matchPackageNames": [
-        "/vite/",
-        "/@vitejs/",
-        "/@crxjs/"
+        "vite",
+        "@vitejs/**",
+        "@crxjs/**"
       ]
     },
     {
@@ -72,7 +72,8 @@
         "minor"
       ],
       "matchPackageNames": [
-        "/vitest/",
+        "vitest",
+        "@vitest/**",
         "/@testing-library/",
         "/jsdom/"
       ]

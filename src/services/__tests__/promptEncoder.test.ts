@@ -1,3 +1,9 @@
+/**
+ * @vitest-environment jsdom
+ *
+ * jsdom, not happy-dom: happy-dom keeps <script> text when DOMPurify >=3.4.12
+ * strips tags, so XSS assertions would fail although real browsers strip it.
+ */
 import LZString from 'lz-string';
 import { describe, it, expect } from 'vitest';
 
