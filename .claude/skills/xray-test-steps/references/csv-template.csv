@@ -1,0 +1,6 @@
+Action,Data,Expected Result
+"[Setup: navigate to the right state / establish preconditions]",,"[Describe what should be visible on screen before starting]"
+"[Happy path: describe the main user action]","[Instructions about what to enter if needed]","[What changes on screen after the action]"
+"[Verification: check visible results on screen]",,"[Describe what the tester should see: field values / status / UI state]"
+"[Variation: describe an alternative path or edge case]","[Different input instructions if needed]","[Expected visible outcome for this variation]"
+"[Cleanup / final state: verify consistency if relevant]",,"[Describe the expected final state on screen]"
