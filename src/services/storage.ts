@@ -71,10 +71,16 @@ export class StorageManager {
     MAX_TOTAL_SIZE: 8000000       // Maximum total storage (8MB, leaving 2MB buffer)
   } as const;
 
-  // Locks for the storage keys, shared with the other contexts (popup, side panel, service worker)
-  // through the Web Locks API, so a read-then-write from one context cannot overwrite a write
-  // made in between from another. Lock order: CATEGORIES -> PROMPTS -> SETTINGS.
+  // Locks for the Prompts and Categories keys, shared with the other contexts (popup, side panel,
+  // service worker) through the Web Locks API, so a read-then-write from one context cannot overwrite
+  // a write made in between from another. Lock order: CATEGORIES -> PROMPTS -> SETTINGS.
   private readonly mutex = new AsyncMutex({ scope: 'StorageManager' });
+
+  // The settings object is small and a user rewrites it by hand with every toggle, often closing the
+  // page right after, so it is serialized within this context only: a lock round trip to the other
+  // contexts would delay every toggle for a race that needs two contexts to change settings within
+  // one read-write (main never locked it at all).
+  private readonly settingsMutex = new AsyncMutex();
 
   private constructor() {}
 
@@ -538,7 +544,7 @@ export class StorageManager {
     // Same lock order as updateCategory, CATEGORIES then PROMPTS, with SETTINGS last
     return this.mutex.withLock(this.STORAGE_KEYS.CATEGORIES, () =>
       this.mutex.withLock(this.STORAGE_KEYS.PROMPTS, () =>
-        this.mutex.withLock(this.STORAGE_KEYS.SETTINGS, async () => {
+        this.settingsMutex.withLock(this.STORAGE_KEYS.SETTINGS, async () => {
           try {
             // Raw values: getPrompts drops malformed entries and getCategories may write the default Category
             const categories = scrubStoredCategories(await this.getStorageData<unknown>(this.STORAGE_KEYS.CATEGORIES));
@@ -576,7 +582,7 @@ export class StorageManager {
   }
 
   updateSettings(updates: Partial<Settings>): Promise<Settings> {
-    return this.mutex.withLock(this.STORAGE_KEYS.SETTINGS, async () => {
+    return this.settingsMutex.withLock(this.STORAGE_KEYS.SETTINGS, async () => {
       try {
         const currentSettings = await this.getSettings();
         const updatedSettings = { ...currentSettings, ...updates };

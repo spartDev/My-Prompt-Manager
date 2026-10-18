@@ -62,7 +62,7 @@ This document provides comprehensive documentation for the business logic layer,
 **Pattern:** Singleton with keyed locks shared across contexts (Web Locks API)
 
 **Key Features:**
-- **Cross-context locks** - `AsyncMutex({ scope: 'StorageManager' })`: the popup, the side panel and the service worker exclude each other through the Web Locks API (in-memory queue where it is missing)
+- **Cross-context locks** - `AsyncMutex({ scope: 'StorageManager' })` for the Prompts and Categories keys: the popup, the side panel and the service worker exclude each other through the Web Locks API (in-memory queue where it is missing). Settings use a plain `AsyncMutex`, so a toggle never waits for a round trip to other contexts
 - **Storage quota monitoring** - Tracks usage (5MB limit)
 - **Import/export functionality** - Full data portability
 - **Comprehensive error handling** - Custom `StorageError` class
@@ -106,7 +106,7 @@ class StorageManager {
 }
 ```
 
-**Locking:** `AsyncMutex` (`src/utils/asyncMutex.ts`) queues operations per key. Created with a `scope`, as StorageManager does, `withLock(key, operation)` runs `navigator.locks.request('StorageManager:' + key, operation)`, so the popup, the side panel and the service worker (same extension origin) exclude each other; the operation's result or error comes back unchanged and the lock is released either way. Where the Web Locks API is missing, or refuses the request without running the operation (it throws, or rejects with a `SecurityError` in an opaque origin), the in-memory queue is used (tests, old browsers). Nested keys are taken in the fixed order CATEGORIES → PROMPTS → SETTINGS, and nothing under a lock awaits another context. `UsageTracker` keeps a plain in-memory `AsyncMutex`.
+**Locking:** `AsyncMutex` (`src/utils/asyncMutex.ts`) queues operations per key. Created with a `scope`, as StorageManager does, `withLock(key, operation)` runs `navigator.locks.request('StorageManager:' + key, operation)`, so the popup, the side panel and the service worker (same extension origin) exclude each other on the Prompts and Categories keys (settings are serialized within one context by a plain `AsyncMutex`); the operation's result or error comes back unchanged and the lock is released either way. Where the Web Locks API is missing, or refuses the request without running the operation (it throws, or rejects with a `SecurityError` in an opaque origin), the in-memory queue is used (tests, old browsers). Nested keys are taken in the fixed order CATEGORIES → PROMPTS → SETTINGS, and nothing under a lock awaits another context. `UsageTracker` keeps a plain in-memory `AsyncMutex`.
 
 **Benefits:**
 - Prevents concurrent modifications to same data

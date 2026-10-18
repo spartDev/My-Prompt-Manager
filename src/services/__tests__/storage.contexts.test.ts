@@ -74,6 +74,21 @@ describe('StorageManager across contexts', () => {
     expect(await storedPrompts()).toEqual([prompt('p1', { title: 'Title' }), saved]);
   });
 
+  it('asks the other contexts for the Prompt and Category locks, but not for the settings lock', async () => {
+    // A settings toggle is the one write a user triggers by hand and may close the page right after,
+    // so it must not wait for a lock round trip to the other contexts
+    uninstall();
+    const locks = new FakeLockManager();
+    uninstall = installNavigatorLocks(locks);
+    const popup = context();
+
+    await popup.savePrompt({ title: 'Saved', content: 'Body', category: DEFAULT_CATEGORY });
+    await popup.updateSettings({ sortOrder: 'title' });
+
+    expect(locks.log.filter((entry) => entry.startsWith('acquire'))).toEqual(['acquire StorageManager:prompts']);
+    expect((await chrome.storage.local.get('settings')).settings).toMatchObject({ sortOrder: 'title' });
+  });
+
   it('a usage count in the service worker cannot overwrite an edit the popup makes meanwhile', async () => {
     await chrome.storage.local.set({ prompts: [prompt('p1', { title: 'Old' })] });
     const worker = context();
