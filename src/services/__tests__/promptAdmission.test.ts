@@ -517,6 +517,42 @@ describe('planCategoryMerge (the one rule for Categories whose names a pass made
     });
   });
 
+  describe('keeps names that already had a partner ignoring case, wherever the changed name is', () => {
+    const padded = cleaned(' Work');
+    const upper = same('WORK');
+    const title = same('Work');
+
+    it.each([
+      ['first', [padded, title, upper], new Set([0])],
+      ['between them', [title, padded, upper], new Set([1])],
+      ['last', [title, upper, padded], new Set([2])]
+    ])('merges only the changed name when it comes %s, so the pair that already existed is not touched', (_where, names, merged) => {
+      expect(planCategoryMerge(names)).toEqual({ merged, renames: new Map([[' Work', 'Work']]) });
+    });
+
+    it('merges every changed name into the pair, and into the first of them when none spells the new name exactly', () => {
+      expect(
+        planCategoryMerge([cleaned('Work\u{200B}'), cleaned(' work'), title, same('work')])
+      ).toEqual({
+        merged: new Set([0, 1]),
+        renames: new Map([
+          ['Work\u{200B}', 'Work'],
+          [' work', 'work']
+        ])
+      });
+    });
+
+    it('keeps only the first when every name in the group is a different name that the pass made the same', () => {
+      expect(planCategoryMerge([cleaned('Work\u{200B}'), cleaned(' work'), title])).toEqual({
+        merged: new Set([1, 2]),
+        renames: new Map([
+          [' work', 'Work'],
+          ['Work', 'Work']
+        ])
+      });
+    });
+  });
+
   it.each([
     ['the later name had the Hidden character', [same('Work'), cleaned('work\u{200B}')], ['work\u{200B}', 'Work']],
     ['the first name had the Hidden character', [cleaned('work\u{200B}'), same('Work')], ['Work', 'work']],

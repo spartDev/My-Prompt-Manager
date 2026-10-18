@@ -306,19 +306,21 @@ export interface CategoryMergePlan {
 
 /**
  * The one rule for Categories whose names a pass made the same (ADR-001). Category names are
- * unique ignoring case, so when cleaning or Admission makes two names the same ignoring case,
- * the first keeps its place and its name and the later ones are merged into it. Names that
- * were already the same ignoring case before the pass are left alone: a pass only merges what
- * it made equal. A merged Category's Prompts are re-pointed to the kept Category whose name is
- * exactly the merged one's new name, or else to the first kept one. A name the pass empties
- * (only Hidden characters, or only spaces once trimmed) is merged into the default Category;
- * a name that was already empty is left alone.
+ * unique ignoring case, so when cleaning or Admission makes names the same ignoring case, one
+ * Category is kept and the others are merged into it. Names that were already the same ignoring
+ * case before the pass are left alone: a pass only merges what it made equal, wherever in the
+ * list the changed name stands. So within a group of names that became the same, the names that
+ * already had a partner ignoring case are all kept; when none had, the first is kept. A merged
+ * Category's Prompts are re-pointed to the kept Category whose name is exactly the merged one's
+ * new name, or else to the first kept one. A name the pass empties (only Hidden characters, or
+ * only spaces once trimmed) is merged into the default Category; a name that was already empty
+ * is left alone.
  *
  * Pure: it only plans. `undefined` stands for an entry that is not a Category and is skipped.
  */
 export function planCategoryMerge(names: readonly (CategoryName | undefined)[]): CategoryMergePlan {
-  /** Name after, lowercase -> the first Category's name before (lowercase), the kept names, the merged ones. */
-  const groups = new Map<string, { first: string; kept: string[]; merged: CategoryName[] }>();
+  /** Name after, lowercase -> the Categories whose names the pass made equal, in list order. */
+  const groups = new Map<string, { index: number; name: CategoryName }[]>();
   const merged = new Set<number>();
   const renames = new Map<string, string>();
 
@@ -334,25 +336,29 @@ export function planCategoryMerge(names: readonly (CategoryName | undefined)[]):
       return;
     }
 
-    const before = name.before.toLowerCase();
     const key = name.after.toLowerCase();
-    let group = groups.get(key);
-    if (group === undefined) {
-      group = { first: before, kept: [], merged: [] };
-      groups.set(key, group);
-    }
-
-    if (group.first === before) {
-      group.kept.push(name.after);
-    } else {
-      merged.add(index);
-      group.merged.push(name);
-    }
+    const group = groups.get(key) ?? [];
+    group.push({ index, name });
+    groups.set(key, group);
   });
 
   for (const group of groups.values()) {
-    for (const name of group.merged) {
-      renames.set(name.before, group.kept.find((kept) => kept === name.after) ?? group.kept[0]);
+    const timesSeen = new Map<string, number>();
+    for (const { name } of group) {
+      const before = name.before.toLowerCase();
+      timesSeen.set(before, (timesSeen.get(before) ?? 0) + 1);
+    }
+
+    // Names that already had a partner ignoring case are not the pass's doing: they stay
+    const partnered = group.filter(({ name }) => (timesSeen.get(name.before.toLowerCase()) ?? 0) > 1);
+    const kept = partnered.length > 0 ? partnered : group.slice(0, 1);
+    const keptNames = kept.map(({ name }) => name.after);
+
+    for (const member of group) {
+      if (!kept.includes(member)) {
+        merged.add(member.index);
+        renames.set(member.name.before, keptNames.find((keptName) => keptName === member.name.after) ?? keptNames[0]);
+      }
     }
   }
 
