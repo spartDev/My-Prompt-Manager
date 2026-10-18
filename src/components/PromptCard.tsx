@@ -28,6 +28,10 @@ const highlightText = (text: string, query: string, promptId: string): ReactNode
   if (searchTerm === '') {return text;}
 
   const lowerText = text.toLowerCase();
+  // Lowercasing can change the length (an 'İ' becomes two code units), which would put a match at the wrong
+  // position of the stored text: show the title as it is, unmarked
+  if (lowerText.length !== text.length) {return text;}
+
   const parts: ReactNode[] = [];
   let lastIndex = 0;
   let index = lowerText.indexOf(searchTerm);

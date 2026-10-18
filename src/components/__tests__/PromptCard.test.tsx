@@ -116,6 +116,16 @@ describe('PromptCard - Basic Rendering', () => {
     expect(screen.getByRole('heading')).toHaveTextContent('Tom & Jerry <3 &amp; co');
   });
 
+  it('should not mark the wrong slice when lowercasing changes the length of the title', () => {
+    // 'İ' (U+0130) lowercases to two code units, so match positions in the lowercased text are off by one
+    const turkishPrompt: Prompt = { ...mockPrompt, title: '\u{130}stanbul tags' };
+
+    render(<PromptCard {...mockProps} prompt={turkishPrompt} searchQuery="tags" />);
+
+    expect(screen.getByRole('heading')).toHaveTextContent('\u{130}stanbul tags');
+    expect(screen.queryByText('ags')).not.toBeInTheDocument();
+  });
+
   it('should highlight a query that looks like the start of a tag, and stay responsive', () => {
     const markupPrompt: Prompt = { ...mockPrompt, title: 'Use <example>text</example> tags' };
 
