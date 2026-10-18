@@ -52,10 +52,12 @@ Thumbs.db
 coverage/
 .nyc_output
 test-results/
+test-results.json
 playwright-report/
 
-# Git worktrees
+# Git worktrees (.claude/worktrees is where Claude Code creates them)
 .worktrees/
+.claude/worktrees/
 
 # Log files
 logs
@@ -170,3 +172,6 @@ hive-mind-prompt-*.txt
 # Beads / Dolt files (added by bd init)
 .dolt/
 .beads-credential-key
+
+# Beads runtime lock
+.beads.gate.lock
