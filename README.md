@@ -315,7 +315,7 @@ npm test -- src/content/platforms/__tests__/claude-strategy.test.ts
 ### Security Features
 
 - **Content Security Policy (CSP):** Strict CSP prevents XSS attacks
-- **DOMPurify Integration:** Used for custom site configuration security only; Prompt text is never rewritten after it is saved, on write, on read, on insertion or on display
+- **DOMPurify Integration:** Used for custom site configuration security only; Prompt text is stored as written (Hidden characters are removed once, when it is saved) and is never rewritten on read, on insertion or on display
 - **Minimal Permissions:** Only essential Chrome APIs requested
 - **Restricted Host Access:** No code execution on unrelated sites
 - **Chrome Web Store Compliance:** Follows security best practices

@@ -309,13 +309,11 @@ export class StorageManager {
     return StorageManager.instance;
   }
 
-  // Mutex-locked operations
+  // Reads take no lock; writes run under the mutex (see below)
   async getPrompts(): Promise<StoredPrompt[]> {
-    return this.mutex.withLock('prompts', async () => {
-      const data = await this.chrome.storage.local.get('prompts');
-      // Reading never writes and never changes text (see Security Architecture)
-      return readPrompts(data.prompts);
-    });
+    const data = await this.getStorageData<unknown>('prompts');
+    // Reading never writes and never changes text (see Security Architecture)
+    return readPrompts(data);
   }
 
   // AsyncMutex (src/utils/asyncMutex.ts): navigator.locks.request('StorageManager:' + key, operation),
@@ -1405,7 +1403,7 @@ Prompt selector / chat input (text stays text)
 
 ### Existing data (upgrade pass)
 
-On extension update the service worker (`chrome.runtime.onInstalled`, reason `update`) calls `StorageManager.upgradeStoredData()`, which cleans stored Prompts and Category names of Hidden characters once. It works on raw stored values, never refuses, trims, shortens or deletes a Prompt (including one already over the limits), writes nothing when there is nothing to clean, and is safe to run any number of times. If cleaning makes two Category names the same, the later Category is merged into the first; its Prompts already name the kept one.
+On extension update the service worker (`chrome.runtime.onInstalled`, reason `update`) calls `StorageManager.upgradeStoredData()`, which cleans stored Prompts, Category names and the default Category of Hidden characters once. It works on raw stored values, never refuses, shortens or deletes a Prompt (including one already over the limits), never trims Prompt text (it trims only the labels Admission trims: Category names, a Prompt's category and the default Category), writes nothing when there is nothing to clean, writes every key that changed in one atomic `set`, and is safe to run any number of times. If cleaning makes Category names the same ignoring case, one is kept (names that already had a partner ignoring case are never merged by the pass) and the others are merged into it; their Prompts and the default Category are re-pointed to the kept name in the same write, and a name that cleaning empties goes to the default Category. A failed run is not retried before the next update. It runs under the same cross-context locks as the writes it competes with.
 
 ### Delivery: no HTML sink for Prompt text
 

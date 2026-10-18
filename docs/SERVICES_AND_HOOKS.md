@@ -100,11 +100,13 @@ class StorageManager {
   async importData(data: unknown): Promise<void>;
   async getStorageUsage(): Promise<{ used: number; total: number }>;
 
-  // Every write runs under this.mutex.withLock(key, operation); lock order CATEGORIES -> PROMPTS -> SETTINGS
+  // Prompt, Category and settings writes run under this.mutex.withLock(key, operation); lock order CATEGORIES -> PROMPTS -> SETTINGS.
+  // Reads take no lock. Three writes also take none: the default Category that getCategories() creates when it is
+  // missing, clearAllData() and importData() (tracked in beads: My-Prompt-Manager-2ne, -uze)
 }
 ```
 
-**Locking:** `AsyncMutex` (`src/utils/asyncMutex.ts`) queues operations per key. Created with a `scope`, as StorageManager does, `withLock(key, operation)` runs `navigator.locks.request('StorageManager:' + key, operation)`, so the popup, the side panel and the service worker (same extension origin) exclude each other; the operation's result or error comes back unchanged and the lock is released either way. Where the Web Locks API is missing, or `request` throws synchronously, the in-memory queue is used (tests, old browsers). Nested keys are taken in the fixed order CATEGORIES → PROMPTS → SETTINGS, and nothing under a lock awaits another context. `UsageTracker` keeps a plain in-memory `AsyncMutex`.
+**Locking:** `AsyncMutex` (`src/utils/asyncMutex.ts`) queues operations per key. Created with a `scope`, as StorageManager does, `withLock(key, operation)` runs `navigator.locks.request('StorageManager:' + key, operation)`, so the popup, the side panel and the service worker (same extension origin) exclude each other; the operation's result or error comes back unchanged and the lock is released either way. Where the Web Locks API is missing, or refuses the request without running the operation (it throws, or rejects with a `SecurityError` in an opaque origin), the in-memory queue is used (tests, old browsers). Nested keys are taken in the fixed order CATEGORIES → PROMPTS → SETTINGS, and nothing under a lock awaits another context. `UsageTracker` keeps a plain in-memory `AsyncMutex`.
 
 **Benefits:**
 - Prevents concurrent modifications to same data

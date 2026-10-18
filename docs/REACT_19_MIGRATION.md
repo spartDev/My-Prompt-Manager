@@ -610,8 +610,7 @@ const [field, setField] = useState('');
 <input defaultValue={field} name="field" onChange={(e) => setField(e.target.value)} />
 ```
 
-The input stays uncontrolled (FormData still reads it); on success, set the state back to `''`
-so the reset clears the form as before. `AddPromptForm` and `EditPromptForm` do this.
+The input stays uncontrolled (FormData still reads it). `AddPromptForm` sets the state back to `''` on success so the reset clears the form as before; `EditPromptForm` keeps the values it tracks, since the form closes after a successful save.
 
 ---
 
