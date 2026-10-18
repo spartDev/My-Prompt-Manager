@@ -47,6 +47,12 @@ test.describe('Usage Counter & Smart Sorting - Logic', () => {
       sortButton = popupPage.getByRole('button', { name: /Sort order: Least Used/i });
       await expect(sortButton).toBeVisible();
 
+      // The list re-sorts before the settings are stored: wait for the stored direction, or closing
+      // the page can cut the write short
+      await expect
+        .poll(async () => (await storage.getSettings())?.sortDirection)
+        .toBe('asc');
+
       await popupPage.close();
 
       // Open sidepanel
@@ -86,6 +92,10 @@ test.describe('Usage Counter & Smart Sorting - Logic', () => {
       // Verify sort was applied
       const sortButton = sidepanelPage.getByRole('button', { name: /Sort order: Recently Used/i });
       await expect(sortButton).toBeVisible();
+
+      // The button changes before the setting is stored: wait for the stored value, or closing the
+      // page can cut the write short
+      await expect.poll(async () => (await storage.getSettings())?.sortOrder).toBe('lastUsedAt');
 
       await sidepanelPage.close();
 
