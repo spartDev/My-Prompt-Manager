@@ -114,3 +114,17 @@ describe('EditPromptForm - Limits', () => {
     });
   });
 });
+
+// An edit has no title to generate (create does): a blank one has to be refused here, because
+// refused later, by Admission, the app shows the refusal as a full-screen load error.
+describe('EditPromptForm - Title', () => {
+  it('refuses a cleared title in the form and does not submit', async () => {
+    const { props } = renderForm();
+
+    await userEvent.clear(screen.getByLabelText(/title/i));
+    await userEvent.click(screen.getByRole('button', { name: /save changes/i }));
+
+    expect(await screen.findByText(/Title is required/)).toBeInTheDocument();
+    expect(props.onSubmit).not.toHaveBeenCalled();
+  });
+});

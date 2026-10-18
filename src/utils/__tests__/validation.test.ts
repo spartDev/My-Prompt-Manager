@@ -66,6 +66,14 @@ describe('validatePromptFields', () => {
     expect(validatePromptFields('   ', 'Content', { component: 'TestComponent' })).toEqual({});
   });
 
+  it('refuses a blank title when the form has no title to generate (an edit)', () => {
+    const options = { component: 'EditPromptForm', requireTitle: true };
+
+    expect(validatePromptFields('', 'Body', options)).toEqual({ title: 'Title is required' });
+    expect(validatePromptFields('   ', 'Body', options)).toEqual({ title: 'Title is required' });
+    expect(validatePromptFields('Title', 'Body', options)).toEqual({});
+  });
+
   it('refuses content that is only Hidden characters as empty', () => {
     const errors = validatePromptFields('Title', '\u{200B}\u{202E}', { component: 'TestComponent' });
     expect(errors.content).toBe('Content is required');

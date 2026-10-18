@@ -68,7 +68,8 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
       // Validation using shared utility
       const validationErrors = validatePromptFields(title, content, {
         component: 'EditPromptForm',
-        promptId: prompt.id
+        promptId: prompt.id,
+        requireTitle: true
       });
 
       // Return validation errors if any

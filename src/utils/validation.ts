@@ -19,13 +19,16 @@ export interface FieldErrors {
 interface ValidationLogOptions {
   component: string;
   promptId?: string;
+  /** The form has no title to generate (an edit): a blank one is refused instead of being left for later. */
+  requireTitle?: boolean;
 }
 
 /**
  * Validates prompt title and content fields by asking Admission whether they would be
  * admitted (ADR-001): Hidden characters are removed and the title trimmed before the limits
  * apply, and nothing is shortened. The title is optional here, because an empty one is
- * generated on save, so only a non-empty title is judged.
+ * generated on save, so only a non-empty title is judged, unless the form has no title to
+ * generate (`requireTitle`, an edit).
  *
  * This shared validation logic is used by both AddPromptForm and EditPromptForm
  * to ensure consistent validation rules across all prompt forms.
@@ -51,7 +54,7 @@ export function validatePromptFields(
 ): FieldErrors {
   const validationErrors: FieldErrors = {};
 
-  const admission = admit({ title: title.trim() ? title : undefined, content });
+  const admission = admit({ title: options.requireTitle || title.trim() ? title : undefined, content });
   if (admission.ok) {
     return validationErrors;
   }
