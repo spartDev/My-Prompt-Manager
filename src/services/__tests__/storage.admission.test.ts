@@ -138,6 +138,42 @@ describe('StorageManager Admission', () => {
       expect(await storedPrompts()).toEqual([imported]);
     });
 
+    it('keeps the usage and createdAt of the Prompt it replaces when the Backup has none (saved before usage tracking)', async () => {
+      await chrome.storage.local.set({
+        prompts: [{ ...backed, title: 'Old', createdAt: 1, updatedAt: 2, usageCount: 7, lastUsedAt: 900 }]
+      });
+      const { usageCount: _count, lastUsedAt: _last, createdAt: _created, ...legacy } = backed;
+
+      const imported = await storageManager.importPrompt({ ...legacy, title: 'New' } as typeof backed);
+
+      expect(imported).toEqual({
+        ...backed,
+        title: 'New',
+        createdAt: 1,
+        usageCount: 7,
+        lastUsedAt: 900,
+        updatedAt: Date.now()
+      });
+      expect(await storedPrompts()).toEqual([imported]);
+    });
+
+    it("takes the Backup's own usage over the stored one when the Backup has it", async () => {
+      await chrome.storage.local.set({ prompts: [{ ...backed, title: 'Old', usageCount: 7, lastUsedAt: 900 }] });
+
+      const imported = await storageManager.importPrompt({ ...backed, usageCount: 2, lastUsedAt: 50 });
+
+      expect(imported).toMatchObject({ usageCount: 2, lastUsedAt: 50 });
+    });
+
+    it('fills in missing usage with defaults for a Prompt that replaces nothing', async () => {
+      const { usageCount: _count, lastUsedAt: _last, ...legacy } = backed;
+
+      const imported = await storageManager.importPrompt(legacy as typeof backed);
+
+      // an unused Prompt was last used when it was created
+      expect(imported).toMatchObject({ usageCount: 0, lastUsedAt: 5 });
+    });
+
     it('stamps updatedAt with the current time when it replaces an existing Prompt', async () => {
       await chrome.storage.local.set({ prompts: [{ ...backed, title: 'Old', updatedAt: 1 }] });
 

@@ -286,20 +286,26 @@ export class StorageManager {
   async importPrompt(prompt: Prompt): Promise<Prompt> {
     return this.mutex.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
       try {
+        const existingPrompts = await this.getPrompts();
+        const existing = existingPrompts.find(p => p.id === prompt.id);
+
+        // A Backup saved before usage tracking has no usage fields: the Prompt it replaces keeps its
+        // own, and the Backup's values win wherever it has them (as `{ ...existing, ...prompt }` did).
+        const merged = existing ? { ...existing, ...prompt } : prompt;
+
         // The Library may spell the Prompt's Category differently (`Work` for `work`): the Prompt takes
         // the stored spelling. The Categories are read raw, because getCategories() can write the
         // default Category and the CATEGORIES lock is never taken under PROMPTS (lock order).
         const storedCategories = await this.getStorageData<unknown>(this.STORAGE_KEYS.CATEGORIES);
         const incoming = readPrompt(
-          typeof prompt.category === 'string'
-            ? { ...prompt, category: matchStoredCategory(prompt.category, storedCategories) }
-            : prompt
+          typeof merged.category === 'string'
+            ? { ...merged, category: matchStoredCategory(merged.category, storedCategories) }
+            : merged
         );
         if (!incoming) {
           throw new Error('Cannot import: the Prompt is missing its id, title or content');
         }
 
-        const existingPrompts = await this.getPrompts();
         const existingIndex = existingPrompts.findIndex(p => p.id === incoming.id);
         const replacing = existingIndex >= 0;
 
