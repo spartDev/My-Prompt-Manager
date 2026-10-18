@@ -234,7 +234,7 @@ type IconType = 'logo' | 'add' | 'edit' | 'settings';
 
 **Key Features:**
 - **Custom memo comparison** (`arePropsEqual`) for performance
-- **XSS protection** via DOMPurify sanitization
+- **Verbatim titles**: the stored title is shown as written, nothing is sanitized or rewritten
 - **Search highlighting** with stable React keys
 - **Full keyboard navigation** with arrow keys
 - **Dropdown menu** with accessibility
@@ -265,13 +265,12 @@ const arePropsEqual = (prev: Props, next: Props): boolean => {
 export default memo(PromptCard, arePropsEqual);
 ```
 
-**Security:**
+**Display:**
 ```typescript
-// XSS prevention
-const sanitizedText = DOMPurify.sanitize(text, {
-  ALLOWED_TAGS: [],
-  ALLOWED_ATTR: []
-});
+// The title is shown as stored. React renders every part as text, so markup in it is displayed,
+// never interpreted, and nothing needs rewriting; an empty query returns the text untouched
+const searchTerm = query.trim().toLowerCase();
+if (searchTerm === '') return text;
 ```
 
 **Actions:**
