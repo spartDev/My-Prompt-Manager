@@ -14,7 +14,7 @@ export default defineConfig({
       ...configDefaults.exclude,
       'tests/e2e/**',
       '.worktrees/**',
-      '.claude/worktrees/**'
+      '.claude/**'
     ],
     coverage: {
       provider: 'v8',
