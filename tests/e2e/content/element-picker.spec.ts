@@ -16,7 +16,7 @@ const resolveBackgroundWorker = async (context: BrowserContext): Promise<Worker>
 };
 
 test.describe('Element picker integration', () => {
-  test('displays selected element after picker flow completes', async ({ context, page, storage }) => {
+  test('displays selected element after picker flow completes', async ({ context, page, storage, extensionId }) => {
     await seedLibrary(storage, {
       settings: {
         ...DEFAULT_SETTINGS,
@@ -27,7 +27,7 @@ test.describe('Element picker integration', () => {
 
     const background = await resolveBackgroundWorker(context);
 
-    await page.reload();
+    await page.goto(`chrome-extension://${extensionId}/src/popup.html`);
 
     await page.getByTestId('tab-settings').click();
     await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();

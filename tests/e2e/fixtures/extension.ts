@@ -329,10 +329,12 @@ export const test = base.extend<ExtensionFixtures>({
     await use(extensionId);
   },
 
-  page: async ({ context, extensionId, storage }, use) => {
+  // Starts on about:blank: the extension app must not run before the test seeds storage,
+  // otherwise its first reads (e.g. getCategories() writing [Uncategorized]) race the seed.
+  // Tests navigate themselves (page.goto(...) / navigateToContext).
+  page: async ({ context, storage }, use) => {
     void storage;
     const page = await context.newPage();
-    await page.goto(`chrome-extension://${extensionId}/src/popup.html`);
     await use(page);
     await page.close();
   },

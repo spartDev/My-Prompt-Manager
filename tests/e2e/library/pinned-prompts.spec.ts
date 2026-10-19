@@ -62,10 +62,7 @@ const prompts: Prompt[] = [
   }),
 ];
 
-// The `page` fixture opens popup.html before seeding; its first getCategories() can write
-// [Uncategorized] over seeded categories. Leave that page before seeding to avoid the race.
-const seed = async (page: Page, storage: ExtensionStorage, seedPrompts: Prompt[], theme: 'light' | 'dark') => {
-  await page.goto('about:blank');
+const seed = async (storage: ExtensionStorage, seedPrompts: Prompt[], theme: 'light' | 'dark') => {
   await seedLibrary(storage, { prompts: seedPrompts, categories, settings: { theme } });
 };
 
@@ -79,7 +76,7 @@ const openLibrary = async (page: Page, extensionId: string) => {
 
 test.describe('Library cards & Pinned Prompts', () => {
   test('AT7: pinning a prompt moves it to the top and it stays there after reload', async ({ page, storage, extensionId }) => {
-    await seed(page, storage, prompts, 'light');
+    await seed(storage, prompts, 'light');
     const library = await openLibrary(page, extensionId);
 
     // Default sort is "recently updated": the last card is the oldest one
@@ -111,11 +108,11 @@ test.describe('Library cards & Pinned Prompts', () => {
 
     // Unpinning puts it back in its sorted place
     await library.togglePin('Release Notes Draft');
-    await expect.poll(async () => (await library.getPromptTitles()).at(-1)).toBe('Release Notes Draft');
+    await expect.poll(async () => (await library.getPromptTitles()).slice(-1)[0]).toBe('Release Notes Draft');
   });
 
   test('AT4: card shows preview, category and usage; clicking the card body opens the editor', async ({ page, storage, extensionId }) => {
-    await seed(page, storage, prompts, 'light');
+    await seed(storage, prompts, 'light');
     await openLibrary(page, extensionId);
 
     const devCard = page.getByTestId('prompt-card').filter({ hasText: 'Dev — Ticket' });
@@ -135,7 +132,7 @@ test.describe('Library cards & Pinned Prompts', () => {
   });
 
   test('AT5: deleting from the edit form asks for confirmation then removes the prompt', async ({ page, storage, extensionId }) => {
-    await seed(page, storage, prompts, 'light');
+    await seed(storage, prompts, 'light');
     const library = await openLibrary(page, extensionId);
 
     await library.deletePrompt('Release Notes Draft');
@@ -149,7 +146,7 @@ test.describe('Library cards & Pinned Prompts', () => {
   for (const theme of ['light', 'dark'] as const) {
     test(`PROOF: Library cards screenshot (${theme} mode)`, async ({ page, storage, extensionId }) => {
       const pinnedFirst = prompts.map(p => (p.id === 'po' ? { ...p, pinned: true } : p));
-      await seed(page, storage, pinnedFirst, theme);
+      await seed(storage, pinnedFirst, theme);
       await openLibrary(page, extensionId);
 
       await expect(page.locator('html')).toHaveClass(theme === 'dark' ? /dark/ : /^(?!.*dark)/);
