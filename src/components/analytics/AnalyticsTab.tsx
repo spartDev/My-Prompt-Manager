@@ -21,15 +21,12 @@ import SummaryCard from './SummaryCard';
 export interface AnalyticsTabProps {
   /** Callback when user wants to expand to full dashboard */
   onExpandDashboard?: () => void;
-  /** Callback when user wants to go back to previous view */
-  onBack?: () => void;
   /** Current context (popup or sidepanel) */
   context?: 'popup' | 'sidepanel';
 }
 
 const AnalyticsTab: FC<AnalyticsTabProps> = ({
   onExpandDashboard,
-  onBack,
   context = 'sidepanel'
 }) => {
   const { stats, loading, error, clearHistory } = useUsageStats();
@@ -78,12 +75,26 @@ const AnalyticsTab: FC<AnalyticsTabProps> = ({
         icon="analytics"
         title="Analytics"
         subtitle="Last 30 days of usage"
-        onBack={onBack}
         context={context}
-      />
+      >
+        {context === 'sidepanel' && (
+          <ViewHeader.Actions>
+            {hasData && onExpandDashboard && (
+              <button
+                onClick={onExpandDashboard}
+                className="px-3 py-2 text-sm font-semibold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 rounded-lg shadow-sm transition-colors focus-primary"
+                aria-label="View full analytics dashboard"
+              >
+                Full Dashboard
+              </button>
+            )}
+            <ViewHeader.CloseButton onClick={() => { window.close(); }} context="sidepanel" />
+          </ViewHeader.Actions>
+        )}
+      </ViewHeader>
 
       {/* Content */}
-      <main className="flex-1 overflow-auto custom-scrollbar p-4 pb-16">
+      <main className="flex-1 overflow-auto custom-scrollbar p-4" data-scroll-container>
         {!hasData && !loading ? (
           /* Empty state */
           <div className="flex flex-col items-center justify-center h-full text-center px-6" role="region" aria-label="Empty analytics">
@@ -223,17 +234,6 @@ const AnalyticsTab: FC<AnalyticsTabProps> = ({
           </div>
         )}
       </main>
-
-      {/* Floating Action Button for Full Dashboard */}
-      {hasData && onExpandDashboard && context === 'sidepanel' && (
-        <button
-          onClick={onExpandDashboard}
-          className="absolute bottom-4 right-4 px-4 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl shadow-lg hover:shadow-xl hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 focus-primary"
-          aria-label="View full analytics dashboard"
-        >
-          Full Dashboard
-        </button>
-      )}
 
       {/* Clear History Confirmation Modal */}
       {showClearConfirm && (

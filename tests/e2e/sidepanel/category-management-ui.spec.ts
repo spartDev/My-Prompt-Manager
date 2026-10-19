@@ -30,17 +30,17 @@ test.describe('Category Manager - UI/UX Tests', () => {
       // Verify we're in the main library view
       await expect(sidepanelPage.getByRole('heading', { name: 'My Prompt Manager' })).toBeVisible();
 
-      // Find the "Manage categories" button
-      const manageCategoriesButton = sidepanelPage.getByRole('button', { name: 'Manage categories' });
-      await expect(manageCategoriesButton).toBeVisible();
-      await expect(manageCategoriesButton).toBeEnabled();
+      // Find the Categories tab in the bottom tab bar
+      const categoriesTab = sidepanelPage.getByTestId('tab-categories');
+      await expect(categoriesTab).toBeVisible();
+      await expect(categoriesTab).toHaveAttribute('aria-selected', 'false');
 
-      // Click to open category manager
-      await manageCategoriesButton.click();
+      // Click to open the Categories section
+      await categoriesTab.click();
 
-      // Verify category manager opened correctly
-      await expect(sidepanelPage.getByRole('heading', { name: 'Manage Categories' })).toBeVisible();
-      await expect(sidepanelPage.getByText('Organize your prompt collection')).toBeVisible();
+      // Verify the Categories section opened correctly
+      await expect(categoriesTab).toHaveAttribute('aria-selected', 'true');
+      await expect(sidepanelPage.getByRole('heading', { level: 1, name: 'Categories', exact: true })).toBeVisible();
 
       // Verify UI components are present
       await expect(sidepanelPage.getByText('Add New Category')).toBeVisible();
@@ -61,20 +61,20 @@ test.describe('Category Manager - UI/UX Tests', () => {
       await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
       // Open category manager
-      await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
-      await expect(sidepanelPage.getByRole('heading', { name: 'Manage Categories' })).toBeVisible();
+      await sidepanelPage.getByTestId('tab-categories').click();
+      await expect(sidepanelPage.getByRole('heading', { level: 1, name: 'Categories', exact: true })).toBeVisible();
 
-      // Find and click the back button
-      const backButton = sidepanelPage.getByTestId('back-button').first();
-      await expect(backButton).toBeVisible();
-      await backButton.click();
+      // Categories has no back button: return via the Library tab
+      await expect(sidepanelPage.getByTestId('back-button')).toHaveCount(0);
+      await sidepanelPage.getByTestId('tab-library').click();
 
       // Verify return to main library view
       await expect(sidepanelPage.getByRole('heading', { name: 'My Prompt Manager' })).toBeVisible();
-      await expect(sidepanelPage.getByRole('heading', { name: 'Manage Categories' })).toBeHidden();
+      await expect(sidepanelPage.getByRole('heading', { level: 1, name: 'Categories', exact: true })).toBeHidden();
 
-      // Verify the "Manage categories" button is visible again
-      await expect(sidepanelPage.getByRole('button', { name: 'Manage categories' })).toBeVisible();
+      // Verify the tab bar reflects the active Library section
+      await expect(sidepanelPage.getByTestId('tab-library')).toHaveAttribute('aria-selected', 'true');
+      await expect(sidepanelPage.getByTestId('tab-categories')).toHaveAttribute('aria-selected', 'false');
     });
 
     test('should display category count correctly', async ({ context, storage, extensionId }) => {
@@ -97,10 +97,10 @@ test.describe('Category Manager - UI/UX Tests', () => {
       await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
       // Open category manager
-      await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
+      await sidepanelPage.getByTestId('tab-categories').click();
 
       // Verify count shows seeded categories + default "Uncategorized"
-      await expect(sidepanelPage.getByText('4 categories')).toBeVisible();
+      await expect(sidepanelPage.getByText('4 categories', { exact: true }).first()).toBeVisible();
 
       // Verify all categories are displayed
       await expect(sidepanelPage.getByText('Work')).toBeVisible();
@@ -122,10 +122,10 @@ test.describe('Category Manager - UI/UX Tests', () => {
       await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
       // Open category manager
-      await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
+      await sidepanelPage.getByTestId('tab-categories').click();
 
       // Verify singular form is used
-      await expect(sidepanelPage.getByText('1 category')).toBeVisible();
+      await expect(sidepanelPage.getByText('1 category', { exact: true }).first()).toBeVisible();
       // Check that the counter doesn't show plural form
       await expect(sidepanelPage.locator('span').filter({ hasText: /^\d+ categories$/ })).toBeHidden();
     });
@@ -143,10 +143,10 @@ test.describe('Category Manager - UI/UX Tests', () => {
       await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
       // Open category manager
-      await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
+      await sidepanelPage.getByTestId('tab-categories').click();
 
       // Verify count shows 1 for the default category
-      await expect(sidepanelPage.getByText('1 category')).toBeVisible();
+      await expect(sidepanelPage.getByText('1 category', { exact: true }).first()).toBeVisible();
 
       // Verify only "Uncategorized" is shown
       await expect(sidepanelPage.getByText('Uncategorized')).toBeVisible();
@@ -169,10 +169,10 @@ test.describe('Category Manager - UI/UX Tests', () => {
       await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
       // Open category manager
-      await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
+      await sidepanelPage.getByTestId('tab-categories').click();
 
       // Initial state: only default category
-      await expect(sidepanelPage.getByText('1 category')).toBeVisible();
+      await expect(sidepanelPage.getByText('1 category', { exact: true }).first()).toBeVisible();
 
       // Add a new category
       const categoryNameInput = sidepanelPage.getByPlaceholder('Enter category name...');
@@ -180,8 +180,8 @@ test.describe('Category Manager - UI/UX Tests', () => {
       await sidepanelPage.getByRole('button', { name: 'Add' }).click();
 
       // Verify count updated to 2
-      await expect(sidepanelPage.getByText('2 categories')).toBeVisible();
-      await expect(sidepanelPage.getByText('1 category')).toBeHidden();
+      await expect(sidepanelPage.getByText('2 categories', { exact: true }).first()).toBeVisible();
+      await expect(sidepanelPage.getByText('1 category', { exact: true }).first()).toBeHidden();
 
       // Add another category
       await categoryNameInput.fill('Development');
@@ -191,7 +191,7 @@ test.describe('Category Manager - UI/UX Tests', () => {
       await expect(sidepanelPage.getByText('Category created successfully').first()).toBeVisible();
 
       // Verify count updated to 3
-      await expect(sidepanelPage.getByText('3 categories')).toBeVisible();
+      await expect(sidepanelPage.getByText('3 categories', { exact: true }).first()).toBeVisible();
 
       // Delete a category (Testing)
       const testingCategoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Testing', { exact: true }) }).first();
@@ -203,8 +203,8 @@ test.describe('Category Manager - UI/UX Tests', () => {
       await confirmDialog.getByRole('button', { name: 'Delete' }).click();
 
       // Verify count decreased to 2
-      await expect(sidepanelPage.getByText('2 categories')).toBeVisible();
-      await expect(sidepanelPage.getByText('3 categories')).toBeHidden();
+      await expect(sidepanelPage.getByText('2 categories', { exact: true }).first()).toBeVisible();
+      await expect(sidepanelPage.getByText('3 categories', { exact: true }).first()).toBeHidden();
     });
   });
 
@@ -221,7 +221,7 @@ test.describe('Category Manager - UI/UX Tests', () => {
       await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
       // Open category manager
-      await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
+      await sidepanelPage.getByTestId('tab-categories').click();
 
       // Verify color picker section is present in the form
       await expect(sidepanelPage.getByText('Category Color')).toBeVisible();
@@ -262,7 +262,7 @@ test.describe('Category Manager - UI/UX Tests', () => {
       await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
       // Open category manager
-      await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
+      await sidepanelPage.getByTestId('tab-categories').click();
 
       // Verify each category has its color swatch visible
       const redCategoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Red Category', { exact: true }) }).first();
@@ -298,7 +298,7 @@ test.describe('Category Manager - UI/UX Tests', () => {
       await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
       // Open category manager
-      await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
+      await sidepanelPage.getByTestId('tab-categories').click();
 
       // Start editing the category
       const categoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Color Test', { exact: true }) }).first();

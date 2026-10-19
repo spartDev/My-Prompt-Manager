@@ -57,12 +57,11 @@ describe('App analytics integration', () => {
   });
 
   describe('Analytics navigation', () => {
-    it('navigates to analytics view when analytics button is clicked', async () => {
+    it('navigates to analytics view when the Analytics tab is clicked', async () => {
       const user = userEvent.setup();
       await renderApp();
 
-      const analyticsButton = screen.getByRole('button', { name: /view analytics/i });
-      await user.click(analyticsButton);
+      await user.click(screen.getByRole('tab', { name: 'Analytics' }));
 
       // Should show analytics view with "Analytics" heading
       await waitFor(() => {
@@ -70,21 +69,19 @@ describe('App analytics integration', () => {
       });
     });
 
-    it('returns to library view when back button is clicked from analytics', async () => {
+    it('returns to library view when the Library tab is clicked from analytics', async () => {
       const user = userEvent.setup();
       await renderApp();
 
       // Navigate to analytics
-      const analyticsButton = screen.getByRole('button', { name: /view analytics/i });
-      await user.click(analyticsButton);
+      await user.click(screen.getByRole('tab', { name: 'Analytics' }));
 
       await waitFor(() => {
         expect(screen.getByRole('heading', { name: /analytics/i })).toBeInTheDocument();
       });
 
-      // Click back button
-      const backButton = screen.getByTestId('back-button');
-      await user.click(backButton);
+      expect(screen.queryByTestId('back-button')).not.toBeInTheDocument();
+      await user.click(screen.getByRole('tab', { name: 'Library' }));
 
       // Should return to library view
       await waitFor(() => {
@@ -96,37 +93,12 @@ describe('App analytics integration', () => {
       const user = userEvent.setup();
       await renderApp();
 
-      const analyticsButton = screen.getByRole('button', { name: /view analytics/i });
-      await user.click(analyticsButton);
+      await user.click(screen.getByRole('tab', { name: 'Analytics' }));
 
       // Should show analytics summary section
       await waitFor(() => {
         expect(screen.getByText(/last 30 days of usage/i)).toBeInTheDocument();
       });
-    });
-  });
-
-  describe('Expand dashboard functionality', () => {
-    it('opens analytics.html in new tab when View Full Dashboard is clicked', async () => {
-      const user = userEvent.setup();
-      const chromeMock = getChromeMock();
-
-      // Reset the mock to track calls
-      vi.mocked(chromeMock.tabs.create).mockClear();
-
-      await renderApp();
-
-      // Navigate to analytics view
-      const analyticsButton = screen.getByRole('button', { name: /view analytics/i });
-      await user.click(analyticsButton);
-
-      await waitFor(() => {
-        expect(screen.getByRole('heading', { name: /analytics/i })).toBeInTheDocument();
-      });
-
-      // Find and click the View Full Dashboard button (only shown in sidepanel context)
-      // Note: In popup context, this button may not be visible
-      // Let's render with sidepanel context
     });
   });
 
@@ -137,8 +109,7 @@ describe('App analytics integration', () => {
       await screen.findByRole('heading', { name: /my prompt manager/i });
 
       // Navigate to analytics
-      const analyticsButton = screen.getByRole('button', { name: /view analytics/i });
-      await user.click(analyticsButton);
+      await user.click(screen.getByRole('tab', { name: 'Analytics' }));
 
       await waitFor(() => {
         expect(screen.getByRole('heading', { name: /analytics/i })).toBeInTheDocument();
@@ -157,8 +128,7 @@ describe('App analytics integration', () => {
       await screen.findByRole('heading', { name: /my prompt manager/i });
 
       // Navigate to analytics
-      const analyticsButton = screen.getByRole('button', { name: /view analytics/i });
-      await user.click(analyticsButton);
+      await user.click(screen.getByRole('tab', { name: 'Analytics' }));
 
       await waitFor(() => {
         expect(screen.getByRole('heading', { name: /analytics/i })).toBeInTheDocument();
@@ -178,28 +148,16 @@ describe('App analytics integration', () => {
   });
 
   describe('Analytics view accessibility', () => {
-    it('analytics button has proper aria-label', async () => {
-      await renderApp();
-
-      const analyticsButton = screen.getByRole('button', { name: /view analytics/i });
-      expect(analyticsButton).toHaveAttribute('aria-label', 'View analytics');
-    });
-
-    it('back button in analytics view is keyboard accessible', async () => {
+    it('marks the Analytics tab as selected while in analytics view', async () => {
       const user = userEvent.setup();
       await renderApp();
 
-      // Navigate to analytics
-      const analyticsButton = screen.getByRole('button', { name: /view analytics/i });
-      await user.click(analyticsButton);
+      await user.click(screen.getByRole('tab', { name: 'Analytics' }));
 
       await waitFor(() => {
-        expect(screen.getByRole('heading', { name: /analytics/i })).toBeInTheDocument();
+        expect(screen.getByRole('tab', { name: 'Analytics' })).toHaveAttribute('aria-selected', 'true');
       });
-
-      // Back button should be focusable
-      const backButton = screen.getByTestId('back-button');
-      expect(backButton).not.toHaveAttribute('tabIndex', '-1');
+      expect(screen.getByRole('tab', { name: 'Library' })).toHaveAttribute('aria-selected', 'false');
     });
   });
 });

@@ -116,7 +116,8 @@ export const categoryAssertions = {
    */
   count: async (page: Page, count: number): Promise<void> => {
     const text = count === 1 ? '1 category' : `${String(count)} categories`;
-    await expect(page.getByText(text)).toBeVisible();
+    // The count appears both in the Categories header subtitle and the list header
+    await expect(page.getByText(text, { exact: true }).first()).toBeVisible();
   },
 
   /**
@@ -197,6 +198,7 @@ export const navigationAssertions = {
    */
   onLibraryPage: async (page: Page): Promise<void> => {
     await expect(page.getByRole('heading', { name: 'My Prompt Manager' })).toBeVisible();
+    await expect(page.getByTestId('tab-library')).toHaveAttribute('aria-selected', 'true');
   },
 
   /**
@@ -210,7 +212,7 @@ export const navigationAssertions = {
    * Expect category manager to be open
    */
   categoryManagerOpen: async (page: Page): Promise<void> => {
-    await expect(page.getByRole('heading', { name: 'Manage Categories' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Categories', exact: true })).toBeVisible();
   },
 
   /**

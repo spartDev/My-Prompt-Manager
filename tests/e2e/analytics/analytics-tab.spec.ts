@@ -318,8 +318,8 @@ test.describe('Analytics Tab', () => {
     });
   });
 
-  test.describe('FAB Visibility', () => {
-    test('shows FAB "View Full Dashboard" button in sidepanel with usage data', async ({
+  test.describe('Full Dashboard button Visibility', () => {
+    test('shows Full Dashboard button "View Full Dashboard" button in sidepanel with usage data', async ({
       context,
       storage,
       extensionId,
@@ -340,11 +340,11 @@ test.describe('Analytics Tab', () => {
       await analyticsWorkflows.navigateToAnalyticsTab(page);
       await analyticsAssertions.tabLoaded(page);
 
-      // FAB should be visible in sidepanel when there's data
+      // Full Dashboard button should be visible in sidepanel when there's data
       await analyticsAssertions.expandButtonVisible(page);
     });
 
-    test('hides FAB in popup mode', async ({ context, storage, extensionId }) => {
+    test('hides Full Dashboard button in popup mode', async ({ context, storage, extensionId }) => {
       const scenario = createAnalyticsScenario('VARIED_USAGE');
       await seedLibrary(storage, {
         prompts: scenario.prompts,
@@ -361,11 +361,11 @@ test.describe('Analytics Tab', () => {
       await analyticsWorkflows.navigateToAnalyticsTab(page);
       await analyticsAssertions.tabLoaded(page);
 
-      // FAB should be hidden in popup mode
+      // Full Dashboard button should be hidden in popup mode
       await analyticsAssertions.expandButtonHidden(page);
     });
 
-    test('hides FAB when no usage data exists (sidepanel)', async ({
+    test('hides Full Dashboard button when no usage data exists (sidepanel)', async ({
       context,
       storage,
       extensionId,
@@ -385,11 +385,11 @@ test.describe('Analytics Tab', () => {
       await analyticsWorkflows.navigateToAnalyticsTab(page);
       await analyticsAssertions.tabLoaded(page);
 
-      // FAB should be hidden when there's no data (empty state)
+      // Full Dashboard button should be hidden when there's no data (empty state)
       await analyticsAssertions.expandButtonHidden(page);
     });
 
-    test('hides FAB when no usage data exists (popup)', async ({
+    test('hides Full Dashboard button when no usage data exists (popup)', async ({
       context,
       storage,
       extensionId,
@@ -408,13 +408,13 @@ test.describe('Analytics Tab', () => {
       await analyticsWorkflows.navigateToAnalyticsTab(page);
       await analyticsAssertions.tabLoaded(page);
 
-      // FAB should be hidden when there's no data
+      // Full Dashboard button should be hidden when there's no data
       await analyticsAssertions.expandButtonHidden(page);
     });
   });
 
-  test.describe('Back Navigation', () => {
-    test('navigates back to library from analytics tab', async ({
+  test.describe('Tab Navigation', () => {
+    test('navigates to library from analytics via the Library tab', async ({
       context,
       storage,
       extensionId,
@@ -436,15 +436,15 @@ test.describe('Analytics Tab', () => {
       await analyticsWorkflows.navigateToAnalyticsTab(page);
       await analyticsAssertions.tabLoaded(page);
 
-      // Click back button
+      // Switch to the Library tab
       const analyticsPage = new AnalyticsPage(page);
-      await analyticsPage.navigateBack();
+      await analyticsPage.navigateToLibrary();
 
       // Verify we're back on the library page
       await expect(page.getByRole('heading', { name: 'My Prompt Manager' })).toBeVisible();
     });
 
-    test('back button is visible in analytics tab', async ({ context, storage, extensionId }) => {
+    test('analytics section has no back button and its tab is selected', async ({ context, storage, extensionId }) => {
       const scenario = createAnalyticsScenario('VARIED_USAGE');
       await seedLibrary(storage, {
         prompts: scenario.prompts,
@@ -461,9 +461,10 @@ test.describe('Analytics Tab', () => {
       await analyticsWorkflows.navigateToAnalyticsTab(page);
       await analyticsAssertions.tabLoaded(page);
 
-      // Verify back button is visible
+      // Sections are switched via the tab bar, so there is no back button
       const analyticsPage = new AnalyticsPage(page);
-      await expect(analyticsPage.getBackButton()).toBeVisible();
+      await expect(analyticsPage.getBackButton()).toHaveCount(0);
+      await expect(analyticsPage.getSectionTab('analytics')).toHaveAttribute('aria-selected', 'true');
     });
 
     test('preserves library state after returning from analytics', async ({
@@ -505,7 +506,7 @@ test.describe('Analytics Tab', () => {
       await analyticsAssertions.tabLoaded(page);
 
       const analyticsPage = new AnalyticsPage(page);
-      await analyticsPage.navigateBack();
+      await analyticsPage.navigateToLibrary();
 
       // Verify prompt is still visible
       await expect(page.getByRole('heading', { name: 'Persistent Prompt' })).toBeVisible();

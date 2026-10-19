@@ -194,7 +194,7 @@ test.describe('Settings', () => {
 
     await page.reload();
 
-    await page.getByRole('button', { name: 'Open settings' }).click();
+    await page.getByTestId('tab-settings').click();
     await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
 
     const sidePanelOption = page.getByRole('radio', { name: 'Select side panel mode' });
@@ -218,7 +218,7 @@ test.describe('Settings', () => {
 
     await page.reload();
 
-    await page.getByRole('button', { name: 'Open settings' }).click();
+    await page.getByTestId('tab-settings').click();
     await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
 
     const lightButton = page.getByRole('button', { name: 'Light' });
@@ -240,7 +240,7 @@ test.describe('Settings', () => {
 
     await page.reload();
 
-    await page.getByRole('button', { name: 'Open settings' }).click();
+    await page.getByTestId('tab-settings').click();
     await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
 
     await page.evaluate(() => {

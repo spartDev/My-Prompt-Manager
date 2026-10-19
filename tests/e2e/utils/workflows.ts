@@ -10,6 +10,7 @@ import type { Page, BrowserContext, Download } from '@playwright/test';
 import { expect } from '../fixtures/extension';
 
 import { assertions } from './assertions';
+import { tabNavigation } from './navigation';
 
 export interface PromptData {
   title?: string;
@@ -123,21 +124,18 @@ export const promptWorkflows = {
  */
 export const categoryWorkflows = {
   /**
-   * Open category manager from library
+   * Open the Categories section via the tab bar
    */
   openManager: async (page: Page): Promise<void> => {
-    await page.getByRole('button', { name: 'Manage categories' }).click();
+    await tabNavigation.switchTo(page, 'categories');
     await assertions.navigation.categoryManagerOpen(page);
   },
 
   /**
-   * Close category manager and return to library
-   * CategoryManager uses a Back button, not a Close button
+   * Leave the Categories section and return to the Library via the tab bar
    */
   closeManager: async (page: Page): Promise<void> => {
-    const backButton = page.getByTestId('back-button').first();
-    await expect(backButton).toBeVisible();
-    await backButton.click();
+    await tabNavigation.switchTo(page, 'library');
     await assertions.navigation.onLibraryPage(page);
   },
 
@@ -261,18 +259,15 @@ export const navigationWorkflows = {
    * Navigate to settings and verify
    */
   toSettings: async (page: Page): Promise<void> => {
-    await page.getByRole('button', { name: 'Settings' }).click();
+    await tabNavigation.switchTo(page, 'settings');
     await assertions.navigation.onSettingsPage(page);
   },
 
   /**
-   * Navigate to library and verify
-   * Uses back button since views no longer have "Library" navigation button
+   * Navigate to library via the tab bar and verify
    */
   toLibrary: async (page: Page): Promise<void> => {
-    const backButton = page.getByTestId('back-button').first();
-    await expect(backButton).toBeVisible();
-    await backButton.click();
+    await tabNavigation.switchTo(page, 'library');
     await assertions.navigation.onLibraryPage(page);
   },
 
@@ -405,8 +400,7 @@ export const analyticsWorkflows = {
    * Navigate to the Analytics tab
    */
   navigateToAnalyticsTab: async (page: Page): Promise<void> => {
-    await page.getByRole('button', { name: 'Analytics' }).click();
-    await expect(page.getByRole('heading', { name: 'Analytics' })).toBeVisible();
+    await tabNavigation.switchTo(page, 'analytics');
   },
 
   /**

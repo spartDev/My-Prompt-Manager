@@ -29,7 +29,7 @@ test.describe('Element picker integration', () => {
 
     await page.reload();
 
-    await page.getByRole('button', { name: 'Open settings' }).click();
+    await page.getByTestId('tab-settings').click();
     await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
 
     await page.evaluate(() => {

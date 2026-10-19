@@ -86,6 +86,13 @@ export interface ViewHeaderProps {
   subtitle?: string;
 
   /**
+   * Announce subtitle changes to screen readers (aria-live="polite").
+   * Use when the subtitle carries live data, such as a result count.
+   * @default false
+   */
+  subtitleLive?: boolean;
+
+  /**
    * Callback fired when the settings button is clicked.
    * When provided, a settings button will be displayed in the header.
    *
@@ -204,13 +211,13 @@ interface SettingsButtonProps {
 }
 
 /**
- * Props for the AnalyticsButton subcomponent.
+ * Props for the NewButton subcomponent.
  */
-interface AnalyticsButtonProps {
+interface NewButtonProps {
   /**
-   * Callback fired when the analytics button is clicked.
+   * Callback fired when the new button is clicked.
    * @example
-   * onClick={() => openAnalytics()}
+   * onClick={() => setView('add')}
    */
   onClick: () => void;
 
@@ -348,27 +355,29 @@ const SettingsButton: FC<SettingsButtonProps> = ({ onClick, disabled = false }) 
 };
 
 /**
- * Analytics button subcomponent.
- * Displays a bar chart icon button for opening analytics.
+ * New button subcomponent.
+ * Displays the primary "New" action with a plus icon.
  *
  * @example
- * <ViewHeader.AnalyticsButton onClick={() => setView('analytics')} />
+ * <ViewHeader.NewButton onClick={() => setView('add')} />
  *
  * @example
- * <ViewHeader.AnalyticsButton onClick={openAnalytics} disabled={isLoading} />
+ * <ViewHeader.NewButton onClick={handleAddNew} disabled={isLoading} />
  */
-const AnalyticsButton: FC<AnalyticsButtonProps> = ({ onClick, disabled = false }) => {
+const NewButton: FC<NewButtonProps> = ({ onClick, disabled = false }) => {
   return (
     <button
       onClick={onClick}
       disabled={disabled}
-      className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors focus-interactive disabled:opacity-50 disabled:cursor-not-allowed"
-      title="Analytics"
-      aria-label="View analytics"
+      className="flex items-center gap-1 px-3 py-2 text-sm font-semibold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 rounded-lg shadow-sm transition-colors focus-primary disabled:opacity-50 disabled:cursor-not-allowed"
+      title="Add new prompt"
+      aria-label="Add new prompt"
+      data-testid="new-prompt-button"
     >
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14m7-7H5" />
       </svg>
+      <span>New</span>
     </button>
   );
 };
@@ -437,10 +446,10 @@ interface ViewHeaderComponent extends FC<ViewHeaderProps> {
   SettingsButton: FC<SettingsButtonProps>;
 
   /**
-   * Analytics button subcomponent.
-   * @see {@link AnalyticsButton}
+   * New button subcomponent.
+   * @see {@link NewButton}
    */
-  AnalyticsButton: FC<AnalyticsButtonProps>;
+  NewButton: FC<NewButtonProps>;
 
   /**
    * Close button subcomponent.
@@ -457,6 +466,7 @@ const ViewHeaderFC: FC<ViewHeaderProps> = ({
   icon = 'logo',
   title,
   subtitle,
+  subtitleLive = false,
   onSettings,
   onClose,
   onBack,
@@ -584,7 +594,13 @@ const ViewHeaderFC: FC<ViewHeaderProps> = ({
             <div>
               <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">{title}</h1>
               {subtitle && (
-                <p className="text-sm text-gray-500 dark:text-gray-400">{subtitle}</p>
+                <p
+                  className="text-sm text-gray-500 dark:text-gray-400"
+                  aria-live={subtitleLive ? 'polite' : undefined}
+                  aria-atomic={subtitleLive ? true : undefined}
+                >
+                  {subtitle}
+                </p>
               )}
             </div>
           </div>
@@ -623,6 +639,7 @@ const ViewHeaderFC: FC<ViewHeaderProps> = ({
  * - `ViewHeader.Actions` - Container for custom action buttons
  * - `ViewHeader.BackButton` - Standardized back navigation button
  * - `ViewHeader.SettingsButton` - Settings gear icon button
+ * - `ViewHeader.NewButton` - Primary "New" action button
  * - `ViewHeader.CloseButton` - Close button with context-aware labels
  *
  * @example
@@ -681,7 +698,7 @@ const ViewHeader = ViewHeaderFC as ViewHeaderComponent;
 ViewHeader.Actions = Actions;
 ViewHeader.BackButton = BackButton;
 ViewHeader.SettingsButton = SettingsButton;
-ViewHeader.AnalyticsButton = AnalyticsButton;
+ViewHeader.NewButton = NewButton;
 ViewHeader.CloseButton = CloseButton;
 
 export default ViewHeader;

@@ -11,21 +11,18 @@ import { BasePage } from './BasePage';
 export class CategoryManagerPage extends BasePage {
 
   /**
-   * Open category manager from the library page
+   * Open the Categories section via the tab bar
    */
   async openFromLibrary(): Promise<void> {
-    await this.page.getByRole('button', { name: 'Manage categories' }).click();
+    await this.switchToSection('categories');
     await this.expectCategoryManagerOpen();
   }
 
   /**
-   * Close category manager and return to library
-   * CategoryManager uses a Back button, not a Close button
+   * Return to the Library section via the tab bar
    */
   async closeToLibrary(): Promise<void> {
-    const backButton = this.getBackButton();
-    await expect(backButton).toBeVisible();
-    await backButton.click();
+    await this.switchToSection('library');
     await expect(this.page.getByRole('heading', { name: 'My Prompt Manager' })).toBeVisible();
   }
 
@@ -112,8 +109,8 @@ export class CategoryManagerPage extends BasePage {
    * Expect the category manager to be open
    */
   async expectCategoryManagerOpen(): Promise<void> {
-    await expect(this.page.getByRole('heading', { name: 'Manage Categories' })).toBeVisible();
-    await expect(this.page.getByText('Organize your prompt collection')).toBeVisible();
+    await expect(this.page.getByRole('heading', { level: 1, name: 'Categories', exact: true })).toBeVisible();
+    await expect(this.getSectionTab('categories')).toHaveAttribute('aria-selected', 'true');
   }
 
   /**
@@ -121,7 +118,8 @@ export class CategoryManagerPage extends BasePage {
    */
   async expectCategoryCount(count: number): Promise<void> {
     const text = count === 1 ? '1 category' : `${String(count)} categories`;
-    await expect(this.page.getByText(text)).toBeVisible();
+    // The count appears both in the header subtitle and the list header
+    await expect(this.page.getByText(text, { exact: true }).first()).toBeVisible();
   }
 
   /**
