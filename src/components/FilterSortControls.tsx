@@ -7,7 +7,7 @@ import type { FilterSortControlsProps } from '../types/components';
 
 import CategoryBadge from './CategoryBadge';
 import { Dropdown, type DropdownItem } from './Dropdown';
-import { ChevronDownIcon, FunnelIcon, SortIcon, FolderIcon } from './icons/SettingsIcons';
+import { ChevronDownIcon, FunnelIcon, SortIcon } from './icons/SettingsIcons';
 import { CheckIcon, ClockIcon, CalendarIcon, AlphabeticalIcon, StarIcon, HistoryIcon } from './icons/UIIcons';
 
 const SORT_OPTIONS: Array<{ value: SortOrder; label: string; icon: FC<{ className?: string }> }> = [
@@ -25,7 +25,6 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
   sortDirection,
   onCategoryChange,
   onSortChange,
-  onManageCategories,
   loading = false
 }) => {
   // Derived values for active state text
@@ -262,32 +261,6 @@ const FilterSortControls: FC<FilterSortControlsProps> = ({
         />
       </div>
 
-      {/* Right: Manage Categories Button */}
-      <button
-        onClick={onManageCategories}
-        disabled={loading}
-        className="
-          flex items-center space-x-2
-          px-3 py-2
-          text-purple-600 dark:text-purple-400
-          hover:text-purple-700 dark:hover:text-purple-300
-          bg-purple-50/50 dark:bg-purple-900/10
-          hover:bg-purple-50 dark:hover:bg-purple-900/20
-          rounded-lg
-          text-xs font-semibold
-          transition-colors
-          focus-interactive
-          disabled:opacity-50 disabled:cursor-not-allowed
-        "
-        aria-label="Manage categories"
-        title="Manage Categories"
-      >
-        {/* Folder/archive icon - always visible */}
-        <FolderIcon className="w-4 h-4 shrink-0" />
-
-        {/* Text - desktop only (>= 375px) */}
-        <span className="hidden min-[375px]:inline">Categories</span>
-      </button>
     </div>
   );
 };
@@ -312,7 +285,6 @@ const arePropsEqual = (
     prev.sortDirection === next.sortDirection &&
     prev.onCategoryChange === next.onCategoryChange &&
     prev.onSortChange === next.onSortChange &&
-    prev.onManageCategories === next.onManageCategories &&
     prev.loading === next.loading
   );
 };

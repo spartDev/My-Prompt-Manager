@@ -13,16 +13,21 @@ export class LibraryPage extends BasePage {
    * Navigate to the settings page
    */
   async navigateToSettings(): Promise<void> {
-    await this.page.getByRole('button', { name: 'Settings' }).click();
-    await expect(this.page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+    await this.switchToSection('settings');
   }
 
   /**
    * Navigate to the category manager
    */
   async navigateToCategoryManager(): Promise<void> {
-    await this.page.getByRole('button', { name: 'Manage categories' }).click();
-    await expect(this.page.getByRole('heading', { name: 'Manage Categories' })).toBeVisible();
+    await this.switchToSection('categories');
+  }
+
+  /**
+   * Navigate to the Analytics section
+   */
+  async navigateToAnalytics(): Promise<void> {
+    await this.switchToSection('analytics');
   }
 
   /**
@@ -62,10 +67,25 @@ export class LibraryPage extends BasePage {
   }
 
   /**
-   * Click the "Add new prompt" button
+   * Get the header "New" button (opens the Add Prompt form)
+   */
+  getNewPromptButton(): Locator {
+    return this.page.getByTestId('new-prompt-button');
+  }
+
+  /**
+   * Click the header "New" button
    */
   async clickAddNewPrompt(): Promise<void> {
-    await this.page.getByRole('button', { name: 'Add new prompt' }).click();
+    await this.getNewPromptButton().click();
+  }
+
+  /**
+   * Get the library header subtitle that shows the prompt count
+   * ("12 prompts" or "3 of 12 prompts")
+   */
+  getPromptCountSubtitle(): Locator {
+    return this.page.getByText(/^(\d+ of )?\d+ prompts?$/);
   }
 
   /**

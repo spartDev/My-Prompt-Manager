@@ -49,7 +49,7 @@ interface Settings {
 }
 
 interface SettingsViewProps {
-  onBack: () => void;
+  context?: 'popup' | 'sidepanel';
   showToast: (message: string, type?: ToastType) => void;
   toastSettings: ToastSettings;
   onToastSettingsChange: (settings: Partial<ToastSettings>) => void;
@@ -69,7 +69,7 @@ const SectionSeparator: FC = () => (
   </div>
 );
 
-const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings, onToastSettingsChange }) => {
+const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toastSettings, onToastSettingsChange }) => {
   const [settings, setSettings] = useState<Settings>({
     enabledSites: [],
     customSites: [],
@@ -503,14 +503,17 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
         icon="settings"
         title="Settings"
         subtitle="Customize your experience"
+        context={context}
       >
-        <ViewHeader.Actions>
-          <ViewHeader.BackButton onClick={onBack} />
-        </ViewHeader.Actions>
+        {context === 'sidepanel' && (
+          <ViewHeader.Actions>
+            <ViewHeader.CloseButton onClick={() => { window.close(); }} context="sidepanel" />
+          </ViewHeader.Actions>
+        )}
       </ViewHeader>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto p-6" data-scroll-container>
         <div className="max-w-4xl mx-auto space-y-8">
           {/* Appearance Section */}
           <AppearanceSection

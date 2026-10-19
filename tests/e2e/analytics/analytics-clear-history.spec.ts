@@ -78,7 +78,7 @@ test.describe('Analytics clear history', () => {
       // Verify modal is closed
       await analyticsAssertions.clearHistoryModalHidden(page);
 
-      // Verify data is still present (FAB should still be visible)
+      // Verify data is still present (Full Dashboard button should still be visible)
       await analyticsAssertions.expandButtonVisible(page);
 
       // Verify storage still has data
@@ -183,7 +183,7 @@ test.describe('Analytics clear history', () => {
       await expect(page.getByText('No usage data yet')).toBeVisible();
     });
 
-    test('FAB hides after clear', async ({ context, storage, extensionId }) => {
+    test('Full Dashboard button hides after clear', async ({ context, storage, extensionId }) => {
       const scenario = createAnalyticsScenario('VARIED_USAGE');
       await seedLibrary(storage, {
         prompts: scenario.prompts,
@@ -198,14 +198,14 @@ test.describe('Analytics clear history', () => {
       const analyticsPage = new AnalyticsPage(page);
       await analyticsPage.navigateToAnalyticsTab();
 
-      // Verify FAB is visible before clearing
+      // Verify Full Dashboard button is visible before clearing
       const expandButton = analyticsPage.getExpandDashboardButton();
       await expect(expandButton).toBeVisible();
 
       // Clear history
       await analyticsPage.confirmClearHistory();
 
-      // Verify FAB is hidden after clearing
+      // Verify Full Dashboard button is hidden after clearing
       await expect(expandButton).toBeHidden();
     });
   });

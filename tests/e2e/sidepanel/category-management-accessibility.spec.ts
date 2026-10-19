@@ -28,7 +28,7 @@ test.describe('Category Manager - Keyboard Navigation and Accessibility', () => 
       await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
       // Open category manager
-      await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
+      await sidepanelPage.getByTestId('tab-categories').click();
 
       // Focus on the category name input
       const categoryNameInput = sidepanelPage.getByPlaceholder('Enter category name...');
@@ -45,7 +45,7 @@ test.describe('Category Manager - Keyboard Navigation and Accessibility', () => 
 
       // Verify category was created
       await expect(sidepanelPage.getByText('Keyboard Test')).toBeVisible();
-      await expect(sidepanelPage.getByText('2 categories')).toBeVisible();
+      await expect(sidepanelPage.getByText('2 categories', { exact: true }).first()).toBeVisible();
     });
 
     test('should support Escape key to cancel category editing', async ({ context, storage, extensionId }) => {
@@ -63,7 +63,7 @@ test.describe('Category Manager - Keyboard Navigation and Accessibility', () => 
       await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
       // Open category manager and start editing
-      await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
+      await sidepanelPage.getByTestId('tab-categories').click();
 
       const categoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Edit Test', { exact: true }) }).first();
       await categoryRow.hover();
@@ -98,7 +98,7 @@ test.describe('Category Manager - Keyboard Navigation and Accessibility', () => 
       await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
       // Open category manager and start editing
-      await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
+      await sidepanelPage.getByTestId('tab-categories').click();
 
       const categoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Save Test', { exact: true }) }).first();
       await categoryRow.hover();
@@ -131,10 +131,10 @@ test.describe('Category Manager - Keyboard Navigation and Accessibility', () => 
       await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
       // Open category manager
-      await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
+      await sidepanelPage.getByTestId('tab-categories').click();
 
       // Verify main heading has proper hierarchy
-      const mainHeading = sidepanelPage.getByRole('heading', { name: 'Manage Categories' });
+      const mainHeading = sidepanelPage.getByRole('heading', { level: 1, name: 'Categories', exact: true });
       await expect(mainHeading).toBeVisible();
 
       // Verify section headings are present
@@ -155,9 +155,8 @@ test.describe('Category Manager - Keyboard Navigation and Accessibility', () => 
       const deleteButton = categoryRow.getByRole('button', { name: 'Delete category' });
       await expect(deleteButton).toBeVisible();
 
-      // Verify back button has proper labeling
-      const backButton = sidepanelPage.getByTestId('back-button').first();
-      await expect(backButton).toBeVisible();
+      // Verify the active tab is exposed to assistive technology
+      await expect(sidepanelPage.getByRole('tab', { name: 'Categories', selected: true })).toBeVisible();
     });
   });
 
@@ -174,7 +173,7 @@ test.describe('Category Manager - Keyboard Navigation and Accessibility', () => 
       await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
       // Open category manager
-      await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
+      await sidepanelPage.getByTestId('tab-categories').click();
 
       // Verify Add button is disabled when input is empty
       const addButton = sidepanelPage.getByRole('button', { name: 'Add' });
@@ -205,7 +204,7 @@ test.describe('Category Manager - Keyboard Navigation and Accessibility', () => 
       await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
       // Open category manager
-      await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
+      await sidepanelPage.getByTestId('tab-categories').click();
 
       const categoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Hover Test', { exact: true }) }).first();
 
@@ -239,17 +238,17 @@ test.describe('Category Manager - Keyboard Navigation and Accessibility', () => 
       await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
       // Open category manager
-      await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
+      await sidepanelPage.getByTestId('tab-categories').click();
 
       // Verify initial state
-      await expect(sidepanelPage.getByText('3 categories')).toBeVisible(); // 2 custom + default
+      await expect(sidepanelPage.getByText('3 categories', { exact: true }).first()).toBeVisible(); // 2 custom + default
 
       // Perform an operation (add category)
       await sidepanelPage.getByPlaceholder('Enter category name...').fill('Category 3');
       await sidepanelPage.getByRole('button', { name: 'Add' }).click();
 
       // Verify state updated correctly
-      await expect(sidepanelPage.getByText('4 categories')).toBeVisible();
+      await expect(sidepanelPage.getByText('4 categories', { exact: true }).first()).toBeVisible();
       await expect(sidepanelPage.getByText('Category 3')).toBeVisible();
 
       // Verify other categories are still visible

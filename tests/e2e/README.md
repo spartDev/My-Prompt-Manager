@@ -78,8 +78,8 @@ test('example test', async ({ context, storage, extensionId }) => {
 
 ```typescript
 // BEFORE: Direct page interactions
-await page.getByRole('button', { name: 'Manage categories' }).click();
-await expect(page.getByRole('heading', { name: 'Manage Categories' })).toBeVisible();
+await page.getByTestId('tab-categories').click();
+await expect(page.getByRole('heading', { level: 1, name: 'Categories', exact: true })).toBeVisible();
 
 // AFTER: Using POMs
 const categoryManager = new CategoryManagerPage(page);
@@ -253,13 +253,13 @@ test.describe('Feature Name', () => {
 **Before:**
 ```typescript
 test('create category', async ({ page }) => {
-  await page.getByRole('button', { name: 'Manage categories' }).click();
-  await expect(page.getByRole('heading', { name: 'Manage Categories' })).toBeVisible();
+  await page.getByTestId('tab-categories').click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Categories', exact: true })).toBeVisible();
   await page.getByPlaceholder('Enter category name...').fill('Test Category');
   await page.getByRole('button', { name: 'Add' }).click();
   await expect(page.getByText('Category created successfully')).toBeVisible();
-  const backButton = page.getByTestId('back-button');
-  await backButton.click();
+  const libraryTab = page.getByTestId('tab-library');
+  await libraryTab.click();
 });
 ```
 

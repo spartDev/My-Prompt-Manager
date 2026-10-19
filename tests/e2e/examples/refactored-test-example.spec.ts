@@ -42,8 +42,8 @@ test.describe('Example: Refactored Category Management Tests', () => {
 
   test('should create a new category using POMs', async () => {
     // BEFORE (old approach):
-    // await page.getByRole('button', { name: 'Manage categories' }).click();
-    // await expect(page.getByRole('heading', { name: 'Manage Categories' })).toBeVisible();
+    // await page.getByTestId('tab-categories').click();
+    // await expect(page.getByRole('heading', { level: 1, name: 'Categories', exact: true })).toBeVisible();
     // await page.getByPlaceholder('Enter category name...').fill('New Category');
     // await page.getByRole('button', { name: 'Add' }).click();
     // await expect(page.getByText('Category created successfully')).toBeVisible();

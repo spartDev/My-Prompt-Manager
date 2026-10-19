@@ -48,9 +48,6 @@ export interface LibraryViewProps {
   onCopyPrompt: (content: string) => void;
   showToast: (message: string, type: ToastType) => void;
   onCategoryChange: (category: string | null) => void;
-  onManageCategories: () => void;
-  onSettings: () => void;
-  onAnalytics: () => void;
   loading?: boolean;
   context?: 'popup' | 'sidepanel';
 }
@@ -86,6 +83,5 @@ export interface FilterSortControlsProps {
   sortDirection: SortDirection;
   onCategoryChange: (category: string | null) => void;
   onSortChange: (order: SortOrder, direction: SortDirection) => void;
-  onManageCategories: () => void;
   loading?: boolean;
 }

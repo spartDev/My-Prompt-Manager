@@ -41,7 +41,7 @@ test.describe('Side panel experience', () => {
     const sidepanelPage = await context.newPage();
     await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
-    await sidepanelPage.getByRole('button', { name: 'Settings' }).click();
+    await sidepanelPage.getByTestId('tab-settings').click();
     const popupRadio = sidepanelPage.getByRole('radio', { name: 'Select popup window mode' });
     await popupRadio.click();
 
@@ -66,7 +66,7 @@ test.describe('Side panel experience', () => {
     const sidepanelPage = await context.newPage();
     await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
-    await sidepanelPage.getByRole('button', { name: 'Settings' }).click();
+    await sidepanelPage.getByTestId('tab-settings').click();
     const lightThemeButton = sidepanelPage.getByRole('button', { name: 'Light' });
     await lightThemeButton.click();
 

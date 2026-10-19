@@ -24,9 +24,6 @@ const LibraryView: FC<LibraryViewProps> = ({
   onCopyPrompt,
   showToast,
   onCategoryChange,
-  onManageCategories,
-  onSettings,
-  onAnalytics,
   loading,
   context = 'popup'
 }) => {
@@ -68,18 +65,23 @@ const LibraryView: FC<LibraryViewProps> = ({
     return PromptManager.getInstance().sortPrompts(filtered, sortOrder, sortDirection);
   }, [filteredPrompts, selectedCategory, sortOrder, sortDirection]);
 
+  const totalLabel = `${String(prompts.length)} prompt${prompts.length !== 1 ? 's' : ''}`;
+  const countLabel = finalFilteredPrompts.length === prompts.length
+    ? totalLabel
+    : `${String(finalFilteredPrompts.length)} of ${totalLabel}`;
+
   return (
     <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900">
       {/* Header with Search and Filter */}
       <ViewHeader
         icon="logo"
         title="My Prompt Manager"
-        subtitle="Organize your creative prompts"
+        subtitle={loading ? undefined : countLabel}
+        subtitleLive
         context={context}
       >
         <ViewHeader.Actions>
-          <ViewHeader.AnalyticsButton onClick={onAnalytics} />
-          <ViewHeader.SettingsButton onClick={onSettings} />
+          <ViewHeader.NewButton onClick={onAddNew} disabled={loading} />
           {context === 'sidepanel' && (
             <ViewHeader.CloseButton onClick={() => { window.close(); }} context="sidepanel" />
           )}
@@ -107,14 +109,13 @@ const LibraryView: FC<LibraryViewProps> = ({
             sortDirection={sortDirection}
             onCategoryChange={onCategoryChange}
             onSortChange={handleSortChange}
-            onManageCategories={onManageCategories}
             loading={loading}
           />
         </div>
       </ViewHeader>
 
       {/* Content */}
-      <main className={`flex-1 overflow-auto custom-scrollbar ${finalFilteredPrompts.length > 0 ? 'pb-24' : ''}`} aria-label="My Prompt Manager content">
+      <main className="flex-1 overflow-auto custom-scrollbar" data-scroll-container aria-label="My Prompt Manager content">
         {loading ? (
           <div className="flex flex-col items-center justify-center h-full space-y-4" role="status" aria-live="polite">
             <div className="w-8 h-8 border-4 border-purple-200 dark:border-purple-800 border-t-purple-500 dark:border-t-purple-400 rounded-full animate-spin" aria-hidden="true"></div>
@@ -168,32 +169,6 @@ const LibraryView: FC<LibraryViewProps> = ({
           </div>
         )}
       </main>
-
-      {/* Footer with stats */}
-      {!loading && (prompts).length > 0 && (
-        <footer className="shrink-0 px-4 py-2 bg-gray-100 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 text-xs text-gray-600 dark:text-gray-400" role="contentinfo" aria-label="Library statistics">
-          <span aria-live="polite" aria-atomic="true">
-            {finalFilteredPrompts.length === (prompts).length ? (
-              `${String((prompts).length)} prompt${(prompts).length !== 1 ? 's' : ''}`
-            ) : (
-              `${String(finalFilteredPrompts.length)} of ${String((prompts).length)} prompt${(prompts).length !== 1 ? 's' : ''}`
-            )}
-          </span>
-        </footer>
-      )}
-
-      {/* Floating Add Button */}
-      <button
-        onClick={onAddNew}
-        className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-full hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 shadow-2xl hover:shadow-3xl transform hover:scale-110 z-50 flex items-center justify-center focus-primary disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-        disabled={loading}
-        aria-label="Add new prompt"
-        title="Add New Prompt"
-      >
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-        </svg>
-      </button>
     </div>
   );
 };

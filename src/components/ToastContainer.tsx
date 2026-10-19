@@ -65,6 +65,8 @@ interface ToastContainerProps {
   onDismiss: (id: string) => void;
   position?: 'top-right' | 'bottom-right';
   queueLength?: number;
+  /** Lift bottom-positioned toasts above the bottom tab bar */
+  aboveTabBar?: boolean;
 }
 
 // Original ToastContainer implementation - will be replaced by memoized version
@@ -243,6 +245,7 @@ const areToastContainerPropsEqual = (prevProps: ToastContainerProps, nextProps: 
   // Check if position or queueLength changed
   if (prevProps.position !== nextProps.position) {return false;}
   if (prevProps.queueLength !== nextProps.queueLength) {return false;}
+  if (prevProps.aboveTabBar !== nextProps.aboveTabBar) {return false;}
 
   // Check if arrays have different lengths
   if (prevProps.toasts.length !== nextProps.toasts.length) {return false;}
@@ -282,7 +285,7 @@ const areToastItemPropsEqual = (
 const MemoizedToastItem = memo(ToastItem, areToastItemPropsEqual);
 
 // Update the ToastContainer to use the memoized ToastItem
-const MemoizedToastContainer: FC<ToastContainerProps> = ({ toasts, onDismiss, position = 'top-right', queueLength = 0 }) => {
+const MemoizedToastContainer: FC<ToastContainerProps> = ({ toasts, onDismiss, position = 'top-right', queueLength = 0, aboveTabBar = false }) => {
   // Add ESC key handler
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -300,7 +303,7 @@ const MemoizedToastContainer: FC<ToastContainerProps> = ({ toasts, onDismiss, po
   if (toasts.length === 0) {return null;}
 
   const positionClasses = position === 'bottom-right'
-    ? 'fixed bottom-4 right-4 z-50 space-y-2'
+    ? `fixed ${aboveTabBar ? 'bottom-20' : 'bottom-4'} right-4 z-50 space-y-2`
     : 'fixed top-4 right-4 z-50 space-y-2';
 
   return (
