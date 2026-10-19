@@ -24,11 +24,66 @@ describe('PromptCard - Basic Rendering', () => {
     prompt: mockPrompt,
     categories: mockCategories,
     onEdit: vi.fn(),
-    onDelete: vi.fn(),
     onCopy: vi.fn(),
+    onTogglePin: vi.fn(),
     showToast: vi.fn<(message: string, type: 'success' | 'error' | 'info' | 'warning') => void>(),
     searchQuery: ''
   };
+
+  it('should offer to pin an unpinned prompt', () => {
+    render(<PromptCard {...mockProps} />);
+    const star = screen.getByRole('button', { name: 'Pin Test Prompt' });
+    expect(star).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('should show a pinned prompt as pressed and offer to unpin it', () => {
+    render(<PromptCard {...mockProps} prompt={{ ...mockPrompt, pinned: true }} />);
+    const star = screen.getByRole('button', { name: 'Unpin Test Prompt' });
+    expect(star).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('should toggle the pin when the star is clicked', async () => {
+    const onTogglePin = vi.fn();
+    render(<PromptCard {...mockProps} onTogglePin={onTogglePin} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Pin Test Prompt' }));
+    expect(onTogglePin).toHaveBeenCalledWith('1');
+  });
+
+  it('should open the prompt for editing from the card', async () => {
+    const onEdit = vi.fn();
+    render(<PromptCard {...mockProps} onEdit={onEdit} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Test Prompt' }));
+    expect(onEdit).toHaveBeenCalledWith(mockPrompt);
+  });
+
+  it('should open the prompt for editing with Enter on the keyboard', async () => {
+    const onEdit = vi.fn();
+    render(<PromptCard {...mockProps} onEdit={onEdit} />);
+    screen.getByRole('button', { name: 'Edit Test Prompt' }).focus();
+    await userEvent.keyboard('{Enter}');
+    expect(onEdit).toHaveBeenCalledWith(mockPrompt);
+  });
+
+  it.each([
+    'Pin Test Prompt',
+    'Copy content of Test Prompt to clipboard',
+    'Share Test Prompt',
+  ])('should not open editing when "%s" is clicked', async (name) => {
+    const onEdit = vi.fn();
+    render(<PromptCard {...mockProps} onEdit={onEdit} />);
+    await userEvent.click(screen.getByRole('button', { name }));
+    expect(onEdit).not.toHaveBeenCalled();
+  });
+
+  it('should keep the prompt title as the heading name', () => {
+    render(<PromptCard {...mockProps} />);
+    expect(screen.getByRole('heading', { name: 'Test Prompt' })).toBeInTheDocument();
+  });
+
+  it('should not have a more-actions menu anymore', () => {
+    render(<PromptCard {...mockProps} />);
+    expect(screen.queryByRole('button', { name: /More actions/ })).not.toBeInTheDocument();
+  });
 
   it('should render prompt title', () => {
     render(<PromptCard {...mockProps} />);
@@ -47,10 +102,29 @@ describe('PromptCard - Basic Rendering', () => {
     expect(screen.queryByText('<script>')).not.toBeInTheDocument();
   });
 
-  it('should render prompt date', () => {
+  it('should not render the last updated date on the card', () => {
     render(<PromptCard {...mockProps} />);
-    // Check that a date is rendered (using aria-label since date format may vary)
-    expect(screen.getByLabelText(/Last updated:/)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Last updated:/)).not.toBeInTheDocument();
+  });
+
+  it('should show a preview of the prompt content', () => {
+    render(<PromptCard {...mockProps} prompt={{ ...mockPrompt, content: 'You are a staff engineer. Read this ticket.' }} />);
+    expect(screen.getByText('You are a staff engineer. Read this ticket.')).toBeInTheDocument();
+  });
+
+  it('should highlight the search query inside the content preview', () => {
+    render(<PromptCard {...mockProps} prompt={{ ...mockPrompt, content: 'Score each backlog item' }} searchQuery="backlog" />);
+    expect(screen.getByText('backlog', { selector: 'mark' })).toBeInTheDocument();
+  });
+
+  it.each([
+    [undefined, 'Never used'],
+    [0, 'Never used'],
+    [1, '1 use'],
+    [18, '18 uses'],
+  ])('should show usage count %s as "%s"', (usageCount, label) => {
+    render(<PromptCard {...mockProps} prompt={{ ...mockPrompt, usageCount }} />);
+    expect(screen.getByText(label)).toBeInTheDocument();
   });
 
   it('should render category', () => {
@@ -86,7 +160,7 @@ describe('PromptCard - Basic Rendering', () => {
     };
 
     render(<PromptCard {...mockProps} prompt={promptWithLongTitle} searchQuery="searchable" />);
-    const titleElement = screen.getByRole('heading', { name: /searchable/i });
+    const titleElement = screen.getByRole('button', { name: `Edit ${longTitle}` });
 
     // Verify full text is accessible via tooltip even with highlighting
     expect(titleElement).toHaveAttribute('title', longTitle);
@@ -162,8 +236,8 @@ describe('PromptCard - Share Button', () => {
     prompt: mockPrompt,
     categories: mockCategories,
     onEdit: vi.fn(),
-    onDelete: vi.fn(),
     onCopy: vi.fn(),
+    onTogglePin: vi.fn(),
     showToast: mockShowToast,
     searchQuery: ''
   });

@@ -50,6 +50,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
     createPrompt,
     updatePrompt,
     deletePrompt,
+    togglePin,
     refreshPrompts
   } = usePrompts();
 
@@ -127,6 +128,23 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
       showToast('Failed to delete prompt', 'error');
     }
   };
+
+  const handleDeleteFromEdit = (id: string) => {
+    setCurrentView('library');
+    setSelectedPrompt(null);
+    void handleDeletePrompt(id);
+  };
+
+  const handleTogglePin = useCallback((id: string) => {
+    togglePin(id).catch((err: unknown) => {
+      Logger.error('Failed to toggle pin', toError(err), {
+        component: 'App',
+        promptId: id,
+        operation: 'togglePin'
+      });
+      showToast('Failed to update pin', 'error');
+    });
+  }, [togglePin, showToast]);
 
   const handleCopyPrompt = async (content: string) => {
     const success = await copyToClipboard(content);
@@ -275,7 +293,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
           selectedCategory={selectedCategory}
           onAddNew={handleAddNew}
           onEditPrompt={handleEditPrompt}
-          onDeletePrompt={(id: string) => { void handleDeletePrompt(id); }}
+          onTogglePin={handleTogglePin}
           onCopyPrompt={(content: string) => { void handleCopyPrompt(content); }}
           showToast={showToast}
           onCategoryChange={setSelectedCategory}
@@ -298,6 +316,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
           categories={categories}
           onSubmit={(data) => { void handleFormSubmit(data); }}
           onCancel={handleFormCancel}
+          onDelete={handleDeleteFromEdit}
         />
       )}
 

@@ -60,7 +60,7 @@ const defaultProps = {
   selectedCategory: null,
   onAddNew: vi.fn(),
   onEditPrompt: vi.fn(),
-  onDeletePrompt: vi.fn(),
+  onTogglePin: vi.fn(),
   onCopyPrompt: vi.fn(),
   showToast: vi.fn(),
   onCategoryChange: vi.fn(),

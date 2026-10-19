@@ -44,6 +44,7 @@ export function buildPrompt(overrides: Partial<Prompt> = {}): Prompt {
     createdAt,
     updatedAt,
     usageCount,
-    lastUsedAt
+    lastUsedAt,
+    ...(overrides.pinned === undefined ? {} : { pinned: overrides.pinned })
   };
 }

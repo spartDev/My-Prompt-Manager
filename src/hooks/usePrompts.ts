@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 import { PromptManager } from '../services/promptManager';
 import { StorageManager } from '../services/storage';
@@ -9,6 +9,9 @@ export const usePrompts = (): UsePromptsReturn => {
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<AppError | null>(null);
+  // Latest prompts for stable callbacks (memoized PromptCards keep the first callback they get)
+  const promptsRef = useRef<Prompt[]>(prompts);
+  promptsRef.current = prompts;
 
   const storageManager = StorageManager.getInstance();
   const promptManager = PromptManager.getInstance();
@@ -80,6 +83,22 @@ export const usePrompts = (): UsePromptsReturn => {
     }
   }, []); // Singleton storageManager never changes, omitted to prevent infinite loop
 
+  // No loading state: pinning is instant and must not flash the Library
+  const togglePin = useCallback(async (id: string) => {
+    try {
+      setError(null);
+      const current = promptsRef.current.find(prompt => prompt.id === id);
+      const updatedPrompt = await storageManager.setPinned(id, current?.pinned !== true);
+
+      setPrompts(prev =>
+        prev.map(prompt => prompt.id === id ? updatedPrompt : prompt)
+      );
+    } catch (err) {
+      setError(err as AppError);
+      throw err;
+    }
+  }, []); // Singleton storageManager never changes, omitted to prevent infinite loop
+
   const searchPrompts = useCallback((query: string): Prompt[] => {
     if (!query.trim()) {
       return prompts;
@@ -112,6 +131,7 @@ export const usePrompts = (): UsePromptsReturn => {
     createPrompt,
     updatePrompt,
     deletePrompt,
+    togglePin,
     searchPrompts,
     filterByCategory,
     refreshPrompts

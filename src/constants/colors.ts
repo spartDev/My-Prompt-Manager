@@ -254,6 +254,39 @@ export const adjustColorBrightness = (hexColor: string, percent: number): string
   return `#${toHex(newR)}${toHex(newG)}${toHex(newB)}`.toUpperCase();
 };
 
+// Card surfaces the soft badge sits on (Tailwind white / gray-800)
+const SOFT_BADGE_SURFACES = { light: '#FFFFFF', dark: '#1E2939' } as const;
+const SOFT_BADGE_TINT = 0.15;
+
+const mixHexColors = (from: string, to: string, amount: number): string => {
+  const channel = (hex: string, i: number) => parseInt(hex.replace('#', '').substring(i, i + 2), 16);
+  const toHex = (value: number) => Math.round(value).toString(16).padStart(2, '0');
+  return `#${[0, 2, 4].map(i => toHex(channel(from, i) + (channel(to, i) - channel(from, i)) * amount)).join('')}`.toUpperCase();
+};
+
+/**
+ * Colors for the "soft" category badge: a pale tint of the category color as background,
+ * and the category color itself as text, darkened (light mode) or lightened (dark mode)
+ * just enough to reach WCAG AA (4.5:1) against that tint.
+ */
+export const getSoftBadgeColors = (
+  hexColor: string,
+  mode: 'light' | 'dark'
+): { background: string; text: string } => {
+  const color = isValidHexColor(hexColor) ? hexColor : DEFAULT_CATEGORY_COLOR;
+  const surface = SOFT_BADGE_SURFACES[mode];
+  const background = mixHexColors(surface, color, SOFT_BADGE_TINT);
+  const target = mode === 'light' ? '#000000' : '#FFFFFF';
+
+  for (let step = 0; step <= 20; step++) {
+    const text = mixHexColors(color, target, step / 20);
+    if (getContrastRatio(text, background) >= 4.5) {
+      return { background, text };
+    }
+  }
+  return { background, text: target };
+};
+
 // Get color name from preset or return "Custom"
 export const getColorName = (hexColor: string): string => {
   const preset = PRESET_COLORS.find(c => c.value.toLowerCase() === hexColor.toLowerCase());

@@ -117,8 +117,7 @@ test.describe('Prompt management', () => {
 
     await expect(page.getByRole('heading', { name: originalPrompt.title })).toBeVisible();
 
-    await page.getByRole('button', { name: `More actions for ${originalPrompt.title}` }).click();
-    await page.getByRole('menuitem', { name: 'Edit' }).click();
+    await page.getByRole('button', { name: `Edit ${originalPrompt.title}` }).click();
 
     await expect(page.getByRole('heading', { name: 'Edit Prompt' })).toBeVisible();
 
@@ -164,8 +163,8 @@ test.describe('Prompt management', () => {
 
     await expect(page.getByRole('heading', { name: promptToDelete.title })).toBeVisible();
 
-    await page.getByRole('button', { name: `More actions for ${promptToDelete.title}` }).click();
-    await page.getByRole('menuitem', { name: 'Delete' }).click();
+    await page.getByRole('button', { name: `Edit ${promptToDelete.title}` }).click();
+    await page.getByRole('button', { name: 'Delete prompt' }).click();
 
     const confirmDialog = page.getByRole('dialog', { name: 'Delete Prompt' });
     await expect(confirmDialog).toBeVisible();

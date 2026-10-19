@@ -235,6 +235,25 @@ describe('usePrompts', () => {
       expect(result.current.loading).toBe(false);
     });
 
+    it('should toggle the pin of a prompt and persist it', async () => {
+      await chrome.storage.local.set({ prompts: mockPrompts });
+      const { result } = renderHook(() => usePrompts());
+      await waitFor(() => { expect(result.current.prompts).toHaveLength(3); });
+
+      await act(async () => { await result.current.togglePin('2'); });
+
+      let stored = (await chrome.storage.local.get('prompts')).prompts as Prompt[];
+      expect(stored.find(p => p.id === '2')?.pinned).toBe(true);
+      expect(stored.find(p => p.id === '2')?.updatedAt).toBe(oneDayAgo);
+      expect(result.current.prompts.find(p => p.id === '2')?.pinned).toBe(true);
+
+      await act(async () => { await result.current.togglePin('2'); });
+
+      stored = (await chrome.storage.local.get('prompts')).prompts as Prompt[];
+      expect(stored.find(p => p.id === '2')?.pinned).toBe(false);
+      expect(result.current.prompts.find(p => p.id === '2')?.pinned).toBe(false);
+    });
+
     it('should refresh prompts list after operations', async () => {
       // Arrange
       await chrome.storage.local.set({ prompts: mockPrompts });

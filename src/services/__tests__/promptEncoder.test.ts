@@ -196,6 +196,15 @@ describe('PromptEncoder', () => {
     });
   });
 
+  describe('Pinned Prompts', () => {
+    it('should not carry the pinned flag in a share link', () => {
+      const encoded = encode(createTestPrompt({ pinned: true }));
+      const payload = JSON.parse(LZString.decompressFromEncodedURIComponent(encoded)) as Record<string, unknown>;
+      expect(payload).not.toHaveProperty('pinned');
+      expect(decode(encoded)).not.toHaveProperty('pinned');
+    });
+  });
+
   describe('decode', () => {
     it('should decode a valid encoded string', () => {
       const prompt = createTestPrompt();

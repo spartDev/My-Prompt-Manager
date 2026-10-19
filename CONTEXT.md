@@ -14,6 +14,10 @@ _Avoid_: Template, snippet
 A user-defined label that groups Prompts; each Prompt belongs to exactly one Category.
 _Avoid_: Collection, tag, folder
 
+**Pinned Prompt**:
+A Prompt the user has marked to always appear before unpinned Prompts in the Library, whatever the chosen sort; within the pinned and unpinned groups the chosen sort still applies.
+_Avoid_: Favorite, starred prompt
+
 ### Navigation
 
 **Library**:

@@ -282,8 +282,7 @@ export const modalNavigation = {
     const promptCard = page.getByTestId('prompt-card')
       .filter({ has: page.getByRole('heading', { name: promptTitle }) })
       .first();
-    await promptCard.getByRole('button', { name: 'More actions' }).click();
-    await page.getByRole('menuitem', { name: 'Edit' }).click();
+    await promptCard.getByRole('button', { name: /^Edit / }).click();
     await expect(page.getByRole('heading', { name: 'Edit Prompt' })).toBeVisible();
   },
 };

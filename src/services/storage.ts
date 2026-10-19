@@ -249,6 +249,32 @@ export class StorageManager {
     });
   }
 
+  // Pinning is a personal preference, not an edit: it leaves updatedAt untouched
+  async setPinned(id: string, pinned: boolean): Promise<Prompt> {
+    return this.mutex.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
+      try {
+        const existingPrompts = await this.getPrompts();
+        const promptIndex = existingPrompts.findIndex(p => p.id === id);
+
+        if (promptIndex === -1) {
+          throw new Error(`Prompt with id ${id} not found`);
+        }
+
+        const updatedPrompt: Prompt = {
+          ...existingPrompts[promptIndex],
+          pinned
+        };
+
+        existingPrompts[promptIndex] = updatedPrompt;
+        await this.setStorageData(this.STORAGE_KEYS.PROMPTS, existingPrompts);
+
+        return updatedPrompt;
+      } catch (error) {
+        throw this.handleStorageError(error);
+      }
+    });
+  }
+
   // Category operations
   async saveCategory(category: Omit<Category, 'id'>): Promise<Category> {
     return this.mutex.withLock(this.STORAGE_KEYS.CATEGORIES, async () => {
