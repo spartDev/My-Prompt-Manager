@@ -186,6 +186,23 @@ describe('App prompt workflows', () => {
     expect(errorMessage).toBeInTheDocument();
   });
 
+  it('keeps the library on screen and shows a toast when pinning fails', async () => {
+    const storageMock = getMockStorageManager();
+    storageMock.getPrompts.mockResolvedValue([basePrompt]);
+    const setSpy = vi.spyOn(chrome.storage.local, 'set');
+    setSpy.mockRejectedValue(new Error('Storage write failed'));
+
+    await renderApp();
+
+    await userEvent.click(await screen.findByRole('button', { name: `Pin ${basePrompt.title}` }));
+
+    await screen.findByText(/failed to update pin/i);
+    expect(screen.getByText(basePrompt.title)).toBeInTheDocument();
+    expect(screen.queryByText(/error loading data/i)).not.toBeInTheDocument();
+
+    setSpy.mockRestore();
+  });
+
   it('surfaces validation errors through an error toast', async () => {
     const storageMock = getMockStorageManager();
     storageMock.getPrompts.mockResolvedValue([basePrompt]);

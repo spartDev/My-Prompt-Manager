@@ -268,6 +268,25 @@ describe('usePrompts', () => {
       expect(result.current.prompts.find(p => p.id === '2')?.pinned).toBe(false);
     });
 
+    it('should reject a failed pin without turning it into a hook error', async () => {
+      await chrome.storage.local.set({ prompts: mockPrompts });
+      const { result } = renderHook(() => usePrompts());
+      await waitFor(() => { expect(result.current.prompts).toHaveLength(3); });
+
+      const setSpy = vi.spyOn(chrome.storage.local, 'set');
+      setSpy.mockRejectedValueOnce(new Error('Pin failed'));
+
+      await act(async () => {
+        await expect(result.current.togglePin('2')).rejects.toThrow();
+      });
+
+      expect(result.current.error).toBeNull();
+      expect(result.current.prompts.find(p => p.id === '2')?.pinned).not.toBe(true);
+      expect(result.current.prompts).toHaveLength(3);
+
+      setSpy.mockRestore();
+    });
+
     it('should refresh prompts list after operations', async () => {
       // Arrange
       await chrome.storage.local.set({ prompts: mockPrompts });

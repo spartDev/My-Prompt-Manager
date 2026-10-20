@@ -81,18 +81,14 @@ export const usePrompts = (): UsePromptsReturn => {
   }, []); // Singleton storageManager never changes, omitted to prevent infinite loop
 
   // No loading state: pinning is instant and must not flash the Library
+  // Errors are not stored as `error`: App treats that as a load failure and
+  // replaces the Library. The rejection reaches the caller, which shows a toast.
   const togglePin = useCallback(async (id: string) => {
-    try {
-      setError(null);
-      const updatedPrompt = await storageManager.togglePinned(id);
+    const updatedPrompt = await storageManager.togglePinned(id);
 
-      setPrompts(prev =>
-        prev.map(prompt => prompt.id === id ? updatedPrompt : prompt)
-      );
-    } catch (err) {
-      setError(err as AppError);
-      throw err;
-    }
+    setPrompts(prev =>
+      prev.map(prompt => prompt.id === id ? updatedPrompt : prompt)
+    );
   }, []); // Singleton storageManager never changes, omitted to prevent infinite loop
 
   const searchPrompts = useCallback((query: string): Prompt[] => {
