@@ -5,6 +5,7 @@ import type { FC, MouseEvent, ReactNode } from 'react';
 import { encode } from '../services/promptEncoder';
 import type { PromptCardProps } from '../types/components';
 import { Logger, toError } from '../utils';
+import { extractVariables } from '../utils/promptVariables';
 
 import CategoryBadge from './CategoryBadge';
 
@@ -16,6 +17,10 @@ const formatUsage = (usageCount: number): string => {
   if (usageCount <= 0) {return 'Never used';}
   return usageCount === 1 ? '1 use' : `${String(usageCount)} uses`;
 };
+
+/** "1 variable" / "3 variables" for the chip counting a Prompt's distinct Variables. */
+const formatVariableCount = (count: number): string =>
+  count === 1 ? '1 variable' : `${String(count)} variables`;
 
 /**
  * Highlights matching text in a string based on a search query.
@@ -112,6 +117,7 @@ const PromptCard: FC<PromptCardProps> = ({
 
 
   const category = categories.find(cat => cat.name === prompt.category);
+  const variableCount = extractVariables(prompt.content).length;
 
   return (
     <article
@@ -161,9 +167,18 @@ const PromptCard: FC<PromptCardProps> = ({
 
       {/* Footer: category, usage and round actions */}
       <div className="mt-3 flex items-center gap-2">
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 flex items-center gap-1.5">
           {category ? (
-            <CategoryBadge category={category} variant="soft" size="sm" />
+            <CategoryBadge category={category} variant="soft" size="sm" className="min-w-0" />
+          ) : null}
+          {variableCount > 0 ? (
+            <span
+              data-testid="prompt-variables-chip"
+              className="shrink-0 inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+              title="Filled in when you insert this prompt on an AI site"
+            >
+              {formatVariableCount(variableCount)}
+            </span>
           ) : null}
         </div>
 

@@ -172,6 +172,60 @@ describe('PromptCard - Basic Rendering', () => {
   });
 });
 
+describe('PromptCard - Variables chip', () => {
+  const basePrompt: Prompt = {
+    id: 'v',
+    title: 'Translate',
+    content: 'No variables here',
+    category: 'Test Category',
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  };
+
+  const renderWithContent = (content: string) =>
+    render(
+      <PromptCard
+        prompt={{ ...basePrompt, content }}
+        categories={[{ id: '1', name: 'Test Category', color: '#FF0000' }]}
+        onEdit={vi.fn()}
+        onCopy={vi.fn()}
+        onTogglePin={vi.fn()}
+        showToast={vi.fn()}
+      />
+    );
+
+  it('shows "1 variable" for a prompt with one distinct variable, repeated', () => {
+    renderWithContent('Translate {{text}} then repeat {{ text }}');
+    expect(screen.getByTestId('prompt-variables-chip')).toHaveTextContent(/^1 variable$/);
+  });
+
+  it('shows "N variables" counting distinct variables', () => {
+    renderWithContent('Translate {{text}} into {{language}} for {{audience}}, again {{text}}');
+    expect(screen.getByTestId('prompt-variables-chip')).toHaveTextContent(/^3 variables$/);
+  });
+
+  it('hides the chip when the prompt has no variables', () => {
+    renderWithContent('Plain text with {single} braces and {{}}');
+    expect(screen.queryByTestId('prompt-variables-chip')).not.toBeInTheDocument();
+  });
+
+  it('still copies the raw text with its variables', async () => {
+    const onCopy = vi.fn();
+    render(
+      <PromptCard
+        prompt={{ ...basePrompt, content: 'Hi {{name}}' }}
+        categories={[]}
+        onEdit={vi.fn()}
+        onCopy={onCopy}
+        onTogglePin={vi.fn()}
+        showToast={vi.fn()}
+      />
+    );
+    await userEvent.click(screen.getByRole('button', { name: /Copy content of Translate/ }));
+    expect(onCopy).toHaveBeenCalledWith('Hi {{name}}');
+  });
+});
+
 describe('PromptCard - Share Button', () => {
   const mockPrompt: Prompt = {
     id: '1',
