@@ -382,6 +382,9 @@ export function validatePromptData(prompt: unknown): Prompt | null {
       updatedAt,
       usageCount,
       lastUsedAt,
+      ...(typeof promptObj.pinned === "boolean"
+        ? { pinned: promptObj.pinned }
+        : {}),
     };
 
     // Ensure required fields are not empty after sanitization

@@ -57,6 +57,15 @@ export interface SPAState {
   routeChangeTimeout: number | null;
 }
 
+/**
+ * Stable partition: Pinned Prompts first, keeping the existing order within each group.
+ * The picker deliberately ignores the Library sort setting.
+ */
+const pinnedFirst = (prompts: Prompt[]): Prompt[] => [
+  ...prompts.filter(prompt => prompt.pinned === true),
+  ...prompts.filter(prompt => prompt.pinned !== true)
+];
+
 export class PromptLibraryInjector {
   private state: InjectorState;
   private eventManager: EventManager;
@@ -1720,8 +1729,8 @@ export class PromptLibraryInjector {
       // Store target element for use in filterPrompts
       this.state.currentTargetElement = targetElement;
 
-      // Get prompts from storage
-      const prompts = await getPrompts();
+      // Get prompts from storage, Pinned Prompts first (stable within each group)
+      const prompts = pinnedFirst(await getPrompts());
       debug('Retrieved prompts for selector', { count: prompts.length });
 
       // Create selector UI
