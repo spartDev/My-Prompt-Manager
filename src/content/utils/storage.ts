@@ -407,7 +407,9 @@ export function validatePromptData(prompt: unknown): Prompt | null {
 }
 
 /**
- * Helper function to safely create prompt list items
+ * Helper function to safely create prompt list items.
+ * Prompt text is set via textContent/setAttribute (never parsed as markup),
+ * so it must NOT be HTML-escaped first, or "&" would show as "&amp;".
  */
 export function createPromptListItem(
   prompt: Prompt,
@@ -417,7 +419,7 @@ export function createPromptListItem(
   try {
     const promptItem = DOMUtils.createElement("div", {
       class: "prompt-item",
-      "data-prompt-id": DOMUtils.escapeHtml(prompt.id),
+      "data-prompt-id": prompt.id,
       role: "option",
       "aria-describedby": `${idPrefix}-${String(index)}-desc`,
       tabindex: "-1",
@@ -428,7 +430,7 @@ export function createPromptListItem(
       {
         class: "prompt-title",
       },
-      DOMUtils.escapeHtml(prompt.title),
+      prompt.title,
     );
 
     const promptCategory = DOMUtils.createElement(
@@ -436,7 +438,7 @@ export function createPromptListItem(
       {
         class: "prompt-category",
       },
-      DOMUtils.escapeHtml(prompt.category),
+      prompt.category,
     );
 
     const promptPreview = DOMUtils.createElement(
@@ -445,7 +447,7 @@ export function createPromptListItem(
         class: "prompt-preview",
         id: `${idPrefix}-${String(index)}-desc`,
       },
-      DOMUtils.escapeHtml(prompt.content.substring(0, 100)) +
+      prompt.content.substring(0, 100) +
         (prompt.content.length > 100 ? "..." : ""),
     );
 
