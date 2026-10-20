@@ -92,11 +92,7 @@ describe('App prompt workflows', () => {
     });
 
     await screen.findByText(basePrompt.title);
-    const menuButton = await screen.findByLabelText(`More actions for ${basePrompt.title}`);
-    await userEvent.click(menuButton);
-
-    const editOption = await screen.findByRole('menuitem', { name: /edit/i });
-    await userEvent.click(editOption);
+    await userEvent.click(await screen.findByRole('button', { name: `Edit ${basePrompt.title}` }));
 
     const contentInput = await screen.findByLabelText(/content/i);
     await userEvent.clear(contentInput);
@@ -116,7 +112,7 @@ describe('App prompt workflows', () => {
     await screen.findByText(/prompt updated successfully/i);
   });
 
-  it('deletes a prompt after confirming the dialog', async () => {
+  it('deletes a prompt from the edit form after confirming the dialog', async () => {
     const storageMock = getMockStorageManager();
     storageMock.getPrompts.mockResolvedValue([basePrompt]);
 
@@ -127,11 +123,8 @@ describe('App prompt workflows', () => {
     });
 
     await screen.findByText(basePrompt.title);
-    const menuButton = await screen.findByLabelText(`More actions for ${basePrompt.title}`);
-    await userEvent.click(menuButton);
-
-    const deleteOption = await screen.findByRole('menuitem', { name: /delete/i });
-    await userEvent.click(deleteOption);
+    await userEvent.click(await screen.findByRole('button', { name: `Edit ${basePrompt.title}` }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete prompt' }));
 
     const confirmButton = await screen.findByRole('button', { name: /^delete$/i });
     await userEvent.click(confirmButton);
@@ -193,6 +186,23 @@ describe('App prompt workflows', () => {
     expect(errorMessage).toBeInTheDocument();
   });
 
+  it('keeps the library on screen and shows a toast when pinning fails', async () => {
+    const storageMock = getMockStorageManager();
+    storageMock.getPrompts.mockResolvedValue([basePrompt]);
+    const setSpy = vi.spyOn(chrome.storage.local, 'set');
+    setSpy.mockRejectedValue(new Error('Storage write failed'));
+
+    await renderApp();
+
+    await userEvent.click(await screen.findByRole('button', { name: `Pin ${basePrompt.title}` }));
+
+    await screen.findByText(/failed to update pin/i);
+    expect(screen.getByText(basePrompt.title)).toBeInTheDocument();
+    expect(screen.queryByText(/error loading data/i)).not.toBeInTheDocument();
+
+    setSpy.mockRestore();
+  });
+
   it('surfaces validation errors through an error toast', async () => {
     const storageMock = getMockStorageManager();
     storageMock.getPrompts.mockResolvedValue([basePrompt]);
@@ -206,10 +216,7 @@ describe('App prompt workflows', () => {
 
     await renderApp();
 
-    const menuButton = await screen.findByLabelText(`More actions for ${basePrompt.title}`);
-    await userEvent.click(menuButton);
-    const editOption = await screen.findByRole('menuitem', { name: /edit/i });
-    await userEvent.click(editOption);
+    await userEvent.click(await screen.findByRole('button', { name: `Edit ${basePrompt.title}` }));
 
     const contentInput = await screen.findByLabelText(/content/i);
     await userEvent.type(contentInput, ' additional');

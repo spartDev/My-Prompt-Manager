@@ -50,6 +50,7 @@
       "resources": [
         "assets/content-*.js",
         "assets/platforms-*.js",
+        "assets/promptVariables-*.js",
         "assets/floating-ui.dom-*.js"
       ],
       "use_dynamic_url": false

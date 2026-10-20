@@ -30,6 +30,7 @@ export interface UsePromptsReturn {
   createPrompt: (prompt: Omit<Prompt, 'id' | 'createdAt' | 'updatedAt' | 'usageCount' | 'lastUsedAt'>) => Promise<void>;
   updatePrompt: (id: string, updates: Partial<Prompt>) => Promise<void>;
   deletePrompt: (id: string) => Promise<void>;
+  togglePin: (id: string) => Promise<void>;
   searchPrompts: (query: string) => Prompt[];
   filterByCategory: (category: string | null) => Prompt[];
   refreshPrompts: () => Promise<void>;

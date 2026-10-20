@@ -20,7 +20,7 @@ const LibraryView: FC<LibraryViewProps> = ({
   selectedCategory,
   onAddNew,
   onEditPrompt,
-  onDeletePrompt,
+  onTogglePin,
   onCopyPrompt,
   showToast,
   onCategoryChange,
@@ -153,14 +153,14 @@ const LibraryView: FC<LibraryViewProps> = ({
             )}
           </div>
         ) : (
-          <div className="grid" role="list" aria-label={`${String(finalFilteredPrompts.length)} prompt${finalFilteredPrompts.length !== 1 ? 's' : ''} found`}>
+          <div className="grid grid-cols-1 gap-3 px-4 py-3" role="list" aria-label={`${String(finalFilteredPrompts.length)} prompt${finalFilteredPrompts.length !== 1 ? 's' : ''} found`}>
             {finalFilteredPrompts.map((prompt: Prompt) => (
               <PromptCard
                 key={prompt.id}
                 prompt={prompt}
                 categories={categories}
                 onEdit={onEditPrompt}
-                onDelete={onDeletePrompt}
+                onTogglePin={onTogglePin}
                 onCopy={onCopyPrompt}
                 showToast={showToast}
                 searchQuery={debouncedQuery}

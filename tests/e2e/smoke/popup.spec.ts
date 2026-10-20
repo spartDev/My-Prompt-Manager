@@ -3,8 +3,8 @@ import { test, expect } from '../fixtures/extension';
 import { seedLibrary, createPromptSeed } from '../utils/storage';
 
 test.describe('Popup smoke test', () => {
-  test('shows the prompt library empty state by default', async ({ page }) => {
-    await page.waitForLoadState('domcontentloaded');
+  test('shows the prompt library empty state by default', async ({ page, extensionId }) => {
+    await page.goto(`chrome-extension://${extensionId}/src/popup.html`);
 
     await expect(page.getByRole('heading', { name: 'My Prompt Manager' })).toBeVisible();
     await expect(page.getByText(/create first prompt/i)).toBeVisible();
@@ -13,7 +13,7 @@ test.describe('Popup smoke test', () => {
 });
 
 test.describe('Storage seeding', () => {
-  test('renders prompts seeded into chrome.storage', async ({ page, storage }) => {
+  test('renders prompts seeded into chrome.storage', async ({ page, storage, extensionId }) => {
     const now = Date.now();
 
     await seedLibrary(storage, {
@@ -33,7 +33,7 @@ test.describe('Storage seeding', () => {
       },
     });
 
-    await page.reload();
+    await page.goto(`chrome-extension://${extensionId}/src/popup.html`);
 
     await expect(page.getByRole('heading', { name: 'Hydration reminder' })).toBeVisible();
     await expect(page.getByText(/1 prompt/i)).toBeVisible();
@@ -51,7 +51,7 @@ test.describe('Storage seeding', () => {
 });
 
 test.describe('Prompt creation flow', () => {
-  test('allows creating a prompt through the popup UI', async ({ page, storage }) => {
+  test('allows creating a prompt through the popup UI', async ({ page, storage, extensionId }) => {
     await seedLibrary(storage, {
       settings: {
         ...DEFAULT_SETTINGS,
@@ -61,7 +61,7 @@ test.describe('Prompt creation flow', () => {
       interfaceMode: 'popup',
     });
 
-    await page.reload();
+    await page.goto(`chrome-extension://${extensionId}/src/popup.html`);
 
     const createFirstPrompt = page.getByRole('button', { name: /create first prompt/i });
     const addPrompt = page.getByRole('button', { name: 'Add new prompt' });
@@ -96,7 +96,7 @@ test.describe('Prompt creation flow', () => {
 });
 
 test.describe('Prompt management', () => {
-  test('allows editing an existing prompt', async ({ page, storage }) => {
+  test('allows editing an existing prompt', async ({ page, storage, extensionId }) => {
     const originalPrompt = createPromptSeed({
       id: 'prompt-edit-1',
       title: 'Morning checklist',
@@ -113,12 +113,11 @@ test.describe('Prompt management', () => {
       interfaceMode: 'popup',
     });
 
-    await page.reload();
+    await page.goto(`chrome-extension://${extensionId}/src/popup.html`);
 
     await expect(page.getByRole('heading', { name: originalPrompt.title })).toBeVisible();
 
-    await page.getByRole('button', { name: `More actions for ${originalPrompt.title}` }).click();
-    await page.getByRole('menuitem', { name: 'Edit' }).click();
+    await page.getByRole('button', { name: `Edit ${originalPrompt.title}` }).click();
 
     await expect(page.getByRole('heading', { name: 'Edit Prompt' })).toBeVisible();
 
@@ -145,7 +144,7 @@ test.describe('Prompt management', () => {
     );
   });
 
-  test('allows deleting a prompt via the actions menu', async ({ page, storage }) => {
+  test('allows deleting a prompt via the actions menu', async ({ page, storage, extensionId }) => {
     const promptToDelete = createPromptSeed({
       id: 'prompt-delete-1',
       title: 'Temporary note',
@@ -160,12 +159,12 @@ test.describe('Prompt management', () => {
       },
     });
 
-    await page.reload();
+    await page.goto(`chrome-extension://${extensionId}/src/popup.html`);
 
     await expect(page.getByRole('heading', { name: promptToDelete.title })).toBeVisible();
 
-    await page.getByRole('button', { name: `More actions for ${promptToDelete.title}` }).click();
-    await page.getByRole('menuitem', { name: 'Delete' }).click();
+    await page.getByRole('button', { name: `Edit ${promptToDelete.title}` }).click();
+    await page.getByRole('button', { name: 'Delete prompt' }).click();
 
     const confirmDialog = page.getByRole('dialog', { name: 'Delete Prompt' });
     await expect(confirmDialog).toBeVisible();
@@ -184,7 +183,7 @@ test.describe('Prompt management', () => {
 });
 
 test.describe('Settings', () => {
-  test('persists interface mode changes', async ({ page, storage }) => {
+  test('persists interface mode changes', async ({ page, storage, extensionId }) => {
     await seedLibrary(storage, {
       settings: {
         ...DEFAULT_SETTINGS,
@@ -192,7 +191,7 @@ test.describe('Settings', () => {
       },
     });
 
-    await page.reload();
+    await page.goto(`chrome-extension://${extensionId}/src/popup.html`);
 
     await page.getByTestId('tab-settings').click();
     await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
@@ -208,7 +207,7 @@ test.describe('Settings', () => {
     }).toBe('sidepanel');
   });
 
-  test('persists theme selection changes', async ({ page, storage }) => {
+  test('persists theme selection changes', async ({ page, storage, extensionId }) => {
     await seedLibrary(storage, {
       settings: {
         ...DEFAULT_SETTINGS,
@@ -216,7 +215,7 @@ test.describe('Settings', () => {
       },
     });
 
-    await page.reload();
+    await page.goto(`chrome-extension://${extensionId}/src/popup.html`);
 
     await page.getByTestId('tab-settings').click();
     await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
@@ -230,7 +229,7 @@ test.describe('Settings', () => {
     }).toBe('light');
   });
 
-  test('keeps previous theme when storage update fails', async ({ page, storage }) => {
+  test('keeps previous theme when storage update fails', async ({ page, storage, extensionId }) => {
     await seedLibrary(storage, {
       settings: {
         ...DEFAULT_SETTINGS,
@@ -238,7 +237,7 @@ test.describe('Settings', () => {
       },
     });
 
-    await page.reload();
+    await page.goto(`chrome-extension://${extensionId}/src/popup.html`);
 
     await page.getByTestId('tab-settings').click();
     await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();

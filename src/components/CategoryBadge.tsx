@@ -6,11 +6,12 @@
  *
  * Usage:
  *   <CategoryBadge category={category} variant="pill" size="sm" />
+ *   <CategoryBadge category={category} variant="soft" />  // pale tint + colored text (Library card)
  */
 
-import type { FC } from 'react';
+import type { CSSProperties, FC } from 'react';
 
-import { getAccessibleTextColor, DEFAULT_CATEGORY_COLOR } from '../constants/colors';
+import { getAccessibleTextColor, getSoftBadgeColors, DEFAULT_CATEGORY_COLOR } from '../constants/colors';
 import type { Category } from '../types';
 import { cn } from '../utils/cn';
 
@@ -18,7 +19,7 @@ interface CategoryBadgeProps {
   /** Category object with name and optional color */
   category: Category;
   /** Visual variant of the badge */
-  variant?: 'pill' | 'dot' | 'inline';
+  variant?: 'pill' | 'soft' | 'dot' | 'inline';
   /** Size of the badge */
   size?: 'sm' | 'md';
   /** Additional CSS classes */
@@ -67,6 +68,33 @@ export const CategoryBadge: FC<CategoryBadgeProps> = ({
   const interactiveClasses = onClick
     ? 'cursor-pointer hover:shadow-md active:scale-95'
     : '';
+
+  // Soft: pale tint background with colored text, AA-compliant in light and dark mode
+  if (variant === 'soft') {
+    const light = getSoftBadgeColors(backgroundColor, 'light');
+    const dark = getSoftBadgeColors(backgroundColor, 'dark');
+    const softStyle = {
+      '--badge-bg': light.background,
+      '--badge-fg': light.text,
+      '--badge-bg-dark': dark.background,
+      '--badge-fg-dark': dark.text
+    } as CSSProperties;
+
+    return (
+      <span
+        className={cn(
+          badgeBaseClasses,
+          size === 'sm' ? 'px-2.5 py-1 text-xs' : 'px-3 py-1 text-sm',
+          'font-semibold max-w-full truncate bg-[var(--badge-bg)] text-[var(--badge-fg)] dark:bg-[var(--badge-bg-dark)] dark:text-[var(--badge-fg-dark)]',
+          className
+        )}
+        style={softStyle}
+        title={`Category: ${category.name}`}
+      >
+        {category.name}
+      </span>
+    );
+  }
 
   return (
     <span

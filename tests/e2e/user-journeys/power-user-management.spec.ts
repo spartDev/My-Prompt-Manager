@@ -203,8 +203,7 @@ test.describe('Power User Prompt Management', () => {
 
     // Move first marketing prompt to Work category
     const socialMediaCard = sidepanelPage.getByTestId('prompt-card').filter({ hasText: 'Social Media Content' }).first();
-    await socialMediaCard.getByRole('button', { name: 'More actions' }).click();
-    await sidepanelPage.getByRole('menuitem', { name: 'Edit' }).click();
+    await socialMediaCard.getByRole('button', { name: /^Edit / }).click();
 
     await expect(sidepanelPage.getByRole('heading', { name: 'Edit Prompt' })).toBeVisible();
     await sidepanelPage.getByLabel('Category').click();
@@ -215,8 +214,7 @@ test.describe('Power User Prompt Management', () => {
 
     // Move second marketing prompt to Work category
     const campaignAnalysisCard = sidepanelPage.getByTestId('prompt-card').filter({ hasText: 'Campaign Analysis' }).first();
-    await campaignAnalysisCard.getByRole('button', { name: 'More actions' }).click();
-    await sidepanelPage.getByRole('menuitem', { name: 'Edit' }).click();
+    await campaignAnalysisCard.getByRole('button', { name: /^Edit / }).click();
 
     await expect(sidepanelPage.getByRole('heading', { name: 'Edit Prompt' })).toBeVisible();
     await sidepanelPage.getByLabel('Category').click();
@@ -317,8 +315,7 @@ test.describe('Power User Prompt Management', () => {
 
     for (const promptTitle of devPrompts) {
       const promptCard = sidepanelPage.getByTestId('prompt-card').filter({ hasText: promptTitle }).first();
-      await promptCard.getByRole('button', { name: 'More actions' }).click();
-      await sidepanelPage.getByRole('menuitem', { name: 'Edit' }).click();
+      await promptCard.getByRole('button', { name: /^Edit / }).click();
 
       await expect(sidepanelPage.getByRole('heading', { name: 'Edit Prompt' })).toBeVisible();
       await sidepanelPage.getByLabel('Category').click();

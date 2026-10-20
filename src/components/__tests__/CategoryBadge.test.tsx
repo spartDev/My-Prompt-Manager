@@ -8,11 +8,26 @@
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 
-import { PRESET_COLORS, getAccessibleTextColor } from '../../constants/colors';
+import { PRESET_COLORS, getAccessibleTextColor, getSoftBadgeColors } from '../../constants/colors';
 import type { Category } from '../../types';
 import { CategoryBadge } from '../CategoryBadge';
 
 describe('CategoryBadge', () => {
+  describe('Soft variant', () => {
+    it('should use the accessible soft colors for light and dark mode', () => {
+      const category: Category = { id: '1', name: 'Development', color: '#16A34A' };
+      render(<CategoryBadge category={category} variant="soft" />);
+
+      const badge = screen.getByText('Development');
+      const light = getSoftBadgeColors('#16A34A', 'light');
+      const dark = getSoftBadgeColors('#16A34A', 'dark');
+      expect(badge.style.getPropertyValue('--badge-bg')).toBe(light.background);
+      expect(badge.style.getPropertyValue('--badge-fg')).toBe(light.text);
+      expect(badge.style.getPropertyValue('--badge-bg-dark')).toBe(dark.background);
+      expect(badge.style.getPropertyValue('--badge-fg-dark')).toBe(dark.text);
+    });
+  });
+
   describe('Rendering', () => {
     it('should render category name in pill variant', () => {
       const category: Category = {

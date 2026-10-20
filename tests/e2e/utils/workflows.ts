@@ -60,8 +60,7 @@ export const promptWorkflows = {
   edit: async (page: Page, originalTitle: string, updates: Partial<PromptData>): Promise<void> => {
     // Open actions menu and click edit
     const promptCard = page.getByTestId('prompt-card').filter({ has: page.getByRole('heading', { name: originalTitle }) }).first();
-    await promptCard.getByRole('button', { name: 'More actions' }).click();
-    await page.getByRole('menuitem', { name: 'Edit' }).click();
+    await promptCard.getByRole('button', { name: /^Edit / }).click();
     await assertions.navigation.promptFormEdit(page);
 
     // Apply updates
@@ -95,8 +94,8 @@ export const promptWorkflows = {
   delete: async (page: Page, promptTitle: string, confirm: boolean = true): Promise<void> => {
     // Open actions menu and click delete
     const promptCard = page.getByTestId('prompt-card').filter({ has: page.getByRole('heading', { name: promptTitle }) }).first();
-    await promptCard.getByRole('button', { name: 'More actions' }).click();
-    await page.getByRole('menuitem', { name: 'Delete' }).click();
+    await promptCard.getByRole('button', { name: /^Edit / }).click();
+    await page.getByRole('button', { name: 'Delete prompt' }).click();
 
     // Handle confirmation dialog
     await assertions.dialogs.confirmationVisible(page, 'Delete Prompt');

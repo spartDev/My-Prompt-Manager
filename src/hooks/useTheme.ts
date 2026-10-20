@@ -164,12 +164,22 @@ export const useTheme = (): UseThemeReturn => {
 
   useEffect(() => {
     const root = document.documentElement;
-    
-    if (resolvedTheme === 'dark') {
-      root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
-    }
+
+    // Switch without transitions: controls with transition-all would otherwise
+    // animate light -> dark for 200ms on every open (see .theme-switching in popup.css)
+    root.classList.add('theme-switching');
+    root.classList.toggle('dark', resolvedTheme === 'dark');
+
+    // Re-enable transitions only after a frame has rendered with the new theme
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => {
+        root.classList.remove('theme-switching');
+      });
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+      root.classList.remove('theme-switching');
+    };
   }, [resolvedTheme]);
 
   return {

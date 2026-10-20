@@ -179,6 +179,13 @@ export class PromptManager {
     const sorted = [...prompts];
 
     sorted.sort((a, b) => {
+      // Pinned Prompts always come first, whatever the chosen sort
+      const pinnedA = a.pinned === true;
+      const pinnedB = b.pinned === true;
+      if (pinnedA !== pinnedB) {
+        return pinnedA ? -1 : 1;
+      }
+
       let comparison = 0;
 
       switch (order) {

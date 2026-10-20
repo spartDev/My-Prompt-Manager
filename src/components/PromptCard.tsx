@@ -5,17 +5,41 @@ import type { FC, MouseEvent, ReactNode } from 'react';
 import { encode } from '../services/promptEncoder';
 import type { PromptCardProps } from '../types/components';
 import { Logger, toError } from '../utils';
+import { extractVariables } from '../utils/promptVariables';
 
 import CategoryBadge from './CategoryBadge';
-import ConfirmDialog from './ConfirmDialog';
-import { Dropdown, type DropdownItem } from './Dropdown';
 
 /**
- * Formats a timestamp as a localized date string.
+ * Formats how many times a prompt was used ("Never used", "1 use", "18 uses").
  * Pure function hoisted to module scope to avoid recreation on every render.
  */
-const formatDate = (timestamp: number): string =>
-  new Date(timestamp).toLocaleDateString();
+const formatUsage = (usageCount: number): string => {
+  if (usageCount <= 0) {return 'Never used';}
+  return usageCount === 1 ? '1 use' : `${String(usageCount)} uses`;
+};
+
+/** "1 variable" / "3 variables" for the chip counting a Prompt's distinct Variables. */
+const formatVariableCount = (count: number): string =>
+  count === 1 ? '1 variable' : `${String(count)} variables`;
+
+/**
+ * How many UTF-16 code units of a Prompt's content the card preview renders.
+ * The preview is clamped to two lines by CSS, so anything past this is never seen;
+ * bounding it keeps 20,000-char prompts out of the DOM and out of highlightText.
+ */
+const PREVIEW_MAX_LENGTH = 300;
+
+/**
+ * Bounded prefix of a Prompt's content for the card preview, with an ellipsis when cut.
+ * Local on purpose: can be replaced by the shared truncate util (PR #434) once merged.
+ */
+const previewOf = (content: string): string => {
+  if (content.length <= PREVIEW_MAX_LENGTH) {return content;}
+  // Step back one code unit when the cut would leave a lone high surrogate (split emoji).
+  const lastKept = content.charCodeAt(PREVIEW_MAX_LENGTH - 1);
+  const end = lastKept >= 0xd800 && lastKept <= 0xdbff ? PREVIEW_MAX_LENGTH - 1 : PREVIEW_MAX_LENGTH;
+  return `${content.slice(0, end)}…`;
+};
 
 /**
  * Highlights matching text in a string based on a search query.
@@ -65,35 +89,30 @@ const PromptCard: FC<PromptCardProps> = ({
   prompt,
   categories,
   onEdit,
-  onDelete,
   onCopy,
+  onTogglePin,
   showToast,
   searchQuery = ''
 }) => {
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
+  const usageCount = typeof prompt.usageCount === 'number' && Number.isFinite(prompt.usageCount) ? prompt.usageCount : 0;
 
   const handleCopyClick = (e?: MouseEvent | KeyboardEvent) => {
     e?.stopPropagation();
     onCopy(prompt.content);
   };
 
+  const isPinned = prompt.pinned === true;
+
+  const handlePinClick = (e: MouseEvent) => {
+    e.stopPropagation();
+    onTogglePin(prompt.id);
+  };
+
   const handleEditClick = () => {
     onEdit(prompt);
   };
 
-  const handleDeleteClick = () => {
-    setShowDeleteConfirm(true);
-  };
-
-  const handleConfirmDelete = () => {
-    onDelete(prompt.id);
-    setShowDeleteConfirm(false);
-  };
-
-  const handleCancelDelete = () => {
-    setShowDeleteConfirm(false);
-  };
 
   const handleShare = async (e?: MouseEvent | KeyboardEvent) => {
     e?.stopPropagation();
@@ -114,126 +133,115 @@ const PromptCard: FC<PromptCardProps> = ({
     }
   };
 
-  // Menu items for dropdown
-  const menuItems: DropdownItem[] = [
-    {
-      id: 'edit',
-      label: 'Edit',
-      onSelect: handleEditClick
-    },
-    {
-      id: 'delete',
-      label: 'Delete',
-      onSelect: handleDeleteClick,
-      className: 'text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 focus:bg-red-50 dark:focus:bg-red-900/20 focus:text-red-700 dark:focus:text-red-400'
-    }
-  ];
 
+
+  const category = categories.find(cat => cat.name === prompt.category);
+  const variableCount = extractVariables(prompt.content).length;
 
   return (
-    <article data-testid="prompt-card" className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5 hover:bg-white/90 dark:hover:bg-gray-800/90 transition-all duration-200 relative group" aria-labelledby={`prompt-title-${prompt.id}`}>
-      <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-4 items-center">
-        {/* Title and metadata */}
-        <div className="pr-3">
-          {/* inline-block enables text-overflow: ellipsis to work with inline elements (e.g., <mark> tags from search highlighting) */}
-          <h3
-            id={`prompt-title-${prompt.id}`}
-            className="inline-block max-w-full font-semibold text-gray-900 dark:text-gray-100 text-sm leading-tight truncate"
-            title={(prompt).title}
-            aria-label={prompt.title}
-          >
-            {highlightText((prompt).title, searchQuery, prompt.id)}
-          </h3>
-          <div className="flex items-center space-x-2 mt-1">
-            {(() => {
-              const category = categories.find(cat => cat.name === prompt.category);
-              return category ? (
-                <CategoryBadge
-                  category={category}
-                  variant="pill"
-                  size="sm"
-                />
-              ) : null;
-            })()}
-            <time
-              className="text-xs text-gray-500 dark:text-gray-400"
-              dateTime={new Date((prompt).updatedAt).toISOString()}
-              aria-label={`Last updated: ${formatDate((prompt).updatedAt)}`}
-            >
-              {formatDate((prompt).updatedAt)}
-            </time>
-          </div>
-        </div>
-        
-        {/* Actions */}
-        <div className="flex items-center space-x-2 shrink-0">
-          {/* Copy Button */}
+    <article
+      data-testid="prompt-card"
+      className="bg-white dark:bg-gray-800 border border-purple-100 dark:border-gray-700 min-w-0 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow duration-200 relative group"
+      aria-labelledby={`prompt-title-${prompt.id}`}
+    >
+      {/* Header: title and pin star */}
+      <div className="flex items-start gap-2">
+        <h3
+          id={`prompt-title-${prompt.id}`}
+          className="min-w-0 flex-1 font-semibold text-gray-900 dark:text-gray-100 text-base leading-snug"
+          aria-label={prompt.title}
+        >
+          {/* Stretched button: its ::after overlay covers the card, so clicking anywhere opens the editor.
+              inline-block enables text-overflow: ellipsis with <mark> tags from search highlighting */}
           <button
-            onClick={handleCopyClick}
-            className="p-2 text-gray-400 dark:text-gray-500 hover:text-purple-600 dark:hover:text-purple-400 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors focus-interactive"
-            aria-label={`Copy content of ${prompt.title} to clipboard`}
-            title="Copy to clipboard"
+            type="button"
+            onClick={handleEditClick}
+            className="inline-block max-w-full truncate text-left align-top cursor-pointer focus:outline-none after:absolute after:inset-0 after:rounded-2xl after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-purple-500"
+            aria-label={`Edit ${prompt.title}`}
+            title={prompt.title}
           >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-              />
-            </svg>
+            {highlightText(prompt.title, searchQuery, prompt.id)}
           </button>
+        </h3>
 
-          {/* Share Button */}
-          <button
-            onClick={(e) => { void handleShare(e); }}
-            disabled={isSharing}
-            className="p-2 text-gray-400 dark:text-gray-500 hover:text-purple-600 dark:hover:text-purple-400 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors focus-interactive disabled:opacity-50 disabled:cursor-not-allowed"
-            aria-label={isSharing ? `Sharing ${prompt.title}...` : `Share ${prompt.title}`}
-            title="Share this prompt"
-            aria-busy={isSharing}
-          >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
-              />
-            </svg>
-          </button>
-
-          {/* Menu */}
-          <Dropdown
-            trigger={
-              <button
-                className="p-1 text-gray-400 dark:text-gray-500 hover:text-purple-600 dark:hover:text-purple-400 rounded-md hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors focus-interactive"
-                aria-label={`More actions for ${prompt.title}`}
-              >
-                <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-                  <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-                </svg>
-              </button>
-            }
-            items={menuItems}
-            placement="bottom-end"
-            className="w-28"
-            itemClassName="px-4 py-3 text-sm font-medium"
-          />
-        </div>
+        {/* Pin star */}
+        <button
+          type="button"
+          onClick={handlePinClick}
+          className={`relative z-10 shrink-0 -mt-0.5 p-1 rounded-full transition-colors focus-interactive ${isPinned ? 'text-amber-400 hover:text-amber-500' : 'text-gray-300 dark:text-gray-600 hover:text-amber-400 dark:hover:text-amber-400'}`}
+          aria-pressed={isPinned}
+          aria-label={isPinned ? `Unpin ${prompt.title}` : `Pin ${prompt.title}`}
+          title={isPinned ? 'Unpin' : 'Pin to top'}
+        >
+          <svg className="h-5 w-5" viewBox="0 0 24 24" fill={isPinned ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={1.8} aria-hidden="true">
+            <path strokeLinejoin="round" d="M11.48 3.5a.56.56 0 011.04 0l2.13 5.11a.56.56 0 00.47.34l5.52.44c.5.04.7.66.32.99l-4.2 3.6a.56.56 0 00-.18.55l1.28 5.39a.56.56 0 01-.84.61l-4.73-2.89a.56.56 0 00-.58 0l-4.73 2.89a.56.56 0 01-.84-.61l1.28-5.39a.56.56 0 00-.18-.55l-4.2-3.6a.56.56 0 01.32-.99l5.52-.44a.56.56 0 00.47-.34L11.48 3.5z" />
+          </svg>
+        </button>
       </div>
 
-      {/* Delete Confirmation Dialog */}
-      <ConfirmDialog
-        isOpen={showDeleteConfirm}
-        onConfirm={handleConfirmDelete}
-        onCancel={handleCancelDelete}
-        title="Delete Prompt"
-        message={`Are you sure you want to delete "${prompt.title}"? This action cannot be undone.`}
-        confirmText="Delete"
-        cancelText="Cancel"
-        variant="danger"
-      />
+      {/* Content preview (2 lines) */}
+      <p className="mt-1.5 text-sm leading-relaxed text-gray-500 dark:text-gray-400 line-clamp-2 break-words">
+        {highlightText(previewOf(prompt.content), searchQuery, prompt.id)}
+      </p>
+
+      {/* Footer: category, usage and round actions */}
+      <div className="mt-3 flex items-center gap-2">
+        <div className="min-w-0 flex-1 flex items-center gap-1.5">
+          {category ? (
+            <CategoryBadge category={category} variant="soft" size="sm" className="min-w-0" />
+          ) : null}
+          {variableCount > 0 ? (
+            <span
+              data-testid="prompt-variables-chip"
+              className="shrink-0 inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+              title="Filled in when you insert this prompt on an AI site"
+            >
+              {formatVariableCount(variableCount)}
+            </span>
+          ) : null}
+        </div>
+
+        <span className={`shrink-0 text-xs ${usageCount > 0 ? 'text-gray-500 dark:text-gray-400' : 'text-gray-400 dark:text-gray-500'}`}>
+          {formatUsage(usageCount)}
+        </span>
+
+        {/* Copy Button */}
+        <button
+          onClick={handleCopyClick}
+          className="relative z-10 shrink-0 h-10 w-10 inline-flex items-center justify-center rounded-full bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-purple-900/40 dark:text-purple-300 dark:hover:bg-purple-900/60 transition-colors focus-interactive"
+          aria-label={`Copy content of ${prompt.title} to clipboard`}
+          title="Copy to clipboard"
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+            />
+          </svg>
+        </button>
+
+        {/* Share Button */}
+        <button
+          onClick={(e) => { void handleShare(e); }}
+          disabled={isSharing}
+          className="relative z-10 shrink-0 h-10 w-10 inline-flex items-center justify-center rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 transition-colors focus-interactive disabled:opacity-50 disabled:cursor-not-allowed"
+          aria-label={isSharing ? `Sharing ${prompt.title}...` : `Share ${prompt.title}`}
+          title="Share this prompt"
+          aria-busy={isSharing}
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
+            />
+          </svg>
+        </button>
+      </div>
+
     </article>
   );
 };
@@ -247,6 +255,8 @@ const arePropsEqual = (prevProps: PromptCardProps, nextProps: PromptCardProps): 
   if (prevProps.prompt.content !== nextProps.prompt.content) {return false;}
   if (prevProps.prompt.category !== nextProps.prompt.category) {return false;}
   if (prevProps.prompt.updatedAt !== nextProps.prompt.updatedAt) {return false;}
+  if (prevProps.prompt.usageCount !== nextProps.prompt.usageCount) {return false;}
+  if (prevProps.prompt.pinned !== nextProps.prompt.pinned) {return false;}
   
   // Check search query changes (affects highlighting)
   if (prevProps.searchQuery !== nextProps.searchQuery) {return false;}
@@ -267,8 +277,8 @@ const arePropsEqual = (prevProps: PromptCardProps, nextProps: PromptCardProps): 
   // Function references comparison - these should be stable from parent
   // but we'll do a shallow check to be safe
   if (prevProps.onEdit !== nextProps.onEdit) {return false;}
-  if (prevProps.onDelete !== nextProps.onDelete) {return false;}
   if (prevProps.onCopy !== nextProps.onCopy) {return false;}
+  if (prevProps.onTogglePin !== nextProps.onTogglePin) {return false;}
   // Note: showToast is excluded from comparison as function references change frequently
   // and re-rendering on showToast changes provides no benefit
 

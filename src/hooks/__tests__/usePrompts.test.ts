@@ -235,6 +235,58 @@ describe('usePrompts', () => {
       expect(result.current.loading).toBe(false);
     });
 
+    it('should toggle the pin of a prompt and persist it', async () => {
+      await chrome.storage.local.set({ prompts: mockPrompts });
+      const { result } = renderHook(() => usePrompts());
+      await waitFor(() => { expect(result.current.prompts).toHaveLength(3); });
+
+      await act(async () => { await result.current.togglePin('2'); });
+
+      let stored = (await chrome.storage.local.get('prompts')).prompts as Prompt[];
+      expect(stored.find(p => p.id === '2')?.pinned).toBe(true);
+      expect(stored.find(p => p.id === '2')?.updatedAt).toBe(oneDayAgo);
+      expect(result.current.prompts.find(p => p.id === '2')?.pinned).toBe(true);
+
+      await act(async () => { await result.current.togglePin('2'); });
+
+      stored = (await chrome.storage.local.get('prompts')).prompts as Prompt[];
+      expect(stored.find(p => p.id === '2')?.pinned).toBe(false);
+      expect(result.current.prompts.find(p => p.id === '2')?.pinned).toBe(false);
+    });
+
+    it('should end unpinned after two quick toggles', async () => {
+      await chrome.storage.local.set({ prompts: mockPrompts });
+      const { result } = renderHook(() => usePrompts());
+      await waitFor(() => { expect(result.current.prompts).toHaveLength(3); });
+
+      await act(async () => {
+        await Promise.all([result.current.togglePin('2'), result.current.togglePin('2')]);
+      });
+
+      const stored = (await chrome.storage.local.get('prompts')).prompts as Prompt[];
+      expect(stored.find(p => p.id === '2')?.pinned).toBe(false);
+      expect(result.current.prompts.find(p => p.id === '2')?.pinned).toBe(false);
+    });
+
+    it('should reject a failed pin without turning it into a hook error', async () => {
+      await chrome.storage.local.set({ prompts: mockPrompts });
+      const { result } = renderHook(() => usePrompts());
+      await waitFor(() => { expect(result.current.prompts).toHaveLength(3); });
+
+      const setSpy = vi.spyOn(chrome.storage.local, 'set');
+      setSpy.mockRejectedValueOnce(new Error('Pin failed'));
+
+      await act(async () => {
+        await expect(result.current.togglePin('2')).rejects.toThrow();
+      });
+
+      expect(result.current.error).toBeNull();
+      expect(result.current.prompts.find(p => p.id === '2')?.pinned).not.toBe(true);
+      expect(result.current.prompts).toHaveLength(3);
+
+      setSpy.mockRestore();
+    });
+
     it('should refresh prompts list after operations', async () => {
       // Arrange
       await chrome.storage.local.set({ prompts: mockPrompts });

@@ -134,27 +134,32 @@ export class LibraryPage extends BasePage {
   }
 
   /**
-   * Open actions menu for a specific prompt
-   */
-  async openPromptActionsMenu(promptTitle: string): Promise<void> {
-    const promptCard = this.getPromptCard(promptTitle);
-    await promptCard.getByRole('button', { name: 'More actions' }).click();
-  }
-
-  /**
-   * Click edit action for a specific prompt
+   * Open a prompt for editing (clicking the card opens the editor)
    */
   async editPrompt(promptTitle: string): Promise<void> {
-    await this.openPromptActionsMenu(promptTitle);
-    await this.page.getByRole('menuitem', { name: 'Edit' }).click();
+    await this.getPromptCard(promptTitle).getByRole('button', { name: /^Edit / }).click();
   }
 
   /**
-   * Click delete action for a specific prompt
+   * Delete a prompt (from its edit form)
    */
   async deletePrompt(promptTitle: string): Promise<void> {
-    await this.openPromptActionsMenu(promptTitle);
-    await this.page.getByRole('menuitem', { name: 'Delete' }).click();
+    await this.editPrompt(promptTitle);
+    await this.page.getByRole('button', { name: 'Delete prompt' }).click();
+  }
+
+  /**
+   * Pin or unpin a prompt with its star
+   */
+  async togglePin(promptTitle: string): Promise<void> {
+    await this.getPromptCard(promptTitle).getByRole('button', { name: /^(Pin|Unpin) / }).click();
+  }
+
+  /**
+   * Titles of the prompt cards, in display order
+   */
+  async getPromptTitles(): Promise<string[]> {
+    return this.page.getByTestId('prompt-card').locator('h3').allInnerTexts();
   }
 
   /**

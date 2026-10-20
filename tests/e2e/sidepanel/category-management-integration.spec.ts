@@ -340,8 +340,7 @@ test.describe('Category Management - Integration with Prompt System', () => {
       // Edit the prompt
       await expect(sidepanelPage.getByRole('heading', { name: 'Editable Prompt' })).toBeVisible();
 
-      await sidepanelPage.getByRole('button', { name: 'More actions for Editable Prompt' }).click();
-      await sidepanelPage.getByRole('menuitem', { name: 'Edit' }).click();
+      await sidepanelPage.getByRole('button', { name: 'Edit Editable Prompt' }).click();
 
       // Change category to the valid one using the custom dropdown
       const categoryButton = sidepanelPage.getByLabel('Category');
