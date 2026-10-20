@@ -16,7 +16,8 @@ import { useClipboard } from './hooks/useClipboard';
 import { usePrompts } from './hooks/usePrompts';
 import { useSearchWithDebounce } from './hooks/useSearchWithDebounce';
 import { useToast } from './hooks/useToast';
-import type { Prompt, AppError, ViewType } from './types';
+import { ALL_PROMPTS } from './services/libraryFilter';
+import type { Prompt, AppError, ViewType, LibraryFilter } from './types';
 import { Logger, toError } from './utils';
 
 type ExtendedViewType = ViewType | Section;
@@ -36,7 +37,8 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   
   const [currentView, setCurrentView] = useState<ExtendedViewType>(isPickerMode ? 'settings' : 'library');
   const [selectedPrompt, setSelectedPrompt] = useState<Prompt | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  // The Library filter lasts while the popup or side panel stays open, across Sections
+  const [libraryFilter, setLibraryFilter] = useState<LibraryFilter>(ALL_PROMPTS);
   const [showStorageWarning, setShowStorageWarning] = useState<boolean>(false);
   const sectionContentRef = useRef<HTMLDivElement>(null);
 
@@ -290,13 +292,13 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
           prompts={optimisticPrompts}
           categories={categories}
           searchWithDebounce={searchWithDebounce}
-          selectedCategory={selectedCategory}
+          libraryFilter={libraryFilter}
           onAddNew={handleAddNew}
           onEditPrompt={handleEditPrompt}
           onTogglePin={handleTogglePin}
           onCopyPrompt={(content: string) => { void handleCopyPrompt(content); }}
           showToast={showToast}
-          onCategoryChange={setSelectedCategory}
+          onLibraryFilterChange={setLibraryFilter}
           loading={loading}
           context={context}
         />

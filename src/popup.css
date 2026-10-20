@@ -94,6 +94,16 @@ body {
   scrollbar-color: #8b5cf6 rgba(243, 244, 246, 0.5); /* thumb track */
 }
 
+/* Rows that scroll sideways without a scrollbar (the Library filter pills).
+   Unlayered like the * rule above, which would otherwise win over a Tailwind utility */
+.scrollbar-hidden {
+  scrollbar-width: none;
+}
+
+.scrollbar-hidden::-webkit-scrollbar {
+  display: none;
+}
+
 /* Enhanced scrollbar for specific scrollable areas */
 .custom-scrollbar {
   scrollbar-width: thin;

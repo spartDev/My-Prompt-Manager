@@ -123,11 +123,19 @@ test.describe('Example: Refactored Category Management Tests', () => {
   });
 
   test('should complete category reorganization workflow', async () => {
+    // Only a Category holding a Prompt has a Library filter pill, so give "Work" one first
+    await workflows.prompts.create(libraryPage.page, {
+      title: 'Weekly Report',
+      content: 'Summarize this week in three bullet points',
+      category: 'Work'
+    });
+    await assertions.categories.exists(libraryPage.page, 'Work');
+
     // Complex workflow that was previously 50+ lines of code
     // Now simplified to a single workflow call:
     await workflows.userJourneys.categoryReorganization(libraryPage.page);
 
-    // Verify final state
+    // Verify final state: the pill follows the rename
     await assertions.categories.exists(libraryPage.page, 'Professional');
     await assertions.categories.notExists(libraryPage.page, 'Work');
 

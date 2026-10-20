@@ -1,6 +1,6 @@
 import type { UseSearchWithDebounceReturn } from './hooks';
 
-import type { Prompt, Category, SortOrder, SortDirection } from './index';
+import type { Prompt, Category, LibraryFilter } from './index';
 
 // Shared toast type for consistent usage across components
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
@@ -42,13 +42,13 @@ export interface LibraryViewProps {
   prompts: Prompt[];
   categories: Category[];
   searchWithDebounce: UseSearchWithDebounceReturn;
-  selectedCategory: string | null;
+  libraryFilter: LibraryFilter;
   onAddNew: () => void;
   onEditPrompt: (prompt: Prompt) => void;
   onTogglePin: (id: string) => void;
   onCopyPrompt: (content: string) => void;
   showToast: (message: string, type: ToastType) => void;
-  onCategoryChange: (category: string | null) => void;
+  onLibraryFilterChange: (filter: LibraryFilter) => void;
   loading?: boolean;
   context?: 'popup' | 'sidepanel';
 }
@@ -77,12 +77,3 @@ export interface ConfirmDialogProps {
   onCancel: () => void;
 }
 
-export interface FilterSortControlsProps {
-  categories: Category[];
-  selectedCategory: string | null;
-  sortOrder: SortOrder;
-  sortDirection: SortDirection;
-  onCategoryChange: (category: string | null) => void;
-  onSortChange: (order: SortOrder, direction: SortDirection) => void;
-  loading?: boolean;
-}

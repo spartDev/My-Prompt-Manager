@@ -1,14 +1,20 @@
-import { useMemo, useEffect, useCallback } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import type { FC } from 'react';
 
-import { useSort } from '../hooks/useSort';
-import { PromptManager } from '../services/promptManager';
+import { DEFAULT_SETTINGS } from '../constants';
+import {
+  ALL_PROMPTS,
+  applyLibraryFilter,
+  getFilterableCategories,
+  resolveLibraryFilter
+} from '../services/libraryFilter';
 import { StorageManager } from '../services/storage';
-import type { Prompt, SortOrder, SortDirection } from '../types';
+import type { Prompt, SortOrder } from '../types';
 import type { LibraryViewProps } from '../types/components';
 import { Logger, toError } from '../utils';
 
-import FilterSortControls from './FilterSortControls';
+import { StarIcon, UsageIcon } from './icons/UIIcons';
+import LibraryFilterBar from './LibraryFilterBar';
 import PromptCard from './PromptCard';
 import SearchBar from './SearchBar';
 import ViewHeader from './ViewHeader';
@@ -17,53 +23,59 @@ const LibraryView: FC<LibraryViewProps> = ({
   prompts,
   categories,
   searchWithDebounce,
-  selectedCategory,
+  libraryFilter,
   onAddNew,
   onEditPrompt,
   onTogglePin,
   onCopyPrompt,
   showToast,
-  onCategoryChange,
+  onLibraryFilterChange,
   loading,
   context = 'popup'
 }) => {
   const { query, debouncedQuery, filteredPrompts, isSearching } = searchWithDebounce;
-  const { sortOrder, sortDirection, handleSortChange: internalHandleSortChange } = useSort();
+  const [sortOrder, setSortOrder] = useState<SortOrder>(DEFAULT_SETTINGS.sortOrder);
 
-  // Load sort settings from storage on mount
+  // The sort is chosen in Settings
   useEffect(() => {
-    const loadSortSettings = async () => {
+    const loadSortOrder = async () => {
       try {
-        const storageManager = StorageManager.getInstance();
-        const settings = await storageManager.getSettings();
-        internalHandleSortChange(settings.sortOrder, settings.sortDirection);
+        const settings = await StorageManager.getInstance().getSettings();
+        setSortOrder(settings.sortOrder);
       } catch (error) {
         Logger.error('Failed to load sort settings', toError(error), { component: 'LibraryView' });
       }
     };
-    void loadSortSettings();
-  }, [internalHandleSortChange]);
+    void loadSortOrder();
+  }, []);
 
-  // Wrap handleSortChange to persist to storage
-  const handleSortChange = useCallback((order: SortOrder, direction: SortDirection) => {
-    internalHandleSortChange(order, direction);
-    // Persist to storage asynchronously (fire-and-forget)
-    const storageManager = StorageManager.getInstance();
-    void storageManager.updateSettings({ sortOrder: order, sortDirection: direction }).catch((error: unknown) => {
-      Logger.error('Failed to persist sort settings', toError(error), { component: 'LibraryView' });
-    });
-  }, [internalHandleSortChange]);
+  // Pills are offered from the whole Library, so a search never hides one
+  const filterableCategories = useMemo(
+    () => getFilterableCategories(categories, prompts),
+    [categories, prompts]
+  );
+  const activeFilter = useMemo(
+    () => resolveLibraryFilter(libraryFilter, filterableCategories),
+    [libraryFilter, filterableCategories]
+  );
 
-  const finalFilteredPrompts = useMemo(() => {
-    // Apply category filter to search-filtered prompts
-    let filtered = filteredPrompts;
-    if (selectedCategory) {
-      filtered = filteredPrompts.filter((prompt) => prompt.category === selectedCategory);
+  // Return to All once the chosen Category is gone or holds no Prompt
+  useEffect(() => {
+    if (!loading && activeFilter !== libraryFilter) {
+      onLibraryFilterChange(ALL_PROMPTS);
     }
+  }, [loading, activeFilter, libraryFilter, onLibraryFilterChange]);
 
-    // Apply sorting using PromptManager service
-    return PromptManager.getInstance().sortPrompts(filtered, sortOrder, sortDirection);
-  }, [filteredPrompts, selectedCategory, sortOrder, sortDirection]);
+  // A search looks only inside the active Library filter
+  const finalFilteredPrompts = useMemo(
+    () => applyLibraryFilter(filteredPrompts, activeFilter, categories, sortOrder),
+    [filteredPrompts, activeFilter, categories, sortOrder]
+  );
+
+  const activeFilterLabel = activeFilter.kind === 'category'
+    ? categories.find(category => category.id === activeFilter.categoryId)?.name ?? ''
+    : activeFilter.kind === 'pinned' ? 'Pinned' : 'Most Used';
+  const isSearchActive = debouncedQuery.trim() !== '';
 
   const totalLabel = `${String(prompts.length)} prompt${prompts.length !== 1 ? 's' : ''}`;
   const countLabel = finalFilteredPrompts.length === prompts.length
@@ -102,14 +114,11 @@ const LibraryView: FC<LibraryViewProps> = ({
             )}
           </div>
 
-          <FilterSortControls
-            categories={categories}
-            selectedCategory={selectedCategory}
-            sortOrder={sortOrder}
-            sortDirection={sortDirection}
-            onCategoryChange={onCategoryChange}
-            onSortChange={handleSortChange}
-            loading={loading}
+          <LibraryFilterBar
+            categories={filterableCategories}
+            activeFilter={activeFilter}
+            onChange={onLibraryFilterChange}
+            disabled={loading}
           />
         </div>
       </ViewHeader>
@@ -140,15 +149,44 @@ const LibraryView: FC<LibraryViewProps> = ({
                   Create First Prompt
                 </button>
               </div>
+            ) : !isSearchActive && activeFilter.kind === 'pinned' ? (
+              <div className="max-w-sm mx-auto text-center px-6" role="region" aria-label="No pinned prompts">
+                <div className="w-14 h-14 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center mx-auto mb-3" aria-hidden="true">
+                  <StarIcon className="w-7 h-7 text-purple-500 dark:text-purple-300" />
+                </div>
+                <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-1">No pinned prompts yet</h2>
+                <p className="text-gray-500 dark:text-gray-400 text-sm">Pin a prompt with its star to keep it here.</p>
+              </div>
+            ) : !isSearchActive && activeFilter.kind === 'mostUsed' ? (
+              <div className="max-w-sm mx-auto text-center px-6" role="region" aria-label="No used prompts">
+                <div className="w-14 h-14 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center mx-auto mb-3" aria-hidden="true">
+                  <UsageIcon className="w-7 h-7 text-purple-500 dark:text-purple-300" />
+                </div>
+                <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-1">No prompts used yet</h2>
+                <p className="text-gray-500 dark:text-gray-400 text-sm">Prompts you insert into an AI chat appear here, most used first.</p>
+              </div>
             ) : (
               <div className="max-w-sm mx-auto text-center px-6" role="region" aria-label="No search results">
-                <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3" role="img" aria-label="No results illustration">
+                <div className="w-14 h-14 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-3" role="img" aria-label="No results illustration">
                   <svg className="w-7 h-7 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
                 </div>
                 <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-1">No matches found</h2>
-                <p className="text-gray-500 dark:text-gray-400 text-sm">Try adjusting your search or filter criteria</p>
+                {activeFilter.kind === 'all' ? (
+                  <p className="text-gray-500 dark:text-gray-400 text-sm">Try a different search</p>
+                ) : (
+                  <>
+                    <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">Nothing in {activeFilterLabel} matches your search.</p>
+                    <button
+                      type="button"
+                      onClick={() => { onLibraryFilterChange(ALL_PROMPTS); }}
+                      className="px-4 py-2 text-sm font-semibold text-purple-700 dark:text-purple-200 bg-purple-100 dark:bg-purple-900/60 border border-purple-300 dark:border-purple-500 rounded-lg hover:bg-purple-200 dark:hover:bg-purple-900 transition-colors focus-interactive"
+                    >
+                      Search all prompts
+                    </button>
+                  </>
+                )}
               </div>
             )}
           </div>

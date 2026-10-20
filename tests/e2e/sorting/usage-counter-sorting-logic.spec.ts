@@ -8,50 +8,39 @@
 
 import { DEFAULT_CATEGORY } from '../../../src/types';
 import { test, expect } from '../fixtures/extension';
+import { LibraryPage } from '../pages/LibraryPage';
+import { getCurrentSortLabel, getSortedPromptTitles, selectSortOption } from '../utils/sort-helpers';
 import { seedLibrary, createPromptSeed } from '../utils/storage';
 
 test.describe('Usage Counter & Smart Sorting - Logic', () => {
 
   // Scenario 2.5: Sort State Syncs Between Contexts (CROSS-CONTEXT TEST)
+  // The sort is a Settings preference: the one chosen in one context is the order shown in the other
   test.describe('Cross-Context Sorting', () => {
-    test('sort state syncs from popup to sidepanel', async ({ context, storage, extensionId }) => {
-      // Verify sort state persists when switching contexts
-
-      // Seed data
+    test('sort chosen in popup is used by sidepanel', async ({ context, storage, extensionId }) => {
+      // Seed data: "Low" was updated last, so the default sort (Recently Updated) lists it first
+      const now = Date.now();
       const prompts = [
-        createPromptSeed({ id: 'p1', title: 'Low', usageCount: 5 }),
-        createPromptSeed({ id: 'p2', title: 'High', usageCount: 10 })
+        createPromptSeed({ id: 'p1', title: 'Low', usageCount: 5, createdAt: now - 10000, updatedAt: now - 1000 }),
+        createPromptSeed({ id: 'p2', title: 'High', usageCount: 10, createdAt: now - 10000, updatedAt: now - 2000 })
       ];
       await seedLibrary(storage, { prompts });
 
-      // Open popup and set sort
+      // Open popup and choose the sort in Settings
       const popupPage = await context.newPage();
       await popupPage.goto(`chrome-extension://${extensionId}/src/popup.html`);
       await popupPage.waitForLoadState('domcontentloaded');
 
-      // Select "Most Used" and toggle to ascending
-      let sortButton = popupPage.getByRole('button', { name: /Sort order:/i });
-      await sortButton.click();
-      await popupPage.getByRole('menuitem', { name: /Most Used/i }).click();
-
-      sortButton = popupPage.getByRole('button', { name: /Sort order: Most Used/i });
-      await expect(sortButton).toBeVisible();
-      await sortButton.click();
-      await popupPage.getByRole('menuitem', { name: /Most Used/i }).click();
-
-      // Verify ascending in popup
-      const popupPromptHeadings = popupPage.locator('article h3');
+      const popupPromptHeadings = popupPage.getByTestId('prompt-card').getByRole('heading');
       await expect(popupPromptHeadings).toHaveText(['Low', 'High']);
 
-      // Verify button shows "Least Used"
-      sortButton = popupPage.getByRole('button', { name: /Sort order: Least Used/i });
-      await expect(sortButton).toBeVisible();
+      await selectSortOption(popupPage, 'Number of Uses');
 
-      // The list re-sorts before the settings are stored: wait for the stored direction, or closing
-      // the page can cut the write short
-      await expect
-        .poll(async () => (await storage.getSettings())?.sortDirection)
-        .toBe('asc');
+      // Verify most used first in popup
+      await expect(popupPromptHeadings).toHaveText(['High', 'Low']);
+
+      // The setting is stored asynchronously: wait for it, or closing the page can cut the write short
+      await expect.poll(async () => (await storage.getSettings())?.sortOrder).toBe('usageCount');
 
       await popupPage.close();
 
@@ -60,41 +49,41 @@ test.describe('Usage Counter & Smart Sorting - Logic', () => {
       await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`);
       await sidepanelPage.waitForLoadState('domcontentloaded');
 
-      // Verify sort persisted
-      await expect(sidepanelPage.getByRole('button', { name: /Sort order: Least Used/i })).toBeVisible();
+      // Verify the sidepanel lists prompts in the same order
+      await expect(sidepanelPage.getByTestId('prompt-card').getByRole('heading')).toHaveText(['High', 'Low']);
 
-      await expect(sidepanelPage.locator('article h3')).toHaveText(['Low', 'High']); // Still ascending
+      // Verify the sidepanel's Settings shows the same sort
+      expect(await getCurrentSortLabel(sidepanelPage)).toBe('Number of Uses');
 
-      // Verify storage has correct values
+      // Verify storage has correct values (each sort has one direction)
       const settings = await storage.getSettings();
       expect(settings?.sortOrder).toBe('usageCount');
+      expect(settings?.sortDirection).toBe('desc');
     });
 
-    test('sort state syncs from sidepanel to popup', async ({ context, storage, extensionId }) => {
-      // Verify sort state persists when switching contexts (reverse direction)
-
-      // Seed data
+    test('sort chosen in sidepanel is used by popup', async ({ context, storage, extensionId }) => {
+      // Seed data: "Used Earlier" was updated last (listed first by default), "Used Just Now" was used last
+      const now = Date.now();
       const prompts = [
-        createPromptSeed({ id: 'p1', title: 'Low', usageCount: 5 }),
-        createPromptSeed({ id: 'p2', title: 'High', usageCount: 10 })
+        createPromptSeed({ id: 'p1', title: 'Used Earlier', usageCount: 5, createdAt: now - 1000000, updatedAt: now - 1000, lastUsedAt: now - 500000 }),
+        createPromptSeed({ id: 'p2', title: 'Used Just Now', usageCount: 1, createdAt: now - 1000000, updatedAt: now - 2000, lastUsedAt: now })
       ];
       await seedLibrary(storage, { prompts });
 
-      // Open sidepanel and set sort
+      // Open sidepanel and choose the sort in Settings
       const sidepanelPage = await context.newPage();
       await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`);
       await sidepanelPage.waitForLoadState('domcontentloaded');
 
-      // Select "Recently Used"
-      await sidepanelPage.getByRole('button', { name: /Sort order:/i }).click();
-      await sidepanelPage.getByRole('menuitem', { name: /Recently Used/i }).click();
+      const sidepanelPromptHeadings = sidepanelPage.getByTestId('prompt-card').getByRole('heading');
+      await expect(sidepanelPromptHeadings).toHaveText(['Used Earlier', 'Used Just Now']);
+
+      await selectSortOption(sidepanelPage, 'Recently Used');
 
       // Verify sort was applied
-      const sortButton = sidepanelPage.getByRole('button', { name: /Sort order: Recently Used/i });
-      await expect(sortButton).toBeVisible();
+      await expect(sidepanelPromptHeadings).toHaveText(['Used Just Now', 'Used Earlier']);
 
-      // The button changes before the setting is stored: wait for the stored value, or closing the
-      // page can cut the write short
+      // The setting is stored asynchronously: wait for it, or closing the page can cut the write short
       await expect.poll(async () => (await storage.getSettings())?.sortOrder).toBe('lastUsedAt');
 
       await sidepanelPage.close();
@@ -104,12 +93,16 @@ test.describe('Usage Counter & Smart Sorting - Logic', () => {
       await popupPage.goto(`chrome-extension://${extensionId}/src/popup.html`);
       await popupPage.waitForLoadState('domcontentloaded');
 
-      // Verify sort persisted
-      await expect(popupPage.getByRole('button', { name: /Sort order: Recently Used/i })).toBeVisible();
+      // Verify the popup lists prompts in the same order
+      await expect(popupPage.getByTestId('prompt-card').getByRole('heading')).toHaveText(['Used Just Now', 'Used Earlier']);
+
+      // Verify the popup's Settings shows the same sort
+      expect(await getCurrentSortLabel(popupPage)).toBe('Recently Used');
 
       // Verify storage has correct values
       const settings = await storage.getSettings();
       expect(settings?.sortOrder).toBe('lastUsedAt');
+      expect(settings?.sortDirection).toBe('desc');
     });
   });
 
@@ -203,9 +196,12 @@ test.describe('Usage Counter & Smart Sorting - Logic', () => {
           await expect(page.getByText('New Prompt')).toBeVisible();
 
           // The legacy prompt counts as unused (usageCount 0), so it sorts after the one used 5 times
-          await page.getByRole('button', { name: /Sort order:/i }).click();
-          await page.getByRole('menuitem', { name: /Most Used/i }).click();
-          await expect(page.locator('article h3')).toHaveText(['New Prompt', 'Old Prompt']);
+          await selectSortOption(page, 'Number of Uses');
+          await expect.poll(async () => getSortedPromptTitles(page)).toEqual(['New Prompt', 'Old Prompt']);
+
+          // ...and is left out of Most Used
+          await new LibraryPage(page).selectLibraryFilter('Most Used');
+          await expect.poll(async () => getSortedPromptTitles(page)).toEqual(['New Prompt']);
 
           // Neither reading nor sorting rewrote the prompts
           expect(await storage.getPrompts()).toEqual(seeded);
@@ -265,16 +261,18 @@ test.describe('Usage Counter & Smart Sorting - Logic', () => {
           await expect(page.getByText('Negative Usage')).toBeVisible();
 
           // Verify sorting works on the normalized values
-          await page.getByRole('button', { name: /Sort order:/i }).click();
-          await page.getByRole('menuitem', { name: /Most Used/i }).click();
-          const sortedHeadings = page.locator('article h3');
-          await expect(sortedHeadings.first()).toHaveText('Float Usage Count');
+          await selectSortOption(page, 'Number of Uses');
+          await expect.poll(async () => (await getSortedPromptTitles(page))[0]).toBe('Float Usage Count');
 
-          const titles = await sortedHeadings.allTextContents();
+          const titles = await getSortedPromptTitles(page);
           expect(titles[0]).toBe('Float Usage Count'); // usageCount: 5
           // The other two prompts (usageCount: 0) will follow in some order
           expect(titles.slice(1)).toContain('Invalid Usage Count');
           expect(titles.slice(1)).toContain('Negative Usage');
+
+          // Most Used lists only the prompt with a valid usage count
+          await new LibraryPage(page).selectLibraryFilter('Most Used');
+          await expect.poll(async () => getSortedPromptTitles(page)).toEqual(['Float Usage Count']);
 
           // Reading never writes: the corrupted values are still exactly as seeded
           expect(await storage.getPrompts()).toEqual(seeded);

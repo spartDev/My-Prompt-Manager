@@ -5,7 +5,7 @@
  * Import from '@/constants' or '../constants' for these values.
  */
 
-import type { Settings } from '../types';
+import type { Settings, SortDirection, SortOrder } from '../types';
 
 // Re-export from organized constant files
 export * from './colors';
@@ -46,6 +46,18 @@ export const DEFAULT_SETTINGS: Settings = {
   sortDirection: 'desc',
   theme: 'system',
   interfaceMode: 'sidepanel'
+};
+
+/**
+ * The only direction the Library sorts each order in. Settings offers no direction,
+ * so a reversed direction saved by earlier versions is ignored.
+ */
+export const NATURAL_SORT_DIRECTION: Record<SortOrder, SortDirection> = {
+  updatedAt: 'desc',
+  lastUsedAt: 'desc',
+  createdAt: 'desc',
+  usageCount: 'desc',
+  title: 'asc'
 };
 
 // ============================================================================

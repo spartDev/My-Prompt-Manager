@@ -306,6 +306,28 @@ describe('SettingsView', () => {
     expect(showToastMock).toHaveBeenCalledWith(expect.stringMatching(/reset to defaults/i), 'success');
   });
 
+  it('shows the saved Library sort and saves a new one in its natural direction', async () => {
+    const chromeMock = getChromeMockFunctions();
+    const storageMock = getMockStorageManager();
+    (chromeMock.storage.local.get as Mock).mockResolvedValue({
+      promptLibrarySettings: { enabledSites: ['chatgpt.com'], customSites: [] },
+      interfaceMode: 'popup',
+      settings: { ...DEFAULT_SETTINGS, sortOrder: 'usageCount', sortDirection: 'asc' }
+    });
+    vi.mocked(storageMock.updateSettings).mockResolvedValue({ ...DEFAULT_SETTINGS, sortOrder: 'title', sortDirection: 'asc' });
+    await renderSettings();
+
+    const select = await screen.findByLabelText('Sort prompts by');
+    expect(select).toHaveValue('usageCount');
+
+    await userEvent.selectOptions(select, 'title');
+
+    await waitFor(() => {
+      expect(storageMock.updateSettings).toHaveBeenCalledWith({ sortOrder: 'title', sortDirection: 'asc' });
+    });
+    expect(select).toHaveValue('title');
+  });
+
   it('changes the interface mode when a different option is selected', async () => {
     const chromeMock = getChromeMockFunctions();
     const storageMock = getMockStorageManager();
