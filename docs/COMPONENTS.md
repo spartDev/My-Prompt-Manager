@@ -60,7 +60,7 @@ src/components/
 ├── CategoryManager.tsx          # Category CRUD
 │
 ├── SearchBar.tsx                # Search input
-├── CategoryFilter.tsx           # Category dropdown
+├── LibraryFilterBar.tsx         # Library filter pills (All, Pinned, Most Used, Categories)
 ├── ColorPicker.tsx              # Color selection widget
 ├── ConfirmDialog.tsx            # Confirmation modal
 ├── ToastContainer.tsx           # Notification system
@@ -72,6 +72,7 @@ src/components/
 ├── settings/                    # 12 settings components
 │   ├── SettingsSection.tsx      # Section wrapper
 │   ├── AppearanceSection.tsx    # Theme & interface settings
+│   ├── LibrarySection.tsx       # Library sort order
 │   ├── DataStorageSection.tsx   # Import/export/clear data
 │   ├── SiteIntegrationSection.tsx # Custom site management
 │   ├── NotificationSection.tsx  # Toast preferences
@@ -111,7 +112,7 @@ interface LibraryViewProps {
 
 **Key Features:**
 - Search with debouncing (300ms delay)
-- Category filtering
+- Library filter pills (All, Pinned, Most Used, one per non-empty Category); sort comes from Settings
 - Prompt CRUD operations
 - Loading state management
 - Empty state UI

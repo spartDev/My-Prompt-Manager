@@ -9,6 +9,10 @@
 
 import type { Page } from '@playwright/test';
 
+import { expect } from '../fixtures/extension';
+
+import { tabNavigation } from './navigation';
+
 /**
  * Get sorted prompt titles from the page
  *
@@ -28,42 +32,39 @@ export async function getSortedPromptTitles(page: Page): Promise<string[]> {
 }
 
 /**
- * Select a sort option from the dropdown
+ * Choose the Library sort in Settings, then come back to the Library
  *
- * Opens the sort dropdown, clicks the specified option, and waits for re-render.
+ * The sort is a Settings preference ("Sort prompts by"); each sort has one direction.
  * Works for both popup and sidepanel contexts.
  *
  * @param page - Playwright Page object
- * @param optionName - Name of the sort option (e.g., "Most Used", "Recently Used")
+ * @param optionName - Label of the sort option: "Recently Updated", "Recently Used",
+ *   "Recently Created", "Number of Uses" or "Alphabetical (A→Z)"
  *
  * @example
- * await selectSortOption(page, 'Most Used');
- * await selectSortOption(page, 'Recently Updated');
+ * await selectSortOption(page, 'Number of Uses');
  */
 export async function selectSortOption(page: Page, optionName: string): Promise<void> {
-  await page.getByRole('button', { name: /Sort order:/i }).click();
-  await page.getByRole('menuitem', { name: new RegExp(optionName, 'i') }).click();
-  await page.waitForTimeout(100); // Allow re-render
+  await tabNavigation.switchTo(page, 'settings');
+  const select = page.getByLabel('Sort prompts by');
+  await select.selectOption({ label: optionName });
+  await expect(select.locator('option:checked')).toHaveText(optionName);
+  await tabNavigation.switchTo(page, 'library');
 }
 
 /**
- * Get the current sort label from the button aria-label
+ * Get the label of the Library sort currently chosen in Settings
  *
- * Retrieves the current sort state from the sort button's aria-label attribute.
- * Useful for verifying sort persistence and state changes.
- * Works for both popup and sidepanel contexts.
+ * Opens Settings to read it, then comes back to the Library.
  *
  * @param page - Playwright Page object
- * @returns The aria-label text (e.g., "Sort order: Most Used")
- *
- * @example
- * const label = await getCurrentSortLabel(page);
- * expect(label).toContain('Most Used');
+ * @returns The selected option label (e.g., "Number of Uses")
  */
 export async function getCurrentSortLabel(page: Page): Promise<string> {
-  const sortButton = page.getByRole('button', { name: /Sort order:/i });
-  const ariaLabel = await sortButton.getAttribute('aria-label');
-  return ariaLabel || '';
+  await tabNavigation.switchTo(page, 'settings');
+  const label = await page.getByLabel('Sort prompts by').locator('option:checked').textContent();
+  await tabNavigation.switchTo(page, 'library');
+  return label ?? '';
 }
 
 /**

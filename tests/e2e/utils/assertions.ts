@@ -86,29 +86,15 @@ export const categoryAssertions = {
    * Expect a category to exist
    */
   exists: async (page: Page, name: string): Promise<void> => {
-    // Check that category exists in the category filter dropdown
-    // Open the filter dropdown
-    await page.getByRole('button', { name: /Filter by category:/i }).click();
-    // Wait for menu to appear
-    await page.getByRole('menu', { name: 'Category filter menu' }).waitFor();
-    // Check if the category menuitem exists
-    await expect(page.getByRole('menuitem', { name })).toBeAttached();
-    // Close the menu
-    await page.keyboard.press('Escape');
+    // A Category holding a Prompt has a Library filter pill
+    await expect(page.getByRole('radiogroup', { name: 'Library filter' }).getByRole('radio', { name, exact: true })).toBeAttached();
   },
 
   /**
    * Expect a category to not exist
    */
   notExists: async (page: Page, name: string): Promise<void> => {
-    // Open the filter dropdown
-    await page.getByRole('button', { name: /Filter by category:/i }).click();
-    // Wait for menu to appear
-    await page.getByRole('menu', { name: 'Category filter menu' }).waitFor();
-    // Check that the category menuitem does not exist
-    await expect(page.getByRole('menuitem', { name })).not.toBeAttached();
-    // Close the menu
-    await page.keyboard.press('Escape');
+    await expect(page.getByRole('radiogroup', { name: 'Library filter' }).getByRole('radio', { name, exact: true })).not.toBeAttached();
   },
 
   /**

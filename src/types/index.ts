@@ -43,6 +43,13 @@ export interface Category {
 export type SortOrder = 'createdAt' | 'updatedAt' | 'title' | 'usageCount' | 'lastUsedAt';
 export type SortDirection = 'asc' | 'desc';
 
+// The one choice that narrows which Prompts the Library lists (see CONTEXT.md)
+export type LibraryFilter =
+  | { kind: 'all' }
+  | { kind: 'pinned' }
+  | { kind: 'mostUsed' }
+  | { kind: 'category'; categoryId: string };
+
 export interface Settings {
   defaultCategory: string;
   sortOrder: SortOrder;

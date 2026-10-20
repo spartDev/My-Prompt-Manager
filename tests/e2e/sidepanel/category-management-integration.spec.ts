@@ -1,5 +1,6 @@
 import { DEFAULT_CATEGORY, DEFAULT_SETTINGS } from '../../../src/types';
 import { test, expect } from '../fixtures/extension';
+import { LibraryPage } from '../pages/LibraryPage';
 import { seedLibrary, createCategorySeed, createPromptSeed } from '../utils/storage';
 
 test.describe('Category Management - Integration with Prompt System', () => {
@@ -109,6 +110,12 @@ test.describe('Category Management - Integration with Prompt System', () => {
 
       const sidepanelPage = await context.newPage();
       await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+      const libraryPage = new LibraryPage(sidepanelPage);
+
+      // Categories with no prompt yet have no Library filter pill
+      await expect(libraryPage.getLibraryFilterPill('All')).toBeVisible();
+      await expect(libraryPage.getLibraryFilterPill('Coding')).toHaveCount(0);
+      await expect(libraryPage.getLibraryFilterPill('Writing')).toHaveCount(0);
 
       // Create a prompt in the "Coding" category
       await sidepanelPage.getByRole('button', { name: 'Add new prompt' }).click();
@@ -141,28 +148,25 @@ test.describe('Category Management - Integration with Prompt System', () => {
       await expect(sidepanelPage.getByRole('heading', { name: 'Debug Function' })).toBeVisible();
       await expect(sidepanelPage.getByRole('heading', { name: 'Blog Post Outline' })).toBeVisible();
 
+      // Each category now holds a prompt, so each has a pill
+      await libraryPage.expectCategoryFilterOptions(['Coding', 'Writing']);
+
       // Test category filtering - filter by "Coding"
-      await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
-      await sidepanelPage.getByRole('menu', { name: 'Category filter menu' }).waitFor();
-      await sidepanelPage.getByRole('menuitem', { name: 'Coding' }).click();
+      await libraryPage.filterByCategory('Coding');
 
       // Should only show the coding prompt
       await expect(sidepanelPage.getByRole('heading', { name: 'Debug Function' })).toBeVisible();
       await expect(sidepanelPage.getByRole('heading', { name: 'Blog Post Outline' })).toBeHidden();
 
       // Filter by "Writing"
-      await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
-      await sidepanelPage.getByRole('menu', { name: 'Category filter menu' }).waitFor();
-      await sidepanelPage.getByRole('menuitem', { name: 'Writing' }).click();
+      await libraryPage.filterByCategory('Writing');
 
       // Should only show the writing prompt
       await expect(sidepanelPage.getByRole('heading', { name: 'Blog Post Outline' })).toBeVisible();
       await expect(sidepanelPage.getByRole('heading', { name: 'Debug Function' })).toBeHidden();
 
       // Clear filter (show all)
-      await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
-      await sidepanelPage.getByRole('menu', { name: 'Category filter menu' }).waitFor();
-      await sidepanelPage.getByRole('menuitem', { name: 'All Categories' }).click();
+      await libraryPage.selectLibraryFilter('All');
 
       // Should show both prompts again
       await expect(sidepanelPage.getByRole('heading', { name: 'Debug Function' })).toBeVisible();
@@ -211,20 +215,17 @@ test.describe('Category Management - Integration with Prompt System', () => {
 
       const sidepanelPage = await context.newPage();
       await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+      const libraryPage = new LibraryPage(sidepanelPage);
 
       // First, verify filtering works with original category name
-      await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
-      await sidepanelPage.getByRole('menu', { name: 'Category filter menu' }).waitFor();
-      await sidepanelPage.getByRole('menuitem', { name: 'Development' }).click();
+      await libraryPage.filterByCategory('Development');
 
       // Should show both development prompts
       await expect(sidepanelPage.getByRole('heading', { name: 'Code Review Checklist' })).toBeVisible();
       await expect(sidepanelPage.getByRole('heading', { name: 'Git Workflow' })).toBeVisible();
 
       // Clear filter to show all prompts
-      await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
-      await sidepanelPage.getByRole('menu', { name: 'Category filter menu' }).waitFor();
-      await sidepanelPage.getByRole('menuitem', { name: 'All Categories' }).click();
+      await libraryPage.selectLibraryFilter('All');
 
       // Now rename the category
       await sidepanelPage.getByTestId('tab-categories').click();
@@ -241,11 +242,9 @@ test.describe('Category Management - Integration with Prompt System', () => {
       const backButton2 = sidepanelPage.getByTestId('tab-library');
       await backButton2.click();
 
-      // Verify category filter dropdown now shows "Programming" instead of "Development"
-      // Check options by trying to select them
-      await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
-      await sidepanelPage.getByRole('menu', { name: 'Category filter menu' }).waitFor();
-      await sidepanelPage.getByRole('menuitem', { name: 'Programming' }).click();
+      // Verify the Library filter now offers "Programming" instead of "Development"
+      await expect(libraryPage.getLibraryFilterPill('Development')).toHaveCount(0);
+      await libraryPage.filterByCategory('Programming');
 
       // Should still show the same prompts, now under "Programming"
       await expect(sidepanelPage.getByRole('heading', { name: 'Code Review Checklist' })).toBeVisible();

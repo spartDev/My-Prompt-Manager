@@ -41,28 +41,34 @@ export class LibraryPage extends BasePage {
   }
 
   /**
+   * Get a Library filter pill ("All", "Pinned", "Most Used" or a Category name)
+   */
+  getLibraryFilterPill(name: string): Locator {
+    return this.page
+      .getByRole('radiogroup', { name: 'Library filter' })
+      .getByRole('radio', { name, exact: true });
+  }
+
+  /**
+   * Choose a Library filter pill ("All", "Pinned", "Most Used" or a Category name)
+   */
+  async selectLibraryFilter(name: string): Promise<void> {
+    await this.getLibraryFilterPill(name).click();
+    await expect(this.getLibraryFilterPill(name)).toHaveAttribute('aria-checked', 'true');
+  }
+
+  /**
    * Filter prompts by category
    */
   async filterByCategory(category: string): Promise<void> {
-    // Click the filter button to open dropdown
-    await this.page.getByRole('button', { name: /Filter by category:/i }).click();
-    // Wait for menu to appear
-    await this.page.getByRole('menu', { name: 'Category filter menu' }).waitFor();
-    // Click the category option
-    await this.page.getByRole('menuitem', { name: category }).click();
+    await this.selectLibraryFilter(category);
   }
 
   /**
    * Clear all filters and search
    */
   async clearFilters(): Promise<void> {
-    // Click the filter button to open dropdown
-    await this.page.getByRole('button', { name: /Filter by category:/i }).click();
-    // Wait for menu to appear
-    await this.page.getByRole('menu', { name: 'Category filter menu' }).waitFor();
-    // Click "All Categories" to clear
-    await this.page.getByRole('menuitem', { name: 'All Categories' }).click();
-    // Clear search
+    await this.selectLibraryFilter('All');
     await this.page.getByPlaceholder('Search your prompts...').clear();
   }
 
@@ -163,18 +169,11 @@ export class LibraryPage extends BasePage {
   }
 
   /**
-   * Verify category count in the filter dropdown
+   * Verify each category has a Library filter pill
    */
   async expectCategoryFilterOptions(categories: string[]): Promise<void> {
-    // Open the filter dropdown
-    await this.page.getByRole('button', { name: /Filter by category:/i }).click();
-    // Wait for menu to appear
-    await this.page.getByRole('menu', { name: 'Category filter menu' }).waitFor();
-    // Verify each category exists in the menu
     for (const category of categories) {
-      await expect(this.page.getByRole('menuitem', { name: category })).toBeVisible();
+      await expect(this.getLibraryFilterPill(category)).toBeAttached();
     }
-    // Close the menu by pressing Escape
-    await this.page.keyboard.press('Escape');
   }
 }

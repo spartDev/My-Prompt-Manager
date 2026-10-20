@@ -14,7 +14,7 @@ type DarkSnapshot = { runningTransitions?: Record<string, string[]>; error?: str
 const TARGETS: Record<string, string> = {
   search: 'input[placeholder="Search your prompts..."]',
   activeTab: '[role="tab"][aria-selected="true"]',
-  filterButton: 'button[aria-label^="Filter by category"]',
+  activeFilter: '[role="radio"][aria-checked="true"]',
 };
 
 test.describe('Dark theme on open', () => {
@@ -61,7 +61,7 @@ test.describe('Dark theme on open', () => {
       const snapshot = await page.evaluate(() => (window as unknown as { __darkSnapshot?: DarkSnapshot }).__darkSnapshot);
       expect(snapshot).toBeDefined();
       expect(snapshot?.error).toBeUndefined();
-      expect(snapshot?.runningTransitions).toEqual({ search: [], activeTab: [], filterButton: [] });
+      expect(snapshot?.runningTransitions).toEqual({ search: [], activeTab: [], activeFilter: [] });
 
       // Once transitions are re-enabled, nothing starts animating either
       await expect(page.locator('html')).not.toHaveClass(/theme-switching/);
@@ -78,7 +78,7 @@ test.describe('Dark theme on open', () => {
             return `${(a as CSSTransition).transitionProperty}: ${JSON.stringify(frames[0])} -> ${JSON.stringify(frames[frames.length - 1])}`;
           }) ?? ['<missing>']];
         })), TARGETS);
-      expect(runningAfter).toEqual({ search: [], activeTab: [], filterButton: [] });
+      expect(runningAfter).toEqual({ search: [], activeTab: [], activeFilter: [] });
     });
   }
 });

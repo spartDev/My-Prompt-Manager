@@ -3,9 +3,10 @@ import type { FC, ReactNode } from 'react';
 
 import manifest from '../../manifest.json';
 import { getDefaultEnabledPlatforms, getLinkedPlatformHostnames } from '../config/platforms';
+import { NATURAL_SORT_DIRECTION } from '../constants';
 import { AdmissionRefusedError } from '../services/promptAdmission';
 import { StorageManager } from '../services/storage';
-import type { Prompt, Category, Settings as UserSettings, CustomSite as ImportedCustomSite } from '../types';
+import type { Prompt, Category, Settings as UserSettings, CustomSite as ImportedCustomSite, SortOrder } from '../types';
 import { DEFAULT_SETTINGS } from '../types';
 import type { ToastType } from '../types/components';
 import type { ToastSettings } from '../types/hooks';
@@ -16,6 +17,7 @@ import AboutSection from './settings/AboutSection';
 import AdvancedSection from './settings/AdvancedSection';
 import AppearanceSection from './settings/AppearanceSection';
 import DataStorageSection from './settings/DataStorageSection';
+import LibrarySection from './settings/LibrarySection';
 import NotificationSection from './settings/NotificationSection';
 import SiteIntegrationSection from './settings/SiteIntegrationSection';
 import ViewHeader from './ViewHeader';
@@ -234,6 +236,16 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
     };
   }, [settings, saveSettings]);
 
+
+  // Handle Library sort change: each sort is saved with its one direction
+  const handleSortOrderChange = useCallback((sortOrder: SortOrder) => {
+    const sortDirection = NATURAL_SORT_DIRECTION[sortOrder];
+    setUserSettings(prev => ({ ...(prev ?? DEFAULT_SETTINGS), sortOrder, sortDirection }));
+    storageManager.updateSettings({ sortOrder, sortDirection }).catch((error: unknown) => {
+      Logger.error('Failed to save sort order', toError(error), { component: 'SettingsView' });
+      showToast('Failed to save the sort order', 'error');
+    });
+  }, [storageManager, showToast]);
 
   // Handle interface mode change
   const handleInterfaceModeChange = useCallback(async (mode: 'popup' | 'sidepanel') => {
@@ -558,6 +570,14 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
             onInterfaceModeChange={handleInterfaceModeChangeCallback}
             saving={saving}
             interfaceModeChanging={interfaceModeChanging}
+          />
+
+          <SectionSeparator />
+
+          {/* Library Section */}
+          <LibrarySection
+            sortOrder={userSettings?.sortOrder ?? DEFAULT_SETTINGS.sortOrder}
+            onSortOrderChange={handleSortOrderChange}
           />
 
           <SectionSeparator />

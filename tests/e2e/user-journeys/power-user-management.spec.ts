@@ -1,5 +1,6 @@
 import { DEFAULT_SETTINGS } from '../../../src/types';
 import { test, expect } from '../fixtures/extension';
+import { LibraryPage } from '../pages/LibraryPage';
 import { seedLibrary, createPromptSeed, createCategorySeed } from '../utils/storage';
 
 /**
@@ -145,6 +146,7 @@ test.describe('Power User Prompt Management', () => {
     const sidepanelPage = await context.newPage();
     await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`);
     await expect(sidepanelPage.getByRole('heading', { name: 'My Prompt Manager' })).toBeVisible();
+    const libraryPage = new LibraryPage(sidepanelPage);
 
     // Verify initial state: 17 total prompts (15 seeded + 2 defaults)
     await expect(sidepanelPage.getByTestId('prompt-card')).toHaveCount(17);
@@ -173,9 +175,8 @@ test.describe('Power User Prompt Management', () => {
     await sidepanelPage.getByTestId('tab-library').click();
 
     // Filter to Professional and verify former "Work" prompts are there
-    await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
-    await sidepanelPage.getByRole('menu', { name: 'Category filter menu' }).waitFor();
-    await sidepanelPage.getByRole('menuitem', { name: 'Professional' }).click();
+    await expect(libraryPage.getLibraryFilterPill('Work')).toHaveCount(0);
+    await libraryPage.filterByCategory('Professional');
     await expect(sidepanelPage.getByTestId('prompt-card')).toHaveCount(5);
 
     // Verify specific prompts show in the renamed category
@@ -194,11 +195,10 @@ test.describe('Power User Prompt Management', () => {
     const sidepanelPage = await context.newPage();
     await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`);
     await expect(sidepanelPage.getByRole('heading', { name: 'My Prompt Manager' })).toBeVisible();
+    const libraryPage = new LibraryPage(sidepanelPage);
 
     // Filter to Marketing category
-    await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
-    await sidepanelPage.getByRole('menu', { name: 'Category filter menu' }).waitFor();
-    await sidepanelPage.getByRole('menuitem', { name: 'Marketing' }).click();
+    await libraryPage.filterByCategory('Marketing');
     await expect(sidepanelPage.getByTestId('prompt-card')).toHaveCount(2);
 
     // Move first marketing prompt to Work category
@@ -223,16 +223,13 @@ test.describe('Power User Prompt Management', () => {
     await sidepanelPage.getByRole('button', { name: 'Save Changes' }).click();
     await expect(sidepanelPage.getByText('Prompt updated successfully').first()).toBeVisible();
 
-    // Verify Marketing category is now empty
-    await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
-    await sidepanelPage.getByRole('menu', { name: 'Category filter menu' }).waitFor();
-    await sidepanelPage.getByRole('menuitem', { name: 'Marketing' }).click();
-    await expect(sidepanelPage.getByText('No matches found')).toBeVisible();
+    // Verify Marketing category is now empty: its pill is gone and the Library is back to All
+    await expect(libraryPage.getLibraryFilterPill('Marketing')).toHaveCount(0);
+    await expect(libraryPage.getLibraryFilterPill('All')).toHaveAttribute('aria-checked', 'true');
+    await expect(sidepanelPage.getByTestId('prompt-card')).toHaveCount(17);
 
     // Verify prompts moved to Work category
-    await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
-    await sidepanelPage.getByRole('menu', { name: 'Category filter menu' }).waitFor();
-    await sidepanelPage.getByRole('menuitem', { name: 'Work' }).click();
+    await libraryPage.filterByCategory('Work');
     await expect(sidepanelPage.getByTestId('prompt-card')).toHaveCount(7); // 5 original + 2 moved
 
     // Delete the empty Marketing category
@@ -260,6 +257,7 @@ test.describe('Power User Prompt Management', () => {
     const sidepanelPage = await context.newPage();
     await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`);
     await expect(sidepanelPage.getByRole('heading', { name: 'My Prompt Manager' })).toBeVisible();
+    const libraryPage = new LibraryPage(sidepanelPage);
 
     const searchInput = sidepanelPage.getByPlaceholder('Search your prompts...');
 
@@ -275,9 +273,7 @@ test.describe('Power User Prompt Management', () => {
     // Test category filter + search term combination
     await searchInput.clear();
     await searchInput.fill('template');
-    await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
-    await sidepanelPage.getByRole('menu', { name: 'Category filter menu' }).waitFor();
-    await sidepanelPage.getByRole('menuitem', { name: 'Work' }).click();
+    await libraryPage.filterByCategory('Work');
 
     // Should find prompts with "template" in Work category
     await expect(sidepanelPage.getByTestId('prompt-card')).toHaveCount(2);
@@ -286,9 +282,7 @@ test.describe('Power User Prompt Management', () => {
 
     // Clear filters and verify all prompts visible
     await searchInput.clear();
-    await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
-    await sidepanelPage.getByRole('menu', { name: 'Category filter menu' }).waitFor();
-    await sidepanelPage.getByRole('menuitem', { name: 'All Categories' }).click();
+    await libraryPage.selectLibraryFilter('All');
     await expect(sidepanelPage.getByTestId('prompt-card')).toHaveCount(17);
   });
 
@@ -303,11 +297,10 @@ test.describe('Power User Prompt Management', () => {
     const sidepanelPage = await context.newPage();
     await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`);
     await expect(sidepanelPage.getByRole('heading', { name: 'My Prompt Manager' })).toBeVisible();
+    const libraryPage = new LibraryPage(sidepanelPage);
 
     // Filter to Development category
-    await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
-    await sidepanelPage.getByRole('menu', { name: 'Category filter menu' }).waitFor();
-    await sidepanelPage.getByRole('menuitem', { name: 'Development' }).click();
+    await libraryPage.filterByCategory('Development');
     await expect(sidepanelPage.getByTestId('prompt-card')).toHaveCount(4);
 
     // Move 3 Development prompts to Work category
@@ -326,16 +319,12 @@ test.describe('Power User Prompt Management', () => {
     }
 
     // Verify Development category now has only 1 prompt
-    await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
-    await sidepanelPage.getByRole('menu', { name: 'Category filter menu' }).waitFor();
-    await sidepanelPage.getByRole('menuitem', { name: 'Development' }).click();
+    await libraryPage.filterByCategory('Development');
     await expect(sidepanelPage.getByTestId('prompt-card')).toHaveCount(1);
     await expect(sidepanelPage.getByText('Database Query Optimizer')).toBeVisible();
 
     // Verify Work category now has the moved prompts (5 original + 3 moved = 8)
-    await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
-    await sidepanelPage.getByRole('menu', { name: 'Category filter menu' }).waitFor();
-    await sidepanelPage.getByRole('menuitem', { name: 'Work' }).click();
+    await libraryPage.filterByCategory('Work');
     await expect(sidepanelPage.getByTestId('prompt-card')).toHaveCount(8);
   });
 

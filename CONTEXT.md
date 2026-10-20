@@ -15,8 +15,12 @@ A user-defined label that groups Prompts. Every Prompt is in exactly one Categor
 _Avoid_: Collection, tag, folder
 
 **Pinned Prompt**:
-A Prompt the user has marked to always appear before unpinned Prompts in the Library, whatever the chosen sort; within the pinned and unpinned groups the chosen sort still applies.
+A Prompt the user has marked to always appear before unpinned Prompts in the Library, whatever the chosen sort; within the pinned and unpinned groups the chosen sort still applies. Most Used is the one exception: it ranks by use alone.
 _Avoid_: Favorite, starred prompt
+
+**Most Used**:
+The Prompts that have been inserted at least once, ranked by how many times each has ever been inserted, most first. A Prompt never inserted is not in Most Used, and copying a Prompt is not inserting it.
+_Avoid_: Popular, top prompts, favorites
 
 **Variable**:
 A named placeholder written {{name}} inside a Prompt's text, filled in by the user when the Prompt is inserted.
@@ -55,8 +59,12 @@ Putting a Prompt's content into a Platform's input field. A Prompt's content arr
 ### Navigation
 
 **Library**:
-The user's own collection of Prompts and Categories, and the top-level section that lists its Prompts with search, filter and sort.
+The user's own collection of Prompts and Categories, and the top-level section that lists its Prompts with search, a Library filter and sort.
 _Avoid_: Home, prompt list
+
+**Library filter**:
+The one choice that narrows which Prompts the Library lists: All, the Pinned Prompts, Most Used, or a single Category. Exactly one is active at a time, All each time the extension is opened, and a search looks only inside the active Library filter.
+_Avoid_: Pill, chip, tab, view
 
 **Categories**:
 The top-level section where the user creates, renames, recolors and deletes Categories.
