@@ -1,7 +1,7 @@
 # Design Guidelines
 
-**Version:** 1.0.0
-**Last Updated:** 2025-10-06
+**Version:** 2.0.0
+**Last Updated:** 2026-10-21
 
 This document provides comprehensive visual design guidelines for the Prompt Library Chrome Extension. All AI agents and developers working on this project **MUST** follow these guidelines to maintain visual consistency.
 
@@ -24,145 +24,92 @@ This document provides comprehensive visual design guidelines for the Prompt Lib
 
 ## Color System
 
-### Brand Colors
+Every color in the popup, side panel and Analytics page comes from a **semantic token** defined once in `src/theme/tokens.css`. Each token is a Tailwind color for one CSS property, so its class carries its name: `--background-color-card` is `bg-card`, `--text-color-secondary` is `text-secondary`, `--border-color-input` is `border-input`.
 
-**Primary Purple Gradient:**
-```css
-/* Main brand gradient */
-background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-background: linear-gradient(to-r, from-purple-600 to-indigo-600);
+- Light values live in `@theme static`; the `.dark` class that `useTheme` puts on `<html>` overrides every one of them. A token class therefore switches theme by itself: **never pair it with a `dark:` variant**.
+- Components use token classes only, never raw palette classes (`gray-*`, `purple-*`, `indigo-*`, `red-*`, `white`...). Category colors are the one exception (see [Category Colors](#category-colors)).
+- `src/theme/__tests__/tokens.test.ts` reads the compiled CSS and fails when a token loses its dark value, a class stops existing, or a contrast drops under its threshold.
 
-/* Tailwind classes */
-from-purple-600 to-indigo-600  /* Gradient */
-bg-purple-500  /* #8b5cf6 */
-bg-purple-600  /* #9333ea */
-bg-purple-700  /* #7c3aed */
-```
+Visual reference (both modes side by side): the palette canvas linked from beads epic `My-Prompt-Manager-el4`.
 
-**Secondary Indigo:**
-```css
-bg-indigo-500  /* #6366f1 */
-bg-indigo-600  /* #4f46e5 */
-```
+### Surfaces
 
-### Status Colors
+| Class | Light | Dark | Use |
+|---|---|---|---|
+| `bg-app` | `#F4F1FA` | `#120E1B` | Page, header and tab bar (seamless, no white band) |
+| `bg-card` | `#FFFFFF` | `#231C34` | Cards, form sections, and the search field and pills that sit on `bg-app` |
+| `bg-subtle` | `#F4F1FA` | `#2B2340` | Chips and fields **on a card**. Never directly on `bg-app`: same value in light |
+| `bg-raised` | `#F8F6FC` | `#1B1528` | Light fills: empty states, nested panels |
+| `bg-muted` | `#F1EDF8` | `#2E2645` | Hover of neutral elements (`hover:bg-muted`) |
+| `bg-inverse` | `#1D1530` | `#4A3D6B` | Toasts |
+| `bg-backdrop` | `#2A2140` at 45% | `#07050C` at 70% | Behind an open dialog or drawer, with `backdrop-blur-sm` |
 
-```css
-/* Success */
-bg-green-500   /* #10b981 */
-text-green-600 /* #059669 */
-border-green-200 dark:border-green-800
+Surfaces are **opaque**. `bg-backdrop` is the only translucent one: no more `bg-white/70` + `backdrop-blur-sm` glass on headers or sections.
 
-/* Error */
-bg-red-500     /* #ef4444 */
-text-red-600   /* #dc2626 */
-border-red-200 dark:border-red-800
+### Borders
 
-/* Warning */
-bg-yellow-500  /* #eab308 */
-text-yellow-600 /* #ca8a04 */
-border-yellow-200 dark:border-yellow-800
+| Class | Light | Dark | Use |
+|---|---|---|---|
+| `border-default` | `#ECE6F5` | `#352C4C` | Cards, unselected pills. Also the color of a bare `border` |
+| `border-divider` | `#F0EBF8` | `#2F2744` | Dividers inside a card |
+| `border-strong` | `#DCD4EA` | `#41375A` | Secondary button; the line under the header, shown only once the list scrolls |
+| `border-input` | `#8F87A5` | `#766C8E` | Field outlines, off track of a switch, unpinned star (3:1 on every surface) |
+| `border-focus` | accent | accent | A focused field (`focus-input` applies it) |
+| `border-error` | danger | danger | A field in error |
 
-/* Info */
-bg-blue-500    /* #3b82f6 */
-text-blue-600  /* #2563eb */
-border-blue-200 dark:border-blue-800
-```
+### Text
+
+| Class | Light | Dark | Use |
+|---|---|---|---|
+| `text-primary` | `#1D1530` | `#F1EDF9` | Titles, main text |
+| `text-secondary` | `#5C5370` | `#BCB3D0` | Labels, body text |
+| `text-tertiary` | `#6F6787` | `#A39ABB` | Previews, metadata, placeholders (`placeholder:text-tertiary`) |
+| `text-faint` | `#B5ADC8` | `#7D7495` | Disabled and decorative only (2.15:1 in light: never for information) |
+| `text-on-inverse` | `#C9BFE6` | `#C9BFE6` | Message on `bg-inverse` |
+| `text-on-accent` | `#FFFFFF` | `#FFFFFF` | Text on `bg-accent` and `bg-danger` |
+
+### Accent (violet)
+
+| Class | Light | Dark | Use |
+|---|---|---|---|
+| `bg-accent` | `#6D28D9` | `#844BF2` | Primary buttons; settings that are on (switch, checkbox, radio) |
+| `bg-accent-hover` | `#5B21B6` | `#7A40E3` | Hover of `bg-accent`: hover darkens in both modes |
+| `bg-accent-selected` | `#EDE5FF` | `#38296A` | A chosen item among several (Library filter pill, active Section, chosen mode) |
+| `bg-accent-subtle` | `#F1EBFD` | `#2F2350` | Info boxes, icon squares |
+| `text-accent` | `#5B21B6` | `#C4B5FD` | Links, accent icons |
+| `text-accent-strong` | `#4C1D95` | `#DDD3FE` | Text of a chosen item |
+| `border-accent` | `#C4B5FD` | `#6D4FC4` | Accent borders; scrollbar thumb |
+| `outline-accent`, `ring-accent` | accent | accent | Focus rings |
+
+The brand gradient (`#6D28D9` to `#4C1D95`) is reserved for the logo. Every other surface is flat.
+
+### States
+
+| Class | Light | Dark | Use |
+|---|---|---|---|
+| `bg-success` | `#10B981` | `#10B981` | Dots and badges only (2.54:1 on white: never text) |
+| `bg-success-subtle` / `text-success` | `#E7F8EF` / `#065F46` | `#0F2D22` / `#6EE7B7` | Success message |
+| `bg-warning-subtle` / `border-warning` / `text-warning` | `#FEF3C7` / `#F5DFA6` / `#92400E` | `#33270F` / `#5A4515` / `#FCD34D` | Warning banner |
+| `bg-danger` / `bg-danger-hover` | `#DC2626` / `#B91C1C` | `#DC2626` / `#B91C1C` | Destructive button |
+| `bg-danger-subtle` / `border-danger` / `text-danger` | `#FDECEC` / `#F6CFCF` / `#991B1B` | `#3A1518` / `#5E2228` / `#FCA5A5` | Error banner and message |
+| `text-pin` | `#D97706` | `#FBBF24` | Filled star of a Pinned Prompt |
+| `text-inverse-success`, `-danger`, `-warning`, `-info` | `#6EE7B7`, `#FCA5A5`, `#FCD34D`, `#C4B5FD` | same | Status icons on `bg-inverse` (toasts), in both modes |
+
+Information uses the accent family (`bg-accent-subtle`, `border-accent`, `text-accent`): there is no blue info color.
+
+### Rules of use
+
+- **Chosen vs on.** One item chosen among several: `bg-accent-selected border-accent text-accent-strong font-semibold`. A setting that is on: `bg-accent`.
+- **Hover.** `hover:bg-accent-hover` on `bg-accent`, `hover:bg-danger-hover` on `bg-danger`, `hover:bg-muted` on neutral elements.
+- **Fields.** On a card: `bg-subtle border-input`; on `bg-app`: `bg-card border-input`; add `focus-input`; in error: `border-error` and a `text-danger` message.
 
 ### Category Colors
 
-From `src/constants/colors.ts`, 18 predefined colors available:
+Category colors are user data, not tokens: the preset palette, the chip (soft badge) rule and its contrast safety net live in `src/constants/colors.ts`, documented in [CATEGORY_COLOR_IMPLEMENTATION.md](./CATEGORY_COLOR_IMPLEMENTATION.md).
 
-```typescript
-// Blues
-{ name: 'Ocean Blue', value: '#3B82F6' }
-{ name: 'Sky Blue', value: '#0EA5E9' }
-{ name: 'Navy', value: '#1E40AF' }
+### Adding or changing a token
 
-// Purples & Pinks
-{ name: 'Purple', value: '#9333EA' }
-{ name: 'Violet', value: '#8B5CF6' }
-{ name: 'Pink', value: '#EC4899' }
-{ name: 'Rose', value: '#F43F5E' }
-
-// Greens
-{ name: 'Emerald', value: '#10B981' }
-{ name: 'Green', value: '#22C55E' }
-{ name: 'Teal', value: '#14B8A6' }
-
-// Warm
-{ name: 'Orange', value: '#F97316' }
-{ name: 'Amber', value: '#F59E0B' }
-{ name: 'Yellow', value: '#EAB308' }
-{ name: 'Red', value: '#EF4444' }
-
-// Neutrals
-{ name: 'Gray', value: '#6B7280' }
-{ name: 'Slate', value: '#475569' }
-{ name: 'Stone', value: '#78716C' }
-{ name: 'Zinc', value: '#71717A' }
-```
-
-**Default Category Color:** `#3B82F6` (Ocean Blue)
-
-### Gray Scale
-
-**Light Mode:**
-```css
-bg-white       /* #ffffff */
-bg-gray-50     /* #f9fafb */
-bg-gray-100    /* #f3f4f6 */
-bg-gray-200    /* #e5e7eb */
-bg-gray-300    /* #d1d5db */
-bg-gray-400    /* #9ca3af */
-bg-gray-500    /* #6b7280 */
-bg-gray-600    /* #4b5563 */
-bg-gray-700    /* #374151 */
-bg-gray-800    /* #1f2937 */
-bg-gray-900    /* #111827 */
-```
-
-**Dark Mode:**
-```css
-dark:bg-gray-900  /* #111827 - Darkest background */
-dark:bg-gray-800  /* #1f2937 - Container background */
-dark:bg-gray-700  /* #374151 - Card background */
-dark:bg-gray-600  /* #4b5563 - Input background */
-dark:text-gray-100 /* #f3f4f6 - Primary text */
-dark:text-gray-300 /* #d1d5db - Secondary text */
-dark:text-gray-400 /* #9ca3af - Tertiary text */
-dark:text-gray-500 /* #6b7280 - Disabled text */
-```
-
-### Border Colors
-
-```css
-/* Light Mode */
-border-purple-100  /* #f3e8ff - Subtle dividers */
-border-purple-200  /* #e9d5ff - Input borders */
-border-gray-300    /* #d1d5db - Default borders */
-
-/* Dark Mode */
-dark:border-gray-700  /* #374151 - Primary borders */
-dark:border-gray-600  /* #4b5563 - Input borders */
-```
-
-### Background Patterns
-
-**Glassmorphism Effect:**
-```css
-bg-white/60 dark:bg-gray-700/60  /* 60% opacity */
-bg-white/70 dark:bg-gray-800/70  /* 70% opacity */
-bg-white/80 dark:bg-gray-800/80  /* 80% opacity */
-backdrop-blur-sm                  /* Blur effect */
-```
-
-**Usage Example:**
-```tsx
-<div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm">
-  {/* Content */}
-</div>
-```
+Declare it in both blocks of `src/theme/tokens.css` (`@theme static` and `.dark`), with the property namespace that gives the class you want (`--background-color-*`, `--text-color-*`, `--border-color-*`, `--ring-color-*`, `--outline-color-*`). A token that only reuses another one may be a `var()` reference in `@theme` alone. Add it to the class list of `tokens.test.ts`, and to a contrast pair when text or a control sits on it.
 
 ---
 
@@ -380,11 +327,15 @@ rounded-full /* 9999px          - Pills, badges, toggle knobs */
 
 ### Shadow Scale
 
+Tailwind's shapes and alphas, tinted violet in light (`rgba(45, 25, 90, α)`) and black at α × 1.6 in dark, through `--shadow-tint-5`, `-10` and `-25` in `src/theme/tokens.css`:
+
 ```css
-shadow-sm  /* 0 1px 2px rgba(0, 0, 0, 0.05) - Subtle elevation */
-shadow     /* 0 1px 3px rgba(0, 0, 0, 0.1)  - Default cards */
-shadow-lg  /* 0 10px 15px rgba(0, 0, 0, 0.1) - Elevated cards */
-shadow-xl  /* 0 20px 25px rgba(0, 0, 0, 0.1) - Modals, dialogs */
+shadow-xs   /* 0 1px 2px 0, tint 5           */
+shadow-sm   /* 0 1px 3px 0, tint 10 - cards  */
+shadow-md   /* 0 4px 6px -1px, tint 10       */
+shadow-lg   /* 0 10px 15px -3px, tint 10     */
+shadow-xl   /* 0 20px 25px -5px, tint 10     */
+shadow-2xl  /* 0 25px 50px -12px, tint 25 - dialogs */
 ```
 
 ### Custom Shadows
@@ -407,9 +358,8 @@ box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.4); /* Blue */
 
 ### Backdrop Effects
 
-```css
-backdrop-blur-sm  /* 4px blur - Glassmorphism effect */
-backdrop-filter: blur(8px);  /* Content script modals */
+```tsx
+<div className="bg-backdrop backdrop-blur-sm" />  /* Behind an open dialog or drawer only */
 ```
 
 ### Usage Patterns
@@ -1092,12 +1042,12 @@ animation: promptSelectorFadeIn 0.2s ease-out;
 
 ### Focus States
 
-Use the predefined Tailwind plugin classes:
-- `.focus-primary` - Primary buttons
-- `.focus-secondary` - Secondary buttons, menu items
-- `.focus-danger` - Danger buttons
+Use the predefined Tailwind plugin classes (`tailwind.config.js`). Buttons get a 2px `outline-accent` separated from them by a transparent gap that shows the surface behind; fields get a 2px `ring-accent` and a `border-focus` border:
+- `.focus-primary` - Primary buttons (2px gap)
+- `.focus-secondary` - Secondary buttons, menu items (1px gap)
+- `.focus-danger` - Danger buttons (`outline-danger`)
 - `.focus-input` - Input fields
-- `.focus-interactive` - Icon buttons, interactive elements
+- `.focus-interactive` - Icon buttons, interactive elements (1px gap)
 
 ### Active States
 
@@ -1112,64 +1062,21 @@ active:opacity-80       /* Alternative press effect */
 
 ### Strategy
 
-The extension uses **class-based dark mode** with Tailwind CSS:
-
-```javascript
-// tailwind.config.js
-darkMode: 'class'
-```
-
-The `.dark` class is applied to the root element when dark mode is active.
+The extension uses **class-based dark mode**: `useTheme` puts the `.dark` class on `<html>`, and `src/theme/tokens.css` overrides every color token under `.dark`. Token classes (`bg-card`, `text-secondary`, `border-input`...) therefore switch theme by themselves.
 
 ### Dark Mode Patterns
 
-#### Background Colors
+Write one token class, never a light class plus a `dark:` variant:
 
 ```tsx
-<div className="
-  bg-white dark:bg-gray-900        /* Page background */
-  bg-gray-50 dark:bg-gray-800      /* Section background */
-  bg-white/70 dark:bg-gray-800/70  /* Card with opacity */
-">
+// Before
+<div className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-purple-100 dark:border-gray-700">
+
+// After
+<div className="bg-card text-primary border-default">
 ```
 
-#### Text Colors
-
-```tsx
-<p className="
-  text-gray-900 dark:text-gray-100  /* Primary text */
-  text-gray-700 dark:text-gray-300  /* Secondary text */
-  text-gray-500 dark:text-gray-400  /* Tertiary text */
-  text-gray-400 dark:text-gray-500  /* Disabled text */
-">
-```
-
-#### Border Colors
-
-```tsx
-<div className="
-  border border-purple-200 dark:border-gray-600  /* Input borders */
-  border-b border-purple-100 dark:border-gray-700 /* Dividers */
-">
-```
-
-#### Hover States
-
-```tsx
-<button className="
-  hover:bg-purple-50 dark:hover:bg-purple-900/20
-  hover:text-purple-600 dark:hover:text-purple-400
-">
-```
-
-#### Focus States
-
-```tsx
-<input className="
-  focus:ring-purple-500 dark:focus:ring-purple-400
-  focus:ring-offset-white dark:focus:ring-offset-gray-900
-">
-```
+`dark:` remains useful for what is not a color token (an icon swapped by theme, for example).
 
 ### Content Script Dark Mode
 

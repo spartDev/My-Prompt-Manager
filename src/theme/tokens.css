@@ -1,0 +1,145 @@
+/*
+  Semantic color tokens (spec: beads epic My-Prompt-Manager-el4).
+  Each token is a Tailwind color for one property, so its class carries its name:
+  --background-color-app is bg-app, --text-color-primary is text-primary.
+  Light values live here; .dark (set on <html> by useTheme) overrides them below.
+  static: every token is emitted, used or not, so the .dark overrides always have a base.
+*/
+@theme static {
+  /* Surfaces */
+  --background-color-app: #f4f1fa;
+  --background-color-card: #ffffff;
+  --background-color-subtle: #f4f1fa;
+  --background-color-raised: #f8f6fc;
+  --background-color-muted: #f1edf8;
+  --background-color-inverse: #1d1530;
+  --background-color-backdrop: rgba(42, 33, 64, 0.45);
+
+  /* Text */
+  --text-color-primary: #1d1530;
+  --text-color-secondary: #5c5370;
+  --text-color-tertiary: #6f6787;
+  --text-color-faint: #b5adc8;
+  --text-color-on-inverse: #c9bfe6;
+  --text-color-on-accent: #ffffff;
+
+  /* Violet */
+  --background-color-accent: #6d28d9;
+  --background-color-accent-hover: #5b21b6;
+  --background-color-accent-selected: #ede5ff;
+  --background-color-accent-subtle: #f1ebfd;
+  --text-color-accent: #5b21b6;
+  --text-color-accent-strong: #4c1d95;
+  --border-color-accent: #c4b5fd;
+
+  /* States */
+  --background-color-success: #10b981;
+  --background-color-success-subtle: #e7f8ef;
+  --text-color-success: #065f46;
+  --background-color-warning-subtle: #fef3c7;
+  --border-color-warning: #f5dfa6;
+  --text-color-warning: #92400e;
+  --background-color-danger: #dc2626;
+  --background-color-danger-hover: #b91c1c;
+  --background-color-danger-subtle: #fdecec;
+  --border-color-danger: #f6cfcf;
+  --text-color-danger: #991b1b;
+
+  /* Borders */
+  --border-color-default: #ece6f5;
+  --border-color-divider: #f0ebf8;
+  --border-color-strong: #dcd4ea;
+  --border-color-input: #8f87a5;
+  /* Field borders that take a fill color: focused (accent) and in error (danger) */
+  --border-color-focus: var(--background-color-accent);
+  --border-color-error: var(--background-color-danger);
+
+  /* Focus ring: the accent */
+  --ring-color-accent: var(--background-color-accent);
+  --outline-color-accent: var(--background-color-accent);
+  --outline-color-danger: var(--background-color-danger);
+
+  /* Pinned Prompt star */
+  --text-color-pin: #d97706;
+
+  /* Status icons on bg-inverse (toasts): the bright variants, in both modes */
+  --text-color-inverse-success: #6ee7b7;
+  --text-color-inverse-danger: #fca5a5;
+  --text-color-inverse-warning: #fcd34d;
+  --text-color-inverse-info: #c4b5fd;
+
+  /* Shadows: Tailwind's shapes and alphas, tinted violet (black at alpha x 1.6 in dark) */
+  --shadow-tint-5: rgba(45, 25, 90, 0.05);
+  --shadow-tint-10: rgba(45, 25, 90, 0.1);
+  --shadow-tint-25: rgba(45, 25, 90, 0.25);
+  --shadow-2xs: 0 1px var(--shadow-tint-5);
+  --shadow-xs: 0 1px 2px 0 var(--shadow-tint-5);
+  --shadow-sm: 0 1px 3px 0 var(--shadow-tint-10), 0 1px 2px -1px var(--shadow-tint-10);
+  --shadow-md: 0 4px 6px -1px var(--shadow-tint-10), 0 2px 4px -2px var(--shadow-tint-10);
+  --shadow-lg: 0 10px 15px -3px var(--shadow-tint-10), 0 4px 6px -4px var(--shadow-tint-10);
+  --shadow-xl: 0 20px 25px -5px var(--shadow-tint-10), 0 8px 10px -6px var(--shadow-tint-10);
+  --shadow-2xl: 0 25px 50px -12px var(--shadow-tint-25);
+}
+
+@layer base {
+  .dark {
+    /* Surfaces */
+    --background-color-app: #120e1b;
+    --background-color-card: #231c34;
+    --background-color-subtle: #2b2340;
+    --background-color-raised: #1b1528;
+    --background-color-muted: #2e2645;
+    --background-color-inverse: #4a3d6b;
+    --background-color-backdrop: rgba(7, 5, 12, 0.7);
+
+    /* Text */
+    --text-color-primary: #f1edf9;
+    --text-color-secondary: #bcb3d0;
+    --text-color-tertiary: #a39abb;
+    --text-color-faint: #7d7495;
+    --text-color-on-inverse: #c9bfe6;
+    --text-color-on-accent: #ffffff;
+
+    /* Violet */
+    --background-color-accent: #844bf2;
+    --background-color-accent-hover: #7a40e3;
+    --background-color-accent-selected: #38296a;
+    --background-color-accent-subtle: #2f2350;
+    --text-color-accent: #c4b5fd;
+    --text-color-accent-strong: #ddd3fe;
+    --border-color-accent: #6d4fc4;
+
+    /* States */
+    --background-color-success: #10b981;
+    --background-color-success-subtle: #0f2d22;
+    --text-color-success: #6ee7b7;
+    --background-color-warning-subtle: #33270f;
+    --border-color-warning: #5a4515;
+    --text-color-warning: #fcd34d;
+    --background-color-danger: #dc2626;
+    --background-color-danger-hover: #b91c1c;
+    --background-color-danger-subtle: #3a1518;
+    --border-color-danger: #5e2228;
+    --text-color-danger: #fca5a5;
+
+    /* Borders */
+    --border-color-default: #352c4c;
+    --border-color-divider: #2f2744;
+    --border-color-strong: #41375a;
+    --border-color-input: #766c8e;
+
+    /* Pinned Prompt star */
+    --text-color-pin: #fbbf24;
+
+    /* Status icons on bg-inverse */
+    --text-color-inverse-success: #6ee7b7;
+    --text-color-inverse-danger: #fca5a5;
+    --text-color-inverse-warning: #fcd34d;
+    --text-color-inverse-info: #c4b5fd;
+
+    /* Shadows */
+    --shadow-tint-5: rgba(0, 0, 0, 0.08);
+    --shadow-tint-10: rgba(0, 0, 0, 0.16);
+    --shadow-tint-25: rgba(0, 0, 0, 0.4);
+  }
+}
