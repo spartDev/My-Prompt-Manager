@@ -53,7 +53,9 @@ export const createPromptSeed = (overrides: Partial<Prompt>): Prompt => {
   // If usageCount > 0: lastUsedAt defaults to updatedAt
   const defaultLastUsedAt = usageCount > 0 ? updatedAt : createdAt;
 
+  // Pass through every field given (e.g. pinned), then fill defaults for the missing ones
   return {
+    ...overrides,
     id: overrides.id ?? `prompt-${Math.random().toString(36).slice(2, 10)}`,
     title: overrides.title ?? 'Sample Prompt',
     content: overrides.content ?? 'Sample prompt content',

@@ -49,15 +49,13 @@ const prompts: Prompt[] = [
     content: 'Turn these raw meeting notes into decisions, owners and due dates.',
     category: 'Writing',
   }),
-  {
-    ...createPromptSeed({
-      id: 'release',
-      title: 'Release Notes Draft',
-      content: 'Write user-facing release notes from this changelog. Keep it short and friendly.',
-      category: 'Writing',
-    }),
+  createPromptSeed({
+    id: 'release',
+    title: 'Release Notes Draft',
+    content: 'Write user-facing release notes from this changelog. Keep it short and friendly.',
+    category: 'Writing',
     pinned: true,
-  },
+  }),
 ];
 
 const seed = async (storage: ExtensionStorage, theme: 'light' | 'dark') => {
