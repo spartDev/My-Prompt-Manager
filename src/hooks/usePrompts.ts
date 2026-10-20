@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 import { PromptManager } from '../services/promptManager';
 import { StorageManager } from '../services/storage';
@@ -9,9 +9,6 @@ export const usePrompts = (): UsePromptsReturn => {
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<AppError | null>(null);
-  // Latest prompts for stable callbacks (memoized PromptCards keep the first callback they get)
-  const promptsRef = useRef<Prompt[]>(prompts);
-  promptsRef.current = prompts;
 
   const storageManager = StorageManager.getInstance();
   const promptManager = PromptManager.getInstance();
@@ -87,8 +84,7 @@ export const usePrompts = (): UsePromptsReturn => {
   const togglePin = useCallback(async (id: string) => {
     try {
       setError(null);
-      const current = promptsRef.current.find(prompt => prompt.id === id);
-      const updatedPrompt = await storageManager.setPinned(id, current?.pinned !== true);
+      const updatedPrompt = await storageManager.togglePinned(id);
 
       setPrompts(prev =>
         prev.map(prompt => prompt.id === id ? updatedPrompt : prompt)

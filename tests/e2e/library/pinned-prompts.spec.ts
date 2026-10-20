@@ -111,6 +111,29 @@ test.describe('Library cards & Pinned Prompts', () => {
     await expect.poll(async () => (await library.getPromptTitles()).slice(-1)[0]).toBe('Release Notes Draft');
   });
 
+  test('f3h AT3: a double click on the star ends unpinned, a single click pins (after reload)', async ({ page, storage, extensionId }) => {
+    await seed(storage, prompts, 'light');
+    const library = await openLibrary(page, extensionId);
+
+    // Two clicks before the first write resolves must cancel each other out
+    await page.getByRole('button', { name: 'Pin Release Notes Draft' }).dblclick();
+    await page.waitForTimeout(500);
+    expect((await storage.getPrompts()).find(p => p.id === 'fresh')?.pinned ?? false).toBe(false);
+
+    await page.reload();
+    await expect(page.getByTestId('prompt-card')).toHaveCount(prompts.length);
+    await expect(page.getByRole('button', { name: 'Pin Release Notes Draft' })).toHaveAttribute('aria-pressed', 'false');
+    expect((await library.getPromptTitles()).slice(-1)[0]).toBe('Release Notes Draft');
+
+    await library.togglePin('Release Notes Draft');
+    await expect(page.getByRole('button', { name: 'Unpin Release Notes Draft' })).toHaveAttribute('aria-pressed', 'true');
+
+    await page.reload();
+    await expect(page.getByTestId('prompt-card')).toHaveCount(prompts.length);
+    await expect(page.getByRole('button', { name: 'Unpin Release Notes Draft' })).toHaveAttribute('aria-pressed', 'true');
+    expect((await library.getPromptTitles())[0]).toBe('Release Notes Draft');
+  });
+
   test('AT4: card shows preview, category and usage; clicking the card body opens the editor', async ({ page, storage, extensionId }) => {
     await seed(storage, prompts, 'light');
     await openLibrary(page, extensionId);

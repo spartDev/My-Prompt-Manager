@@ -137,7 +137,7 @@ describe('StorageManager', () => {
       await chrome.storage.local.set({ prompts: [buildPrompt({ id: 'pin-test', updatedAt: originalUpdatedAt })] });
       vi.setSystemTime(FIXED_TIME.getTime() + 60_000);
 
-      const pinned = await storageManager.setPinned('pin-test', true);
+      const pinned = await storageManager.togglePinned('pin-test');
       expect(pinned.pinned).toBe(true);
       expect(pinned.updatedAt).toBe(originalUpdatedAt);
 
@@ -145,14 +145,27 @@ describe('StorageManager', () => {
       expect(stored[0].pinned).toBe(true);
       expect(stored[0].updatedAt).toBe(originalUpdatedAt);
 
-      await storageManager.setPinned('pin-test', false);
+      const unpinned = await storageManager.togglePinned('pin-test');
+      expect(unpinned.pinned).toBe(false);
       stored = (await chrome.storage.local.get('prompts')).prompts as Prompt[];
       expect(stored[0].pinned).toBe(false);
       expect(stored[0].updatedAt).toBe(originalUpdatedAt);
     });
 
-    it('should reject pinning an unknown prompt', async () => {
-      await expect(storageManager.setPinned('missing', true)).rejects.toThrow();
+    it('should leave a prompt unpinned after two concurrent toggles', async () => {
+      await chrome.storage.local.set({ prompts: [buildPrompt({ id: 'pin-test' })] });
+
+      await Promise.all([
+        storageManager.togglePinned('pin-test'),
+        storageManager.togglePinned('pin-test')
+      ]);
+
+      const stored = (await chrome.storage.local.get('prompts')).prompts as Prompt[];
+      expect(stored[0].pinned).toBe(false);
+    });
+
+    it('should reject toggling the pin of an unknown prompt', async () => {
+      await expect(storageManager.togglePinned('missing')).rejects.toThrow();
     });
   });
 

@@ -249,8 +249,9 @@ export class StorageManager {
     });
   }
 
-  // Pinning is a personal preference, not an edit: it leaves updatedAt untouched
-  async setPinned(id: string, pinned: boolean): Promise<Prompt> {
+  // Pinning is a personal preference, not an edit: it leaves updatedAt untouched.
+  // The pin is read under the lock, so rapid toggles never act on a stale value.
+  async togglePinned(id: string): Promise<Prompt> {
     return this.mutex.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
       try {
         const existingPrompts = await this.getPrompts();
@@ -262,7 +263,7 @@ export class StorageManager {
 
         const updatedPrompt: Prompt = {
           ...existingPrompts[promptIndex],
-          pinned
+          pinned: existingPrompts[promptIndex].pinned !== true
         };
 
         existingPrompts[promptIndex] = updatedPrompt;

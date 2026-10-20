@@ -254,6 +254,20 @@ describe('usePrompts', () => {
       expect(result.current.prompts.find(p => p.id === '2')?.pinned).toBe(false);
     });
 
+    it('should end unpinned after two quick toggles', async () => {
+      await chrome.storage.local.set({ prompts: mockPrompts });
+      const { result } = renderHook(() => usePrompts());
+      await waitFor(() => { expect(result.current.prompts).toHaveLength(3); });
+
+      await act(async () => {
+        await Promise.all([result.current.togglePin('2'), result.current.togglePin('2')]);
+      });
+
+      const stored = (await chrome.storage.local.get('prompts')).prompts as Prompt[];
+      expect(stored.find(p => p.id === '2')?.pinned).toBe(false);
+      expect(result.current.prompts.find(p => p.id === '2')?.pinned).toBe(false);
+    });
+
     it('should refresh prompts list after operations', async () => {
       // Arrange
       await chrome.storage.local.set({ prompts: mockPrompts });
