@@ -15,8 +15,7 @@ interface CategoryManagerProps {
   onCreateCategory: (category: { name: string; color?: string }) => Promise<void>;
   onUpdateCategory: (id: string, updates: Partial<Category>) => Promise<void>;
   onDeleteCategory: (id: string) => Promise<void>;
-  isOpen: boolean;
-  onClose: () => void;
+  context?: 'popup' | 'sidepanel';
 }
 
 const CategoryManager: FC<CategoryManagerProps> = ({
@@ -24,8 +23,7 @@ const CategoryManager: FC<CategoryManagerProps> = ({
   onCreateCategory,
   onUpdateCategory,
   onDeleteCategory,
-  isOpen,
-  onClose
+  context = 'popup'
 }) => {
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newCategoryColor, setNewCategoryColor] = useState(DEFAULT_CATEGORY_COLOR);
@@ -126,7 +124,6 @@ const CategoryManager: FC<CategoryManagerProps> = ({
     setDeleteConfirm({ isOpen: false, category: null });
   }, []);
 
-  if (!isOpen) {return null;}
 
   return (
     <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900">
@@ -137,16 +134,19 @@ const CategoryManager: FC<CategoryManagerProps> = ({
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
           </svg>
         }
-        title="Manage Categories"
-        subtitle="Organize your prompt collection"
+        title="Categories"
+        subtitle={`${String(categories.length)} ${categories.length === 1 ? 'category' : 'categories'}`}
+        context={context}
       >
-        <ViewHeader.Actions>
-          <ViewHeader.BackButton onClick={onClose} />
-        </ViewHeader.Actions>
+        {context === 'sidepanel' && (
+          <ViewHeader.Actions>
+            <ViewHeader.CloseButton onClick={() => { window.close(); }} context="sidepanel" />
+          </ViewHeader.Actions>
+        )}
       </ViewHeader>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto" data-scroll-container>
           {/* Error Display */}
           {error && (
             <div className="p-5 text-sm text-red-600 dark:text-red-400 bg-red-50/80 dark:bg-red-900/20 backdrop-blur-sm border-b border-red-200 dark:border-red-700 font-medium">
@@ -218,9 +218,6 @@ const CategoryManager: FC<CategoryManagerProps> = ({
                 </svg>
                 <span className='text-sm'>Your Categories</span>
               </div>
-              <span className="text-sm text-gray-500 dark:text-gray-400">
-                {categories.length} {categories.length === 1 ? 'category' : 'categories'}
-              </span>
             </h3>
             
             {categories.length === 0 ? (

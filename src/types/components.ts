@@ -10,8 +10,8 @@ export interface PromptCardProps {
   prompt: Prompt;
   categories: Category[];
   onEdit: (prompt: Prompt) => void;
-  onDelete: (id: string) => void;
   onCopy: (content: string) => void;
+  onTogglePin: (id: string) => void;
   showToast: (message: string, type: ToastType) => void;
   isSelected?: boolean;
   searchQuery?: string;
@@ -35,6 +35,7 @@ export interface EditPromptFormProps {
   categories: Category[];
   onSubmit: (data: { title: string; content: string; category: string }) => Promise<void> | void;
   onCancel: () => void;
+  onDelete: (id: string) => void;
 }
 
 export interface LibraryViewProps {
@@ -44,13 +45,10 @@ export interface LibraryViewProps {
   selectedCategory: string | null;
   onAddNew: () => void;
   onEditPrompt: (prompt: Prompt) => void;
-  onDeletePrompt: (id: string) => void;
+  onTogglePin: (id: string) => void;
   onCopyPrompt: (content: string) => void;
   showToast: (message: string, type: ToastType) => void;
   onCategoryChange: (category: string | null) => void;
-  onManageCategories: () => void;
-  onSettings: () => void;
-  onAnalytics: () => void;
   loading?: boolean;
   context?: 'popup' | 'sidepanel';
 }
@@ -86,6 +84,5 @@ export interface FilterSortControlsProps {
   sortDirection: SortDirection;
   onCategoryChange: (category: string | null) => void;
   onSortChange: (order: SortOrder, direction: SortDirection) => void;
-  onManageCategories: () => void;
   loading?: boolean;
 }

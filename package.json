@@ -19,34 +19,34 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.4.15",
-    "@crxjs/vite-plugin": "2.3.0",
+    "@biomejs/biome": "2.5.15",
+    "@crxjs/vite-plugin": "2.7.1",
     "@playwright/test": "1.58.2",
     "@tailwindcss/postcss": "4.1.18",
     "@testing-library/jest-dom": "6.9.1",
     "@testing-library/react": "16.3.2",
     "@testing-library/user-event": "14.6.1",
-    "@types/chrome": "0.1.42",
+    "@types/chrome": "0.3.5",
     "@types/jsdom": "27.0.0",
-    "@types/node": "24.10.13",
+    "@types/node": "24.19.2",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
-    "@vitejs/plugin-react": "5.1.4",
-    "@vitest/coverage-v8": "4.0.18",
+    "@vitejs/plugin-react": "5.2.0",
+    "@vitest/coverage-v8": "4.1.12",
     "happy-dom": "20.9.0",
     "husky": "9.1.7",
     "jsdom": "28.0.0",
-    "lint-staged": "16.2.7",
+    "lint-staged": "16.4.0",
     "playwright": "1.58.2",
-    "postcss": "8.5.14",
+    "postcss": "8.5.30",
     "tailwindcss": "4.1.18",
     "typescript": "5.9.3",
-    "vite": "7.3.3",
-    "vitest": "4.0.18"
+    "vite": "7.3.7",
+    "vitest": "4.1.12"
   },
   "dependencies": {
     "@floating-ui/dom": "1.7.5",
-    "dompurify": "3.4.3",
+    "dompurify": "3.4.17",
     "lz-string": "1.5.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
@@ -55,10 +55,5 @@
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": "biome lint --write --no-errors-on-unmatched"
-  },
-  "overrides": {
-    "@crxjs/vite-plugin": {
-      "rollup": "2.80.0"
-    }
   }
 }

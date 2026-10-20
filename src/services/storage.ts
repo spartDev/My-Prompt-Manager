@@ -31,6 +31,7 @@ import {
   readPrompt,
   readPrompts,
   recordUse,
+  togglePin,
   repointPrompt,
   scrubStored,
   scrubStoredCategories,
@@ -244,6 +245,30 @@ export class StorageManager {
         }
 
         const updatedPrompt = recordUse(existingPrompts[promptIndex], Date.now());
+
+        existingPrompts[promptIndex] = updatedPrompt;
+        await this.writePrompts(existingPrompts);
+
+        return updatedPrompt;
+      } catch (error) {
+        throw this.handleStorageError(error);
+      }
+    });
+  }
+
+  // Pinning is a personal preference, not an edit: it leaves updatedAt untouched.
+  // The pin is read under the lock, so rapid toggles never act on a stale value.
+  async togglePinned(id: string): Promise<Prompt> {
+    return this.mutex.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
+      try {
+        const existingPrompts = await this.getPrompts();
+        const promptIndex = existingPrompts.findIndex(p => p.id === id);
+
+        if (promptIndex === -1) {
+          throw new Error(`Prompt with id ${id} not found`);
+        }
+
+        const updatedPrompt = togglePin(existingPrompts[promptIndex]);
 
         existingPrompts[promptIndex] = updatedPrompt;
         await this.writePrompts(existingPrompts);

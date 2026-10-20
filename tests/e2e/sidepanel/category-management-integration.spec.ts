@@ -50,7 +50,7 @@ test.describe('Category Management - Integration with Prompt System', () => {
       await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
       // Navigate to category manager and edit the Research category
-      await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
+      await sidepanelPage.getByTestId('tab-categories').click();
       await expect(sidepanelPage.getByText('Research')).toBeVisible();
 
       // Start editing the Research category
@@ -68,8 +68,8 @@ test.describe('Category Management - Integration with Prompt System', () => {
       await expect(sidepanelPage.getByText('Analysis')).toBeVisible();
       await expect(sidepanelPage.getByText('Research')).toBeHidden();
 
-      // Go back to main view
-      const backButton = sidepanelPage.getByTestId('back-button').first();
+      // Return to the Library via the tab bar
+      const backButton = sidepanelPage.getByTestId('tab-library');
       await backButton.click();
       await expect(sidepanelPage.getByRole('heading', { name: 'My Prompt Manager' })).toBeVisible();
 
@@ -227,7 +227,7 @@ test.describe('Category Management - Integration with Prompt System', () => {
       await sidepanelPage.getByRole('menuitem', { name: 'All Categories' }).click();
 
       // Now rename the category
-      await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
+      await sidepanelPage.getByTestId('tab-categories').click();
       const categoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Development', { exact: true }) }).first();
       await categoryRow.hover();
       await categoryRow.getByRole('button', { name: 'Edit category' }).click();
@@ -237,8 +237,8 @@ test.describe('Category Management - Integration with Prompt System', () => {
       await editInput.fill('Programming');
       await editInput.press('Enter');
 
-      // Go back to main view
-      const backButton2 = sidepanelPage.getByTestId('back-button').first();
+      // Return to the Library via the tab bar
+      const backButton2 = sidepanelPage.getByTestId('tab-library');
       await backButton2.click();
 
       // Verify category filter dropdown now shows "Programming" instead of "Development"
@@ -340,8 +340,7 @@ test.describe('Category Management - Integration with Prompt System', () => {
       // Edit the prompt
       await expect(sidepanelPage.getByRole('heading', { name: 'Editable Prompt' })).toBeVisible();
 
-      await sidepanelPage.getByRole('button', { name: 'More actions for Editable Prompt' }).click();
-      await sidepanelPage.getByRole('menuitem', { name: 'Edit' }).click();
+      await sidepanelPage.getByRole('button', { name: 'Edit Editable Prompt' }).click();
 
       // Change category to the valid one using the custom dropdown
       const categoryButton = sidepanelPage.getByLabel('Category');

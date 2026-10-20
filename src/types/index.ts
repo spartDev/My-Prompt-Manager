@@ -7,6 +7,7 @@ export interface Prompt {
   updatedAt: number; // timestamp
   usageCount?: number; // number of times the prompt has been used
   lastUsedAt?: number; // timestamp of the last usage (defaults to createdAt)
+  pinned?: boolean; // Pinned Prompts always appear first in the Library (absent = unpinned)
 }
 
 // Usage Analytics types

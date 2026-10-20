@@ -51,6 +51,7 @@
         "assets/content-*.js",
         "assets/promptAdmission-*.js",
         "assets/truncate-*.js",
+        "assets/promptVariables-*.js",
         "assets/floating-ui.dom-*.js"
       ],
       "use_dynamic_url": false

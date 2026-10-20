@@ -5,10 +5,56 @@
  * contexts and pages in the Chrome extension testing environment.
  */
 
-import type { Page, BrowserContext } from '@playwright/test';
+import type { Page, BrowserContext, Locator } from '@playwright/test';
 
 import { expect } from '../fixtures/extension';
 import { CLAUDE_MOCK_HTML, CHATGPT_MOCK_HTML } from '../fixtures/mock-pages';
+
+/**
+ * Top-level destinations reachable from the bottom tab bar
+ */
+export type Section = 'library' | 'categories' | 'analytics' | 'settings';
+
+/**
+ * Header title (h1) shown for each Section
+ */
+export const SECTION_HEADINGS: Record<Section, string> = {
+  library: 'My Prompt Manager',
+  categories: 'Categories',
+  analytics: 'Analytics',
+  settings: 'Settings',
+};
+
+/**
+ * Bottom tab bar navigation utilities
+ */
+export const tabNavigation = {
+  /**
+   * Get the bottom tab bar navigation landmark
+   */
+  getTabBar: (page: Page): Locator => page.getByRole('navigation', { name: 'Main navigation' }),
+
+  /**
+   * Get the tab for a given Section
+   */
+  getTab: (page: Page, section: Section): Locator => page.getByTestId(`tab-${section}`),
+
+  /**
+   * Get the header heading for a given Section
+   */
+  getSectionHeading: (page: Page, section: Section): Locator =>
+    page.getByRole('heading', { level: 1, name: SECTION_HEADINGS[section], exact: true }),
+
+  /**
+   * Switch to a Section via the tab bar and wait for its header
+   */
+  switchTo: async (page: Page, section: Section): Promise<void> => {
+    const tab = tabNavigation.getTab(page, section);
+    await tab.click();
+    await expect(tab).toHaveAttribute('aria-selected', 'true');
+    await expect(tabNavigation.getSectionHeading(page, section)).toBeVisible();
+  },
+};
 
 /**
  * Extension page navigation utilities
@@ -179,16 +225,14 @@ export const settingsNavigation = {
    * Navigate to settings from any page
    */
   openSettings: async (page: Page): Promise<void> => {
-    await page.getByRole('button', { name: 'Settings' }).click();
-    await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+    await tabNavigation.switchTo(page, 'settings');
   },
 
   /**
    * Navigate back to library from settings
    */
   backToLibrary: async (page: Page): Promise<void> => {
-    await page.getByRole('button', { name: 'Library' }).click();
-    await expect(page.getByRole('heading', { name: 'My Prompt Manager' })).toBeVisible();
+    await tabNavigation.switchTo(page, 'library');
   },
 
   /**
@@ -209,11 +253,10 @@ export const settingsNavigation = {
  */
 export const modalNavigation = {
   /**
-   * Open category manager modal
+   * Open the Categories section
    */
   openCategoryManager: async (page: Page): Promise<void> => {
-    await page.getByRole('button', { name: 'Manage categories' }).click();
-    await expect(page.getByRole('heading', { name: 'Manage Categories' })).toBeVisible();
+    await tabNavigation.switchTo(page, 'categories');
   },
 
   /**
@@ -239,8 +282,7 @@ export const modalNavigation = {
     const promptCard = page.getByTestId('prompt-card')
       .filter({ has: page.getByRole('heading', { name: promptTitle }) })
       .first();
-    await promptCard.getByRole('button', { name: 'More actions' }).click();
-    await page.getByRole('menuitem', { name: 'Edit' }).click();
+    await promptCard.getByRole('button', { name: /^Edit / }).click();
     await expect(page.getByRole('heading', { name: 'Edit Prompt' })).toBeVisible();
   },
 };
@@ -320,6 +362,7 @@ export const testingNavigation = {
  * All navigation utilities combined
  */
 export const navigation = {
+  tabs: tabNavigation,
   extension: extensionNavigation,
   mockSites: mockSiteNavigation,
   contentScript: contentScriptNavigation,

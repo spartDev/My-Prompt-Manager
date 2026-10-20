@@ -33,7 +33,6 @@ const renderSettings = async (showToastMock = vi.fn()) => {
   render(
     <ThemeProvider>
       <SettingsView
-        onBack={vi.fn()}
         showToast={showToastMock}
         toastSettings={mockToastSettings}
         onToastSettingsChange={vi.fn()}

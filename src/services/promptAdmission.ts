@@ -148,6 +148,7 @@ export declare class StoredPrompt {
   readonly updatedAt: number;
   readonly usageCount: number;
   readonly lastUsedAt: number;
+  readonly pinned?: boolean;
 }
 
 interface StoredFields {
@@ -159,6 +160,12 @@ interface StoredFields {
   updatedAt: number;
   usageCount: number;
   lastUsedAt: number;
+  pinned?: boolean;
+}
+
+/** A pin is carried over only when it is a boolean; an unpinned Prompt may have no field. */
+function pinOf(pinned: unknown): { pinned?: boolean } {
+  return typeof pinned === 'boolean' ? { pinned } : {};
 }
 
 /** The only place a StoredPrompt value is made. */
@@ -212,7 +219,8 @@ export function readPrompt(raw: unknown): StoredPrompt | null {
     createdAt,
     updatedAt,
     usageCount,
-    lastUsedAt
+    lastUsedAt,
+    ...pinOf(raw.pinned)
   });
 }
 
@@ -528,7 +536,8 @@ export function admitEdit(current: StoredPrompt, patch: PromptTextPatch, now: nu
       createdAt: current.createdAt,
       updatedAt: now,
       usageCount: current.usageCount,
-      lastUsedAt: current.lastUsedAt
+      lastUsedAt: current.lastUsedAt,
+      ...pinOf(current.pinned)
     })
   };
 }
@@ -559,7 +568,8 @@ export function admitRestored(
       createdAt,
       updatedAt: options.replacing ? now : incoming.updatedAt || now,
       usageCount: incoming.usageCount,
-      lastUsedAt: Math.max(incoming.lastUsedAt, createdAt)
+      lastUsedAt: Math.max(incoming.lastUsedAt, createdAt),
+      ...pinOf(incoming.pinned)
     })
   };
 }
@@ -593,6 +603,14 @@ export function matchStoredCategory(name: string, storedCategories: unknown): st
 /** A non-text change that keeps the result typed: counts one use. */
 export function recordUse(prompt: StoredPrompt, now: number): StoredPrompt {
   return mintStored({ ...prompt, usageCount: prompt.usageCount + 1, lastUsedAt: now });
+}
+
+/**
+ * A non-text change that keeps the result typed: pins or unpins the Prompt. Pinning is a
+ * personal preference, not an edit, so timestamps and usage stay.
+ */
+export function togglePin(prompt: StoredPrompt): StoredPrompt {
+  return mintStored({ ...prompt, pinned: prompt.pinned !== true });
 }
 
 /**

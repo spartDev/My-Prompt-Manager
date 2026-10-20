@@ -60,13 +60,10 @@ const defaultProps = {
   selectedCategory: null,
   onAddNew: vi.fn(),
   onEditPrompt: vi.fn(),
-  onDeletePrompt: vi.fn(),
+  onTogglePin: vi.fn(),
   onCopyPrompt: vi.fn(),
   showToast: vi.fn(),
   onCategoryChange: vi.fn(),
-  onManageCategories: vi.fn(),
-  onSettings: vi.fn(),
-  onAnalytics: vi.fn(),
   loading: false,
   context: 'popup' as const
 };
@@ -82,72 +79,33 @@ describe('LibraryView', () => {
       expect(screen.getByRole('heading', { name: /my prompt manager/i })).toBeInTheDocument();
     });
 
-    it('renders subtitle', () => {
+    it('shows the prompt count as subtitle', () => {
       render(<LibraryView {...defaultProps} />);
-      expect(screen.getByText(/organize your creative prompts/i)).toBeInTheDocument();
+      const subtitle = screen.getByText('1 prompt');
+      expect(subtitle).toHaveAttribute('aria-live', 'polite');
     });
-  });
 
-  describe('Analytics button', () => {
-    it('renders analytics button in header', () => {
+    it('shows "X of N prompts" when search or filter narrows the list', () => {
+      const prompts: Prompt[] = [
+        ...defaultPrompts,
+        { ...defaultPrompts[0], id: 'prompt-2', title: 'Other', category: 'Uncategorized' }
+      ];
+      render(
+        <LibraryView
+          {...defaultProps}
+          prompts={prompts}
+          searchWithDebounce={createMockSearchWithDebounce(prompts)}
+          selectedCategory="Work"
+        />
+      );
+      expect(screen.getByText('1 of 2 prompts')).toBeInTheDocument();
+    });
+
+    it('no longer renders the Analytics and Settings header buttons or the footer', () => {
       render(<LibraryView {...defaultProps} />);
-      expect(screen.getByRole('button', { name: /view analytics/i })).toBeInTheDocument();
-    });
-
-    it('calls onAnalytics when analytics button is clicked', async () => {
-      const user = userEvent.setup();
-      const onAnalytics = vi.fn();
-
-      render(<LibraryView {...defaultProps} onAnalytics={onAnalytics} />);
-
-      const analyticsButton = screen.getByRole('button', { name: /view analytics/i });
-      await user.click(analyticsButton);
-
-      expect(onAnalytics).toHaveBeenCalledTimes(1);
-    });
-
-    it('analytics button has correct aria-label', () => {
-      render(<LibraryView {...defaultProps} />);
-      const analyticsButton = screen.getByRole('button', { name: /view analytics/i });
-      expect(analyticsButton).toHaveAttribute('aria-label', 'View analytics');
-    });
-
-    it('analytics button is positioned before settings button', () => {
-      const { container } = render(<LibraryView {...defaultProps} />);
-
-      const analyticsButton = container.querySelector('[aria-label="View analytics"]');
-      const settingsButton = container.querySelector('[aria-label="Open settings"]');
-
-      expect(analyticsButton).toBeInTheDocument();
-      expect(settingsButton).toBeInTheDocument();
-
-      // Check order by DOM position
-      const allButtons = container.querySelectorAll('button[aria-label]');
-      const buttonLabels = Array.from(allButtons).map(b => b.getAttribute('aria-label'));
-
-      const analyticsIndex = buttonLabels.indexOf('View analytics');
-      const settingsIndex = buttonLabels.indexOf('Open settings');
-
-      expect(analyticsIndex).toBeLessThan(settingsIndex);
-    });
-  });
-
-  describe('Settings button', () => {
-    it('renders settings button in header', () => {
-      render(<LibraryView {...defaultProps} />);
-      expect(screen.getByRole('button', { name: /open settings/i })).toBeInTheDocument();
-    });
-
-    it('calls onSettings when settings button is clicked', async () => {
-      const user = userEvent.setup();
-      const onSettings = vi.fn();
-
-      render(<LibraryView {...defaultProps} onSettings={onSettings} />);
-
-      const settingsButton = screen.getByRole('button', { name: /open settings/i });
-      await user.click(settingsButton);
-
-      expect(onSettings).toHaveBeenCalledTimes(1);
+      expect(screen.queryByRole('button', { name: /view analytics/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /open settings/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('contentinfo')).not.toBeInTheDocument();
     });
   });
 
@@ -203,35 +161,31 @@ describe('LibraryView', () => {
       render(<LibraryView {...defaultProps} />);
       expect(screen.getByText('Test Prompt')).toBeInTheDocument();
     });
-
-    it('shows prompt count in footer', () => {
-      render(<LibraryView {...defaultProps} />);
-      expect(screen.getByText(/1 prompt/i)).toBeInTheDocument();
-    });
   });
 
-  describe('Floating add button', () => {
-    it('renders floating add button', () => {
+  describe('New button', () => {
+    it('renders exactly one "New" button in the header', () => {
       render(<LibraryView {...defaultProps} />);
-      expect(screen.getByRole('button', { name: /add new prompt/i })).toBeInTheDocument();
+      const buttons = screen.getAllByRole('button', { name: /add new prompt/i });
+      expect(buttons).toHaveLength(1);
+      expect(buttons[0]).toHaveTextContent('New');
+      expect(screen.getByRole('banner')).toContainElement(buttons[0]);
     });
 
-    it('calls onAddNew when floating add button is clicked', async () => {
+    it('calls onAddNew when clicked', async () => {
       const user = userEvent.setup();
       const onAddNew = vi.fn();
 
       render(<LibraryView {...defaultProps} onAddNew={onAddNew} />);
 
-      const addButton = screen.getByRole('button', { name: /add new prompt/i });
-      await user.click(addButton);
+      await user.click(screen.getByRole('button', { name: /add new prompt/i }));
 
       expect(onAddNew).toHaveBeenCalledTimes(1);
     });
 
-    it('floating add button is disabled when loading', () => {
+    it('is disabled when loading', () => {
       render(<LibraryView {...defaultProps} loading={true} />);
-      const addButton = screen.getByRole('button', { name: /add new prompt/i });
-      expect(addButton).toBeDisabled();
+      expect(screen.getByRole('button', { name: /add new prompt/i })).toBeDisabled();
     });
   });
 });

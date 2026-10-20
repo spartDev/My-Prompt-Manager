@@ -1,3 +1,9 @@
+/**
+ * @vitest-environment jsdom
+ *
+ * jsdom, not happy-dom: happy-dom keeps <script> text when DOMPurify >=3.4.12
+ * strips tags, so XSS assertions would fail although real browsers strip it.
+ */
 import LZString from 'lz-string';
 import { describe, it, expect } from 'vitest';
 
@@ -119,6 +125,15 @@ describe('PromptEncoder', () => {
       const uncompressed = JSON.stringify(prompt);
       // Encoded should be significantly smaller
       expect(encoded.length).toBeLessThan(uncompressed.length / 2);
+    });
+  });
+
+  describe('Pinned Prompts', () => {
+    it('should not carry the pinned flag in a share link', () => {
+      const encoded = encode(createTestPrompt({ pinned: true }));
+      const payload = JSON.parse(LZString.decompressFromEncodedURIComponent(encoded)) as Record<string, unknown>;
+      expect(payload).not.toHaveProperty('pinned');
+      expect(decode(encoded)).not.toHaveProperty('pinned');
     });
   });
 

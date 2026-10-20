@@ -283,4 +283,52 @@ describe('PromptManager - Sorting', () => {
       expect(sorted[1].title).toBe('Zebra Prompt');
     });
   });
+  describe('Pinned Prompts', () => {
+    const sortOrders: SortOrder[] = ['title', 'createdAt', 'updatedAt', 'usageCount', 'lastUsedAt'];
+    const directions = ['asc', 'desc'] as const;
+
+    const build = (id: string, title: string, offset: number, pinned?: boolean): Prompt => ({
+      id,
+      title,
+      content: `Content ${id}`,
+      category: 'Work',
+      createdAt: FIXED_TIME - offset * 1000,
+      updatedAt: FIXED_TIME - offset * 2000,
+      usageCount: offset,
+      lastUsedAt: FIXED_TIME - offset * 500,
+      ...(pinned === undefined ? {} : { pinned }),
+    });
+
+    const prompts = [
+      build('a', 'Alpha', 1, true),
+      build('b', 'Bravo', 2),
+      build('c', 'Charlie', 3, false),
+      build('d', 'Delta', 4, true),
+      build('e', 'Echo', 5),
+    ];
+
+    it.each(sortOrders.flatMap(order => directions.map(direction => [order, direction] as const)))(
+      'puts Pinned Prompts first and keeps the chosen sort within each group (%s %s)',
+      (order, direction) => {
+        const sorted = manager.sortPrompts(prompts, order, direction);
+        const pinnedIds = sorted.filter(p => p.pinned === true).map(p => p.id);
+        const unpinnedIds = sorted.filter(p => p.pinned !== true).map(p => p.id);
+
+        // Pinned group comes first
+        expect(sorted.map(p => p.id)).toEqual([...pinnedIds, ...unpinnedIds]);
+        // Chosen sort applies inside each group
+        expect(pinnedIds).toEqual(
+          manager.sortPrompts(prompts.filter(p => p.pinned === true), order, direction).map(p => p.id)
+        );
+        expect(unpinnedIds).toEqual(
+          manager.sortPrompts(prompts.filter(p => p.pinned !== true), order, direction).map(p => p.id)
+        );
+      }
+    );
+
+    it('keeps a pinned prompt above unpinned ones even when it would sort last', () => {
+      const sorted = manager.sortPrompts(prompts, 'title', 'desc');
+      expect(sorted.map(p => p.id)).toEqual(['d', 'a', 'e', 'c', 'b']);
+    });
+  });
 });

@@ -144,6 +144,36 @@ describe('StorageManager', () => {
       expect(chromeMock.storage.local.set).not.toHaveBeenCalled();
     });
 
+    it('keeps the Pinned Prompt flag so the picker can list Pinned Prompts first', async () => {
+      const base = {
+        content: 'Test content',
+        category: 'Test',
+        createdAt: 1234567890,
+        updatedAt: 1234567890,
+        usageCount: 0,
+        lastUsedAt: 1234567890,
+      };
+      chromeMock.storage.local.get.mockImplementation((_keys, callback) => {
+        callback({
+          prompts: [
+            { ...base, id: 'pinned', title: 'Pinned', pinned: true },
+            { ...base, id: 'unpinned', title: 'Unpinned', pinned: false },
+            { ...base, id: 'legacy', title: 'Legacy' },
+            { ...base, id: 'bogus', title: 'Bogus', pinned: 'yes' },
+          ],
+        });
+      });
+
+      const result = await getPrompts();
+
+      expect(result.map(p => [p.id, p.pinned])).toEqual([
+        ['pinned', true],
+        ['unpinned', false],
+        ['legacy', undefined],
+        ['bogus', undefined],
+      ]);
+    });
+
     it('should handle chrome storage errors gracefully', async () => {
       (chromeMock.runtime as any).lastError = { message: 'Storage error' } as chrome.runtime.LastError;
       chromeMock.storage.local.get.mockImplementation((_keys, callback) => {

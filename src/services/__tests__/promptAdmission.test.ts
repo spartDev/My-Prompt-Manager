@@ -16,7 +16,8 @@ import {
   repointPrompt,
   scrubStored,
   scrubStoredCategories,
-  scrubStoredSettings
+  scrubStoredSettings,
+  togglePin
 } from '../promptAdmission';
 
 const valid = { title: 'T', content: 'C', category: 'Cat' };
@@ -214,6 +215,20 @@ describe('readPrompts', () => {
     };
 
     expect(readPrompts([awkward])).toEqual([awkward]);
+  });
+});
+
+describe('readPrompts: the Pinned Prompt flag', () => {
+  const entry = { id: 'p1', title: 'T', content: 'C', category: 'Work', createdAt: 1, updatedAt: 1 };
+
+  it('keeps a stored pin, true or false', () => {
+    expect(readPrompts([{ ...entry, pinned: true }])[0]?.pinned).toBe(true);
+    expect(readPrompts([{ ...entry, pinned: false }])[0]?.pinned).toBe(false);
+  });
+
+  it('reads a Prompt without a pin, or with one that is not a boolean, as unpinned (no field)', () => {
+    expect(readPrompts([entry])[0]).not.toHaveProperty('pinned');
+    expect(readPrompts([{ ...entry, pinned: 'yes' }])[0]).not.toHaveProperty('pinned');
   });
 });
 
@@ -798,6 +813,12 @@ describe('writing a Prompt: the routes that make an AdmittedPrompt', () => {
       });
     });
 
+    it('keeps the pin: editing a Pinned Prompt does not unpin it', () => {
+      const result = admitEdit(stored({ pinned: true }), { title: 'New' }, 500);
+
+      expect(result.ok && result.prompt.pinned).toBe(true);
+    });
+
     it('refuses an invalid patch', () => {
       expect(admitEdit(stored(), { title: '' }, 500)).toEqual({
         ok: false,
@@ -814,6 +835,12 @@ describe('writing a Prompt: the routes that make an AdmittedPrompt', () => {
         ok: true,
         prompt: { ...incoming, title: 'Restored' }
       });
+    });
+
+    it('keeps the pin a Backup carries', () => {
+      const result = admitRestored(stored({ pinned: true }), 900);
+
+      expect(result.ok && result.prompt.pinned).toBe(true);
     });
 
     it('stamps updatedAt with the given time when it replaces an existing Prompt', () => {
@@ -850,6 +877,15 @@ describe('writing a Prompt: the routes that make an AdmittedPrompt', () => {
       const current = stored();
 
       expect(recordUse(current, 777)).toEqual({ ...current, usageCount: 3, lastUsedAt: 777 });
+    });
+  });
+
+  describe('togglePin', () => {
+    it('pins an unpinned Prompt and unpins a Pinned one, without counting it as an edit', () => {
+      const current = stored();
+
+      expect(togglePin(current)).toEqual({ ...current, pinned: true });
+      expect(togglePin(togglePin(current))).toEqual({ ...current, pinned: false });
     });
   });
 

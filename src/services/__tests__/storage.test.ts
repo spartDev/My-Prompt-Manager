@@ -151,6 +151,42 @@ describe('StorageManager', () => {
       expect(prompts[0].usageCount).toBe(3);
       expect(prompts[0].lastUsedAt).toBe(updatedPrompt.lastUsedAt);
     });
+
+    it('should pin and unpin a prompt without changing updatedAt', async () => {
+      const originalUpdatedAt = FIXED_TIME.getTime() - 60_000;
+      await chrome.storage.local.set({ prompts: [buildPrompt({ id: 'pin-test', updatedAt: originalUpdatedAt })] });
+      vi.setSystemTime(FIXED_TIME.getTime() + 60_000);
+
+      const pinned = await storageManager.togglePinned('pin-test');
+      expect(pinned.pinned).toBe(true);
+      expect(pinned.updatedAt).toBe(originalUpdatedAt);
+
+      let stored = (await chrome.storage.local.get('prompts')).prompts as Prompt[];
+      expect(stored[0].pinned).toBe(true);
+      expect(stored[0].updatedAt).toBe(originalUpdatedAt);
+
+      const unpinned = await storageManager.togglePinned('pin-test');
+      expect(unpinned.pinned).toBe(false);
+      stored = (await chrome.storage.local.get('prompts')).prompts as Prompt[];
+      expect(stored[0].pinned).toBe(false);
+      expect(stored[0].updatedAt).toBe(originalUpdatedAt);
+    });
+
+    it('should leave a prompt unpinned after two concurrent toggles', async () => {
+      await chrome.storage.local.set({ prompts: [buildPrompt({ id: 'pin-test' })] });
+
+      await Promise.all([
+        storageManager.togglePinned('pin-test'),
+        storageManager.togglePinned('pin-test')
+      ]);
+
+      const stored = (await chrome.storage.local.get('prompts')).prompts as Prompt[];
+      expect(stored[0].pinned).toBe(false);
+    });
+
+    it('should reject toggling the pin of an unknown prompt', async () => {
+      await expect(storageManager.togglePinned('missing')).rejects.toThrow();
+    });
   });
 
   describe('Category Operations', () => {
@@ -613,6 +649,27 @@ describe('StorageManager', () => {
       expect(chrome.storage.local.clear).toHaveBeenCalled();
 
       expect(chrome.storage.local.set).toHaveBeenCalledWith({ prompts: importData.prompts });
+    });
+
+    it('should keep Pinned Prompts through export then import', async () => {
+      await chrome.storage.local.set({
+        prompts: [buildPrompt({ id: 'p1', pinned: true }), buildPrompt({ id: 'p2' })],
+        settings: { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt', sortDirection: 'desc', theme: 'system' }
+      });
+
+      const exported = await storageManager.exportData();
+      await chrome.storage.local.set({ prompts: [] });
+      await storageManager.importData(exported);
+
+      const prompts = await storageManager.getPrompts();
+      expect(prompts.find(p => p.id === 'p1')?.pinned).toBe(true);
+      expect(prompts.find(p => p.id === 'p2')?.pinned).toBeUndefined();
+    });
+
+    it('should keep the pinned flag when importing a single prompt', async () => {
+      await storageManager.importPrompt(buildPrompt({ id: 'single', pinned: true }));
+      const prompts = await storageManager.getPrompts();
+      expect(prompts.find(p => p.id === 'single')?.pinned).toBe(true);
     });
 
     it('should reject invalid import data', async () => {

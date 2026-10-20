@@ -8,10 +8,12 @@
 
 import { getPlatformByHostname } from '../../config/platforms';
 import type { ElementFingerprint } from '../../types/index';
+import { extractVariables, fillVariables } from '../../utils/promptVariables';
 import type { InsertionResult, Prompt } from '../types/index';
 import { UIElementFactory } from '../ui/element-factory';
 import { EventManager } from '../ui/event-manager';
 import { KeyboardNavigationManager } from '../ui/keyboard-navigation';
+import { createVariableForm } from '../ui/variable-form';
 import { DOMUtils } from '../utils/dom';
 import { getElementFingerprintGenerator } from '../utils/element-fingerprint';
 import { debug, error, info, isDebugMode, refreshDebugMode, warn } from '../utils/logger';
@@ -56,6 +58,15 @@ export interface SPAState {
   navigationDetected: boolean;
   routeChangeTimeout: number | null;
 }
+
+/**
+ * Stable partition: Pinned Prompts first, keeping the existing order within each group.
+ * The picker deliberately ignores the Library sort setting.
+ */
+const pinnedFirst = (prompts: Prompt[]): Prompt[] => [
+  ...prompts.filter(prompt => prompt.pinned === true),
+  ...prompts.filter(prompt => prompt.pinned !== true)
+];
 
 export class PromptLibraryInjector {
   private state: InjectorState;
@@ -1720,8 +1731,8 @@ export class PromptLibraryInjector {
       // Store target element for use in filterPrompts
       this.state.currentTargetElement = targetElement;
 
-      // Get prompts from storage
-      const prompts = await getPrompts();
+      // Get prompts from storage, Pinned Prompts first (stable within each group)
+      const prompts = pinnedFirst(await getPrompts());
       debug('Retrieved prompts for selector', { count: prompts.length });
 
       // Create selector UI
@@ -1940,8 +1951,55 @@ export class PromptLibraryInjector {
   }
 
   private async handlePromptSelection(prompt: Prompt, targetElement: HTMLElement): Promise<void> {
+    const variables = extractVariables(prompt.content);
+    if (variables.length > 0 && this.state.promptSelector) {
+      this.showVariableForm(this.state.promptSelector, prompt, variables, targetElement);
+      return;
+    }
+    await this.insertSelectedPrompt(prompt, prompt.content, targetElement);
+  }
+
+  /**
+   * Replaces the prompt list with a form to fill in the prompt's Variables before inserting it.
+   * The list stays in the DOM (hidden) so the click that opened the form still counts as a click
+   * inside the selector for the outside-click handler.
+   */
+  private showVariableForm(selector: HTMLElement, prompt: Prompt, variables: string[], targetElement: HTMLElement): void {
+    debug('[CONTENT] Showing variable form', { promptId: prompt.id, variableCount: variables.length });
+
+    // The list's keyboard navigation would take Enter and Escape away from the form
+    if (this.keyboardNav) {
+      this.keyboardNav.destroy();
+      this.keyboardNav = null;
+    }
+
+    for (const element of selector.querySelectorAll<HTMLElement>('.prompt-search, .prompt-list')) {
+      element.style.display = 'none';
+    }
+
+    const title = selector.querySelector('#prompt-selector-title');
+    if (title) {
+      title.textContent = prompt.title;
+    }
+
+    let settled = false;
+    const insertOnce = (content: string) => {
+      if (settled) {return;}
+      settled = true;
+      void this.insertSelectedPrompt(prompt, content, targetElement);
+    };
+
+    const form = createVariableForm(variables, {
+      onSubmit: (values) => { insertOnce(fillVariables(prompt.content, values)); },
+      onSkip: () => { insertOnce(prompt.content); }
+    });
+    selector.appendChild(form);
+    form.querySelector<HTMLInputElement>('input')?.focus();
+  }
+
+  private async insertSelectedPrompt(prompt: Prompt, content: string, targetElement: HTMLElement): Promise<void> {
     try {
-      const result = await this.insertPrompt(targetElement, prompt.content);
+      const result = await this.insertPrompt(targetElement, content);
 
       if (result.success) {
         try {

@@ -14,15 +14,16 @@ export class SettingsPage extends BasePage {
    * Open settings from the library page
    */
   async openFromLibrary(): Promise<void> {
-    await this.page.getByRole('button', { name: 'Settings' }).click();
+    await this.switchToSection('settings');
     await this.expectSettingsOpen();
   }
 
   /**
-   * Navigate back to library view
+   * Navigate back to library view via the tab bar
+   * (leaving Settings refreshes prompts/categories)
    */
   async navigateToLibrary(): Promise<void> {
-    await this.page.getByRole('button', { name: 'Library' }).click();
+    await this.switchToSection('library');
     await expect(this.page.getByRole('heading', { name: 'My Prompt Manager' })).toBeVisible();
   }
 

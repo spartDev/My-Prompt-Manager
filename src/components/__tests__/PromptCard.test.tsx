@@ -24,11 +24,66 @@ describe('PromptCard - Basic Rendering', () => {
     prompt: mockPrompt,
     categories: mockCategories,
     onEdit: vi.fn(),
-    onDelete: vi.fn(),
     onCopy: vi.fn(),
+    onTogglePin: vi.fn(),
     showToast: vi.fn<(message: string, type: 'success' | 'error' | 'info' | 'warning') => void>(),
     searchQuery: ''
   };
+
+  it('should offer to pin an unpinned prompt', () => {
+    render(<PromptCard {...mockProps} />);
+    const star = screen.getByRole('button', { name: 'Pin Test Prompt' });
+    expect(star).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('should show a pinned prompt as pressed and offer to unpin it', () => {
+    render(<PromptCard {...mockProps} prompt={{ ...mockPrompt, pinned: true }} />);
+    const star = screen.getByRole('button', { name: 'Unpin Test Prompt' });
+    expect(star).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('should toggle the pin when the star is clicked', async () => {
+    const onTogglePin = vi.fn();
+    render(<PromptCard {...mockProps} onTogglePin={onTogglePin} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Pin Test Prompt' }));
+    expect(onTogglePin).toHaveBeenCalledWith('1');
+  });
+
+  it('should open the prompt for editing from the card', async () => {
+    const onEdit = vi.fn();
+    render(<PromptCard {...mockProps} onEdit={onEdit} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Test Prompt' }));
+    expect(onEdit).toHaveBeenCalledWith(mockPrompt);
+  });
+
+  it('should open the prompt for editing with Enter on the keyboard', async () => {
+    const onEdit = vi.fn();
+    render(<PromptCard {...mockProps} onEdit={onEdit} />);
+    screen.getByRole('button', { name: 'Edit Test Prompt' }).focus();
+    await userEvent.keyboard('{Enter}');
+    expect(onEdit).toHaveBeenCalledWith(mockPrompt);
+  });
+
+  it.each([
+    'Pin Test Prompt',
+    'Copy content of Test Prompt to clipboard',
+    'Share Test Prompt',
+  ])('should not open editing when "%s" is clicked', async (name) => {
+    const onEdit = vi.fn();
+    render(<PromptCard {...mockProps} onEdit={onEdit} />);
+    await userEvent.click(screen.getByRole('button', { name }));
+    expect(onEdit).not.toHaveBeenCalled();
+  });
+
+  it('should keep the prompt title as the heading name', () => {
+    render(<PromptCard {...mockProps} />);
+    expect(screen.getByRole('heading', { name: 'Test Prompt' })).toBeInTheDocument();
+  });
+
+  it('should not have a more-actions menu anymore', () => {
+    render(<PromptCard {...mockProps} />);
+    expect(screen.queryByRole('button', { name: /More actions/ })).not.toBeInTheDocument();
+  });
 
   it('should render prompt title', () => {
     render(<PromptCard {...mockProps} />);
@@ -47,10 +102,29 @@ describe('PromptCard - Basic Rendering', () => {
     expect(screen.queryByText('<script>')).not.toBeInTheDocument();
   });
 
-  it('should render prompt date', () => {
+  it('should not render the last updated date on the card', () => {
     render(<PromptCard {...mockProps} />);
-    // Check that a date is rendered (using aria-label since date format may vary)
-    expect(screen.getByLabelText(/Last updated:/)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Last updated:/)).not.toBeInTheDocument();
+  });
+
+  it('should show a preview of the prompt content', () => {
+    render(<PromptCard {...mockProps} prompt={{ ...mockPrompt, content: 'You are a staff engineer. Read this ticket.' }} />);
+    expect(screen.getByText('You are a staff engineer. Read this ticket.')).toBeInTheDocument();
+  });
+
+  it('should highlight the search query inside the content preview', () => {
+    render(<PromptCard {...mockProps} prompt={{ ...mockPrompt, content: 'Score each backlog item' }} searchQuery="backlog" />);
+    expect(screen.getByText('backlog', { selector: 'mark' })).toBeInTheDocument();
+  });
+
+  it.each([
+    [undefined, 'Never used'],
+    [0, 'Never used'],
+    [1, '1 use'],
+    [18, '18 uses'],
+  ])('should show usage count %s as "%s"', (usageCount, label) => {
+    render(<PromptCard {...mockProps} prompt={{ ...mockPrompt, usageCount }} />);
+    expect(screen.getByText(label)).toBeInTheDocument();
   });
 
   it('should render category', () => {
@@ -86,7 +160,7 @@ describe('PromptCard - Basic Rendering', () => {
     };
 
     render(<PromptCard {...mockProps} prompt={promptWithLongTitle} searchQuery="searchable" />);
-    const titleElement = screen.getByRole('heading', { name: /searchable/i });
+    const titleElement = screen.getByRole('button', { name: `Edit ${longTitle}` });
 
     // Verify full text is accessible via tooltip even with highlighting
     expect(titleElement).toHaveAttribute('title', longTitle);
@@ -133,6 +207,114 @@ describe('PromptCard - Basic Rendering', () => {
 
     expect(screen.getAllByText('<e')[0].tagName).toBe('MARK');
     expect(screen.getByRole('heading')).toHaveTextContent('Use <example>text</example> tags');
+  });
+});
+
+describe('PromptCard - Content preview prefix', () => {
+  const basePrompt: Prompt = {
+    id: 'long',
+    title: 'Long Prompt',
+    content: '',
+    category: 'Test Category',
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  };
+
+  const baseProps = {
+    categories: [{ id: '1', name: 'Test Category', color: '#FF0000' }],
+    onEdit: vi.fn(),
+    onCopy: vi.fn(),
+    onTogglePin: vi.fn(),
+    showToast: vi.fn<(message: string, type: 'success' | 'error' | 'info' | 'warning') => void>(),
+  };
+
+  /** Renders a card and returns the text of its content preview (the card's only <p>). */
+  const renderPreview = (content: string, searchQuery = ''): HTMLParagraphElement => {
+    const { container } = render(
+      <PromptCard {...baseProps} prompt={{ ...basePrompt, content }} searchQuery={searchQuery} />
+    );
+    const preview = container.querySelector('p');
+    if (!preview) {throw new Error('content preview not rendered');}
+    return preview;
+  };
+
+  it('AT1: renders only a bounded prefix of a 20,000-char content, with an ellipsis', () => {
+    const text = renderPreview('a'.repeat(20000)).textContent;
+    expect(text.length).toBeLessThanOrEqual(301);
+    expect(text.length).toBeGreaterThanOrEqual(290);
+    expect(text.endsWith('…')).toBe(true);
+  });
+
+  it.each([299, 298])('AT2: never splits an emoji surrogate pair at the cut (%i-char lead)', (lead) => {
+    // Each emoji is 2 UTF-16 code units; a 299-char lead puts the 300-unit
+    // boundary between an emoji's high and low surrogate.
+    const text = renderPreview('x'.repeat(lead) + '😀'.repeat(200)).textContent;
+    expect(text.endsWith('…')).toBe(true);
+    expect(text).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/);
+  });
+
+  it('AT3: highlights a match inside the prefix and leaves the cut-off tail out of the DOM', () => {
+    const preview = renderPreview(`Score each backlog item ${'z'.repeat(20000)} tail-needle`, 'backlog');
+    expect(preview.querySelector('mark')?.textContent).toBe('backlog');
+    expect(preview.textContent).not.toContain('tail-needle');
+  });
+
+  it('AT3: renders short content unchanged, without an ellipsis', () => {
+    expect(renderPreview('Short and sweet 😀').textContent).toBe('Short and sweet 😀');
+  });
+});
+
+describe('PromptCard - Variables chip', () => {
+  const basePrompt: Prompt = {
+    id: 'v',
+    title: 'Translate',
+    content: 'No variables here',
+    category: 'Test Category',
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  };
+
+  const renderWithContent = (content: string) =>
+    render(
+      <PromptCard
+        prompt={{ ...basePrompt, content }}
+        categories={[{ id: '1', name: 'Test Category', color: '#FF0000' }]}
+        onEdit={vi.fn()}
+        onCopy={vi.fn()}
+        onTogglePin={vi.fn()}
+        showToast={vi.fn()}
+      />
+    );
+
+  it('shows "1 variable" for a prompt with one distinct variable, repeated', () => {
+    renderWithContent('Translate {{text}} then repeat {{ text }}');
+    expect(screen.getByTestId('prompt-variables-chip')).toHaveTextContent(/^1 variable$/);
+  });
+
+  it('shows "N variables" counting distinct variables', () => {
+    renderWithContent('Translate {{text}} into {{language}} for {{audience}}, again {{text}}');
+    expect(screen.getByTestId('prompt-variables-chip')).toHaveTextContent(/^3 variables$/);
+  });
+
+  it('hides the chip when the prompt has no variables', () => {
+    renderWithContent('Plain text with {single} braces and {{}}');
+    expect(screen.queryByTestId('prompt-variables-chip')).not.toBeInTheDocument();
+  });
+
+  it('still copies the raw text with its variables', async () => {
+    const onCopy = vi.fn();
+    render(
+      <PromptCard
+        prompt={{ ...basePrompt, content: 'Hi {{name}}' }}
+        categories={[]}
+        onEdit={vi.fn()}
+        onCopy={onCopy}
+        onTogglePin={vi.fn()}
+        showToast={vi.fn()}
+      />
+    );
+    await userEvent.click(screen.getByRole('button', { name: /Copy content of Translate/ }));
+    expect(onCopy).toHaveBeenCalledWith('Hi {{name}}');
   });
 });
 
@@ -200,8 +382,8 @@ describe('PromptCard - Share Button', () => {
     prompt: mockPrompt,
     categories: mockCategories,
     onEdit: vi.fn(),
-    onDelete: vi.fn(),
     onCopy: vi.fn(),
+    onTogglePin: vi.fn(),
     showToast: mockShowToast,
     searchQuery: ''
   });

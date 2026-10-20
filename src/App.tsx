@@ -1,4 +1,4 @@
-import { useState, useOptimistic, useTransition, useCallback } from 'react';
+import { useState, useOptimistic, useTransition, useCallback, useRef } from 'react';
 import type { FC } from 'react';
 
 import AddPromptForm from './components/AddPromptForm';
@@ -8,6 +8,7 @@ import EditPromptForm from './components/EditPromptForm';
 import LibraryView from './components/LibraryView';
 import SettingsView from './components/SettingsView';
 import StorageWarning from './components/StorageWarning';
+import TabBar, { type Section } from './components/TabBar';
 import ToastContainer from './components/ToastContainer';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { useCategories } from './hooks/useCategories';
@@ -18,7 +19,11 @@ import { useToast } from './hooks/useToast';
 import type { Prompt, AppError, ViewType } from './types';
 import { Logger, toError } from './utils';
 
-type ExtendedViewType = ViewType | 'categories' | 'settings' | 'analytics';
+type ExtendedViewType = ViewType | Section;
+
+const SECTIONS: readonly ExtendedViewType[] = ['library', 'categories', 'analytics', 'settings'];
+
+const isSection = (view: ExtendedViewType): view is Section => SECTIONS.includes(view);
 
 interface AppProps {
   context?: 'popup' | 'sidepanel';
@@ -33,6 +38,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   const [selectedPrompt, setSelectedPrompt] = useState<Prompt | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [showStorageWarning, setShowStorageWarning] = useState<boolean>(false);
+  const sectionContentRef = useRef<HTMLDivElement>(null);
 
   // React 19 useTransition for managing optimistic updates
   const [, startTransition] = useTransition();
@@ -44,6 +50,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
     createPrompt,
     updatePrompt,
     deletePrompt,
+    togglePin,
     refreshPrompts
   } = usePrompts();
 
@@ -121,6 +128,23 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
       showToast('Failed to delete prompt', 'error');
     }
   };
+
+  const handleDeleteFromEdit = (id: string) => {
+    setCurrentView('library');
+    setSelectedPrompt(null);
+    void handleDeletePrompt(id);
+  };
+
+  const handleTogglePin = useCallback((id: string) => {
+    togglePin(id).catch((err: unknown) => {
+      Logger.error('Failed to toggle pin', toError(err), {
+        component: 'App',
+        promptId: id,
+        operation: 'togglePin'
+      });
+      showToast('Failed to update pin', 'error');
+    });
+  }, [togglePin, showToast]);
 
   const handleCopyPrompt = async (content: string) => {
     const success = await copyToClipboard(content);
@@ -216,29 +240,21 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
     }
   };
 
-  // Memoized callbacks to prevent unnecessary re-renders
-  const handleManageCategories = useCallback(() => {
-    setCurrentView('categories');
-  }, []);
-
-  const handleSettings = useCallback(() => {
-    setCurrentView('settings');
-  }, []);
-
-  const handleAnalytics = useCallback(() => {
-    setCurrentView('analytics');
-  }, []);
-
-  const handleBackToLibrary = useCallback(() => {
-    setCurrentView('library');
-  }, []);
-
-  const handleBackToLibraryWithRefresh = useCallback(() => {
-    setCurrentView('library');
-    // Refresh data to ensure imported prompts/categories are visible
-    void refreshPrompts();
-    void refreshCategories();
-  }, [refreshPrompts, refreshCategories]);
+  const handleSelectSection = useCallback((section: Section) => {
+    if (section === currentView) {
+      // iOS convention: pressing the active tab scrolls its content back to the top
+      sectionContentRef.current
+        ?.querySelector('[data-scroll-container]')
+        ?.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    if (currentView === 'settings') {
+      // Settings may have imported prompts/categories: refresh so other Sections show them
+      void refreshPrompts();
+      void refreshCategories();
+    }
+    setCurrentView(section);
+  }, [currentView, refreshPrompts, refreshCategories]);
 
   const handleExpandDashboard = useCallback(() => {
     // Open full analytics dashboard in a new tab
@@ -250,6 +266,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   }, []);
 
   const loading = promptsLoading || categoriesLoading;
+  const showTabBar = isSection(currentView);
 
   if (promptsError) {
     return (
@@ -266,7 +283,8 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
 
   return (
     <ThemeProvider>
-      <div className={`h-full w-full bg-gray-50 dark:bg-gray-900 relative ${context === 'sidepanel' ? 'sidepanel' : ''}`}>
+      <div className={`h-full w-full bg-gray-50 dark:bg-gray-900 relative flex flex-col ${context === 'sidepanel' ? 'sidepanel' : ''}`}>
+      <div ref={sectionContentRef} className="flex-1 min-h-0">
       {currentView === 'library' && (
         <LibraryView
           prompts={optimisticPrompts}
@@ -275,13 +293,10 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
           selectedCategory={selectedCategory}
           onAddNew={handleAddNew}
           onEditPrompt={handleEditPrompt}
-          onDeletePrompt={(id: string) => { void handleDeletePrompt(id); }}
+          onTogglePin={handleTogglePin}
           onCopyPrompt={(content: string) => { void handleCopyPrompt(content); }}
           showToast={showToast}
           onCategoryChange={setSelectedCategory}
-          onManageCategories={handleManageCategories}
-          onSettings={handleSettings}
-          onAnalytics={handleAnalytics}
           loading={loading}
           context={context}
         />
@@ -301,6 +316,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
           categories={categories}
           onSubmit={(data) => { void handleFormSubmit(data); }}
           onCancel={handleFormCancel}
+          onDelete={handleDeleteFromEdit}
         />
       )}
 
@@ -310,14 +326,13 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
           onCreateCategory={handleCreateCategory}
           onUpdateCategory={handleUpdateCategory}
           onDeleteCategory={handleDeleteCategory}
-          isOpen={true}
-          onClose={handleBackToLibrary}
+          context={context}
         />
       )}
 
       {currentView === 'settings' && (
         <SettingsView
-          onBack={handleBackToLibraryWithRefresh}
+          context={context}
           showToast={showToast}
           toastSettings={settings}
           onToastSettingsChange={updateSettings}
@@ -326,10 +341,14 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
 
       {currentView === 'analytics' && (
         <AnalyticsTab
-          onBack={handleBackToLibrary}
           onExpandDashboard={handleExpandDashboard}
           context={context}
         />
+      )}
+      </div>
+
+      {showTabBar && (
+        <TabBar activeSection={currentView} onSelect={handleSelectSection} />
       )}
 
       {showStorageWarning && (
@@ -341,6 +360,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
         onDismiss={hideToast}
         position={settings.position}
         queueLength={queueLength}
+        aboveTabBar={showTabBar}
       />
       </div>
     </ThemeProvider>

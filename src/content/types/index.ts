@@ -11,6 +11,7 @@ export interface Prompt {
   updatedAt: number;
   usageCount?: number;
   lastUsedAt?: number;
+  pinned?: boolean; // Pinned Prompts appear first in the prompt picker (absent = unpinned)
 }
 
 export interface InsertionResult {

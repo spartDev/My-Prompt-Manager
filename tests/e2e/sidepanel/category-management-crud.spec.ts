@@ -23,13 +23,12 @@ test.describe('Category Management - Core CRUD Operations', () => {
       // Navigate to category manager (button is in the main library view)
       await expect(sidepanelPage.getByRole('heading', { name: 'My Prompt Manager' })).toBeVisible();
 
-      const manageCategoriesButton = sidepanelPage.getByRole('button', { name: 'Manage categories' });
+      const manageCategoriesButton = sidepanelPage.getByTestId('tab-categories');
       await expect(manageCategoriesButton).toBeVisible();
       await manageCategoriesButton.click();
 
       // Verify category manager opened
-      await expect(sidepanelPage.getByRole('heading', { name: 'Manage Categories' })).toBeVisible();
-      await expect(sidepanelPage.getByText('Organize your prompt collection')).toBeVisible();
+      await expect(sidepanelPage.getByRole('heading', { level: 1, name: 'Categories', exact: true })).toBeVisible();
 
       // Create new category
       const categoryNameInput = sidepanelPage.getByPlaceholder('Enter category name...');
@@ -43,7 +42,7 @@ test.describe('Category Management - Core CRUD Operations', () => {
 
       // Verify category appears in list
       await expect(sidepanelPage.getByText('Coding')).toBeVisible();
-      await expect(sidepanelPage.getByText('2 categories')).toBeVisible(); // Should include default "Uncategorized" + new one
+      await expect(sidepanelPage.getByText('2 categories', { exact: true }).first()).toBeVisible(); // Should include default "Uncategorized" + new one
 
       // Verify input is cleared after creation
       await expect(categoryNameInput).toHaveValue('');
@@ -75,7 +74,7 @@ test.describe('Category Management - Core CRUD Operations', () => {
       await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
       // Navigate to category manager
-      await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
+      await sidepanelPage.getByTestId('tab-categories').click();
 
       // Try to create duplicate category (case-insensitive test)
       const categoryNameInput = sidepanelPage.getByPlaceholder('Enter category name...');
@@ -88,7 +87,7 @@ test.describe('Category Management - Core CRUD Operations', () => {
       await expect(sidepanelPage.getByText('⚠️ Category already exists')).toBeVisible();
 
       // Verify category count hasn't changed
-      await expect(sidepanelPage.getByText('2 categories')).toBeVisible(); // Default + seeded category
+      await expect(sidepanelPage.getByText('2 categories', { exact: true }).first()).toBeVisible(); // Default + seeded category
 
       // Verify storage unchanged
       const categories = await storage.getCategories();
@@ -101,7 +100,7 @@ test.describe('Category Management - Core CRUD Operations', () => {
       await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
       // Navigate to category manager
-      await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
+      await sidepanelPage.getByTestId('tab-categories').click();
 
       // Verify add button is disabled when input is empty
       const addButton = sidepanelPage.getByRole('button', { name: 'Add' });
@@ -136,7 +135,7 @@ test.describe('Category Management - Core CRUD Operations', () => {
       await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
       // Navigate to category manager
-      await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
+      await sidepanelPage.getByTestId('tab-categories').click();
 
       const categoryNameInput = sidepanelPage.getByPlaceholder('Enter category name...');
 
@@ -174,7 +173,7 @@ test.describe('Category Management - Core CRUD Operations', () => {
       await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
       // Navigate to category manager
-      await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
+      await sidepanelPage.getByTestId('tab-categories').click();
 
       // Verify category is displayed
       await expect(sidepanelPage.getByText('Research')).toBeVisible();
@@ -232,7 +231,7 @@ test.describe('Category Management - Core CRUD Operations', () => {
       await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
       // Navigate to category manager
-      await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
+      await sidepanelPage.getByTestId('tab-categories').click();
 
       // Start editing
       const categoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Original Name', { exact: true }) }).first();
@@ -279,7 +278,7 @@ test.describe('Category Management - Core CRUD Operations', () => {
       await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
       // Navigate to category manager
-      await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
+      await sidepanelPage.getByTestId('tab-categories').click();
 
       // Start editing
       const categoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Old Name', { exact: true }) }).first();
@@ -325,11 +324,11 @@ test.describe('Category Management - Core CRUD Operations', () => {
       await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
       // Navigate to category manager
-      await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
+      await sidepanelPage.getByTestId('tab-categories').click();
 
       // Verify category exists
       await expect(sidepanelPage.getByText('Temporary Category')).toBeVisible();
-      await expect(sidepanelPage.getByText('2 categories')).toBeVisible();
+      await expect(sidepanelPage.getByText('2 categories', { exact: true }).first()).toBeVisible();
 
       // Hover to reveal delete button and click it
       const categoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Temporary Category', { exact: true }) }).first();
@@ -351,7 +350,7 @@ test.describe('Category Management - Core CRUD Operations', () => {
 
       // Verify category removed from list (not from dialog which should be closed)
       await expect(sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Temporary Category', { exact: true }) })).toBeHidden();
-      await expect(sidepanelPage.getByText('1 category')).toBeVisible(); // Only "Uncategorized" remains
+      await expect(sidepanelPage.getByText('1 category', { exact: true }).first()).toBeVisible(); // Only "Uncategorized" remains
 
       // Verify storage updated
       const categories = await storage.getCategories();
@@ -367,7 +366,7 @@ test.describe('Category Management - Core CRUD Operations', () => {
       await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
       // Navigate to category manager
-      await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
+      await sidepanelPage.getByTestId('tab-categories').click();
 
       // Find the Uncategorized category row
       const uncategorizedRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Uncategorized', { exact: true }) }).first();
@@ -396,7 +395,7 @@ test.describe('Category Management - Core CRUD Operations', () => {
       await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
       // Navigate to category manager
-      await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
+      await sidepanelPage.getByTestId('tab-categories').click();
 
       // Click delete button
       const categoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Keep This Category', { exact: true }) }).first();
@@ -413,7 +412,7 @@ test.describe('Category Management - Core CRUD Operations', () => {
 
       // Verify category remains
       await expect(sidepanelPage.getByText('Keep This Category')).toBeVisible();
-      await expect(sidepanelPage.getByText('2 categories')).toBeVisible();
+      await expect(sidepanelPage.getByText('2 categories', { exact: true }).first()).toBeVisible();
 
       // Verify dialog closed
       await expect(confirmDialog).toBeHidden();
@@ -458,7 +457,7 @@ test.describe('Category Management - Core CRUD Operations', () => {
       await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
       // Navigate to category manager
-      await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
+      await sidepanelPage.getByTestId('tab-categories').click();
 
       // Delete the "Work" category
       const categoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Work', { exact: true }) }).first();
@@ -469,9 +468,9 @@ test.describe('Category Management - Core CRUD Operations', () => {
       const confirmDialog = sidepanelPage.getByRole('dialog', { name: 'Delete Category' });
       await confirmDialog.getByRole('button', { name: 'Delete' }).click();
 
-      // Go back to main view to verify prompts moved to Uncategorized
-      // Find and click the back button in the category manager header
-      const closeButton = sidepanelPage.getByTestId('back-button');
+      // Return to the Library via the tab bar to verify prompts moved to Uncategorized
+      // Categories has no back button; use the Library tab
+      const closeButton = sidepanelPage.getByTestId('tab-library');
       await closeButton.click();
       await expect(sidepanelPage.getByRole('heading', { name: 'My Prompt Manager' })).toBeVisible();
 

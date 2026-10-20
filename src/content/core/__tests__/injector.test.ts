@@ -269,6 +269,56 @@ describe('PromptLibraryInjector', () => {
       expect(noPrompts).toBeTruthy();
     });
 
+    describe('Pinned Prompts', () => {
+      const makePrompt = (id: string, pinned?: boolean): Prompt => ({
+        id,
+        title: `Prompt ${id}`,
+        content: `Content ${id}`,
+        category: 'Test',
+        createdAt: 1,
+        updatedAt: 1,
+        usageCount: 0,
+        lastUsedAt: 1,
+        ...(pinned === undefined ? {} : { pinned })
+      });
+
+      const listedIds = () =>
+        Array.from(document.querySelectorAll<HTMLElement>('.prompt-library-selector .prompt-list [data-prompt-id]'))
+          .map(item => item.dataset.promptId);
+
+      beforeEach(async () => {
+        const { getPrompts } = await import('../../utils/storage');
+        (getPrompts as any).mockResolvedValue([
+          makePrompt('a'),
+          makePrompt('b', true),
+          makePrompt('c', false),
+          makePrompt('d', true),
+          makePrompt('e')
+        ]);
+      });
+
+      it('lists Pinned Prompts first, keeping storage order within each group', async () => {
+        await injector.showPromptSelector(mockTextarea);
+
+        expect(listedIds()).toEqual(['b', 'd', 'a', 'c', 'e']);
+      });
+
+      it('keeps Pinned Prompts first in search results', async () => {
+        const { EventManager } = await import('../../ui/event-manager');
+        await injector.showPromptSelector(mockTextarea);
+
+        const eventManager = (EventManager as any).mock.results.at(-1).value;
+        const searchCall = eventManager.addTrackedEventListener.mock.calls.find(
+          ([element, type]: [Element, string]) => type === 'input' && element.classList.contains('search-input')
+        );
+        const searchInput = searchCall[0] as HTMLInputElement;
+        searchInput.value = 'Content';
+        searchCall[2]({ target: searchInput });
+
+        expect(listedIds()).toEqual(['b', 'd', 'a', 'c', 'e']);
+      });
+    });
+
     it('should handle storage errors gracefully', async () => {
       const { getPrompts } = await import('../../utils/storage');
       const Logger = await import('../../utils/logger');

@@ -6,6 +6,7 @@ import { PROMPT_LIMITS } from '../services/promptAdmission';
 import type { EditPromptFormProps } from '../types/components';
 import { Logger, toError, validatePromptFields, type FieldErrors } from '../utils';
 
+import ConfirmDialog from './ConfirmDialog';
 import { Dropdown, type DropdownItem } from './Dropdown';
 import ViewHeader from './ViewHeader';
 
@@ -36,8 +37,11 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
   prompt,
   categories,
   onSubmit,
-  onCancel
+  onCancel,
+  onDelete
 }) => {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
   // Track character counts in state (updated on change)
   const [titleLength, setTitleLength] = useState(prompt.title.length);
   const [contentLength, setContentLength] = useState(prompt.content.length);
@@ -306,7 +310,33 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
             )}
           </button>
         </div>
+
+        {/* Delete - kept apart from Save/Cancel to avoid accidental clicks */}
+        <div className="mt-4 pt-4 border-t border-purple-100 dark:border-gray-700 text-center">
+          <button
+            type="button"
+            onClick={() => { setShowDeleteConfirm(true); }}
+            className="px-3 py-1.5 text-sm font-medium text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors focus-interactive"
+            disabled={isPending}
+          >
+            Delete prompt
+          </button>
+        </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        onConfirm={() => {
+          setShowDeleteConfirm(false);
+          onDelete(prompt.id);
+        }}
+        onCancel={() => { setShowDeleteConfirm(false); }}
+        title="Delete Prompt"
+        message={`Are you sure you want to delete "${prompt.title}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+      />
     </div>
   );
 };

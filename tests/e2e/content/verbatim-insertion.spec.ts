@@ -9,6 +9,7 @@
  */
 import type { Prompt } from '../../../src/types';
 import { DEFAULT_CATEGORY } from '../../../src/types';
+import { extractVariables } from '../../../src/utils/promptVariables';
 import { expect, test } from '../fixtures/extension';
 import { choosePrompt, openPlatform, routePlatform } from '../fixtures/platform-pages';
 import { createPromptSeed, seedLibrary } from '../utils/storage';
@@ -46,6 +47,9 @@ const LINE_BREAKS = {
   content: '\n\nTwo leading line breaks,\n\tthen a tab,\n\nand two trailing line breaks\n\n',
 };
 
+/** `{{braces}}` is a Variable: the fill-in form opens and "Insert as is" must still deliver the exact text. */
+const hasVariables = (content: string): boolean => extractVariables(content).length > 0;
+
 const toSeed = (sample: { id: string; title: string; content: string; category?: string }): Prompt =>
   createPromptSeed({ category: DEFAULT_CATEGORY, ...sample });
 
@@ -60,7 +64,7 @@ test.describe('Insertion is verbatim', () => {
     const reactState = page.locator('#composer-state');
 
     for (const sample of samples) {
-      await choosePrompt(page, sample.id);
+      await choosePrompt(page, sample.id, { insertAsIs: hasVariables(sample.content) });
       await expect.poll(() => textarea.inputValue(), { message: `${sample.id}: textarea value` }).toBe(sample.content);
       await expect.poll(() => reactState.textContent(), { message: `${sample.id}: React state` }).toBe(sample.content);
     }
@@ -80,7 +84,7 @@ test.describe('Insertion is verbatim', () => {
     const editor = page.locator('.ProseMirror');
 
     for (const sample of SAMPLES) {
-      await choosePrompt(page, sample.id);
+      await choosePrompt(page, sample.id, { insertAsIs: hasVariables(sample.content) });
       await expect.poll(() => editor.textContent(), { message: `${sample.id}: editor text` }).toBe(sample.content);
       expect(await editor.evaluate((element) => element.childElementCount), `${sample.id}: elements made from the text`).toBe(0);
     }

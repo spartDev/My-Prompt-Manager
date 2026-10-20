@@ -17,8 +17,6 @@ const renderManager = (overrides: Partial<React.ComponentProps<typeof CategoryMa
     onCreateCategory: vi.fn().mockResolvedValue(undefined),
     onUpdateCategory: vi.fn().mockResolvedValue(undefined),
     onDeleteCategory: vi.fn().mockResolvedValue(undefined),
-    isOpen: true,
-    onClose: vi.fn(),
     ...overrides
   };
 
@@ -27,6 +25,29 @@ const renderManager = (overrides: Partial<React.ComponentProps<typeof CategoryMa
 };
 
 describe('CategoryManager', () => {
+  it('is titled "Categories" with the category count as subtitle and no Back button', () => {
+    renderManager();
+
+    expect(screen.getByRole('heading', { name: 'Categories' })).toBeInTheDocument();
+    expect(screen.getByText('2 categories')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /go back/i })).not.toBeInTheDocument();
+  });
+
+  it('uses the singular for a single category', () => {
+    renderManager({ categories: [baseCategories[0]] });
+
+    expect(screen.getByText('1 category')).toBeInTheDocument();
+  });
+
+  it('shows a Close button only in the side panel', () => {
+    const { unmount } = renderManager({ context: 'popup' });
+    expect(screen.queryByRole('button', { name: /close side panel/i })).not.toBeInTheDocument();
+    unmount();
+
+    renderManager({ context: 'sidepanel' });
+    expect(screen.getByRole('button', { name: /close side panel/i })).toBeInTheDocument();
+  });
+
   it('prevents creating duplicate category names', async () => {
     const { props } = renderManager();
 
@@ -82,7 +103,7 @@ describe('CategoryManager', () => {
     await userEvent.type(editInput, 'Ideas Updated');
     await userEvent.tab();
 
-    await screen.findByText(/manage categories/i);
+    await screen.findByRole('heading', { name: 'Categories' });
 
     expect(props.onUpdateCategory).toHaveBeenCalledWith('ideas', { name: 'Ideas Updated' });
   });

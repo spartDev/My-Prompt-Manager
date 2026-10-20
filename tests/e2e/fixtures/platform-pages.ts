@@ -149,16 +149,26 @@ export async function openPlatform(context: BrowserContext, platform: PlatformFi
  * Chooses a Prompt as a user does: opens the Prompt selector from the extension's icon in
  * the input area and clicks the Prompt. Waits for the selector to close.
  *
+ * A Prompt with Variables opens the fill-in form instead of inserting: `insertAsIs` then
+ * chooses "Insert as is", the user's way to insert the text exactly as stored.
+ *
  * After an Insertion the content script closes "the open selector" only once the use has
  * been reported to the service worker, which can land after a test (far faster than a
  * person) has already reopened it; the selector is then reopened.
  */
-export async function choosePrompt(page: Page, promptId: string): Promise<void> {
+export async function choosePrompt(
+  page: Page,
+  promptId: string,
+  options: { insertAsIs?: boolean } = {}
+): Promise<void> {
   const selector = page.locator('.prompt-library-selector');
 
   await expect(async () => {
     await page.locator('.prompt-library-integrated-icon').click({ timeout: 5_000 });
     await selector.locator(`.prompt-item[data-prompt-id="${promptId}"]`).click({ timeout: 2_000 });
   }).toPass({ timeout: 15_000 });
+  if (options.insertAsIs) {
+    await selector.getByRole('button', { name: 'Insert as is' }).click();
+  }
   await expect(selector).toBeHidden();
 }

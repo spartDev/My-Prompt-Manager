@@ -74,6 +74,19 @@ describe('StorageManager across contexts', () => {
     expect(await storedPrompts()).toEqual([prompt('p1', { title: 'Title' }), saved]);
   });
 
+  it('a pin toggled in the popup and a use counted by the service worker are both kept', async () => {
+    await chrome.storage.local.set({ prompts: [prompt('p1')] });
+    const worker = context();
+    const popup = context();
+    slowRead('prompts'); // the first read, whichever context makes it, is slow
+
+    await Promise.all([worker.incrementUsageCount('p1'), popup.togglePinned('p1')]);
+
+    expect(await storedPrompts()).toEqual([
+      expect.objectContaining({ id: 'p1', pinned: true, usageCount: 1, updatedAt: 2 })
+    ]);
+  });
+
   it('asks the other contexts for the Prompt and Category locks, but not for the settings lock', async () => {
     // A settings toggle is the one write a user triggers by hand and may close the page right after,
     // so it must not wait for a lock round trip to the other contexts

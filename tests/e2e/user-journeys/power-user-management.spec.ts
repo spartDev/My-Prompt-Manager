@@ -150,8 +150,8 @@ test.describe('Power User Prompt Management', () => {
     await expect(sidepanelPage.getByTestId('prompt-card')).toHaveCount(17);
 
     // Open category manager
-    await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
-    await expect(sidepanelPage.getByRole('heading', { name: 'Manage Categories' })).toBeVisible();
+    await sidepanelPage.getByTestId('tab-categories').click();
+    await expect(sidepanelPage.getByRole('heading', { level: 1, name: 'Categories', exact: true })).toBeVisible();
 
     // Rename "Work" category to "Professional"
     const workCategoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Work', { exact: true }) }).first();
@@ -169,8 +169,8 @@ test.describe('Power User Prompt Management', () => {
     await expect(sidepanelPage.getByText('Professional')).toBeVisible();
     await expect(sidepanelPage.getByText('Work')).toBeHidden();
 
-    // Close category manager and verify prompts updated
-    await sidepanelPage.getByTestId('back-button').first().click();
+    // Switch to the Library tab and verify prompts updated
+    await sidepanelPage.getByTestId('tab-library').click();
 
     // Filter to Professional and verify former "Work" prompts are there
     await sidepanelPage.getByRole('button', { name: /Filter by category:/i }).click();
@@ -203,8 +203,7 @@ test.describe('Power User Prompt Management', () => {
 
     // Move first marketing prompt to Work category
     const socialMediaCard = sidepanelPage.getByTestId('prompt-card').filter({ hasText: 'Social Media Content' }).first();
-    await socialMediaCard.getByRole('button', { name: 'More actions' }).click();
-    await sidepanelPage.getByRole('menuitem', { name: 'Edit' }).click();
+    await socialMediaCard.getByRole('button', { name: /^Edit / }).click();
 
     await expect(sidepanelPage.getByRole('heading', { name: 'Edit Prompt' })).toBeVisible();
     await sidepanelPage.getByLabel('Category').click();
@@ -215,8 +214,7 @@ test.describe('Power User Prompt Management', () => {
 
     // Move second marketing prompt to Work category
     const campaignAnalysisCard = sidepanelPage.getByTestId('prompt-card').filter({ hasText: 'Campaign Analysis' }).first();
-    await campaignAnalysisCard.getByRole('button', { name: 'More actions' }).click();
-    await sidepanelPage.getByRole('menuitem', { name: 'Edit' }).click();
+    await campaignAnalysisCard.getByRole('button', { name: /^Edit / }).click();
 
     await expect(sidepanelPage.getByRole('heading', { name: 'Edit Prompt' })).toBeVisible();
     await sidepanelPage.getByLabel('Category').click();
@@ -238,7 +236,7 @@ test.describe('Power User Prompt Management', () => {
     await expect(sidepanelPage.getByTestId('prompt-card')).toHaveCount(7); // 5 original + 2 moved
 
     // Delete the empty Marketing category
-    await sidepanelPage.getByRole('button', { name: 'Manage categories' }).click();
+    await sidepanelPage.getByTestId('tab-categories').click();
     const marketingCategoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Marketing', { exact: true }) }).first();
     await marketingCategoryRow.hover();
     await marketingCategoryRow.getByRole('button', { name: 'Delete category' }).click();
@@ -317,8 +315,7 @@ test.describe('Power User Prompt Management', () => {
 
     for (const promptTitle of devPrompts) {
       const promptCard = sidepanelPage.getByTestId('prompt-card').filter({ hasText: promptTitle }).first();
-      await promptCard.getByRole('button', { name: 'More actions' }).click();
-      await sidepanelPage.getByRole('menuitem', { name: 'Edit' }).click();
+      await promptCard.getByRole('button', { name: /^Edit / }).click();
 
       await expect(sidepanelPage.getByRole('heading', { name: 'Edit Prompt' })).toBeVisible();
       await sidepanelPage.getByLabel('Category').click();
@@ -355,7 +352,7 @@ test.describe('Power User Prompt Management', () => {
     await expect(sidepanelPage.getByRole('heading', { name: 'My Prompt Manager' })).toBeVisible();
 
     // Navigate to settings for export functionality
-    await sidepanelPage.getByRole('button', { name: 'Settings' }).click();
+    await sidepanelPage.getByTestId('tab-settings').click();
     await expect(sidepanelPage.getByRole('heading', { name: 'Settings' })).toBeVisible();
 
     // Remove File System Access API to force legacy download fallback
