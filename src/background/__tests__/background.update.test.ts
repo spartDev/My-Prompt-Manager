@@ -35,6 +35,10 @@ async function loadBackground(): Promise<{ onInstalled: InstalledListener; Logge
 const storedPrompts = async (): Promise<unknown> => (await chrome.storage.local.get('prompts')).prompts;
 const storedCategories = async (): Promise<unknown> => (await chrome.storage.local.get('categories')).categories;
 
+
+/** chrome.runtime.onInstalled details for an update (previousVersion is required with that reason). */
+const UPDATE = { reason: 'update', previousVersion: '1.0.0' } as const;
+
 describe('background: stored data on extension update', () => {
   const entry = {
     id: 'p1',
@@ -57,7 +61,7 @@ describe('background: stored data on extension update', () => {
   it('cleans stored Prompts and Category names of Hidden characters when the extension is updated', async () => {
     const { onInstalled } = await loadBackground();
 
-    onInstalled({ reason: 'update' });
+    onInstalled(UPDATE);
 
     await vi.waitFor(async () => {
       expect(await storedPrompts()).toEqual([entry]);
@@ -65,12 +69,16 @@ describe('background: stored data on extension update', () => {
     });
   });
 
-  it.each(['install', 'chrome_update', 'shared_module_update'] as const)(
-    'leaves stored data alone when the reason is %s',
-    async (reason) => {
+  it.each([
+    { reason: 'install' },
+    { reason: 'chrome_update' },
+    { reason: 'shared_module_update', id: 'shared-module-id' }
+  ] as const)(
+    'leaves stored data alone when the reason is $reason',
+    async (details) => {
       const { onInstalled } = await loadBackground();
 
-      onInstalled({ reason });
+      onInstalled(details);
 
       await vi.waitFor(() => {
         expect(chrome.action.setPopup).toHaveBeenCalled();
@@ -86,7 +94,7 @@ describe('background: stored data on extension update', () => {
     const { onInstalled, Logger } = await loadBackground();
 
     expect(() => {
-      onInstalled({ reason: 'update' });
+      onInstalled(UPDATE);
     }).not.toThrow();
 
     await vi.waitFor(() => {
@@ -103,7 +111,7 @@ describe('background: stored data on extension update', () => {
     vi.mocked(chrome.storage.local.set).mockImplementation(() => new Promise<void>(() => undefined));
     const { onInstalled } = await loadBackground();
 
-    onInstalled({ reason: 'update' });
+    onInstalled(UPDATE);
 
     await vi.waitFor(() => {
       expect(chrome.storage.local.set).toHaveBeenCalled();
