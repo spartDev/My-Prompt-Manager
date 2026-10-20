@@ -34,7 +34,7 @@ class TestReactStrategy extends ReactPlatformStrategy {
 
   async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
     try {
-      const validation = this.validateAndSanitize(content, 1000);
+      const validation = this.validateContent(content);
       if (!validation.valid) {
         return await Promise.resolve({
           success: false,
@@ -42,16 +42,9 @@ class TestReactStrategy extends ReactPlatformStrategy {
         });
       }
 
-      if (typeof validation.sanitized !== 'string') {
-        return await Promise.resolve({
-          success: false,
-          error: 'Content sanitization failed'
-        });
-      }
-
       return await this.insertIntoReactTextarea(
         element as HTMLTextAreaElement,
-        validation.sanitized,
+        content,
         'TestReact'
       );
     } catch (error) {
@@ -131,8 +124,8 @@ describe('ReactPlatformStrategy', () => {
     });
   });
 
-  describe('validateAndSanitize', () => {
-    it('should validate and return sanitized content for valid string', async () => {
+  describe('validateContent', () => {
+    it('should insert a valid string as given', async () => {
       const content = 'Hello, World!';
       const result = await strategy.insert(mockTextarea, content);
 
@@ -148,40 +141,36 @@ describe('ReactPlatformStrategy', () => {
       expect(result.error).toBe('Invalid content type');
     });
 
-    it('should reject content exceeding maximum length', async () => {
-      const longContent = 'a'.repeat(1001); // Max is 1000 in TestReactStrategy
+    it('should not insert anything when the content is not a string', async () => {
+      mockTextarea.value = 'existing';
+
+      await strategy.insert(mockTextarea, null as unknown as string);
+
+      expect(mockTextarea.value).toBe('existing');
+    });
+
+    it('should not limit the length of the content', async () => {
+      const longContent = 'a'.repeat(60000);
       const result = await strategy.insert(mockTextarea, longContent);
 
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('Content exceeds maximum length');
-    });
-
-    it('should accept content at maximum length boundary', async () => {
-      const maxContent = 'a'.repeat(1000); // Exactly at max
-      const result = await strategy.insert(mockTextarea, maxContent);
-
       expect(result.success).toBe(true);
-      expect(mockTextarea.value).toBe(maxContent);
+      expect(mockTextarea.value).toBe(longContent);
     });
 
-    it('should sanitize control characters while preserving newlines', async () => {
+    it('should preserve newlines, tabs and carriage returns', async () => {
       const content = 'Line 1\nLine 2\tTabbed\rCarriage Return';
       const result = await strategy.insert(mockTextarea, content);
 
       expect(result.success).toBe(true);
-      expect(mockTextarea.value).toContain('\n'); // Preserves newline
-      expect(mockTextarea.value).toContain('\t'); // Preserves tab
-      expect(mockTextarea.value).toContain('\r'); // Preserves carriage return
+      expect(mockTextarea.value).toBe(content);
     });
 
-    it('should remove dangerous control characters', async () => {
-      // String with NULL, backspace, vertical tab
-      const content = 'Hello\x00World\x08Test\x0BMore';
+    it('should leave control and invisible characters as given', async () => {
+      const content = 'Hello\x00World\x08Test\x0BMore\u{200B}\u{200D}';
       const result = await strategy.insert(mockTextarea, content);
 
       expect(result.success).toBe(true);
-      // Control characters should be removed
-      expect(mockTextarea.value).toBe('HelloWorldTestMore');
+      expect(mockTextarea.value).toBe(content);
     });
 
     it('should handle empty string', async () => {
@@ -331,7 +320,7 @@ describe('ReactPlatformStrategy', () => {
   });
 
   describe('integration with derived classes', () => {
-    it('should allow derived classes to use validateAndSanitize', async () => {
+    it('should allow derived classes to use validateContent', async () => {
       // This test verifies that derived classes can access protected methods
       const result = await strategy.insert(mockTextarea, 'Valid content');
       expect(result.success).toBe(true);
@@ -357,13 +346,13 @@ describe('ReactPlatformStrategy', () => {
         }
 
         insert(element: HTMLElement, content: string): Promise<InsertionResult> {
-          const validation = this.validateAndSanitize(content, 500);
-          if (!validation.valid || !validation.sanitized) {
-            return Promise.resolve({ success: false, error: validation.error || 'Validation failed' });
+          const validation = this.validateContent(content);
+          if (!validation.valid) {
+            return Promise.resolve({ success: false, error: validation.error });
           }
           return this.insertIntoReactTextarea(
             element as HTMLTextAreaElement,
-            validation.sanitized,
+            content,
             'CustomPlatform'
           );
         }
@@ -378,45 +367,6 @@ describe('ReactPlatformStrategy', () => {
 
       expect(result.success).toBe(true);
       expect(result.method).toBe('customplatform-textarea');
-    });
-  });
-
-  describe('edge cases and security', () => {
-    it('should handle very long valid content', async () => {
-      const longContent = 'a'.repeat(999); // Just under limit
-      const result = await strategy.insert(mockTextarea, longContent);
-
-      expect(result.success).toBe(true);
-      expect(mockTextarea.value).toBe(longContent);
-    });
-
-    it('should prevent XSS attempts in content', async () => {
-      const xssContent = '<script>alert("XSS")</script>';
-      const result = await strategy.insert(mockTextarea, xssContent);
-
-      // Content should be inserted as plain text, not executed
-      expect(result.success).toBe(true);
-      expect(mockTextarea.value).toBe(xssContent);
-      // Verify no script was executed (value is plain text)
-      expect(mockTextarea.value).toContain('<script>');
-    });
-
-    it('should handle null bytes in content', async () => {
-      const content = 'Before\x00After';
-      const result = await strategy.insert(mockTextarea, content);
-
-      expect(result.success).toBe(true);
-      // Null byte should be removed
-      expect(mockTextarea.value).toBe('BeforeAfter');
-    });
-
-    it('should handle content with only control characters', async () => {
-      const content = '\x00\x01\x02\x03';
-      const result = await strategy.insert(mockTextarea, content);
-
-      expect(result.success).toBe(true);
-      // All control characters should be removed
-      expect(mockTextarea.value).toBe('');
     });
   });
 });

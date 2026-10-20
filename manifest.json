@@ -49,7 +49,8 @@
       ],
       "resources": [
         "assets/content-*.js",
-        "assets/platforms-*.js",
+        "assets/promptAdmission-*.js",
+        "assets/truncate-*.js",
         "assets/promptVariables-*.js",
         "assets/floating-ui.dom-*.js"
       ],

@@ -392,7 +392,11 @@ test.describe('Usage Counter & Smart Sorting - UI Display', () => {
 
           await expect(promptHeadings).toHaveText(['Low', 'High']);
 
-          // Verify persistence to storage
+          // Verify persistence to storage. The list re-sorts before the write lands, so wait for the
+          // direction to be stored: closing the page first can cut the write short.
+          await expect
+            .poll(async () => (await storage.getSettings())?.sortDirection)
+            .toBe('asc');
           const settings = await storage.getSettings();
           expect(settings?.sortOrder).toBe('usageCount');
 

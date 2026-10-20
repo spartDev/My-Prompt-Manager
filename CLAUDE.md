@@ -16,6 +16,7 @@ npm test && npm run lint && npm run typecheck
 - **Logger**: Use `Logger` from `src/utils/logger.ts` (popup) or `@content/utils/logger` (content scripts) - never `console.*`
 - **React 19 forms**: Use `useActionState` for validation/submission
 - **Platform strategies**: Extend `BaseStrategy` in `src/content/platforms/`
+- **Prompt text**: Never rewrite Prompt text on read or insertion; it is admitted once at the write path (`src/services/promptAdmission.ts`, ADR-001)
 
 ## Workflow
 
@@ -34,6 +35,8 @@ npm test && npm run lint && npm run typecheck
 | Testing patterns | `docs/TESTING.md` |
 | Adding AI platforms | `docs/PLATFORM_INTEGRATION.md` |
 | Custom site config | `docs/ELEMENT_FINGERPRINTING_DESIGN.md` |
+| Domain language (Prompt, Library, Admission, Verbatim...) | CONTEXT.md |
+| Architecture decisions | docs/adr/ |
 
 
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:7510c1e2 -->

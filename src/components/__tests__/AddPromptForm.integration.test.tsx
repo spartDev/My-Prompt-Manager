@@ -6,9 +6,12 @@
  */
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import LZString from 'lz-string';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
+import { admit, AdmissionRefusedError } from '../../services/promptAdmission';
 import { encode } from '../../services/promptEncoder';
+import { PromptManager } from '../../services/promptManager';
 import type { Category, Prompt } from '../../types';
 import AddPromptForm from '../AddPromptForm';
 
@@ -205,12 +208,11 @@ describe('AddPromptForm - Import Integration Tests', () => {
     });
   });
 
-  it('handles special characters in imported prompts', async () => {
-    // Create a prompt with special characters
+  it('hands special characters and tags in imported prompts to onSubmit unchanged', async () => {
     const specialPrompt: Prompt = {
       ...testPrompt,
       title: 'Test 💡 Prompt with "quotes" & <tags>',
-      content: 'Content with\nnewlines\nand\ttabs & special chars: ©®™'
+      content: 'Content with\nnewlines\nand\ttabs & special chars: ©®™ <example>kept</example>'
     };
     const sharingCode = encode(specialPrompt);
 
@@ -229,17 +231,19 @@ describe('AddPromptForm - Import Integration Tests', () => {
       expect(screen.getByText(/valid sharing code detected/i)).toBeInTheDocument();
     }, { timeout: 600 });
 
-    // Verify special characters are preserved (but sanitized)
-    // Note: DOMPurify strips HTML tags, so <tags> becomes empty
-    expect(screen.getByText(/Test.*Prompt with "quotes"/)).toBeInTheDocument();
+    // The preview shows the text as shared, tags included
+    expect(screen.getByText('Test 💡 Prompt with "quotes" & <tags>')).toBeInTheDocument();
 
     // Submit the import
     const submitButton = screen.getByRole('button', { name: /import prompt/i });
     await userEvent.click(submitButton);
 
-    // Verify onSubmit was called (content will be sanitized)
     await waitFor(() => {
-      expect(props.onSubmit).toHaveBeenCalled();
+      expect(props.onSubmit).toHaveBeenCalledWith({
+        title: specialPrompt.title,
+        content: specialPrompt.content,
+        category: specialPrompt.category
+      });
     });
   });
 
@@ -339,5 +343,138 @@ describe('AddPromptForm - End-to-End Workflow Tests', () => {
 
     // After successful import, form should still be usable
     // (In a real app, the parent would close the form or reset it)
+  });
+});
+
+/**
+ * Opening a Share code is one of the routes into the Library (ADR-001): the text must arrive
+ * Verbatim, and Hidden characters must be removed once, when the Prompt is saved. These tests go
+ * through the real form, PromptManager and StorageManager over the in-memory chrome.storage.
+ */
+describe('AddPromptForm - Share code Admission (real StorageManager)', () => {
+  const storedPrompts = async (): Promise<Prompt[]> =>
+    ((await chrome.storage.local.get('prompts')).prompts ?? []) as Prompt[];
+
+  beforeEach(async () => {
+    await chrome.storage.local.set({
+      prompts: [],
+      categories: defaultCategories,
+      settings: { defaultCategory: 'Uncategorized', sortOrder: 'updatedAt' }
+    });
+  });
+
+  // Pastes the code into the form and clicks Import, saving through the real PromptManager.
+  const openShareCode = async (code: string) => {
+    const onSubmit = vi.fn(async (data: { title: string; content: string; category: string }) => {
+      await PromptManager.getInstance().createPrompt(data.title, data.content, data.category);
+    });
+    renderForm({ onSubmit });
+
+    await userEvent.click(screen.getByRole('button', { name: /import shared prompt/i }));
+    await userEvent.click(screen.getByLabelText(/sharing code/i));
+    await userEvent.paste(code);
+
+    await screen.findByText(/valid sharing code detected/i);
+    await userEvent.click(screen.getByRole('button', { name: /import prompt/i }));
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalled();
+    });
+
+    return onSubmit;
+  };
+
+  it('saves tags, "metadata:" and surrounding whitespace exactly as shared', async () => {
+    const content = '  Summarize the metadata: use <example>text</example> tags; if count=5 and onboarding = true\n\n';
+    const code = encode({ ...testPrompt, title: 'Metadata helper', content });
+
+    await openShareCode(code);
+
+    await waitFor(async () => {
+      expect(await storedPrompts()).toHaveLength(1);
+    });
+    expect(await storedPrompts()).toEqual([
+      expect.objectContaining({ title: 'Metadata helper', content, category: 'Work' })
+    ]);
+  });
+
+  it('removes Hidden characters from a Share code when the Prompt is saved, and nothing else', async () => {
+    const code = LZString.compressToEncodedURIComponent(
+      JSON.stringify({
+        title: '  Hid\u{200B}den\u{E0041} title ',
+        content: ' Keep <context>this</context>,\u{202E} drop the rest\u{FEFF}. \n',
+        category: 'Work'
+      })
+    );
+
+    await openShareCode(code);
+
+    await waitFor(async () => {
+      expect(await storedPrompts()).toHaveLength(1);
+    });
+    expect(await storedPrompts()).toEqual([
+      expect.objectContaining({
+        title: 'Hidden title',
+        content: ' Keep <context>this</context>, drop the rest. \n',
+        category: 'Work'
+      })
+    ]);
+  });
+
+  it('tells the user straight away when a Share code holds a Prompt that Admission would refuse', async () => {
+    const code = encode({ ...testPrompt, content: 'x'.repeat(20_001) });
+    const { props } = renderForm();
+
+    await userEvent.click(screen.getByRole('button', { name: /import shared prompt/i }));
+    await userEvent.click(screen.getByLabelText(/sharing code/i));
+    await userEvent.paste(code);
+
+    expect(await screen.findByText('Content cannot exceed 20,000 characters')).toBeInTheDocument();
+    expect(screen.queryByText(/valid sharing code detected/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /import prompt/i })).toBeDisabled();
+    expect(props.onSubmit).not.toHaveBeenCalled();
+    expect(await storedPrompts()).toEqual([]);
+  });
+
+  it('imports a Prompt whose title is over the limit only because of a Hidden character', async () => {
+    const code = LZString.compressToEncodedURIComponent(
+      JSON.stringify({ title: `${'T'.repeat(50)}\u{200B}${'t'.repeat(50)}`, content: 'Body', category: 'Work' })
+    );
+
+    await openShareCode(code);
+
+    await waitFor(async () => {
+      expect(await storedPrompts()).toHaveLength(1);
+    });
+    expect((await storedPrompts())[0].title).toBe(`${'T'.repeat(50)}${'t'.repeat(50)}`);
+  });
+
+  it('selects the Category a Share code names even when the name has spaces or a Hidden character around it', async () => {
+    const code = LZString.compressToEncodedURIComponent(
+      JSON.stringify({ title: 'Title', content: 'Body', category: ' Per\u{200B}sonal ' })
+    );
+
+    await openShareCode(code);
+
+    await waitFor(async () => {
+      expect(await storedPrompts()).toHaveLength(1);
+    });
+    expect((await storedPrompts())[0].category).toBe('Personal');
+  });
+
+  it('shows the refusal in the form when saving is refused at Admission', async () => {
+    const refusal = admit({ title: 'T', content: 'x'.repeat(20_001), category: 'Work' });
+    if (refusal.ok) {
+      throw new Error('Expected the text to be refused');
+    }
+    const onSubmit = vi.fn().mockRejectedValue(new AdmissionRefusedError(refusal.errors));
+    renderForm({ onSubmit });
+
+    await userEvent.click(screen.getByRole('button', { name: /import shared prompt/i }));
+    await userEvent.click(screen.getByLabelText(/sharing code/i));
+    await userEvent.paste(encode(testPrompt));
+    await screen.findByText(/valid sharing code detected/i);
+    await userEvent.click(screen.getByRole('button', { name: /import prompt/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Content cannot exceed 20,000 characters');
   });
 });

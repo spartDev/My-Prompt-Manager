@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
+import { FakeLockManager, installNavigatorLocks } from '../../test/utils/FakeLockManager';
 import { AsyncMutex } from '../asyncMutex';
 
 describe('AsyncMutex', () => {
@@ -221,6 +222,169 @@ describe('AsyncMutex', () => {
       });
 
       expect(locks.has(defaultKey)).toBe(false);
+    });
+  });
+
+  describe('shared across contexts (Web Locks)', () => {
+    let locks: FakeLockManager;
+    let uninstall: () => void;
+
+    beforeEach(() => {
+      locks = new FakeLockManager();
+      uninstall = installNavigatorLocks(locks);
+    });
+
+    afterEach(() => {
+      uninstall();
+    });
+
+    const slowly = async (push: () => void): Promise<void> => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      push();
+    };
+
+    it('a mutex with a scope takes the Web Lock scope:key, so two instances (two contexts) exclude each other', async () => {
+      const worker = new AsyncMutex({ scope: 'storage' });
+      const popup = new AsyncMutex({ scope: 'storage' });
+      const order: string[] = [];
+
+      await Promise.all([
+        worker.withLock('prompts', () => slowly(() => order.push('worker'))),
+        popup.withLock('prompts', async () => {
+          order.push('popup');
+        })
+      ]);
+
+      expect(order).toEqual(['worker', 'popup']);
+      expect(locks.log).toEqual([
+        'acquire storage:prompts',
+        'release storage:prompts',
+        'acquire storage:prompts',
+        'release storage:prompts'
+      ]);
+    });
+
+    it('without a scope, two instances do not exclude each other, as before', async () => {
+      const a = new AsyncMutex();
+      const b = new AsyncMutex();
+      const order: string[] = [];
+
+      await Promise.all([
+        a.withLock('k', () => slowly(() => order.push('a'))),
+        b.withLock('k', async () => {
+          order.push('b');
+        })
+      ]);
+
+      expect(order).toEqual(['b', 'a']);
+      expect(locks.log).toEqual([]);
+    });
+
+    it('keys of one scope are separate locks, and the default key is one of them', async () => {
+      const mutex = new AsyncMutex({ scope: 's' });
+
+      await Promise.all([
+        mutex.withLock('a', () => slowly(() => undefined)),
+        mutex.withLock('b', async () => undefined),
+        mutex.withLock(async () => undefined)
+      ]);
+
+      expect(locks.log.slice(0, 3)).toEqual(['acquire s:a', 'acquire s:b', 'acquire s:__default__']);
+    });
+
+    it('returns the operation result, propagates its error unchanged, and releases the lock either way', async () => {
+      const mutex = new AsyncMutex({ scope: 's' });
+      const failure = new Error('boom');
+
+      await expect(mutex.withLock('k', async () => 'ok')).resolves.toBe('ok');
+      await expect(
+        mutex.withLock('k', async () => {
+          throw failure;
+        })
+      ).rejects.toBe(failure);
+      await expect(mutex.withLock('k', async () => 'after')).resolves.toBe('after');
+
+      expect(locks.log).toEqual([
+        'acquire s:k',
+        'release s:k',
+        'acquire s:k',
+        'release s:k',
+        'acquire s:k',
+        'release s:k'
+      ]);
+    });
+
+    it('nested locks on different keys stay legal (CATEGORIES, then PROMPTS, then SETTINGS)', async () => {
+      const mutex = new AsyncMutex({ scope: 's' });
+
+      const result = await mutex.withLock('categories', () =>
+        mutex.withLock('prompts', () => mutex.withLock('settings', async () => 'done'))
+      );
+
+      expect(result).toBe('done');
+      expect(locks.log).toEqual([
+        'acquire s:categories',
+        'acquire s:prompts',
+        'acquire s:settings',
+        'release s:settings',
+        'release s:prompts',
+        'release s:categories'
+      ]);
+    });
+
+    it('falls back to the in-memory queue when the runtime has no Web Locks', async () => {
+      uninstall();
+      const mutex = new AsyncMutex({ scope: 's' });
+      // @ts-expect-error - accessing private property for testing
+      const inMemory: Map<string, Promise<void>> = mutex.locks;
+
+      await mutex.withLock('k', async () => {
+        expect(inMemory.has('k')).toBe(true);
+      });
+
+      expect(inMemory.has('k')).toBe(false);
+      expect(locks.log).toEqual([]);
+    });
+
+    it('falls back to the in-memory queue when request throws synchronously', async () => {
+      installNavigatorLocks({
+        request: () => {
+          throw new Error('Web Locks are not usable here');
+        }
+      });
+      const mutex = new AsyncMutex({ scope: 's' });
+
+      await expect(mutex.withLock('k', async () => 'ok')).resolves.toBe('ok');
+    });
+
+    it('falls back to the in-memory queue when the API rejects the request without running the operation', async () => {
+      // For example a SecurityError in an opaque origin: the promise rejects, the callback never runs
+      installNavigatorLocks({
+        request: () => Promise.reject(new DOMException('The request is not allowed here', 'SecurityError'))
+      });
+      const mutex = new AsyncMutex({ scope: 's' });
+      let runs = 0;
+
+      await expect(
+        mutex.withLock('k', async () => {
+          runs += 1;
+          return 'ok';
+        })
+      ).resolves.toBe('ok');
+      expect(runs).toBe(1);
+    });
+
+    it('runs an operation that throws once, and hands its error back instead of falling back', async () => {
+      const mutex = new AsyncMutex({ scope: 's' });
+      let runs = 0;
+
+      await expect(
+        mutex.withLock('k', async () => {
+          runs += 1;
+          throw new Error('boom');
+        })
+      ).rejects.toThrow('boom');
+      expect(runs).toBe(1);
     });
   });
 });

@@ -13,6 +13,10 @@
  * - `setupThemeTest()` - Setup theme hook with mocked storage
  * - `testThemeToggle()` - Test theme toggle from one value to another
  *
+ * ### Hostile Text Helpers
+ * - `HOSTILE_TEXTS` - Hostile-looking strings (markup, handlers, URLs) that must stay plain text
+ * - `expectNoMarkupIn()` - Assert nothing under an element was made from Prompt text
+ *
  * ## Usage
  *
  * ```typescript
@@ -35,3 +39,4 @@
 
 export { testEncoderRoundtrip } from './encoder-helpers';
 export { setupThemeTest, testThemeToggle } from './theme-helpers';
+export { HOSTILE_TEXTS, expectNoMarkupIn } from './hostile-text';

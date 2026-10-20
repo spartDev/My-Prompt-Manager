@@ -106,14 +106,15 @@ const DataStorageSection: FC<DataStorageSectionProps> = ({
         throw new Error('Invalid backup file: categories data is not in valid format.');
       }
 
-      // Validate prompt structure
-      if (findInvalidImportPrompt(typedData.prompts as unknown[])) {
+      // Validate prompt structure. The finder returns the offending entry itself, which can be
+      // falsy (a null entry), so compare with undefined rather than testing it for truthiness.
+      if (findInvalidImportPrompt(typedData.prompts as unknown[]) !== undefined) {
         throw new Error('Invalid backup file: one or more prompts have invalid structure.');
       }
 
       // Validate category structure if present
       if (typedData.categories && typedData.categories.length > 0) {
-        if (findInvalidImportCategory(typedData.categories as unknown[])) {
+        if (findInvalidImportCategory(typedData.categories as unknown[]) !== undefined) {
           throw new Error('Invalid backup file: one or more categories have invalid structure.');
         }
       }

@@ -2,12 +2,13 @@
  * Unit tests for M365CopilotStrategy
  *
  * Tests the Microsoft 365 Copilot platform strategy implementation,
- * including Lexical editor support, textarea fallback, content sanitization,
+ * including Lexical editor support, textarea fallback, verbatim delivery of content,
  * and React-compatible event triggering.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+import { HOSTILE_TEXTS, expectNoMarkupIn } from '../../../test/helpers/hostile-text';
 import type { UIElementFactory } from '../../ui/element-factory';
 import { M365CopilotStrategy } from '../m365copilot-strategy';
 
@@ -25,8 +26,7 @@ import {
   cleanupElement,
   M365_COPILOT_SELECTORS,
   M365_COPILOT_BUTTON_CONTAINER_SELECTOR,
-  M365_COPILOT_CONFIG,
-  M365_COPILOT_MAX_LENGTH
+  M365_COPILOT_CONFIG
 } from './fixtures/m365copilot-fixtures';
 
 // Mock Logger
@@ -380,40 +380,38 @@ describe('M365CopilotStrategy', () => {
       expect(result.error).toBe('Invalid content type');
     });
 
-    it('should reject content exceeding maximum length', async () => {
+    it('should not reject long content', async () => {
       // Arrange
-      const longContent = 'a'.repeat(M365_COPILOT_MAX_LENGTH + 1);
+      const longContent = 'a'.repeat(60000);
 
       // Act
       const result = await strategy.insert(mockTextarea, longContent);
 
       // Assert
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('maximum length');
-      expect(result.error).toContain(String(M365_COPILOT_MAX_LENGTH));
-    });
-
-    it('should accept content at maximum length boundary', async () => {
-      // Arrange
-      const maxContent = 'a'.repeat(M365_COPILOT_MAX_LENGTH);
-
-      // Act
-      const result = await strategy.insert(mockTextarea, maxContent);
-
-      // Assert
       expect(result.success).toBe(true);
+      expect(mockTextarea.value).toBe(longContent);
     });
 
-    it('should sanitize control characters from content', async () => {
+    it('should leave control and invisible characters as given', async () => {
       // Arrange
-      const contentWithControlChars = 'Hello\x00\x01\x02World';
-      const expectedSanitized = 'HelloWorld';
+      const content = 'Hello\u{0}\u{1}\u{2}World\u{200B}\u{200D}';
 
       // Act
-      await strategy.insert(mockTextarea, contentWithControlChars);
+      await strategy.insert(mockTextarea, content);
 
       // Assert
-      expect(mockTextarea.value).toBe(expectedSanitized);
+      expect(mockTextarea.value).toBe(content);
+    });
+
+    it('should insert content exactly as given', async () => {
+      // Arrange
+      const content = '  Summarize the metadata: use <example>text</example> tags; if count=5 and onboarding = true, return data: JSON\n\n';
+
+      // Act
+      await strategy.insert(mockTextarea, content);
+
+      // Assert
+      expect(mockTextarea.value).toBe(content);
     });
 
     it('should preserve newlines in content', async () => {
@@ -501,6 +499,52 @@ describe('M365CopilotStrategy', () => {
       // Assert
       expect(result.success).toBe(false);
       expect(result.error).toContain('Selection failed');
+    });
+  });
+
+  describe.each(HOSTILE_TEXTS)('hostile-looking text %j', (text) => {
+    it('is set as the value of a textarea', async () => {
+      // Arrange
+      document.body.appendChild(mockTextarea);
+
+      // Act
+      const result = await strategy.insert(mockTextarea, text);
+
+      // Assert
+      expect(result.method).toBe('m365copilot-textarea');
+      expect(mockTextarea.value).toBe(text);
+      expectNoMarkupIn(document.body, ['textarea']);
+    });
+
+    it('goes to execCommand as the same text', async () => {
+      // Arrange
+      const execCommandSpy = setupExecCommandMock(true);
+      setupGetSelectionMock(true);
+
+      // Act
+      const result = await strategy.insert(mockLexicalEditor, text);
+
+      // Assert
+      expect(result.method).toBe('m365copilot-contenteditable-execCommand');
+      expect(execCommandSpy).toHaveBeenCalledWith('insertText', false, text);
+      expectNoMarkupIn(mockLexicalEditor);
+    });
+
+    it('is inserted as a text node when execCommand fails', async () => {
+      // Arrange
+      setupExecCommandMock(false);
+      setupGetSelectionMock(true);
+      const range = window.getSelection()?.getRangeAt(0);
+
+      // Act
+      const result = await strategy.insert(mockLexicalEditor, text);
+
+      // Assert
+      expect(result.method).toBe('m365copilot-contenteditable-dom');
+      expect(range?.insertNode).toHaveBeenCalledTimes(1);
+      const inserted = vi.mocked(range?.insertNode as (node: Node) => void).mock.calls[0][0];
+      expect(inserted.nodeType).toBe(Node.TEXT_NODE);
+      expect(inserted.textContent).toBe(text);
     });
   });
 

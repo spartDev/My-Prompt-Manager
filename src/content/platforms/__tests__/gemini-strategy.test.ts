@@ -4,6 +4,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+import { HOSTILE_TEXTS, expectNoMarkupIn } from '../../../test/helpers/hostile-text';
 import type { UIElementFactory } from '../../ui/element-factory';
 import { GeminiStrategy } from '../gemini-strategy';
 
@@ -15,13 +16,6 @@ vi.mock('../../utils/logger', () => ({
   debug: vi.fn(),
   isDebugMode: vi.fn().mockReturnValue(false),
   showDebugNotification: vi.fn()
-}));
-
-// Mock storage utilities
-vi.mock('../../utils/storage', () => ({
-  sanitizeUserInput: vi.fn((input: string) => input),
-  createElement: vi.fn((tag: string) => document.createElement(tag)),
-  createSVGElement: vi.fn((tag: string) => document.createElementNS('http://www.w3.org/2000/svg', tag))
 }));
 
 // Mock window.location.hostname
@@ -143,23 +137,29 @@ describe('GeminiStrategy', () => {
   });
 
   describe('insert', () => {
-    it('should sanitize content before insertion', async () => {
-      const { sanitizeUserInput } = await import('../../utils/storage');
-      const content = 'Test prompt';
+    it('should insert content exactly as given', async () => {
+      const content = '  Summarize the metadata: use <example>text</example> tags; if count=5 and onboarding = true, return data: JSON\n\n';
+
+      const result = await strategy.insert(mockElement, content);
+
+      expect(result.success).toBe(true);
+      expect(mockElement.textContent).toBe(content);
+    });
+
+    it('should not shorten long content', async () => {
+      const content = 'a'.repeat(60000);
 
       await strategy.insert(mockElement, content);
 
-      expect(sanitizeUserInput).toHaveBeenCalledWith(content);
+      expect(mockElement.textContent).toBe(content);
     });
 
-    it('should return error if sanitization results in empty content', async () => {
-      const { sanitizeUserInput } = await import('../../utils/storage');
-      vi.mocked(sanitizeUserInput).mockReturnValueOnce('');
+    it('should leave control and invisible characters as given', async () => {
+      const content = 'a\u{0}b\u{200B}c\u{200D}d';
 
-      const result = await strategy.insert(mockElement, '<script>alert("xss")</script>');
+      await strategy.insert(mockElement, content);
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Content could not be sanitized safely');
+      expect(mockElement.textContent).toBe(content);
     });
 
     it('should try DOM manipulation for contenteditable elements', async () => {
@@ -204,6 +204,39 @@ describe('GeminiStrategy', () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('All insertion methods failed for Gemini');
+    });
+  });
+
+  describe.each(HOSTILE_TEXTS)('hostile-looking text %j', (text) => {
+    it('goes to the Quill API as the same text', async () => {
+      const setText = vi.fn();
+      (mockElement as HTMLElement & { __quill?: unknown }).__quill = { setText };
+
+      const result = await strategy.insert(mockElement, text);
+
+      expect(result.method).toBe('gemini-quill-api');
+      expect(setText).toHaveBeenCalledWith(text);
+      expectNoMarkupIn(mockElement);
+    });
+
+    it('goes to execCommand as the same text', async () => {
+      const execCommandSpy = vi.spyOn(document, 'execCommand').mockReturnValue(true);
+
+      const result = await strategy.insert(mockElement, text);
+
+      expect(result.method).toBe('gemini-execCommand');
+      expect(execCommandSpy).toHaveBeenCalledWith('insertText', false, text);
+      expectNoMarkupIn(mockElement);
+    });
+
+    it('is set as a text node when the editor is filled directly', async () => {
+      vi.spyOn(document, 'execCommand').mockReturnValue(false);
+
+      const result = await strategy.insert(mockElement, text);
+
+      expect(result.method).toBe('gemini-dom-manipulation');
+      expect(mockElement.textContent).toBe(text);
+      expectNoMarkupIn(mockElement, ['p']);
     });
   });
 

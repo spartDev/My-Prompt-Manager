@@ -4,6 +4,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+import { HOSTILE_TEXTS, expectNoMarkupIn } from '../../../test/helpers/hostile-text';
 import type { UIElementFactory } from '../../ui/element-factory';
 import { DefaultStrategy } from '../default-strategy';
 
@@ -281,6 +282,40 @@ describe('DefaultStrategy', () => {
       const result = await strategy.insert(mixedCaseDiv, 'mixed case content');
       expect(mixedCaseDiv.textContent).toBe('mixed case content');
       expect(result.success).toBe(true);
+    });
+  });
+
+  describe.each(HOSTILE_TEXTS)('hostile-looking text %j', (text) => {
+    it('is set as the value of a textarea', async () => {
+      document.body.appendChild(mockTextarea);
+
+      const result = await strategy.insert(mockTextarea, text);
+
+      expect(result.success).toBe(true);
+      expect(mockTextarea.value).toBe(text);
+      expectNoMarkupIn(document.body, ['textarea']);
+
+      mockTextarea.remove();
+    });
+
+    it('is set as the value of an input', async () => {
+      document.body.appendChild(mockInput);
+
+      const result = await strategy.insert(mockInput, text);
+
+      expect(result.success).toBe(true);
+      expect(mockInput.value).toBe(text);
+      expectNoMarkupIn(document.body, ['input']);
+
+      mockInput.remove();
+    });
+
+    it('is set as the text of a contenteditable element', async () => {
+      const result = await strategy.insert(mockContentEditableDiv, text);
+
+      expect(result.success).toBe(true);
+      expect(mockContentEditableDiv.textContent).toBe(text);
+      expectNoMarkupIn(mockContentEditableDiv);
     });
   });
 });

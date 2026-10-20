@@ -1,4 +1,3 @@
-import DOMPurify from 'dompurify';
 import { useState, memo } from 'react';
 import type { FC, MouseEvent, ReactNode } from 'react';
 
@@ -6,6 +5,7 @@ import { encode } from '../services/promptEncoder';
 import type { PromptCardProps } from '../types/components';
 import { Logger, toError } from '../utils';
 import { extractVariables } from '../utils/promptVariables';
+import { cutWithoutSplittingPairs } from '../utils/truncate';
 
 import CategoryBadge from './CategoryBadge';
 
@@ -29,33 +29,26 @@ const formatVariableCount = (count: number): string =>
  */
 const PREVIEW_MAX_LENGTH = 300;
 
-/**
- * Bounded prefix of a Prompt's content for the card preview, with an ellipsis when cut.
- * Local on purpose: can be replaced by the shared truncate util (PR #434) once merged.
- */
-const previewOf = (content: string): string => {
-  if (content.length <= PREVIEW_MAX_LENGTH) {return content;}
-  // Step back one code unit when the cut would leave a lone high surrogate (split emoji).
-  const lastKept = content.charCodeAt(PREVIEW_MAX_LENGTH - 1);
-  const end = lastKept >= 0xd800 && lastKept <= 0xdbff ? PREVIEW_MAX_LENGTH - 1 : PREVIEW_MAX_LENGTH;
-  return `${content.slice(0, end)}…`;
-};
+/** Bounded prefix of a Prompt's content for the card preview, with an ellipsis when cut. */
+const previewOf = (content: string): string =>
+  content.length <= PREVIEW_MAX_LENGTH ? content : `${cutWithoutSplittingPairs(content, PREVIEW_MAX_LENGTH)}…`;
 
 /**
  * Highlights matching text in a string based on a search query.
  * Pure function hoisted to module scope to avoid recreation on every render.
+ *
+ * The text is shown exactly as stored: React renders every part below as a text node, so markup
+ * in a title is displayed, never interpreted, and nothing needs to be rewritten first.
  */
 const highlightText = (text: string, query: string, promptId: string): ReactNode => {
-  if (!query.trim()) {return text;}
+  const searchTerm = query.trim().toLowerCase();
+  if (searchTerm === '') {return text;}
 
-  // Sanitize both text and query to prevent XSS
+  const lowerText = text.toLowerCase();
+  // Lowercasing can change the length (an 'İ' becomes two code units), which would put a match at the wrong
+  // position of the stored text: show the title as it is, unmarked
+  if (lowerText.length !== text.length) {return text;}
 
-  const sanitizedText = DOMPurify.sanitize(text, { ALLOWED_TAGS: [] });
-
-  const sanitizedQuery = DOMPurify.sanitize(query, { ALLOWED_TAGS: [] });
-
-  const searchTerm = sanitizedQuery.toLowerCase().trim();
-  const lowerText = sanitizedText.toLowerCase();
   const parts: ReactNode[] = [];
   let lastIndex = 0;
   let index = lowerText.indexOf(searchTerm);
@@ -63,13 +56,13 @@ const highlightText = (text: string, query: string, promptId: string): ReactNode
   while (index !== -1) {
     // Add text before the match
     if (index > lastIndex) {
-      parts.push(sanitizedText.substring(lastIndex, index));
+      parts.push(text.substring(lastIndex, index));
     }
 
     // Add highlighted match - using stable key with prompt ID and match position
     parts.push(
       <mark key={`highlight-${promptId}-${String(index)}-${searchTerm}`} className="bg-yellow-200 dark:bg-yellow-800/40 px-1 rounded-sm">
-        {sanitizedText.substring(index, index + searchTerm.length)}
+        {text.substring(index, index + searchTerm.length)}
       </mark>
     );
 
@@ -78,8 +71,8 @@ const highlightText = (text: string, query: string, promptId: string): ReactNode
   }
 
   // Add remaining text
-  if (lastIndex < sanitizedText.length) {
-    parts.push(sanitizedText.substring(lastIndex));
+  if (lastIndex < text.length) {
+    parts.push(text.substring(lastIndex));
   }
 
   return parts;

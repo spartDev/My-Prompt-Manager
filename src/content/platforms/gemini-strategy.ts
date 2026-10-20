@@ -7,7 +7,6 @@
 import { getPlatformById } from '../../config/platforms';
 import type { InsertionResult } from '../types/index';
 import type { UIElementFactory } from '../ui/element-factory';
-import { sanitizeUserInput } from '../utils/storage';
 
 import { PlatformStrategy } from './base-strategy';
 
@@ -115,45 +114,23 @@ export class GeminiStrategy extends PlatformStrategy {
    * Tries Quill.js API, then execCommand, then DOM manipulation
    */
   async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
-    // Sanitize content before any insertion attempts
-    const sanitizedContent = sanitizeUserInput(content);
-
-    if (!sanitizedContent) {
-      this._warn('Content sanitization resulted in empty content', {
-        originalLength: content.length,
-        wasEmpty: content.length === 0
-      });
-      return {
-        success: false,
-        error: 'Content could not be sanitized safely'
-      };
-    }
-
-    if (sanitizedContent !== content) {
-      this._debug('Content was sanitized during insertion', {
-        originalLength: content.length,
-        sanitizedLength: sanitizedContent.length,
-        contentModified: true
-      });
-    }
-
     // Find the Quill editor element
     const quillElement = this._findQuillEditor(element);
 
     // Method 1: Try Quill.js API
-    const quillResult = this._tryQuillInsertion(quillElement, sanitizedContent);
+    const quillResult = this._tryQuillInsertion(quillElement, content);
     if (quillResult.success) {
       return quillResult;
     }
 
     // Method 2: Try execCommand for contenteditable
-    const execCommandResult = await this._tryExecCommand(quillElement, sanitizedContent);
+    const execCommandResult = await this._tryExecCommand(quillElement, content);
     if (execCommandResult.success) {
       return execCommandResult;
     }
 
     // Method 3: Direct DOM manipulation
-    return this._tryDOMManipulation(quillElement, sanitizedContent);
+    return this._tryDOMManipulation(quillElement, content);
   }
 
   /**

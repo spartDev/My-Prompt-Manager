@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 
+import { isValidHexColor } from '../constants/colors';
 import {
   type Prompt,
   type Category,
@@ -18,6 +19,27 @@ import {
   estimatePromptsArraySize
 } from '../utils/storageQuota';
 
+import {
+  AdmissionRefusedError,
+  PROMPT_LIMITS,
+  admit,
+  admitEdit,
+  admitNew,
+  admitRestored,
+  matchStoredCategory,
+  planCategoryMerge,
+  readPrompt,
+  readPrompts,
+  recordUse,
+  togglePin,
+  repointPrompt,
+  scrubStored,
+  scrubStoredCategories,
+  scrubStoredSettings,
+  type PromptTextPatch,
+  type StoredPrompt
+} from './promptAdmission';
+
 class StorageError extends Error implements AppError {
   public type: ErrorType;
   public details?: unknown;
@@ -30,13 +52,18 @@ class StorageError extends Error implements AppError {
   }
 }
 
+const STORAGE_KEYS = {
+  PROMPTS: 'prompts',
+  CATEGORIES: 'categories',
+  SETTINGS: 'settings'
+} as const;
+
+/** Every key except the prompts key, which can only be written through writePrompts. */
+type NonPromptStorageKey = Exclude<(typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS], typeof STORAGE_KEYS.PROMPTS>;
+
 export class StorageManager {
   private static instance: StorageManager | undefined;
-  private readonly STORAGE_KEYS = {
-    PROMPTS: 'prompts',
-    CATEGORIES: 'categories',
-    SETTINGS: 'settings'
-  } as const;
+  private readonly STORAGE_KEYS = STORAGE_KEYS;
 
   // Hard limits for storage quota enforcement
   private readonly STORAGE_LIMITS = {
@@ -45,8 +72,16 @@ export class StorageManager {
     MAX_TOTAL_SIZE: 8000000       // Maximum total storage (8MB, leaving 2MB buffer)
   } as const;
 
-  // Mutex for preventing concurrent storage operations
-  private readonly mutex = new AsyncMutex();
+  // Locks for the Prompts and Categories keys, shared with the other contexts (popup, side panel,
+  // service worker) through the Web Locks API, so a read-then-write from one context cannot overwrite
+  // a write made in between from another. Lock order: CATEGORIES -> PROMPTS -> SETTINGS.
+  private readonly mutex = new AsyncMutex({ scope: 'StorageManager' });
+
+  // The settings object is small and a user rewrites it by hand with every toggle, often closing the
+  // page right after, so it is serialized within this context only: a lock round trip to the other
+  // contexts would delay every toggle for a race that needs two contexts to change settings within
+  // one read-write (main never locked it at all).
+  private readonly settingsMutex = new AsyncMutex();
 
   private constructor() {}
 
@@ -61,6 +96,14 @@ export class StorageManager {
   async savePrompt(prompt: Omit<Prompt, 'id' | 'createdAt' | 'updatedAt' | 'usageCount' | 'lastUsedAt'>): Promise<Prompt> {
     return this.mutex.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
       try {
+        // Admission: remove Hidden characters, trim, refuse empty/over-limit text (ADR-001).
+        // Runs before the size and quota estimates so they see the text that will be stored.
+        const admission = admitNew(prompt, { id: uuidv4(), now: Date.now() });
+        if (!admission.ok) {
+          throw new AdmissionRefusedError(admission.errors);
+        }
+        const newPrompt = admission.prompt;
+
         const existingPrompts = await this.getPrompts();
 
         // HARD LIMIT: Enforce maximum prompt count
@@ -76,7 +119,7 @@ export class StorageManager {
         }
 
         // HARD LIMIT: Enforce individual prompt size
-        const estimatedSize = estimatePromptSize(prompt.title, prompt.content, prompt.category);
+        const estimatedSize = estimatePromptSize(newPrompt.title, newPrompt.content, newPrompt.category);
         if (estimatedSize > this.STORAGE_LIMITS.MAX_PROMPT_SIZE) {
           throw new StorageError({
             message: `Prompt exceeds maximum size limit (${String(this.STORAGE_LIMITS.MAX_PROMPT_SIZE)} bytes)`,
@@ -104,20 +147,9 @@ export class StorageManager {
         // Proactive quota check BEFORE attempting write (Chrome API check)
         await this.checkQuotaBeforeWrite(estimatedSize);
 
-        const timestamp = Date.now();
-
-        const newPrompt: Prompt = {
-          ...prompt,
-          id: uuidv4(),
-          createdAt: timestamp,
-          updatedAt: timestamp,
-          usageCount: 0
-          // lastUsedAt intentionally omitted - semantically wrong to set on unused prompts
-        };
-
         const updatedPrompts = [...existingPrompts, newPrompt];
 
-        await this.setStorageData(this.STORAGE_KEYS.PROMPTS, updatedPrompts);
+        await this.writePrompts(updatedPrompts);
         return newPrompt;
       } catch (error) {
         throw this.handleStorageError(error);
@@ -125,33 +157,17 @@ export class StorageManager {
     });
   }
 
-  async getPrompts(): Promise<Prompt[]> {
+  async getPrompts(): Promise<StoredPrompt[]> {
     try {
-      const prompts = await this.getStorageData<Prompt[]>(this.STORAGE_KEYS.PROMPTS);
-      const rawPrompts = prompts || [];
-      const normalizedPrompts = rawPrompts.map(prompt => this.normalizePrompt(prompt));
-
-      const needsMigration = rawPrompts.some((prompt, index) => {
-        const normalized = normalizedPrompts[index];
-        return (
-          typeof prompt.usageCount !== 'number' ||
-          typeof prompt.lastUsedAt !== 'number' ||
-          prompt.usageCount !== normalized.usageCount ||
-          prompt.lastUsedAt !== normalized.lastUsedAt
-        );
-      });
-
-      if (needsMigration) {
-        await this.setStorageData(this.STORAGE_KEYS.PROMPTS, normalizedPrompts);
-      }
-
-      return normalizedPrompts;
+      const raw = await this.getStorageData<unknown>(this.STORAGE_KEYS.PROMPTS);
+      // Reading never writes: usage fields missing from older entries are backfilled in memory only.
+      return readPrompts(raw);
     } catch (error) {
       throw this.handleStorageError(error);
     }
   }
 
-  async updatePrompt(id: string, updates: Partial<Omit<Prompt, 'id' | 'createdAt'>>): Promise<Prompt> {
+  async updatePrompt(id: string, updates: PromptTextPatch): Promise<Prompt> {
     return this.mutex.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
       try {
         const existingPrompts = await this.getPrompts();
@@ -161,11 +177,12 @@ export class StorageManager {
           throw new Error(`Prompt with id ${id} not found`);
         }
 
-        const updatedPrompt = this.normalizePrompt({
-          ...existingPrompts[promptIndex],
-          ...updates,
-          updatedAt: Date.now()
-        });
+        // Admission: only the fields in the patch are checked; the rest is carried over.
+        const admission = admitEdit(existingPrompts[promptIndex], updates, Date.now());
+        if (!admission.ok) {
+          throw new AdmissionRefusedError(admission.errors);
+        }
+        const updatedPrompt = admission.prompt;
 
         // Check if update would increase size (content/title getting longer)
         const oldPrompt = existingPrompts[promptIndex];
@@ -191,7 +208,7 @@ export class StorageManager {
         }
 
         existingPrompts[promptIndex] = updatedPrompt;
-        await this.setStorageData(this.STORAGE_KEYS.PROMPTS, existingPrompts);
+        await this.writePrompts(existingPrompts);
 
         return updatedPrompt;
       } catch (error) {
@@ -210,7 +227,7 @@ export class StorageManager {
           throw new Error(`Prompt with id ${id} not found`);
         }
 
-        await this.setStorageData(this.STORAGE_KEYS.PROMPTS, filteredPrompts);
+        await this.writePrompts(filteredPrompts);
       } catch (error) {
         throw this.handleStorageError(error);
       }
@@ -227,20 +244,10 @@ export class StorageManager {
           throw new Error(`Prompt with id ${id} not found`);
         }
 
-        const now = Date.now();
-        const currentUsage = Number.isFinite(existingPrompts[promptIndex].usageCount)
-          ? (existingPrompts[promptIndex].usageCount as number)
-          : 0;
-        const usageCount = currentUsage + 1;
-
-        const updatedPrompt: Prompt = {
-          ...existingPrompts[promptIndex],
-          usageCount,
-          lastUsedAt: now
-        };
+        const updatedPrompt = recordUse(existingPrompts[promptIndex], Date.now());
 
         existingPrompts[promptIndex] = updatedPrompt;
-        await this.setStorageData(this.STORAGE_KEYS.PROMPTS, existingPrompts);
+        await this.writePrompts(existingPrompts);
 
         return updatedPrompt;
       } catch (error) {
@@ -261,13 +268,10 @@ export class StorageManager {
           throw new Error(`Prompt with id ${id} not found`);
         }
 
-        const updatedPrompt: Prompt = {
-          ...existingPrompts[promptIndex],
-          pinned: existingPrompts[promptIndex].pinned !== true
-        };
+        const updatedPrompt = togglePin(existingPrompts[promptIndex]);
 
         existingPrompts[promptIndex] = updatedPrompt;
-        await this.setStorageData(this.STORAGE_KEYS.PROMPTS, existingPrompts);
+        await this.writePrompts(existingPrompts);
 
         return updatedPrompt;
       } catch (error) {
@@ -282,14 +286,15 @@ export class StorageManager {
       try {
         const newCategory: Category = {
           ...category,
+          name: this.admitCategoryName(category.name),
           id: uuidv4()
         };
 
         const existingCategories = await this.getCategories();
 
-        // Check for duplicate names
-        if (existingCategories.some(c => c.name.toLowerCase() === category.name.toLowerCase())) {
-          throw new Error(`Category with name "${category.name}" already exists`);
+        // Check for duplicate names (on the admitted name, so invisible differences cannot hide one)
+        if (existingCategories.some(c => c.name.toLowerCase() === newCategory.name.toLowerCase())) {
+          throw new Error(`Category with name "${newCategory.name}" already exists`);
         }
 
         const updatedCategories = [...existingCategories, newCategory];
@@ -307,72 +312,119 @@ export class StorageManager {
     return this.mutex.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
       try {
         const existingPrompts = await this.getPrompts();
-        const existingIndex = existingPrompts.findIndex(p => p.id === prompt.id);
+        const existing = existingPrompts.find(p => p.id === prompt.id);
 
-        if (existingIndex >= 0) {
+        // A Backup saved before usage tracking has no usage fields: the Prompt it replaces keeps its
+        // own, and the Backup's values win wherever it has them (as `{ ...existing, ...prompt }` did).
+        const merged = existing ? { ...existing, ...prompt } : prompt;
+
+        // The Library may spell the Prompt's Category differently (`Work` for `work`): the Prompt takes
+        // the stored spelling. The Categories are read raw, because getCategories() can write the
+        // default Category and the CATEGORIES lock is never taken under PROMPTS (lock order).
+        const storedCategories = await this.getStorageData<unknown>(this.STORAGE_KEYS.CATEGORIES);
+        const incoming = readPrompt(
+          typeof merged.category === 'string'
+            ? { ...merged, category: matchStoredCategory(merged.category, storedCategories) }
+            : merged
+        );
+        if (!incoming) {
+          throw new Error('Cannot import: the Prompt is missing its id, title or content');
+        }
+
+        const existingIndex = existingPrompts.findIndex(p => p.id === incoming.id);
+        const replacing = existingIndex >= 0;
+
+        // Admission: the same rules as every other route, before any size or quota estimate.
+        const admission = admitRestored(incoming, Date.now(), { replacing });
+        if (!admission.ok) {
+          throw new AdmissionRefusedError(admission.errors);
+        }
+        const admitted = admission.prompt;
+
+        if (replacing) {
           // Update existing prompt - check quota if size is increasing
           const oldPrompt = existingPrompts[existingIndex];
           const oldSize = estimatePromptSize(oldPrompt.title, oldPrompt.content, oldPrompt.category);
-          const newSize = estimatePromptSize(prompt.title, prompt.content, prompt.category);
+          const newSize = estimatePromptSize(admitted.title, admitted.content, admitted.category);
           const sizeDelta = newSize - oldSize;
 
           if (sizeDelta > 0) {
             await this.checkQuotaBeforeWrite(sizeDelta);
           }
 
-          const updatedPrompt = this.normalizePrompt({
-            ...existingPrompts[existingIndex],
-            ...prompt,
-            updatedAt: Date.now() // Update the modification time
-          });
-          existingPrompts[existingIndex] = updatedPrompt;
-          await this.setStorageData(this.STORAGE_KEYS.PROMPTS, existingPrompts);
-          return updatedPrompt;
-        } else {
-          // Add new prompt - check quota for full size
-          const promptSize = estimatePromptSize(prompt.title, prompt.content, prompt.category);
-          await this.checkQuotaBeforeWrite(promptSize);
-
-          const timestamp = Date.now();
-          const newPrompt = this.normalizePrompt({
-            ...prompt,
-            // Use provided timestamps or set current time as fallback
-            createdAt: prompt.createdAt || timestamp,
-            updatedAt: prompt.updatedAt || timestamp
-          });
-          const updatedPrompts = [...existingPrompts, newPrompt];
-          await this.setStorageData(this.STORAGE_KEYS.PROMPTS, updatedPrompts);
-          return newPrompt;
+          existingPrompts[existingIndex] = admitted;
+          await this.writePrompts(existingPrompts);
+          return admitted;
         }
+
+        // Add new prompt - check quota for full size
+        await this.checkQuotaBeforeWrite(estimatePromptSize(admitted.title, admitted.content, admitted.category));
+        await this.writePrompts([...existingPrompts, admitted]);
+        return admitted;
       } catch (error) {
         throw this.handleStorageError(error);
       }
     });
   }
 
-  async importCategory(category: Category): Promise<Category> {
+  async importCategory(incoming: Category): Promise<Category> {
     return this.mutex.withLock(this.STORAGE_KEYS.CATEGORIES, async () => {
       try {
+        // Admission: the name is admitted like every other Category name. A Category from a Backup
+        // may have no id (or not a string one); it is given one, so none is ever stored without. A
+        // colour that is not a hex colour, by the same test as importData's, is dropped, not refused.
+        const { color, ...rest } = incoming;
+        const category: Category = {
+          ...rest,
+          id: typeof incoming.id === 'string' ? incoming.id : uuidv4(),
+          name: this.admitCategoryName(incoming.name),
+          ...(typeof color === 'string' && (color === '' || isValidHexColor(color)) && { color })
+        };
+
         const existingCategories = await this.getCategories();
         const existingIndex = existingCategories.findIndex(c => c.id === category.id);
-        
+
         if (existingIndex >= 0) {
-          // Update existing category
-          existingCategories[existingIndex] = category;
-          await this.setStorageData(this.STORAGE_KEYS.CATEGORIES, existingCategories);
-          return category;
+          // The Backup names a stored Category by id. It never renames the default Category, and
+          // never renames a Category into another's name (ignoring case): then the stored name stays
+          // and only the other fields (colour) come from the Backup. A rename it does apply moves the
+          // Prompts with it, in one atomic write, under the same locks as updateCategory.
+          const existing = existingCategories[existingIndex];
+          const taken = existingCategories.some(
+            (c, index) => index !== existingIndex && c.name.toLowerCase() === category.name.toLowerCase()
+          );
+          const updatedCategory: Category = {
+            ...category,
+            name: existing.name === DEFAULT_CATEGORY || taken ? existing.name : category.name
+          };
+          existingCategories[existingIndex] = updatedCategory;
+
+          if (updatedCategory.name === existing.name) {
+            await this.setStorageData(this.STORAGE_KEYS.CATEGORIES, existingCategories);
+            return updatedCategory;
+          }
+
+          return await this.mutex.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
+            const prompts = await this.getPrompts();
+            // Re-pointing is not an edit: timestamps and usage stay
+            const movedPrompts = prompts.map(prompt =>
+              prompt.category === existing.name ? repointPrompt(prompt, updatedCategory.name) : prompt
+            );
+            await this.writeCategoriesAndPrompts(existingCategories, movedPrompts);
+            return updatedCategory;
+          });
         } else {
-          // Check for duplicate names before adding new category
+          // Check for duplicate names (on the admitted name) before adding new category
           const duplicateNameIndex = existingCategories.findIndex(
             c => c.name.toLowerCase() === category.name.toLowerCase()
           );
-          
+
           if (duplicateNameIndex >= 0) {
-            // Update the existing category with the same name, preserving the existing ID
-            const updatedCategory: Category = {
-              ...category,
-              id: existingCategories[duplicateNameIndex].id // Keep existing ID
-            };
+            // First wins: the stored Category keeps its id and its name (names are unique ignoring
+            // case, and the Library's Prompts name the stored spelling), and takes the other fields
+            // (colour) from the Backup. importPrompt snaps the Backup's Prompts to the stored spelling.
+            const existing = existingCategories[duplicateNameIndex];
+            const updatedCategory: Category = { ...category, id: existing.id, name: existing.name };
             existingCategories[duplicateNameIndex] = updatedCategory;
             await this.setStorageData(this.STORAGE_KEYS.CATEGORIES, existingCategories);
             return updatedCategory;
@@ -423,40 +475,36 @@ export class StorageManager {
 
         const oldCategory = existingCategories[categoryIndex];
 
-        // Check for duplicate names (excluding current category)
-        if (updates.name) {
+        // Admission: a new name is admitted like every other Category name
+        const name = updates.name === undefined ? undefined : this.admitCategoryName(updates.name);
+
+        // Check for duplicate names (excluding current category), on the admitted name
+        if (name !== undefined) {
           const duplicateCategory = existingCategories.find(
-            (c, index) => index !== categoryIndex &&
-            c.name.toLowerCase() === (updates.name || '').toLowerCase()
+            (c, index) => index !== categoryIndex && c.name.toLowerCase() === name.toLowerCase()
           );
 
           if (duplicateCategory) {
-            throw new Error(`Category with name "${updates.name}" already exists`);
+            throw new Error(`Category with name "${name}" already exists`);
           }
         }
 
         const updatedCategory: Category = {
           ...oldCategory,
-          ...updates
+          ...updates,
+          ...(name === undefined ? {} : { name })
         };
 
         existingCategories[categoryIndex] = updatedCategory;
 
         // If the category name changed, also lock PROMPTS to update references
-        if (updates.name && updates.name !== oldCategory.name) {
+        if (name !== undefined && name !== oldCategory.name) {
           return await this.mutex.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
             const prompts = await this.getPrompts();
-            const updatedPrompts = prompts.map(prompt =>
-              prompt.category === oldCategory.name
-                ? { ...prompt, category: updates.name, updatedAt: Date.now() }
-                : prompt
-            );
+            const updatedPrompts = this.moveCategoryPrompts(prompts, oldCategory.name, name);
 
             // Update both categories and prompts atomically with both locks held
-            await chrome.storage.local.set({
-              [this.STORAGE_KEYS.CATEGORIES]: existingCategories,
-              [this.STORAGE_KEYS.PROMPTS]: updatedPrompts
-            });
+            await this.writeCategoriesAndPrompts(existingCategories, updatedPrompts);
 
             return updatedCategory;
           });
@@ -496,17 +544,10 @@ export class StorageManager {
           const hasPromptsToUpdate = prompts.some(p => p.category === categoryToDelete.name);
 
           if (hasPromptsToUpdate) {
-            const updatedPrompts = prompts.map(prompt =>
-              prompt.category === categoryToDelete.name
-                ? { ...prompt, category: DEFAULT_CATEGORY, updatedAt: Date.now() }
-                : prompt
-            );
+            const updatedPrompts = this.moveCategoryPrompts(prompts, categoryToDelete.name, DEFAULT_CATEGORY);
 
             // Update both categories and prompts atomically with both locks held
-            await chrome.storage.local.set({
-              [this.STORAGE_KEYS.CATEGORIES]: filteredCategories,
-              [this.STORAGE_KEYS.PROMPTS]: updatedPrompts
-            });
+            await this.writeCategoriesAndPrompts(filteredCategories, updatedPrompts);
           } else {
             // No prompts to update, just delete category
             await this.setStorageData(this.STORAGE_KEYS.CATEGORIES, filteredCategories);
@@ -516,6 +557,49 @@ export class StorageManager {
         throw this.handleStorageError(error);
       }
     });
+  }
+
+  /**
+   * The one-time upgrade pass (ADR-001, "Existing data"): cleans stored Prompts, Category names
+   * and the default Category of Hidden characters. It works on the raw stored values, so it never
+   * refuses, shortens or drops a Prompt, including a malformed one or one already over the
+   * limits, and never trims Prompt text; it trims the labels that Admission trims (Category
+   * names, a Prompt's category, the default Category). The only Categories it drops are later
+   * ones whose name becomes the same as an earlier one's once cleaned, and ones whose name
+   * becomes empty; every Prompt, and the default Category, that named a dropped Category is
+   * re-pointed to the kept one (the default Category for an emptied name) in the same write. It
+   * writes nothing when there is nothing to clean, and every key that changed in one atomic
+   * write. Safe to run any number of times.
+   */
+  upgradeStoredData(): Promise<{ promptsChanged: boolean; categoriesChanged: boolean }> {
+    // Same lock order as updateCategory, CATEGORIES then PROMPTS, with SETTINGS last
+    return this.mutex.withLock(this.STORAGE_KEYS.CATEGORIES, () =>
+      this.mutex.withLock(this.STORAGE_KEYS.PROMPTS, () =>
+        this.settingsMutex.withLock(this.STORAGE_KEYS.SETTINGS, async () => {
+          try {
+            // Raw values: getPrompts drops malformed entries and getCategories may write the default Category
+            const categories = scrubStoredCategories(await this.getStorageData<unknown>(this.STORAGE_KEYS.CATEGORIES));
+            const prompts = scrubStored(await this.getStorageData<unknown>(this.STORAGE_KEYS.PROMPTS), categories.renames);
+            const settings = scrubStoredSettings(
+              await this.getStorageData<unknown>(this.STORAGE_KEYS.SETTINGS),
+              categories.renames
+            );
+
+            if (prompts.changed || categories.changed || settings.changed) {
+              await this.writeScrubbed({
+                prompts: prompts.changed ? prompts.entries : undefined,
+                categories: categories.changed ? categories.entries : undefined,
+                settings: settings.changed ? settings.settings : undefined
+              });
+            }
+
+            return { promptsChanged: prompts.changed, categoriesChanged: categories.changed };
+          } catch (error) {
+            throw this.handleStorageError(error);
+          }
+        })
+      )
+    );
   }
 
   // Settings operations
@@ -528,16 +612,18 @@ export class StorageManager {
     }
   }
 
-  async updateSettings(updates: Partial<Settings>): Promise<Settings> {
-    try {
-      const currentSettings = await this.getSettings();
-      const updatedSettings = { ...currentSettings, ...updates };
-      
-      await this.setStorageData(this.STORAGE_KEYS.SETTINGS, updatedSettings);
-      return updatedSettings;
-    } catch (error) {
-      throw this.handleStorageError(error);
-    }
+  updateSettings(updates: Partial<Settings>): Promise<Settings> {
+    return this.settingsMutex.withLock(this.STORAGE_KEYS.SETTINGS, async () => {
+      try {
+        const currentSettings = await this.getSettings();
+        const updatedSettings = { ...currentSettings, ...updates };
+
+        await this.setStorageData(this.STORAGE_KEYS.SETTINGS, updatedSettings);
+        return updatedSettings;
+      } catch (error) {
+        throw this.handleStorageError(error);
+      }
+    });
   }
 
   // Utility methods
@@ -628,11 +714,40 @@ export class StorageManager {
         throw new Error('Invalid data format');
       }
 
+      // Admission: every Prompt and Category name in the file is admitted before anything is
+      // cleared, so a refusal leaves the existing data untouched. Categories that Admission made
+      // the same name are merged, first wins, and their Prompts and the default Category are
+      // re-pointed to the kept one: the same plan as the upgrade pass.
+      const importedAt = Date.now();
+      const categoryNames = data.categories.map(category => ({
+        before: category.name,
+        after: this.admitCategoryName(category.name)
+      }));
+      const plan = planCategoryMerge(categoryNames);
+      const admittedCategories: Category[] = data.categories.flatMap((category, index) =>
+        plan.merged.has(index) ? [] : [{ ...category, name: categoryNames[index].after }]
+      );
+      const admittedPrompts: StoredPrompt[] = data.prompts.map(raw => {
+        const incoming = readPrompt({ ...raw, category: plan.renames.get(raw.category) ?? raw.category });
+        if (!incoming) {
+          throw new Error('Invalid data format');
+        }
+        const admission = admitRestored(incoming, importedAt);
+        if (!admission.ok) {
+          throw new AdmissionRefusedError(admission.errors);
+        }
+        return admission.prompt;
+      });
+      const settings: Settings = {
+        ...data.settings,
+        defaultCategory: plan.renames.get(data.settings.defaultCategory) ?? data.settings.defaultCategory
+      };
+
       // Proactive quota check BEFORE clearing data
       // Since we clear ALL existing data before import, check if import size
       // fits within total quota (not current usage + import size)
-      const estimatedPromptsSize = estimatePromptsArraySize(data.prompts);
-      const estimatedCategoriesSize = data.categories.length * 100; // Rough estimate
+      const estimatedPromptsSize = estimatePromptsArraySize(admittedPrompts);
+      const estimatedCategoriesSize = admittedCategories.length * 100; // Rough estimate
       const estimatedSettingsSize = 500; // Settings overhead
       const totalEstimatedSize = estimatedPromptsSize + estimatedCategoriesSize + estimatedSettingsSize;
 
@@ -651,23 +766,28 @@ export class StorageManager {
       }
 
       // Create backup of existing data before clearing
-      const backup = await this.getAllData();
+      const [backupPrompts, backupCategories, backupSettings] = await Promise.all([
+        this.getPrompts(),
+        this.getCategories(),
+        this.getSettings()
+      ]);
+      const backup = { prompts: backupPrompts, categories: backupCategories, settings: backupSettings };
 
       try {
         // Clear existing data and import new data
         await this.clearAllData();
 
         await Promise.all([
-          this.setStorageData(this.STORAGE_KEYS.PROMPTS, data.prompts),
-          this.setStorageData(this.STORAGE_KEYS.CATEGORIES, data.categories),
-          this.setStorageData(this.STORAGE_KEYS.SETTINGS, data.settings)
+          this.writePrompts(admittedPrompts),
+          this.setStorageData(this.STORAGE_KEYS.CATEGORIES, admittedCategories),
+          this.setStorageData(this.STORAGE_KEYS.SETTINGS, settings)
         ]);
       } catch (importError) {
         // Rollback: restore backup if import fails
         // Use Promise.allSettled to ensure ALL rollback operations are attempted
         // even if some fail, to maximize chances of data recovery
         const rollbackResults = await Promise.allSettled([
-          this.setStorageData(this.STORAGE_KEYS.PROMPTS, backup.prompts),
+          this.writePrompts(backup.prompts),
           this.setStorageData(this.STORAGE_KEYS.CATEGORIES, backup.categories),
           this.setStorageData(this.STORAGE_KEYS.SETTINGS, backup.settings)
         ]);
@@ -712,7 +832,47 @@ export class StorageManager {
     return value !== undefined ? value : null;
   }
 
-  private async setStorageData(key: string, data: unknown): Promise<void> {
+  /**
+   * The only way to write the prompts key. It accepts only values produced by the
+   * Admission module, so a route that skips Admission does not compile.
+   */
+  private async writePrompts(prompts: readonly StoredPrompt[]): Promise<void> {
+    await ensureStorageAvailable();
+    await chrome.storage.local.set({ [STORAGE_KEYS.PROMPTS]: prompts });
+  }
+
+  /**
+   * The single exception to "the prompts key is only written through writePrompts", used
+   * only by upgradeStoredData. The upgrade pass works on raw entries and must keep the ones
+   * that are not StoredPrompts (malformed, or already over the limits) rather than drop them.
+   * Writes only the keys given (`undefined` means the key is left alone), in one atomic set.
+   */
+  private async writeScrubbed(scrubbed: {
+    prompts: readonly unknown[] | undefined;
+    categories: readonly unknown[] | undefined;
+    settings: unknown;
+  }): Promise<void> {
+    await ensureStorageAvailable();
+    await chrome.storage.local.set({
+      ...(scrubbed.prompts && { [STORAGE_KEYS.PROMPTS]: scrubbed.prompts }),
+      ...(scrubbed.categories && { [STORAGE_KEYS.CATEGORIES]: scrubbed.categories }),
+      ...(scrubbed.settings !== undefined && { [STORAGE_KEYS.SETTINGS]: scrubbed.settings })
+    });
+  }
+
+  /** Writes categories and prompts together (one atomic set), prompts typed as above. */
+  private async writeCategoriesAndPrompts(
+    categories: readonly Category[],
+    prompts: readonly StoredPrompt[]
+  ): Promise<void> {
+    await ensureStorageAvailable();
+    await chrome.storage.local.set({
+      [STORAGE_KEYS.CATEGORIES]: categories,
+      [STORAGE_KEYS.PROMPTS]: prompts
+    });
+  }
+
+  private async setStorageData(key: NonPromptStorageKey, data: unknown): Promise<void> {
     await ensureStorageAvailable();
     await chrome.storage.local.set({ [key]: data });
   }
@@ -754,37 +914,40 @@ export class StorageManager {
     }
   }
 
-  private normalizePrompt(prompt: Prompt): Prompt {
-    const createdAt = typeof prompt.createdAt === 'number' ? prompt.createdAt : Date.now();
-    const updatedAt = typeof prompt.updatedAt === 'number' ? prompt.updatedAt : createdAt;
-    const usageCount =
-      typeof prompt.usageCount === 'number' && Number.isFinite(prompt.usageCount) && prompt.usageCount >= 0
-        ? Math.floor(prompt.usageCount)
-        : 0;
+  /** Moves the Prompts of one Category to another (already admitted) name, through Admission. */
+  private moveCategoryPrompts(prompts: readonly StoredPrompt[], from: string, to: string): StoredPrompt[] {
+    const now = Date.now();
 
-    let lastUsedAt: number;
-    if (typeof prompt.lastUsedAt === 'number' && Number.isFinite(prompt.lastUsedAt) && prompt.lastUsedAt > 0) {
-      lastUsedAt = prompt.lastUsedAt;
-    } else {
-      lastUsedAt = usageCount > 0 ? updatedAt : createdAt;
-    }
+    return prompts.map(prompt => {
+      if (prompt.category !== from) {
+        return prompt;
+      }
 
-    if (lastUsedAt < createdAt) {
-      lastUsedAt = createdAt;
-    }
-
-    return {
-      ...prompt,
-      createdAt,
-      updatedAt,
-      usageCount,
-      lastUsedAt
-    };
+      const admission = admitEdit(prompt, { category: to }, now);
+      if (!admission.ok) {
+        throw new AdmissionRefusedError(admission.errors);
+      }
+      return admission.prompt;
+    });
   }
 
-  private handleStorageError(error: unknown): StorageError {
+  /** Admission for a Category name: the same rules as a Prompt's category field. */
+  private admitCategoryName(name: string): string {
+    const admission = admit({ category: name });
+    if (!admission.ok) {
+      throw new AdmissionRefusedError(admission.errors);
+    }
+    return admission.text.category ?? name;
+  }
+
+  private handleStorageError(error: unknown): StorageError | AdmissionRefusedError {
     // If it's already a StorageError, return it as-is to preserve details
     if (error instanceof StorageError) {
+      return error;
+    }
+
+    // A refused Admission is not a storage failure: keep its type and refusals for the caller
+    if (error instanceof AdmissionRefusedError) {
       return error;
     }
 
@@ -974,8 +1137,8 @@ export class StorageManager {
       errors.push(`${prefix}: Field "title" must be a string`);
     } else if (prompt.title.length === 0) {
       errors.push(`${prefix}: Field "title" cannot be empty`);
-    } else if (prompt.title.length > 100) {
-      errors.push(`${prefix}: Field "title" exceeds maximum length of 100 characters (got ${String(prompt.title.length)})`);
+    } else if (prompt.title.length > PROMPT_LIMITS.title) {
+      errors.push(`${prefix}: Field "title" exceeds maximum length of ${String(PROMPT_LIMITS.title)} characters (got ${String(prompt.title.length)})`);
     }
 
     // Content validation
@@ -985,8 +1148,8 @@ export class StorageManager {
       errors.push(`${prefix}: Field "content" must be a string`);
     } else if (prompt.content.length === 0) {
       errors.push(`${prefix}: Field "content" cannot be empty`);
-    } else if (prompt.content.length > 20000) {
-      errors.push(`${prefix}: Field "content" exceeds maximum length of 20,000 characters (got ${String(prompt.content.length)})`);
+    } else if (prompt.content.length > PROMPT_LIMITS.content) {
+      errors.push(`${prefix}: Field "content" exceeds maximum length of ${PROMPT_LIMITS.content.toLocaleString('en-US')} characters (got ${String(prompt.content.length)})`);
     }
 
     // Category validation
@@ -1087,7 +1250,7 @@ export class StorageManager {
     if ('color' in category && category.color !== undefined) {
       if (typeof category.color !== 'string') {
         errors.push(`${prefix}: Field "color" must be a string if provided`);
-      } else if (category.color.length > 0 && !category.color.match(/^#[0-9A-Fa-f]{6}$/)) {
+      } else if (category.color.length > 0 && !isValidHexColor(category.color)) {
         errors.push(`${prefix}: Field "color" must be a valid hex color (#RRGGBB format)`);
       }
     }

@@ -1,16 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+import { HOSTILE_TEXTS, expectNoMarkupIn } from '../../../test/helpers/hostile-text';
 import type { UIElementFactory } from '../../ui/element-factory';
 
-// Mock the sanitization function using proper factory
-vi.mock('../../utils/storage', () => ({
-  sanitizeUserInput: vi.fn()
-}));
-
 import { MistralStrategy } from '../mistral-strategy';
-
-// Get the mocked function after import
-const { sanitizeUserInput: mockSanitizeUserInput } = vi.mocked(await import('../../utils/storage'));
 
 vi.mock('../../utils/logger', () => ({
   info: vi.fn(),
@@ -43,9 +36,6 @@ describe('MistralStrategy', () => {
     mockUIFactory = {
       createMistralIcon: vi.fn().mockReturnValue(document.createElement('button'))
     } as any;
-
-    // Reset sanitization mock to return content unchanged by default
-    mockSanitizeUserInput.mockImplementation((content: string) => content);
 
     vi.clearAllMocks();
   });
@@ -122,82 +112,122 @@ describe('MistralStrategy', () => {
     });
   });
 
-  describe('insert - Content Sanitization', () => {
+  describe('insert - content is delivered as given', () => {
     beforeEach(() => {
-      vi.spyOn(mockElement, 'focus').mockImplementation(() => {});
-      vi.spyOn(mockElement, 'click').mockImplementation(() => {});
+      vi.spyOn(mockElement, 'focus').mockImplementation(() => undefined);
+      vi.spyOn(mockElement, 'click').mockImplementation(() => undefined);
       vi.spyOn(mockElement, 'dispatchEvent').mockImplementation(() => true);
     });
 
-    it('should sanitize content before insertion', async () => {
-      const originalContent = '<script>alert("xss")</script>Hello World';
-      const sanitizedContent = 'Hello World';
-      mockSanitizeUserInput.mockReturnValue(sanitizedContent);
-
+    it('should insert content exactly as given', async () => {
+      const content = '  Summarize the metadata: use <example>text</example> tags; if count=5 and onboarding = true, return data: JSON\n\n';
       const pElement = document.createElement('p');
       mockElement.appendChild(pElement);
 
-      const result = await strategy.insert(mockElement, originalContent);
+      const result = await strategy.insert(mockElement, content);
 
-      expect(mockSanitizeUserInput).toHaveBeenCalledWith(originalContent);
       expect(result.success).toBe(true);
-      expect(pElement.textContent).toBe(sanitizedContent);
+      expect(pElement.textContent).toBe(content);
     });
 
-    it('should log debug message when content is modified during sanitization', async () => {
-      const Logger = await import('../../utils/logger');
-      const originalContent = '<script>alert("xss")</script>Hello';
-      const sanitizedContent = 'Hello';
-      mockSanitizeUserInput.mockReturnValue(sanitizedContent);
-
+    it('should not shorten long content', async () => {
+      const content = 'a'.repeat(60000);
       const pElement = document.createElement('p');
       mockElement.appendChild(pElement);
 
-      await strategy.insert(mockElement, originalContent);
+      await strategy.insert(mockElement, content);
 
-      expect(Logger.debug).toHaveBeenCalledWith(
-        '[Mistral] Content was sanitized during insertion',
-        expect.objectContaining({
-          originalLength: originalContent.length,
-          sanitizedLength: sanitizedContent.length,
-          contentModified: true
-        })
-      );
+      expect(pElement.textContent).toBe(content);
     });
 
-    it('should handle empty content after sanitization', async () => {
-      const Logger = await import('../../utils/logger');
-      const originalContent = '<script>alert("xss")</script>';
-      mockSanitizeUserInput.mockReturnValue('');
+    it('should leave control and invisible characters as given', async () => {
+      const content = 'a\u{0}b\u{200B}c\u{200D}d';
+      const pElement = document.createElement('p');
+      mockElement.appendChild(pElement);
 
-      const result = await strategy.insert(mockElement, originalContent);
+      await strategy.insert(mockElement, content);
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Content could not be sanitized safely');
-      expect(Logger.warn).toHaveBeenCalledWith(
-        '[Mistral] Content sanitization resulted in empty content',
-        expect.objectContaining({
-          originalLength: originalContent.length,
-          wasEmpty: false
-        })
-      );
+      expect(pElement.textContent).toBe(content);
     });
 
-    it('should handle originally empty content', async () => {
-      const Logger = await import('../../utils/logger');
-      mockSanitizeUserInput.mockReturnValue('');
+    it('should not refuse empty content', async () => {
+      const pElement = document.createElement('p');
+      mockElement.appendChild(pElement);
 
       const result = await strategy.insert(mockElement, '');
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Content could not be sanitized safely');
-      expect(Logger.warn).toHaveBeenCalledWith(
-        '[Mistral] Content sanitization resulted in empty content',
-        expect.objectContaining({
-          originalLength: 0,
-          wasEmpty: true
-        })
-      );
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe.each(HOSTILE_TEXTS)('hostile-looking text %j', (text) => {
+    beforeEach(() => {
+      vi.spyOn(mockElement, 'focus').mockImplementation(() => undefined);
+      vi.spyOn(mockElement, 'click').mockImplementation(() => undefined);
+      vi.spyOn(mockElement, 'dispatchEvent').mockImplementation(() => true);
+    });
+
+    it('is set as the text of the ProseMirror paragraph', async () => {
+      const pElement = document.createElement('p');
+      mockElement.appendChild(pElement);
+
+      const result = await strategy.insert(mockElement, text);
+
+      expect(result.method).toBe('mistral-prosemirror-p');
+      expect(pElement.textContent).toBe(text);
+      expectNoMarkupIn(mockElement, ['p']);
+    });
+
+    it('goes to the ProseMirror transaction as the same text', async () => {
+      const mockView = {
+        state: { tr: { insertText: vi.fn().mockReturnValue({}) }, selection: { from: 0, to: 0 } },
+        dispatch: vi.fn()
+      };
+      (mockElement as any)._pmViewDesc = { view: mockView };
+
+      const result = await strategy.insert(mockElement, text);
+
+      expect(result.method).toBe('mistral-prosemirror-transaction');
+      expect(mockView.state.tr.insertText).toHaveBeenCalledWith(text, 0, 0);
+      expectNoMarkupIn(mockElement);
+    });
+
+    it('goes to execCommand as the same text', async () => {
+      (document as any).execCommand = vi.fn().mockReturnValue(true);
+      vi.spyOn(window, 'getSelection').mockReturnValue({ removeAllRanges: vi.fn(), addRange: vi.fn() } as any);
+      vi.spyOn(document, 'createRange').mockReturnValue({ selectNodeContents: vi.fn() } as any);
+
+      const result = await strategy.insert(mockElement, text);
+
+      expect(result.method).toBe('mistral-execCommand');
+      expect((document as any).execCommand).toHaveBeenCalledWith('insertText', false, text);
+      expectNoMarkupIn(mockElement);
+    });
+
+    it('is set as the value of a textarea', async () => {
+      (document as any).execCommand = vi.fn().mockReturnValue(false);
+      const textarea = document.createElement('textarea');
+      document.body.appendChild(textarea);
+
+      const result = await strategy.insert(textarea, text);
+
+      expect(result.method).toBe('mistral-textarea');
+      expect(textarea.value).toBe(text);
+      expectNoMarkupIn(document.body, ['textarea']);
+
+      textarea.remove();
+    });
+
+    it('is set as a text node when the editor is filled directly', async () => {
+      (document as any).execCommand = vi.fn().mockReturnValue(false);
+      const div = document.createElement('div');
+      div.contentEditable = 'true';
+
+      const result = await strategy.insert(div, text);
+
+      expect(result.method).toBe('mistral-contenteditable');
+      expect(div.textContent).toBe(text);
+      expectNoMarkupIn(div);
     });
   });
 
@@ -206,7 +236,6 @@ describe('MistralStrategy', () => {
       vi.spyOn(mockElement, 'focus').mockImplementation(() => {});
       vi.spyOn(mockElement, 'click').mockImplementation(() => {});
       vi.spyOn(mockElement, 'dispatchEvent').mockImplementation(() => true);
-      mockSanitizeUserInput.mockReturnValue('test content');
     });
 
     it('should attempt ProseMirror paragraph insertion first', async () => {
@@ -250,7 +279,6 @@ describe('MistralStrategy', () => {
       vi.spyOn(mockElement, 'focus').mockImplementation(() => {});
       vi.spyOn(mockElement, 'click').mockImplementation(() => {});
       vi.spyOn(mockElement, 'dispatchEvent').mockImplementation(() => true);
-      mockSanitizeUserInput.mockReturnValue('test content');
 
       (document as any).execCommand = vi.fn().mockReturnValue(true);
 
@@ -295,7 +323,6 @@ describe('MistralStrategy', () => {
     beforeEach(() => {
       vi.spyOn(mockElement, 'focus').mockImplementation(() => {});
       vi.spyOn(mockElement, 'dispatchEvent').mockImplementation(() => true);
-      mockSanitizeUserInput.mockReturnValue('test content');
       (document as any).execCommand = vi.fn().mockReturnValue(false);
     });
 
@@ -332,8 +359,6 @@ describe('MistralStrategy', () => {
       div.innerHTML = 'existing content';
       vi.spyOn(div, 'focus').mockImplementation(() => {});
       vi.spyOn(div, 'dispatchEvent').mockImplementation(() => true);
-      // Mock sanitization to return 'new content' instead of 'test content'
-      mockSanitizeUserInput.mockReturnValue('new content');
 
       const result = await strategy.insert(div, 'new content');
 
@@ -362,10 +387,6 @@ describe('MistralStrategy', () => {
   });
 
   describe('error handling', () => {
-    beforeEach(() => {
-      mockSanitizeUserInput.mockReturnValue('test content');
-    });
-
     it('should handle errors gracefully in ProseMirror insertion', async () => {
       const Logger = await import('../../utils/logger');
 
@@ -422,7 +443,6 @@ describe('MistralStrategy', () => {
 
   describe('event handling', () => {
     beforeEach(() => {
-      mockSanitizeUserInput.mockReturnValue('test content');
       vi.spyOn(mockElement, 'focus').mockImplementation(() => {});
       vi.spyOn(mockElement, 'click').mockImplementation(() => {});
       vi.spyOn(mockElement, 'dispatchEvent').mockImplementation(() => true);

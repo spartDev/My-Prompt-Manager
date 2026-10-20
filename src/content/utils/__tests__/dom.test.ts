@@ -481,26 +481,4 @@ describe('DOMUtils', () => {
       expect(result).toBe(false);
     });
   });
-
-  describe('escapeHtml', () => {
-    it('should escape HTML characters', () => {
-      const input = '<script>alert("xss")</script>';
-      const expected = '&lt;script&gt;alert(&quot;xss&quot;)&lt;&#x2F;script&gt;';
-      
-      expect(DOMUtils.escapeHtml(input)).toBe(expected);
-    });
-
-    it('should handle non-string input', () => {
-      expect(DOMUtils.escapeHtml(123 as any)).toBe('123');
-      expect(Logger.warn).toHaveBeenCalledWith(
-        'escapeHtml received non-string input',
-        expect.objectContaining({ type: 'number', value: 123 })
-      );
-    });
-
-    it('should handle errors gracefully', () => {
-      const result = DOMUtils.escapeHtml('test');
-      expect(result).toBe('test');
-    });
-  });
 });

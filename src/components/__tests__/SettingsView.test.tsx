@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 
 import { ThemeProvider } from '../../contexts/ThemeContext';
+import { AdmissionRefusedError } from '../../services/promptAdmission';
 import { getChromeMockFunctions, getMockStorageManager } from '../../test/mocks';
 import { DEFAULT_SETTINGS, type Prompt, type Category } from '../../types';
 import SettingsView from '../SettingsView';
@@ -109,6 +110,53 @@ describe('SettingsView', () => {
     expect((chromeMock.storage.local.get as Mock).mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 
+  it('skips a refused item, restores the rest, and says what was skipped', async () => {
+    const storageMock = getMockStorageManager();
+    const showToastMock = vi.fn();
+    (storageMock.importPrompt as unknown as Mock).mockImplementation((prompt: Prompt) => {
+      if (prompt.id === 'bad') {
+        return Promise.reject(
+          new AdmissionRefusedError({
+            content: {
+              field: 'content',
+              reason: 'too_long',
+              length: 20_001,
+              max: 20_000,
+              message: 'Content cannot exceed 20,000 characters'
+            }
+          })
+        );
+      }
+      return Promise.resolve(prompt);
+    });
+
+    await renderSettings(showToastMock);
+    await waitFor(() => {
+      expect(storageMock.getPrompts).toHaveBeenCalled();
+    });
+
+    const fileInput = document.querySelector<HTMLInputElement>('input[type="file"]');
+    const prompts: Prompt[] = [
+      { id: 'good', title: 'Fine', content: 'Hello', category: 'Uncategorized', createdAt: 1, updatedAt: 1 },
+      { id: 'bad', title: 'Too long', content: 'x', category: 'Uncategorized', createdAt: 1, updatedAt: 1 },
+      { id: 'good2', title: 'Also fine', content: 'Hi', category: 'Uncategorized', createdAt: 1, updatedAt: 1 }
+    ];
+    await userEvent.upload(
+      fileInput as HTMLInputElement,
+      createJsonFile(JSON.stringify({ prompts, categories: [], version: '1.0' }))
+    );
+
+    await waitFor(() => {
+      expect(storageMock.importPrompt).toHaveBeenCalledTimes(3);
+    });
+    await waitFor(() => {
+      expect(showToastMock).toHaveBeenCalledWith(
+        expect.stringMatching(/imported 2 prompts.*skipped 1.*Too long.*Content cannot exceed 20,000 characters/is),
+        'warning'
+      );
+    });
+  });
+
   it('alerts when import JSON is invalid', async () => {
     const storageMock = getMockStorageManager();
     const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
@@ -128,6 +176,54 @@ describe('SettingsView', () => {
       expect(alertSpy).toHaveBeenCalledWith(expect.stringMatching(/invalid json/i));
     });
     expect(storageMock.importPrompt).not.toHaveBeenCalled();
+    alertSpy.mockRestore();
+  });
+
+  it.each([
+    ['a null entry', null],
+    ['a Prompt without an id', { title: 'No id', content: 'Hello', category: 'Uncategorized' }]
+  ])('rejects a backup with %s before restoring anything', async (_label, badEntry) => {
+    const storageMock = getMockStorageManager();
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => undefined);
+
+    await renderSettings();
+    await waitFor(() => {
+      expect(storageMock.getPrompts).toHaveBeenCalled();
+    });
+
+    const fileInput = document.querySelector<HTMLInputElement>('input[type="file"]');
+    const good = { id: 'good', title: 'Fine', content: 'Hello', category: 'Uncategorized', createdAt: 1, updatedAt: 1 };
+    await userEvent.upload(
+      fileInput as HTMLInputElement,
+      createJsonFile(JSON.stringify({ prompts: [good, badEntry], categories: [], version: '1.0' }))
+    );
+
+    await waitFor(() => {
+      expect(alertSpy).toHaveBeenCalledWith(expect.stringMatching(/one or more prompts have invalid structure/i));
+    });
+    expect(storageMock.importPrompt).not.toHaveBeenCalled();
+    alertSpy.mockRestore();
+  });
+
+  it('rejects a backup with a null Category entry before restoring anything', async () => {
+    const storageMock = getMockStorageManager();
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => undefined);
+
+    await renderSettings();
+    await waitFor(() => {
+      expect(storageMock.getPrompts).toHaveBeenCalled();
+    });
+
+    const fileInput = document.querySelector<HTMLInputElement>('input[type="file"]');
+    await userEvent.upload(
+      fileInput as HTMLInputElement,
+      createJsonFile(JSON.stringify({ prompts: [], categories: [{ id: 'c1', name: 'Custom' }, null], version: '1.0' }))
+    );
+
+    await waitFor(() => {
+      expect(alertSpy).toHaveBeenCalledWith(expect.stringMatching(/one or more categories have invalid structure/i));
+    });
+    expect(storageMock.importCategory).not.toHaveBeenCalled();
     alertSpy.mockRestore();
   });
 

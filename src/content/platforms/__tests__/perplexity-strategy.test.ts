@@ -4,6 +4,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+import { HOSTILE_TEXTS, expectNoMarkupIn } from '../../../test/helpers/hostile-text';
 import type { UIElementFactory } from '../../ui/element-factory';
 import { PerplexityStrategy } from '../perplexity-strategy';
 
@@ -252,6 +253,47 @@ describe('PerplexityStrategy', () => {
       // Remove duplicates while preserving first occurrence order
       const uniqueEvents = [...new Set(filteredEvents)];
       expect(uniqueEvents).toEqual(requiredEvents);
+    });
+  });
+
+  describe.each(HOSTILE_TEXTS)('hostile-looking text %j', (text) => {
+    beforeEach(() => {
+      vi.spyOn(mockContentEditableDiv, 'focus').mockImplementation(() => undefined);
+      vi.spyOn(mockContentEditableDiv, 'dispatchEvent').mockImplementation(() => true);
+    });
+
+    it('goes to execCommand as the same text', async () => {
+      const execCommandSpy = vi.spyOn(document, 'execCommand').mockReturnValue(true);
+
+      const result = await strategy.insert(mockContentEditableDiv, text);
+
+      expect(result.method).toBe('perplexity-execCommand');
+      expect(execCommandSpy).toHaveBeenCalledWith('insertText', false, text);
+      expectNoMarkupIn(mockContentEditableDiv);
+    });
+
+    it('is set as a text node when the editor is filled by replacing its selection', async () => {
+      vi.spyOn(document, 'execCommand').mockReturnValue(false);
+
+      const result = await strategy.insert(mockContentEditableDiv, text);
+
+      expect(result.method).toBe('perplexity-selection');
+      expect(mockContentEditableDiv.textContent).toBe(text);
+      expectNoMarkupIn(mockContentEditableDiv);
+    });
+
+    it('is set as the text of the editor when it is filled directly', async () => {
+      vi.spyOn(document, 'execCommand').mockReturnValue(false);
+      // The selection is only used by the first two methods; making it fail leaves the direct one
+      vi.spyOn(window, 'getSelection').mockImplementation(() => {
+        throw new Error('No selection');
+      });
+
+      const result = await strategy.insert(mockContentEditableDiv, text);
+
+      expect(result.method).toBe('perplexity-direct');
+      expect(mockContentEditableDiv.textContent).toBe(text);
+      expectNoMarkupIn(mockContentEditableDiv);
     });
   });
 });

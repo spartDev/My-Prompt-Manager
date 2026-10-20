@@ -4,6 +4,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+import { HOSTILE_TEXTS, expectNoMarkupIn } from '../../../test/helpers/hostile-text';
 import type { UIElementFactory } from '../../ui/element-factory';
 import { CopilotStrategy } from '../copilot-strategy';
 
@@ -324,6 +325,51 @@ describe('CopilotStrategy', () => {
 
       expect(result.success).toBe(true);
       expect(mockTextarea.value).toBe(longContent);
+    });
+
+    it('should not reject content over 50,000 characters', async () => {
+      const longContent = 'a'.repeat(60000);
+      const result = await strategy.insert(mockTextarea, longContent);
+
+      expect(result.success).toBe(true);
+      expect(mockTextarea.value).toBe(longContent);
+    });
+
+    it('should insert content exactly as given', async () => {
+      const content = '  Summarize the metadata: use <example>text</example> tags; if count=5 and onboarding = true, return data: JSON\n\n';
+      const result = await strategy.insert(mockTextarea, content);
+
+      expect(result.success).toBe(true);
+      expect(mockTextarea.value).toBe(content);
+    });
+
+    it('should leave control and invisible characters as given', async () => {
+      const content = 'Hello\u{0}\u{1}\u{2}World\u{200B}\u{200D}';
+      const result = await strategy.insert(mockTextarea, content);
+
+      expect(result.success).toBe(true);
+      expect(mockTextarea.value).toBe(content);
+    });
+
+    it('should reject content that is not a string', async () => {
+      const result = await strategy.insert(mockTextarea, 123 as unknown as string);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Invalid content type');
+    });
+  });
+
+  describe.each(HOSTILE_TEXTS)('hostile-looking text %j', (text) => {
+    it('is set as the value of the textarea', async () => {
+      const textarea = createCopilotTextarea('primary', true);
+
+      const result = await strategy.insert(textarea, text);
+
+      expect(result.success).toBe(true);
+      expect(textarea.value).toBe(text);
+      expectNoMarkupIn(document.body, ['textarea']);
+
+      textarea.remove();
     });
   });
 });

@@ -1,7 +1,8 @@
 import { forwardRef, useActionState, useMemo, useState } from 'react';
 import type { FC } from 'react';
 
-import { MAX_CONTENT_LENGTH, MAX_TITLE_LENGTH, formatCharacterCount } from '../constants/validation';
+import { formatCharacterCount } from '../constants/validation';
+import { PROMPT_LIMITS } from '../services/promptAdmission';
 import type { EditPromptFormProps } from '../types/components';
 import { Logger, toError, validatePromptFields, type FieldErrors } from '../utils';
 
@@ -45,7 +46,9 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
   const [titleLength, setTitleLength] = useState(prompt.title.length);
   const [contentLength, setContentLength] = useState(prompt.content.length);
 
-  // Track current form values for dirty checking
+  // Track current form values for dirty checking. They are also the inputs' defaultValue: React 19
+  // resets a form's uncontrolled fields once its action completes, and the reset restores the
+  // defaultValue, so a refused save keeps exactly what the user typed instead of the stored text.
   const [currentValues, setCurrentValues] = useState({
     title: prompt.title,
     content: prompt.content,
@@ -69,7 +72,8 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
       // Validation using shared utility
       const validationErrors = validatePromptFields(title, content, {
         component: 'EditPromptForm',
-        promptId: prompt.id
+        promptId: prompt.id,
+        requireTitle: true
       });
 
       // Return validation errors if any
@@ -181,20 +185,19 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
               type="text"
               id="title"
               name="title"
-              defaultValue={prompt.title}
+              defaultValue={currentValues.title}
               onChange={(e) => { handleFieldChange('title', e.target.value); }}
               placeholder="Enter a descriptive title"
               className={`w-full px-4 py-3 border rounded-xl focus-input bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 text-sm text-gray-900 dark:text-gray-100 ${
                 errors?.title ? 'border-red-300 dark:border-red-500' : 'border-purple-200 dark:border-gray-600'
               }`}
               disabled={isPending}
-              maxLength={MAX_TITLE_LENGTH}
             />
             {errors?.title && (
               <p className="mt-2 text-sm text-red-600 dark:text-red-400 font-medium">⚠️ {errors.title}</p>
             )}
-            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
-              {formatCharacterCount(titleLength, MAX_TITLE_LENGTH)}
+            <p className={`mt-2 text-xs font-medium ${titleLength > PROMPT_LIMITS.title ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'}`}>
+              {formatCharacterCount(titleLength, PROMPT_LIMITS.title)}
             </p>
           </div>
 
@@ -236,7 +239,7 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
             <textarea
               id="content"
               name="content"
-              defaultValue={prompt.content}
+              defaultValue={currentValues.content}
               onChange={(e) => { handleFieldChange('content', e.target.value); }}
               placeholder="Enter your prompt content here..."
               rows={10}
@@ -244,14 +247,13 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
                 errors?.content ? 'border-red-300 dark:border-red-500' : 'border-purple-200 dark:border-gray-600'
               }`}
               disabled={isPending}
-              maxLength={MAX_CONTENT_LENGTH}
               required
             />
             {errors?.content && (
               <p className="mt-2 text-sm text-red-600 dark:text-red-400 font-medium">⚠️ {errors.content}</p>
             )}
-            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
-              {formatCharacterCount(contentLength, MAX_CONTENT_LENGTH)}
+            <p className={`mt-2 text-xs font-medium ${contentLength > PROMPT_LIMITS.content ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'}`}>
+              {formatCharacterCount(contentLength, PROMPT_LIMITS.content)}
             </p>
           </div>
         </form>

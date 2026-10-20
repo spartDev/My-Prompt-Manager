@@ -178,7 +178,6 @@ const [contentLength, setContentLength] = useState(0);
 <input
   name="title"
   onChange={(e) => setTitleLength(e.target.value.length)}
-  maxLength={100}
 />
 <p>{titleLength}/100 characters</p>
 ```
@@ -509,7 +508,6 @@ const [charCount, setCharCount] = useState(0);
 <input
   name="field"
   onChange={(e) => setCharCount(e.target.value.length)}
-  maxLength={100}
 />
 <p>{charCount}/100 characters</p>
 ```
@@ -596,6 +594,23 @@ const [value, setValue] = useState('');
 // ✅ CORRECT - uncontrolled with defaultValue
 <input defaultValue="" name="field" />
 ```
+
+### ❌ Pitfall 6: Losing the typed text when a submit is refused
+
+React resets a form's uncontrolled fields once its action completes, whether the action
+succeeded or returned errors, and the reset restores each field's `defaultValue`. A fixed
+`defaultValue=""` therefore wipes what the user typed when validation fails.
+
+```tsx
+// ❌ WRONG - a refused submit empties the field
+<input defaultValue="" name="field" onChange={(e) => setLength(e.target.value.length)} />
+
+// ✅ CORRECT - the typed text is the defaultValue, so the reset puts it back
+const [field, setField] = useState('');
+<input defaultValue={field} name="field" onChange={(e) => setField(e.target.value)} />
+```
+
+The input stays uncontrolled (FormData still reads it). `AddPromptForm` sets the state back to `''` on success so the reset clears the form as before; `EditPromptForm` keeps the values it tracks, since the form closes after a successful save.
 
 ---
 

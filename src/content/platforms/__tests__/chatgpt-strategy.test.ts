@@ -4,6 +4,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+import { HOSTILE_TEXTS, expectNoMarkupIn } from '../../../test/helpers/hostile-text';
 import type { UIElementFactory } from '../../ui/element-factory';
 import { ChatGPTStrategy } from '../chatgpt-strategy';
 
@@ -264,6 +265,20 @@ describe('ChatGPTStrategy', () => {
       
       expect(chatgptStrategy.canHandle(mockTextarea)).toBe(true);
       expect(chatgptStrategy.canHandle(input)).toBe(false);
+    });
+  });
+
+  describe.each(HOSTILE_TEXTS)('hostile-looking text %j', (text) => {
+    it('is set as the value of the textarea', async () => {
+      document.body.appendChild(mockTextarea);
+
+      const result = await strategy.insert(mockTextarea, text);
+
+      expect(result.method).toBe('chatgpt-react');
+      expect(mockTextarea.value).toBe(text);
+      expectNoMarkupIn(document.body, ['textarea']);
+
+      mockTextarea.remove();
     });
   });
 });

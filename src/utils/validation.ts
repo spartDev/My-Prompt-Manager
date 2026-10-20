@@ -1,4 +1,4 @@
-import { MAX_CONTENT_LENGTH, MAX_TITLE_LENGTH, VALIDATION_MESSAGES } from '../constants/validation';
+import { admit } from '../services/promptAdmission';
 import type { Prompt, Category, Settings, StorageData, UsageEvent, CustomSite } from '../types';
 import type { TypeGuard } from '../types/hooks';
 
@@ -19,18 +19,24 @@ export interface FieldErrors {
 interface ValidationLogOptions {
   component: string;
   promptId?: string;
+  /** The form has no title to generate (an edit): a blank one is refused instead of being left for later. */
+  requireTitle?: boolean;
 }
 
 /**
- * Validates prompt title and content fields according to form constraints.
+ * Validates prompt title and content fields by asking Admission whether they would be
+ * admitted (ADR-001): Hidden characters are removed and the title trimmed before the limits
+ * apply, and nothing is shortened. The title is optional here, because an empty one is
+ * generated on save, so only a non-empty title is judged, unless the form has no title to
+ * generate (`requireTitle`, an edit).
  *
  * This shared validation logic is used by both AddPromptForm and EditPromptForm
  * to ensure consistent validation rules across all prompt forms.
  *
- * @param title - The prompt title to validate
+ * @param title - The prompt title to validate (optional field)
  * @param content - The prompt content to validate (required field)
  * @param options - Logging context (component name and optional prompt ID)
- * @returns FieldErrors object with validation errors, or empty object if valid
+ * @returns FieldErrors object with Admission's refusal per field, or empty object if valid
  *
  * @example
  * ```ts
@@ -48,37 +54,35 @@ export function validatePromptFields(
 ): FieldErrors {
   const validationErrors: FieldErrors = {};
 
-  // Content validation (required field)
-  if (!content.trim()) {
-    Logger.warn('Form validation failed: Content is required', {
-      component: options.component,
-      field: 'content',
-      ...(options.promptId && { promptId: options.promptId })
-    });
-    validationErrors.content = VALIDATION_MESSAGES.CONTENT_REQUIRED;
+  const admission = admit({ title: options.requireTitle || title.trim() ? title : undefined, content });
+  if (admission.ok) {
+    return validationErrors;
   }
 
-  if (content.length > MAX_CONTENT_LENGTH) {
-    Logger.warn('Form validation failed: Content exceeds limit', {
-      component: options.component,
+  const context = {
+    component: options.component,
+    ...(options.promptId && { promptId: options.promptId })
+  };
+  const { content: contentRefusal, title: titleRefusal } = admission.errors;
+
+  if (contentRefusal) {
+    Logger.warn(`Form validation failed: ${contentRefusal.message}`, {
+      ...context,
       field: 'content',
-      length: content.length,
-      limit: MAX_CONTENT_LENGTH,
-      ...(options.promptId && { promptId: options.promptId })
+      length: contentRefusal.length,
+      limit: contentRefusal.max
     });
-    validationErrors.content = VALIDATION_MESSAGES.CONTENT_TOO_LONG;
+    validationErrors.content = contentRefusal.message;
   }
 
-  // Title validation (optional field, but has length limit)
-  if (title.length > MAX_TITLE_LENGTH) {
-    Logger.warn('Form validation failed: Title exceeds limit', {
-      component: options.component,
+  if (titleRefusal) {
+    Logger.warn(`Form validation failed: ${titleRefusal.message}`, {
+      ...context,
       field: 'title',
-      length: title.length,
-      limit: MAX_TITLE_LENGTH,
-      ...(options.promptId && { promptId: options.promptId })
+      length: titleRefusal.length,
+      limit: titleRefusal.max
     });
-    validationErrors.title = VALIDATION_MESSAGES.TITLE_TOO_LONG;
+    validationErrors.title = titleRefusal.message;
   }
 
   return validationErrors;
@@ -231,8 +235,12 @@ export function isArrayOf<T>(itemGuard: TypeGuard<T>): TypeGuard<T[]> {
 
 /**
  * Validates that a value is a valid prompt for import purposes.
- * Import prompts must have title, content, and category strings.
- * Other fields (id, createdAt, etc.) may be generated during import.
+ * Import prompts must have id, title, content, and category strings: the same shape the
+ * reader (`readPrompt`) needs, so a restore never starts and then fails halfway on a Prompt
+ * it cannot read. Other fields (createdAt, usage, etc.) are filled in on import.
+ *
+ * This checks structure only. The text itself (whitespace, tags, Hidden characters, length)
+ * is never judged or rewritten here: Admission decides, once, when each Prompt is restored.
  */
 export function isValidImportPrompt(value: unknown): boolean {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -240,6 +248,7 @@ export function isValidImportPrompt(value: unknown): boolean {
   }
   const p = value as Record<string, unknown>;
   return (
+    typeof p.id === 'string' &&
     typeof p.title === 'string' &&
     typeof p.content === 'string' &&
     typeof p.category === 'string'
