@@ -172,6 +172,60 @@ describe('PromptCard - Basic Rendering', () => {
   });
 });
 
+describe('PromptCard - Content preview prefix', () => {
+  const basePrompt: Prompt = {
+    id: 'long',
+    title: 'Long Prompt',
+    content: '',
+    category: 'Test Category',
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  };
+
+  const baseProps = {
+    categories: [{ id: '1', name: 'Test Category', color: '#FF0000' }],
+    onEdit: vi.fn(),
+    onCopy: vi.fn(),
+    onTogglePin: vi.fn(),
+    showToast: vi.fn<(message: string, type: 'success' | 'error' | 'info' | 'warning') => void>(),
+  };
+
+  /** Renders a card and returns the text of its content preview (the card's only <p>). */
+  const renderPreview = (content: string, searchQuery = ''): HTMLParagraphElement => {
+    const { container } = render(
+      <PromptCard {...baseProps} prompt={{ ...basePrompt, content }} searchQuery={searchQuery} />
+    );
+    const preview = container.querySelector('p');
+    if (!preview) {throw new Error('content preview not rendered');}
+    return preview;
+  };
+
+  it('AT1: renders only a bounded prefix of a 20,000-char content, with an ellipsis', () => {
+    const text = renderPreview('a'.repeat(20000)).textContent;
+    expect(text.length).toBeLessThanOrEqual(301);
+    expect(text.length).toBeGreaterThanOrEqual(290);
+    expect(text.endsWith('…')).toBe(true);
+  });
+
+  it.each([299, 298])('AT2: never splits an emoji surrogate pair at the cut (%i-char lead)', (lead) => {
+    // Each emoji is 2 UTF-16 code units; a 299-char lead puts the 300-unit
+    // boundary between an emoji's high and low surrogate.
+    const text = renderPreview('x'.repeat(lead) + '😀'.repeat(200)).textContent;
+    expect(text.endsWith('…')).toBe(true);
+    expect(text).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/);
+  });
+
+  it('AT3: highlights a match inside the prefix and leaves the cut-off tail out of the DOM', () => {
+    const preview = renderPreview(`Score each backlog item ${'z'.repeat(20000)} tail-needle`, 'backlog');
+    expect(preview.querySelector('mark')?.textContent).toBe('backlog');
+    expect(preview.textContent).not.toContain('tail-needle');
+  });
+
+  it('AT3: renders short content unchanged, without an ellipsis', () => {
+    expect(renderPreview('Short and sweet 😀').textContent).toBe('Short and sweet 😀');
+  });
+});
+
 describe('PromptCard - Variables chip', () => {
   const basePrompt: Prompt = {
     id: 'v',

@@ -23,6 +23,25 @@ const formatVariableCount = (count: number): string =>
   count === 1 ? '1 variable' : `${String(count)} variables`;
 
 /**
+ * How many UTF-16 code units of a Prompt's content the card preview renders.
+ * The preview is clamped to two lines by CSS, so anything past this is never seen;
+ * bounding it keeps 20,000-char prompts out of the DOM and out of highlightText.
+ */
+const PREVIEW_MAX_LENGTH = 300;
+
+/**
+ * Bounded prefix of a Prompt's content for the card preview, with an ellipsis when cut.
+ * Local on purpose: can be replaced by the shared truncate util (PR #434) once merged.
+ */
+const previewOf = (content: string): string => {
+  if (content.length <= PREVIEW_MAX_LENGTH) {return content;}
+  // Step back one code unit when the cut would leave a lone high surrogate (split emoji).
+  const lastKept = content.charCodeAt(PREVIEW_MAX_LENGTH - 1);
+  const end = lastKept >= 0xd800 && lastKept <= 0xdbff ? PREVIEW_MAX_LENGTH - 1 : PREVIEW_MAX_LENGTH;
+  return `${content.slice(0, end)}…`;
+};
+
+/**
  * Highlights matching text in a string based on a search query.
  * Pure function hoisted to module scope to avoid recreation on every render.
  */
@@ -162,7 +181,7 @@ const PromptCard: FC<PromptCardProps> = ({
 
       {/* Content preview (2 lines) */}
       <p className="mt-1.5 text-sm leading-relaxed text-gray-500 dark:text-gray-400 line-clamp-2 break-words">
-        {highlightText(prompt.content, searchQuery, prompt.id)}
+        {highlightText(previewOf(prompt.content), searchQuery, prompt.id)}
       </p>
 
       {/* Footer: category, usage and round actions */}
