@@ -144,13 +144,19 @@ test.describe('Library filter', () => {
     await expect(library.getLibraryFilterPill('Pinned')).toHaveAttribute('aria-checked', 'true');
   });
 
-  test('arrow keys, Home and End move the selection', async ({ page, extensionId }) => {
+  test('all four arrow keys, Home and End move the selection', async ({ page, extensionId }) => {
     const library = await openPopup(page, extensionId);
     await library.getLibraryFilterPill('All').focus();
 
     await page.keyboard.press('ArrowRight');
     await expect(library.getLibraryFilterPill('Pinned')).toHaveAttribute('aria-checked', 'true');
     await expect(library.getLibraryFilterPill('Pinned')).toBeFocused();
+
+    await page.keyboard.press('ArrowDown');
+    await expect(library.getLibraryFilterPill('Most Used')).toHaveAttribute('aria-checked', 'true');
+
+    await page.keyboard.press('ArrowUp');
+    await expect(library.getLibraryFilterPill('Pinned')).toHaveAttribute('aria-checked', 'true');
 
     await page.keyboard.press('End');
     await expect(library.getLibraryFilterPill('Research')).toHaveAttribute('aria-checked', 'true');
@@ -183,6 +189,32 @@ test.describe('Library filter', () => {
     const rowBox = await row.boundingBox();
     const pillBox = await library.getLibraryFilterPill('Design').boundingBox();
     expect(rowBox && pillBox && pillBox.x + pillBox.width <= rowBox.x + rowBox.width).toBe(true);
+  });
+
+  test('a sort chosen in Settings applies even when the Library opens before it is saved', async ({ page, extensionId }) => {
+    // Slow down settings writes so the Library mounts while the save is still pending
+    await page.addInitScript(() => {
+      const local = chrome.storage.local;
+      const set = local.set.bind(local) as (items: Record<string, unknown>) => Promise<void>;
+      Object.defineProperty(local, 'set', {
+        configurable: true,
+        value: async (items: Record<string, unknown>) => {
+          if ('settings' in items) {
+            await new Promise(resolve => { setTimeout(resolve, 500); });
+          }
+          return set(items);
+        }
+      });
+    });
+    await openPopup(page, extensionId);
+
+    await tabNavigation.switchTo(page, 'settings');
+    await page.getByLabel('Sort prompts by').selectOption({ label: 'Alphabetical (A→Z)' });
+    await tabNavigation.getTab(page, 'library').click();
+
+    await expect.poll(() => getSortedPromptTitles(page), { timeout: 3000 }).toEqual([
+      'Bug report', 'Meeting notes', 'Blog outline', 'Code review', 'Email reply', 'Paper summary'
+    ]);
   });
 
   for (const theme of ['light', 'dark'] as const) {

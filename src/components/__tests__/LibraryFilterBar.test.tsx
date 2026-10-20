@@ -65,6 +65,10 @@ describe('LibraryFilterBar', () => {
     ['ArrowRight', `category:${personal.id}`, 'all'],
     ['ArrowLeft', 'all', `category:${personal.id}`],
     ['ArrowLeft', 'mostUsed', 'pinned'],
+    ['ArrowDown', 'all', 'pinned'],
+    ['ArrowDown', `category:${personal.id}`, 'all'],
+    ['ArrowUp', 'pinned', 'all'],
+    ['ArrowUp', 'all', `category:${personal.id}`],
     ['Home', `category:${work.id}`, 'all'],
     ['End', 'pinned', `category:${personal.id}`]
   ] as const)('%s from %s selects %s and moves focus', async (key, fromKey, toKey) => {

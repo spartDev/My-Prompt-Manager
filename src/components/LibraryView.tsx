@@ -9,7 +9,7 @@ import {
   resolveLibraryFilter
 } from '../services/libraryFilter';
 import { StorageManager } from '../services/storage';
-import type { Prompt, SortOrder } from '../types';
+import type { Prompt, Settings, SortOrder } from '../types';
 import type { LibraryViewProps } from '../types/components';
 import { Logger, toError } from '../utils';
 
@@ -36,17 +36,37 @@ const LibraryView: FC<LibraryViewProps> = ({
   const { query, debouncedQuery, filteredPrompts, isSearching } = searchWithDebounce;
   const [sortOrder, setSortOrder] = useState<SortOrder>(DEFAULT_SETTINGS.sortOrder);
 
-  // The sort is chosen in Settings
+  // The sort is chosen in Settings. Read it once, then follow every later save: a save can
+  // land after this view has mounted (or come from the other context)
   useEffect(() => {
+    let savedSinceMount = false;
+    const handleStorageChange = (changes: { [key: string]: chrome.storage.StorageChange }, areaName: string) => {
+      if (areaName === 'local' && 'settings' in changes) {
+        const newSettings = changes.settings.newValue as Partial<Settings> | undefined;
+        if (newSettings?.sortOrder) {
+          savedSinceMount = true;
+          setSortOrder(newSettings.sortOrder);
+        }
+      }
+    };
+    // chrome.storage.onChanged may not be available in all contexts (see useTheme)
+    const onChangedApi = typeof chrome !== 'undefined' ? chrome.storage.onChanged : undefined;
+    onChangedApi?.addListener(handleStorageChange);
+
     const loadSortOrder = async () => {
       try {
         const settings = await StorageManager.getInstance().getSettings();
-        setSortOrder(settings.sortOrder);
+        // A save seen meanwhile is newer than this first read
+        if (!savedSinceMount) {
+          setSortOrder(settings.sortOrder);
+        }
       } catch (error) {
         Logger.error('Failed to load sort settings', toError(error), { component: 'LibraryView' });
       }
     };
     void loadSortOrder();
+
+    return () => { onChangedApi?.removeListener(handleStorageChange); };
   }, []);
 
   // Pills are offered from the whole Library, so a search never hides one

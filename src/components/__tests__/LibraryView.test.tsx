@@ -1,8 +1,9 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { ALL_PROMPTS } from '../../services/libraryFilter';
+import { triggerChromeStorageChange } from '../../test/mocks';
 import type { Prompt, Category, LibraryFilter } from '../../types';
 import type { UseSearchWithDebounceReturn } from '../../types/hooks';
 import LibraryView from '../LibraryView';
@@ -322,6 +323,35 @@ describe('LibraryView', () => {
       await waitFor(() => {
         expect(sortPrompts).toHaveBeenLastCalledWith(expect.any(Array), 'title', 'asc');
       });
+    });
+
+    it('follows a sort saved after it opened', async () => {
+      render(<LibraryView {...defaultProps} />);
+      await waitFor(() => { expect(getSettings).toHaveBeenCalled(); });
+
+      act(() => {
+        triggerChromeStorageChange({ settings: { newValue: { sortOrder: 'title', sortDirection: 'asc' } } });
+      });
+
+      await waitFor(() => {
+        expect(sortPrompts).toHaveBeenLastCalledWith(expect.any(Array), 'title', 'asc');
+      });
+    });
+
+    it('keeps a newer save when its first read of the settings answers late', async () => {
+      let answerFirstRead: (settings: unknown) => void = () => undefined;
+      getSettings.mockReturnValue(new Promise(resolve => { answerFirstRead = resolve; }));
+      render(<LibraryView {...defaultProps} />);
+
+      act(() => {
+        triggerChromeStorageChange({ settings: { newValue: { sortOrder: 'title', sortDirection: 'asc' } } });
+      });
+      await act(async () => {
+        answerFirstRead({ sortOrder: 'updatedAt', sortDirection: 'desc' });
+        await Promise.resolve();
+      });
+
+      expect(sortPrompts).toHaveBeenLastCalledWith(expect.any(Array), 'title', 'asc');
     });
   });
 });

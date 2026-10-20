@@ -38,7 +38,7 @@ const filterKey = (filter: LibraryFilter): string =>
 /**
  * The Library filter as a row of pills that scrolls sideways: All, Pinned, Most Used,
  * then one pill per Category. Implements the WAI-ARIA radio group pattern
- * (roving tabindex, arrow keys move the selection).
+ * (roving tabindex; all four arrow keys, Home and End move the selection).
  */
 const LibraryFilterBar: FC<LibraryFilterBarProps> = ({ categories, activeFilter, onChange, disabled = false }) => {
   const rowRef = useRef<HTMLDivElement>(null);
@@ -110,8 +110,8 @@ const LibraryFilterBar: FC<LibraryFilterBarProps> = ({ categories, activeFilter,
 
   const handleKeyDown = (e: KeyboardEvent<HTMLButtonElement>, index: number) => {
     let nextIndex: number | null = null;
-    if (e.key === 'ArrowRight') { nextIndex = (index + 1) % options.length; }
-    if (e.key === 'ArrowLeft') { nextIndex = (index - 1 + options.length) % options.length; }
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { nextIndex = (index + 1) % options.length; }
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { nextIndex = (index - 1 + options.length) % options.length; }
     if (e.key === 'Home') { nextIndex = 0; }
     if (e.key === 'End') { nextIndex = options.length - 1; }
     if (nextIndex === null) { return; }
