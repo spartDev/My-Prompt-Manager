@@ -1,0 +1,151 @@
+version: 2.5.0
+installed_at: 2026-09-30T19:30:35.582Z
+tools:
+  - claude
+level: recommended
+standards:
+  commands:
+    - design-epic
+    - refine-epic
+    - implement
+    - create-pr
+    - commit
+    - adr
+    - discover
+    - datacontract
+    - dbt-testing-and-documentation
+    - secure-deps
+    - audit-fix
+    - review-code
+  rules:
+    - agentic-engineering-principles
+    - python-guidelines
+  skills:
+    - adr-writing
+    - architecture-documentation
+    - skill-reviewer
+    - creating-pull-requests
+    - elements-design-system
+    - design-challenge
+    - tdd
+    - cicd-engineering
+    - elements-charts
+    - react-best-practices
+    - web-design-guidelines
+    - composition-patterns
+    - release-process
+    - xray-test-steps
+    - org-discovery
+    - datacontract-writing
+    - iac-terraform
+    - dependency-audit
+    - code-review
+    - iac-security-review
+    - dbt-testing-and-documentation
+    - incident-postmortem
+    - context-engineering
+    - presentation-html
+    - coach-me
+    - e2e-test-generation
+    - code-to-figma
+    - engineering-docs
+  agents:
+    - pr-author
+    - adr-assistant
+    - datacontract-generator
+    - iac-tf-engineer
+    - security-auditor
+    - code-reviewer
+    - dbt-testing-and-documentation-generator
+    - engineering-docs-agent
+  hooks:
+    - batch-format
+    - update-check
+    - secret-guard
+  mcps:
+    - atlassian
+    - aws-mcp
+standard_versions:
+  commands:
+    design-epic: 1.0.0
+    refine-epic: 1.0.0
+    implement: 1.0.0
+    create-pr: 1.0.0
+    commit: 1.0.0
+    adr: 1.0.0
+    discover: 1.0.0
+    datacontract: 1.0.0
+    dbt-testing-and-documentation: 1.0.0
+    secure-deps: 2.0.0
+    audit-fix: 1.0.0
+    review-code: 1.0.0
+  rules:
+    agentic-engineering-principles: 1.0.0
+    python-guidelines: 1.0.0
+  skills:
+    adr-writing: 2.0.0
+    architecture-documentation: 1.0.0
+    skill-reviewer: 1.0.0
+    creating-pull-requests: 2.0.0
+    elements-design-system: 1.0.0
+    design-challenge: 1.0.0
+    tdd: 1.0.1
+    cicd-engineering: 1.1.0
+    elements-charts: 1.0.0
+    react-best-practices: 1.0.0
+    web-design-guidelines: 1.0.0
+    composition-patterns: 1.0.0
+    release-process: 1.0.0
+    xray-test-steps: 1.0.0
+    org-discovery: 1.0.0
+    datacontract-writing: 1.0.0
+    iac-terraform: 1.0.0
+    dependency-audit: 1.0.0
+    code-review: 1.0.0
+    iac-security-review: 1.0.0
+    dbt-testing-and-documentation: 1.0.0
+    incident-postmortem: 1.0.0
+    context-engineering: 1.0.0
+    presentation-html: 1.1.0
+    coach-me: 1.0.0
+    e2e-test-generation: 1.0.0
+    code-to-figma: 1.0.0
+    engineering-docs: 1.0.0
+  agents:
+    pr-author: 1.0.0
+    adr-assistant: 1.0.0
+    datacontract-generator: 1.0.0
+    iac-tf-engineer: 1.0.0
+    security-auditor: 1.0.0
+    code-reviewer: 1.0.0
+    dbt-testing-and-documentation-generator: 1.0.0
+    engineering-docs-agent: 1.0.0
+  hooks:
+    batch-format: 1.2.0
+    update-check: 2.0.1
+    secret-guard: 1.1.0
+  mcps:
+    atlassian: 1.0.0
+    aws-mcp: 1.0.0
+file_hashes:
+  .claude/commands/design-epic.md: 652109a45d44c07274b8f23947404228df89a7d666f6a512b689be7fba987d3b
+  .claude/commands/refine-epic.md: 1744ee373bd69a95e9dae78f894445cb89a48daeb6e1db2237be322e34d81fd2
+  .claude/commands/implement.md: 0d707e7438f76bd323c86a3bbeb896367a7217fc3f6d883d8498aedde505098c
+  .claude/commands/create-pr.md: c65646cd8e976022e5de58c83a753430a66b6bb47a23427837959ea549e037eb
+  .claude/commands/commit.md: ed4540fb89e78d2b91529fc2983ce0392a834e558076fedf7890addb0770e296
+  .claude/commands/adr.md: 1d6d5670641581449457ea25782ca4788662821e555b17bb961a86741ee119b4
+  .claude/commands/discover.md: aaf68b30839337da2663f9212417ba3d839d55f877d65a08db858015f21ba08f
+  .claude/commands/datacontract.md: 14d3aa16a0130eb43b7dea4250ec5cb76ab3b2f27528f04db487e6ca1b3134a6
+  .claude/commands/dbt-testing-and-documentation.md: cf7de35fbdd52bd730aed6b0547d35d030a68ffdb7ded6401043937648b60833
+  .claude/commands/secure-deps.md: 3ffee1a62ce47a6dda4f96ef788882bf6bb579bcfc5c5afe47e321383eba0118
+  .claude/commands/audit-fix.md: 25619ccdb101bb5d5e2f22274a7504ad24b1218c6eb15eabe2beabaad6abf333
+  .claude/commands/review-code.md: 675fca5d4e06b3f1fd3aca72afa1bef9d4f24e07f346d4fafe7c2d430c136f17
+  .claude/rules/agentic-engineering-principles.md: 8e95ab76c799e1cedd0fa9cb235e9ddf98144a32be9d27f43f3b8a0ccdd8bca9
+  .claude/rules/python-guidelines.md: ccfa02129779a39a70463856e842c4085072e423af397d42b40b61bcd4788f2e
+  .claude/templates/claude-plugins/configure/SKILL.md: 189a73505aca1c549fab1ae74cf45ca7a0ecf6e756548ac240776953f22c99d0
+  .claude/templates/confluence/design-page.template.md: 167b7bef43a58035f3c460e2c405a8e5a2330e82cfef0a156a80a11e7d20099b
+  .claude/templates/design-doc.template.md: 84e1611789eddd23b924734f5211d2a257cb07aa8e614ee24b26568ef96c6988
+  .claude/templates/epic-refinement.template.md: 477a39023e42e7bed74a3446611c7306034ff7849f07ad8470ac73680b52546d
+  .claude/templates/jira/epic.template.md: 0dffa84c012d399a5d8ca67c641f779739960361df2352c0eb92b18465aafed3
+  .claude/templates/jira/story.template.md: 10410991875dceed593be3c1a93302e85115686bb9dfe66b783acc14da36a5e4
+  .claude/templates/jira/task.template.md: 6720468813af2cb880e4942f00b9624c045165b8b5e03b4ec5ff8bec33d114c0
