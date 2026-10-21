@@ -155,35 +155,35 @@ leading-relaxed /* 1.625 - Comfortable reading */
 
 **Page Title:**
 ```tsx
-<h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+<h1 className="text-xl font-bold text-primary">
   Add New Prompt
 </h1>
 ```
 
 **Section Header:**
 ```tsx
-<h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+<h2 className="text-sm font-semibold text-secondary mb-3">
   Category
 </h2>
 ```
 
 **Body Text:**
 ```tsx
-<p className="text-sm text-gray-600 dark:text-gray-400">
+<p className="text-sm text-secondary">
   Description text
 </p>
 ```
 
 **Helper Text:**
 ```tsx
-<p className="text-xs text-gray-500 dark:text-gray-400 font-medium">
+<p className="text-xs text-tertiary font-medium">
   100/10000 characters
 </p>
 ```
 
 **Prompt Card Title:**
 ```tsx
-<h3 className="font-semibold text-gray-900 dark:text-gray-100 text-sm leading-tight truncate">
+<h3 className="font-semibold text-primary text-sm leading-tight truncate">
   Prompt Title
 </h3>
 ```
@@ -341,6 +341,8 @@ shadow-2xl  /* 0 25px 50px -12px, tint 25 - dialogs */
 
 ### Custom Shadows
 
+The Prompt selector injected on Platforms is styled in `src/content/utils/styles.ts`, outside Tailwind; its shadows and colors are not on the palette yet.
+
 **Icon Shadow (Legacy):**
 ```css
 box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
@@ -381,8 +383,8 @@ box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.4); /* Blue */
 
 **Modal/Dialog:**
 ```tsx
-<div className="shadow-xl backdrop-blur-sm">
-  {/* Modal content */}
+<div className="bg-card shadow-2xl">
+  {/* Modal content: the panel itself is opaque */}
 </div>
 ```
 
@@ -392,15 +394,16 @@ box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.4); /* Blue */
 
 ### Buttons
 
-#### Primary Button (Gradient)
+#### Primary Button
+
+Flat accent: the brand gradient belongs to the logo only.
 
 ```tsx
 <button className="
   px-6 py-3
-  text-sm font-semibold text-white
-  bg-linear-to-r from-purple-600 to-indigo-600
+  text-sm font-semibold text-on-accent
+  bg-accent hover:bg-accent-hover
   rounded-xl
-  hover:from-purple-700 hover:to-indigo-700
   transition-all duration-200
   shadow-lg hover:shadow-xl
   disabled:opacity-50
@@ -410,26 +413,15 @@ box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.4); /* Blue */
 </button>
 ```
 
-**Focus Class:**
-```css
-.focus-primary {
-  @apply focus:outline-none focus:ring-2 focus:ring-purple-500
-         focus:ring-offset-2 focus:ring-offset-white
-         dark:focus:ring-offset-gray-900;
-}
-```
-
 #### Secondary Button
 
 ```tsx
 <button className="
   px-6 py-3
-  text-sm font-semibold
-  text-gray-700 dark:text-gray-300
-  bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm
-  border border-purple-200 dark:border-gray-600
+  text-sm font-semibold text-secondary
+  bg-card hover:bg-muted
+  border border-strong
   rounded-xl
-  hover:bg-white/80 dark:hover:bg-gray-700/80
   transition-all duration-200
   focus-secondary
 ">
@@ -437,22 +429,13 @@ box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.4); /* Blue */
 </button>
 ```
 
-**Focus Class:**
-```css
-.focus-secondary {
-  @apply focus:outline-none focus:ring-2 focus:ring-purple-500
-         focus:ring-offset-1 focus:ring-offset-white
-         dark:focus:ring-offset-gray-800;
-}
-```
-
 #### Danger Button
 
 ```tsx
 <button className="
   px-3 py-1.5
-  text-xs font-semibold text-white
-  bg-red-600 hover:bg-red-700
+  text-xs font-semibold text-on-accent
+  bg-danger hover:bg-danger-hover
   rounded-lg
   shadow-sm
   transition-colors
@@ -462,26 +445,16 @@ box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.4); /* Blue */
 </button>
 ```
 
-**Focus Class:**
-```css
-.focus-danger {
-  @apply focus:outline-none focus:ring-2 focus:ring-red-500
-         focus:ring-offset-2 focus:ring-offset-white
-         dark:focus:ring-offset-gray-900;
-}
-```
-
 #### Small Action Button (Copy)
 
 ```tsx
 <button className="
   inline-flex items-center
   px-2 py-1
-  bg-linear-to-r from-purple-500 to-indigo-500
-  text-white
+  bg-accent hover:bg-accent-hover
+  text-on-accent
   rounded-md
-  hover:from-purple-600 hover:to-indigo-600
-  transition-all duration-200
+  transition-colors duration-200
   text-xs font-medium
   focus-primary
 ">
@@ -495,10 +468,9 @@ box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.4); /* Blue */
 ```tsx
 <button className="
   p-2
-  text-gray-400 dark:text-gray-500
-  hover:text-purple-600 dark:hover:text-purple-400
+  text-tertiary hover:text-accent
   rounded-lg
-  hover:bg-purple-50 dark:hover:bg-purple-900/20
+  hover:bg-muted
   transition-colors
   focus-interactive
 ">
@@ -506,27 +478,36 @@ box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.4); /* Blue */
 </button>
 ```
 
-**Focus Class:**
+An icon that is the only content of a button takes `text-tertiary` or stronger: `text-faint` is under 3:1.
+
+#### Focus Classes
+
+Defined in `tailwind.config.js` (see [Focus States](#focus-states)):
+
 ```css
-.focus-interactive {
-  @apply focus:outline-none focus:ring-2 focus:ring-purple-500
-         focus:ring-offset-1 focus:ring-offset-white
-         dark:focus:ring-offset-gray-800 dark:focus:ring-purple-400;
-}
+.focus-primary     { @apply focus:outline-2 focus:outline-offset-2 focus:outline-accent; }
+.focus-secondary   { @apply focus:outline-2 focus:outline-offset-1 focus:outline-accent; }
+.focus-danger      { @apply focus:outline-2 focus:outline-offset-2 focus:outline-danger; }
+.focus-input       { @apply focus:outline-none focus:ring-2 focus:ring-accent focus:border-focus; }
+.focus-interactive { @apply focus:outline-2 focus:outline-offset-1 focus:outline-accent; }
 ```
 
 #### Loading State
 
+The spinner takes the text color of its button, so it works on any button:
+
 ```tsx
 <button disabled className="disabled:opacity-50">
   <div className="flex items-center justify-center space-x-2">
-    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+    <div className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />
     <span>Saving...</span>
   </div>
 </button>
 ```
 
 ### Input Fields
+
+A field on a card takes `bg-subtle`; a field placed directly on `bg-app` (the Library search) takes `bg-card`. Both take `border-input` (3:1 on every surface), `focus-input` and `placeholder:text-tertiary`.
 
 #### Text Input
 
@@ -535,25 +516,16 @@ box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.4); /* Blue */
   type="text"
   className="
     w-full px-4 py-3
-    border border-purple-200 dark:border-gray-600
+    border border-input
     rounded-xl
     focus-input
-    bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm
+    bg-subtle
     transition-all duration-200
-    text-gray-900 dark:text-gray-100
-    placeholder-gray-500 dark:placeholder-gray-400
+    text-primary
+    placeholder:text-tertiary
   "
   placeholder="Enter text..."
 />
-```
-
-**Focus Class:**
-```css
-.focus-input {
-  @apply focus:outline-none focus:ring-2 focus:ring-purple-500
-         focus:border-purple-500 dark:focus:ring-purple-400
-         dark:focus:border-purple-400;
-}
 ```
 
 #### Text Input with Error
@@ -563,14 +535,14 @@ box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.4); /* Blue */
   className="
     w-full px-4 py-3
     border rounded-xl focus-input
-    bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm
+    bg-subtle
     transition-all duration-200
-    text-gray-900 dark:text-gray-100
-    border-red-300 dark:border-red-500
+    text-primary
+    border-error
   "
 />
 {errors.field && (
-  <p className="mt-2 text-sm text-red-600 dark:text-red-400 font-medium">
+  <p className="mt-2 text-sm text-danger font-medium">
     {errors.field}
   </p>
 )}
@@ -583,13 +555,14 @@ box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.4); /* Blue */
   rows={8}
   className="
     w-full px-4 py-3
-    border border-purple-200 dark:border-gray-600
+    border border-input
     rounded-xl
     focus-input
     resize-none
-    bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm
+    bg-subtle
     transition-all duration-200
-    text-gray-900 dark:text-gray-100
+    text-primary
+    placeholder:text-tertiary
   "
   placeholder="Enter your prompt content..."
 />
@@ -601,20 +574,20 @@ box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.4); /* Blue */
 <div className="relative">
   <select className="
     w-full px-4 py-3 pr-10
-    border border-purple-200 dark:border-gray-600
+    border border-input
     rounded-xl
     focus-input
-    bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm
+    bg-subtle
     transition-all duration-200
     font-medium
     appearance-none
     cursor-pointer
-    text-gray-900 dark:text-gray-100
+    text-primary
   ">
     <option>Option 1</option>
   </select>
   <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-    <svg className="w-4 h-4 text-purple-400 dark:text-purple-300">
+    <svg className="w-4 h-4 text-tertiary">
       {/* Chevron down icon */}
     </svg>
   </div>
@@ -623,10 +596,12 @@ box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.4); /* Blue */
 
 #### Search Input
 
+The Library search sits on `bg-app`, so it takes `bg-card`, like the cards:
+
 ```tsx
 <div className="relative">
   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none z-10">
-    <svg className="h-5 w-5 text-purple-400 dark:text-purple-300">
+    <svg className="h-5 w-5 text-tertiary">
       {/* Search icon */}
     </svg>
   </div>
@@ -634,15 +609,14 @@ box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.4); /* Blue */
     type="text"
     className="
       w-full pl-12 pr-12 py-3
-      bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm
-      border border-purple-200 dark:border-gray-600
+      bg-card
+      border border-input
       rounded-xl
       focus-input
       text-sm
-      text-gray-900 dark:text-gray-100
-      placeholder-gray-500 dark:placeholder-gray-400
+      text-primary
+      placeholder:text-tertiary
       shadow-sm
-      hover:bg-white/80 dark:hover:bg-gray-700/80
       transition-all duration-200
     "
     placeholder="Search prompts"
@@ -653,15 +627,17 @@ box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.4); /* Blue */
 
 ### Cards
 
+Cards are opaque `bg-card` with a `border-default` border, floating on `bg-app`. Dividers inside a card take `border-divider` (`divide-y divide-divider`).
+
 #### Prompt Card
 
 ```tsx
 <article className="
-  bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm
-  border-b border-purple-100 dark:border-gray-700
-  p-5
-  hover:bg-white/90 dark:hover:bg-gray-800/90
-  transition-all duration-200
+  bg-card
+  border border-default
+  rounded-2xl p-4
+  shadow-sm hover:shadow-md
+  transition-shadow duration-200
   relative group
 ">
   {/* Card content */}
@@ -672,8 +648,8 @@ box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.4); /* Blue */
 
 ```tsx
 <div className="
-  bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm
-  border border-purple-100 dark:border-gray-700
+  bg-card
+  border border-default
   rounded-xl
   p-5
   hover:shadow-md
@@ -687,18 +663,10 @@ box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.4); /* Blue */
 
 #### Category Badge
 
+Category colors are user data, not tokens: use the component, which derives the chip colors of both modes from the Category's color (`getSoftBadgeColors` in `src/constants/colors.ts`):
+
 ```tsx
-<span
-  className="
-    inline-flex items-center
-    px-2 py-0.5
-    rounded-full
-    text-xs font-medium text-white
-  "
-  style={{ backgroundColor: categoryColor }}
->
-  Category Name
-</span>
+<CategoryBadge category={category} variant="soft" />
 ```
 
 #### Status Badge
@@ -709,11 +677,27 @@ box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.4); /* Blue */
   px-2 py-1
   rounded-full
   text-xs font-medium
-  bg-green-100 dark:bg-green-900/20
-  text-green-700 dark:text-green-400
+  bg-success-subtle
+  text-success
 ">
   Active
 </span>
+```
+
+#### Chosen Pill
+
+One item chosen among several (Library filter pill, active Section):
+
+```tsx
+<button className={`
+  px-3 py-1.5 rounded-full border text-sm
+  ${chosen
+    ? 'bg-accent-selected border-accent text-accent-strong font-semibold'
+    : 'bg-card border-default text-secondary hover:bg-muted'
+  }
+`}>
+  Pinned
+</button>
 ```
 
 ### Modals & Dialogs
@@ -725,26 +709,25 @@ box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.4); /* Blue */
   fixed inset-0 z-50
   flex items-center justify-center p-3
 ">
-  {/* Backdrop */}
+  {/* Backdrop: the only translucent surface */}
   <div
     className="
       absolute inset-0
-      bg-black bg-opacity-50
+      bg-backdrop backdrop-blur-sm
       transition-opacity
     "
     onClick={onClose}
   />
 
-  {/* Modal Panel */}
+  {/* Modal Panel: opaque */}
   <div className="
     relative
-    bg-white dark:bg-gray-800
+    bg-card
     rounded-xl p-3
-    shadow-xl
+    shadow-2xl
     transform transition-all
     max-w-xs w-full mx-2
-    backdrop-blur-sm
-    border border-purple-100 dark:border-gray-700
+    border border-default
   ">
     {/* Modal content */}
   </div>
@@ -760,17 +743,17 @@ box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.4); /* Blue */
     shrink-0 flex items-center justify-center
     h-8 w-8
     rounded-full
-    bg-red-100 dark:bg-red-900/20
+    bg-danger-subtle
   ">
-    <svg className="w-6 h-6 text-red-600">{/* Icon */}</svg>
+    <svg className="w-6 h-6 text-danger">{/* Icon */}</svg>
   </div>
 
   {/* Content */}
   <div className="ml-3 flex-1">
-    <h3 className="text-sm leading-5 font-bold text-gray-900 dark:text-gray-100">
+    <h3 className="text-sm leading-5 font-bold text-primary">
       Delete Prompt
     </h3>
-    <p className="mt-1 text-xs text-gray-600 dark:text-gray-400 leading-tight">
+    <p className="mt-1 text-xs text-secondary leading-tight">
       Are you sure? This action cannot be undone.
     </p>
   </div>
@@ -778,12 +761,14 @@ box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.4); /* Blue */
 
 {/* Actions */}
 <div className="mt-3 flex flex-row-reverse gap-2">
-  <button className="bg-red-600 hover:bg-red-700 ...">Delete</button>
-  <button className="border bg-white dark:bg-gray-700 ...">Cancel</button>
+  <button className="bg-danger hover:bg-danger-hover text-on-accent focus-danger ...">Delete</button>
+  <button className="border border-strong bg-card hover:bg-muted text-secondary focus-secondary ...">Cancel</button>
 </div>
 ```
 
 ### Toggle Switch
+
+On: `bg-accent`. Off: the track is filled with the field-outline token (`border-input`, 3:1 on every surface). The knob is white in both modes, the `text-on-accent` color. Neither fill has a `bg-` class, so both read their token through an arbitrary value:
 
 ```tsx
 <button
@@ -796,20 +781,16 @@ box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.4); /* Blue */
     relative inline-flex items-center
     rounded-full
     transition-all duration-200
-    focus:outline-none focus:ring-4 focus:ring-purple-300 dark:focus:ring-purple-800
-    ${checked
-      ? 'bg-linear-to-r from-purple-600 to-indigo-600 shadow-sm'
-      : 'bg-gray-200 dark:bg-gray-700'
-    }
+    focus-interactive
+    ${checked ? 'bg-accent' : 'bg-(--border-color-input)'}
     ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
   `}
 >
   <span className={`
     h-5 w-5
     inline-block transform
-    rounded-full bg-white shadow-sm
+    rounded-full bg-(--text-color-on-accent) shadow-sm
     transition-transform duration-200
-    border border-gray-300 dark:border-gray-600
     ${checked ? 'translate-x-6' : 'translate-x-[2px]'}
   `} />
 </button>
@@ -817,20 +798,19 @@ box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.4); /* Blue */
 
 ### Toast Notifications
 
+Toasts are dark in both modes (`bg-inverse`). The status icon takes its bright variant (`text-inverse-success`, `-danger`, `-warning`, `-info`), and the progress bar takes the icon color through `bg-current`:
+
 ```tsx
 <div className="
-  flex items-start p-4
+  relative flex items-start p-4
   rounded-lg shadow-lg
-  bg-white dark:bg-gray-800
-  text-gray-900 dark:text-white
-  border border-l-4
-  border-l-purple-500
-  border-t border-r border-b
-  border-purple-200 dark:border-purple-800
+  bg-inverse
+  text-on-inverse
+  overflow-hidden
 ">
   {/* Icon */}
-  <div className="shrink-0">
-    <svg className="h-5 w-5 text-purple-500">{/* Icon */}</svg>
+  <div className="shrink-0 text-inverse-success">
+    <svg className="h-5 w-5">{/* Icon */}</svg>
   </div>
 
   {/* Message */}
@@ -844,7 +824,7 @@ box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.4); /* Blue */
   </button>
 
   {/* Progress bar */}
-  <div className="absolute bottom-0 left-0 h-1 bg-purple-500"
+  <div className="absolute bottom-0 left-0 h-1 bg-current text-inverse-success"
        style={{
          width: '100%',
          animation: 'shrink-width 3s linear'
@@ -873,10 +853,10 @@ box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.4); /* Blue */
       <div className="
         absolute right-0 top-full mt-1
         w-28
-        bg-white dark:bg-gray-800 backdrop-blur-sm
+        bg-card
         rounded-xl
         shadow-xl
-        border border-purple-200 dark:border-gray-700
+        border border-default
         overflow-hidden
         z-1001
       ">
@@ -884,9 +864,9 @@ box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.4); /* Blue */
           block w-full text-left
           px-4 py-3
           text-sm
-          text-gray-700 dark:text-gray-300
-          hover:bg-purple-50 dark:hover:bg-purple-900/20
-          hover:text-purple-700 dark:hover:text-purple-400
+          text-secondary
+          hover:bg-muted
+          hover:text-primary
           font-medium
           transition-colors
           focus-secondary
@@ -897,8 +877,8 @@ box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.4); /* Blue */
           block w-full text-left
           px-4 py-3
           text-sm
-          text-red-600 dark:text-red-400
-          hover:bg-red-50 dark:hover:bg-red-900/20
+          text-danger
+          hover:bg-danger-subtle
           font-medium
           transition-colors
           focus-danger
@@ -913,30 +893,33 @@ box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.4); /* Blue */
 
 ### Section Headers
 
+The header is seamless: it shares `bg-app` with the page, and its bottom line (`border-strong`) shows only once the content scrolls under it. The icon square is `bg-accent-subtle` with a `text-accent` icon.
+
 ```tsx
-<div className="
+<div className={`
   shrink-0 p-6
-  bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm
-  border-b border-purple-100 dark:border-gray-700
-">
+  bg-app
+  border-b
+  ${isScrolled ? 'border-strong' : 'border-transparent'}
+`}>
   <div className="flex items-center justify-between">
     <div className="flex items-center space-x-3">
       {/* Icon */}
       <div className="
         w-10 h-10
-        bg-linear-to-br from-purple-600 to-indigo-600
+        bg-accent-subtle
         rounded-xl
         flex items-center justify-center
       ">
-        <svg className="w-6 h-6 text-white">{/* Icon */}</svg>
+        <svg className="w-6 h-6 text-accent">{/* Icon */}</svg>
       </div>
 
       {/* Text */}
       <div>
-        <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+        <h2 className="text-xl font-bold text-primary">
           Section Title
         </h2>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
+        <p className="text-sm text-tertiary">
           Description text
         </p>
       </div>
@@ -1004,7 +987,7 @@ animation: promptSelectorFadeIn 0.2s ease-out;
 ```tsx
 <div className="
   w-4 h-4
-  border-2 border-white/30 border-t-white
+  border-2 border-current/30 border-t-current
   rounded-full
   animate-spin
 " />
@@ -1015,29 +998,28 @@ animation: promptSelectorFadeIn 0.2s ease-out;
 **General Pattern:**
 ```tsx
 <element className="
-  hover:bg-purple-50 dark:hover:bg-purple-900/20
-  hover:text-purple-600 dark:hover:text-purple-400
+  hover:bg-muted
+  hover:text-accent
   hover:shadow-md
   transition-all duration-200
 ">
 ```
 
-**Button Hover:**
+**Button Hover:** hover darkens, in both modes
 ```tsx
 <button className="
-  bg-linear-to-r from-purple-600 to-indigo-600
-  hover:from-purple-700 hover:to-indigo-700
+  bg-accent hover:bg-accent-hover
   shadow-lg hover:shadow-xl
   transition-all duration-200
 ">
 ```
 
-**Card Hover:**
+**Card Hover:** the surface stays opaque; the shadow rises
 ```tsx
 <div className="
-  bg-white/70 dark:bg-gray-800/70
-  hover:bg-white/90 dark:hover:bg-gray-800/90
-  transition-all duration-200
+  bg-card
+  hover:shadow-md
+  transition-shadow duration-200
 ">
 ```
 
@@ -1098,7 +1080,7 @@ All components MUST be tested in both light and dark modes to ensure:
 - Readable text on all backgrounds
 - Visible borders and dividers
 - Consistent hover/focus states
-- Proper backdrop-blur-sm rendering
+- A visible backdrop behind dialogs
 
 ---
 
@@ -1121,18 +1103,24 @@ h-6 w-6  /* 24px - Page headers, dialogs */
 
 ```css
 /* Neutral */
-text-gray-400 dark:text-gray-500      /* Default icon color */
-text-gray-500 dark:text-gray-400      /* Secondary icons */
+text-tertiary    /* Default icon color (3:1 and more on every surface) */
+text-secondary   /* Stronger neutral icons */
+text-faint       /* Decorative icons only: under 3:1 */
 
 /* Brand */
-text-purple-400 dark:text-purple-300  /* Primary icons */
-text-purple-500 dark:text-purple-400  /* Accent icons */
+text-accent      /* Accent icons, and icons in a bg-accent-subtle square */
 
-/* Status */
-text-green-500  /* Success */
-text-red-500    /* Error */
-text-yellow-500 /* Warning */
-text-blue-500   /* Info */
+/* Status, on a surface */
+text-success     /* Success */
+text-danger      /* Error */
+text-warning     /* Warning */
+text-accent      /* Info: there is no blue */
+
+/* Status, on bg-inverse (toasts) */
+text-inverse-success  text-inverse-danger  text-inverse-warning  text-inverse-info
+
+/* Pinned Prompt */
+text-pin         /* Filled star */
 ```
 
 ### Platform Icons
@@ -1158,10 +1146,9 @@ import { ClaudeIcon, ChatGPTIcon } from './components/icons/SiteIcons';
 ```tsx
 <button className="
   p-2
-  text-gray-400 dark:text-gray-500
-  hover:text-purple-600 dark:hover:text-purple-400
+  text-tertiary hover:text-accent
   rounded-lg
-  hover:bg-purple-50 dark:hover:bg-purple-900/20
+  hover:bg-muted
   transition-colors
   focus-interactive
 ">
@@ -1171,16 +1158,18 @@ import { ClaudeIcon, ChatGPTIcon } from './components/icons/SiteIcons';
 </button>
 ```
 
-### Gradient Icon Background
+### Icon Square
+
+The brand gradient (`#6D28D9` to `#4C1D95`) stays on the logo. Other icon squares (Settings, Analytics) are flat:
 
 ```tsx
 <div className="
   w-10 h-10
-  bg-linear-to-br from-purple-600 to-indigo-600
+  bg-accent-subtle
   rounded-xl
   flex items-center justify-center
 ">
-  <svg className="w-6 h-6 text-white">{/* Icon */}</svg>
+  <svg className="w-6 h-6 text-accent">{/* Icon */}</svg>
 </div>
 ```
 
@@ -1248,11 +1237,11 @@ All interactive elements MUST have appropriate ARIA labels:
 - Large text (18px+): 3:1 contrast ratio
 - Interactive elements: 3:1 contrast ratio
 
-**Verified Combinations:**
-- White background + gray-900 text: ✓
-- Gray-800 background + gray-100 text: ✓
-- Purple-600 background + white text: ✓
-- Status colors + white text: ✓
+**Verified by `src/theme/__tests__/tokens.test.ts`, in light and dark:**
+- `text-primary`, `text-secondary` and `text-tertiary` on `bg-app`, `bg-card` and `bg-subtle`: 4.5:1
+- Text on fills and tints (`text-on-accent` on `bg-accent` and `bg-danger`, each state text on its `-subtle` background, `text-on-inverse` on `bg-inverse`): 4.5:1
+- Controls (`border-input`, the focus ring, `text-pin`, the toast icons, the scrollbar thumb): 3:1
+- `text-faint` is under 3:1: decorative and disabled content only
 
 ### Screen Reader Support
 
@@ -1285,9 +1274,10 @@ All interactive elements MUST have appropriate ARIA labels:
 ### ✅ DO
 
 - **Use the predefined focus classes** (`.focus-primary`, `.focus-input`, etc.)
-- **Apply backdrop-blur-sm** with semi-transparent backgrounds for glassmorphism
-- **Use purple-indigo gradient** for primary actions
-- **Include both light and dark mode styles** for all components
+- **Use token classes for every color** (`bg-card`, `text-secondary`, `border-input`...): they switch theme by themselves
+- **Use the flat accent** (`bg-accent hover:bg-accent-hover`) for primary actions
+- **Keep surfaces opaque**: `bg-backdrop` with `backdrop-blur-sm` goes behind dialogs and drawers only
+- **Check every component in light and dark**
 - **Test keyboard navigation** on all interactive elements
 - **Add ARIA labels** to all buttons without visible text
 - **Use rounded-xl (12px)** for cards, inputs, and buttons
@@ -1297,13 +1287,15 @@ All interactive elements MUST have appropriate ARIA labels:
 
 ### ❌ DON'T
 
-- **Don't use arbitrary color values** - stick to the defined palette
+- **Don't use raw palette classes or arbitrary colors** (`gray-*`, `purple-*`, `white`, `text-[#...]`): add a token instead
+- **Don't pair a token class with a `dark:` color variant**
+- **Don't use the brand gradient outside the logo**
+- **Don't use `text-faint` for information**, placeholders included (`placeholder:text-tertiary`)
+- **Don't put `bg-subtle` directly on `bg-app`**: same value in light
 - **Don't mix border radius values** - use the standard scale
-- **Don't skip dark mode styles** - every component needs both
 - **Don't forget hover states** on interactive elements
 - **Don't use multiple transition durations** - stick to 200ms
 - **Don't create custom focus styles** - use the predefined classes
-- **Don't use opacity without backdrop-blur** for glassmorphism
 - **Don't forget ARIA labels** on icon-only buttons
 - **Don't use box-shadow directly** - use Tailwind shadow utilities
 - **Don't skip the loading state** for async operations
@@ -1312,21 +1304,22 @@ All interactive elements MUST have appropriate ARIA labels:
 
 **DO:**
 ```tsx
-// Use defined status colors
-<span className="text-green-500">Success</span>
-<span className="text-red-500">Error</span>
+// Use the state tokens
+<span className="text-success">Saved</span>
+<p className="text-danger">Title is required</p>
 
-// Use the purple-indigo gradient for primary actions
-<button className="bg-linear-to-r from-purple-600 to-indigo-600">
+// Use the flat accent for primary actions
+<button className="bg-accent hover:bg-accent-hover text-on-accent">Save</button>
 ```
 
 **DON'T:**
 ```tsx
-// Don't use arbitrary color values
-<span className="text-[#00ff00]">Success</span>
+// Don't use raw palette classes or arbitrary values
+<span className="text-green-500">Saved</span>
+<span className="text-[#00ff00]">Saved</span>
 
-// Don't use single-color gradients
-<button className="bg-purple-600">Primary</button>
+// Don't use a gradient outside the logo
+<button className="bg-linear-to-r from-purple-600 to-indigo-600">Save</button>
 ```
 
 ### 📐 Spacing
@@ -1349,16 +1342,16 @@ All interactive elements MUST have appropriate ARIA labels:
 
 **DO:**
 ```tsx
-// Include dark mode variant for every style
-<div className="bg-white dark:bg-gray-800">
-  <p className="text-gray-900 dark:text-gray-100">
+// One token class: it switches theme by itself
+<div className="bg-card">
+  <p className="text-primary">
 ```
 
 **DON'T:**
 ```tsx
-// Don't omit dark mode styles
-<div className="bg-white">
-  <p className="text-gray-900">
+// Don't pair a raw class with a dark: variant
+<div className="bg-white dark:bg-gray-800">
+  <p className="text-gray-900 dark:text-gray-100">
 ```
 
 ---
@@ -1369,43 +1362,47 @@ All interactive elements MUST have appropriate ARIA labels:
 
 **Primary Button:**
 ```
-px-6 py-3 text-sm font-semibold text-white
-bg-linear-to-r from-purple-600 to-indigo-600
-rounded-xl hover:from-purple-700 hover:to-indigo-700
-transition-all duration-200 shadow-lg hover:shadow-xl
+px-6 py-3 text-sm font-semibold text-on-accent
+bg-accent hover:bg-accent-hover
+rounded-xl transition-all duration-200
+shadow-lg hover:shadow-xl
 disabled:opacity-50 focus-primary
 ```
 
-**Text Input:**
+**Text Input (on a card; on bg-app use bg-card):**
 ```
 w-full px-4 py-3
-border border-purple-200 dark:border-gray-600
+border border-input
 rounded-xl focus-input
-bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm
+bg-subtle
 transition-all duration-200
-text-gray-900 dark:text-gray-100
+text-primary placeholder:text-tertiary
 ```
 
 **Card Container:**
 ```
-bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm
-border-b border-purple-100 dark:border-gray-700
-p-5 hover:bg-white/90 dark:hover:bg-gray-800/90
-transition-all duration-200
+bg-card border border-default
+rounded-2xl p-4
+shadow-sm hover:shadow-md
+transition-shadow duration-200
 ```
 
-**Section Header:**
+**Section Header (line shown once the content scrolls under it):**
 ```
-shrink-0 p-6
-bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm
-border-b border-purple-100 dark:border-gray-700
+shrink-0 p-6 bg-app
+border-b border-transparent / border-strong
+```
+
+**Chosen Item:**
+```
+bg-accent-selected border border-accent
+text-accent-strong font-semibold
 ```
 
 **Icon Button:**
 ```
-p-2 text-gray-400 dark:text-gray-500
-hover:text-purple-600 dark:hover:text-purple-400
-rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20
+p-2 text-tertiary hover:text-accent
+rounded-lg hover:bg-muted
 transition-colors focus-interactive
 ```
 
@@ -1443,10 +1440,10 @@ z-1000002  /* Content script debug */
 ### Complete Form Section
 
 ```tsx
-<div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5">
+<div className="bg-card border-b border-divider p-5">
   <label
     htmlFor="title"
-    className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3"
+    className="block text-sm font-semibold text-secondary mb-3"
   >
     Title (optional)
   </label>
@@ -1456,9 +1453,9 @@ z-1000002  /* Content script debug */
     value={formData.title}
     onChange={(e) => handleChange('title', e.target.value)}
     placeholder="Enter a descriptive title"
-    className="w-full px-4 py-3 border rounded-xl focus-input bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 text-gray-900 dark:text-gray-100 border-purple-200 dark:border-gray-600"
+    className="w-full px-4 py-3 border border-input rounded-xl focus-input bg-subtle transition-all duration-200 text-primary placeholder:text-tertiary"
   />
-  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
+  <p className="mt-2 text-xs text-tertiary font-medium">
     {formData.title.length}/100 characters
   </p>
 </div>
@@ -1467,18 +1464,18 @@ z-1000002  /* Content script debug */
 ### Complete Action Buttons
 
 ```tsx
-<div className="shrink-0 p-6 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-t border-purple-100 dark:border-gray-700">
+<div className="shrink-0 p-6 bg-app border-t border-strong">
   <div className="flex space-x-3">
     <button
       type="button"
       onClick={onCancel}
-      className="flex-1 px-6 py-3 text-sm font-semibold text-gray-700 dark:text-gray-300 bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm border border-purple-200 dark:border-gray-600 rounded-xl hover:bg-white/80 dark:hover:bg-gray-700/80 transition-all duration-200 focus-secondary"
+      className="flex-1 px-6 py-3 text-sm font-semibold text-secondary bg-card border border-strong rounded-xl hover:bg-muted transition-all duration-200 focus-secondary"
     >
       Cancel
     </button>
     <button
       type="submit"
-      className="flex-1 px-6 py-3 text-sm font-semibold text-white bg-linear-to-r from-purple-600 to-indigo-600 rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 focus-primary"
+      className="flex-1 px-6 py-3 text-sm font-semibold text-on-accent bg-accent rounded-xl hover:bg-accent-hover transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 focus-primary"
       disabled={isLoading}
     >
       {isLoading ? 'Saving...' : 'Save Prompt'}
@@ -1490,6 +1487,11 @@ z-1000002  /* Content script debug */
 ---
 
 ## Version History
+
+**v2.0.0** (2026-10-21)
+- Semantic color tokens for light and dark (`src/theme/tokens.css`): one class per color, no `dark:` color variant
+- Every pattern and example moved to the token classes: flat accent instead of the purple-indigo gradient, opaque surfaces instead of glass, dark toasts
+- Focus rings drawn as a 2px accent outline with a transparent gap
 
 **v1.0.0** (2025-10-06)
 - Initial comprehensive design guidelines
@@ -1506,5 +1508,5 @@ For questions or suggestions about these design guidelines, please open an issue
 
 ---
 
-**Last Updated:** 2025-10-06
+**Last Updated:** 2026-10-21
 **Maintained By:** AI Development Team
