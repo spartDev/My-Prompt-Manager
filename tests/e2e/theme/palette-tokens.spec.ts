@@ -15,9 +15,11 @@ import { createPromptSeed, seedLibrary } from '../utils/storage';
 const POPUP_URL = 'src/popup.html';
 const SCREENSHOT_DIR = 'test-results/palette-tokens';
 
+const THUMB = 'rgb(139, 92, 246) rgba(0, 0, 0, 0)';
+
 const EXPECTED = {
-  light: { app: 'rgb(244, 241, 250)', accent: 'rgb(109, 40, 217)', border: 'rgb(236, 230, 245)' },
-  dark: { app: 'rgb(18, 14, 27)', accent: 'rgb(132, 75, 242)', border: 'rgb(53, 44, 76)' }
+  light: { app: 'rgb(244, 241, 250)', accent: 'rgb(109, 40, 217)', border: 'rgb(236, 230, 245)', scrollbar: THUMB },
+  dark: { app: 'rgb(18, 14, 27)', accent: 'rgb(132, 75, 242)', border: 'rgb(53, 44, 76)', scrollbar: THUMB }
 } as const;
 
 const categories: Category[] = [{ id: 'writing', name: 'Rédaction', color: '#2563EB' }];
@@ -42,10 +44,12 @@ const openLibrary = async (page: Page, storage: ExtensionStorage, extensionId: s
 
 test.describe('Color tokens follow the theme', () => {
   for (const theme of ['light', 'dark'] as const) {
-    test(`page background, focus ring and default border use the ${theme} tokens`, async ({ page, storage, extensionId }) => {
+    test(`page background, focus ring, scrollbar and default border use the ${theme} tokens`, async ({ page, storage, extensionId }) => {
       await openLibrary(page, storage, extensionId, theme);
 
       await expect(page.locator('body')).toHaveCSS('background-color', EXPECTED[theme].app);
+      // Thumb on a transparent track
+      await expect(page.locator('main[data-scroll-container]')).toHaveCSS('scrollbar-color', EXPECTED[theme].scrollbar);
 
       const newButton = page.getByTestId('new-prompt-button');
       await newButton.focus();

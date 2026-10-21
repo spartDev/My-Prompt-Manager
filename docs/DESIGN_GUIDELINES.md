@@ -78,8 +78,9 @@ Surfaces are **opaque**. `bg-backdrop` is the only translucent one: no more `bg-
 | `bg-accent-subtle` | `#F1EBFD` | `#2F2350` | Info boxes, icon squares |
 | `text-accent` | `#5B21B6` | `#C4B5FD` | Links, accent icons |
 | `text-accent-strong` | `#4C1D95` | `#DDD3FE` | Text of a chosen item |
-| `border-accent` | `#C4B5FD` | `#6D4FC4` | Accent borders; scrollbar thumb |
+| `border-accent` | `#C4B5FD` | `#6D4FC4` | Accent borders |
 | `outline-accent`, `ring-accent` | accent | accent | Focus rings |
+| `--scrollbar-color-thumb` (variable, no class) | `#8B5CF6` | `#8B5CF6` | Scrollbar thumb, read by `popup.css` (at least 3:1 on every surface) |
 
 The brand gradient (`#6D28D9` to `#4C1D95`) is reserved for the logo. Every other surface is flat.
 

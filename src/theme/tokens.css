@@ -62,6 +62,9 @@
   /* Pinned Prompt star */
   --text-color-pin: #d97706;
 
+  /* Idle scrollbar thumb on a transparent track: 3:1 on every surface, in both modes */
+  --scrollbar-color-thumb: #8b5cf6;
+
   /* Status icons on bg-inverse (toasts): the bright variants, in both modes */
   --text-color-inverse-success: #6ee7b7;
   --text-color-inverse-danger: #fca5a5;
@@ -130,6 +133,9 @@
 
     /* Pinned Prompt star */
     --text-color-pin: #fbbf24;
+
+    /* Scrollbar thumb */
+    --scrollbar-color-thumb: #8b5cf6;
 
     /* Status icons on bg-inverse */
     --text-color-inverse-success: #6ee7b7;

@@ -55,7 +55,7 @@ body {
   position: relative;
 }
 
-/* Scrollbars: an accent/border thumb on a transparent track.
+/* Scrollbars: a violet thumb (3:1 on every surface) on a transparent track.
    Chrome uses scrollbar-color when it is set; the ::-webkit-scrollbar rules serve older engines */
 ::-webkit-scrollbar {
   width: 8px;
@@ -68,7 +68,7 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--border-color-accent);
+  background: var(--scrollbar-color-thumb);
   border-radius: 10px;
 }
 
@@ -79,7 +79,7 @@ body {
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--border-color-accent) transparent; /* thumb track */
+  scrollbar-color: var(--scrollbar-color-thumb) transparent; /* thumb track */
 }
 
 /* Rows that scroll sideways without a scrollbar (the Library filter pills).
@@ -95,7 +95,7 @@ body {
 /* Thinner scrollbar for specific scrollable areas */
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: var(--border-color-accent) transparent;
+  scrollbar-color: var(--scrollbar-color-thumb) transparent;
 }
 
 .custom-scrollbar::-webkit-scrollbar {
@@ -108,7 +108,7 @@ body {
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: var(--border-color-accent);
+  background: var(--scrollbar-color-thumb);
   border-radius: 8px;
 }
 

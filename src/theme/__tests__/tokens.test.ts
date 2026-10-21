@@ -113,7 +113,12 @@ describe('Color tokens', () => {
       ['--text-color-inverse-success', 'inverse'],
       ['--text-color-inverse-danger', 'inverse'],
       ['--text-color-inverse-warning', 'inverse'],
-      ['--text-color-inverse-info', 'inverse']
+      ['--text-color-inverse-info', 'inverse'],
+      ['--scrollbar-color-thumb', 'app'],
+      ['--scrollbar-color-thumb', 'card'],
+      ['--scrollbar-color-thumb', 'subtle'],
+      ['--scrollbar-color-thumb', 'raised'],
+      ['--scrollbar-color-thumb', 'muted']
     ];
 
     for (const mode of [tokens.light, tokens.dark]) {
@@ -129,7 +134,7 @@ describe('Color tokens', () => {
   it('every color token states its dark value, so none keeps its light value by omission', async () => {
     const { light, dark } = await readDeclarations();
     const literalColorTokens = Object.entries(light)
-      .filter(([name, value]) => /^--(background|text|border|ring|outline)-color-/.test(name) && !value.startsWith('var('))
+      .filter(([name, value]) => /^--(background|text|border|ring|outline|scrollbar)-color-/.test(name) && !value.startsWith('var('))
       .map(([name]) => name);
 
     expect(literalColorTokens.length).toBeGreaterThan(0);
@@ -163,6 +168,16 @@ describe('Color tokens', () => {
 
     expect(literalColors, 'colors written in popup.css instead of tokens').toEqual([]);
     expect(ownRules).toMatch(/body\s*\{[^}]*background:\s*var\(--background-color-app\)/);
+
+    // Every idle scrollbar thumb takes the thumb token, the one checked at 3:1 above
+    const thumbs = [
+      ...ownRules.matchAll(/scrollbar-color:\s*([^;]+);/g),
+      ...ownRules.matchAll(/scrollbar-thumb\s*\{[^}]*background:\s*([^;]+);/g)
+    ].map(([, value]) => value.trim());
+    expect(thumbs.length).toBeGreaterThan(0);
+    for (const thumb of thumbs) {
+      expect(thumb, 'scrollbar thumb').toMatch(/^var\(--scrollbar-color-thumb\)/);
+    }
   });
 
   it('shadows take the violet tint in light and a stronger black in dark', async () => {
