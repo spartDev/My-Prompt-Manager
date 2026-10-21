@@ -8,7 +8,7 @@ import ColorPicker from '../ColorPicker';
 describe('ColorPicker', () => {
   const mockOnChange = vi.fn();
   const defaultProps = {
-    value: '#DC2626', // Red from preset colors
+    value: '#E11D48', // Rose from preset colors
     onChange: mockOnChange,
     label: 'Select Color'
   };
@@ -25,7 +25,7 @@ describe('ColorPicker', () => {
     expect(trigger).toBeInTheDocument();
 
     // In non-compact mode, the color name should be visible
-    expect(trigger).toHaveTextContent('Red');
+    expect(trigger).toHaveTextContent('Rose');
   });
 
   it('renders compact mode correctly', () => {
@@ -39,7 +39,7 @@ describe('ColorPicker', () => {
     expect(trigger).toBeInTheDocument();
 
     // In compact mode, the button should have a title attribute with color name
-    expect(trigger).toHaveAttribute('title', 'Red');
+    expect(trigger).toHaveAttribute('title', 'Rose');
   });
 
   it('opens dropdown on click', async () => {
@@ -107,14 +107,25 @@ describe('ColorPicker', () => {
   it('syncs internal state when value prop changes', () => {
     const { rerender } = render(<ColorPicker {...defaultProps} />);
 
-    // Initially displays Red
-    expect(screen.getByRole('button')).toHaveTextContent('Red');
+    // Initially displays Rose
+    expect(screen.getByRole('button')).toHaveTextContent('Rose');
 
     // Update prop to a different color
-    rerender(<ColorPicker {...defaultProps} value="#1E40AF" />);
+    rerender(<ColorPicker {...defaultProps} value="#4F46E5" />);
 
-    // Check if displayed color name updated to Navy
-    expect(screen.getByRole('button')).toHaveTextContent('Navy');
+    // Check if displayed color name updated to Indigo
+    expect(screen.getByRole('button')).toHaveTextContent('Indigo');
+  });
+
+  it('keeps a Category color that left the palette, shown as Custom', async () => {
+    render(<ColorPicker {...defaultProps} value="#1E40AF" />); // Navy, no longer a preset
+
+    const trigger = screen.getByRole('button');
+    expect(trigger).toHaveTextContent('Custom');
+
+    await userEvent.click(trigger);
+    expect(screen.queryByTitle('Navy')).not.toBeInTheDocument();
+    expect(screen.queryAllByRole('button', { current: true })).toHaveLength(0);
   });
 
   it('disables the picker when disabled prop is true', () => {
@@ -141,26 +152,26 @@ describe('ColorPicker', () => {
   });
 
   it('shows checkmark on currently selected preset color', async () => {
-    render(<ColorPicker {...defaultProps} value="#DC2626" />); // Red
+    render(<ColorPicker {...defaultProps} value="#E11D48" />); // Rose
 
     // Open dropdown using the accessible button
     const trigger = screen.getByRole('button');
-    expect(trigger).toHaveTextContent('Red');
+    expect(trigger).toHaveTextContent('Rose');
     await userEvent.click(trigger);
 
     // Wait for dropdown to open
     expect(await screen.findByText('Preset Colors')).toBeInTheDocument();
 
-    // Find the Red option and verify it's marked as current selection
-    const redOption = screen.getByTitle('Red');
-    expect(redOption).toHaveAttribute('aria-current', 'true');
+    // Find the Rose option and verify it's marked as current selection
+    const roseOption = screen.getByTitle('Rose');
+    expect(roseOption).toHaveAttribute('aria-current', 'true');
 
     // Verify checkmark is visible using accessible query
-    expect(within(redOption).getByRole('img', { name: 'Selected' })).toBeInTheDocument();
+    expect(within(roseOption).getByRole('img', { name: 'Selected' })).toBeInTheDocument();
   });
 
   it('updates checkmark when selected color changes', async () => {
-    const { rerender } = render(<ColorPicker {...defaultProps} value="#DC2626" />); // Red
+    const { rerender } = render(<ColorPicker {...defaultProps} value="#E11D48" />); // Rose
 
     // Open dropdown
     const trigger = screen.getByRole('button');
@@ -172,13 +183,13 @@ describe('ColorPicker', () => {
     // Change to Ocean Blue
     rerender(<ColorPicker {...defaultProps} value="#2563EB" />);
 
-    // Verify checkmark moved from Red to Ocean Blue
-    const redBtn = screen.getByTitle('Red');
+    // Verify checkmark moved from Rose to Ocean Blue
+    const roseBtn = screen.getByTitle('Rose');
     const blueBtn = screen.getByTitle('Ocean Blue');
 
-    // Red button should not be marked as current
-    expect(redBtn).not.toHaveAttribute('aria-current', 'true');
-    expect(within(redBtn).queryByRole('img', { name: 'Selected' })).not.toBeInTheDocument();
+    // Rose button should not be marked as current
+    expect(roseBtn).not.toHaveAttribute('aria-current', 'true');
+    expect(within(roseBtn).queryByRole('img', { name: 'Selected' })).not.toBeInTheDocument();
 
     // Ocean Blue button should be marked as current with checkmark
     expect(blueBtn).toHaveAttribute('aria-current', 'true');
