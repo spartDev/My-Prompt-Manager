@@ -1,7 +1,7 @@
 # Design Guidelines
 
-**Version:** 1.0.0
-**Last Updated:** 2025-10-06
+**Version:** 2.0.0
+**Last Updated:** 2026-10-21
 
 This document provides comprehensive visual design guidelines for the Prompt Library Chrome Extension. All AI agents and developers working on this project **MUST** follow these guidelines to maintain visual consistency.
 
@@ -24,145 +24,93 @@ This document provides comprehensive visual design guidelines for the Prompt Lib
 
 ## Color System
 
-### Brand Colors
+Every color in the popup, side panel and Analytics page comes from a **semantic token** defined once in `src/theme/tokens.css`. Each token is a Tailwind color for one CSS property, so its class carries its name: `--background-color-card` is `bg-card`, `--text-color-secondary` is `text-secondary`, `--border-color-input` is `border-input`.
 
-**Primary Purple Gradient:**
-```css
-/* Main brand gradient */
-background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-background: linear-gradient(to-r, from-purple-600 to-indigo-600);
+- Light values live in `@theme static`; the `.dark` class that `useTheme` puts on `<html>` overrides every one of them. A token class therefore switches theme by itself: **never pair it with a `dark:` variant**.
+- Components use token classes only, never raw palette classes (`gray-*`, `purple-*`, `indigo-*`, `red-*`, `white`...). Category colors are the one exception (see [Category Colors](#category-colors)).
+- `src/theme/__tests__/tokens.test.ts` reads the compiled CSS and fails when a token loses its dark value, a class stops existing, or a contrast drops under its threshold.
 
-/* Tailwind classes */
-from-purple-600 to-indigo-600  /* Gradient */
-bg-purple-500  /* #8b5cf6 */
-bg-purple-600  /* #9333ea */
-bg-purple-700  /* #7c3aed */
-```
+Visual reference (both modes side by side): the palette canvas linked from beads epic `My-Prompt-Manager-el4`.
 
-**Secondary Indigo:**
-```css
-bg-indigo-500  /* #6366f1 */
-bg-indigo-600  /* #4f46e5 */
-```
+### Surfaces
 
-### Status Colors
+| Class | Light | Dark | Use |
+|---|---|---|---|
+| `bg-app` | `#F4F1FA` | `#120E1B` | Page, header and tab bar (seamless, no white band) |
+| `bg-card` | `#FFFFFF` | `#231C34` | Cards, form sections, and the search field and pills that sit on `bg-app` |
+| `bg-subtle` | `#F4F1FA` | `#2B2340` | Chips and fields **on a card**. Never directly on `bg-app`: same value in light |
+| `bg-raised` | `#F8F6FC` | `#1B1528` | Light fills: empty states, nested panels |
+| `bg-muted` | `#F1EDF8` | `#2E2645` | Hover of neutral elements (`hover:bg-muted`) |
+| `bg-inverse` | `#1D1530` | `#4A3D6B` | Toasts |
+| `bg-backdrop` | `#2A2140` at 45% | `#07050C` at 70% | Behind an open dialog or drawer, with `backdrop-blur-sm` |
 
-```css
-/* Success */
-bg-green-500   /* #10b981 */
-text-green-600 /* #059669 */
-border-green-200 dark:border-green-800
+Surfaces are **opaque**. `bg-backdrop` is the only translucent one: no more `bg-white/70` + `backdrop-blur-sm` glass on headers or sections.
 
-/* Error */
-bg-red-500     /* #ef4444 */
-text-red-600   /* #dc2626 */
-border-red-200 dark:border-red-800
+### Borders
 
-/* Warning */
-bg-yellow-500  /* #eab308 */
-text-yellow-600 /* #ca8a04 */
-border-yellow-200 dark:border-yellow-800
+| Class | Light | Dark | Use |
+|---|---|---|---|
+| `border-default` | `#ECE6F5` | `#352C4C` | Cards, unselected pills. Also the color of a bare `border` |
+| `border-divider` | `#F0EBF8` | `#2F2744` | Dividers inside a card |
+| `border-strong` | `#DCD4EA` | `#41375A` | Secondary button; the line under the header, shown only once the list scrolls |
+| `border-input` | `#8F87A5` | `#766C8E` | Field outlines, off track of a switch, unpinned star (3:1 on every surface) |
+| `border-focus` | accent | accent | A focused field (`focus-input` applies it) |
+| `border-error` | danger | danger | A field in error |
 
-/* Info */
-bg-blue-500    /* #3b82f6 */
-text-blue-600  /* #2563eb */
-border-blue-200 dark:border-blue-800
-```
+### Text
+
+| Class | Light | Dark | Use |
+|---|---|---|---|
+| `text-primary` | `#1D1530` | `#F1EDF9` | Titles, main text |
+| `text-secondary` | `#5C5370` | `#BCB3D0` | Labels, body text |
+| `text-tertiary` | `#6F6787` | `#A39ABB` | Previews, metadata, placeholders (`placeholder:text-tertiary`) |
+| `text-faint` | `#B5ADC8` | `#7D7495` | Disabled and decorative only (2.15:1 in light: never for information) |
+| `text-on-inverse` | `#C9BFE6` | `#C9BFE6` | Message on `bg-inverse` |
+| `text-on-accent` | `#FFFFFF` | `#FFFFFF` | Text on `bg-accent` and `bg-danger` |
+
+### Accent (violet)
+
+| Class | Light | Dark | Use |
+|---|---|---|---|
+| `bg-accent` | `#6D28D9` | `#844BF2` | Primary buttons; settings that are on (switch, checkbox, radio) |
+| `bg-accent-hover` | `#5B21B6` | `#7A40E3` | Hover of `bg-accent`: hover darkens in both modes |
+| `bg-accent-selected` | `#EDE5FF` | `#38296A` | A chosen item among several (Library filter pill, active Section, chosen mode) |
+| `bg-accent-subtle` | `#F1EBFD` | `#2F2350` | Info boxes, icon squares |
+| `text-accent` | `#5B21B6` | `#C4B5FD` | Links, accent icons |
+| `text-accent-strong` | `#4C1D95` | `#DDD3FE` | Text of a chosen item |
+| `border-accent` | `#C4B5FD` | `#6D4FC4` | Accent borders |
+| `outline-accent`, `ring-accent` | accent | accent | Focus rings |
+| `--scrollbar-color-thumb` (variable, no class) | `#8B5CF6` | `#8B5CF6` | Scrollbar thumb, read by `popup.css` (at least 3:1 on every surface) |
+
+The brand gradient (`#6D28D9` to `#4C1D95`) is reserved for the logo. Every other surface is flat.
+
+### States
+
+| Class | Light | Dark | Use |
+|---|---|---|---|
+| `bg-success` | `#10B981` | `#10B981` | Dots and badges only (2.54:1 on white: never text) |
+| `bg-success-subtle` / `text-success` | `#E7F8EF` / `#065F46` | `#0F2D22` / `#6EE7B7` | Success message |
+| `bg-warning-subtle` / `border-warning` / `text-warning` | `#FEF3C7` / `#F5DFA6` / `#92400E` | `#33270F` / `#5A4515` / `#FCD34D` | Warning banner |
+| `bg-danger` / `bg-danger-hover` | `#DC2626` / `#B91C1C` | `#DC2626` / `#B91C1C` | Destructive button |
+| `bg-danger-subtle` / `border-danger` / `text-danger` | `#FDECEC` / `#F6CFCF` / `#991B1B` | `#3A1518` / `#5E2228` / `#FCA5A5` | Error banner and message |
+| `text-pin` | `#D97706` | `#FBBF24` | Filled star of a Pinned Prompt |
+| `text-inverse-success`, `-danger`, `-warning`, `-info` | `#6EE7B7`, `#FCA5A5`, `#FCD34D`, `#C4B5FD` | same | Status icons on `bg-inverse` (toasts), in both modes |
+
+Information uses the accent family (`bg-accent-subtle`, `border-accent`, `text-accent`): there is no blue info color.
+
+### Rules of use
+
+- **Chosen vs on.** One item chosen among several: `bg-accent-selected border-accent text-accent-strong font-semibold`. A setting that is on: `bg-accent`.
+- **Hover.** `hover:bg-accent-hover` on `bg-accent`, `hover:bg-danger-hover` on `bg-danger`, `hover:bg-muted` on neutral elements.
+- **Fields.** On a card: `bg-subtle border-input`; on `bg-app`: `bg-card border-input`; add `focus-input`; in error: `border-error` and a `text-danger` message.
 
 ### Category Colors
 
-From `src/constants/colors.ts`, 18 predefined colors available:
+Category colors are user data, not tokens: the preset palette, the chip (soft badge) rule and its contrast safety net live in `src/constants/colors.ts`, documented in [CATEGORY_COLOR_IMPLEMENTATION.md](./CATEGORY_COLOR_IMPLEMENTATION.md).
 
-```typescript
-// Blues
-{ name: 'Ocean Blue', value: '#3B82F6' }
-{ name: 'Sky Blue', value: '#0EA5E9' }
-{ name: 'Navy', value: '#1E40AF' }
+### Adding or changing a token
 
-// Purples & Pinks
-{ name: 'Purple', value: '#9333EA' }
-{ name: 'Violet', value: '#8B5CF6' }
-{ name: 'Pink', value: '#EC4899' }
-{ name: 'Rose', value: '#F43F5E' }
-
-// Greens
-{ name: 'Emerald', value: '#10B981' }
-{ name: 'Green', value: '#22C55E' }
-{ name: 'Teal', value: '#14B8A6' }
-
-// Warm
-{ name: 'Orange', value: '#F97316' }
-{ name: 'Amber', value: '#F59E0B' }
-{ name: 'Yellow', value: '#EAB308' }
-{ name: 'Red', value: '#EF4444' }
-
-// Neutrals
-{ name: 'Gray', value: '#6B7280' }
-{ name: 'Slate', value: '#475569' }
-{ name: 'Stone', value: '#78716C' }
-{ name: 'Zinc', value: '#71717A' }
-```
-
-**Default Category Color:** `#3B82F6` (Ocean Blue)
-
-### Gray Scale
-
-**Light Mode:**
-```css
-bg-white       /* #ffffff */
-bg-gray-50     /* #f9fafb */
-bg-gray-100    /* #f3f4f6 */
-bg-gray-200    /* #e5e7eb */
-bg-gray-300    /* #d1d5db */
-bg-gray-400    /* #9ca3af */
-bg-gray-500    /* #6b7280 */
-bg-gray-600    /* #4b5563 */
-bg-gray-700    /* #374151 */
-bg-gray-800    /* #1f2937 */
-bg-gray-900    /* #111827 */
-```
-
-**Dark Mode:**
-```css
-dark:bg-gray-900  /* #111827 - Darkest background */
-dark:bg-gray-800  /* #1f2937 - Container background */
-dark:bg-gray-700  /* #374151 - Card background */
-dark:bg-gray-600  /* #4b5563 - Input background */
-dark:text-gray-100 /* #f3f4f6 - Primary text */
-dark:text-gray-300 /* #d1d5db - Secondary text */
-dark:text-gray-400 /* #9ca3af - Tertiary text */
-dark:text-gray-500 /* #6b7280 - Disabled text */
-```
-
-### Border Colors
-
-```css
-/* Light Mode */
-border-purple-100  /* #f3e8ff - Subtle dividers */
-border-purple-200  /* #e9d5ff - Input borders */
-border-gray-300    /* #d1d5db - Default borders */
-
-/* Dark Mode */
-dark:border-gray-700  /* #374151 - Primary borders */
-dark:border-gray-600  /* #4b5563 - Input borders */
-```
-
-### Background Patterns
-
-**Glassmorphism Effect:**
-```css
-bg-white/60 dark:bg-gray-700/60  /* 60% opacity */
-bg-white/70 dark:bg-gray-800/70  /* 70% opacity */
-bg-white/80 dark:bg-gray-800/80  /* 80% opacity */
-backdrop-blur-sm                  /* Blur effect */
-```
-
-**Usage Example:**
-```tsx
-<div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm">
-  {/* Content */}
-</div>
-```
+Declare it in both blocks of `src/theme/tokens.css` (`@theme static` and `.dark`), with the property namespace that gives the class you want (`--background-color-*`, `--text-color-*`, `--border-color-*`, `--ring-color-*`, `--outline-color-*`). A token that only reuses another one may be a `var()` reference in `@theme` alone. Add it to the class list of `tokens.test.ts`, and to a contrast pair when text or a control sits on it.
 
 ---
 
@@ -207,35 +155,35 @@ leading-relaxed /* 1.625 - Comfortable reading */
 
 **Page Title:**
 ```tsx
-<h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+<h1 className="text-xl font-bold text-primary">
   Add New Prompt
 </h1>
 ```
 
 **Section Header:**
 ```tsx
-<h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+<h2 className="text-sm font-semibold text-secondary mb-3">
   Category
 </h2>
 ```
 
 **Body Text:**
 ```tsx
-<p className="text-sm text-gray-600 dark:text-gray-400">
+<p className="text-sm text-secondary">
   Description text
 </p>
 ```
 
 **Helper Text:**
 ```tsx
-<p className="text-xs text-gray-500 dark:text-gray-400 font-medium">
+<p className="text-xs text-tertiary font-medium">
   100/10000 characters
 </p>
 ```
 
 **Prompt Card Title:**
 ```tsx
-<h3 className="font-semibold text-gray-900 dark:text-gray-100 text-sm leading-tight truncate">
+<h3 className="font-semibold text-primary text-sm leading-tight truncate">
   Prompt Title
 </h3>
 ```
@@ -380,14 +328,20 @@ rounded-full /* 9999px          - Pills, badges, toggle knobs */
 
 ### Shadow Scale
 
+Tailwind's shapes and alphas, tinted violet in light (`rgba(45, 25, 90, α)`) and black at α × 1.6 in dark, through `--shadow-tint-5`, `-10` and `-25` in `src/theme/tokens.css`:
+
 ```css
-shadow-sm  /* 0 1px 2px rgba(0, 0, 0, 0.05) - Subtle elevation */
-shadow     /* 0 1px 3px rgba(0, 0, 0, 0.1)  - Default cards */
-shadow-lg  /* 0 10px 15px rgba(0, 0, 0, 0.1) - Elevated cards */
-shadow-xl  /* 0 20px 25px rgba(0, 0, 0, 0.1) - Modals, dialogs */
+shadow-xs   /* 0 1px 2px 0, tint 5           */
+shadow-sm   /* 0 1px 3px 0, tint 10 - cards  */
+shadow-md   /* 0 4px 6px -1px, tint 10       */
+shadow-lg   /* 0 10px 15px -3px, tint 10     */
+shadow-xl   /* 0 20px 25px -5px, tint 10     */
+shadow-2xl  /* 0 25px 50px -12px, tint 25 - dialogs */
 ```
 
 ### Custom Shadows
+
+The Prompt selector injected on Platforms is styled in `src/content/utils/styles.ts`, outside Tailwind; its shadows and colors are not on the palette yet.
 
 **Icon Shadow (Legacy):**
 ```css
@@ -407,9 +361,8 @@ box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.4); /* Blue */
 
 ### Backdrop Effects
 
-```css
-backdrop-blur-sm  /* 4px blur - Glassmorphism effect */
-backdrop-filter: blur(8px);  /* Content script modals */
+```tsx
+<div className="bg-backdrop backdrop-blur-sm" />  /* Behind an open dialog or drawer only */
 ```
 
 ### Usage Patterns
@@ -430,8 +383,8 @@ backdrop-filter: blur(8px);  /* Content script modals */
 
 **Modal/Dialog:**
 ```tsx
-<div className="shadow-xl backdrop-blur-sm">
-  {/* Modal content */}
+<div className="bg-card shadow-2xl">
+  {/* Modal content: the panel itself is opaque */}
 </div>
 ```
 
@@ -441,15 +394,16 @@ backdrop-filter: blur(8px);  /* Content script modals */
 
 ### Buttons
 
-#### Primary Button (Gradient)
+#### Primary Button
+
+Flat accent: the brand gradient belongs to the logo only.
 
 ```tsx
 <button className="
   px-6 py-3
-  text-sm font-semibold text-white
-  bg-linear-to-r from-purple-600 to-indigo-600
+  text-sm font-semibold text-on-accent
+  bg-accent hover:bg-accent-hover
   rounded-xl
-  hover:from-purple-700 hover:to-indigo-700
   transition-all duration-200
   shadow-lg hover:shadow-xl
   disabled:opacity-50
@@ -459,26 +413,15 @@ backdrop-filter: blur(8px);  /* Content script modals */
 </button>
 ```
 
-**Focus Class:**
-```css
-.focus-primary {
-  @apply focus:outline-none focus:ring-2 focus:ring-purple-500
-         focus:ring-offset-2 focus:ring-offset-white
-         dark:focus:ring-offset-gray-900;
-}
-```
-
 #### Secondary Button
 
 ```tsx
 <button className="
   px-6 py-3
-  text-sm font-semibold
-  text-gray-700 dark:text-gray-300
-  bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm
-  border border-purple-200 dark:border-gray-600
+  text-sm font-semibold text-secondary
+  bg-card hover:bg-muted
+  border border-strong
   rounded-xl
-  hover:bg-white/80 dark:hover:bg-gray-700/80
   transition-all duration-200
   focus-secondary
 ">
@@ -486,22 +429,13 @@ backdrop-filter: blur(8px);  /* Content script modals */
 </button>
 ```
 
-**Focus Class:**
-```css
-.focus-secondary {
-  @apply focus:outline-none focus:ring-2 focus:ring-purple-500
-         focus:ring-offset-1 focus:ring-offset-white
-         dark:focus:ring-offset-gray-800;
-}
-```
-
 #### Danger Button
 
 ```tsx
 <button className="
   px-3 py-1.5
-  text-xs font-semibold text-white
-  bg-red-600 hover:bg-red-700
+  text-xs font-semibold text-on-accent
+  bg-danger hover:bg-danger-hover
   rounded-lg
   shadow-sm
   transition-colors
@@ -511,26 +445,16 @@ backdrop-filter: blur(8px);  /* Content script modals */
 </button>
 ```
 
-**Focus Class:**
-```css
-.focus-danger {
-  @apply focus:outline-none focus:ring-2 focus:ring-red-500
-         focus:ring-offset-2 focus:ring-offset-white
-         dark:focus:ring-offset-gray-900;
-}
-```
-
 #### Small Action Button (Copy)
 
 ```tsx
 <button className="
   inline-flex items-center
   px-2 py-1
-  bg-linear-to-r from-purple-500 to-indigo-500
-  text-white
+  bg-accent hover:bg-accent-hover
+  text-on-accent
   rounded-md
-  hover:from-purple-600 hover:to-indigo-600
-  transition-all duration-200
+  transition-colors duration-200
   text-xs font-medium
   focus-primary
 ">
@@ -544,10 +468,9 @@ backdrop-filter: blur(8px);  /* Content script modals */
 ```tsx
 <button className="
   p-2
-  text-gray-400 dark:text-gray-500
-  hover:text-purple-600 dark:hover:text-purple-400
+  text-tertiary hover:text-accent
   rounded-lg
-  hover:bg-purple-50 dark:hover:bg-purple-900/20
+  hover:bg-muted
   transition-colors
   focus-interactive
 ">
@@ -555,27 +478,36 @@ backdrop-filter: blur(8px);  /* Content script modals */
 </button>
 ```
 
-**Focus Class:**
+An icon that is the only content of a button takes `text-tertiary` or stronger: `text-faint` is under 3:1.
+
+#### Focus Classes
+
+Defined in `tailwind.config.js` (see [Focus States](#focus-states)):
+
 ```css
-.focus-interactive {
-  @apply focus:outline-none focus:ring-2 focus:ring-purple-500
-         focus:ring-offset-1 focus:ring-offset-white
-         dark:focus:ring-offset-gray-800 dark:focus:ring-purple-400;
-}
+.focus-primary     { @apply focus:outline-2 focus:outline-offset-2 focus:outline-accent; }
+.focus-secondary   { @apply focus:outline-2 focus:outline-offset-1 focus:outline-accent; }
+.focus-danger      { @apply focus:outline-2 focus:outline-offset-2 focus:outline-danger; }
+.focus-input       { @apply focus:outline-none focus:ring-2 focus:ring-accent focus:border-focus; }
+.focus-interactive { @apply focus:outline-2 focus:outline-offset-1 focus:outline-accent; }
 ```
 
 #### Loading State
 
+The spinner takes the text color of its button, so it works on any button:
+
 ```tsx
 <button disabled className="disabled:opacity-50">
   <div className="flex items-center justify-center space-x-2">
-    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+    <div className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />
     <span>Saving...</span>
   </div>
 </button>
 ```
 
 ### Input Fields
+
+A field on a card takes `bg-subtle`; a field placed directly on `bg-app` (the Library search) takes `bg-card`. Both take `border-input` (3:1 on every surface), `focus-input` and `placeholder:text-tertiary`.
 
 #### Text Input
 
@@ -584,25 +516,16 @@ backdrop-filter: blur(8px);  /* Content script modals */
   type="text"
   className="
     w-full px-4 py-3
-    border border-purple-200 dark:border-gray-600
+    border border-input
     rounded-xl
     focus-input
-    bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm
+    bg-subtle
     transition-all duration-200
-    text-gray-900 dark:text-gray-100
-    placeholder-gray-500 dark:placeholder-gray-400
+    text-primary
+    placeholder:text-tertiary
   "
   placeholder="Enter text..."
 />
-```
-
-**Focus Class:**
-```css
-.focus-input {
-  @apply focus:outline-none focus:ring-2 focus:ring-purple-500
-         focus:border-purple-500 dark:focus:ring-purple-400
-         dark:focus:border-purple-400;
-}
 ```
 
 #### Text Input with Error
@@ -612,14 +535,14 @@ backdrop-filter: blur(8px);  /* Content script modals */
   className="
     w-full px-4 py-3
     border rounded-xl focus-input
-    bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm
+    bg-subtle
     transition-all duration-200
-    text-gray-900 dark:text-gray-100
-    border-red-300 dark:border-red-500
+    text-primary
+    border-error
   "
 />
 {errors.field && (
-  <p className="mt-2 text-sm text-red-600 dark:text-red-400 font-medium">
+  <p className="mt-2 text-sm text-danger font-medium">
     {errors.field}
   </p>
 )}
@@ -632,13 +555,14 @@ backdrop-filter: blur(8px);  /* Content script modals */
   rows={8}
   className="
     w-full px-4 py-3
-    border border-purple-200 dark:border-gray-600
+    border border-input
     rounded-xl
     focus-input
     resize-none
-    bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm
+    bg-subtle
     transition-all duration-200
-    text-gray-900 dark:text-gray-100
+    text-primary
+    placeholder:text-tertiary
   "
   placeholder="Enter your prompt content..."
 />
@@ -650,20 +574,20 @@ backdrop-filter: blur(8px);  /* Content script modals */
 <div className="relative">
   <select className="
     w-full px-4 py-3 pr-10
-    border border-purple-200 dark:border-gray-600
+    border border-input
     rounded-xl
     focus-input
-    bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm
+    bg-subtle
     transition-all duration-200
     font-medium
     appearance-none
     cursor-pointer
-    text-gray-900 dark:text-gray-100
+    text-primary
   ">
     <option>Option 1</option>
   </select>
   <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-    <svg className="w-4 h-4 text-purple-400 dark:text-purple-300">
+    <svg className="w-4 h-4 text-tertiary">
       {/* Chevron down icon */}
     </svg>
   </div>
@@ -672,10 +596,12 @@ backdrop-filter: blur(8px);  /* Content script modals */
 
 #### Search Input
 
+The Library search sits on `bg-app`, so it takes `bg-card`, like the cards:
+
 ```tsx
 <div className="relative">
   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none z-10">
-    <svg className="h-5 w-5 text-purple-400 dark:text-purple-300">
+    <svg className="h-5 w-5 text-tertiary">
       {/* Search icon */}
     </svg>
   </div>
@@ -683,15 +609,14 @@ backdrop-filter: blur(8px);  /* Content script modals */
     type="text"
     className="
       w-full pl-12 pr-12 py-3
-      bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm
-      border border-purple-200 dark:border-gray-600
+      bg-card
+      border border-input
       rounded-xl
       focus-input
       text-sm
-      text-gray-900 dark:text-gray-100
-      placeholder-gray-500 dark:placeholder-gray-400
+      text-primary
+      placeholder:text-tertiary
       shadow-sm
-      hover:bg-white/80 dark:hover:bg-gray-700/80
       transition-all duration-200
     "
     placeholder="Search prompts"
@@ -702,15 +627,17 @@ backdrop-filter: blur(8px);  /* Content script modals */
 
 ### Cards
 
+Cards are opaque `bg-card` with a `border-default` border, floating on `bg-app`. Dividers inside a card take `border-divider` (`divide-y divide-divider`).
+
 #### Prompt Card
 
 ```tsx
 <article className="
-  bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm
-  border-b border-purple-100 dark:border-gray-700
-  p-5
-  hover:bg-white/90 dark:hover:bg-gray-800/90
-  transition-all duration-200
+  bg-card
+  border border-default
+  rounded-2xl p-4
+  shadow-sm hover:shadow-md
+  transition-shadow duration-200
   relative group
 ">
   {/* Card content */}
@@ -721,8 +648,8 @@ backdrop-filter: blur(8px);  /* Content script modals */
 
 ```tsx
 <div className="
-  bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm
-  border border-purple-100 dark:border-gray-700
+  bg-card
+  border border-default
   rounded-xl
   p-5
   hover:shadow-md
@@ -736,18 +663,10 @@ backdrop-filter: blur(8px);  /* Content script modals */
 
 #### Category Badge
 
+Category colors are user data, not tokens: use the component, which derives the chip colors of both modes from the Category's color (`getSoftBadgeColors` in `src/constants/colors.ts`):
+
 ```tsx
-<span
-  className="
-    inline-flex items-center
-    px-2 py-0.5
-    rounded-full
-    text-xs font-medium text-white
-  "
-  style={{ backgroundColor: categoryColor }}
->
-  Category Name
-</span>
+<CategoryBadge category={category} variant="soft" />
 ```
 
 #### Status Badge
@@ -758,11 +677,27 @@ backdrop-filter: blur(8px);  /* Content script modals */
   px-2 py-1
   rounded-full
   text-xs font-medium
-  bg-green-100 dark:bg-green-900/20
-  text-green-700 dark:text-green-400
+  bg-success-subtle
+  text-success
 ">
   Active
 </span>
+```
+
+#### Chosen Pill
+
+One item chosen among several (Library filter pill, active Section):
+
+```tsx
+<button className={`
+  px-3 py-1.5 rounded-full border text-sm
+  ${chosen
+    ? 'bg-accent-selected border-accent text-accent-strong font-semibold'
+    : 'bg-card border-default text-secondary hover:bg-muted'
+  }
+`}>
+  Pinned
+</button>
 ```
 
 ### Modals & Dialogs
@@ -774,26 +709,25 @@ backdrop-filter: blur(8px);  /* Content script modals */
   fixed inset-0 z-50
   flex items-center justify-center p-3
 ">
-  {/* Backdrop */}
+  {/* Backdrop: the only translucent surface */}
   <div
     className="
       absolute inset-0
-      bg-black bg-opacity-50
+      bg-backdrop backdrop-blur-sm
       transition-opacity
     "
     onClick={onClose}
   />
 
-  {/* Modal Panel */}
+  {/* Modal Panel: opaque */}
   <div className="
     relative
-    bg-white dark:bg-gray-800
+    bg-card
     rounded-xl p-3
-    shadow-xl
+    shadow-2xl
     transform transition-all
     max-w-xs w-full mx-2
-    backdrop-blur-sm
-    border border-purple-100 dark:border-gray-700
+    border border-default
   ">
     {/* Modal content */}
   </div>
@@ -809,17 +743,17 @@ backdrop-filter: blur(8px);  /* Content script modals */
     shrink-0 flex items-center justify-center
     h-8 w-8
     rounded-full
-    bg-red-100 dark:bg-red-900/20
+    bg-danger-subtle
   ">
-    <svg className="w-6 h-6 text-red-600">{/* Icon */}</svg>
+    <svg className="w-6 h-6 text-danger">{/* Icon */}</svg>
   </div>
 
   {/* Content */}
   <div className="ml-3 flex-1">
-    <h3 className="text-sm leading-5 font-bold text-gray-900 dark:text-gray-100">
+    <h3 className="text-sm leading-5 font-bold text-primary">
       Delete Prompt
     </h3>
-    <p className="mt-1 text-xs text-gray-600 dark:text-gray-400 leading-tight">
+    <p className="mt-1 text-xs text-secondary leading-tight">
       Are you sure? This action cannot be undone.
     </p>
   </div>
@@ -827,12 +761,14 @@ backdrop-filter: blur(8px);  /* Content script modals */
 
 {/* Actions */}
 <div className="mt-3 flex flex-row-reverse gap-2">
-  <button className="bg-red-600 hover:bg-red-700 ...">Delete</button>
-  <button className="border bg-white dark:bg-gray-700 ...">Cancel</button>
+  <button className="bg-danger hover:bg-danger-hover text-on-accent focus-danger ...">Delete</button>
+  <button className="border border-strong bg-card hover:bg-muted text-secondary focus-secondary ...">Cancel</button>
 </div>
 ```
 
 ### Toggle Switch
+
+On: `bg-accent`. Off: the track is filled with the field-outline token (`border-input`, 3:1 on every surface). The knob is white in both modes, the `text-on-accent` color. Neither fill has a `bg-` class, so both read their token through an arbitrary value:
 
 ```tsx
 <button
@@ -845,20 +781,16 @@ backdrop-filter: blur(8px);  /* Content script modals */
     relative inline-flex items-center
     rounded-full
     transition-all duration-200
-    focus:outline-none focus:ring-4 focus:ring-purple-300 dark:focus:ring-purple-800
-    ${checked
-      ? 'bg-linear-to-r from-purple-600 to-indigo-600 shadow-sm'
-      : 'bg-gray-200 dark:bg-gray-700'
-    }
+    focus-interactive
+    ${checked ? 'bg-accent' : 'bg-(--border-color-input)'}
     ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
   `}
 >
   <span className={`
     h-5 w-5
     inline-block transform
-    rounded-full bg-white shadow-sm
+    rounded-full bg-(--text-color-on-accent) shadow-sm
     transition-transform duration-200
-    border border-gray-300 dark:border-gray-600
     ${checked ? 'translate-x-6' : 'translate-x-[2px]'}
   `} />
 </button>
@@ -866,20 +798,19 @@ backdrop-filter: blur(8px);  /* Content script modals */
 
 ### Toast Notifications
 
+Toasts are dark in both modes (`bg-inverse`). The status icon takes its bright variant (`text-inverse-success`, `-danger`, `-warning`, `-info`), and the progress bar takes the icon color through `bg-current`:
+
 ```tsx
 <div className="
-  flex items-start p-4
+  relative flex items-start p-4
   rounded-lg shadow-lg
-  bg-white dark:bg-gray-800
-  text-gray-900 dark:text-white
-  border border-l-4
-  border-l-purple-500
-  border-t border-r border-b
-  border-purple-200 dark:border-purple-800
+  bg-inverse
+  text-on-inverse
+  overflow-hidden
 ">
   {/* Icon */}
-  <div className="shrink-0">
-    <svg className="h-5 w-5 text-purple-500">{/* Icon */}</svg>
+  <div className="shrink-0 text-inverse-success">
+    <svg className="h-5 w-5">{/* Icon */}</svg>
   </div>
 
   {/* Message */}
@@ -893,7 +824,7 @@ backdrop-filter: blur(8px);  /* Content script modals */
   </button>
 
   {/* Progress bar */}
-  <div className="absolute bottom-0 left-0 h-1 bg-purple-500"
+  <div className="absolute bottom-0 left-0 h-1 bg-current text-inverse-success"
        style={{
          width: '100%',
          animation: 'shrink-width 3s linear'
@@ -922,10 +853,10 @@ backdrop-filter: blur(8px);  /* Content script modals */
       <div className="
         absolute right-0 top-full mt-1
         w-28
-        bg-white dark:bg-gray-800 backdrop-blur-sm
+        bg-card
         rounded-xl
         shadow-xl
-        border border-purple-200 dark:border-gray-700
+        border border-default
         overflow-hidden
         z-1001
       ">
@@ -933,9 +864,9 @@ backdrop-filter: blur(8px);  /* Content script modals */
           block w-full text-left
           px-4 py-3
           text-sm
-          text-gray-700 dark:text-gray-300
-          hover:bg-purple-50 dark:hover:bg-purple-900/20
-          hover:text-purple-700 dark:hover:text-purple-400
+          text-secondary
+          hover:bg-muted
+          hover:text-primary
           font-medium
           transition-colors
           focus-secondary
@@ -946,8 +877,8 @@ backdrop-filter: blur(8px);  /* Content script modals */
           block w-full text-left
           px-4 py-3
           text-sm
-          text-red-600 dark:text-red-400
-          hover:bg-red-50 dark:hover:bg-red-900/20
+          text-danger
+          hover:bg-danger-subtle
           font-medium
           transition-colors
           focus-danger
@@ -962,30 +893,33 @@ backdrop-filter: blur(8px);  /* Content script modals */
 
 ### Section Headers
 
+The header is seamless: it shares `bg-app` with the page, and its bottom line (`border-strong`) shows only once the content scrolls under it. The icon square is `bg-accent-subtle` with a `text-accent` icon.
+
 ```tsx
-<div className="
+<div className={`
   shrink-0 p-6
-  bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm
-  border-b border-purple-100 dark:border-gray-700
-">
+  bg-app
+  border-b
+  ${isScrolled ? 'border-strong' : 'border-transparent'}
+`}>
   <div className="flex items-center justify-between">
     <div className="flex items-center space-x-3">
       {/* Icon */}
       <div className="
         w-10 h-10
-        bg-linear-to-br from-purple-600 to-indigo-600
+        bg-accent-subtle
         rounded-xl
         flex items-center justify-center
       ">
-        <svg className="w-6 h-6 text-white">{/* Icon */}</svg>
+        <svg className="w-6 h-6 text-accent">{/* Icon */}</svg>
       </div>
 
       {/* Text */}
       <div>
-        <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+        <h2 className="text-xl font-bold text-primary">
           Section Title
         </h2>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
+        <p className="text-sm text-tertiary">
           Description text
         </p>
       </div>
@@ -1053,7 +987,7 @@ animation: promptSelectorFadeIn 0.2s ease-out;
 ```tsx
 <div className="
   w-4 h-4
-  border-2 border-white/30 border-t-white
+  border-2 border-current/30 border-t-current
   rounded-full
   animate-spin
 " />
@@ -1064,40 +998,39 @@ animation: promptSelectorFadeIn 0.2s ease-out;
 **General Pattern:**
 ```tsx
 <element className="
-  hover:bg-purple-50 dark:hover:bg-purple-900/20
-  hover:text-purple-600 dark:hover:text-purple-400
+  hover:bg-muted
+  hover:text-accent
   hover:shadow-md
   transition-all duration-200
 ">
 ```
 
-**Button Hover:**
+**Button Hover:** hover darkens, in both modes
 ```tsx
 <button className="
-  bg-linear-to-r from-purple-600 to-indigo-600
-  hover:from-purple-700 hover:to-indigo-700
+  bg-accent hover:bg-accent-hover
   shadow-lg hover:shadow-xl
   transition-all duration-200
 ">
 ```
 
-**Card Hover:**
+**Card Hover:** the surface stays opaque; the shadow rises
 ```tsx
 <div className="
-  bg-white/70 dark:bg-gray-800/70
-  hover:bg-white/90 dark:hover:bg-gray-800/90
-  transition-all duration-200
+  bg-card
+  hover:shadow-md
+  transition-shadow duration-200
 ">
 ```
 
 ### Focus States
 
-Use the predefined Tailwind plugin classes:
-- `.focus-primary` - Primary buttons
-- `.focus-secondary` - Secondary buttons, menu items
-- `.focus-danger` - Danger buttons
+Use the predefined Tailwind plugin classes (`tailwind.config.js`). Buttons get a 2px `outline-accent` separated from them by a transparent gap that shows the surface behind; fields get a 2px `ring-accent` and a `border-focus` border:
+- `.focus-primary` - Primary buttons (2px gap)
+- `.focus-secondary` - Secondary buttons, menu items (1px gap)
+- `.focus-danger` - Danger buttons (`outline-danger`)
 - `.focus-input` - Input fields
-- `.focus-interactive` - Icon buttons, interactive elements
+- `.focus-interactive` - Icon buttons, interactive elements (1px gap)
 
 ### Active States
 
@@ -1112,64 +1045,21 @@ active:opacity-80       /* Alternative press effect */
 
 ### Strategy
 
-The extension uses **class-based dark mode** with Tailwind CSS:
-
-```javascript
-// tailwind.config.js
-darkMode: 'class'
-```
-
-The `.dark` class is applied to the root element when dark mode is active.
+The extension uses **class-based dark mode**: `useTheme` puts the `.dark` class on `<html>`, and `src/theme/tokens.css` overrides every color token under `.dark`. Token classes (`bg-card`, `text-secondary`, `border-input`...) therefore switch theme by themselves.
 
 ### Dark Mode Patterns
 
-#### Background Colors
+Write one token class, never a light class plus a `dark:` variant:
 
 ```tsx
-<div className="
-  bg-white dark:bg-gray-900        /* Page background */
-  bg-gray-50 dark:bg-gray-800      /* Section background */
-  bg-white/70 dark:bg-gray-800/70  /* Card with opacity */
-">
+// Before
+<div className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-purple-100 dark:border-gray-700">
+
+// After
+<div className="bg-card text-primary border-default">
 ```
 
-#### Text Colors
-
-```tsx
-<p className="
-  text-gray-900 dark:text-gray-100  /* Primary text */
-  text-gray-700 dark:text-gray-300  /* Secondary text */
-  text-gray-500 dark:text-gray-400  /* Tertiary text */
-  text-gray-400 dark:text-gray-500  /* Disabled text */
-">
-```
-
-#### Border Colors
-
-```tsx
-<div className="
-  border border-purple-200 dark:border-gray-600  /* Input borders */
-  border-b border-purple-100 dark:border-gray-700 /* Dividers */
-">
-```
-
-#### Hover States
-
-```tsx
-<button className="
-  hover:bg-purple-50 dark:hover:bg-purple-900/20
-  hover:text-purple-600 dark:hover:text-purple-400
-">
-```
-
-#### Focus States
-
-```tsx
-<input className="
-  focus:ring-purple-500 dark:focus:ring-purple-400
-  focus:ring-offset-white dark:focus:ring-offset-gray-900
-">
-```
+`dark:` remains useful for what is not a color token (an icon swapped by theme, for example).
 
 ### Content Script Dark Mode
 
@@ -1190,7 +1080,7 @@ All components MUST be tested in both light and dark modes to ensure:
 - Readable text on all backgrounds
 - Visible borders and dividers
 - Consistent hover/focus states
-- Proper backdrop-blur-sm rendering
+- A visible backdrop behind dialogs
 
 ---
 
@@ -1213,18 +1103,24 @@ h-6 w-6  /* 24px - Page headers, dialogs */
 
 ```css
 /* Neutral */
-text-gray-400 dark:text-gray-500      /* Default icon color */
-text-gray-500 dark:text-gray-400      /* Secondary icons */
+text-tertiary    /* Default icon color (3:1 and more on every surface) */
+text-secondary   /* Stronger neutral icons */
+text-faint       /* Decorative icons only: under 3:1 */
 
 /* Brand */
-text-purple-400 dark:text-purple-300  /* Primary icons */
-text-purple-500 dark:text-purple-400  /* Accent icons */
+text-accent      /* Accent icons, and icons in a bg-accent-subtle square */
 
-/* Status */
-text-green-500  /* Success */
-text-red-500    /* Error */
-text-yellow-500 /* Warning */
-text-blue-500   /* Info */
+/* Status, on a surface */
+text-success     /* Success */
+text-danger      /* Error */
+text-warning     /* Warning */
+text-accent      /* Info: there is no blue */
+
+/* Status, on bg-inverse (toasts) */
+text-inverse-success  text-inverse-danger  text-inverse-warning  text-inverse-info
+
+/* Pinned Prompt */
+text-pin         /* Filled star */
 ```
 
 ### Platform Icons
@@ -1250,10 +1146,9 @@ import { ClaudeIcon, ChatGPTIcon } from './components/icons/SiteIcons';
 ```tsx
 <button className="
   p-2
-  text-gray-400 dark:text-gray-500
-  hover:text-purple-600 dark:hover:text-purple-400
+  text-tertiary hover:text-accent
   rounded-lg
-  hover:bg-purple-50 dark:hover:bg-purple-900/20
+  hover:bg-muted
   transition-colors
   focus-interactive
 ">
@@ -1263,16 +1158,18 @@ import { ClaudeIcon, ChatGPTIcon } from './components/icons/SiteIcons';
 </button>
 ```
 
-### Gradient Icon Background
+### Icon Square
+
+The brand gradient (`#6D28D9` to `#4C1D95`) stays on the logo. Other icon squares (Settings, Analytics) are flat:
 
 ```tsx
 <div className="
   w-10 h-10
-  bg-linear-to-br from-purple-600 to-indigo-600
+  bg-accent-subtle
   rounded-xl
   flex items-center justify-center
 ">
-  <svg className="w-6 h-6 text-white">{/* Icon */}</svg>
+  <svg className="w-6 h-6 text-accent">{/* Icon */}</svg>
 </div>
 ```
 
@@ -1340,11 +1237,11 @@ All interactive elements MUST have appropriate ARIA labels:
 - Large text (18px+): 3:1 contrast ratio
 - Interactive elements: 3:1 contrast ratio
 
-**Verified Combinations:**
-- White background + gray-900 text: ✓
-- Gray-800 background + gray-100 text: ✓
-- Purple-600 background + white text: ✓
-- Status colors + white text: ✓
+**Verified by `src/theme/__tests__/tokens.test.ts`, in light and dark:**
+- `text-primary`, `text-secondary` and `text-tertiary` on `bg-app`, `bg-card` and `bg-subtle`: 4.5:1
+- Text on fills and tints (`text-on-accent` on `bg-accent` and `bg-danger`, each state text on its `-subtle` background, `text-on-inverse` on `bg-inverse`): 4.5:1
+- Controls (`border-input`, the focus ring, `text-pin`, the toast icons, the scrollbar thumb): 3:1
+- `text-faint` is under 3:1: decorative and disabled content only
 
 ### Screen Reader Support
 
@@ -1377,9 +1274,10 @@ All interactive elements MUST have appropriate ARIA labels:
 ### ✅ DO
 
 - **Use the predefined focus classes** (`.focus-primary`, `.focus-input`, etc.)
-- **Apply backdrop-blur-sm** with semi-transparent backgrounds for glassmorphism
-- **Use purple-indigo gradient** for primary actions
-- **Include both light and dark mode styles** for all components
+- **Use token classes for every color** (`bg-card`, `text-secondary`, `border-input`...): they switch theme by themselves
+- **Use the flat accent** (`bg-accent hover:bg-accent-hover`) for primary actions
+- **Keep surfaces opaque**: `bg-backdrop` with `backdrop-blur-sm` goes behind dialogs and drawers only
+- **Check every component in light and dark**
 - **Test keyboard navigation** on all interactive elements
 - **Add ARIA labels** to all buttons without visible text
 - **Use rounded-xl (12px)** for cards, inputs, and buttons
@@ -1389,13 +1287,15 @@ All interactive elements MUST have appropriate ARIA labels:
 
 ### ❌ DON'T
 
-- **Don't use arbitrary color values** - stick to the defined palette
+- **Don't use raw palette classes or arbitrary colors** (`gray-*`, `purple-*`, `white`, `text-[#...]`): add a token instead
+- **Don't pair a token class with a `dark:` color variant**
+- **Don't use the brand gradient outside the logo**
+- **Don't use `text-faint` for information**, placeholders included (`placeholder:text-tertiary`)
+- **Don't put `bg-subtle` directly on `bg-app`**: same value in light
 - **Don't mix border radius values** - use the standard scale
-- **Don't skip dark mode styles** - every component needs both
 - **Don't forget hover states** on interactive elements
 - **Don't use multiple transition durations** - stick to 200ms
 - **Don't create custom focus styles** - use the predefined classes
-- **Don't use opacity without backdrop-blur** for glassmorphism
 - **Don't forget ARIA labels** on icon-only buttons
 - **Don't use box-shadow directly** - use Tailwind shadow utilities
 - **Don't skip the loading state** for async operations
@@ -1404,21 +1304,22 @@ All interactive elements MUST have appropriate ARIA labels:
 
 **DO:**
 ```tsx
-// Use defined status colors
-<span className="text-green-500">Success</span>
-<span className="text-red-500">Error</span>
+// Use the state tokens
+<span className="text-success">Saved</span>
+<p className="text-danger">Title is required</p>
 
-// Use the purple-indigo gradient for primary actions
-<button className="bg-linear-to-r from-purple-600 to-indigo-600">
+// Use the flat accent for primary actions
+<button className="bg-accent hover:bg-accent-hover text-on-accent">Save</button>
 ```
 
 **DON'T:**
 ```tsx
-// Don't use arbitrary color values
-<span className="text-[#00ff00]">Success</span>
+// Don't use raw palette classes or arbitrary values
+<span className="text-green-500">Saved</span>
+<span className="text-[#00ff00]">Saved</span>
 
-// Don't use single-color gradients
-<button className="bg-purple-600">Primary</button>
+// Don't use a gradient outside the logo
+<button className="bg-linear-to-r from-purple-600 to-indigo-600">Save</button>
 ```
 
 ### 📐 Spacing
@@ -1441,16 +1342,16 @@ All interactive elements MUST have appropriate ARIA labels:
 
 **DO:**
 ```tsx
-// Include dark mode variant for every style
-<div className="bg-white dark:bg-gray-800">
-  <p className="text-gray-900 dark:text-gray-100">
+// One token class: it switches theme by itself
+<div className="bg-card">
+  <p className="text-primary">
 ```
 
 **DON'T:**
 ```tsx
-// Don't omit dark mode styles
-<div className="bg-white">
-  <p className="text-gray-900">
+// Don't pair a raw class with a dark: variant
+<div className="bg-white dark:bg-gray-800">
+  <p className="text-gray-900 dark:text-gray-100">
 ```
 
 ---
@@ -1461,43 +1362,47 @@ All interactive elements MUST have appropriate ARIA labels:
 
 **Primary Button:**
 ```
-px-6 py-3 text-sm font-semibold text-white
-bg-linear-to-r from-purple-600 to-indigo-600
-rounded-xl hover:from-purple-700 hover:to-indigo-700
-transition-all duration-200 shadow-lg hover:shadow-xl
+px-6 py-3 text-sm font-semibold text-on-accent
+bg-accent hover:bg-accent-hover
+rounded-xl transition-all duration-200
+shadow-lg hover:shadow-xl
 disabled:opacity-50 focus-primary
 ```
 
-**Text Input:**
+**Text Input (on a card; on bg-app use bg-card):**
 ```
 w-full px-4 py-3
-border border-purple-200 dark:border-gray-600
+border border-input
 rounded-xl focus-input
-bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm
+bg-subtle
 transition-all duration-200
-text-gray-900 dark:text-gray-100
+text-primary placeholder:text-tertiary
 ```
 
 **Card Container:**
 ```
-bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm
-border-b border-purple-100 dark:border-gray-700
-p-5 hover:bg-white/90 dark:hover:bg-gray-800/90
-transition-all duration-200
+bg-card border border-default
+rounded-2xl p-4
+shadow-sm hover:shadow-md
+transition-shadow duration-200
 ```
 
-**Section Header:**
+**Section Header (line shown once the content scrolls under it):**
 ```
-shrink-0 p-6
-bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm
-border-b border-purple-100 dark:border-gray-700
+shrink-0 p-6 bg-app
+border-b border-transparent / border-strong
+```
+
+**Chosen Item:**
+```
+bg-accent-selected border border-accent
+text-accent-strong font-semibold
 ```
 
 **Icon Button:**
 ```
-p-2 text-gray-400 dark:text-gray-500
-hover:text-purple-600 dark:hover:text-purple-400
-rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20
+p-2 text-tertiary hover:text-accent
+rounded-lg hover:bg-muted
 transition-colors focus-interactive
 ```
 
@@ -1535,10 +1440,10 @@ z-1000002  /* Content script debug */
 ### Complete Form Section
 
 ```tsx
-<div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5">
+<div className="bg-card border-b border-divider p-5">
   <label
     htmlFor="title"
-    className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3"
+    className="block text-sm font-semibold text-secondary mb-3"
   >
     Title (optional)
   </label>
@@ -1548,9 +1453,9 @@ z-1000002  /* Content script debug */
     value={formData.title}
     onChange={(e) => handleChange('title', e.target.value)}
     placeholder="Enter a descriptive title"
-    className="w-full px-4 py-3 border rounded-xl focus-input bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 text-gray-900 dark:text-gray-100 border-purple-200 dark:border-gray-600"
+    className="w-full px-4 py-3 border border-input rounded-xl focus-input bg-subtle transition-all duration-200 text-primary placeholder:text-tertiary"
   />
-  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
+  <p className="mt-2 text-xs text-tertiary font-medium">
     {formData.title.length}/100 characters
   </p>
 </div>
@@ -1559,18 +1464,18 @@ z-1000002  /* Content script debug */
 ### Complete Action Buttons
 
 ```tsx
-<div className="shrink-0 p-6 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-t border-purple-100 dark:border-gray-700">
+<div className="shrink-0 p-6 bg-app border-t border-strong">
   <div className="flex space-x-3">
     <button
       type="button"
       onClick={onCancel}
-      className="flex-1 px-6 py-3 text-sm font-semibold text-gray-700 dark:text-gray-300 bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm border border-purple-200 dark:border-gray-600 rounded-xl hover:bg-white/80 dark:hover:bg-gray-700/80 transition-all duration-200 focus-secondary"
+      className="flex-1 px-6 py-3 text-sm font-semibold text-secondary bg-card border border-strong rounded-xl hover:bg-muted transition-all duration-200 focus-secondary"
     >
       Cancel
     </button>
     <button
       type="submit"
-      className="flex-1 px-6 py-3 text-sm font-semibold text-white bg-linear-to-r from-purple-600 to-indigo-600 rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 focus-primary"
+      className="flex-1 px-6 py-3 text-sm font-semibold text-on-accent bg-accent rounded-xl hover:bg-accent-hover transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 focus-primary"
       disabled={isLoading}
     >
       {isLoading ? 'Saving...' : 'Save Prompt'}
@@ -1582,6 +1487,11 @@ z-1000002  /* Content script debug */
 ---
 
 ## Version History
+
+**v2.0.0** (2026-10-21)
+- Semantic color tokens for light and dark (`src/theme/tokens.css`): one class per color, no `dark:` color variant
+- Every pattern and example moved to the token classes: flat accent instead of the purple-indigo gradient, opaque surfaces instead of glass, dark toasts
+- Focus rings drawn as a 2px accent outline with a transparent gap
 
 **v1.0.0** (2025-10-06)
 - Initial comprehensive design guidelines
@@ -1598,5 +1508,5 @@ For questions or suggestions about these design guidelines, please open an issue
 
 ---
 
-**Last Updated:** 2025-10-06
+**Last Updated:** 2026-10-21
 **Maintained By:** AI Development Team

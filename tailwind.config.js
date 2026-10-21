@@ -20,22 +20,23 @@ export default {
   plugins: [
     function({ addComponents }) {
       addComponents({
-        // Standard focus states for different button types
+        // Focus rings: a 2px accent outline, offset by a transparent gap that shows the surface behind
         '.focus-primary': {
-          '@apply focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-900': {},
+          '@apply focus:outline-2 focus:outline-offset-2 focus:outline-accent': {},
         },
         '.focus-secondary': {
-          '@apply focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-1 focus:ring-offset-white dark:focus:ring-offset-gray-800': {},
+          '@apply focus:outline-2 focus:outline-offset-1 focus:outline-accent': {},
         },
         '.focus-danger': {
-          '@apply focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-900': {},
+          '@apply focus:outline-2 focus:outline-offset-2 focus:outline-danger': {},
         },
+        // Fields: the ring hugs the field and its border takes the same accent
         '.focus-input': {
-          '@apply focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 dark:focus:ring-purple-400 dark:focus:border-purple-400': {},
+          '@apply focus:outline-none focus:ring-2 focus:ring-accent focus:border-focus': {},
         },
         // Interactive element base focus
         '.focus-interactive': {
-          '@apply focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-1 focus:ring-offset-white dark:focus:ring-offset-gray-800 dark:focus:ring-purple-400': {},
+          '@apply focus:outline-2 focus:outline-offset-1 focus:outline-accent': {},
         }
       })
     }

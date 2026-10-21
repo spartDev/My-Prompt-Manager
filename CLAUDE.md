@@ -17,6 +17,7 @@ npm test && npm run lint && npm run typecheck
 - **React 19 forms**: Use `useActionState` for validation/submission
 - **Platform strategies**: Extend `BaseStrategy` in `src/content/platforms/`
 - **Prompt text**: Never rewrite Prompt text on read or insertion; it is admitted once at the write path (`src/services/promptAdmission.ts`, ADR-001)
+- **Colors**: Use the token classes of `src/theme/tokens.css` (`bg-card`, `text-secondary`, `border-input`...), never raw palette classes or a `dark:` color variant (`docs/DESIGN_GUIDELINES.md`)
 
 ## Workflow
 
