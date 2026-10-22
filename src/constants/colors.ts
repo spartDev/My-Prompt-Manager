@@ -240,8 +240,9 @@ export const adjustColorBrightness = (hexColor: string, percent: number): string
   return `#${toHex(newR)}${toHex(newG)}${toHex(newB)}`.toUpperCase();
 };
 
-// The surface the soft badge sits on: bg-card of src/theme/tokens.css (light / dark)
-const SOFT_BADGE_SURFACES = { light: '#FFFFFF', dark: '#231C34' } as const;
+// The Library card the soft badge renders on (white / gray-800). The badge background is translucent,
+// so the safety net must measure on this surface; switch dark to bg-card (#231C34) with the card itself
+const SOFT_BADGE_SURFACES = { light: '#FFFFFF', dark: '#1E2939' } as const;
 const SOFT_BADGE_ALPHA = 0.13;
 
 const hexChannels = (hex: string): number[] =>
@@ -260,7 +261,7 @@ const scaleHexColor = (hexColor: string, factor: number): string =>
  * Colors for the "soft" category badge: the category color at 13% opacity as background (the same
  * in both modes), and the category color as text: darkened in light mode (x 0.45 for a light color,
  * x 0.72 otherwise), mixed with 38% white in dark mode. A safety net keeps darkening (light) or
- * lightening (dark) in 5% steps while the text is under WCAG AA (4.5:1) on the tint over bg-card;
+ * lightening (dark) in 5% steps while the text is under WCAG AA (4.5:1) on the tint over the card;
  * no preset color needs it.
  */
 export const getSoftBadgeColors = (

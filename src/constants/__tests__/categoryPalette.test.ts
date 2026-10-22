@@ -7,10 +7,10 @@ import { describe, it, expect } from 'vitest';
 
 import { PRESET_COLORS, getColorName, getContrastRatio, getSoftBadgeColors } from '../colors';
 
-// bg-card in src/theme/tokens.css: the surface Category chips sit on
-const CARD = { light: '#FFFFFF', dark: '#231C34' } as const;
+// The Library card the chips render on: white / gray-800 until the Library moves to bg-card (#231C34 in dark)
+const CARD = { light: '#FFFFFF', dark: '#1E2939' } as const;
 
-/** The chip background as it renders: its translucent color composited over bg-card */
+/** The chip background as it renders: its translucent color composited over the card */
 const onCard = (background: string, mode: 'light' | 'dark'): string => {
   const [r, g, b, alpha] = (/^rgba\((\d+), (\d+), (\d+), ([\d.]+)\)$/.exec(background) ?? []).slice(1).map(Number);
   const card = [1, 3, 5].map(i => parseInt(CARD[mode].substring(i, i + 2), 16));
@@ -45,7 +45,7 @@ describe('Category chip', () => {
     expect(getSoftBadgeColors('#2563EB', 'dark').background).toBe('rgba(37, 99, 235, 0.13)');
   });
 
-  describe.each(['light', 'dark'] as const)('on bg-card, %s mode', (mode) => {
+  describe.each(['light', 'dark'] as const)('on the Library card, %s mode', (mode) => {
     it.each(PRESET_CHIP_TEXT)('%s (%s) reads at 4.5:1 or more', (_name, color) => {
       const { background, text } = getSoftBadgeColors(color, mode);
       expect(getContrastRatio(text, onCard(background, mode))).toBeGreaterThanOrEqual(4.5);
@@ -62,9 +62,10 @@ describe('Category chip', () => {
   });
 
   it.each([
-    ['#000000', '#858585'],
-    ['#1A1A2E', '#8B8B96']
-  ])('lightens the dark-mode text of custom %s until it reads at 4.5:1', (color, corrected) => {
+    ['#1E40AF', '#8295D2'], // Navy, a former preset
+    ['#000000', '#8B8B8B'],
+    ['#1A1A2E', '#91919B']
+  ])('lightens the dark-mode text of %s until it reads at 4.5:1', (color, corrected) => {
     const { background, text } = getSoftBadgeColors(color, 'dark');
     expect(text).toBe(corrected);
     expect(getContrastRatio(text, onCard(background, 'dark'))).toBeGreaterThanOrEqual(4.5);

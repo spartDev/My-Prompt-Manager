@@ -7,7 +7,7 @@
  * color picker with the 12 presets.
  */
 
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 
 import type { Category, Prompt } from '../../../src/types';
 import { type ExtensionStorage, expect, test } from '../fixtures/extension';
@@ -35,6 +35,38 @@ const prompts: Prompt[] = categories.map((category, index) =>
   })
 );
 
+// Colors that need the safety net: a former preset still stored by Categories, and an extreme custom color
+const netCategories: Category[] = [
+  { id: 'archive', name: 'Archives', color: '#1E40AF' }, // Navy
+  { id: 'black', name: 'Noir', color: '#000000' }
+];
+
+const relativeLuminance = ([r, g, b]: number[]) => {
+  const linear = (channel: number) => (channel / 255 <= 0.03928 ? channel / 255 / 12.92 : ((channel / 255 + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b);
+};
+
+const contrast = (a: number[], b: number[]) => {
+  const [lighter, darker] = [relativeLuminance(a), relativeLuminance(b)].sort((x, y) => y - x);
+  return (lighter + 0.05) / (darker + 0.05);
+};
+
+/** The chip background as painted: a pixel of its top padding, read back from a screenshot */
+const paintedBackground = async (page: Page, chip: Locator): Promise<number[]> => {
+  const shot = await chip.screenshot();
+  return page.evaluate(async base64 => {
+    const image = new Image();
+    image.src = `data:image/png;base64,${base64}`;
+    await image.decode();
+    const canvas = document.createElement('canvas');
+    canvas.width = image.width;
+    canvas.height = image.height;
+    const context = canvas.getContext('2d') as CanvasRenderingContext2D;
+    context.drawImage(image, 0, 0);
+    return [...context.getImageData(Math.round(image.width / 2), 2, 1, 1).data].slice(0, 3);
+  }, shot.toString('base64'));
+};
+
 const CHIP = {
   background: 'rgba(37, 99, 235, 0.13)',
   text: { light: 'rgb(27, 71, 169)', dark: 'rgb(120, 158, 243)' }
@@ -56,6 +88,22 @@ test.describe('Category chips follow the chip rule', () => {
       const chip = page.getByTitle('Category: Rédaction');
       await expect(chip).toHaveCSS('background-color', CHIP.background);
       await expect(chip).toHaveCSS('color', CHIP.text[theme]);
+    });
+
+    test(`chip text reads at 4.5:1 on the chip as painted, safety net included (${theme})`, async ({ page, storage, extensionId }) => {
+      const netPrompts = netCategories.map(category =>
+        createPromptSeed({ id: `prompt-${category.id}`, title: `Prompt ${category.name}`, content: 'Texte', category: category.name })
+      );
+      await seedLibrary(storage, { prompts: netPrompts, categories: netCategories, settings: { theme } });
+      await page.goto(`chrome-extension://${extensionId}/${SIDEPANEL_URL}`);
+      await expect(page.getByTestId('prompt-card')).toHaveCount(netPrompts.length);
+
+      for (const category of netCategories) {
+        const chip = page.getByTitle(`Category: ${category.name}`);
+        const text = (await chip.evaluate(element => getComputedStyle(element).color)).match(/\d+/g)?.slice(0, 3).map(Number) ?? [];
+        const ratio = contrast(text, await paintedBackground(page, chip));
+        expect(ratio, `${category.name} (${category.color})`).toBeGreaterThanOrEqual(4.5);
+      }
     });
 
     test(`PROOF: Library chips and color picker screenshots (${theme} mode)`, async ({ page, storage, extensionId }) => {
