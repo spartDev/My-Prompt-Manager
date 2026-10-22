@@ -10,36 +10,22 @@ export interface ColorOption {
   textColor?: string; // For ensuring good contrast
 }
 
-// Modern, vibrant color palette optimized for both light and dark themes
-// All colors meet WCAG AA contrast requirements (4.5:1 minimum) with specified text colors
+// The 12 Category colors (epic My-Prompt-Manager-el4), the same in light and dark: no two of them
+// look alike as chips, and none looks like the accent. textColor is the checkmark drawn on the swatch.
+// Colors removed from this list stay valid: a Category keeps its stored color and shows it as Custom.
 export const PRESET_COLORS: ColorOption[] = [
-  // Blues
   { name: 'Ocean Blue', value: '#2563EB', textColor: '#FFFFFF' }, // blue-600: 5.17:1
-  { name: 'Sky Blue', value: '#0369A1', textColor: '#FFFFFF' }, // sky-700: 5.95:1
-  { name: 'Navy', value: '#1E40AF', textColor: '#FFFFFF' }, // blue-800: 8.72:1
-
-  // Purples & Pinks
+  { name: 'Sky Blue', value: '#0369A1', textColor: '#FFFFFF' }, // sky-700: 5.93:1
+  { name: 'Indigo', value: '#4F46E5', textColor: '#FFFFFF' }, // indigo-600: 6.29:1
   { name: 'Purple', value: '#9333EA', textColor: '#FFFFFF' }, // purple-600: 5.38:1
-  { name: 'Violet', value: '#7C3AED', textColor: '#FFFFFF' }, // violet-600: 5.70:1
   { name: 'Pink', value: '#DB2777', textColor: '#FFFFFF' }, // pink-600: 4.60:1
   { name: 'Rose', value: '#E11D48', textColor: '#FFFFFF' }, // rose-600: 4.70:1
-
-  // Greens
-  { name: 'Emerald', value: '#047857', textColor: '#FFFFFF' }, // emerald-700: 5.44:1
-  { name: 'Green', value: '#15803D', textColor: '#FFFFFF' }, // green-700: 4.74:1
-  { name: 'Teal', value: '#0F766E', textColor: '#FFFFFF' }, // teal-700: 5.35:1
-
-  // Warm colors
-  { name: 'Orange', value: '#C2410C', textColor: '#FFFFFF' }, // orange-700: 5.67:1
-  { name: 'Amber', value: '#F59E0B', textColor: '#000000' }, // amber-500: 9.78:1 with black
+  { name: 'Amber', value: '#D97706', textColor: '#000000' }, // amber-600: 6.59:1 with black
+  { name: 'Lime', value: '#4D7C0F', textColor: '#FFFFFF' }, // lime-700: 4.99:1
+  { name: 'Teal', value: '#0F766E', textColor: '#FFFFFF' }, // teal-700: 5.47:1
+  { name: 'Orange', value: '#C2410C', textColor: '#FFFFFF' }, // orange-700: 5.18:1
   { name: 'Yellow', value: '#EAB308', textColor: '#000000' }, // yellow-500: 10.95:1 with black
-  { name: 'Red', value: '#DC2626', textColor: '#FFFFFF' }, // red-600: 4.83:1
-
-  // Neutrals
-  { name: 'Gray', value: '#6B7280', textColor: '#FFFFFF' }, // gray-500: 4.83:1
   { name: 'Slate', value: '#475569', textColor: '#FFFFFF' }, // slate-600: 7.58:1
-  { name: 'Stone', value: '#78716C', textColor: '#FFFFFF' }, // stone-500: 4.80:1
-  { name: 'Zinc', value: '#71717A', textColor: '#FFFFFF' }, // zinc-500: 4.83:1
 ];
 
 // Default color for new categories (WCAG AA compliant)
@@ -254,37 +240,46 @@ export const adjustColorBrightness = (hexColor: string, percent: number): string
   return `#${toHex(newR)}${toHex(newG)}${toHex(newB)}`.toUpperCase();
 };
 
-// Card surfaces the soft badge sits on (Tailwind white / gray-800)
+// The Library card the soft badge renders on (white / gray-800). The badge background is translucent,
+// so the safety net must measure on this surface; switch dark to bg-card (#231C34) with the card itself
 const SOFT_BADGE_SURFACES = { light: '#FFFFFF', dark: '#1E2939' } as const;
-const SOFT_BADGE_TINT = 0.15;
+const SOFT_BADGE_ALPHA = 0.13;
+
+const hexChannels = (hex: string): number[] =>
+  [0, 2, 4].map(i => parseInt(hex.replace('#', '').substring(i, i + 2), 16));
 
 const mixHexColors = (from: string, to: string, amount: number): string => {
-  const channel = (hex: string, i: number) => parseInt(hex.replace('#', '').substring(i, i + 2), 16);
+  const [start, end] = [hexChannels(from), hexChannels(to)];
   const toHex = (value: number) => Math.round(value).toString(16).padStart(2, '0');
-  return `#${[0, 2, 4].map(i => toHex(channel(from, i) + (channel(to, i) - channel(from, i)) * amount)).join('')}`.toUpperCase();
+  return `#${start.map((channel, i) => toHex(channel + (end[i] - channel) * amount)).join('')}`.toUpperCase();
 };
 
+const scaleHexColor = (hexColor: string, factor: number): string =>
+  mixHexColors('#000000', hexColor, factor);
+
 /**
- * Colors for the "soft" category badge: a pale tint of the category color as background,
- * and the category color itself as text, darkened (light mode) or lightened (dark mode)
- * just enough to reach WCAG AA (4.5:1) against that tint.
+ * Colors for the "soft" category badge: the category color at 13% opacity as background (the same
+ * in both modes), and the category color as text: darkened in light mode (x 0.45 for a light color,
+ * x 0.72 otherwise), mixed with 38% white in dark mode. A safety net keeps darkening (light) or
+ * lightening (dark) in 5% steps while the text is under WCAG AA (4.5:1) on the tint over the card;
+ * no preset color needs it.
  */
 export const getSoftBadgeColors = (
   hexColor: string,
   mode: 'light' | 'dark'
 ): { background: string; text: string } => {
   const color = isValidHexColor(hexColor) ? hexColor : DEFAULT_CATEGORY_COLOR;
-  const surface = SOFT_BADGE_SURFACES[mode];
-  const background = mixHexColors(surface, color, SOFT_BADGE_TINT);
+  const background = `rgba(${hexChannels(color).join(', ')}, ${String(SOFT_BADGE_ALPHA)})`;
+  const backgroundOnCard = mixHexColors(SOFT_BADGE_SURFACES[mode], color, SOFT_BADGE_ALPHA);
   const target = mode === 'light' ? '#000000' : '#FFFFFF';
 
-  for (let step = 0; step <= 20; step++) {
-    const text = mixHexColors(color, target, step / 20);
-    if (getContrastRatio(text, background) >= 4.5) {
-      return { background, text };
-    }
+  let text = mode === 'light'
+    ? scaleHexColor(color, getRelativeLuminance(color) > 0.3 ? 0.45 : 0.72)
+    : mixHexColors(color, '#FFFFFF', 0.38);
+  for (let step = 0; step < 60 && getContrastRatio(text, backgroundOnCard) < 4.5; step++) {
+    text = mixHexColors(text, target, 0.05);
   }
-  return { background, text: target };
+  return { background, text };
 };
 
 // Get color name from preset or return "Custom"

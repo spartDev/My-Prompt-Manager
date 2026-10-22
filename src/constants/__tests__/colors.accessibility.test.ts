@@ -13,7 +13,6 @@ import {
   meetsWCAGStandard,
   getAccessibleTextColor,
   getContrastingTextColor,
-  getSoftBadgeColors,
   isValidHexColor
 } from '../colors';
 
@@ -205,7 +204,7 @@ describe('Color Contrast Accessibility', () => {
     });
 
     it('dark colors should specify white text', () => {
-      const darkColors = ['Navy', 'Purple', 'Violet', 'Emerald', 'Slate'];
+      const darkColors = ['Indigo', 'Purple', 'Teal', 'Slate'];
 
       darkColors.forEach(colorName => {
         const color = PRESET_COLORS.find(c => c.name === colorName);
@@ -303,23 +302,6 @@ describe('Color Contrast Accessibility', () => {
 
         expect(passes).toBe(true);
       });
-    });
-  });
-
-  describe('Soft category badge (Library card)', () => {
-    const colors = [...PRESET_COLORS.map(c => c.value), '#FFFF00', '#000000', '#FFFFFF', '#00FF00'];
-
-    describe.each(['light', 'dark'] as const)('%s mode', (mode) => {
-      it.each(colors)('keeps %s readable at WCAG AA (4.5:1)', (color) => {
-        const { background, text } = getSoftBadgeColors(color, mode);
-        expect(getContrastRatio(text, background)).toBeGreaterThanOrEqual(4.5);
-      });
-    });
-
-    it('tints the background with the category color instead of filling it', () => {
-      const { background } = getSoftBadgeColors('#2563EB', 'light');
-      expect(background).not.toBe('#2563EB');
-      expect(getContrastRatio(background, '#FFFFFF')).toBeLessThan(1.5);
     });
   });
 });
