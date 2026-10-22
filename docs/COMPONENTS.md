@@ -398,13 +398,15 @@ interface SearchBarProps {
 interface ColorPickerProps {
   value: string;
   onChange: (color: string) => void;
-  colors: Color[];
-  compact?: boolean;
+  label?: string;
+  disabled?: boolean;
+  className?: string;
+  compact?: boolean; // Show only the color swatch, no text
 }
 ```
 
 **Features:**
-- 18 preset colors from `src/constants/colors.ts`
+- 12 preset colors (2 rows of 6) from `src/constants/colors.ts`; a stored color outside them shows as Custom ([CATEGORY_COLOR_IMPLEMENTATION.md](./CATEGORY_COLOR_IMPLEMENTATION.md))
 - Custom hex input
 - Compact mode for smaller spaces
 - Validation
