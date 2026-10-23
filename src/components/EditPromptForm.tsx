@@ -22,10 +22,10 @@ const CategoryTrigger = forwardRef<HTMLButtonElement, CategoryTriggerProps>(
       ref={ref}
       type="button"
       {...rest}
-      className={className ?? "w-full px-4 py-3 border border-purple-200 dark:border-gray-600 rounded-xl focus-input bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 font-medium cursor-pointer text-gray-900 dark:text-gray-100 text-left flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"}
+      className={className ?? "w-full px-4 py-3 border border-input rounded-xl focus-input bg-subtle transition-all duration-200 font-medium cursor-pointer text-primary text-left flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"}
     >
       <span>{selectedCategory}</span>
-      <svg className="w-4 h-4 text-purple-400 dark:text-purple-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg className="w-4 h-4 text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
       </svg>
     </button>
@@ -148,7 +148,7 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
   };
 
   return (
-    <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900">
+    <div className="h-full flex flex-col bg-app">
       {/* Header */}
       <ViewHeader
         icon="edit"
@@ -165,19 +165,20 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
         <div
           role="alert"
           aria-live="polite"
-          className="shrink-0 p-4 text-sm text-red-600 dark:text-red-400 bg-red-50/80 dark:bg-red-900/20 backdrop-blur-sm border-b border-red-200 dark:border-red-700 font-medium"
+          className="shrink-0 p-4 text-sm text-danger bg-danger-subtle border-y border-danger font-medium"
         >
           ⚠️ {errors.general}
         </div>
       )}
 
       {/* Form */}
-      <div className="flex-1 overflow-auto custom-scrollbar" data-scroll-container>
-        <form id="edit-prompt-form" action={submitAction}>
+      <div className="flex-1 overflow-auto custom-scrollbar p-4" data-scroll-container>
+        <div className="bg-card border border-default rounded-2xl shadow-sm overflow-hidden divide-y divide-divider">
+        <form id="edit-prompt-form" action={submitAction} className="divide-y divide-divider">
           {/* Title Section */}
-          <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5">
+          <div className="p-5">
             <div className="flex items-center space-x-2 mb-4">
-              <label htmlFor="title" className="block text-sm font-bold text-gray-900 dark:text-gray-100">
+              <label htmlFor="title" className="block text-sm font-bold text-primary">
                 Title
               </label>
             </div>
@@ -188,26 +189,26 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
               defaultValue={currentValues.title}
               onChange={(e) => { handleFieldChange('title', e.target.value); }}
               placeholder="Enter a descriptive title"
-              className={`w-full px-4 py-3 border rounded-xl focus-input bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 text-sm text-gray-900 dark:text-gray-100 ${
-                errors?.title ? 'border-red-300 dark:border-red-500' : 'border-purple-200 dark:border-gray-600'
+              className={`w-full px-4 py-3 border rounded-xl focus-input bg-subtle transition-all duration-200 text-sm text-primary placeholder:text-tertiary ${
+                errors?.title ? 'border-error' : 'border-input'
               }`}
               disabled={isPending}
             />
             {errors?.title && (
-              <p className="mt-2 text-sm text-red-600 dark:text-red-400 font-medium">⚠️ {errors.title}</p>
+              <p className="mt-2 text-sm text-danger font-medium">⚠️ {errors.title}</p>
             )}
-            <p className={`mt-2 text-xs font-medium ${titleLength > PROMPT_LIMITS.title ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'}`}>
+            <p className={`mt-2 text-xs font-medium ${titleLength > PROMPT_LIMITS.title ? 'text-danger' : 'text-tertiary'}`}>
               {formatCharacterCount(titleLength, PROMPT_LIMITS.title)}
             </p>
           </div>
 
           {/* Category Section */}
-          <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5">
+          <div className="p-5">
             <div className="flex items-center space-x-2 mb-4">
               {/* Label uses aria-labelledby on the button instead of htmlFor -
                   this is the correct accessible pattern for custom dropdown triggers
                   since buttons don't respond to label clicks like native form controls */}
-              <label id="category-label" className="block text-sm font-bold text-gray-900 dark:text-gray-100">
+              <label id="category-label" className="block text-sm font-bold text-primary">
                 Category
               </label>
             </div>
@@ -230,9 +231,9 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
           </div>
 
           {/* Content Section */}
-          <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5">
+          <div className="p-5">
             <div className="flex items-center space-x-2 mb-4">
-              <label htmlFor="content" className="block text-sm font-bold text-gray-900 dark:text-gray-100">
+              <label htmlFor="content" className="block text-sm font-bold text-primary">
                 Content *
               </label>
             </div>
@@ -243,25 +244,25 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
               onChange={(e) => { handleFieldChange('content', e.target.value); }}
               placeholder="Enter your prompt content here..."
               rows={10}
-              className={`w-full px-4 py-3 border rounded-xl focus-input resize-none bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 text-sm text-gray-900 dark:text-gray-100 ${
-                errors?.content ? 'border-red-300 dark:border-red-500' : 'border-purple-200 dark:border-gray-600'
+              className={`w-full px-4 py-3 border rounded-xl focus-input resize-none bg-subtle transition-all duration-200 text-sm text-primary placeholder:text-tertiary ${
+                errors?.content ? 'border-error' : 'border-input'
               }`}
               disabled={isPending}
               required
             />
             {errors?.content && (
-              <p className="mt-2 text-sm text-red-600 dark:text-red-400 font-medium">⚠️ {errors.content}</p>
+              <p className="mt-2 text-sm text-danger font-medium">⚠️ {errors.content}</p>
             )}
-            <p className={`mt-2 text-xs font-medium ${contentLength > PROMPT_LIMITS.content ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'}`}>
+            <p className={`mt-2 text-xs font-medium ${contentLength > PROMPT_LIMITS.content ? 'text-danger' : 'text-tertiary'}`}>
               {formatCharacterCount(contentLength, PROMPT_LIMITS.content)}
             </p>
           </div>
         </form>
         
         {/* Metadata */}
-        <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5">
-          <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Prompt Information</h4>
-          <div className="text-xs text-gray-600 dark:text-gray-400 space-y-2 font-medium">
+        <div className="p-5">
+          <h4 className="text-sm font-semibold text-secondary mb-3">Prompt Information</h4>
+          <div className="text-xs text-tertiary space-y-2 font-medium">
             <div className="flex items-center space-x-2">
               <span>Created:</span>
               <span>{formatDate((prompt).createdAt)}</span>
@@ -272,13 +273,14 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
             </div>
           </div>
         </div>
+        </div>
       </div>
 
       {/* Footer */}
-      <div className="shrink-0 p-6 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-t border-purple-100 dark:border-gray-700">
+      <div className="shrink-0 p-6 bg-app border-t border-transparent scroll-edge-bottom">
         {/* Unsaved changes indicator */}
         {hasUnsavedChanges && !isPending && (
-          <div className="mb-4 text-xs text-amber-600 dark:text-amber-400 font-medium flex items-center space-x-2 bg-amber-50/80 dark:bg-amber-900/20 backdrop-blur-sm border border-amber-200 dark:border-amber-700 rounded-lg px-3 py-2">
+          <div className="mb-4 text-xs text-warning font-medium flex items-center space-x-2 bg-warning-subtle border border-warning rounded-lg px-3 py-2">
             <span>⚡</span>
             <span>You have unsaved changes</span>
           </div>
@@ -289,7 +291,7 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
           <button
             type="button"
             onClick={onCancel}
-            className="flex-1 px-6 py-3 text-sm font-semibold text-gray-700 dark:text-gray-300 bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm border border-purple-200 dark:border-gray-600 rounded-xl hover:bg-white/80 dark:hover:bg-gray-700/80 transition-all duration-200 focus-secondary"
+            className="flex-1 px-6 py-3 text-sm font-semibold text-secondary bg-card border border-strong rounded-xl hover:bg-muted transition-all duration-200 focus-secondary"
             disabled={isPending}
           >
             Cancel
@@ -297,12 +299,12 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
           <button
             type="submit"
             form="edit-prompt-form"
-            className="flex-1 px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 focus-primary"
+            className="flex-1 px-6 py-3 text-sm font-semibold text-on-accent bg-accent rounded-xl hover:bg-accent-hover transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 focus-primary"
             disabled={isPending}
           >
             {isPending ? (
               <div className="flex items-center justify-center space-x-2">
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                <div className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin"></div>
                 <span>Saving...</span>
               </div>
             ) : (
@@ -312,11 +314,11 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
         </div>
 
         {/* Delete - kept apart from Save/Cancel to avoid accidental clicks */}
-        <div className="mt-4 pt-4 border-t border-purple-100 dark:border-gray-700 text-center">
+        <div className="mt-4 pt-4 border-t border-strong text-center">
           <button
             type="button"
             onClick={() => { setShowDeleteConfirm(true); }}
-            className="px-3 py-1.5 text-sm font-medium text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors focus-interactive"
+            className="px-3 py-1.5 text-sm font-medium text-danger hover:bg-danger-subtle rounded-lg transition-colors focus-danger"
             disabled={isPending}
           >
             Delete prompt

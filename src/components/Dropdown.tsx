@@ -345,8 +345,7 @@ export const Dropdown: FC<DropdownProps> = ({
       aria-labelledby={!ariaLabel ? triggerHandlers.id : undefined}
       className={cn(
         'absolute z-50 min-w-32 overflow-hidden',
-        'rounded-xl border bg-white shadow-lg',
-        'dark:bg-gray-800 dark:border-gray-700',
+        'rounded-xl border border-default bg-card shadow-lg',
         'animate-in fade-in-0 zoom-in-95',
         className
       )}
@@ -360,7 +359,7 @@ export const Dropdown: FC<DropdownProps> = ({
             // Use explicit type field or fallback to id check for backward compatibility
             if (item.type === 'separator' || item.id === 'separator') {
               return (
-                <div key={item.id} role="separator" className="my-1 h-px bg-gray-200 dark:bg-gray-700" />
+                <div key={item.id} role="separator" className="my-1 h-px bg-(--border-color-divider)" />
               );
             }
 
@@ -380,12 +379,12 @@ export const Dropdown: FC<DropdownProps> = ({
                 }}
                 className={cn(
                   'flex w-full items-center px-3 py-2 text-sm',
-                  'text-gray-700 dark:text-gray-300',
-                  'hover:bg-gray-100 dark:hover:bg-gray-700',
-                  'focus:bg-gray-100 dark:focus:bg-gray-700',
+                  'text-secondary',
+                  'hover:bg-muted',
+                  'focus:bg-muted',
                   'focus:outline-none transition-colors',
                   'disabled:opacity-50 disabled:cursor-not-allowed',
-                  item.disabled && 'hover:bg-transparent dark:hover:bg-transparent',
+                  item.disabled && 'hover:bg-transparent',
                   item.className,
                   itemClassName
                 )}
@@ -421,6 +420,6 @@ export const Dropdown: FC<DropdownProps> = ({
 export const DropdownSeparator: FC<{ className?: string }> = ({ className }) => (
   <div
     role="separator"
-    className={cn('my-1 h-px bg-gray-200 dark:bg-gray-700', className)}
+    className={cn('my-1 h-px bg-(--border-color-divider)', className)}
   />
 );

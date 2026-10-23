@@ -452,7 +452,7 @@ describe('AddPromptForm - Limits', () => {
     await userEvent.paste(content);
 
     expect(contentInput).toHaveValue(content);
-    expect(screen.getByText(formatCharacterCount(content.length, PROMPT_LIMITS.content))).toHaveClass('text-red-600');
+    expect(screen.getByText(formatCharacterCount(content.length, PROMPT_LIMITS.content))).toHaveClass('text-danger');
 
     await userEvent.click(screen.getByRole('button', { name: /save prompt/i }));
 
@@ -470,7 +470,7 @@ describe('AddPromptForm - Limits', () => {
     await userEvent.type(screen.getByLabelText(/content/i), 'Body');
 
     expect(titleInput).toHaveValue(title);
-    expect(screen.getByText(formatCharacterCount(title.length, PROMPT_LIMITS.title))).toHaveClass('text-red-600');
+    expect(screen.getByText(formatCharacterCount(title.length, PROMPT_LIMITS.title))).toHaveClass('text-danger');
 
     await userEvent.click(screen.getByRole('button', { name: /save prompt/i }));
 
@@ -508,7 +508,7 @@ describe('AddPromptForm - Limits', () => {
     expect(screen.getByLabelText(/title/i)).toHaveValue('My Title');
     expect(screen.getByLabelText(/content/i)).toHaveValue(overLimit);
     expect(screen.getByRole('button', { name: /category/i })).toHaveTextContent('Work');
-    expect(screen.getByText(formatCharacterCount(overLimit.length, PROMPT_LIMITS.content))).toHaveClass('text-red-600');
+    expect(screen.getByText(formatCharacterCount(overLimit.length, PROMPT_LIMITS.content))).toHaveClass('text-danger');
     expect(props.onSubmit).not.toHaveBeenCalled();
 
     await userEvent.clear(screen.getByLabelText(/content/i));

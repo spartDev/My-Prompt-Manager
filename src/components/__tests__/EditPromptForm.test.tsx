@@ -48,7 +48,7 @@ describe('EditPromptForm - Limits', () => {
     await userEvent.paste(content);
 
     expect(contentInput).toHaveValue(content);
-    expect(screen.getByText(formatCharacterCount(content.length, PROMPT_LIMITS.content))).toHaveClass('text-red-600');
+    expect(screen.getByText(formatCharacterCount(content.length, PROMPT_LIMITS.content))).toHaveClass('text-danger');
 
     await userEvent.click(screen.getByRole('button', { name: /save changes/i }));
 
@@ -65,7 +65,7 @@ describe('EditPromptForm - Limits', () => {
     await userEvent.paste(title);
 
     expect(titleInput).toHaveValue(title);
-    expect(screen.getByText(formatCharacterCount(title.length, PROMPT_LIMITS.title))).toHaveClass('text-red-600');
+    expect(screen.getByText(formatCharacterCount(title.length, PROMPT_LIMITS.title))).toHaveClass('text-danger');
 
     await userEvent.click(screen.getByRole('button', { name: /save changes/i }));
 
@@ -104,7 +104,7 @@ describe('EditPromptForm - Limits', () => {
     expect(screen.getByLabelText(/title/i)).toHaveValue('New Title');
     expect(screen.getByLabelText(/content/i)).toHaveValue(overLimit);
     expect(screen.getByRole('button', { name: /category/i })).toHaveTextContent('Uncategorized');
-    expect(screen.getByText(formatCharacterCount(overLimit.length, PROMPT_LIMITS.content))).toHaveClass('text-red-600');
+    expect(screen.getByText(formatCharacterCount(overLimit.length, PROMPT_LIMITS.content))).toHaveClass('text-danger');
     expect(props.onSubmit).not.toHaveBeenCalled();
 
     await userEvent.clear(screen.getByLabelText(/content/i));

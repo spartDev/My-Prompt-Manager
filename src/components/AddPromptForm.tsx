@@ -28,10 +28,10 @@ const CategoryTrigger = forwardRef<HTMLButtonElement, CategoryTriggerProps>(
       ref={ref}
       type="button"
       {...rest}
-      className={className ?? "w-full px-4 py-3 border border-purple-200 dark:border-gray-600 rounded-xl focus-input bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 font-medium cursor-pointer text-gray-900 dark:text-gray-100 text-left flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"}
+      className={className ?? "w-full px-4 py-3 border border-input rounded-xl focus-input bg-subtle transition-all duration-200 font-medium cursor-pointer text-primary text-left flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"}
     >
       <span>{selectedCategory}</span>
-      <svg className="w-4 h-4 text-purple-400 dark:text-purple-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg className="w-4 h-4 text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
       </svg>
     </button>
@@ -257,7 +257,7 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
   );
 
   return (
-    <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900">
+    <div className="h-full flex flex-col bg-app">
       {/* Header */}
       <ViewHeader
         icon="add"
@@ -270,17 +270,17 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
       </ViewHeader>
 
       {/* Mode Selector */}
-      <div className="shrink-0 p-4 bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700">
-        <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-700 rounded-xl p-1">
+      <div className="shrink-0 px-4 pb-4">
+        <div className="flex items-center gap-2 bg-card border border-default rounded-xl p-1">
           <button
             type="button"
             onClick={() => {
               setMode('create');
             }}
-            className={`flex-1 px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 focus-interactive ${
+            className={`flex-1 px-4 py-2 text-sm font-semibold rounded-lg border transition-all duration-200 focus-interactive ${
               mode === 'create'
-                ? 'bg-white dark:bg-gray-600 text-purple-600 dark:text-purple-400 shadow-sm'
-                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                ? 'bg-accent-selected border-accent text-accent-strong'
+                : 'border-transparent text-secondary hover:text-primary'
             }`}
             disabled={isPending}
             aria-pressed={mode === 'create'}
@@ -298,10 +298,10 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
             onClick={() => {
               setMode('import');
             }}
-            className={`flex-1 px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 focus-interactive ${
+            className={`flex-1 px-4 py-2 text-sm font-semibold rounded-lg border transition-all duration-200 focus-interactive ${
               mode === 'import'
-                ? 'bg-white dark:bg-gray-600 text-purple-600 dark:text-purple-400 shadow-sm'
-                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                ? 'bg-accent-selected border-accent text-accent-strong'
+                : 'border-transparent text-secondary hover:text-primary'
             }`}
             disabled={isPending}
             aria-pressed={mode === 'import'}
@@ -322,7 +322,7 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
         <div
           role="alert"
           aria-live="polite"
-          className="shrink-0 p-4 text-sm text-red-600 dark:text-red-400 bg-red-50/80 dark:bg-red-900/20 backdrop-blur-sm border-b border-red-200 dark:border-red-700 font-medium"
+          className="shrink-0 p-4 text-sm text-danger bg-danger-subtle border-y border-danger font-medium"
         >
           <div className="flex items-center space-x-2">
             <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -334,24 +334,24 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
       )}
 
       {/* Form */}
-      <div className="flex-1 overflow-auto custom-scrollbar" data-scroll-container>
-          <form id="add-prompt-form" action={submitAction}>
+      <div className="flex-1 overflow-auto custom-scrollbar p-4" data-scroll-container>
+          <form id="add-prompt-form" action={submitAction} className="bg-card border border-default rounded-2xl shadow-sm overflow-hidden divide-y divide-divider">
             {/* Import Mode UI */}
             {mode === 'import' && (
               <>
                 {/* Instructions */}
-                <div className="bg-blue-50/80 dark:bg-blue-900/20 backdrop-blur-sm border-b border-blue-200 dark:border-blue-800 p-5">
-                  <div className="flex items-start space-x-3">
-                    <div className="shrink-0 w-6 h-6 rounded-full bg-blue-500 dark:bg-blue-400 flex items-center justify-center">
-                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="p-5">
+                  <div className="flex items-start space-x-3 p-3 rounded-xl border border-accent bg-accent-subtle">
+                    <div className="shrink-0 w-6 h-6 rounded-full bg-accent flex items-center justify-center">
+                      <svg className="w-4 h-4 text-on-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                     </div>
                     <div className="flex-1">
-                      <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">
+                      <h3 className="text-sm font-semibold text-accent-strong mb-1">
                         How to Import
                       </h3>
-                      <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">
+                      <p className="text-xs text-accent-strong leading-relaxed">
                         Paste the sharing code you received from another user below. The code will be automatically validated and decoded.
                       </p>
                     </div>
@@ -359,8 +359,8 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
                 </div>
 
                 {/* Import Code Text Area */}
-                <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5">
-                  <label htmlFor="import-code" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                <div className="p-5">
+                  <label htmlFor="import-code" className="block text-sm font-semibold text-secondary mb-3">
                     Sharing Code *
                   </label>
                   <textarea
@@ -371,20 +371,20 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
                     }}
                     placeholder="Paste the sharing code here..."
                     rows={6}
-                    className={`w-full px-4 py-3 border rounded-xl focus-input resize-none bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 text-gray-900 dark:text-gray-100 font-mono text-sm ${
-                      validationError ? 'border-red-300 dark:border-red-500' : 'border-purple-200 dark:border-gray-600'
+                    className={`w-full px-4 py-3 border rounded-xl focus-input resize-none bg-subtle transition-all duration-200 text-primary placeholder:text-tertiary font-mono text-sm ${
+                      validationError ? 'border-error' : 'border-input'
                     }`}
                     disabled={isPending}
                   />
                   {/* Validation Status */}
                   {isValidating && (
-                    <div className="mt-2 flex items-center space-x-2 text-sm text-purple-600 dark:text-purple-400">
-                      <div className="w-4 h-4 border-2 border-purple-600/30 border-t-purple-600 rounded-full animate-spin"></div>
+                    <div className="mt-2 flex items-center space-x-2 text-sm text-accent">
+                      <div className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin"></div>
                       <span>Validating...</span>
                     </div>
                   )}
                   {validationError && (
-                    <p className="mt-2 text-sm text-red-600 dark:text-red-400 font-medium flex items-center space-x-1">
+                    <p className="mt-2 text-sm text-danger font-medium flex items-center space-x-1">
                       <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                       </svg>
@@ -392,7 +392,7 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
                     </p>
                   )}
                   {decodedPrompt && !validationError && (
-                    <p className="mt-2 text-sm text-green-600 dark:text-green-400 font-medium flex items-center space-x-1">
+                    <p className="mt-2 text-sm text-success font-medium flex items-center space-x-1">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
@@ -403,56 +403,56 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
 
                 {/* Preview Section */}
                 {decodedPrompt && !validationError && (
-                  <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5">
+                  <div className="p-5">
                     <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                      <h3 className="text-sm font-semibold text-secondary">
                         Preview
                       </h3>
-                      <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">
+                      <span className="text-xs text-tertiary font-medium">
                         Decoded from sharing code
                       </span>
                     </div>
 
                     {/* Preview Card */}
-                    <div className="bg-white dark:bg-gray-700 rounded-xl border border-purple-100 dark:border-gray-600 p-4 space-y-3">
+                    <div className="bg-raised rounded-xl border border-default p-4 space-y-3">
                       {/* Title Preview */}
                       <div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mb-1">
+                        <p className="text-xs text-tertiary font-medium mb-1">
                           Title
                         </p>
-                        <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                        <p className="text-sm font-semibold text-primary">
                           {decodedPrompt.title}
                         </p>
                       </div>
 
                       {/* Content Preview */}
                       <div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mb-1">
+                        <p className="text-xs text-tertiary font-medium mb-1">
                           Content
                         </p>
-                        <div className="bg-gray-50 dark:bg-gray-600 rounded-lg p-3 max-h-40 overflow-y-auto custom-scrollbar">
-                          <p className="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap break-words">
+                        <div className="bg-subtle rounded-lg p-3 max-h-40 overflow-y-auto custom-scrollbar">
+                          <p className="text-sm text-secondary whitespace-pre-wrap break-words">
                             {decodedPrompt.content}
                           </p>
                         </div>
-                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 font-medium">
+                        <p className="mt-1 text-xs text-tertiary font-medium">
                           {decodedPrompt.content.length} characters
                         </p>
                       </div>
 
                       {/* Original Category Preview */}
                       <div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mb-1">
+                        <p className="text-xs text-tertiary font-medium mb-1">
                           Original Category
                         </p>
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-accent-subtle text-accent">
                           {decodedPrompt.category}
                         </span>
                       </div>
                     </div>
 
                     {/* Info Note */}
-                    <p className="mt-3 text-xs text-gray-500 dark:text-gray-400 italic flex items-start space-x-1">
+                    <p className="mt-3 text-xs text-tertiary italic flex items-start space-x-1">
                       <svg className="w-3 h-3 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
@@ -463,11 +463,11 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
 
                 {/* Category Selector for Import */}
                 {decodedPrompt && !validationError && (
-                  <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5">
+                  <div className="p-5">
                     {/* Label uses aria-labelledby on the button instead of htmlFor -
                         this is the correct accessible pattern for custom dropdown triggers
                         since buttons don't respond to label clicks like native form controls */}
-                    <label id="import-category-label" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                    <label id="import-category-label" className="block text-sm font-semibold text-secondary mb-3">
                       Import to Category
                     </label>
                     <Dropdown
@@ -484,7 +484,7 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
                       ariaLabel="Select import category"
                       matchWidth
                     />
-                    <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
+                    <p className="mt-2 text-xs text-tertiary font-medium">
                       {selectedCategory === decodedPrompt.category
                         ? 'Using original category'
                         : `Importing to "${selectedCategory}" instead of "${decodedPrompt.category}"`
@@ -499,8 +499,8 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
             {mode === 'create' && (
               <>
             {/* Title */}
-            <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5">
-              <label htmlFor="title" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+            <div className="p-5">
+              <label htmlFor="title" className="block text-sm font-semibold text-secondary mb-3">
                 Title (optional)
               </label>
               <input
@@ -510,30 +510,30 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
                 defaultValue={createTitle}
                 onChange={(e) => { setCreateTitle(e.target.value); }}
                 placeholder="Enter a descriptive title or leave blank to auto-generate"
-                className={`w-full px-4 py-3 border rounded-xl focus-input bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 text-gray-900 dark:text-gray-100 ${
-                  errors?.title ? 'border-red-300 dark:border-red-500' : 'border-purple-200 dark:border-gray-600'
+                className={`w-full px-4 py-3 border rounded-xl focus-input bg-subtle transition-all duration-200 text-primary placeholder:text-tertiary ${
+                  errors?.title ? 'border-error' : 'border-input'
                 }`}
                 disabled={isPending}
               />
               {errors?.title && (
-                <p className="mt-2 text-sm text-red-600 dark:text-red-400 font-medium flex items-center space-x-1">
+                <p className="mt-2 text-sm text-danger font-medium flex items-center space-x-1">
                   <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                   </svg>
                   <span>{errors.title}</span>
                 </p>
               )}
-              <p className={`mt-2 text-xs font-medium ${createTitle.length > PROMPT_LIMITS.title ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'}`}>
+              <p className={`mt-2 text-xs font-medium ${createTitle.length > PROMPT_LIMITS.title ? 'text-danger' : 'text-tertiary'}`}>
                 {formatCharacterCount(createTitle.length, PROMPT_LIMITS.title)}
               </p>
             </div>
 
             {/* Category */}
-            <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5">
+            <div className="p-5">
               {/* Label uses aria-labelledby on the button instead of htmlFor -
                   this is the correct accessible pattern for custom dropdown triggers
                   since buttons don't respond to label clicks like native form controls */}
-              <label id="category-label" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+              <label id="category-label" className="block text-sm font-semibold text-secondary mb-3">
                 Category
               </label>
               <Dropdown
@@ -553,8 +553,8 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
             </div>
 
             {/* Content */}
-            <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5">
-              <label htmlFor="content" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+            <div className="p-5">
+              <label htmlFor="content" className="block text-sm font-semibold text-secondary mb-3">
                 Content *
               </label>
               <textarea
@@ -564,21 +564,21 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
                 onChange={(e) => { setCreateContent(e.target.value); }}
                 placeholder="Enter your prompt content here..."
                 rows={8}
-                className={`w-full px-4 py-3 border rounded-xl focus-input resize-none bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm transition-all duration-200 text-gray-900 dark:text-gray-100 ${
-                  errors?.content ? 'border-red-300 dark:border-red-500' : 'border-purple-200 dark:border-gray-600'
+                className={`w-full px-4 py-3 border rounded-xl focus-input resize-none bg-subtle transition-all duration-200 text-primary placeholder:text-tertiary ${
+                  errors?.content ? 'border-error' : 'border-input'
                 }`}
                 disabled={isPending}
                 required
               />
               {errors?.content && (
-                <p className="mt-2 text-sm text-red-600 dark:text-red-400 font-medium flex items-center space-x-1">
+                <p className="mt-2 text-sm text-danger font-medium flex items-center space-x-1">
                   <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                   </svg>
                   <span>{errors.content}</span>
                 </p>
               )}
-              <p className={`mt-2 text-xs font-medium ${createContent.length > PROMPT_LIMITS.content ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'}`}>
+              <p className={`mt-2 text-xs font-medium ${createContent.length > PROMPT_LIMITS.content ? 'text-danger' : 'text-tertiary'}`}>
                 {formatCharacterCount(createContent.length, PROMPT_LIMITS.content)}
               </p>
             </div>
@@ -589,12 +589,12 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
       </div>
 
       {/* Footer */}
-      <div className="shrink-0 p-6 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-t border-purple-100 dark:border-gray-700">
+      <div className="shrink-0 p-6 bg-app border-t border-transparent scroll-edge-bottom">
         <div className="flex space-x-3">
           <button
             type="button"
             onClick={onCancel}
-            className="flex-1 px-6 py-3 text-sm font-semibold text-gray-700 dark:text-gray-300 bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm border border-purple-200 dark:border-gray-600 rounded-xl hover:bg-white/80 dark:hover:bg-gray-700/80 transition-all duration-200 focus-secondary"
+            className="flex-1 px-6 py-3 text-sm font-semibold text-secondary bg-card border border-strong rounded-xl hover:bg-muted transition-all duration-200 focus-secondary"
             disabled={isPending}
           >
             Cancel
@@ -602,12 +602,12 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
           <button
             type="submit"
             form="add-prompt-form"
-            className="flex-1 px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 focus-primary"
+            className="flex-1 px-6 py-3 text-sm font-semibold text-on-accent bg-accent rounded-xl hover:bg-accent-hover transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 focus-primary"
             disabled={isPending || (mode === 'import' && (!decodedPrompt || !!validationError || isValidating))}
           >
             {isPending ? (
               <div className="flex items-center justify-center space-x-2">
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                <div className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin"></div>
                 <span>{mode === 'import' ? 'Importing...' : 'Saving...'}</span>
               </div>
             ) : (
