@@ -112,6 +112,7 @@ describe('Color tokens', () => {
       ['--ring-color-accent', 'app'],
       ['--outline-color-accent', 'card'],
       ['--text-color-pin', 'card'],
+      ['--background-color-warning', 'card'],
       ['--text-color-inverse-success', 'inverse'],
       ['--text-color-inverse-danger', 'inverse'],
       ['--text-color-inverse-warning', 'inverse'],
@@ -152,7 +153,7 @@ describe('Color tokens', () => {
       'bg-accent', 'bg-accent-hover', 'bg-accent-selected', 'bg-accent-subtle', 'bg-highlight',
       'text-accent', 'text-accent-strong', 'border-accent', 'ring-accent', 'outline-accent',
       'bg-success', 'bg-success-subtle', 'text-success',
-      'bg-warning-subtle', 'border-warning', 'text-warning',
+      'bg-warning', 'bg-warning-subtle', 'border-warning', 'text-warning',
       'bg-danger', 'bg-danger-hover', 'bg-danger-subtle', 'border-danger', 'text-danger',
       'border-focus', 'border-error', 'outline-danger',
       'text-pin', 'text-inverse-success', 'text-inverse-danger', 'text-inverse-warning', 'text-inverse-info'

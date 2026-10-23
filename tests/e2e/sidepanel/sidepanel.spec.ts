@@ -67,7 +67,7 @@ test.describe('Side panel experience', () => {
     await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
     await sidepanelPage.getByTestId('tab-settings').click();
-    const lightThemeButton = sidepanelPage.getByRole('button', { name: 'Light' });
+    const lightThemeButton = sidepanelPage.getByRole('radio', { name: 'Light' });
     await lightThemeButton.click();
 
     // Wait for the async storage operation to complete by checking for the visual indicator

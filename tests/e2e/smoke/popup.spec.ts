@@ -220,7 +220,7 @@ test.describe('Settings', () => {
     await page.getByTestId('tab-settings').click();
     await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
 
-    const lightButton = page.getByRole('button', { name: 'Light' });
+    const lightButton = page.getByRole('radio', { name: 'Light' });
     await lightButton.click();
 
     await expect.poll(async () => {
@@ -242,37 +242,26 @@ test.describe('Settings', () => {
     await page.getByTestId('tab-settings').click();
     await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
 
+    // StorageManager awaits the promise form of set: the failed save is a rejected promise
     await page.evaluate(() => {
       const originalSet = chrome.storage.local.set.bind(chrome.storage.local);
-      chrome.storage.local.set = (items, callback) => {
-        if (items && typeof items === 'object' && 'settings' in items) {
-          const descriptor = Object.getOwnPropertyDescriptor(chrome.runtime, 'lastError');
-          Object.defineProperty(chrome.runtime, 'lastError', {
-            configurable: true,
-            value: { message: 'Simulated storage failure' }
-          });
-          callback?.();
-          if (descriptor) {
-            Object.defineProperty(chrome.runtime, 'lastError', descriptor);
-          } else {
-            delete (chrome.runtime as Record<string, unknown>).lastError;
-          }
+      chrome.storage.local.set = ((items: Record<string, unknown>) => {
+        if ('settings' in items) {
           chrome.storage.local.set = originalSet;
-          return;
+          return Promise.reject(new Error('Simulated storage failure'));
         }
-
-        originalSet(items, callback);
-      };
+        return originalSet(items);
+      }) as typeof chrome.storage.local.set;
     });
 
-    await page.getByRole('button', { name: 'Light' }).click();
+    await page.getByRole('radio', { name: 'Light' }).click();
 
     await expect.poll(async () => {
       const snapshot = await storage.get<{ settings?: { theme?: string } }>('settings');
       return snapshot.settings?.theme;
     }).toBe('system');
 
-    const systemButton = page.getByRole('button', { name: 'System' });
-    await expect(systemButton).toHaveAttribute('class', expect.stringContaining('border-purple-500'));
+    const systemButton = page.getByRole('radio', { name: 'System' });
+    await expect(systemButton).toHaveAttribute('aria-checked', 'true');
   });
 });

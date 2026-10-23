@@ -39,6 +39,8 @@
   --background-color-success: #10b981;
   --background-color-success-subtle: #e7f8ef;
   --text-color-success: #065f46;
+  /* Warning as a graphic (bars, marks), never text: 3:1 on bg-card */
+  --background-color-warning: #d97706;
   --background-color-warning-subtle: #fef3c7;
   --border-color-warning: #f5dfa6;
   --text-color-warning: #92400e;
@@ -122,6 +124,7 @@
     --background-color-success: #10b981;
     --background-color-success-subtle: #0f2d22;
     --text-color-success: #6ee7b7;
+    --background-color-warning: #fbbf24;
     --background-color-warning-subtle: #33270f;
     --border-color-warning: #5a4515;
     --text-color-warning: #fcd34d;

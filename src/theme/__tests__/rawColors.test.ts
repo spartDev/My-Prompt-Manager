@@ -32,7 +32,19 @@ const MIGRATED = [
   // My-Prompt-Manager-el4.5.1: Categories
   'components/CategoryManager.tsx',
   'components/ColorPicker.tsx',
-  'components/CategoryBadge.tsx'
+  'components/CategoryBadge.tsx',
+  // My-Prompt-Manager-el4.5.2: general Settings sections
+  'components/SettingsView.tsx',
+  'components/settings/SettingsSection.tsx',
+  'components/settings/ToggleSwitch.tsx',
+  'components/settings/AppearanceSection.tsx',
+  'components/InterfaceModeSelector.tsx',
+  'components/ThemeToggle.tsx',
+  'components/settings/LibrarySection.tsx',
+  'components/settings/DataStorageSection.tsx',
+  'components/settings/NotificationSection.tsx',
+  'components/settings/AdvancedSection.tsx',
+  'components/settings/AboutSection.tsx'
 ];
 
 const PALETTE = 'white|black|slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose';

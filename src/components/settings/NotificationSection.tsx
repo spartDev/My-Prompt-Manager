@@ -1,4 +1,4 @@
-import { type FC, useCallback, useMemo, useState } from 'react';
+import { type FC, useCallback, useId, useMemo, useState } from 'react';
 
 import type { ToastType } from '../../types/components';
 import type { ToastSettings } from '../../types/hooks';
@@ -33,17 +33,17 @@ const NotificationTypeRow: FC<NotificationTypeRowProps> = ({
     <div className={`
       flex items-center justify-between p-3 rounded-lg border transition-all duration-200
       ${enabled
-        ? 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50'
-        : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 opacity-60'
+        ? 'border-default hover:bg-muted'
+        : 'border-default bg-raised opacity-60'
       }
     `}>
       <div className="flex items-center space-x-3">
-        <div className={`w-1 h-8 rounded-sm transition-colors duration-200 ${enabled ? color : 'bg-gray-400 dark:bg-gray-600'}`}></div>
+        <div data-testid="notification-type-mark" className={`w-1 h-8 rounded-sm transition-colors duration-200 ${enabled ? color : 'bg-(--border-color-input)'}`}></div>
         <div>
-          <div className={`text-sm font-medium transition-colors duration-200 ${enabled ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-500'}`}>
+          <div className={`text-sm font-medium transition-colors duration-200 ${enabled ? 'text-primary' : 'text-tertiary'}`}>
             {label}
           </div>
-          <div className={`text-xs transition-colors duration-200 ${enabled ? 'text-gray-500 dark:text-gray-400' : 'text-gray-400 dark:text-gray-600'}`}>
+          <div className={`text-xs transition-colors duration-200 ${enabled ? 'text-tertiary' : 'text-faint'}`}>
             {description}
           </div>
         </div>
@@ -64,25 +64,25 @@ const NOTIFICATION_TYPES = [
     type: 'success' as const,
     label: 'Success',
     description: 'Confirmation messages (2.75s)',
-    color: 'bg-green-500'
+    color: 'bg-success'
   },
   {
     type: 'error' as const,
     label: 'Error',
     description: 'Error messages (7s)',
-    color: 'bg-red-500'
+    color: 'bg-danger'
   },
   {
     type: 'warning' as const,
     label: 'Warning',
     description: 'Important alerts (5s)',
-    color: 'bg-yellow-500'
+    color: 'bg-warning'
   },
   {
     type: 'info' as const,
     label: 'Info',
     description: 'Informational messages (2.75s)',
-    color: 'bg-blue-500'
+    color: 'bg-accent'
   }
 ] as const;
 
@@ -95,6 +95,7 @@ const NotificationSection: FC<NotificationSectionProps> = ({
   const [currentTestTypeIndex, setCurrentTestTypeIndex] = useState(0);
 
   const toggleExpanded = useCallback(() => { setIsExpanded(prev => !prev); }, []);
+  const titleId = useId();
 
   // Memoize enabledTypes with defaults
   const currentEnabledTypes = useMemo(() => {
@@ -134,35 +135,35 @@ const NotificationSection: FC<NotificationSectionProps> = ({
   };
 
   return (
-    <section className="border-t border-gray-200 dark:border-gray-700 pt-6">
+    <section aria-labelledby={titleId} className="border-t border-default pt-6">
       <button
         onClick={toggleExpanded}
         className="w-full flex items-center justify-between text-left mb-4 group"
         aria-expanded={isExpanded}
       >
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-lg flex items-center justify-center shrink-0">
-            <BellIcon className="w-5 h-5 text-white" />
+          <div data-testid="section-icon" className="w-10 h-10 bg-accent-subtle text-accent rounded-xl flex items-center justify-center shrink-0">
+            <BellIcon className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+            <h2 id={titleId} className="text-xl font-semibold text-primary">
               Notifications
             </h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
+            <p className="text-sm text-tertiary">
               Customize toast notification behavior and appearance
             </p>
           </div>
         </div>
         <span className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
-          <ChevronDownIcon className="w-5 h-5 text-gray-400" />
+          <ChevronDownIcon className="w-5 h-5 text-tertiary" />
         </span>
       </button>
 
       {isExpanded && (
         <div className="space-y-4 animate-in slide-in-from-top-2 duration-200">
         {/* Position Setting */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-          <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm mb-3">
+        <div className="bg-card rounded-xl p-4 border border-default">
+          <h3 className="font-medium text-primary text-sm mb-3">
             Position
           </h3>
           <div className="grid grid-cols-2 gap-3">
@@ -171,19 +172,19 @@ const NotificationSection: FC<NotificationSectionProps> = ({
               className={`
                 relative p-4 rounded-lg border-2 transition-all
                 ${(settings?.position ?? 'top-right') === 'top-right'
-                  ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20'
-                  : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                  ? 'border-accent bg-accent-selected text-accent-strong font-semibold'
+                  : 'border-default bg-card text-primary font-medium hover:border-strong'
                 }
               `}
             >
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                <span className="text-sm">
                   Top Right
                 </span>
-                {(settings?.position ?? 'top-right') === 'top-right' && <CheckCircleIcon className="w-5 h-5 text-purple-500" />}
+                {(settings?.position ?? 'top-right') === 'top-right' && <CheckCircleIcon className="w-5 h-5 text-accent" />}
               </div>
-              <div className="relative h-12 bg-gray-100 dark:bg-gray-700 rounded-sm border border-gray-200 dark:border-gray-600">
-                <div className="absolute top-1 right-1 w-16 h-3 bg-purple-500 rounded-sm"></div>
+              <div className="relative h-12 bg-subtle rounded-sm border border-default">
+                <div className="absolute top-1 right-1 w-16 h-3 bg-accent rounded-sm"></div>
               </div>
             </button>
 
@@ -192,32 +193,32 @@ const NotificationSection: FC<NotificationSectionProps> = ({
               className={`
                 relative p-4 rounded-lg border-2 transition-all
                 ${settings?.position === 'bottom-right'
-                  ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20'
-                  : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                  ? 'border-accent bg-accent-selected text-accent-strong font-semibold'
+                  : 'border-default bg-card text-primary font-medium hover:border-strong'
                 }
               `}
             >
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                <span className="text-sm">
                   Bottom Right
                 </span>
-                {settings?.position === 'bottom-right' && <CheckCircleIcon className="w-5 h-5 text-purple-500" />}
+                {settings?.position === 'bottom-right' && <CheckCircleIcon className="w-5 h-5 text-accent" />}
               </div>
-              <div className="relative h-12 bg-gray-100 dark:bg-gray-700 rounded-sm border border-gray-200 dark:border-gray-600">
-                <div className="absolute bottom-1 right-1 w-16 h-3 bg-purple-500 rounded-sm"></div>
+              <div className="relative h-12 bg-subtle rounded-sm border border-default">
+                <div className="absolute bottom-1 right-1 w-16 h-3 bg-accent rounded-sm"></div>
               </div>
             </button>
           </div>
         </div>
 
         {/* Notification Types */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+        <div className="bg-card rounded-xl p-4 border border-default">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm">
+              <h3 className="font-medium text-primary text-sm">
                 Notification Types
               </h3>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              <p className="text-xs text-tertiary mt-1">
                 Choose which types of notifications you want to see
               </p>
             </div>
@@ -228,8 +229,8 @@ const NotificationSection: FC<NotificationSectionProps> = ({
               className={`
                 flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors
                 ${enabledTypes.length === 0
-                  ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed'
-                  : 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900/50'
+                  ? 'bg-card border border-default text-faint cursor-not-allowed'
+                  : 'bg-card border border-strong text-secondary hover:bg-muted focus-secondary'
                 }
               `}
             >

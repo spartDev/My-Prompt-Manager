@@ -175,36 +175,36 @@ const DataStorageSection: FC<DataStorageSectionProps> = ({
     >
       <div className="space-y-4">
         {/* Storage Usage */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+        <div className="bg-card rounded-xl p-4 border border-default">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm">
+            <h3 className="font-medium text-primary text-sm">
               Storage Usage
             </h3>
-            <span className="text-xs text-gray-500 dark:text-gray-400">
+            <span className="text-xs text-tertiary">
               {(storageUsed / 1024).toFixed(1)} KB / 5 MB
             </span>
           </div>
-          <div data-testid="storage-bar" role="progressbar" aria-valuenow={storagePercentage} aria-valuemin={0} aria-valuemax={100} aria-label="Storage usage" className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+          <div data-testid="storage-bar" role="progressbar" aria-valuenow={storagePercentage} aria-valuemin={0} aria-valuemax={100} aria-label="Storage usage" className="w-full bg-subtle rounded-full h-2 overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-purple-600 to-indigo-600 transition-all duration-300"
+              className="h-full bg-accent transition-all duration-300"
               style={{ width: `${storagePercentage.toFixed(1)}%` }}
             />
           </div>
-          <div className="mt-2 flex items-center justify-between text-xs text-gray-600 dark:text-gray-400">
+          <div className="mt-2 flex items-center justify-between text-xs text-secondary">
             <span>{prompts.length} prompts</span>
             <span>{categories.length} categories</span>
           </div>
         </div>
 
         {/* Export/Import */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-          <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm mb-3">
+        <div className="bg-card rounded-xl p-4 border border-default">
+          <h3 className="font-medium text-primary text-sm mb-3">
             Backup & Restore
           </h3>
           <div className="flex gap-2">
             <button
               onClick={() => void handleExport()}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 focus-primary"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover text-on-accent rounded-lg transition-all duration-200 focus-primary"
             >
               <ExportIcon />
               <span className="text-sm font-medium">Export</span>
@@ -213,11 +213,11 @@ const DataStorageSection: FC<DataStorageSectionProps> = ({
             <button
               onClick={handleImportClick}
               disabled={importing}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 text-purple-600 dark:text-purple-400 border-2 border-purple-600 dark:border-purple-400 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-all duration-200 focus-primary disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-card text-secondary border border-strong rounded-lg hover:bg-muted transition-all duration-200 focus-secondary disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {importing ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-purple-600 dark:border-purple-400 border-t-transparent rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
                   <span className="text-sm font-medium">Importing...</span>
                 </>
               ) : (
@@ -236,24 +236,24 @@ const DataStorageSection: FC<DataStorageSectionProps> = ({
               className="hidden"
             />
           </div>
-          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+          <p className="mt-2 text-xs text-tertiary">
             Export your prompts as JSON for backup or sharing
           </p>
         </div>
 
         {/* Clear Data */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-          <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm mb-2">
+        <div className="bg-card rounded-xl p-4 border border-default">
+          <h3 className="font-medium text-primary text-sm mb-2">
             Clear Data
           </h3>
-          <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
+          <p className="text-xs text-secondary mb-3">
             Remove all prompts and categories from local storage
           </p>
           
           {showClearConfirm ? (
             <div className="space-y-3">
-              <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-                <p className="text-sm text-red-700 dark:text-red-300">
+              <div className="p-3 bg-danger-subtle border border-danger rounded-lg">
+                <p className="text-sm text-danger">
                   ⚠️ This will permanently delete all your prompts and categories. This action cannot be undone.
                 </p>
               </div>
@@ -261,14 +261,14 @@ const DataStorageSection: FC<DataStorageSectionProps> = ({
                 <button
                   onClick={() => void handleClearData()}
                   disabled={clearing}
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 px-4 py-2 bg-danger hover:bg-danger-hover text-on-accent rounded-lg transition-all duration-200 focus-danger disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {clearing ? 'Clearing...' : 'Yes, Clear All Data'}
                 </button>
                 <button
                   onClick={() => { setShowClearConfirm(false); }}
                   disabled={clearing}
-                  className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-all duration-200"
+                  className="flex-1 px-4 py-2 bg-card text-secondary border border-strong rounded-lg hover:bg-muted transition-all duration-200 focus-secondary"
                 >
                   Cancel
                 </button>
@@ -277,7 +277,7 @@ const DataStorageSection: FC<DataStorageSectionProps> = ({
           ) : (
             <button
               onClick={() => void handleClearData()}
-              className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-all duration-200"
+              className="px-4 py-2 text-danger border border-danger rounded-lg hover:bg-danger-subtle transition-all duration-200 focus-danger"
             >
               Clear All Data
             </button>

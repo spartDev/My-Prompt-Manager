@@ -345,8 +345,8 @@ describe('StorageWarning', () => {
   // One state family per level: success, warning (critical included) and danger
   describe.each([
     ['safe', 50, 'bg-success', 'text-success'],
-    ['warning', 75, 'bg-(--text-color-warning)', 'text-warning'],
-    ['critical', 90, 'bg-(--text-color-warning)', 'text-warning'],
+    ['warning', 75, 'bg-warning', 'text-warning'],
+    ['critical', 90, 'bg-warning', 'text-warning'],
     ['danger', 98, 'bg-danger', 'text-danger']
   ] as const)('%s level', (level, percentage, barClass, iconClass) => {
     it(`colors the progress bar ${barClass} and the icon ${iconClass}`, async () => {
