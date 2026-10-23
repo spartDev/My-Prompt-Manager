@@ -176,7 +176,7 @@ const CategoryManager: FC<CategoryManagerProps> = ({
                       setError(null);
                     }}
                     placeholder="Enter category name..."
-                    className="flex-1 px-4 py-3 h-12 border border-input rounded-xl focus-input text-sm text-primary bg-subtle transition-all duration-200 placeholder:text-tertiary"
+                    className="flex-1 min-w-0 px-4 py-3 h-12 border border-input rounded-xl focus-input text-sm text-primary bg-subtle transition-all duration-200 placeholder:text-tertiary"
                     disabled={loading}
                     maxLength={PROMPT_LIMITS.category}
                   />
@@ -232,7 +232,7 @@ const CategoryManager: FC<CategoryManagerProps> = ({
                 <div key={category.id} data-testid="category-row" data-category-name={category.name} className={`relative group flex items-center justify-between p-5 transition-colors duration-200 ${editingCategory ? '' : 'hover:bg-muted'}`}>
                   {editingCategory?.category.id === category.id ? (
                     // Edit Mode - Show both color and name editors
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                       <div className="flex items-center space-x-3">
                         <div className="relative shrink-0" style={{ zIndex: 100 }}>
                           <ColorPicker
@@ -265,7 +265,7 @@ const CategoryManager: FC<CategoryManagerProps> = ({
                             ignoreBlurRef.current = false;
                           }}
                           placeholder="Category name"
-                          className="flex-1 text-sm border border-input rounded-lg px-3 py-2.5 focus-input bg-subtle font-medium text-primary placeholder:text-tertiary"
+                          className="flex-1 min-w-0 text-sm border border-input rounded-lg px-3 py-2.5 focus-input bg-subtle font-medium text-primary placeholder:text-tertiary"
                           maxLength={PROMPT_LIMITS.category}
                           disabled={loading}
                         />

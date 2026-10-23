@@ -36,16 +36,36 @@ const categories: Category[] = [
   { id: 'research', name: 'Recherche', color: '#D97706' }
 ];
 
-const openCategories = async (page: Page, storage: ExtensionStorage, extensionId: string, theme: 'light' | 'dark') => {
+/** The popup is 400 x 500; the side panel is at least 320 px wide (docs/DESIGN_GUIDELINES.md) */
+const SURFACES = {
+  popup: { width: 400, height: 500 },
+  sidepanel: { width: 320, height: 700 }
+} as const;
+
+const openCategories = async (
+  page: Page,
+  storage: ExtensionStorage,
+  extensionId: string,
+  theme: 'light' | 'dark',
+  surface: keyof typeof SURFACES = 'popup'
+) => {
   await seedLibrary(storage, { categories, settings: { theme } });
-  await page.setViewportSize({ width: 400, height: 500 });
-  await page.goto(`chrome-extension://${extensionId}/src/popup.html`);
+  await page.setViewportSize(SURFACES[surface]);
+  await page.goto(`chrome-extension://${extensionId}/src/${surface}.html`);
   await expect(page.locator('html')).toHaveClass(theme === 'dark' ? /dark/ : /^(?!.*dark)/);
   await page.getByTestId('tab-categories').click();
   await expect(page.getByTestId('category-row')).toHaveCount(categories.length + 1);
 };
 
-const escapeRegExp = (text: string) => text.replace(/[()]/g, '\\$&');
+/** Fails when part of the element sticks out of the card, where the card's edge or the viewport clips it */
+const expectInside = async (element: Locator, card: Locator) => {
+  const [inner, outer] = await Promise.all([element.boundingBox(), card.boundingBox()]);
+  expect(inner, 'element box').not.toBeNull();
+  expect(outer, 'card box').not.toBeNull();
+  if (!inner || !outer) {return;}
+  expect(inner.x, 'left edge').toBeGreaterThanOrEqual(outer.x);
+  expect(inner.x + inner.width, 'right edge').toBeLessThanOrEqual(outer.x + outer.width);
+};
 
 /** The color painted behind an element: its own background, else the first opaque one above it */
 const backdropOf = (locator: Locator) =>
@@ -103,8 +123,9 @@ test.describe('Categories view on the tokens', () => {
       const panel = page.getByRole('dialog');
       await expect(panel).toHaveCSS('background-color', colors.card);
       await expect(panel.getByText('Preset Colors')).toHaveCSS('color', colors.tertiary);
-      await expect(panel.locator('[aria-current="true"]')).toHaveAttribute('title', 'Ocean Blue');
-      await expect(panel.locator('[aria-current="true"]')).toHaveCSS('box-shadow', new RegExp(escapeRegExp(colors.accent)));
+      const chosen = panel.locator('[aria-current="true"]');
+      await expect(chosen).toHaveAttribute('title', 'Ocean Blue');
+      await expect.poll(() => chosen.evaluate(swatch => getComputedStyle(swatch).boxShadow)).toContain(colors.accent);
       await expect(panel.getByRole('button', { name: 'Pick custom color' })).toHaveCSS('border-top-color', colors.strong);
       await page.screenshot({ path: `${SCREENSHOT_DIR}/color-picker-${theme}.png` });
 
@@ -150,4 +171,22 @@ test.describe('Categories view on the tokens', () => {
       await page.screenshot({ path: `${SCREENSHOT_DIR}/delete-confirmation-${theme}.png` });
     });
   }
+
+  test('at the side panel minimum width, the Add form and the inline editor fit in their cards', async ({ page, storage, extensionId }) => {
+    await openCategories(page, storage, extensionId, 'light', 'sidepanel');
+
+    await page.getByPlaceholder('Enter category name...').fill('Traduction');
+    await expectInside(page.getByRole('button', { name: 'Add', exact: true }), page.getByRole('region', { name: 'Add New Category' }));
+
+    const row = page.locator('[data-testid="category-row"][data-category-name="Rédaction"]');
+    await row.hover();
+    await row.getByRole('button', { name: 'Edit category' }).click();
+    const listCard = page.getByRole('region', { name: 'Your Categories' });
+    await expectInside(row.getByRole('button', { name: 'Save changes (Enter)' }), listCard);
+    await expectInside(row.getByRole('button', { name: 'Cancel (Esc)' }), listCard);
+
+    const overflow = await listCard.locator('xpath=ancestor::*[@data-scroll-container][1]').evaluate(view => view.scrollWidth - view.clientWidth);
+    expect(overflow, 'horizontal scroll').toBe(0);
+    await page.screenshot({ path: `${SCREENSHOT_DIR}/sidepanel-320-inline-edit.png` });
+  });
 });
