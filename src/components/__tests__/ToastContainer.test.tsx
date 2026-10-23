@@ -55,40 +55,20 @@ describe('ToastContainer', () => {
     expect(positionedDiv).toBeInTheDocument();
   });
 
-  it('renders success toast with correct styling', () => {
-    const toast = createToast({ type: 'success', message: 'Operation succeeded' });
-    render(<ToastContainer toasts={[toast]} onDismiss={mockOnDismiss} />);
+  // Toasts sit on bg-inverse in both modes; the icon and the progress bar take the type's bright variant
+  it.each([
+    ['success', 'status', 'text-inverse-success'],
+    ['error', 'alert', 'text-inverse-danger'],
+    ['warning', 'alert', 'text-inverse-warning'],
+    ['info', 'status', 'text-inverse-info']
+  ] as const)('renders a %s toast on bg-inverse with its bright icon and progress bar', (type, role, tone) => {
+    const toast = createToast({ type, message: `A ${type} message`, duration: 3000 });
+    const { container } = render(<ToastContainer toasts={[toast]} onDismiss={mockOnDismiss} />);
 
-    expect(screen.getByText('Operation succeeded')).toBeInTheDocument();
-    const successIcon = screen.getByRole('status').querySelector('.text-green-500');
-    expect(successIcon).toBeInTheDocument();
-  });
-
-  it('renders error toast with correct styling', () => {
-    const toast = createToast({ type: 'error', message: 'Operation failed' });
-    render(<ToastContainer toasts={[toast]} onDismiss={mockOnDismiss} />);
-
-    expect(screen.getByText('Operation failed')).toBeInTheDocument();
-    const errorIcon = screen.getByRole('alert').querySelector('.text-red-500');
-    expect(errorIcon).toBeInTheDocument();
-  });
-
-  it('renders warning toast with correct styling', () => {
-    const toast = createToast({ type: 'warning', message: 'Warning message' });
-    render(<ToastContainer toasts={[toast]} onDismiss={mockOnDismiss} />);
-
-    expect(screen.getByText('Warning message')).toBeInTheDocument();
-    const warningIcon = screen.getByRole('alert').querySelector('.text-yellow-500');
-    expect(warningIcon).toBeInTheDocument();
-  });
-
-  it('renders info toast with correct styling', () => {
-    const toast = createToast({ type: 'info', message: 'Info message' });
-    render(<ToastContainer toasts={[toast]} onDismiss={mockOnDismiss} />);
-
-    expect(screen.getByText('Info message')).toBeInTheDocument();
-    const infoIcon = screen.getByRole('status').querySelector('.text-purple-500');
-    expect(infoIcon).toBeInTheDocument();
+    const element = screen.getByRole(role);
+    expect(element).toHaveClass('bg-inverse', 'text-on-inverse');
+    expect(element.querySelector('svg')?.closest('div')).toHaveClass(tone);
+    expect(container.querySelector('.absolute.bottom-0.left-0.h-1.w-full')).toHaveClass('bg-current', tone);
   });
 
   it('calls onDismiss when dismiss button is clicked', () => {
@@ -203,8 +183,9 @@ describe('ToastContainer', () => {
 
     render(<ToastContainer toasts={[toast]} onDismiss={mockOnDismiss} />);
 
+    // Outlined in the message color, on bg-inverse
     const actionButton = screen.getByText('Dismiss');
-    expect(actionButton).toHaveClass('bg-gray-100');
+    expect(actionButton).toHaveClass('text-on-inverse', 'border');
   });
 
   it('renders progress bar when duration is set', () => {

@@ -342,111 +342,24 @@ describe('StorageWarning', () => {
     });
   });
 
-  describe('progress bar colors', () => {
-    it('should render green progress bar for safe level', async () => {
+  // One state family per level: success, warning (critical included) and danger
+  describe.each([
+    ['safe', 50, 'bg-success', 'text-success'],
+    ['warning', 75, 'bg-(--text-color-warning)', 'text-warning'],
+    ['critical', 90, 'bg-(--text-color-warning)', 'text-warning'],
+    ['danger', 98, 'bg-danger', 'text-danger']
+  ] as const)('%s level', (level, percentage, barClass, iconClass) => {
+    it(`colors the progress bar ${barClass} and the icon ${iconClass}`, async () => {
       vi.mocked(mockStorageManager.getStorageUsageWithWarnings).mockResolvedValue(
-        createStorageInfo(50, 'safe')
+        createStorageInfo(percentage, level)
       );
 
       render(<StorageWarning onClose={mockOnClose} />);
 
       await waitFor(() => {
-        const progressBar = document.querySelector('.bg-green-500');
-        expect(progressBar).toBeInTheDocument();
+        expect(document.querySelector(`[style*="width: ${String(percentage)}%"]`)).toHaveClass(barClass);
       });
-    });
-
-    it('should render yellow progress bar for warning level', async () => {
-      vi.mocked(mockStorageManager.getStorageUsageWithWarnings).mockResolvedValue(
-        createStorageInfo(75, 'warning')
-      );
-
-      render(<StorageWarning onClose={mockOnClose} />);
-
-      await waitFor(() => {
-        const progressBar = document.querySelector('.bg-yellow-500');
-        expect(progressBar).toBeInTheDocument();
-      });
-    });
-
-    it('should render orange progress bar for critical level', async () => {
-      vi.mocked(mockStorageManager.getStorageUsageWithWarnings).mockResolvedValue(
-        createStorageInfo(90, 'critical')
-      );
-
-      render(<StorageWarning onClose={mockOnClose} />);
-
-      await waitFor(() => {
-        const progressBar = document.querySelector('.bg-orange-500');
-        expect(progressBar).toBeInTheDocument();
-      });
-    });
-
-    it('should render red progress bar for danger level', async () => {
-      vi.mocked(mockStorageManager.getStorageUsageWithWarnings).mockResolvedValue(
-        createStorageInfo(98, 'danger')
-      );
-
-      render(<StorageWarning onClose={mockOnClose} />);
-
-      await waitFor(() => {
-        const progressBar = document.querySelector('.bg-red-500');
-        expect(progressBar).toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('icon colors', () => {
-    it('should render green icon for safe level', async () => {
-      vi.mocked(mockStorageManager.getStorageUsageWithWarnings).mockResolvedValue(
-        createStorageInfo(50, 'safe')
-      );
-
-      render(<StorageWarning onClose={mockOnClose} />);
-
-      await waitFor(() => {
-        const icon = document.querySelector('.text-green-500');
-        expect(icon).toBeInTheDocument();
-      });
-    });
-
-    it('should render yellow icon for warning level', async () => {
-      vi.mocked(mockStorageManager.getStorageUsageWithWarnings).mockResolvedValue(
-        createStorageInfo(75, 'warning')
-      );
-
-      render(<StorageWarning onClose={mockOnClose} />);
-
-      await waitFor(() => {
-        const icon = document.querySelector('.text-yellow-500');
-        expect(icon).toBeInTheDocument();
-      });
-    });
-
-    it('should render orange icon for critical level', async () => {
-      vi.mocked(mockStorageManager.getStorageUsageWithWarnings).mockResolvedValue(
-        createStorageInfo(90, 'critical')
-      );
-
-      render(<StorageWarning onClose={mockOnClose} />);
-
-      await waitFor(() => {
-        const icon = document.querySelector('.text-orange-500');
-        expect(icon).toBeInTheDocument();
-      });
-    });
-
-    it('should render red icon for danger level', async () => {
-      vi.mocked(mockStorageManager.getStorageUsageWithWarnings).mockResolvedValue(
-        createStorageInfo(98, 'danger')
-      );
-
-      render(<StorageWarning onClose={mockOnClose} />);
-
-      await waitFor(() => {
-        const icon = document.querySelector('.text-red-500');
-        expect(icon).toBeInTheDocument();
-      });
+      expect(document.querySelector('svg.h-8')).toHaveClass(iconClass);
     });
   });
 

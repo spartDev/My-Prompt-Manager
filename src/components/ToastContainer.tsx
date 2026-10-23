@@ -5,7 +5,7 @@ import type { Toast } from '../types/hooks';
 
 // Module-scope SVG icon constants to avoid recreation on every render
 const SuccessIcon = (
-  <svg className="h-5 w-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+  <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
     <path
       fillRule="evenodd"
       d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
@@ -15,7 +15,7 @@ const SuccessIcon = (
 );
 
 const ErrorIcon = (
-  <svg className="h-5 w-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+  <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
     <path
       fillRule="evenodd"
       d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
@@ -25,7 +25,7 @@ const ErrorIcon = (
 );
 
 const WarningIcon = (
-  <svg className="h-5 w-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+  <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
     <path
       fillRule="evenodd"
       d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
@@ -35,7 +35,7 @@ const WarningIcon = (
 );
 
 const InfoIcon = (
-  <svg className="h-5 w-5 text-purple-500" fill="currentColor" viewBox="0 0 20 20">
+  <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
     <path
       fillRule="evenodd"
       d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
@@ -59,6 +59,14 @@ const QueueIndicatorIcon = (
     <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
   </svg>
 );
+
+// Toasts sit on bg-inverse in both modes: the icon and the progress bar take the bright variant of their type
+const TONE: Record<Toast['type'], string> = {
+  success: 'text-inverse-success',
+  error: 'text-inverse-danger',
+  warning: 'text-inverse-warning',
+  info: 'text-inverse-info'
+};
 
 interface ToastContainerProps {
   toasts: Toast[];
@@ -110,39 +118,6 @@ const ToastItem: FC<{ toast: Toast; onDismiss: (id: string) => void }> = ({ toas
     };
   }, [toast.duration, handleDismiss]);
 
-  const getToastStyles = () => {
-    // Match extension's design system with purple theme
-    const baseStyles = 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white border';
-    const borderColor = (() => {
-      switch (toast.type) {
-        case 'success':
-          return 'border-l-4 border-l-green-500 border-t border-r border-b border-green-200 dark:border-green-800';
-        case 'error':
-          return 'border-l-4 border-l-red-500 border-t border-r border-b border-red-200 dark:border-red-800';
-        case 'warning':
-          return 'border-l-4 border-l-yellow-500 border-t border-r border-b border-yellow-200 dark:border-yellow-800';
-        case 'info':
-        default:
-          return 'border-l-4 border-l-purple-500 border-t border-r border-b border-purple-200 dark:border-purple-800';
-      }
-    })();
-    return `${baseStyles} ${borderColor}`;
-  };
-
-  const getProgressBarColor = () => {
-    switch (toast.type) {
-      case 'success':
-        return '#10b981'; // green-500
-      case 'error':
-        return '#ef4444'; // red-500
-      case 'warning':
-        return '#eab308'; // yellow-500
-      case 'info':
-      default:
-        return '#8b5cf6'; // purple-500 (extension's primary color)
-    }
-  };
-
   const getIcon = () => {
     switch (toast.type) {
       case 'success':
@@ -171,7 +146,7 @@ const ToastItem: FC<{ toast: Toast; onDismiss: (id: string) => void }> = ({ toas
     <div
       {...getAriaProps()}
       className={`
-        ${getToastStyles()}
+        bg-inverse text-on-inverse
         rounded-xl max-w-sm min-w-[288px]
         overflow-hidden
         group
@@ -191,7 +166,7 @@ const ToastItem: FC<{ toast: Toast; onDismiss: (id: string) => void }> = ({ toas
       }}
     >
       <div className="px-5 py-3 flex items-center space-x-3">
-        <div className="shrink-0">
+        <div className={`shrink-0 ${TONE[toast.type]}`}>
           {getIcon()}
         </div>
         <div className="flex-1 min-w-0">
@@ -204,10 +179,10 @@ const ToastItem: FC<{ toast: Toast; onDismiss: (id: string) => void }> = ({ toas
               }}
               className={`
                 mt-2 text-xs font-medium px-3 py-1.5 rounded-lg
-                transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400
+                transition-colors focus:outline-none focus:ring-2 focus:ring-current
                 ${toast.action.variant === 'secondary'
-                  ? 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200'
-                  : 'bg-purple-500 hover:bg-purple-600 text-white'
+                  ? 'border border-current/40 text-on-inverse hover:bg-current/10'
+                  : 'bg-accent hover:bg-accent-hover text-on-accent'
                 }
               `}
             >
@@ -217,7 +192,7 @@ const ToastItem: FC<{ toast: Toast; onDismiss: (id: string) => void }> = ({ toas
         </div>
         <button
           onClick={handleDismiss}
-          className="shrink-0 ml-2 p-1 rounded-md text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400"
+          className="shrink-0 ml-2 p-1 rounded-md text-on-inverse hover:bg-current/10 transition-colors focus:outline-none focus:ring-2 focus:ring-current"
           aria-label="Dismiss notification"
         >
           {CloseIcon}
@@ -226,9 +201,8 @@ const ToastItem: FC<{ toast: Toast; onDismiss: (id: string) => void }> = ({ toas
       {/* Progress bar */}
       {toast.duration && toast.duration > 0 && !isExiting && (
         <div
-          className="absolute bottom-0 left-0 h-1 w-full"
+          className={`absolute bottom-0 left-0 h-1 w-full bg-current ${TONE[toast.type]}`}
           style={{
-            backgroundColor: getProgressBarColor(),
             opacity: 0.6,
             transformOrigin: 'left',
             animation: `shrink-width ${toast.duration.toString()}ms linear forwards`
@@ -315,13 +289,11 @@ const MemoizedToastContainer: FC<ToastContainerProps> = ({ toasts, onDismiss, po
       {queueLength > 0 && (
         <div
           className="
-            bg-purple-100 dark:bg-purple-900/30
-            text-purple-700 dark:text-purple-300
+            bg-inverse text-on-inverse
             text-xs font-medium
             px-3 py-2 rounded-lg
             flex items-center space-x-2
             animate-in fade-in duration-200
-            border border-purple-200 dark:border-purple-800
             shadow-sm
           "
         >

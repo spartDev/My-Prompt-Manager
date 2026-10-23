@@ -1,6 +1,6 @@
 # Design Guidelines
 
-**Version:** 2.1.0
+**Version:** 2.2.0
 **Last Updated:** 2026-10-23
 
 This document provides comprehensive visual design guidelines for the Prompt Library Chrome Extension. All AI agents and developers working on this project **MUST** follow these guidelines to maintain visual consistency.
@@ -643,6 +643,22 @@ Cards are opaque `bg-card` with a `border-default` border, floating on `bg-app`.
 ">
   {/* Card content */}
 </article>
+```
+
+#### Form Card
+
+A form (Add and Edit Prompt) is one card on `bg-app`: its sections are split by `border-divider`, its fields take `bg-subtle`. The button bar below it stays on `bg-app`, with a line only while fields remain below (`scroll-edge-bottom`, like the tab bar):
+
+```tsx
+<div className="flex-1 overflow-auto p-4" data-scroll-container>
+  <form className="bg-card border border-default rounded-2xl shadow-sm overflow-hidden divide-y divide-divider">
+    <div className="p-5">{/* Label and field */}</div>
+    <div className="p-5">{/* Label and field */}</div>
+  </form>
+</div>
+<div className="shrink-0 p-6 bg-app border-t border-transparent scroll-edge-bottom">
+  {/* Cancel and Save */}
+</div>
 ```
 
 #### Settings Card
@@ -1489,6 +1505,9 @@ z-1000002  /* Content script debug */
 ---
 
 ## Version History
+
+**v2.2.0** (2026-10-23)
+- Form card pattern: one card on `bg-app`, sections split by `border-divider`, button bar with the `scroll-edge-bottom` line
 
 **v2.1.0** (2026-10-23)
 - `bg-highlight` for search matches and `bg-brand` for the logo gradient

@@ -20,14 +20,22 @@ const MIGRATED = [
   'components/LibraryView.tsx',
   'components/LibraryFilterBar.tsx',
   'components/SearchBar.tsx',
-  'components/PromptCard.tsx'
+  'components/PromptCard.tsx',
+  // My-Prompt-Manager-el4.4: forms, dialogs and toasts
+  'components/AddPromptForm.tsx',
+  'components/EditPromptForm.tsx',
+  'components/Dropdown.tsx',
+  'components/ConfirmDialog.tsx',
+  'components/StorageWarning.tsx',
+  'components/ToastContainer.tsx',
+  'components/ErrorBoundary.tsx'
 ];
 
 const PALETTE = 'white|black|slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose';
 const COLOR_UTILITY = 'bg|text|border(?:-[trblxy])?|ring|ring-offset|outline|from|via|to|fill|stroke|divide|placeholder|decoration|shadow|accent|caret';
 
-/** bg-gray-50, hover:text-purple-600, from-white, border-t-purple-500/30... */
-const RAW_PALETTE_CLASS = new RegExp(`(?<![\\w-])(?:[\\w-]+:)*(?:${COLOR_UTILITY})-(?:${PALETTE})(?:-\\d{2,3})?(?:\\/\\d+)?(?![\\w-])`, 'g');
+/** bg-gray-50, hover:text-purple-600, from-white, border-t-purple-500/30, bg-primary-600 (tailwind.config.js)... */
+const RAW_PALETTE_CLASS = new RegExp(`(?<![\\w-])(?:[\\w-]+:)*(?:${COLOR_UTILITY})-(?:(?:${PALETTE})(?:-\\d{2,3})?|primary-\\d{2,3})(?:\\/\\d+)?(?![\\w-])`, 'g');
 /** dark:bg-card, dark:hover:text-secondary: a token class switches theme by itself */
 const DARK_COLOR_VARIANT = new RegExp(`(?<![\\w-])dark:(?:[\\w-]+:)*(?:${COLOR_UTILITY})-[\\w()/-]+`, 'g');
 

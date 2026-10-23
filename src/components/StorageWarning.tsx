@@ -91,32 +91,32 @@ const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
 
   const getProgressBarColor = () => {
     switch (warningLevel) {
-      case 'danger': return 'bg-red-500';
-      case 'critical': return 'bg-orange-500';
-      case 'warning': return 'bg-yellow-500';
-      default: return 'bg-green-500';
+      case 'danger': return 'bg-danger';
+      case 'critical':
+      case 'warning': return 'bg-(--text-color-warning)';
+      default: return 'bg-success';
     }
   };
 
   const getIconColor = () => {
     switch (warningLevel) {
-      case 'danger': return 'text-red-500';
-      case 'critical': return 'text-orange-500';
-      case 'warning': return 'text-yellow-500';
-      default: return 'text-green-500';
+      case 'danger': return 'text-danger';
+      case 'critical':
+      case 'warning': return 'text-warning';
+      default: return 'text-success';
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-6">
+    <div className="fixed inset-0 bg-backdrop backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="bg-card border border-default rounded-lg shadow-xl w-full max-w-md p-6">
         {/* Header */}
         <div className="flex items-center mb-4">
           <div className="shrink-0">
             <WarningIcon className={`h-8 w-8 ${getIconColor()}`} />
           </div>
           <div className="ml-3">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+            <h3 className="text-lg font-medium text-primary">
               {isAtLimit ? 'Storage Limit Reached' : isCritical ? 'Critical Storage Warning' : 'Storage Warning'}
             </h3>
           </div>
@@ -125,19 +125,19 @@ const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
         {/* Storage Info */}
         {storageInfo && (
           <div className="mb-4">
-            <div className="flex justify-between text-sm text-gray-600 dark:text-gray-300 mb-2">
+            <div className="flex justify-between text-sm text-secondary mb-2">
               <span>Storage Used</span>
               <span>{usagePercentage}%</span>
             </div>
 
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+            <div className="w-full bg-(--border-color-strong) rounded-full h-2.5">
               <div
                 className={`h-2.5 rounded-full ${getProgressBarColor()}`}
                 style={{ width: `${String(Math.min(usagePercentage, 100))}%` }}
               />
             </div>
 
-            <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+            <div className="flex justify-between text-xs text-tertiary mt-1">
               <span>{formatBytes(storageInfo.used)}</span>
               <span>{formatBytes(storageInfo.total)}</span>
             </div>
@@ -146,7 +146,7 @@ const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
 
         {/* Warning Message */}
         <div className="mb-6">
-          <p className="text-sm text-gray-700 dark:text-gray-300">
+          <p className="text-sm text-secondary">
             {warningLevel === 'danger' ? (
               <>
                 Your storage is full ({Math.round(usagePercentage)}% used). You won&apos;t be able to save new prompts until you free up space.
@@ -175,7 +175,7 @@ const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
         <div className="flex space-x-3">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+            className="flex-1 px-4 py-2 text-sm font-medium text-secondary bg-card border border-strong rounded-lg hover:bg-muted transition-colors focus-secondary"
             disabled={isLoading}
           >
             Continue
@@ -184,7 +184,7 @@ const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
           {isAtLimit && (
             <button
               onClick={() => { handleClearData(); }}
-              className="flex-1 px-4 py-2 text-sm font-medium text-white bg-red-600 dark:bg-red-700 rounded-lg hover:bg-red-700 dark:hover:bg-red-800 transition-colors disabled:opacity-50"
+              className="flex-1 px-4 py-2 text-sm font-medium text-on-accent bg-danger rounded-lg hover:bg-danger-hover transition-colors disabled:opacity-50 focus-danger"
               disabled={isLoading}
             >
               {isLoading ? 'Clearing...' : 'Clear All Data'}
@@ -193,7 +193,7 @@ const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
         </div>
 
         {/* Help Text */}
-        <div className="mt-4 text-xs text-gray-500 dark:text-gray-400">
+        <div className="mt-4 text-xs text-tertiary">
           <p>
             Tip: Delete unused prompts or export your data before clearing to avoid losing important prompts.
           </p>
