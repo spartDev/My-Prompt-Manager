@@ -1,6 +1,6 @@
 # Design Guidelines
 
-**Version:** 2.2.0
+**Version:** 2.3.0
 **Last Updated:** 2026-10-23
 
 This document provides comprehensive visual design guidelines for the Prompt Library Chrome Extension. All AI agents and developers working on this project **MUST** follow these guidelines to maintain visual consistency.
@@ -660,6 +660,21 @@ A form (Add and Edit Prompt) is one card on `bg-app`: its sections are split by 
   {/* Cancel and Save */}
 </div>
 ```
+
+#### List Card
+
+A list of items (the Categories) is one card on `bg-app`: its title and rows are split by `border-divider`, and a row hovers to `bg-muted` while it can be acted on. A row being edited in place stays on the card, with `bg-subtle` fields:
+
+```tsx
+<section aria-labelledby={titleId} className="bg-card border border-default rounded-2xl shadow-sm overflow-hidden divide-y divide-divider">
+  <h3 id={titleId} className="p-5 text-sm font-bold text-primary">Your Categories</h3>
+  {items.map(item => (
+    <div key={item.id} className="p-5 transition-colors duration-200 hover:bg-muted">{/* Item */}</div>
+  ))}
+</section>
+```
+
+A color swatch is user data: it keeps its own color. In a picker, the chosen swatch takes an accent ring with a gap in the card's color (`ring-2 ring-accent ring-offset-2 ring-offset-(--background-color-card)`).
 
 #### Settings Card
 
@@ -1505,6 +1520,9 @@ z-1000002  /* Content script debug */
 ---
 
 ## Version History
+
+**v2.3.0** (2026-10-23)
+- List card pattern (the Categories): rows split by `border-divider`, `hover:bg-muted`; the chosen swatch of a color picker takes an accent ring
 
 **v2.2.0** (2026-10-23)
 - Form card pattern: one card on `bg-app`, sections split by `border-divider`, button bar with the `scroll-edge-bottom` line
