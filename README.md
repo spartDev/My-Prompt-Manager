@@ -2,7 +2,7 @@
 
 [![Version](https://img.shields.io/badge/version-1.9.0-blue.svg)](https://github.com/spartDev/My-Prompt-Manager)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Chrome](https://img.shields.io/badge/Chrome-114%2B-yellow.svg)](https://www.google.com/chrome/)
+[![Chrome](https://img.shields.io/badge/Chrome-116%2B-yellow.svg)](https://www.google.com/chrome/)
 [![Tests](https://img.shields.io/badge/tests-1692%20passing-brightgreen.svg)](https://github.com/spartDev/My-Prompt-Manager)
 
 Transform your AI interactions with a powerful personal prompt library that integrates seamlessly with Claude, ChatGPT, Gemini, Mistral, Perplexity, and Microsoft Copilot. Store, organize, share, and instantly insert your best prompts with one click.
@@ -29,7 +29,7 @@ Transform your AI interactions with a powerful personal prompt library that inte
 ✅ **Keyboard Navigation:** Full keyboard support for accessibility
 ✅ **Custom Sites:** Add support for any AI platform through settings
 ✅ **Theme Synchronization:** Matches the host platform's theme automatically
-✅ **Side Panel Support:** Chrome 114+ dual interface mode (popup or side panel)
+✅ **Side Panel Support:** Chrome 116+ dual interface mode (popup or side panel)
 
 ### Analytics Dashboard (New in v1.8)
 ✅ **Usage Tracking:** Track prompt usage across all platforms
@@ -76,7 +76,7 @@ See our [Platform Integration Guide](docs/PLATFORM_INTEGRATION.md) to add your o
 ### Prerequisites
 
 - [Node.js](https://nodejs.org/) 22+ (LTS recommended)
-- [Chrome Browser](https://www.google.com/chrome/) 114+
+- [Chrome Browser](https://www.google.com/chrome/) 116+
 - [Git](https://git-scm.com/) for cloning the repository
 
 ### Development Setup
@@ -335,10 +335,10 @@ npm test -- src/content/platforms/__tests__/claude-strategy.test.ts
 
 | Browser | Minimum Version | Status |
 |---------|----------------|---------|
-| Chrome | 114+ | ✅ Fully Supported |
-| Edge | 114+ | ✅ Fully Supported |
+| Chrome | 116+ | ✅ Fully Supported |
+| Edge | 116+ | ✅ Fully Supported |
 | Brave | 1.58+ | ✅ Fully Supported |
-| Opera | 100+ | ⚠️ Should work (untested) |
+| Opera | 102+ | ⚠️ Should work (untested) |
 | Firefox | - | ❌ Not supported (Manifest V3) |
 
 ## 🤝 Contributing
@@ -457,7 +457,7 @@ window.__promptLibraryDebug?.testInsertion?.('test content')
 - [x] Dark mode support
 - [x] Custom site configuration
 - [x] Comprehensive testing (1692 tests)
-- [x] Side Panel Support (Chrome 114+)
+- [x] Side Panel Support (Chrome 116+)
 - [x] Enhanced Security Architecture
 - [x] Import/Export functionality (JSON)
 - [x] Programmatic Content Script Injection

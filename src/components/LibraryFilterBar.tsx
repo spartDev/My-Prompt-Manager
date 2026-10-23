@@ -146,10 +146,10 @@ const LibraryFilterBar: FC<LibraryFilterBarProps> = ({ categories, activeFilter,
               data-testid={`library-filter-${option.key}`}
               onClick={() => { onChange(option.filter); }}
               onKeyDown={(e) => { handleKeyDown(e, index); }}
-              className={`shrink-0 h-8 px-3 inline-flex items-center gap-1.5 rounded-full border text-sm whitespace-nowrap transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:focus-visible:ring-purple-400 disabled:opacity-50 disabled:cursor-not-allowed ${
+              className={`shrink-0 h-8 px-3 inline-flex items-center gap-1.5 rounded-full border text-sm whitespace-nowrap transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50 disabled:cursor-not-allowed ${
                 isActive
-                  ? 'bg-purple-100 dark:bg-purple-900/60 border-purple-300 dark:border-purple-500 text-purple-700 dark:text-purple-100 font-semibold'
-                  : 'bg-white dark:bg-gray-700/60 border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-50 dark:hover:bg-gray-700'
+                  ? 'bg-accent-selected border-accent text-accent-strong font-semibold'
+                  : 'bg-card border-default text-secondary font-medium hover:bg-muted'
               }`}
             >
               {Icon && <Icon className="w-3.5 h-3.5 shrink-0" />}
@@ -169,14 +169,14 @@ const LibraryFilterBar: FC<LibraryFilterBarProps> = ({ categories, activeFilter,
       {fades.start && (
         <div
           data-testid="library-filter-fade-start"
-          className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-white dark:from-gray-800 to-transparent"
+          className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-(--background-color-app) to-transparent"
           aria-hidden="true"
         />
       )}
       {fades.end && (
         <div
           data-testid="library-filter-fade-end"
-          className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-white dark:from-gray-800 to-transparent"
+          className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-(--background-color-app) to-transparent"
           aria-hidden="true"
         />
       )}

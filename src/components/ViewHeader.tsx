@@ -151,7 +151,7 @@ export interface ViewHeaderProps {
    * Additional CSS classes to apply to the header element.
    *
    * @example
-   * className="custom-header border-red-500"
+   * className="custom-header"
    */
   className?: string;
 
@@ -314,7 +314,7 @@ const BackButton: FC<BackButtonProps> = ({ onClick, disabled = false }) => {
     <button
       onClick={onClick}
       disabled={disabled}
-      className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors focus-interactive disabled:opacity-50 disabled:cursor-not-allowed"
+      className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-secondary hover:text-primary hover:bg-muted rounded-lg transition-colors focus-interactive disabled:opacity-50 disabled:cursor-not-allowed"
       title="Go back"
       aria-label="Go back"
       data-testid="back-button"
@@ -342,7 +342,7 @@ const SettingsButton: FC<SettingsButtonProps> = ({ onClick, disabled = false }) 
     <button
       onClick={onClick}
       disabled={disabled}
-      className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors focus-interactive disabled:opacity-50 disabled:cursor-not-allowed"
+      className="p-2 text-tertiary hover:text-accent hover:bg-muted rounded-lg transition-colors focus-interactive disabled:opacity-50 disabled:cursor-not-allowed"
       title="Settings"
       aria-label="Open settings"
     >
@@ -369,7 +369,7 @@ const NewButton: FC<NewButtonProps> = ({ onClick, disabled = false }) => {
     <button
       onClick={onClick}
       disabled={disabled}
-      className="flex items-center gap-1 px-3 py-2 text-sm font-semibold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 rounded-lg shadow-sm transition-colors focus-primary disabled:opacity-50 disabled:cursor-not-allowed"
+      className="flex items-center gap-1 px-3 py-2 text-sm font-semibold text-on-accent bg-accent hover:bg-accent-hover rounded-lg shadow-sm transition-colors focus-primary disabled:opacity-50 disabled:cursor-not-allowed"
       title="Add new prompt"
       aria-label="Add new prompt"
       data-testid="new-prompt-button"
@@ -410,7 +410,7 @@ const CloseButton: FC<CloseButtonProps> = ({ onClick, context = 'popup', disable
       onClick={onClick}
       onKeyDown={handleKeyDown}
       disabled={disabled}
-      className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors focus-interactive disabled:opacity-50 disabled:cursor-not-allowed"
+      className="p-2 text-tertiary hover:text-accent hover:bg-muted rounded-lg transition-colors focus-interactive disabled:opacity-50 disabled:cursor-not-allowed"
       title={context === 'sidepanel' ? 'Close side panel' : 'Close'}
       aria-label={context === 'sidepanel' ? 'Close side panel' : 'Close'}
       data-testid="close-modal"
@@ -494,9 +494,12 @@ const ViewHeaderFC: FC<ViewHeaderProps> = ({
       iconElement = icon;
     }
 
+    // The brand gradient belongs to the logo; every other view shows its icon on a flat accent tint
     return (
       <div
-        className="w-10 h-10 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center text-white"
+        className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+          icon === 'logo' ? 'bg-brand text-on-accent' : 'bg-accent-subtle text-accent'
+        }`}
         role="img"
         aria-label={`${title} icon`}
       >
@@ -584,7 +587,7 @@ const ViewHeaderFC: FC<ViewHeaderProps> = ({
 
   return (
     <header
-      className={`shrink-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 ${className}`}
+      className={`shrink-0 bg-app border-b border-transparent scroll-edge-top ${className}`}
       role="banner"
     >
       <div className="p-6">
@@ -592,10 +595,10 @@ const ViewHeaderFC: FC<ViewHeaderProps> = ({
           <div className="flex items-center space-x-3">
             {renderIcon()}
             <div>
-              <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">{title}</h1>
+              <h1 className="text-xl font-bold text-primary">{title}</h1>
               {subtitle && (
                 <p
-                  className="text-sm text-gray-500 dark:text-gray-400"
+                  className="text-sm text-tertiary"
                   aria-live={subtitleLive ? 'polite' : undefined}
                   aria-atomic={subtitleLive ? true : undefined}
                 >
@@ -686,7 +689,7 @@ const ViewHeaderFC: FC<ViewHeaderProps> = ({
  * @example
  * // Custom icon with ReactElement
  * <ViewHeader
- *   icon={<FolderIcon className="w-6 h-6 text-white" />}
+ *   icon={<FolderIcon className="w-6 h-6" />}
  *   title="Categories"
  *   onBack={handleBack}
  * />

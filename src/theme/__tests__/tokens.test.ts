@@ -85,7 +85,9 @@ describe('Color tokens', () => {
       ['success', 'success-subtle'],
       ['warning', 'warning-subtle'],
       ['danger', 'danger-subtle'],
-      ['on-inverse', 'inverse']
+      ['on-inverse', 'inverse'],
+      ['primary', 'highlight'],
+      ['tertiary', 'highlight']
     ];
 
     for (const mode of [tokens.light, tokens.dark]) {
@@ -147,7 +149,7 @@ describe('Color tokens', () => {
       'border-default', 'border-divider', 'border-strong', 'border-input',
       'text-primary', 'text-secondary', 'text-tertiary', 'text-faint', 'text-on-inverse', 'text-on-accent',
       'placeholder:text-tertiary',
-      'bg-accent', 'bg-accent-hover', 'bg-accent-selected', 'bg-accent-subtle',
+      'bg-accent', 'bg-accent-hover', 'bg-accent-selected', 'bg-accent-subtle', 'bg-highlight',
       'text-accent', 'text-accent-strong', 'border-accent', 'ring-accent', 'outline-accent',
       'bg-success', 'bg-success-subtle', 'text-success',
       'bg-warning-subtle', 'border-warning', 'text-warning',
@@ -178,6 +180,15 @@ describe('Color tokens', () => {
     for (const thumb of thumbs) {
       expect(thumb, 'scrollbar thumb').toMatch(/^var\(--scrollbar-color-thumb\)/);
     }
+  });
+
+  it('the brand gradient runs from the light accent to accent-strong, the same in both modes', async () => {
+    const css = await buildCss(['bg-brand']);
+    const { light, dark } = await readDeclarations();
+
+    expect(ruleFor(css, 'bg-brand')).toContain('background-image: var(--background-image-brand)');
+    expect(light['--background-image-brand']).toBe('linear-gradient(135deg, #6d28d9 0%, #4c1d95 100%)');
+    expect(dark['--background-image-brand'], 'no dark override').toBeUndefined();
   });
 
   it('shadows take the violet tint in light and a stronger black in dark', async () => {

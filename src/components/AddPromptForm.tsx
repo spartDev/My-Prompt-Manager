@@ -334,7 +334,7 @@ const AddPromptForm: FC<AddPromptFormProps> = ({
       )}
 
       {/* Form */}
-      <div className="flex-1 overflow-auto custom-scrollbar">
+      <div className="flex-1 overflow-auto custom-scrollbar" data-scroll-container>
           <form id="add-prompt-form" action={submitAction}>
             {/* Import Mode UI */}
             {mode === 'import' && (
