@@ -120,28 +120,26 @@ body {
   Seamless header and tab bar: the line under the header shows once the Section has scrolled,
   the line above the tab bar while content remains below. The Section's [data-scroll-container]
   drives a scroll timeline that App's root shares with the header and the tab bar (timeline-scope).
-  Without scroll-driven animations (Chrome before 116) neither line shows.
+  timeline-scope ships in Chrome 116, the manifest's minimum_chrome_version.
 */
-@supports (timeline-scope: none) and (animation-timeline: scroll()) {
-  .section-scroll-scope {
-    timeline-scope: --section-scroll;
-  }
+.section-scroll-scope {
+  timeline-scope: --section-scroll;
+}
 
-  .section-scroll-scope [data-scroll-container] {
-    scroll-timeline: --section-scroll block;
-  }
+.section-scroll-scope [data-scroll-container] {
+  scroll-timeline: --section-scroll block;
+}
 
-  .scroll-edge-top {
-    animation: scroll-edge-top linear both;
-    animation-timeline: --section-scroll;
-    animation-range: 0 8px;
-  }
+.scroll-edge-top {
+  animation: scroll-edge-top linear both;
+  animation-timeline: --section-scroll;
+  animation-range: 0 8px;
+}
 
-  .scroll-edge-bottom {
-    animation: scroll-edge-bottom linear both;
-    animation-timeline: --section-scroll;
-    animation-range: calc(100% - 8px) 100%;
-  }
+.scroll-edge-bottom {
+  animation: scroll-edge-bottom linear both;
+  animation-timeline: --section-scroll;
+  animation-range: calc(100% - 8px) 100%;
 }
 
 @keyframes scroll-edge-top {
