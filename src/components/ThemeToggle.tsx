@@ -5,7 +5,7 @@ import { Logger, toError } from '../utils';
 
 const MoonIcon = (
   <svg
-    className="w-5 h-5 text-gray-600 dark:text-gray-400"
+    className="w-5 h-5 text-secondary"
     fill="none"
     stroke="currentColor"
     viewBox="0 0 24 24"
@@ -22,7 +22,7 @@ const MoonIcon = (
 
 const SunIcon = (
   <svg
-    className="w-5 h-5 text-yellow-500"
+    className="w-5 h-5 text-secondary"
     fill="currentColor"
     viewBox="0 0 24 24"
     aria-hidden="true"
@@ -49,7 +49,7 @@ const ThemeToggle: FC = () => {
   return (
     <button
       onClick={() => { void handleThemeChange(); }}
-      className="p-2 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 focus-interactive"
+      className="p-2 rounded-lg transition-colors hover:bg-muted focus-interactive"
       aria-label={`Switch to ${resolvedTheme === 'light' ? 'dark' : 'light'} theme`}
       title={`Switch to ${resolvedTheme === 'light' ? 'dark' : 'light'} theme`}
     >

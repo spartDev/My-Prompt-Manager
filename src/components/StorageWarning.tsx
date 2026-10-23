@@ -93,7 +93,7 @@ const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
     switch (warningLevel) {
       case 'danger': return 'bg-danger';
       case 'critical':
-      case 'warning': return 'bg-(--text-color-warning)';
+      case 'warning': return 'bg-warning';
       default: return 'bg-success';
     }
   };

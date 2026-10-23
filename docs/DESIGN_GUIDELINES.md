@@ -1,6 +1,6 @@
 # Design Guidelines
 
-**Version:** 2.3.0
+**Version:** 2.4.0
 **Last Updated:** 2026-10-23
 
 This document provides comprehensive visual design guidelines for the Prompt Library Chrome Extension. All AI agents and developers working on this project **MUST** follow these guidelines to maintain visual consistency.
@@ -91,6 +91,7 @@ The brand gradient (`bg-brand`: `#6D28D9` to `#4C1D95`, the same in both modes) 
 |---|---|---|---|
 | `bg-success` | `#10B981` | `#10B981` | Dots and badges only (2.54:1 on white: never text) |
 | `bg-success-subtle` / `text-success` | `#E7F8EF` / `#065F46` | `#0F2D22` / `#6EE7B7` | Success message |
+| `bg-warning` | `#D97706` | `#FBBF24` | Graphics only: bars and marks (3:1 on `bg-card`, never text) |
 | `bg-warning-subtle` / `border-warning` / `text-warning` | `#FEF3C7` / `#F5DFA6` / `#92400E` | `#33270F` / `#5A4515` / `#FCD34D` | Warning banner |
 | `bg-danger` / `bg-danger-hover` | `#DC2626` / `#B91C1C` | `#DC2626` / `#B91C1C` | Destructive button |
 | `bg-danger-subtle` / `border-danger` / `text-danger` | `#FDECEC` / `#F6CFCF` / `#991B1B` | `#3A1518` / `#5E2228` / `#FCA5A5` | Error banner and message |
@@ -730,6 +731,32 @@ One item chosen among several (Library filter pill, active Section):
 `}>
   Pinned
 </button>
+```
+
+#### Segmented Control
+
+A short choice among a few options (the theme) sits in a `bg-subtle` track. The chosen option takes the chosen-item colors; the others are transparent. It is a radio group:
+
+```tsx
+<div role="radiogroup" aria-labelledby={labelId} className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-subtle">
+  {options.map(option => (
+    <button
+      key={option.value}
+      type="button"
+      role="radio"
+      aria-checked={value === option.value}
+      className={`
+        h-9 rounded-lg border text-sm font-semibold transition-colors focus-interactive
+        ${value === option.value
+          ? 'bg-accent-selected border-accent text-accent-strong'
+          : 'border-transparent text-secondary hover:text-primary hover:bg-muted'
+        }
+      `}
+    >
+      {option.label}
+    </button>
+  ))}
+</div>
 ```
 
 ### Modals & Dialogs
@@ -1520,6 +1547,9 @@ z-1000002  /* Content script debug */
 ---
 
 ## Version History
+
+**v2.4.0** (2026-10-23)
+- `bg-warning` for warning graphics (toast-type marks, the storage bar); segmented control pattern (the theme)
 
 **v2.3.0** (2026-10-23)
 - List card pattern (the Categories): rows split by `border-divider`, `hover:bg-muted`; the chosen swatch of a color picker takes an accent ring

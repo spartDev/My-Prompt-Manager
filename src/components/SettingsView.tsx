@@ -58,19 +58,7 @@ interface SettingsViewProps {
   onToastSettingsChange: (settings: Partial<ToastSettings>) => void;
 }
 
-const SectionSeparator: FC = () => (
-  <div className="flex items-center justify-center my-8">
-    <div className="flex items-center gap-3">
-      <div className="h-px w-12 bg-gradient-to-r from-transparent to-gray-300 dark:to-gray-600"></div>
-      <div className="flex gap-1.5">
-        <div className="w-1 h-1 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
-        <div className="w-1 h-1 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
-        <div className="w-1 h-1 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
-      </div>
-      <div className="h-px w-12 bg-gradient-to-l from-transparent to-gray-300 dark:to-gray-600"></div>
-    </div>
-  </div>
-);
+const SectionSeparator: FC = () => <hr className="border-default" />;
 
 const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toastSettings, onToastSettingsChange }) => {
   const [settings, setSettings] = useState<Settings>({
@@ -536,17 +524,17 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
 
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+      <div className="h-full flex items-center justify-center bg-app">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Loading settings...</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-current text-accent mx-auto mb-4"></div>
+          <p className="text-secondary">Loading settings...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900">
+    <div className="h-full flex flex-col bg-app">
       {/* Header */}
       <ViewHeader
         icon="settings"
