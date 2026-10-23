@@ -114,7 +114,11 @@ test.describe('App shell and Library on the tokens', () => {
     });
 
     test(`a list that fits shows neither line (${theme})`, async ({ page, storage, extensionId }) => {
-      await openLibrary(page, storage, extensionId, { theme, library: prompts.slice(0, 1) });
+      // The side panel's height: in the popup, fonts that wrap the title (Linux CI) push one card a few
+      // pixels past the fold, and the tab bar line rightly shows
+      await openLibrary(page, storage, extensionId, { theme, surface: 'sidepanel', library: prompts.slice(0, 1) });
+      const overflow = await page.locator('main[data-scroll-container]').evaluate(list => list.scrollHeight - list.clientHeight);
+      expect(overflow, 'the list fits without scrolling').toBeLessThanOrEqual(0);
 
       await expect(page.getByRole('banner')).toHaveCSS('border-bottom-color', TRANSPARENT);
       await expect(page.getByRole('navigation', { name: 'Main navigation' })).toHaveCSS('border-top-color', TRANSPARENT);
