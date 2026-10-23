@@ -1,5 +1,5 @@
-import { useState, useRef, useCallback } from 'react';
 import type { FC, FormEvent } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 import { DEFAULT_CATEGORY_COLOR, getColorName } from '../constants/colors';
 import { PROMPT_LIMITS } from '../services/promptAdmission';

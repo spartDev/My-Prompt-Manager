@@ -4,13 +4,13 @@
  */
 
 import {
-  getDefaultEnabledPlatforms,
   getAllHostnamePatterns,
+  getDefaultEnabledPlatforms,
 } from "../config/platforms";
 import { StorageManager } from "../services/storage";
 import { UsageTracker } from "../services/UsageTracker";
 import type { ElementFingerprint, PlatformType } from "../types";
-import { Logger, toError, getErrorMessage } from "../utils";
+import { getErrorMessage, Logger, toError } from "../utils";
 
 // Track active element picker sessions
 const activePickerSessions = new Map<

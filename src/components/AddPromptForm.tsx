@@ -1,12 +1,12 @@
-import { forwardRef, useActionState, useEffect, useMemo, useRef, useState } from 'react';
 import type { FC } from 'react';
+import { forwardRef, useActionState, useEffect, useMemo, useRef, useState } from 'react';
 
 import { formatCharacterCount } from '../constants/validation';
 import { admit, PROMPT_LIMITS } from '../services/promptAdmission';
 import { decode } from '../services/promptEncoder';
 import { DEFAULT_CATEGORY, type SharedPromptData } from '../types';
 import type { AddPromptFormProps } from '../types/components';
-import { Logger, toError, validatePromptFields, type FieldErrors } from '../utils';
+import { type FieldErrors, Logger, toError, validatePromptFields } from '../utils';
 
 import { Dropdown, type DropdownItem } from './Dropdown';
 import ViewHeader from './ViewHeader';

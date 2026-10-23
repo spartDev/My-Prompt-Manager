@@ -1,11 +1,11 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 import { ThemeProvider } from '../../contexts/ThemeContext';
 import { AdmissionRefusedError } from '../../services/promptAdmission';
 import { getChromeMockFunctions, getMockStorageManager } from '../../test/mocks';
-import { DEFAULT_SETTINGS, type Prompt, type Category } from '../../types';
+import { type Category, DEFAULT_SETTINGS, type Prompt } from '../../types';
 import SettingsView from '../SettingsView';
 
 const createJsonFile = (contents: string): File => {

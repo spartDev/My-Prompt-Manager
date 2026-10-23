@@ -1,5 +1,5 @@
-import { memo, useState, useEffect, useCallback, useRef } from 'react';
 import type { FC } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 
 import type { Toast } from '../types/hooks';
 

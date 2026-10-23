@@ -5,7 +5,7 @@
  * common user interaction patterns across multiple test files.
  */
 
-import type { Page, BrowserContext, Download } from '@playwright/test';
+import type { BrowserContext, Download, Page } from '@playwright/test';
 
 import { expect } from '../fixtures/extension';
 

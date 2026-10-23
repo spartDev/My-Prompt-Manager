@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { PromptManager } from '../services/promptManager';
 import { StorageManager } from '../services/storage';
-import type { Category, AppError } from '../types';
+import type { AppError, Category } from '../types';
 import type { UseCategoriesReturn } from '../types/hooks';
 
 export const useCategories = (): UseCategoriesReturn => {

@@ -11,7 +11,7 @@
 
 import type { CSSProperties, FC } from 'react';
 
-import { getAccessibleTextColor, getSoftBadgeColors, DEFAULT_CATEGORY_COLOR } from '../constants/colors';
+import { DEFAULT_CATEGORY_COLOR, getAccessibleTextColor, getSoftBadgeColors } from '../constants/colors';
 import type { Category } from '../types';
 import { cn } from '../utils/cn';
 

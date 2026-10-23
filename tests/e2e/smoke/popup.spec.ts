@@ -1,6 +1,6 @@
 import { DEFAULT_CATEGORY, DEFAULT_SETTINGS } from '../../../src/types';
-import { test, expect } from '../fixtures/extension';
-import { seedLibrary, createPromptSeed } from '../utils/storage';
+import { expect, test } from '../fixtures/extension';
+import { createPromptSeed, seedLibrary } from '../utils/storage';
 
 test.describe('Popup smoke test', () => {
   test('shows the prompt library empty state by default', async ({ page, extensionId }) => {

@@ -1,7 +1,7 @@
 import { DEFAULT_CATEGORY, DEFAULT_SETTINGS } from '../../../src/types';
-import { test, expect } from '../fixtures/extension';
+import { expect, test } from '../fixtures/extension';
 import { LibraryPage } from '../pages/LibraryPage';
-import { seedLibrary, createCategorySeed, createPromptSeed } from '../utils/storage';
+import { createCategorySeed, createPromptSeed, seedLibrary } from '../utils/storage';
 
 test.describe('Category Management - Integration with Prompt System', () => {
 

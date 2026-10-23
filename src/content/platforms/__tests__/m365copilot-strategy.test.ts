@@ -6,27 +6,27 @@
  * and React-compatible event triggering.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { HOSTILE_TEXTS, expectNoMarkupIn } from '../../../test/helpers/hostile-text';
+import { expectNoMarkupIn, HOSTILE_TEXTS } from '../../../test/helpers/hostile-text';
 import type { UIElementFactory } from '../../ui/element-factory';
 import { M365CopilotStrategy } from '../m365copilot-strategy';
 
 import {
+  cleanupElement,
   createM365CopilotElement,
   createM365CopilotElementWithConfig,
   createM365CopilotTextarea,
   createMockUIFactory,
-  setMockHostname,
+  M365_COPILOT_BUTTON_CONTAINER_SELECTOR,
+  M365_COPILOT_CONFIG, 
+  M365_COPILOT_SELECTORS,
   resetMockHostname,
+  setMockHostname,
   setupDispatchEventMock,
-  setupNativeValueSetterMock,
   setupExecCommandMock,
   setupGetSelectionMock,
-  cleanupElement,
-  M365_COPILOT_SELECTORS,
-  M365_COPILOT_BUTTON_CONTAINER_SELECTOR,
-  M365_COPILOT_CONFIG
+  setupNativeValueSetterMock
 } from './fixtures/m365copilot-fixtures';
 
 // Mock Logger

@@ -6,12 +6,12 @@ import { useUsageStats } from '../../hooks/useUsageStats';
 import type { PromptUsageSummary } from '../../types/hooks';
 import { formatPlatformName, formatRelativeTime } from '../../utils';
 import {
-  UsageIcon,
-  PlatformIcon,
   CalendarIcon,
   CategoryIcon,
+  PlatformIcon,
+  TrashIcon, 
   TrophyIcon,
-  TrashIcon
+  UsageIcon
 } from '../icons/UIIcons';
 import ViewHeader from '../ViewHeader';
 

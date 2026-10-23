@@ -1,4 +1,4 @@
-import { type FC, useState, useCallback, useRef } from 'react';
+import { type FC, useCallback, useRef, useState } from 'react';
 
 import { useNow } from '../../hooks/useNow';
 import { useSummaryMetrics } from '../../hooks/useSummaryMetrics';
@@ -7,20 +7,20 @@ import type { PromptUsageSummary } from '../../types/hooks';
 import { formatPlatformName, formatRelativeTime } from '../../utils';
 import ErrorBoundary from '../ErrorBoundary';
 import {
-  UsageIcon,
-  PlatformIcon,
+  BackIcon,
   CalendarIcon,
   CategoryIcon,
-  BackIcon,
-  TrophyIcon
+  PlatformIcon,
+  TrophyIcon, 
+  UsageIcon
 } from '../icons/UIIcons';
 
 import {
-  UsageLineChart,
-  PlatformPieChart,
-  DayOfWeekChart,
   CategoryBarChart,
-  TimeOfDayChart
+  DayOfWeekChart,
+  PlatformPieChart,
+  TimeOfDayChart, 
+  UsageLineChart
 } from './charts';
 import { CHART_HEIGHT, MAX_CATEGORIES_DISPLAY, REFRESH_INTERVAL_MS } from './constants';
 import SummaryCard from './SummaryCard';

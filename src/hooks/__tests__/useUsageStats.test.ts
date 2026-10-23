@@ -1,10 +1,10 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { act } from 'react';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { buildPrompt } from '../../test/builders';
-import type { UsageEvent, Prompt } from '../../types';
-import { DEFAULT_CATEGORY, USAGE_STORAGE_KEY, USAGE_RETENTION_DAYS } from '../../types';
+import type { Prompt, UsageEvent } from '../../types';
+import { DEFAULT_CATEGORY, USAGE_RETENTION_DAYS, USAGE_STORAGE_KEY } from '../../types';
 import { useUsageStats } from '../useUsageStats';
 
 const NOW = Date.now();

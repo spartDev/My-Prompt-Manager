@@ -1,17 +1,17 @@
 import {
-  type Prompt,
-  VALIDATION_LIMITS,
+  type AppError,
   DEFAULT_CATEGORY,
   type ErrorType,
-  type AppError,
+  type Prompt,
+  type SortDirection, 
   type SortOrder,
-  type SortDirection
+  VALIDATION_LIMITS
 } from '../types';
 import type { HighlightedPrompt } from '../types/hooks';
 import { findTextHighlights } from '../utils/textHighlight';
 import { cutWithoutSplittingPairs } from '../utils/truncate';
 
-import { admit, type Admission, type PromptTextPatch } from './promptAdmission';
+import { type Admission, admit, type PromptTextPatch } from './promptAdmission';
 import { getSearchIndex } from './SearchIndex';
 import { calculateSimilarityOptimized } from './SimilarityAlgorithms';
 import { StorageManager } from './storage';

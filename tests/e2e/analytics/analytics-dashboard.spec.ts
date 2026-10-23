@@ -1,5 +1,5 @@
 import { DEFAULT_SETTINGS } from '../../../src/types';
-import { test, expect } from '../fixtures/extension';
+import { expect, test } from '../fixtures/extension';
 import { ANALYTICS_FIXTURES } from '../fixtures/test-data';
 import { AnalyticsPage } from '../pages/AnalyticsPage';
 import { analyticsAssertions } from '../utils/assertions';

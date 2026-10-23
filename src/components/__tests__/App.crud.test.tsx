@@ -1,10 +1,10 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import App from '../../App';
 import { getMockPromptManager, getMockStorageManager } from '../../test/mocks';
-import type { Prompt, Category, AppError } from '../../types';
+import type { AppError, Category, Prompt } from '../../types';
 
 const defaultCategories: Category[] = [
   { id: 'default', name: 'Uncategorized', color: '#888888' },

@@ -1,7 +1,7 @@
 import type { BrowserContext, Worker } from '@playwright/test';
 
 import { DEFAULT_SETTINGS } from '../../../src/types';
-import { test, expect } from '../fixtures/extension';
+import { expect, test } from '../fixtures/extension';
 import { seedLibrary } from '../utils/storage';
 
 const resolveBackgroundWorker = async (context: BrowserContext): Promise<Worker> => {

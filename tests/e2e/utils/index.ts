@@ -5,25 +5,22 @@
  * making it easy to import and use across test files.
  */
 
-// Page Object Models
-export * from '../pages';
-
-// Core utilities
-export * from './assertions';
-export * from './workflows';
-export * from './navigation';
-
-// Storage and data management
-export * from './storage';
-export * from './enhanced-storage';
-
-// Test data fixtures
-export * from '../fixtures/test-data';
 
 // Re-export commonly used types
-export type { Page, Locator, BrowserContext } from '@playwright/test';
+export type { BrowserContext, Locator, Page } from '@playwright/test';
+export type { Category, Prompt, Settings } from '../../../src/types';
 export type { ExtensionStorage } from '../fixtures/extension';
-export type { Prompt, Category, Settings } from '../../../src/types';
+// Test data fixtures
+export * from '../fixtures/test-data';
+// Page Object Models
+export * from '../pages';
+// Core utilities
+export * from './assertions';
+export * from './enhanced-storage';
+export * from './navigation';
+// Storage and data management
+export * from './storage';
+export * from './workflows';
 
 /**
  * Convenience object that groups related utilities together

@@ -5,11 +5,11 @@
  * handles loading and error states, and displays top prompts.
  */
 
-import { render, screen, fireEvent, within } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { fireEvent, render, screen, within } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useUsageStats } from '../../../hooks/useUsageStats';
-import type { UseUsageStatsReturn, UsageStats } from '../../../types/hooks';
+import type { UsageStats, UseUsageStatsReturn } from '../../../types/hooks';
 import AnalyticsTab from '../AnalyticsTab';
 
 // Mock the useUsageStats hook

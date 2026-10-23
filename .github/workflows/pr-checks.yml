@@ -148,7 +148,7 @@ jobs:
         if: always()
         run: |
           echo "📋 Biome Summary:"
-          npx @biomejs/biome lint --max-diagnostics=2000 . || echo "⚠️ Linting issues found above"
+          npx @biomejs/biome check --formatter-enabled=false --max-diagnostics=2000 . || echo "⚠️ Linting issues found above"
 
   # Job 4: Comprehensive testing with coverage
   test:

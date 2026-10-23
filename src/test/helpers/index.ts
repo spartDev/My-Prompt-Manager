@@ -38,5 +38,5 @@
  */
 
 export { testEncoderRoundtrip } from './encoder-helpers';
+export { expectNoMarkupIn, HOSTILE_TEXTS } from './hostile-text';
 export { setupThemeTest, testThemeToggle } from './theme-helpers';
-export { HOSTILE_TEXTS, expectNoMarkupIn } from './hostile-text';

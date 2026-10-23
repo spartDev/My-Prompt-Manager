@@ -11,7 +11,7 @@
  
  
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Prompt } from '../../types/index';
 import { PromptLibraryInjector } from '../injector';

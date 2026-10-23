@@ -7,9 +7,9 @@
  */
 
 import type { Category } from '../../../src/types';
-import { test, expect } from '../fixtures/extension';
+import { expect, test } from '../fixtures/extension';
 import { LibraryPage } from '../pages/LibraryPage';
-import { seedLibrary, createPromptSeed } from '../utils/storage';
+import { createPromptSeed, seedLibrary } from '../utils/storage';
 
 const categories: Category[] = [
   { id: 'dev', name: 'Development', color: '#16A34A' },

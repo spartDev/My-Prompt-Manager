@@ -1,12 +1,12 @@
 import { type FC, memo } from 'react';
 import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
   CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer, 
   Tooltip,
-  ResponsiveContainer
+  XAxis,
+  YAxis
 } from 'recharts';
 
 import { useChartTheme } from '../../../hooks/useChartTheme';

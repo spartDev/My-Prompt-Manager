@@ -4,10 +4,10 @@
 
  
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import * as Logger from '../logger';
-import { injectCSS, getCSS, removeCSS, isInjected } from '../styles';
+import { getCSS, injectCSS, isInjected, removeCSS } from '../styles';
 
 // Mock Logger
 vi.mock('../logger', () => ({

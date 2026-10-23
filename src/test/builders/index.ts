@@ -27,5 +27,5 @@
  * ```
  */
 
-export { buildPrompt } from './buildPrompt';
 export { buildCategory } from './buildCategory';
+export { buildPrompt } from './buildPrompt';

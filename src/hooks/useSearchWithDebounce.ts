@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { Prompt } from '../types';
 import type { UseSearchWithDebounceReturn } from '../types/hooks';

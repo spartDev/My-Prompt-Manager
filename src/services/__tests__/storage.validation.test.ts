@@ -1,10 +1,9 @@
 import { readFileSync } from "fs";
 import { join } from "path";
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-
-import { DEFAULT_CATEGORY } from "../../types";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Prompt } from "../../types";
+import { DEFAULT_CATEGORY } from "../../types";
 import { StorageManager } from "../storage";
 
 const FIXED_TIME = new Date("2025-01-01T00:00:00Z");

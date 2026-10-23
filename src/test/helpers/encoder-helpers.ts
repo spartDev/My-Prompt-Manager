@@ -1,6 +1,6 @@
 import { expect } from 'vitest';
 
-import { encode, decode } from '../../services/promptEncoder';
+import { decode, encode } from '../../services/promptEncoder';
 import type { Prompt } from '../../types';
 
 /**

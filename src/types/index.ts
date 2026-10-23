@@ -25,12 +25,12 @@ export interface UsageEvent {
 
 // Re-export constants from centralized location for backward compatibility
 export {
-  USAGE_RETENTION_DAYS,
-  USAGE_STORAGE_KEY,
-  VALIDATION_LIMITS,
   DEFAULT_CATEGORY,
   DEFAULT_SETTINGS,
   PROMPT_SHARING_SIZE_LIMITS,
+  USAGE_RETENTION_DAYS,
+  USAGE_STORAGE_KEY,
+  VALIDATION_LIMITS,
 } from '../constants';
 
 export interface Category {

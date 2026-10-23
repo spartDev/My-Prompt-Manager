@@ -5,9 +5,9 @@
  * common expectations used across multiple test files.
  */
 
-import type { Page, Locator } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 
-import type { Prompt, Category } from '../../../src/types';
+import type { Category, Prompt } from '../../../src/types';
 import { expect } from '../fixtures/extension';
 
 /**

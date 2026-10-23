@@ -6,11 +6,11 @@
  * @see docs/TEST_PLAN_USAGE_COUNTER_SMART_SORTING.md
  */
 
-import { test, expect } from '../fixtures/extension';
+import { expect, test } from '../fixtures/extension';
 import { LibraryPage } from '../pages/LibraryPage';
 import { tabNavigation } from '../utils/navigation';
-import { getSortedPromptTitles, selectSortOption, navigateToContext } from '../utils/sort-helpers';
-import { seedLibrary, createPromptSeed } from '../utils/storage';
+import { getSortedPromptTitles, navigateToContext, selectSortOption } from '../utils/sort-helpers';
+import { createPromptSeed, seedLibrary } from '../utils/storage';
 
 // Define contexts for parameterized testing
 const CONTEXTS = [

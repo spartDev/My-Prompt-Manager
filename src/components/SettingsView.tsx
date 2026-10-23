@@ -1,18 +1,18 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { FC, ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import manifest from '../../manifest.json';
 import { getDefaultEnabledPlatforms, getLinkedPlatformHostnames } from '../config/platforms';
 import { NATURAL_SORT_DIRECTION } from '../constants';
 import { AdmissionRefusedError } from '../services/promptAdmission';
 import { StorageManager } from '../services/storage';
-import type { Prompt, Category, Settings as UserSettings, CustomSite as ImportedCustomSite, SortOrder } from '../types';
+import type { Category, CustomSite as ImportedCustomSite, Prompt, SortOrder, Settings as UserSettings } from '../types';
 import { DEFAULT_SETTINGS } from '../types';
 import type { ToastType } from '../types/components';
 import type { ToastSettings } from '../types/hooks';
 import { Logger, toError } from '../utils';
 
-import { ClaudeIcon, ChatGPTIcon, PerplexityIcon, MistralIcon, GeminiIcon, CopilotIcon } from './icons/SiteIcons';
+import { ChatGPTIcon, ClaudeIcon, CopilotIcon, GeminiIcon, MistralIcon, PerplexityIcon } from './icons/SiteIcons';
 import AboutSection from './settings/AboutSection';
 import AdvancedSection from './settings/AdvancedSection';
 import AppearanceSection from './settings/AppearanceSection';

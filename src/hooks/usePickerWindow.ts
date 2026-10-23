@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import type { ElementFingerprint, CustomSite } from '../types';
+import type { CustomSite, ElementFingerprint } from '../types';
 import { Logger, toError } from '../utils';
 
 import { useSitePermissions } from './useSitePermissions';

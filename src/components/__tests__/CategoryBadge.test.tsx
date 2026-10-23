@@ -6,9 +6,9 @@
  */
 
 import { render, screen } from '@testing-library/react';
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-import { PRESET_COLORS, getAccessibleTextColor, getSoftBadgeColors } from '../../constants/colors';
+import { getAccessibleTextColor, getSoftBadgeColors, PRESET_COLORS } from '../../constants/colors';
 import type { Category } from '../../types';
 import { CategoryBadge } from '../CategoryBadge';
 

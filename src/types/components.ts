@@ -1,6 +1,6 @@
 import type { UseSearchWithDebounceReturn } from './hooks';
 
-import type { Prompt, Category, LibraryFilter } from './index';
+import type { Category, LibraryFilter, Prompt } from './index';
 
 // Shared toast type for consistent usage across components
 export type ToastType = 'success' | 'error' | 'info' | 'warning';

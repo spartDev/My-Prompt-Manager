@@ -1,5 +1,5 @@
-import { useMemo, useEffect, useState } from 'react';
 import type { FC } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { DEFAULT_SETTINGS } from '../constants';
 import {

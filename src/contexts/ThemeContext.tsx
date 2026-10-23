@@ -1,7 +1,7 @@
-import { createContext, useContext } from 'react';
 import type { FC, ReactNode } from 'react';
+import { createContext, useContext } from 'react';
 
-import { useTheme, type Theme } from '../hooks/useTheme';
+import { type Theme, useTheme } from '../hooks/useTheme';
 
 export type { Theme };
 

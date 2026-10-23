@@ -1,5 +1,5 @@
-import { useEffect, useRef, useCallback } from 'react';
 import type { FC } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
 import type { CustomSiteConfiguration, SecurityWarning } from '../../types';

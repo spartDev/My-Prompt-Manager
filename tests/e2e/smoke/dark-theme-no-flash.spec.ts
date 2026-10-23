@@ -6,8 +6,8 @@
  * running transitions at the exact moment `dark` lands on <html>.
  */
 
-import { test, expect } from '../fixtures/extension';
-import { seedLibrary, createPromptSeed } from '../utils/storage';
+import { expect, test } from '../fixtures/extension';
+import { createPromptSeed, seedLibrary } from '../utils/storage';
 
 type DarkSnapshot = { runningTransitions?: Record<string, string[]>; error?: string };
 

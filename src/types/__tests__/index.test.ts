@@ -1,10 +1,10 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import {
   DEFAULT_CATEGORY,
   DEFAULT_SETTINGS,
-  VALIDATION_LIMITS,
-  type ErrorType
+  type ErrorType, 
+  VALIDATION_LIMITS
 } from '../index';
 
 describe('Type Definitions', () => {

@@ -1,5 +1,5 @@
 import { USAGE_STORAGE_KEY } from '../../../src/types';
-import { test, expect } from '../fixtures/extension';
+import { expect, test } from '../fixtures/extension';
 import { createAnalyticsScenario } from '../fixtures/test-data';
 import { AnalyticsPage } from '../pages/AnalyticsPage';
 import { analyticsAssertions } from '../utils/assertions';
