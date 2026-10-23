@@ -1,5 +1,5 @@
-import type { FC, ReactNode } from 'react';
-import { useId } from 'react';
+import type { FC, KeyboardEvent, ReactNode } from 'react';
+import { useId, useRef } from 'react';
 
 interface InterfaceModeSelectorProps {
   value: 'popup' | 'sidepanel';
@@ -80,6 +80,8 @@ const SIDE_PANEL_PREVIEW_SVG: ReactNode = (
   </svg>
 );
 
+const MODES = ['popup', 'sidepanel'] as const;
+
 const InterfaceModeSelector: FC<InterfaceModeSelectorProps> = ({
   value,
   onChange,
@@ -87,11 +89,28 @@ const InterfaceModeSelector: FC<InterfaceModeSelectorProps> = ({
   loading = false
 }) => {
   const labelId = useId();
+  const modeRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const locked = disabled || loading;
 
   const handleModeSelect = (mode: 'popup' | 'sidepanel') => {
-    if (!disabled && !loading) {
+    if (!locked) {
       onChange(mode);
     }
+  };
+
+  // WAI-ARIA radio group: the arrows, Home and End move the focus and the selection
+  const handleModeKeyDown = (e: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    let nextIndex: number | null = null;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { nextIndex = (index + 1) % MODES.length; }
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { nextIndex = (index - 1 + MODES.length) % MODES.length; }
+    if (e.key === 'Home') { nextIndex = 0; }
+    if (e.key === 'End') { nextIndex = MODES.length - 1; }
+    if (nextIndex === null) { return; }
+
+    e.preventDefault();
+    if (locked) { return; }
+    modeRefs.current[nextIndex]?.focus();
+    handleModeSelect(MODES[nextIndex]);
   };
 
   return (
@@ -112,8 +131,11 @@ const InterfaceModeSelector: FC<InterfaceModeSelectorProps> = ({
       <div role="radiogroup" aria-labelledby={labelId} className="grid grid-cols-2 gap-4">
         {/* Popup Mode Card */}
         <button
+          ref={(el) => { modeRefs.current[0] = el; }}
           onClick={() => { handleModeSelect('popup'); }}
-          disabled={disabled || loading}
+          onKeyDown={(e) => { handleModeKeyDown(e, 0); }}
+          aria-disabled={locked}
+          tabIndex={value === 'popup' ? 0 : -1}
           className={`
             relative group cursor-pointer transition-all duration-200
             ${disabled || loading ? 'opacity-50 cursor-not-allowed' : ''}
@@ -160,8 +182,11 @@ const InterfaceModeSelector: FC<InterfaceModeSelectorProps> = ({
 
         {/* Side Panel Mode Card */}
         <button
+          ref={(el) => { modeRefs.current[1] = el; }}
           onClick={() => { handleModeSelect('sidepanel'); }}
-          disabled={disabled || loading}
+          onKeyDown={(e) => { handleModeKeyDown(e, 1); }}
+          aria-disabled={locked}
+          tabIndex={value === 'sidepanel' ? 0 : -1}
           className={`
             relative group cursor-pointer transition-all duration-200
             ${disabled || loading ? 'opacity-50 cursor-not-allowed' : ''}

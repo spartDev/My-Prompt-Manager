@@ -213,4 +213,32 @@ test.describe('General Settings sections on the tokens', () => {
       await page.screenshot({ path: `${SCREENSHOT_DIR}/reset-settings-${theme}.png` });
     });
   }
+
+  test('the theme and interface mode radio groups take one tab stop and follow the arrows, Home and End', async ({ page, storage, extensionId }) => {
+    await openSettings(page, storage, extensionId, 'light');
+    const tabStops = (group: Locator) => group.getByRole('radio').evaluateAll(radios => radios.map(radio => (radio as HTMLElement).tabIndex));
+
+    const themes = page.getByRole('radiogroup', { name: 'Theme' });
+    const theme = (name: string) => themes.getByRole('radio', { name });
+    expect(await tabStops(themes)).toEqual([0, -1, -1]);
+    await theme('Light').focus();
+    for (const [key, name] of [['ArrowRight', 'Dark'], ['End', 'System'], ['ArrowDown', 'Light'], ['ArrowLeft', 'System'], ['Home', 'Light'], ['ArrowUp', 'System']] as const) {
+      await page.keyboard.press(key);
+      await expect(theme(name), key).toBeFocused();
+      await expect(theme(name), key).toHaveAttribute('aria-checked', 'true');
+    }
+    expect(await tabStops(themes)).toEqual([-1, -1, 0]);
+    await page.keyboard.press('Tab');
+    await expect(themes.locator(':focus')).toHaveCount(0);
+
+    const modes = page.getByRole('radiogroup', { name: 'Interface Mode' });
+    const sidePanel = modes.getByRole('radio', { name: 'Select side panel mode' });
+    expect(await tabStops(modes)).toEqual([0, -1]);
+    await modes.getByRole('radio', { name: 'Select popup window mode' }).focus();
+    await page.keyboard.press('ArrowRight');
+    // The mode saves for a few seconds: the chosen radio keeps the focus meanwhile
+    await expect(sidePanel).toHaveAttribute('aria-checked', 'true');
+    await expect(sidePanel).toBeFocused();
+    expect(await tabStops(modes)).toEqual([-1, 0]);
+  });
 });
