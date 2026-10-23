@@ -78,7 +78,7 @@ const ColorPickerContent: FC<{
     <div className="p-4">
       {/* Preset Colors Grid */}
       <div className="mb-4">
-        <h4 className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-3">
+        <h4 className="text-xs font-semibold text-tertiary uppercase tracking-wider mb-3">
           Preset Colors
         </h4>
         <div className="grid grid-cols-6 gap-2">
@@ -88,10 +88,10 @@ const ColorPickerContent: FC<{
               type="button"
               onClick={() => { handleColorSelect(color.value); }}
               className={`
-                w-10 h-10 rounded-lg border-2 transition-all hover:scale-110 hover:shadow-md
+                w-10 h-10 rounded-lg border-2 transition-all hover:scale-110 hover:shadow-md focus-interactive
                 ${value === color.value
-                  ? 'border-purple-500 dark:border-purple-400 ring-2 ring-purple-500/30'
-                  : 'border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-600'
+                  ? 'border-transparent ring-2 ring-accent ring-offset-2 ring-offset-(--background-color-card)'
+                  : 'border-transparent hover:border-accent'
                 }
               `}
               style={{ backgroundColor: color.value }}
@@ -125,7 +125,7 @@ const ColorPickerContent: FC<{
 
       {/* Custom Color Section */}
       <div>
-        <h4 className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-3">
+        <h4 className="text-xs font-semibold text-tertiary uppercase tracking-wider mb-3">
           Custom Color
         </h4>
 
@@ -150,7 +150,7 @@ const ColorPickerContent: FC<{
                   e.stopPropagation();
                   document.getElementById(colorInputId)?.click();
                 }}
-                className="flex items-center space-x-2 px-3 py-2 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/30 cursor-pointer transition-colors"
+                className="flex items-center space-x-2 px-3 py-2 bg-card border border-strong text-secondary rounded-lg hover:bg-muted cursor-pointer transition-colors focus-secondary"
                 aria-label="Pick custom color"
               >
                 <svg
@@ -172,7 +172,7 @@ const ColorPickerContent: FC<{
               {/* Color Preview showing current custom selection */}
               <div className="flex items-center space-x-2">
                 <div
-                  className="w-10 h-10 rounded-lg border-2 border-gray-200 dark:border-gray-700 shrink-0"
+                  className="w-10 h-10 rounded-lg border-2 border-default shrink-0"
                   style={{ backgroundColor: customColor }}
                   title={customColor !== value ? "New selection" : "Current color"}
                 />
@@ -183,7 +183,7 @@ const ColorPickerContent: FC<{
                     onClick={() => {
                       handleColorSelect(customColor);
                     }}
-                    className="px-2 py-1 text-xs bg-green-500 hover:bg-green-600 text-white rounded-md transition-colors"
+                    className="px-2 py-1 text-xs font-medium bg-accent hover:bg-accent-hover text-on-accent rounded-md transition-colors focus-primary"
                     title="Apply this color"
                   >
                     Apply
@@ -199,7 +199,7 @@ const ColorPickerContent: FC<{
                 setShowCustomInput(true);
                 setHexInputValue(value);
               }}
-              className="w-full px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors border border-gray-200 dark:border-gray-600 rounded-lg hover:border-purple-300 dark:hover:border-purple-500"
+              className="w-full px-3 py-2 text-sm text-secondary bg-card border border-strong rounded-lg hover:bg-muted transition-colors focus-secondary"
             >
               Enter Hex Code
             </button>
@@ -225,7 +225,7 @@ const ColorPickerContent: FC<{
                   e.stopPropagation();
                   document.getElementById(colorInputId)?.click();
                 }}
-                className="flex items-center space-x-2 px-3 py-2 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/30 cursor-pointer transition-colors"
+                className="flex items-center space-x-2 px-3 py-2 bg-card border border-strong text-secondary rounded-lg hover:bg-muted cursor-pointer transition-colors focus-secondary"
                 aria-label="Pick custom color"
               >
                 <svg
@@ -246,7 +246,7 @@ const ColorPickerContent: FC<{
 
               {/* Color Preview */}
               <div
-                className="w-10 h-10 rounded-lg border-2 border-gray-200 dark:border-gray-700 shrink-0"
+                className="w-10 h-10 rounded-lg border-2 border-default shrink-0"
                 style={{ backgroundColor: value }}
               />
             </div>
@@ -260,7 +260,7 @@ const ColorPickerContent: FC<{
                   handleHexInputChange(e.target.value.toUpperCase());
                 }}
                 placeholder="#000000"
-                className="flex-1 min-w-0 px-3 py-2 text-sm border border-purple-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-mono"
+                className="flex-1 min-w-0 px-3 py-2 text-sm border border-input rounded-lg focus-input bg-subtle text-primary placeholder:text-tertiary font-mono"
                 maxLength={MAX_HEX_COLOR_LENGTH}
               />
               <div className="flex items-center gap-1 shrink-0">
@@ -268,7 +268,7 @@ const ColorPickerContent: FC<{
                   type="button"
                   onClick={handleCustomColorSubmit}
                   disabled={!isValidHexColor(hexInputValue)}
-                  className="p-2 text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="p-2 text-accent hover:bg-muted rounded-lg transition-colors focus-interactive disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Apply"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -282,7 +282,7 @@ const ColorPickerContent: FC<{
                     setCustomColor(value);
                     setHexInputValue(value);
                   }}
-                  className="p-2 text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                  className="p-2 text-tertiary hover:text-primary hover:bg-muted rounded-lg transition-colors focus-interactive"
                   title="Cancel"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -326,7 +326,7 @@ const ColorPicker: FC<ColorPickerProps> = ({
     <div className={`relative ${className}`}>
       <div className="flex flex-col space-y-2">
         {label && (
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          <label className="text-sm font-medium text-secondary">
             {label}
           </label>
         )}
@@ -340,20 +340,20 @@ const ColorPicker: FC<ColorPickerProps> = ({
             <button
               type="button"
               disabled={disabled}
-              className={`flex items-center ${compact ? 'p-1' : 'px-3 py-2 space-x-2'} bg-white dark:bg-gray-700 border border-purple-200 dark:border-gray-600 rounded-lg hover:border-purple-400 dark:hover:border-purple-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-fit`}
+              className={`flex items-center ${compact ? 'p-1' : 'px-3 py-2 space-x-2'} bg-subtle border border-input rounded-lg hover:bg-muted transition-colors focus-input disabled:opacity-50 disabled:cursor-not-allowed w-fit`}
               title={compact ? currentColorName : undefined}
             >
               <div
-                className={`${compact ? 'w-8 h-8' : 'w-6 h-6'} rounded-md border-2 border-white dark:border-gray-800 shadow-sm`}
+                className={`${compact ? 'w-8 h-8' : 'w-6 h-6'} rounded-md border border-default shadow-sm`}
                 style={{ backgroundColor: value }}
               />
               {!compact && (
                 <>
-                  <span className="text-sm text-gray-700 dark:text-gray-300">
+                  <span className="text-sm text-primary">
                     {currentColorName}
                   </span>
                   <svg
-                    className="w-4 h-4 text-gray-500"
+                    className="w-4 h-4 text-tertiary"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"

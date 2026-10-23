@@ -28,7 +28,11 @@ const MIGRATED = [
   'components/ConfirmDialog.tsx',
   'components/StorageWarning.tsx',
   'components/ToastContainer.tsx',
-  'components/ErrorBoundary.tsx'
+  'components/ErrorBoundary.tsx',
+  // My-Prompt-Manager-el4.5.1: Categories
+  'components/CategoryManager.tsx',
+  'components/ColorPicker.tsx',
+  'components/CategoryBadge.tsx'
 ];
 
 const PALETTE = 'white|black|slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose';
