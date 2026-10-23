@@ -34,9 +34,9 @@ Category colors are **user data, not tokens**: each Category stores one hex colo
 | Background | the color at 13% opacity: `rgba(r, g, b, 0.13)` | same |
 | Text | each channel × 0.45 when the color's relative luminance is over 0.3 (Yellow), × 0.72 otherwise | 62% color + 38% white |
 
-**Safety net.** While the text is under 4.5:1 against the background composited over the Library card it renders on (`SOFT_BADGE_SURFACES`), the text keeps moving 5% toward black (light) or white (dark). The background is translucent, so this surface must be the card actually painted: white in light, and in dark the card's current gray-800 (`#1E2939`) until the Library moves to `bg-card` (`#231C34`), when `SOFT_BADGE_SURFACES` switches with it.
+**Safety net.** While the text is under 4.5:1 against the background composited over the Library card it renders on (`SOFT_BADGE_SURFACES`), the text keeps moving 5% toward black (light) or white (dark). The background is translucent, so this surface must be the card actually painted: `bg-card`, white in light and `#231C34` in dark.
 
-None of the 12 presets triggers the net (lowest: Slate in dark at 4.53:1, Amber in light at 4.87:1); their text equals the reference canvas. It corrects former presets and extreme custom colors in dark, for example Navy `#1E40AF` (`#7489CD`, 4.11:1, becomes `#8295D2`, 4.76:1) and `#000000` (`#616161`, 2.53:1, becomes `#8B8B8B`, 4.59:1).
+None of the 12 presets triggers the net (lowest: Slate in dark at 5.03:1, Amber in light at 4.87:1); their text equals the reference canvas. It corrects extreme custom colors in dark, for example `#000000` (`#616161`, 2.77:1, becomes `#858585`, 4.65:1) and `#1A1A2E` (`#71717D`, 3.40:1, becomes `#8B8B96`, 4.86:1). Navy `#1E40AF`, a former preset, reads at 4.53:1 without it.
 
 `CategoryBadge` passes both modes' colors as CSS variables (`--badge-bg`, `--badge-fg`, `--badge-bg-dark`, `--badge-fg-dark`), so a chip switches theme with the `.dark` class like everything else.
 
@@ -44,7 +44,7 @@ None of the 12 presets triggers the net (lowest: Slate in dark at 4.53:1, Amber 
 
 ## Tests
 
-- `src/constants/__tests__/categoryPalette.test.ts`: the 12 presets in order; the expected chip text of each preset in both modes (the reference canvas's output); 4.5:1 on the Library card for the presets and the nine former presets; the safety net on Navy, `#000000` and `#1A1A2E`; `Custom` for a former preset.
+- `src/constants/__tests__/categoryPalette.test.ts`: the 12 presets in order; the expected chip text of each preset in both modes (the reference canvas's output); 4.5:1 on the Library card for the presets and the nine former presets; the safety net on `#000000` and `#1A1A2E`; `Custom` for a former preset.
 - `tests/e2e/theme/category-chips.spec.ts`: the computed background and text of a chip on a Library card, light and dark; the contrast of Navy and `#000000` chips measured on the painted pixels, light and dark; proof screenshots of the Library chips and the color picker.
 
-When the Library card's surface changes, update `SOFT_BADGE_SURFACES` and the `CARD` constant of `categoryPalette.test.ts` with it. The painted-contrast e2e fails when the painted card is lighter than the measured surface; a darker card (gray-800 to `bg-card`) stays readable but over-corrects the colors that need the net.
+When the Library card's surface changes, update `SOFT_BADGE_SURFACES` and the `CARD` constant of `categoryPalette.test.ts` with it. The painted-contrast e2e fails when the painted card is lighter than the measured surface; a darker card stays readable but over-corrects the colors that need the net.

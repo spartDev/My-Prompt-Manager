@@ -35,7 +35,8 @@ const prompts: Prompt[] = categories.map((category, index) =>
   })
 );
 
-// Colors that need the safety net: a former preset still stored by Categories, and an extreme custom color
+// Colors at the edge of the rule: a former preset still stored by Categories (4.53:1 in dark without the net),
+// and an extreme custom color that needs the net
 const netCategories: Category[] = [
   { id: 'archive', name: 'Archives', color: '#1E40AF' }, // Navy
   { id: 'black', name: 'Noir', color: '#000000' }

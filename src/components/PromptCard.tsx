@@ -61,7 +61,7 @@ const highlightText = (text: string, query: string, promptId: string): ReactNode
 
     // Add highlighted match - using stable key with prompt ID and match position
     parts.push(
-      <mark key={`highlight-${promptId}-${String(index)}-${searchTerm}`} className="bg-yellow-200 dark:bg-yellow-800/40 px-1 rounded-sm">
+      <mark key={`highlight-${promptId}-${String(index)}-${searchTerm}`} className="bg-highlight text-inherit px-1 rounded-sm">
         {text.substring(index, index + searchTerm.length)}
       </mark>
     );
@@ -134,14 +134,14 @@ const PromptCard: FC<PromptCardProps> = ({
   return (
     <article
       data-testid="prompt-card"
-      className="bg-white dark:bg-gray-800 border border-purple-100 dark:border-gray-700 min-w-0 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow duration-200 relative group"
+      className="bg-card border border-default min-w-0 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow duration-200 relative group"
       aria-labelledby={`prompt-title-${prompt.id}`}
     >
       {/* Header: title and pin star */}
       <div className="flex items-start gap-2">
         <h3
           id={`prompt-title-${prompt.id}`}
-          className="min-w-0 flex-1 font-semibold text-gray-900 dark:text-gray-100 text-base leading-snug"
+          className="min-w-0 flex-1 font-semibold text-primary text-base leading-snug"
           aria-label={prompt.title}
         >
           {/* Stretched button: its ::after overlay covers the card, so clicking anywhere opens the editor.
@@ -149,7 +149,7 @@ const PromptCard: FC<PromptCardProps> = ({
           <button
             type="button"
             onClick={handleEditClick}
-            className="inline-block max-w-full truncate text-left align-top cursor-pointer focus:outline-none after:absolute after:inset-0 after:rounded-2xl after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-purple-500"
+            className="inline-block max-w-full truncate text-left align-top cursor-pointer focus:outline-none after:absolute after:inset-0 after:rounded-2xl after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-accent"
             aria-label={`Edit ${prompt.title}`}
             title={prompt.title}
           >
@@ -161,7 +161,7 @@ const PromptCard: FC<PromptCardProps> = ({
         <button
           type="button"
           onClick={handlePinClick}
-          className={`relative z-10 shrink-0 -mt-0.5 p-1 rounded-full transition-colors focus-interactive ${isPinned ? 'text-amber-400 hover:text-amber-500' : 'text-gray-300 dark:text-gray-600 hover:text-amber-400 dark:hover:text-amber-400'}`}
+          className={`relative z-10 shrink-0 -mt-0.5 p-1 rounded-full transition-colors focus-interactive ${isPinned ? 'text-pin' : 'text-(--border-color-input) hover:text-pin'}`}
           aria-pressed={isPinned}
           aria-label={isPinned ? `Unpin ${prompt.title}` : `Pin ${prompt.title}`}
           title={isPinned ? 'Unpin' : 'Pin to top'}
@@ -173,7 +173,7 @@ const PromptCard: FC<PromptCardProps> = ({
       </div>
 
       {/* Content preview (2 lines) */}
-      <p className="mt-1.5 text-sm leading-relaxed text-gray-500 dark:text-gray-400 line-clamp-2 break-words">
+      <p className="mt-1.5 text-sm leading-relaxed text-tertiary line-clamp-2 break-words">
         {highlightText(previewOf(prompt.content), searchQuery, prompt.id)}
       </p>
 
@@ -186,7 +186,7 @@ const PromptCard: FC<PromptCardProps> = ({
           {variableCount > 0 ? (
             <span
               data-testid="prompt-variables-chip"
-              className="shrink-0 inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+              className="shrink-0 inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold bg-subtle text-secondary"
               title="Filled in when you insert this prompt on an AI site"
             >
               {formatVariableCount(variableCount)}
@@ -194,14 +194,14 @@ const PromptCard: FC<PromptCardProps> = ({
           ) : null}
         </div>
 
-        <span className={`shrink-0 text-xs ${usageCount > 0 ? 'text-gray-500 dark:text-gray-400' : 'text-gray-400 dark:text-gray-500'}`}>
+        <span className="shrink-0 text-xs text-tertiary">
           {formatUsage(usageCount)}
         </span>
 
         {/* Copy Button */}
         <button
           onClick={handleCopyClick}
-          className="relative z-10 shrink-0 h-10 w-10 inline-flex items-center justify-center rounded-full bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-purple-900/40 dark:text-purple-300 dark:hover:bg-purple-900/60 transition-colors focus-interactive"
+          className="relative z-10 shrink-0 h-10 w-10 inline-flex items-center justify-center rounded-full bg-accent-subtle text-accent hover:bg-accent-selected transition-colors focus-interactive"
           aria-label={`Copy content of ${prompt.title} to clipboard`}
           title="Copy to clipboard"
         >
@@ -219,7 +219,7 @@ const PromptCard: FC<PromptCardProps> = ({
         <button
           onClick={(e) => { void handleShare(e); }}
           disabled={isSharing}
-          className="relative z-10 shrink-0 h-10 w-10 inline-flex items-center justify-center rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 transition-colors focus-interactive disabled:opacity-50 disabled:cursor-not-allowed"
+          className="relative z-10 shrink-0 h-10 w-10 inline-flex items-center justify-center rounded-full bg-subtle text-secondary hover:bg-muted transition-colors focus-interactive disabled:opacity-50 disabled:cursor-not-allowed"
           aria-label={isSharing ? `Sharing ${prompt.title}...` : `Share ${prompt.title}`}
           title="Share this prompt"
           aria-busy={isSharing}

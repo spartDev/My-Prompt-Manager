@@ -273,10 +273,10 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   if (promptsError) {
     return (
       <ThemeProvider>
-        <div className="h-full w-full p-4 bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="h-full w-full p-4 bg-app flex items-center justify-center">
           <div className="text-center">
-            <h2 className="text-xl font-semibold text-red-600 dark:text-red-400 mb-2">Error Loading Data</h2>
-            <p className="text-gray-600 dark:text-gray-400">{promptsError.message}</p>
+            <h2 className="text-xl font-semibold text-danger mb-2">Error Loading Data</h2>
+            <p className="text-secondary">{promptsError.message}</p>
           </div>
         </div>
       </ThemeProvider>
@@ -285,7 +285,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
 
   return (
     <ThemeProvider>
-      <div className={`h-full w-full bg-gray-50 dark:bg-gray-900 relative flex flex-col ${context === 'sidepanel' ? 'sidepanel' : ''}`}>
+      <div className={`h-full w-full bg-app section-scroll-scope relative flex flex-col ${context === 'sidepanel' ? 'sidepanel' : ''}`}>
       <div ref={sectionContentRef} className="flex-1 min-h-0">
       {currentView === 'library' && (
         <LibraryView

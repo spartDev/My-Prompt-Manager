@@ -1,0 +1,41 @@
+// @vitest-environment node
+/**
+ * Components moved to the color tokens (epic My-Prompt-Manager-el4) stay on them: no raw Tailwind
+ * palette class and no dark: color variant. Each migration ticket adds its files to MIGRATED.
+ */
+
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+
+import { describe, it, expect } from 'vitest';
+
+const SRC = path.resolve(__dirname, '../..');
+
+const MIGRATED = [
+  // My-Prompt-Manager-el4.3: app shell and Library
+  'App.tsx',
+  'components/ViewHeader.tsx',
+  'components/icons/HeaderIcons.tsx',
+  'components/TabBar.tsx',
+  'components/LibraryView.tsx',
+  'components/LibraryFilterBar.tsx',
+  'components/SearchBar.tsx',
+  'components/PromptCard.tsx'
+];
+
+const PALETTE = 'white|black|slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose';
+const COLOR_UTILITY = 'bg|text|border(?:-[trblxy])?|ring|ring-offset|outline|from|via|to|fill|stroke|divide|placeholder|decoration|shadow|accent|caret';
+
+/** bg-gray-50, hover:text-purple-600, from-white, border-t-purple-500/30... */
+const RAW_PALETTE_CLASS = new RegExp(`(?<![\\w-])(?:[\\w-]+:)*(?:${COLOR_UTILITY})-(?:${PALETTE})(?:-\\d{2,3})?(?:\\/\\d+)?(?![\\w-])`, 'g');
+/** dark:bg-card, dark:hover:text-secondary: a token class switches theme by itself */
+const DARK_COLOR_VARIANT = new RegExp(`(?<![\\w-])dark:(?:[\\w-]+:)*(?:${COLOR_UTILITY})-[\\w()/-]+`, 'g');
+
+describe('Components on the color tokens', () => {
+  it.each(MIGRATED)('%s uses no raw palette class and no dark: color variant', (file) => {
+    const source = readFileSync(path.join(SRC, file), 'utf8');
+
+    expect(source.match(RAW_PALETTE_CLASS) ?? [], 'raw palette classes').toEqual([]);
+    expect(source.match(DARK_COLOR_VARIANT) ?? [], 'dark: color variants').toEqual([]);
+  });
+});

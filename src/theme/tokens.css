@@ -32,6 +32,9 @@
   --text-color-accent-strong: #4c1d95;
   --border-color-accent: #c4b5fd;
 
+  /* Brand gradient: the logo only, the same in both modes */
+  --background-image-brand: linear-gradient(135deg, #6d28d9 0%, #4c1d95 100%);
+
   /* States */
   --background-color-success: #10b981;
   --background-color-success-subtle: #e7f8ef;
@@ -61,6 +64,9 @@
 
   /* Pinned Prompt star */
   --text-color-pin: #d97706;
+
+  /* Search match in a Prompt title or preview (warning-subtle's amber: 4.5:1 with tertiary text) */
+  --background-color-highlight: #fef3c7;
 
   /* Idle scrollbar thumb on a transparent track: 3:1 on every surface, in both modes */
   --scrollbar-color-thumb: #8b5cf6;
@@ -133,6 +139,9 @@
 
     /* Pinned Prompt star */
     --text-color-pin: #fbbf24;
+
+    /* Search match */
+    --background-color-highlight: #33270f;
 
     /* Scrollbar thumb */
     --scrollbar-color-thumb: #8b5cf6;

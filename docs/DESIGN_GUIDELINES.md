@@ -1,7 +1,7 @@
 # Design Guidelines
 
-**Version:** 2.0.0
-**Last Updated:** 2026-10-21
+**Version:** 2.1.0
+**Last Updated:** 2026-10-23
 
 This document provides comprehensive visual design guidelines for the Prompt Library Chrome Extension. All AI agents and developers working on this project **MUST** follow these guidelines to maintain visual consistency.
 
@@ -43,6 +43,7 @@ Visual reference (both modes side by side): the palette canvas linked from beads
 | `bg-muted` | `#F1EDF8` | `#2E2645` | Hover of neutral elements (`hover:bg-muted`) |
 | `bg-inverse` | `#1D1530` | `#4A3D6B` | Toasts |
 | `bg-backdrop` | `#2A2140` at 45% | `#07050C` at 70% | Behind an open dialog or drawer, with `backdrop-blur-sm` |
+| `bg-highlight` | `#FEF3C7` | `#33270F` | Search match in a Prompt title or preview (`<mark className="bg-highlight text-inherit">`) |
 
 Surfaces are **opaque**. `bg-backdrop` is the only translucent one: no more `bg-white/70` + `backdrop-blur-sm` glass on headers or sections.
 
@@ -82,7 +83,7 @@ Surfaces are **opaque**. `bg-backdrop` is the only translucent one: no more `bg-
 | `outline-accent`, `ring-accent` | accent | accent | Focus rings |
 | `--scrollbar-color-thumb` (variable, no class) | `#8B5CF6` | `#8B5CF6` | Scrollbar thumb, read by `popup.css` (at least 3:1 on every surface) |
 
-The brand gradient (`#6D28D9` to `#4C1D95`) is reserved for the logo. Every other surface is flat.
+The brand gradient (`bg-brand`: `#6D28D9` to `#4C1D95`, the same in both modes) is reserved for the logo. Every other surface is flat.
 
 ### States
 
@@ -893,15 +894,16 @@ Toasts are dark in both modes (`bg-inverse`). The status icon takes its bright v
 
 ### Section Headers
 
-The header is seamless: it shares `bg-app` with the page, and its bottom line (`border-strong`) shows only once the content scrolls under it. The icon square is `bg-accent-subtle` with a `text-accent` icon.
+The header is seamless: it shares `bg-app` with the page, and its bottom line (`border-strong`) shows only once the content scrolls under it. The tab bar works the same way: its top line shows while content remains below. Both lines are drawn by CSS (`scroll-edge-top` and `scroll-edge-bottom` in `src/popup.css`), driven by the scroll of the view's `[data-scroll-container]` inside App's `section-scroll-scope`: no scroll state in React. `ViewHeader` and `TabBar` already carry them.
+
+The icon square is `bg-accent-subtle` with a `text-accent` icon; the Library's logo takes `bg-brand` with a `text-on-accent` icon.
 
 ```tsx
-<div className={`
+<header className="
   shrink-0 p-6
   bg-app
-  border-b
-  ${isScrolled ? 'border-strong' : 'border-transparent'}
-`}>
+  border-b border-transparent scroll-edge-top
+">
   <div className="flex items-center justify-between">
     <div className="flex items-center space-x-3">
       {/* Icon */}
@@ -927,7 +929,7 @@ The header is seamless: it shares `bg-app` with the page, and its bottom line (`
 
     {/* Action button */}
   </div>
-</div>
+</header>
 ```
 
 ---
@@ -1488,6 +1490,10 @@ z-1000002  /* Content script debug */
 
 ## Version History
 
+**v2.1.0** (2026-10-23)
+- `bg-highlight` for search matches and `bg-brand` for the logo gradient
+- Header and tab bar lines drawn by CSS from the view's scroll (`scroll-edge-top`, `scroll-edge-bottom`)
+
 **v2.0.0** (2026-10-21)
 - Semantic color tokens for light and dark (`src/theme/tokens.css`): one class per color, no `dark:` color variant
 - Every pattern and example moved to the token classes: flat accent instead of the purple-indigo gradient, opaque surfaces instead of glass, dark toasts
@@ -1508,5 +1514,5 @@ For questions or suggestions about these design guidelines, please open an issue
 
 ---
 
-**Last Updated:** 2026-10-21
+**Last Updated:** 2026-10-23
 **Maintained By:** AI Development Team

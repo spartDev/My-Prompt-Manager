@@ -7,8 +7,8 @@ import { describe, it, expect } from 'vitest';
 
 import { PRESET_COLORS, getColorName, getContrastRatio, getSoftBadgeColors } from '../colors';
 
-// The Library card the chips render on: white / gray-800 until the Library moves to bg-card (#231C34 in dark)
-const CARD = { light: '#FFFFFF', dark: '#1E2939' } as const;
+// The Library card the chips render on: bg-card
+const CARD = { light: '#FFFFFF', dark: '#231C34' } as const;
 
 /** The chip background as it renders: its translucent color composited over the card */
 const onCard = (background: string, mode: 'light' | 'dark'): string => {
@@ -61,10 +61,10 @@ describe('Category chip', () => {
     );
   });
 
+  // Navy (#1E40AF), a former preset, reads at 4.53:1 on bg-card without the net
   it.each([
-    ['#1E40AF', '#8295D2'], // Navy, a former preset
-    ['#000000', '#8B8B8B'],
-    ['#1A1A2E', '#91919B']
+    ['#000000', '#858585'],
+    ['#1A1A2E', '#8B8B96']
   ])('lightens the dark-mode text of %s until it reads at 4.5:1', (color, corrected) => {
     const { background, text } = getSoftBadgeColors(color, 'dark');
     expect(text).toBe(corrected);

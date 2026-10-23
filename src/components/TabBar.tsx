@@ -41,7 +41,7 @@ const TabBar: FC<TabBarProps> = ({ activeSection, onSelect }) => {
 
   return (
     <nav
-      className="shrink-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 px-2 pt-2 pb-2"
+      className="shrink-0 bg-app border-t border-transparent scroll-edge-bottom px-2 pt-2 pb-2"
       aria-label="Main navigation"
     >
       <div className="grid grid-cols-4 gap-1" role="tablist" aria-label="Sections">
@@ -58,10 +58,10 @@ const TabBar: FC<TabBarProps> = ({ activeSection, onSelect }) => {
               data-testid={`tab-${section}`}
               onClick={() => { onSelect(section); }}
               onKeyDown={(e) => { handleKeyDown(e, index); }}
-              className={`flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-xl text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:focus-visible:ring-purple-400 ${
+              className={`flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-xl text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
                 isActive
-                  ? 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300'
-                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                  ? 'bg-accent-selected text-accent-strong'
+                  : 'text-tertiary hover:text-primary'
               }`}
             >
               <Icon className="w-6 h-6" />

@@ -13,7 +13,7 @@ const SearchBar: FC<SearchBarProps> = ({
     <div className="relative">
       <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none z-10">
         <svg
-          className="h-5 w-5 text-purple-400 dark:text-purple-300"
+          className="h-5 w-5 text-tertiary"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -33,7 +33,7 @@ const SearchBar: FC<SearchBarProps> = ({
         value={value}
         onChange={(e) => { onChange(e.target.value); }}
         placeholder={placeholder}
-        className="w-full pl-12 pr-12 py-3 bg-white/60 dark:bg-gray-700/60 backdrop-blur-sm border border-purple-200 dark:border-gray-600 rounded-xl focus-input text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 shadow-sm hover:bg-white/80 dark:hover:bg-gray-700/80 transition-all duration-200"
+        className="w-full pl-12 pr-12 py-3 bg-card border border-input rounded-xl focus-input text-sm text-primary placeholder:text-tertiary shadow-sm transition-all duration-200"
         aria-label="Search prompts"
         role="searchbox"
       />
@@ -41,12 +41,12 @@ const SearchBar: FC<SearchBarProps> = ({
       {value && (
         <button
           onClick={onClear}
-          className="absolute inset-y-0 right-0 pr-4 flex items-center hover:text-purple-600 dark:hover:text-purple-400 transition-colors focus-interactive rounded-sm"
+          className="absolute inset-y-0 right-0 pr-4 flex items-center text-tertiary hover:text-accent transition-colors focus-interactive rounded-sm"
           aria-label="Clear search"
           title="Clear search"
         >
           <svg
-            className="h-4 w-4 text-gray-400 dark:text-gray-500 hover:text-purple-600 dark:hover:text-purple-400"
+            className="h-4 w-4"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
