@@ -96,6 +96,23 @@ test.describe('App shell and Library on the tokens', () => {
       await expect(header).toHaveCSS('border-bottom-color', TRANSPARENT);
     });
 
+    test(`the Add and Edit forms show the header line once they scroll (${theme})`, async ({ page, storage, extensionId }) => {
+      await openLibrary(page, storage, extensionId, { theme, library: [{ ...prompts[0], content: 'Ligne\n'.repeat(40) }] });
+      const header = page.getByRole('banner');
+
+      for (const form of ['add', 'edit'] as const) {
+        await page.getByRole('button', { name: form === 'add' ? 'Add new prompt' : `Edit ${prompts[0].title}` }).click();
+        await expect(header).toHaveCSS('border-bottom-color', TRANSPARENT);
+
+        await page.locator(`#${form}-prompt-form`).hover({ position: { x: 8, y: 8 } });
+        await page.mouse.wheel(0, 300);
+        await expect(header, `${form} form scrolled`).toHaveCSS('border-bottom-color', colors.strong);
+
+        await page.getByRole('button', { name: 'Cancel' }).click();
+        await expect(page.getByTestId('prompt-card')).toHaveCount(1);
+      }
+    });
+
     test(`a list that fits shows neither line (${theme})`, async ({ page, storage, extensionId }) => {
       await openLibrary(page, storage, extensionId, { theme, library: prompts.slice(0, 1) });
 

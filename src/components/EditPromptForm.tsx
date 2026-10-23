@@ -172,7 +172,7 @@ const EditPromptForm: FC<EditPromptFormProps> = ({
       )}
 
       {/* Form */}
-      <div className="flex-1 overflow-auto custom-scrollbar">
+      <div className="flex-1 overflow-auto custom-scrollbar" data-scroll-container>
         <form id="edit-prompt-form" action={submitAction}>
           {/* Title Section */}
           <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-b border-purple-100 dark:border-gray-700 p-5">
