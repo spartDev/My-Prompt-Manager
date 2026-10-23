@@ -1,6 +1,6 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { act } from 'react';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { buildCategory } from '../../test/builders';
 import type { Category } from '../../types';

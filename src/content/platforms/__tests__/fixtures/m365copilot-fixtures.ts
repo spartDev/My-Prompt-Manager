@@ -11,21 +11,21 @@ import { vi } from 'vitest';
 import {
   cleanupElement,
   createMockUIFactory,
+  type MockLocation,
+  type NativeValueSetterConfig, 
   setMockHostname,
   setupDispatchEventMock,
-  setupNativeValueSetterMock,
-  type MockLocation,
-  type NativeValueSetterConfig
+  setupNativeValueSetterMock
 } from './shared-fixtures';
 
 export {
   cleanupElement,
   createMockUIFactory,
+  type MockLocation,
+  type NativeValueSetterConfig, 
   setMockHostname,
   setupDispatchEventMock,
-  setupNativeValueSetterMock,
-  type MockLocation,
-  type NativeValueSetterConfig
+  setupNativeValueSetterMock
 };
 
 /**

@@ -1,7 +1,7 @@
 import { DEFAULT_SETTINGS } from '../../../src/types';
-import { test, expect } from '../fixtures/extension';
+import { expect, test } from '../fixtures/extension';
 import { LibraryPage } from '../pages/LibraryPage';
-import { seedLibrary, createPromptSeed, createCategorySeed } from '../utils/storage';
+import { createCategorySeed, createPromptSeed, seedLibrary } from '../utils/storage';
 
 /**
  * Creates seed data for power user testing scenarios.

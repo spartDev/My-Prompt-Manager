@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
 import type { FC, ReactNode } from 'react';
+import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
 export type ConfirmDialogVariant = 'danger' | 'warning' | 'info';

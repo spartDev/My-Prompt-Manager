@@ -7,9 +7,9 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import LZString from 'lz-string';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { admit, AdmissionRefusedError } from '../../services/promptAdmission';
+import { AdmissionRefusedError, admit } from '../../services/promptAdmission';
 import { encode } from '../../services/promptEncoder';
 import { PromptManager } from '../../services/promptManager';
 import type { Category, Prompt } from '../../types';

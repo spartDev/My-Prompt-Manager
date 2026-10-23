@@ -1,6 +1,6 @@
 import { renderHook } from '@testing-library/react';
 import { useRef } from 'react';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useDropdownClose } from '../useDropdownClose';
 

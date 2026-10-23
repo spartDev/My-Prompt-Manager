@@ -1,11 +1,11 @@
 import { type FC, memo } from 'react';
 import {
-  PieChart,
-  Pie,
   Cell,
+  Legend, 
+  Pie,
+  PieChart,
   ResponsiveContainer,
-  Tooltip,
-  Legend
+  Tooltip
 } from 'recharts';
 
 import { useChartTheme } from '../../../hooks/useChartTheme';

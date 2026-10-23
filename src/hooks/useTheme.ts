@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { StorageManager } from '../services/storage';
 import type { CustomSite } from '../types';

@@ -6,7 +6,7 @@
  */
 
 import { render, screen, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeAll, beforeEach, type Mock } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 import { ThemeProvider } from '../../../../contexts/ThemeContext';
 import { getChromeMockFunctions, getMockStorageManager } from '../../../../test/mocks';

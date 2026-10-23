@@ -2,23 +2,23 @@
  * Unit tests for CopilotStrategy
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { HOSTILE_TEXTS, expectNoMarkupIn } from '../../../test/helpers/hostile-text';
+import { expectNoMarkupIn, HOSTILE_TEXTS } from '../../../test/helpers/hostile-text';
 import type { UIElementFactory } from '../../ui/element-factory';
 import { CopilotStrategy } from '../copilot-strategy';
 
 import {
+  COPILOT_BUTTON_CONTAINER_SELECTOR,
+  COPILOT_CONFIG, 
+  COPILOT_SELECTORS,
   createCopilotTextarea,
   createMockUIFactory,
-  setMockHostname,
-  resetMockHostname,
-  setupDispatchEventMock,
-  setupNativeValueSetterMock,
   createReactTextarea,
-  COPILOT_SELECTORS,
-  COPILOT_BUTTON_CONTAINER_SELECTOR,
-  COPILOT_CONFIG
+  resetMockHostname,
+  setMockHostname,
+  setupDispatchEventMock,
+  setupNativeValueSetterMock
 } from './fixtures/copilot-fixtures';
 
 // Mock Logger

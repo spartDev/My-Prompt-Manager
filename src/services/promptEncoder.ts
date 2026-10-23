@@ -19,11 +19,11 @@
 import LZString from 'lz-string';
 
 import {
-  type SharedPromptData,
+  type AppError, 
+  type ErrorType,
   PROMPT_SHARING_SIZE_LIMITS,
   type Prompt,
-  type ErrorType,
-  type AppError
+  type SharedPromptData
 } from '../types';
 import { Logger, toError } from '../utils';
 

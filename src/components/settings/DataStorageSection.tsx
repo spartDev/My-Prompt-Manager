@@ -1,8 +1,8 @@
-import { type FC, useState, useRef, useMemo, useCallback } from 'react';
+import { type FC, useCallback, useMemo, useRef, useState } from 'react';
 
-import type { Prompt, Category } from '../../types';
+import type { Category, Prompt } from '../../types';
 import type {} from '../../types/file-system-access-api';
-import { Logger, toError, findInvalidImportPrompt, findInvalidImportCategory } from '../../utils';
+import { findInvalidImportCategory, findInvalidImportPrompt, Logger, toError } from '../../utils';
 import { DatabaseIcon, ExportIcon, ImportIcon } from '../icons/SettingsIcons';
 
 import SettingsSection from './SettingsSection';

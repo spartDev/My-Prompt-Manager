@@ -1,6 +1,6 @@
 import { DEFAULT_CATEGORY, DEFAULT_SETTINGS } from '../../../src/types';
-import { test, expect } from '../fixtures/extension';
-import { seedLibrary, createPromptSeed } from '../utils/storage';
+import { expect, test } from '../fixtures/extension';
+import { createPromptSeed, seedLibrary } from '../utils/storage';
 
 const MOCK_HOST = 'https://claude.ai/';
 const MOCK_BODY = /* html */ `

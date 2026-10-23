@@ -10,7 +10,7 @@
  * "Summarize the meta use text tags; if count=5 and  true, return  JSON".
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DEFAULT_CATEGORY } from '../../constants';
 import { StorageManager } from '../../services/storage';

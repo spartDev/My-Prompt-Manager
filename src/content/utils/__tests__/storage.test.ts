@@ -2,11 +2,11 @@
  * Unit tests for StorageManager utility module
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DEFAULT_CATEGORY } from '../../../constants';
 import * as Logger from '../logger';
-import { getPrompts, createElement, createSVGElement } from '../storage';
+import { createElement, createSVGElement, getPrompts } from '../storage';
 
 // Mock Logger
 vi.mock('../logger', () => ({

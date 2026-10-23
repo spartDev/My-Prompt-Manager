@@ -8,8 +8,8 @@
 import type { BrowserContext, Page } from '@playwright/test';
 
 import { DEFAULT_SETTINGS, type Prompt } from '../../../src/types';
-import { test, expect, type ExtensionStorage } from '../fixtures/extension';
-import { seedLibrary, createPromptSeed } from '../utils/storage';
+import { type ExtensionStorage, expect, test } from '../fixtures/extension';
+import { createPromptSeed, seedLibrary } from '../utils/storage';
 
 const MOCK_HOST = 'https://claude.ai/';
 const SCREENSHOT_DIR = 'test-results/picker-pinned';

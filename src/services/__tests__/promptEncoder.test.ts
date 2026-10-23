@@ -5,11 +5,11 @@
  * strips tags, so XSS assertions would fail although real browsers strip it.
  */
 import LZString from 'lz-string';
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { testEncoderRoundtrip } from '../../test/helpers/encoder-helpers';
 import type { Prompt } from '../../types';
-import { encode, decode } from '../promptEncoder';
+import { decode, encode } from '../promptEncoder';
 
 // Helper to create test prompt
 function createTestPrompt(overrides: Partial<Prompt> = {}): Prompt {

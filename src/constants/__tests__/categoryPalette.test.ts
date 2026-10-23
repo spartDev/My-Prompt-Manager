@@ -3,9 +3,9 @@
  * Expected chip colors are the output of the reference canvas of epic My-Prompt-Manager-el4 (run as is).
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-import { PRESET_COLORS, getColorName, getContrastRatio, getSoftBadgeColors } from '../colors';
+import { getColorName, getContrastRatio, getSoftBadgeColors, PRESET_COLORS } from '../colors';
 
 // The Library card the chips render on: bg-card
 const CARD = { light: '#FFFFFF', dark: '#231C34' } as const;

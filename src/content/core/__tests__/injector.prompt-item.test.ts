@@ -6,7 +6,7 @@
  * can bring in ids such as `a/b`), and that the content inserted is the Prompt's own.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Prompt } from '../../types/index';
 import { PromptLibraryInjector } from '../injector';

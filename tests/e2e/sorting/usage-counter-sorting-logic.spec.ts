@@ -7,10 +7,10 @@
  */
 
 import { DEFAULT_CATEGORY } from '../../../src/types';
-import { test, expect } from '../fixtures/extension';
+import { expect, test } from '../fixtures/extension';
 import { LibraryPage } from '../pages/LibraryPage';
 import { getCurrentSortLabel, getSortedPromptTitles, selectSortOption } from '../utils/sort-helpers';
-import { seedLibrary, createPromptSeed } from '../utils/storage';
+import { createPromptSeed, seedLibrary } from '../utils/storage';
 
 test.describe('Usage Counter & Smart Sorting - Logic', () => {
 

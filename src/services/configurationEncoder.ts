@@ -20,19 +20,19 @@
 import { compressToEncodedURIComponent, decompressFromEncodedURIComponent } from 'lz-string';
 
 import type {
+  ConfigurationValidationResult,
   CustomSite,
   CustomSiteConfiguration,
-  ConfigurationValidationResult,
-  EncodedCustomSitePayloadV1,
   ElementFingerprint,
+  EncodedCustomSitePayloadV1,
   SecurityWarning
 } from '../types';
 import { Logger, toError } from '../utils';
 import {
   detectMaliciousContent,
+  HOSTNAME_PATTERN, 
   isSelectorSafe,
-  sanitizeConfiguration,
-  HOSTNAME_PATTERN
+  sanitizeConfiguration
 } from '../utils/configurationSecurity';
 
 type NormalizedPayload = Omit<EncodedCustomSitePayloadV1, 'c'>;
@@ -563,5 +563,5 @@ const ConfigurationEncoder = {
   validate: validateConfiguration
 } as const;
 
-export { ConfigurationEncoder };
 export type { ConfigurationErrorCode };
+export { ConfigurationEncoder };

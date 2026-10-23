@@ -2,7 +2,7 @@
  * Unit tests for KeyboardNavigationManager
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import * as Logger from '../../utils/logger';
 import { EventManager } from '../event-manager';

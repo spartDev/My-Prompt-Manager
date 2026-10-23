@@ -1,10 +1,10 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ALL_PROMPTS } from '../../services/libraryFilter';
 import { triggerChromeStorageChange } from '../../test/mocks';
-import type { Prompt, Category, LibraryFilter } from '../../types';
+import type { Category, LibraryFilter, Prompt } from '../../types';
 import type { UseSearchWithDebounceReturn } from '../../types/hooks';
 import LibraryView from '../LibraryView';
 

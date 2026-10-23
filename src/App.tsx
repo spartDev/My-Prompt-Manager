@@ -1,5 +1,5 @@
-import { useState, useOptimistic, useTransition, useCallback, useRef } from 'react';
 import type { FC } from 'react';
+import { useCallback, useOptimistic, useRef, useState, useTransition } from 'react';
 
 import AddPromptForm from './components/AddPromptForm';
 import { AnalyticsTab } from './components/analytics';
@@ -17,7 +17,7 @@ import { usePrompts } from './hooks/usePrompts';
 import { useSearchWithDebounce } from './hooks/useSearchWithDebounce';
 import { useToast } from './hooks/useToast';
 import { ALL_PROMPTS } from './services/libraryFilter';
-import type { Prompt, AppError, ViewType, LibraryFilter } from './types';
+import type { AppError, LibraryFilter, Prompt, ViewType } from './types';
 import { Logger, toError } from './utils';
 
 type ExtendedViewType = ViewType | Section;

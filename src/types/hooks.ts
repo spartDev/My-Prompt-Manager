@@ -1,6 +1,6 @@
 import type { ToastType } from './components';
 
-import type { Prompt, Category, AppError, UsageEvent } from './index';
+import type { AppError, Category, Prompt, UsageEvent } from './index';
 
 /**
  * Type guard function that validates an unknown value is of type T.

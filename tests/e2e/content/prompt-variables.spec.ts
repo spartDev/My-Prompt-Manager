@@ -9,8 +9,8 @@
 import type { BrowserContext, Page } from '@playwright/test';
 
 import { DEFAULT_CATEGORY } from '../../../src/types';
-import { test, expect, type ExtensionStorage } from '../fixtures/extension';
-import { seedLibrary, createPromptSeed } from '../utils/storage';
+import { type ExtensionStorage, expect, test } from '../fixtures/extension';
+import { createPromptSeed, seedLibrary } from '../utils/storage';
 
 const SIDEPANEL_URL = 'src/sidepanel.html';
 const SCREENSHOT_DIR = 'test-results/prompt-variables';

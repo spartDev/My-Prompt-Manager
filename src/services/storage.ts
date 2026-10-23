@@ -2,14 +2,14 @@ import { v4 as uuidv4 } from 'uuid';
 
 import { isValidHexColor } from '../constants/colors';
 import {
-  type Prompt,
+  type AppError, 
   type Category,
-  type Settings,
-  type StorageData,
-  DEFAULT_SETTINGS,
   DEFAULT_CATEGORY,
+  DEFAULT_SETTINGS,
   type ErrorType,
-  type AppError
+  type Prompt,
+  type Settings,
+  type StorageData
 } from '../types';
 import { AsyncMutex } from '../utils/asyncMutex';
 import { ensureStorageAvailable } from '../utils/chromeStorage';
@@ -21,23 +21,23 @@ import {
 
 import {
   AdmissionRefusedError,
-  PROMPT_LIMITS,
   admit,
   admitEdit,
   admitNew,
   admitRestored,
   matchStoredCategory,
+  PROMPT_LIMITS,
+  type PromptTextPatch,
   planCategoryMerge,
   readPrompt,
   readPrompts,
   recordUse,
-  togglePin,
   repointPrompt,
+  type StoredPrompt, 
   scrubStored,
   scrubStoredCategories,
   scrubStoredSettings,
-  type PromptTextPatch,
-  type StoredPrompt
+  togglePin
 } from './promptAdmission';
 
 class StorageError extends Error implements AppError {

@@ -1,5 +1,5 @@
 import { admit } from '../services/promptAdmission';
-import type { Prompt, Category, Settings, StorageData, UsageEvent, CustomSite } from '../types';
+import type { Category, CustomSite, Prompt, Settings, StorageData, UsageEvent } from '../types';
 import type { TypeGuard } from '../types/hooks';
 
 import * as Logger from './logger';

@@ -1,4 +1,4 @@
-import { type FC, useState, useEffect, useCallback } from 'react';
+import { type FC, useCallback, useEffect, useState } from 'react';
 
 import { useSitePermissions } from '../../hooks/useSitePermissions';
 import type { CustomSite, ElementFingerprint } from '../../types';

@@ -1,5 +1,5 @@
-import { renderHook, waitFor, act } from '@testing-library/react';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { act, renderHook, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { buildPrompt } from '../../test/builders';
 import type { Prompt } from '../../types';

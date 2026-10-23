@@ -5,10 +5,10 @@
  * contexts and pages in the Chrome extension testing environment.
  */
 
-import type { Page, BrowserContext, Locator } from '@playwright/test';
+import type { BrowserContext, Locator, Page } from '@playwright/test';
 
 import { expect } from '../fixtures/extension';
-import { CLAUDE_MOCK_HTML, CHATGPT_MOCK_HTML } from '../fixtures/mock-pages';
+import { CHATGPT_MOCK_HTML, CLAUDE_MOCK_HTML } from '../fixtures/mock-pages';
 
 /**
  * Top-level destinations reachable from the bottom tab bar

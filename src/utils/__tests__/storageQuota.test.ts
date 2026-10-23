@@ -1,15 +1,15 @@
 
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import {
+  calculateMaxPrompts,
   checkQuotaAvailability,
+  ESTIMATED_SIZES, 
   estimatePromptSize,
   estimatePromptsArraySize,
-  calculateMaxPrompts,
   formatBytes,
   getStorageStats,
-  QUOTA_THRESHOLDS,
-  ESTIMATED_SIZES
+  QUOTA_THRESHOLDS
 } from '../storageQuota';
 
 describe('StorageQuota Utils', () => {

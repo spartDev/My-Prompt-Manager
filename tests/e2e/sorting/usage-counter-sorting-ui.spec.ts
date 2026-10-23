@@ -8,11 +8,11 @@
  */
 
 import { DEFAULT_CATEGORY } from '../../../src/types';
-import { test, expect } from '../fixtures/extension';
+import { expect, test } from '../fixtures/extension';
 import { LibraryPage } from '../pages/LibraryPage';
 import { tabNavigation } from '../utils/navigation';
-import { getSortedPromptTitles, selectSortOption, navigateToContext, getCurrentSortLabel } from '../utils/sort-helpers';
-import { seedLibrary, createPromptSeed } from '../utils/storage';
+import { getCurrentSortLabel, getSortedPromptTitles, navigateToContext, selectSortOption } from '../utils/sort-helpers';
+import { createPromptSeed, seedLibrary } from '../utils/storage';
 
 // Define contexts for parameterized testing - ensures both popup and sidepanel are tested
 const CONTEXTS = [

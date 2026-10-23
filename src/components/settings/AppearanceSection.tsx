@@ -1,6 +1,6 @@
 import { type FC, useCallback } from 'react';
 
-import { useThemeContext, type Theme } from '../../contexts/ThemeContext';
+import { type Theme, useThemeContext } from '../../contexts/ThemeContext';
 import InterfaceModeSelector from '../InterfaceModeSelector';
 
 import SettingsSection from './SettingsSection';

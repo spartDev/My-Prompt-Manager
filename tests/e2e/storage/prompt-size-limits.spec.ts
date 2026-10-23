@@ -13,10 +13,10 @@
  * - Both save and update behave consistently for the same content
  */
 import { DEFAULT_CATEGORY, DEFAULT_SETTINGS } from '../../../src/types';
-import { test, expect } from '../fixtures/extension';
+import { expect, test } from '../fixtures/extension';
 import { LibraryPage } from '../pages/LibraryPage';
 import { PromptFormPage } from '../pages/PromptFormPage';
-import { seedLibrary, createPromptSeed } from '../utils/storage';
+import { createPromptSeed, seedLibrary } from '../utils/storage';
 
 test.describe('Prompt size limits (MAX_PROMPT_SIZE fix)', () => {
   // Generate a large content string near the 20K character limit

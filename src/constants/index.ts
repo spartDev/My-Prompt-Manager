@@ -7,11 +7,11 @@
 
 import type { Settings, SortDirection, SortOrder } from '../types';
 
+export * from './brandColors';
 // Re-export from organized constant files
 export * from './colors';
-export * from './validation';
 export * from './ui';
-export * from './brandColors';
+export * from './validation';
 
 // ============================================================================
 // Usage Analytics Constants

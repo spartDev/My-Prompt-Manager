@@ -1,14 +1,14 @@
-import { useState, useId, useEffect } from 'react';
 import type { FC } from 'react';
+import { useEffect, useId, useState } from 'react';
 
 import {
-  PRESET_COLORS,
+  getColorName, 
   isValidHexColor,
-  getColorName
+  PRESET_COLORS
 } from '../constants/colors';
 import { MAX_HEX_COLOR_LENGTH } from '../constants/validation';
 
-import { Dropdown, useDropdown, DropdownSeparator } from './Dropdown';
+import { Dropdown, DropdownSeparator, useDropdown } from './Dropdown';
 
 interface ColorPickerProps {
   value: string;

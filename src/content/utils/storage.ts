@@ -9,7 +9,7 @@ import { cutWithoutSplittingPairs } from "../../utils/truncate";
 import type { Prompt } from "../types/index";
 
 import { DOMUtils } from "./dom";
-import { warn, debug, error as logError } from "./logger";
+import { debug, error as logError, warn } from "./logger";
 
 /**
  * Interface for extension settings

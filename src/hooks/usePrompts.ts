@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { PromptManager } from '../services/promptManager';
 import { StorageManager } from '../services/storage';
-import type { Prompt, AppError } from '../types';
+import type { AppError, Prompt } from '../types';
 import type { UsePromptsReturn } from '../types/hooks';
 
 export const usePrompts = (): UsePromptsReturn => {

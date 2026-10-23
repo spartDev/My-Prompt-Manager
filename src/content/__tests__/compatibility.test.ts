@@ -13,7 +13,7 @@
  
 
 import { JSDOM } from 'jsdom';
-import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 import { getChromeMockFunctions } from '../../test/mocks';
 import { PromptLibraryInjector } from '../core/injector';

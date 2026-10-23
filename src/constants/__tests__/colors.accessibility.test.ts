@@ -4,16 +4,16 @@
  * Tests WCAG 2.1 compliance for category colors in both light and dark modes.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import {
-  PRESET_COLORS,
-  getRelativeLuminance,
-  getContrastRatio,
-  meetsWCAGStandard,
   getAccessibleTextColor,
   getContrastingTextColor,
-  isValidHexColor
+  getContrastRatio,
+  getRelativeLuminance,
+  isValidHexColor, 
+  meetsWCAGStandard,
+  PRESET_COLORS
 } from '../colors';
 
 describe('Color Contrast Accessibility', () => {

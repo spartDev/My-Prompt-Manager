@@ -5,18 +5,18 @@
  * and advanced data management features for more sophisticated testing.
  */
 
-import type { Prompt, Category, Settings } from '../../../src/types';
+import type { Category, Prompt, Settings } from '../../../src/types';
 import type { ExtensionStorage } from '../fixtures/extension';
 import {
-  SCENARIO_FIXTURES,
-  PROMPT_FIXTURES,
-  CATEGORY_FIXTURES,
   CATEGORY_COLORS,
-  testDataHelpers,
-  type TestScenario
+  CATEGORY_FIXTURES,
+  PROMPT_FIXTURES,
+  SCENARIO_FIXTURES,
+  type TestScenario, 
+  testDataHelpers
 } from '../fixtures/test-data';
 
-import { seedLibrary, createPromptSeed, createCategorySeed } from './storage';
+import { createCategorySeed, createPromptSeed, seedLibrary } from './storage';
 
 
 /**

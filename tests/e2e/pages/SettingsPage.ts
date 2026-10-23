@@ -1,4 +1,4 @@
-import type { Locator, Download } from '@playwright/test';
+import type { Download, Locator } from '@playwright/test';
 
 import { expect } from '../fixtures/extension';
 

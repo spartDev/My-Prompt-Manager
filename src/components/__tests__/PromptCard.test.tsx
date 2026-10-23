@@ -1,9 +1,9 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import * as promptEncoder from '../../services/promptEncoder';
-import type { Prompt, Category } from '../../types';
+import type { Category, Prompt } from '../../types';
 import PromptCard from '../PromptCard';
 
 describe('PromptCard - Basic Rendering', () => {

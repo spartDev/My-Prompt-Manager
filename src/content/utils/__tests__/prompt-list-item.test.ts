@@ -5,9 +5,9 @@
  * has to show a Prompt exactly as saved (Verbatim): no escaping, and ids passed through.
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { HOSTILE_TEXTS, expectNoMarkupIn } from '../../../test/helpers/hostile-text';
+import { expectNoMarkupIn, HOSTILE_TEXTS } from '../../../test/helpers/hostile-text';
 import type { Prompt } from '../../types/index';
 import { createPromptListItem } from '../storage';
 

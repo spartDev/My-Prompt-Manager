@@ -1,11 +1,11 @@
-import { renderHook, waitFor, act } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { expect, vi } from 'vitest';
 
 import { useTheme } from '../../hooks/useTheme';
 import { StorageManager } from '../../services/storage';
 import type { StorageManagerMock } from '../../test/setup';
-import { DEFAULT_SETTINGS } from '../../types';
 import type { Settings } from '../../types';
+import { DEFAULT_SETTINGS } from '../../types';
 
 /**
  * Test helper for setting up theme tests with consistent mock configuration

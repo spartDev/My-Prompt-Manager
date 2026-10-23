@@ -10,7 +10,7 @@ import type { InsertionResult } from '../types/index';
 import type { PlatformManagerOptions } from '../types/platform';
 import type { UIElementFactory } from '../ui/element-factory';
 import { debug, warn } from '../utils/logger';
-import { getSettings, type CustomSite } from '../utils/storage';
+import { type CustomSite, getSettings } from '../utils/storage';
 
 import type { PlatformStrategy } from './base-strategy';
 import { ChatGPTStrategy } from './chatgpt-strategy';

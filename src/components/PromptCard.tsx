@@ -1,5 +1,5 @@
-import { useState, memo } from 'react';
 import type { FC, MouseEvent, ReactNode } from 'react';
+import { memo, useState } from 'react';
 
 import { encode } from '../services/promptEncoder';
 import type { PromptCardProps } from '../types/components';

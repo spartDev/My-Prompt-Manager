@@ -3,7 +3,7 @@
  * Exports all utility classes for easy importing
  */
 
-export { isDebugMode, error, warn, info, debug, showDebugNotification } from './logger';
-export { getPrompts, createElement, createSVGElement, createPromptListItem } from './storage';
-export { injectCSS, getCSS, removeCSS, isInjected } from './styles';
 export { DOMUtils } from './dom';
+export { debug, error, info, isDebugMode, showDebugNotification, warn } from './logger';
+export { createElement, createPromptListItem, createSVGElement, getPrompts } from './storage';
+export { getCSS, injectCSS, isInjected, removeCSS } from './styles';

@@ -8,9 +8,9 @@
 import type { Page } from '@playwright/test';
 
 import type { Category, Prompt } from '../../../src/types';
-import { test, expect, type ExtensionStorage } from '../fixtures/extension';
+import { type ExtensionStorage, expect, test } from '../fixtures/extension';
 import { LibraryPage } from '../pages/LibraryPage';
-import { seedLibrary, createPromptSeed } from '../utils/storage';
+import { createPromptSeed, seedLibrary } from '../utils/storage';
 
 const SIDEPANEL_URL = 'src/sidepanel.html';
 const SCREENSHOT_DIR = 'test-results/library-cards';

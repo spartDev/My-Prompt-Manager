@@ -1,5 +1,5 @@
 import { DEFAULT_SETTINGS } from '../../../src/types';
-import { test, expect } from '../fixtures/extension';
+import { expect, test } from '../fixtures/extension';
 import {
   CATEGORY_FIXTURES,
   createAnalyticsScenario,
@@ -7,10 +7,10 @@ import {
 import { AnalyticsPage } from '../pages/AnalyticsPage';
 import { analyticsAssertions } from '../utils/assertions';
 import {
-  seedLibrary,
-  seedUsageHistory,
   createPromptSeed,
   createUsageEventSeed,
+  seedLibrary,
+  seedUsageHistory,
 } from '../utils/storage';
 import { analyticsWorkflows } from '../utils/workflows';
 

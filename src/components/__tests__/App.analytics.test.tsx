@@ -1,12 +1,12 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import App from '../../App';
 import { useUsageStats } from '../../hooks/useUsageStats';
-import { getMockStorageManager, getChromeMock } from '../../test/mocks';
+import { getChromeMock, getMockStorageManager } from '../../test/mocks';
 import type { Category } from '../../types';
-import type { UseUsageStatsReturn, UsageStats } from '../../types/hooks';
+import type { UsageStats, UseUsageStatsReturn } from '../../types/hooks';
 
 // Mock the useUsageStats hook
 vi.mock('../../hooks/useUsageStats', () => ({
