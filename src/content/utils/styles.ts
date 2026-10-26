@@ -36,6 +36,68 @@ export function injectCSS(): void {
  */
 export function getCSS(): string {
   return `
+    /*
+      Color tokens: the popup's semantic tokens (src/theme/tokens.css, epic My-Prompt-Manager-el4) under
+      the same names, declared on the selector so the host page's styles cannot reach them. Light values
+      here, dark values on .dark-theme (set by ThemeManager from the extension's theme). Every rule below
+      reads them through var(): no color is written anywhere else in this file.
+    */
+    .prompt-library-selector {
+      --background-color-card: #ffffff;
+      --background-color-subtle: #f4f1fa;
+      --background-color-muted: #f1edf8;
+      --background-color-accent: #6d28d9;
+      --background-color-accent-hover: #5b21b6;
+      --background-color-accent-selected: #ede5ff;
+      --text-color-primary: #1d1530;
+      --text-color-secondary: #5c5370;
+      --text-color-tertiary: #6f6787;
+      --text-color-on-accent: #ffffff;
+      --text-color-accent-strong: #4c1d95;
+      --border-color-default: #ece6f5;
+      --border-color-divider: #f0ebf8;
+      --border-color-strong: #dcd4ea;
+      --border-color-input: #8f87a5;
+      --border-color-accent: #c4b5fd;
+      --shadow-tint-10: rgba(45, 25, 90, 0.1);
+      --shadow-xl: 0 20px 25px -5px var(--shadow-tint-10), 0 8px 10px -6px var(--shadow-tint-10);
+    }
+
+    .prompt-library-selector.dark-theme {
+      --background-color-card: #231c34;
+      --background-color-subtle: #2b2340;
+      --background-color-muted: #2e2645;
+      --background-color-accent: #844bf2;
+      --background-color-accent-hover: #7a40e3;
+      --background-color-accent-selected: #38296a;
+      --text-color-primary: #f1edf9;
+      --text-color-secondary: #bcb3d0;
+      --text-color-tertiary: #a39abb;
+      --text-color-on-accent: #ffffff;
+      --text-color-accent-strong: #ddd3fe;
+      --border-color-default: #352c4c;
+      --border-color-divider: #2f2744;
+      --border-color-strong: #41375a;
+      --border-color-input: #766c8e;
+      --border-color-accent: #6d4fc4;
+      --shadow-tint-10: rgba(0, 0, 0, 0.16);
+    }
+
+    /*
+      The floating icon (custom sites) sits on the host page, not on the selector: it follows the page's
+      own dark mode (.dark on an ancestor). Hover is the popup's bg-muted on a light page, a white veil on
+      a dark one; the focus ring is the accent of the matching mode.
+    */
+    .prompt-library-icon-base {
+      --prompt-library-icon-hover: #f1edf8;
+      --prompt-library-icon-ring: #6d28d9;
+    }
+
+    .prompt-library-icon-base:is(.dark *) {
+      --prompt-library-icon-hover: rgba(255, 255, 255, 0.08);
+      --prompt-library-icon-ring: #844bf2;
+    }
+
     /* Base Prompt Manager Icon Styles */
     .prompt-library-icon-base {
       min-width: 32px;
@@ -60,45 +122,16 @@ export function getCSS(): string {
       z-index: 10;
     }
 
-    /* Legacy class for backward compatibility */
-    .prompt-library-icon {
-      position: absolute;
-      width: 32px;
-      height: 32px;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-      z-index: 999999;
-      border: 2px solid transparent;
+    .prompt-library-icon-base:hover {
+      background: var(--prompt-library-icon-hover);
     }
 
-    /* Hover and focus styles for all prompt library icons */
-    /* Light mode hover (default) */
-    .prompt-library-icon-base:hover,
-    .prompt-library-icon:hover {
-      background: #e4e4e4;
+    .prompt-library-icon-base:focus-visible {
+      outline: 2px solid var(--prompt-library-icon-ring);
+      outline-offset: 2px;
     }
 
-    /* Dark mode hover */
-    .prompt-library-icon-base:hover:is(.dark *):hover,
-    .prompt-library-icon:hover:is(.dark *):hover {
-      background: #ffffff14;
-    }
-
-    .prompt-library-icon-base:focus-visible,
-    .prompt-library-icon:focus-visible {
-      outline: none;
-      border-color: #60a5fa;
-      box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.4);
-    }
-
-    .prompt-library-icon-base svg,
-    .prompt-library-icon svg {
+    .prompt-library-icon-base svg {
       color: currentColor;
       width: 18px;
       height: 18px;
@@ -107,26 +140,21 @@ export function getCSS(): string {
       margin: auto;
     }
 
-    /* Prompt Selector Modal */
+    /* Prompt Selector Modal: one opaque card */
     .prompt-library-selector {
       position: absolute;
       width: 400px;
       max-height: 500px;
-      background: white;
-      border: 1px solid #e5e7eb;
+      background: var(--background-color-card);
+      color: var(--text-color-primary);
+      border: 1px solid var(--border-color-default);
       border-radius: 12px;
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1), 0 8px 16px rgba(0, 0, 0, 0.08);
+      box-shadow: var(--shadow-xl);
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       z-index: 1000000;
       overflow: hidden;
-      backdrop-filter: blur(8px);
       animation: promptSelectorFadeIn 0.2s ease-out;
       transition: top 0.15s ease-out, left 0.15s ease-out;
-    }
-
-    .prompt-library-selector:focus-within {
-      border-color: #4f46e5;
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15), 0 8px 16px rgba(0, 0, 0, 0.1), 0 0 0 3px rgba(79, 70, 229, 0.1);
     }
 
     @keyframes promptSelectorFadeIn {
@@ -166,18 +194,17 @@ export function getCSS(): string {
 
     .prompt-selector-header {
       padding: 16px;
-      border-bottom: 1px solid #e5e7eb;
+      border-bottom: 1px solid var(--border-color-divider);
       display: flex;
       justify-content: space-between;
       align-items: center;
-      background: #f9fafb;
     }
 
     .prompt-selector-header h3 {
       margin: 0;
       font-size: 16px;
       font-weight: 600;
-      color: #111827;
+      color: var(--text-color-primary);
     }
 
     .close-selector {
@@ -185,7 +212,7 @@ export function getCSS(): string {
       border: none;
       font-size: 20px;
       cursor: pointer;
-      color: #6b7280;
+      color: var(--text-color-tertiary);
       width: 24px;
       height: 24px;
       display: flex;
@@ -195,28 +222,44 @@ export function getCSS(): string {
     }
 
     .close-selector:hover {
-      background: #e5e7eb;
-      color: #374151;
+      background: var(--background-color-muted);
+      color: var(--text-color-primary);
+    }
+
+    .close-selector:focus-visible {
+      outline: 2px solid var(--background-color-accent);
+      outline-offset: 2px;
     }
 
     .prompt-search {
       padding: 12px 16px;
-      border-bottom: 1px solid #e5e7eb;
+      border-bottom: 1px solid var(--border-color-divider);
     }
 
-    .search-input {
+    /* Fields on a card: bg-subtle, border-input; focused: accent border and ring (focus-input) */
+    .search-input,
+    .prompt-variable-input {
       width: 100%;
       padding: 8px 12px;
-      border: 1px solid #d1d5db;
+      border: 1px solid var(--border-color-input);
       border-radius: 6px;
       font-size: 14px;
       outline: none;
       box-sizing: border-box;
+      background: var(--background-color-subtle);
+      color: var(--text-color-primary);
     }
 
-    .search-input:focus {
-      border-color: #4f46e5;
-      box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+    .search-input::placeholder,
+    .prompt-variable-input::placeholder {
+      color: var(--text-color-tertiary);
+      opacity: 1;
+    }
+
+    .search-input:focus,
+    .prompt-variable-input:focus {
+      border-color: var(--background-color-accent);
+      box-shadow: 0 0 0 2px var(--background-color-accent);
     }
 
     .prompt-list {
@@ -226,7 +269,7 @@ export function getCSS(): string {
 
     .prompt-item {
       padding: 12px 16px;
-      border-bottom: 1px solid #f3f4f6;
+      border-bottom: 1px solid var(--border-color-divider);
       cursor: pointer;
       transition: background-color 0.15s ease;
       border-radius: 4px;
@@ -234,20 +277,19 @@ export function getCSS(): string {
       position: relative;
     }
 
-    .prompt-item:hover,
+    .prompt-item:hover {
+      background: var(--background-color-muted);
+    }
+
     .prompt-item:focus-visible {
-      background: #f9fafb;
       outline: none;
+      box-shadow: 0 0 0 2px var(--background-color-accent);
     }
 
-    .prompt-item:focus-visible {
-      box-shadow: 0 0 0 2px #4f46e5;
-      background: #f0f0f3;
-    }
-
+    /* The keyboard-selected Prompt: a chosen item among several */
     .prompt-item.keyboard-selected {
-      background: #f0f0f3;
-      box-shadow: 0 0 0 2px #4f46e5;
+      background: var(--background-color-accent-selected);
+      box-shadow: inset 0 0 0 1px var(--border-color-accent);
     }
 
     .prompt-item:last-child {
@@ -256,178 +298,45 @@ export function getCSS(): string {
 
     .prompt-title {
       font-weight: 600;
-      color: #111827;
+      color: var(--text-color-primary);
       font-size: 14px;
       margin-bottom: 4px;
     }
 
+    .prompt-item.keyboard-selected .prompt-title {
+      color: var(--text-color-accent-strong);
+    }
+
+    /*
+      Category chip: the chip rule of the Category's color (getSoftBadgeColors), set on the chip by the
+      content script as --prompt-category-bg, --prompt-category-text and --prompt-category-text-dark
+    */
     .prompt-category {
       font-size: 12px;
-      color: #4f46e5;
-      background: #eef2ff;
+      font-weight: 600;
+      color: var(--prompt-category-text, var(--text-color-secondary));
+      background: var(--prompt-category-bg, var(--background-color-subtle));
       padding: 2px 8px;
       border-radius: 12px;
       display: inline-block;
       margin-bottom: 6px;
     }
 
+    .prompt-library-selector.dark-theme .prompt-category {
+      color: var(--prompt-category-text-dark, var(--text-color-secondary));
+    }
+
     .prompt-preview {
       font-size: 13px;
-      color: #6b7280;
+      color: var(--text-color-tertiary);
       line-height: 1.4;
     }
 
     .no-prompts {
       padding: 32px 16px;
       text-align: center;
-      color: #6b7280;
+      color: var(--text-color-tertiary);
       font-style: italic;
-    }
-
-    /* Dark theme support */
-    .prompt-library-selector.dark-theme {
-      background: #1f2937;
-      border-color: #374151;
-    }
-
-    .prompt-library-selector.dark-theme .prompt-selector-header {
-      background: #111827;
-      border-color: #374151;
-    }
-
-    .prompt-library-selector.dark-theme .prompt-selector-header h3 {
-      color: #f9fafb;
-    }
-
-    .prompt-library-selector.dark-theme .close-selector {
-      color: #9ca3af;
-    }
-
-    .prompt-library-selector.dark-theme .close-selector:hover {
-      background: #374151;
-      color: #f3f4f6;
-    }
-
-    .prompt-library-selector.dark-theme .prompt-search {
-      border-color: #374151;
-    }
-
-    .prompt-library-selector.dark-theme .search-input {
-      background: #374151;
-      border-color: #4b5563;
-      color: #f9fafb;
-    }
-
-    .prompt-library-selector.dark-theme .search-input:focus {
-      border-color: #6366f1;
-    }
-
-    .prompt-library-selector.dark-theme .prompt-item {
-      border-color: #374151;
-    }
-
-    .prompt-library-selector.dark-theme .prompt-item:hover {
-      background: #374151;
-    }
-
-    .prompt-library-selector.dark-theme .prompt-item:focus-visible {
-      box-shadow: 0 0 0 2px #6366f1;
-      background: #374151;
-    }
-
-    .prompt-library-selector.dark-theme .prompt-item.keyboard-selected {
-      background: #374151;
-      box-shadow: 0 0 0 2px #6366f1;
-    }
-
-    .prompt-library-selector.dark-theme .prompt-title {
-      color: #f9fafb;
-    }
-
-    .prompt-library-selector.dark-theme .prompt-category {
-      background: #312e81;
-      color: #c7d2fe;
-    }
-
-    .prompt-library-selector.dark-theme .prompt-preview {
-      color: #9ca3af;
-    }
-
-    .prompt-library-selector.dark-theme .no-prompts {
-      color: #9ca3af;
-    }
-
-    /* Light theme support (explicit for clarity) */
-    .prompt-library-selector.light-theme {
-      background: white;
-      border-color: #e5e7eb;
-    }
-
-    .prompt-library-selector.light-theme .prompt-selector-header {
-      background: #f9fafb;
-      border-color: #e5e7eb;
-    }
-
-    .prompt-library-selector.light-theme .prompt-selector-header h3 {
-      color: #111827;
-    }
-
-    .prompt-library-selector.light-theme .close-selector {
-      color: #6b7280;
-    }
-
-    .prompt-library-selector.light-theme .close-selector:hover {
-      background: #e5e7eb;
-      color: #374151;
-    }
-
-    .prompt-library-selector.light-theme .prompt-search {
-      border-color: #e5e7eb;
-    }
-
-    .prompt-library-selector.light-theme .search-input {
-      background: white;
-      border-color: #d1d5db;
-      color: #111827;
-    }
-
-    .prompt-library-selector.light-theme .search-input:focus {
-      border-color: #4f46e5;
-    }
-
-    .prompt-library-selector.light-theme .prompt-item {
-      border-color: #f3f4f6;
-    }
-
-    .prompt-library-selector.light-theme .prompt-item:hover {
-      background: #f9fafb;
-    }
-
-    .prompt-library-selector.light-theme .prompt-item:focus-visible {
-      box-shadow: 0 0 0 2px #4f46e5;
-      background: #f0f0f3;
-    }
-
-    .prompt-library-selector.light-theme .prompt-item.keyboard-selected {
-      background: #f0f0f3;
-      box-shadow: 0 0 0 2px #4f46e5;
-    }
-
-    .prompt-library-selector.light-theme .prompt-title {
-      color: #111827;
-    }
-
-    .prompt-library-selector.light-theme .prompt-category {
-      background: #eef2ff;
-      color: #4f46e5;
-    }
-
-    .prompt-library-selector.light-theme .prompt-preview {
-      color: #6b7280;
-    }
-
-    .prompt-library-selector.light-theme .no-prompts {
-      color: #6b7280;
     }
 
     /* Variable fill-in form (Prompt with {{name}} Variables) */
@@ -450,25 +359,8 @@ export function getCSS(): string {
     .prompt-variable-label {
       font-size: 13px;
       font-weight: 600;
-      color: #374151;
+      color: var(--text-color-secondary);
       overflow-wrap: anywhere;
-    }
-
-    .prompt-variable-input {
-      width: 100%;
-      padding: 8px 12px;
-      border: 1px solid #d1d5db;
-      border-radius: 6px;
-      font-size: 14px;
-      outline: none;
-      box-sizing: border-box;
-      background: white;
-      color: #111827;
-    }
-
-    .prompt-variable-input:focus {
-      border-color: #4f46e5;
-      box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
     }
 
     .prompt-variables-actions {
@@ -483,71 +375,36 @@ export function getCSS(): string {
       padding: 8px 14px;
       border-radius: 6px;
       font-size: 14px;
-      font-weight: 500;
+      font-weight: 600;
       cursor: pointer;
       border: 1px solid transparent;
     }
 
+    /* Insert as is: the secondary button */
     .prompt-variables-skip {
-      background: white;
-      border-color: #d1d5db;
-      color: #374151;
+      background: var(--background-color-card);
+      border-color: var(--border-color-strong);
+      color: var(--text-color-secondary);
     }
 
     .prompt-variables-skip:hover {
-      background: #f9fafb;
+      background: var(--background-color-muted);
     }
 
+    /* Insert: the primary button */
     .prompt-variables-submit {
-      background: #4f46e5;
-      color: white;
+      background: var(--background-color-accent);
+      color: var(--text-color-on-accent);
     }
 
     .prompt-variables-submit:hover {
-      background: #4338ca;
+      background: var(--background-color-accent-hover);
     }
 
     .prompt-variables-skip:focus-visible,
     .prompt-variables-submit:focus-visible {
-      outline: 2px solid #4f46e5;
+      outline: 2px solid var(--background-color-accent);
       outline-offset: 2px;
-    }
-
-    .prompt-library-selector.dark-theme .prompt-variable-label {
-      color: #e5e7eb;
-    }
-
-    .prompt-library-selector.dark-theme .prompt-variable-input {
-      background: #374151;
-      border-color: #4b5563;
-      color: #f9fafb;
-    }
-
-    .prompt-library-selector.dark-theme .prompt-variable-input:focus {
-      border-color: #6366f1;
-    }
-
-    .prompt-library-selector.dark-theme .prompt-variables-skip {
-      background: #1f2937;
-      border-color: #4b5563;
-      color: #e5e7eb;
-    }
-
-    .prompt-library-selector.dark-theme .prompt-variables-skip:hover {
-      background: #374151;
-    }
-
-    .prompt-library-selector.dark-theme .prompt-variables-submit {
-      background: #6366f1;
-    }
-
-    .prompt-library-selector.dark-theme .prompt-variables-submit:hover {
-      background: #4f46e5;
-    }
-
-    .prompt-library-selector.dark-theme .prompt-variables-skip:focus-visible,
-    .prompt-library-selector.dark-theme .prompt-variables-submit:focus-visible {
-      outline-color: #818cf8;
     }
 
     /* Responsive design */
@@ -569,61 +426,6 @@ export function getCSS(): string {
       clip: rect(0, 0, 0, 0);
       white-space: nowrap;
       border: 0;
-    }
-
-    /* Insertion Feedback Styles */
-    .insertion-feedback {
-      position: absolute;
-      top: -40px;
-      left: 50%;
-      transform: translateX(-50%);
-      padding: 8px 16px;
-      border-radius: 6px;
-      font-size: 12px;
-      font-weight: 500;
-      color: white;
-      z-index: 1000001;
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity 0.2s ease;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-      backdrop-filter: blur(8px);
-    }
-
-    .insertion-feedback.success {
-      background: linear-gradient(135deg, #10b981, #059669);
-    }
-
-    .insertion-feedback.error {
-      background: linear-gradient(135deg, #ef4444, #dc2626);
-    }
-
-    .insertion-feedback.show {
-      opacity: 1;
-    }
-
-    /* Platform-specific insertion debugging styles */
-    .insertion-debug {
-      position: fixed;
-      top: 10px;
-      right: 10px;
-      background: rgba(0, 0, 0, 0.8);
-      color: white;
-      padding: 12px;
-      border-radius: 8px;
-      font-family: monospace;
-      font-size: 11px;
-      z-index: 1000002;
-      max-width: 300px;
-      backdrop-filter: blur(8px);
-    }
-
-    .insertion-debug.success {
-      border-left: 4px solid #10b981;
-    }
-
-    .insertion-debug.error {
-      border-left: 4px solid #ef4444;
     }
   `;
 }

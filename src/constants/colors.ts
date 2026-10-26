@@ -28,8 +28,9 @@ export const PRESET_COLORS: ColorOption[] = [
   { name: 'Slate', value: '#475569', textColor: '#FFFFFF' }, // slate-600: 7.58:1
 ];
 
-// Default color for new categories (WCAG AA compliant)
-export const DEFAULT_CATEGORY_COLOR = '#2563EB';
+// Default color for new categories (WCAG AA compliant), and the chip rule: both live in a module with no
+// logger, so the content script shares them (src/theme/categoryChip.ts)
+export { DEFAULT_CATEGORY_COLOR, getSoftBadgeColors } from '../theme/categoryChip';
 
 // Function to get a random color from the palette
 export const getRandomPresetColor = (): string => {
@@ -238,48 +239,6 @@ export const adjustColorBrightness = (hexColor: string, percent: number): string
   const toHex = (value: number) => value.toString(16).padStart(2, '0');
 
   return `#${toHex(newR)}${toHex(newG)}${toHex(newB)}`.toUpperCase();
-};
-
-// The Library card the soft badge renders on (bg-card). The badge background is translucent, so the
-// safety net must measure on this surface: change it with the card's background
-const SOFT_BADGE_SURFACES = { light: '#FFFFFF', dark: '#231C34' } as const;
-const SOFT_BADGE_ALPHA = 0.13;
-
-const hexChannels = (hex: string): number[] =>
-  [0, 2, 4].map(i => parseInt(hex.replace('#', '').substring(i, i + 2), 16));
-
-const mixHexColors = (from: string, to: string, amount: number): string => {
-  const [start, end] = [hexChannels(from), hexChannels(to)];
-  const toHex = (value: number) => Math.round(value).toString(16).padStart(2, '0');
-  return `#${start.map((channel, i) => toHex(channel + (end[i] - channel) * amount)).join('')}`.toUpperCase();
-};
-
-const scaleHexColor = (hexColor: string, factor: number): string =>
-  mixHexColors('#000000', hexColor, factor);
-
-/**
- * Colors for the "soft" category badge: the category color at 13% opacity as background (the same
- * in both modes), and the category color as text: darkened in light mode (x 0.45 for a light color,
- * x 0.72 otherwise), mixed with 38% white in dark mode. A safety net keeps darkening (light) or
- * lightening (dark) in 5% steps while the text is under WCAG AA (4.5:1) on the tint over the card;
- * no preset color needs it.
- */
-export const getSoftBadgeColors = (
-  hexColor: string,
-  mode: 'light' | 'dark'
-): { background: string; text: string } => {
-  const color = isValidHexColor(hexColor) ? hexColor : DEFAULT_CATEGORY_COLOR;
-  const background = `rgba(${hexChannels(color).join(', ')}, ${String(SOFT_BADGE_ALPHA)})`;
-  const backgroundOnCard = mixHexColors(SOFT_BADGE_SURFACES[mode], color, SOFT_BADGE_ALPHA);
-  const target = mode === 'light' ? '#000000' : '#FFFFFF';
-
-  let text = mode === 'light'
-    ? scaleHexColor(color, getRelativeLuminance(color) > 0.3 ? 0.45 : 0.72)
-    : mixHexColors(color, '#FFFFFF', 0.38);
-  for (let step = 0; step < 60 && getContrastRatio(text, backgroundOnCard) < 4.5; step++) {
-    text = mixHexColors(text, target, 0.05);
-  }
-  return { background, text };
 };
 
 // Get color name from preset or return "Custom"

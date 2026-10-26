@@ -5,6 +5,7 @@
 
 import { getDefaultEnabledPlatforms } from "../../config/platforms";
 import { readPrompts } from "../../services/promptAdmission";
+import { DEFAULT_CATEGORY_COLOR, getSoftBadgeColors } from "../../theme/categoryChip";
 import { cutWithoutSplittingPairs } from "../../utils/truncate";
 import type { Prompt } from "../types/index";
 
@@ -237,6 +238,42 @@ export async function getPrompts(): Promise<Prompt[]> {
 }
 
 /**
+ * The color of each Category, by name, for the Category chips of the Prompt selector.
+ * A Category with no valid #RRGGBB color is left out: its chip takes the default color.
+ */
+export function getCategoryColors(): Promise<Map<string, string>> {
+  return new Promise((resolve) => {
+    try {
+      chrome.storage.local.get(["categories"], (result) => {
+        if (chrome.runtime.lastError) {
+          logError(
+            "Failed to retrieve categories from storage",
+            new Error(
+              `Chrome storage error: ${chrome.runtime.lastError.message ?? "Unknown error"}`,
+            ),
+          );
+          resolve(new Map());
+          return;
+        }
+
+        const rawCategories: unknown = result.categories;
+        const colors = new Map<string, string>();
+        for (const category of Array.isArray(rawCategories) ? rawCategories : []) {
+          const { name, color } = (category ?? {}) as { name?: unknown; color?: unknown };
+          if (typeof name === "string" && typeof color === "string" && /^#[0-9A-F]{6}$/i.test(color)) {
+            colors.set(name, color);
+          }
+        }
+        resolve(colors);
+      });
+    } catch (err) {
+      logError("Unexpected error accessing chrome storage", err as Error);
+      resolve(new Map()); // Graceful fallback
+    }
+  });
+}
+
+/**
  * Helper function to safely create DOM elements with text content
  * @deprecated Use DOMUtils.createElement instead
  */
@@ -264,11 +301,14 @@ export function createSVGElement(
  *
  * Shows the Prompt exactly as saved (Verbatim): text is set as text, so it needs no
  * escaping, and the id goes into the attribute unchanged so it can be matched later.
+ * The Category chip takes the chip rule of `categoryColor` (the default Category color when
+ * unknown), in light and dark: the selector's theme class picks one.
  */
 export function createPromptListItem(
   prompt: Prompt,
   index: number,
   idPrefix: string = "prompt-item",
+  categoryColor: string = DEFAULT_CATEGORY_COLOR,
 ): HTMLElement {
   try {
     const promptItem = DOMUtils.createElement("div", {
@@ -293,6 +333,13 @@ export function createPromptListItem(
         class: "prompt-category",
       },
       prompt.category,
+    );
+    const light = getSoftBadgeColors(categoryColor, "light");
+    promptCategory.style.setProperty("--prompt-category-bg", light.background);
+    promptCategory.style.setProperty("--prompt-category-text", light.text);
+    promptCategory.style.setProperty(
+      "--prompt-category-text-dark",
+      getSoftBadgeColors(categoryColor, "dark").text,
     );
 
     const promptPreview = DOMUtils.createElement(

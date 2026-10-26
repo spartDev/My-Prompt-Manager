@@ -57,6 +57,7 @@ vi.mock('../../ui/keyboard-navigation', () => ({
 }));
 
 vi.mock('../../utils/storage', () => ({
+  getCategoryColors: vi.fn().mockResolvedValue(new Map()),
   getPrompts: vi.fn().mockResolvedValue([]),
   createPromptListItem: vi.fn().mockImplementation((prompt, _index, className) => {
     const item = document.createElement('div');
