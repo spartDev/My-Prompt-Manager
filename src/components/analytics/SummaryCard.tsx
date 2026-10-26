@@ -26,21 +26,21 @@ const SummaryCard: FC<SummaryCardProps> = memo(({
   const getTrendColor = () => {
     switch (trend) {
       case 'up':
-        return 'text-green-500 dark:text-green-400';
+        return 'text-success';
       case 'down':
-        return 'text-red-500 dark:text-red-400';
+        return 'text-danger';
       default:
-        return 'text-gray-500 dark:text-gray-400';
+        return 'text-tertiary';
     }
   };
 
   if (loading) {
     return (
-      <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl p-4 border border-purple-100 dark:border-gray-700">
+      <div className="bg-card rounded-xl p-4 border border-default">
         <div className="animate-pulse">
-          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2 mb-3" />
-          <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-2" />
-          <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/3" />
+          <div className="h-4 bg-muted rounded w-1/2 mb-3" />
+          <div className="h-8 bg-muted rounded w-3/4 mb-2" />
+          <div className="h-3 bg-muted rounded w-1/3" />
         </div>
       </div>
     );
@@ -48,22 +48,22 @@ const SummaryCard: FC<SummaryCardProps> = memo(({
 
   return (
     <article
-      className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl p-4 border border-purple-100 dark:border-gray-700 hover:bg-white/90 dark:hover:bg-gray-800/90 transition-all duration-200"
+      className="bg-card rounded-xl p-4 border border-default"
       aria-label={`${label}: ${String(value)}${subtitle ? `, ${subtitle}` : ''}`}
     >
       <div className="flex items-start justify-between mb-2">
-        <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+        <span className="text-xs font-medium text-tertiary uppercase tracking-wider">
           {label}
         </span>
-        <div className="w-8 h-8 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-lg flex items-center justify-center shrink-0">
-          <div className="w-4 h-4 text-white" aria-hidden="true">
+        <div className="w-8 h-8 bg-accent-subtle text-accent rounded-lg flex items-center justify-center shrink-0" data-testid="summary-icon">
+          <div className="w-4 h-4" aria-hidden="true">
             {icon}
           </div>
         </div>
       </div>
 
       <div className="flex items-baseline gap-2">
-        <span className={`text-2xl font-bold ${trend ? getTrendColor() : 'text-gray-900 dark:text-gray-100'}`}>
+        <span className={`text-2xl font-bold ${trend ? getTrendColor() : 'text-primary'}`}>
           {value}
         </span>
         {trend && (
@@ -75,7 +75,7 @@ const SummaryCard: FC<SummaryCardProps> = memo(({
       </div>
 
       {subtitle && (
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate" title={subtitle}>
+        <p className="text-xs text-tertiary mt-1 truncate" title={subtitle}>
           {subtitle}
         </p>
       )}

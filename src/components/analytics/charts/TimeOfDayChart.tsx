@@ -10,8 +10,7 @@ import {
   YAxis
 } from 'recharts';
 
-import { useChartTheme } from '../../../hooks/useChartTheme';
-import { CHART_PRIMARY, TIME_BUCKET_COLORS } from '../../../theme/chartColors';
+import { CHART_PRIMARY, CHART_THEME, TIME_BUCKET_COLORS } from '../../../theme/chartColors';
 import type { TimeOfDayDistribution } from '../../../types/hooks';
 
 export interface TimeOfDayChartProps {
@@ -42,17 +41,17 @@ const TimeOfDayChart: FC<TimeOfDayChartProps> = memo(({
   showGrid = true,
   highlightPeak = true
 }) => {
-  const { gridColor, textColor, tooltipBg, tooltipBorder, tooltipLabelColor, cursorColor } = useChartTheme();
+  const { gridColor, textColor, tooltipBg, tooltipBorder, tooltipLabelColor, cursorColor } = CHART_THEME;
 
   if (data.length === 0) {
     return (
       <div
-        className="flex items-center justify-center bg-gray-50 dark:bg-gray-800/50 rounded-xl"
+        className="flex items-center justify-center bg-raised rounded-xl"
         style={{ height }}
         role="img"
         aria-label="No time of day data available"
       >
-        <p className="text-sm text-gray-500 dark:text-gray-400">No time of day data</p>
+        <p className="text-sm text-tertiary">No time of day data</p>
       </div>
     );
   }

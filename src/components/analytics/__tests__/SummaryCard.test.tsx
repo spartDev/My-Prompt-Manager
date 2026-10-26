@@ -202,7 +202,7 @@ describe('SummaryCard', () => {
   });
 
   describe('Styling', () => {
-    it('should have glassmorphism styling', () => {
+    it('is an opaque card on the color tokens, with no hover since it is not interactive', () => {
       const { container } = render(
         <SummaryCard
           label="Test"
@@ -212,23 +212,22 @@ describe('SummaryCard', () => {
       );
 
       const card = container.querySelector('article');
-      expect(card).toHaveClass('bg-white/70');
-      expect(card).toHaveClass('backdrop-blur-sm');
-      expect(card).toHaveClass('rounded-xl');
+      expect(card).toHaveClass('bg-card', 'border-default', 'rounded-xl');
+      expect(card?.className).not.toMatch(/backdrop-blur|hover:/);
     });
 
-    it('should have hover state classes', () => {
-      const { container } = render(
-        <SummaryCard
-          label="Test"
-          value={0}
-          icon={<TestIcon />}
-        />
+    it('shows a rising trend in the success color and a falling one in the danger color', () => {
+      render(
+        <>
+          <SummaryCard label="Growth" value={10} icon={<TestIcon />} trend="up" />
+          <SummaryCard label="Decline" value={-5} icon={<TestIcon />} trend="down" />
+        </>
       );
 
-      const card = container.querySelector('article');
-      expect(card).toHaveClass('hover:bg-white/90');
-      expect(card).toHaveClass('transition-all');
+      expect(screen.getByText('↑')).toHaveClass('text-success');
+      expect(screen.getByText('10')).toHaveClass('text-success');
+      expect(screen.getByText('↓')).toHaveClass('text-danger');
+      expect(screen.getByText('-5')).toHaveClass('text-danger');
     });
   });
 

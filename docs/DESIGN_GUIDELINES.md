@@ -83,7 +83,9 @@ Surfaces are **opaque**. `bg-backdrop` is the only translucent one: no more `bg-
 | `outline-accent`, `ring-accent` | accent | accent | Focus rings |
 | `--scrollbar-color-thumb` (variable, no class) | `#8B5CF6` | `#8B5CF6` | Scrollbar thumb, read by `popup.css` (at least 3:1 on every surface) |
 
-The brand gradient (`bg-brand`: `#6D28D9` to `#4C1D95`, the same in both modes) is reserved for the logo. Every other surface is flat.
+The brand gradient (`bg-brand`: `#6D28D9` to `#4C1D95`, the same in both modes) is reserved for the logo. Every other surface is flat, except the Analytics medals: `bg-medal-gold`, `bg-medal-silver` and `bg-medal-bronze` (the same in both modes, with a `text-on-accent` icon) mark the three most used Prompts.
+
+Charts read the tokens as CSS variables (`src/theme/chartColors.ts`): the primary series and the peak bar take the accent, the other bars `border-accent`, and grid, axes and tooltip the neutral tokens, so they follow the mode without React. The categorical palettes (Categories, Platforms, times of day) are data, the same in both modes.
 
 ### States
 

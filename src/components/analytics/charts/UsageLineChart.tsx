@@ -9,7 +9,7 @@ import {
   YAxis
 } from 'recharts';
 
-import { useChartTheme } from '../../../hooks/useChartTheme';
+import { CHART_PRIMARY, CHART_THEME } from '../../../theme/chartColors';
 import type { DailyUsage } from '../../../types/hooks';
 
 export interface UsageLineChartProps {
@@ -29,7 +29,7 @@ const UsageLineChart: FC<UsageLineChartProps> = memo(({
   height = 200,
   showGrid = true
 }) => {
-  const { gridColor, textColor, tooltipBg, tooltipBorder, tooltipLabelColor } = useChartTheme();
+  const { gridColor, textColor, tooltipBg, tooltipBorder, tooltipLabelColor, tooltipAccentColor } = CHART_THEME;
 
   // Format date for X axis (e.g., "Jan 13")
   const formatDate = (dateStr: string): string => {
@@ -37,18 +37,17 @@ const UsageLineChart: FC<UsageLineChartProps> = memo(({
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
-  // Colors based on design guidelines
-  const lineColor = '#9333ea'; // purple-600
+  const lineColor = CHART_PRIMARY.PRIMARY;
 
   if (data.length === 0) {
     return (
       <div
-        className="flex items-center justify-center bg-gray-50 dark:bg-gray-800/50 rounded-xl"
+        className="flex items-center justify-center bg-raised rounded-xl"
         style={{ height }}
         role="img"
         aria-label="No usage data available"
       >
-        <p className="text-sm text-gray-500 dark:text-gray-400">No usage data</p>
+        <p className="text-sm text-tertiary">No usage data</p>
       </div>
     );
   }
@@ -98,7 +97,7 @@ const UsageLineChart: FC<UsageLineChartProps> = memo(({
               fontWeight: 600
             }}
             itemStyle={{
-              color: lineColor
+              color: tooltipAccentColor
             }}
           />
           <Line

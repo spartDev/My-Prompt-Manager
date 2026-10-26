@@ -35,6 +35,12 @@
   /* Brand gradient: the logo only, the same in both modes */
   --background-image-brand: linear-gradient(135deg, #6d28d9 0%, #4c1d95 100%);
 
+  /* Analytics medals (first three Prompts by uses), the same in both modes: Tailwind's yellow-400 to orange-500,
+     gray-300 to gray-400 and amber-600 to amber-700, as they were drawn before the tokens */
+  --background-image-medal-gold: linear-gradient(to bottom right in oklab, oklch(85.2% 0.199 91.936) 0%, oklch(70.5% 0.213 47.604) 100%);
+  --background-image-medal-silver: linear-gradient(to bottom right in oklab, oklch(87.2% 0.01 258.338) 0%, oklch(70.7% 0.022 261.325) 100%);
+  --background-image-medal-bronze: linear-gradient(to bottom right in oklab, oklch(66.6% 0.179 58.318) 0%, oklch(55.5% 0.163 48.998) 100%);
+
   /* States */
   --background-color-success: #10b981;
   --background-color-success-subtle: #e7f8ef;

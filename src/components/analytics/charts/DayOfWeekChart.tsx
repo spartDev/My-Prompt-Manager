@@ -10,8 +10,7 @@ import {
   YAxis
 } from 'recharts';
 
-import { useChartTheme } from '../../../hooks/useChartTheme';
-import { DAY_OF_WEEK_COLORS } from '../../../theme/chartColors';
+import { CHART_THEME, DAY_OF_WEEK_COLORS } from '../../../theme/chartColors';
 import type { DayOfWeekDistribution } from '../../../types/hooks';
 
 export interface DayOfWeekChartProps {
@@ -34,17 +33,17 @@ const DayOfWeekChart: FC<DayOfWeekChartProps> = memo(({
   showGrid = true,
   highlightPeak = true
 }) => {
-  const { gridColor, textColor, tooltipBg, tooltipBorder, tooltipLabelColor, cursorColor } = useChartTheme();
+  const { gridColor, textColor, tooltipBg, tooltipBorder, tooltipLabelColor, cursorColor } = CHART_THEME;
 
   if (data.length === 0) {
     return (
       <div
-        className="flex items-center justify-center bg-gray-50 dark:bg-gray-800/50 rounded-xl"
+        className="flex items-center justify-center bg-raised rounded-xl"
         style={{ height }}
         role="img"
         aria-label="No day of week data available"
       >
-        <p className="text-sm text-gray-500 dark:text-gray-400">No day of week data</p>
+        <p className="text-sm text-tertiary">No day of week data</p>
       </div>
     );
   }
