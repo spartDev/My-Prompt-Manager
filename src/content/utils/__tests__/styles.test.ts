@@ -236,9 +236,12 @@ describe('StylesManager', () => {
     const TOKENS_CSS = readFileSync(path.resolve(__dirname, '../../../theme/tokens.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
     const declarationsOf = (block: string): Record<string, string> =>
       Object.fromEntries([...block.matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)].map(([, name, value]) => [name, value.trim().replace(/\s+/g, ' ').toLowerCase()]));
-    /** The block of the first rule whose selector is exactly `selector` */
+    /** The block of the first rule whose selector is exactly `selector` (written `selector {`, starting a selector) */
     const blockOf = (css: string, selector: string): string => {
-      const start = css.search(new RegExp(`(^|[\\s}])${selector.replace(/[.()*]/g, '\\$&')}\\s*\\{`));
+      let start = css.indexOf(`${selector} {`);
+      while (start > 0 && !/[\s}]/.test(css[start - 1])) {
+        start = css.indexOf(`${selector} {`, start + 1);
+      }
       expect(start, `rule ${selector}`).toBeGreaterThanOrEqual(0);
       const open = css.indexOf('{', start);
       return css.slice(open + 1, css.indexOf('}', open));
