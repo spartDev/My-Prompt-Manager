@@ -41,8 +41,7 @@ export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
     strategyClass: 'YourPlatformStrategy', // For future custom logic
     hostnamePatterns: ['yourplatform'], // For hostname matching
     brandColors: {
-      enabled: 'bg-[#123456] text-white shadow-xs', // Matches platform brand styling
-      disabled: 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+      enabled: 'bg-[#123456] text-white shadow-xs' // Matches platform brand styling
     }
   }
 };
@@ -75,7 +74,7 @@ export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
 | `buttonContainerSelector` | string | ❌ | Where to place the library icon |
 | `strategyClass` | string | ✅ | Class name for custom strategy (future use) |
 | `hostnamePatterns` | string[] | ❌ | Additional hostname patterns for detection |
-| `brandColors` | BrandColorScheme | ❌ | Tailwind class strings for enabled/disabled badges; defaults to green gradient when omitted |
+| `brandColors` | `{ enabled: string }` | ❌ | Tailwind classes of the logo square when the site is on; the accent (`bg-accent-subtle text-accent`) when omitted. Every site shares one disabled state (`bg-muted text-tertiary`, `src/constants/brandColors.ts`), so its logo component takes `disabled` and draws in `currentColor` |
 | `iconMethod` | PlatformIconMethod | ❌ | Optional UIElementFactory method for rendering a platform-specific icon (`createFloatingIcon` is used when omitted) |
 
 ### Priority Guidelines

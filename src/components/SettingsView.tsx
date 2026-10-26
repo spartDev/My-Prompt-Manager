@@ -89,17 +89,17 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
     'www.perplexity.ai': {
       name: 'Perplexity',
       description: 'AI-powered search engine',
-      icon: (_isEnabled: boolean) => <PerplexityIcon />
+      icon: (isEnabled: boolean) => <PerplexityIcon disabled={!isEnabled} />
     },
     'claude.ai': {
       name: 'Claude',
       description: 'Anthropic\'s AI assistant',
-      icon: (_isEnabled: boolean) => <ClaudeIcon />
+      icon: (isEnabled: boolean) => <ClaudeIcon disabled={!isEnabled} />
     },
     'chatgpt.com': {
       name: 'ChatGPT',
       description: 'OpenAI\'s conversational AI',
-      icon: (_isEnabled: boolean) => <ChatGPTIcon />
+      icon: (isEnabled: boolean) => <ChatGPTIcon disabled={!isEnabled} />
     },
     'gemini.google.com': {
       name: 'Google Gemini',

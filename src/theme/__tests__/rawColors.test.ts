@@ -44,7 +44,21 @@ const MIGRATED = [
   'components/settings/DataStorageSection.tsx',
   'components/settings/NotificationSection.tsx',
   'components/settings/AdvancedSection.tsx',
-  'components/settings/AboutSection.tsx'
+  'components/settings/AboutSection.tsx',
+  // My-Prompt-Manager-el4.5.3: site integration Settings (Platform brand colors stay in config/platforms.ts)
+  'constants/brandColors.ts',
+  'components/settings/SiteIntegrationSection.tsx',
+  'components/settings/SupportedSitesList.tsx',
+  'components/settings/CustomSitesList.tsx',
+  'components/settings/SiteCard.tsx',
+  'components/settings/ExportButton.tsx',
+  'components/settings/AddCustomSiteCard.tsx',
+  'components/settings/EmptyCustomSitesState.tsx',
+  'components/settings/AddMethodChooser.tsx',
+  'components/settings/AddCustomSiteForm.tsx',
+  'components/settings/SiteImportDrawer.tsx',
+  'components/settings/ImportSection.tsx',
+  'components/settings/ConfigurationPreview.tsx'
 ];
 
 const PALETTE = 'white|black|slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose';

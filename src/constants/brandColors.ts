@@ -21,27 +21,26 @@ export interface BrandColorScheme {
 }
 
 /**
- * Common disabled state used across all platforms
+ * Disabled state shared by every site, Platform or custom: it is not brand data
  */
-const DISABLED_STATE = 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400';
+const DISABLED_STATE = 'bg-muted text-tertiary';
 
 /**
- * Default brand colors for custom sites (fallback)
- * Uses the original green gradient for custom/unrecognized platforms
+ * Enabled colors of a custom or unrecognized site
  */
-const DEFAULT_BRAND_COLORS: BrandColorScheme = {
-  enabled: 'bg-gradient-to-br from-green-500 to-emerald-600 text-white shadow-sm',
-  disabled: DISABLED_STATE
-};
+const DEFAULT_ENABLED = 'bg-accent-subtle text-accent';
 
 /**
  * Get brand colors for a given hostname
  *
  * @param hostname - The platform hostname (e.g., 'claude.ai')
- * @returns Brand color scheme for the platform, or default colors for custom sites
+ * @returns The platform's brand color when enabled (the accent for custom sites), and the shared disabled state
  */
 export const getBrandColors = (hostname: string): BrandColorScheme => {
   const platform = getPlatformByHostname(hostname);
-  return platform?.brandColors ?? DEFAULT_BRAND_COLORS;
+  return {
+    enabled: platform?.brandColors?.enabled ?? DEFAULT_ENABLED,
+    disabled: DISABLED_STATE
+  };
 };
 

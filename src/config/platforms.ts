@@ -21,9 +21,6 @@ export type PlatformIconMethod =
   | "createCopilotIcon"
   | "createGeminiIcon";
 
-const DISABLED_STATE =
-  "bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400";
-
 /**
  * Interface for comprehensive platform configuration
  */
@@ -46,8 +43,8 @@ export interface PlatformDefinition {
   strategyClass: string;
   /** Additional hostname patterns to check for platform detection */
   hostnamePatterns?: string[];
-  /** Brand color scheme for UI elements (optional, defaults to green gradient when omitted) */
-  brandColors?: BrandColorScheme;
+  /** Brand color of the site logo when enabled (optional, the accent when omitted); every site shares one disabled state */
+  brandColors?: Pick<BrandColorScheme, "enabled">;
   /** Optional icon creation method for explicit UI factory integration */
   iconMethod?: PlatformIconMethod;
   /** Platform IDs that should toggle together (bidirectional relationship) */
@@ -77,7 +74,6 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
     hostnamePatterns: ["claude"],
     brandColors: {
       enabled: "bg-[#d37354] text-white shadow-sm",
-      disabled: DISABLED_STATE,
     },
   },
 
@@ -97,7 +93,6 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
     hostnamePatterns: ["openai", "chatgpt"],
     brandColors: {
       enabled: "bg-white text-gray-800 shadow-sm border border-gray-200",
-      disabled: DISABLED_STATE,
     },
   },
 
@@ -121,7 +116,6 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
     hostnamePatterns: ["mistral"],
     brandColors: {
       enabled: "bg-gray-700 text-white shadow-sm",
-      disabled: DISABLED_STATE,
     },
     iconMethod: "createMistralIcon",
   },
@@ -142,7 +136,6 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
     hostnamePatterns: ["perplexity"],
     brandColors: {
       enabled: "bg-[#2d808c] text-white shadow-sm",
-      disabled: DISABLED_STATE,
     },
   },
 
@@ -163,7 +156,6 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
     hostnamePatterns: ["gemini"],
     brandColors: {
       enabled: "bg-white text-gray-800 shadow-sm border border-gray-200",
-      disabled: DISABLED_STATE,
     },
     iconMethod: "createGeminiIcon",
   },
@@ -187,7 +179,6 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
     hostnamePatterns: ["copilot.microsoft"],
     brandColors: {
       enabled: "bg-[#0e111b] text-white shadow-sm",
-      disabled: DISABLED_STATE,
     },
     iconMethod: "createCopilotIcon",
     linkedPlatforms: ['m365copilot'],
@@ -212,7 +203,6 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
     hostnamePatterns: ["m365.cloud.microsoft"],
     brandColors: {
       enabled: "bg-[#0e111b] text-white shadow-sm",
-      disabled: DISABLED_STATE,
     },
     iconMethod: "createCopilotIcon",
     linkedPlatforms: ['copilot'],

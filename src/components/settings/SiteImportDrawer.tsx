@@ -22,10 +22,10 @@ const SiteImportDrawer: FC<SiteImportDrawerProps> = ({
   return (
     <div
       id="custom-site-import-drawer"
-      className="py-8 px-4 bg-gray-50 dark:bg-gray-800/50 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg"
+      className="py-8 px-4 bg-raised border-2 border-dashed border-strong rounded-lg"
     >
       <div className="text-center mb-6">
-        <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-purple-100 text-purple-600 dark:bg-purple-900/40 dark:text-purple-300 mb-3">
+        <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-accent-subtle text-accent mb-3">
           <svg className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
             <path
               strokeLinecap="round"
@@ -34,10 +34,10 @@ const SiteImportDrawer: FC<SiteImportDrawerProps> = ({
             />
           </svg>
         </div>
-        <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+        <h4 className="text-sm font-medium text-primary mb-1">
           Import Configuration
         </h4>
-        <p className="text-xs text-gray-500 dark:text-gray-400">
+        <p className="text-xs text-tertiary">
           Reuse an existing setup by pasting a configuration code
         </p>
       </div>
