@@ -193,25 +193,25 @@ const AddCustomSiteForm: FC<AddCustomSiteFormProps> = ({
   ]);
 
   return (
-    <div className="py-8 px-4 bg-gray-50 dark:bg-gray-800/50 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
+    <div className="py-8 px-4 bg-raised border-2 border-dashed border-strong rounded-lg">
       <div className="text-center mb-6">
-        <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-purple-100 text-purple-600 dark:bg-purple-900/40 dark:text-purple-300 mb-3">
+        <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-accent-subtle text-accent mb-3">
           <svg className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
           </svg>
         </div>
-        <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">Manual Configuration</h4>
-        <p className="text-xs text-gray-500 dark:text-gray-400">Configure your custom site integration</p>
+        <h4 className="text-sm font-medium text-primary mb-1">Manual Configuration</h4>
+        <p className="text-xs text-tertiary">Configure your custom site integration</p>
       </div>
       <div className="max-w-2xl mx-auto space-y-4">
         {/* Basic Information Card */}
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-          <h5 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wide">
+        <div className="bg-card border border-default rounded-lg p-4">
+          <h5 className="text-xs font-semibold text-secondary mb-3 uppercase tracking-wide">
             Basic Information
           </h5>
           <div className="space-y-3">
             <div>
-              <label htmlFor="website-url" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+              <label htmlFor="website-url" className="block text-xs font-medium text-secondary mb-1.5">
                 Website URL *
               </label>
               <input
@@ -223,16 +223,18 @@ const AddCustomSiteForm: FC<AddCustomSiteFormProps> = ({
                   setUrlError('');
                 }}
                 placeholder="example.com or https://example.com"
-                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                className={`w-full px-3 py-2 text-sm border rounded-lg bg-subtle text-primary placeholder:text-tertiary focus-input ${
+                  urlError ? 'border-error' : 'border-input'
+                }`}
               />
-              {urlError && <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{urlError}</p>}
+              {urlError && <p className="mt-1.5 text-xs text-danger">{urlError}</p>}
 
               {/* Auto-fill indicator */}
               {!isPickerWindow && currentTabUrl && !isCurrentSiteIntegrated && !newSiteUrl && (
-                <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <div className="mt-2 p-2 bg-accent-subtle border border-accent rounded-lg">
                   <div className="flex items-center gap-2">
                     <svg
-                      className="w-4 h-4 text-blue-600 dark:text-blue-400"
+                      className="w-4 h-4 text-accent"
                       fill="none"
                       stroke="currentColor"
                       strokeWidth={2}
@@ -245,10 +247,10 @@ const AddCustomSiteForm: FC<AddCustomSiteFormProps> = ({
                       />
                     </svg>
                     <div className="flex-1">
-                      <p className="text-xs text-blue-700 dark:text-blue-300 font-medium">
+                      <p className="text-xs text-accent-strong font-medium">
                         Current page detected: {currentTabTitle || new URL(currentTabUrl).hostname}
                       </p>
-                      <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
+                      <p className="text-xs text-accent mt-0.5">
                         Fields will auto-fill when you start adding this site
                       </p>
                     </div>
@@ -258,10 +260,10 @@ const AddCustomSiteForm: FC<AddCustomSiteFormProps> = ({
 
               {/* Already integrated warning */}
               {!isPickerWindow && currentTabUrl && isCurrentSiteIntegrated && (
-                <div className="mt-2 p-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                <div className="mt-2 p-2 bg-warning-subtle border border-warning rounded-lg">
                   <div className="flex items-center gap-2">
                     <svg
-                      className="w-4 h-4 text-amber-600 dark:text-amber-400"
+                      className="w-4 h-4 text-warning"
                       fill="none"
                       stroke="currentColor"
                       strokeWidth={2}
@@ -273,7 +275,7 @@ const AddCustomSiteForm: FC<AddCustomSiteFormProps> = ({
                         d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
                       />
                     </svg>
-                    <p className="text-xs text-amber-700 dark:text-amber-300">
+                    <p className="text-xs text-warning">
                       <strong>Note:</strong> The current website ({new URL(currentTabUrl).hostname}) is already
                       integrated
                     </p>
@@ -285,7 +287,7 @@ const AddCustomSiteForm: FC<AddCustomSiteFormProps> = ({
             <div>
               <label
                 htmlFor="display-name"
-                className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5"
+                className="block text-xs font-medium text-secondary mb-1.5"
               >
                 Display Name
               </label>
@@ -297,16 +299,16 @@ const AddCustomSiteForm: FC<AddCustomSiteFormProps> = ({
                   setNewSiteName(e.target.value);
                 }}
                 placeholder="My Website (optional)"
-                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                className="w-full px-3 py-2 text-sm border border-input rounded-lg bg-subtle text-primary placeholder:text-tertiary focus-input"
               />
             </div>
           </div>
         </div>
 
         {/* Element Picker Section */}
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+        <div className="bg-card border border-default rounded-lg p-4">
           <div className="flex items-center justify-between mb-3">
-            <h5 className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+            <h5 className="text-xs font-semibold text-secondary uppercase tracking-wide">
               Custom Positioning
             </h5>
             <button
@@ -315,7 +317,7 @@ const AddCustomSiteForm: FC<AddCustomSiteFormProps> = ({
                 void onStartElementPicker();
               }}
               disabled={pickingElement || adding}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-card text-secondary border border-strong text-xs font-medium rounded-lg hover:bg-muted focus-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                 <path
@@ -327,16 +329,16 @@ const AddCustomSiteForm: FC<AddCustomSiteFormProps> = ({
               {pickingElement ? 'Picking...' : 'Pick Element'}
             </button>
           </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+          <p className="text-xs text-tertiary mb-3">
             Specify where the prompt library icon should appear. If not set, the extension will automatically detect
             suitable input areas.
           </p>
 
           {pickerError && (
-            <div className="mt-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-              <p className="text-sm text-red-600 dark:text-red-400">{pickerError}</p>
+            <div className="mt-2 p-3 bg-danger-subtle border border-danger rounded-lg">
+              <p className="text-sm text-danger">{pickerError}</p>
               {pickerError.includes('refresh') && (
-                <p className="text-xs text-red-500 dark:text-red-400 mt-1">
+                <p className="text-xs text-danger mt-1">
                   This usually happens when the page was already open before the extension was installed or updated.
                 </p>
               )}
@@ -344,12 +346,12 @@ const AddCustomSiteForm: FC<AddCustomSiteFormProps> = ({
           )}
 
           {customSelector && (
-            <div className="space-y-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+            <div className="space-y-3 pt-3 border-t border-divider">
               {/* Placement */}
               <div>
                 <label
                   htmlFor="placement-select"
-                  className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5"
+                  className="block text-xs font-medium text-secondary mb-1.5"
                 >
                   Placement
                 </label>
@@ -359,7 +361,7 @@ const AddCustomSiteForm: FC<AddCustomSiteFormProps> = ({
                   onChange={(e) => {
                     setPlacement(e.target.value as 'before' | 'after' | 'inside-start' | 'inside-end');
                   }}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-3 py-2 text-sm border border-input rounded-lg bg-subtle text-primary placeholder:text-tertiary focus-input"
                 >
                   <option value="before">Before element</option>
                   <option value="after">After element</option>
@@ -373,7 +375,7 @@ const AddCustomSiteForm: FC<AddCustomSiteFormProps> = ({
                 <div>
                   <label
                     htmlFor="offset-x"
-                    className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5"
+                    className="block text-xs font-medium text-secondary mb-1.5"
                   >
                     Offset X (px)
                   </label>
@@ -384,7 +386,7 @@ const AddCustomSiteForm: FC<AddCustomSiteFormProps> = ({
                     onChange={(e) => {
                       setOffsetX(Number(e.target.value));
                     }}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="w-full px-3 py-2 text-sm border border-input rounded-lg bg-subtle text-primary placeholder:text-tertiary focus-input"
                     min="-500"
                     max="500"
                   />
@@ -392,7 +394,7 @@ const AddCustomSiteForm: FC<AddCustomSiteFormProps> = ({
                 <div>
                   <label
                     htmlFor="offset-y"
-                    className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5"
+                    className="block text-xs font-medium text-secondary mb-1.5"
                   >
                     Offset Y (px)
                   </label>
@@ -403,7 +405,7 @@ const AddCustomSiteForm: FC<AddCustomSiteFormProps> = ({
                     onChange={(e) => {
                       setOffsetY(Number(e.target.value));
                     }}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="w-full px-3 py-2 text-sm border border-input rounded-lg bg-subtle text-primary placeholder:text-tertiary focus-input"
                     min="-500"
                     max="500"
                   />
@@ -414,7 +416,7 @@ const AddCustomSiteForm: FC<AddCustomSiteFormProps> = ({
               <div>
                 <label
                   htmlFor="z-index"
-                  className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5"
+                  className="block text-xs font-medium text-secondary mb-1.5"
                 >
                   Z-Index
                 </label>
@@ -425,7 +427,7 @@ const AddCustomSiteForm: FC<AddCustomSiteFormProps> = ({
                   onChange={(e) => {
                     setZIndex(Number(e.target.value));
                   }}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-3 py-2 text-sm border border-input rounded-lg bg-subtle text-primary placeholder:text-tertiary focus-input"
                   min="1"
                   max="2147483647"
                 />
@@ -435,7 +437,7 @@ const AddCustomSiteForm: FC<AddCustomSiteFormProps> = ({
               <div>
                 <label
                   htmlFor="positioning-description"
-                  className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5"
+                  className="block text-xs font-medium text-secondary mb-1.5"
                 >
                   Description
                 </label>
@@ -447,7 +449,7 @@ const AddCustomSiteForm: FC<AddCustomSiteFormProps> = ({
                     setPositioningDescription(e.target.value);
                   }}
                   placeholder="e.g., 'Next to submit button' (optional)"
-                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-3 py-2 text-sm border border-input rounded-lg bg-subtle text-primary placeholder:text-tertiary focus-input"
                 />
               </div>
             </div>
@@ -461,14 +463,14 @@ const AddCustomSiteForm: FC<AddCustomSiteFormProps> = ({
               void handleAddSite();
             }}
             disabled={adding}
-            className="w-full px-4 py-2.5 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full px-4 py-2.5 bg-accent text-on-accent text-sm font-medium rounded-lg hover:bg-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {adding ? 'Adding Site...' : 'Add Site'}
           </button>
           <button
             onClick={onCancel}
             disabled={adding}
-            className="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 underline transition-colors"
+            className="text-sm text-secondary hover:text-primary underline transition-colors"
           >
             Cancel
           </button>

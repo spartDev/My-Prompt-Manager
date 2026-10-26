@@ -87,7 +87,11 @@ describe('Color tokens', () => {
       ['danger', 'danger-subtle'],
       ['on-inverse', 'inverse'],
       ['primary', 'highlight'],
-      ['tertiary', 'highlight']
+      ['tertiary', 'highlight'],
+      // A Platform switched off: its logo square (My-Prompt-Manager-el4.5.3)
+      ['tertiary', 'muted'],
+      // Empty states and dashed panels
+      ['tertiary', 'raised']
     ];
 
     for (const mode of [tokens.light, tokens.dark]) {

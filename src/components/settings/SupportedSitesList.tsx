@@ -23,7 +23,7 @@ const SupportedSitesList: FC<SupportedSitesListProps> = ({
 }) => {
   return (
     <div>
-      <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm mb-3">
+      <h3 className="font-medium text-primary text-sm mb-3">
         Supported Sites
       </h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

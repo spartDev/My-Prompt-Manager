@@ -78,15 +78,14 @@ export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
     buttonContainerSelector: '.toolbar-container', // Where to place icon (optional)
     strategyClass: 'YourPlatformStrategy',        // Strategy class name
     hostnamePatterns: ['yourplatform', 'your-ai'], // Additional hostname patterns
-    brandColors: {                                // Tailwind classes for badge styling
-      enabled: 'bg-[#123456] text-white shadow-xs',
-      disabled: 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+    brandColors: {                                // Tailwind classes of the logo square when on
+      enabled: 'bg-[#123456] text-white shadow-xs'
     }
   }
 };
 ```
 
-> ℹ️ If you omit `brandColors`, the UI falls back to a green gradient badge so the integration still renders correctly.
+> ℹ️ If you omit `brandColors`, the logo square falls back to the accent (`bg-accent-subtle text-accent`). Switched off, every site shows the same disabled state (`bg-muted text-tertiary`, `src/constants/brandColors.ts`): give the logo component a `disabled` prop that draws it in `currentColor` (see `src/components/icons/SiteIcons.tsx`).
 
 **Priority Guidelines:**
 - 100: Premium platforms (Claude, ChatGPT)

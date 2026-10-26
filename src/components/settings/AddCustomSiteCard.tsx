@@ -18,18 +18,18 @@ const AddCustomSiteCard: FC<AddCustomSiteCardProps> = ({
   const descriptionId = useId();
 
   const baseClasses = `
-    group relative flex h-full flex-col gap-3 rounded-xl border border-gray-200 dark:border-gray-700
-    bg-white dark:bg-gray-800 p-4 text-left transition-all duration-200
-    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70
+    group relative flex h-full flex-col gap-3 rounded-xl border border-default
+    bg-card p-4 text-left transition-all duration-200
+    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent
   `;
 
   const stateClasses = disabled
-    ? 'cursor-not-allowed opacity-80 bg-gray-100 dark:bg-gray-800/70 border-gray-300 dark:border-gray-600'
-    : 'cursor-pointer hover:border-purple-300 dark:hover:border-purple-600 hover:shadow-sm';
+    ? 'cursor-not-allowed opacity-80'
+    : 'cursor-pointer hover:border-accent hover:shadow-sm';
 
   const iconClasses = disabled
-    ? 'bg-purple-100 text-purple-400 dark:bg-purple-900/30 dark:text-purple-500'
-    : 'bg-purple-100 text-purple-600 group-hover:bg-purple-200 group-hover:text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 dark:group-hover:bg-purple-800/70 dark:group-hover:text-purple-200';
+    ? 'bg-muted text-tertiary'
+    : 'bg-accent-subtle text-accent group-hover:bg-accent-selected group-hover:text-accent-strong';
 
   return (
     <button
@@ -53,10 +53,10 @@ const AddCustomSiteCard: FC<AddCustomSiteCardProps> = ({
           </svg>
         </span>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+          <p className="text-sm font-semibold text-primary">
             Add Custom Site
           </p>
-          <p id={descriptionId} className="text-xs text-gray-600 dark:text-gray-400">
+          <p id={descriptionId} className="text-xs text-secondary">
             Configure a new AI platform integration
           </p>
         </div>
