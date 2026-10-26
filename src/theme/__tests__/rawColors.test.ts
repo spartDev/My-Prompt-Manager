@@ -58,7 +58,16 @@ const MIGRATED = [
   'components/settings/AddCustomSiteForm.tsx',
   'components/settings/SiteImportDrawer.tsx',
   'components/settings/ImportSection.tsx',
-  'components/settings/ConfigurationPreview.tsx'
+  'components/settings/ConfigurationPreview.tsx',
+  // My-Prompt-Manager-el4.6: Analytics (medals are tokens; the categorical chart palettes are data in theme/chartColors.ts)
+  'components/analytics/AnalyticsTab.tsx',
+  'components/analytics/AnalyticsDashboard.tsx',
+  'components/analytics/SummaryCard.tsx',
+  'components/analytics/charts/UsageLineChart.tsx',
+  'components/analytics/charts/DayOfWeekChart.tsx',
+  'components/analytics/charts/CategoryBarChart.tsx',
+  'components/analytics/charts/PlatformPieChart.tsx',
+  'components/analytics/charts/TimeOfDayChart.tsx'
 ];
 
 const PALETTE = 'white|black|slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose';

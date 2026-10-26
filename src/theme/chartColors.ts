@@ -1,16 +1,38 @@
 /**
  * Centralized chart color definitions
- * Based on design guidelines - uses Tailwind color palette for consistency
+ * Neutrals and the primary color read the color tokens of src/theme/tokens.css as CSS variables:
+ * Chrome resolves var() in SVG presentation attributes, so the charts follow the .dark class by themselves.
+ * The categorical palettes below stay data, the same in both modes.
  */
+
+/**
+ * Neutral chart colors: grid, axes, legend, tooltip and hover band
+ */
+export const CHART_THEME = {
+  /** Grid lines and axis line */
+  gridColor: 'var(--border-color-default)',
+  /** Axis tick labels */
+  textColor: 'var(--text-color-tertiary)',
+  /** Legend labels */
+  legendColor: 'var(--text-color-secondary)',
+  /** Tooltip background */
+  tooltipBg: 'var(--background-color-card)',
+  /** Tooltip border */
+  tooltipBorder: 'var(--border-color-default)',
+  /** Tooltip label text */
+  tooltipLabelColor: 'var(--text-color-primary)',
+  /** Tooltip value of a series drawn in the accent */
+  tooltipAccentColor: 'var(--text-color-accent)',
+  /** Band behind the hovered bar */
+  cursorColor: 'var(--background-color-muted)',
+} as const;
 
 /**
  * Primary brand colors for charts
  */
 export const CHART_PRIMARY = {
-  /** Primary purple - purple-600 */
-  PRIMARY: '#9333ea',
-  /** Secondary indigo - indigo-500 */
-  SECONDARY: '#6366f1',
+  /** Accent of the current mode */
+  PRIMARY: 'var(--background-color-accent)',
 } as const;
 
 /**
@@ -71,10 +93,10 @@ export const TIME_BUCKET_COLORS: Record<string, string> = {
  * Day of week chart colors
  */
 export const DAY_OF_WEEK_COLORS = {
-  /** Default bar color - indigo-500 */
-  BAR: '#6366f1',
-  /** Peak day highlight - purple-600 */
-  PEAK: '#9333ea',
+  /** Default bar color - the softer accent/border */
+  BAR: 'var(--border-color-accent)',
+  /** Peak day highlight - the accent */
+  PEAK: 'var(--background-color-accent)',
 } as const;
 
 /**

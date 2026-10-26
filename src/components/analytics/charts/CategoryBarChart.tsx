@@ -10,8 +10,7 @@ import {
   YAxis
 } from 'recharts';
 
-import { useChartTheme } from '../../../hooks/useChartTheme';
-import { CATEGORY_COLORS } from '../../../theme/chartColors';
+import { CATEGORY_COLORS, CHART_THEME } from '../../../theme/chartColors';
 import type { CategoryDistribution } from '../../../types/hooks';
 
 export interface CategoryBarChartProps {
@@ -34,7 +33,7 @@ const CategoryBarChart: FC<CategoryBarChartProps> = memo(({
   maxCategories = 5,
   showGrid = true
 }) => {
-  const { gridColor, textColor, tooltipBg, tooltipBorder, tooltipLabelColor, cursorColor } = useChartTheme();
+  const { gridColor, textColor, tooltipBg, tooltipBorder, tooltipLabelColor, cursorColor } = CHART_THEME;
 
   // Limit to top N categories
   const chartData = data.slice(0, maxCategories);
@@ -50,12 +49,12 @@ const CategoryBarChart: FC<CategoryBarChartProps> = memo(({
   if (data.length === 0) {
     return (
       <div
-        className="flex items-center justify-center bg-gray-50 dark:bg-gray-800/50 rounded-xl"
+        className="flex items-center justify-center bg-raised rounded-xl"
         style={{ height }}
         role="img"
         aria-label="No category data available"
       >
-        <p className="text-sm text-gray-500 dark:text-gray-400">No category data</p>
+        <p className="text-sm text-tertiary">No category data</p>
       </div>
     );
   }
