@@ -46,12 +46,12 @@ jobs:
       is-prerelease: ${{ steps.version.outputs.is-prerelease }}
     steps:
       - name: 🛎️ Checkout Repository
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
       - name: 🟢 Setup Node.js
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: "npm"
@@ -84,7 +84,7 @@ jobs:
 
       - name: 📦 Cache Node Modules (Multi-level Strategy)
         id: cache-deps
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.npm
@@ -148,10 +148,10 @@ jobs:
     needs: validate-release
     steps:
       - name: 🛎️ Checkout Repository
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: 🟢 Setup Node.js
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: "npm"
@@ -160,7 +160,7 @@ jobs:
           registry-url: "https://registry.npmjs.org"
 
       - name: 📦 Restore Cache (Multi-level Strategy)
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.npm
@@ -179,7 +179,7 @@ jobs:
           npm ci --prefer-offline --no-audit --no-fund --silent
 
       - name: 📋 Cache Build Assets
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             dist
@@ -240,12 +240,12 @@ jobs:
           find dist/ -type f -exec sh -c 'echo "  $(basename "$1"): $(wc -c < "$1") bytes"' _ {} \;
 
       - name: 🔐 Generate Build Attestation
-        uses: actions/attest-build-provenance@96278af6caaf10aea03fd8d33a09a777ca52d62f # v3.2.0
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: "*.zip"
 
       - name: 📤 Upload Release Build
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: chrome-extension-release-v${{ needs.validate-release.outputs.version }}
           path: |
@@ -262,12 +262,12 @@ jobs:
     needs: [validate-release, build-release]
     steps:
       - name: 🛎️ Checkout Repository
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
       - name: 📤 Download Release Build
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: chrome-extension-release-v${{ needs.validate-release.outputs.version }}
           path: ./release-assets
@@ -404,7 +404,7 @@ jobs:
 
       - name: 🏷️ Create GitHub Release
         id: create-release
-        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: v${{ needs.validate-release.outputs.version }}
           name: 🚀 My Prompt Manager v${{ needs.validate-release.outputs.version }}
@@ -422,7 +422,7 @@ jobs:
     needs: [validate-release, build-release]
     steps:
       - name: 📤 Download Release Build
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: chrome-extension-release-v${{ needs.validate-release.outputs.version }}
           path: ./webstore-prep
@@ -476,7 +476,7 @@ jobs:
           unzip -l "chrome-extension-webstore-v${{ needs.validate-release.outputs.version }}.zip"
 
       - name: 📤 Upload Web Store Package
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: chrome-webstore-package-v${{ needs.validate-release.outputs.version }}
           path: webstore-prep/chrome-extension-webstore-v${{ needs.validate-release.outputs.version }}.zip
@@ -652,7 +652,7 @@ jobs:
     environment: emergency-rollback
     steps:
       - name: 🛎️ Checkout Repository
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
