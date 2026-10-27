@@ -190,9 +190,9 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
 
       if (appError.type === 'STORAGE_QUOTA_EXCEEDED') {
         setShowStorageWarning(true);
-      } else {
-        showToast(appError.message || 'Failed to save prompt', 'error');
       }
+      // The form shows the refusal and keeps what the user typed
+      throw error;
     }
   };
 
@@ -307,7 +307,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
       {currentView === 'add' && (
         <AddPromptForm
           categories={categories}
-          onSubmit={(data) => { void handleFormSubmit(data); }}
+          onSubmit={handleFormSubmit}
           onCancel={handleFormCancel}
         />
       )}
@@ -316,7 +316,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
         <EditPromptForm
           prompt={selectedPrompt}
           categories={categories}
-          onSubmit={(data) => { void handleFormSubmit(data); }}
+          onSubmit={handleFormSubmit}
           onCancel={handleFormCancel}
           onDelete={handleDeleteFromEdit}
         />

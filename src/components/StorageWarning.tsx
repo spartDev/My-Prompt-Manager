@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 
 import { StorageManager } from '../services/storage';
 import { Logger, toError } from '../utils';
@@ -35,6 +35,7 @@ const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
   } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const titleId = useId();
 
   useEffect(() => {
     const loadStorageInfo = async () => {
@@ -109,14 +110,19 @@ const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
 
   return (
     <div className="fixed inset-0 bg-backdrop backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-card border border-default rounded-lg shadow-xl w-full max-w-md p-6">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="bg-card border border-default rounded-lg shadow-xl w-full max-w-md p-6"
+      >
         {/* Header */}
         <div className="flex items-center mb-4">
           <div className="shrink-0">
             <WarningIcon className={`h-8 w-8 ${getIconColor()}`} />
           </div>
           <div className="ml-3">
-            <h3 className="text-lg font-medium text-primary">
+            <h3 id={titleId} className="text-lg font-medium text-primary">
               {isAtLimit ? 'Storage Limit Reached' : isCritical ? 'Critical Storage Warning' : 'Storage Warning'}
             </h3>
           </div>

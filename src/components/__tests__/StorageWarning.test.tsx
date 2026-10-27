@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -253,7 +253,7 @@ describe('StorageWarning', () => {
       await user.click(screen.getByRole('button', { name: 'Clear All Data' }));
 
       await waitFor(() => {
-        expect(screen.getByRole('dialog')).toBeInTheDocument();
+        expect(screen.getByRole('dialog', { name: 'Clear All Data' })).toBeInTheDocument();
       });
 
       expect(screen.getByText(/Are you sure you want to clear all data/)).toBeInTheDocument();
@@ -274,13 +274,13 @@ describe('StorageWarning', () => {
       await user.click(screen.getByRole('button', { name: 'Clear All Data' }));
 
       await waitFor(() => {
-        expect(screen.getByRole('dialog')).toBeInTheDocument();
+        expect(screen.getByRole('dialog', { name: 'Clear All Data' })).toBeInTheDocument();
       });
 
       await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
       await waitFor(() => {
-        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        expect(screen.queryByRole('dialog', { name: 'Clear All Data' })).not.toBeInTheDocument();
       });
     });
 
@@ -300,19 +300,12 @@ describe('StorageWarning', () => {
       await user.click(screen.getByRole('button', { name: 'Clear All Data' }));
 
       await waitFor(() => {
-        expect(screen.getByRole('dialog')).toBeInTheDocument();
+        expect(screen.getByRole('dialog', { name: 'Clear All Data' })).toBeInTheDocument();
       });
 
-      // Find the confirm button in the dialog (there are two "Clear All Data" buttons)
-      const confirmButtons = screen.getAllByRole('button', { name: 'Clear All Data' });
-      const dialogConfirmButton = confirmButtons.find(btn =>
-        btn.closest('[role="dialog"]')
-      );
-
-      expect(dialogConfirmButton).toBeDefined();
-      if (dialogConfirmButton) {
-        await user.click(dialogConfirmButton);
-      }
+      // The confirmation has its own "Clear All Data" button
+      const confirmDialog = screen.getByRole('dialog', { name: 'Clear All Data' });
+      await user.click(within(confirmDialog).getByRole('button', { name: 'Clear All Data' }));
 
       await waitFor(() => {
         expect(mockStorageManager.clearAllData).toHaveBeenCalled();
@@ -385,18 +378,11 @@ describe('StorageWarning', () => {
       await user.click(screen.getByRole('button', { name: 'Clear All Data' }));
 
       await waitFor(() => {
-        expect(screen.getByRole('dialog')).toBeInTheDocument();
+        expect(screen.getByRole('dialog', { name: 'Clear All Data' })).toBeInTheDocument();
       });
 
-      const confirmButtons = screen.getAllByRole('button', { name: 'Clear All Data' });
-      const dialogConfirmButton = confirmButtons.find(btn =>
-        btn.closest('[role="dialog"]')
-      );
-
-      expect(dialogConfirmButton).toBeDefined();
-      if (dialogConfirmButton) {
-        await user.click(dialogConfirmButton);
-      }
+      const confirmDialog = screen.getByRole('dialog', { name: 'Clear All Data' });
+      await user.click(within(confirmDialog).getByRole('button', { name: 'Clear All Data' }));
 
       await waitFor(() => {
         expect(screen.getByText('Clearing...')).toBeInTheDocument();

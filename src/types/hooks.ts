@@ -26,6 +26,7 @@ export type TypeGuard<T> = (value: unknown) => value is T;
 export interface UsePromptsReturn {
   prompts: Prompt[];
   loading: boolean;
+  /** A failed load only: a failed save rejects to its caller instead */
   error: AppError | null;
   createPrompt: (prompt: Omit<Prompt, 'id' | 'createdAt' | 'updatedAt' | 'usageCount' | 'lastUsedAt'>) => Promise<void>;
   updatePrompt: (id: string, updates: Partial<Prompt>) => Promise<void>;
