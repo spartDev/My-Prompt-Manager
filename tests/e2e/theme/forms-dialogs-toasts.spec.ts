@@ -129,7 +129,13 @@ test.describe('Forms, dialogs and toasts on the tokens', () => {
       await expect(page.getByText('Error Loading Data')).toHaveCount(0);
       await page.screenshot({ path: `${SCREENSHOT_DIR}/storage-warning-${theme}.png` });
 
-      await warning.getByRole('button', { name: 'Continue' }).click();
+      // A modal: the keyboard starts on Continue, stays in the warning, and Escape closes it
+      await expect(warning.getByRole('button', { name: 'Continue' })).toBeFocused();
+      await page.keyboard.press('Shift+Tab');
+      await expect(warning.getByRole('button', { name: 'Clear All Data' })).toBeFocused();
+      await page.keyboard.press('Shift+Tab');
+      await expect(warning.getByRole('button', { name: 'Continue' })).toBeFocused();
+      await page.keyboard.press('Escape');
       await expect(warning).toHaveCount(0);
       await expect(content).toHaveValue('Résume la transcription ci-dessous.');
       await expect(page.getByRole('alert')).toContainText(/storage/i);

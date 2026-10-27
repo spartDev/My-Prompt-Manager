@@ -56,6 +56,73 @@ describe('StorageWarning', () => {
     });
   });
 
+  // A modal: the keyboard handles the warning first, and the form behind it is out of reach
+  describe('keyboard', () => {
+    it('focuses Continue when it opens', async () => {
+      vi.mocked(mockStorageManager.getStorageUsageWithWarnings).mockResolvedValue(createStorageInfo(40, 'safe'));
+
+      render(<StorageWarning reason={REASON} onClose={mockOnClose} />);
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Continue' })).toHaveFocus();
+      });
+    });
+
+    it('keeps Tab and Shift+Tab between its two buttons', async () => {
+      const user = userEvent.setup();
+      vi.mocked(mockStorageManager.getStorageUsageWithWarnings).mockResolvedValue(createStorageInfo(40, 'safe'));
+      render(
+        <>
+          <button type="button">Save Prompt</button>
+          <StorageWarning reason={REASON} onClose={mockOnClose} />
+          <button type="button">After</button>
+        </>
+      );
+      const continueButton = screen.getByRole('button', { name: 'Continue' });
+      const clearButton = screen.getByRole('button', { name: 'Clear All Data' });
+      await waitFor(() => { expect(continueButton).toHaveFocus(); });
+
+      await user.tab({ shift: true });
+      expect(clearButton).toHaveFocus();
+      await user.tab();
+      expect(continueButton).toHaveFocus();
+      await user.tab();
+      expect(clearButton).toHaveFocus();
+      await user.tab();
+      expect(continueButton).toHaveFocus();
+    });
+
+    it('closes on Escape, like Continue', async () => {
+      const user = userEvent.setup();
+      vi.mocked(mockStorageManager.getStorageUsageWithWarnings).mockResolvedValue(createStorageInfo(40, 'safe'));
+      render(<StorageWarning reason={REASON} onClose={mockOnClose} />);
+      await waitFor(() => { expect(screen.getByRole('button', { name: 'Continue' })).toHaveFocus(); });
+
+      await user.keyboard('{Escape}');
+
+      expect(mockOnClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('leaves the keyboard to the Clear All Data confirmation, then takes it back on Clear All Data', async () => {
+      const user = userEvent.setup();
+      vi.mocked(mockStorageManager.getStorageUsageWithWarnings).mockResolvedValue(createStorageInfo(40, 'safe'));
+      render(<StorageWarning reason={REASON} onClose={mockOnClose} />);
+      await waitFor(() => { expect(screen.getByRole('button', { name: 'Continue' })).toHaveFocus(); });
+
+      await user.click(screen.getByRole('button', { name: 'Clear All Data' }));
+      const confirmation = screen.getByRole('dialog', { name: 'Clear All Data' });
+      expect(within(confirmation).getByRole('button', { name: 'Cancel' })).toHaveFocus();
+      await user.tab();
+      expect(within(confirmation).getByRole('button', { name: 'Clear All Data' })).toHaveFocus();
+
+      await user.keyboard('{Escape}');
+
+      expect(screen.queryByRole('dialog', { name: 'Clear All Data' })).not.toBeInTheDocument();
+      expect(mockOnClose).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: 'Clear All Data' })).toHaveFocus();
+    });
+  });
+
   describe('storage percentage display', () => {
     it('should display correct storage percentage in header', async () => {
       vi.mocked(mockStorageManager.getStorageUsageWithWarnings).mockResolvedValue(

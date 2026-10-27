@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 
 import { StorageManager } from '../services/storage';
 import { Logger, toError } from '../utils';
@@ -39,6 +39,37 @@ const StorageWarning: FC<StorageWarningProps> = ({ reason, onClose }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const titleId = useId();
+  const continueButtonRef = useRef<HTMLButtonElement>(null);
+  const clearButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Focus the safe choice when it opens: the form behind it must not take the keyboard
+  useEffect(() => {
+    continueButtonRef.current?.focus();
+  }, []);
+
+  // Escape closes it like Continue; Tab and Shift+Tab stay on its two buttons. The Clear All Data
+  // confirmation handles the keyboard itself while it is open.
+  useEffect(() => {
+    if (showClearConfirm) {return;}
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (!isLoading) {onClose();}
+        return;
+      }
+      if (e.key !== 'Tab') {return;}
+      const buttons = [continueButtonRef.current, clearButtonRef.current].filter(Boolean);
+      const currentIndex = buttons.indexOf(document.activeElement as HTMLButtonElement);
+      const nextIndex = e.shiftKey
+        ? (currentIndex <= 0 ? buttons.length - 1 : currentIndex - 1)
+        : (currentIndex + 1) % buttons.length;
+      e.preventDefault();
+      buttons[nextIndex]?.focus();
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => { document.removeEventListener('keydown', handleKeyDown); };
+  }, [showClearConfirm, isLoading, onClose]);
 
   useEffect(() => {
     const loadStorageInfo = async () => {
@@ -76,6 +107,8 @@ const StorageWarning: FC<StorageWarningProps> = ({ reason, onClose }) => {
 
   const handleCancelClear = () => {
     setShowClearConfirm(false);
+    // The confirmation's buttons go away: the keyboard comes back where it left
+    clearButtonRef.current?.focus();
   };
 
   const formatBytes = (bytes: number) => {
@@ -148,6 +181,7 @@ const StorageWarning: FC<StorageWarningProps> = ({ reason, onClose }) => {
         {/* Actions */}
         <div className="flex space-x-3">
           <button
+            ref={continueButtonRef}
             onClick={onClose}
             className="flex-1 px-4 py-2 text-sm font-medium text-secondary bg-card border border-strong rounded-lg hover:bg-muted transition-colors focus-secondary"
             disabled={isLoading}
@@ -156,6 +190,7 @@ const StorageWarning: FC<StorageWarningProps> = ({ reason, onClose }) => {
           </button>
 
           <button
+            ref={clearButtonRef}
             onClick={() => { handleClearData(); }}
             className="flex-1 px-4 py-2 text-sm font-medium text-on-accent bg-danger rounded-lg hover:bg-danger-hover transition-colors disabled:opacity-50 focus-danger"
             disabled={isLoading}
