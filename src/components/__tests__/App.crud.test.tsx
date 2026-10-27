@@ -195,7 +195,8 @@ describe('App prompt workflows', () => {
     const saveFromEmpty = await screen.findByRole('button', { name: /save prompt/i });
     await userEvent.click(saveFromEmpty);
 
-    const warning = await screen.findByRole('dialog', { name: /storage/i });
+    const warning = await screen.findByRole('dialog', { name: 'Storage Limit Reached' });
+    expect(within(warning).getByText('Quota reached')).toBeInTheDocument();
     expect(screen.queryByText(/error loading data/i)).not.toBeInTheDocument();
 
     await userEvent.click(within(warning).getByRole('button', { name: 'Continue' }));

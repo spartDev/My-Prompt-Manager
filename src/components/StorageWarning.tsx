@@ -23,10 +23,13 @@ const WarningIcon: FC<{ className?: string }> = ({ className }) => (
 );
 
 interface StorageWarningProps {
+  /** Why the save was refused. The app's own limits can refuse it while Chrome storage is far from full. */
+  reason: string;
   onClose: () => void;
 }
 
-const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
+/** Shown after a save refused for lack of storage, whatever Chrome storage use is */
+const StorageWarning: FC<StorageWarningProps> = ({ reason, onClose }) => {
   const [storageInfo, setStorageInfo] = useState<{
     used: number;
     total: number;
@@ -86,25 +89,12 @@ const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
   const usagePercentage = storageInfo?.percentage ?? 0;
   const warningLevel = storageInfo?.warningLevel ?? 'safe';
 
-  // Map warning levels to colors and states
-  const isAtLimit = warningLevel === 'danger';
-  const isCritical = warningLevel === 'critical' || warningLevel === 'danger';
-
   const getProgressBarColor = () => {
     switch (warningLevel) {
       case 'danger': return 'bg-danger';
       case 'critical':
       case 'warning': return 'bg-warning';
       default: return 'bg-success';
-    }
-  };
-
-  const getIconColor = () => {
-    switch (warningLevel) {
-      case 'danger': return 'text-danger';
-      case 'critical':
-      case 'warning': return 'text-warning';
-      default: return 'text-success';
     }
   };
 
@@ -119,11 +109,11 @@ const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
         {/* Header */}
         <div className="flex items-center mb-4">
           <div className="shrink-0">
-            <WarningIcon className={`h-8 w-8 ${getIconColor()}`} />
+            <WarningIcon className="h-8 w-8 text-danger" />
           </div>
           <div className="ml-3">
             <h3 id={titleId} className="text-lg font-medium text-primary">
-              {isAtLimit ? 'Storage Limit Reached' : isCritical ? 'Critical Storage Warning' : 'Storage Warning'}
+              Storage Limit Reached
             </h3>
           </div>
         </div>
@@ -150,31 +140,9 @@ const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
           </div>
         )}
 
-        {/* Warning Message */}
+        {/* Why the save was refused */}
         <div className="mb-6">
-          <p className="text-sm text-secondary">
-            {warningLevel === 'danger' ? (
-              <>
-                Your storage is full ({Math.round(usagePercentage)}% used). You won&apos;t be able to save new prompts until you free up space.
-                Consider deleting old prompts or clearing all data.
-              </>
-            ) : warningLevel === 'critical' ? (
-              <>
-                Your storage is critically low ({Math.round(usagePercentage)}% used).
-                You may encounter issues saving new prompts soon. Please delete unused prompts to free up space.
-              </>
-            ) : warningLevel === 'warning' ? (
-              <>
-                Your storage is getting low ({Math.round(usagePercentage)}% used).
-                Consider managing your prompts to free up space before reaching the limit.
-              </>
-            ) : (
-              <>
-                Your storage usage is at {Math.round(usagePercentage)}%.
-                You have plenty of space available.
-              </>
-            )}
-          </p>
+          <p className="text-sm text-secondary">{reason}</p>
         </div>
 
         {/* Actions */}
@@ -187,15 +155,13 @@ const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
             Continue
           </button>
 
-          {isAtLimit && (
-            <button
-              onClick={() => { handleClearData(); }}
-              className="flex-1 px-4 py-2 text-sm font-medium text-on-accent bg-danger rounded-lg hover:bg-danger-hover transition-colors disabled:opacity-50 focus-danger"
-              disabled={isLoading}
-            >
-              {isLoading ? 'Clearing...' : 'Clear All Data'}
-            </button>
-          )}
+          <button
+            onClick={() => { handleClearData(); }}
+            className="flex-1 px-4 py-2 text-sm font-medium text-on-accent bg-danger rounded-lg hover:bg-danger-hover transition-colors disabled:opacity-50 focus-danger"
+            disabled={isLoading}
+          >
+            {isLoading ? 'Clearing...' : 'Clear All Data'}
+          </button>
         </div>
 
         {/* Help Text */}

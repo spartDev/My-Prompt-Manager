@@ -108,12 +108,12 @@ test.describe('Forms, dialogs and toasts on the tokens', () => {
     });
 
     test(`a save refused for lack of storage opens the storage warning on the backdrop and keeps the Add form (${theme})`, async ({ page, storage, extensionId }) => {
-      // About 4.2 MB of Prompts plus a 6 MB key: over 95% of the 10 MB quota, so a new Prompt does not fit
+      // 220 Prompts of 19,000 characters fill only 40% of Chrome's 10 MB, but StorageManager estimates
+      // 2 bytes per character and refuses a save past 8 MB: the warning must say the limit is reached
       const fullLibrary = Array.from({ length: 220 }, (_, i) =>
         createPromptSeed({ id: `long-${String(i)}`, title: `Long prompt ${String(i + 1)}`, content: 'x'.repeat(19_000), category: 'Rédaction' })
       );
       await openPopup(page, storage, extensionId, theme, fullLibrary);
-      await storage.seed({ quotaFiller: 'x'.repeat(6_000_000) });
 
       await page.getByTestId('new-prompt-button').click();
       const content = page.getByLabel('Content *');
@@ -122,6 +122,7 @@ test.describe('Forms, dialogs and toasts on the tokens', () => {
 
       const warning = page.getByRole('dialog', { name: 'Storage Limit Reached' });
       await expect(warning).toBeVisible();
+      await expect(warning.getByText('Storage quota exceeded. Please delete old prompts to free up space.')).toBeVisible();
       await expect(warning.locator('..')).toHaveCSS('background-color', colors.backdrop);
       await expect(warning).toHaveCSS('background-color', colors.card);
       await expect(warning.getByRole('button', { name: 'Clear All Data' })).toHaveCSS('background-color', DANGER_FILL);

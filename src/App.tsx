@@ -39,7 +39,8 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   const [selectedPrompt, setSelectedPrompt] = useState<Prompt | null>(null);
   // The Library filter lasts while the popup or side panel stays open, across Sections
   const [libraryFilter, setLibraryFilter] = useState<LibraryFilter>(ALL_PROMPTS);
-  const [showStorageWarning, setShowStorageWarning] = useState<boolean>(false);
+  // Why the last save was refused for lack of storage: the storage warning shows it
+  const [storageRefusal, setStorageRefusal] = useState<string | null>(null);
   const sectionContentRef = useRef<HTMLDivElement>(null);
 
   // React 19 useTransition for managing optimistic updates
@@ -189,7 +190,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
       });
 
       if (appError.type === 'STORAGE_QUOTA_EXCEEDED') {
-        setShowStorageWarning(true);
+        setStorageRefusal(appError.message || 'Failed to save prompt');
       }
       // The form shows the refusal and keeps what the user typed
       throw error;
@@ -208,7 +209,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
     } catch (error: unknown) {
       const appError = error as AppError;
       if (appError.type === 'STORAGE_QUOTA_EXCEEDED') {
-        setShowStorageWarning(true);
+        setStorageRefusal(appError.message || 'Failed to create category');
       } else {
         showToast(appError.message || 'Failed to create category', 'error');
       }
@@ -264,7 +265,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   }, []);
 
   const handleCloseStorageWarning = useCallback(() => {
-    setShowStorageWarning(false);
+    setStorageRefusal(null);
   }, []);
 
   const loading = promptsLoading || categoriesLoading;
@@ -353,8 +354,8 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
         <TabBar activeSection={currentView} onSelect={handleSelectSection} />
       )}
 
-      {showStorageWarning && (
-        <StorageWarning onClose={handleCloseStorageWarning} />
+      {storageRefusal !== null && (
+        <StorageWarning reason={storageRefusal} onClose={handleCloseStorageWarning} />
       )}
 
       <ToastContainer
