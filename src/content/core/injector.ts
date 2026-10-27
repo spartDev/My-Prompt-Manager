@@ -17,7 +17,7 @@ import { createVariableForm } from '../ui/variable-form';
 import { DOMUtils } from '../utils/dom';
 import { getElementFingerprintGenerator } from '../utils/element-fingerprint';
 import { debug, error, info, isDebugMode, refreshDebugMode, warn } from '../utils/logger';
-import { type CustomSite, createPromptListItem, type ExtensionSettings, getPrompts, getSettings, isSiteEnabled } from '../utils/storage';
+import { type CustomSite, createPromptListItem, type ExtensionSettings, getCategoryColors, getPrompts, getSettings, isSiteEnabled } from '../utils/storage';
 import { injectCSS } from '../utils/styles';
 import { ThemeManager } from '../utils/theme-manager';
 
@@ -32,6 +32,8 @@ export interface InjectorState {
   currentTextarea: HTMLElement | null;
   promptSelector: HTMLElement | null;
   currentTargetElement: HTMLElement | null;
+  /** Color of each Category by name, read when the selector opens: its chips follow the chip rule */
+  categoryColors: Map<string, string>;
   isInitialized: boolean;
   isSiteEnabled: boolean;
   detectionTimeout: number | null;
@@ -90,6 +92,7 @@ export class PromptLibraryInjector {
       currentTextarea: null,
       promptSelector: null,
       currentTargetElement: null,
+      categoryColors: new Map(),
       isInitialized: false,
       isSiteEnabled: false,
       detectionTimeout: null,
@@ -1731,8 +1734,10 @@ export class PromptLibraryInjector {
       // Store target element for use in filterPrompts
       this.state.currentTargetElement = targetElement;
 
-      // Get prompts from storage, Pinned Prompts first (stable within each group)
-      const prompts = pinnedFirst(await getPrompts());
+      // Get prompts from storage, Pinned Prompts first (stable within each group), and the Category colors
+      const [storedPrompts, categoryColors] = await Promise.all([getPrompts(), getCategoryColors()]);
+      const prompts = pinnedFirst(storedPrompts);
+      this.state.categoryColors = categoryColors;
       debug('Retrieved prompts for selector', { count: prompts.length });
 
       // Create selector UI
@@ -1821,7 +1826,7 @@ export class PromptLibraryInjector {
     // Add prompt items
     if (prompts.length > 0) {
       prompts.forEach((prompt, index) => {
-        const promptItem = createPromptListItem(prompt, index, 'prompt-item');
+        const promptItem = createPromptListItem(prompt, index, 'prompt-item', this.state.categoryColors.get(prompt.category));
         promptList.appendChild(promptItem);
       });
     } else {
@@ -2133,7 +2138,7 @@ export class PromptLibraryInjector {
     if (filteredPrompts.length > 0) {
       const newPromptItems: HTMLElement[] = [];
       filteredPrompts.forEach((prompt, index) => {
-        const promptItem = createPromptListItem(prompt, index, 'filtered-prompt-item');
+        const promptItem = createPromptListItem(prompt, index, 'filtered-prompt-item', this.state.categoryColors.get(prompt.category));
         promptList.appendChild(promptItem);
         newPromptItems.push(promptItem);
       });

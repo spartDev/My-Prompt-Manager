@@ -28,6 +28,7 @@ vi.mock('../insertion-manager', () => ({
 }));
 
 vi.mock('../../utils/storage', () => ({
+  getCategoryColors: vi.fn().mockResolvedValue(new Map()),
   getPrompts: getPromptsMock,
   createPromptListItem: vi.fn().mockImplementation((prompt: Prompt) => {
     const item = document.createElement('div');

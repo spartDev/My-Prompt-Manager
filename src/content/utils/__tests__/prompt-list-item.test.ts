@@ -47,6 +47,22 @@ describe('createPromptListItem', () => {
     expect(text(item, '.prompt-preview')).toBe('Test content');
   });
 
+  it('colors the Category chip by the chip rule of its Category color, in light and dark', () => {
+    const item = createPromptListItem(buildPrompt({ category: 'Code' }), 0, 'prompt-item', '#0F766E');
+    const chip = item.querySelector<HTMLElement>('.prompt-category');
+
+    // Teal at 13% in both modes; its text darkened in light, mixed with white in dark (getSoftBadgeColors)
+    expect(chip?.style.getPropertyValue('--prompt-category-bg')).toBe('rgba(15, 118, 110, 0.13)');
+    expect(chip?.style.getPropertyValue('--prompt-category-text')).toBe('#0B554F');
+    expect(chip?.style.getPropertyValue('--prompt-category-text-dark')).toBe('#6AAAA5');
+  });
+
+  it('gives a Category with no known color the default Category color', () => {
+    const chip = createPromptListItem(buildPrompt(), 0).querySelector<HTMLElement>('.prompt-category');
+
+    expect(chip?.style.getPropertyValue('--prompt-category-bg')).toBe('rgba(37, 99, 235, 0.13)');
+  });
+
   it('should set up the option for assistive technology', () => {
     const item = createPromptListItem(buildPrompt(), 3, 'filtered-prompt-item');
 

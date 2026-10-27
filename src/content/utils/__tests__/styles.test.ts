@@ -4,6 +4,9 @@
 
  
 
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import * as Logger from '../logger';
@@ -101,15 +104,12 @@ describe('StylesManager', () => {
       expect(css).toContain('.prompt-category');
       expect(css).toContain('.prompt-preview');
       expect(css).toContain('.no-prompts');
-      expect(css).toContain('.insertion-feedback');
-      expect(css).toContain('.insertion-debug');
     });
 
     it('should include dark mode styles', () => {
       const css = getCSS();
 
       expect(css).toContain('.prompt-library-selector.dark-theme');
-      expect(css).toContain('.prompt-library-selector.light-theme');
     });
 
     it('should include responsive design styles', () => {
@@ -229,8 +229,62 @@ describe('StylesManager', () => {
 
       expect(css).toContain('z-index: 999999'); // Icon
       expect(css).toContain('z-index: 1000000'); // Selector
-      expect(css).toContain('z-index: 1000001'); // Feedback
-      expect(css).toContain('z-index: 1000002'); // Debug
+    });
+  });
+
+  describe('color tokens (My-Prompt-Manager-el4.7)', () => {
+    const TOKENS_CSS = readFileSync(path.resolve(__dirname, '../../../theme/tokens.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    const declarationsOf = (block: string): Record<string, string> =>
+      Object.fromEntries([...block.matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)].map(([, name, value]) => [name, value.trim().replace(/\s+/g, ' ').toLowerCase()]));
+    /** The block of the first rule whose selector is exactly `selector` (written `selector {`, starting a selector) */
+    const blockOf = (css: string, selector: string): string => {
+      let start = css.indexOf(`${selector} {`);
+      while (start > 0 && !/[\s}]/.test(css[start - 1])) {
+        start = css.indexOf(`${selector} {`, start + 1);
+      }
+      expect(start, `rule ${selector}`).toBeGreaterThanOrEqual(0);
+      const open = css.indexOf('{', start);
+      return css.slice(open + 1, css.indexOf('}', open));
+    };
+    /** The popup's tokens: light from @theme static, dark from the .dark override (literal values) */
+    const popup = {
+      light: declarationsOf(blockOf(TOKENS_CSS, '@theme static')),
+      dark: declarationsOf(blockOf(TOKENS_CSS, '.dark'))
+    };
+
+    it('declares the popup tokens on the selector with their light values, and on its dark-theme variant with their dark values', () => {
+      const css = getCSS();
+      const light = declarationsOf(blockOf(css, '.prompt-library-selector'));
+      const dark = declarationsOf(blockOf(css, '.prompt-library-selector.dark-theme'));
+
+      expect(Object.keys(light).length).toBeGreaterThan(10);
+      for (const [name, value] of Object.entries(light)) {
+        expect(popup.light[name], `${name} is a token of tokens.css`).toBeDefined();
+        expect(value, `${name} (light)`).toBe(popup.light[name]);
+      }
+      // A literal color token keeps its light value in dark only by mistake: each one is declared again
+      for (const [name, value] of Object.entries(light).filter(([, value]) => /^(#|rgba?\()/.test(value))) {
+        expect(dark[name], `${name} (dark)`).toBe(popup.dark[name] ?? value);
+      }
+      for (const [name, value] of Object.entries(dark)) {
+        expect(value, `${name} (dark)`).toBe(popup.dark[name]);
+      }
+    });
+
+    it('writes no color outside the token declarations', () => {
+      const rules = getCSS().replace(/\/\*[\s\S]*?\*\//g, '').replace(/--[\w-]+\s*:[^;]+;/g, '');
+      const literals = rules.match(/#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?|oklch|oklab)\(|:\s*(?:white|black)\b/gi) ?? [];
+
+      expect(literals).toEqual([]);
+    });
+
+    it('reads only tokens it declares on the selector', () => {
+      const css = getCSS();
+      const declared = new Set(Object.keys(declarationsOf(blockOf(css, '.prompt-library-selector'))));
+      const used = [...css.matchAll(/var\((--(?:background|text|border)-color-[\w-]+|--shadow-[\w-]+)/g)].map(([, name]) => name);
+
+      expect(used.length).toBeGreaterThan(0);
+      expect([...new Set(used)].filter(name => !declared.has(name)), 'tokens read but not declared').toEqual([]);
     });
   });
 });

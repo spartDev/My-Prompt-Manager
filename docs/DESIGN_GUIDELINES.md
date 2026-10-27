@@ -87,6 +87,8 @@ The brand gradient (`bg-brand`: `#6D28D9` to `#4C1D95`, the same in both modes) 
 
 Charts read the tokens as CSS variables (`src/theme/chartColors.ts`): the primary series and the peak bar take the accent, the other bars `border-accent`, and grid, axes and tooltip the neutral tokens, so they follow the mode without React. The categorical palettes (Categories, Platforms, times of day) are data, the same in both modes.
 
+The Prompt selector and the Variable form injected on Platforms are plain CSS (`src/content/utils/styles.ts`), not Tailwind: they declare the same tokens, under the same names, as CSS variables on `.prompt-library-selector` (light) and `.prompt-library-selector.dark-theme` (dark), and read them through `var()`. `styles.test.ts` fails when a value drifts from `tokens.css` or a color is written outside those declarations. Category chips there follow the same chip rule (`src/theme/categoryChip.ts`).
+
 ### States
 
 | Class | Light | Dark | Use |
