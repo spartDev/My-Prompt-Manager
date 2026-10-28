@@ -39,7 +39,11 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   const [selectedPrompt, setSelectedPrompt] = useState<Prompt | null>(null);
   // The Library filter lasts while the popup or side panel stays open, across Sections
   const [libraryFilter, setLibraryFilter] = useState<LibraryFilter>(ALL_PROMPTS);
-  const [showStorageWarning, setShowStorageWarning] = useState<boolean>(false);
+  // Why the last save was refused for lack of storage: the storage warning shows it
+  const [storageRefusal, setStorageRefusal] = useState<string | null>(null);
+  // What had the keyboard when the refused save started (Save, or the field where Enter was
+  // pressed): it gets the keyboard back when the warning closes
+  const storageRefusalTriggerRef = useRef<HTMLElement | null>(null);
   const sectionContentRef = useRef<HTMLDivElement>(null);
 
   // React 19 useTransition for managing optimistic updates
@@ -158,6 +162,8 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   };
 
   const handleFormSubmit = async (data: { title: string; content: string; category: string }) => {
+    // The form calls this before Save is disabled, so Save (or the field) still has the keyboard
+    const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     try {
       if (currentView === 'add') {
         await createPrompt(data);
@@ -189,10 +195,11 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
       });
 
       if (appError.type === 'STORAGE_QUOTA_EXCEEDED') {
-        setShowStorageWarning(true);
-      } else {
-        showToast(appError.message || 'Failed to save prompt', 'error');
+        storageRefusalTriggerRef.current = trigger;
+        setStorageRefusal(appError.message || 'Failed to save prompt');
       }
+      // The form shows the refusal and keeps what the user typed
+      throw error;
     }
   };
 
@@ -202,13 +209,15 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   };
 
   const handleCreateCategory = async (categoryData: { name: string; color?: string }) => {
+    const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     try {
       await createCategory(categoryData);
       showToast('Category created successfully', 'success');
     } catch (error: unknown) {
       const appError = error as AppError;
       if (appError.type === 'STORAGE_QUOTA_EXCEEDED') {
-        setShowStorageWarning(true);
+        storageRefusalTriggerRef.current = trigger;
+        setStorageRefusal(appError.message || 'Failed to create category');
       } else {
         showToast(appError.message || 'Failed to create category', 'error');
       }
@@ -264,7 +273,12 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   }, []);
 
   const handleCloseStorageWarning = useCallback(() => {
-    setShowStorageWarning(false);
+    const trigger = storageRefusalTriggerRef.current;
+    storageRefusalTriggerRef.current = null;
+    setStorageRefusal(null);
+    if (trigger?.isConnected) {
+      trigger.focus();
+    }
   }, []);
 
   const loading = promptsLoading || categoriesLoading;
@@ -307,7 +321,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
       {currentView === 'add' && (
         <AddPromptForm
           categories={categories}
-          onSubmit={(data) => { void handleFormSubmit(data); }}
+          onSubmit={handleFormSubmit}
           onCancel={handleFormCancel}
         />
       )}
@@ -316,7 +330,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
         <EditPromptForm
           prompt={selectedPrompt}
           categories={categories}
-          onSubmit={(data) => { void handleFormSubmit(data); }}
+          onSubmit={handleFormSubmit}
           onCancel={handleFormCancel}
           onDelete={handleDeleteFromEdit}
         />
@@ -353,8 +367,8 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
         <TabBar activeSection={currentView} onSelect={handleSelectSection} />
       )}
 
-      {showStorageWarning && (
-        <StorageWarning onClose={handleCloseStorageWarning} />
+      {storageRefusal !== null && (
+        <StorageWarning reason={storageRefusal} onClose={handleCloseStorageWarning} />
       )}
 
       <ToastContainer

@@ -26,10 +26,11 @@ export const usePrompts = (): UsePromptsReturn => {
     }
   }, []); // Singleton storageManager never changes, omitted to prevent infinite loop
 
+  // A failed create, update or delete is not stored as `error`: App treats that as a load
+  // failure and replaces the Library. The rejection reaches the caller, which shows it.
   const createPrompt = useCallback(async (prompt: Omit<Prompt, 'id' | 'createdAt' | 'updatedAt' | 'usageCount' | 'lastUsedAt'>) => {
     try {
       setLoading(true);
-      setError(null);
 
       const newPrompt = await promptManager.createPrompt(
         prompt.title,
@@ -38,9 +39,6 @@ export const usePrompts = (): UsePromptsReturn => {
       );
 
       setPrompts(prev => [...prev, newPrompt]);
-    } catch (err) {
-      setError(err as AppError);
-      throw err; // Re-throw for component error handling
     } finally {
       setLoading(false);
     }
@@ -49,16 +47,12 @@ export const usePrompts = (): UsePromptsReturn => {
   const updatePrompt = useCallback(async (id: string, updates: Partial<Prompt>) => {
     try {
       setLoading(true);
-      setError(null);
 
       const updatedPrompt = await promptManager.updatePrompt(id, updates);
 
       setPrompts(prev =>
         prev.map(prompt => prompt.id === id ? updatedPrompt : prompt)
       );
-    } catch (err) {
-      setError(err as AppError);
-      throw err;
     } finally {
       setLoading(false);
     }
@@ -67,14 +61,10 @@ export const usePrompts = (): UsePromptsReturn => {
   const deletePrompt = useCallback(async (id: string) => {
     try {
       setLoading(true);
-      setError(null);
 
       await storageManager.deletePrompt(id);
 
       setPrompts(prev => prev.filter(prompt => prompt.id !== id));
-    } catch (err) {
-      setError(err as AppError);
-      throw err;
     } finally {
       setLoading(false);
     }

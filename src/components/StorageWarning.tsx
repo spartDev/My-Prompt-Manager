@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 
 import { StorageManager } from '../services/storage';
 import { Logger, toError } from '../utils';
@@ -23,10 +23,13 @@ const WarningIcon: FC<{ className?: string }> = ({ className }) => (
 );
 
 interface StorageWarningProps {
+  /** Why the save was refused. The app's own limits can refuse it while Chrome storage is far from full. */
+  reason: string;
   onClose: () => void;
 }
 
-const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
+/** Shown after a save refused for lack of storage, whatever Chrome storage use is */
+const StorageWarning: FC<StorageWarningProps> = ({ reason, onClose }) => {
   const [storageInfo, setStorageInfo] = useState<{
     used: number;
     total: number;
@@ -35,6 +38,38 @@ const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
   } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const titleId = useId();
+  const continueButtonRef = useRef<HTMLButtonElement>(null);
+  const clearButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Focus the safe choice when it opens: the form behind it must not take the keyboard
+  useEffect(() => {
+    continueButtonRef.current?.focus();
+  }, []);
+
+  // Escape closes it like Continue; Tab and Shift+Tab stay on its two buttons. The Clear All Data
+  // confirmation handles the keyboard itself while it is open.
+  useEffect(() => {
+    if (showClearConfirm) {return;}
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (!isLoading) {onClose();}
+        return;
+      }
+      if (e.key !== 'Tab') {return;}
+      const buttons = [continueButtonRef.current, clearButtonRef.current].filter(Boolean);
+      const currentIndex = buttons.indexOf(document.activeElement as HTMLButtonElement);
+      const nextIndex = e.shiftKey
+        ? (currentIndex <= 0 ? buttons.length - 1 : currentIndex - 1)
+        : (currentIndex + 1) % buttons.length;
+      e.preventDefault();
+      buttons[nextIndex]?.focus();
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => { document.removeEventListener('keydown', handleKeyDown); };
+  }, [showClearConfirm, isLoading, onClose]);
 
   useEffect(() => {
     const loadStorageInfo = async () => {
@@ -72,6 +107,8 @@ const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
 
   const handleCancelClear = () => {
     setShowClearConfirm(false);
+    // The confirmation's buttons go away: the keyboard comes back where it left
+    clearButtonRef.current?.focus();
   };
 
   const formatBytes = (bytes: number) => {
@@ -85,10 +122,6 @@ const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
   const usagePercentage = storageInfo?.percentage ?? 0;
   const warningLevel = storageInfo?.warningLevel ?? 'safe';
 
-  // Map warning levels to colors and states
-  const isAtLimit = warningLevel === 'danger';
-  const isCritical = warningLevel === 'critical' || warningLevel === 'danger';
-
   const getProgressBarColor = () => {
     switch (warningLevel) {
       case 'danger': return 'bg-danger';
@@ -98,26 +131,22 @@ const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
     }
   };
 
-  const getIconColor = () => {
-    switch (warningLevel) {
-      case 'danger': return 'text-danger';
-      case 'critical':
-      case 'warning': return 'text-warning';
-      default: return 'text-success';
-    }
-  };
-
   return (
     <div className="fixed inset-0 bg-backdrop backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-card border border-default rounded-lg shadow-xl w-full max-w-md p-6">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="bg-card border border-default rounded-lg shadow-xl w-full max-w-md p-6"
+      >
         {/* Header */}
         <div className="flex items-center mb-4">
           <div className="shrink-0">
-            <WarningIcon className={`h-8 w-8 ${getIconColor()}`} />
+            <WarningIcon className="h-8 w-8 text-danger" />
           </div>
           <div className="ml-3">
-            <h3 className="text-lg font-medium text-primary">
-              {isAtLimit ? 'Storage Limit Reached' : isCritical ? 'Critical Storage Warning' : 'Storage Warning'}
+            <h3 id={titleId} className="text-lg font-medium text-primary">
+              Storage Limit Reached
             </h3>
           </div>
         </div>
@@ -144,36 +173,15 @@ const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
           </div>
         )}
 
-        {/* Warning Message */}
+        {/* Why the save was refused */}
         <div className="mb-6">
-          <p className="text-sm text-secondary">
-            {warningLevel === 'danger' ? (
-              <>
-                Your storage is full ({Math.round(usagePercentage)}% used). You won&apos;t be able to save new prompts until you free up space.
-                Consider deleting old prompts or clearing all data.
-              </>
-            ) : warningLevel === 'critical' ? (
-              <>
-                Your storage is critically low ({Math.round(usagePercentage)}% used).
-                You may encounter issues saving new prompts soon. Please delete unused prompts to free up space.
-              </>
-            ) : warningLevel === 'warning' ? (
-              <>
-                Your storage is getting low ({Math.round(usagePercentage)}% used).
-                Consider managing your prompts to free up space before reaching the limit.
-              </>
-            ) : (
-              <>
-                Your storage usage is at {Math.round(usagePercentage)}%.
-                You have plenty of space available.
-              </>
-            )}
-          </p>
+          <p className="text-sm text-secondary">{reason}</p>
         </div>
 
         {/* Actions */}
         <div className="flex space-x-3">
           <button
+            ref={continueButtonRef}
             onClick={onClose}
             className="flex-1 px-4 py-2 text-sm font-medium text-secondary bg-card border border-strong rounded-lg hover:bg-muted transition-colors focus-secondary"
             disabled={isLoading}
@@ -181,15 +189,14 @@ const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
             Continue
           </button>
 
-          {isAtLimit && (
-            <button
-              onClick={() => { handleClearData(); }}
-              className="flex-1 px-4 py-2 text-sm font-medium text-on-accent bg-danger rounded-lg hover:bg-danger-hover transition-colors disabled:opacity-50 focus-danger"
-              disabled={isLoading}
-            >
-              {isLoading ? 'Clearing...' : 'Clear All Data'}
-            </button>
-          )}
+          <button
+            ref={clearButtonRef}
+            onClick={() => { handleClearData(); }}
+            className="flex-1 px-4 py-2 text-sm font-medium text-on-accent bg-danger rounded-lg hover:bg-danger-hover transition-colors disabled:opacity-50 focus-danger"
+            disabled={isLoading}
+          >
+            {isLoading ? 'Clearing...' : 'Clear All Data'}
+          </button>
         </div>
 
         {/* Help Text */}

@@ -136,6 +136,22 @@ describe('App prompt workflows', () => {
     await screen.findByText(/prompt deleted successfully/i);
   });
 
+  it('keeps the Library, brings the Prompt back and shows a toast when a delete fails', async () => {
+    const storageMock = getMockStorageManager();
+    storageMock.getPrompts.mockResolvedValue([basePrompt]);
+    vi.mocked(storageMock.deletePrompt).mockRejectedValue(new Error('Storage write failed'));
+
+    await renderApp();
+
+    await userEvent.click(await screen.findByRole('button', { name: `Edit ${basePrompt.title}` }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete prompt' }));
+    await userEvent.click(await screen.findByRole('button', { name: /^delete$/i }));
+
+    await screen.findByText(/failed to delete prompt/i);
+    expect(screen.getByText(basePrompt.title)).toBeInTheDocument();
+    expect(screen.queryByText(/error loading data/i)).not.toBeInTheDocument();
+  });
+
   it('copies prompt content to the clipboard in secure contexts', async () => {
     const storageMock = getMockStorageManager();
     storageMock.getPrompts.mockResolvedValue([basePrompt]);
@@ -157,7 +173,7 @@ describe('App prompt workflows', () => {
     await screen.findByText(/prompt copied to clipboard/i);
   });
 
-  it('shows a storage warning when quota errors occur', async () => {
+  it('opens the storage warning over the Add form, which keeps the typed text, when a save exceeds the quota', async () => {
     const storageMock = getMockStorageManager();
     storageMock.getStorageUsage.mockResolvedValue({ used: 5120000, total: 5242880 });
 
@@ -179,11 +195,57 @@ describe('App prompt workflows', () => {
     const saveFromEmpty = await screen.findByRole('button', { name: /save prompt/i });
     await userEvent.click(saveFromEmpty);
 
-    const errorHeading = await screen.findByRole('heading', { name: /error loading data/i });
-    expect(errorHeading).toBeInTheDocument();
-    
-    const errorMessage = await screen.findByText(/quota reached/i);
-    expect(errorMessage).toBeInTheDocument();
+    const warning = await screen.findByRole('dialog', { name: 'Storage Limit Reached' });
+    expect(within(warning).getByText('Quota reached')).toBeInTheDocument();
+    expect(screen.queryByText(/error loading data/i)).not.toBeInTheDocument();
+
+    await userEvent.click(within(warning).getByRole('button', { name: 'Continue' }));
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Quota reached');
+    expect(screen.getByLabelText(/content/i)).toHaveValue('Some content');
+  });
+
+  it('gives the keyboard back to Save Prompt when the storage warning closes', async () => {
+    const promptMock = getMockPromptManager();
+    const quotaError: AppError = { type: 'STORAGE_QUOTA_EXCEEDED', message: 'Quota reached' };
+    (promptMock.createPrompt as any).mockRejectedValue(quotaError);
+
+    await renderApp();
+
+    const emptyState = await screen.findByRole('region', { name: /empty state/i });
+    await userEvent.click(await within(emptyState).findByRole('button', { name: /create your first prompt/i }));
+    await userEvent.type(screen.getByLabelText(/content/i), 'Some content');
+    await userEvent.click(await screen.findByRole('button', { name: /save prompt/i }));
+
+    const warning = await screen.findByRole('dialog', { name: 'Storage Limit Reached' });
+    await waitFor(() => { expect(within(warning).getByRole('button', { name: 'Continue' })).toHaveFocus(); });
+
+    await userEvent.keyboard('{Escape}');
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /save prompt/i })).toHaveFocus();
+  });
+
+  it('gives the keyboard back to Add when the storage warning of a refused Category closes', async () => {
+    const storageMock = getMockStorageManager();
+    const quotaError: AppError = { type: 'STORAGE_QUOTA_EXCEEDED', message: 'Quota reached' };
+    vi.mocked(storageMock.saveCategory).mockRejectedValue(quotaError);
+
+    await renderApp();
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Categories' }));
+    await userEvent.type(await screen.findByPlaceholderText('Enter category name...'), 'Research');
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+
+    const warning = await screen.findByRole('dialog', { name: 'Storage Limit Reached' });
+    expect(within(warning).getByText('Quota reached')).toBeInTheDocument();
+    await waitFor(() => { expect(within(warning).getByRole('button', { name: 'Continue' })).toHaveFocus(); });
+
+    await userEvent.keyboard('{Escape}');
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add' })).toHaveFocus();
   });
 
   it('keeps the library on screen and shows a toast when pinning fails', async () => {
@@ -203,7 +265,7 @@ describe('App prompt workflows', () => {
     setSpy.mockRestore();
   });
 
-  it('surfaces validation errors through an error toast', async () => {
+  it('keeps the Edit form, the typed text and the refusal in the form when a save is refused', async () => {
     const storageMock = getMockStorageManager();
     storageMock.getPrompts.mockResolvedValue([basePrompt]);
 
@@ -228,6 +290,10 @@ describe('App prompt workflows', () => {
       expect(promptMock.updatePrompt).toHaveBeenCalled();
     });
 
-    await screen.findByText(/title is required/i);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Title is required');
+    expect(screen.getAllByText(/title is required/i)).toHaveLength(1);
+    expect(screen.queryByText(/error loading data/i)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/content/i)).toHaveValue(`${basePrompt.content} additional`);
+    expect(screen.getByRole('button', { name: /save changes/i })).toBeInTheDocument();
   });
 });

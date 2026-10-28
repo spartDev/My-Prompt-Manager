@@ -3,8 +3,8 @@
  *
  * The prompt forms are a card on bg-app with bg-subtle fields and danger-colored validation; the
  * delete confirmation is a card on the backdrop; every toast type sits on bg-inverse with its bright
- * icon. The storage warning cannot open yet (bd My-Prompt-Manager-jnu): StorageWarning.test.tsx
- * covers its colors. Also captures light/dark screenshots as visual proof
+ * icon; a save refused for lack of storage opens the storage warning on the backdrop and keeps the
+ * Add form (My-Prompt-Manager-jnu). Also captures light/dark screenshots as visual proof
  * (test-results/forms-dialogs-toasts/).
  */
 
@@ -105,6 +105,42 @@ test.describe('Forms, dialogs and toasts on the tokens', () => {
       await expect(dialog.locator('> div').nth(1)).toHaveCSS('background-color', colors.card);
       await expect(dialog.getByRole('button', { name: 'Delete' })).toHaveCSS('background-color', DANGER_FILL);
       await page.screenshot({ path: `${SCREENSHOT_DIR}/delete-confirmation-${theme}.png` });
+    });
+
+    test(`a save refused for lack of storage opens the storage warning on the backdrop and keeps the Add form (${theme})`, async ({ page, storage, extensionId }) => {
+      // 220 Prompts of 19,000 characters fill only 40% of Chrome's 10 MB, but StorageManager estimates
+      // 2 bytes per character and refuses a save past 8 MB: the warning must say the limit is reached
+      const fullLibrary = Array.from({ length: 220 }, (_, i) =>
+        createPromptSeed({ id: `long-${String(i)}`, title: `Long prompt ${String(i + 1)}`, content: 'x'.repeat(19_000), category: 'Rédaction' })
+      );
+      await openPopup(page, storage, extensionId, theme, fullLibrary);
+
+      await page.getByTestId('new-prompt-button').click();
+      const content = page.getByLabel('Content *');
+      await content.fill('Résume la transcription ci-dessous.');
+      await page.getByRole('button', { name: 'Save Prompt' }).click();
+
+      const warning = page.getByRole('dialog', { name: 'Storage Limit Reached' });
+      await expect(warning).toBeVisible();
+      await expect(warning.getByText('Storage quota exceeded. Please delete old prompts to free up space.')).toBeVisible();
+      await expect(warning.locator('..')).toHaveCSS('background-color', colors.backdrop);
+      await expect(warning).toHaveCSS('background-color', colors.card);
+      await expect(warning.getByRole('button', { name: 'Clear All Data' })).toHaveCSS('background-color', DANGER_FILL);
+      await expect(page.getByText('Error Loading Data')).toHaveCount(0);
+      await page.screenshot({ path: `${SCREENSHOT_DIR}/storage-warning-${theme}.png` });
+
+      // A modal: the keyboard starts on Continue, stays in the warning, and Escape gives it back to Save
+      await expect(warning.getByRole('button', { name: 'Continue' })).toBeFocused();
+      await page.keyboard.press('Shift+Tab');
+      await expect(warning.getByRole('button', { name: 'Clear All Data' })).toBeFocused();
+      await page.keyboard.press('Shift+Tab');
+      await expect(warning.getByRole('button', { name: 'Continue' })).toBeFocused();
+      await page.keyboard.press('Escape');
+      await expect(warning).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'Save Prompt' })).toBeFocused();
+      await expect(content).toHaveValue('Résume la transcription ci-dessous.');
+      await expect(page.getByRole('alert')).toContainText(/storage/i);
+      await page.screenshot({ path: `${SCREENSHOT_DIR}/save-refused-${theme}.png` });
     });
 
     test(`every toast type sits on bg-inverse with its bright icon (${theme})`, async ({ page, storage, extensionId }) => {

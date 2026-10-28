@@ -340,7 +340,8 @@ describe('usePrompts', () => {
         ).rejects.toThrow();
       });
 
-      expect(result.current.error).toBeTruthy();
+      // A failed save is not a load error: App would replace the Library with an error screen
+      expect(result.current.error).toBeNull();
       expect(result.current.loading).toBe(false);
     });
 
@@ -366,7 +367,8 @@ describe('usePrompts', () => {
         ).rejects.toThrow();
       });
 
-      expect(result.current.error).toBeTruthy();
+      // A failed save is not a load error: App would replace the Library with an error screen
+      expect(result.current.error).toBeNull();
       expect(result.current.loading).toBe(false);
 
       setSpy.mockRestore();
@@ -392,7 +394,8 @@ describe('usePrompts', () => {
         await expect(result.current.deletePrompt('1')).rejects.toThrow();
       });
 
-      expect(result.current.error).toBeTruthy();
+      // A failed save is not a load error: App would replace the Library with an error screen
+      expect(result.current.error).toBeNull();
       expect(result.current.loading).toBe(false);
 
       setSpy.mockRestore();
@@ -667,7 +670,7 @@ describe('usePrompts', () => {
       expect(result.current.prompts).toEqual(mockPrompts);
     });
 
-    it('should maintain error state after failed operation', async () => {
+    it('should keep the loaded Prompts and no error after a failed save', async () => {
       // Arrange
       await chrome.storage.local.set({ prompts: mockPrompts });
 
@@ -695,7 +698,8 @@ describe('usePrompts', () => {
         expect(result.current.loading).toBe(false);
       });
 
-      expect(result.current.error).toBeTruthy();
+      expect(result.current.error).toBeNull();
+      expect(result.current.prompts).toEqual(mockPrompts);
     });
   });
 
