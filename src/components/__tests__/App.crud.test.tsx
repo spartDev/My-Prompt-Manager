@@ -206,6 +206,48 @@ describe('App prompt workflows', () => {
     expect(screen.getByLabelText(/content/i)).toHaveValue('Some content');
   });
 
+  it('gives the keyboard back to Save Prompt when the storage warning closes', async () => {
+    const promptMock = getMockPromptManager();
+    const quotaError: AppError = { type: 'STORAGE_QUOTA_EXCEEDED', message: 'Quota reached' };
+    (promptMock.createPrompt as any).mockRejectedValue(quotaError);
+
+    await renderApp();
+
+    const emptyState = await screen.findByRole('region', { name: /empty state/i });
+    await userEvent.click(await within(emptyState).findByRole('button', { name: /create your first prompt/i }));
+    await userEvent.type(screen.getByLabelText(/content/i), 'Some content');
+    await userEvent.click(await screen.findByRole('button', { name: /save prompt/i }));
+
+    const warning = await screen.findByRole('dialog', { name: 'Storage Limit Reached' });
+    await waitFor(() => { expect(within(warning).getByRole('button', { name: 'Continue' })).toHaveFocus(); });
+
+    await userEvent.keyboard('{Escape}');
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /save prompt/i })).toHaveFocus();
+  });
+
+  it('gives the keyboard back to Add when the storage warning of a refused Category closes', async () => {
+    const storageMock = getMockStorageManager();
+    const quotaError: AppError = { type: 'STORAGE_QUOTA_EXCEEDED', message: 'Quota reached' };
+    vi.mocked(storageMock.saveCategory).mockRejectedValue(quotaError);
+
+    await renderApp();
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Categories' }));
+    await userEvent.type(await screen.findByPlaceholderText('Enter category name...'), 'Research');
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+
+    const warning = await screen.findByRole('dialog', { name: 'Storage Limit Reached' });
+    expect(within(warning).getByText('Quota reached')).toBeInTheDocument();
+    await waitFor(() => { expect(within(warning).getByRole('button', { name: 'Continue' })).toHaveFocus(); });
+
+    await userEvent.keyboard('{Escape}');
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add' })).toHaveFocus();
+  });
+
   it('keeps the library on screen and shows a toast when pinning fails', async () => {
     const storageMock = getMockStorageManager();
     storageMock.getPrompts.mockResolvedValue([basePrompt]);
