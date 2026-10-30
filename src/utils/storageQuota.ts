@@ -1,6 +1,6 @@
 /**
  * Storage quota utilities for proactive quota management
- * Chrome storage.local limit: 5MB (5,242,880 bytes)
+ * Chrome storage.local limit: 10 MB (10,485,760 bytes) since Chrome 114
  */
 
 /**
@@ -77,38 +77,19 @@ export function checkQuotaAvailability(
   };
 }
 
-/**
- * Estimate the size of a prompt in bytes
- *
- * @param title Prompt title
- * @param content Prompt content
- * @param category Category name
- * @returns Estimated size in bytes
- */
-export function estimatePromptSize(
-  title: string,
-  content: string,
-  category: string
-): number {
-  const titleBytes = title.length * ESTIMATED_SIZES.PROMPT_PER_CHAR;
-  const contentBytes = content.length * ESTIMATED_SIZES.PROMPT_PER_CHAR;
-  const categoryBytes = category.length * ESTIMATED_SIZES.PROMPT_PER_CHAR;
+const utf8 = new TextEncoder();
 
-  return ESTIMATED_SIZES.PROMPT_BASE + titleBytes + contentBytes + categoryBytes;
-}
+// Chrome writes these characters as 6-byte \uXXXX escapes in the JSON it stores
+const ESCAPED_BY_CHROME = /[<\u2028\u2029]/g;
+const escapeLikeChrome = (char: string) => `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`;
 
 /**
- * Estimate the size of an array of prompts
- *
- * @param prompts Array of prompts to estimate
- * @returns Estimated total size in bytes
+ * The bytes `value` takes in chrome.storage.local: the JSON Chrome stores, in UTF-8, as getBytesInUse
+ * counts it. Chrome also writes large numbers such as timestamps in exponent notation, a few bytes
+ * more each, which this leaves out.
  */
-export function estimatePromptsArraySize(
-  prompts: Array<{ title: string; content: string; category: string }>
-): number {
-  return prompts.reduce((total, prompt) => {
-    return total + estimatePromptSize(prompt.title, prompt.content, prompt.category);
-  }, 0);
+export function storedSize(value: unknown): number {
+  return utf8.encode(JSON.stringify(value).replace(ESCAPED_BY_CHROME, escapeLikeChrome)).length;
 }
 
 /**

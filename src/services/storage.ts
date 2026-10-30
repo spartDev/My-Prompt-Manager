@@ -15,8 +15,7 @@ import { AsyncMutex } from '../utils/asyncMutex';
 import { ensureStorageAvailable } from '../utils/chromeStorage';
 import {
   checkQuotaAvailability,
-  estimatePromptSize,
-  estimatePromptsArraySize
+  storedSize
 } from '../utils/storageQuota';
 
 import {
@@ -68,8 +67,9 @@ export class StorageManager {
   // Hard limits for storage quota enforcement
   private readonly STORAGE_LIMITS = {
     MAX_PROMPTS: 5000,            // Maximum number of prompts
-    MAX_PROMPT_SIZE: 50000,       // Maximum size per prompt (50KB) - accounts for 20K chars × 2 bytes/char + overhead
-    MAX_TOTAL_SIZE: 8000000       // Maximum total storage (8MB, leaving 2MB buffer)
+    // Maximum bytes the Prompts take in Chrome storage: 8 MB of the 10 MB quota, which leaves 2 MB for the
+    // usage history (up to 10,000 events) and the other keys. Admission limits a single Prompt's text.
+    MAX_TOTAL_SIZE: 8000000
   } as const;
 
   // Locks for the Prompts and Categories keys, shared with the other contexts (popup, side panel,
@@ -118,21 +118,10 @@ export class StorageManager {
           });
         }
 
-        // HARD LIMIT: Enforce individual prompt size
-        const estimatedSize = estimatePromptSize(newPrompt.title, newPrompt.content, newPrompt.category);
-        if (estimatedSize > this.STORAGE_LIMITS.MAX_PROMPT_SIZE) {
-          throw new StorageError({
-            message: `Prompt exceeds maximum size limit (${String(this.STORAGE_LIMITS.MAX_PROMPT_SIZE)} bytes)`,
-            type: 'VALIDATION_ERROR',
-            details: {
-              size: estimatedSize,
-              max: this.STORAGE_LIMITS.MAX_PROMPT_SIZE
-            }
-          });
-        }
+        const updatedPrompts = [...existingPrompts, newPrompt];
 
-        // HARD LIMIT: Check total storage before write
-        const totalSize = estimatePromptsArraySize(existingPrompts) + estimatedSize;
+        // HARD LIMIT: the bytes the Library will take in Chrome storage
+        const totalSize = storedSize(updatedPrompts);
         if (totalSize > this.STORAGE_LIMITS.MAX_TOTAL_SIZE) {
           throw new StorageError({
             message: 'Storage quota exceeded. Please delete old prompts to free up space.',
@@ -145,9 +134,7 @@ export class StorageManager {
         }
 
         // Proactive quota check BEFORE attempting write (Chrome API check)
-        await this.checkQuotaBeforeWrite(estimatedSize);
-
-        const updatedPrompts = [...existingPrompts, newPrompt];
+        await this.checkQuotaBeforeWrite(storedSize(newPrompt));
 
         await this.writePrompts(updatedPrompts);
         return newPrompt;
@@ -185,22 +172,7 @@ export class StorageManager {
         const updatedPrompt = admission.prompt;
 
         // Check if update would increase size (content/title getting longer)
-        const oldPrompt = existingPrompts[promptIndex];
-        const oldSize = estimatePromptSize(oldPrompt.title, oldPrompt.content, oldPrompt.category);
-        const newSize = estimatePromptSize(updatedPrompt.title, updatedPrompt.content, updatedPrompt.category);
-        const sizeDelta = newSize - oldSize;
-
-        // HARD LIMIT: Enforce individual prompt size (same check as savePrompt)
-        if (newSize > this.STORAGE_LIMITS.MAX_PROMPT_SIZE) {
-          throw new StorageError({
-            message: `Prompt exceeds maximum size limit (${String(this.STORAGE_LIMITS.MAX_PROMPT_SIZE)} bytes)`,
-            type: 'VALIDATION_ERROR',
-            details: {
-              size: newSize,
-              max: this.STORAGE_LIMITS.MAX_PROMPT_SIZE
-            }
-          });
-        }
+        const sizeDelta = storedSize(updatedPrompt) - storedSize(existingPrompts[promptIndex]);
 
         // Only check quota if size is increasing
         if (sizeDelta > 0) {
@@ -343,10 +315,7 @@ export class StorageManager {
 
         if (replacing) {
           // Update existing prompt - check quota if size is increasing
-          const oldPrompt = existingPrompts[existingIndex];
-          const oldSize = estimatePromptSize(oldPrompt.title, oldPrompt.content, oldPrompt.category);
-          const newSize = estimatePromptSize(admitted.title, admitted.content, admitted.category);
-          const sizeDelta = newSize - oldSize;
+          const sizeDelta = storedSize(admitted) - storedSize(existingPrompts[existingIndex]);
 
           if (sizeDelta > 0) {
             await this.checkQuotaBeforeWrite(sizeDelta);
@@ -358,7 +327,7 @@ export class StorageManager {
         }
 
         // Add new prompt - check quota for full size
-        await this.checkQuotaBeforeWrite(estimatePromptSize(admitted.title, admitted.content, admitted.category));
+        await this.checkQuotaBeforeWrite(storedSize(admitted));
         await this.writePrompts([...existingPrompts, admitted]);
         return admitted;
       } catch (error) {
@@ -746,10 +715,7 @@ export class StorageManager {
       // Proactive quota check BEFORE clearing data
       // Since we clear ALL existing data before import, check if import size
       // fits within total quota (not current usage + import size)
-      const estimatedPromptsSize = estimatePromptsArraySize(admittedPrompts);
-      const estimatedCategoriesSize = admittedCategories.length * 100; // Rough estimate
-      const estimatedSettingsSize = 500; // Settings overhead
-      const totalEstimatedSize = estimatedPromptsSize + estimatedCategoriesSize + estimatedSettingsSize;
+      const totalEstimatedSize = storedSize({ prompts: admittedPrompts, categories: admittedCategories, settings });
 
       // Check against total quota since existing data will be cleared
       const quota = chrome.storage.local.QUOTA_BYTES;
