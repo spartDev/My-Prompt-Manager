@@ -83,13 +83,25 @@ const utf8 = new TextEncoder();
 const ESCAPED_BY_CHROME = /[<\u2028\u2029]/g;
 const escapeLikeChrome = (char: string) => `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`;
 
+// Chrome writes an integer past 32 bits, such as a timestamp, as a double: 1793212345678 becomes
+// 1.793212345678e+12, at most 5 bytes longer than its JSON
+const DOUBLE_EXTRA_BYTES = 5;
+const isStoredAsDouble = (value: unknown) =>
+  typeof value === 'number' && Number.isInteger(value) && (value > 2 ** 31 - 1 || value < -(2 ** 31));
+
 /**
  * The bytes `value` takes in chrome.storage.local: the JSON Chrome stores, in UTF-8, as getBytesInUse
- * counts it. Chrome also writes large numbers such as timestamps in exponent notation, a few bytes
- * more each, which this leaves out.
+ * counts it. It never counts less than Chrome: an integer past 32 bits counts its longest form.
  */
 export function storedSize(value: unknown): number {
-  return utf8.encode(JSON.stringify(value).replace(ESCAPED_BY_CHROME, escapeLikeChrome)).length;
+  let doubles = 0;
+  const json = JSON.stringify(value, (_key, item: unknown) => {
+    if (isStoredAsDouble(item)) {
+      doubles += 1;
+    }
+    return item;
+  });
+  return utf8.encode(json.replace(ESCAPED_BY_CHROME, escapeLikeChrome)).length + doubles * DOUBLE_EXTRA_BYTES;
 }
 
 /**

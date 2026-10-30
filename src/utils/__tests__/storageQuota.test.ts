@@ -69,6 +69,12 @@ describe('StorageQuota Utils', () => {
       expect(storedSize('\n"'.repeat(500))).toBe(2002);
       expect(storedSize('>&'.repeat(500))).toBe(1002);
     });
+
+    it('counts an integer past 32 bits, such as a timestamp, at the longest form Chrome writes: 5 bytes more', () => {
+      expect(storedSize(1_793_212_345_678)).toBe('1.793212345678e+12'.length);
+      expect(storedSize({ createdAt: -1_793_212_345_678, usageCount: 2_147_483_647, ratio: 1.5 }))
+        .toBe('{"createdAt":-1793212345678,"usageCount":2147483647,"ratio":1.5}'.length + 5);
+    });
   });
 
   describe('calculateMaxPrompts', () => {

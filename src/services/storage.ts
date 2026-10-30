@@ -119,19 +119,7 @@ export class StorageManager {
         }
 
         const updatedPrompts = [...existingPrompts, newPrompt];
-
-        // HARD LIMIT: the bytes the Library will take in Chrome storage
-        const totalSize = storedSize(updatedPrompts);
-        if (totalSize > this.STORAGE_LIMITS.MAX_TOTAL_SIZE) {
-          throw new StorageError({
-            message: 'Storage quota exceeded. Please delete old prompts to free up space.',
-            type: 'STORAGE_QUOTA_EXCEEDED',
-            details: {
-              total: totalSize,
-              max: this.STORAGE_LIMITS.MAX_TOTAL_SIZE
-            }
-          });
-        }
+        this.checkLibraryCap(updatedPrompts);
 
         // Proactive quota check BEFORE attempting write (Chrome API check)
         await this.checkQuotaBeforeWrite(storedSize(newPrompt));
@@ -173,13 +161,14 @@ export class StorageManager {
 
         // Check if update would increase size (content/title getting longer)
         const sizeDelta = storedSize(updatedPrompt) - storedSize(existingPrompts[promptIndex]);
+        existingPrompts[promptIndex] = updatedPrompt;
 
-        // Only check quota if size is increasing
+        // Only check the cap and the quota if size is increasing
         if (sizeDelta > 0) {
+          this.checkLibraryCap(existingPrompts);
           await this.checkQuotaBeforeWrite(sizeDelta);
         }
 
-        existingPrompts[promptIndex] = updatedPrompt;
         await this.writePrompts(existingPrompts);
 
         return updatedPrompt;
@@ -317,18 +306,21 @@ export class StorageManager {
           // Update existing prompt - check quota if size is increasing
           const sizeDelta = storedSize(admitted) - storedSize(existingPrompts[existingIndex]);
 
+          existingPrompts[existingIndex] = admitted;
           if (sizeDelta > 0) {
+            this.checkLibraryCap(existingPrompts);
             await this.checkQuotaBeforeWrite(sizeDelta);
           }
 
-          existingPrompts[existingIndex] = admitted;
           await this.writePrompts(existingPrompts);
           return admitted;
         }
 
-        // Add new prompt - check quota for full size
+        // Add new prompt - check the cap and the quota for its full size
+        const updatedPrompts = [...existingPrompts, admitted];
+        this.checkLibraryCap(updatedPrompts);
         await this.checkQuotaBeforeWrite(storedSize(admitted));
-        await this.writePrompts([...existingPrompts, admitted]);
+        await this.writePrompts(updatedPrompts);
         return admitted;
       } catch (error) {
         throw this.handleStorageError(error);
@@ -841,6 +833,26 @@ export class StorageManager {
   private async setStorageData(key: NonPromptStorageKey, data: unknown): Promise<void> {
     await ensureStorageAvailable();
     await chrome.storage.local.set({ [key]: data });
+  }
+
+  /**
+   * HARD LIMIT: refuse a write that takes the Prompts past MAX_TOTAL_SIZE, in the bytes Chrome will store
+   *
+   * @param prompts The Prompts as they will be written
+   * @throws StorageError if they would pass the cap
+   */
+  private checkLibraryCap(prompts: StoredPrompt[]): void {
+    const totalSize = storedSize(prompts);
+    if (totalSize > this.STORAGE_LIMITS.MAX_TOTAL_SIZE) {
+      throw new StorageError({
+        message: 'Storage quota exceeded. Please delete old prompts to free up space.',
+        type: 'STORAGE_QUOTA_EXCEEDED',
+        details: {
+          total: totalSize,
+          max: this.STORAGE_LIMITS.MAX_TOTAL_SIZE
+        }
+      });
+    }
   }
 
   /**

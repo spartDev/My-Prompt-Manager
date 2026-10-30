@@ -213,6 +213,41 @@ describe('StorageManager', () => {
       expect(await storageManager.getPrompts()).toHaveLength(139);
     });
 
+    it('refuses to import a Prompt that takes the Library past the 8 MB cap', async () => {
+      const chinese = '中'.repeat(19_000);
+      await chrome.storage.local.set({ prompts: library(139, chinese) });
+
+      await expect(storageManager.importPrompt(buildPrompt({ id: 'imported', content: chinese }))).rejects.toMatchObject({
+        type: 'STORAGE_QUOTA_EXCEEDED',
+        message: 'Storage quota exceeded. Please delete old prompts to free up space.'
+      });
+      expect(await storageManager.getPrompts()).toHaveLength(139);
+    });
+
+    describe('with a Prompt that grows in a Library just under the 8 MB cap', () => {
+      const chinese = '中'.repeat(19_000);
+
+      beforeEach(async () => {
+        await chrome.storage.local.set({ prompts: [...library(139, chinese), buildPrompt({ id: 'short', content: 'x' })] });
+      });
+
+      it('refuses the edit that takes the Library past the cap', async () => {
+        await expect(storageManager.updatePrompt('short', { content: chinese })).rejects.toMatchObject({ type: 'STORAGE_QUOTA_EXCEEDED' });
+        expect((await storageManager.getPrompts()).find(p => p.id === 'short')?.content).toBe('x');
+      });
+
+      it('refuses the import that replaces it and takes the Library past the cap', async () => {
+        await expect(storageManager.importPrompt(buildPrompt({ id: 'short', content: chinese }))).rejects.toMatchObject({ type: 'STORAGE_QUOTA_EXCEEDED' });
+        expect((await storageManager.getPrompts()).find(p => p.id === 'short')?.content).toBe('x');
+      });
+
+      it('takes an edit that shrinks a Prompt of a Library already past the cap', async () => {
+        await chrome.storage.local.set({ prompts: library(141, chinese) });
+
+        await expect(storageManager.updatePrompt('long-0', { content: 'Shorter' })).resolves.toMatchObject({ content: 'Shorter' });
+      });
+    });
+
     it('restores a backup of 150 Prompts of 19,000 ASCII characters, 2.9 MB stored, within a 5 MB quota', async () => {
       const backup = {
         prompts: library(150, 'x'.repeat(19_000)),

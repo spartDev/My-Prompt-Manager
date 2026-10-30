@@ -17,7 +17,9 @@ const LINE_SEPARATOR = String.fromCodePoint(0x2028);
 test.describe('Library size in Chrome storage', () => {
   test('storedSize counts the bytes Chrome stores for ASCII, accented, emoji, Chinese and escaped text', async ({ page, extensionId }) => {
     const content = ['x', 'é', '😀', '中', '<', '\n', '"', LINE_SEPARATOR].map(char => char.repeat(500)).join('');
-    const prompts = [createPromptSeed({ id: 'mixed', title: 'Résumé 😀 <draft>', content, category: 'Rédaction' })];
+    // A timestamp of 13 significant digits takes its longest form in Chrome, 1.793212345678e+12
+    const at = 1_793_212_345_678;
+    const prompts = [createPromptSeed({ id: 'mixed', title: 'Résumé 😀 <draft>', content, category: 'Rédaction', createdAt: at, updatedAt: at, lastUsedAt: at })];
     await page.goto(`chrome-extension://${extensionId}/src/popup.html`);
 
     const chromeBytes = await page.evaluate(async (value) => {
@@ -26,10 +28,37 @@ test.describe('Library size in Chrome storage', () => {
       return chrome.storage.local.getBytesInUse('prompts');
     }, prompts);
 
-    // Chrome counts the key too, and writes each of the 3 timestamps up to 5 bytes longer (exponent notation)
-    const measured = 'prompts'.length + storedSize(prompts);
-    expect(chromeBytes).toBeGreaterThanOrEqual(measured);
-    expect(chromeBytes).toBeLessThanOrEqual(measured + 15);
+    // Chrome counts the key too
+    expect('prompts'.length + storedSize(prompts)).toBe(chromeBytes);
+  });
+
+  test('a Settings import stops at the 8 MB cap on the Prompts', async ({ page, storage, extensionId }) => {
+    const library = Array.from({ length: 410 }, (_, i) =>
+      createPromptSeed({ id: `long-${String(i)}`, title: `Long prompt ${String(i + 1)}`, content: 'x'.repeat(19_000) })
+    );
+    await seedLibrary(storage, { prompts: library });
+    await page.goto(`chrome-extension://${extensionId}/src/popup.html`);
+    await expect(page.getByTestId('prompt-card').first()).toBeVisible();
+
+    // 410 Prompts store 7.9 MB: the 20 imported ones would take the Prompts to 8.2 MB
+    const backup = {
+      prompts: Array.from({ length: 20 }, (_, i) =>
+        createPromptSeed({ id: `imported-${String(i)}`, title: `Imported ${String(i + 1)}`, content: 'y'.repeat(19_000) })
+      ),
+      categories: []
+    };
+    const alertMessage = new Promise<string>(resolve => {
+      page.once('dialog', dialog => {
+        resolve(dialog.message());
+        void dialog.accept();
+      });
+    });
+    await page.getByTestId('tab-settings').click();
+    await page.locator('input[type="file"]').setInputFiles({ name: 'backup.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(backup)) });
+
+    expect(await alertMessage).toContain('Storage quota exceeded. Please delete old prompts to free up space.');
+    expect(await page.evaluate(() => chrome.storage.local.getBytesInUse('prompts'))).toBeLessThanOrEqual('prompts'.length + 8_000_000);
+    expect((await storage.getPrompts()).length).toBeLessThan(430);
   });
 
   for (const theme of ['light', 'dark'] as const) {
