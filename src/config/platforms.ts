@@ -354,6 +354,7 @@ export function getLinkedPlatformHostnames(hostname: string): string[] {
   const linkedHostnames = platform.linkedPlatforms
     .map((platformId) => {
       if (!(platformId in SUPPORTED_PLATFORMS)) {
+        // biome-ignore lint/suspicious/noConsole: dependency-free config shared by every surface, so no logger to import
         console.error(
           `Linked platform ${platformId} not found in SUPPORTED_PLATFORMS`,
         );

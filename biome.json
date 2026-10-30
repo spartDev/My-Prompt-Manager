@@ -103,7 +103,7 @@
 				"noUselessRegexBackrefs": "error",
 				"noWith": "error",
 				"useGetterReturn": "error",
-				"noConsole": { "level": "warn", "options": { "allow": ["error"] } }
+				"noConsole": "error"
 			}
 		}
 	},
@@ -220,7 +220,7 @@
 			}
 		},
 		{
-			"includes": ["src/content/**/*.ts"],
+			"includes": ["src/utils/logger.ts", "src/content/utils/logger.ts"],
 			"linter": {
 				"rules": {
 					"suspicious": { "noConsole": "off" }
