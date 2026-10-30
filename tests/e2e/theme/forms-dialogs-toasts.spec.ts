@@ -108,9 +108,9 @@ test.describe('Forms, dialogs and toasts on the tokens', () => {
     });
 
     test(`a save refused for lack of storage opens the storage warning on the backdrop and keeps the Add form (${theme})`, async ({ page, storage, extensionId }) => {
-      // 220 Prompts of 19,000 characters fill only 40% of Chrome's 10 MB, but StorageManager estimates
-      // 2 bytes per character and refuses a save past 8 MB: the warning must say the limit is reached
-      const fullLibrary = Array.from({ length: 220 }, (_, i) =>
+      // 420 Prompts of 19,000 characters store 8.1 MB, past StorageManager's 8 MB cap on the Prompts
+      // (77% of Chrome's 10 MB): the warning must say the limit is reached
+      const fullLibrary = Array.from({ length: 420 }, (_, i) =>
         createPromptSeed({ id: `long-${String(i)}`, title: `Long prompt ${String(i + 1)}`, content: 'x'.repeat(19_000), category: 'Rédaction' })
       );
       await openPopup(page, storage, extensionId, theme, fullLibrary);

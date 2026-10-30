@@ -1,6 +1,6 @@
 /**
  * Storage quota utilities for proactive quota management
- * Chrome storage.local limit: 5MB (5,242,880 bytes)
+ * Chrome storage.local limit: 10 MB (10,485,760 bytes) since Chrome 114
  */
 
 /**
@@ -77,38 +77,31 @@ export function checkQuotaAvailability(
   };
 }
 
-/**
- * Estimate the size of a prompt in bytes
- *
- * @param title Prompt title
- * @param content Prompt content
- * @param category Category name
- * @returns Estimated size in bytes
- */
-export function estimatePromptSize(
-  title: string,
-  content: string,
-  category: string
-): number {
-  const titleBytes = title.length * ESTIMATED_SIZES.PROMPT_PER_CHAR;
-  const contentBytes = content.length * ESTIMATED_SIZES.PROMPT_PER_CHAR;
-  const categoryBytes = category.length * ESTIMATED_SIZES.PROMPT_PER_CHAR;
+const utf8 = new TextEncoder();
 
-  return ESTIMATED_SIZES.PROMPT_BASE + titleBytes + contentBytes + categoryBytes;
-}
+// Chrome writes these characters as 6-byte \uXXXX escapes in the JSON it stores
+const ESCAPED_BY_CHROME = /[<\u2028\u2029]/g;
+const escapeLikeChrome = (char: string) => `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`;
+
+// Chrome writes an integer past 32 bits, such as a timestamp, as a double: 1793212345678 becomes
+// 1.793212345678e+12, at most 5 bytes longer than its JSON
+const DOUBLE_EXTRA_BYTES = 5;
+const isStoredAsDouble = (value: unknown) =>
+  typeof value === 'number' && Number.isInteger(value) && (value > 2 ** 31 - 1 || value < -(2 ** 31));
 
 /**
- * Estimate the size of an array of prompts
- *
- * @param prompts Array of prompts to estimate
- * @returns Estimated total size in bytes
+ * The bytes `value` takes in chrome.storage.local: the JSON Chrome stores, in UTF-8, as getBytesInUse
+ * counts it. It never counts less than Chrome: an integer past 32 bits counts its longest form.
  */
-export function estimatePromptsArraySize(
-  prompts: Array<{ title: string; content: string; category: string }>
-): number {
-  return prompts.reduce((total, prompt) => {
-    return total + estimatePromptSize(prompt.title, prompt.content, prompt.category);
-  }, 0);
+export function storedSize(value: unknown): number {
+  let doubles = 0;
+  const json = JSON.stringify(value, (_key, item: unknown) => {
+    if (isStoredAsDouble(item)) {
+      doubles += 1;
+    }
+    return item;
+  });
+  return utf8.encode(json.replace(ESCAPED_BY_CHROME, escapeLikeChrome)).length + doubles * DOUBLE_EXTRA_BYTES;
 }
 
 /**

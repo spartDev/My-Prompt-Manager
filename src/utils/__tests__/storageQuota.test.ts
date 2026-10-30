@@ -4,12 +4,11 @@ import { describe, expect, it } from 'vitest';
 import {
   calculateMaxPrompts,
   checkQuotaAvailability,
-  ESTIMATED_SIZES, 
-  estimatePromptSize,
-  estimatePromptsArraySize,
+  ESTIMATED_SIZES,
   formatBytes,
   getStorageStats,
-  QUOTA_THRESHOLDS
+  QUOTA_THRESHOLDS,
+  storedSize
 } from '../storageQuota';
 
 describe('StorageQuota Utils', () => {
@@ -52,44 +51,29 @@ describe('StorageQuota Utils', () => {
     });
   });
 
-  describe('estimatePromptSize', () => {
-    it('should calculate size correctly based on constants', () => {
-      const title = 'Test';
-      const content = 'Content';
-      const category = 'Category';
-
-      const size = estimatePromptSize(title, content, category);
-
-      const expectedSize = ESTIMATED_SIZES.PROMPT_BASE +
-        (title.length * ESTIMATED_SIZES.PROMPT_PER_CHAR) +
-        (content.length * ESTIMATED_SIZES.PROMPT_PER_CHAR) +
-        (category.length * ESTIMATED_SIZES.PROMPT_PER_CHAR);
-
-      expect(size).toBe(expectedSize);
+  describe('storedSize', () => {
+    it('counts one byte per ASCII character of the JSON Chrome stores', () => {
+      expect(storedSize('x'.repeat(1000))).toBe(1002);
+      expect(storedSize({ title: 'Draft', usageCount: 3 })).toBe('{"title":"Draft","usageCount":3}'.length);
     });
 
-    it('should handle empty strings', () => {
-      const size = estimatePromptSize('', '', '');
-      expect(size).toBe(ESTIMATED_SIZES.PROMPT_BASE);
-    });
-  });
-
-  describe('estimatePromptsArraySize', () => {
-    it('should sum up sizes of all prompts', () => {
-      const prompts = [
-        { title: 'T1', content: 'C1', category: 'Cat1' },
-        { title: 'T2', content: 'C2', category: 'Cat2' }
-      ];
-
-      const size = estimatePromptsArraySize(prompts);
-      const expectedSize = estimatePromptSize('T1', 'C1', 'Cat1') +
-                           estimatePromptSize('T2', 'C2', 'Cat2');
-
-      expect(size).toBe(expectedSize);
+    it('counts the UTF-8 bytes of non-ASCII text, as Chrome measured them', () => {
+      expect(storedSize('é'.repeat(1000))).toBe(2002);
+      expect(storedSize('😀'.repeat(500))).toBe(2002);
+      expect(storedSize('中'.repeat(1000))).toBe(3002);
     });
 
-    it('should return 0 for empty array', () => {
-      expect(estimatePromptsArraySize([])).toBe(0);
+    it('counts the 6-byte escapes Chrome writes for <, U+2028 and U+2029, and the 2 bytes of \\n and "', () => {
+      expect(storedSize('<'.repeat(1000))).toBe(6002);
+      expect(storedSize('\u2028\u2029'.repeat(500))).toBe(6002);
+      expect(storedSize('\n"'.repeat(500))).toBe(2002);
+      expect(storedSize('>&'.repeat(500))).toBe(1002);
+    });
+
+    it('counts an integer past 32 bits, such as a timestamp, at the longest form Chrome writes: 5 bytes more', () => {
+      expect(storedSize(1_793_212_345_678)).toBe('1.793212345678e+12'.length);
+      expect(storedSize({ createdAt: -1_793_212_345_678, usageCount: 2_147_483_647, ratio: 1.5 }))
+        .toBe('{"createdAt":-1793212345678,"usageCount":2147483647,"ratio":1.5}'.length + 5);
     });
   });
 

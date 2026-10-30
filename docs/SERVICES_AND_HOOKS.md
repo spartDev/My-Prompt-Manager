@@ -63,7 +63,7 @@ This document provides comprehensive documentation for the business logic layer,
 
 **Key Features:**
 - **Cross-context locks** - `AsyncMutex({ scope: 'StorageManager' })` for the Prompts and Categories keys: the popup, the side panel and the service worker exclude each other through the Web Locks API (in-memory queue where it is missing). Settings use a plain `AsyncMutex`, so a toggle never waits for a round trip to other contexts
-- **Storage quota monitoring** - Tracks usage (5MB limit)
+- **Storage quota monitoring** - Counts the bytes Chrome stores (`storedSize`, the JSON in UTF-8, as `getBytesInUse` counts it): the Prompts may take 8 MB, and a write must leave Chrome's 10 MB quota under 98%
 - **Import/export functionality** - Full data portability
 - **Comprehensive error handling** - Custom `StorageError` class
 - **Admission on write** - Prompt and Category text is admitted inside the text-writing methods (see [Prompt Admission](#4-prompt-admission))

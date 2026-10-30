@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { buildPrompt } from '../../test/builders';
 import { type Category, DEFAULT_CATEGORY, type Prompt } from '../../types';
+import { PROMPT_LIMITS } from '../promptAdmission';
 import { StorageManager } from '../storage';
 
 const FIXED_TIME = new Date('2025-01-01T00:00:00Z');
@@ -186,6 +187,104 @@ describe('StorageManager', () => {
 
     it('should reject toggling the pin of an unknown prompt', async () => {
       await expect(storageManager.togglePinned('missing')).rejects.toThrow();
+    });
+  });
+
+  describe('Library size', () => {
+    const library = (count: number, content: string) =>
+      Array.from({ length: count }, (_, i) => buildPrompt({ id: `long-${String(i)}`, title: `Long ${String(i)}`, content }));
+    const onePrompt = { title: 'One more', content: 'Résume la transcription.', category: DEFAULT_CATEGORY };
+
+    it('takes one more Prompt when 220 Prompts of 19,000 ASCII characters store 4.2 MB, under the 8 MB cap', async () => {
+      await chrome.storage.local.set({ prompts: library(220, 'x'.repeat(19_000)) });
+
+      await expect(storageManager.savePrompt(onePrompt)).resolves.toMatchObject({ title: 'One more' });
+      expect(await storageManager.getPrompts()).toHaveLength(221);
+    });
+
+    it('refuses a Prompt that takes a Library of Chinese text, 3 bytes per character, past the 8 MB cap', async () => {
+      const chinese = '中'.repeat(19_000);
+      await chrome.storage.local.set({ prompts: library(139, chinese) });
+
+      await expect(storageManager.savePrompt({ ...onePrompt, content: chinese })).rejects.toMatchObject({
+        type: 'STORAGE_QUOTA_EXCEEDED',
+        message: 'Storage quota exceeded. Please delete old prompts to free up space.'
+      });
+      expect(await storageManager.getPrompts()).toHaveLength(139);
+    });
+
+    it('refuses to import a Prompt that takes the Library past the 8 MB cap', async () => {
+      const chinese = '中'.repeat(19_000);
+      await chrome.storage.local.set({ prompts: library(139, chinese) });
+
+      await expect(storageManager.importPrompt(buildPrompt({ id: 'imported', content: chinese }))).rejects.toMatchObject({
+        type: 'STORAGE_QUOTA_EXCEEDED',
+        message: 'Storage quota exceeded. Please delete old prompts to free up space.'
+      });
+      expect(await storageManager.getPrompts()).toHaveLength(139);
+    });
+
+    describe('with a Prompt that grows in a Library just under the 8 MB cap', () => {
+      const chinese = '中'.repeat(19_000);
+
+      beforeEach(async () => {
+        await chrome.storage.local.set({ prompts: [...library(139, chinese), buildPrompt({ id: 'short', content: 'x' })] });
+      });
+
+      it('refuses the edit that takes the Library past the cap', async () => {
+        await expect(storageManager.updatePrompt('short', { content: chinese })).rejects.toMatchObject({ type: 'STORAGE_QUOTA_EXCEEDED' });
+        expect((await storageManager.getPrompts()).find(p => p.id === 'short')?.content).toBe('x');
+      });
+
+      it('refuses the import that replaces it and takes the Library past the cap', async () => {
+        await expect(storageManager.importPrompt(buildPrompt({ id: 'short', content: chinese }))).rejects.toMatchObject({ type: 'STORAGE_QUOTA_EXCEEDED' });
+        expect((await storageManager.getPrompts()).find(p => p.id === 'short')?.content).toBe('x');
+      });
+
+      it('takes an edit that shrinks a Prompt of a Library already past the cap', async () => {
+        await chrome.storage.local.set({ prompts: library(141, chinese) });
+
+        await expect(storageManager.updatePrompt('long-0', { content: 'Shorter' })).resolves.toMatchObject({ content: 'Shorter' });
+      });
+    });
+
+    it('restores a backup of 150 Prompts of 19,000 ASCII characters, 2.9 MB stored, within a 5 MB quota', async () => {
+      const backup = {
+        prompts: library(150, 'x'.repeat(19_000)),
+        categories: [{ id: 'default', name: DEFAULT_CATEGORY }],
+        settings: { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt' as const, sortDirection: 'desc' as const, theme: 'system' as const }
+      };
+      expect(chrome.storage.local.QUOTA_BYTES).toBe(5_242_880);
+
+      await storageManager.importData(JSON.stringify(backup));
+
+      expect(await storageManager.getPrompts()).toHaveLength(150);
+    });
+
+    it('takes a Prompt of 20,000 Chinese characters, 60 KB stored, as Admission allows 20,000 characters', async () => {
+      const chinese = '中'.repeat(PROMPT_LIMITS.content);
+
+      await expect(storageManager.savePrompt({ ...onePrompt, content: chinese })).resolves.toMatchObject({ content: chinese });
+    });
+
+    describe('with Chrome storage 97.5% full, 26 KB under the 98% safety threshold', () => {
+      const asciiText = 'x'.repeat(19_000);
+
+      beforeEach(() => {
+        // The Promise form of getBytesInUse: vi.mocked would type its last overload, the callback one
+        const getBytesInUse: () => Promise<number> = chrome.storage.local.getBytesInUse;
+        vi.mocked(getBytesInUse).mockResolvedValue(0.975 * chrome.storage.local.QUOTA_BYTES);
+      });
+
+      it('takes a new Prompt of 19,000 ASCII characters, which stores 19 KB', async () => {
+        await expect(storageManager.savePrompt({ ...onePrompt, content: asciiText })).resolves.toMatchObject({ content: asciiText });
+      });
+
+      it('takes an edit that adds 19,000 ASCII characters to a Prompt', async () => {
+        await chrome.storage.local.set({ prompts: [buildPrompt({ id: 'short', content: 'x' })] });
+
+        await expect(storageManager.updatePrompt('short', { content: asciiText })).resolves.toMatchObject({ content: asciiText });
+      });
     });
   });
 
