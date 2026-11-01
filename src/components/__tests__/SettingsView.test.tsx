@@ -17,7 +17,7 @@ const createJsonFile = (contents: string): File => {
   return file;
 };
 
-const renderSettings = async (showToastMock = vi.fn()) => {
+const renderSettings = async (showToastMock = vi.fn(), onStorageRefusedMock = vi.fn()) => {
   const mockToastSettings = {
     position: 'top-right' as const,
     enabledTypes: {
@@ -36,13 +36,17 @@ const renderSettings = async (showToastMock = vi.fn()) => {
         showToast={showToastMock}
         toastSettings={mockToastSettings}
         onToastSettingsChange={vi.fn()}
+        onStorageRefused={onStorageRefusedMock}
       />
     </ThemeProvider>
   );
 
   await screen.findByRole('heading', { name: /settings/i });
-  return { showToastMock };
+  return { showToastMock, onStorageRefusedMock };
 };
+
+const STORAGE_REFUSAL = 'Storage quota exceeded. Please delete old prompts to free up space.';
+const storageRefusal = () => Object.assign(new Error(STORAGE_REFUSAL), { type: 'STORAGE_QUOTA_EXCEEDED' });
 
 // Helper to find the reset call among multiple storage.local.set calls
 const findResetCall = (calls: Array<any>) =>
@@ -157,11 +161,11 @@ describe('SettingsView', () => {
     });
   });
 
-  it('alerts when import JSON is invalid', async () => {
+  it('says in an error toast, not an alert, that a file which is not JSON is invalid', async () => {
     const storageMock = getMockStorageManager();
-    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => undefined);
 
-    await renderSettings();
+    const { showToastMock } = await renderSettings();
     await waitFor(() => {
       expect(storageMock.getPrompts).toHaveBeenCalled();
       expect(storageMock.getCategories).toHaveBeenCalled();
@@ -173,8 +177,9 @@ describe('SettingsView', () => {
     await userEvent.upload(fileInput as HTMLInputElement, badFile);
 
     await waitFor(() => {
-      expect(alertSpy).toHaveBeenCalledWith(expect.stringMatching(/invalid json/i));
+      expect(showToastMock).toHaveBeenCalledWith(expect.stringMatching(/invalid json/i), 'error');
     });
+    expect(alertSpy).not.toHaveBeenCalled();
     expect(storageMock.importPrompt).not.toHaveBeenCalled();
     alertSpy.mockRestore();
   });
@@ -186,7 +191,7 @@ describe('SettingsView', () => {
     const storageMock = getMockStorageManager();
     const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => undefined);
 
-    await renderSettings();
+    const { showToastMock } = await renderSettings();
     await waitFor(() => {
       expect(storageMock.getPrompts).toHaveBeenCalled();
     });
@@ -199,8 +204,9 @@ describe('SettingsView', () => {
     );
 
     await waitFor(() => {
-      expect(alertSpy).toHaveBeenCalledWith(expect.stringMatching(/one or more prompts have invalid structure/i));
+      expect(showToastMock).toHaveBeenCalledWith(expect.stringMatching(/one or more prompts have invalid structure/i), 'error');
     });
+    expect(alertSpy).not.toHaveBeenCalled();
     expect(storageMock.importPrompt).not.toHaveBeenCalled();
     alertSpy.mockRestore();
   });
@@ -209,7 +215,7 @@ describe('SettingsView', () => {
     const storageMock = getMockStorageManager();
     const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => undefined);
 
-    await renderSettings();
+    const { showToastMock } = await renderSettings();
     await waitFor(() => {
       expect(storageMock.getPrompts).toHaveBeenCalled();
     });
@@ -220,11 +226,131 @@ describe('SettingsView', () => {
       createJsonFile(JSON.stringify({ prompts: [], categories: [{ id: 'c1', name: 'Custom' }, null], version: '1.0' }))
     );
 
+    // A toast shows 80 characters: the whole message fits
     await waitFor(() => {
-      expect(alertSpy).toHaveBeenCalledWith(expect.stringMatching(/one or more categories have invalid structure/i));
+      expect(showToastMock).toHaveBeenCalledWith(expect.stringMatching(/^Import failed: Invalid backup file: one or more categories .*\.$/), 'error');
     });
+    expect((showToastMock.mock.calls[0] as [string])[0].length).toBeLessThanOrEqual(80);
+    expect(alertSpy).not.toHaveBeenCalled();
     expect(storageMock.importCategory).not.toHaveBeenCalled();
     alertSpy.mockRestore();
+  });
+
+  // My-Prompt-Manager-ag4: the Prompts imported before the refusal stay in the Library, so the
+  // refusal says how many; like a refused save, it opens the storage warning (PR #465)
+  it('opens the storage warning, saying how many Prompts were imported, when storage stops an import', async () => {
+    const storageMock = getMockStorageManager();
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => undefined);
+    let stored = 0;
+    (storageMock.importPrompt as unknown as Mock).mockImplementation((prompt: Prompt) => {
+      if (stored === 2) {
+        return Promise.reject(storageRefusal());
+      }
+      stored += 1;
+      return Promise.resolve(prompt);
+    });
+
+    const { showToastMock, onStorageRefusedMock } = await renderSettings();
+    await waitFor(() => {
+      expect(storageMock.getPrompts).toHaveBeenCalled();
+    });
+    const loadsBeforeImport = storageMock.getPrompts.mock.calls.length;
+
+    const fileInput = document.querySelector<HTMLInputElement>('input[type="file"]');
+    const prompts: Prompt[] = Array.from({ length: 4 }, (_, i) => (
+      { id: `p${String(i)}`, title: `Prompt ${String(i)}`, content: 'Hello', category: 'Uncategorized', createdAt: 1, updatedAt: 1 }
+    ));
+    await userEvent.upload(
+      fileInput as HTMLInputElement,
+      createJsonFile(JSON.stringify({ prompts, categories: [], version: '1.0' }))
+    );
+
+    await waitFor(() => {
+      expect(onStorageRefusedMock).toHaveBeenCalledWith(
+        `The import stopped when storage was full: 2 of 4 prompts were imported. ${STORAGE_REFUSAL}`
+      );
+    });
+    expect(storageMock.importPrompt).toHaveBeenCalledTimes(3);
+    expect(alertSpy).not.toHaveBeenCalled();
+    expect(showToastMock).not.toHaveBeenCalledWith(expect.anything(), 'error');
+    // Settings shows the Prompts that were imported
+    await waitFor(() => {
+      expect(storageMock.getPrompts.mock.calls.length).toBeGreaterThan(loadsBeforeImport);
+    });
+    alertSpy.mockRestore();
+  });
+
+  it('says in an error toast that an import failed for another reason, without blaming the file', async () => {
+    const storageMock = getMockStorageManager();
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => undefined);
+    (storageMock.importPrompt as unknown as Mock).mockRejectedValue(
+      Object.assign(new Error('Storage API is unavailable. Please try again later.'), { type: 'STORAGE_UNAVAILABLE' })
+    );
+
+    const { showToastMock, onStorageRefusedMock } = await renderSettings();
+    await waitFor(() => {
+      expect(storageMock.getPrompts).toHaveBeenCalled();
+    });
+
+    const fileInput = document.querySelector<HTMLInputElement>('input[type="file"]');
+    const prompt = { id: 'p1', title: 'Fine', content: 'Hello', category: 'Uncategorized', createdAt: 1, updatedAt: 1 };
+    await userEvent.upload(
+      fileInput as HTMLInputElement,
+      createJsonFile(JSON.stringify({ prompts: [prompt], categories: [], version: '1.0' }))
+    );
+
+    await waitFor(() => {
+      expect(showToastMock).toHaveBeenCalledWith('Import failed: Storage API is unavailable. Please try again later.', 'error');
+    });
+    expect(onStorageRefusedMock).not.toHaveBeenCalled();
+    expect(alertSpy).not.toHaveBeenCalled();
+    alertSpy.mockRestore();
+  });
+
+  // Chrome takes the keyboard away from a disabled button: Import stays focusable, so the keyboard
+  // can come back to it when the storage warning closes, but does nothing until the import ends
+  it('keeps Import focusable but inactive while an import runs', async () => {
+    const storageMock = getMockStorageManager();
+    let finishImport: () => void = () => undefined;
+    (storageMock.importPrompt as unknown as Mock).mockImplementation((prompt: Prompt) =>
+      new Promise(resolve => { finishImport = () => { resolve(prompt); }; })
+    );
+
+    await renderSettings();
+    await waitFor(() => {
+      expect(storageMock.getPrompts).toHaveBeenCalled();
+    });
+
+    const fileInput = document.querySelector<HTMLInputElement>('input[type="file"]') as HTMLInputElement;
+    const prompt = { id: 'p1', title: 'Fine', content: 'Hello', category: 'Uncategorized', createdAt: 1, updatedAt: 1 };
+    await userEvent.upload(fileInput, createJsonFile(JSON.stringify({ prompts: [prompt], categories: [], version: '1.0' })));
+
+    const importing = await screen.findByRole('button', { name: /importing/i });
+    expect(importing).toHaveAttribute('aria-disabled', 'true');
+    expect(importing).toBeEnabled();
+    const openFileChooser = vi.spyOn(fileInput, 'click');
+    await userEvent.click(importing);
+    expect(openFileChooser).not.toHaveBeenCalled();
+
+    finishImport();
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Import' })).toHaveAttribute('aria-disabled', 'false');
+    });
+  });
+
+  // My-Prompt-Manager-71n: the bar shows what Chrome counts (getBytesInUse) against its quota (QUOTA_BYTES)
+  it('shows the bytes Chrome stores against its quota in the Data & Storage bar', async () => {
+    const storageMock = getMockStorageManager();
+    storageMock.getStorageUsage.mockResolvedValue({ used: 4_404_019, total: 10_485_760 });
+
+    await renderSettings();
+
+    const bar = await screen.findByRole('progressbar', { name: 'Storage usage' });
+    await waitFor(() => {
+      expect(bar).toHaveAttribute('aria-valuenow', '42');
+    });
+    expect(screen.getByText('4.2 MB / 10 MB (42%)')).toBeInTheDocument();
+    expect(bar.firstElementChild).toHaveStyle({ width: '42%' });
   });
 
   it('resets settings to defaults after confirmation', async () => {

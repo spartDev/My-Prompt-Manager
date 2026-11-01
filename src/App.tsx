@@ -39,7 +39,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   const [selectedPrompt, setSelectedPrompt] = useState<Prompt | null>(null);
   // The Library filter lasts while the popup or side panel stays open, across Sections
   const [libraryFilter, setLibraryFilter] = useState<LibraryFilter>(ALL_PROMPTS);
-  // Why the last save was refused for lack of storage: the storage warning shows it
+  // Why the last save or Settings import was refused for lack of storage: the storage warning shows it
   const [storageRefusal, setStorageRefusal] = useState<string | null>(null);
   // What had the keyboard when the refused save started (Save, or the field where Enter was
   // pressed): it gets the keyboard back when the warning closes
@@ -272,6 +272,13 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
     void chrome.tabs.create({ url: chrome.runtime.getURL('src/analytics.html') });
   }, []);
 
+  // A Settings import stopped by storage: like a refused save, it opens the storage warning, and
+  // what had the keyboard (Import) gets it back when the warning closes
+  const handleImportRefused = useCallback((reason: string) => {
+    storageRefusalTriggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setStorageRefusal(reason);
+  }, []);
+
   const handleCloseStorageWarning = useCallback(() => {
     const trigger = storageRefusalTriggerRef.current;
     storageRefusalTriggerRef.current = null;
@@ -352,6 +359,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
           showToast={showToast}
           toastSettings={settings}
           onToastSettingsChange={updateSettings}
+          onStorageRefused={handleImportRefused}
         />
       )}
 

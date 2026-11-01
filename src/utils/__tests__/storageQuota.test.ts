@@ -2,11 +2,9 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  calculateMaxPrompts,
   checkQuotaAvailability,
-  ESTIMATED_SIZES,
+  describeStorageUsage,
   formatBytes,
-  getStorageStats,
   QUOTA_THRESHOLDS,
   storedSize
 } from '../storageQuota';
@@ -77,28 +75,6 @@ describe('StorageQuota Utils', () => {
     });
   });
 
-  describe('calculateMaxPrompts', () => {
-    it('should calculate correct number of prompts', () => {
-      const availableBytes = 10000;
-      const avgPromptLength = 5000;
-
-      const avgPromptSize =
-        ESTIMATED_SIZES.PROMPT_BASE +
-        (50 * ESTIMATED_SIZES.PROMPT_PER_CHAR) + // title
-        (avgPromptLength * ESTIMATED_SIZES.PROMPT_PER_CHAR) + // content
-        (10 * ESTIMATED_SIZES.PROMPT_PER_CHAR); // category
-
-      const expected = Math.floor(availableBytes / avgPromptSize);
-      const result = calculateMaxPrompts(availableBytes, avgPromptLength);
-
-      expect(result).toBe(expected);
-    });
-
-    it('should return 0 when available bytes is small', () => {
-      expect(calculateMaxPrompts(10)).toBe(0);
-    });
-  });
-
   describe('formatBytes', () => {
     it('should format 0 bytes', () => {
       expect(formatBytes(0)).toBe('0 B');
@@ -122,50 +98,25 @@ describe('StorageQuota Utils', () => {
     });
   });
 
-  describe('getStorageStats', () => {
-    const total = 1000;
+  // The Settings bar and the storage warning show Chrome's use through this one function, so they agree
+  describe('describeStorageUsage', () => {
+    const QUOTA = 10_485_760;
 
-    it('should return safe level', () => {
-      const used = 100; // 10%
-      const stats = getStorageStats(used, total);
-
-      expect(stats.warningLevel).toBe('safe');
-      expect(stats.percentage).toBe(10);
-      expect(stats.recommendation).toMatch(/Storage is healthy/);
+    it('gives the bytes in use and the quota as sizes, and the percentage of the quota in use', () => {
+      expect(describeStorageUsage(4_404_019, QUOTA)).toEqual({ percentage: 42, used: '4.2 MB', total: '10 MB' });
     });
 
-    it('should return warning level', () => {
-      const used = 750; // 75% > SAFE(70%)
-      const stats = getStorageStats(used, total);
-
-      expect(stats.warningLevel).toBe('warning');
-      expect(stats.percentage).toBe(75);
-      expect(stats.recommendation).toMatch(/Storage is getting full/);
+    it('rounds the percentage to a whole number', () => {
+      expect(describeStorageUsage(QUOTA * 0.9748332977294922, QUOTA).percentage).toBe(97);
+      expect(describeStorageUsage(QUOTA * 0.004, QUOTA).percentage).toBe(0);
+      expect(describeStorageUsage(QUOTA * 0.996, QUOTA).percentage).toBe(100);
     });
 
-    it('should return critical level', () => {
-      const used = 900; // 90% > WARNING(85%)
-      const stats = getStorageStats(used, total);
-
-      expect(stats.warningLevel).toBe('critical');
-      expect(stats.percentage).toBe(90);
-      expect(stats.recommendation).toMatch(/Storage is critically low/);
-    });
-
-    it('should return danger level', () => {
-      const used = 960; // 96% > CRITICAL(95%)
-      const stats = getStorageStats(used, total);
-
-      expect(stats.warningLevel).toBe('danger');
-      expect(stats.percentage).toBe(96);
-      expect(stats.recommendation).toMatch(/Storage is nearly full/);
-    });
-
-    it('should calculate estimated prompts remaining', () => {
-      const used = 0;
-      const stats = getStorageStats(used, total);
-      const expected = calculateMaxPrompts(total);
-      expect(stats.estimatedPromptsRemaining).toBe(expected);
+    it('formats bytes, kilobytes and gigabytes', () => {
+      expect(describeStorageUsage(0, QUOTA).used).toBe('0 Bytes');
+      expect(describeStorageUsage(500, QUOTA).used).toBe('500 Bytes');
+      expect(describeStorageUsage(1536, QUOTA).used).toBe('1.5 KB');
+      expect(describeStorageUsage(1_073_741_824, 2_147_483_648)).toEqual({ percentage: 50, used: '1 GB', total: '2 GB' });
     });
   });
 });

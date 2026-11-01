@@ -3,6 +3,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 
 import { StorageManager } from '../services/storage';
 import { Logger, toError } from '../utils';
+import { describeStorageUsage } from '../utils/storageQuota';
 
 import ConfirmDialog from './ConfirmDialog';
 
@@ -111,15 +112,8 @@ const StorageWarning: FC<StorageWarningProps> = ({ reason, onClose }) => {
     clearButtonRef.current?.focus();
   };
 
-  const formatBytes = (bytes: number) => {
-    if (bytes === 0) {return '0 Bytes';}
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return String(parseFloat((bytes / Math.pow(k, i)).toFixed(2))) + ' ' + sizes[i];
-  };
-
-  const usagePercentage = storageInfo?.percentage ?? 0;
+  // Rounded and formatted like the Settings bar, so the two never disagree
+  const usage = storageInfo ? describeStorageUsage(storageInfo.used, storageInfo.total) : null;
   const warningLevel = storageInfo?.warningLevel ?? 'safe';
 
   const getProgressBarColor = () => {
@@ -152,23 +146,23 @@ const StorageWarning: FC<StorageWarningProps> = ({ reason, onClose }) => {
         </div>
 
         {/* Storage Info */}
-        {storageInfo && (
+        {usage && (
           <div className="mb-4">
             <div className="flex justify-between text-sm text-secondary mb-2">
               <span>Storage Used</span>
-              <span>{usagePercentage}%</span>
+              <span>{usage.percentage}%</span>
             </div>
 
             <div className="w-full bg-(--border-color-strong) rounded-full h-2.5">
               <div
                 className={`h-2.5 rounded-full ${getProgressBarColor()}`}
-                style={{ width: `${String(Math.min(usagePercentage, 100))}%` }}
+                style={{ width: `${String(usage.percentage)}%` }}
               />
             </div>
 
             <div className="flex justify-between text-xs text-tertiary mt-1">
-              <span>{formatBytes(storageInfo.used)}</span>
-              <span>{formatBytes(storageInfo.total)}</span>
+              <span>{usage.used}</span>
+              <span>{usage.total}</span>
             </div>
           </div>
         )}

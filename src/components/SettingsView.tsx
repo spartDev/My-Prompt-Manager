@@ -6,7 +6,7 @@ import { getDefaultEnabledPlatforms, getLinkedPlatformHostnames } from '../confi
 import { NATURAL_SORT_DIRECTION } from '../constants';
 import { AdmissionRefusedError } from '../services/promptAdmission';
 import { StorageManager } from '../services/storage';
-import type { Category, CustomSite as ImportedCustomSite, Prompt, SortOrder, Settings as UserSettings } from '../types';
+import type { AppError, Category, CustomSite as ImportedCustomSite, Prompt, SortOrder, Settings as UserSettings } from '../types';
 import { DEFAULT_SETTINGS } from '../types';
 import type { ToastType } from '../types/components';
 import type { ToastSettings } from '../types/hooks';
@@ -56,11 +56,13 @@ interface SettingsViewProps {
   showToast: (message: string, type?: ToastType) => void;
   toastSettings: ToastSettings;
   onToastSettingsChange: (settings: Partial<ToastSettings>) => void;
+  /** Opens the storage warning with why storage refused the import */
+  onStorageRefused: (reason: string) => void;
 }
 
 const SectionSeparator: FC = () => <hr className="border-default" />;
 
-const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toastSettings, onToastSettingsChange }) => {
+const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toastSettings, onToastSettingsChange, onStorageRefused }) => {
   const [settings, setSettings] = useState<Settings>({
     enabledSites: [],
     customSites: [],
@@ -79,6 +81,7 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
   // Data for import/export
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [storageUsage, setStorageUsage] = useState<{ used: number; total: number } | null>(null);
 
   const storageManager = useMemo(() => StorageManager.getInstance(), []);
 
@@ -147,13 +150,19 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
         setUserSettings(savedUserSettings);
       }
       
-      // Load prompts and categories
-      const [loadedPrompts, loadedCategories] = await Promise.all([
+      // Load prompts and categories, and the bytes Chrome stores for the storage bar (which cannot
+      // fail the rest)
+      const [loadedPrompts, loadedCategories, loadedUsage] = await Promise.all([
         storageManager.getPrompts(),
-        storageManager.getCategories()
+        storageManager.getCategories(),
+        storageManager.getStorageUsage().catch((error: unknown) => {
+          Logger.warn('Failed to read storage usage', { component: 'SettingsView', error: toError(error) });
+          return null;
+        })
       ]);
       setPrompts(loadedPrompts);
       setCategories(loadedCategories);
+      setStorageUsage(loadedUsage);
     } catch (error) {
       Logger.error('Failed to load settings', toError(error));
       setSettings(defaultSettings);
@@ -384,60 +393,62 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
 
   // Handle import data
   const handleImportData = async (data: { prompts: Prompt[]; categories: Category[] }) => {
-    try {
-      // An item that is refused at Admission (ADR-001) is skipped and reported; the rest are restored.
-      const skipped: { label: string; reason: string }[] = [];
+    // An item that is refused at Admission (ADR-001) is skipped and reported; the rest are restored.
+    const skipped: { label: string; reason: string }[] = [];
+    // Counted as they go: an import that stops keeps what it imported before
+    const imported = { categories: 0, prompts: 0 };
 
-      const importEach = async <T,>(
-        items: readonly T[],
-        label: (item: T) => string,
-        importItem: (item: T) => Promise<unknown>
-      ): Promise<number> => {
-        let imported = 0;
-        for (const item of items) {
-          try {
-            await importItem(item);
-            imported += 1;
-          } catch (error) {
-            if (!(error instanceof AdmissionRefusedError)) {
-              throw error;
-            }
-            skipped.push({ label: label(item), reason: error.message });
+    const importEach = async <T,>(
+      items: readonly T[],
+      kind: keyof typeof imported,
+      label: (item: T) => string,
+      importItem: (item: T) => Promise<unknown>
+    ): Promise<void> => {
+      for (const item of items) {
+        try {
+          await importItem(item);
+          imported[kind] += 1;
+        } catch (error) {
+          if (!(error instanceof AdmissionRefusedError)) {
+            throw error;
           }
+          skipped.push({ label: label(item), reason: error.message });
         }
-        return imported;
-      };
-
-      // Import categories first (prompts reference categories)
-      const importedCategories = await importEach(
-        data.categories,
-        (category) => category.name,
-        (category) => storageManager.importCategory(category)
-      );
-
-      // Import prompts
-      const importedPrompts = await importEach(
-        data.prompts,
-        (prompt) => prompt.title,
-        (prompt) => storageManager.importPrompt(prompt)
-      );
-
-      // Reload data
-      await loadSettings();
-
-      if (skipped.length === 0) {
-        showToast(`Successfully imported ${data.prompts.length.toString()} prompts and ${data.categories.length.toString()} categories!`, 'success');
-      } else {
-        const details = skipped.slice(0, 3).map((item) => `"${item.label}" (${item.reason})`).join('; ');
-        const more = skipped.length > 3 ? ` and ${(skipped.length - 3).toString()} more` : '';
-        showToast(
-          `Imported ${importedPrompts.toString()} prompts and ${importedCategories.toString()} categories. Skipped ${skipped.length.toString()}: ${details}${more}.`,
-          'warning'
-        );
       }
+    };
+
+    try {
+      // Import categories first (prompts reference categories)
+      await importEach(data.categories, 'categories', (category) => category.name, (category) => storageManager.importCategory(category));
+      await importEach(data.prompts, 'prompts', (prompt) => prompt.title, (prompt) => storageManager.importPrompt(prompt));
     } catch (error) {
       Logger.error('Import failed', toError(error));
+      // Show the Prompts imported before it stopped
+      await loadSettings();
+
+      // Like a refused save, a refusal for storage opens the storage warning (not the file's fault)
+      const appError = error as AppError;
+      if (appError.type === 'STORAGE_QUOTA_EXCEEDED') {
+        const total = data.prompts.length;
+        const count = `${imported.prompts.toString()} of ${total.toString()} ${total === 1 ? 'prompt was' : 'prompts were'}`;
+        onStorageRefused(`The import stopped when storage was full: ${count} imported. ${appError.message}`);
+        return;
+      }
       throw error;
+    }
+
+    // Reload data
+    await loadSettings();
+
+    if (skipped.length === 0) {
+      showToast(`Successfully imported ${data.prompts.length.toString()} prompts and ${data.categories.length.toString()} categories!`, 'success');
+    } else {
+      const details = skipped.slice(0, 3).map((item) => `"${item.label}" (${item.reason})`).join('; ');
+      const more = skipped.length > 3 ? ` and ${(skipped.length - 3).toString()} more` : '';
+      showToast(
+        `Imported ${imported.prompts.toString()} prompts and ${imported.categories.toString()} categories. Skipped ${skipped.length.toString()}: ${details}${more}.`,
+        'warning'
+      );
     }
   };
 
@@ -590,8 +601,10 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
           <DataStorageSection
             prompts={prompts}
             categories={categories}
+            storageUsage={storageUsage}
             onImport={handleImportData}
             onClearData={handleClearData}
+            onShowToast={showToast}
           />
 
           {/* Notification Settings Section */}

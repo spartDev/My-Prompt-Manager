@@ -123,6 +123,12 @@ test.describe('Forms, dialogs and toasts on the tokens', () => {
       const warning = page.getByRole('dialog', { name: 'Storage Limit Reached' });
       await expect(warning).toBeVisible();
       await expect(warning.getByText('Storage quota exceeded. Please delete old prompts to free up space.')).toBeVisible();
+      // Chrome's use as a whole percentage, as the Settings bar shows it (My-Prompt-Manager-54h)
+      const percentage = await page.evaluate(async () =>
+        Math.round(((await chrome.storage.local.getBytesInUse()) / chrome.storage.local.QUOTA_BYTES) * 100)
+      );
+      await expect(warning.getByText(`${String(percentage)}%`, { exact: true })).toBeVisible();
+      await expect(warning.getByText(/\d\.\d*%/)).toHaveCount(0);
       await expect(warning.locator('..')).toHaveCSS('background-color', colors.backdrop);
       await expect(warning).toHaveCSS('background-color', colors.card);
       await expect(warning.getByRole('button', { name: 'Clear All Data' })).toHaveCSS('background-color', DANGER_FILL);
