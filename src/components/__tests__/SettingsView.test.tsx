@@ -1,10 +1,10 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 import { ThemeProvider } from '../../contexts/ThemeContext';
 import { AdmissionRefusedError } from '../../services/promptAdmission';
-import { getChromeMockFunctions, getMockStorageManager } from '../../test/mocks';
+import { getChromeMockFunctions, getMockStorageManager, triggerChromeStorageChange } from '../../test/mocks';
 import { type Category, DEFAULT_SETTINGS, type Prompt } from '../../types';
 import SettingsView from '../SettingsView';
 
@@ -351,6 +351,24 @@ describe('SettingsView', () => {
     });
     expect(screen.getByText('4.2 MB / 10 MB (42%)')).toBeInTheDocument();
     expect(bar.firstElementChild).toHaveStyle({ width: '42%' });
+  });
+
+  // Review round 1 (Codex): writes land after the first reading (the default Category written on load,
+  // the site settings saved after it, Clear All Data), so the bar reads Chrome's use again after each
+  it('reads Chrome storage use again after every write to local storage', async () => {
+    const storageMock = getMockStorageManager();
+    storageMock.getStorageUsage.mockResolvedValue({ used: 80, total: 10_485_760 });
+
+    await renderSettings();
+    expect(await screen.findByText('80 Bytes / 10 MB (0%)')).toBeInTheDocument();
+
+    storageMock.getStorageUsage.mockResolvedValue({ used: 309, total: 10_485_760 });
+    await act(async () => {
+      triggerChromeStorageChange({ promptLibrarySettings: { newValue: { enabledSites: [] } } });
+      await Promise.resolve();
+    });
+
+    expect(await screen.findByText('309 Bytes / 10 MB (0%)')).toBeInTheDocument();
   });
 
   it('resets settings to defaults after confirmation', async () => {

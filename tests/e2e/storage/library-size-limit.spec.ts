@@ -9,12 +9,33 @@
  * visual proof (test-results/library-size-limit/).
  */
 
-import { storedSize } from '../../../src/utils/storageQuota';
+import type { Locator, Page } from '@playwright/test';
+
+import { describeStorageUsage, storedSize } from '../../../src/utils/storageQuota';
 import { expect, test } from '../fixtures/extension';
 import { createPromptSeed, createUsageHistory, seedLibrary, seedUsageHistory } from '../utils/storage';
 
 const SCREENSHOT_DIR = 'test-results/library-size-limit';
 const LINE_SEPARATOR = String.fromCodePoint(0x2028);
+
+const chromeBytesInUse = (page: Page) => page.evaluate(() => chrome.storage.local.getBytesInUse(null));
+
+/**
+ * Once Chrome storage has stopped changing (the writes that follow a load have landed), the Settings bar
+ * shows its figure. Waiting for the bytes to settle, rather than for given writes, keeps this true when
+ * those writes go away.
+ */
+const expectBarToMatchChrome = async (page: Page, label: Locator) => {
+  let previous = -1;
+  await expect.poll(async () => {
+    const now = await chromeBytesInUse(page);
+    const settled = now === previous;
+    previous = now;
+    return settled;
+  }, { intervals: [500] }).toBe(true);
+  const usage = describeStorageUsage(previous, await page.evaluate(() => chrome.storage.local.QUOTA_BYTES));
+  await expect(label).toHaveText(`${usage.used} / ${usage.total} (${String(usage.percentage)}%)`);
+};
 
 test.describe('Library size in Chrome storage', () => {
   test('storedSize counts the bytes Chrome stores for ASCII, accented, emoji, Chinese and escaped text', async ({ page, extensionId }) => {
@@ -116,6 +137,27 @@ test.describe('Library size in Chrome storage', () => {
       await expect(page.getByText(`${used} / 10 MB (${String(percentage)}%)`, { exact: true })).toBeVisible();
       await page.getByRole('heading', { name: 'Storage Usage' }).scrollIntoViewIfNeeded();
       await page.screenshot({ path: `${SCREENSHOT_DIR}/settings-storage-bar-${theme}.png` });
+    });
+
+    // Review round 1 (Codex): opening Settings and Clear All Data write to Chrome storage after the bar
+    // is measured (the default Category, the site settings saved 150 ms after load): the bar follows them
+    test(`the Settings storage bar follows the writes made on opening Settings and after Clear All Data (${theme})`, async ({ page, storage, extensionId }) => {
+      await seedLibrary(storage, { prompts: [createPromptSeed({ id: 'meeting', title: 'Résumé de réunion', content: 'Résume la transcription ci-dessous.' })], settings: { theme } });
+      await page.setViewportSize({ width: 400, height: 600 });
+      await page.goto(`chrome-extension://${extensionId}/src/popup.html`);
+      await expect(page.locator('html')).toHaveClass(theme === 'dark' ? /dark/ : /^(?!.*dark)/);
+      await page.getByTestId('tab-settings').click();
+      const label = page.getByRole('region', { name: 'Data & Storage' }).getByText(/ \/ 10 MB \(\d+%\)$/);
+
+      await expectBarToMatchChrome(page, label);
+
+      await page.getByRole('button', { name: 'Clear All Data' }).click();
+      await page.getByRole('button', { name: 'Yes, Clear All Data' }).click();
+      await expect(page.getByText('All data has been cleared.')).toBeVisible();
+
+      await expectBarToMatchChrome(page, label);
+      await page.getByRole('heading', { name: 'Storage Usage' }).scrollIntoViewIfNeeded();
+      await page.screenshot({ path: `${SCREENSHOT_DIR}/storage-bar-after-clear-${theme}.png` });
     });
 
 

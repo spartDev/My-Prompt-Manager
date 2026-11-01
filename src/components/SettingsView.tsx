@@ -150,19 +150,13 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
         setUserSettings(savedUserSettings);
       }
       
-      // Load prompts and categories, and the bytes Chrome stores for the storage bar (which cannot
-      // fail the rest)
-      const [loadedPrompts, loadedCategories, loadedUsage] = await Promise.all([
+      // Load prompts and categories
+      const [loadedPrompts, loadedCategories] = await Promise.all([
         storageManager.getPrompts(),
-        storageManager.getCategories(),
-        storageManager.getStorageUsage().catch((error: unknown) => {
-          Logger.warn('Failed to read storage usage', { component: 'SettingsView', error: toError(error) });
-          return null;
-        })
+        storageManager.getCategories()
       ]);
       setPrompts(loadedPrompts);
       setCategories(loadedCategories);
-      setStorageUsage(loadedUsage);
     } catch (error) {
       Logger.error('Failed to load settings', toError(error));
       setSettings(defaultSettings);
@@ -171,6 +165,33 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
       setLoading(false);
     }
   }, [defaultSettings, storageManager]);
+
+  // The storage bar shows what Chrome stores and follows every write, whoever makes it: the default
+  // Category written on load, the site settings saved after it, an import, Clear All Data, another
+  // surface. The last reading asked for wins, so an older reply never overwrites a newer one.
+  const usageReading = useRef(0);
+  useEffect(() => {
+    const readStorageUsage = async () => {
+      const reading = ++usageReading.current;
+      try {
+        const usage = await storageManager.getStorageUsage();
+        if (reading === usageReading.current) {
+          setStorageUsage(usage);
+        }
+      } catch (error) {
+        Logger.warn('Failed to read storage usage', { component: 'SettingsView', error: toError(error) });
+      }
+    };
+    const handleStorageChange = (_changes: unknown, areaName: string) => {
+      if (areaName === 'local') {
+        void readStorageUsage();
+      }
+    };
+
+    void readStorageUsage();
+    chrome.storage.onChanged.addListener(handleStorageChange);
+    return () => { chrome.storage.onChanged.removeListener(handleStorageChange); };
+  }, [storageManager]);
 
   useEffect(() => {
     void loadSettings();
