@@ -145,7 +145,11 @@ interface LibraryViewProps {
 **Props:**
 ```typescript
 interface SettingsViewProps {
-  onBack: () => void;
+  context?: 'popup' | 'sidepanel';
+  showToast: (message: string, type?: ToastType) => void;
+  toastSettings: ToastSettings;
+  onToastSettingsChange: (settings: Partial<ToastSettings>) => void;
+  onStorageRefused: (reason: string) => void; // App opens the StorageWarning
 }
 ```
 
@@ -153,7 +157,7 @@ interface SettingsViewProps {
 1. **Appearance** - Theme & interface mode
 2. **Site Integration** - Manage enabled platforms
 3. **Custom Sites** - Add/edit custom site configurations
-4. **Data Storage** - Import/export/clear data
+4. **Data Storage** - Chrome's storage use (bytes in use against the quota), import/export/clear data. An invalid Backup file is reported in an error toast; an import stopped by storage opens the StorageWarning with the count of Prompts imported
 5. **Notifications** - Toast preferences
 6. **Advanced** - Debug mode
 7. **About** - Version info & reset
@@ -481,19 +485,19 @@ const areToastContainerPropsEqual = (prev: Props, next: Props): boolean => {
 
 ### StorageWarning
 
-**Purpose:** Alert users when approaching storage quota.
+**Purpose:** Modal dialog ("Storage Limit Reached") that App opens when storage refuses a save (`STORAGE_QUOTA_EXCEEDED`): a new or edited Prompt, a new Category, or a Settings import (then the reason says how many Prompts were imported before it stopped).
 
 **Props:**
 ```typescript
 interface StorageWarningProps {
-  usagePercent: number;
-  onClearData: () => void;
+  reason: string;      // Why the save was refused, shown as is
+  onClose: () => void;
 }
 ```
 
-**Display Conditions:**
-- Shows when usage > 80%
-- Critical warning at > 95%
+**Display:**
+- Chrome's use (`getBytesInUse` against `QUOTA_BYTES`) through `describeStorageUsage`, so its whole percentage and sizes match the Settings "Data & Storage" bar
+- Continue (closes, focus returns to what triggered the save) and Clear All Data (asks for confirmation)
 
 **File:** `src/components/StorageWarning.tsx`
 

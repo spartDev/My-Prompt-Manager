@@ -1,8 +1,10 @@
-import { type FC, useCallback, useMemo, useRef, useState } from 'react';
+import { type FC, useCallback, useRef, useState } from 'react';
 
 import type { Category, Prompt } from '../../types';
+import type { ToastType } from '../../types/components';
 import type {} from '../../types/file-system-access-api';
 import { findInvalidImportCategory, findInvalidImportPrompt, Logger, toError } from '../../utils';
+import { describeStorageUsage } from '../../utils/storageQuota';
 import { DatabaseIcon, ExportIcon, ImportIcon } from '../icons/SettingsIcons';
 
 import SettingsSection from './SettingsSection';
@@ -10,15 +12,20 @@ import SettingsSection from './SettingsSection';
 interface DataStorageSectionProps {
   prompts: Prompt[];
   categories: Category[];
+  /** The bytes Chrome stores (getBytesInUse) and its quota (QUOTA_BYTES); null until they are read */
+  storageUsage: { used: number; total: number } | null;
   onImport: (data: { prompts: Prompt[]; categories: Category[] }) => Promise<void>;
   onClearData: () => Promise<void>;
+  onShowToast: (message: string, type?: ToastType) => void;
 }
 
 const DataStorageSection: FC<DataStorageSectionProps> = ({
   prompts,
   categories,
+  storageUsage,
   onImport,
-  onClearData
+  onClearData,
+  onShowToast
 }) => {
   const [importing, setImporting] = useState(false);
   const [clearing, setClearing] = useState(false);
@@ -69,6 +76,11 @@ const DataStorageSection: FC<DataStorageSectionProps> = ({
   }, [prompts, categories]);
 
   const handleImportClick = () => {
+    // aria-disabled rather than disabled while importing: Chrome takes the keyboard away from a
+    // disabled button, and it must come back to Import when the storage warning closes
+    if (importing) {
+      return;
+    }
     fileInputRef.current?.click();
   };
 
@@ -115,7 +127,7 @@ const DataStorageSection: FC<DataStorageSectionProps> = ({
       // Validate category structure if present
       if (typedData.categories && typedData.categories.length > 0) {
         if (findInvalidImportCategory(typedData.categories as unknown[]) !== undefined) {
-          throw new Error('Invalid backup file: one or more categories have invalid structure.');
+          throw new Error('Invalid backup file: one or more categories are invalid.');
         }
       }
 
@@ -131,9 +143,10 @@ const DataStorageSection: FC<DataStorageSectionProps> = ({
     } catch (error) {
       Logger.error('Import failed', toError(error));
 
-      // Show more specific error messages
+      // An invalid file says so in its message; any other failure is not blamed on the file. An
+      // import stopped by storage never reaches here: Settings opens the storage warning for it.
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      alert(`Import failed: ${errorMessage}\n\nPlease ensure you are selecting a valid backup file exported from this extension.`);
+      onShowToast(`Import failed: ${errorMessage}`, 'error');
     } finally {
       setImporting(false);
     }
@@ -156,16 +169,8 @@ const DataStorageSection: FC<DataStorageSectionProps> = ({
     }
   };
 
-  // Calculate storage usage (rough estimate)
-  const storageMax = 5 * 1024 * 1024; // 5MB Chrome storage limit
-  const storageUsed = useMemo(
-    () => JSON.stringify({ prompts, categories }).length,
-    [prompts, categories]
-  );
-  const storagePercentage = useMemo(
-    () => Math.min((storageUsed / storageMax) * 100, 100),
-    [storageUsed, storageMax]
-  );
+  // What Chrome stores for every key (Prompts, Categories, usage history, settings), against its quota
+  const usage = storageUsage ? describeStorageUsage(storageUsage.used, storageUsage.total) : null;
 
   return (
     <SettingsSection
@@ -180,14 +185,16 @@ const DataStorageSection: FC<DataStorageSectionProps> = ({
             <h3 className="font-medium text-primary text-sm">
               Storage Usage
             </h3>
-            <span className="text-xs text-tertiary">
-              {(storageUsed / 1024).toFixed(1)} KB / 5 MB
-            </span>
+            {usage && (
+              <span className="text-xs text-tertiary">
+                {usage.used} / {usage.total} ({usage.percentage}%)
+              </span>
+            )}
           </div>
-          <div data-testid="storage-bar" role="progressbar" aria-valuenow={storagePercentage} aria-valuemin={0} aria-valuemax={100} aria-label="Storage usage" className="w-full bg-subtle rounded-full h-2 overflow-hidden">
+          <div data-testid="storage-bar" role="progressbar" aria-valuenow={usage?.percentage} aria-valuemin={0} aria-valuemax={100} aria-label="Storage usage" className="w-full bg-subtle rounded-full h-2 overflow-hidden">
             <div
               className="h-full bg-accent transition-all duration-300"
-              style={{ width: `${storagePercentage.toFixed(1)}%` }}
+              style={{ width: `${String(usage?.percentage ?? 0)}%` }}
             />
           </div>
           <div className="mt-2 flex items-center justify-between text-xs text-secondary">
@@ -212,8 +219,8 @@ const DataStorageSection: FC<DataStorageSectionProps> = ({
             
             <button
               onClick={handleImportClick}
-              disabled={importing}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-card text-secondary border border-strong rounded-lg hover:bg-muted transition-all duration-200 focus-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-disabled={importing}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-card text-secondary border border-strong rounded-lg hover:bg-muted transition-all duration-200 focus-secondary aria-disabled:opacity-50 aria-disabled:cursor-not-allowed"
             >
               {importing ? (
                 <>

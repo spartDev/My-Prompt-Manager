@@ -147,6 +147,28 @@ test.describe('General Settings sections on the tokens', () => {
       await page.screenshot({ path: `${SCREENSHOT_DIR}/clear-data-${theme}.png` });
     });
 
+    // My-Prompt-Manager-ag4: the app's error toast, not a native alert, says the file is invalid
+    test(`an invalid Backup file is reported in an error toast on bg-inverse, not a native alert (${theme})`, async ({ page, storage, extensionId }) => {
+      await openSettings(page, storage, extensionId, theme);
+      const nativeDialogs: string[] = [];
+      page.on('dialog', dialog => {
+        nativeDialogs.push(dialog.message());
+        void dialog.dismiss();
+      });
+
+      const fileChooser = page.waitForEvent('filechooser');
+      await page.getByRole('button', { name: 'Import', exact: true }).click();
+      await (await fileChooser).setFiles({ name: 'notes.json', mimeType: 'application/json', buffer: Buffer.from('not a backup') });
+
+      const toast = page.getByRole('alert').filter({ hasText: 'Import failed: Invalid JSON format. Please select a valid backup file.' });
+      await expect(toast).toBeVisible();
+      await expect(toast).toHaveCSS('background-color', colors.inverse);
+      await expect(toast).toHaveCSS('color', ON_INVERSE);
+      expect(await storage.getPrompts()).toHaveLength(prompts.length);
+      expect(nativeDialogs).toEqual([]);
+      await page.screenshot({ path: `${SCREENSHOT_DIR}/import-invalid-${theme}.png` });
+    });
+
     test(`Notifications mark each type in its state color, with accent switches and an accent-selected position (${theme})`, async ({ page, storage, extensionId }) => {
       await openSettings(page, storage, extensionId, theme);
       await page.getByRole('button', { name: /Notifications/ }).first().click();

@@ -132,9 +132,9 @@ await storage.savePrompt({ id, title, content, categoryId });
 // Get all prompts
 const prompts = await storage.getPrompts();
 
-// Check storage usage
+// Check storage usage, shown as the Settings bar and the storage warning show it
 const { used, total } = await storage.getStorageUsage();
-const usagePercent = (used / total) * 100;
+const { percentage } = describeStorageUsage(used, total); // a whole number, e.g. 42
 ```
 
 ---

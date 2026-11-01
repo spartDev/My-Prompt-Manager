@@ -248,6 +248,28 @@ describe('App prompt workflows', () => {
     expect(screen.getByRole('button', { name: 'Add' })).toHaveFocus();
   });
 
+  it('opens the storage warning, not an alert, when storage stops a Settings import', async () => {
+    const storageMock = getMockStorageManager();
+    const quotaError: AppError = { type: 'STORAGE_QUOTA_EXCEEDED', message: 'Quota reached' };
+    vi.mocked(storageMock.importPrompt).mockRejectedValue(quotaError);
+    // jsdom has no alert(): give it one to watch
+    const alertMock = vi.fn();
+    window.alert = alertMock;
+
+    await renderApp();
+    await userEvent.click(screen.getByRole('tab', { name: 'Settings' }));
+    await screen.findByRole('heading', { name: 'Settings' });
+
+    const backup = JSON.stringify({ prompts: [basePrompt], categories: [] });
+    const file = new File([backup], 'backup.json', { type: 'application/json' });
+    Object.defineProperty(file, 'text', { value: () => Promise.resolve(backup) });
+    await userEvent.upload(document.querySelector<HTMLInputElement>('input[type="file"]') as HTMLInputElement, file);
+
+    const warning = await screen.findByRole('dialog', { name: 'Storage Limit Reached' });
+    expect(within(warning).getByText('The import stopped when storage was full: 0 of 1 prompt was imported. Quota reached')).toBeInTheDocument();
+    expect(alertMock).not.toHaveBeenCalled();
+  });
+
   it('keeps the library on screen and shows a toast when pinning fails', async () => {
     const storageMock = getMockStorageManager();
     storageMock.getPrompts.mockResolvedValue([basePrompt]);

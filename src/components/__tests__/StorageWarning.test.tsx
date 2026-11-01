@@ -135,6 +135,21 @@ describe('StorageWarning', () => {
         expect(screen.getByText('65%')).toBeInTheDocument();
       });
     });
+
+    // Chrome's use is rarely a whole percentage: the warning shows it rounded, like the Settings bar
+    it('shows a fractional percentage as a whole number, next to a bar of that width', async () => {
+      vi.mocked(mockStorageManager.getStorageUsageWithWarnings).mockResolvedValue(
+        createStorageInfo(97.48332977294922, 'danger')
+      );
+
+      render(<StorageWarning reason={REASON} onClose={mockOnClose} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('97%')).toBeInTheDocument();
+      });
+      expect(screen.queryByText(/97\.48/)).not.toBeInTheDocument();
+      expect(document.querySelector('[style*="width: 97%"]')).toHaveClass('bg-danger');
+    });
   });
 
   describe('byte formatting', () => {

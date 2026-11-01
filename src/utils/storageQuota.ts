@@ -14,17 +14,6 @@ export const QUOTA_THRESHOLDS = {
 } as const;
 
 /**
- * Estimated average sizes for different data types
- * Based on testing with 20K character limit
- */
-export const ESTIMATED_SIZES = {
-  PROMPT_BASE: 300,           // Base overhead per prompt (ID, timestamps, metadata)
-  PROMPT_PER_CHAR: 2,         // Bytes per character (UTF-8 encoding)
-  CATEGORY: 100,              // Average category size
-  SETTINGS: 500               // Settings object size
-} as const;
-
-/**
  * Check if there's enough quota available before writing data
  *
  * @param estimatedSize Estimated size of data to be written (in bytes)
@@ -105,28 +94,6 @@ export function storedSize(value: unknown): number {
 }
 
 /**
- * Calculate maximum number of prompts that can fit in available storage
- * Assumes average prompt size based on 20K character limit
- *
- * @param availableBytes Available storage in bytes
- * @param averagePromptLength Average prompt content length (default: 5000 chars)
- * @returns Estimated maximum number of prompts
- */
-export function calculateMaxPrompts(
-  availableBytes: number,
-  averagePromptLength: number = 5000
-): number {
-  // Average prompt: base + title (50 chars) + content (avg length) + category (10 chars)
-  const avgPromptSize =
-    ESTIMATED_SIZES.PROMPT_BASE +
-    (50 * ESTIMATED_SIZES.PROMPT_PER_CHAR) +
-    (averagePromptLength * ESTIMATED_SIZES.PROMPT_PER_CHAR) +
-    (10 * ESTIMATED_SIZES.PROMPT_PER_CHAR);
-
-  return Math.floor(availableBytes / avgPromptSize);
-}
-
-/**
  * Format bytes to human-readable string
  *
  * @param bytes Number of bytes
@@ -142,50 +109,25 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
 }
 
+/** A size as the storage displays show it: "0 Bytes", "1.5 KB", "10 MB" */
+const formatStorageSize = (bytes: number): string => {
+  if (bytes === 0) {return '0 Bytes';}
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), sizes.length - 1);
+  return `${String(parseFloat((bytes / 1024 ** i).toFixed(2)))} ${sizes[i]}`;
+};
+
 /**
- * Get storage statistics and recommendations
+ * Chrome storage use as the Settings bar and the storage warning both show it, so they never disagree:
+ * the share of the quota in use as a whole percentage, and the two sizes.
  *
- * @param used Current storage usage
- * @param total Total storage quota
- * @returns Storage statistics with recommendations
+ * @param used Bytes in use, as chrome.storage.local.getBytesInUse counts them
+ * @param total The quota, chrome.storage.local.QUOTA_BYTES
  */
-export function getStorageStats(
-  used: number,
-  total: number
-): {
-  percentage: number;
-  available: number;
-  warningLevel: 'safe' | 'warning' | 'critical' | 'danger';
-  recommendation: string;
-  estimatedPromptsRemaining: number;
-} {
-  const percentage = (used / total) * 100;
-  const available = total - used;
-
-  let warningLevel: 'safe' | 'warning' | 'critical' | 'danger';
-  let recommendation: string;
-
-  if (percentage < QUOTA_THRESHOLDS.SAFE * 100) {
-    warningLevel = 'safe';
-    recommendation = 'Storage is healthy. You can continue adding prompts.';
-  } else if (percentage < QUOTA_THRESHOLDS.WARNING * 100) {
-    warningLevel = 'warning';
-    recommendation = 'Storage is getting full. Consider deleting unused prompts or exporting data.';
-  } else if (percentage < QUOTA_THRESHOLDS.CRITICAL * 100) {
-    warningLevel = 'critical';
-    recommendation = 'Storage is critically low. Delete prompts soon to avoid issues.';
-  } else {
-    warningLevel = 'danger';
-    recommendation = 'Storage is nearly full! Delete prompts immediately or risk data loss.';
-  }
-
-  const estimatedPromptsRemaining = calculateMaxPrompts(available);
-
+export function describeStorageUsage(used: number, total: number): { percentage: number; used: string; total: string } {
   return {
-    percentage,
-    available,
-    warningLevel,
-    recommendation,
-    estimatedPromptsRemaining
+    percentage: total > 0 ? Math.min(Math.round((used / total) * 100), 100) : 0,
+    used: formatStorageSize(used),
+    total: formatStorageSize(total)
   };
 }
