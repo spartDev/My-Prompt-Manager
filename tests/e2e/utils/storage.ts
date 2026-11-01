@@ -44,7 +44,10 @@ type SeedOptions = {
 
 export const createPromptSeed = (overrides: Partial<Prompt>): Prompt => {
   const now = Date.now();
-  const createdAt = overrides.createdAt ?? now;
+  // A Prompt is never used before it was created: the extension reads lastUsedAt as at least createdAt
+  // (readPrompt). Created "now", a Prompt seeded as used an hour ago would be read as used "now", and two
+  // such Prompts would rank by the millisecond each was seeded in, not by their lastUsedAt.
+  const createdAt = overrides.createdAt ?? Math.min(now, overrides.lastUsedAt ?? now);
   const updatedAt = overrides.updatedAt ?? createdAt;
   const usageCount = overrides.usageCount ?? 0;
 
