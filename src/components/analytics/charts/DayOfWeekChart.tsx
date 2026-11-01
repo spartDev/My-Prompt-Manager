@@ -12,6 +12,7 @@ import {
 
 import { CHART_THEME, DAY_OF_WEEK_COLORS } from '../../../theme/chartColors';
 import type { DayOfWeekDistribution } from '../../../types/hooks';
+import { formatUsesTooltip } from './tooltipFormatters';
 
 export interface DayOfWeekChartProps {
   /** Day of week distribution data */
@@ -80,7 +81,7 @@ const DayOfWeekChart: FC<DayOfWeekChartProps> = memo(({
             width={30}
           />
           <Tooltip
-            formatter={(value: number | undefined) => [value ?? 0, 'Uses']}
+            formatter={formatUsesTooltip}
             contentStyle={{
               backgroundColor: tooltipBg,
               border: `1px solid ${tooltipBorder}`,

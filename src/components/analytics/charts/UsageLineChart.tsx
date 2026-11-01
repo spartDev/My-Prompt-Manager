@@ -11,6 +11,7 @@ import {
 
 import { CHART_PRIMARY, CHART_THEME } from '../../../theme/chartColors';
 import type { DailyUsage } from '../../../types/hooks';
+import { formatUsesTooltip } from './tooltipFormatters';
 
 export interface UsageLineChartProps {
   /** Daily usage data for the chart */
@@ -84,7 +85,7 @@ const UsageLineChart: FC<UsageLineChartProps> = memo(({
             width={30}
           />
           <Tooltip
-            formatter={(value: number | undefined) => [value ?? 0, 'Uses']}
+            formatter={formatUsesTooltip}
             labelFormatter={(label) => formatDate(String(label))}
             contentStyle={{
               backgroundColor: tooltipBg,

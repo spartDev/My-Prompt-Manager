@@ -12,6 +12,7 @@ import { CHART_THEME, getPlatformColor } from '../../../theme/chartColors';
 import type { PlatformBreakdown } from '../../../types/hooks';
 import { formatPlatformName } from '../../../utils';
 import { PIE_CHART, PIE_LEGEND } from '../constants';
+import { formatPlatformUsesTooltip } from './tooltipFormatters';
 
 export interface PlatformPieChartProps {
   /** Platform breakdown data */
@@ -75,7 +76,7 @@ const PlatformPieChart: FC<PlatformPieChartProps> = memo(({
             ))}
           </Pie>
           <Tooltip
-            formatter={(value: number | undefined, name: string | undefined) => [`${String(value ?? 0)} uses`, name ?? '']}
+            formatter={formatPlatformUsesTooltip}
             contentStyle={{
               backgroundColor: tooltipBg,
               border: `1px solid ${tooltipBorder}`,

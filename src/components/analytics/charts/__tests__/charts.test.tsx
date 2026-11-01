@@ -5,8 +5,8 @@
  * PlatformPieChart, DayOfWeekChart, CategoryBarChart, and TimeOfDayChart.
  */
 
-import { render, screen, waitFor } from '@testing-library/react';
-import { beforeAll, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, type Mock, type MockInstance, vi } from 'vitest';
 
 import { ThemeProvider } from '../../../../contexts/ThemeContext';
 import { getChromeMockFunctions, getMockStorageManager } from '../../../../test/mocks';
@@ -303,5 +303,81 @@ describe('Chart Accessibility', () => {
     await renderWithTheme(<TimeOfDayChart data={data} />);
 
     expect(screen.getByRole('img')).toHaveAttribute('aria-label');
+  });
+});
+
+describe('Chart Tooltips', () => {
+  let layout: MockInstance<HTMLElement['getBoundingClientRect']>;
+
+  // happy-dom lays nothing out: give each element a size so the charts draw and can be hovered
+  beforeEach(() => {
+    layout = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 400, 200));
+  });
+
+  afterEach(() => {
+    layout.mockRestore();
+  });
+
+  /** Hovers the middle of a chart, as a user does to read a value */
+  const hoverChart = (container: HTMLElement) => {
+    const chart = container.querySelector('.recharts-wrapper');
+    expect(chart, 'chart drawn').not.toBeNull();
+    fireEvent.mouseMove(chart as Element, { clientX: 200, clientY: 100 });
+  };
+
+  /** The Tooltip shows exactly this line: name, separator, value */
+  const expectTooltipLine = async (container: HTMLElement, line: string) => {
+    await waitFor(() => {
+      expect(container.querySelector('.recharts-tooltip-item')?.textContent).toBe(line);
+    });
+  };
+
+  it('UsageLineChart shows the uses of the hovered day', async () => {
+    const { container } = await renderWithTheme(<UsageLineChart data={[{ date: '2026-01-11', count: 5 }]} />);
+
+    hoverChart(container);
+
+    await expectTooltipLine(container, 'Uses : 5');
+  });
+
+  it('DayOfWeekChart shows the uses of the hovered day', async () => {
+    const { container } = await renderWithTheme(<DayOfWeekChart data={[{ day: 'Mon', dayIndex: 1, count: 15 }]} />);
+
+    hoverChart(container);
+
+    await expectTooltipLine(container, 'Uses : 15');
+  });
+
+  it('CategoryBarChart shows the uses of the hovered Category', async () => {
+    const { container } = await renderWithTheme(
+      <CategoryBarChart data={[{ categoryId: '1', name: 'Development', count: 25 }]} />
+    );
+
+    hoverChart(container);
+
+    await expectTooltipLine(container, 'Uses : 25');
+  });
+
+  it('TimeOfDayChart shows the uses of the hovered time of day', async () => {
+    const { container } = await renderWithTheme(<TimeOfDayChart data={[{ bucket: 'Morning', count: 12 }]} />);
+
+    hoverChart(container);
+
+    await expectTooltipLine(container, 'Uses : 12');
+  });
+
+  it('PlatformPieChart shows the hovered Platform and its uses', async () => {
+    const { container } = await renderWithTheme(
+      <PlatformPieChart data={[{ platform: 'claude', count: 20, percentage: 100 }]} />
+    );
+
+    const sector = await waitFor(() => {
+      const drawn = container.querySelector('.recharts-pie-sector');
+      expect(drawn, 'Platform sector drawn').not.toBeNull();
+      return drawn as Element;
+    });
+    fireEvent.mouseOver(sector);
+
+    await expectTooltipLine(container, 'Claude : 20 uses');
   });
 });

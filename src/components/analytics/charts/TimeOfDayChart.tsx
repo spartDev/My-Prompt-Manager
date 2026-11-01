@@ -12,6 +12,7 @@ import {
 
 import { CHART_PRIMARY, CHART_THEME, TIME_BUCKET_COLORS } from '../../../theme/chartColors';
 import type { TimeOfDayDistribution } from '../../../types/hooks';
+import { formatUsesTooltip } from './tooltipFormatters';
 
 export interface TimeOfDayChartProps {
   /** Time of day distribution data */
@@ -94,7 +95,7 @@ const TimeOfDayChart: FC<TimeOfDayChartProps> = memo(({
             width={30}
           />
           <Tooltip
-            formatter={(value: number | undefined) => [value ?? 0, 'Uses']}
+            formatter={formatUsesTooltip}
             contentStyle={{
               backgroundColor: tooltipBg,
               border: `1px solid ${tooltipBorder}`,

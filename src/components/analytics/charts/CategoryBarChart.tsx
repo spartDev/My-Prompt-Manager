@@ -12,6 +12,7 @@ import {
 
 import { CATEGORY_COLORS, CHART_THEME } from '../../../theme/chartColors';
 import type { CategoryDistribution } from '../../../types/hooks';
+import { formatUsesTooltip } from './tooltipFormatters';
 
 export interface CategoryBarChartProps {
   /** Category distribution data */
@@ -95,7 +96,7 @@ const CategoryBarChart: FC<CategoryBarChartProps> = memo(({
             tickFormatter={truncateName}
           />
           <Tooltip
-            formatter={(value: number | undefined) => [value ?? 0, 'Uses']}
+            formatter={formatUsesTooltip}
             contentStyle={{
               backgroundColor: tooltipBg,
               border: `1px solid ${tooltipBorder}`,
