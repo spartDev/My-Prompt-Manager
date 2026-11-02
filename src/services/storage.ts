@@ -251,7 +251,7 @@ export class StorageManager {
           id: uuidv4()
         };
 
-        const existingCategories = await this.getCategories();
+        const existingCategories = await this.readCategoriesWithDefault();
 
         // Check for duplicate names (on the admitted name, so invisible differences cannot hide one)
         if (existingCategories.some(c => c.name.toLowerCase() === newCategory.name.toLowerCase())) {
@@ -280,8 +280,8 @@ export class StorageManager {
         const merged = existing ? { ...existing, ...prompt } : prompt;
 
         // The Library may spell the Prompt's Category differently (`Work` for `work`): the Prompt takes
-        // the stored spelling. The Categories are read raw, because getCategories() can write the
-        // default Category and the CATEGORIES lock is never taken under PROMPTS (lock order).
+        // the stored spelling. The Categories are read raw, because getCategories() can take the
+        // CATEGORIES lock to write the default Category, and CATEGORIES is never taken under PROMPTS (lock order).
         const storedCategories = await this.getStorageData<unknown>(this.STORAGE_KEYS.CATEGORIES);
         const incoming = readPrompt(
           typeof merged.category === 'string'
@@ -342,7 +342,7 @@ export class StorageManager {
           ...(typeof color === 'string' && (color === '' || isValidHexColor(color)) && { color })
         };
 
-        const existingCategories = await this.getCategories();
+        const existingCategories = await this.readCategoriesWithDefault();
         const existingIndex = existingCategories.findIndex(c => c.id === category.id);
 
         if (existingIndex >= 0) {
@@ -402,32 +402,41 @@ export class StorageManager {
     });
   }
 
+  /**
+   * The Library's Categories, the default Category always among them. When the default Category
+   * is not stored (a fresh store, or a by-id rename), it is created and written under the
+   * CATEGORIES lock, after reading the list again inside it, so the write cannot put back a list
+   * read before another context's Category write. Never call it while holding CATEGORIES (the
+   * locks are not reentrant): a locked writer reads through readCategoriesWithDefault().
+   */
   async getCategories(): Promise<Category[]> {
     try {
       const categories = await this.getStorageData<Category[]>(this.STORAGE_KEYS.CATEGORIES);
-      const defaultCategories = categories || [];
-      
-      // Ensure default category exists
-      if (!defaultCategories.some(c => c.name === DEFAULT_CATEGORY)) {
-        const defaultCat: Category = {
-          id: uuidv4(),
-          name: DEFAULT_CATEGORY
-        };
-        defaultCategories.unshift(defaultCat);
-        await this.setStorageData(this.STORAGE_KEYS.CATEGORIES, defaultCategories);
+      if (categories?.some(c => c.name === DEFAULT_CATEGORY)) {
+        return categories;
       }
-      
-      return defaultCategories;
+      return await this.mutex.withLock(this.STORAGE_KEYS.CATEGORIES, () => this.readCategoriesWithDefault());
     } catch (error) {
       throw this.handleStorageError(error);
     }
+  }
+
+  /** The stored Categories, writing the default Category first when it is absent. Caller holds CATEGORIES. */
+  private async readCategoriesWithDefault(): Promise<Category[]> {
+    const categories = (await this.getStorageData<Category[]>(this.STORAGE_KEYS.CATEGORIES)) ?? [];
+    if (categories.some(c => c.name === DEFAULT_CATEGORY)) {
+      return categories;
+    }
+    const withDefault: Category[] = [{ id: uuidv4(), name: DEFAULT_CATEGORY }, ...categories];
+    await this.setStorageData(this.STORAGE_KEYS.CATEGORIES, withDefault);
+    return withDefault;
   }
 
   async updateCategory(id: string, updates: Partial<Omit<Category, 'id'>>): Promise<Category> {
     // Lock CATEGORIES first (always modified), then PROMPTS if name changes
     return this.mutex.withLock(this.STORAGE_KEYS.CATEGORIES, async () => {
       try {
-        const existingCategories = await this.getCategories();
+        const existingCategories = await this.readCategoriesWithDefault();
         const categoryIndex = existingCategories.findIndex(c => c.id === id);
 
         if (categoryIndex === -1) {
@@ -484,7 +493,7 @@ export class StorageManager {
     // Lock CATEGORIES first (always modified), then PROMPTS if prompts need updating
     await this.mutex.withLock(this.STORAGE_KEYS.CATEGORIES, async () => {
       try {
-        const existingCategories = await this.getCategories();
+        const existingCategories = await this.readCategoriesWithDefault();
         const categoryToDelete = existingCategories.find(c => c.id === id);
 
         if (!categoryToDelete) {

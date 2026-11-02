@@ -87,6 +87,30 @@ describe('StorageManager across contexts', () => {
     ]);
   });
 
+  it('a Category list read in the popup, with no default Category stored, cannot overwrite a Category the service worker saves meanwhile', async () => {
+    // The default Category is absent (a fresh store, or a dirty default name): the read creates it
+    await chrome.storage.local.set({ categories: [{ id: 'work', name: 'Work' }] });
+    const worker = context();
+    const popup = context();
+    slowRead('categories'); // the popup's read, made first, returns after the worker's write
+
+    const [, saved] = await Promise.all([popup.getCategories(), worker.saveCategory({ name: 'Saved meanwhile' })]);
+
+    const stored = (await chrome.storage.local.get('categories')).categories as { id: string; name: string }[];
+    expect(stored.map((category) => category.name)).toEqual([DEFAULT_CATEGORY, 'Work', 'Saved meanwhile']);
+    expect(stored).toContainEqual(saved);
+  });
+
+  it('a Category list read takes no lock when the default Category is stored', async () => {
+    uninstall();
+    const locks = new FakeLockManager();
+    uninstall = installNavigatorLocks(locks);
+
+    await context().getCategories();
+
+    expect(locks.log).toEqual([]);
+  });
+
   it('asks the other contexts for the Prompt and Category locks, but not for the settings lock', async () => {
     // A settings toggle is the one write a user triggers by hand and may close the page right after,
     // so it must not wait for a lock round trip to the other contexts
