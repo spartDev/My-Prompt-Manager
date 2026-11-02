@@ -23,7 +23,6 @@ const defaultProps = {
   onCustomSiteToggle: vi.fn(),
   onRemoveCustomSite: vi.fn(),
   onAddCustomSite: noopAsync,
-  onEditCustomSite: vi.fn(),
   interfaceMode: 'popup' as const,
   saving: false,
   onShowToast: vi.fn()
