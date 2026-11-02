@@ -138,7 +138,6 @@ interface SiteIntegrationSectionProps {
   onCustomSiteToggle: (hostname: string, enabled: boolean) => Promise<void> | void;
   onRemoveCustomSite: (hostname: string) => Promise<void> | void;
   onAddCustomSite?: (siteData: Omit<CustomSite, 'dateAdded'> & { positioning?: CustomSite['positioning'] }) => Promise<void> | void;
-  onEditCustomSite?: (hostname: string) => void;
   interfaceMode?: 'popup' | 'sidepanel';
   saving?: boolean;
   onShowToast?: (message: string, type?: ToastType) => void;
@@ -152,7 +151,6 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
   onCustomSiteToggle,
   onRemoveCustomSite,
   onAddCustomSite,
-  onEditCustomSite,
   interfaceMode = 'popup',
   saving = false,
   onShowToast,
@@ -441,7 +439,6 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
                 customSites={customSites}
                 onCustomSiteToggle={onCustomSiteToggle}
                 onRemoveCustomSite={onRemoveCustomSite}
-                onEditCustomSite={onEditCustomSite}
                 onExportCustomSite={handleExportCustomSite}
                 onAddClick={openAddMethodSelector}
                 exportingHostname={importState.exportingHostname}

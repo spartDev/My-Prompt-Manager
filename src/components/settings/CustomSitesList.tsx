@@ -11,7 +11,6 @@ interface CustomSitesListProps {
   customSites: CustomSite[];
   onCustomSiteToggle: (hostname: string, enabled: boolean) => Promise<void> | void;
   onRemoveCustomSite: (hostname: string) => Promise<void> | void;
-  onEditCustomSite?: (hostname: string) => void;
   onExportCustomSite: (site: CustomSite) => Promise<void>;
   onAddClick: () => void;
   exportingHostname: string | null;
@@ -24,7 +23,6 @@ const CustomSitesList: FC<CustomSitesListProps> = ({
   customSites,
   onCustomSiteToggle,
   onRemoveCustomSite,
-  onEditCustomSite,
   onExportCustomSite,
   onAddClick,
   exportingHostname,
@@ -46,7 +44,6 @@ const CustomSitesList: FC<CustomSitesListProps> = ({
           isCustom={true}
           onToggle={onCustomSiteToggle}
           onRemove={onRemoveCustomSite}
-          onEdit={onEditCustomSite}
           onExport={(hostname) => {
             const target = customSites.find((s) => s.hostname === hostname);
             if (target) {

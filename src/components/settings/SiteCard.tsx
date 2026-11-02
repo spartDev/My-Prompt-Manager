@@ -14,7 +14,6 @@ interface SiteCardProps {
   isCustom?: boolean;
   onToggle: (hostname: string, enabled: boolean) => Promise<void> | void;
   onRemove?: (hostname: string) => Promise<void> | void;
-  onEdit?: (hostname: string) => Promise<void> | void;
   onExport?: (hostname: string) => Promise<void> | void;
   exporting?: boolean;
   saving?: boolean;
@@ -29,7 +28,6 @@ const SiteCard: FC<SiteCardProps> = ({
   isCustom = false,
   onToggle,
   onRemove,
-  onEdit,
   onExport,
   exporting = false,
   saving = false
@@ -48,12 +46,6 @@ const SiteCard: FC<SiteCardProps> = ({
       void onExport(hostname);
     }
   }, [hostname, onExport]);
-
-  const handleEdit = useCallback(() => {
-    if (onEdit) {
-      void onEdit(hostname);
-    }
-  }, [hostname, onEdit]);
 
   const handleRemove = useCallback(() => {
     if (onRemove) {
@@ -119,18 +111,6 @@ const SiteCard: FC<SiteCardProps> = ({
               disabled={saving}
               loading={exporting}
             />
-          )}
-          {onEdit && (
-            <button
-              onClick={handleEdit}
-              disabled={saving}
-              className="flex-1 flex items-center justify-center gap-1 px-2 py-1 text-xs font-medium text-accent hover:bg-accent-subtle rounded-sm transition-colors"
-            >
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
-              Edit
-            </button>
           )}
           {onRemove && (
             <button
