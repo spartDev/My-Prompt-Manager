@@ -1,6 +1,6 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { act } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { buildPrompt } from '../../test/builders';
 import type { Prompt, UsageEvent } from '../../types';
@@ -135,7 +135,7 @@ describe('useUsageStats', () => {
     });
 
     it('should count events per day correctly', async () => {
-      const today = new Date(NOW).toISOString().split('T')[0];
+      const today = new Date(NOW).toLocaleDateString('en-CA'); // YYYY-MM-DD, local day
       const events: UsageEvent[] = [
         buildUsageEvent({ timestamp: NOW }),
         buildUsageEvent({ timestamp: NOW - 1000 }),
@@ -163,6 +163,61 @@ describe('useUsageStats', () => {
       const dates = result.current.stats?.dailyUsage.map(d => d.date) ?? [];
       const sortedDates = [...dates].sort();
       expect(dates).toEqual(sortedDates);
+    });
+
+    describe('in the local time zone (Europe/Paris)', () => {
+      const systemTimeZone = process.env.TZ;
+
+      beforeEach(() => {
+        process.env.TZ = 'Europe/Paris';
+        vi.useFakeTimers({ toFake: ['Date'] });
+      });
+
+      afterEach(() => {
+        vi.useRealTimers();
+        if (systemTimeZone === undefined) {
+          delete process.env.TZ;
+        } else {
+          process.env.TZ = systemTimeZone;
+        }
+      });
+
+      const dailyUsageAt = async (now: string, insertions: string[]) => {
+        vi.setSystemTime(new Date(now));
+        await chrome.storage.local.set({
+          [USAGE_STORAGE_KEY]: insertions.map(at => buildUsageEvent({ timestamp: Date.parse(at) }))
+        });
+
+        const { result } = renderHook(() => useUsageStats());
+        await waitFor(() => {
+          expect(result.current.loading).toBe(false);
+        });
+        return result.current.stats;
+      };
+
+      it('counts an insertion at 00:30 on its own day, which ends the trend, as Day of Week does', async () => {
+        // 00:30 and 00:45 in Paris are still the day before in UTC
+        const stats = await dailyUsageAt('2026-11-02T00:45:00+01:00', ['2026-11-02T00:30:00+01:00']);
+
+        expect(stats?.dailyUsage[USAGE_RETENTION_DAYS - 1]).toEqual({ date: '2026-11-02', count: 1 });
+        expect(stats?.dailyUsage.find(d => d.date === '2026-11-01')?.count).toBe(0);
+        expect(stats?.dayOfWeekDistribution.find(d => d.day === 'Mon')?.count).toBe(1);
+      });
+
+      it('keeps one entry per local day across the change back from summer time', async () => {
+        // Paris leaves summer time (UTC+2) for UTC+1 at 03:00 on 25 October 2026
+        const stats = await dailyUsageAt('2026-10-26T09:00:00+01:00', [
+          '2026-10-25T00:30:00+02:00',
+          '2026-10-25T23:30:00+01:00'
+        ]);
+
+        const dates = stats?.dailyUsage.map(d => d.date) ?? [];
+        expect(dates).toHaveLength(USAGE_RETENTION_DAYS);
+        expect(new Set(dates).size).toBe(USAGE_RETENTION_DAYS);
+        expect([dates[0], dates[USAGE_RETENTION_DAYS - 1]]).toEqual(['2026-09-27', '2026-10-26']);
+        expect(stats?.dailyUsage.find(d => d.date === '2026-10-25')?.count).toBe(2);
+        expect(stats?.dailyUsage.find(d => d.date === '2026-10-24')?.count).toBe(0);
+      });
     });
   });
 

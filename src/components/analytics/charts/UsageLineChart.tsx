@@ -33,9 +33,9 @@ const UsageLineChart: FC<UsageLineChartProps> = memo(({
 }) => {
   const { gridColor, textColor, tooltipBg, tooltipBorder, tooltipLabelColor, tooltipAccentColor } = CHART_THEME;
 
-  // Format date for X axis (e.g., "Jan 13")
+  // Format date for X axis (e.g., "Jan 13"). The time makes it a local day: a bare YYYY-MM-DD parses as UTC midnight
   const formatDate = (dateStr: string): string => {
-    const date = new Date(dateStr);
+    const date = new Date(`${dateStr}T00:00`);
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 

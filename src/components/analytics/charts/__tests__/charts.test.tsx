@@ -340,6 +340,26 @@ describe('Chart Tooltips', () => {
     await expectTooltipLine(container, 'Uses : 5');
   });
 
+  it('UsageLineChart labels the hovered day with its own date, west of UTC too', async () => {
+    const systemTimeZone = process.env.TZ;
+    process.env.TZ = 'America/New_York';
+    try {
+      const { container } = await renderWithTheme(<UsageLineChart data={[{ date: '2026-01-11', count: 5 }]} />);
+
+      hoverChart(container);
+
+      await waitFor(() => {
+        expect(container.querySelector('.recharts-tooltip-label')?.textContent).toBe('Jan 11');
+      });
+    } finally {
+      if (systemTimeZone === undefined) {
+        delete process.env.TZ;
+      } else {
+        process.env.TZ = systemTimeZone;
+      }
+    }
+  });
+
   it('DayOfWeekChart shows the uses of the hovered day', async () => {
     const { container } = await renderWithTheme(<DayOfWeekChart data={[{ day: 'Mon', dayIndex: 1, count: 15 }]} />);
 
