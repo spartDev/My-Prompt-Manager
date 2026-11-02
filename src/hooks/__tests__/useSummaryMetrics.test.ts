@@ -20,8 +20,8 @@ function createMockStats(overrides: Partial<UsageStats> = {}): UsageStats {
     ],
     timeOfDayDistribution: [{ bucket: 'Afternoon', count: 25 }],
     categoryDistribution: [
-      { categoryId: 'cat-1', name: 'Writing', count: 40 },
-      { categoryId: 'cat-2', name: 'Coding', count: 35 },
+      { categoryId: 'cat-1', name: 'Writing', count: 40, color: '#2563EB' },
+      { categoryId: 'cat-2', name: 'Coding', count: 35, color: '#2563EB' },
     ],
     topPrompts: [],
     recentPrompts: [],
@@ -163,8 +163,8 @@ describe('useSummaryMetrics', () => {
     it('should return top category from categoryDistribution', () => {
       const stats = createMockStats({
         categoryDistribution: [
-          { categoryId: 'cat-1', name: 'Writing', count: 60 },
-          { categoryId: 'cat-2', name: 'Coding', count: 40 },
+          { categoryId: 'cat-1', name: 'Writing', count: 60, color: '#2563EB' },
+          { categoryId: 'cat-2', name: 'Coding', count: 40, color: '#2563EB' },
         ],
       });
       const { result } = renderHook(() => useSummaryMetrics(stats));
@@ -184,7 +184,7 @@ describe('useSummaryMetrics', () => {
 
     it('should handle single category', () => {
       const stats = createMockStats({
-        categoryDistribution: [{ categoryId: 'cat-1', name: 'General', count: 100 }],
+        categoryDistribution: [{ categoryId: 'cat-1', name: 'General', count: 100, color: '#2563EB' }],
       });
       const { result } = renderHook(() => useSummaryMetrics(stats));
 

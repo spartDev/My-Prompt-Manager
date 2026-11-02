@@ -1,7 +1,8 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { act } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { DEFAULT_CATEGORY_COLOR } from '../../constants/colors';
 import { buildPrompt } from '../../test/builders';
 import type { Prompt, UsageEvent } from '../../types';
 import { DEFAULT_CATEGORY, USAGE_RETENTION_DAYS, USAGE_STORAGE_KEY } from '../../types';
@@ -135,7 +136,7 @@ describe('useUsageStats', () => {
     });
 
     it('should count events per day correctly', async () => {
-      const today = new Date(NOW).toISOString().split('T')[0];
+      const today = new Date(NOW).toLocaleDateString('en-CA'); // YYYY-MM-DD, local day
       const events: UsageEvent[] = [
         buildUsageEvent({ timestamp: NOW }),
         buildUsageEvent({ timestamp: NOW - 1000 }),
@@ -163,6 +164,61 @@ describe('useUsageStats', () => {
       const dates = result.current.stats?.dailyUsage.map(d => d.date) ?? [];
       const sortedDates = [...dates].sort();
       expect(dates).toEqual(sortedDates);
+    });
+
+    describe('in the local time zone (Europe/Paris)', () => {
+      const systemTimeZone = process.env.TZ;
+
+      beforeEach(() => {
+        process.env.TZ = 'Europe/Paris';
+        vi.useFakeTimers({ toFake: ['Date'] });
+      });
+
+      afterEach(() => {
+        vi.useRealTimers();
+        if (systemTimeZone === undefined) {
+          delete process.env.TZ;
+        } else {
+          process.env.TZ = systemTimeZone;
+        }
+      });
+
+      const dailyUsageAt = async (now: string, insertions: string[]) => {
+        vi.setSystemTime(new Date(now));
+        await chrome.storage.local.set({
+          [USAGE_STORAGE_KEY]: insertions.map(at => buildUsageEvent({ timestamp: Date.parse(at) }))
+        });
+
+        const { result } = renderHook(() => useUsageStats());
+        await waitFor(() => {
+          expect(result.current.loading).toBe(false);
+        });
+        return result.current.stats;
+      };
+
+      it('counts an insertion at 00:30 on its own day, which ends the trend, as Day of Week does', async () => {
+        // 00:30 and 00:45 in Paris are still the day before in UTC
+        const stats = await dailyUsageAt('2026-11-02T00:45:00+01:00', ['2026-11-02T00:30:00+01:00']);
+
+        expect(stats?.dailyUsage[USAGE_RETENTION_DAYS - 1]).toEqual({ date: '2026-11-02', count: 1 });
+        expect(stats?.dailyUsage.find(d => d.date === '2026-11-01')?.count).toBe(0);
+        expect(stats?.dayOfWeekDistribution.find(d => d.day === 'Mon')?.count).toBe(1);
+      });
+
+      it('keeps one entry per local day across the change back from summer time', async () => {
+        // Paris leaves summer time (UTC+2) for UTC+1 at 03:00 on 25 October 2026
+        const stats = await dailyUsageAt('2026-10-26T09:00:00+01:00', [
+          '2026-10-25T00:30:00+02:00',
+          '2026-10-25T23:30:00+01:00'
+        ]);
+
+        const dates = stats?.dailyUsage.map(d => d.date) ?? [];
+        expect(dates).toHaveLength(USAGE_RETENTION_DAYS);
+        expect(new Set(dates).size).toBe(USAGE_RETENTION_DAYS);
+        expect([dates[0], dates[USAGE_RETENTION_DAYS - 1]]).toEqual(['2026-09-27', '2026-10-26']);
+        expect(stats?.dailyUsage.find(d => d.date === '2026-10-25')?.count).toBe(2);
+        expect(stats?.dailyUsage.find(d => d.date === '2026-10-24')?.count).toBe(0);
+      });
     });
   });
 
@@ -358,6 +414,35 @@ describe('useUsageStats', () => {
       const categories = result.current.stats?.categoryDistribution ?? [];
       expect(categories[0]?.name).toBe('Development');
       expect(categories[1]?.name).toBe('Design');
+    });
+
+    it('gives each Category its stored color, and the default Category color when it has none or no longer exists', async () => {
+      await chrome.storage.local.set({
+        prompts: [...mockPrompts, buildPrompt({ id: 'prompt-orphan', category: 'Archived' })],
+        categories: [
+          { id: 'cat-1', name: DEFAULT_CATEGORY },
+          { id: 'cat-2', name: 'Development', color: '#10B981' },
+          { id: 'cat-3', name: 'Design', color: '#EC4899' }
+        ],
+        [USAGE_STORAGE_KEY]: [
+          buildUsageEvent({ promptId: 'prompt-1' }), // Development
+          buildUsageEvent({ promptId: 'prompt-2', timestamp: NOW - 1000 }), // Design
+          buildUsageEvent({ promptId: 'prompt-3', timestamp: NOW - 2000 }), // the default Category, stored without a color
+          buildUsageEvent({ promptId: 'prompt-orphan', timestamp: NOW - 3000 }) // its Category 'Archived' no longer exists
+        ]
+      });
+
+      const { result } = renderHook(() => useUsageStats());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      const colorOf = (name: string) => result.current.stats?.categoryDistribution.find(c => c.name === name)?.color;
+      expect(colorOf('Development')).toBe('#10B981');
+      expect(colorOf('Design')).toBe('#EC4899');
+      expect(colorOf(DEFAULT_CATEGORY)).toBe(DEFAULT_CATEGORY_COLOR);
+      expect(colorOf('Archived')).toBe(DEFAULT_CATEGORY_COLOR);
     });
   });
 

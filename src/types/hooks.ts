@@ -174,6 +174,7 @@ export interface CategoryDistribution {
   categoryId: string | null;
   name: string;
   count: number;
+  color: string;  // The Category's stored color, else the default Category color
 }
 
 export interface PromptUsageSummary {

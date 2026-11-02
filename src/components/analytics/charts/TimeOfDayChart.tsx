@@ -74,7 +74,7 @@ const TimeOfDayChart: FC<TimeOfDayChartProps> = memo(({
       aria-label="Time of day usage chart"
     >
       <ResponsiveContainer width="100%" height={height}>
-        <BarChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }} throttledEvents={NO_THROTTLED_EVENTS}>
+        <BarChart data={chartData} margin={{ top: 5, right: 10, left: 4, bottom: 5 }} throttledEvents={NO_THROTTLED_EVENTS}>
           {showGrid && (
             <CartesianGrid
               strokeDasharray="3 3"
@@ -93,7 +93,7 @@ const TimeOfDayChart: FC<TimeOfDayChartProps> = memo(({
             tickLine={false}
             axisLine={false}
             allowDecimals={false}
-            width={30}
+            width="auto"
           />
           <Tooltip
             formatter={formatUsesTooltip}

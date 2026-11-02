@@ -10,7 +10,7 @@ import {
   YAxis
 } from 'recharts';
 
-import { CATEGORY_COLORS, CHART_THEME } from '../../../theme/chartColors';
+import { CHART_THEME } from '../../../theme/chartColors';
 import type { CategoryDistribution } from '../../../types/hooks';
 import { NO_THROTTLED_EVENTS } from '../constants';
 import { formatUsesTooltip } from './tooltipFormatters';
@@ -26,6 +26,13 @@ export interface CategoryBarChartProps {
   showGrid?: boolean;
 }
 
+/** Longest Category name the Y axis shows; a longer one ends with an ellipsis, and the Tooltip shows it in full */
+const MAX_NAME_LENGTH = 12;
+
+// One parameter on purpose: recharts calls a tickFormatter with (value, index)
+const truncateName = (name: string): string =>
+  name.length <= MAX_NAME_LENGTH ? name : `${name.substring(0, MAX_NAME_LENGTH - 1)}…`;
+
 /**
  * Horizontal bar chart showing category usage distribution
  */
@@ -39,14 +46,6 @@ const CategoryBarChart: FC<CategoryBarChartProps> = memo(({
 
   // Limit to top N categories
   const chartData = data.slice(0, maxCategories);
-
-  // Truncate long category names
-  const truncateName = (name: string, maxLength: number = 12): string => {
-    if (name.length <= maxLength) {
-      return name;
-    }
-    return name.substring(0, maxLength - 2) + '...';
-  };
 
   if (data.length === 0) {
     return (
@@ -71,7 +70,7 @@ const CategoryBarChart: FC<CategoryBarChartProps> = memo(({
         <BarChart
           data={chartData}
           layout="vertical"
-          margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
+          margin={{ top: 5, right: 20, left: 4, bottom: 5 }}
           throttledEvents={NO_THROTTLED_EVENTS}
         >
           {showGrid && (
@@ -94,8 +93,10 @@ const CategoryBarChart: FC<CategoryBarChartProps> = memo(({
             tick={{ fontSize: 11, fill: textColor }}
             tickLine={false}
             axisLine={false}
-            width={80}
+            width="auto"
             tickFormatter={truncateName}
+            // Every bar keeps its Category name: recharts may otherwise drop ticks it measures as overlapping
+            interval={0}
           />
           <Tooltip
             formatter={formatUsesTooltip}
@@ -115,10 +116,10 @@ const CategoryBarChart: FC<CategoryBarChartProps> = memo(({
             cursor={{ fill: cursorColor }}
           />
           <Bar dataKey="count" radius={[0, 4, 4, 0]}>
-            {chartData.map((_, index) => (
+            {chartData.map((entry, index) => (
               <Cell
                 key={`cell-${String(index)}`}
-                fill={CATEGORY_COLORS[index % CATEGORY_COLORS.length]}
+                fill={entry.color}
               />
             ))}
           </Bar>

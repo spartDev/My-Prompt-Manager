@@ -2,7 +2,8 @@
  * Centralized chart color definitions
  * Neutrals and the primary color read the color tokens of src/theme/tokens.css as CSS variables:
  * Chrome resolves var() in SVG presentation attributes, so the charts follow the .dark class by themselves.
- * The categorical palettes below stay data, the same in both modes.
+ * The categorical palettes below stay data, the same in both modes. Category bars take each Category's own color
+ * (useUsageStats), not a palette.
  */
 
 /**
@@ -34,23 +35,6 @@ export const CHART_PRIMARY = {
   /** Accent of the current mode */
   PRIMARY: 'var(--background-color-accent)',
 } as const;
-
-/**
- * Colors for category bar chart - diverse palette for visual distinction
- * Order matters: most contrasting colors first for better differentiation
- */
-export const CATEGORY_COLORS = [
-  '#9333ea', // purple-600
-  '#6366f1', // indigo-500
-  '#3b82f6', // blue-500
-  '#0ea5e9', // sky-500
-  '#10b981', // emerald-500
-  '#14b8a6', // teal-500
-  '#f59e0b', // amber-500
-  '#f97316', // orange-500
-  '#ec4899', // pink-500
-  '#8b5cf6', // violet-500
-] as const;
 
 /**
  * Platform-specific brand colors

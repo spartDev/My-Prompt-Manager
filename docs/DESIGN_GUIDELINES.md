@@ -85,7 +85,7 @@ Surfaces are **opaque**. `bg-backdrop` is the only translucent one: no more `bg-
 
 The brand gradient (`bg-brand`: `#6D28D9` to `#4C1D95`, the same in both modes) is reserved for the logo. Every other surface is flat, except the Analytics medals: `bg-medal-gold`, `bg-medal-silver` and `bg-medal-bronze` (the same in both modes, with a `text-on-accent` icon) mark the three most used Prompts.
 
-Charts read the tokens as CSS variables (`src/theme/chartColors.ts`): the primary series and the peak bar take the accent, the other bars `border-accent`, and grid, axes and tooltip the neutral tokens, so they follow the mode without React. The categorical palettes (Categories, Platforms, times of day) are data, the same in both modes.
+Charts read the tokens as CSS variables (`src/theme/chartColors.ts`): the primary series and the peak bar take the accent, the other bars `border-accent`, and grid, axes and tooltip the neutral tokens, so they follow the mode without React. The Platform and time-of-day palettes are data, the same in both modes, and each Category bar takes its Category's own color (the default Category color when it has none).
 
 The Prompt selector and the Variable form injected on Platforms are plain CSS (`src/content/utils/styles.ts`), not Tailwind: they declare the same tokens, under the same names, as CSS variables on `.prompt-library-selector` (light) and `.prompt-library-selector.dark-theme` (dark), and read them through `var()`. `styles.test.ts` fails when a value drifts from `tokens.css` or a color is written outside those declarations. Category chips there follow the same chip rule (`src/theme/categoryChip.ts`).
 

@@ -21,7 +21,7 @@ const createMockStats = (): UsageStats => ({
   platformBreakdown: [{ platform: 'claude', count: 25, percentage: 100 }],
   dayOfWeekDistribution: [{ day: 'Mon', dayIndex: 1, count: 15 }],
   timeOfDayDistribution: [],
-  categoryDistribution: [{ categoryId: '1', name: 'Development', count: 20 }],
+  categoryDistribution: [{ categoryId: '1', name: 'Development', count: 20, color: '#2563EB' }],
   topPrompts: [{ promptId: 'p1', title: 'Test Prompt', category: 'Development', count: 15, lastUsed: Date.now() }],
   recentPrompts: [],
   forgottenPrompts: []
