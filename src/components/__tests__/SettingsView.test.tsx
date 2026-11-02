@@ -472,6 +472,56 @@ describe('SettingsView', () => {
     expect(select).toHaveValue('title');
   });
 
+  // My-Prompt-Manager-see: loading the site settings is not a change, so opening Settings saves nothing
+  describe('site settings persistence', () => {
+    const PAST_THE_DEBOUNCE_MS = 400;
+    const waitPastTheDebounce = () => act(async () => {
+      await new Promise(resolve => { setTimeout(resolve, PAST_THE_DEBOUNCE_MS); });
+    });
+    const siteSettingsWrites = () =>
+      (getChromeMockFunctions().storage.local.set as Mock).mock.calls.filter(
+        ([items]) => (items as Record<string, unknown>).promptLibrarySettings !== undefined
+      );
+
+    beforeEach(() => {
+      const chromeMock = getChromeMockFunctions();
+      (chromeMock.tabs.query as Mock).mockResolvedValue([{ id: 7, url: 'https://claude.ai/new' }]);
+      (chromeMock.tabs.sendMessage as Mock).mockResolvedValue(undefined);
+    });
+
+    it('opening Settings neither saves the site settings nor sends them to the tabs', async () => {
+      const chromeMock = getChromeMockFunctions();
+      // A save that never ends keeps the interface mode locked, so a save on open would show
+      (chromeMock.storage.local.set as Mock).mockImplementation((items: Record<string, unknown>) =>
+        items.promptLibrarySettings === undefined ? Promise.resolve() : new Promise<void>(() => undefined)
+      );
+
+      await renderSettings();
+      await screen.findByRole('switch', { name: 'Enable ChatGPT integration' });
+      await waitPastTheDebounce();
+
+      expect(siteSettingsWrites()).toHaveLength(0);
+      expect(chromeMock.tabs.sendMessage).not.toHaveBeenCalled();
+      expect(screen.getByRole('radio', { name: /select side panel mode/i })).toBeEnabled();
+    });
+
+    it('saves a site setting the user changes once, and sends it to the tabs', async () => {
+      const chromeMock = getChromeMockFunctions();
+
+      await renderSettings();
+      await waitPastTheDebounce();
+      await userEvent.click(await screen.findByRole('switch', { name: 'Enable Claude integration' }));
+      await waitPastTheDebounce();
+
+      const writes = siteSettingsWrites();
+      expect(writes).toHaveLength(1);
+      const saved = (writes[0][0] as { promptLibrarySettings: { enabledSites: string[] } }).promptLibrarySettings;
+      expect(saved.enabledSites).toEqual(expect.arrayContaining(['chatgpt.com', 'claude.ai']));
+      expect(chromeMock.tabs.sendMessage).toHaveBeenCalledTimes(1);
+      expect(chromeMock.tabs.sendMessage).toHaveBeenCalledWith(7, { action: 'settingsUpdated', settings: saved });
+    });
+  });
+
   it('changes the interface mode when a different option is selected', async () => {
     const chromeMock = getChromeMockFunctions();
     const storageMock = getMockStorageManager();

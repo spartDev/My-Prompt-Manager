@@ -85,8 +85,9 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
 
   const storageManager = useMemo(() => StorageManager.getInstance(), []);
 
-  // Track initial mount to skip saving on first render
-  const isInitialMount = useRef(true);
+  // The site settings as storage and the tabs have them, null until Settings has loaded them.
+  // Only settings that differ from them are saved and sent to the tabs.
+  const storedSettings = useRef<Settings | null>(null);
 
   const siteConfigs: Record<string, SiteConfig> = useMemo(() => ({
     'www.perplexity.ai': {
@@ -138,6 +139,9 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
         ...defaultSettings,
         ...(savedSettings ?? {})
       };
+      // The first load is what storage and the tabs already have: opening Settings changes nothing.
+      // A later load (after an import, Clear All Data or a reset) is still sent if it differs.
+      storedSettings.current ??= loadedSettings;
       setSettings(loadedSettings);
       
       // Load interface mode
@@ -208,6 +212,7 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
       await chrome.storage.local.set({
         promptLibrarySettings: newSettings
       });
+      storedSettings.current = newSettings;
 
       // Notify content scripts of changes in parallel
       const tabs = await chrome.tabs.query({});
@@ -232,14 +237,12 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
 
   // Debounced persistence: save settings after user stops making changes
   useEffect(() => {
-    // Skip saving on initial mount (when settings are loaded)
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
-
     // Debounce: wait 150ms after last change before saving
     const timeoutId = setTimeout(() => {
+      // Nothing to save before the settings are loaded, or when storage already has them
+      if (storedSettings.current === null || JSON.stringify(settings) === JSON.stringify(storedSettings.current)) {
+        return;
+      }
       saveSettings(settings).catch((err: unknown) => {
         Logger.error('Failed to save settings', toError(err), {
           component: 'SettingsView',
