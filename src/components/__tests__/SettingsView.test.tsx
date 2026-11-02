@@ -520,6 +520,25 @@ describe('SettingsView', () => {
       expect(chromeMock.tabs.sendMessage).toHaveBeenCalledTimes(1);
       expect(chromeMock.tabs.sendMessage).toHaveBeenCalledWith(7, { action: 'settingsUpdated', settings: saved });
     });
+
+    // Review round 1 (Codex): a load that fails shows the default settings, and a change to them is still saved
+    it('saves a site setting the user changes after the settings failed to load', async () => {
+      const chromeMock = getChromeMockFunctions();
+      (chromeMock.storage.local.get as Mock).mockRejectedValue(new Error('storage unavailable'));
+
+      await renderSettings();
+      await waitPastTheDebounce();
+      expect(siteSettingsWrites()).toHaveLength(0);
+
+      await userEvent.click(await screen.findByRole('switch', { name: 'Enable Claude integration' }));
+      await waitPastTheDebounce();
+
+      const writes = siteSettingsWrites();
+      expect(writes).toHaveLength(1);
+      const saved = (writes[0][0] as { promptLibrarySettings: { enabledSites: string[] } }).promptLibrarySettings;
+      expect(saved.enabledSites).not.toContain('claude.ai');
+      expect(chromeMock.tabs.sendMessage).toHaveBeenCalledWith(7, { action: 'settingsUpdated', settings: saved });
+    });
   });
 
   it('changes the interface mode when a different option is selected', async () => {

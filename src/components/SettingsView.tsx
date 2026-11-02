@@ -163,6 +163,8 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
       setCategories(loadedCategories);
     } catch (error) {
       Logger.error('Failed to load settings', toError(error));
+      // Shown, not saved: only a change the user makes to them is saved
+      storedSettings.current ??= defaultSettings;
       setSettings(defaultSettings);
       setInterfaceMode(DEFAULT_SETTINGS.interfaceMode as 'popup' | 'sidepanel');
     } finally {
