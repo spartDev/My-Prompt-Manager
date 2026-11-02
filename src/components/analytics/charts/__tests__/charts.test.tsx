@@ -401,3 +401,34 @@ describe('Chart Tooltips', () => {
     await expectTooltipLine(container, 'Claude : 20 uses');
   });
 });
+
+describe('CategoryBarChart Y axis', () => {
+  let layout: MockInstance<HTMLElement['getBoundingClientRect']>;
+
+  // happy-dom lays nothing out: give each element a size so the chart draws its axes
+  beforeEach(() => {
+    layout = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 400, 200));
+  });
+
+  afterEach(() => {
+    layout.mockRestore();
+  });
+
+  it('names each Category, and ends a name over 12 characters with an ellipsis', async () => {
+    const { container } = await renderWithTheme(
+      <CategoryBarChart
+        data={[
+          { categoryId: '1', name: 'Work', count: 4 },
+          { categoryId: '2', name: 'Development', count: 3 },
+          { categoryId: '3', name: 'Personal', count: 2 },
+          { categoryId: '4', name: 'Customer Support Escalations', count: 1 }
+        ]}
+      />
+    );
+
+    await waitFor(() => {
+      const ticks = container.querySelectorAll('.recharts-yAxis-tick-labels .recharts-cartesian-axis-tick-value');
+      expect(Array.from(ticks, tick => tick.textContent)).toEqual(['Work', 'Development', 'Personal', 'Customer Su…']);
+    });
+  });
+});

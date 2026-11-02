@@ -61,7 +61,7 @@ const UsageLineChart: FC<UsageLineChartProps> = memo(({
       aria-label={`Usage trend chart showing ${String(data.length)} days of data`}
     >
       <ResponsiveContainer width="100%" height={height}>
-        <LineChart data={data} margin={{ top: 5, right: 10, left: -20, bottom: 5 }} throttledEvents={NO_THROTTLED_EVENTS}>
+        <LineChart data={data} margin={{ top: 5, right: 10, left: 4, bottom: 5 }} throttledEvents={NO_THROTTLED_EVENTS}>
           {showGrid && (
             <CartesianGrid
               strokeDasharray="3 3"
@@ -83,7 +83,7 @@ const UsageLineChart: FC<UsageLineChartProps> = memo(({
             tickLine={false}
             axisLine={false}
             allowDecimals={false}
-            width={30}
+            width="auto"
           />
           <Tooltip
             formatter={formatUsesTooltip}
