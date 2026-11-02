@@ -10,7 +10,7 @@ import {
   YAxis
 } from 'recharts';
 
-import { CATEGORY_COLORS, CHART_THEME } from '../../../theme/chartColors';
+import { CHART_THEME } from '../../../theme/chartColors';
 import type { CategoryDistribution } from '../../../types/hooks';
 import { NO_THROTTLED_EVENTS } from '../constants';
 import { formatUsesTooltip } from './tooltipFormatters';
@@ -116,10 +116,10 @@ const CategoryBarChart: FC<CategoryBarChartProps> = memo(({
             cursor={{ fill: cursorColor }}
           />
           <Bar dataKey="count" radius={[0, 4, 4, 0]}>
-            {chartData.map((_, index) => (
+            {chartData.map((entry, index) => (
               <Cell
                 key={`cell-${String(index)}`}
-                fill={CATEGORY_COLORS[index % CATEGORY_COLORS.length]}
+                fill={entry.color}
               />
             ))}
           </Bar>

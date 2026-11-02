@@ -45,8 +45,8 @@ const createMockStats = (overrides: Partial<UsageStats> = {}): UsageStats => ({
     { bucket: 'Night', count: 4 }
   ],
   categoryDistribution: [
-    { categoryId: '1', name: 'Development', count: 20 },
-    { categoryId: '2', name: 'Writing', count: 15 }
+    { categoryId: '1', name: 'Development', count: 20, color: '#2563EB' },
+    { categoryId: '2', name: 'Writing', count: 15, color: '#2563EB' }
   ],
   topPrompts: [
     { promptId: 'p1', title: 'Code Review Helper', category: 'Development', count: 15, lastUsed: Date.now() - 3600000 },

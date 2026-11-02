@@ -2,6 +2,7 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { DEFAULT_CATEGORY_COLOR } from '../../constants/colors';
 import { buildPrompt } from '../../test/builders';
 import type { Prompt, UsageEvent } from '../../types';
 import { DEFAULT_CATEGORY, USAGE_RETENTION_DAYS, USAGE_STORAGE_KEY } from '../../types';
@@ -413,6 +414,35 @@ describe('useUsageStats', () => {
       const categories = result.current.stats?.categoryDistribution ?? [];
       expect(categories[0]?.name).toBe('Development');
       expect(categories[1]?.name).toBe('Design');
+    });
+
+    it('gives each Category its stored color, and the default Category color when it has none or no longer exists', async () => {
+      await chrome.storage.local.set({
+        prompts: [...mockPrompts, buildPrompt({ id: 'prompt-orphan', category: 'Archived' })],
+        categories: [
+          { id: 'cat-1', name: DEFAULT_CATEGORY },
+          { id: 'cat-2', name: 'Development', color: '#10B981' },
+          { id: 'cat-3', name: 'Design', color: '#EC4899' }
+        ],
+        [USAGE_STORAGE_KEY]: [
+          buildUsageEvent({ promptId: 'prompt-1' }), // Development
+          buildUsageEvent({ promptId: 'prompt-2', timestamp: NOW - 1000 }), // Design
+          buildUsageEvent({ promptId: 'prompt-3', timestamp: NOW - 2000 }), // the default Category, stored without a color
+          buildUsageEvent({ promptId: 'prompt-orphan', timestamp: NOW - 3000 }) // its Category 'Archived' no longer exists
+        ]
+      });
+
+      const { result } = renderHook(() => useUsageStats());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      const colorOf = (name: string) => result.current.stats?.categoryDistribution.find(c => c.name === name)?.color;
+      expect(colorOf('Development')).toBe('#10B981');
+      expect(colorOf('Design')).toBe('#EC4899');
+      expect(colorOf(DEFAULT_CATEGORY)).toBe(DEFAULT_CATEGORY_COLOR);
+      expect(colorOf('Archived')).toBe(DEFAULT_CATEGORY_COLOR);
     });
   });
 
