@@ -27,10 +27,14 @@ const buildCss = async (candidates: string[] = []): Promise<string> => {
 const declarationsOf = (block: string): Record<string, string> =>
   Object.fromEntries([...block.matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)].map(([, name, value]) => [name, value.trim()]));
 
-/** The compiled rule of a class (nested variants included), or undefined when Tailwind generated none */
+/**
+ * The compiled rule of a class, its variant included, or undefined when Tailwind generated none.
+ * Tailwind 4.3.3 writes a variant into the selector (`.focus-primary:focus {`); earlier versions nested it (`.focus-primary { &:focus {`).
+ */
 const ruleFor = (css: string, className: string): string | undefined => {
-  const start = css.indexOf(`.${className.replace(':', '\\:')} {`);
-  return start < 0 ? undefined : css.slice(start, css.indexOf('\n  }\n', start));
+  const selector = `.${className.replace(':', '\\:')}`.replace(/[.\\]/g, '\\$&');
+  const start = new RegExp(`${selector}(?=[\\s:{])`).exec(css)?.index;
+  return start === undefined ? undefined : css.slice(start, css.indexOf('\n  }\n', start));
 };
 
 /** A token written as var(--other) takes the other token's value in the same mode */

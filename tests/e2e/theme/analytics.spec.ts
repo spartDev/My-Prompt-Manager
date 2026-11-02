@@ -9,6 +9,7 @@
 
 import type { Locator, Page } from '@playwright/test';
 
+import { PIE_CHART } from '../../../src/components/analytics/constants';
 import { type ExtensionStorage, expect, test } from '../fixtures/extension';
 import { ANALYTICS_FIXTURES, createUsageEventSeed } from '../fixtures/test-data';
 import { seedLibrary, seedUsageHistory } from '../utils/storage';
@@ -254,10 +255,30 @@ test.describe('Analytics on the tokens', () => {
       await expect(tooltip).toHaveCSS('border-top-color', colors.border);
       await expect(tooltip.locator('.recharts-tooltip-label')).toHaveCSS('color', colors.primary);
       await expect(tooltip.locator('.recharts-tooltip-item')).toHaveCSS('color', colors.accentText);
+      await expect(tooltip.locator('.recharts-tooltip-item')).toHaveText(/^Uses : \d+$/);
 
       // The hover band behind a bar
       await dayBars.first().hover();
       await expect(chartCard(page, 'Day of Week').locator('.recharts-tooltip-cursor')).toHaveCSS('fill', colors.muted);
+
+      // Once the charts are drawn, the trend line Tooltip of the last day, for the screenshot
+      await settleCharts(page);
+      const trendSurface = trend.locator('.recharts-surface');
+      const trendWidth = (await trendSurface.boundingBox())?.width ?? 0;
+      await trendSurface.hover({ position: { x: trendWidth - 30, y: 120 } });
+      await expect(tooltip.locator('.recharts-tooltip-item')).toHaveText(/^Uses : \d+$/);
+      await page.screenshot({ path: `${SCREENSHOT_DIR}/dashboard-tooltip-${theme}.png` });
+
+      // Tooltip of the Platforms pie: the Platform, then its uses. The middle of a sector's box is the donut hole,
+      // so the pointer goes to the top of the ring, inside the first sector (it starts at 3 o'clock, counterclockwise)
+      const platforms = chartCard(page, 'Platforms');
+      const sector = platforms.locator('.recharts-pie-sector path').first();
+      const [cx, cy] = await Promise.all([sector.getAttribute('cx'), sector.getAttribute('cy')]);
+      const ringMiddle = (PIE_CHART.INNER_RADIUS + PIE_CHART.OUTER_RADIUS) / 2;
+      const pie = platforms.locator('.recharts-surface').filter({ has: page.locator('.recharts-pie-sector') });
+      await pie.hover({ position: { x: Number(cx), y: Number(cy) - ringMiddle } });
+      await expect(platforms.locator('.recharts-tooltip-item')).toHaveText(/^(Claude|ChatGPT) : \d+ uses$/);
+      await page.screenshot({ path: `${SCREENSHOT_DIR}/dashboard-platform-tooltip-${theme}.png` });
     });
 
     test(`the dashboard is seamless on bg-app: its header line shows once the page scrolls, charts sit in cards, the chosen tab is accent-selected (${theme})`, async ({ page, storage, extensionId }) => {

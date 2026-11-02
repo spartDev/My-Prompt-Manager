@@ -12,6 +12,8 @@ import {
 
 import { CHART_PRIMARY, CHART_THEME, TIME_BUCKET_COLORS } from '../../../theme/chartColors';
 import type { TimeOfDayDistribution } from '../../../types/hooks';
+import { NO_THROTTLED_EVENTS } from '../constants';
+import { formatUsesTooltip } from './tooltipFormatters';
 
 export interface TimeOfDayChartProps {
   /** Time of day distribution data */
@@ -72,7 +74,7 @@ const TimeOfDayChart: FC<TimeOfDayChartProps> = memo(({
       aria-label="Time of day usage chart"
     >
       <ResponsiveContainer width="100%" height={height}>
-        <BarChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+        <BarChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }} throttledEvents={NO_THROTTLED_EVENTS}>
           {showGrid && (
             <CartesianGrid
               strokeDasharray="3 3"
@@ -94,7 +96,7 @@ const TimeOfDayChart: FC<TimeOfDayChartProps> = memo(({
             width={30}
           />
           <Tooltip
-            formatter={(value: number | undefined) => [value ?? 0, 'Uses']}
+            formatter={formatUsesTooltip}
             contentStyle={{
               backgroundColor: tooltipBg,
               border: `1px solid ${tooltipBorder}`,

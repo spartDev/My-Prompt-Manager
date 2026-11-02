@@ -192,6 +192,9 @@
   "postUpdateOptions": [
     "npmDedupe"
   ],
+  "constraints": {
+    "npm": "^11"
+  },
   "npm": {
     "minimumReleaseAge": "3 days",
     "packageRules": [
