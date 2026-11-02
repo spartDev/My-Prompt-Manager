@@ -11,6 +11,7 @@ import {
 
 import { CHART_PRIMARY, CHART_THEME } from '../../../theme/chartColors';
 import type { DailyUsage } from '../../../types/hooks';
+import { NO_THROTTLED_EVENTS } from '../constants';
 import { formatUsesTooltip } from './tooltipFormatters';
 
 export interface UsageLineChartProps {
@@ -60,7 +61,7 @@ const UsageLineChart: FC<UsageLineChartProps> = memo(({
       aria-label={`Usage trend chart showing ${String(data.length)} days of data`}
     >
       <ResponsiveContainer width="100%" height={height}>
-        <LineChart data={data} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+        <LineChart data={data} margin={{ top: 5, right: 10, left: -20, bottom: 5 }} throttledEvents={NO_THROTTLED_EVENTS}>
           {showGrid && (
             <CartesianGrid
               strokeDasharray="3 3"

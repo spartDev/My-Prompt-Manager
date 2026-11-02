@@ -34,3 +34,10 @@ export const PIE_LEGEND = {
   /** Size of legend icons */
   ICON_SIZE: 8,
 } as const;
+
+/**
+ * The chart events recharts may defer to the next animation frame: none. Recharts 3 defers mouse moves and does not
+ * cancel the pending frame on mouseleave, so a leave in the frame of the last move leaves the Tooltip stuck open
+ * (recharts#7876). Remove once a stable recharts includes the fix, recharts PR #7884 (My-Prompt-Manager-0vj).
+ */
+export const NO_THROTTLED_EVENTS: ReadonlyArray<keyof GlobalEventHandlersEventMap> = [];

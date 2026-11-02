@@ -11,7 +11,7 @@ import {
 import { CHART_THEME, getPlatformColor } from '../../../theme/chartColors';
 import type { PlatformBreakdown } from '../../../types/hooks';
 import { formatPlatformName } from '../../../utils';
-import { PIE_CHART, PIE_LEGEND } from '../constants';
+import { NO_THROTTLED_EVENTS, PIE_CHART, PIE_LEGEND } from '../constants';
 import { formatPlatformUsesTooltip } from './tooltipFormatters';
 
 export interface PlatformPieChartProps {
@@ -60,7 +60,7 @@ const PlatformPieChart: FC<PlatformPieChartProps> = memo(({
       aria-label={`Platform breakdown chart showing ${String(data.length)} platforms`}
     >
       <ResponsiveContainer width="100%" height={height}>
-        <PieChart>
+        <PieChart throttledEvents={NO_THROTTLED_EVENTS}>
           <Pie
             data={chartData}
             cx="50%"

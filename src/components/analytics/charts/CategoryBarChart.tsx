@@ -12,6 +12,7 @@ import {
 
 import { CATEGORY_COLORS, CHART_THEME } from '../../../theme/chartColors';
 import type { CategoryDistribution } from '../../../types/hooks';
+import { NO_THROTTLED_EVENTS } from '../constants';
 import { formatUsesTooltip } from './tooltipFormatters';
 
 export interface CategoryBarChartProps {
@@ -71,6 +72,7 @@ const CategoryBarChart: FC<CategoryBarChartProps> = memo(({
           data={chartData}
           layout="vertical"
           margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
+          throttledEvents={NO_THROTTLED_EVENTS}
         >
           {showGrid && (
             <CartesianGrid

@@ -12,6 +12,7 @@ import {
 
 import { CHART_THEME, DAY_OF_WEEK_COLORS } from '../../../theme/chartColors';
 import type { DayOfWeekDistribution } from '../../../types/hooks';
+import { NO_THROTTLED_EVENTS } from '../constants';
 import { formatUsesTooltip } from './tooltipFormatters';
 
 export interface DayOfWeekChartProps {
@@ -59,7 +60,7 @@ const DayOfWeekChart: FC<DayOfWeekChartProps> = memo(({
       aria-label="Day of week usage chart"
     >
       <ResponsiveContainer width="100%" height={height}>
-        <BarChart data={data} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+        <BarChart data={data} margin={{ top: 5, right: 10, left: -20, bottom: 5 }} throttledEvents={NO_THROTTLED_EVENTS}>
           {showGrid && (
             <CartesianGrid
               strokeDasharray="3 3"
