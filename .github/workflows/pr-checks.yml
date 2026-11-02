@@ -428,6 +428,7 @@ jobs:
 
           # Check each job status
           setup_status="${{ needs.setup.result }}"
+          type_check_status="${{ needs.type-check.result }}"
           lint_status="${{ needs.lint.result }}"
           test_status="${{ needs.test.result }}"
           build_status="${{ needs.build.result }}"
@@ -435,22 +436,19 @@ jobs:
           security_status="${{ needs.security.result }}"
 
           echo "📦 Dependencies & Setup: $setup_status"
+          echo "📘 TypeScript Type Checking: $type_check_status"
           echo "🧹 Code Quality & Linting: $lint_status"
           echo "🧪 Test Suite & Coverage: $test_status"
           echo "🏗️ Build Verification: $build_status"
           echo "🎯 End-to-End Tests: $e2e_status"
           echo "🔒 Security & Dependencies: $security_status"
 
-          # Check if workflow was cancelled (new commit pushed)
-          if [[ "$setup_status" == "cancelled" || "$lint_status" == "cancelled" || "$test_status" == "cancelled" || "$build_status" == "cancelled" || "$e2e_status" == "cancelled" || "$security_status" == "cancelled" ]]; then
-            echo ""
-            echo "⚠️ WORKFLOW CANCELLED"
-            echo "A new commit was pushed, cancelling this workflow run."
-            echo "The latest commit will be checked in a new workflow run."
-            # Don't fail on cancelled - it's expected behavior
-            exit 0
-          # Check if all succeeded
-          elif [[ "$setup_status" == "success" && "$lint_status" == "success" && "$test_status" == "success" && "$build_status" == "success" && "$e2e_status" == "success" && "$security_status" == "success" ]]; then
+          # This job is the required check of main. GitHub counts a skipped
+          # required check as passing, and every job is skipped once Setup
+          # fails, so only "success" passes here: skipped and cancelled fail.
+          # A run cancelled by a newer push fails on a commit that is no
+          # longer the head of the PR, so it blocks nothing.
+          if [[ "$setup_status" == "success" && "$type_check_status" == "success" && "$lint_status" == "success" && "$test_status" == "success" && "$build_status" == "success" && "$e2e_status" == "success" && "$security_status" == "success" ]]; then
             echo ""
             echo "🎉 ✅ ALL QUALITY GATES PASSED!"
             echo "🚀 This PR meets all mandatory requirements and is ready for review."
@@ -470,6 +468,7 @@ jobs:
           script: |
             const results = {
               setup: "${{ needs.setup.result }}",
+              typeCheck: "${{ needs.type-check.result }}",
               lint: "${{ needs.lint.result }}",
               test: "${{ needs.test.result }}",
               build: "${{ needs.build.result }}",
@@ -552,6 +551,7 @@ jobs:
             | Check | Status |
             |-------|---------|
             | 📦 Dependencies & Setup | ${getStatusIcon(results.setup)} ${results.setup} |
+            | 📘 TypeScript Type Checking | ${getStatusIcon(results.typeCheck)} ${results.typeCheck} |
             | 🧹 Code Quality & Linting | ${getStatusIcon(results.lint)} ${results.lint} |
             | 🧪 Test Suite & Coverage | ${getStatusIcon(results.test)} ${results.test} |
             | 🏗️ Build Verification | ${getStatusIcon(results.build)} ${results.build} |
