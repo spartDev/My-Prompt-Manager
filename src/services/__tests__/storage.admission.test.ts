@@ -217,11 +217,8 @@ describe('StorageManager Admission', () => {
         expect(await storedPrompts()).toEqual([imported]);
       });
 
-      it.each([
-        ['an exact match', 'Work'],
-        ['a name no Category has (it never invents one)', 'Play']
-      ])('leaves %s as it is', async (_case, category) => {
-        expect(await storageManager.importPrompt({ ...backed, category })).toEqual({ ...backed, category });
+      it('leaves an exact match as it is', async () => {
+        expect(await storageManager.importPrompt({ ...backed, category: 'Work' })).toEqual({ ...backed, category: 'Work' });
       });
 
       it('reads the Categories as stored, without creating the default Category', async () => {
@@ -230,6 +227,83 @@ describe('StorageManager Admission', () => {
         await storageManager.importPrompt({ ...backed, category: 'work' });
 
         expect(await storedCategories()).toEqual([{ id: 'c1', name: 'Work' }]);
+      });
+    });
+
+    // My-Prompt-Manager-cx9: every stored Prompt names an existing Category
+    describe('its Category, when neither the Backup nor the Library has it', () => {
+      beforeEach(async () => {
+        await chrome.storage.local.set({
+          categories: [
+            { id: 'default', name: DEFAULT_CATEGORY },
+            { id: 'c1', name: 'Work' }
+          ]
+        });
+        vi.mocked(chrome.storage.local.set).mockClear();
+      });
+
+      it('creates it from the name, without a colour, in the same atomic write as the Prompt', async () => {
+        const imported = await storageManager.importPrompt({ ...backed, category: 'Play' });
+
+        expect(imported).toEqual({ ...backed, category: 'Play' });
+        expect(chrome.storage.local.set).toHaveBeenCalledTimes(1);
+        expect(chrome.storage.local.set).toHaveBeenCalledWith({
+          categories: [
+            { id: 'default', name: DEFAULT_CATEGORY },
+            { id: 'c1', name: 'Work' },
+            { id: expect.any(String), name: 'Play' }
+          ],
+          prompts: [imported]
+        });
+      });
+
+      it('creates it from the admitted name', async () => {
+        const imported = await storageManager.importPrompt({ ...backed, category: ' Play\u{200B} ' });
+
+        expect(imported.category).toBe('Play');
+        expect(await storedCategories()).toContainEqual({ id: expect.any(String), name: 'Play' });
+      });
+
+      it('creates it once when two Prompts name it, the second in another case', async () => {
+        await storageManager.importPrompt({ ...backed, id: 'b1', category: 'Play' });
+        const second = await storageManager.importPrompt({ ...backed, id: 'b2', category: 'play' });
+
+        expect(second.category).toBe('Play');
+        expect(await storedCategories()).toEqual([
+          { id: 'default', name: DEFAULT_CATEGORY },
+          { id: 'c1', name: 'Work' },
+          { id: expect.any(String), name: 'Play' }
+        ]);
+      });
+
+      it('puts the default Category first when it is the one missing, as getCategories does', async () => {
+        await chrome.storage.local.set({ categories: [{ id: 'c1', name: 'Work' }] });
+
+        await storageManager.importPrompt({ ...backed, category: DEFAULT_CATEGORY });
+
+        expect(await storedCategories()).toEqual([
+          { id: expect.any(String), name: DEFAULT_CATEGORY },
+          { id: 'c1', name: 'Work' }
+        ]);
+      });
+
+      it.each([
+        ['names a stored Category', 'Work', []],
+        ['names a Category to create', 'Play', [{ id: expect.any(String), name: 'Play' }]]
+      ])('keeps the malformed entries the upgrade pass keeps, when the Prompt %s', async (_case, category, added) => {
+        const categories = [{ id: 'default', name: DEFAULT_CATEGORY }, null, 'text', { id: 7 }, { id: 'c1', name: 'Work' }];
+        await chrome.storage.local.set({ categories });
+
+        expect(await storageManager.importPrompt({ ...backed, category })).toEqual({ ...backed, category });
+        expect(await storedCategories()).toEqual([...categories, ...added]);
+      });
+
+      it('creates nothing when the Prompt is refused', async () => {
+        await expect(
+          storageManager.importPrompt({ ...backed, category: 'Play', content: 'x'.repeat(20_001) })
+        ).rejects.toBeInstanceOf(AdmissionRefusedError);
+
+        expect(chrome.storage.local.set).not.toHaveBeenCalled();
       });
     });
   });
@@ -530,6 +604,29 @@ describe('StorageManager Admission', () => {
 
       expect(await storedCategories()).toEqual([{ id: 'default', name: DEFAULT_CATEGORY }, { id: 'c1', name: kept }]);
       expect(await storedPrompts()).toEqual([prompt('p1', kept), prompt('p2', kept)]);
+    });
+
+    // My-Prompt-Manager-cx9
+    describe('every stored Prompt names an existing Category, when the Backup', () => {
+      const categoryNames = async (): Promise<string[]> =>
+        ((await storedCategories()) as { name: string }[]).map((category) => category.name);
+
+      it('has no categories section', async () => {
+        await storageManager.importPrompt(prompt('p1', 'Play'));
+
+        expect(await storedPrompts()).toEqual([prompt('p1', 'Play')]);
+        expect(await categoryNames()).toEqual([DEFAULT_CATEGORY, 'Play']);
+      });
+
+      it('lists Categories but omits one its Prompts name, also spelled differently or with a Hidden character', async () => {
+        await storageManager.importCategory({ id: 'c1', name: 'Work' });
+        await storageManager.importPrompt(prompt('p1', 'Work'));
+        await storageManager.importPrompt(prompt('p2', 'Play'));
+        await storageManager.importPrompt(prompt('p3', ' play\u{200B} '));
+
+        expect(await storedPrompts()).toEqual([prompt('p1', 'Work'), prompt('p2', 'Play'), prompt('p3', 'Play')]);
+        expect(await categoryNames()).toEqual([DEFAULT_CATEGORY, 'Work', 'Play']);
+      });
     });
   });
 });
