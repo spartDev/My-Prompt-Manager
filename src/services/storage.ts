@@ -263,7 +263,8 @@ export class StorageManager {
 
   // Import operations for backup/restore functionality
   async importPrompt(prompt: Prompt): Promise<Prompt> {
-    return this.mutex.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
+    // CATEGORIES before PROMPTS (lock order): the Prompt may name a Category that has to be created
+    return this.mutex.withLock(this.STORAGE_KEYS.CATEGORIES, () => this.mutex.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
       try {
         const existingPrompts = await this.getPrompts();
         const existing = existingPrompts.find(p => p.id === prompt.id);
@@ -273,9 +274,9 @@ export class StorageManager {
         const merged = existing ? { ...existing, ...prompt } : prompt;
 
         // The Library may spell the Prompt's Category differently (`Work` for `work`): the Prompt takes
-        // the stored spelling. The Categories are read raw, because getCategories() can take the
-        // CATEGORIES lock to write the default Category, and CATEGORIES is never taken under PROMPTS (lock order).
-        const storedCategories = await this.getStorageData<unknown>(this.STORAGE_KEYS.CATEGORIES);
+        // the stored spelling. The Categories are read raw: the default Category is written only
+        // when the Prompt names it and it is missing (below).
+        const storedCategories = await this.getStorageData<Category[]>(this.STORAGE_KEYS.CATEGORIES);
         const incoming = readPrompt(
           typeof merged.category === 'string'
             ? { ...merged, category: matchStoredCategory(merged.category, storedCategories) }
@@ -295,6 +296,24 @@ export class StorageManager {
         }
         const admitted = admission.prompt;
 
+        // A Category that neither the Backup nor the Library has is created from the name the
+        // Prompt gives it, already admitted with the Prompt, so every Prompt names an existing
+        // Category (ADR-001). Without a colour, like the default Category.
+        const categories = storedCategories ?? [];
+        const created: Category | undefined = categories.some(c => c.name === admitted.category)
+          ? undefined
+          : { id: uuidv4(), name: admitted.category };
+        const createdSize = created ? storedSize(created) : 0;
+        const write = async (prompts: StoredPrompt[]): Promise<void> => {
+          if (!created) {
+            await this.writePrompts(prompts);
+            return;
+          }
+          // The default Category stays first, as readCategoriesWithDefault writes it
+          const withCreated = created.name === DEFAULT_CATEGORY ? [created, ...categories] : [...categories, created];
+          await this.writeCategoriesAndPrompts(withCreated, prompts);
+        };
+
         if (replacing) {
           // Update existing prompt - check quota if size is increasing
           const sizeDelta = storedSize(admitted) - storedSize(existingPrompts[existingIndex]);
@@ -302,23 +321,25 @@ export class StorageManager {
           existingPrompts[existingIndex] = admitted;
           if (sizeDelta > 0) {
             this.checkLibraryCap(existingPrompts);
-            await this.checkQuotaBeforeWrite(sizeDelta);
+          }
+          if (sizeDelta + createdSize > 0) {
+            await this.checkQuotaBeforeWrite(sizeDelta + createdSize);
           }
 
-          await this.writePrompts(existingPrompts);
+          await write(existingPrompts);
           return admitted;
         }
 
         // Add new prompt - check the cap and the quota for its full size
         const updatedPrompts = [...existingPrompts, admitted];
         this.checkLibraryCap(updatedPrompts);
-        await this.checkQuotaBeforeWrite(storedSize(admitted));
-        await this.writePrompts(updatedPrompts);
+        await this.checkQuotaBeforeWrite(storedSize(admitted) + createdSize);
+        await write(updatedPrompts);
         return admitted;
       } catch (error) {
         throw this.handleStorageError(error);
       }
-    });
+    }));
   }
 
   async importCategory(incoming: Category): Promise<Category> {
