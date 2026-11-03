@@ -47,6 +47,18 @@ describe('StorageManager across contexts', () => {
     });
   };
 
+  /** Makes the next chrome.storage clear slow; resolves when it starts, so the other context can act while it runs. */
+  const slowClear = (): Promise<void> => {
+    const clear = vi.mocked(chrome.storage.local.clear).getMockImplementation() as unknown as () => Promise<void>;
+    return new Promise((started) => {
+      vi.mocked(chrome.storage.local.clear).mockImplementationOnce(async () => {
+        started();
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        return clear();
+      });
+    });
+  };
+
   beforeEach(async () => {
     uninstall = installNavigatorLocks(new FakeLockManager());
     await chrome.storage.local.set({
@@ -111,9 +123,7 @@ describe('StorageManager across contexts', () => {
     expect(locks.log).toEqual([]);
   });
 
-  it('asks the other contexts for the Prompt and Category locks, but not for the settings lock', async () => {
-    // A settings toggle is the one write a user triggers by hand and may close the page right after,
-    // so it must not wait for a lock round trip to the other contexts
+  it('asks the other contexts for the Prompt, Category and settings locks', async () => {
     uninstall();
     const locks = new FakeLockManager();
     uninstall = installNavigatorLocks(locks);
@@ -122,8 +132,59 @@ describe('StorageManager across contexts', () => {
     await popup.savePrompt({ title: 'Saved', content: 'Body', category: DEFAULT_CATEGORY });
     await popup.updateSettings({ sortOrder: 'title' });
 
-    expect(locks.log.filter((entry) => entry.startsWith('acquire'))).toEqual(['acquire StorageManager:prompts']);
+    expect(locks.log.filter((entry) => entry.startsWith('acquire'))).toEqual([
+      'acquire StorageManager:prompts',
+      'acquire StorageManager:settings'
+    ]);
     expect((await chrome.storage.local.get('settings')).settings).toMatchObject({ sortOrder: 'title' });
+  });
+
+  it('a theme set in the side panel and a sort order set in the popup meanwhile are both kept', async () => {
+    const sidePanel = context();
+    const popup = context();
+    slowRead('settings'); // the first read, whichever context makes it, is slow
+
+    await Promise.all([sidePanel.updateSettings({ theme: 'dark' }), popup.updateSettings({ sortOrder: 'title' })]);
+
+    expect((await chrome.storage.local.get('settings')).settings).toMatchObject({ theme: 'dark', sortOrder: 'title' });
+  });
+
+  it('a settings change paused in the side panel cannot write the settings back after Clear All Data in the popup', async () => {
+    await chrome.storage.local.set({ prompts: [prompt('p1')] });
+    const sidePanel = context();
+    const popup = context();
+    slowRead('settings'); // the side panel reads the settings, under the settings lock, then pauses
+
+    await Promise.all([sidePanel.updateSettings({ theme: 'dark' }), popup.clearAllData()]);
+
+    expect(await chrome.storage.local.get(null)).toEqual({});
+  });
+
+  it('Clear All Data in the popup waits for a Prompt the service worker is saving, and clears it too', async () => {
+    const worker = context();
+    const popup = context();
+    slowRead('prompts'); // the worker's read, under the Prompts lock, returns after the popup asked to clear
+
+    await Promise.all([
+      worker.savePrompt({ title: 'Saved meanwhile', content: 'Body', category: DEFAULT_CATEGORY }),
+      popup.clearAllData()
+    ]);
+
+    expect(await chrome.storage.local.get(null)).toEqual({});
+  });
+
+  it('a Prompt the service worker saves while Clear All Data runs in the popup is saved after the clear, alone', async () => {
+    await chrome.storage.local.set({ prompts: [prompt('p1')] });
+    const worker = context();
+    const popup = context();
+    const clearing = slowClear();
+
+    const cleared = popup.clearAllData();
+    await clearing; // the popup is clearing: a read of the Library now would still see p1
+    const saved = await worker.savePrompt({ title: 'Saved meanwhile', content: 'Body', category: DEFAULT_CATEGORY });
+    await cleared;
+
+    expect(await storedPrompts()).toEqual([saved]);
   });
 
   it('a usage count in the service worker cannot overwrite an edit the popup makes meanwhile', async () => {
