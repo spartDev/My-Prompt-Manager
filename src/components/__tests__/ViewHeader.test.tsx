@@ -4,6 +4,19 @@ import { describe, expect, it, vi } from 'vitest';
 
 import ViewHeader from '../ViewHeader';
 
+const CustomIcon = () => (
+  <svg data-testid="custom-icon" className="w-6 h-6">
+    <path d="M12 0L24 24H0z" />
+  </svg>
+);
+
+const ComplexChild = () => (
+  <div>
+    <input data-testid="search-input" placeholder="Search..." />
+    <button data-testid="filter-button">Filter</button>
+  </div>
+);
+
 describe('ViewHeader', () => {
   describe('Rendering', () => {
     it('renders with title', () => {
@@ -78,12 +91,6 @@ describe('ViewHeader', () => {
 
   describe('Custom Icon', () => {
     it('renders with custom ReactElement icon', () => {
-      const CustomIcon = () => (
-        <svg data-testid="custom-icon" className="w-6 h-6">
-          <path d="M12 0L24 24H0z" />
-        </svg>
-      );
-
       render(
         <ViewHeader
           title="Test"
@@ -395,13 +402,6 @@ describe('ViewHeader', () => {
     });
 
     it('renders complex children content', () => {
-      const ComplexChild = () => (
-        <div>
-          <input data-testid="search-input" placeholder="Search..." />
-          <button data-testid="filter-button">Filter</button>
-        </div>
-      );
-
       render(
         <ViewHeader title="Test">
           <ComplexChild />
