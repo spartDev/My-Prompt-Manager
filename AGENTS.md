@@ -10,6 +10,10 @@ Use the domain terms of `CONTEXT.md` (Prompt, Library, Category, Admission, Verb
 
 After a code change, `npm test && npm run lint && npm run typecheck` passes before you call the work done.
 
+A pull request is done when its CI checks are green. The e2e job takes about 10 minutes, longer than a foreground command may run: watch `gh pr checks <number> --watch` in the background.
+
 ## Work tracking
 
-Track work in beads (`bd`). Run `bd prime` if its workflow is not already in context. A session ends with its branch pushed and a pull request open.
+Track work in beads (`bd`). Run `bd prime` if its workflow is not already in context. A session ends with its branch pushed, a pull request open on `.github/PULL_REQUEST_TEMPLATE.md`, and its checks green.
+
+Hand off in beads: `bd update <id> --append-notes` on the ticket or its epic, or `bd remember`, where the next session reads it with `bd show` or `bd memories`. A temp folder is not a handoff: a reboot can clear it.

@@ -1,150 +1,44 @@
 ## Summary
-<!-- Brief description (2-3 sentences) of what this PR accomplishes -->
+<!-- The problem in the user's terms, then what this PR changes. A few sentences, in the domain terms of CONTEXT.md. -->
 
 ## Related Issues
-**JIRA:** [PROJECT-XXX](https://your-company.atlassian.net/browse/PROJECT-XXX)
-**GitHub Issues:** Closes #, Related to #
+**Beads:** My-Prompt-Manager-<id>
 
 ## Type of Change
 - [ ] 🆕 New feature (non-breaking change that adds functionality)
-- [ ] 🐛 Bug fix (non-breaking change that fixes an issue)
-- [ ] 💥 Breaking change (fix or feature that would cause existing functionality to change)
+- [ ] 🐛 Bug fix
+- [ ] 💥 Breaking change
 - [ ] 📝 Documentation update
-- [ ] ♻️ Code refactoring (no functional changes)
+- [ ] ♻️ Code refactoring
 - [ ] ⚡ Performance improvement
 - [ ] ✅ Test improvement
 - [ ] 🔧 Configuration/build changes
 
-## Motivation and Context
-<!-- Why is this change needed? What problem does it solve? -->
-<!-- Link to any relevant discussions, RFCs, or design documents -->
-
 ## Implementation Details
-
-### What Changed
-<!-- High-level overview of the implementation approach -->
-
-### Key Files Modified
-<!-- List the most important files changed and why -->
-- `src/path/to/file.ts` - Brief description
-- `src/path/to/another.tsx` - Brief description
-
-### API/Interface Changes
-<!-- List any new or modified APIs, types, or interfaces -->
-<!-- Include code examples for complex changes -->
-
-<details>
-<summary>Example API Usage (click to expand)</summary>
-
-```typescript
-// Example code showing the new API usage
-```
-
-</details>
-
-## Breaking Changes
-**Does this introduce breaking changes?** ⚠️
-- [ ] Yes - See details below
-- [ ] No - Fully backward compatible
-
-<details>
-<summary>Breaking change details (if applicable)</summary>
-
-**What's Breaking:**
-<!-- Describe the breaking change -->
-
-**Migration Guide:**
-```typescript
-// Before
-// ...
-
-// After
-// ...
-```
-
-</details>
+<!-- One bullet per change: the file or function in bold, what it does now and why. Add "## How it was found" above this section when the cause took digging. -->
 
 ## Testing
+<!-- Each new test, and whether it was red before the fix ("red on main, green with the fix"). Delete the subsections that do not apply. -->
 
-### Test Coverage
-- [ ] Unit tests added/updated (`npm test`)
-- [ ] Integration tests added/updated
-- [ ] Manual testing completed
-- [ ] All existing tests pass
+### Unit
 
-**Coverage:** Run `npm run test:coverage` - New code has XX% coverage
+### E2E
 
-### Test Scenarios Validated
-1. **Happy Path:** [Description] - ✅ Pass
-2. **Edge Case:** [Description] - ✅ Pass
-3. **Error Handling:** [Description] - ✅ Pass
+### Proof
+<!-- A UI change shows screenshots, light and dark. Push them to the orphan branch pr-assets/<topic>:
+     scripts/pr-assets.sh <topic> test-results/<dir>/*.png
+     It prints this table with the raw.githubusercontent.com links; paste it here. -->
 
-### How to Test Manually
-```bash
-npm run dev
-# 1. Navigate to [URL/Feature]
-# 2. Click/Interact with [Element]
-# 3. Verify [Expected Behavior]
-```
+| Light | Dark |
+|---|---|
+| <img src="" width="380"> | <img src="" width="380"> |
 
-## Visual Changes
-<!-- Include screenshots/GIFs/videos for any UI changes -->
-<!-- Delete this section if not applicable -->
+## Review rounds
+<!-- One "### <reviewer>, round <n> (<commit>)" per round of review comments: what each comment found, and the change that answers it. Delete when there was none. -->
 
-### Before & After
-
-| Before | After |
-|--------|-------|
-| ![Before](url) | ![After](url) |
-
-**Or use a demo GIF:**
-![Feature Demo](url-to-gif)
-
-## Performance Impact
-- [ ] No performance impact
-- [ ] Performance improved (describe below)
-- [ ] Performance impact acceptable (explain below)
-
-**Metrics:**
-<!-- If applicable: bundle size changes, load time changes, etc. -->
-- Bundle size: ±X KB
-- Load time impact: ±X ms
-
-## Security Considerations
-- [ ] No security implications
-- [ ] Input validation implemented
-- [ ] Output encoding implemented
-- [ ] Authentication/authorization reviewed
-- [ ] No sensitive data exposed
-- [ ] Dependencies scanned for vulnerabilities
-
-**Security Notes:**
-<!-- Describe any security-relevant changes or considerations -->
-
-## Documentation
-- [ ] Code comments added for complex logic
-- [ ] README.md updated (if needed)
-- [ ] ARCHITECTURE.md or other docs updated (if needed)
-- [ ] CHANGELOG.md updated (if needed)
-
-## Pre-Merge Checklist
-- [ ] Code follows project style guidelines
-- [ ] Self-review completed
-- [ ] Code builds without errors (`npm run build`)
-- [ ] All tests pass (`npm test`)
-- [ ] Lint checks pass (`npm run lint`)
-- [ ] No new warnings introduced
-- [ ] Branch is up-to-date with base branch
-- [ ] Commits are clean and well-described
-
-## Deployment Notes
-<!-- Any special deployment considerations, feature flags, environment variables, etc. -->
-<!-- Delete this section if not applicable -->
-
-## Additional Context
-<!-- Add any other context, related PRs, future work, technical debt, etc. -->
-
----
-
-**Reviewer Focus Areas:**
-<!-- Optional: Guide reviewers on what to pay special attention to -->
+## Checklist
+- [ ] `npm test`: <files> files, <tests> tests
+- [ ] `npm run lint`: <warnings> warnings, none in the changed files
+- [ ] `npm run typecheck`
+- [ ] `npx playwright test`: <passed> of <total>
+- [ ] CI checks green
