@@ -29,6 +29,13 @@ describe('replacesNotes', () => {
     'eval "bd update My-Prompt-Manager-abc --notes x"',
     'cat <<EOF\n$(bd update My-Prompt-Manager-abc --notes x)\nEOF',
     'cat > example.txt <<\'EOF\'\nbd update My-Prompt-Manager-abc --notes x\nEOF\nbd update My-Prompt-Manager-abc --notes x',
+    'bash <<\'EOF\'\nbd update My-Prompt-Manager-abc --notes x\nEOF',
+    'cat <<\'EOF\' | sh\nbd update My-Prompt-Manager-abc --notes x\nEOF',
+    'echo \'bd update My-Prompt-Manager-abc --notes x\' | bash',
+    '>/dev/null bd update My-Prompt-Manager-abc --notes x',
+    '2>&1 bd update My-Prompt-Manager-abc --notes x',
+    '&>/dev/null bd update My-Prompt-Manager-abc --notes x',
+    '2> /dev/null bd update My-Prompt-Manager-abc --notes x',
   ])('blocks %s', (command) => {
     expect(replacesNotes(command)).toBe(true);
   });
@@ -44,6 +51,9 @@ describe('replacesNotes', () => {
     'cat > example.txt <<-EOF\n\tbd update My-Prompt-Manager-abc --notes x\n\tEOF',
     'echo done # then bd update My-Prompt-Manager-abc --notes x',
     'echo "$(bd show My-Prompt-Manager-abc)"',
+    'echo \'bd update My-Prompt-Manager-abc --notes x\' > notes.txt',
+    'bd show My-Prompt-Manager-abc 2>&1 | tail -5',
+    'npm test > out.log 2>&1; bd update My-Prompt-Manager-abc --append-notes "tests pass"',
   ])('lets %s through', (command) => {
     expect(replacesNotes(command)).toBe(false);
   });

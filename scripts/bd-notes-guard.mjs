@@ -2,6 +2,8 @@
  * Claude Code PreToolUse hook for Bash, registered in .claude/settings.json.
  * `bd update <id> --notes` replaces a ticket's notes, so the hook blocks it and points to `--append-notes`.
  * It reads the tool call as JSON on stdin and exits 2 to block; any other input lets the call through.
+ * It catches the ways an agent writes the command, not deliberate evasion: a script file, a command held in a
+ * variable, or text decoded at run time still get through.
  */
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
@@ -13,6 +15,12 @@ const COMMAND_SEPARATORS = ';&|\n()';
 const COMMAND_PREFIXES = new Set(['!', '{', 'if', 'then', 'else', 'elif', 'while', 'until', 'do', 'env', 'command', 'exec', 'nohup', 'time']);
 const SHELLS = new Set(['sh', 'bash', 'zsh']);
 const ENV_ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
+/** A redirection word: `>/dev/null`, `2>&1`, `&>log`, `<input`. */
+const REDIRECTION = /^(?:\d+|&)?[<>]/;
+/** A redirection whose target is the next word: `>`, `2>`, `&>>`. */
+const REDIRECTION_OPERATOR = /^(?:\d+|&)?(?:<|>|>>|<>|>&|<&|>\||<<<)$/;
+const SCRIPT_FLAG = /^-[a-z]*c[a-z]*$/;
+const STDIN_FLAG = /^-[a-z]*s[a-z]*$/;
 
 /** Index of the `)` closing a `$(` whose contents start at `start`, honouring nested parentheses and quotes. */
 function closingParen(line, start) {
@@ -96,8 +104,11 @@ function readHeredoc(line, start) {
   return { heredoc: { delimiter, quoted, stripTabs }, end: i };
 }
 
-/** Skips the bodies of the heredocs opened on the line that ends at `start`; returns the index after the last body. */
-function skipHeredocBodies(line, start, heredocs, commands) {
+/**
+ * Skips the bodies of the heredocs opened on the line that ends at `start`; returns the index after the last body.
+ * A body a shell reads on stdin runs as commands, quoted or not; an unquoted one runs its substitutions.
+ */
+function skipHeredocBodies(line, start, heredocs, commands, feedsShell) {
   let position = start;
   for (const { delimiter, quoted, stripTabs } of heredocs) {
     let body = '';
@@ -111,17 +122,45 @@ function skipHeredocBodies(line, start, heredocs, commands) {
       }
       body += `${text}\n`;
     }
-    if (!quoted) {
+    if (feedsShell) {
+      commands.push(...splitCommands(body));
+    } else if (!quoted) {
       commands.push(...substitutedCommands(body));
     }
   }
   return position;
 }
 
+/** The program and arguments of a simple command, without env assignments, control words, runners and redirections. */
+function commandWords(words) {
+  const kept = [];
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i];
+    if (REDIRECTION_OPERATOR.test(word)) {
+      i++;
+    } else if (REDIRECTION.test(word)) {
+      // the target is inside the word
+    } else if (kept.length > 0 || !(ENV_ASSIGNMENT.test(word) || COMMAND_PREFIXES.has(word))) {
+      kept.push(word);
+    }
+  }
+  return kept;
+}
+
+/** True when a simple command is a shell that reads its script on stdin: `bash`, `sh -s`, not `bash -c …` or `bash file.sh`. */
+function readsScriptFromStdin(words) {
+  const [program, ...args] = commandWords(words);
+  if (program === undefined || !SHELLS.has(program.split('/').pop()) || args.some((w) => SCRIPT_FLAG.test(w))) {
+    return false;
+  }
+  return args.some((w) => STDIN_FLAG.test(w)) || args.every((w) => w.startsWith('-'));
+}
+
 /**
  * Splits a shell command line into simple commands, each a list of words. A quoted string stays inside one word,
  * so a flag named in a message is not a flag; the commands of `$(…)` and backtick substitutions, which run even
- * inside double quotes, are added as commands of their own; comments and quoted heredoc bodies are skipped.
+ * inside double quotes, are added as commands of their own, and so is text a shell reads on stdin (a heredoc body,
+ * `echo '…' | bash`); comments and other quoted heredoc bodies are skipped.
  */
 function splitCommands(line) {
   const commands = [];
@@ -130,6 +169,7 @@ function splitCommands(line) {
   let inWord = false;
   let quote = null;
   let heredocs = [];
+  let lineStart = 0;
 
   const endWord = () => {
     if (inWord) {
@@ -153,6 +193,20 @@ function splitCommands(line) {
     commands.push(...splitCommands(line.slice(start, end)));
     word += line.slice(i, end + 1);
     inWord = true;
+    return end;
+  };
+  /** Ends the line whose heredoc bodies start at `start`; returns the index after the bodies. */
+  const endLine = (start) => {
+    const lineCommands = commands.slice(lineStart);
+    const feedsShell = lineCommands.some(readsScriptFromStdin);
+    if (feedsShell) {
+      for (const text of lineCommands.flat().filter((w) => /\s/.test(w))) {
+        commands.push(...splitCommands(text));
+      }
+    }
+    const end = skipHeredocBodies(line, start, heredocs, commands, feedsShell);
+    heredocs = [];
+    lineStart = commands.length;
     return end;
   };
 
@@ -192,13 +246,16 @@ function splitCommands(line) {
       const { heredoc, end } = readHeredoc(line, i + 2);
       heredocs.push(heredoc);
       i = end - 1;
+    } else if (char === '&' && (/[<>]$/.test(word) || (!inWord && line[i + 1] === '>'))) {
+      // `2>&1` and `&>log` are redirections, not the `&` that ends a command
+      word += char;
+      inWord = true;
     } else if (char === ' ' || char === '\t') {
       endWord();
     } else if (COMMAND_SEPARATORS.includes(char)) {
       endCommand();
-      if (char === '\n' && heredocs.length > 0) {
-        i = skipHeredocBodies(line, i + 1, heredocs, commands) - 1;
-        heredocs = [];
+      if (char === '\n') {
+        i = endLine(i + 1) - 1;
       }
     } else {
       word += char;
@@ -206,26 +263,23 @@ function splitCommands(line) {
     }
   }
   endCommand();
+  endLine(line.length);
   return commands;
 }
 
 /** True when a simple command runs `bd update` with `--notes`, directly or through `eval` or `sh -c`. */
 function updatesNotes(words) {
-  let program = 0;
-  while (program < words.length && (ENV_ASSIGNMENT.test(words[program]) || COMMAND_PREFIXES.has(words[program]))) {
-    program++;
-  }
-  if (program === words.length) {
+  const [program, ...args] = commandWords(words);
+  if (program === undefined) {
     return false;
   }
-  const name = words[program].split('/').pop();
-  const args = words.slice(program + 1);
+  const name = program.split('/').pop();
 
   if (name === 'eval') {
     return replacesNotes(args.join(' '));
   }
   if (SHELLS.has(name)) {
-    const script = args.findIndex((w) => /^-[a-z]*c[a-z]*$/.test(w));
+    const script = args.findIndex((w) => SCRIPT_FLAG.test(w));
     return script !== -1 && script + 1 < args.length && replacesNotes(args[script + 1]);
   }
   if (name !== 'bd') {
