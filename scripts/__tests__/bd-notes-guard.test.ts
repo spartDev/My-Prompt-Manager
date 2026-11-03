@@ -36,6 +36,14 @@ describe('replacesNotes', () => {
     '2>&1 bd update My-Prompt-Manager-abc --notes x',
     '&>/dev/null bd update My-Prompt-Manager-abc --notes x',
     '2> /dev/null bd update My-Prompt-Manager-abc --notes x',
+    'env -i bd update My-Prompt-Manager-abc --notes x',
+    'env -u HOME bd update My-Prompt-Manager-abc --notes x',
+    'time -p bd update My-Prompt-Manager-abc --notes x',
+    'timeout 10 bd update My-Prompt-Manager-abc --notes x',
+    'echo My-Prompt-Manager-abc | xargs -I{} bd update {} --notes x',
+    'find . -name x -exec bd update My-Prompt-Manager-abc --notes x \\;',
+    'bash -o pipefail <<\'EOF\'\nbd update My-Prompt-Manager-abc --notes x\nEOF',
+    'cat <<\'EOF\' |\nbd update My-Prompt-Manager-abc --notes x\nEOF\nbash',
   ])('blocks %s', (command) => {
     expect(replacesNotes(command)).toBe(true);
   });
@@ -54,6 +62,8 @@ describe('replacesNotes', () => {
     'echo \'bd update My-Prompt-Manager-abc --notes x\' > notes.txt',
     'bd show My-Prompt-Manager-abc 2>&1 | tail -5',
     'npm test > out.log 2>&1; bd update My-Prompt-Manager-abc --append-notes "tests pass"',
+    'printf "%s\\n" bd update My-Prompt-Manager-abc --notes x',
+    'cat <<\'EOF\' |\nbd update My-Prompt-Manager-abc --notes x\nEOF\ntee notes.txt',
   ])('lets %s through', (command) => {
     expect(replacesNotes(command)).toBe(false);
   });

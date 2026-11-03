@@ -20,7 +20,7 @@ const REDIRECTION = /^(?:\d+|&)?[<>]/;
 /** A redirection whose target is the next word: `>`, `2>`, `&>>`. */
 const REDIRECTION_OPERATOR = /^(?:\d+|&)?(?:<|>|>>|<>|>&|<&|>\||<<<)$/;
 const SCRIPT_FLAG = /^-[a-z]*c[a-z]*$/;
-const STDIN_FLAG = /^-[a-z]*s[a-z]*$/;
+const PRINTERS = new Set(['echo', 'printf']);
 
 /** Index of the `)` closing a `$(` whose contents start at `start`, honouring nested parentheses and quotes. */
 function closingParen(line, start) {
@@ -104,56 +104,54 @@ function readHeredoc(line, start) {
   return { heredoc: { delimiter, quoted, stripTabs }, end: i };
 }
 
-/**
- * Skips the bodies of the heredocs opened on the line that ends at `start`; returns the index after the last body.
- * A body a shell reads on stdin runs as commands, quoted or not; an unquoted one runs its substitutions.
- */
-function skipHeredocBodies(line, start, heredocs, commands, feedsShell) {
+/** Reads the bodies of the heredocs opened on the line that ends at `start`; returns them and the index after the last. */
+function readHeredocBodies(line, start, heredocs) {
   let position = start;
-  for (const { delimiter, quoted, stripTabs } of heredocs) {
-    let body = '';
+  const bodies = heredocs.map(({ delimiter, quoted, stripTabs }) => {
+    let text = '';
     while (position < line.length) {
       const newline = line.indexOf('\n', position);
       const end = newline === -1 ? line.length : newline;
-      const text = line.slice(position, end);
+      const bodyLine = line.slice(position, end);
       position = end + 1;
-      if ((stripTabs ? text.replace(/^\t+/, '') : text) === delimiter) {
+      if ((stripTabs ? bodyLine.replace(/^\t+/, '') : bodyLine) === delimiter) {
         break;
       }
-      body += `${text}\n`;
+      text += `${bodyLine}\n`;
     }
-    if (feedsShell) {
-      commands.push(...splitCommands(body));
-    } else if (!quoted) {
-      commands.push(...substitutedCommands(body));
-    }
-  }
-  return position;
+    return { text, quoted };
+  });
+  return { bodies, end: position };
 }
 
-/** The program and arguments of a simple command, without env assignments, control words, runners and redirections. */
-function commandWords(words) {
+const basename = (word) => word.split('/').pop();
+
+/** The words of a simple command without its redirections and their targets. */
+function withoutRedirections(words) {
   const kept = [];
   for (let i = 0; i < words.length; i++) {
-    const word = words[i];
-    if (REDIRECTION_OPERATOR.test(word)) {
+    if (REDIRECTION_OPERATOR.test(words[i])) {
       i++;
-    } else if (REDIRECTION.test(word)) {
-      // the target is inside the word
-    } else if (kept.length > 0 || !(ENV_ASSIGNMENT.test(word) || COMMAND_PREFIXES.has(word))) {
-      kept.push(word);
+    } else if (!REDIRECTION.test(words[i])) {
+      kept.push(words[i]);
     }
   }
   return kept;
 }
 
-/** True when a simple command is a shell that reads its script on stdin: `bash`, `sh -s`, not `bash -c …` or `bash file.sh`. */
+/** True when a simple command only prints its words (`echo`, `printf`), so a `bd` among them is text, not a program. */
+function onlyPrints(words) {
+  const program = words.find((w) => !ENV_ASSIGNMENT.test(w) && !COMMAND_PREFIXES.has(w));
+  return program !== undefined && PRINTERS.has(basename(program));
+}
+
+/**
+ * True when a simple command runs a shell without `-c`, so the shell may read a script on stdin: `bash`,
+ * `bash -o pipefail`, `sh -s`. A shell given a script file counts too: the file may read stdin.
+ */
 function readsScriptFromStdin(words) {
-  const [program, ...args] = commandWords(words);
-  if (program === undefined || !SHELLS.has(program.split('/').pop()) || args.some((w) => SCRIPT_FLAG.test(w))) {
-    return false;
-  }
-  return args.some((w) => STDIN_FLAG.test(w)) || args.every((w) => w.startsWith('-'));
+  const args = withoutRedirections(words);
+  return !onlyPrints(args) && args.some((word, i) => SHELLS.has(basename(word)) && !args.slice(i + 1).some((w) => SCRIPT_FLAG.test(w)));
 }
 
 /**
@@ -169,7 +167,9 @@ function splitCommands(line) {
   let inWord = false;
   let quote = null;
   let heredocs = [];
+  let pendingBodies = [];
   let lineStart = 0;
+  let lineTextStart = 0;
 
   const endWord = () => {
     if (inWord) {
@@ -195,17 +195,28 @@ function splitCommands(line) {
     inWord = true;
     return end;
   };
-  /** Ends the line whose heredoc bodies start at `start`; returns the index after the bodies. */
-  const endLine = (start) => {
+  /**
+   * Ends the line whose heredoc bodies start at `start`; returns the index after the bodies. A pipeline that
+   * continues (`|`, `&&`) keeps the bodies until it ends, since its shell may come after them. Text a shell reads on
+   * stdin runs as commands, quoted or not; an unquoted body otherwise runs only its substitutions.
+   */
+  const endLine = (start, continues) => {
+    const { bodies, end } = readHeredocBodies(line, start, heredocs);
+    heredocs = [];
+    pendingBodies.push(...bodies);
+    if (continues) {
+      return end;
+    }
     const lineCommands = commands.slice(lineStart);
     const feedsShell = lineCommands.some(readsScriptFromStdin);
-    if (feedsShell) {
-      for (const text of lineCommands.flat().filter((w) => /\s/.test(w))) {
-        commands.push(...splitCommands(text));
-      }
+    const texts = feedsShell ? [...lineCommands.flat().filter((w) => /\s/.test(w)), ...pendingBodies.map((b) => b.text)] : [];
+    for (const text of texts) {
+      commands.push(...splitCommands(text));
     }
-    const end = skipHeredocBodies(line, start, heredocs, commands, feedsShell);
-    heredocs = [];
+    for (const body of feedsShell ? [] : pendingBodies.filter((b) => !b.quoted)) {
+      commands.push(...substitutedCommands(body.text));
+    }
+    pendingBodies = [];
     lineStart = commands.length;
     return end;
   };
@@ -255,7 +266,9 @@ function splitCommands(line) {
     } else if (COMMAND_SEPARATORS.includes(char)) {
       endCommand();
       if (char === '\n') {
-        i = endLine(i + 1) - 1;
+        const continues = /(?:\||&&)$/.test(line.slice(lineTextStart, i).trimEnd());
+        lineTextStart = endLine(i + 1, continues);
+        i = lineTextStart - 1;
       }
     } else {
       word += char;
@@ -263,30 +276,33 @@ function splitCommands(line) {
     }
   }
   endCommand();
-  endLine(line.length);
+  endLine(line.length, false);
   return commands;
 }
 
-/** True when a simple command runs `bd update` with `--notes`, directly or through `eval` or `sh -c`. */
+/**
+ * True when a simple command runs `bd update` with `--notes`, whatever runs it (`env -i`, `time -p`, `xargs`,
+ * `find -exec`), or through `eval` or `sh -c`. The `bd` word is looked for anywhere rather than as the program, so
+ * a runner's options never hide it; only a command that prints its words is left out.
+ */
 function updatesNotes(words) {
-  const [program, ...args] = commandWords(words);
-  if (program === undefined) {
+  const args = withoutRedirections(words);
+  if (onlyPrints(args)) {
     return false;
   }
-  const name = program.split('/').pop();
-
-  if (name === 'eval') {
-    return replacesNotes(args.join(' '));
-  }
-  if (SHELLS.has(name)) {
-    const script = args.findIndex((w) => SCRIPT_FLAG.test(w));
-    return script !== -1 && script + 1 < args.length && replacesNotes(args[script + 1]);
-  }
-  if (name !== 'bd') {
-    return false;
-  }
-  const subcommand = args.find((w) => !w.startsWith('-'));
-  return subcommand === 'update' && args.some((w) => w === '--notes' || w.startsWith('--notes='));
+  return args.some((word, i) => {
+    const name = basename(word);
+    const rest = args.slice(i + 1);
+    if (name === 'eval') {
+      return replacesNotes(rest.join(' '));
+    }
+    if (SHELLS.has(name)) {
+      const script = rest.findIndex((w) => SCRIPT_FLAG.test(w));
+      return script !== -1 && script + 1 < rest.length && replacesNotes(rest[script + 1]);
+    }
+    const subcommand = rest.find((w) => !w.startsWith('-'));
+    return name === 'bd' && subcommand === 'update' && rest.some((w) => w === '--notes' || w.startsWith('--notes='));
+  });
 }
 
 /** True when any command the line runs is `bd update` with `--notes`. */
