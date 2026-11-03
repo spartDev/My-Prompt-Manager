@@ -70,6 +70,10 @@ const MIGRATED = [
   'components/analytics/charts/TimeOfDayChart.tsx'
 ];
 
+// Agent guidance that prescribes classes follows the same rule, or it steers UI work off the tokens
+// (My-Prompt-Manager-192). Paths from the repository root.
+const GUIDANCE = ['.claude/skills/design-system/SKILL.md'];
+
 const PALETTE = 'white|black|slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose';
 const COLOR_UTILITY = 'bg|text|border(?:-[trblxy])?|ring|ring-offset|outline|from|via|to|fill|stroke|divide|placeholder|decoration|shadow|accent|caret';
 
@@ -81,6 +85,13 @@ const DARK_COLOR_VARIANT = new RegExp(`(?<![\\w-])dark:(?:[\\w-]+:)*(?:${COLOR_U
 describe('Components on the color tokens', () => {
   it.each(MIGRATED)('%s uses no raw palette class and no dark: color variant', (file) => {
     const source = readFileSync(path.join(SRC, file), 'utf8');
+
+    expect(source.match(RAW_PALETTE_CLASS) ?? [], 'raw palette classes').toEqual([]);
+    expect(source.match(DARK_COLOR_VARIANT) ?? [], 'dark: color variants').toEqual([]);
+  });
+
+  it.each(GUIDANCE)('%s prescribes no raw palette class and no dark: color variant', (file) => {
+    const source = readFileSync(path.resolve(SRC, '..', file), 'utf8');
 
     expect(source.match(RAW_PALETTE_CLASS) ?? [], 'raw palette classes').toEqual([]);
     expect(source.match(DARK_COLOR_VARIANT) ?? [], 'dark: color variants').toEqual([]);
