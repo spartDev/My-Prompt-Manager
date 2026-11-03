@@ -48,9 +48,10 @@
         "http://*/*"
       ],
       "resources": [
+        "assets/src-content-index.ts-*.js",
         "assets/content-*.js",
+        "assets/rolldown-runtime-*.js",
         "assets/promptAdmission-*.js",
-        "assets/truncate-*.js",
         "assets/promptVariables-*.js",
         "assets/floating-ui.dom-*.js",
         "assets/categoryChip-*.js"
