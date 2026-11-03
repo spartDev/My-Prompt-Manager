@@ -119,9 +119,13 @@ test.describe('Prompt selector on a Platform, on the tokens', () => {
 
       await page.screenshot({ path: `${SCREENSHOT_DIR}/selector-${theme}.png` });
 
+      // :hover follows the pointer's last move: if the item moves under a resting pointer (the selector
+      // is repositioned when the page scrolls or resizes), Chrome keeps the old hit until the pointer moves again
       const hovered = selector.locator('.prompt-item').filter({ hasText: 'Summarize a meeting' });
-      await hovered.hover();
-      await expect(hovered).toHaveCSS('background-color', colors.muted);
+      await expect(async () => {
+        await hovered.hover();
+        await expect(hovered).toHaveCSS('background-color', colors.muted, { timeout: 1_000 });
+      }).toPass();
     });
 
     test(`a Category chip takes the chip rule of its Category color (${theme})`, async ({ context, storage }) => {

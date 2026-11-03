@@ -83,6 +83,8 @@ export class PromptLibraryInjector {
   private readonly cacheTimeout: number = 2000;
   private floatingUICleanups: WeakMap<HTMLElement, () => void>;
   private iconCleanups: Map<HTMLElement, () => void>;
+  /** Counts the calls to showPromptSelector, so a selector still loading when another opens is dropped. */
+  private selectorOpenings = 0;
 
   constructor() {
     const hostname = window.location.hostname || '';
@@ -1722,6 +1724,7 @@ export class PromptLibraryInjector {
    * Shows the prompt selector modal
    */
   async showPromptSelector(targetElement: HTMLElement): Promise<void> {
+    const opening = ++this.selectorOpenings;
     try {
       debug('Showing prompt selector', {
         textareaTag: targetElement.tagName,
@@ -1736,6 +1739,10 @@ export class PromptLibraryInjector {
 
       // Get prompts from storage, Pinned Prompts first (stable within each group), and the Category colors
       const [storedPrompts, categoryColors] = await Promise.all([getPrompts(), getCategoryColors()]);
+      // The icon was clicked again while these loaded: the later opening shows its own selector
+      if (opening !== this.selectorOpenings) {
+        return;
+      }
       const prompts = pinnedFirst(storedPrompts);
       this.state.categoryColors = categoryColors;
       debug('Retrieved prompts for selector', { count: prompts.length });
@@ -1852,19 +1859,24 @@ export class PromptLibraryInjector {
     const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
     const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
     
-    // Temporarily add selector to DOM to measure its dimensions
-    selector.style.visibility = 'hidden';
+    // Measure it in the DOM: a selector not shown yet is added hidden for the measure, an open one
+    // (repositioned on scroll or resize) is measured in place and stays open
+    const isOpen = selector.isConnected;
     selector.style.position = 'absolute';
     selector.style.zIndex = '1000000';
-    document.body.appendChild(selector);
-    
+    if (!isOpen) {
+      selector.style.visibility = 'hidden';
+      document.body.appendChild(selector);
+    }
+
     const selectorRect = selector.getBoundingClientRect();
     const selectorHeight = selectorRect.height;
     const selectorWidth = selectorRect.width;
-    
-    // Remove from DOM temporarily
-    document.body.removeChild(selector);
-    selector.style.visibility = 'visible';
+
+    if (!isOpen) {
+      document.body.removeChild(selector);
+      selector.style.visibility = 'visible';
+    }
     
     // Calculate available space
     const viewportHeight = window.innerHeight;
@@ -2003,8 +2015,12 @@ export class PromptLibraryInjector {
   }
 
   private async insertSelectedPrompt(prompt: Prompt, content: string, targetElement: HTMLElement): Promise<void> {
+    // The selector this Prompt was chosen from: one the user opens meanwhile is not this Insertion's to close
+    const selector = this.state.promptSelector;
     try {
       const result = await this.insertPrompt(targetElement, content);
+      // Close once the text is in, before the use is reported to the service worker
+      this.closePromptSelector(selector);
 
       if (result.success) {
         try {
@@ -2034,7 +2050,7 @@ export class PromptLibraryInjector {
         promptId: prompt.id
       });
     } finally {
-      this.closePromptSelector();
+      this.closePromptSelector(selector);
     }
   }
 
@@ -2190,9 +2206,13 @@ export class PromptLibraryInjector {
   }
 
   /**
-   * Closes the prompt selector
+   * Closes the prompt selector. Given `only`, closes it only while that selector is still the open one.
    */
-  private closePromptSelector(): void {
+  private closePromptSelector(only?: HTMLElement | null): void {
+    if (only !== undefined && this.state.promptSelector !== only) {
+      return;
+    }
+
     if (this.state.promptSelector) {
       this.state.promptSelector.remove();
       this.state.promptSelector = null;
