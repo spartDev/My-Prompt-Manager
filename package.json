@@ -17,9 +17,10 @@
     "test:coverage": "vitest --coverage",
     "lint": "biome check --formatter-enabled=false .",
     "lint:fix": "biome check --write --formatter-enabled=false .",
+    "lint:changed": "scripts/lint-changed.sh",
     "prepare": "if [ \"$CI\" = \"true\" ] || [ -n \"$GITHUB_ACTIONS\" ] || [ -n \"$JENKINS_URL\" ] || [ -n \"$BUILDKITE\" ]; then echo 'CI detected, skipping husky'; else husky; fi",
     "test:e2e": "playwright test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tests/e2e/tsconfig.json"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.4",

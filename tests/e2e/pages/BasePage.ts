@@ -10,7 +10,7 @@ import { type Section, tabNavigation } from '../utils/navigation';
  * should be performed in test files or using utilities from assertions.ts.
  */
 export abstract class BasePage {
-  constructor(protected page: Page) {}
+  constructor(readonly page: Page) {}
 
   /**
    * Wait for the page to be fully loaded

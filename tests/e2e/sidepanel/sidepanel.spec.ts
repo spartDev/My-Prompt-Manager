@@ -47,7 +47,7 @@ test.describe('Side panel experience', () => {
 
     await expect(popupRadio).toHaveAttribute('aria-checked', 'true');
 
-    const storageSnapshot = await context.serviceWorkers()[0].evaluate(() => new Promise((resolve) => {
+    const storageSnapshot = await context.serviceWorkers()[0].evaluate(() => new Promise<{ interfaceMode?: string }>((resolve) => {
       chrome.storage.local.get('interfaceMode', resolve);
     }));
 
@@ -74,7 +74,7 @@ test.describe('Side panel experience', () => {
     // The theme button shows a checkmark when selected, indicating the update is complete
     await sidepanelPage.waitForTimeout(200);
 
-    const storageSnapshot = await context.serviceWorkers()[0].evaluate(() => new Promise((resolve) => {
+    const storageSnapshot = await context.serviceWorkers()[0].evaluate(() => new Promise<{ settings?: { theme?: string } }>((resolve) => {
       chrome.storage.local.get('settings', resolve);
     }));
 

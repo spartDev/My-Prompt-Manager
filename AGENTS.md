@@ -8,7 +8,7 @@ Use the domain terms of `CONTEXT.md` (Prompt, Library, Category, Admission, Verb
 
 ## Done means green
 
-After a code change, `npm test && npm run lint && npm run typecheck` passes before you call the work done.
+After a code change, `npm test && npm run lint && npm run lint:changed && npm run typecheck` passes before you call the work done. `npm run lint` tolerates the warnings `main` already has; `lint:changed` fails on any warning in a file the branch changes, old ones included, so fix those in the files you touch.
 
 A pull request is done when its CI checks are green. The e2e job takes about 10 minutes, longer than a foreground command may run: watch `gh pr checks <number> --watch` in the background.
 

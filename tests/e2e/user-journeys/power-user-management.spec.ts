@@ -347,7 +347,7 @@ test.describe('Power User Prompt Management', () => {
     // Remove File System Access API to force legacy download fallback
     // (showSaveFilePicker opens native OS dialog that Playwright can't interact with)
     await sidepanelPage.evaluate(() => {
-      delete (window as Record<string, unknown>).showSaveFilePicker;
+      Reflect.deleteProperty(window, 'showSaveFilePicker');
     });
 
     // Test export functionality

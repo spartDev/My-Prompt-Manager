@@ -34,7 +34,7 @@ test.describe('Element picker integration', () => {
 
     await page.evaluate(() => {
       const originalSendMessage = chrome.runtime.sendMessage.bind(chrome.runtime);
-      chrome.runtime.sendMessage = (message, responseCallback) => {
+      chrome.runtime.sendMessage = ((message: unknown, responseCallback?: (response: unknown) => void) => {
         if (message && typeof message === 'object' && (message as { type?: string }).type === 'START_ELEMENT_PICKER') {
           responseCallback?.({ success: true });
           return;
@@ -44,7 +44,7 @@ test.describe('Element picker integration', () => {
           message as Parameters<typeof chrome.runtime.sendMessage>[0],
           responseCallback as Parameters<typeof chrome.runtime.sendMessage>[1]
         );
-      };
+      }) as typeof chrome.runtime.sendMessage;
     });
 
     await page.getByRole('button', { name: 'Add Your First Site' }).click();

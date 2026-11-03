@@ -20,6 +20,8 @@ export * from './enhanced-storage';
 export * from './navigation';
 // Storage and data management
 export * from './storage';
+// fixtures/test-data has its own createUsageEventSeed: name the one this index exports
+export { createUsageEventSeed } from './storage';
 export * from './workflows';
 
 /**
