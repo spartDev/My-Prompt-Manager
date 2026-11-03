@@ -75,7 +75,7 @@ See our [Platform Integration Guide](docs/PLATFORM_INTEGRATION.md) to add your o
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) 22+ (LTS recommended)
+- [Node.js](https://nodejs.org/) 22.22.2+, 24.15+ or 26+ (LTS recommended; odd-numbered releases such as 25 are not supported)
 - [Chrome Browser](https://www.google.com/chrome/) 116+
 - [Git](https://git-scm.com/) for cloning the repository
 
