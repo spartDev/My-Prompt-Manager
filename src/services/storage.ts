@@ -274,9 +274,10 @@ export class StorageManager {
         const merged = existing ? { ...existing, ...prompt } : prompt;
 
         // The Library may spell the Prompt's Category differently (`Work` for `work`): the Prompt takes
-        // the stored spelling. The Categories are read raw: the default Category is written only
-        // when the Prompt names it and it is missing (below).
-        const storedCategories = await this.getStorageData<Category[]>(this.STORAGE_KEYS.CATEGORIES);
+        // the stored spelling. The Categories are read raw: the upgrade pass keeps malformed entries
+        // (null, no name), which are skipped here and written back as they are, and the default
+        // Category is written only when the Prompt names it and it is missing (below).
+        const storedCategories = await this.getStorageData<unknown>(this.STORAGE_KEYS.CATEGORIES);
         const incoming = readPrompt(
           typeof merged.category === 'string'
             ? { ...merged, category: matchStoredCategory(merged.category, storedCategories) }
@@ -299,8 +300,10 @@ export class StorageManager {
         // A Category that neither the Backup nor the Library has is created from the name the
         // Prompt gives it, already admitted with the Prompt, so every Prompt names an existing
         // Category (ADR-001). Without a colour, like the default Category.
-        const categories = storedCategories ?? [];
-        const created: Category | undefined = categories.some(c => c.name === admitted.category)
+        const categories: unknown[] = Array.isArray(storedCategories) ? storedCategories : [];
+        const named = (entry: unknown): boolean =>
+          typeof entry === 'object' && entry !== null && 'name' in entry && entry.name === admitted.category;
+        const created: Category | undefined = categories.some(named)
           ? undefined
           : { id: uuidv4(), name: admitted.category };
         const createdSize = created ? storedSize(created) : 0;
@@ -737,9 +740,12 @@ export class StorageManager {
     });
   }
 
-  /** Writes categories and prompts together (one atomic set), prompts typed as above. */
+  /**
+   * Writes categories and prompts together (one atomic set), prompts typed as above. The categories
+   * may hold the malformed entries the upgrade pass keeps, written back as they are.
+   */
   private async writeCategoriesAndPrompts(
-    categories: readonly Category[],
+    categories: readonly unknown[],
     prompts: readonly StoredPrompt[]
   ): Promise<void> {
     await ensureStorageAvailable();

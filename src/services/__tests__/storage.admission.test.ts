@@ -287,6 +287,17 @@ describe('StorageManager Admission', () => {
         ]);
       });
 
+      it.each([
+        ['names a stored Category', 'Work', []],
+        ['names a Category to create', 'Play', [{ id: expect.any(String), name: 'Play' }]]
+      ])('keeps the malformed entries the upgrade pass keeps, when the Prompt %s', async (_case, category, added) => {
+        const categories = [{ id: 'default', name: DEFAULT_CATEGORY }, null, 'text', { id: 7 }, { id: 'c1', name: 'Work' }];
+        await chrome.storage.local.set({ categories });
+
+        expect(await storageManager.importPrompt({ ...backed, category })).toEqual({ ...backed, category });
+        expect(await storedCategories()).toEqual([...categories, ...added]);
+      });
+
       it('creates nothing when the Prompt is refused', async () => {
         await expect(
           storageManager.importPrompt({ ...backed, category: 'Play', content: 'x'.repeat(20_001) })
