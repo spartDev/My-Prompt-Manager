@@ -481,7 +481,7 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
   // Handle clear data
   const handleClearData = async () => {
     try {
-      await chrome.storage.local.clear();
+      await storageManager.clearAllData();
       await loadSettings();
       showToast('All data has been cleared.', 'success');
     } catch (error) {

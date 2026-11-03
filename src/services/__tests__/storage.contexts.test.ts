@@ -47,6 +47,18 @@ describe('StorageManager across contexts', () => {
     });
   };
 
+  /** Makes the next chrome.storage clear slow; resolves when it starts, so the other context can act while it runs. */
+  const slowClear = (): Promise<void> => {
+    const clear = vi.mocked(chrome.storage.local.clear).getMockImplementation() as unknown as () => Promise<void>;
+    return new Promise((started) => {
+      vi.mocked(chrome.storage.local.clear).mockImplementationOnce(async () => {
+        started();
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        return clear();
+      });
+    });
+  };
+
   beforeEach(async () => {
     uninstall = installNavigatorLocks(new FakeLockManager());
     await chrome.storage.local.set({
@@ -124,6 +136,33 @@ describe('StorageManager across contexts', () => {
 
     expect(locks.log.filter((entry) => entry.startsWith('acquire'))).toEqual(['acquire StorageManager:prompts']);
     expect((await chrome.storage.local.get('settings')).settings).toMatchObject({ sortOrder: 'title' });
+  });
+
+  it('Clear All Data in the popup waits for a Prompt the service worker is saving, and clears it too', async () => {
+    const worker = context();
+    const popup = context();
+    slowRead('prompts'); // the worker's read, under the Prompts lock, returns after the popup asked to clear
+
+    await Promise.all([
+      worker.savePrompt({ title: 'Saved meanwhile', content: 'Body', category: DEFAULT_CATEGORY }),
+      popup.clearAllData()
+    ]);
+
+    expect(await chrome.storage.local.get(null)).toEqual({});
+  });
+
+  it('a Prompt the service worker saves while Clear All Data runs in the popup is saved after the clear, alone', async () => {
+    await chrome.storage.local.set({ prompts: [prompt('p1')] });
+    const worker = context();
+    const popup = context();
+    const clearing = slowClear();
+
+    const cleared = popup.clearAllData();
+    await clearing; // the popup is clearing: a read of the Library now would still see p1
+    const saved = await worker.savePrompt({ title: 'Saved meanwhile', content: 'Body', category: DEFAULT_CATEGORY });
+    await cleared;
+
+    expect(await storedPrompts()).toEqual([saved]);
   });
 
   it('a usage count in the service worker cannot overwrite an edit the popup makes meanwhile', async () => {

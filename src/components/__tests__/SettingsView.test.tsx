@@ -371,6 +371,23 @@ describe('SettingsView', () => {
     expect(await screen.findByText('309 Bytes / 10 MB (0%)')).toBeInTheDocument();
   });
 
+  it('clears all data through StorageManager, which takes the storage locks', async () => {
+    const chromeMock = getChromeMockFunctions();
+    const storageMock = getMockStorageManager();
+    const showToastMock = vi.fn();
+
+    await renderSettings(showToastMock);
+    await userEvent.click(await screen.findByRole('button', { name: 'Clear All Data' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Yes, Clear All Data' }));
+
+    await waitFor(() => {
+      expect(showToastMock).toHaveBeenCalledWith('All data has been cleared.', 'success');
+    });
+    expect(storageMock.clearAllData).toHaveBeenCalledTimes(1);
+    // The one clear is StorageManager's: a direct clear would skip the locks another context's write holds
+    expect(chromeMock.storage.local.clear).toHaveBeenCalledTimes(1);
+  });
+
   it('resets settings to defaults after confirmation', async () => {
     const chromeMock = getChromeMockFunctions();
     const storageMock = getMockStorageManager();
