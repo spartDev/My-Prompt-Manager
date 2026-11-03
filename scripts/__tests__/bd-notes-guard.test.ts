@@ -20,6 +20,15 @@ describe('replacesNotes', () => {
     'BEADS_DIR=/repo/.beads bd update My-Prompt-Manager-abc --notes x',
     '/usr/local/bin/bd update My-Prompt-Manager-abc --notes x',
     'bd update My-Prompt-Manager-abc --notes "$(cat <<\'EOF\'\nline one\nEOF\n)"',
+    'result="$(bd update My-Prompt-Manager-abc --notes x)"',
+    'echo "`bd update My-Prompt-Manager-abc --notes x`"',
+    'echo $(bd update My-Prompt-Manager-abc --notes x)',
+    'if bd update My-Prompt-Manager-abc --notes x; then echo updated; fi',
+    'for id in abc def; do bd update "My-Prompt-Manager-$id" --notes x; done',
+    'bash -c \'bd update My-Prompt-Manager-abc --notes x\'',
+    'eval "bd update My-Prompt-Manager-abc --notes x"',
+    'cat <<EOF\n$(bd update My-Prompt-Manager-abc --notes x)\nEOF',
+    'cat > example.txt <<\'EOF\'\nbd update My-Prompt-Manager-abc --notes x\nEOF\nbd update My-Prompt-Manager-abc --notes x',
   ])('blocks %s', (command) => {
     expect(replacesNotes(command)).toBe(true);
   });
@@ -31,6 +40,10 @@ describe('replacesNotes', () => {
     'git commit -m "bd update --notes replaces the notes"',
     'echo bd update My-Prompt-Manager-abc --notes x',
     'bd show My-Prompt-Manager-abc',
+    'cat > example.txt <<\'EOF\'\nbd update My-Prompt-Manager-abc --notes x\nEOF',
+    'cat > example.txt <<-EOF\n\tbd update My-Prompt-Manager-abc --notes x\n\tEOF',
+    'echo done # then bd update My-Prompt-Manager-abc --notes x',
+    'echo "$(bd show My-Prompt-Manager-abc)"',
   ])('lets %s through', (command) => {
     expect(replacesNotes(command)).toBe(false);
   });
