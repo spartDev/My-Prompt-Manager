@@ -197,7 +197,7 @@ function splitCommands(line) {
   };
   /**
    * Ends the line whose heredoc bodies start at `start`; returns the index after the bodies. A pipeline that
-   * continues (`|`, `&&`) keeps the bodies until it ends, since its shell may come after them. Text a shell reads on
+   * continues (`|`, `|&`, `&&`) keeps the bodies until it ends, since its shell may come after them. Text a shell reads on
    * stdin runs as commands, quoted or not; an unquoted body otherwise runs only its substitutions.
    */
   const endLine = (start, continues) => {
@@ -252,7 +252,12 @@ function splitCommands(line) {
       while (i + 1 < line.length && line[i + 1] !== '\n') {
         i++;
       }
-    } else if (char === '<' && line[i + 1] === '<' && line[i + 2] !== '<') {
+    } else if (line.startsWith('<<<', i)) {
+      // a here-string: its text is the next word, scanned like any text a shell reads on stdin
+      endWord();
+      words.push('<<<');
+      i += 2;
+    } else if (line.startsWith('<<', i)) {
       endWord();
       const { heredoc, end } = readHeredoc(line, i + 2);
       heredocs.push(heredoc);
@@ -266,7 +271,7 @@ function splitCommands(line) {
     } else if (COMMAND_SEPARATORS.includes(char)) {
       endCommand();
       if (char === '\n') {
-        const continues = /(?:\||&&)$/.test(line.slice(lineTextStart, i).trimEnd());
+        const continues = /(?:\||\|&|&&)$/.test(line.slice(lineTextStart, i).trimEnd());
         lineTextStart = endLine(i + 1, continues);
         i = lineTextStart - 1;
       }

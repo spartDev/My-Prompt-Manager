@@ -44,6 +44,9 @@ describe('replacesNotes', () => {
     'find . -name x -exec bd update My-Prompt-Manager-abc --notes x \\;',
     'bash -o pipefail <<\'EOF\'\nbd update My-Prompt-Manager-abc --notes x\nEOF',
     'cat <<\'EOF\' |\nbd update My-Prompt-Manager-abc --notes x\nEOF\nbash',
+    'bash <<< \'bd update My-Prompt-Manager-abc --notes x\'',
+    'bash <<<\'bd update My-Prompt-Manager-abc --notes x\'',
+    'cat <<\'EOF\' |&\nbd update My-Prompt-Manager-abc --notes x\nEOF\nbash',
   ])('blocks %s', (command) => {
     expect(replacesNotes(command)).toBe(true);
   });
@@ -64,6 +67,7 @@ describe('replacesNotes', () => {
     'npm test > out.log 2>&1; bd update My-Prompt-Manager-abc --append-notes "tests pass"',
     'printf "%s\\n" bd update My-Prompt-Manager-abc --notes x',
     'cat <<\'EOF\' |\nbd update My-Prompt-Manager-abc --notes x\nEOF\ntee notes.txt',
+    'grep -c notes <<< \'bd update My-Prompt-Manager-abc --notes x\'',
   ])('lets %s through', (command) => {
     expect(replacesNotes(command)).toBe(false);
   });
