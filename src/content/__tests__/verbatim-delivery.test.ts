@@ -48,13 +48,11 @@ describe('Prompt text reaches the chat exactly as saved', () => {
     document.execCommand = vi.fn().mockReturnValue(false);
   });
 
-  afterEach(async () => {
+  afterEach(() => {
     injector?.cleanup();
     input?.remove();
     document.body.innerHTML = '';
     document.head.innerHTML = '';
-    // Let the selector's delayed outside-click setup finish
-    await new Promise((resolve) => setTimeout(resolve, 150));
   });
 
   const save = (content: string, title = 'Q&A / "FAQ"') =>

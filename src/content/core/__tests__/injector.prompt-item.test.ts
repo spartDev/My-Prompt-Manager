@@ -107,12 +107,10 @@ describe('Prompt selector: choosing a Prompt', () => {
     await injector.showPromptSelector(textarea);
   });
 
-  afterEach(async () => {
+  afterEach(() => {
     injector.cleanup();
     textarea.remove();
     document.body.innerHTML = '';
-    // Let the selector's delayed outside-click setup finish
-    await new Promise((resolve) => setTimeout(resolve, 150));
   });
 
   it('should show the Prompt text as saved, and the id unchanged in the attribute', () => {
