@@ -3,7 +3,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 
 import { StorageManager } from '../services/storage';
 import { Logger, toError } from '../utils';
-import { describeStorageUsage } from '../utils/storageQuota';
+import { describeStorageUsage, type StorageWarningLevel } from '../utils/storageQuota';
 
 import ConfirmDialog from './ConfirmDialog';
 
@@ -35,7 +35,7 @@ const StorageWarning: FC<StorageWarningProps> = ({ reason, onClose }) => {
     used: number;
     total: number;
     percentage: number;
-    warningLevel: 'safe' | 'warning' | 'critical' | 'danger';
+    warningLevel: StorageWarningLevel;
   } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);

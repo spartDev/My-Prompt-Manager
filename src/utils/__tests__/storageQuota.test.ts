@@ -35,6 +35,16 @@ describe('StorageQuota Utils', () => {
       expect(result.reason).toMatch(/Insufficient storage space/);
     });
 
+    // The storage warning shows this reason under the sizes of describeStorageUsage: one format for both
+    it('gives the sizes in its reason as the storage warning shows them', () => {
+      const result = checkQuotaAvailability(1536, totalQuota - 512, totalQuota);
+
+      expect(result.reason).toBe(
+        `Insufficient storage space. Need ${describeStorageUsage(1536, totalQuota).used} but only ${describeStorageUsage(512, totalQuota).used} available.`
+      );
+      expect(result.reason).toBe('Insufficient storage space. Need 1.5 KB but only 512 Bytes available.');
+    });
+
     it('should deny write when exceeding danger threshold', () => {
       // DANGER threshold is 0.98
       const currentUsage = 0.97 * totalQuota;
@@ -76,25 +86,17 @@ describe('StorageQuota Utils', () => {
   });
 
   describe('formatBytes', () => {
-    it('should format 0 bytes', () => {
-      expect(formatBytes(0)).toBe('0 B');
+    it('formats zero and a few bytes in Bytes', () => {
+      expect(formatBytes(0)).toBe('0 Bytes');
+      expect(formatBytes(500)).toBe('500 Bytes');
     });
 
-    it('should format bytes', () => {
-      expect(formatBytes(500)).toBe('500.00 B');
-    });
-
-    it('should format KB', () => {
-      expect(formatBytes(1024)).toBe('1.00 KB');
-      expect(formatBytes(1536)).toBe('1.50 KB');
-    });
-
-    it('should format MB', () => {
-      expect(formatBytes(1024 * 1024)).toBe('1.00 MB');
-    });
-
-    it('should format GB', () => {
-      expect(formatBytes(1024 * 1024 * 1024)).toBe('1.00 GB');
+    it('formats KB, MB and GB with at most two decimals and no trailing zeros', () => {
+      expect(formatBytes(1024)).toBe('1 KB');
+      expect(formatBytes(1536)).toBe('1.5 KB');
+      expect(formatBytes(19_200)).toBe('18.75 KB');
+      expect(formatBytes(1024 * 1024)).toBe('1 MB');
+      expect(formatBytes(1024 * 1024 * 1024)).toBe('1 GB');
     });
   });
 

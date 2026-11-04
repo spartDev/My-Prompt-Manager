@@ -15,6 +15,8 @@ import { AsyncMutex } from '../utils/asyncMutex';
 import { ensureStorageAvailable } from '../utils/chromeStorage';
 import {
   checkQuotaAvailability,
+  type StorageWarningLevel,
+  storageWarningLevel,
   storedSize
 } from '../utils/storageQuota';
 
@@ -86,7 +88,7 @@ export class StorageManager {
   }
 
   // Prompt operations
-  async savePrompt(prompt: Omit<Prompt, 'id' | 'createdAt' | 'updatedAt' | 'usageCount' | 'lastUsedAt'>): Promise<Prompt> {
+  savePrompt(prompt: Omit<Prompt, 'id' | 'createdAt' | 'updatedAt' | 'usageCount' | 'lastUsedAt'>): Promise<Prompt> {
     return this.mutex.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
       try {
         // Admission: remove Hidden characters, trim, refuse empty/over-limit text (ADR-001).
@@ -135,7 +137,7 @@ export class StorageManager {
     }
   }
 
-  async updatePrompt(id: string, updates: PromptTextPatch): Promise<Prompt> {
+  updatePrompt(id: string, updates: PromptTextPatch): Promise<Prompt> {
     return this.mutex.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
       try {
         const existingPrompts = await this.getPrompts();
@@ -171,7 +173,7 @@ export class StorageManager {
     });
   }
 
-  async deletePrompt(id: string): Promise<void> {
+  deletePrompt(id: string): Promise<void> {
     return this.mutex.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
       try {
         const existingPrompts = await this.getPrompts();
@@ -188,7 +190,7 @@ export class StorageManager {
     });
   }
 
-  async incrementUsageCount(id: string): Promise<Prompt> {
+  incrementUsageCount(id: string): Promise<Prompt> {
     return this.mutex.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
       try {
         const existingPrompts = await this.getPrompts();
@@ -212,7 +214,7 @@ export class StorageManager {
 
   // Pinning is a personal preference, not an edit: it leaves updatedAt untouched.
   // The pin is read under the lock, so rapid toggles never act on a stale value.
-  async togglePinned(id: string): Promise<Prompt> {
+  togglePinned(id: string): Promise<Prompt> {
     return this.mutex.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
       try {
         const existingPrompts = await this.getPrompts();
@@ -235,7 +237,7 @@ export class StorageManager {
   }
 
   // Category operations
-  async saveCategory(category: Omit<Category, 'id'>): Promise<Category> {
+  saveCategory(category: Omit<Category, 'id'>): Promise<Category> {
     return this.mutex.withLock(this.STORAGE_KEYS.CATEGORIES, async () => {
       try {
         const newCategory: Category = {
@@ -262,7 +264,7 @@ export class StorageManager {
   }
 
   // Import operations for backup/restore functionality
-  async importPrompt(prompt: Prompt): Promise<Prompt> {
+  importPrompt(prompt: Prompt): Promise<Prompt> {
     // CATEGORIES before PROMPTS (lock order): the Prompt may name a Category that has to be created
     return this.mutex.withLock(this.STORAGE_KEYS.CATEGORIES, () => this.mutex.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
       try {
@@ -345,7 +347,7 @@ export class StorageManager {
     }));
   }
 
-  async importCategory(incoming: Category): Promise<Category> {
+  importCategory(incoming: Category): Promise<Category> {
     return this.mutex.withLock(this.STORAGE_KEYS.CATEGORIES, async () => {
       try {
         // Admission: the name is admitted like every other Category name. A Category from a Backup
@@ -449,7 +451,7 @@ export class StorageManager {
     return withDefault;
   }
 
-  async updateCategory(id: string, updates: Partial<Omit<Category, 'id'>>): Promise<Category> {
+  updateCategory(id: string, updates: Partial<Omit<Category, 'id'>>): Promise<Category> {
     // Lock CATEGORIES first (always modified), then PROMPTS if name changes
     return this.mutex.withLock(this.STORAGE_KEYS.CATEGORIES, async () => {
       try {
@@ -665,23 +667,13 @@ export class StorageManager {
     used: number;
     total: number;
     percentage: number;
-    warningLevel: 'safe' | 'warning' | 'critical' | 'danger';
+    warningLevel: StorageWarningLevel;
   }> {
     try {
       const usage = await chrome.storage.local.getBytesInUse();
       const quota = chrome.storage.local.QUOTA_BYTES;
       const percentage = (usage / quota) * 100;
-
-      let warningLevel: 'safe' | 'warning' | 'critical' | 'danger';
-      if (percentage < 70) {
-        warningLevel = 'safe';
-      } else if (percentage < 85) {
-        warningLevel = 'warning';
-      } else if (percentage < 95) {
-        warningLevel = 'critical';
-      } else {
-        warningLevel = 'danger';
-      }
+      const warningLevel = storageWarningLevel(usage, quota);
 
       return {
         used: usage,

@@ -48,7 +48,6 @@ Which component does which job in the popup and the side panel, and the conventi
 | `src/components/ToastContainer.tsx` | Renders the toasts of `useToast` |
 | `src/components/StorageWarning.tsx` | "Storage Limit Reached": App opens it when storage refuses a save (`STORAGE_QUOTA_EXCEEDED`); usage is shown through `describeStorageUsage`, like the Settings storage bar |
 | `src/components/ColorPicker.tsx` | Category color: the presets of `src/constants/colors.ts`, or a custom hex ([CATEGORY_COLOR_IMPLEMENTATION.md](./CATEGORY_COLOR_IMPLEMENTATION.md)) |
-| `src/components/ThemeToggle.tsx` | Light / dark / system, through `useThemeContext` |
 | `src/components/InterfaceModeSelector.tsx` | Popup or side panel |
 | `src/components/ErrorBoundary.tsx` | Catches a render error and shows a fallback instead of a blank popup |
 

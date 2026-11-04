@@ -39,7 +39,6 @@ const MIGRATED = [
   'components/settings/ToggleSwitch.tsx',
   'components/settings/AppearanceSection.tsx',
   'components/InterfaceModeSelector.tsx',
-  'components/ThemeToggle.tsx',
   'components/settings/LibrarySection.tsx',
   'components/settings/DataStorageSection.tsx',
   'components/settings/NotificationSection.tsx',
