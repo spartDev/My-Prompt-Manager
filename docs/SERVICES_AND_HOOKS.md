@@ -13,13 +13,22 @@ React components
 Services (src/services/): PromptManager, ConfigurationEncoder, promptEncoder, libraryFilter…
    │
    ▼
-StorageManager (src/services/storage.ts): the only writer of chrome.storage.local
+StorageManager (src/services/storage.ts): the only writer of the Prompts, Categories and settings
    │  Admission (src/services/promptAdmission.ts) on every write of Prompt text
    ▼
 chrome.storage.local
 ```
 
 The popup, the side panel and the service worker each have their own `StorageManager` instance, and share the stored data. The content script reads Prompts with `readPrompts()` of `promptAdmission.ts`, and never writes them.
+
+Other keys of `chrome.storage.local` belong to the code that owns them, which writes them directly:
+
+| Key | Owner |
+|-----|-------|
+| `usageHistory` | `src/services/UsageTracker.ts` |
+| `toast_settings` | `src/hooks/useToast.ts` |
+| `promptLibrarySettings` (site integration settings), `interfaceMode` | `src/components/SettingsView.tsx` |
+| `grantedPermissions` | `src/background/background.ts` |
 
 ---
 
@@ -116,7 +125,7 @@ Components read the theme through `useThemeContext()` of `src/contexts/ThemeCont
 
 ## Adding a service or hook
 
-1. Write to storage only through `StorageManager`; a new route that brings Prompt text into the Library goes through an Admission route.
+1. Write the Prompts, the Categories and the settings only through `StorageManager`; a new route that brings Prompt text into the Library goes through an Admission route. Another key belongs to the one module that owns it: add it to the table of owners above.
 2. Take locks in the order CATEGORIES → PROMPTS → SETTINGS, and await nothing from another context under a lock.
 3. Test it in the `__tests__/` folder next to it ([TESTING.md](./TESTING.md)).
 4. Add a row to the table of this page: one line on its job, no signature.
