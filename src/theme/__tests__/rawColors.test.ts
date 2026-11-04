@@ -71,7 +71,7 @@ const MIGRATED = [
 
 // Agent guidance that prescribes classes follows the same rule, or it steers UI work off the tokens
 // (My-Prompt-Manager-192). Paths from the repository root.
-const GUIDANCE = ['.claude/skills/design-system/SKILL.md'];
+const GUIDANCE = ['.claude/skills/design-system/SKILL.md', '.claude/skills/add-platform/SKILL.md'];
 
 const PALETTE = 'white|black|slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose';
 const COLOR_UTILITY = 'bg|text|border(?:-[trblxy])?|ring|ring-offset|outline|from|via|to|fill|stroke|divide|placeholder|decoration|shadow|accent|caret';

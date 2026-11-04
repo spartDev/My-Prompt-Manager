@@ -18,6 +18,7 @@
     "lint": "biome check --formatter-enabled=false .",
     "lint:fix": "biome check --write --formatter-enabled=false .",
     "lint:changed": "scripts/lint-changed.sh",
+    "lint:renovate": "npx -y --package renovate@44.197.1 renovate-config-validator --strict",
     "prepare": "node scripts/prepare.mjs",
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tests/e2e/tsconfig.json && tsc --noEmit -p tsconfig.node.json"

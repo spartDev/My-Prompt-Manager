@@ -1,6 +1,6 @@
 # Category Colors
 
-How a Category's color is offered, stored and drawn. Code: `src/constants/colors.ts`. Visual reference (light and dark side by side): the palette canvas linked from beads epic `My-Prompt-Manager-el4`.
+How a Category's color is offered, stored and drawn. Code: the chip (soft badge) rule and its contrast safety net live in `src/theme/categoryChip.ts`; the preset palette and the contrast helpers in `src/constants/colors.ts`. Visual reference (light and dark side by side): the palette canvas linked from beads epic `My-Prompt-Manager-el4`.
 
 Category colors are **user data, not tokens**: each Category stores one hex color, the same in both modes. The UI tokens of `src/theme/tokens.css` never depend on it (see [DESIGN_GUIDELINES.md](./DESIGN_GUIDELINES.md#color-system)).
 

@@ -56,20 +56,22 @@ See our [Platform Integration Guide](docs/PLATFORM_INTEGRATION.md) to add your o
 
 ## 💻 Tech Stack
 
-| Technology | Purpose | Version |
-|------------|---------|---------|
-| **React** | UI Framework | 19.2.3 |
-| **TypeScript** | Type Safety | 5.9.3 |
-| **Tailwind CSS** | Styling | 4.1.17 |
-| **Vite** | Build Tool | 7.3.1 |
-| **Vitest** | Testing Framework | 4.0.17 |
-| **DOMPurify** | XSS Protection | 3.3.1 |
-| **Husky** | Git Hooks | 9.1.7 |
-| **@crxjs/vite-plugin** | Chrome Extension Support | 2.3.0 |
-| **Recharts** | Analytics Charts | 3.6.0 |
-| **@floating-ui/dom** | Floating UI | 1.7.4 |
-| **uuid** | UUID Generation | 13.0.0 |
-| **lz-string** | String Compression | 1.5.0 |
+| Technology | Purpose |
+|------------|---------|
+| **React** | UI Framework |
+| **TypeScript** | Type Safety |
+| **Tailwind CSS** | Styling |
+| **Vite** | Build Tool |
+| **Vitest** | Testing Framework |
+| **DOMPurify** | XSS Protection |
+| **Husky** | Git Hooks |
+| **@crxjs/vite-plugin** | Chrome Extension Support |
+| **Recharts** | Analytics Charts |
+| **@floating-ui/dom** | Floating UI |
+| **uuid** | UUID Generation |
+| **lz-string** | String Compression |
+
+Versions: `package.json`.
 
 ## 📦 Installation
 
