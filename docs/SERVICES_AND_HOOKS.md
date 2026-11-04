@@ -21,6 +21,8 @@ chrome.storage.local
 
 The popup, the side panel and the service worker each have their own `StorageManager` instance, and share the stored data. The content script reads Prompts with `readPrompts()` of `promptAdmission.ts`, and never writes them.
 
+One exception: the reset action of `src/components/ErrorBoundary.tsx` calls `chrome.storage.local.clear()` directly, outside `StorageManager` and its locks, so it is not serialized with other writes. `clearAllData()` of `StorageManager` is the serialized way to clear.
+
 Other keys of `chrome.storage.local` belong to the code that owns them, which writes them directly:
 
 | Key | Owner |
