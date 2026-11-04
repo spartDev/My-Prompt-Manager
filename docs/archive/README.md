@@ -38,6 +38,15 @@ Contains:
 - Onboarding new team members
 - Product roadmap context
 
+### One-off reports and plans (archived 2026-11, My-Prompt-Manager-uxu.10)
+
+Linked from nowhere and out of date; kept for history, not as a reference for current code. Their paths and numbers describe the code of the day they were written.
+
+- `ACCESSIBLE_COLOR_CONTRAST_GUIDE.md`: a generic WCAG contrast guide (October 2025). Current rule: `docs/DESIGN_GUIDELINES.md` and `src/theme/categoryChip.ts`.
+- `ANALYTICS_IMPLEMENTATION_PLAN.md`: the analytics plan; most of the `src/` paths it cites never existed under those names.
+- `AUDIT_AREAS.md`, `AUDIT_SERVICES_CORE_BUSINESS_LOGIC.md`: one-off code audits.
+- `PR_156_PERFORMANCE_ANALYSIS.md`: the performance analysis of PR #156.
+
 ## Current Documentation
 
 For up-to-date technical documentation, see:
