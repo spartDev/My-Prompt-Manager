@@ -13,7 +13,10 @@ const COMPONENTS = path.resolve(__dirname, '..');
 
 /** role="radio", role={'radio'}, role={"radio"}; not radiogroup */
 const RADIO_ROLE = /\brole=\{?\s*["'`]radio["'`]/;
+const RADIO_ROLES = new RegExp(RADIO_ROLE.source, 'g');
 const USES_HOOK = /\buseRadioGroup\s*\(/;
+/** {...getRadioProps(index)} on a radio element */
+const RADIO_PROPS_SPREADS = /\{\s*\.\.\.\s*(?:\w+\.)?getRadioProps\s*\(/g;
 
 const sourceFiles = (dir: string): string[] =>
   readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -22,8 +25,16 @@ const sourceFiles = (dir: string): string[] =>
     return /\.tsx?$/.test(entry.name) ? [full] : [];
   });
 
-/** True when a source renders radios with hand-written keyboard handling */
-const radiosWithoutHook = (source: string): boolean => RADIO_ROLE.test(source) && !USES_HOOK.test(source);
+/**
+ * True when a source renders a radio with hand-written keyboard handling: it has no useRadioGroup call,
+ * or fewer {...getRadioProps()} spreads than role="radio" elements (a second group beside a hooked one)
+ */
+const radiosWithoutHook = (source: string): boolean => {
+  const radios = source.match(RADIO_ROLES)?.length ?? 0;
+  if (radios === 0) { return false; }
+  const spreads = source.match(RADIO_PROPS_SPREADS)?.length ?? 0;
+  return !USES_HOOK.test(source) || spreads < radios;
+};
 
 const RADIO_FILES = sourceFiles(COMPONENTS)
   .filter(file => RADIO_ROLE.test(readFileSync(file, 'utf8')))
@@ -49,9 +60,17 @@ describe('Radio groups in src/components', () => {
     expect(radiosWithoutHook(withHook)).toBe(false);
   });
 
+  it('flags a hand-written radio group beside one that uses the hook', () => {
+    const secondGroup = `const { getRadioProps } = useRadioGroup({ options, selectedIndex, onSelect });
+      <button role="radio" aria-checked={on} {...getRadioProps(0)} />
+      <button role="radio" aria-checked={size === 'small'} onKeyDown={handleArrows} />`;
+
+    expect(radiosWithoutHook(secondGroup)).toBe(true);
+  });
+
   it.each(RADIO_FILES)('%s takes its keyboard behavior from useRadioGroup', (file) => {
     const source = readFileSync(path.join(COMPONENTS, file), 'utf8');
 
-    expect(radiosWithoutHook(source), `${file} renders role="radio" without useRadioGroup`).toBe(false);
+    expect(radiosWithoutHook(source), `${file} renders a role="radio" without {...getRadioProps()} from useRadioGroup`).toBe(false);
   });
 });

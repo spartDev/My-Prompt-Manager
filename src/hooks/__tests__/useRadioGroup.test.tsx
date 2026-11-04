@@ -34,6 +34,21 @@ const Group: FC<GroupProps> = ({ initial = 'Light', locked = false, onSelect }) 
   );
 };
 
+type RadioElements = ReturnType<typeof useRadioGroup>['radios'];
+
+/** Hands the radio elements of its group to the test */
+const Probe: FC<{ onRadios: (radios: RadioElements) => void }> = ({ onRadios }) => {
+  const { getRadioProps, radios } = useRadioGroup({ options: OPTIONS, selectedIndex: 0, onSelect: () => undefined });
+  onRadios(radios);
+  return (
+    <>
+      {OPTIONS.map((option, index) => (
+        <button key={option} type="button" role="radio" aria-checked={index === 0} {...getRadioProps(index)}>{option}</button>
+      ))}
+    </>
+  );
+};
+
 const radio = (name: Option) => screen.getByRole('radio', { name });
 const tabStops = () => screen.getAllByRole('radio').filter(element => element.tabIndex === 0);
 
@@ -113,13 +128,8 @@ describe('useRadioGroup', () => {
   });
 
   it('exposes the radio elements by index', () => {
-    let radios: ReturnType<typeof useRadioGroup>['radios'] | undefined;
-    const Probe: FC = () => {
-      const group = useRadioGroup({ options: OPTIONS, selectedIndex: 0, onSelect: vi.fn() });
-      radios = group.radios;
-      return <>{OPTIONS.map((option, index) => <button key={option} role="radio" aria-checked={index === 0} {...group.getRadioProps(index)}>{option}</button>)}</>;
-    };
-    render(<Probe />);
+    let radios: RadioElements | undefined;
+    render(<Probe onRadios={(elements) => { radios = elements; }} />);
 
     expect(radios?.current[2]).toBe(radio('System'));
   });
