@@ -1,7 +1,8 @@
-import type { FC, KeyboardEvent } from 'react';
+import type { FC } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { DEFAULT_CATEGORY_COLOR } from '../constants/colors';
+import { useRadioGroup } from '../hooks/useRadioGroup';
 import { ALL_PROMPTS } from '../services/libraryFilter';
 import type { Category, LibraryFilter } from '../types';
 
@@ -37,12 +38,10 @@ const filterKey = (filter: LibraryFilter): string =>
 
 /**
  * The Library filter as a row of pills that scrolls sideways: All, Pinned, Most Used,
- * then one pill per Category. Implements the WAI-ARIA radio group pattern
- * (roving tabindex; all four arrow keys, Home and End move the selection).
+ * then one pill per Category. A WAI-ARIA radio group (useRadioGroup).
  */
 const LibraryFilterBar: FC<LibraryFilterBarProps> = ({ categories, activeFilter, onChange, disabled = false }) => {
   const rowRef = useRef<HTMLDivElement>(null);
-  const pillRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [fades, setFades] = useState({ start: false, end: false });
 
   const options: FilterOption[] = [
@@ -92,11 +91,17 @@ const LibraryFilterBar: FC<LibraryFilterBarProps> = ({ categories, activeFilter,
     return () => { observer.disconnect(); };
   }, [updateFades]);
 
-  // Keep the active pill fully visible, clear of the edge fades
   const activeIndex = options.findIndex(option => option.key === activeKey);
+  const { getRadioProps, radios: pills } = useRadioGroup({
+    options,
+    selectedIndex: activeIndex,
+    onSelect: (option) => { onChange(option.filter); }
+  });
+
+  // Keep the active pill fully visible, clear of the edge fades
   useEffect(() => {
     const row = rowRef.current;
-    const pill = pillRefs.current[activeIndex];
+    const pill = pills.current[activeIndex];
     if (!row || !pill) { return; }
     const start = pill.offsetLeft - FADE_WIDTH;
     const end = pill.offsetLeft + pill.offsetWidth + FADE_WIDTH;
@@ -106,20 +111,7 @@ const LibraryFilterBar: FC<LibraryFilterBarProps> = ({ categories, activeFilter,
       row.scrollLeft = end - row.clientWidth;
     }
     updateFades();
-  }, [activeIndex, updateFades]);
-
-  const handleKeyDown = (e: KeyboardEvent<HTMLButtonElement>, index: number) => {
-    let nextIndex: number | null = null;
-    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { nextIndex = (index + 1) % options.length; }
-    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { nextIndex = (index - 1 + options.length) % options.length; }
-    if (e.key === 'Home') { nextIndex = 0; }
-    if (e.key === 'End') { nextIndex = options.length - 1; }
-    if (nextIndex === null) { return; }
-
-    e.preventDefault();
-    pillRefs.current[nextIndex]?.focus();
-    onChange(options[nextIndex].filter);
-  };
+  }, [activeIndex, pills, updateFades]);
 
   return (
     <div className="relative -mx-6">
@@ -136,16 +128,13 @@ const LibraryFilterBar: FC<LibraryFilterBarProps> = ({ categories, activeFilter,
           return (
             <button
               key={option.key}
-              ref={(el) => { pillRefs.current[index] = el; }}
+              {...getRadioProps(index)}
               type="button"
               role="radio"
               aria-checked={isActive}
-              tabIndex={isActive ? 0 : -1}
               disabled={disabled}
               title={option.filter.kind === 'category' ? option.label : undefined}
               data-testid={`library-filter-${option.key}`}
-              onClick={() => { onChange(option.filter); }}
-              onKeyDown={(e) => { handleKeyDown(e, index); }}
               className={`shrink-0 h-8 px-3 inline-flex items-center gap-1.5 rounded-full border text-sm whitespace-nowrap transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50 disabled:cursor-not-allowed ${
                 isActive
                   ? 'bg-accent-selected border-accent text-accent-strong font-semibold'
