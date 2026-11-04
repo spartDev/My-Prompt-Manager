@@ -7,11 +7,27 @@
  * Storage quota thresholds for different warning levels
  */
 export const QUOTA_THRESHOLDS = {
-  SAFE: 0.7,      // 70% - Safe to write
-  WARNING: 0.85,  // 85% - Show warning
-  CRITICAL: 0.95, // 95% - Block non-critical writes
+  SAFE: 0.7,      // 70% - Below it the warning level is 'safe'; from it, 'warning'
+  WARNING: 0.85,  // 85% - From it, 'critical'
+  CRITICAL: 0.95, // 95% - From it, 'danger'
   DANGER: 0.98    // 98% - Block all writes
 } as const;
+
+export type StorageWarningLevel = 'safe' | 'warning' | 'critical' | 'danger';
+
+/**
+ * How full Chrome storage is, by QUOTA_THRESHOLDS: SAFE, WARNING and CRITICAL each start the next level
+ *
+ * @param used Bytes in use, as chrome.storage.local.getBytesInUse counts them
+ * @param total The quota, chrome.storage.local.QUOTA_BYTES
+ */
+export function storageWarningLevel(used: number, total: number): StorageWarningLevel {
+  const share = used / total;
+  if (share < QUOTA_THRESHOLDS.SAFE) {return 'safe';}
+  if (share < QUOTA_THRESHOLDS.WARNING) {return 'warning';}
+  if (share < QUOTA_THRESHOLDS.CRITICAL) {return 'critical';}
+  return 'danger';
+}
 
 /**
  * Check if there's enough quota available before writing data
@@ -94,28 +110,16 @@ export function storedSize(value: unknown): number {
 }
 
 /**
- * Format bytes to human-readable string
+ * A size as every storage display shows it, the refusal reasons included: "0 Bytes", "1.5 KB", "10 MB"
  *
  * @param bytes Number of bytes
- * @returns Formatted string (e.g., "1.5 MB", "256 KB")
  */
 export function formatBytes(bytes: number): string {
-  if (bytes === 0) {return '0 B';}
-
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-
-  return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
-}
-
-/** A size as the storage displays show it: "0 Bytes", "1.5 KB", "10 MB" */
-const formatStorageSize = (bytes: number): string => {
   if (bytes === 0) {return '0 Bytes';}
   const sizes = ['Bytes', 'KB', 'MB', 'GB'];
   const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), sizes.length - 1);
   return `${String(parseFloat((bytes / 1024 ** i).toFixed(2)))} ${sizes[i]}`;
-};
+}
 
 /**
  * Chrome storage use as the Settings bar and the storage warning both show it, so they never disagree:
@@ -127,7 +131,7 @@ const formatStorageSize = (bytes: number): string => {
 export function describeStorageUsage(used: number, total: number): { percentage: number; used: string; total: string } {
   return {
     percentage: total > 0 ? Math.min(Math.round((used / total) * 100), 100) : 0,
-    used: formatStorageSize(used),
-    total: formatStorageSize(total)
+    used: formatBytes(used),
+    total: formatBytes(total)
   };
 }

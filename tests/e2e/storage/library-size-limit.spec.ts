@@ -161,6 +161,49 @@ test.describe('Library size in Chrome storage', () => {
     });
 
 
+    // My-Prompt-Manager-qja: with Chrome storage itself full, the warning shows the quota check's reason,
+    // and its sizes read like the sizes under the bar ("3.6 KB", "512 Bytes"), not "3.60 KB" or "512.00 B"
+    test(`a save refused by Chrome's quota gives its sizes in the warning's own format (${theme})`, async ({ page, storage, extensionId }) => {
+      await seedLibrary(storage, { prompts: [createPromptSeed({ id: 'meeting', title: 'Résumé de réunion', content: 'Résume la transcription ci-dessous.' })], settings: { theme } });
+      await page.setViewportSize({ width: 400, height: 600 });
+      await page.goto(`chrome-extension://${extensionId}/src/popup.html`);
+      await expect(page.getByTestId('prompt-card').first()).toBeVisible();
+      await expect(page.locator('html')).toHaveClass(theme === 'dark' ? /dark/ : /^(?!.*dark)/);
+
+      // Once the writes that follow a load have landed, fill Chrome storage up to 512 bytes of its quota
+      let previous = -1;
+      await expect.poll(async () => {
+        const now = await chromeBytesInUse(page);
+        const settled = now === previous;
+        previous = now;
+        return settled;
+      }, { intervals: [500] }).toBe(true);
+      const available = await page.evaluate(async () => {
+        const free = chrome.storage.local.QUOTA_BYTES - (await chrome.storage.local.getBytesInUse());
+        // Chrome counts the key and the two quotes of the JSON string
+        await chrome.storage.local.set({ filler: 'z'.repeat(free - 512 - 'filler'.length - 2) });
+        return chrome.storage.local.QUOTA_BYTES - (await chrome.storage.local.getBytesInUse());
+      });
+      expect(available).toBe(512);
+
+      await page.getByTestId('new-prompt-button').click();
+      await page.getByLabel('Content *').fill('Résume la transcription ci-dessous. '.repeat(100));
+      await page.getByRole('button', { name: 'Save Prompt' }).click();
+
+      const warning = page.getByRole('dialog', { name: 'Storage Limit Reached' });
+      await expect(warning).toBeVisible();
+      const usage = describeStorageUsage(await chromeBytesInUse(page), await page.evaluate(() => chrome.storage.local.QUOTA_BYTES));
+      // Chrome storage is full: in use and the quota both read "10 MB"
+      expect(usage).toEqual({ percentage: 100, used: '10 MB', total: '10 MB' });
+      await expect(warning.getByText('10 MB', { exact: true })).toHaveCount(2);
+      await expect(warning.getByText(
+        /^Insufficient storage space\. Need \d+(\.\d{1,2})? KB but only 512 Bytes available\.$/
+      )).toBeVisible();
+      // No size padded with zeros, as the other formatter wrote them ("3.70 KB", "512.00 B")
+      await expect(warning.getByText(/\d\.\d0 |\d B\b/)).toHaveCount(0);
+      await page.screenshot({ path: `${SCREENSHOT_DIR}/quota-refusal-reason-${theme}.png` });
+    });
+
     test(`a Library of 220 Prompts of 19,000 characters, 40% of Chrome storage, takes one more Prompt (${theme})`, async ({ page, storage, extensionId }) => {
       const library = Array.from({ length: 220 }, (_, i) =>
         createPromptSeed({ id: `long-${String(i)}`, title: `Long prompt ${String(i + 1)}`, content: 'x'.repeat(19_000) })

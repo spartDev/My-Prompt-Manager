@@ -724,6 +724,22 @@ describe('StorageManager', () => {
       expect(usage.total).toBe(chrome.storage.local.QUOTA_BYTES);
     });
 
+    // The levels are QUOTA_THRESHOLDS: 70%, 85% and 95% of the quota each start the next one
+    it.each([
+      [69.9, 'safe'],
+      [70, 'warning'],
+      [84.9, 'warning'],
+      [85, 'critical'],
+      [94.9, 'critical'],
+      [95, 'danger']
+    ] as const)('gives the warning level of Chrome storage %s%% full: %s', async (percentFull, warningLevel) => {
+      // The Promise form of getBytesInUse: vi.mocked would type its last overload, the callback one
+      const getBytesInUse: () => Promise<number> = chrome.storage.local.getBytesInUse;
+      vi.mocked(getBytesInUse).mockResolvedValue((chrome.storage.local.QUOTA_BYTES * percentFull) / 100);
+
+      await expect(storageManager.getStorageUsageWithWarnings()).resolves.toMatchObject({ warningLevel });
+    });
+
     it('should export data as JSON', async () => {
       const exportedData = await storageManager.exportData();
       const parsedData = JSON.parse(exportedData) as Record<string, unknown>;
