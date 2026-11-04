@@ -240,7 +240,6 @@ test.describe('Analytics dashboard', () => {
 
       // The dashboard page closes when back is clicked (window.close())
       // So we verify the tab is closed
-      expect(dashboardPage).toHaveProperty('isClosed', expect.any(Function));
       expect(dashboardPage.isClosed()).toBe(true);
     });
 

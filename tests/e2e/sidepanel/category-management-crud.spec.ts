@@ -95,7 +95,7 @@ test.describe('Category Management - Core CRUD Operations', () => {
       expect(codingCategories).toHaveLength(1); // Only the original one
     });
 
-    test('should show validation error for empty category name', async ({ context, storage, extensionId }) => {
+    test('should show validation error for empty category name', async ({ context, extensionId }) => {
       const sidepanelPage = await context.newPage();
       await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
@@ -361,7 +361,7 @@ test.describe('Category Management - Core CRUD Operations', () => {
       );
     });
 
-    test('should prevent deletion of "Uncategorized" default category', async ({ context, storage, extensionId }) => {
+    test('should prevent deletion of "Uncategorized" default category', async ({ context, extensionId }) => {
       const sidepanelPage = await context.newPage();
       await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 

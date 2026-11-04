@@ -155,4 +155,26 @@ describe('Prompt selector: when it closes', () => {
     expect(reopened?.isConnected).toBe(true);
     expect(selector()).toBe(reopened);
   });
+
+  // The selector listens for an outside click 100 ms after it opens (My-Prompt-Manager-d9j)
+  it.each([
+    ['its close button is clicked', () => { selector()?.querySelector<HTMLElement>('.close-selector')?.click(); }],
+    ['the injector is cleaned up', () => { injector.cleanup(); }]
+  ])('listens for no outside click when %s before those 100 ms', async (_when, close) => {
+    injector.cleanup();
+    vi.useFakeTimers();
+    const addListener = vi.spyOn(document, 'addEventListener');
+    try {
+      await injector.showPromptSelector(textarea);
+
+      close();
+      vi.advanceTimersByTime(150);
+
+      expect(selector()).toBeNull();
+      expect(addListener.mock.calls.map(([type]) => type)).not.toContain('click');
+    } finally {
+      addListener.mockRestore();
+      vi.useRealTimers();
+    }
+  });
 });

@@ -150,7 +150,9 @@ const waitForBackgroundTarget = async (context: BrowserContext): Promise<Backgro
 
 const createStorageController = (target: BackgroundTarget): ExtensionStorage => {
   const wrapChromeCall = <T, Arg>(fn: (arg: Arg) => Promise<T>, arg: Arg): Promise<T> => {
-    return target.evaluate(fn, arg);
+    // Page and Worker share this evaluate signature, but TypeScript cannot call it on their union, and
+    // Playwright types the function's argument as Unboxed<Arg>, which a generic Arg cannot be shown to match
+    return (target as Worker).evaluate(fn as (arg: unknown) => Promise<T>, arg);
   };
 
   const normalizeErrors = async <T>(promise: Promise<T>): Promise<T> => {

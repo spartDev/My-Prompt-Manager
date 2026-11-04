@@ -2,10 +2,10 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "noEmit": true,
-    "types": ["node", "@playwright/test"],
+    "types": ["node", "@playwright/test", "chrome", "vite/client"],
     "resolveJsonModule": true,
     "module": "ESNext"
   },
-  "include": ["./**/*.ts"],
+  "include": ["./**/*.ts", "../../playwright.config.ts"],
   "exclude": []
 }

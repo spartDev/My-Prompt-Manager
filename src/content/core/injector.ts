@@ -37,6 +37,8 @@ export interface InjectorState {
   isInitialized: boolean;
   isSiteEnabled: boolean;
   detectionTimeout: number | null;
+  /** Arms the open selector's outside-click listener; cleared when the selector closes before it fires */
+  outsideClickTimeout: number | null;
   mutationObserver: MutationObserver | null;
   spaMonitoringInterval: NodeJS.Timeout | null;
   hostname: string;
@@ -98,6 +100,7 @@ export class PromptLibraryInjector {
       isInitialized: false,
       isSiteEnabled: false,
       detectionTimeout: null,
+      outsideClickTimeout: null,
       mutationObserver: null,
       spaMonitoringInterval: null,
       hostname,
@@ -2087,7 +2090,9 @@ export class PromptLibraryInjector {
     }
 
     // Outside click to close
-    setTimeout(() => {
+    this.clearOutsideClickTimeout();
+    this.state.outsideClickTimeout = window.setTimeout(() => {
+      this.state.outsideClickTimeout = null;
       const outsideClickHandler = (e: Event) => {
         const target = e.target;
         if (!(target instanceof HTMLElement)) {
@@ -2213,6 +2218,8 @@ export class PromptLibraryInjector {
       return;
     }
 
+    this.clearOutsideClickTimeout();
+
     if (this.state.promptSelector) {
       this.state.promptSelector.remove();
       this.state.promptSelector = null;
@@ -2224,6 +2231,13 @@ export class PromptLibraryInjector {
     }
     // Clear the stored target element
     this.state.currentTargetElement = null;
+  }
+
+  private clearOutsideClickTimeout(): void {
+    if (this.state.outsideClickTimeout !== null) {
+      clearTimeout(this.state.outsideClickTimeout);
+      this.state.outsideClickTimeout = null;
+    }
   }
 
   /**
