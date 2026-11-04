@@ -6,6 +6,6 @@
     "resolveJsonModule": true,
     "module": "ESNext"
   },
-  "include": ["./**/*.ts"],
+  "include": ["./**/*.ts", "../../playwright.config.ts"],
   "exclude": []
 }
