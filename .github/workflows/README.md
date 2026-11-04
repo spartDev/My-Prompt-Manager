@@ -14,23 +14,26 @@ All workflows enforce the **MANDATORY** requirements from `CLAUDE.md`:
 
 ### 1. 🔍 Pull Request Checks (`pr-checks.yml`)
 
-**Triggers**: Pull requests to `main` branch
+**Triggers**: pull requests to `main` (opened, synchronize, reopened, ready for review). Draft PRs run nothing. A newer push cancels the run in progress.
 
-**Quality Gates**:
-- 📦 Dependencies & Setup
-- 🧹 Code Quality & Linting (zero tolerance)
-- 🧪 Test Suite & Coverage (all must pass)
-- 🏗️ Build Verification (dev + production)
-- 🔒 Security & Dependencies
-- ✅ Quality Gate Summary with PR comments
+**Job graph** (job names as GitHub shows them):
 
-**Features**:
-- Parallel job execution for speed
-- Matrix testing (Node.js 22.x LTS, 24.x latest)
-- Smart caching (dependencies, builds)
-- Fail-fast strategy
-- Chrome extension validation
-- Automated PR status comments
+```text
+📦 Dependencies & Setup (setup)
+├── 📘 TypeScript Type Checking (type-check)          npm run typecheck
+│   ├── 🧹 Code Quality & Linting (lint)              npm run lint
+│   └── 🧪 Test Suite & Coverage (test)               npm test, Node 22.x and 24.x
+│       │                                             (coverage on 22.x)
+│       └── after type-check, lint and test:
+│           ├── 🏗️ Build Verification (build)         npm run build, npm run package
+│           └── 🎯 End-to-End Tests (e2e)             npm run test:e2e (Playwright, ~10 min)
+└── 🔒 Security & Dependencies (security)             npm audit --audit-level=moderate,
+                                                      dependency review, manifest check
+✅ Quality Gate Summary (quality-gate)                needs all seven jobs, always runs,
+                                                      comments the results on the PR
+```
+
+The Quality Gate passes only when every one of the seven jobs ends in `success`. A job that is skipped (every job is skipped once Setup fails) or cancelled fails the gate. A run cancelled by a newer push fails on a commit that is no longer the head of the PR, so it blocks nothing.
 
 ### 2. 🚀 Main Branch Deployment (`main-deploy.yml`)
 
@@ -88,23 +91,22 @@ npm run test:coverage # Generate coverage reports
 npm run build        # Production build
 npm run package      # Chrome extension packaging
 npm audit --audit-level=moderate # Security check
+npm run lint:renovate # Validate renovate.json (pinned Renovate, via npx)
 ```
 
 ## 🔧 Configuration
 
 ### Required Repository Settings
 
-**Branch Protection Rules** (recommended):
-```yaml
-main:
-  required_status_checks:
-    - "Dependencies & Setup"
-    - "Code Quality & Linting" 
-    - "Test Suite & Coverage"
-    - "Build Verification"
-    - "Security & Dependencies"
-  require_pull_request_reviews: true
-  restrict_pushes: true
+Branch protection of `main` requires **one** status check: `✅ Quality Gate Summary`. Do not add the other jobs as required checks: GitHub counts a required check whose conclusion is `skipped` as passing, so a PR whose Setup failed (which skips every other job) got through the old set of required jobs. The Quality Gate turns skipped and cancelled into a failure, so it alone holds every job of the graph above (since #479; the switch was made on 2026-11-02).
+
+Also on `main`: unresolved review conversations block the merge (`required_conversation_resolution`), Codex threads included; no approving review is required.
+
+Check the live settings:
+
+```bash
+gh api repos/spartDev/My-Prompt-Manager/branches/main/protection \
+  --jq '{checks: .required_status_checks.contexts, conversations: .required_conversation_resolution.enabled}'
 ```
 
 ### GitHub Secrets (if needed)

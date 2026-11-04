@@ -122,6 +122,7 @@ A refusal keeps its type through `StorageManager` and `PromptManager`, so a call
 | `src/hooks/useUsageStats.ts` | Usage history and Prompts aggregated for Analytics | Analytics |
 | `src/hooks/useSummaryMetrics.ts` | Top Platform, peak day and top Category from those stats | Analytics |
 | `src/hooks/useNow.ts` | The current time, refreshed at an interval, for relative dates | Analytics |
+| `src/hooks/useRadioGroup.ts` | Keyboard behavior of a WAI-ARIA radio group: one tab stop, arrows, Home and End move focus and selection, `locked` ignores input. `src/components/__tests__/radioGroups.test.ts` fails when a component renders `role="radio"` without it | `LibraryFilterBar`, `AppearanceSection`, `InterfaceModeSelector` |
 
 Components read the theme through `useThemeContext()` of `src/contexts/ThemeContext.tsx`, never `useTheme()` directly: `ThemeProvider` calls `useTheme` once, so every component sees the same theme.
 

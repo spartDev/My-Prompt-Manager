@@ -109,7 +109,7 @@ Information uses the accent family (`bg-accent-subtle`, `border-accent`, `text-a
 
 ### Category Colors
 
-Category colors are user data, not tokens: the preset palette, the chip (soft badge) rule and its contrast safety net live in `src/constants/colors.ts`, documented in [CATEGORY_COLOR_IMPLEMENTATION.md](./CATEGORY_COLOR_IMPLEMENTATION.md).
+Category colors are user data, not tokens: the chip (soft badge) rule and its contrast safety net live in `src/theme/categoryChip.ts`, the preset palette in `src/constants/colors.ts`, documented in [CATEGORY_COLOR_IMPLEMENTATION.md](./CATEGORY_COLOR_IMPLEMENTATION.md).
 
 ### Adding or changing a token
 
@@ -697,7 +697,7 @@ A color swatch is user data: it keeps its own color. In a picker, the chosen swa
 
 #### Category Badge
 
-Category colors are user data, not tokens: use the component, which derives the chip colors of both modes from the Category's color (`getSoftBadgeColors` in `src/constants/colors.ts`):
+Category colors are user data, not tokens: use the component, which derives the chip colors of both modes from the Category's color (`getSoftBadgeColors` in `src/theme/categoryChip.ts`):
 
 ```tsx
 <CategoryBadge category={category} variant="soft" />
