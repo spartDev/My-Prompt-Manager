@@ -38,7 +38,7 @@ Other keys of `chrome.storage.local` belong to the code that owns them, which wr
 
 | File | Job |
 |------|-----|
-| `src/services/storage.ts` | `StorageManager`, a singleton: every read and write of the Prompts, the Categories and the settings, Backup import and export, storage use, the upgrade pass. Prompt text goes through Admission inside its writing methods |
+| `src/services/storage.ts` | `StorageManager`, a singleton: the only writer of the Prompts, the Categories and the settings, and the read API the popup and side panel use for them (direct readers too: the content script in `src/content/utils/storage.ts` and `src/content/utils/theme-manager.ts`, and `SettingsView`'s `loadSettings`); Backup import and export, storage use, the upgrade pass. Prompt text goes through Admission inside its writing methods |
 | `src/services/promptAdmission.ts` | Admission: the one place Prompt text is checked, the one reader of stored Prompts, the limits (`PROMPT_LIMITS`). Pure, no `chrome.*`; shared by the popup, the service worker and the content script |
 | `src/services/promptManager.ts` | `PromptManager`, a singleton over `StorageManager`: creating and updating Prompts, search with highlights, sorting, statistics, duplicate detection, title generation |
 | `src/services/SearchIndex.ts` | The inverted index behind `PromptManager`'s search |
