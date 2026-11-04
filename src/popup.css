@@ -3,6 +3,10 @@
 
 @config '../tailwind.config.js';
 
+/* Agent prompts in .claude/ (e.g. `[file:line]`) are not markup: scanning them
+   emits invalid CSS and an esbuild warning on every build */
+@source not '../.claude';
+
 /* Applied by useTheme for one style recalc while the theme class changes,
    so colors switch instantly instead of animating (no light flash in dark mode) */
 .theme-switching,

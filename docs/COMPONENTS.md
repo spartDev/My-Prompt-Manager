@@ -64,7 +64,6 @@ src/components/
 ├── ColorPicker.tsx              # Color selection widget
 ├── ConfirmDialog.tsx            # Confirmation modal
 ├── ToastContainer.tsx           # Notification system
-├── ThemeToggle.tsx              # Dark/light mode toggle
 ├── StorageWarning.tsx           # Storage quota warning
 ├── InterfaceModeSelector.tsx    # Popup/sidepanel mode
 ├── ErrorBoundary.tsx            # Error handling
