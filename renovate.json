@@ -9,8 +9,8 @@
   ],
   "timezone": "Europe/Paris",
   "schedule": [
-      "after 10pm",
-      "before 5am"
+    "after 10pm",
+    "before 5am"
   ],
   "labels": [
     "dependencies",
@@ -93,15 +93,6 @@
       ]
     },
     {
-      "description": "Handle Chrome extension types carefully",
-      "matchPackageNames": [
-        "@types/chrome"
-      ],
-      "groupName": "chrome types",
-      "automerge": false,
-      "prPriority": 5
-    },
-    {
       "description": "Security updates - high priority",
       "matchDatasources": [
         "npm"
@@ -118,13 +109,6 @@
         "dependencies",
         "renovate"
       ]
-    },
-    {
-      "description": "Pin Chrome extension critical deps",
-      "matchPackageNames": [
-        "@crxjs/vite-plugin"
-      ],
-      "automerge": false
     },
     {
       "description": "Major updates - require manual review; the PR opens only once ticked in the Dependency Dashboard",
@@ -191,6 +175,22 @@
         "lint-staged"
       ],
       "groupName": "git hooks",
+      "automerge": false
+    },
+    {
+      "description": "Handle Chrome extension types carefully. After the devDependency patch automerge rule: a later rule wins",
+      "matchPackageNames": [
+        "@types/chrome"
+      ],
+      "groupName": "chrome types",
+      "automerge": false,
+      "prPriority": 5
+    },
+    {
+      "description": "Pin Chrome extension critical deps. After the devDependency patch automerge rule: a later rule wins",
+      "matchPackageNames": [
+        "@crxjs/vite-plugin"
+      ],
       "automerge": false
     }
   ],

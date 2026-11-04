@@ -18,7 +18,7 @@ The version in the script is pinned by hand (Renovate does not update `npx` argu
 - **`vite ecosystem (major)` group**: `@vitejs/plugin-react` follows Vite's major (6.x needs `vite ^8`), so neither can be installed alone. Their majors land in one PR.
 - **Majors need approval**: a major PR opens only once ticked in the Dependency Dashboard issue (`dependencyDashboardApproval`), so majors land when someone has time to read the migration guide.
 - **`constraints.npm: ^11` and the disabled `renovate-config` npm rule**: npm 12 breaks lockfile updates (npm/cli#9800, `EALLOWREMOTE`). The disabled rule keeps Renovate from bumping its own constraint. Remove both together, see beads `My-Prompt-Manager-67o`.
-- **Automerge**: only devDependency patches and GitHub Actions. Runtime dependencies, `@types/chrome` and `@crxjs/vite-plugin` change what runs in the extension and get a human merge.
+- **Automerge**: only devDependency patches and GitHub Actions. Runtime dependencies, `@types/chrome` and `@crxjs/vite-plugin` change what runs in the extension and get a human merge. Renovate applies `packageRules` in order and a later rule wins, so their `automerge: false` rules come after the devDependency patch rule (both are devDependencies): keep it that way.
 - **`minimumReleaseAge`**: a release must be some days old before Renovate proposes it, so a broken or yanked release is caught upstream first (longer for `react` and `react-dom`).
 
 ## How a Renovate PR merges
