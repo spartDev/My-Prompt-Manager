@@ -1,6 +1,6 @@
 # Component Catalog
 
-Which component does which job in the popup and the side panel, and the conventions they share. This page does not copy Props or code: the source file is the reference, and its Props interface sits at its top. Open it before you use or change a component.
+Which component does which job in the popup and the side panel, and the conventions they share. This page does not copy Props or code: the source file is the reference. Most components declare their Props interface at the top of the file; `LibraryView`, `PromptCard`, `AddPromptForm`, `EditPromptForm` and `SearchBar` import theirs from `src/types/components.ts`. Open them before you use or change a component.
 
 ---
 
@@ -75,7 +75,7 @@ Imported from `src/components/analytics/index.ts`. Each chart takes its data fro
 - **Verbatim Prompt text:** a component shows a Prompt's title and content exactly as stored. React renders them as text; nothing sanitizes or rewrites them (`CONTEXT.md`, ADR-001).
 - **Forms:** submit with React 19's `useActionState` (`CODING_STANDARDS.md`, [REACT_19_MIGRATION.md](./REACT_19_MIGRATION.md)). Character counters read `PROMPT_LIMITS`, and storage runs Admission on save: a form never keeps its own copy of the limits or the rules.
 - **Memo:** `PromptCard`, `SearchBar` and `ToastContainer` use a custom props comparison. Adding a prop to one of them means adding it to its comparison, or the component will not re-render when the prop changes.
-- **Accessibility:** icon-only buttons carry an `aria-label`; dialogs trap focus and close on Escape; menus are keyboard-navigable (`Dropdown` does it for you).
+- **Accessibility:** icon-only buttons carry an `aria-label`; dialogs trap focus and close on Escape (exception today: the clear-history dialog of `AnalyticsTab` does neither); menus are keyboard-navigable (`Dropdown` does it for you).
 
 ## Adding a component
 
