@@ -158,7 +158,6 @@ Components for user feedback, errors, and global state display.
 src/components/ToastContainer.tsx
 src/components/ErrorBoundary.tsx
 src/components/StorageWarning.tsx
-src/components/ThemeToggle.tsx
 ```
 
 ---
