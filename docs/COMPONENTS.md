@@ -24,7 +24,7 @@ Which component does which job in the popup and the side panel, and the conventi
 | `src/components/LibraryView.tsx` | The Library: search, the Library filter pills, the Prompt cards, the empty states |
 | `src/components/CategoryManager.tsx` | The Categories section: create, rename, recolor and delete Categories |
 | `src/components/analytics/AnalyticsTab.tsx` | The Analytics section; `src/components/analytics/AnalyticsDashboard.tsx` is the full page it expands to |
-| `src/components/SettingsView.tsx` | Settings: assembles the sections of `src/components/settings/`, and runs Backup export and restore |
+| `src/components/SettingsView.tsx` | Settings: assembles the sections of `src/components/settings/`, and runs Backup restore (`handleImportData`, passed down as `onImport`) |
 | `src/components/TabBar.tsx` | The bottom tab bar; its `Section` type names the four sections |
 
 ### Prompts
@@ -58,7 +58,7 @@ Which component does which job in the popup and the side panel, and the conventi
 | `src/components/settings/SettingsSection.tsx` | The frame of every Settings section |
 | `src/components/settings/ToggleSwitch.tsx` | The switch for every boolean setting |
 | `src/components/settings/AppearanceSection.tsx`, `LibrarySection.tsx`, `NotificationSection.tsx`, `AdvancedSection.tsx`, `AboutSection.tsx` | One Settings section each |
-| `src/components/settings/DataStorageSection.tsx` | Storage use, Backup export and restore, Clear All Data |
+| `src/components/settings/DataStorageSection.tsx` | Storage use, Backup export (`handleExport` builds and writes the file), the restore file picker, Clear All Data |
 | `src/components/settings/SiteIntegrationSection.tsx` | Platforms and custom sites: lists, add flow, element picker, import and export of a site configuration |
 | `src/components/settings/SiteCard.tsx` | One Platform or custom site, with its switch |
 
