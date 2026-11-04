@@ -1,6 +1,7 @@
-import { type FC, type KeyboardEvent, useCallback, useId, useRef } from 'react';
+import { type FC, useId } from 'react';
 
-import { type Theme, useThemeContext } from '../../contexts/ThemeContext';
+import { useThemeContext } from '../../contexts/ThemeContext';
+import { useRadioGroup } from '../../hooks/useRadioGroup';
 import InterfaceModeSelector from '../InterfaceModeSelector';
 
 import SettingsSection from './SettingsSection';
@@ -34,28 +35,11 @@ const AppearanceSection: FC<AppearanceSectionProps> = ({
 }) => {
   const { theme, setTheme } = useThemeContext();
   const themeLabelId = useId();
-  const themeRefs = useRef<Array<HTMLButtonElement | null>>([]);
-
-  const handleThemeClick = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
-    const themeValue = e.currentTarget.dataset.theme as Theme | undefined;
-    if (themeValue) {
-      void setTheme(themeValue);
-    }
-  }, [setTheme]);
-
-  // WAI-ARIA radio group: the arrows, Home and End move the focus and the selection
-  const handleThemeKeyDown = (e: KeyboardEvent<HTMLButtonElement>, index: number) => {
-    let nextIndex: number | null = null;
-    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { nextIndex = (index + 1) % THEME_OPTIONS.length; }
-    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { nextIndex = (index - 1 + THEME_OPTIONS.length) % THEME_OPTIONS.length; }
-    if (e.key === 'Home') { nextIndex = 0; }
-    if (e.key === 'End') { nextIndex = THEME_OPTIONS.length - 1; }
-    if (nextIndex === null) { return; }
-
-    e.preventDefault();
-    themeRefs.current[nextIndex]?.focus();
-    void setTheme(THEME_OPTIONS[nextIndex].value);
-  };
+  const { getRadioProps } = useRadioGroup({
+    options: THEME_OPTIONS,
+    selectedIndex: THEME_OPTIONS.findIndex(option => option.value === theme),
+    onSelect: (option) => { void setTheme(option.value); }
+  });
 
   return (
     <SettingsSection
@@ -75,14 +59,10 @@ const AppearanceSection: FC<AppearanceSectionProps> = ({
             {THEME_OPTIONS.map((option, index) => (
               <button
                 key={option.value}
-                ref={(el) => { themeRefs.current[index] = el; }}
+                {...getRadioProps(index)}
                 type="button"
                 role="radio"
                 aria-checked={theme === option.value}
-                tabIndex={theme === option.value ? 0 : -1}
-                data-theme={option.value}
-                onClick={handleThemeClick}
-                onKeyDown={(e) => { handleThemeKeyDown(e, index); }}
                 className={`
                   h-9 rounded-lg border text-sm font-semibold transition-colors focus-interactive cursor-pointer
                   ${theme === option.value

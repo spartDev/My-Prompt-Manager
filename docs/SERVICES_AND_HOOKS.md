@@ -864,6 +864,40 @@ function ViewHeader() {
 
 ---
 
+### 9. useRadioGroup
+
+**File:** `src/hooks/useRadioGroup.ts`
+
+**Purpose:** The keyboard behavior of a WAI-ARIA radio group, shared by every component that renders `role="radio"` (the Library filter, the theme and the interface mode in Settings).
+
+**API:**
+```typescript
+const {
+  getRadioProps, // (index) => { ref, tabIndex, onClick, onKeyDown }: spread on each radio
+  radios         // RefObject<Array<HTMLElement | null>>: the radio elements by index
+} = useRadioGroup({ options, selectedIndex, onSelect, locked });
+```
+
+**Behavior:**
+1. One tab stop, on the chosen option (the first option when none is chosen)
+2. The four arrows (with wrap), Home and End move the focus and the selection together
+3. `locked` ignores clicks and keys (a save in progress); the keys still do not scroll the page
+
+The caller keeps `role="radio"` and `aria-checked` on the element. `src/components/__tests__/radioGroups.test.ts` fails when a file in `src/components` renders `role="radio"` without the hook.
+
+**Usage:**
+```typescript
+const { getRadioProps } = useRadioGroup({
+  options: THEME_OPTIONS,
+  selectedIndex: THEME_OPTIONS.findIndex(option => option.value === theme),
+  onSelect: (option) => { void setTheme(option.value); }
+});
+
+<button role="radio" aria-checked={theme === option.value} {...getRadioProps(index)}>
+```
+
+---
+
 ## Data Flow Patterns
 
 ### 1. CRUD Operation Flow
@@ -1052,6 +1086,7 @@ interface ElementFingerprint {
 | **useTheme** | `theme`, `setTheme`, `toggleTheme` | Theme management |
 | **useClipboard** | `copyToClipboard`, `copyStatus` | Clipboard operations |
 | **useExtensionContext** | `isPopup`, `isSidepanel` | Context detection |
+| **useRadioGroup** | `getRadioProps`, `radios` | Radio group keyboard behavior |
 
 ---
 
