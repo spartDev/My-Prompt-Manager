@@ -18,7 +18,7 @@
     "lint": "biome check --formatter-enabled=false .",
     "lint:fix": "biome check --write --formatter-enabled=false .",
     "lint:changed": "scripts/lint-changed.sh",
-    "prepare": "if [ \"$CI\" = \"true\" ] || [ -n \"$GITHUB_ACTIONS\" ] || [ -n \"$JENKINS_URL\" ] || [ -n \"$BUILDKITE\" ]; then echo 'CI detected, skipping husky'; else husky; fi",
+    "prepare": "node scripts/prepare.mjs",
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tests/e2e/tsconfig.json"
   },
