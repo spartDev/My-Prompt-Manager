@@ -74,6 +74,17 @@ test.describe('Library card preview prefix', () => {
     await expect(page.getByTestId('prompt-card')).toContainText('Huge Spec Review');
   });
 
+  // SEED (My-Prompt-Manager-5yg proof, reverted before merge): fits on the Mac, cut by DejaVu Sans on Linux
+  test('SEED: a card title of 37 characters is shown uncut', async ({ page, storage, extensionId }) => {
+    const title = 'Review the pull request for its risks';
+    await seedLibrary(storage, { prompts: [createPromptSeed({ id: 'seed', title, content: 'x' })], categories });
+    await page.setViewportSize({ width: 400, height: 760 });
+    await page.goto(`chrome-extension://${extensionId}/${SIDEPANEL_URL}`);
+    const button = page.getByRole('button', { name: `Edit ${title}`, exact: true });
+    const { clientWidth, scrollWidth } = await button.evaluate(el => ({ clientWidth: el.clientWidth, scrollWidth: el.scrollWidth }));
+    expect(scrollWidth, `title needs ${scrollWidth}px, has ${clientWidth}px`).toBeLessThanOrEqual(clientWidth);
+  });
+
   for (const theme of ['light', 'dark'] as const) {
     test(`PROOF: long-content card preview screenshot (${theme} mode)`, async ({ page, storage, extensionId }) => {
       await seed(storage, theme);
