@@ -1,50 +1,65 @@
 name: 📊 Coverage Report Comment
 
-# SECURITY: workflow_run trigger runs in the base repository context
-# This is safe for untrusted PRs (including forks) because:
-# - It doesn't execute code from the PR
-# - It runs after PR checks complete in a separate, trusted context
-# - Artifacts are downloaded from the completed workflow
+# Posts the coverage of a pull request as one comment, updated on each push.
+#
+# SECURITY: workflow_run runs the workflow file and scripts of the default branch, with the base
+# repository's token, never code of the pull request. The one thing that comes from the pull
+# request is the coverage-summary artifact, which its own code wrote (a fork can upload anything
+# under that name). So the artifact is downloaded outside the workspace, into runner.temp, where
+# no later step loads code from, and the script reads it as data and validates every value.
 on:
   workflow_run:
     workflows: ["🔍 Pull Request Checks"]
     types:
       - completed
 
-# Minimal permissions following principle of least privilege
-permissions:
-  actions: read         # Required to download artifacts from workflow_run
-  contents: read        # Required to checkout repository
-  pull-requests: write  # Required to post/delete PR comments
+permissions: {}
+
+# One report at a time per pull request branch, so two runs never write the comment at once.
+concurrency:
+  group: coverage-comment-${{ github.event.workflow_run.head_repository.full_name }}-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
 
 jobs:
   coverage-comment:
     name: 📊 Post Coverage Report
     runs-on: ubuntu-latest
-    # IMPORTANT: Only run on successful PR workflows to avoid posting on failed runs
-    if: >
-      github.event.workflow_run.event == 'pull_request' &&
-      github.event.workflow_run.conclusion == 'success'
+    # Runs whatever the checks concluded: on a failure the script reports the coverage when there is
+    # some (a missed threshold) and says why when there is none, rather than leave an older report.
+    if: github.event.workflow_run.event == 'pull_request'
+    permissions:
+      actions: read         # download the artifact of the PR checks run
+      contents: read        # check out the script
+      pull-requests: write  # create, update and delete the coverage comment
 
     steps:
       - name: 🛎️ Checkout Repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
-      - name: 📥 Download Coverage Artifact
-        uses: actions/download-artifact@6e448e04c1fea8d8c4ed3f8af84d0bd5e2f1aaef # v4.1.8
-        id: download-artifact
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          name: coverage-reports
-          path: coverage
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: ${{ github.event.workflow_run.id }}
-        continue-on-error: true
-        # Note: continue-on-error allows graceful handling when artifact is missing
-        # The script will post an explanatory comment if coverage-summary.json is not found
+          persist-credentials: false
+          sparse-checkout: .github/scripts
 
-      - name: 📊 Generate and Post Coverage Comment
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.1
+      - name: 📥 Download Coverage Summary
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        # A run that failed before the coverage step uploads no artifact: the script then says so.
+        continue-on-error: true
+        with:
+          name: coverage-summary
+          path: ${{ runner.temp }}/coverage-summary
+          github-token: ${{ github.token }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: 📊 Post Coverage Comment
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          COVERAGE_SUMMARY: ${{ runner.temp }}/coverage-summary/coverage-summary.json
         with:
           script: |
-            const script = require('./.github/scripts/generate-coverage-comment.cjs');
-            await script.generateCoverageComment(github, context);
+            const { generateCoverageComment } = require('./.github/scripts/generate-coverage-comment.cjs');
+            await generateCoverageComment({
+              github,
+              context,
+              core,
+              summaryPath: process.env.COVERAGE_SUMMARY,
+              workspace: process.env.GITHUB_WORKSPACE
+            });
