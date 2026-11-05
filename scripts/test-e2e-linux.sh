@@ -2,7 +2,7 @@
 # Runs e2e specs the way Linux CI renders them: in the Playwright noble image, with the DejaVu fonts of
 # ubuntu-latest, which are wider than the Mac fonts, so a title that fits on the Mac can wrap here.
 # It runs the committed HEAD (git archive), not the working tree: commit what you want to test.
-# The image tag is the @playwright/test version of package.json. Needs Docker.
+# The image tag is the @playwright/test version of the committed package.json. Needs Docker.
 #
 # Usage: npm run test:e2e:linux -- <spec>... [playwright test options]
 # Test output (failure screenshots, traces) lands in test-results-linux/.
@@ -16,7 +16,7 @@ fi
 root=$(git rev-parse --show-toplevel)
 cd "$root"
 
-version=$(node -p "require('./package.json').devDependencies['@playwright/test']")
+version=$(git show HEAD:package.json | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).devDependencies['@playwright/test']")
 image="mcr.microsoft.com/playwright:v${version}-noble"
 
 # A client newer than the daemon (colima) refuses to talk to it: use the API version the daemon names
@@ -46,11 +46,12 @@ git archive HEAD | docker run -i --rm --ipc=host \
   -v mpm-e2e-linux-npm:/root/.npm \
   -v mpm-e2e-linux-browsers:/ms-playwright \
   -v "$out:/out" \
-  -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
   "$image" bash -c '
     set -euo pipefail
-    # The container runs as root: on a rootful Linux daemon, hand the output back so the next run can clear it
-    trap '\''chown -R "$HOST_UID:$HOST_GID" /out'\'' EXIT
+    # The container runs as root: give the output the owner the mount had, so the next run can clear it.
+    # A rootful daemon shows the host user as is; a rootless one shows them as root, and this changes nothing
+    owner=$(stat -c %u:%g /out)
+    trap '\''chown -R "$owner" /out'\'' EXIT
     mkdir /work && tar -x -C /work && cd /work
     HUSKY=0 npm ci --no-audit --no-fund --loglevel=error
     apt-get update -qq && apt-get install -y -qq fonts-dejavu-core >/dev/null
