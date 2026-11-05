@@ -5,13 +5,13 @@
  * Import from '@/constants' or '../constants' for these values.
  */
 
-import type { Settings } from '../types';
+import type { Settings, SortDirection, SortOrder } from '../types';
 
+export * from './brandColors';
 // Re-export from organized constant files
 export * from './colors';
-export * from './validation';
 export * from './ui';
-export * from './brandColors';
+export * from './validation';
 
 // ============================================================================
 // Usage Analytics Constants
@@ -27,11 +27,8 @@ export const USAGE_STORAGE_KEY = 'usageHistory';
 // Validation Limits
 // ============================================================================
 
-/** Validation limits for prompts, categories, and other entities */
+/** Length of a title generated from content; the Prompt text limits are PROMPT_LIMITS (src/services/promptAdmission.ts) */
 export const VALIDATION_LIMITS = {
-  PROMPT_TITLE_MAX: 100,
-  PROMPT_CONTENT_MAX: 20000,
-  CATEGORY_NAME_MAX: 50,
   TITLE_GENERATION_LENGTH: 50
 } as const;
 
@@ -51,14 +48,23 @@ export const DEFAULT_SETTINGS: Settings = {
   interfaceMode: 'sidepanel'
 };
 
+/**
+ * The only direction the Library sorts each order in. Settings offers no direction,
+ * so a reversed direction saved by earlier versions is ignored.
+ */
+export const NATURAL_SORT_DIRECTION: Record<SortOrder, SortDirection> = {
+  updatedAt: 'desc',
+  lastUsedAt: 'desc',
+  createdAt: 'desc',
+  usageCount: 'desc',
+  title: 'asc'
+};
+
 // ============================================================================
 // Prompt Sharing Constants
 // ============================================================================
 
-/** Size limits for prompt sharing/encoding */
+/** Size limit for an encoded Share code */
 export const PROMPT_SHARING_SIZE_LIMITS = {
-  TITLE_MAX: 100,
-  CONTENT_MAX: 20_000,
-  CATEGORY_MAX: 50,
   ENCODED_MAX: 40_000,
 } as const;

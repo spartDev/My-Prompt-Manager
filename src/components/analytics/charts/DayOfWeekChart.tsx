@@ -1,18 +1,19 @@
-import { FC, memo } from 'react';
+import { type FC, memo } from 'react';
 import {
-  BarChart,
   Bar,
-  XAxis,
-  YAxis,
+  BarChart,
   CartesianGrid,
-  Tooltip,
+  Cell, 
   ResponsiveContainer,
-  Cell
+  Tooltip,
+  XAxis,
+  YAxis
 } from 'recharts';
 
-import { useChartTheme } from '../../../hooks/useChartTheme';
-import { DAY_OF_WEEK_COLORS } from '../../../theme/chartColors';
-import { DayOfWeekDistribution } from '../../../types/hooks';
+import { CHART_THEME, DAY_OF_WEEK_COLORS } from '../../../theme/chartColors';
+import type { DayOfWeekDistribution } from '../../../types/hooks';
+import { NO_THROTTLED_EVENTS } from '../constants';
+import { formatUsesTooltip } from './tooltipFormatters';
 
 export interface DayOfWeekChartProps {
   /** Day of week distribution data */
@@ -34,17 +35,17 @@ const DayOfWeekChart: FC<DayOfWeekChartProps> = memo(({
   showGrid = true,
   highlightPeak = true
 }) => {
-  const { gridColor, textColor, tooltipBg, tooltipBorder, tooltipLabelColor, cursorColor } = useChartTheme();
+  const { gridColor, textColor, tooltipBg, tooltipBorder, tooltipLabelColor, cursorColor } = CHART_THEME;
 
   if (data.length === 0) {
     return (
       <div
-        className="flex items-center justify-center bg-gray-50 dark:bg-gray-800/50 rounded-xl"
+        className="flex items-center justify-center bg-raised rounded-xl"
         style={{ height }}
         role="img"
         aria-label="No day of week data available"
       >
-        <p className="text-sm text-gray-500 dark:text-gray-400">No day of week data</p>
+        <p className="text-sm text-tertiary">No day of week data</p>
       </div>
     );
   }
@@ -59,7 +60,7 @@ const DayOfWeekChart: FC<DayOfWeekChartProps> = memo(({
       aria-label="Day of week usage chart"
     >
       <ResponsiveContainer width="100%" height={height}>
-        <BarChart data={data} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+        <BarChart data={data} margin={{ top: 5, right: 10, left: 4, bottom: 5 }} throttledEvents={NO_THROTTLED_EVENTS}>
           {showGrid && (
             <CartesianGrid
               strokeDasharray="3 3"
@@ -78,10 +79,10 @@ const DayOfWeekChart: FC<DayOfWeekChartProps> = memo(({
             tickLine={false}
             axisLine={false}
             allowDecimals={false}
-            width={30}
+            width="auto"
           />
           <Tooltip
-            formatter={(value: number | undefined) => [value ?? 0, 'Uses']}
+            formatter={formatUsesTooltip}
             contentStyle={{
               backgroundColor: tooltipBg,
               border: `1px solid ${tooltipBorder}`,

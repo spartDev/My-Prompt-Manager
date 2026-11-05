@@ -1,7 +1,7 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Mock } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { CustomSite, ElementFingerprint } from '../../../types';
 import AddCustomSiteForm from '../AddCustomSiteForm';
@@ -698,7 +698,7 @@ describe('AddCustomSiteForm', () => {
   describe('Adding State', () => {
     it('shows "Adding Site..." button text during submission', async () => {
       // Make permission request hang so we can observe the adding state
-      (chrome.permissions.request as unknown as Mock).mockReturnValue(new Promise(() => {}));
+      (chrome.permissions.request as unknown as Mock).mockReturnValue(new Promise(() => undefined));
 
       renderForm();
 
@@ -714,7 +714,7 @@ describe('AddCustomSiteForm', () => {
     });
 
     it('disables add button during submission', async () => {
-      (chrome.permissions.request as unknown as Mock).mockReturnValue(new Promise(() => {}));
+      (chrome.permissions.request as unknown as Mock).mockReturnValue(new Promise(() => undefined));
 
       renderForm();
 
@@ -730,7 +730,7 @@ describe('AddCustomSiteForm', () => {
     });
 
     it('disables cancel button during submission', async () => {
-      (chrome.permissions.request as unknown as Mock).mockReturnValue(new Promise(() => {}));
+      (chrome.permissions.request as unknown as Mock).mockReturnValue(new Promise(() => undefined));
 
       renderForm();
 
@@ -747,7 +747,7 @@ describe('AddCustomSiteForm', () => {
     });
 
     it('disables picker button during submission', async () => {
-      (chrome.permissions.request as unknown as Mock).mockReturnValue(new Promise(() => {}));
+      (chrome.permissions.request as unknown as Mock).mockReturnValue(new Promise(() => undefined));
 
       renderForm();
 

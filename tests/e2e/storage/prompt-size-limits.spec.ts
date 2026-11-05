@@ -7,18 +7,21 @@
  * 2. updatePrompt() was missing size validation that savePrompt() had, causing
  *    inconsistent behavior where editing worked but adding the same content failed
  *
+ * Since My-Prompt-Manager-58z there is no MAX_PROMPT_SIZE: Admission limits a Prompt to 20,000
+ * characters, and the storage limits count the bytes Chrome stores (library-size-limit.spec.ts).
+ *
  * These tests verify:
  * - Large prompts near the 20K character limit can be saved
  * - Large prompts can be updated with large content
  * - Both save and update behave consistently for the same content
  */
 import { DEFAULT_CATEGORY, DEFAULT_SETTINGS } from '../../../src/types';
-import { test, expect } from '../fixtures/extension';
+import { expect, test } from '../fixtures/extension';
 import { LibraryPage } from '../pages/LibraryPage';
 import { PromptFormPage } from '../pages/PromptFormPage';
-import { seedLibrary, createPromptSeed } from '../utils/storage';
+import { createPromptSeed, seedLibrary } from '../utils/storage';
 
-test.describe('Prompt size limits (MAX_PROMPT_SIZE fix)', () => {
+test.describe('Prompt size limits', () => {
   // Generate a large content string near the 20K character limit
   // Using 19,000 characters to stay safely under the 20K limit
   const generateLargeContent = (charCount: number): string => {

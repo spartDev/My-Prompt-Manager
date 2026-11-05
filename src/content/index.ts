@@ -15,7 +15,7 @@
 
 import { PromptLibraryInjector } from './core/injector';
 import { getElementPicker } from './modules/element-picker';
-import { error, warn, info, debug } from './utils/logger';
+import { debug, error, info, warn } from './utils/logger';
 import { ThemeManager } from './utils/theme-manager';
 
 interface PromptLibraryDebugApi {

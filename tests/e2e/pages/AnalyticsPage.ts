@@ -15,7 +15,7 @@ export class AnalyticsPage extends BasePage {
    * Navigate to the Analytics tab from the library view
    */
   async navigateToAnalyticsTab(): Promise<void> {
-    await this.page.getByRole('button', { name: 'Analytics' }).click();
+    await this.switchToSection('analytics');
   }
 
   /**
@@ -51,7 +51,7 @@ export class AnalyticsPage extends BasePage {
   }
 
   /**
-   * Get the "View Full Dashboard" floating action button
+   * Get the "Full Dashboard" header button (sidepanel only, when there is data)
    */
   getExpandDashboardButton(): Locator {
     return this.page.getByRole('button', { name: 'View full analytics dashboard' });
@@ -134,17 +134,25 @@ export class AnalyticsPage extends BasePage {
   }
 
   /**
-   * Get the back button in the header
+   * Get the back button in the full dashboard header
+   * (the Analytics section itself has no back button; use the tab bar)
    */
   getBackButton(): Locator {
     return this.page.getByRole('button', { name: 'Go back' });
   }
 
   /**
-   * Navigate back from the dashboard or tab
+   * Navigate back from the full dashboard
    */
   async navigateBack(): Promise<void> {
     await this.getBackButton().click();
+  }
+
+  /**
+   * Return from the Analytics section to the Library via the tab bar
+   */
+  async navigateToLibrary(): Promise<void> {
+    await this.switchToSection('library');
   }
 
   /**

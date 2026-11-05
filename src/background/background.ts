@@ -4,13 +4,13 @@
  */
 
 import {
-  getDefaultEnabledPlatforms,
   getAllHostnamePatterns,
+  getDefaultEnabledPlatforms,
 } from "../config/platforms";
 import { StorageManager } from "../services/storage";
 import { UsageTracker } from "../services/UsageTracker";
 import type { ElementFingerprint, PlatformType } from "../types";
-import { Logger, toError, getErrorMessage } from "../utils";
+import { getErrorMessage, Logger, toError } from "../utils";
 
 // Track active element picker sessions
 const activePickerSessions = new Map<
@@ -1075,6 +1075,33 @@ async function handleExtensionUpdate(): Promise<void> {
 }
 
 /**
+ * Clean stored Prompts and Category names of Hidden characters on extension update, and again
+ * at every browser startup so a pass that failed or was cut short is retried (ADR-001). The pass
+ * writes nothing on a clean Library. Independent of the re-injection above: nothing waits for
+ * it, and a failure is logged here and never reaches the caller.
+ */
+async function upgradeStoredData(): Promise<void> {
+  try {
+    const { promptsChanged, categoriesChanged } =
+      await storageManager.upgradeStoredData();
+
+    if (promptsChanged || categoriesChanged) {
+      Logger.info("Cleaned stored data of Hidden characters", {
+        component: "Background",
+        promptsChanged,
+        categoriesChanged,
+      });
+    }
+  } catch (error) {
+    Logger.error(
+      "Error cleaning stored data of Hidden characters",
+      toError(error),
+      { component: "Background", phase: "upgrade_pass" },
+    );
+  }
+}
+
+/**
  * Get the current interface mode from storage
  */
 async function getInterfaceMode(): Promise<InterfaceMode> {
@@ -1432,6 +1459,11 @@ chrome.runtime.onConnect.addListener((port) => {
 
 // Initialize interface mode on extension startup and handle updates
 chrome.runtime.onInstalled.addListener((details) => {
+  // Clean stored data of Hidden characters after an update, alongside (not before) the rest
+  if (details.reason === "update") {
+    void upgradeStoredData();
+  }
+
   void (async () => {
     try {
       const mode = await getInterfaceMode();
@@ -1454,6 +1486,9 @@ chrome.runtime.onInstalled.addListener((details) => {
 
 // Initialize interface mode on browser startup
 chrome.runtime.onStartup.addListener(() => {
+  // Retry the upgrade pass: one that failed or was cut short on update left stored data uncleaned
+  void upgradeStoredData();
+
   void (async () => {
     try {
       const mode = await getInterfaceMode();

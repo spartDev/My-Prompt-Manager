@@ -1,6 +1,6 @@
 import { DEFAULT_SETTINGS } from '../../../src/types';
-import { test, expect } from '../fixtures/extension';
-import { CLAUDE_MOCK_HTML, CHATGPT_MOCK_HTML } from '../fixtures/mock-pages';
+import { expect, test } from '../fixtures/extension';
+import { CHATGPT_MOCK_HTML, CLAUDE_MOCK_HTML } from '../fixtures/mock-pages';
 import { CategoryManagerPage } from '../pages/CategoryManagerPage';
 import { LibraryPage } from '../pages/LibraryPage';
 import { PromptFormPage } from '../pages/PromptFormPage';

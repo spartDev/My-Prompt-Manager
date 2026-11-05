@@ -23,14 +23,14 @@ const BOT_LOGIN = 'github-actions[bot]';
 
 /**
  * Indicator bands, and MINIMUM: the statements floor that vitest.config.ts enforces
- * (coverage.thresholds.statements). scripts/__tests__/generate-coverage-comment.test.ts fails
- * when the two differ.
+ * (coverage.thresholds.statements). __tests__/generate-coverage-comment.test.ts fails when the
+ * two differ.
  */
 const COVERAGE_THRESHOLDS = Object.freeze({
   EXCELLENT: 80,
   GOOD: 60,
   FAIR: 40,
-  MINIMUM: 50
+  MINIMUM: 80
 });
 
 const METRICS = Object.freeze(['statements', 'branches', 'functions', 'lines']);
@@ -125,19 +125,16 @@ function displayPath(file, workspace) {
 
 const formatPct = (pct) => (pct === null ? '–' : `${Math.round(pct * 100) / 100}%`);
 
-function indicator(pct) {
-  if (pct >= COVERAGE_THRESHOLDS.EXCELLENT) return '🟢';
-  if (pct >= COVERAGE_THRESHOLDS.GOOD) return '🟡';
-  if (pct >= COVERAGE_THRESHOLDS.FAIR) return '🟠';
-  return '🔴';
-}
+/** The band a percentage falls in, from the best: its row indicator and its title. */
+const BANDS = Object.freeze([
+  { floor: COVERAGE_THRESHOLDS.EXCELLENT, indicator: '🟢', emoji: '🎉', label: 'Excellent' },
+  { floor: COVERAGE_THRESHOLDS.GOOD, indicator: '🟡', emoji: '👍', label: 'Good' },
+  { floor: COVERAGE_THRESHOLDS.FAIR, indicator: '🟠', emoji: '⚠️', label: 'Fair' },
+  { floor: Number.NEGATIVE_INFINITY, indicator: '🔴', emoji: '🚨', label: 'Needs Improvement' }
+]);
 
-function overallStatus(pct) {
-  if (pct >= COVERAGE_THRESHOLDS.EXCELLENT) return { emoji: '🎉', label: 'Excellent' };
-  if (pct >= COVERAGE_THRESHOLDS.GOOD) return { emoji: '👍', label: 'Good' };
-  if (pct >= COVERAGE_THRESHOLDS.FAIR) return { emoji: '⚠️', label: 'Fair' };
-  return { emoji: '🚨', label: 'Needs Improvement' };
-}
+const bandOf = (pct) => BANDS.find((band) => pct >= band.floor) ?? BANDS[BANDS.length - 1];
+const indicator = (pct) => bandOf(pct).indicator;
 
 /** A 20-cell bar; the percentage is clamped to 0–100 so the repeat counts are never negative. */
 function formatBar(pct) {
@@ -165,7 +162,7 @@ function footer(run) {
 /** The comment for a parsed summary. */
 function buildReport({ summary, run, workspace }) {
   const { total, files } = summary;
-  const status = overallStatus(total.lines.pct);
+  const status = bandOf(total.lines.pct);
   const rows = METRICS.map((metric) => {
     const { pct, covered, total: count } = total[metric];
     const name = metric[0].toUpperCase() + metric.slice(1);

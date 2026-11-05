@@ -1,232 +1,33 @@
-# Renovate Configuration Guide
+# Renovate
 
-## Overview
+`renovate.json` is the reference for every value: schedule, limits, priorities, groups, automerge, release ages. This page keeps only what the file cannot say: why some rules exist, and how to check a change.
 
-This document explains the Renovate bot configuration for the My Prompt Manager Chrome extension project. Renovate helps keep dependencies up-to-date automatically while maintaining stability and security.
+## Check a change to renovate.json
 
-## Configuration Strategy
-
-### 1. **Update Schedule**
-- **Weekly Updates**: Runs before 3am on Monday mornings
-- **Timezone**: Europe/Paris
-- Allows weekend for any critical fixes before the work week
-
-### 2. **Grouping Strategy**
-
-Dependencies are grouped logically to reduce PR noise:
-
-| Group | Packages | Rationale |
-|-------|----------|-----------|
-| **React packages** | react, react-dom, @types/react* | Core framework - test together |
-| **TypeScript & Linting** | typescript, eslint, @typescript-eslint/* | Development tooling compatibility |
-| **Build tools** | vite, @vitejs/*, @crxjs/* | Build system integrity |
-| **Testing libraries** | vitest, @testing-library/*, jsdom | Test suite compatibility |
-| **Tailwind CSS** | tailwindcss, autoprefixer, postcss | CSS processing chain |
-| **Chrome types** | @types/chrome | Extension API compatibility |
-| **GitHub Actions** | All actions | CI/CD consistency |
-| **Git hooks** | husky, lint-staged | Pre-commit workflow |
-
-### 3. **Priority System**
-
-Updates are prioritized based on importance:
-
-1. **Security vulnerabilities** (Priority: 20) - Immediate attention
-2. **Chrome extension types** (Priority: 5) - Critical for extension functionality  
-3. **Regular updates** (Priority: 0) - Standard priority
-4. **Major updates** (Priority: -1) - Requires careful review
-
-### 4. **Automerge Rules**
-
-#### Automatically Merged:
-- ✅ DevDependencies patches (low risk)
-- ✅ GitHub Actions updates (well-tested)
-- ✅ Minor/patch updates after 3-day stability period
-
-#### Manual Review Required:
-- ⚠️ Major version updates
-- ⚠️ Chrome extension critical dependencies (@crxjs/vite-plugin)
-- ⚠️ Security-sensitive packages (dompurify)
-- ⚠️ React major versions (7-day stability period)
-
-### 5. **Stability Measures**
-
-- **Minimum Release Age**: 3 days for most packages
-- **React Stability**: 7 days minimum before considering updates
-- **Rebase Strategy**: Automatically rebase when behind base branch
-- **PR Limits**: Max 3 concurrent PRs, 2 per hour
-
-## Special Considerations for Chrome Extensions
-
-### Critical Dependencies
-
-The following packages are handled with extra care:
-
-1. **@crxjs/vite-plugin** - Pinned version, manual review only
-   - Breaking changes can affect extension building
-   - Test thoroughly after updates
-
-2. **@types/chrome** - Never auto-merged
-   - API changes can break extension functionality
-   - Review Chrome extension documentation for compatibility
-
-3. **manifest.json** - Not managed by Renovate
-   - Manual updates only for manifest version changes
-
-### Testing Requirements
-
-After dependency updates, always:
-
-1. **Run full test suite**: `npm test`
-2. **Build extension**: `npm run build`
-3. **Manual testing**:
-   - Load extension in Chrome developer mode
-   - Test popup interface functionality
-   - Verify content script on all supported platforms:
-     - Claude.ai
-     - ChatGPT.com
-     - Perplexity.ai
-   - Check custom site configuration
-
-## Dependency Dashboard
-
-Renovate creates a dashboard issue showing:
-- Pending updates
-- Ignored updates
-- Rate-limited updates
-- Recently closed PRs
-
-Access via: Issues → "🔄 Dependency Updates Dashboard"
-
-## Handling Renovate PRs
-
-### For Minor/Patch Updates:
-
-1. Review the changelog (Renovate provides links)
-2. Check CI/CD status (automated tests)
-3. For grouped updates, ensure compatibility
-4. Merge if all checks pass
-
-### For Major Updates:
-
-1. Read breaking changes carefully
-2. Check migration guides
-3. Update code if necessary
-4. Run full test suite locally
-5. Test extension manually
-6. Update documentation if needed
-
-### For Security Updates:
-
-1. **Priority**: Address immediately
-2. Review the vulnerability details
-3. Test affected functionality
-4. Deploy quickly after verification
-
-## Common Commands
-
-### Renovate Control Comments
-
-Add these comments to PRs to control Renovate:
-
-- `@renovate-bot rebase` - Manually trigger rebase
-- `@renovate-bot recreate` - Recreate the PR
-- `@renovate-bot retry` - Retry failed status checks
-
-### Temporarily Disable Updates
-
-Add to renovate.json:
-```json
-{
-  "enabled": false
-}
+```bash
+npm run lint:renovate
 ```
 
-Or for specific packages:
-```json
-{
-  "ignoreDeps": ["package-name"]
-}
-```
+It runs Renovate's `renovate-config-validator --strict` on `renovate.json` as a repository config, from a pinned Renovate version, through `npx`: nothing is added to `package.json` dependencies. Exit 0 means valid; an unknown or deprecated option (`matchPackagePatterns`, `stabilityDays`…) exits 1. The first run downloads Renovate (about 3 minutes), later runs take about 25 seconds. The lines `RE2 not usable` and the `re2` stack trace are noise: Renovate falls back to `RegExp`. Renovate needs Node `^24.11`; a newer Node prints an `EBADENGINE` warning and still works.
 
-## Best Practices
+The version in the script is pinned by hand (Renovate does not update `npx` arguments). Bump it when the validator rejects an option that the current Renovate docs list.
 
-1. **Don't ignore security updates** - Address them promptly
-2. **Test grouped updates together** - They're grouped for compatibility
-3. **Read changelogs** - Especially for minor updates that might have features
-4. **Keep dashboard clean** - Close or merge PRs regularly
-5. **Update major versions during low activity** - Plan for potential issues
+## Why the rules exist
 
-## Customization Options
+- **Groups**: packages that must move together (React and its types, Vite and its plugins, Vitest and its coverage, Tailwind and PostCSS) share a group so that one PR carries a consistent set.
+- **`vite ecosystem (major)` group**: `@vitejs/plugin-react` follows Vite's major (6.x needs `vite ^8`), so neither can be installed alone. Their majors land in one PR.
+- **Majors need approval**: a major PR opens only once ticked in the Dependency Dashboard issue (`dependencyDashboardApproval`), so majors land when someone has time to read the migration guide.
+- **`constraints.npm: ^11` and the disabled `renovate-config` npm rule**: npm 12 breaks lockfile updates (npm/cli#9800, `EALLOWREMOTE`). The disabled rule keeps Renovate from bumping its own constraint. Remove both together, see beads `My-Prompt-Manager-67o`.
+- **Automerge**: only devDependency patches and GitHub Actions. Runtime dependencies, `@types/chrome` and `@crxjs/vite-plugin` change what runs in the extension and get a human merge. Renovate applies `packageRules` in order and a later rule wins, so their `automerge: false` rules come after the devDependency patch rule (both are devDependencies): keep it that way.
+- **`minimumReleaseAge`**: a release must be some days old before Renovate proposes it, so a broken or yanked release is caught upstream first (longer for `react` and `react-dom`).
 
-### Adding New Package Groups
+## How a Renovate PR merges
 
-```json
-{
-  "packageRules": [
-    {
-      "description": "Group description",
-      "matchPackagePatterns": ["pattern"],
-      "groupName": "group-name",
-      "groupSlug": "group-slug"
-    }
-  ]
-}
-```
+Renovate PRs pass the same gate as any PR: `✅ Quality Gate Summary`, the only required check of `main` (`.github/workflows/README.md`). Automerge waits for it. An unresolved review thread (Codex included) also blocks the merge, even on a green, automerge PR.
 
-### Changing Schedule
-
-```json
-{
-  "schedule": ["after 10pm on weekdays", "before 5am on weekdays"]
-}
-```
-
-### Adjusting Automerge
-
-```json
-{
-  "packageRules": [
-    {
-      "matchPackageNames": ["safe-package"],
-      "automerge": true,
-      "automergeType": "branch"
-    }
-  ]
-}
-```
-
-## Troubleshooting
-
-### Issue: Too many PRs at once
-**Solution**: Adjust `prConcurrentLimit` and `prHourlyLimit`
-
-### Issue: Updates breaking CI
-**Solution**: Increase `minimumReleaseAge` and `stabilityDays`
-
-### Issue: Missing updates
-**Check**: 
-- Dependency Dashboard for ignored/blocked updates
-- Repository settings for Renovate app permissions
-- Branch protection rules
-
-### Issue: Failing to rebase
-**Solution**: Check for merge conflicts, may need manual intervention
+The CI `Security & Dependencies` job runs `npm audit --audit-level=moderate` on the whole tree. A new transitive advisory therefore fails every Renovate PR at once: fix it on `main`, not PR by PR.
 
 ## Resources
 
-- [Renovate Documentation](https://docs.renovatebot.com/)
-- [Renovate Presets](https://docs.renovatebot.com/presets-default/)
-- [Configuration Options](https://docs.renovatebot.com/configuration-options/)
-- [Package Rules](https://docs.renovatebot.com/configuration-options/#packagerules)
-
-## Support
-
-For Renovate issues:
-1. Check the Dependency Dashboard first
-2. Review Renovate logs in PR comments
-3. Visit [Renovate Discussions](https://github.com/renovatebot/renovate/discussions)
-
-For project-specific issues:
-1. Create an issue in the repository
-2. Tag with `dependencies` label
-3. Include Renovate PR link if applicable
+- [Configuration options](https://docs.renovatebot.com/configuration-options/)
+- [Config validation](https://docs.renovatebot.com/config-validation/)

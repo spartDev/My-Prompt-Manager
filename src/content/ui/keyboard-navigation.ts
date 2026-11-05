@@ -32,6 +32,8 @@ export class KeyboardNavigationManager {
     const searchInput = this.selector.querySelector('.search-input');
     if (searchInput) {
       setTimeout(() => {
+        // Destroyed meanwhile (selector closed, or replaced by the variable form): leave focus alone
+        if (!this.isActive) {return;}
         (searchInput as HTMLInputElement).focus();
         debug('Focused search input for keyboard navigation');
       }, 100);

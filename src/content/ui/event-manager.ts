@@ -4,7 +4,7 @@
  */
 
 import type { EventListenerEntry } from '../types/index';
-import { warn, debug } from '../utils/logger';
+import { debug, warn } from '../utils/logger';
 
 export class EventManager {
   private listeners: Map<EventTarget, EventListenerEntry[]>;

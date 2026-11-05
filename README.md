@@ -2,8 +2,7 @@
 
 [![Version](https://img.shields.io/badge/version-1.9.0-blue.svg)](https://github.com/spartDev/My-Prompt-Manager)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Chrome](https://img.shields.io/badge/Chrome-114%2B-yellow.svg)](https://www.google.com/chrome/)
-[![Tests](https://img.shields.io/badge/tests-1692%20passing-brightgreen.svg)](https://github.com/spartDev/My-Prompt-Manager)
+[![Chrome](https://img.shields.io/badge/Chrome-116%2B-yellow.svg)](https://www.google.com/chrome/)
 
 Transform your AI interactions with a powerful personal prompt library that integrates seamlessly with Claude, ChatGPT, Gemini, Mistral, Perplexity, and Microsoft Copilot. Store, organize, share, and instantly insert your best prompts with one click.
 
@@ -19,7 +18,7 @@ Transform your AI interactions with a powerful personal prompt library that inte
 ✅ **Quick Actions:** One-click copy to clipboard, edit in-place, and bulk operations  
 ✅ **Dark Mode Support:** Beautiful dark theme with automatic system preference detection  
 ✅ **Data Persistence:** Automatic saving using Chrome's storage API with quota monitoring  
-✅ **Security First:** DOMPurify sanitization for XSS protection  
+✅ **Security First:** Prompts are inserted exactly as written, as plain text and never as markup; hidden characters are removed when text is saved  
 ✅ **Import/Export:** JSON backup and restore functionality with data portability
 
 ### AI Platform Integration
@@ -29,7 +28,7 @@ Transform your AI interactions with a powerful personal prompt library that inte
 ✅ **Keyboard Navigation:** Full keyboard support for accessibility
 ✅ **Custom Sites:** Add support for any AI platform through settings
 ✅ **Theme Synchronization:** Matches the host platform's theme automatically
-✅ **Side Panel Support:** Chrome 114+ dual interface mode (popup or side panel)
+✅ **Side Panel Support:** Chrome 116+ dual interface mode (popup or side panel)
 
 ### Analytics Dashboard (New in v1.8)
 ✅ **Usage Tracking:** Track prompt usage across all platforms
@@ -56,27 +55,29 @@ See our [Platform Integration Guide](docs/PLATFORM_INTEGRATION.md) to add your o
 
 ## 💻 Tech Stack
 
-| Technology | Purpose | Version |
-|------------|---------|---------|
-| **React** | UI Framework | 19.2.3 |
-| **TypeScript** | Type Safety | 5.9.3 |
-| **Tailwind CSS** | Styling | 4.1.17 |
-| **Vite** | Build Tool | 7.3.1 |
-| **Vitest** | Testing Framework | 4.0.17 |
-| **DOMPurify** | XSS Protection | 3.3.1 |
-| **Husky** | Git Hooks | 9.1.7 |
-| **@crxjs/vite-plugin** | Chrome Extension Support | 2.3.0 |
-| **Recharts** | Analytics Charts | 3.6.0 |
-| **@floating-ui/dom** | Floating UI | 1.7.4 |
-| **uuid** | UUID Generation | 13.0.0 |
-| **lz-string** | String Compression | 1.5.0 |
+| Technology | Purpose |
+|------------|---------|
+| **React** | UI Framework |
+| **TypeScript** | Type Safety |
+| **Tailwind CSS** | Styling |
+| **Vite** | Build Tool |
+| **Vitest** | Testing Framework |
+| **DOMPurify** | XSS Protection |
+| **Husky** | Git Hooks |
+| **@crxjs/vite-plugin** | Chrome Extension Support |
+| **Recharts** | Analytics Charts |
+| **@floating-ui/dom** | Floating UI |
+| **uuid** | UUID Generation |
+| **lz-string** | String Compression |
+
+Versions: `package.json`.
 
 ## 📦 Installation
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) 22+ (LTS recommended)
-- [Chrome Browser](https://www.google.com/chrome/) 114+
+- [Node.js](https://nodejs.org/) 22.22.2+, 24.15+ or 26+ (LTS recommended; odd-numbered releases such as 25 are not supported)
+- [Chrome Browser](https://www.google.com/chrome/) 116+
 - [Git](https://git-scm.com/) for cloning the repository
 
 ### Development Setup
@@ -125,11 +126,11 @@ See our [Platform Integration Guide](docs/PLATFORM_INTEGRATION.md) to add your o
 |---------|-------------|--------|
 | `npm run dev` | Start development server with HMR | Development |
 | `npm run build` | Create production build | Deployment |
-| `npm test` | Run test suite (1692 tests) | Testing |
+| `npm test` | Run the Vitest suite | Testing |
 | `npm run test:ui` | Run tests with Vitest UI | Interactive Testing |
 | `npm run test:coverage` | Generate coverage report | Code Coverage |
-| `npm run lint` | Run ESLint checks | Code Quality |
-| `npm run lint:fix` | Auto-fix ESLint issues | Code Formatting |
+| `npm run lint` | Run Biome lint checks | Code Quality |
+| `npm run lint:fix` | Auto-fix Biome lint issues | Code Formatting |
 | `npm run typecheck` | TypeScript type checking | Code Quality |
 | `npm run test:e2e` | Run Playwright E2E tests | E2E Testing |
 | `npm run package` | Package extension for distribution | Chrome Web Store |
@@ -254,7 +255,7 @@ The extension automatically detects your system theme preference. You can also t
 
 ## 🧪 Testing
 
-The project includes a comprehensive test suite with 1692 tests across 607 test files.
+The project includes a Vitest unit and integration suite and a Playwright end-to-end suite.
 
 ### Running Tests
 
@@ -315,7 +316,7 @@ npm test -- src/content/platforms/__tests__/claude-strategy.test.ts
 ### Security Features
 
 - **Content Security Policy (CSP):** Strict CSP prevents XSS attacks
-- **DOMPurify Integration:** All user content is sanitized
+- **DOMPurify Integration:** Used for custom site configuration security only; Prompt text is stored as written (Hidden characters are removed once, when it is saved) and is never rewritten on read, on insertion or on display
 - **Minimal Permissions:** Only essential Chrome APIs requested
 - **Restricted Host Access:** No code execution on unrelated sites
 - **Chrome Web Store Compliance:** Follows security best practices
@@ -335,10 +336,10 @@ npm test -- src/content/platforms/__tests__/claude-strategy.test.ts
 
 | Browser | Minimum Version | Status |
 |---------|----------------|---------|
-| Chrome | 114+ | ✅ Fully Supported |
-| Edge | 114+ | ✅ Fully Supported |
+| Chrome | 116+ | ✅ Fully Supported |
+| Edge | 116+ | ✅ Fully Supported |
 | Brave | 1.58+ | ✅ Fully Supported |
-| Opera | 100+ | ⚠️ Should work (untested) |
+| Opera | 102+ | ⚠️ Should work (untested) |
 | Firefox | - | ❌ Not supported (Manifest V3) |
 
 ## 🤝 Contributing
@@ -378,7 +379,7 @@ We welcome contributions! Please follow these guidelines:
 ### Code Style Guidelines
 
 - Use TypeScript for all new code
-- Follow ESLint configuration
+- Follow Biome lint configuration
 - Write comprehensive tests
 - Document complex logic
 - Use meaningful variable names
@@ -456,8 +457,8 @@ window.__promptLibraryDebug?.testInsertion?.('test content')
 - [x] Multi-platform AI integration (8 platforms)
 - [x] Dark mode support
 - [x] Custom site configuration
-- [x] Comprehensive testing (1692 tests)
-- [x] Side Panel Support (Chrome 114+)
+- [x] Comprehensive testing (Vitest and Playwright)
+- [x] Side Panel Support (Chrome 116+)
 - [x] Enhanced Security Architecture
 - [x] Import/Export functionality (JSON)
 - [x] Programmatic Content Script Injection

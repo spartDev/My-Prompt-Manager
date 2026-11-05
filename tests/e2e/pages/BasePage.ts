@@ -1,4 +1,6 @@
-import type { Page, Locator } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
+
+import { type Section, tabNavigation } from '../utils/navigation';
 
 /**
  * Base page class containing common functionality used across all pages
@@ -8,7 +10,7 @@ import type { Page, Locator } from '@playwright/test';
  * should be performed in test files or using utilities from assertions.ts.
  */
 export abstract class BasePage {
-  constructor(protected page: Page) {}
+  constructor(readonly page: Page) {}
 
   /**
    * Wait for the page to be fully loaded
@@ -42,6 +44,27 @@ export abstract class BasePage {
   }
 
   /**
+   * Get the bottom tab bar (Main navigation landmark)
+   */
+  getTabBar(): Locator {
+    return tabNavigation.getTabBar(this.page);
+  }
+
+  /**
+   * Get the tab bar tab for a Section
+   */
+  getSectionTab(section: Section): Locator {
+    return tabNavigation.getTab(this.page, section);
+  }
+
+  /**
+   * Switch to a Section via the bottom tab bar and wait for its header
+   */
+  async switchToSection(section: Section): Promise<void> {
+    await tabNavigation.switchTo(this.page, section);
+  }
+
+  /**
    * Go back to the previous page
    */
   async goBack(): Promise<void> {
@@ -65,6 +88,8 @@ export abstract class BasePage {
 
   /**
    * Get back button using data-testid attribute
+   * Only the Add/Edit prompt forms (and the full analytics dashboard) have one;
+   * Sections are switched via the tab bar.
    */
   protected getBackButton(): Locator {
     return this.page.getByTestId('back-button').first();

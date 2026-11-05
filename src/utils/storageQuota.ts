@@ -1,28 +1,33 @@
 /**
  * Storage quota utilities for proactive quota management
- * Chrome storage.local limit: 5MB (5,242,880 bytes)
+ * Chrome storage.local limit: 10 MB (10,485,760 bytes) since Chrome 114
  */
 
 /**
  * Storage quota thresholds for different warning levels
  */
 export const QUOTA_THRESHOLDS = {
-  SAFE: 0.7,      // 70% - Safe to write
-  WARNING: 0.85,  // 85% - Show warning
-  CRITICAL: 0.95, // 95% - Block non-critical writes
+  SAFE: 0.7,      // 70% - Below it the warning level is 'safe'; from it, 'warning'
+  WARNING: 0.85,  // 85% - From it, 'critical'
+  CRITICAL: 0.95, // 95% - From it, 'danger'
   DANGER: 0.98    // 98% - Block all writes
 } as const;
 
+export type StorageWarningLevel = 'safe' | 'warning' | 'critical' | 'danger';
+
 /**
- * Estimated average sizes for different data types
- * Based on testing with 20K character limit
+ * How full Chrome storage is, by QUOTA_THRESHOLDS: SAFE, WARNING and CRITICAL each start the next level
+ *
+ * @param used Bytes in use, as chrome.storage.local.getBytesInUse counts them
+ * @param total The quota, chrome.storage.local.QUOTA_BYTES
  */
-export const ESTIMATED_SIZES = {
-  PROMPT_BASE: 300,           // Base overhead per prompt (ID, timestamps, metadata)
-  PROMPT_PER_CHAR: 2,         // Bytes per character (UTF-8 encoding)
-  CATEGORY: 100,              // Average category size
-  SETTINGS: 500               // Settings object size
-} as const;
+export function storageWarningLevel(used: number, total: number): StorageWarningLevel {
+  const share = used / total;
+  if (share < QUOTA_THRESHOLDS.SAFE) {return 'safe';}
+  if (share < QUOTA_THRESHOLDS.WARNING) {return 'warning';}
+  if (share < QUOTA_THRESHOLDS.CRITICAL) {return 'critical';}
+  return 'danger';
+}
 
 /**
  * Check if there's enough quota available before writing data
@@ -77,122 +82,56 @@ export function checkQuotaAvailability(
   };
 }
 
-/**
- * Estimate the size of a prompt in bytes
- *
- * @param title Prompt title
- * @param content Prompt content
- * @param category Category name
- * @returns Estimated size in bytes
- */
-export function estimatePromptSize(
-  title: string,
-  content: string,
-  category: string
-): number {
-  const titleBytes = title.length * ESTIMATED_SIZES.PROMPT_PER_CHAR;
-  const contentBytes = content.length * ESTIMATED_SIZES.PROMPT_PER_CHAR;
-  const categoryBytes = category.length * ESTIMATED_SIZES.PROMPT_PER_CHAR;
+const utf8 = new TextEncoder();
 
-  return ESTIMATED_SIZES.PROMPT_BASE + titleBytes + contentBytes + categoryBytes;
+// Chrome writes these characters as 6-byte \uXXXX escapes in the JSON it stores
+const ESCAPED_BY_CHROME = /[<\u2028\u2029]/g;
+const escapeLikeChrome = (char: string) => `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`;
+
+// Chrome writes an integer past 32 bits, such as a timestamp, as a double: 1793212345678 becomes
+// 1.793212345678e+12, at most 5 bytes longer than its JSON
+const DOUBLE_EXTRA_BYTES = 5;
+const isStoredAsDouble = (value: unknown) =>
+  typeof value === 'number' && Number.isInteger(value) && (value > 2 ** 31 - 1 || value < -(2 ** 31));
+
+/**
+ * The bytes `value` takes in chrome.storage.local: the JSON Chrome stores, in UTF-8, as getBytesInUse
+ * counts it. It never counts less than Chrome: an integer past 32 bits counts its longest form.
+ */
+export function storedSize(value: unknown): number {
+  let doubles = 0;
+  const json = JSON.stringify(value, (_key, item: unknown) => {
+    if (isStoredAsDouble(item)) {
+      doubles += 1;
+    }
+    return item;
+  });
+  return utf8.encode(json.replace(ESCAPED_BY_CHROME, escapeLikeChrome)).length + doubles * DOUBLE_EXTRA_BYTES;
 }
 
 /**
- * Estimate the size of an array of prompts
- *
- * @param prompts Array of prompts to estimate
- * @returns Estimated total size in bytes
- */
-export function estimatePromptsArraySize(
-  prompts: Array<{ title: string; content: string; category: string }>
-): number {
-  return prompts.reduce((total, prompt) => {
-    return total + estimatePromptSize(prompt.title, prompt.content, prompt.category);
-  }, 0);
-}
-
-/**
- * Calculate maximum number of prompts that can fit in available storage
- * Assumes average prompt size based on 20K character limit
- *
- * @param availableBytes Available storage in bytes
- * @param averagePromptLength Average prompt content length (default: 5000 chars)
- * @returns Estimated maximum number of prompts
- */
-export function calculateMaxPrompts(
-  availableBytes: number,
-  averagePromptLength: number = 5000
-): number {
-  // Average prompt: base + title (50 chars) + content (avg length) + category (10 chars)
-  const avgPromptSize =
-    ESTIMATED_SIZES.PROMPT_BASE +
-    (50 * ESTIMATED_SIZES.PROMPT_PER_CHAR) +
-    (averagePromptLength * ESTIMATED_SIZES.PROMPT_PER_CHAR) +
-    (10 * ESTIMATED_SIZES.PROMPT_PER_CHAR);
-
-  return Math.floor(availableBytes / avgPromptSize);
-}
-
-/**
- * Format bytes to human-readable string
+ * A size as every storage display shows it, the refusal reasons included: "0 Bytes", "1.5 KB", "10 MB"
  *
  * @param bytes Number of bytes
- * @returns Formatted string (e.g., "1.5 MB", "256 KB")
  */
 export function formatBytes(bytes: number): string {
-  if (bytes === 0) {return '0 B';}
-
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-
-  return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
+  if (bytes === 0) {return '0 Bytes';}
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), sizes.length - 1);
+  return `${String(parseFloat((bytes / 1024 ** i).toFixed(2)))} ${sizes[i]}`;
 }
 
 /**
- * Get storage statistics and recommendations
+ * Chrome storage use as the Settings bar and the storage warning both show it, so they never disagree:
+ * the share of the quota in use as a whole percentage, and the two sizes.
  *
- * @param used Current storage usage
- * @param total Total storage quota
- * @returns Storage statistics with recommendations
+ * @param used Bytes in use, as chrome.storage.local.getBytesInUse counts them
+ * @param total The quota, chrome.storage.local.QUOTA_BYTES
  */
-export function getStorageStats(
-  used: number,
-  total: number
-): {
-  percentage: number;
-  available: number;
-  warningLevel: 'safe' | 'warning' | 'critical' | 'danger';
-  recommendation: string;
-  estimatedPromptsRemaining: number;
-} {
-  const percentage = (used / total) * 100;
-  const available = total - used;
-
-  let warningLevel: 'safe' | 'warning' | 'critical' | 'danger';
-  let recommendation: string;
-
-  if (percentage < QUOTA_THRESHOLDS.SAFE * 100) {
-    warningLevel = 'safe';
-    recommendation = 'Storage is healthy. You can continue adding prompts.';
-  } else if (percentage < QUOTA_THRESHOLDS.WARNING * 100) {
-    warningLevel = 'warning';
-    recommendation = 'Storage is getting full. Consider deleting unused prompts or exporting data.';
-  } else if (percentage < QUOTA_THRESHOLDS.CRITICAL * 100) {
-    warningLevel = 'critical';
-    recommendation = 'Storage is critically low. Delete prompts soon to avoid issues.';
-  } else {
-    warningLevel = 'danger';
-    recommendation = 'Storage is nearly full! Delete prompts immediately or risk data loss.';
-  }
-
-  const estimatedPromptsRemaining = calculateMaxPrompts(available);
-
+export function describeStorageUsage(used: number, total: number): { percentage: number; used: string; total: string } {
   return {
-    percentage,
-    available,
-    warningLevel,
-    recommendation,
-    estimatedPromptsRemaining
+    percentage: total > 0 ? Math.min(Math.round((used / total) * 100), 100) : 0,
+    used: formatBytes(used),
+    total: formatBytes(total)
   };
 }

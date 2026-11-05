@@ -1,17 +1,18 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { DEFAULT_CATEGORY_COLOR } from '../constants/colors';
 import { StorageManager } from '../services/storage';
 import { UsageTracker } from '../services/UsageTracker';
-import { UsageEvent, AppError, Prompt, USAGE_RETENTION_DAYS } from '../types';
-import {
-  UsageStats,
-  UseUsageStatsReturn,
-  DailyUsage,
-  PlatformBreakdown,
-  DayOfWeekDistribution,
-  TimeOfDayDistribution,
+import { type AppError, type Category, type Prompt, USAGE_RETENTION_DAYS, type UsageEvent } from '../types';
+import type {
   CategoryDistribution,
-  PromptUsageSummary
+  DailyUsage,
+  DayOfWeekDistribution,
+  PlatformBreakdown,
+  PromptUsageSummary, 
+  TimeOfDayDistribution,
+  UsageStats,
+  UseUsageStatsReturn
 } from '../types/hooks';
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -36,10 +37,12 @@ function getTimeBucket(hour: number): string {
 }
 
 /**
- * Format date as YYYY-MM-DD
+ * Format date as YYYY-MM-DD, its local calendar day (like Day of Week and Time of Day)
  */
 function formatDate(date: Date): string {
-  return date.toISOString().split('T')[0];
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${String(date.getFullYear())}-${month}-${day}`;
 }
 
 /**
@@ -144,15 +147,18 @@ function calculateTimeOfDayDistribution(events: UsageEvent[]): TimeOfDayDistribu
  */
 function calculateCategoryDistribution(
   events: UsageEvent[],
-  prompts: Prompt[]
+  prompts: Prompt[],
+  categories: Category[]
 ): CategoryDistribution[] {
-  const categoryCounts = new Map<string | null, number>();
+  const categoryCounts = new Map<string, number>();
 
   // Create a map of promptId to category name
   const promptCategories = new Map<string, string>();
   for (const prompt of prompts) {
     promptCategories.set(prompt.id, prompt.category);
   }
+
+  const categoryColors = new Map(categories.map(category => [category.name, category.color]));
 
   for (const event of events) {
     const categoryName = promptCategories.get(event.promptId) ?? 'Unknown';
@@ -162,8 +168,10 @@ function calculateCategoryDistribution(
   return Array.from(categoryCounts.entries())
     .map(([name, count]) => ({
       categoryId: name, // Using name as ID since we have the name
-      name: name ?? 'Uncategorized',
-      count
+      name,
+      count,
+      // A Category stored without a color, or no longer stored, takes the default color, as in the Library
+      color: categoryColors.get(name) || DEFAULT_CATEGORY_COLOR
     }))
     .sort((a, b) => b.count - a.count);
 }
@@ -258,6 +266,7 @@ function calculatePromptSummaries(
 export function useUsageStats(): UseUsageStatsReturn {
   const [history, setHistory] = useState<UsageEvent[]>([]);
   const [prompts, setPrompts] = useState<Prompt[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<AppError | null>(null);
 
@@ -269,20 +278,21 @@ export function useUsageStats(): UseUsageStatsReturn {
       setLoading(true);
       setError(null);
 
-      // Fetch both history and prompts in parallel
-      const [usageHistory, allPrompts] = await Promise.all([
+      // Fetch history, prompts and categories in parallel
+      const [usageHistory, allPrompts, allCategories] = await Promise.all([
         usageTracker.getHistory(),
-        storageManager.getPrompts()
+        storageManager.getPrompts(),
+        storageManager.getCategories()
       ]);
 
       setHistory(usageHistory);
       setPrompts(allPrompts);
+      setCategories(allCategories);
     } catch (err) {
       setError(err as AppError);
     } finally {
       setLoading(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Singletons never change
 
   const clearHistory = useCallback(async () => {
@@ -297,7 +307,6 @@ export function useUsageStats(): UseUsageStatsReturn {
     } finally {
       setLoading(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Singleton never changes
 
   // Compute stats from history and prompts
@@ -314,12 +323,12 @@ export function useUsageStats(): UseUsageStatsReturn {
       platformBreakdown: calculatePlatformBreakdown(history),
       dayOfWeekDistribution: calculateDayOfWeekDistribution(history),
       timeOfDayDistribution: calculateTimeOfDayDistribution(history),
-      categoryDistribution: calculateCategoryDistribution(history, prompts),
+      categoryDistribution: calculateCategoryDistribution(history, prompts, categories),
       topPrompts,
       recentPrompts,
       forgottenPrompts
     };
-  }, [history, prompts, loading]);
+  }, [history, prompts, categories, loading]);
 
   // Initial load
   useEffect(() => {

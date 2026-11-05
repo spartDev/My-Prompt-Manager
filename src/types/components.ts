@@ -1,6 +1,6 @@
-import { UseSearchWithDebounceReturn } from './hooks';
+import type { UseSearchWithDebounceReturn } from './hooks';
 
-import { Prompt, Category, SortOrder, SortDirection } from './index';
+import type { Category, LibraryFilter, Prompt } from './index';
 
 // Shared toast type for consistent usage across components
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
@@ -10,8 +10,8 @@ export interface PromptCardProps {
   prompt: Prompt;
   categories: Category[];
   onEdit: (prompt: Prompt) => void;
-  onDelete: (id: string) => void;
   onCopy: (content: string) => void;
+  onTogglePin: (id: string) => void;
   showToast: (message: string, type: ToastType) => void;
   isSelected?: boolean;
   searchQuery?: string;
@@ -35,22 +35,20 @@ export interface EditPromptFormProps {
   categories: Category[];
   onSubmit: (data: { title: string; content: string; category: string }) => Promise<void> | void;
   onCancel: () => void;
+  onDelete: (id: string) => void;
 }
 
 export interface LibraryViewProps {
   prompts: Prompt[];
   categories: Category[];
   searchWithDebounce: UseSearchWithDebounceReturn;
-  selectedCategory: string | null;
+  libraryFilter: LibraryFilter;
   onAddNew: () => void;
   onEditPrompt: (prompt: Prompt) => void;
-  onDeletePrompt: (id: string) => void;
+  onTogglePin: (id: string) => void;
   onCopyPrompt: (content: string) => void;
   showToast: (message: string, type: ToastType) => void;
-  onCategoryChange: (category: string | null) => void;
-  onManageCategories: () => void;
-  onSettings: () => void;
-  onAnalytics: () => void;
+  onLibraryFilterChange: (filter: LibraryFilter) => void;
   loading?: boolean;
   context?: 'popup' | 'sidepanel';
 }
@@ -79,13 +77,3 @@ export interface ConfirmDialogProps {
   onCancel: () => void;
 }
 
-export interface FilterSortControlsProps {
-  categories: Category[];
-  selectedCategory: string | null;
-  sortOrder: SortOrder;
-  sortDirection: SortDirection;
-  onCategoryChange: (category: string | null) => void;
-  onSortChange: (order: SortOrder, direction: SortDirection) => void;
-  onManageCategories: () => void;
-  loading?: boolean;
-}

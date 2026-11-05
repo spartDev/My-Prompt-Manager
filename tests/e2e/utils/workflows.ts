@@ -5,11 +5,12 @@
  * common user interaction patterns across multiple test files.
  */
 
-import type { Page, BrowserContext, Download } from '@playwright/test';
+import type { BrowserContext, Download, Page } from '@playwright/test';
 
 import { expect } from '../fixtures/extension';
 
 import { assertions } from './assertions';
+import { tabNavigation } from './navigation';
 
 export interface PromptData {
   title?: string;
@@ -59,8 +60,7 @@ export const promptWorkflows = {
   edit: async (page: Page, originalTitle: string, updates: Partial<PromptData>): Promise<void> => {
     // Open actions menu and click edit
     const promptCard = page.getByTestId('prompt-card').filter({ has: page.getByRole('heading', { name: originalTitle }) }).first();
-    await promptCard.getByRole('button', { name: 'More actions' }).click();
-    await page.getByRole('menuitem', { name: 'Edit' }).click();
+    await promptCard.getByRole('button', { name: /^Edit / }).click();
     await assertions.navigation.promptFormEdit(page);
 
     // Apply updates
@@ -94,8 +94,8 @@ export const promptWorkflows = {
   delete: async (page: Page, promptTitle: string, confirm: boolean = true): Promise<void> => {
     // Open actions menu and click delete
     const promptCard = page.getByTestId('prompt-card').filter({ has: page.getByRole('heading', { name: promptTitle }) }).first();
-    await promptCard.getByRole('button', { name: 'More actions' }).click();
-    await page.getByRole('menuitem', { name: 'Delete' }).click();
+    await promptCard.getByRole('button', { name: /^Edit / }).click();
+    await page.getByRole('button', { name: 'Delete prompt' }).click();
 
     // Handle confirmation dialog
     await assertions.dialogs.confirmationVisible(page, 'Delete Prompt');
@@ -123,21 +123,18 @@ export const promptWorkflows = {
  */
 export const categoryWorkflows = {
   /**
-   * Open category manager from library
+   * Open the Categories section via the tab bar
    */
   openManager: async (page: Page): Promise<void> => {
-    await page.getByRole('button', { name: 'Manage categories' }).click();
+    await tabNavigation.switchTo(page, 'categories');
     await assertions.navigation.categoryManagerOpen(page);
   },
 
   /**
-   * Close category manager and return to library
-   * CategoryManager uses a Back button, not a Close button
+   * Leave the Categories section and return to the Library via the tab bar
    */
   closeManager: async (page: Page): Promise<void> => {
-    const backButton = page.getByTestId('back-button').first();
-    await expect(backButton).toBeVisible();
-    await backButton.click();
+    await tabNavigation.switchTo(page, 'library');
     await assertions.navigation.onLibraryPage(page);
   },
 
@@ -222,12 +219,7 @@ export const searchWorkflows = {
    * Filter by category and verify results
    */
   filterByCategoryAndVerify: async (page: Page, category: string, expectedCount: number): Promise<void> => {
-    // Click the filter button to open dropdown
-    await page.getByRole('button', { name: /Filter by category:/i }).click();
-    // Wait for menu to appear
-    await page.getByRole('menu', { name: 'Category filter menu' }).waitFor();
-    // Click the category option
-    await page.getByRole('menuitem', { name: category }).click();
+    await page.getByRole('radiogroup', { name: 'Library filter' }).getByRole('radio', { name: category, exact: true }).click();
     await assertions.prompts.count(page, expectedCount);
   },
 
@@ -235,12 +227,7 @@ export const searchWorkflows = {
    * Clear all filters and search
    */
   clearAllFilters: async (page: Page): Promise<void> => {
-    // Click the filter button to open dropdown
-    await page.getByRole('button', { name: /Filter by category:/i }).click();
-    // Wait for menu to appear
-    await page.getByRole('menu', { name: 'Category filter menu' }).waitFor();
-    // Click "All Categories" to clear
-    await page.getByRole('menuitem', { name: 'All Categories' }).click();
+    await page.getByRole('radiogroup', { name: 'Library filter' }).getByRole('radio', { name: 'All', exact: true }).click();
     await page.getByPlaceholder('Search your prompts...').clear();
   },
 
@@ -261,18 +248,15 @@ export const navigationWorkflows = {
    * Navigate to settings and verify
    */
   toSettings: async (page: Page): Promise<void> => {
-    await page.getByRole('button', { name: 'Settings' }).click();
+    await tabNavigation.switchTo(page, 'settings');
     await assertions.navigation.onSettingsPage(page);
   },
 
   /**
-   * Navigate to library and verify
-   * Uses back button since views no longer have "Library" navigation button
+   * Navigate to library via the tab bar and verify
    */
   toLibrary: async (page: Page): Promise<void> => {
-    const backButton = page.getByTestId('back-button').first();
-    await expect(backButton).toBeVisible();
-    await backButton.click();
+    await tabNavigation.switchTo(page, 'library');
     await assertions.navigation.onLibraryPage(page);
   },
 
@@ -405,8 +389,7 @@ export const analyticsWorkflows = {
    * Navigate to the Analytics tab
    */
   navigateToAnalyticsTab: async (page: Page): Promise<void> => {
-    await page.getByRole('button', { name: 'Analytics' }).click();
-    await expect(page.getByRole('heading', { name: 'Analytics' })).toBeVisible();
+    await tabNavigation.switchTo(page, 'analytics');
   },
 
   /**

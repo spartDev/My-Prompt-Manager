@@ -18,7 +18,7 @@
 - **lz-string**: 1.5.0 (Data compression)
 
 ## Development Tools
-- **ESLint**: 9.32.0 (Code linting)
+- **Biome**: 2.4.15 (Code linting)
 - **Husky**: 9.1.7 (Git hooks)
 - **@testing-library/react**: 16.3.0 (Component testing)
 - **jsdom**: 26.1.0 (DOM testing environment)

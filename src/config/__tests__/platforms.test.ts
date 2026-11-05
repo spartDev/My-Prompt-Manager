@@ -1,15 +1,15 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import {
-  SUPPORTED_PLATFORMS,
+  getAllHostnamePatterns,
+  getAllSupportedHostnames,
   getDefaultEnabledPlatforms,
+  getLinkedPlatformHostnames, 
   getPlatformByHostname,
   getPlatformById,
-  getAllSupportedHostnames,
-  getAllHostnamePatterns,
-  isHostnameSupported,
   getPlatformsByPriority,
-  getLinkedPlatformHostnames
+  isHostnameSupported,
+  SUPPORTED_PLATFORMS
 } from '../platforms';
 
 describe('Copilot Platform Configuration', () => {

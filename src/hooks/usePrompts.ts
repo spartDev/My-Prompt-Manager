@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { PromptManager } from '../services/promptManager';
 import { StorageManager } from '../services/storage';
-import { Prompt, AppError } from '../types';
-import { UsePromptsReturn } from '../types/hooks';
+import type { AppError, Prompt } from '../types';
+import type { UsePromptsReturn } from '../types/hooks';
 
 export const usePrompts = (): UsePromptsReturn => {
   const [prompts, setPrompts] = useState<Prompt[]>([]);
@@ -24,13 +24,13 @@ export const usePrompts = (): UsePromptsReturn => {
     } finally {
       setLoading(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Singleton storageManager never changes, omitted to prevent infinite loop
 
+  // A failed create, update or delete is not stored as `error`: App treats that as a load
+  // failure and replaces the Library. The rejection reaches the caller, which shows it.
   const createPrompt = useCallback(async (prompt: Omit<Prompt, 'id' | 'createdAt' | 'updatedAt' | 'usageCount' | 'lastUsedAt'>) => {
     try {
       setLoading(true);
-      setError(null);
 
       const newPrompt = await promptManager.createPrompt(
         prompt.title,
@@ -39,49 +39,46 @@ export const usePrompts = (): UsePromptsReturn => {
       );
 
       setPrompts(prev => [...prev, newPrompt]);
-    } catch (err) {
-      setError(err as AppError);
-      throw err; // Re-throw for component error handling
     } finally {
       setLoading(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Singleton promptManager never changes, omitted to prevent infinite loop
 
   const updatePrompt = useCallback(async (id: string, updates: Partial<Prompt>) => {
     try {
       setLoading(true);
-      setError(null);
 
       const updatedPrompt = await promptManager.updatePrompt(id, updates);
 
       setPrompts(prev =>
         prev.map(prompt => prompt.id === id ? updatedPrompt : prompt)
       );
-    } catch (err) {
-      setError(err as AppError);
-      throw err;
     } finally {
       setLoading(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Singleton promptManager never changes, omitted to prevent infinite loop
 
   const deletePrompt = useCallback(async (id: string) => {
     try {
       setLoading(true);
-      setError(null);
 
       await storageManager.deletePrompt(id);
 
       setPrompts(prev => prev.filter(prompt => prompt.id !== id));
-    } catch (err) {
-      setError(err as AppError);
-      throw err;
     } finally {
       setLoading(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Singleton storageManager never changes, omitted to prevent infinite loop
+
+  // No loading state: pinning is instant and must not flash the Library
+  // Errors are not stored as `error`: App treats that as a load failure and
+  // replaces the Library. The rejection reaches the caller, which shows a toast.
+  const togglePin = useCallback(async (id: string) => {
+    const updatedPrompt = await storageManager.togglePinned(id);
+
+    setPrompts(prev =>
+      prev.map(prompt => prompt.id === id ? updatedPrompt : prompt)
+    );
   }, []); // Singleton storageManager never changes, omitted to prevent infinite loop
 
   const searchPrompts = useCallback((query: string): Prompt[] => {
@@ -116,6 +113,7 @@ export const usePrompts = (): UsePromptsReturn => {
     createPrompt,
     updatePrompt,
     deletePrompt,
+    togglePin,
     searchPrompts,
     filterByCategory,
     refreshPrompts

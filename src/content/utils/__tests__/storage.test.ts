@@ -2,10 +2,11 @@
  * Unit tests for StorageManager utility module
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { DEFAULT_CATEGORY } from '../../../constants';
 import * as Logger from '../logger';
-import { getPrompts, sanitizeUserInput, validatePromptData, createPromptListItem, escapeHtml, createElement, createSVGElement } from '../storage';
+import { createElement, createSVGElement, getCategoryColors, getPrompts } from '../storage';
 
 // Mock Logger
 vi.mock('../logger', () => ({
@@ -23,6 +24,7 @@ const chromeMock = {
   storage: {
     local: {
       get: vi.fn(),
+      set: vi.fn(),
     },
   },
   runtime: {
@@ -55,33 +57,150 @@ describe('StorageManager', () => {
     chromeMock.runtime.lastError = null;
   });
 
-  describe('getPrompts', () => {
-    it('should return validated prompts from storage', async () => {
-      const mockPrompts = [
-        {
-          id: 'test-1',
-          title: 'Test Prompt',
-          content: 'Test content',
-          category: 'Test',
-          createdAt: 1234567890,
-          updatedAt: 1234567890,
-          usageCount: 0,
-          lastUsedAt: 1234567890,
-        },
-      ];
-      
+  describe('getCategoryColors', () => {
+    const storeRaw = (categories: unknown) => {
       chromeMock.storage.local.get.mockImplementation((_keys, callback) => {
-        callback({ prompts: mockPrompts });
+        callback({ categories });
       });
+    };
+
+    it('maps each Category name to its color, for the chips of the Prompt selector', async () => {
+      storeRaw([{ id: 'a', name: 'Code', color: '#0F766E' }, { id: 'b', name: 'Writing', color: '#2563EB' }]);
+
+      expect(await getCategoryColors()).toEqual(new Map([['Code', '#0F766E'], ['Writing', '#2563EB']]));
+      expect(chromeMock.storage.local.get).toHaveBeenCalledWith(['categories'], expect.any(Function));
+    });
+
+    it('leaves out a Category with no valid color, and anything that is not a Category', async () => {
+      storeRaw([{ id: 'a', name: 'No color' }, { id: 'b', name: 'Bad', color: 'red' }, 'Code', null, { id: 'c', name: 'Ok', color: '#D97706' }]);
+
+      expect(await getCategoryColors()).toEqual(new Map([['Ok', '#D97706']]));
+    });
+
+    it('gives an empty map when nothing is stored or storage fails', async () => {
+      storeRaw(undefined);
+      expect(await getCategoryColors()).toEqual(new Map());
+
+      chromeMock.storage.local.get.mockImplementation(() => { throw new Error('storage down'); });
+      expect(await getCategoryColors()).toEqual(new Map());
+    });
+  });
+
+  describe('getPrompts', () => {
+    const storedPrompt = (overrides: Record<string, unknown> = {}) => ({
+      id: 'test-1',
+      title: 'Test Prompt',
+      content: 'Test content',
+      category: 'Test',
+      createdAt: 1234567890,
+      updatedAt: 1234567890,
+      usageCount: 0,
+      lastUsedAt: 1234567890,
+      ...overrides
+    });
+
+    const storeRaw = (prompts: unknown) => {
+      chromeMock.storage.local.get.mockImplementation((_keys, callback) => {
+        callback({ prompts });
+      });
+    };
+
+    it('should return the prompts from storage', async () => {
+      const mockPrompts = [storedPrompt()];
+      storeRaw(mockPrompts);
 
       const result = await getPrompts();
 
       expect(result).toEqual(mockPrompts);
       expect(chromeMock.storage.local.get).toHaveBeenCalledWith(['prompts'], expect.any(Function));
       expect(Logger.debug).toHaveBeenCalledWith(
-        'Retrieved and validated prompts from storage',
+        'Retrieved prompts from storage',
         { count: 1 }
       );
+    });
+
+    it('should return text exactly as stored: tags, keywords and surrounding whitespace untouched', async () => {
+      const content = '  Summarize the metadata: use <example>text</example> tags; if count=5 and onboarding = true, return data: JSON\n\n';
+      storeRaw([storedPrompt({ title: ' <b>Q&A</b> / "FAQ" ', content, category: 'a/b & <c>' })]);
+
+      const [prompt] = await getPrompts();
+
+      expect(prompt.title).toBe(' <b>Q&A</b> / "FAQ" ');
+      expect(prompt.content).toBe(content);
+      expect(prompt.category).toBe('a/b & <c>');
+    });
+
+    it('should return a Prompt over 50,000 characters in full, without truncating it', async () => {
+      const content = 'a'.repeat(60000);
+      storeRaw([storedPrompt({ content })]);
+
+      const [prompt] = await getPrompts();
+
+      expect(prompt.content).toBe(content);
+    });
+
+    it('should keep a Prompt whose text is only tags, instead of dropping it for being empty once stripped', async () => {
+      storeRaw([storedPrompt({ id: '<id>', title: '<b></b>', content: '<br>' })]);
+
+      const result = await getPrompts();
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({ id: '<id>', title: '<b></b>', content: '<br>' });
+    });
+
+    it('should fill in missing usage fields in memory, with no clock', async () => {
+      storeRaw([{ id: 'old', title: 'Old', content: 'Body', createdAt: 1000, updatedAt: 2000 }]);
+
+      const [prompt] = await getPrompts();
+
+      expect(prompt).toEqual({
+        id: 'old',
+        title: 'Old',
+        content: 'Body',
+        category: DEFAULT_CATEGORY,
+        createdAt: 1000,
+        updatedAt: 2000,
+        usageCount: 0,
+        lastUsedAt: 1000
+      });
+    });
+
+    it('should never write to storage', async () => {
+      storeRaw([{ id: 'old', title: 'Old', content: 'Body' }]);
+
+      await getPrompts();
+
+      expect(chromeMock.storage.local.set).not.toHaveBeenCalled();
+    });
+
+    it('keeps the Pinned Prompt flag so the picker can list Pinned Prompts first', async () => {
+      const base = {
+        content: 'Test content',
+        category: 'Test',
+        createdAt: 1234567890,
+        updatedAt: 1234567890,
+        usageCount: 0,
+        lastUsedAt: 1234567890,
+      };
+      chromeMock.storage.local.get.mockImplementation((_keys, callback) => {
+        callback({
+          prompts: [
+            { ...base, id: 'pinned', title: 'Pinned', pinned: true },
+            { ...base, id: 'unpinned', title: 'Unpinned', pinned: false },
+            { ...base, id: 'legacy', title: 'Legacy' },
+            { ...base, id: 'bogus', title: 'Bogus', pinned: 'yes' },
+          ],
+        });
+      });
+
+      const result = await getPrompts();
+
+      expect(result.map(p => [p.id, p.pinned])).toEqual([
+        ['pinned', true],
+        ['unpinned', false],
+        ['legacy', undefined],
+        ['bogus', undefined],
+      ]);
     });
 
     it('should handle chrome storage errors gracefully', async () => {
@@ -99,30 +218,8 @@ describe('StorageManager', () => {
       );
     });
 
-    it('should filter out invalid prompts', async () => {
-      const mockPrompts = [
-        {
-          id: 'valid-1',
-          title: 'Valid Prompt',
-          content: 'Valid content',
-          category: 'Test',
-          createdAt: 1234567890,
-          updatedAt: 1234567890,
-          usageCount: 0,
-          lastUsedAt: 1234567890,
-        },
-        {
-          id: '', // Invalid - empty id
-          title: 'Invalid Prompt',
-          content: 'Invalid content',
-          category: 'Test',
-        },
-        null, // Invalid - null prompt
-      ];
-      
-      chromeMock.storage.local.get.mockImplementation((_keys, callback) => {
-        callback({ prompts: mockPrompts });
-      });
+    it('should skip stored entries that are not Prompts', async () => {
+      storeRaw([storedPrompt({ id: 'valid-1' }), { id: 'no-text' }, null, 'text']);
 
       const result = await getPrompts();
 
@@ -131,11 +228,17 @@ describe('StorageManager', () => {
       expect(Logger.warn).toHaveBeenCalledWith(
         'Filtered out invalid prompts',
         expect.objectContaining({
-          originalCount: 3,
+          originalCount: 4,
           validCount: 1,
-          invalidCount: 2,
+          invalidCount: 3,
         })
       );
+    });
+
+    it('should return an empty list when nothing is stored', async () => {
+      storeRaw(undefined);
+
+      expect(await getPrompts()).toEqual([]);
     });
 
     it('should handle unexpected errors', async () => {
@@ -150,29 +253,6 @@ describe('StorageManager', () => {
         'Unexpected error accessing chrome storage',
         expect.any(Error)
       );
-    });
-  });
-
-  describe('escapeHtml', () => {
-    it('should escape HTML characters', () => {
-      const input = '<script>alert("xss")</script>';
-      const expected = '&lt;script&gt;alert(&quot;xss&quot;)&lt;&#x2F;script&gt;';
-      
-      expect(escapeHtml(input)).toBe(expected);
-    });
-
-    it('should handle non-string input', () => {
-      expect(escapeHtml(123 as any)).toBe('123');
-      expect(Logger.warn).toHaveBeenCalledWith(
-        'escapeHtml received non-string input',
-        expect.objectContaining({ type: 'number', value: 123 })
-      );
-    });
-
-    it('should handle errors gracefully', () => {
-      // Test with a problematic input that could cause errors
-      const result = escapeHtml('test');
-      expect(result).toBe('test');
     });
   });
 
@@ -242,176 +322,6 @@ describe('StorageManager', () => {
         'Failed to create SVG element',
         expect.any(Error),
         expect.objectContaining({ tag: 'path' })
-      );
-      expect(result).toBeDefined(); // Should return fallback element
-    });
-  });
-
-  describe('sanitizeUserInput', () => {
-    it('should remove dangerous content', () => {
-      const input = '<script>alert("xss")</script>javascript:void(0)';
-      const result = sanitizeUserInput(input);
-      
-      expect(result).not.toContain('<script>');
-      expect(result).not.toContain('javascript:');
-    });
-
-    it('should remove control characters', () => {
-      const input = 'test\x00\x01\x02content';
-      const result = sanitizeUserInput(input);
-      
-      expect(result).toBe('testcontent');
-    });
-
-    it('should truncate long input', () => {
-      const longInput = 'a'.repeat(60000);
-      const result = sanitizeUserInput(longInput);
-      
-      expect(result.length).toBeLessThan(longInput.length);
-      expect(result.endsWith('...')).toBe(true);
-      expect(Logger.warn).toHaveBeenCalledWith(
-        'Input truncated due to length limit',
-        expect.objectContaining({
-          originalLength: 60000,
-          maxLength: 50000,
-        })
-      );
-    });
-
-    it('should handle non-string input', () => {
-      expect(sanitizeUserInput(123 as any)).toBe('');
-      expect(Logger.warn).toHaveBeenCalledWith(
-        'sanitizeUserInput received non-string input',
-        expect.objectContaining({ type: 'number', value: 123 })
-      );
-    });
-  });
-
-  describe('validatePromptData', () => {
-    it('should validate and sanitize valid prompt data', () => {
-      const input = {
-        id: 'test-id',
-        title: 'Test Title',
-        content: 'Test content',
-        category: 'Test Category',
-        createdAt: 1234567890
-      };
-
-      const result = validatePromptData(input);
-
-      expect(result).toEqual({
-        ...input,
-        updatedAt: 1234567890,
-        usageCount: 0,
-        lastUsedAt: 1234567890
-      });
-    });
-
-    it('should provide defaults for missing fields', () => {
-      const input = {
-        id: 'test-id',
-        content: 'Test content'
-      };
-
-      const result = validatePromptData(input);
-
-      expect(result).toEqual({
-        id: 'test-id',
-        title: 'Untitled',
-        content: 'Test content',
-        category: 'General',
-        createdAt: expect.any(Number),
-        updatedAt: expect.any(Number),
-        usageCount: 0,
-        lastUsedAt: expect.any(Number)
-      });
-      expect(result?.updatedAt).toBe(result?.createdAt);
-      expect(result?.lastUsedAt).toBe(result?.createdAt);
-    });
-
-    it('should return null for invalid data', () => {
-      expect(validatePromptData(null)).toBeNull();
-      expect(validatePromptData('invalid')).toBeNull();
-      expect(validatePromptData({})).toBeNull(); // Missing required fields
-    });
-
-    it('should return null when required fields are empty after sanitization', () => {
-      const input = {
-        id: '',
-        title: 'Test',
-        content: 'Test content',
-      };
-
-      const result = validatePromptData(input);
-      expect(result).toBeNull();
-      expect(Logger.warn).toHaveBeenCalledWith(
-        'Prompt failed validation - empty required fields',
-        expect.any(Object)
-      );
-    });
-  });
-
-  describe('createPromptListItem', () => {
-    beforeEach(() => {
-      const mockElement = {
-        setAttribute: vi.fn(),
-        textContent: '',
-        appendChild: vi.fn(),
-      };
-      documentMock.createElement.mockReturnValue(mockElement);
-    });
-
-    it('should create prompt list item with all elements', () => {
-      const prompt = {
-        id: 'test-id',
-        title: 'Test Title',
-        content: 'Test content that is longer than 100 characters to test the truncation functionality properly',
-        category: 'Test Category',
-        createdAt: 1234567890,
-        updatedAt: 1234567890,
-        usageCount: 0,
-        lastUsedAt: 1234567890,
-      };
-
-      const result = createPromptListItem(prompt, 0);
-
-      expect(documentMock.createElement).toHaveBeenCalledWith('div');
-      expect(result.appendChild).toHaveBeenCalledTimes(3); // title, category, preview
-    });
-
-    it('should handle creation errors gracefully', () => {
-      let callCount = 0;
-      documentMock.createElement.mockImplementation((_tag) => {
-        callCount++;
-        if (callCount === 1) {
-          throw new Error('Creation error');
-        }
-        // Return mock for fallback div element
-        return {
-          setAttribute: vi.fn(),
-          textContent: '',
-          appendChild: vi.fn(),
-        };
-      });
-
-      const prompt = {
-        id: 'test-id',
-        title: 'Test Title',
-        content: 'Test content',
-        category: 'Test Category',
-        createdAt: 1234567890,
-        updatedAt: 1234567890,
-        usageCount: 0,
-        lastUsedAt: 1234567890,
-      };
-
-      const result = createPromptListItem(prompt, 0);
-
-      // The error is caught by createElement, not createPromptListItem
-      expect(Logger.error).toHaveBeenCalledWith(
-        'Failed to create DOM element',
-        expect.any(Error),
-        expect.objectContaining({ tag: 'div' })
       );
       expect(result).toBeDefined(); // Should return fallback element
     });

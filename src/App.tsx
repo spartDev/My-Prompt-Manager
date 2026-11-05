@@ -1,5 +1,5 @@
-import { useState, useOptimistic, useTransition, useCallback } from 'react';
 import type { FC } from 'react';
+import { useCallback, useOptimistic, useRef, useState, useTransition } from 'react';
 
 import AddPromptForm from './components/AddPromptForm';
 import { AnalyticsTab } from './components/analytics';
@@ -8,6 +8,7 @@ import EditPromptForm from './components/EditPromptForm';
 import LibraryView from './components/LibraryView';
 import SettingsView from './components/SettingsView';
 import StorageWarning from './components/StorageWarning';
+import TabBar, { type Section } from './components/TabBar';
 import ToastContainer from './components/ToastContainer';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { useCategories } from './hooks/useCategories';
@@ -15,10 +16,15 @@ import { useClipboard } from './hooks/useClipboard';
 import { usePrompts } from './hooks/usePrompts';
 import { useSearchWithDebounce } from './hooks/useSearchWithDebounce';
 import { useToast } from './hooks/useToast';
-import { Prompt, AppError, ViewType } from './types';
+import { ALL_PROMPTS } from './services/libraryFilter';
+import type { AppError, LibraryFilter, Prompt, ViewType } from './types';
 import { Logger, toError } from './utils';
 
-type ExtendedViewType = ViewType | 'categories' | 'settings' | 'analytics';
+type ExtendedViewType = ViewType | Section;
+
+const SECTIONS: readonly ExtendedViewType[] = ['library', 'categories', 'analytics', 'settings'];
+
+const isSection = (view: ExtendedViewType): view is Section => SECTIONS.includes(view);
 
 interface AppProps {
   context?: 'popup' | 'sidepanel';
@@ -31,8 +37,14 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   
   const [currentView, setCurrentView] = useState<ExtendedViewType>(isPickerMode ? 'settings' : 'library');
   const [selectedPrompt, setSelectedPrompt] = useState<Prompt | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [showStorageWarning, setShowStorageWarning] = useState<boolean>(false);
+  // The Library filter lasts while the popup or side panel stays open, across Sections
+  const [libraryFilter, setLibraryFilter] = useState<LibraryFilter>(ALL_PROMPTS);
+  // Why the last save or Settings import was refused for lack of storage: the storage warning shows it
+  const [storageRefusal, setStorageRefusal] = useState<string | null>(null);
+  // What had the keyboard when the refused save started (Save, or the field where Enter was
+  // pressed): it gets the keyboard back when the warning closes
+  const storageRefusalTriggerRef = useRef<HTMLElement | null>(null);
+  const sectionContentRef = useRef<HTMLDivElement>(null);
 
   // React 19 useTransition for managing optimistic updates
   const [, startTransition] = useTransition();
@@ -44,6 +56,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
     createPrompt,
     updatePrompt,
     deletePrompt,
+    togglePin,
     refreshPrompts
   } = usePrompts();
 
@@ -122,6 +135,23 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
     }
   };
 
+  const handleDeleteFromEdit = (id: string) => {
+    setCurrentView('library');
+    setSelectedPrompt(null);
+    void handleDeletePrompt(id);
+  };
+
+  const handleTogglePin = useCallback((id: string) => {
+    togglePin(id).catch((err: unknown) => {
+      Logger.error('Failed to toggle pin', toError(err), {
+        component: 'App',
+        promptId: id,
+        operation: 'togglePin'
+      });
+      showToast('Failed to update pin', 'error');
+    });
+  }, [togglePin, showToast]);
+
   const handleCopyPrompt = async (content: string) => {
     const success = await copyToClipboard(content);
     if (success) {
@@ -132,6 +162,8 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   };
 
   const handleFormSubmit = async (data: { title: string; content: string; category: string }) => {
+    // The form calls this before Save is disabled, so Save (or the field) still has the keyboard
+    const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     try {
       if (currentView === 'add') {
         await createPrompt(data);
@@ -163,10 +195,11 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
       });
 
       if (appError.type === 'STORAGE_QUOTA_EXCEEDED') {
-        setShowStorageWarning(true);
-      } else {
-        showToast(appError.message || 'Failed to save prompt', 'error');
+        storageRefusalTriggerRef.current = trigger;
+        setStorageRefusal(appError.message || 'Failed to save prompt');
       }
+      // The form shows the refusal and keeps what the user typed
+      throw error;
     }
   };
 
@@ -176,13 +209,15 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   };
 
   const handleCreateCategory = async (categoryData: { name: string; color?: string }) => {
+    const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     try {
       await createCategory(categoryData);
       showToast('Category created successfully', 'success');
     } catch (error: unknown) {
       const appError = error as AppError;
       if (appError.type === 'STORAGE_QUOTA_EXCEEDED') {
-        setShowStorageWarning(true);
+        storageRefusalTriggerRef.current = trigger;
+        setStorageRefusal(appError.message || 'Failed to create category');
       } else {
         showToast(appError.message || 'Failed to create category', 'error');
       }
@@ -198,9 +233,10 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
         await refreshPrompts();
       }
       showToast('Category updated successfully', 'success');
-    } catch (error) {
-      showToast('Failed to update category', 'error');
-      throw error;
+    } catch (error: unknown) {
+      const appError = error as AppError;
+      showToast(appError.message || 'Failed to update category', 'error');
+      throw new Error(appError.message || 'Failed to update category');
     }
   };
 
@@ -216,48 +252,53 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
     }
   };
 
-  // Memoized callbacks to prevent unnecessary re-renders
-  const handleManageCategories = useCallback(() => {
-    setCurrentView('categories');
-  }, []);
-
-  const handleSettings = useCallback(() => {
-    setCurrentView('settings');
-  }, []);
-
-  const handleAnalytics = useCallback(() => {
-    setCurrentView('analytics');
-  }, []);
-
-  const handleBackToLibrary = useCallback(() => {
-    setCurrentView('library');
-  }, []);
-
-  const handleBackToLibraryWithRefresh = useCallback(() => {
-    setCurrentView('library');
-    // Refresh data to ensure imported prompts/categories are visible
-    void refreshPrompts();
-    void refreshCategories();
-  }, [refreshPrompts, refreshCategories]);
+  const handleSelectSection = useCallback((section: Section) => {
+    if (section === currentView) {
+      // iOS convention: pressing the active tab scrolls its content back to the top
+      sectionContentRef.current
+        ?.querySelector('[data-scroll-container]')
+        ?.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    if (currentView === 'settings') {
+      // Settings may have imported prompts/categories: refresh so other Sections show them
+      void refreshPrompts();
+      void refreshCategories();
+    }
+    setCurrentView(section);
+  }, [currentView, refreshPrompts, refreshCategories]);
 
   const handleExpandDashboard = useCallback(() => {
     // Open full analytics dashboard in a new tab
     void chrome.tabs.create({ url: chrome.runtime.getURL('src/analytics.html') });
   }, []);
 
+  // A Settings import stopped by storage: like a refused save, it opens the storage warning, and
+  // what had the keyboard (Import) gets it back when the warning closes
+  const handleImportRefused = useCallback((reason: string) => {
+    storageRefusalTriggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setStorageRefusal(reason);
+  }, []);
+
   const handleCloseStorageWarning = useCallback(() => {
-    setShowStorageWarning(false);
+    const trigger = storageRefusalTriggerRef.current;
+    storageRefusalTriggerRef.current = null;
+    setStorageRefusal(null);
+    if (trigger?.isConnected) {
+      trigger.focus();
+    }
   }, []);
 
   const loading = promptsLoading || categoriesLoading;
+  const showTabBar = isSection(currentView);
 
   if (promptsError) {
     return (
       <ThemeProvider>
-        <div className="h-full w-full p-4 bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="h-full w-full p-4 bg-app flex items-center justify-center">
           <div className="text-center">
-            <h2 className="text-xl font-semibold text-red-600 dark:text-red-400 mb-2">Error Loading Data</h2>
-            <p className="text-gray-600 dark:text-gray-400">{promptsError.message}</p>
+            <h2 className="text-xl font-semibold text-danger mb-2">Error Loading Data</h2>
+            <p className="text-secondary">{promptsError.message}</p>
           </div>
         </div>
       </ThemeProvider>
@@ -266,22 +307,20 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
 
   return (
     <ThemeProvider>
-      <div className={`h-full w-full bg-gray-50 dark:bg-gray-900 relative ${context === 'sidepanel' ? 'sidepanel' : ''}`}>
+      <div className={`h-full w-full bg-app section-scroll-scope relative flex flex-col ${context === 'sidepanel' ? 'sidepanel' : ''}`}>
+      <div ref={sectionContentRef} className="flex-1 min-h-0">
       {currentView === 'library' && (
         <LibraryView
           prompts={optimisticPrompts}
           categories={categories}
           searchWithDebounce={searchWithDebounce}
-          selectedCategory={selectedCategory}
+          libraryFilter={libraryFilter}
           onAddNew={handleAddNew}
           onEditPrompt={handleEditPrompt}
-          onDeletePrompt={(id: string) => { void handleDeletePrompt(id); }}
+          onTogglePin={handleTogglePin}
           onCopyPrompt={(content: string) => { void handleCopyPrompt(content); }}
           showToast={showToast}
-          onCategoryChange={setSelectedCategory}
-          onManageCategories={handleManageCategories}
-          onSettings={handleSettings}
-          onAnalytics={handleAnalytics}
+          onLibraryFilterChange={setLibraryFilter}
           loading={loading}
           context={context}
         />
@@ -290,7 +329,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
       {currentView === 'add' && (
         <AddPromptForm
           categories={categories}
-          onSubmit={(data) => { void handleFormSubmit(data); }}
+          onSubmit={handleFormSubmit}
           onCancel={handleFormCancel}
         />
       )}
@@ -299,8 +338,9 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
         <EditPromptForm
           prompt={selectedPrompt}
           categories={categories}
-          onSubmit={(data) => { void handleFormSubmit(data); }}
+          onSubmit={handleFormSubmit}
           onCancel={handleFormCancel}
+          onDelete={handleDeleteFromEdit}
         />
       )}
 
@@ -310,30 +350,34 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
           onCreateCategory={handleCreateCategory}
           onUpdateCategory={handleUpdateCategory}
           onDeleteCategory={handleDeleteCategory}
-          isOpen={true}
-          onClose={handleBackToLibrary}
+          context={context}
         />
       )}
 
       {currentView === 'settings' && (
         <SettingsView
-          onBack={handleBackToLibraryWithRefresh}
+          context={context}
           showToast={showToast}
           toastSettings={settings}
           onToastSettingsChange={updateSettings}
+          onStorageRefused={handleImportRefused}
         />
       )}
 
       {currentView === 'analytics' && (
         <AnalyticsTab
-          onBack={handleBackToLibrary}
           onExpandDashboard={handleExpandDashboard}
           context={context}
         />
       )}
+      </div>
 
-      {showStorageWarning && (
-        <StorageWarning onClose={handleCloseStorageWarning} />
+      {showTabBar && (
+        <TabBar activeSection={currentView} onSelect={handleSelectSection} />
+      )}
+
+      {storageRefusal !== null && (
+        <StorageWarning reason={storageRefusal} onClose={handleCloseStorageWarning} />
       )}
 
       <ToastContainer
@@ -341,6 +385,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
         onDismiss={hideToast}
         position={settings.position}
         queueLength={queueLength}
+        aboveTabBar={showTabBar}
       />
       </div>
     </ThemeProvider>

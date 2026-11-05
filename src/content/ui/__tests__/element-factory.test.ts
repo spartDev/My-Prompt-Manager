@@ -2,7 +2,7 @@
  * Unit tests for UIElementFactory
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createElement, createSVGElement } from '../../utils/storage';
 import { UIElementFactory } from '../element-factory';

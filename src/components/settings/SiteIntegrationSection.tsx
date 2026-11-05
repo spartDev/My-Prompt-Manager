@@ -1,11 +1,11 @@
-import { FC, useReducer, useCallback } from 'react';
+import { type FC, useCallback, useReducer } from 'react';
 
 import { useClipboard } from '../../hooks/useClipboard';
 import { usePickerWindow } from '../../hooks/usePickerWindow';
 import { useSitePermissions } from '../../hooks/useSitePermissions';
 import { ConfigurationEncoder, ConfigurationEncoderError } from '../../services/configurationEncoder';
-import { CustomSite, CustomSiteConfiguration, SecurityWarning } from '../../types';
-import { ToastType } from '../../types/components';
+import type { CustomSite, CustomSiteConfiguration, SecurityWarning } from '../../types';
+import type { ToastType } from '../../types/components';
 import { Logger, toError } from '../../utils';
 
 import AddCustomSiteForm from './AddCustomSiteForm';
@@ -15,7 +15,7 @@ import CustomSitesList from './CustomSitesList';
 import EmptyCustomSitesState from './EmptyCustomSitesState';
 import SettingsSection from './SettingsSection';
 import SiteImportDrawer from './SiteImportDrawer';
-import SupportedSitesList, { SiteConfig } from './SupportedSitesList';
+import SupportedSitesList, { type SiteConfig } from './SupportedSitesList';
 
 // ============================================================================
 // View State Reducer - manages which view is currently displayed
@@ -138,7 +138,6 @@ interface SiteIntegrationSectionProps {
   onCustomSiteToggle: (hostname: string, enabled: boolean) => Promise<void> | void;
   onRemoveCustomSite: (hostname: string) => Promise<void> | void;
   onAddCustomSite?: (siteData: Omit<CustomSite, 'dateAdded'> & { positioning?: CustomSite['positioning'] }) => Promise<void> | void;
-  onEditCustomSite?: (hostname: string) => void;
   interfaceMode?: 'popup' | 'sidepanel';
   saving?: boolean;
   onShowToast?: (message: string, type?: ToastType) => void;
@@ -152,7 +151,6 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
   onCustomSiteToggle,
   onRemoveCustomSite,
   onAddCustomSite,
-  onEditCustomSite,
   interfaceMode = 'popup',
   saving = false,
   onShowToast,
@@ -393,7 +391,7 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
           {/* Custom Sites */}
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm">Custom Sites</h3>
+              <h3 className="font-medium text-primary text-sm">Custom Sites</h3>
             </div>
 
             {showAddMethodChooser && (
@@ -441,7 +439,6 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
                 customSites={customSites}
                 onCustomSiteToggle={onCustomSiteToggle}
                 onRemoveCustomSite={onRemoveCustomSite}
-                onEditCustomSite={onEditCustomSite}
                 onExportCustomSite={handleExportCustomSite}
                 onAddClick={openAddMethodSelector}
                 exportingHostname={importState.exportingHostname}

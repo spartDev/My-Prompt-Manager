@@ -1,6 +1,6 @@
 import { DEFAULT_CATEGORY, DEFAULT_SETTINGS } from '../../../src/types';
-import { test, expect } from '../fixtures/extension';
-import { seedLibrary, createPromptSeed } from '../utils/storage';
+import { expect, test } from '../fixtures/extension';
+import { createPromptSeed, seedLibrary } from '../utils/storage';
 
 test.describe('Side panel experience', () => {
   test('renders stored prompts in sidepanel context', async ({ context, storage, extensionId }) => {
@@ -41,13 +41,13 @@ test.describe('Side panel experience', () => {
     const sidepanelPage = await context.newPage();
     await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
-    await sidepanelPage.getByRole('button', { name: 'Settings' }).click();
+    await sidepanelPage.getByTestId('tab-settings').click();
     const popupRadio = sidepanelPage.getByRole('radio', { name: 'Select popup window mode' });
     await popupRadio.click();
 
     await expect(popupRadio).toHaveAttribute('aria-checked', 'true');
 
-    const storageSnapshot = await context.serviceWorkers()[0].evaluate(() => new Promise((resolve) => {
+    const storageSnapshot = await context.serviceWorkers()[0].evaluate(() => new Promise<{ interfaceMode?: string }>((resolve) => {
       chrome.storage.local.get('interfaceMode', resolve);
     }));
 
@@ -66,15 +66,15 @@ test.describe('Side panel experience', () => {
     const sidepanelPage = await context.newPage();
     await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
-    await sidepanelPage.getByRole('button', { name: 'Settings' }).click();
-    const lightThemeButton = sidepanelPage.getByRole('button', { name: 'Light' });
+    await sidepanelPage.getByTestId('tab-settings').click();
+    const lightThemeButton = sidepanelPage.getByRole('radio', { name: 'Light' });
     await lightThemeButton.click();
 
     // Wait for the async storage operation to complete by checking for the visual indicator
     // The theme button shows a checkmark when selected, indicating the update is complete
     await sidepanelPage.waitForTimeout(200);
 
-    const storageSnapshot = await context.serviceWorkers()[0].evaluate(() => new Promise((resolve) => {
+    const storageSnapshot = await context.serviceWorkers()[0].evaluate(() => new Promise<{ settings?: { theme?: string } }>((resolve) => {
       chrome.storage.local.get('settings', resolve);
     }));
 

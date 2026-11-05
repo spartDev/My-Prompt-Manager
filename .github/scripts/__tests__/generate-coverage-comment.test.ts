@@ -157,7 +157,8 @@ describe('displayPath', () => {
 
   it('replaces every character that could end the code span, the cell or the row', () => {
     const shown = displayPath('src/a.ts`\n| injected | row |\r\n@someone <img src=x>\u0000', WORKSPACE);
-    expect(shown).not.toMatch(/[`|\r\n<>\u0000]/);
+    expect(shown).not.toMatch(/[`|\r\n<>]/);
+    expect(shown).not.toContain('\u0000');
     expect(shown).toBe('src/a.ts??? injected ? row ???@someone ?img src?x??');
   });
 

@@ -9,8 +9,8 @@
   ],
   "timezone": "Europe/Paris",
   "schedule": [
-      "after 10pm",
-      "before 5am"
+    "after 10pm",
+    "before 5am"
   ],
   "labels": [
     "dependencies",
@@ -37,7 +37,7 @@
       ]
     },
     {
-      "description": "Group all TypeScript and ESLint updates",
+      "description": "Group all TypeScript and Biome updates",
       "groupName": "typescript and linting",
       "groupSlug": "typescript-linting",
       "matchUpdateTypes": [
@@ -46,8 +46,7 @@
       ],
       "matchPackageNames": [
         "/typescript/",
-        "/eslint/",
-        "/@typescript-eslint/"
+        "/@biomejs/"
       ]
     },
     {
@@ -59,9 +58,9 @@
         "minor"
       ],
       "matchPackageNames": [
-        "/vite/",
-        "/@vitejs/",
-        "/@crxjs/"
+        "vite",
+        "@vitejs/**",
+        "@crxjs/**"
       ]
     },
     {
@@ -73,7 +72,8 @@
         "minor"
       ],
       "matchPackageNames": [
-        "/vitest/",
+        "vitest",
+        "@vitest/**",
         "/@testing-library/",
         "/jsdom/"
       ]
@@ -91,15 +91,6 @@
         "/autoprefixer/",
         "/postcss/"
       ]
-    },
-    {
-      "description": "Handle Chrome extension types carefully",
-      "matchPackageNames": [
-        "@types/chrome"
-      ],
-      "groupName": "chrome types",
-      "automerge": false,
-      "prPriority": 5
     },
     {
       "description": "Security updates - high priority",
@@ -120,14 +111,7 @@
       ]
     },
     {
-      "description": "Pin Chrome extension critical deps",
-      "matchPackageNames": [
-        "@crxjs/vite-plugin"
-      ],
-      "automerge": false
-    },
-    {
-      "description": "Major updates - require manual review",
+      "description": "Major updates - require manual review; the PR opens only once ticked in the Dependency Dashboard",
       "matchUpdateTypes": [
         "major"
       ],
@@ -137,7 +121,31 @@
         "renovate"
       ],
       "automerge": false,
+      "dependencyDashboardApproval": true,
       "prPriority": -1
+    },
+    {
+      "description": "Vite ecosystem majors land in one PR: @vitejs/plugin-react follows Vite's major (6.x needs vite ^8) and cannot install alone",
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "matchPackageNames": [
+        "vite",
+        "@vitejs/**",
+        "@crxjs/**"
+      ],
+      "groupName": "vite ecosystem (major)",
+      "groupSlug": "vite-major"
+    },
+    {
+      "description": "Keep the npm ^11 constraint as written: npm 12 breaks lockfile updates (npm/cli#9800, EALLOWREMOTE). Remove with the constraint, see My-Prompt-Manager-67o",
+      "matchManagers": [
+        "renovate-config"
+      ],
+      "matchDepNames": [
+        "npm"
+      ],
+      "enabled": false
     },
     {
       "description": "Automerge dev dependencies patches",
@@ -168,6 +176,22 @@
       ],
       "groupName": "git hooks",
       "automerge": false
+    },
+    {
+      "description": "Handle Chrome extension types carefully. After the devDependency patch automerge rule: a later rule wins",
+      "matchPackageNames": [
+        "@types/chrome"
+      ],
+      "groupName": "chrome types",
+      "automerge": false,
+      "prPriority": 5
+    },
+    {
+      "description": "Pin Chrome extension critical deps. After the devDependency patch automerge rule: a later rule wins",
+      "matchPackageNames": [
+        "@crxjs/vite-plugin"
+      ],
+      "automerge": false
     }
   ],
   "prConcurrentLimit": 5,
@@ -192,6 +216,9 @@
   "postUpdateOptions": [
     "npmDedupe"
   ],
+  "constraints": {
+    "npm": "^11"
+  },
   "npm": {
     "minimumReleaseAge": "3 days",
     "packageRules": [

@@ -1,10 +1,10 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import {
   DEFAULT_CATEGORY,
   DEFAULT_SETTINGS,
-  VALIDATION_LIMITS,
-  type ErrorType
+  type ErrorType, 
+  VALIDATION_LIMITS
 } from '../index';
 
 describe('Type Definitions', () => {
@@ -24,9 +24,6 @@ describe('Type Definitions', () => {
     });
 
     it('should have validation limits', () => {
-      expect(VALIDATION_LIMITS.PROMPT_TITLE_MAX).toBe(100);
-      expect(VALIDATION_LIMITS.PROMPT_CONTENT_MAX).toBe(20000);
-      expect(VALIDATION_LIMITS.CATEGORY_NAME_MAX).toBe(50);
       expect(VALIDATION_LIMITS.TITLE_GENERATION_LENGTH).toBe(50);
     });
   });

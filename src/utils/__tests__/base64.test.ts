@@ -1,10 +1,10 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import {
-  encodeBase64UrlSafe,
   decodeBase64UrlSafe,
-  encodeObjectToBase64UrlSafe,
   decodeObjectFromBase64UrlSafe,
+  encodeBase64UrlSafe,
+  encodeObjectToBase64UrlSafe,
   isValidBase64UrlSafe
 } from '../base64';
 

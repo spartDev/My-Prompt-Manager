@@ -1,18 +1,19 @@
-import { FC, memo } from 'react';
+import { type FC, memo } from 'react';
 import {
-  BarChart,
   Bar,
-  XAxis,
-  YAxis,
+  BarChart,
   CartesianGrid,
-  Tooltip,
+  Cell, 
   ResponsiveContainer,
-  Cell
+  Tooltip,
+  XAxis,
+  YAxis
 } from 'recharts';
 
-import { useChartTheme } from '../../../hooks/useChartTheme';
-import { CATEGORY_COLORS } from '../../../theme/chartColors';
-import { CategoryDistribution } from '../../../types/hooks';
+import { CHART_THEME } from '../../../theme/chartColors';
+import type { CategoryDistribution } from '../../../types/hooks';
+import { NO_THROTTLED_EVENTS } from '../constants';
+import { formatUsesTooltip } from './tooltipFormatters';
 
 export interface CategoryBarChartProps {
   /** Category distribution data */
@@ -25,6 +26,13 @@ export interface CategoryBarChartProps {
   showGrid?: boolean;
 }
 
+/** Longest Category name the Y axis shows; a longer one ends with an ellipsis, and the Tooltip shows it in full */
+const MAX_NAME_LENGTH = 12;
+
+// One parameter on purpose: recharts calls a tickFormatter with (value, index)
+const truncateName = (name: string): string =>
+  name.length <= MAX_NAME_LENGTH ? name : `${name.substring(0, MAX_NAME_LENGTH - 1)}…`;
+
 /**
  * Horizontal bar chart showing category usage distribution
  */
@@ -34,28 +42,20 @@ const CategoryBarChart: FC<CategoryBarChartProps> = memo(({
   maxCategories = 5,
   showGrid = true
 }) => {
-  const { gridColor, textColor, tooltipBg, tooltipBorder, tooltipLabelColor, cursorColor } = useChartTheme();
+  const { gridColor, textColor, tooltipBg, tooltipBorder, tooltipLabelColor, cursorColor } = CHART_THEME;
 
   // Limit to top N categories
   const chartData = data.slice(0, maxCategories);
 
-  // Truncate long category names
-  const truncateName = (name: string, maxLength: number = 12): string => {
-    if (name.length <= maxLength) {
-      return name;
-    }
-    return name.substring(0, maxLength - 2) + '...';
-  };
-
   if (data.length === 0) {
     return (
       <div
-        className="flex items-center justify-center bg-gray-50 dark:bg-gray-800/50 rounded-xl"
+        className="flex items-center justify-center bg-raised rounded-xl"
         style={{ height }}
         role="img"
         aria-label="No category data available"
       >
-        <p className="text-sm text-gray-500 dark:text-gray-400">No category data</p>
+        <p className="text-sm text-tertiary">No category data</p>
       </div>
     );
   }
@@ -70,7 +70,8 @@ const CategoryBarChart: FC<CategoryBarChartProps> = memo(({
         <BarChart
           data={chartData}
           layout="vertical"
-          margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
+          margin={{ top: 5, right: 20, left: 4, bottom: 5 }}
+          throttledEvents={NO_THROTTLED_EVENTS}
         >
           {showGrid && (
             <CartesianGrid
@@ -92,11 +93,13 @@ const CategoryBarChart: FC<CategoryBarChartProps> = memo(({
             tick={{ fontSize: 11, fill: textColor }}
             tickLine={false}
             axisLine={false}
-            width={80}
+            width="auto"
             tickFormatter={truncateName}
+            // Every bar keeps its Category name: recharts may otherwise drop ticks it measures as overlapping
+            interval={0}
           />
           <Tooltip
-            formatter={(value: number | undefined) => [value ?? 0, 'Uses']}
+            formatter={formatUsesTooltip}
             contentStyle={{
               backgroundColor: tooltipBg,
               border: `1px solid ${tooltipBorder}`,
@@ -113,10 +116,10 @@ const CategoryBarChart: FC<CategoryBarChartProps> = memo(({
             cursor={{ fill: cursorColor }}
           />
           <Bar dataKey="count" radius={[0, 4, 4, 0]}>
-            {chartData.map((_, index) => (
+            {chartData.map((entry, index) => (
               <Cell
                 key={`cell-${String(index)}`}
-                fill={CATEGORY_COLORS[index % CATEGORY_COLORS.length]}
+                fill={entry.color}
               />
             ))}
           </Bar>

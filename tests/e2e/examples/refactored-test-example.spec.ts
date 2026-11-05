@@ -5,21 +5,18 @@
  * Page Object Models, utilities, and test data fixtures for better maintainability.
  */
 
-import { test, expect } from '../fixtures/extension';
+import { expect, test } from '../fixtures/extension';
 import {
-  LibraryPage,
-  CategoryManagerPage,
-  PromptFormPage,
-  workflows,
   assertions,
+  CategoryManagerPage,
+  LibraryPage,
   TestDataManager,
-  SCENARIO_FIXTURES
+  workflows,
 } from '../utils';
 
 test.describe('Example: Refactored Category Management Tests', () => {
   let libraryPage: LibraryPage;
   let categoryManager: CategoryManagerPage;
-  let promptForm: PromptFormPage;
   let testDataManager: TestDataManager;
 
   test.beforeEach(async ({ context, storage, extensionId }) => {
@@ -38,7 +35,6 @@ test.describe('Example: Refactored Category Management Tests', () => {
     // Initialize Page Object Models
     libraryPage = new LibraryPage(page);
     categoryManager = new CategoryManagerPage(page);
-    promptForm = new PromptFormPage(page);
 
     // Verify we're on the library page
     await libraryPage.expectLibraryLoaded();
@@ -46,8 +42,8 @@ test.describe('Example: Refactored Category Management Tests', () => {
 
   test('should create a new category using POMs', async () => {
     // BEFORE (old approach):
-    // await page.getByRole('button', { name: 'Manage categories' }).click();
-    // await expect(page.getByRole('heading', { name: 'Manage Categories' })).toBeVisible();
+    // await page.getByTestId('tab-categories').click();
+    // await expect(page.getByRole('heading', { level: 1, name: 'Categories', exact: true })).toBeVisible();
     // await page.getByPlaceholder('Enter category name...').fill('New Category');
     // await page.getByRole('button', { name: 'Add' }).click();
     // await expect(page.getByText('Category created successfully')).toBeVisible();
@@ -127,11 +123,19 @@ test.describe('Example: Refactored Category Management Tests', () => {
   });
 
   test('should complete category reorganization workflow', async () => {
+    // Only a Category holding a Prompt has a Library filter pill, so give "Work" one first
+    await workflows.prompts.create(libraryPage.page, {
+      title: 'Weekly Report',
+      content: 'Summarize this week in three bullet points',
+      category: 'Work'
+    });
+    await assertions.categories.exists(libraryPage.page, 'Work');
+
     // Complex workflow that was previously 50+ lines of code
     // Now simplified to a single workflow call:
     await workflows.userJourneys.categoryReorganization(libraryPage.page);
 
-    // Verify final state
+    // Verify final state: the pill follows the rename
     await assertions.categories.exists(libraryPage.page, 'Professional');
     await assertions.categories.notExists(libraryPage.page, 'Work');
 

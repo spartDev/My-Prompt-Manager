@@ -2,7 +2,7 @@
  * Predefined color palettes for category management
  */
 
-import { Logger } from '../utils';
+import * as Logger from '../utils/logger';
 
 export interface ColorOption {
   name: string;
@@ -10,40 +10,27 @@ export interface ColorOption {
   textColor?: string; // For ensuring good contrast
 }
 
-// Modern, vibrant color palette optimized for both light and dark themes
-// All colors meet WCAG AA contrast requirements (4.5:1 minimum) with specified text colors
+// The 12 Category colors (epic My-Prompt-Manager-el4), the same in light and dark: no two of them
+// look alike as chips, and none looks like the accent. textColor is the checkmark drawn on the swatch.
+// Colors removed from this list stay valid: a Category keeps its stored color and shows it as Custom.
 export const PRESET_COLORS: ColorOption[] = [
-  // Blues
   { name: 'Ocean Blue', value: '#2563EB', textColor: '#FFFFFF' }, // blue-600: 5.17:1
-  { name: 'Sky Blue', value: '#0369A1', textColor: '#FFFFFF' }, // sky-700: 5.95:1
-  { name: 'Navy', value: '#1E40AF', textColor: '#FFFFFF' }, // blue-800: 8.72:1
-
-  // Purples & Pinks
+  { name: 'Sky Blue', value: '#0369A1', textColor: '#FFFFFF' }, // sky-700: 5.93:1
+  { name: 'Indigo', value: '#4F46E5', textColor: '#FFFFFF' }, // indigo-600: 6.29:1
   { name: 'Purple', value: '#9333EA', textColor: '#FFFFFF' }, // purple-600: 5.38:1
-  { name: 'Violet', value: '#7C3AED', textColor: '#FFFFFF' }, // violet-600: 5.70:1
   { name: 'Pink', value: '#DB2777', textColor: '#FFFFFF' }, // pink-600: 4.60:1
   { name: 'Rose', value: '#E11D48', textColor: '#FFFFFF' }, // rose-600: 4.70:1
-
-  // Greens
-  { name: 'Emerald', value: '#047857', textColor: '#FFFFFF' }, // emerald-700: 5.44:1
-  { name: 'Green', value: '#15803D', textColor: '#FFFFFF' }, // green-700: 4.74:1
-  { name: 'Teal', value: '#0F766E', textColor: '#FFFFFF' }, // teal-700: 5.35:1
-
-  // Warm colors
-  { name: 'Orange', value: '#C2410C', textColor: '#FFFFFF' }, // orange-700: 5.67:1
-  { name: 'Amber', value: '#F59E0B', textColor: '#000000' }, // amber-500: 9.78:1 with black
+  { name: 'Amber', value: '#D97706', textColor: '#000000' }, // amber-600: 6.59:1 with black
+  { name: 'Lime', value: '#4D7C0F', textColor: '#FFFFFF' }, // lime-700: 4.99:1
+  { name: 'Teal', value: '#0F766E', textColor: '#FFFFFF' }, // teal-700: 5.47:1
+  { name: 'Orange', value: '#C2410C', textColor: '#FFFFFF' }, // orange-700: 5.18:1
   { name: 'Yellow', value: '#EAB308', textColor: '#000000' }, // yellow-500: 10.95:1 with black
-  { name: 'Red', value: '#DC2626', textColor: '#FFFFFF' }, // red-600: 4.83:1
-
-  // Neutrals
-  { name: 'Gray', value: '#6B7280', textColor: '#FFFFFF' }, // gray-500: 4.83:1
   { name: 'Slate', value: '#475569', textColor: '#FFFFFF' }, // slate-600: 7.58:1
-  { name: 'Stone', value: '#78716C', textColor: '#FFFFFF' }, // stone-500: 4.80:1
-  { name: 'Zinc', value: '#71717A', textColor: '#FFFFFF' }, // zinc-500: 4.83:1
 ];
 
-// Default color for new categories (WCAG AA compliant)
-export const DEFAULT_CATEGORY_COLOR = '#2563EB';
+// Default color for new categories (WCAG AA compliant), and the chip rule: both live in a module with no
+// logger, so the content script shares them (src/theme/categoryChip.ts)
+export { DEFAULT_CATEGORY_COLOR, getSoftBadgeColors } from '../theme/categoryChip';
 
 // Function to get a random color from the palette
 export const getRandomPresetColor = (): string => {

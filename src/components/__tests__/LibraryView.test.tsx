@@ -1,19 +1,23 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { Prompt, Category } from '../../types';
-import { UseSearchWithDebounceReturn } from '../../types/hooks';
+import { ALL_PROMPTS } from '../../services/libraryFilter';
+import { triggerChromeStorageChange } from '../../test/mocks';
+import type { Category, LibraryFilter, Prompt } from '../../types';
+import type { UseSearchWithDebounceReturn } from '../../types/hooks';
 import LibraryView from '../LibraryView';
+
+const { getSettings, sortPrompts } = vi.hoisted(() => ({
+  getSettings: vi.fn(),
+  sortPrompts: vi.fn((prompts: unknown[]) => prompts)
+}));
 
 // Mock the storage and prompt manager singletons
 vi.mock('../../services/storage', () => ({
   StorageManager: {
     getInstance: vi.fn(() => ({
-      getSettings: vi.fn().mockResolvedValue({
-        sortOrder: 'date',
-        sortDirection: 'desc'
-      }),
+      getSettings,
       updateSettings: vi.fn().mockResolvedValue(undefined)
     }))
   }
@@ -21,9 +25,7 @@ vi.mock('../../services/storage', () => ({
 
 vi.mock('../../services/promptManager', () => ({
   PromptManager: {
-    getInstance: vi.fn(() => ({
-      sortPrompts: vi.fn((prompts: Prompt[]) => prompts)
-    }))
+    getInstance: vi.fn(() => ({ sortPrompts }))
   }
 }));
 
@@ -43,9 +45,9 @@ const defaultPrompts: Prompt[] = [
   }
 ];
 
-const createMockSearchWithDebounce = (prompts: Prompt[] = defaultPrompts): UseSearchWithDebounceReturn => ({
-  query: '',
-  debouncedQuery: '',
+const createMockSearchWithDebounce = (prompts: Prompt[] = defaultPrompts, query = ''): UseSearchWithDebounceReturn => ({
+  query,
+  debouncedQuery: query,
   filteredPrompts: prompts,
   highlightedResults: [],
   isSearching: false,
@@ -57,16 +59,13 @@ const defaultProps = {
   prompts: defaultPrompts,
   categories: defaultCategories,
   searchWithDebounce: createMockSearchWithDebounce(),
-  selectedCategory: null,
+  libraryFilter: ALL_PROMPTS,
   onAddNew: vi.fn(),
   onEditPrompt: vi.fn(),
-  onDeletePrompt: vi.fn(),
+  onTogglePin: vi.fn(),
   onCopyPrompt: vi.fn(),
   showToast: vi.fn(),
-  onCategoryChange: vi.fn(),
-  onManageCategories: vi.fn(),
-  onSettings: vi.fn(),
-  onAnalytics: vi.fn(),
+  onLibraryFilterChange: vi.fn(),
   loading: false,
   context: 'popup' as const
 };
@@ -74,6 +73,7 @@ const defaultProps = {
 describe('LibraryView', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getSettings.mockResolvedValue({ sortOrder: 'updatedAt', sortDirection: 'desc' });
   });
 
   describe('Header rendering', () => {
@@ -82,72 +82,33 @@ describe('LibraryView', () => {
       expect(screen.getByRole('heading', { name: /my prompt manager/i })).toBeInTheDocument();
     });
 
-    it('renders subtitle', () => {
+    it('shows the prompt count as subtitle', () => {
       render(<LibraryView {...defaultProps} />);
-      expect(screen.getByText(/organize your creative prompts/i)).toBeInTheDocument();
+      const subtitle = screen.getByText('1 prompt');
+      expect(subtitle).toHaveAttribute('aria-live', 'polite');
     });
-  });
 
-  describe('Analytics button', () => {
-    it('renders analytics button in header', () => {
+    it('shows "X of N prompts" when search or filter narrows the list', () => {
+      const prompts: Prompt[] = [
+        ...defaultPrompts,
+        { ...defaultPrompts[0], id: 'prompt-2', title: 'Other', category: 'Uncategorized' }
+      ];
+      render(
+        <LibraryView
+          {...defaultProps}
+          prompts={prompts}
+          searchWithDebounce={createMockSearchWithDebounce(prompts)}
+          libraryFilter={{ kind: 'category', categoryId: 'work' }}
+        />
+      );
+      expect(screen.getByText('1 of 2 prompts')).toBeInTheDocument();
+    });
+
+    it('no longer renders the Analytics and Settings header buttons or the footer', () => {
       render(<LibraryView {...defaultProps} />);
-      expect(screen.getByRole('button', { name: /view analytics/i })).toBeInTheDocument();
-    });
-
-    it('calls onAnalytics when analytics button is clicked', async () => {
-      const user = userEvent.setup();
-      const onAnalytics = vi.fn();
-
-      render(<LibraryView {...defaultProps} onAnalytics={onAnalytics} />);
-
-      const analyticsButton = screen.getByRole('button', { name: /view analytics/i });
-      await user.click(analyticsButton);
-
-      expect(onAnalytics).toHaveBeenCalledTimes(1);
-    });
-
-    it('analytics button has correct aria-label', () => {
-      render(<LibraryView {...defaultProps} />);
-      const analyticsButton = screen.getByRole('button', { name: /view analytics/i });
-      expect(analyticsButton).toHaveAttribute('aria-label', 'View analytics');
-    });
-
-    it('analytics button is positioned before settings button', () => {
-      const { container } = render(<LibraryView {...defaultProps} />);
-
-      const analyticsButton = container.querySelector('[aria-label="View analytics"]');
-      const settingsButton = container.querySelector('[aria-label="Open settings"]');
-
-      expect(analyticsButton).toBeInTheDocument();
-      expect(settingsButton).toBeInTheDocument();
-
-      // Check order by DOM position
-      const allButtons = container.querySelectorAll('button[aria-label]');
-      const buttonLabels = Array.from(allButtons).map(b => b.getAttribute('aria-label'));
-
-      const analyticsIndex = buttonLabels.indexOf('View analytics');
-      const settingsIndex = buttonLabels.indexOf('Open settings');
-
-      expect(analyticsIndex).toBeLessThan(settingsIndex);
-    });
-  });
-
-  describe('Settings button', () => {
-    it('renders settings button in header', () => {
-      render(<LibraryView {...defaultProps} />);
-      expect(screen.getByRole('button', { name: /open settings/i })).toBeInTheDocument();
-    });
-
-    it('calls onSettings when settings button is clicked', async () => {
-      const user = userEvent.setup();
-      const onSettings = vi.fn();
-
-      render(<LibraryView {...defaultProps} onSettings={onSettings} />);
-
-      const settingsButton = screen.getByRole('button', { name: /open settings/i });
-      await user.click(settingsButton);
-
-      expect(onSettings).toHaveBeenCalledTimes(1);
+      expect(screen.queryByRole('button', { name: /view analytics/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /open settings/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('contentinfo')).not.toBeInTheDocument();
     });
   });
 
@@ -203,35 +164,194 @@ describe('LibraryView', () => {
       render(<LibraryView {...defaultProps} />);
       expect(screen.getByText('Test Prompt')).toBeInTheDocument();
     });
-
-    it('shows prompt count in footer', () => {
-      render(<LibraryView {...defaultProps} />);
-      expect(screen.getByText(/1 prompt/i)).toBeInTheDocument();
-    });
   });
 
-  describe('Floating add button', () => {
-    it('renders floating add button', () => {
+  describe('New button', () => {
+    it('renders exactly one "New" button in the header', () => {
       render(<LibraryView {...defaultProps} />);
-      expect(screen.getByRole('button', { name: /add new prompt/i })).toBeInTheDocument();
+      const buttons = screen.getAllByRole('button', { name: /add new prompt/i });
+      expect(buttons).toHaveLength(1);
+      expect(buttons[0]).toHaveTextContent('New');
+      expect(screen.getByRole('banner')).toContainElement(buttons[0]);
     });
 
-    it('calls onAddNew when floating add button is clicked', async () => {
+    it('calls onAddNew when clicked', async () => {
       const user = userEvent.setup();
       const onAddNew = vi.fn();
 
       render(<LibraryView {...defaultProps} onAddNew={onAddNew} />);
 
-      const addButton = screen.getByRole('button', { name: /add new prompt/i });
-      await user.click(addButton);
+      await user.click(screen.getByRole('button', { name: /add new prompt/i }));
 
       expect(onAddNew).toHaveBeenCalledTimes(1);
     });
 
-    it('floating add button is disabled when loading', () => {
+    it('is disabled when loading', () => {
       render(<LibraryView {...defaultProps} loading={true} />);
-      const addButton = screen.getByRole('button', { name: /add new prompt/i });
-      expect(addButton).toBeDisabled();
+      expect(screen.getByRole('button', { name: /add new prompt/i })).toBeDisabled();
+    });
+  });
+
+  describe('Library filter', () => {
+    const pinned: Prompt = { ...defaultPrompts[0], id: 'prompt-pinned', title: 'Pinned One', category: 'Uncategorized', pinned: true };
+    const used: Prompt = { ...defaultPrompts[0], id: 'prompt-used', title: 'Used One', usageCount: 3 };
+    const library = [...defaultPrompts, pinned, used];
+
+    const renderWith = (libraryFilter: LibraryFilter, overrides: Partial<typeof defaultProps> = {}) =>
+      render(
+        <LibraryView
+          {...defaultProps}
+          prompts={library}
+          searchWithDebounce={createMockSearchWithDebounce(library)}
+          libraryFilter={libraryFilter}
+          {...overrides}
+        />
+      );
+
+    const cardTitles = () => screen.getAllByRole('heading', { level: 3 }).map(h => h.textContent);
+
+    it('shows the Library filter pills instead of the category and sort menus', () => {
+      renderWith(ALL_PROMPTS);
+
+      expect(screen.getByRole('radiogroup', { name: 'Library filter' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /filter by category/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /sort order/i })).not.toBeInTheDocument();
+    });
+
+    it('offers a pill only for Categories that hold a Prompt', () => {
+      render(<LibraryView {...defaultProps} />);
+
+      expect(screen.getByRole('radio', { name: 'Work' })).toBeInTheDocument();
+      expect(screen.queryByRole('radio', { name: 'Uncategorized' })).not.toBeInTheDocument();
+    });
+
+    it('reports the pill pressed', async () => {
+      const user = userEvent.setup();
+      const onLibraryFilterChange = vi.fn();
+      renderWith(ALL_PROMPTS, { onLibraryFilterChange });
+
+      await user.click(screen.getByRole('radio', { name: 'Pinned' }));
+
+      expect(onLibraryFilterChange).toHaveBeenCalledWith({ kind: 'pinned' });
+    });
+
+    it('lists only Pinned Prompts under Pinned', () => {
+      renderWith({ kind: 'pinned' });
+
+      expect(screen.getByRole('radio', { name: 'Pinned' })).toHaveAttribute('aria-checked', 'true');
+      expect(cardTitles()).toEqual(['Pinned One']);
+    });
+
+    it('lists only Prompts inserted at least once under Most Used', () => {
+      renderWith({ kind: 'mostUsed' });
+
+      expect(cardTitles()).toEqual(['Used One']);
+    });
+
+    it('lists only the Prompts of the chosen Category', () => {
+      renderWith({ kind: 'category', categoryId: 'default' });
+
+      expect(cardTitles()).toEqual(['Pinned One']);
+    });
+
+    it('returns to All once the active Category holds no Prompt', async () => {
+      const onLibraryFilterChange = vi.fn();
+      render(<LibraryView {...defaultProps} libraryFilter={{ kind: 'category', categoryId: 'default' }} onLibraryFilterChange={onLibraryFilterChange} />);
+
+      expect(screen.getByRole('radio', { name: 'All' })).toHaveAttribute('aria-checked', 'true');
+      await waitFor(() => { expect(onLibraryFilterChange).toHaveBeenCalledWith(ALL_PROMPTS); });
+    });
+
+    it('keeps the chosen filter while the Library is loading', () => {
+      const onLibraryFilterChange = vi.fn();
+      render(
+        <LibraryView
+          {...defaultProps}
+          prompts={[]}
+          categories={[]}
+          libraryFilter={{ kind: 'category', categoryId: 'work' }}
+          onLibraryFilterChange={onLibraryFilterChange}
+          loading
+        />
+      );
+
+      expect(onLibraryFilterChange).not.toHaveBeenCalled();
+    });
+
+    it('searches inside the active filter and offers to search all prompts when nothing matches', async () => {
+      const user = userEvent.setup();
+      const onLibraryFilterChange = vi.fn();
+      const clearSearch = vi.fn();
+      const search = { ...createMockSearchWithDebounce([pinned], 'pinned'), clearSearch };
+      renderWith({ kind: 'category', categoryId: 'work' }, { searchWithDebounce: search, onLibraryFilterChange });
+
+      expect(screen.getByRole('region', { name: /no search results/i })).toHaveTextContent('Nothing in Work matches your search');
+      await user.click(screen.getByRole('button', { name: 'Search all prompts' }));
+
+      expect(onLibraryFilterChange).toHaveBeenCalledWith(ALL_PROMPTS);
+      expect(clearSearch).not.toHaveBeenCalled();
+    });
+
+    it('does not offer to search all prompts when All finds nothing', () => {
+      renderWith(ALL_PROMPTS, { searchWithDebounce: createMockSearchWithDebounce([], 'zzz') });
+
+      expect(screen.getByText('No matches found')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Search all prompts' })).not.toBeInTheDocument();
+    });
+
+    it('explains an empty Pinned filter', () => {
+      render(<LibraryView {...defaultProps} libraryFilter={{ kind: 'pinned' }} />);
+
+      expect(screen.getByRole('region', { name: /no pinned prompts/i })).toBeInTheDocument();
+      expect(screen.getByText('No pinned prompts yet')).toBeInTheDocument();
+    });
+
+    it('explains an empty Most Used filter', () => {
+      render(<LibraryView {...defaultProps} libraryFilter={{ kind: 'mostUsed' }} />);
+
+      expect(screen.getByRole('region', { name: /no used prompts/i })).toBeInTheDocument();
+      expect(screen.getByText('No prompts used yet')).toBeInTheDocument();
+    });
+  });
+
+  describe('Sort', () => {
+    it('sorts with the order saved in Settings, in its natural direction', async () => {
+      getSettings.mockResolvedValue({ sortOrder: 'title', sortDirection: 'desc' });
+
+      render(<LibraryView {...defaultProps} />);
+
+      await waitFor(() => {
+        expect(sortPrompts).toHaveBeenLastCalledWith(expect.any(Array), 'title', 'asc');
+      });
+    });
+
+    it('follows a sort saved after it opened', async () => {
+      render(<LibraryView {...defaultProps} />);
+      await waitFor(() => { expect(getSettings).toHaveBeenCalled(); });
+
+      act(() => {
+        triggerChromeStorageChange({ settings: { newValue: { sortOrder: 'title', sortDirection: 'asc' } } });
+      });
+
+      await waitFor(() => {
+        expect(sortPrompts).toHaveBeenLastCalledWith(expect.any(Array), 'title', 'asc');
+      });
+    });
+
+    it('keeps a newer save when its first read of the settings answers late', async () => {
+      let answerFirstRead: (settings: unknown) => void = () => undefined;
+      getSettings.mockReturnValue(new Promise(resolve => { answerFirstRead = resolve; }));
+      render(<LibraryView {...defaultProps} />);
+
+      act(() => {
+        triggerChromeStorageChange({ settings: { newValue: { sortOrder: 'title', sortDirection: 'asc' } } });
+      });
+      await act(async () => {
+        answerFirstRead({ sortOrder: 'updatedAt', sortDirection: 'desc' });
+        await Promise.resolve();
+      });
+
+      expect(sortPrompts).toHaveBeenLastCalledWith(expect.any(Array), 'title', 'asc');
     });
   });
 });

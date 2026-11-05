@@ -1,4 +1,4 @@
-import { Prompt, Category, Settings, AppError, ViewType } from './index';
+import type { AppError, Category, Prompt, Settings, ViewType } from './index';
 
 // App Context types
 export interface AppContextType {

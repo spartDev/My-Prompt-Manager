@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
 import type { FC } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 
 import { StorageManager } from '../services/storage';
 import { Logger, toError } from '../utils';
+import { describeStorageUsage, type StorageWarningLevel } from '../utils/storageQuota';
 
 import ConfirmDialog from './ConfirmDialog';
 
@@ -23,18 +24,53 @@ const WarningIcon: FC<{ className?: string }> = ({ className }) => (
 );
 
 interface StorageWarningProps {
+  /** Why the save was refused. The app's own limits can refuse it while Chrome storage is far from full. */
+  reason: string;
   onClose: () => void;
 }
 
-const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
+/** Shown after a save refused for lack of storage, whatever Chrome storage use is */
+const StorageWarning: FC<StorageWarningProps> = ({ reason, onClose }) => {
   const [storageInfo, setStorageInfo] = useState<{
     used: number;
     total: number;
     percentage: number;
-    warningLevel: 'safe' | 'warning' | 'critical' | 'danger';
+    warningLevel: StorageWarningLevel;
   } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const titleId = useId();
+  const continueButtonRef = useRef<HTMLButtonElement>(null);
+  const clearButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Focus the safe choice when it opens: the form behind it must not take the keyboard
+  useEffect(() => {
+    continueButtonRef.current?.focus();
+  }, []);
+
+  // Escape closes it like Continue; Tab and Shift+Tab stay on its two buttons. The Clear All Data
+  // confirmation handles the keyboard itself while it is open.
+  useEffect(() => {
+    if (showClearConfirm) {return;}
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (!isLoading) {onClose();}
+        return;
+      }
+      if (e.key !== 'Tab') {return;}
+      const buttons = [continueButtonRef.current, clearButtonRef.current].filter(Boolean);
+      const currentIndex = buttons.indexOf(document.activeElement as HTMLButtonElement);
+      const nextIndex = e.shiftKey
+        ? (currentIndex <= 0 ? buttons.length - 1 : currentIndex - 1)
+        : (currentIndex + 1) % buttons.length;
+      e.preventDefault();
+      buttons[nextIndex]?.focus();
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => { document.removeEventListener('keydown', handleKeyDown); };
+  }, [showClearConfirm, isLoading, onClose]);
 
   useEffect(() => {
     const loadStorageInfo = async () => {
@@ -72,128 +108,93 @@ const StorageWarning: FC<StorageWarningProps> = ({ onClose }) => {
 
   const handleCancelClear = () => {
     setShowClearConfirm(false);
+    // The confirmation's buttons go away: the keyboard comes back where it left
+    clearButtonRef.current?.focus();
   };
 
-  const formatBytes = (bytes: number) => {
-    if (bytes === 0) {return '0 Bytes';}
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return String(parseFloat((bytes / Math.pow(k, i)).toFixed(2))) + ' ' + sizes[i];
-  };
-
-  const usagePercentage = storageInfo?.percentage ?? 0;
+  // Rounded and formatted like the Settings bar, so the two never disagree
+  const usage = storageInfo ? describeStorageUsage(storageInfo.used, storageInfo.total) : null;
   const warningLevel = storageInfo?.warningLevel ?? 'safe';
-
-  // Map warning levels to colors and states
-  const isAtLimit = warningLevel === 'danger';
-  const isCritical = warningLevel === 'critical' || warningLevel === 'danger';
 
   const getProgressBarColor = () => {
     switch (warningLevel) {
-      case 'danger': return 'bg-red-500';
-      case 'critical': return 'bg-orange-500';
-      case 'warning': return 'bg-yellow-500';
-      default: return 'bg-green-500';
-    }
-  };
-
-  const getIconColor = () => {
-    switch (warningLevel) {
-      case 'danger': return 'text-red-500';
-      case 'critical': return 'text-orange-500';
-      case 'warning': return 'text-yellow-500';
-      default: return 'text-green-500';
+      case 'danger': return 'bg-danger';
+      case 'critical':
+      case 'warning': return 'bg-warning';
+      default: return 'bg-success';
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-6">
+    <div className="fixed inset-0 bg-backdrop backdrop-blur-sm flex items-center justify-center z-50">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="bg-card border border-default rounded-lg shadow-xl w-full max-w-md p-6"
+      >
         {/* Header */}
         <div className="flex items-center mb-4">
           <div className="shrink-0">
-            <WarningIcon className={`h-8 w-8 ${getIconColor()}`} />
+            <WarningIcon className="h-8 w-8 text-danger" />
           </div>
           <div className="ml-3">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-              {isAtLimit ? 'Storage Limit Reached' : isCritical ? 'Critical Storage Warning' : 'Storage Warning'}
+            <h3 id={titleId} className="text-lg font-medium text-primary">
+              Storage Limit Reached
             </h3>
           </div>
         </div>
 
         {/* Storage Info */}
-        {storageInfo && (
+        {usage && (
           <div className="mb-4">
-            <div className="flex justify-between text-sm text-gray-600 dark:text-gray-300 mb-2">
+            <div className="flex justify-between text-sm text-secondary mb-2">
               <span>Storage Used</span>
-              <span>{usagePercentage}%</span>
+              <span>{usage.percentage}%</span>
             </div>
 
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+            <div className="w-full bg-(--border-color-strong) rounded-full h-2.5">
               <div
                 className={`h-2.5 rounded-full ${getProgressBarColor()}`}
-                style={{ width: `${String(Math.min(usagePercentage, 100))}%` }}
+                style={{ width: `${String(usage.percentage)}%` }}
               />
             </div>
 
-            <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
-              <span>{formatBytes(storageInfo.used)}</span>
-              <span>{formatBytes(storageInfo.total)}</span>
+            <div className="flex justify-between text-xs text-tertiary mt-1">
+              <span>{usage.used}</span>
+              <span>{usage.total}</span>
             </div>
           </div>
         )}
 
-        {/* Warning Message */}
+        {/* Why the save was refused */}
         <div className="mb-6">
-          <p className="text-sm text-gray-700 dark:text-gray-300">
-            {warningLevel === 'danger' ? (
-              <>
-                Your storage is full ({Math.round(usagePercentage)}% used). You won&apos;t be able to save new prompts until you free up space.
-                Consider deleting old prompts or clearing all data.
-              </>
-            ) : warningLevel === 'critical' ? (
-              <>
-                Your storage is critically low ({Math.round(usagePercentage)}% used).
-                You may encounter issues saving new prompts soon. Please delete unused prompts to free up space.
-              </>
-            ) : warningLevel === 'warning' ? (
-              <>
-                Your storage is getting low ({Math.round(usagePercentage)}% used).
-                Consider managing your prompts to free up space before reaching the limit.
-              </>
-            ) : (
-              <>
-                Your storage usage is at {Math.round(usagePercentage)}%.
-                You have plenty of space available.
-              </>
-            )}
-          </p>
+          <p className="text-sm text-secondary">{reason}</p>
         </div>
 
         {/* Actions */}
         <div className="flex space-x-3">
           <button
+            ref={continueButtonRef}
             onClick={onClose}
-            className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+            className="flex-1 px-4 py-2 text-sm font-medium text-secondary bg-card border border-strong rounded-lg hover:bg-muted transition-colors focus-secondary"
             disabled={isLoading}
           >
             Continue
           </button>
 
-          {isAtLimit && (
-            <button
-              onClick={() => { handleClearData(); }}
-              className="flex-1 px-4 py-2 text-sm font-medium text-white bg-red-600 dark:bg-red-700 rounded-lg hover:bg-red-700 dark:hover:bg-red-800 transition-colors disabled:opacity-50"
-              disabled={isLoading}
-            >
-              {isLoading ? 'Clearing...' : 'Clear All Data'}
-            </button>
-          )}
+          <button
+            ref={clearButtonRef}
+            onClick={() => { handleClearData(); }}
+            className="flex-1 px-4 py-2 text-sm font-medium text-on-accent bg-danger rounded-lg hover:bg-danger-hover transition-colors disabled:opacity-50 focus-danger"
+            disabled={isLoading}
+          >
+            {isLoading ? 'Clearing...' : 'Clear All Data'}
+          </button>
         </div>
 
         {/* Help Text */}
-        <div className="mt-4 text-xs text-gray-500 dark:text-gray-400">
+        <div className="mt-4 text-xs text-tertiary">
           <p>
             Tip: Delete unused prompts or export your data before clearing to avoid losing important prompts.
           </p>

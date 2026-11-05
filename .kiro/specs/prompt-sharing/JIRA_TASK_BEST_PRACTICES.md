@@ -381,7 +381,7 @@ Acceptance:
 - [ ] All public APIs documented
 - [ ] Examples are tested/working
 - [ ] Types are accurate
-- [ ] ESLint JSDoc rules pass
+- [ ] Biome lint JSDoc rules pass
 ```
 
 ### 4. Code Review Tasks
@@ -698,7 +698,7 @@ A clear and concise list of requirements that software must adhere to for the te
 
 ### Code Quality
 - [ ] Code follows project style guide
-- [ ] ESLint passes with no warnings
+- [ ] Biome lint passes with no warnings
 - [ ] TypeScript strict mode compliance
 - [ ] No console.* statements (use Logger)
 - [ ] Functions have proper error handling

@@ -177,22 +177,43 @@ class TestStorage extends InMemoryStorage {
 
 let testStorage: TestStorage = new TestStorage();
 
+type StorageKeys = string | string[] | Record<string, unknown> | null;
+type ItemsCallback = (items: Record<string, unknown>) => void;
+type DoneCallback = () => void;
+
+/**
+ * Answers the way chrome.storage does: when a callback is passed, it is called with the result
+ * and nothing is returned; otherwise the result comes back as a promise. chrome.runtime.lastError
+ * is left as the test set it.
+ */
+function answer<T>(result: Promise<T>, callback?: (value: T) => void): Promise<T> | undefined {
+  if (!callback) {
+    return result;
+  }
+  void result.then(callback);
+  return undefined;
+}
+
+/** As in Chrome, the callbacks of set, remove and clear get no arguments. */
+const withNoArguments = (callback?: DoneCallback): DoneCallback | undefined => callback && (() => callback());
+
+const fakeLocalGet = (keys?: StorageKeys | ItemsCallback, callback?: ItemsCallback) =>
+  typeof keys === 'function' ? answer(testStorage.get(null), keys) : answer(testStorage.get(keys ?? null), callback);
+const fakeLocalSet = (items: Record<string, unknown>, callback?: DoneCallback) =>
+  answer(testStorage.set(items), withNoArguments(callback));
+const fakeLocalClear = (callback?: DoneCallback) =>
+  answer(testStorage.clear(), withNoArguments(callback));
+const fakeLocalRemove = (keys: string | string[], callback?: DoneCallback) =>
+  answer(testStorage.remove(keys), withNoArguments(callback));
+
 // Create vi.fn() wrappers around TestStorage methods for test spying/mocking
-const storageLocalGet = vi.fn((keys?: string | string[] | Record<string, unknown> | null) =>
-  testStorage.get(keys ?? null)
-);
-const storageLocalSet = vi.fn((items: Record<string, unknown>) =>
-  testStorage.set(items)
-);
-const storageLocalClear = vi.fn(() =>
-  testStorage.clear()
-);
+const storageLocalGet = vi.fn(fakeLocalGet);
+const storageLocalSet = vi.fn(fakeLocalSet);
+const storageLocalClear = vi.fn(fakeLocalClear);
 const storageLocalGetBytesInUse = vi.fn((keys?: string | string[] | null) =>
   testStorage.getBytesInUse(keys)
 );
-const storageLocalRemove = vi.fn((keys: string | string[]) =>
-  testStorage.remove(keys)
-);
+const storageLocalRemove = vi.fn(fakeLocalRemove);
 
 const baseStorageManager = originalStorageGetInstance();
 const basePromptManager = originalPromptGetInstance();
@@ -490,21 +511,13 @@ const resetChromeMocks = (): void => {
   testStorage = new TestStorage();
 
   // Reset vi.fn() wrappers to point to new testStorage instance
-  storageLocalGet.mockReset().mockImplementation((keys?: string | string[] | Record<string, unknown> | null) =>
-    testStorage.get(keys ?? null)
-  );
-  storageLocalSet.mockReset().mockImplementation((items: Record<string, unknown>) =>
-    testStorage.set(items)
-  );
-  storageLocalClear.mockReset().mockImplementation(() =>
-    testStorage.clear()
-  );
+  storageLocalGet.mockReset().mockImplementation(fakeLocalGet);
+  storageLocalSet.mockReset().mockImplementation(fakeLocalSet);
+  storageLocalClear.mockReset().mockImplementation(fakeLocalClear);
   storageLocalGetBytesInUse.mockReset().mockImplementation((keys?: string | string[] | null) =>
     testStorage.getBytesInUse(keys)
   );
-  storageLocalRemove.mockReset().mockImplementation((keys: string | string[]) =>
-    testStorage.remove(keys)
-  );
+  storageLocalRemove.mockReset().mockImplementation(fakeLocalRemove);
 
   mockChrome.runtime.lastError = null;
   (mockChrome.runtime.sendMessage as any).mockResolvedValue(undefined);

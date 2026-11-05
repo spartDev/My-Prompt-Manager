@@ -5,9 +5,9 @@
  * common expectations used across multiple test files.
  */
 
-import type { Page, Locator } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 
-import type { Prompt, Category } from '../../../src/types';
+import type { Category, Prompt } from '../../../src/types';
 import { expect } from '../fixtures/extension';
 
 /**
@@ -86,29 +86,15 @@ export const categoryAssertions = {
    * Expect a category to exist
    */
   exists: async (page: Page, name: string): Promise<void> => {
-    // Check that category exists in the category filter dropdown
-    // Open the filter dropdown
-    await page.getByRole('button', { name: /Filter by category:/i }).click();
-    // Wait for menu to appear
-    await page.getByRole('menu', { name: 'Category filter menu' }).waitFor();
-    // Check if the category menuitem exists
-    await expect(page.getByRole('menuitem', { name })).toBeAttached();
-    // Close the menu
-    await page.keyboard.press('Escape');
+    // A Category holding a Prompt has a Library filter pill
+    await expect(page.getByRole('radiogroup', { name: 'Library filter' }).getByRole('radio', { name, exact: true })).toBeAttached();
   },
 
   /**
    * Expect a category to not exist
    */
   notExists: async (page: Page, name: string): Promise<void> => {
-    // Open the filter dropdown
-    await page.getByRole('button', { name: /Filter by category:/i }).click();
-    // Wait for menu to appear
-    await page.getByRole('menu', { name: 'Category filter menu' }).waitFor();
-    // Check that the category menuitem does not exist
-    await expect(page.getByRole('menuitem', { name })).not.toBeAttached();
-    // Close the menu
-    await page.keyboard.press('Escape');
+    await expect(page.getByRole('radiogroup', { name: 'Library filter' }).getByRole('radio', { name, exact: true })).not.toBeAttached();
   },
 
   /**
@@ -116,7 +102,8 @@ export const categoryAssertions = {
    */
   count: async (page: Page, count: number): Promise<void> => {
     const text = count === 1 ? '1 category' : `${String(count)} categories`;
-    await expect(page.getByText(text)).toBeVisible();
+    // The count appears both in the Categories header subtitle and the list header
+    await expect(page.getByText(text, { exact: true }).first()).toBeVisible();
   },
 
   /**
@@ -197,6 +184,7 @@ export const navigationAssertions = {
    */
   onLibraryPage: async (page: Page): Promise<void> => {
     await expect(page.getByRole('heading', { name: 'My Prompt Manager' })).toBeVisible();
+    await expect(page.getByTestId('tab-library')).toHaveAttribute('aria-selected', 'true');
   },
 
   /**
@@ -210,7 +198,7 @@ export const navigationAssertions = {
    * Expect category manager to be open
    */
   categoryManagerOpen: async (page: Page): Promise<void> => {
-    await expect(page.getByRole('heading', { name: 'Manage Categories' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Categories', exact: true })).toBeVisible();
   },
 
   /**

@@ -130,7 +130,7 @@ PRIVACY & SECURITY:
 • No external network requests or analytics
 • No data collection or transmission to servers
 • Open source and auditable code
-• DOMPurify sanitization for XSS protection
+• Prompt text is handled as plain text and never interpreted as markup
 • Secure element fingerprinting (no sensitive data captured)
 
 HOW TO USE:

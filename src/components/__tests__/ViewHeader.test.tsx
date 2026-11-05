@@ -1,8 +1,21 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import ViewHeader from '../ViewHeader';
+
+const CustomIcon = () => (
+  <svg data-testid="custom-icon" className="w-6 h-6">
+    <path d="M12 0L24 24H0z" />
+  </svg>
+);
+
+const ComplexChild = () => (
+  <div>
+    <input data-testid="search-input" placeholder="Search..." />
+    <button data-testid="filter-button">Filter</button>
+  </div>
+);
 
 describe('ViewHeader', () => {
   describe('Rendering', () => {
@@ -78,12 +91,6 @@ describe('ViewHeader', () => {
 
   describe('Custom Icon', () => {
     it('renders with custom ReactElement icon', () => {
-      const CustomIcon = () => (
-        <svg data-testid="custom-icon" className="w-6 h-6">
-          <path d="M12 0L24 24H0z" />
-        </svg>
-      );
-
       render(
         <ViewHeader
           title="Test"
@@ -395,13 +402,6 @@ describe('ViewHeader', () => {
     });
 
     it('renders complex children content', () => {
-      const ComplexChild = () => (
-        <div>
-          <input data-testid="search-input" placeholder="Search..." />
-          <button data-testid="filter-button">Filter</button>
-        </div>
-      );
-
       render(
         <ViewHeader title="Test">
           <ComplexChild />
@@ -688,81 +688,61 @@ describe('ViewHeader', () => {
       });
     });
 
-    describe('ViewHeader.AnalyticsButton', () => {
-      it('renders analytics button with composable API', () => {
-        const onAnalytics = vi.fn();
-
+    describe('ViewHeader.NewButton', () => {
+      it('renders a labelled "New" button', () => {
         render(
           <ViewHeader title="Test">
             <ViewHeader.Actions>
-              <ViewHeader.AnalyticsButton onClick={onAnalytics} />
+              <ViewHeader.NewButton onClick={vi.fn()} />
             </ViewHeader.Actions>
           </ViewHeader>
         );
 
-        expect(screen.getByRole('button', { name: /view analytics/i })).toBeInTheDocument();
+        const button = screen.getByRole('button', { name: /add new prompt/i });
+        expect(button).toHaveTextContent('New');
+        expect(button.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
       });
 
       it('calls onClick when clicked', async () => {
         const user = userEvent.setup();
-        const onAnalytics = vi.fn();
+        const onNew = vi.fn();
 
         render(
           <ViewHeader title="Test">
             <ViewHeader.Actions>
-              <ViewHeader.AnalyticsButton onClick={onAnalytics} />
+              <ViewHeader.NewButton onClick={onNew} />
             </ViewHeader.Actions>
           </ViewHeader>
         );
 
-        await user.click(screen.getByRole('button', { name: /view analytics/i }));
-        expect(onAnalytics).toHaveBeenCalledTimes(1);
+        await user.click(screen.getByRole('button', { name: /add new prompt/i }));
+        expect(onNew).toHaveBeenCalledTimes(1);
       });
 
       it('supports disabled state', () => {
-        const onAnalytics = vi.fn();
-
         render(
           <ViewHeader title="Test">
             <ViewHeader.Actions>
-              <ViewHeader.AnalyticsButton onClick={onAnalytics} disabled />
+              <ViewHeader.NewButton onClick={vi.fn()} disabled />
             </ViewHeader.Actions>
           </ViewHeader>
         );
 
-        const button = screen.getByRole('button', { name: /view analytics/i });
-        expect(button).toBeDisabled();
+        expect(screen.getByRole('button', { name: /add new prompt/i })).toBeDisabled();
+      });
+    });
+
+    describe('subtitleLive', () => {
+      it('announces subtitle changes politely when enabled', () => {
+        render(<ViewHeader title="Test" subtitle="3 prompts" subtitleLive />);
+
+        expect(screen.getByText('3 prompts')).toHaveAttribute('aria-live', 'polite');
       });
 
-      it('has correct title attribute', () => {
-        const onAnalytics = vi.fn();
+      it('does not mark the subtitle live by default', () => {
+        render(<ViewHeader title="Test" subtitle="Static" />);
 
-        render(
-          <ViewHeader title="Test">
-            <ViewHeader.Actions>
-              <ViewHeader.AnalyticsButton onClick={onAnalytics} />
-            </ViewHeader.Actions>
-          </ViewHeader>
-        );
-
-        const button = screen.getByRole('button', { name: /view analytics/i });
-        expect(button).toHaveAttribute('title', 'Analytics');
-      });
-
-      it('renders chart icon with aria-hidden', () => {
-        const onAnalytics = vi.fn();
-
-        const { container } = render(
-          <ViewHeader title="Test">
-            <ViewHeader.Actions>
-              <ViewHeader.AnalyticsButton onClick={onAnalytics} />
-            </ViewHeader.Actions>
-          </ViewHeader>
-        );
-
-        const button = container.querySelector('[aria-label="View analytics"]');
-        const svg = button?.querySelector('svg');
-        expect(svg).toHaveAttribute('aria-hidden', 'true');
+        expect(screen.getByText('Static')).not.toHaveAttribute('aria-live');
       });
     });
 

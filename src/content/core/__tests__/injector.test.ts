@@ -11,7 +11,7 @@
  
  
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Prompt } from '../../types/index';
 import { PromptLibraryInjector } from '../injector';
@@ -63,6 +63,7 @@ vi.mock('../../ui/keyboard-navigation', () => ({
 }));
 
 vi.mock('../../utils/storage', () => ({
+  getCategoryColors: vi.fn().mockResolvedValue(new Map()),
   getPrompts: vi.fn().mockResolvedValue([]),
   createPromptListItem: vi.fn().mockImplementation((prompt, _index, className) => {
     const item = document.createElement('div');
@@ -295,6 +296,56 @@ describe('PromptLibraryInjector', () => {
       
       const noPrompts = selector?.querySelector('.no-prompts');
       expect(noPrompts).toBeTruthy();
+    });
+
+    describe('Pinned Prompts', () => {
+      const makePrompt = (id: string, pinned?: boolean): Prompt => ({
+        id,
+        title: `Prompt ${id}`,
+        content: `Content ${id}`,
+        category: 'Test',
+        createdAt: 1,
+        updatedAt: 1,
+        usageCount: 0,
+        lastUsedAt: 1,
+        ...(pinned === undefined ? {} : { pinned })
+      });
+
+      const listedIds = () =>
+        Array.from(document.querySelectorAll<HTMLElement>('.prompt-library-selector .prompt-list [data-prompt-id]'))
+          .map(item => item.dataset.promptId);
+
+      beforeEach(async () => {
+        const { getPrompts } = await import('../../utils/storage');
+        (getPrompts as any).mockResolvedValue([
+          makePrompt('a'),
+          makePrompt('b', true),
+          makePrompt('c', false),
+          makePrompt('d', true),
+          makePrompt('e')
+        ]);
+      });
+
+      it('lists Pinned Prompts first, keeping storage order within each group', async () => {
+        await injector.showPromptSelector(mockTextarea);
+
+        expect(listedIds()).toEqual(['b', 'd', 'a', 'c', 'e']);
+      });
+
+      it('keeps Pinned Prompts first in search results', async () => {
+        const { EventManager } = await import('../../ui/event-manager');
+        await injector.showPromptSelector(mockTextarea);
+
+        const eventManager = (EventManager as any).mock.results.at(-1).value;
+        const searchCall = eventManager.addTrackedEventListener.mock.calls.find(
+          ([element, type]: [Element, string]) => type === 'input' && element.classList.contains('search-input')
+        );
+        const searchInput = searchCall[0] as HTMLInputElement;
+        searchInput.value = 'Content';
+        searchCall[2]({ target: searchInput });
+
+        expect(listedIds()).toEqual(['b', 'd', 'a', 'c', 'e']);
+      });
     });
 
     it('should handle storage errors gracefully', async () => {
@@ -1118,11 +1169,13 @@ describe('PromptLibraryInjector', () => {
       Object.setPrototypeOf(mockEvent.target, HTMLInputElement.prototype);
       handler(mockEvent);
 
-      // Should have called createPromptListItem for the matching prompt
+      // Should have called createPromptListItem for the matching prompt; no Category color was
+      // loaded, so its color argument is undefined
       expect(createPromptListItem).toHaveBeenCalledWith(
         expect.objectContaining({ id: '2', category: 'Vue' }),
         0,
-        'filtered-prompt-item'
+        'filtered-prompt-item',
+        undefined
       );
     });
 

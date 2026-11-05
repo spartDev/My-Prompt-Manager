@@ -35,16 +35,20 @@ type CreateUsageHistoryOptions = {
   categoryIds?: (string | null)[];
 };
 
+// Readonly, so the `as const` fixtures of fixtures/test-data.ts can be seeded as they are
 type SeedOptions = {
-  prompts?: Prompt[];
-  categories?: Category[];
+  prompts?: readonly Prompt[];
+  categories?: readonly Category[];
   settings?: Partial<Settings>;
   interfaceMode?: Settings['interfaceMode'];
 };
 
 export const createPromptSeed = (overrides: Partial<Prompt>): Prompt => {
   const now = Date.now();
-  const createdAt = overrides.createdAt ?? now;
+  // A Prompt is never used before it was created: the extension reads lastUsedAt as at least createdAt
+  // (readPrompt). Created "now", a Prompt seeded as used an hour ago would be read as used "now", and two
+  // such Prompts would rank by the millisecond each was seeded in, not by their lastUsedAt.
+  const createdAt = overrides.createdAt ?? Math.min(now, overrides.lastUsedAt ?? now);
   const updatedAt = overrides.updatedAt ?? createdAt;
   const usageCount = overrides.usageCount ?? 0;
 
@@ -53,7 +57,9 @@ export const createPromptSeed = (overrides: Partial<Prompt>): Prompt => {
   // If usageCount > 0: lastUsedAt defaults to updatedAt
   const defaultLastUsedAt = usageCount > 0 ? updatedAt : createdAt;
 
+  // Pass through every field given (e.g. pinned), then fill defaults for the missing ones
   return {
+    ...overrides,
     id: overrides.id ?? `prompt-${Math.random().toString(36).slice(2, 10)}`,
     title: overrides.title ?? 'Sample Prompt',
     content: overrides.content ?? 'Sample prompt content',
@@ -71,10 +77,10 @@ export const createCategorySeed = (overrides: Partial<Category>): Category => ({
   color: overrides.color,
 });
 
-const ensureDefaultCategory = (categories: Category[]): Category[] => {
+const ensureDefaultCategory = (categories: readonly Category[]): Category[] => {
   const hasDefault = categories.some((category) => category.name === DEFAULT_CATEGORY);
   return hasDefault
-    ? categories
+    ? [...categories]
     : [
         {
           id: 'default-category',
@@ -89,7 +95,7 @@ export const seedLibrary = async (
   options: SeedOptions = {}
 ): Promise<void> => {
   const categories = ensureDefaultCategory(options.categories ?? []);
-  const prompts = options.prompts ?? [];
+  const prompts = [...(options.prompts ?? [])];
   const settings: Settings = {
     ...DEFAULT_SETTINGS,
     interfaceMode: 'popup',

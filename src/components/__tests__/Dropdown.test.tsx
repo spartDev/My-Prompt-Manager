@@ -1,8 +1,19 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { Dropdown, DropdownItem, DropdownSeparator, useDropdown } from '../Dropdown';
+import { Dropdown, type DropdownItem, DropdownSeparator, useDropdown } from '../Dropdown';
+
+// Custom content that reads the Dropdown through useDropdown
+const CloseMenuButton = () => {
+  const { close } = useDropdown();
+  return <button onClick={close}>Close Menu</button>;
+};
+
+const OpenStateLabel = () => {
+  const { isOpen } = useDropdown();
+  return <div>{isOpen ? 'Open' : 'Closed'}</div>;
+};
 
 describe('Dropdown', () => {
   const mockItems: DropdownItem[] = [
@@ -632,14 +643,9 @@ describe('Dropdown', () => {
     it('provides close function via useDropdown hook', async () => {
       const user = userEvent.setup();
 
-      const CustomContent = () => {
-        const { close } = useDropdown();
-        return <button onClick={close}>Close Menu</button>;
-      };
-
       render(
         <Dropdown trigger={<button>Open Menu</button>}>
-          <CustomContent />
+          <CloseMenuButton />
         </Dropdown>
       );
 
@@ -659,14 +665,9 @@ describe('Dropdown', () => {
     it('provides isOpen state via useDropdown hook', async () => {
       const user = userEvent.setup();
 
-      const CustomContent = () => {
-        const { isOpen } = useDropdown();
-        return <div>{isOpen ? 'Open' : 'Closed'}</div>;
-      };
-
       render(
         <Dropdown trigger={<button>Open Menu</button>}>
-          <CustomContent />
+          <OpenStateLabel />
         </Dropdown>
       );
 

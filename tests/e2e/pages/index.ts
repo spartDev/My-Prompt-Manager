@@ -5,13 +5,13 @@
  * UI interactions and provide clean, reusable methods for testing.
  */
 
-export { AnalyticsPage } from './AnalyticsPage';
-export { BasePage } from './BasePage';
-export { LibraryPage } from './LibraryPage';
-export { CategoryManagerPage } from './CategoryManagerPage';
-export { PromptFormPage } from './PromptFormPage';
-export { SettingsPage } from './SettingsPage';
-export { ConfirmationDialog } from './ConfirmationDialog';
 
 // Re-export types for convenience
-export type { Page, Locator } from '@playwright/test';
+export type { Locator, Page } from '@playwright/test';
+export { AnalyticsPage } from './AnalyticsPage';
+export { BasePage } from './BasePage';
+export { CategoryManagerPage } from './CategoryManagerPage';
+export { ConfirmationDialog } from './ConfirmationDialog';
+export { LibraryPage } from './LibraryPage';
+export { PromptFormPage } from './PromptFormPage';
+export { SettingsPage } from './SettingsPage';

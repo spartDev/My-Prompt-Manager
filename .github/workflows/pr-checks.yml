@@ -26,20 +26,20 @@ jobs:
       node-version: ${{ env.NODE_VERSION }}
     steps:
       - name: 🛎️ Checkout Repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # Fetch full history for better caching and analysis
           fetch-depth: 0
 
       - name: 🟢 Setup Node.js
-        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: "npm"
 
       - name: 📦 Cache Dependencies
         id: cache-deps
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.npm
@@ -66,16 +66,16 @@ jobs:
     if: github.event.pull_request.draft == false
     steps:
       - name: "🛎️ Checkout Repository"
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: "🟢 Setup Node.js"
-        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ needs.setup.outputs.node-version }}
           cache: "npm"
 
       - name: "📦 Restore Dependencies"
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.npm
@@ -116,16 +116,16 @@ jobs:
     if: github.event.pull_request.draft == false
     steps:
       - name: 🛎️ Checkout Repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: 🟢 Setup Node.js
-        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ needs.setup.outputs.node-version }}
           cache: "npm"
 
       - name: 📦 Restore Dependencies
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.npm
@@ -136,26 +136,19 @@ jobs:
         if: needs.setup.outputs.cache-hit != 'true'
         run: npm ci --prefer-offline --no-audit
 
-      - name: 📋 Cache ESLint Results
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5
-        with:
-          path: .eslintcache
-          key: ${{ runner.os }}-eslint-${{ hashFiles('.eslintrc.*', 'eslint.config.*', 'src/**/*.{ts,tsx}') }}
-
-      - name: 🧹 Run ESLint (MANDATORY - ZERO TOLERANCE)
+      - name: 🧹 Run Biome lint (MANDATORY - ZERO TOLERANCE)
         run: |
-          echo "🚨 MANDATORY: Running ESLint with zero tolerance policy"
+          echo "🚨 MANDATORY: Running Biome lint with zero tolerance policy"
           echo "❌ Any linting errors will fail this check - NO EXCEPTIONS"
           npm run lint
         env:
-          # Ensure ESLint failures cause workflow failure
           NODE_ENV: test
 
-      - name: 📊 ESLint Report
+      - name: 📊 Biome Report
         if: always()
         run: |
-          echo "📋 ESLint Summary:"
-          npx eslint . --format=compact --max-warnings=0 || echo "⚠️ Linting issues found above"
+          echo "📋 Biome Summary:"
+          npx @biomejs/biome check --formatter-enabled=false --max-diagnostics=2000 . || echo "⚠️ Linting issues found above"
 
   # Job 4: Comprehensive testing with coverage
   test:
@@ -169,16 +162,16 @@ jobs:
       fail-fast: true # Stop immediately on first failure
     steps:
       - name: 🛎️ Checkout Repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: 🟢 Setup Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ matrix.node-version }}
           cache: "npm"
 
       - name: 📦 Restore Dependencies
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.npm
@@ -204,20 +197,30 @@ jobs:
 
       - name: 📈 Upload Coverage Reports
         if: matrix.node-version == '22.x'
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-reports
-          path: |
-            coverage/coverage-summary.json
-            coverage/
+          path: coverage/
+          retention-days: 7
+
+      # Read by pr-coverage-comment.yml, which posts it on the PR. Uploaded after a missed coverage
+      # threshold too (the summary is written before Vitest checks the thresholds), so the PR comment
+      # shows the coverage when it matters most.
+      - name: 📈 Upload Coverage Summary
+        if: ${{ !cancelled() && matrix.node-version == '22.x' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-summary
+          path: coverage/coverage-summary.json
+          if-no-files-found: ignore
           retention-days: 7
 
       - name: 📋 Coverage Summary
-        if: matrix.node-version == '22.x'
+        if: ${{ !cancelled() && matrix.node-version == '22.x' }}
         run: |
           echo "📊 Test Coverage Summary:"
           if [ -f coverage/coverage-summary.json ]; then
-            cat coverage/coverage-summary.json
+            jq '.total' coverage/coverage-summary.json
           fi
 
   # Job 5: Build verification for both dev and production
@@ -228,16 +231,16 @@ jobs:
     if: github.event.pull_request.draft == false
     steps:
       - name: 🛎️ Checkout Repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: 🟢 Setup Node.js
-        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ needs.setup.outputs.node-version }}
           cache: "npm"
 
       - name: 📦 Restore Dependencies
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.npm
@@ -249,7 +252,7 @@ jobs:
         run: npm ci --prefer-offline --no-audit
 
       - name: 📋 Cache Build Assets
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             dist
@@ -259,6 +262,8 @@ jobs:
       - name: 🏗️ Production Build
         run: |
           echo "🏗️ Building Chrome extension for production..."
+          # postbuild runs check:custom-site-chunks: every chunk the content script
+          # loads must match a web_accessible_resources pattern for custom sites
           npm run build
         env:
           NODE_ENV: production
@@ -279,7 +284,7 @@ jobs:
           npm run package
 
       - name: 📤 Upload Build Artifacts
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: chrome-extension-build
           path: |
@@ -303,16 +308,16 @@ jobs:
     if: github.event.pull_request.draft == false
     steps:
       - name: 🛎️ Checkout Repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: 🟢 Setup Node.js
-        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ needs.setup.outputs.node-version }}
           cache: "npm"
 
       - name: 📦 Restore Dependencies
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.npm
@@ -325,7 +330,7 @@ jobs:
 
       - name: 📥 Cache Playwright Browsers
         id: playwright-cache
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cache/ms-playwright
@@ -346,7 +351,7 @@ jobs:
 
       - name: 📤 Upload Playwright Report (on failure)
         if: failure()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-report
           path: |
@@ -362,16 +367,16 @@ jobs:
     if: github.event.pull_request.draft == false
     steps:
       - name: 🛎️ Checkout Repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: 🟢 Setup Node.js
-        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ needs.setup.outputs.node-version }}
           cache: "npm"
 
       - name: 📦 Restore Dependencies
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.npm
@@ -389,7 +394,7 @@ jobs:
         continue-on-error: false # Fail on security vulnerabilities
 
       - name: 🔍 Dependency Review
-        uses: actions/dependency-review-action@3c4e3dcb1aa7874d2c16be7d79418e9b7efd6261 # v4
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
           fail-on-severity: moderate
           # DOMPurify is dual-licensed (Apache-2.0 OR MPL-2.0) but npm metadata includes GPL-2.0-only
@@ -437,6 +442,7 @@ jobs:
 
           # Check each job status
           setup_status="${{ needs.setup.result }}"
+          type_check_status="${{ needs.type-check.result }}"
           lint_status="${{ needs.lint.result }}"
           test_status="${{ needs.test.result }}"
           build_status="${{ needs.build.result }}"
@@ -444,22 +450,19 @@ jobs:
           security_status="${{ needs.security.result }}"
 
           echo "📦 Dependencies & Setup: $setup_status"
+          echo "📘 TypeScript Type Checking: $type_check_status"
           echo "🧹 Code Quality & Linting: $lint_status"
           echo "🧪 Test Suite & Coverage: $test_status"
           echo "🏗️ Build Verification: $build_status"
           echo "🎯 End-to-End Tests: $e2e_status"
           echo "🔒 Security & Dependencies: $security_status"
 
-          # Check if workflow was cancelled (new commit pushed)
-          if [[ "$setup_status" == "cancelled" || "$lint_status" == "cancelled" || "$test_status" == "cancelled" || "$build_status" == "cancelled" || "$e2e_status" == "cancelled" || "$security_status" == "cancelled" ]]; then
-            echo ""
-            echo "⚠️ WORKFLOW CANCELLED"
-            echo "A new commit was pushed, cancelling this workflow run."
-            echo "The latest commit will be checked in a new workflow run."
-            # Don't fail on cancelled - it's expected behavior
-            exit 0
-          # Check if all succeeded
-          elif [[ "$setup_status" == "success" && "$lint_status" == "success" && "$test_status" == "success" && "$build_status" == "success" && "$e2e_status" == "success" && "$security_status" == "success" ]]; then
+          # This job is the required check of main. GitHub counts a skipped
+          # required check as passing, and every job is skipped once Setup
+          # fails, so only "success" passes here: skipped and cancelled fail.
+          # A run cancelled by a newer push fails on a commit that is no
+          # longer the head of the PR, so it blocks nothing.
+          if [[ "$setup_status" == "success" && "$type_check_status" == "success" && "$lint_status" == "success" && "$test_status" == "success" && "$build_status" == "success" && "$e2e_status" == "success" && "$security_status" == "success" ]]; then
             echo ""
             echo "🎉 ✅ ALL QUALITY GATES PASSED!"
             echo "🚀 This PR meets all mandatory requirements and is ready for review."
@@ -474,11 +477,12 @@ jobs:
 
       - name: 📊 Add PR Comment with Results
         if: always()
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const results = {
               setup: "${{ needs.setup.result }}",
+              typeCheck: "${{ needs.type-check.result }}",
               lint: "${{ needs.lint.result }}",
               test: "${{ needs.test.result }}",
               build: "${{ needs.build.result }}",
@@ -561,6 +565,7 @@ jobs:
             | Check | Status |
             |-------|---------|
             | 📦 Dependencies & Setup | ${getStatusIcon(results.setup)} ${results.setup} |
+            | 📘 TypeScript Type Checking | ${getStatusIcon(results.typeCheck)} ${results.typeCheck} |
             | 🧹 Code Quality & Linting | ${getStatusIcon(results.lint)} ${results.lint} |
             | 🧪 Test Suite & Coverage | ${getStatusIcon(results.test)} ${results.test} |
             | 🏗️ Build Verification | ${getStatusIcon(results.build)} ${results.build} |

@@ -1,16 +1,18 @@
-import { FC, memo } from 'react';
+import { type FC, memo } from 'react';
 import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
   CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer, 
   Tooltip,
-  ResponsiveContainer
+  XAxis,
+  YAxis
 } from 'recharts';
 
-import { useChartTheme } from '../../../hooks/useChartTheme';
-import { DailyUsage } from '../../../types/hooks';
+import { CHART_PRIMARY, CHART_THEME } from '../../../theme/chartColors';
+import type { DailyUsage } from '../../../types/hooks';
+import { NO_THROTTLED_EVENTS } from '../constants';
+import { formatUsesTooltip } from './tooltipFormatters';
 
 export interface UsageLineChartProps {
   /** Daily usage data for the chart */
@@ -29,26 +31,25 @@ const UsageLineChart: FC<UsageLineChartProps> = memo(({
   height = 200,
   showGrid = true
 }) => {
-  const { gridColor, textColor, tooltipBg, tooltipBorder, tooltipLabelColor } = useChartTheme();
+  const { gridColor, textColor, tooltipBg, tooltipBorder, tooltipLabelColor, tooltipAccentColor } = CHART_THEME;
 
-  // Format date for X axis (e.g., "Jan 13")
+  // Format date for X axis (e.g., "Jan 13"). The time makes it a local day: a bare YYYY-MM-DD parses as UTC midnight
   const formatDate = (dateStr: string): string => {
-    const date = new Date(dateStr);
+    const date = new Date(`${dateStr}T00:00`);
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
-  // Colors based on design guidelines
-  const lineColor = '#9333ea'; // purple-600
+  const lineColor = CHART_PRIMARY.PRIMARY;
 
   if (data.length === 0) {
     return (
       <div
-        className="flex items-center justify-center bg-gray-50 dark:bg-gray-800/50 rounded-xl"
+        className="flex items-center justify-center bg-raised rounded-xl"
         style={{ height }}
         role="img"
         aria-label="No usage data available"
       >
-        <p className="text-sm text-gray-500 dark:text-gray-400">No usage data</p>
+        <p className="text-sm text-tertiary">No usage data</p>
       </div>
     );
   }
@@ -60,7 +61,7 @@ const UsageLineChart: FC<UsageLineChartProps> = memo(({
       aria-label={`Usage trend chart showing ${String(data.length)} days of data`}
     >
       <ResponsiveContainer width="100%" height={height}>
-        <LineChart data={data} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+        <LineChart data={data} margin={{ top: 5, right: 10, left: 4, bottom: 5 }} throttledEvents={NO_THROTTLED_EVENTS}>
           {showGrid && (
             <CartesianGrid
               strokeDasharray="3 3"
@@ -82,10 +83,10 @@ const UsageLineChart: FC<UsageLineChartProps> = memo(({
             tickLine={false}
             axisLine={false}
             allowDecimals={false}
-            width={30}
+            width="auto"
           />
           <Tooltip
-            formatter={(value: number | undefined) => [value ?? 0, 'Uses']}
+            formatter={formatUsesTooltip}
             labelFormatter={(label) => formatDate(String(label))}
             contentStyle={{
               backgroundColor: tooltipBg,
@@ -98,7 +99,7 @@ const UsageLineChart: FC<UsageLineChartProps> = memo(({
               fontWeight: 600
             }}
             itemStyle={{
-              color: lineColor
+              color: tooltipAccentColor
             }}
           />
           <Line

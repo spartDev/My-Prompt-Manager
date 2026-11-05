@@ -1,15 +1,12 @@
 
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import {
   checkQuotaAvailability,
-  estimatePromptSize,
-  estimatePromptsArraySize,
-  calculateMaxPrompts,
+  describeStorageUsage,
   formatBytes,
-  getStorageStats,
   QUOTA_THRESHOLDS,
-  ESTIMATED_SIZES
+  storedSize
 } from '../storageQuota';
 
 describe('StorageQuota Utils', () => {
@@ -38,6 +35,16 @@ describe('StorageQuota Utils', () => {
       expect(result.reason).toMatch(/Insufficient storage space/);
     });
 
+    // The storage warning shows this reason under the sizes of describeStorageUsage: one format for both
+    it('gives the sizes in its reason as the storage warning shows them', () => {
+      const result = checkQuotaAvailability(1536, totalQuota - 512, totalQuota);
+
+      expect(result.reason).toBe(
+        `Insufficient storage space. Need ${describeStorageUsage(1536, totalQuota).used} but only ${describeStorageUsage(512, totalQuota).used} available.`
+      );
+      expect(result.reason).toBe('Insufficient storage space. Need 1.5 KB but only 512 Bytes available.');
+    });
+
     it('should deny write when exceeding danger threshold', () => {
       // DANGER threshold is 0.98
       const currentUsage = 0.97 * totalQuota;
@@ -52,136 +59,66 @@ describe('StorageQuota Utils', () => {
     });
   });
 
-  describe('estimatePromptSize', () => {
-    it('should calculate size correctly based on constants', () => {
-      const title = 'Test';
-      const content = 'Content';
-      const category = 'Category';
-
-      const size = estimatePromptSize(title, content, category);
-
-      const expectedSize = ESTIMATED_SIZES.PROMPT_BASE +
-        (title.length * ESTIMATED_SIZES.PROMPT_PER_CHAR) +
-        (content.length * ESTIMATED_SIZES.PROMPT_PER_CHAR) +
-        (category.length * ESTIMATED_SIZES.PROMPT_PER_CHAR);
-
-      expect(size).toBe(expectedSize);
+  describe('storedSize', () => {
+    it('counts one byte per ASCII character of the JSON Chrome stores', () => {
+      expect(storedSize('x'.repeat(1000))).toBe(1002);
+      expect(storedSize({ title: 'Draft', usageCount: 3 })).toBe('{"title":"Draft","usageCount":3}'.length);
     });
 
-    it('should handle empty strings', () => {
-      const size = estimatePromptSize('', '', '');
-      expect(size).toBe(ESTIMATED_SIZES.PROMPT_BASE);
-    });
-  });
-
-  describe('estimatePromptsArraySize', () => {
-    it('should sum up sizes of all prompts', () => {
-      const prompts = [
-        { title: 'T1', content: 'C1', category: 'Cat1' },
-        { title: 'T2', content: 'C2', category: 'Cat2' }
-      ];
-
-      const size = estimatePromptsArraySize(prompts);
-      const expectedSize = estimatePromptSize('T1', 'C1', 'Cat1') +
-                           estimatePromptSize('T2', 'C2', 'Cat2');
-
-      expect(size).toBe(expectedSize);
+    it('counts the UTF-8 bytes of non-ASCII text, as Chrome measured them', () => {
+      expect(storedSize('é'.repeat(1000))).toBe(2002);
+      expect(storedSize('😀'.repeat(500))).toBe(2002);
+      expect(storedSize('中'.repeat(1000))).toBe(3002);
     });
 
-    it('should return 0 for empty array', () => {
-      expect(estimatePromptsArraySize([])).toBe(0);
-    });
-  });
-
-  describe('calculateMaxPrompts', () => {
-    it('should calculate correct number of prompts', () => {
-      const availableBytes = 10000;
-      const avgPromptLength = 5000;
-
-      const avgPromptSize =
-        ESTIMATED_SIZES.PROMPT_BASE +
-        (50 * ESTIMATED_SIZES.PROMPT_PER_CHAR) + // title
-        (avgPromptLength * ESTIMATED_SIZES.PROMPT_PER_CHAR) + // content
-        (10 * ESTIMATED_SIZES.PROMPT_PER_CHAR); // category
-
-      const expected = Math.floor(availableBytes / avgPromptSize);
-      const result = calculateMaxPrompts(availableBytes, avgPromptLength);
-
-      expect(result).toBe(expected);
+    it('counts the 6-byte escapes Chrome writes for <, U+2028 and U+2029, and the 2 bytes of \\n and "', () => {
+      expect(storedSize('<'.repeat(1000))).toBe(6002);
+      expect(storedSize('\u2028\u2029'.repeat(500))).toBe(6002);
+      expect(storedSize('\n"'.repeat(500))).toBe(2002);
+      expect(storedSize('>&'.repeat(500))).toBe(1002);
     });
 
-    it('should return 0 when available bytes is small', () => {
-      expect(calculateMaxPrompts(10)).toBe(0);
+    it('counts an integer past 32 bits, such as a timestamp, at the longest form Chrome writes: 5 bytes more', () => {
+      expect(storedSize(1_793_212_345_678)).toBe('1.793212345678e+12'.length);
+      expect(storedSize({ createdAt: -1_793_212_345_678, usageCount: 2_147_483_647, ratio: 1.5 }))
+        .toBe('{"createdAt":-1793212345678,"usageCount":2147483647,"ratio":1.5}'.length + 5);
     });
   });
 
   describe('formatBytes', () => {
-    it('should format 0 bytes', () => {
-      expect(formatBytes(0)).toBe('0 B');
+    it('formats zero and a few bytes in Bytes', () => {
+      expect(formatBytes(0)).toBe('0 Bytes');
+      expect(formatBytes(500)).toBe('500 Bytes');
     });
 
-    it('should format bytes', () => {
-      expect(formatBytes(500)).toBe('500.00 B');
-    });
-
-    it('should format KB', () => {
-      expect(formatBytes(1024)).toBe('1.00 KB');
-      expect(formatBytes(1536)).toBe('1.50 KB');
-    });
-
-    it('should format MB', () => {
-      expect(formatBytes(1024 * 1024)).toBe('1.00 MB');
-    });
-
-    it('should format GB', () => {
-      expect(formatBytes(1024 * 1024 * 1024)).toBe('1.00 GB');
+    it('formats KB, MB and GB with at most two decimals and no trailing zeros', () => {
+      expect(formatBytes(1024)).toBe('1 KB');
+      expect(formatBytes(1536)).toBe('1.5 KB');
+      expect(formatBytes(19_200)).toBe('18.75 KB');
+      expect(formatBytes(1024 * 1024)).toBe('1 MB');
+      expect(formatBytes(1024 * 1024 * 1024)).toBe('1 GB');
     });
   });
 
-  describe('getStorageStats', () => {
-    const total = 1000;
+  // The Settings bar and the storage warning show Chrome's use through this one function, so they agree
+  describe('describeStorageUsage', () => {
+    const QUOTA = 10_485_760;
 
-    it('should return safe level', () => {
-      const used = 100; // 10%
-      const stats = getStorageStats(used, total);
-
-      expect(stats.warningLevel).toBe('safe');
-      expect(stats.percentage).toBe(10);
-      expect(stats.recommendation).toMatch(/Storage is healthy/);
+    it('gives the bytes in use and the quota as sizes, and the percentage of the quota in use', () => {
+      expect(describeStorageUsage(4_404_019, QUOTA)).toEqual({ percentage: 42, used: '4.2 MB', total: '10 MB' });
     });
 
-    it('should return warning level', () => {
-      const used = 750; // 75% > SAFE(70%)
-      const stats = getStorageStats(used, total);
-
-      expect(stats.warningLevel).toBe('warning');
-      expect(stats.percentage).toBe(75);
-      expect(stats.recommendation).toMatch(/Storage is getting full/);
+    it('rounds the percentage to a whole number', () => {
+      expect(describeStorageUsage(QUOTA * 0.9748332977294922, QUOTA).percentage).toBe(97);
+      expect(describeStorageUsage(QUOTA * 0.004, QUOTA).percentage).toBe(0);
+      expect(describeStorageUsage(QUOTA * 0.996, QUOTA).percentage).toBe(100);
     });
 
-    it('should return critical level', () => {
-      const used = 900; // 90% > WARNING(85%)
-      const stats = getStorageStats(used, total);
-
-      expect(stats.warningLevel).toBe('critical');
-      expect(stats.percentage).toBe(90);
-      expect(stats.recommendation).toMatch(/Storage is critically low/);
-    });
-
-    it('should return danger level', () => {
-      const used = 960; // 96% > CRITICAL(95%)
-      const stats = getStorageStats(used, total);
-
-      expect(stats.warningLevel).toBe('danger');
-      expect(stats.percentage).toBe(96);
-      expect(stats.recommendation).toMatch(/Storage is nearly full/);
-    });
-
-    it('should calculate estimated prompts remaining', () => {
-      const used = 0;
-      const stats = getStorageStats(used, total);
-      const expected = calculateMaxPrompts(total);
-      expect(stats.estimatedPromptsRemaining).toBe(expected);
+    it('formats bytes, kilobytes and gigabytes', () => {
+      expect(describeStorageUsage(0, QUOTA).used).toBe('0 Bytes');
+      expect(describeStorageUsage(500, QUOTA).used).toBe('500 Bytes');
+      expect(describeStorageUsage(1536, QUOTA).used).toBe('1.5 KB');
+      expect(describeStorageUsage(1_073_741_824, 2_147_483_648)).toEqual({ percentage: 50, used: '1 GB', total: '2 GB' });
     });
   });
 });

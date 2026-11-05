@@ -1,6 +1,6 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { StorageManager } from '../../services/storage';
 import StorageWarning from '../StorageWarning';
@@ -11,6 +11,8 @@ Object.defineProperty(window, 'location', {
   value: { reload: mockReload },
   writable: true
 });
+
+const REASON = 'Storage quota exceeded. Please delete old prompts to free up space.';
 
 describe('StorageWarning', () => {
   const mockOnClose = vi.fn();
@@ -29,65 +31,95 @@ describe('StorageWarning', () => {
     warningLevel
   });
 
-  describe('warning levels', () => {
-    it('should render with safe warning level', async () => {
+  // The warning opens only after a refused save, and the app's own limits (5,000 Prompts, 8 MB
+  // estimated) can refuse it while Chrome storage is far from full
+  describe.each([
+    ['safe', 40],
+    ['warning', 75],
+    ['critical', 90],
+    ['danger', 98]
+  ] as const)('a save refused at the %s level', (level, percentage) => {
+    it('says the limit is reached, gives the reason and offers to clear the data', async () => {
       vi.mocked(mockStorageManager.getStorageUsageWithWarnings).mockResolvedValue(
-        createStorageInfo(50, 'safe')
+        createStorageInfo(percentage, level)
       );
 
-      render(<StorageWarning onClose={mockOnClose} />);
+      render(<StorageWarning reason={REASON} onClose={mockOnClose} />);
 
       await waitFor(() => {
-        expect(screen.getByText('50%')).toBeInTheDocument();
+        expect(screen.getByText(`${String(percentage)}%`)).toBeInTheDocument();
       });
+      expect(screen.getByRole('dialog', { name: 'Storage Limit Reached' })).toBeInTheDocument();
+      expect(screen.getByText(REASON)).toBeInTheDocument();
+      expect(screen.queryByText(/plenty of space|getting low|critically low/)).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Clear All Data' })).toBeInTheDocument();
+    });
+  });
 
-      expect(screen.getByText('Storage Warning')).toBeInTheDocument();
-      expect(screen.getByText(/You have plenty of space available/)).toBeInTheDocument();
+  // A modal: the keyboard handles the warning first, and the form behind it is out of reach
+  describe('keyboard', () => {
+    it('focuses Continue when it opens', async () => {
+      vi.mocked(mockStorageManager.getStorageUsageWithWarnings).mockResolvedValue(createStorageInfo(40, 'safe'));
+
+      render(<StorageWarning reason={REASON} onClose={mockOnClose} />);
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Continue' })).toHaveFocus();
+      });
     });
 
-    it('should render with warning level', async () => {
-      vi.mocked(mockStorageManager.getStorageUsageWithWarnings).mockResolvedValue(
-        createStorageInfo(75, 'warning')
+    it('keeps Tab and Shift+Tab between its two buttons', async () => {
+      const user = userEvent.setup();
+      vi.mocked(mockStorageManager.getStorageUsageWithWarnings).mockResolvedValue(createStorageInfo(40, 'safe'));
+      render(
+        <>
+          <button type="button">Save Prompt</button>
+          <StorageWarning reason={REASON} onClose={mockOnClose} />
+          <button type="button">After</button>
+        </>
       );
+      const continueButton = screen.getByRole('button', { name: 'Continue' });
+      const clearButton = screen.getByRole('button', { name: 'Clear All Data' });
+      await waitFor(() => { expect(continueButton).toHaveFocus(); });
 
-      render(<StorageWarning onClose={mockOnClose} />);
-
-      await waitFor(() => {
-        expect(screen.getByText('75%')).toBeInTheDocument();
-      });
-
-      expect(screen.getByText('Storage Warning')).toBeInTheDocument();
-      expect(screen.getByText(/storage is getting low/)).toBeInTheDocument();
+      await user.tab({ shift: true });
+      expect(clearButton).toHaveFocus();
+      await user.tab();
+      expect(continueButton).toHaveFocus();
+      await user.tab();
+      expect(clearButton).toHaveFocus();
+      await user.tab();
+      expect(continueButton).toHaveFocus();
     });
 
-    it('should render with critical warning level', async () => {
-      vi.mocked(mockStorageManager.getStorageUsageWithWarnings).mockResolvedValue(
-        createStorageInfo(90, 'critical')
-      );
+    it('closes on Escape, like Continue', async () => {
+      const user = userEvent.setup();
+      vi.mocked(mockStorageManager.getStorageUsageWithWarnings).mockResolvedValue(createStorageInfo(40, 'safe'));
+      render(<StorageWarning reason={REASON} onClose={mockOnClose} />);
+      await waitFor(() => { expect(screen.getByRole('button', { name: 'Continue' })).toHaveFocus(); });
 
-      render(<StorageWarning onClose={mockOnClose} />);
+      await user.keyboard('{Escape}');
 
-      await waitFor(() => {
-        expect(screen.getByText('90%')).toBeInTheDocument();
-      });
-
-      expect(screen.getByText('Critical Storage Warning')).toBeInTheDocument();
-      expect(screen.getByText(/critically low/)).toBeInTheDocument();
+      expect(mockOnClose).toHaveBeenCalledTimes(1);
     });
 
-    it('should render with danger warning level', async () => {
-      vi.mocked(mockStorageManager.getStorageUsageWithWarnings).mockResolvedValue(
-        createStorageInfo(98, 'danger')
-      );
+    it('leaves the keyboard to the Clear All Data confirmation, then takes it back on Clear All Data', async () => {
+      const user = userEvent.setup();
+      vi.mocked(mockStorageManager.getStorageUsageWithWarnings).mockResolvedValue(createStorageInfo(40, 'safe'));
+      render(<StorageWarning reason={REASON} onClose={mockOnClose} />);
+      await waitFor(() => { expect(screen.getByRole('button', { name: 'Continue' })).toHaveFocus(); });
 
-      render(<StorageWarning onClose={mockOnClose} />);
+      await user.click(screen.getByRole('button', { name: 'Clear All Data' }));
+      const confirmation = screen.getByRole('dialog', { name: 'Clear All Data' });
+      expect(within(confirmation).getByRole('button', { name: 'Cancel' })).toHaveFocus();
+      await user.tab();
+      expect(within(confirmation).getByRole('button', { name: 'Clear All Data' })).toHaveFocus();
 
-      await waitFor(() => {
-        expect(screen.getByText('98%')).toBeInTheDocument();
-      });
+      await user.keyboard('{Escape}');
 
-      expect(screen.getByText('Storage Limit Reached')).toBeInTheDocument();
-      expect(screen.getByText(/storage is full/)).toBeInTheDocument();
+      expect(screen.queryByRole('dialog', { name: 'Clear All Data' })).not.toBeInTheDocument();
+      expect(mockOnClose).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: 'Clear All Data' })).toHaveFocus();
     });
   });
 
@@ -97,23 +129,26 @@ describe('StorageWarning', () => {
         createStorageInfo(65, 'safe')
       );
 
-      render(<StorageWarning onClose={mockOnClose} />);
+      render(<StorageWarning reason={REASON} onClose={mockOnClose} />);
 
       await waitFor(() => {
         expect(screen.getByText('65%')).toBeInTheDocument();
       });
     });
 
-    it('should display percentage in warning message', async () => {
+    // Chrome's use is rarely a whole percentage: the warning shows it rounded, like the Settings bar
+    it('shows a fractional percentage as a whole number, next to a bar of that width', async () => {
       vi.mocked(mockStorageManager.getStorageUsageWithWarnings).mockResolvedValue(
-        createStorageInfo(82, 'warning')
+        createStorageInfo(97.48332977294922, 'danger')
       );
 
-      render(<StorageWarning onClose={mockOnClose} />);
+      render(<StorageWarning reason={REASON} onClose={mockOnClose} />);
 
       await waitFor(() => {
-        expect(screen.getByText(/82% used/)).toBeInTheDocument();
+        expect(screen.getByText('97%')).toBeInTheDocument();
       });
+      expect(screen.queryByText(/97\.48/)).not.toBeInTheDocument();
+      expect(document.querySelector('[style*="width: 97%"]')).toHaveClass('bg-danger');
     });
   });
 
@@ -126,7 +161,7 @@ describe('StorageWarning', () => {
         warningLevel: 'safe'
       });
 
-      render(<StorageWarning onClose={mockOnClose} />);
+      render(<StorageWarning reason={REASON} onClose={mockOnClose} />);
 
       await waitFor(() => {
         expect(screen.getByText('1 KB')).toBeInTheDocument();
@@ -141,7 +176,7 @@ describe('StorageWarning', () => {
         warningLevel: 'safe'
       });
 
-      render(<StorageWarning onClose={mockOnClose} />);
+      render(<StorageWarning reason={REASON} onClose={mockOnClose} />);
 
       await waitFor(() => {
         expect(screen.getByText('2 MB')).toBeInTheDocument();
@@ -157,7 +192,7 @@ describe('StorageWarning', () => {
         warningLevel: 'safe'
       });
 
-      render(<StorageWarning onClose={mockOnClose} />);
+      render(<StorageWarning reason={REASON} onClose={mockOnClose} />);
 
       await waitFor(() => {
         expect(screen.getByText('1 GB')).toBeInTheDocument();
@@ -173,66 +208,10 @@ describe('StorageWarning', () => {
         warningLevel: 'safe'
       });
 
-      render(<StorageWarning onClose={mockOnClose} />);
+      render(<StorageWarning reason={REASON} onClose={mockOnClose} />);
 
       await waitFor(() => {
         expect(screen.getByText('0 Bytes')).toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('Clear All Data button visibility', () => {
-    it('should not show Clear All Data button for safe level', async () => {
-      vi.mocked(mockStorageManager.getStorageUsageWithWarnings).mockResolvedValue(
-        createStorageInfo(50, 'safe')
-      );
-
-      render(<StorageWarning onClose={mockOnClose} />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Continue')).toBeInTheDocument();
-      });
-
-      expect(screen.queryByText('Clear All Data')).not.toBeInTheDocument();
-    });
-
-    it('should not show Clear All Data button for warning level', async () => {
-      vi.mocked(mockStorageManager.getStorageUsageWithWarnings).mockResolvedValue(
-        createStorageInfo(75, 'warning')
-      );
-
-      render(<StorageWarning onClose={mockOnClose} />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Continue')).toBeInTheDocument();
-      });
-
-      expect(screen.queryByText('Clear All Data')).not.toBeInTheDocument();
-    });
-
-    it('should not show Clear All Data button for critical level', async () => {
-      vi.mocked(mockStorageManager.getStorageUsageWithWarnings).mockResolvedValue(
-        createStorageInfo(90, 'critical')
-      );
-
-      render(<StorageWarning onClose={mockOnClose} />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Continue')).toBeInTheDocument();
-      });
-
-      expect(screen.queryByText('Clear All Data')).not.toBeInTheDocument();
-    });
-
-    it('should show Clear All Data button for danger level', async () => {
-      vi.mocked(mockStorageManager.getStorageUsageWithWarnings).mockResolvedValue(
-        createStorageInfo(98, 'danger')
-      );
-
-      render(<StorageWarning onClose={mockOnClose} />);
-
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: 'Clear All Data' })).toBeInTheDocument();
       });
     });
   });
@@ -244,7 +223,7 @@ describe('StorageWarning', () => {
         createStorageInfo(98, 'danger')
       );
 
-      render(<StorageWarning onClose={mockOnClose} />);
+      render(<StorageWarning reason={REASON} onClose={mockOnClose} />);
 
       await waitFor(() => {
         expect(screen.getByRole('button', { name: 'Clear All Data' })).toBeInTheDocument();
@@ -253,7 +232,7 @@ describe('StorageWarning', () => {
       await user.click(screen.getByRole('button', { name: 'Clear All Data' }));
 
       await waitFor(() => {
-        expect(screen.getByRole('dialog')).toBeInTheDocument();
+        expect(screen.getByRole('dialog', { name: 'Clear All Data' })).toBeInTheDocument();
       });
 
       expect(screen.getByText(/Are you sure you want to clear all data/)).toBeInTheDocument();
@@ -265,7 +244,7 @@ describe('StorageWarning', () => {
         createStorageInfo(98, 'danger')
       );
 
-      render(<StorageWarning onClose={mockOnClose} />);
+      render(<StorageWarning reason={REASON} onClose={mockOnClose} />);
 
       await waitFor(() => {
         expect(screen.getByRole('button', { name: 'Clear All Data' })).toBeInTheDocument();
@@ -274,13 +253,13 @@ describe('StorageWarning', () => {
       await user.click(screen.getByRole('button', { name: 'Clear All Data' }));
 
       await waitFor(() => {
-        expect(screen.getByRole('dialog')).toBeInTheDocument();
+        expect(screen.getByRole('dialog', { name: 'Clear All Data' })).toBeInTheDocument();
       });
 
       await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
       await waitFor(() => {
-        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        expect(screen.queryByRole('dialog', { name: 'Clear All Data' })).not.toBeInTheDocument();
       });
     });
 
@@ -291,7 +270,7 @@ describe('StorageWarning', () => {
       );
       vi.mocked(mockStorageManager.clearAllData).mockResolvedValue(undefined);
 
-      render(<StorageWarning onClose={mockOnClose} />);
+      render(<StorageWarning reason={REASON} onClose={mockOnClose} />);
 
       await waitFor(() => {
         expect(screen.getByRole('button', { name: 'Clear All Data' })).toBeInTheDocument();
@@ -300,19 +279,12 @@ describe('StorageWarning', () => {
       await user.click(screen.getByRole('button', { name: 'Clear All Data' }));
 
       await waitFor(() => {
-        expect(screen.getByRole('dialog')).toBeInTheDocument();
+        expect(screen.getByRole('dialog', { name: 'Clear All Data' })).toBeInTheDocument();
       });
 
-      // Find the confirm button in the dialog (there are two "Clear All Data" buttons)
-      const confirmButtons = screen.getAllByRole('button', { name: 'Clear All Data' });
-      const dialogConfirmButton = confirmButtons.find(btn =>
-        btn.closest('[role="dialog"]')
-      );
-
-      expect(dialogConfirmButton).toBeDefined();
-      if (dialogConfirmButton) {
-        await user.click(dialogConfirmButton);
-      }
+      // The confirmation has its own "Clear All Data" button
+      const confirmDialog = screen.getByRole('dialog', { name: 'Clear All Data' });
+      await user.click(within(confirmDialog).getByRole('button', { name: 'Clear All Data' }));
 
       await waitFor(() => {
         expect(mockStorageManager.clearAllData).toHaveBeenCalled();
@@ -330,7 +302,7 @@ describe('StorageWarning', () => {
         createStorageInfo(50, 'safe')
       );
 
-      render(<StorageWarning onClose={mockOnClose} />);
+      render(<StorageWarning reason={REASON} onClose={mockOnClose} />);
 
       await waitFor(() => {
         expect(screen.getByRole('button', { name: 'Continue' })).toBeInTheDocument();
@@ -342,111 +314,25 @@ describe('StorageWarning', () => {
     });
   });
 
-  describe('progress bar colors', () => {
-    it('should render green progress bar for safe level', async () => {
+  // The bar keeps one state family per level (success, warning with critical, danger); the icon
+  // stays danger, since the save was refused
+  describe.each([
+    ['safe', 50, 'bg-success'],
+    ['warning', 75, 'bg-warning'],
+    ['critical', 90, 'bg-warning'],
+    ['danger', 98, 'bg-danger']
+  ] as const)('%s level', (level, percentage, barClass) => {
+    it(`colors the progress bar ${barClass} and the icon text-danger`, async () => {
       vi.mocked(mockStorageManager.getStorageUsageWithWarnings).mockResolvedValue(
-        createStorageInfo(50, 'safe')
+        createStorageInfo(percentage, level)
       );
 
-      render(<StorageWarning onClose={mockOnClose} />);
+      render(<StorageWarning reason={REASON} onClose={mockOnClose} />);
 
       await waitFor(() => {
-        const progressBar = document.querySelector('.bg-green-500');
-        expect(progressBar).toBeInTheDocument();
+        expect(document.querySelector(`[style*="width: ${String(percentage)}%"]`)).toHaveClass(barClass);
       });
-    });
-
-    it('should render yellow progress bar for warning level', async () => {
-      vi.mocked(mockStorageManager.getStorageUsageWithWarnings).mockResolvedValue(
-        createStorageInfo(75, 'warning')
-      );
-
-      render(<StorageWarning onClose={mockOnClose} />);
-
-      await waitFor(() => {
-        const progressBar = document.querySelector('.bg-yellow-500');
-        expect(progressBar).toBeInTheDocument();
-      });
-    });
-
-    it('should render orange progress bar for critical level', async () => {
-      vi.mocked(mockStorageManager.getStorageUsageWithWarnings).mockResolvedValue(
-        createStorageInfo(90, 'critical')
-      );
-
-      render(<StorageWarning onClose={mockOnClose} />);
-
-      await waitFor(() => {
-        const progressBar = document.querySelector('.bg-orange-500');
-        expect(progressBar).toBeInTheDocument();
-      });
-    });
-
-    it('should render red progress bar for danger level', async () => {
-      vi.mocked(mockStorageManager.getStorageUsageWithWarnings).mockResolvedValue(
-        createStorageInfo(98, 'danger')
-      );
-
-      render(<StorageWarning onClose={mockOnClose} />);
-
-      await waitFor(() => {
-        const progressBar = document.querySelector('.bg-red-500');
-        expect(progressBar).toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('icon colors', () => {
-    it('should render green icon for safe level', async () => {
-      vi.mocked(mockStorageManager.getStorageUsageWithWarnings).mockResolvedValue(
-        createStorageInfo(50, 'safe')
-      );
-
-      render(<StorageWarning onClose={mockOnClose} />);
-
-      await waitFor(() => {
-        const icon = document.querySelector('.text-green-500');
-        expect(icon).toBeInTheDocument();
-      });
-    });
-
-    it('should render yellow icon for warning level', async () => {
-      vi.mocked(mockStorageManager.getStorageUsageWithWarnings).mockResolvedValue(
-        createStorageInfo(75, 'warning')
-      );
-
-      render(<StorageWarning onClose={mockOnClose} />);
-
-      await waitFor(() => {
-        const icon = document.querySelector('.text-yellow-500');
-        expect(icon).toBeInTheDocument();
-      });
-    });
-
-    it('should render orange icon for critical level', async () => {
-      vi.mocked(mockStorageManager.getStorageUsageWithWarnings).mockResolvedValue(
-        createStorageInfo(90, 'critical')
-      );
-
-      render(<StorageWarning onClose={mockOnClose} />);
-
-      await waitFor(() => {
-        const icon = document.querySelector('.text-orange-500');
-        expect(icon).toBeInTheDocument();
-      });
-    });
-
-    it('should render red icon for danger level', async () => {
-      vi.mocked(mockStorageManager.getStorageUsageWithWarnings).mockResolvedValue(
-        createStorageInfo(98, 'danger')
-      );
-
-      render(<StorageWarning onClose={mockOnClose} />);
-
-      await waitFor(() => {
-        const icon = document.querySelector('.text-red-500');
-        expect(icon).toBeInTheDocument();
-      });
+      expect(document.querySelector('svg.h-8')).toHaveClass('text-danger');
     });
   });
 
@@ -463,7 +349,7 @@ describe('StorageWarning', () => {
       );
       vi.mocked(mockStorageManager.clearAllData).mockImplementation(() => clearPromise);
 
-      render(<StorageWarning onClose={mockOnClose} />);
+      render(<StorageWarning reason={REASON} onClose={mockOnClose} />);
 
       await waitFor(() => {
         expect(screen.getByRole('button', { name: 'Clear All Data' })).toBeInTheDocument();
@@ -472,18 +358,11 @@ describe('StorageWarning', () => {
       await user.click(screen.getByRole('button', { name: 'Clear All Data' }));
 
       await waitFor(() => {
-        expect(screen.getByRole('dialog')).toBeInTheDocument();
+        expect(screen.getByRole('dialog', { name: 'Clear All Data' })).toBeInTheDocument();
       });
 
-      const confirmButtons = screen.getAllByRole('button', { name: 'Clear All Data' });
-      const dialogConfirmButton = confirmButtons.find(btn =>
-        btn.closest('[role="dialog"]')
-      );
-
-      expect(dialogConfirmButton).toBeDefined();
-      if (dialogConfirmButton) {
-        await user.click(dialogConfirmButton);
-      }
+      const confirmDialog = screen.getByRole('dialog', { name: 'Clear All Data' });
+      await user.click(within(confirmDialog).getByRole('button', { name: 'Clear All Data' }));
 
       await waitFor(() => {
         expect(screen.getByText('Clearing...')).toBeInTheDocument();
@@ -502,12 +381,13 @@ describe('StorageWarning', () => {
         new Error('Failed to get storage info')
       );
 
-      render(<StorageWarning onClose={mockOnClose} />);
+      render(<StorageWarning reason={REASON} onClose={mockOnClose} />);
 
-      // Should still render the component with default values
+      // Still says why the save was refused, without the usage figures
       await waitFor(() => {
-        expect(screen.getByText('Storage Warning')).toBeInTheDocument();
+        expect(screen.getByRole('dialog', { name: 'Storage Limit Reached' })).toBeInTheDocument();
       });
+      expect(screen.getByText(REASON)).toBeInTheDocument();
 
       expect(screen.getByRole('button', { name: 'Continue' })).toBeInTheDocument();
     });
@@ -519,7 +399,7 @@ describe('StorageWarning', () => {
         createStorageInfo(50, 'safe')
       );
 
-      render(<StorageWarning onClose={mockOnClose} />);
+      render(<StorageWarning reason={REASON} onClose={mockOnClose} />);
 
       await waitFor(() => {
         expect(screen.getByText(/export your data before clearing/)).toBeInTheDocument();

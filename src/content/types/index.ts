@@ -11,6 +11,7 @@ export interface Prompt {
   updatedAt: number;
   usageCount?: number;
   lastUsedAt?: number;
+  pinned?: boolean; // Pinned Prompts appear first in the prompt picker (absent = unpinned)
 }
 
 export interface InsertionResult {
@@ -53,21 +54,21 @@ export interface PlatformManagerOptions {
 
 // Re-export types from other modules
 export type {
+  IconCreationResult as PlatformIconCreationResult, 
   PlatformConfig,
-  PlatformStrategyInterface,
-  PlatformName,
   PlatformDetectionResult,
-  StorageData,
-  IconCreationResult as PlatformIconCreationResult
+  PlatformName,
+  PlatformStrategyInterface,
+  StorageData
 } from './platform';
 
 export type {
-  KeyboardNavigationOptions,
-  UIElementFactoryOptions,
-  IconCreationResult,
-  KeyboardNavigationState,
-  ToastNotification,
-  PromptSelectorOptions,
   DOMElementAttributes,
-  SVGElementAttributes
+  IconCreationResult,
+  KeyboardNavigationOptions,
+  KeyboardNavigationState,
+  PromptSelectorOptions,
+  SVGElementAttributes, 
+  ToastNotification,
+  UIElementFactoryOptions
 } from './ui';

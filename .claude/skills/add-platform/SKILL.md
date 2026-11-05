@@ -78,15 +78,14 @@ export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
     buttonContainerSelector: '.toolbar-container', // Where to place icon (optional)
     strategyClass: 'YourPlatformStrategy',        // Strategy class name
     hostnamePatterns: ['yourplatform', 'your-ai'], // Additional hostname patterns
-    brandColors: {                                // Tailwind classes for badge styling
-      enabled: 'bg-[#123456] text-white shadow-xs',
-      disabled: 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+    brandColors: {                                // Logo square when on: brand data, so arbitrary hex values
+      enabled: 'bg-[#123456] text-[#ffffff] shadow-xs'
     }
   }
 };
 ```
 
-> ℹ️ If you omit `brandColors`, the UI falls back to a green gradient badge so the integration still renders correctly.
+> ℹ️ If you omit `brandColors`, the logo square falls back to the accent (`bg-accent-subtle text-accent`). Switched off, every site shows the same disabled state (`bg-muted text-tertiary`, `src/constants/brandColors.ts`): give the logo component a `disabled` prop that draws it in `currentColor` (see `src/components/icons/SiteIcons.tsx`).
 
 **Priority Guidelines:**
 - 100: Premium platforms (Claude, ChatGPT)
@@ -106,7 +105,7 @@ Add or update the platform card shown in settings so users can enable/disable th
 
 **Actions:**
 1. Add an icon component in `src/components/icons/SiteIcons.tsx` (or reuse an existing one).
-2. Update `src/components/settings/SiteCardList.tsx` (or wherever cards are listed) to include the new platform with the right icon.
+2. Update `src/components/settings/SupportedSitesList.tsx`, which lists the cards, to include the new platform with the right icon.
 3. Make sure the new card passes the correct hostname and uses `getBrandColors(hostname)`.
 4. Verify the badge colors/labels look correct; adjust `brandColors` if needed.
 
@@ -258,8 +257,7 @@ constructor(options: PlatformManagerOptions = {}) {
       "matches": [
         "https://*.your-ai-platform.com/*"
       ],
-      "js": ["src/content/index.ts"],
-      "css": ["src/content/styles/injected-icon.css"]
+      "js": ["src/content/index.ts"]
     }
   ]
 }
@@ -433,9 +431,12 @@ npm run lint:fix
 createYourPlatformIcon(): HTMLElement {
   const icon = document.createElement('button');
 
-  // IMPORTANT: Always include 'prompt-library-integrated-icon' for E2E test compatibility
-  // Add platform-specific Tailwind classes after the shared class
-  icon.className = 'prompt-library-integrated-icon flex items-center gap-2 px-3 h-10 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-all duration-200 text-gray-700 dark:text-gray-300';
+  // IMPORTANT: Always include 'prompt-library-integrated-icon' for E2E test compatibility.
+  // Then copy the class list of the platform's own native button (inspect it in DevTools):
+  // the host page's stylesheet styles the icon and follows the platform's theme. The
+  // extension's token classes (src/theme/tokens.css) are not loaded in the host page,
+  // and a raw palette class or dark: color variant breaks the Colors rule (CODING_STANDARDS.md).
+  icon.className = 'prompt-library-integrated-icon <native-button-classes-of-the-platform>';
 
   // Required attributes
   icon.setAttribute('type', 'button');
@@ -478,10 +479,10 @@ createYourPlatformIcon(): HTMLElement {
 **Key Patterns to Follow:**
 
 1. **Always include `prompt-library-integrated-icon` class** - Required for E2E test selectors
-2. **Use Tailwind classes** - No custom CSS needed, all styling via Tailwind utilities
+2. **Reuse the platform's native button classes** - The host page's stylesheet styles the icon; no custom CSS
 3. **Standard 18x18 SVG sizing** - Consistent across all platforms
 4. **Use `createElement` and `createSVGElement`** - Secure DOM construction (never `innerHTML`)
-5. **Include dark mode classes** - Use `dark:` variants for all styles
+5. **Let the host handle dark mode** - The native classes follow the platform's theme; add no `dark:` color variant
 6. **Text label optional** - Include for button-style integrations (Claude, Perplexity, Mistral, Copilot)
 
 **Reference Examples:**

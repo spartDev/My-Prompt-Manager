@@ -3,9 +3,9 @@
  * Tests toError() and getErrorMessage() helpers
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-import { toError, getErrorMessage } from '../error';
+import { getErrorMessage, toError } from '../error';
 
 describe('toError', () => {
   describe('Error objects', () => {

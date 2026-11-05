@@ -7,7 +7,7 @@
 
 import type { Mock } from 'vitest';
 
-import type { StorageManagerMock, PromptManagerMock } from '../test/setup';
+import type { PromptManagerMock, StorageManagerMock } from '../test/setup';
 
 import type { Settings } from './index';
 

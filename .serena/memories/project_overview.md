@@ -13,7 +13,7 @@ A Chrome extension providing seamless access to personal prompt libraries direct
 - Custom site configuration
 - Security-first approach with DOMPurify sanitization
 - Local storage only - no data transmission
-- Side panel support (Chrome 114+)
+- Side panel support (Chrome 116+)
 
 ## Target Users
 Developers, writers, researchers, and AI power users who maintain reusable prompt libraries across multiple AI platforms.

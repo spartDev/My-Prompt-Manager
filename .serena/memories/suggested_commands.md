@@ -16,8 +16,8 @@ npm run test:coverage # Generate test coverage report
 
 ## Code Quality Commands (MANDATORY)
 ```bash
-npm run lint         # Run ESLint checks
-npm run lint:fix     # Fix ESLint issues automatically
+npm run lint         # Run Biome lint checks
+npm run lint:fix     # Fix Biome lint issues automatically
 ```
 
 ## Packaging Commands

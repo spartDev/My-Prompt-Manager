@@ -132,7 +132,7 @@ The release process enforces these mandatory quality gates:
 
 1. **🔍 Release Validation**
    - Version consistency check (package.json vs release tag)
-   - Complete ESLint check with zero tolerance
+   - Complete Biome lint check with zero tolerance
    - Full test suite execution with coverage
    - Security audit (moderate+ vulnerabilities fail release)
    - Advanced security scanning (CodeQL)
@@ -341,7 +341,7 @@ git commit -m "chore: update version to [TARGET_VERSION]"
 
 #### Linting Failures
 ```bash
-❌ ESLint found issues - release failed
+❌ Biome lint found issues - release failed
 ```
 **Solution:**
 ```bash

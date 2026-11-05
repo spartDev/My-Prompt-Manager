@@ -12,8 +12,8 @@ const ExportButton: FC<ExportButtonProps> = ({ onClick, disabled = false, loadin
     disabled={disabled}
     className={`flex-1 flex items-center justify-center gap-1 px-2 py-1 text-xs font-medium rounded transition-colors ${
       disabled
-        ? 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
-        : 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40'
+        ? 'bg-muted text-tertiary cursor-not-allowed'
+        : 'bg-accent-subtle text-accent hover:bg-accent-selected'
     }`}
     aria-label={loading ? 'Exporting configuration' : 'Export custom site configuration'}
   >

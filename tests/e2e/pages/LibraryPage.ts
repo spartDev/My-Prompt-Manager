@@ -13,16 +13,21 @@ export class LibraryPage extends BasePage {
    * Navigate to the settings page
    */
   async navigateToSettings(): Promise<void> {
-    await this.page.getByRole('button', { name: 'Settings' }).click();
-    await expect(this.page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+    await this.switchToSection('settings');
   }
 
   /**
    * Navigate to the category manager
    */
   async navigateToCategoryManager(): Promise<void> {
-    await this.page.getByRole('button', { name: 'Manage categories' }).click();
-    await expect(this.page.getByRole('heading', { name: 'Manage Categories' })).toBeVisible();
+    await this.switchToSection('categories');
+  }
+
+  /**
+   * Navigate to the Analytics section
+   */
+  async navigateToAnalytics(): Promise<void> {
+    await this.switchToSection('analytics');
   }
 
   /**
@@ -36,36 +41,57 @@ export class LibraryPage extends BasePage {
   }
 
   /**
+   * Get a Library filter pill ("All", "Pinned", "Most Used" or a Category name)
+   */
+  getLibraryFilterPill(name: string): Locator {
+    return this.page
+      .getByRole('radiogroup', { name: 'Library filter' })
+      .getByRole('radio', { name, exact: true });
+  }
+
+  /**
+   * Choose a Library filter pill ("All", "Pinned", "Most Used" or a Category name)
+   */
+  async selectLibraryFilter(name: string): Promise<void> {
+    await this.getLibraryFilterPill(name).click();
+    await expect(this.getLibraryFilterPill(name)).toHaveAttribute('aria-checked', 'true');
+  }
+
+  /**
    * Filter prompts by category
    */
   async filterByCategory(category: string): Promise<void> {
-    // Click the filter button to open dropdown
-    await this.page.getByRole('button', { name: /Filter by category:/i }).click();
-    // Wait for menu to appear
-    await this.page.getByRole('menu', { name: 'Category filter menu' }).waitFor();
-    // Click the category option
-    await this.page.getByRole('menuitem', { name: category }).click();
+    await this.selectLibraryFilter(category);
   }
 
   /**
    * Clear all filters and search
    */
   async clearFilters(): Promise<void> {
-    // Click the filter button to open dropdown
-    await this.page.getByRole('button', { name: /Filter by category:/i }).click();
-    // Wait for menu to appear
-    await this.page.getByRole('menu', { name: 'Category filter menu' }).waitFor();
-    // Click "All Categories" to clear
-    await this.page.getByRole('menuitem', { name: 'All Categories' }).click();
-    // Clear search
+    await this.selectLibraryFilter('All');
     await this.page.getByPlaceholder('Search your prompts...').clear();
   }
 
   /**
-   * Click the "Add new prompt" button
+   * Get the header "New" button (opens the Add Prompt form)
+   */
+  getNewPromptButton(): Locator {
+    return this.page.getByTestId('new-prompt-button');
+  }
+
+  /**
+   * Click the header "New" button
    */
   async clickAddNewPrompt(): Promise<void> {
-    await this.page.getByRole('button', { name: 'Add new prompt' }).click();
+    await this.getNewPromptButton().click();
+  }
+
+  /**
+   * Get the library header subtitle that shows the prompt count
+   * ("12 prompts" or "3 of 12 prompts")
+   */
+  getPromptCountSubtitle(): Locator {
+    return this.page.getByText(/^(\d+ of )?\d+ prompts?$/);
   }
 
   /**
@@ -114,42 +140,40 @@ export class LibraryPage extends BasePage {
   }
 
   /**
-   * Open actions menu for a specific prompt
-   */
-  async openPromptActionsMenu(promptTitle: string): Promise<void> {
-    const promptCard = this.getPromptCard(promptTitle);
-    await promptCard.getByRole('button', { name: 'More actions' }).click();
-  }
-
-  /**
-   * Click edit action for a specific prompt
+   * Open a prompt for editing (clicking the card opens the editor)
    */
   async editPrompt(promptTitle: string): Promise<void> {
-    await this.openPromptActionsMenu(promptTitle);
-    await this.page.getByRole('menuitem', { name: 'Edit' }).click();
+    await this.getPromptCard(promptTitle).getByRole('button', { name: /^Edit / }).click();
   }
 
   /**
-   * Click delete action for a specific prompt
+   * Delete a prompt (from its edit form)
    */
   async deletePrompt(promptTitle: string): Promise<void> {
-    await this.openPromptActionsMenu(promptTitle);
-    await this.page.getByRole('menuitem', { name: 'Delete' }).click();
+    await this.editPrompt(promptTitle);
+    await this.page.getByRole('button', { name: 'Delete prompt' }).click();
   }
 
   /**
-   * Verify category count in the filter dropdown
+   * Pin or unpin a prompt with its star
+   */
+  async togglePin(promptTitle: string): Promise<void> {
+    await this.getPromptCard(promptTitle).getByRole('button', { name: /^(Pin|Unpin) / }).click();
+  }
+
+  /**
+   * Titles of the prompt cards, in display order
+   */
+  async getPromptTitles(): Promise<string[]> {
+    return this.page.getByTestId('prompt-card').locator('h3').allInnerTexts();
+  }
+
+  /**
+   * Verify each category has a Library filter pill
    */
   async expectCategoryFilterOptions(categories: string[]): Promise<void> {
-    // Open the filter dropdown
-    await this.page.getByRole('button', { name: /Filter by category:/i }).click();
-    // Wait for menu to appear
-    await this.page.getByRole('menu', { name: 'Category filter menu' }).waitFor();
-    // Verify each category exists in the menu
     for (const category of categories) {
-      await expect(this.page.getByRole('menuitem', { name: category })).toBeVisible();
+      await expect(this.getLibraryFilterPill(category)).toBeAttached();
     }
-    // Close the menu by pressing Escape
-    await this.page.keyboard.press('Escape');
   }
 }

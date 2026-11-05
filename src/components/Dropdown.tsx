@@ -1,15 +1,15 @@
 import type { Placement } from '@floating-ui/dom';
 import {
-  FC,
-  ReactElement,
-  ReactNode,
   cloneElement,
-  useRef,
-  useState,
   createContext,
+  type FC,
+  type ReactElement,
+  type ReactNode,
   useContext,
   useEffect,
-  useId
+  useId, 
+  useRef,
+  useState
 } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -314,8 +314,7 @@ export const Dropdown: FC<DropdownProps> = ({
   // The ref is assigned synchronously during render, and triggerRef is stable
   // across renders because it's created with useRef outside this function.
   // This pattern is documented in React docs: https://react.dev/reference/react/cloneElement#caveats
-  // We must disable the rule because ESLint doesn't recognize this safe usage.
-  // eslint-disable-next-line react-hooks/refs -- Safe: ref callback with stable useRef
+  // This ref pattern is documented in React and safe despite lint warnings.
   const enhancedTrigger = cloneElement(trigger, enhancedTriggerProps);
 
   // Validate portal container - ensure it's a valid HTMLElement in the document
@@ -346,8 +345,7 @@ export const Dropdown: FC<DropdownProps> = ({
       aria-labelledby={!ariaLabel ? triggerHandlers.id : undefined}
       className={cn(
         'absolute z-50 min-w-32 overflow-hidden',
-        'rounded-xl border bg-white shadow-lg',
-        'dark:bg-gray-800 dark:border-gray-700',
+        'rounded-xl border border-default bg-card shadow-lg',
         'animate-in fade-in-0 zoom-in-95',
         className
       )}
@@ -361,7 +359,7 @@ export const Dropdown: FC<DropdownProps> = ({
             // Use explicit type field or fallback to id check for backward compatibility
             if (item.type === 'separator' || item.id === 'separator') {
               return (
-                <div key={item.id} role="separator" className="my-1 h-px bg-gray-200 dark:bg-gray-700" />
+                <div key={item.id} role="separator" className="my-1 h-px bg-(--border-color-divider)" />
               );
             }
 
@@ -381,12 +379,12 @@ export const Dropdown: FC<DropdownProps> = ({
                 }}
                 className={cn(
                   'flex w-full items-center px-3 py-2 text-sm',
-                  'text-gray-700 dark:text-gray-300',
-                  'hover:bg-gray-100 dark:hover:bg-gray-700',
-                  'focus:bg-gray-100 dark:focus:bg-gray-700',
+                  'text-secondary',
+                  'hover:bg-muted',
+                  'focus:bg-muted',
                   'focus:outline-none transition-colors',
                   'disabled:opacity-50 disabled:cursor-not-allowed',
-                  item.disabled && 'hover:bg-transparent dark:hover:bg-transparent',
+                  item.disabled && 'hover:bg-transparent',
                   item.className,
                   itemClassName
                 )}
@@ -422,6 +420,6 @@ export const Dropdown: FC<DropdownProps> = ({
 export const DropdownSeparator: FC<{ className?: string }> = ({ className }) => (
   <div
     role="separator"
-    className={cn('my-1 h-px bg-gray-200 dark:bg-gray-700', className)}
+    className={cn('my-1 h-px bg-(--border-color-divider)', className)}
   />
 );

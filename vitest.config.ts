@@ -13,11 +13,12 @@ export default defineConfig({
     exclude: [
       ...configDefaults.exclude,
       'tests/e2e/**',
-      '.worktrees/**'
+      '.worktrees/**',
+      '.claude/**'
     ],
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'json', 'html'],
+      reporter: ['text', 'json', 'json-summary', 'html'],
       thresholds: {
         statements: 80
       },

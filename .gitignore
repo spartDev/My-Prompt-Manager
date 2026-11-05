@@ -52,10 +52,12 @@ Thumbs.db
 coverage/
 .nyc_output
 test-results/
+test-results.json
 playwright-report/
 
-# Git worktrees
+# Git worktrees (.claude/worktrees is where Claude Code creates them)
 .worktrees/
+.claude/worktrees/
 
 # Log files
 logs
@@ -81,17 +83,11 @@ extension-*.zip
 *.backup
 *~
 
-# ESLint cache
-.eslintcache
-
 # TypeScript cache
 *.tsbuildinfo
 
 # Optional npm cache directory
 .npm
-
-# Optional eslint cache
-.eslintcache
 
 # Optional REPL history
 .node_repl_history
@@ -172,3 +168,10 @@ claude-flow
 claude-flow.bat
 claude-flow.ps1
 hive-mind-prompt-*.txt
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+.beads-credential-key
+
+# Beads runtime lock
+.beads.gate.lock

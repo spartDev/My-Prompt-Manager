@@ -1,9 +1,9 @@
-import { renderHook, act, waitFor } from "@testing-library/react";
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { testThemeToggle } from "../../test/helpers/theme-helpers";
-import { DEFAULT_SETTINGS } from "../../types";
 import type { Settings } from "../../types";
+import { DEFAULT_SETTINGS } from "../../types";
 import type { GlobalWithMocks } from "../../types/test-helpers";
 import { useTheme } from "../useTheme";
 
@@ -251,6 +251,43 @@ describe("useTheme", () => {
       await waitFor(() => {
         expect(document.documentElement.classList.contains("dark")).toBe(true);
       });
+    });
+
+    it("should switch the theme with transitions disabled, then re-enable them", async () => {
+      await chrome.storage.local.set({
+        settings: { ...DEFAULT_SETTINGS, theme: "light" },
+      });
+
+      // Record every class state <html> goes through (oldValue keeps intermediate states)
+      const classStates: string[] = [];
+      const observer = new MutationObserver((records) => {
+        for (const record of records) {
+          classStates.push(record.oldValue ?? "");
+        }
+        classStates.push(document.documentElement.className);
+      });
+      observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"], attributeOldValue: true });
+
+      const { result } = renderHook(() => useTheme());
+      await waitFor(() => {
+        expect(result.current.theme).toBe("light");
+      });
+
+      await act(async () => {
+        await result.current.setTheme("dark");
+      });
+      await waitFor(() => {
+        expect(document.documentElement.classList.contains("dark")).toBe(true);
+      });
+      await waitFor(() => {
+        expect(document.documentElement.classList.contains("theme-switching")).toBe(false);
+      });
+      observer.disconnect();
+
+      // "dark" landed while transitions were suppressed...
+      expect(classStates.some(c => c.includes("dark") && c.includes("theme-switching"))).toBe(true);
+      // ...and transitions are back once the theme is applied
+      expect(document.documentElement.classList.contains("theme-switching")).toBe(false);
     });
 
     it("should remove dark class when theme changes to light", async () => {
@@ -677,12 +714,10 @@ describe("useTheme", () => {
   });
 
   describe("Toggle Theme", () => {
-    // eslint-disable-next-line vitest/expect-expect -- Assertion is in testThemeToggle helper
     it("should toggle from light to dark", async () => {
       await testThemeToggle("light", "dark");
     });
 
-    // eslint-disable-next-line vitest/expect-expect -- Assertion is in testThemeToggle helper
     it("should toggle from dark to light", async () => {
       await testThemeToggle("dark", "light");
     });

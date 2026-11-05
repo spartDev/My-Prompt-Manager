@@ -1,6 +1,6 @@
-import { ToastType } from './components';
+import type { ToastType } from './components';
 
-import { Prompt, Category, AppError, UsageEvent } from './index';
+import type { AppError, Category, Prompt, UsageEvent } from './index';
 
 /**
  * Type guard function that validates an unknown value is of type T.
@@ -26,10 +26,12 @@ export type TypeGuard<T> = (value: unknown) => value is T;
 export interface UsePromptsReturn {
   prompts: Prompt[];
   loading: boolean;
+  /** A failed load only: a failed save rejects to its caller instead */
   error: AppError | null;
   createPrompt: (prompt: Omit<Prompt, 'id' | 'createdAt' | 'updatedAt' | 'usageCount' | 'lastUsedAt'>) => Promise<void>;
   updatePrompt: (id: string, updates: Partial<Prompt>) => Promise<void>;
   deletePrompt: (id: string) => Promise<void>;
+  togglePin: (id: string) => Promise<void>;
   searchPrompts: (query: string) => Prompt[];
   filterByCategory: (category: string | null) => Prompt[];
   refreshPrompts: () => Promise<void>;
@@ -68,7 +70,6 @@ export interface UseSearchWithDebounceReturn {
 }
 
 export interface UseStorageReturn {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters -- Generic provides caller type inference and API consistency with loadData
   saveData: <T>(key: string, data: T) => Promise<void>;
   /**
    * Load data from storage with optional runtime type validation.
@@ -173,6 +174,7 @@ export interface CategoryDistribution {
   categoryId: string | null;
   name: string;
   count: number;
+  color: string;  // The Category's stored color, else the default Category color
 }
 
 export interface PromptUsageSummary {

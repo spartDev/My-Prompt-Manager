@@ -1,5 +1,5 @@
 import { DEFAULT_SETTINGS } from '../../../src/types';
-import { test, expect } from '../fixtures/extension';
+import { expect, test } from '../fixtures/extension';
 import { ANALYTICS_FIXTURES } from '../fixtures/test-data';
 import { AnalyticsPage } from '../pages/AnalyticsPage';
 import { analyticsAssertions } from '../utils/assertions';
@@ -240,7 +240,6 @@ test.describe('Analytics dashboard', () => {
 
       // The dashboard page closes when back is clicked (window.close())
       // So we verify the tab is closed
-      expect(dashboardPage).toHaveProperty('isClosed', expect.any(Function));
       expect(dashboardPage.isClosed()).toBe(true);
     });
 

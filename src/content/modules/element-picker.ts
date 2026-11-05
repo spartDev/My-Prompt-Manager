@@ -284,6 +284,7 @@ export class ElementPicker {
     // Log to console in debug mode (sanitized for security)
     if (localStorage.getItem('prompt-library-debug') === 'true') {
       const sanitizedDetails = this.sanitizeAuditDetailsForLogging(details);
+      // biome-ignore lint/suspicious/noConsole: opt-in audit trail, printed only when prompt-library-debug is set
       console.log(`[ElementPicker Audit] ${action}:`, sanitizedDetails);
     }
   }

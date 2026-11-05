@@ -1,7 +1,7 @@
 import type { BrowserContext, Worker } from '@playwright/test';
 
 import { DEFAULT_SETTINGS } from '../../../src/types';
-import { test, expect } from '../fixtures/extension';
+import { expect, test } from '../fixtures/extension';
 import { seedLibrary } from '../utils/storage';
 
 const resolveBackgroundWorker = async (context: BrowserContext): Promise<Worker> => {
@@ -16,7 +16,7 @@ const resolveBackgroundWorker = async (context: BrowserContext): Promise<Worker>
 };
 
 test.describe('Element picker integration', () => {
-  test('displays selected element after picker flow completes', async ({ context, page, storage }) => {
+  test('displays selected element after picker flow completes', async ({ context, page, storage, extensionId }) => {
     await seedLibrary(storage, {
       settings: {
         ...DEFAULT_SETTINGS,
@@ -27,14 +27,14 @@ test.describe('Element picker integration', () => {
 
     const background = await resolveBackgroundWorker(context);
 
-    await page.reload();
+    await page.goto(`chrome-extension://${extensionId}/src/popup.html`);
 
-    await page.getByRole('button', { name: 'Open settings' }).click();
+    await page.getByTestId('tab-settings').click();
     await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
 
     await page.evaluate(() => {
       const originalSendMessage = chrome.runtime.sendMessage.bind(chrome.runtime);
-      chrome.runtime.sendMessage = (message, responseCallback) => {
+      chrome.runtime.sendMessage = ((message: unknown, responseCallback?: (response: unknown) => void) => {
         if (message && typeof message === 'object' && (message as { type?: string }).type === 'START_ELEMENT_PICKER') {
           responseCallback?.({ success: true });
           return;
@@ -44,7 +44,7 @@ test.describe('Element picker integration', () => {
           message as Parameters<typeof chrome.runtime.sendMessage>[0],
           responseCallback as Parameters<typeof chrome.runtime.sendMessage>[1]
         );
-      };
+      }) as typeof chrome.runtime.sendMessage;
     });
 
     await page.getByRole('button', { name: 'Add Your First Site' }).click();

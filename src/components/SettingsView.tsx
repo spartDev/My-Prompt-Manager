@@ -1,20 +1,23 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { FC, ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import manifest from '../../manifest.json';
 import { getDefaultEnabledPlatforms, getLinkedPlatformHostnames } from '../config/platforms';
+import { NATURAL_SORT_DIRECTION } from '../constants';
+import { AdmissionRefusedError } from '../services/promptAdmission';
 import { StorageManager } from '../services/storage';
-import type { Prompt, Category, Settings as UserSettings, CustomSite as ImportedCustomSite } from '../types';
+import type { AppError, Category, CustomSite as ImportedCustomSite, Prompt, SortOrder, Settings as UserSettings } from '../types';
 import { DEFAULT_SETTINGS } from '../types';
 import type { ToastType } from '../types/components';
 import type { ToastSettings } from '../types/hooks';
-import { Logger, toError } from '../utils';
+import { formatCount, Logger, toError } from '../utils';
 
-import { ClaudeIcon, ChatGPTIcon, PerplexityIcon, MistralIcon, GeminiIcon, CopilotIcon } from './icons/SiteIcons';
+import { ChatGPTIcon, ClaudeIcon, CopilotIcon, GeminiIcon, MistralIcon, PerplexityIcon } from './icons/SiteIcons';
 import AboutSection from './settings/AboutSection';
 import AdvancedSection from './settings/AdvancedSection';
 import AppearanceSection from './settings/AppearanceSection';
-import DataStorageSection from './settings/DataStorageSection';
+import DataStorageSection, { type ImportReport } from './settings/DataStorageSection';
+import LibrarySection from './settings/LibrarySection';
 import NotificationSection from './settings/NotificationSection';
 import SiteIntegrationSection from './settings/SiteIntegrationSection';
 import ViewHeader from './ViewHeader';
@@ -49,27 +52,17 @@ interface Settings {
 }
 
 interface SettingsViewProps {
-  onBack: () => void;
+  context?: 'popup' | 'sidepanel';
   showToast: (message: string, type?: ToastType) => void;
   toastSettings: ToastSettings;
   onToastSettingsChange: (settings: Partial<ToastSettings>) => void;
+  /** Opens the storage warning with why storage refused the import */
+  onStorageRefused: (reason: string) => void;
 }
 
-const SectionSeparator: FC = () => (
-  <div className="flex items-center justify-center my-8">
-    <div className="flex items-center gap-3">
-      <div className="h-px w-12 bg-gradient-to-r from-transparent to-gray-300 dark:to-gray-600"></div>
-      <div className="flex gap-1.5">
-        <div className="w-1 h-1 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
-        <div className="w-1 h-1 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
-        <div className="w-1 h-1 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
-      </div>
-      <div className="h-px w-12 bg-gradient-to-l from-transparent to-gray-300 dark:to-gray-600"></div>
-    </div>
-  </div>
-);
+const SectionSeparator: FC = () => <hr className="border-default" />;
 
-const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings, onToastSettingsChange }) => {
+const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toastSettings, onToastSettingsChange, onStorageRefused }) => {
   const [settings, setSettings] = useState<Settings>({
     enabledSites: [],
     customSites: [],
@@ -85,30 +78,35 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
   const [interfaceMode, setInterfaceMode] = useState<'popup' | 'sidepanel'>(DEFAULT_SETTINGS.interfaceMode as 'popup' | 'sidepanel');
   const [interfaceModeChanging, setInterfaceModeChanging] = useState(false);
 
+  // What the last import skipped, or why it stopped, until the user dismisses it
+  const [importReport, setImportReport] = useState<ImportReport | null>(null);
+
   // Data for import/export
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [storageUsage, setStorageUsage] = useState<{ used: number; total: number } | null>(null);
 
   const storageManager = useMemo(() => StorageManager.getInstance(), []);
 
-  // Track initial mount to skip saving on first render
-  const isInitialMount = useRef(true);
+  // The site settings as storage and the tabs have them, null until Settings has loaded them.
+  // Only settings that differ from them are saved and sent to the tabs.
+  const storedSettings = useRef<Settings | null>(null);
 
   const siteConfigs: Record<string, SiteConfig> = useMemo(() => ({
     'www.perplexity.ai': {
       name: 'Perplexity',
       description: 'AI-powered search engine',
-      icon: (_isEnabled: boolean) => <PerplexityIcon />
+      icon: (isEnabled: boolean) => <PerplexityIcon disabled={!isEnabled} />
     },
     'claude.ai': {
       name: 'Claude',
       description: 'Anthropic\'s AI assistant',
-      icon: (_isEnabled: boolean) => <ClaudeIcon />
+      icon: (isEnabled: boolean) => <ClaudeIcon disabled={!isEnabled} />
     },
     'chatgpt.com': {
       name: 'ChatGPT',
       description: 'OpenAI\'s conversational AI',
-      icon: (_isEnabled: boolean) => <ChatGPTIcon />
+      icon: (isEnabled: boolean) => <ChatGPTIcon disabled={!isEnabled} />
     },
     'gemini.google.com': {
       name: 'Google Gemini',
@@ -144,6 +142,9 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
         ...defaultSettings,
         ...(savedSettings ?? {})
       };
+      // The first load is what storage and the tabs already have: opening Settings changes nothing.
+      // A later load (after an import, Clear All Data or a reset) is still sent if it differs.
+      storedSettings.current ??= loadedSettings;
       setSettings(loadedSettings);
       
       // Load interface mode
@@ -165,12 +166,41 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
       setCategories(loadedCategories);
     } catch (error) {
       Logger.error('Failed to load settings', toError(error));
+      // Shown, not saved: only a change the user makes to them is saved
+      storedSettings.current ??= defaultSettings;
       setSettings(defaultSettings);
       setInterfaceMode(DEFAULT_SETTINGS.interfaceMode as 'popup' | 'sidepanel');
     } finally {
       setLoading(false);
     }
   }, [defaultSettings, storageManager]);
+
+  // The storage bar shows what Chrome stores and follows every write, whoever makes it: the default
+  // Category written on load, the site settings saved after it, an import, Clear All Data, another
+  // surface. The last reading asked for wins, so an older reply never overwrites a newer one.
+  const usageReading = useRef(0);
+  useEffect(() => {
+    const readStorageUsage = async () => {
+      const reading = ++usageReading.current;
+      try {
+        const usage = await storageManager.getStorageUsage();
+        if (reading === usageReading.current) {
+          setStorageUsage(usage);
+        }
+      } catch (error) {
+        Logger.warn('Failed to read storage usage', { component: 'SettingsView', error: toError(error) });
+      }
+    };
+    const handleStorageChange = (_changes: unknown, areaName: string) => {
+      if (areaName === 'local') {
+        void readStorageUsage();
+      }
+    };
+
+    void readStorageUsage();
+    chrome.storage.onChanged.addListener(handleStorageChange);
+    return () => { chrome.storage.onChanged.removeListener(handleStorageChange); };
+  }, [storageManager]);
 
   useEffect(() => {
     void loadSettings();
@@ -187,6 +217,7 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
       await chrome.storage.local.set({
         promptLibrarySettings: newSettings
       });
+      storedSettings.current = newSettings;
 
       // Notify content scripts of changes in parallel
       const tabs = await chrome.tabs.query({});
@@ -211,14 +242,12 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
 
   // Debounced persistence: save settings after user stops making changes
   useEffect(() => {
-    // Skip saving on initial mount (when settings are loaded)
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
-
     // Debounce: wait 150ms after last change before saving
     const timeoutId = setTimeout(() => {
+      // Nothing to save before the settings are loaded, or when storage already has them
+      if (storedSettings.current === null || JSON.stringify(settings) === JSON.stringify(storedSettings.current)) {
+        return;
+      }
       saveSettings(settings).catch((err: unknown) => {
         Logger.error('Failed to save settings', toError(err), {
           component: 'SettingsView',
@@ -233,6 +262,16 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
     };
   }, [settings, saveSettings]);
 
+
+  // Handle Library sort change: each sort is saved with its one direction
+  const handleSortOrderChange = useCallback((sortOrder: SortOrder) => {
+    const sortDirection = NATURAL_SORT_DIRECTION[sortOrder];
+    setUserSettings(prev => ({ ...(prev ?? DEFAULT_SETTINGS), sortOrder, sortDirection }));
+    storageManager.updateSettings({ sortOrder, sortDirection }).catch((error: unknown) => {
+      Logger.error('Failed to save sort order', toError(error), { component: 'SettingsView' });
+      showToast('Failed to save the sort order', 'error');
+    });
+  }, [storageManager, showToast]);
 
   // Handle interface mode change
   const handleInterfaceModeChange = useCallback(async (mode: 'popup' | 'sidepanel') => {
@@ -383,31 +422,81 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
 
   // Handle import data
   const handleImportData = async (data: { prompts: Prompt[]; categories: Category[] }) => {
+    setImportReport(null);
+    // An item that is refused at Admission (ADR-001) is skipped and reported; the rest are restored.
+    const skipped: ImportReport['skipped'] = [];
+    // Counted as they go: an import that stops keeps what it imported before
+    const imported = { categories: 0, prompts: 0 };
+    // The Categories a restored Prompt names that neither the Backup nor the Library has are created
+    // with it (PR #487): they count with the Backup's own
+    let createdCategories = 0;
+
+    const importEach = async <T,>(
+      items: readonly T[],
+      kind: keyof typeof imported,
+      id: (item: T) => string,
+      label: (item: T) => string,
+      importItem: (item: T) => Promise<unknown>
+    ): Promise<void> => {
+      for (const item of items) {
+        try {
+          await importItem(item);
+          imported[kind] += 1;
+        } catch (error) {
+          if (!(error instanceof AdmissionRefusedError)) {
+            throw error;
+          }
+          skipped.push({ key: `${kind}:${id(item)}`, label: label(item), reason: error.message });
+        }
+      }
+    };
+
     try {
       // Import categories first (prompts reference categories)
-      for (const category of data.categories) {
-        await storageManager.importCategory(category);
-      }
-      
-      // Import prompts
-      for (const prompt of data.prompts) {
-        await storageManager.importPrompt(prompt);
-      }
-      
-      // Reload data
-      await loadSettings();
-      
-      showToast(`Successfully imported ${data.prompts.length.toString()} prompts and ${data.categories.length.toString()} categories!`, 'success');
+      await importEach(data.categories, 'categories', (category) => category.id || category.name, (category) => category.name, (category) => storageManager.importCategory(category));
+      const namesBefore = new Set((await storageManager.getCategories()).map((category) => category.name));
+      await importEach(data.prompts, 'prompts', (prompt) => prompt.id, (prompt) => prompt.title, (prompt) => storageManager.importPrompt(prompt));
+      createdCategories = (await storageManager.getCategories()).filter((category) => !namesBefore.has(category.name)).length;
     } catch (error) {
       Logger.error('Import failed', toError(error));
-      throw error;
+      // Show the Prompts imported before it stopped
+      await loadSettings();
+
+      const appError = error as AppError;
+      const total = data.prompts.length;
+      const count = `${imported.prompts.toString()} of ${formatCount(total, 'prompt was', 'prompts were')}`;
+      // Like a refused save, a refusal for storage opens the storage warning (not the file's fault)
+      if (appError.type === 'STORAGE_QUOTA_EXCEEDED') {
+        onStorageRefused(`The import stopped when storage was full: ${count} imported. ${appError.message}`);
+        return;
+      }
+      // Any other error: the report says how many were imported and why it stopped, which a toast
+      // cut at 80 characters cannot hold
+      const reason = error instanceof Error ? error.message : 'Unknown error occurred';
+      setImportReport({ skipped, stopped: { imported: imported.prompts, total, reason } });
+      showToast(`Import stopped: ${count} imported. See Backup & Restore.`, 'error');
+      return;
+    }
+
+    // Reload data
+    await loadSettings();
+
+    const summary = `${formatCount(imported.prompts, 'prompt', 'prompts')} and ${formatCount(imported.categories + createdCategories, 'category', 'categories')}`;
+    if (skipped.length === 0) {
+      showToast(`Successfully imported ${summary}!`, 'success');
+    } else {
+      // Every skipped title and reason stays in Backup & Restore: a toast shows 80 characters
+      setImportReport({ skipped });
+      showToast(`Imported ${summary}. Skipped ${skipped.length.toString()}: see Backup & Restore.`, 'warning');
     }
   };
+
+  const dismissImportReport = useCallback(() => { setImportReport(null); }, []);
 
   // Handle clear data
   const handleClearData = async () => {
     try {
-      await chrome.storage.local.clear();
+      await storageManager.clearAllData();
       await loadSettings();
       showToast('All data has been cleared.', 'success');
     } catch (error) {
@@ -487,30 +576,33 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
 
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+      <div className="h-full flex items-center justify-center bg-app">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Loading settings...</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-current text-accent mx-auto mb-4"></div>
+          <p className="text-secondary">Loading settings...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900">
+    <div className="h-full flex flex-col bg-app">
       {/* Header */}
       <ViewHeader
         icon="settings"
         title="Settings"
         subtitle="Customize your experience"
+        context={context}
       >
-        <ViewHeader.Actions>
-          <ViewHeader.BackButton onClick={onBack} />
-        </ViewHeader.Actions>
+        {context === 'sidepanel' && (
+          <ViewHeader.Actions>
+            <ViewHeader.CloseButton onClick={() => { window.close(); }} context="sidepanel" />
+          </ViewHeader.Actions>
+        )}
       </ViewHeader>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto p-6" data-scroll-container>
         <div className="max-w-4xl mx-auto space-y-8">
           {/* Appearance Section */}
           <AppearanceSection
@@ -518,6 +610,14 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
             onInterfaceModeChange={handleInterfaceModeChangeCallback}
             saving={saving}
             interfaceModeChanging={interfaceModeChanging}
+          />
+
+          <SectionSeparator />
+
+          {/* Library Section */}
+          <LibrarySection
+            sortOrder={userSettings?.sortOrder ?? DEFAULT_SETTINGS.sortOrder}
+            onSortOrderChange={handleSortOrderChange}
           />
 
           <SectionSeparator />
@@ -542,8 +642,12 @@ const SettingsView: FC<SettingsViewProps> = ({ onBack, showToast, toastSettings,
           <DataStorageSection
             prompts={prompts}
             categories={categories}
+            storageUsage={storageUsage}
             onImport={handleImportData}
+            importReport={importReport}
+            onDismissImportReport={dismissImportReport}
             onClearData={handleClearData}
+            onShowToast={showToast}
           />
 
           {/* Notification Settings Section */}

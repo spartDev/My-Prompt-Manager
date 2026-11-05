@@ -3,7 +3,6 @@
   "name": "My Prompt Manager",
   "version": "1.9.0",
   "description": "Personal prompt library for AI platforms. Store, organize, and instantly insert your best prompts with one click.",
-  "author": "Thomas Roux",
   "homepage_url": "https://github.com/spartDev/My-Prompt-Manager",
   "background": {
     "service_worker": "src/background/background.ts",
@@ -48,9 +47,13 @@
         "http://*/*"
       ],
       "resources": [
+        "assets/src-content-index.ts-*.js",
         "assets/content-*.js",
-        "assets/platforms-*.js",
-        "assets/floating-ui.dom-*.js"
+        "assets/rolldown-runtime-*.js",
+        "assets/promptAdmission-*.js",
+        "assets/promptVariables-*.js",
+        "assets/floating-ui.dom-*.js",
+        "assets/categoryChip-*.js"
       ],
       "use_dynamic_url": false
     }
@@ -75,5 +78,5 @@
     "extension_pages": "script-src 'self'; object-src 'self'"
   },
   "short_name": "My Prompt Manager",
-  "minimum_chrome_version": "114"
+  "minimum_chrome_version": "116"
 }

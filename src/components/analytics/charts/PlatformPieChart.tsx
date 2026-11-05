@@ -1,18 +1,18 @@
-import { FC, memo } from 'react';
+import { type FC, memo } from 'react';
 import {
-  PieChart,
-  Pie,
   Cell,
+  Legend, 
+  Pie,
+  PieChart,
   ResponsiveContainer,
-  Tooltip,
-  Legend
+  Tooltip
 } from 'recharts';
 
-import { useChartTheme } from '../../../hooks/useChartTheme';
-import { getPlatformColor } from '../../../theme/chartColors';
-import { PlatformBreakdown } from '../../../types/hooks';
+import { CHART_THEME, getPlatformColor } from '../../../theme/chartColors';
+import type { PlatformBreakdown } from '../../../types/hooks';
 import { formatPlatformName } from '../../../utils';
-import { PIE_CHART, PIE_LEGEND } from '../constants';
+import { NO_THROTTLED_EVENTS, PIE_CHART, PIE_LEGEND } from '../constants';
+import { formatPlatformUsesTooltip } from './tooltipFormatters';
 
 export interface PlatformPieChartProps {
   /** Platform breakdown data */
@@ -31,7 +31,7 @@ const PlatformPieChart: FC<PlatformPieChartProps> = memo(({
   height = 200,
   showLegend = true
 }) => {
-  const { tooltipBg, tooltipBorder, tooltipLabelColor, isDarkMode } = useChartTheme();
+  const { tooltipBg, tooltipBorder, tooltipLabelColor, legendColor } = CHART_THEME;
 
   // Prepare data with formatted names
   const chartData = data.map((item, index) => ({
@@ -43,12 +43,12 @@ const PlatformPieChart: FC<PlatformPieChartProps> = memo(({
   if (data.length === 0) {
     return (
       <div
-        className="flex items-center justify-center bg-gray-50 dark:bg-gray-800/50 rounded-xl"
+        className="flex items-center justify-center bg-raised rounded-xl"
         style={{ height }}
         role="img"
         aria-label="No platform data available"
       >
-        <p className="text-sm text-gray-500 dark:text-gray-400">No platform data</p>
+        <p className="text-sm text-tertiary">No platform data</p>
       </div>
     );
   }
@@ -60,7 +60,7 @@ const PlatformPieChart: FC<PlatformPieChartProps> = memo(({
       aria-label={`Platform breakdown chart showing ${String(data.length)} platforms`}
     >
       <ResponsiveContainer width="100%" height={height}>
-        <PieChart>
+        <PieChart throttledEvents={NO_THROTTLED_EVENTS}>
           <Pie
             data={chartData}
             cx="50%"
@@ -76,7 +76,7 @@ const PlatformPieChart: FC<PlatformPieChartProps> = memo(({
             ))}
           </Pie>
           <Tooltip
-            formatter={(value: number | undefined, name: string | undefined) => [`${String(value ?? 0)} uses`, name ?? '']}
+            formatter={formatPlatformUsesTooltip}
             contentStyle={{
               backgroundColor: tooltipBg,
               border: `1px solid ${tooltipBorder}`,
@@ -98,7 +98,7 @@ const PlatformPieChart: FC<PlatformPieChartProps> = memo(({
               iconType="circle"
               iconSize={PIE_LEGEND.ICON_SIZE}
               formatter={(value: string) => (
-                <span style={{ color: isDarkMode ? '#d1d5db' : '#4b5563', fontSize: '11px' }}>
+                <span style={{ color: legendColor, fontSize: '11px' }}>
                   {value}
                 </span>
               )}

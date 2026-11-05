@@ -1,7 +1,6 @@
 import { getPlatformById } from '../../config/platforms';
 import type { InsertionResult } from '../types/index';
 import type { UIElementFactory } from '../ui/element-factory';
-import { sanitizeUserInput } from '../utils/storage';
 
 import { PlatformStrategy } from './base-strategy';
 
@@ -71,37 +70,15 @@ export class MistralStrategy extends PlatformStrategy {
   }
 
   async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
-    // Sanitize content before any insertion attempts
-    const sanitizedContent = sanitizeUserInput(content);
-    
-    if (!sanitizedContent) {
-      this._warn('Content sanitization resulted in empty content', { 
-        originalLength: content.length,
-        wasEmpty: content.length === 0
-      });
-      return { 
-        success: false, 
-        error: 'Content could not be sanitized safely' 
-      };
-    }
-
-    if (sanitizedContent !== content) {
-      this._debug('Content was sanitized during insertion', {
-        originalLength: content.length,
-        sanitizedLength: sanitizedContent.length,
-        contentModified: true
-      });
-    }
-
     const proseMirrorElement = this._findProseMirrorElement(element);
 
-    const proseMirrorResult = this._tryProseMirrorInsertion(proseMirrorElement, sanitizedContent);
+    const proseMirrorResult = this._tryProseMirrorInsertion(proseMirrorElement, content);
     if (proseMirrorResult.success) {return proseMirrorResult;}
 
-    const execCommandResult = await this._tryExecCommand(proseMirrorElement, sanitizedContent);
+    const execCommandResult = await this._tryExecCommand(proseMirrorElement, content);
     if (execCommandResult.success) {return execCommandResult;}
 
-    return this._tryDOMManipulation(proseMirrorElement, sanitizedContent);
+    return this._tryDOMManipulation(proseMirrorElement, content);
   }
 
   getSelectors(): string[] {

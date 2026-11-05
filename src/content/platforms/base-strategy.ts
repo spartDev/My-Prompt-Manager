@@ -5,9 +5,9 @@
  * Each platform must implement all abstract methods to ensure consistent behavior.
  */
 
-import type { PlatformStrategyInterface, PlatformConfig, InsertionResult } from '../types/index';
+import type { InsertionResult, PlatformConfig, PlatformStrategyInterface } from '../types/index';
 import type { UIElementFactory } from '../ui/element-factory';
-import { debug, warn , error as logError } from '../utils/logger';
+import { debug, error as logError, warn  } from '../utils/logger';
 
 export abstract class PlatformStrategy implements PlatformStrategyInterface {
   public readonly name: string;

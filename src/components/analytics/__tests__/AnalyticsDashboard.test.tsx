@@ -14,14 +14,14 @@
  * - Forgotten tab empty message
  */
 
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useNow } from '../../../hooks/useNow';
-import { useSummaryMetrics, type SummaryMetrics } from '../../../hooks/useSummaryMetrics';
+import { type SummaryMetrics, useSummaryMetrics } from '../../../hooks/useSummaryMetrics';
 import { useUsageStats } from '../../../hooks/useUsageStats';
-import type { UseUsageStatsReturn, UsageStats, PromptUsageSummary } from '../../../types/hooks';
+import type { PromptUsageSummary, UsageStats, UseUsageStatsReturn } from '../../../types/hooks';
 import AnalyticsDashboard from '../AnalyticsDashboard';
 
 // Mock hooks
@@ -133,8 +133,8 @@ const createMockStats = (overrides: Partial<UsageStats> = {}): UsageStats => ({
     { bucket: 'Night', count: 4 }
   ],
   categoryDistribution: [
-    { categoryId: '1', name: 'Development', count: 20 },
-    { categoryId: '2', name: 'Writing', count: 15 }
+    { categoryId: '1', name: 'Development', count: 20, color: '#7c3aed' },
+    { categoryId: '2', name: 'Writing', count: 15, color: '#2563eb' }
   ],
   topPrompts: createMockPrompts(5, 'top'),
   recentPrompts: createMockPrompts(3, 'recent'),

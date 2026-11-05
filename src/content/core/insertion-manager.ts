@@ -9,7 +9,7 @@
 import { PlatformManager } from '../platforms/platform-manager';
 import type { InsertionResult } from '../types/index';
 import type { UIElementFactory } from '../ui/element-factory';
-import { warn, debug } from '../utils/logger';
+import { debug, warn } from '../utils/logger';
 import type { CustomSite } from '../utils/storage';
 
 export class PlatformInsertionManager {

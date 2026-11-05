@@ -4,10 +4,13 @@
  */
 
 import { getDefaultEnabledPlatforms } from "../../config/platforms";
+import { readPrompts } from "../../services/promptAdmission";
+import { DEFAULT_CATEGORY_COLOR, getSoftBadgeColors } from "../../theme/categoryChip";
+import { cutWithoutSplittingPairs } from "../../utils/truncate";
 import type { Prompt } from "../types/index";
 
 import { DOMUtils } from "./dom";
-import { warn, debug, error as logError } from "./logger";
+import { debug, error as logError, warn } from "./logger";
 
 /**
  * Interface for extension settings
@@ -191,7 +194,9 @@ export async function isSiteEnabled(hostname: string): Promise<boolean> {
 }
 
 /**
- * Get prompts with validation and sanitization
+ * Get the Prompts from storage, exactly as stored (Verbatim). Reading never writes, and
+ * never changes or drops a Prompt because of what its text says: only entries that are not
+ * Prompts at all are skipped.
  */
 export async function getPrompts(): Promise<Prompt[]> {
   return new Promise((resolve) => {
@@ -206,26 +211,24 @@ export async function getPrompts(): Promise<Prompt[]> {
           return;
         }
 
-        const rawPrompts = Array.isArray(result.prompts) ? result.prompts : [];
+        const rawPrompts: unknown = result.prompts;
+        const prompts = readPrompts(rawPrompts);
 
-        // Validate and sanitize each prompt
-        const validatedPrompts = rawPrompts
-          .map((prompt: unknown) => validatePromptData(prompt))
-          .filter((prompt: Prompt | null): prompt is Prompt => prompt !== null); // Remove invalid prompts
-
-        const invalidCount = rawPrompts.length - validatedPrompts.length;
+        const invalidCount = Array.isArray(rawPrompts)
+          ? rawPrompts.length - prompts.length
+          : 0;
         if (invalidCount > 0) {
           warn("Filtered out invalid prompts", {
-            originalCount: rawPrompts.length,
-            validCount: validatedPrompts.length,
+            originalCount: prompts.length + invalidCount,
+            validCount: prompts.length,
             invalidCount,
           });
         }
 
-        debug("Retrieved and validated prompts from storage", {
-          count: validatedPrompts.length,
+        debug("Retrieved prompts from storage", {
+          count: prompts.length,
         });
-        resolve(validatedPrompts);
+        resolve(prompts);
       });
     } catch (err) {
       logError("Unexpected error accessing chrome storage", err as Error);
@@ -235,11 +238,39 @@ export async function getPrompts(): Promise<Prompt[]> {
 }
 
 /**
- * Escape HTML to ensure user-generated content is displayed safely
- * @deprecated Use DOMUtils.escapeHtml instead
+ * The color of each Category, by name, for the Category chips of the Prompt selector.
+ * A Category with no valid #RRGGBB color is left out: its chip takes the default color.
  */
-export function escapeHtml(text: string): string {
-  return DOMUtils.escapeHtml(text);
+export function getCategoryColors(): Promise<Map<string, string>> {
+  return new Promise((resolve) => {
+    try {
+      chrome.storage.local.get(["categories"], (result) => {
+        if (chrome.runtime.lastError) {
+          logError(
+            "Failed to retrieve categories from storage",
+            new Error(
+              `Chrome storage error: ${chrome.runtime.lastError.message ?? "Unknown error"}`,
+            ),
+          );
+          resolve(new Map());
+          return;
+        }
+
+        const rawCategories: unknown = result.categories;
+        const colors = new Map<string, string>();
+        for (const category of Array.isArray(rawCategories) ? rawCategories : []) {
+          const { name, color } = (category ?? {}) as { name?: unknown; color?: unknown };
+          if (typeof name === "string" && typeof color === "string" && /^#[0-9A-F]{6}$/i.test(color)) {
+            colors.set(name, color);
+          }
+        }
+        resolve(colors);
+      });
+    } catch (err) {
+      logError("Unexpected error accessing chrome storage", err as Error);
+      resolve(new Map()); // Graceful fallback
+    }
+  });
 }
 
 /**
@@ -266,156 +297,23 @@ export function createSVGElement(
 }
 
 /**
- * Comprehensive input sanitization for user-generated content
- */
-export function sanitizeUserInput(input: string): string {
-  try {
-    if (typeof input !== "string") {
-      warn("sanitizeUserInput received non-string input", {
-        type: typeof input,
-        value: input,
-      });
-      return "";
-    }
-
-    // Remove null characters and control characters (except \n, \r, \t)
-    let sanitized = input.replace(
-      // eslint-disable-next-line no-control-regex
-      /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g,
-      "",
-    );
-
-    // Remove potentially dangerous Unicode characters
-    sanitized = sanitized.replace(
-      /[\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/g,
-      "",
-    );
-
-    // Remove HTML/XML tags completely (more aggressive than escaping)
-    sanitized = sanitized.replace(/<[^>]*>/g, "");
-
-    // Remove javascript: and data: URLs
-    sanitized = sanitized.replace(/javascript\s*:/gi, "");
-    sanitized = sanitized.replace(/data\s*:/gi, "");
-
-    // Remove vbscript: URLs
-    sanitized = sanitized.replace(/vbscript\s*:/gi, "");
-
-    // Remove on* event handlers
-    sanitized = sanitized.replace(/\bon\w+\s*=/gi, "");
-
-    // Limit length to prevent DoS attacks
-    const MAX_INPUT_LENGTH = 50000; // 50KB limit
-    if (sanitized.length > MAX_INPUT_LENGTH) {
-      warn("Input truncated due to length limit", {
-        originalLength: sanitized.length,
-        maxLength: MAX_INPUT_LENGTH,
-      });
-      sanitized = sanitized.substring(0, MAX_INPUT_LENGTH) + "...";
-    }
-
-    return sanitized;
-  } catch (err) {
-    logError("Failed to sanitize user input", err as Error, { input });
-    return ""; // Safe fallback
-  }
-}
-
-/**
- * Validate prompt data structure to ensure expected properties
- */
-export function validatePromptData(prompt: unknown): Prompt | null {
-  try {
-    if (!prompt || typeof prompt !== "object") {
-      warn("Invalid prompt data structure", { prompt });
-      return null;
-    }
-
-    const promptObj = prompt as Record<string, unknown>;
-
-    const safeString = (value: unknown, fallback: string): string => {
-      if (typeof value === "string") {
-        return value;
-      }
-      if (value === null || value === undefined) {
-        return fallback;
-      }
-      if (typeof value === "number" || typeof value === "boolean") {
-        return String(value);
-      }
-      return fallback;
-    };
-
-    const createdAt =
-      typeof promptObj.createdAt === "number"
-        ? promptObj.createdAt
-        : Date.now();
-    const updatedAt =
-      typeof promptObj.updatedAt === "number" ? promptObj.updatedAt : createdAt;
-
-    const usageCountRaw = promptObj.usageCount;
-    const usageCount =
-      typeof usageCountRaw === "number" &&
-      Number.isFinite(usageCountRaw) &&
-      usageCountRaw >= 0
-        ? Math.floor(usageCountRaw)
-        : 0;
-
-    let lastUsedAt =
-      typeof promptObj.lastUsedAt === "number" &&
-      Number.isFinite(promptObj.lastUsedAt) &&
-      promptObj.lastUsedAt > 0
-        ? promptObj.lastUsedAt
-        : usageCount > 0
-          ? updatedAt
-          : createdAt;
-
-    if (lastUsedAt < createdAt) {
-      lastUsedAt = createdAt;
-    }
-
-    const validatedPrompt: Prompt = {
-      id: sanitizeUserInput(safeString(promptObj.id, "")),
-      title: sanitizeUserInput(safeString(promptObj.title, "Untitled")),
-      content: sanitizeUserInput(safeString(promptObj.content, "")),
-      category: sanitizeUserInput(safeString(promptObj.category, "General")),
-      createdAt,
-      updatedAt,
-      usageCount,
-      lastUsedAt,
-    };
-
-    // Ensure required fields are not empty after sanitization
-    if (
-      !validatedPrompt.id ||
-      !validatedPrompt.title ||
-      !validatedPrompt.content
-    ) {
-      warn("Prompt failed validation - empty required fields", {
-        validatedPrompt,
-      });
-      return null;
-    }
-
-    return validatedPrompt;
-  } catch (err) {
-    logError("Failed to validate prompt data", err as Error, { prompt });
-    return null;
-  }
-}
-
-/**
- * Helper function to safely create prompt list items
+ * Helper function to create a prompt list item for the Prompt selector.
+ *
+ * Shows the Prompt exactly as saved (Verbatim): text is set as text, so it needs no
+ * escaping, and the id goes into the attribute unchanged so it can be matched later.
+ * The Category chip takes the chip rule of `categoryColor` (the default Category color when
+ * unknown), in light and dark: the selector's theme class picks one.
  */
 export function createPromptListItem(
   prompt: Prompt,
   index: number,
   idPrefix: string = "prompt-item",
+  categoryColor: string = DEFAULT_CATEGORY_COLOR,
 ): HTMLElement {
   try {
     const promptItem = DOMUtils.createElement("div", {
       class: "prompt-item",
-      "data-prompt-id": DOMUtils.escapeHtml(prompt.id),
+      "data-prompt-id": prompt.id,
       role: "option",
       "aria-describedby": `${idPrefix}-${String(index)}-desc`,
       tabindex: "-1",
@@ -426,7 +324,7 @@ export function createPromptListItem(
       {
         class: "prompt-title",
       },
-      DOMUtils.escapeHtml(prompt.title),
+      prompt.title,
     );
 
     const promptCategory = DOMUtils.createElement(
@@ -434,7 +332,14 @@ export function createPromptListItem(
       {
         class: "prompt-category",
       },
-      DOMUtils.escapeHtml(prompt.category),
+      prompt.category,
+    );
+    const light = getSoftBadgeColors(categoryColor, "light");
+    promptCategory.style.setProperty("--prompt-category-bg", light.background);
+    promptCategory.style.setProperty("--prompt-category-text", light.text);
+    promptCategory.style.setProperty(
+      "--prompt-category-text-dark",
+      getSoftBadgeColors(categoryColor, "dark").text,
     );
 
     const promptPreview = DOMUtils.createElement(
@@ -443,7 +348,7 @@ export function createPromptListItem(
         class: "prompt-preview",
         id: `${idPrefix}-${String(index)}-desc`,
       },
-      DOMUtils.escapeHtml(prompt.content.substring(0, 100)) +
+      cutWithoutSplittingPairs(prompt.content, 100) +
         (prompt.content.length > 100 ? "..." : ""),
     );
 

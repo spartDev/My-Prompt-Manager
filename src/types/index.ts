@@ -7,6 +7,7 @@ export interface Prompt {
   updatedAt: number; // timestamp
   usageCount?: number; // number of times the prompt has been used
   lastUsedAt?: number; // timestamp of the last usage (defaults to createdAt)
+  pinned?: boolean; // Pinned Prompts always appear first in the Library (absent = unpinned)
 }
 
 // Usage Analytics types
@@ -24,12 +25,12 @@ export interface UsageEvent {
 
 // Re-export constants from centralized location for backward compatibility
 export {
-  USAGE_RETENTION_DAYS,
-  USAGE_STORAGE_KEY,
-  VALIDATION_LIMITS,
   DEFAULT_CATEGORY,
   DEFAULT_SETTINGS,
   PROMPT_SHARING_SIZE_LIMITS,
+  USAGE_RETENTION_DAYS,
+  USAGE_STORAGE_KEY,
+  VALIDATION_LIMITS,
 } from '../constants';
 
 export interface Category {
@@ -41,6 +42,13 @@ export interface Category {
 // Sort order types for prompts
 export type SortOrder = 'createdAt' | 'updatedAt' | 'title' | 'usageCount' | 'lastUsedAt';
 export type SortDirection = 'asc' | 'desc';
+
+// The one choice that narrows which Prompts the Library lists (see CONTEXT.md)
+export type LibraryFilter =
+  | { kind: 'all' }
+  | { kind: 'pinned' }
+  | { kind: 'mostUsed' }
+  | { kind: 'category'; categoryId: string };
 
 export interface Settings {
   defaultCategory: string;

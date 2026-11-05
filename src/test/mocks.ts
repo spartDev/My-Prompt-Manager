@@ -1,4 +1,4 @@
-import type { StorageManagerMock, PromptManagerMock } from './setup';
+import type { PromptManagerMock, StorageManagerMock } from './setup';
 
 type GlobalWithMocks = typeof globalThis & {
   chrome: typeof chrome;
@@ -68,4 +68,4 @@ export const triggerChromeStorageChange = (changes: Record<string, unknown>, are
   }
 };
 
-export type { StorageManagerMock, PromptManagerMock };
+export type { PromptManagerMock, StorageManagerMock };

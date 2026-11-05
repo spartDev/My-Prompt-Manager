@@ -6,11 +6,11 @@
 - **Module**: ESNext with node resolution
 - **JSX**: react-jsx (React 18 transform)
 
-## ESLint Rules
+## Biome Lint Rules
 - **TypeScript**: Strict type checking with recommended rules
-- **React**: React 18 best practices, hooks rules
-- **Import**: Alphabetical ordering with newlines between groups
-- **Accessibility**: jsx-a11y recommended rules
+- **React**: React 19 best practices, hooks rules (useExhaustiveDependencies, useHookAtTopLevel)
+- **Import**: Organize imports via Biome assist (organizeImports action)
+- **Accessibility**: Biome a11y domain rules
 
 ## Naming Conventions
 - **Components**: PascalCase (e.g., `PromptCard.tsx`)
@@ -35,7 +35,7 @@ src/
     └── utils/     # Content script utilities
 ```
 
-## Import Order (ESLint enforced)
+## Import Order (Biome organizeImports enforced)
 1. Built-in modules
 2. External dependencies
 3. Internal modules

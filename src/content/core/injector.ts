@@ -8,14 +8,16 @@
 
 import { getPlatformByHostname } from '../../config/platforms';
 import type { ElementFingerprint } from '../../types/index';
-import type { Prompt, InsertionResult } from '../types/index';
+import { extractVariables, fillVariables } from '../../utils/promptVariables';
+import type { InsertionResult, Prompt } from '../types/index';
 import { UIElementFactory } from '../ui/element-factory';
 import { EventManager } from '../ui/event-manager';
 import { KeyboardNavigationManager } from '../ui/keyboard-navigation';
+import { createVariableForm } from '../ui/variable-form';
 import { DOMUtils } from '../utils/dom';
 import { getElementFingerprintGenerator } from '../utils/element-fingerprint';
-import { warn, error, debug, info, isDebugMode, refreshDebugMode } from '../utils/logger';
-import { getPrompts, createPromptListItem, isSiteEnabled, getSettings, type ExtensionSettings, type CustomSite } from '../utils/storage';
+import { debug, error, info, isDebugMode, refreshDebugMode, warn } from '../utils/logger';
+import { type CustomSite, createPromptListItem, type ExtensionSettings, getCategoryColors, getPrompts, getSettings, isSiteEnabled } from '../utils/storage';
 import { injectCSS } from '../utils/styles';
 import { ThemeManager } from '../utils/theme-manager';
 
@@ -30,9 +32,13 @@ export interface InjectorState {
   currentTextarea: HTMLElement | null;
   promptSelector: HTMLElement | null;
   currentTargetElement: HTMLElement | null;
+  /** Color of each Category by name, read when the selector opens: its chips follow the chip rule */
+  categoryColors: Map<string, string>;
   isInitialized: boolean;
   isSiteEnabled: boolean;
   detectionTimeout: number | null;
+  /** Arms the open selector's outside-click listener; cleared when the selector closes before it fires */
+  outsideClickTimeout: number | null;
   mutationObserver: MutationObserver | null;
   spaMonitoringInterval: NodeJS.Timeout | null;
   hostname: string;
@@ -57,6 +63,15 @@ export interface SPAState {
   routeChangeTimeout: number | null;
 }
 
+/**
+ * Stable partition: Pinned Prompts first, keeping the existing order within each group.
+ * The picker deliberately ignores the Library sort setting.
+ */
+const pinnedFirst = (prompts: Prompt[]): Prompt[] => [
+  ...prompts.filter(prompt => prompt.pinned === true),
+  ...prompts.filter(prompt => prompt.pinned !== true)
+];
+
 export class PromptLibraryInjector {
   private state: InjectorState;
   private eventManager: EventManager;
@@ -70,6 +85,8 @@ export class PromptLibraryInjector {
   private readonly cacheTimeout: number = 2000;
   private floatingUICleanups: WeakMap<HTMLElement, () => void>;
   private iconCleanups: Map<HTMLElement, () => void>;
+  /** Counts the calls to showPromptSelector, so a selector still loading when another opens is dropped. */
+  private selectorOpenings = 0;
 
   constructor() {
     const hostname = window.location.hostname || '';
@@ -79,9 +96,11 @@ export class PromptLibraryInjector {
       currentTextarea: null,
       promptSelector: null,
       currentTargetElement: null,
+      categoryColors: new Map(),
       isInitialized: false,
       isSiteEnabled: false,
       detectionTimeout: null,
+      outsideClickTimeout: null,
       mutationObserver: null,
       spaMonitoringInterval: null,
       hostname,
@@ -1287,7 +1306,7 @@ export class PromptLibraryInjector {
       // Use existing data-mpm-anchor if present, otherwise use config anchorId or generate new
       const existingAnchorId: string | null = referenceElement.getAttribute('data-mpm-anchor');
       const fallbackAnchorId = `mpm-${String(Date.now())}-${Math.random().toString(36).substring(2, 9)}`;
-      // ESLint is confused about the type here, but TypeScript knows anchorId is string | undefined
+      // TypeScript knows anchorId is string | undefined
        
       const trackingAnchorId: string = existingAnchorId ?? anchorId ?? fallbackAnchorId;
 
@@ -1708,6 +1727,7 @@ export class PromptLibraryInjector {
    * Shows the prompt selector modal
    */
   async showPromptSelector(targetElement: HTMLElement): Promise<void> {
+    const opening = ++this.selectorOpenings;
     try {
       debug('Showing prompt selector', {
         textareaTag: targetElement.tagName,
@@ -1720,8 +1740,14 @@ export class PromptLibraryInjector {
       // Store target element for use in filterPrompts
       this.state.currentTargetElement = targetElement;
 
-      // Get prompts from storage
-      const prompts = await getPrompts();
+      // Get prompts from storage, Pinned Prompts first (stable within each group), and the Category colors
+      const [storedPrompts, categoryColors] = await Promise.all([getPrompts(), getCategoryColors()]);
+      // The icon was clicked again while these loaded: the later opening shows its own selector
+      if (opening !== this.selectorOpenings) {
+        return;
+      }
+      const prompts = pinnedFirst(storedPrompts);
+      this.state.categoryColors = categoryColors;
       debug('Retrieved prompts for selector', { count: prompts.length });
 
       // Create selector UI
@@ -1810,7 +1836,7 @@ export class PromptLibraryInjector {
     // Add prompt items
     if (prompts.length > 0) {
       prompts.forEach((prompt, index) => {
-        const promptItem = createPromptListItem(prompt, index, 'prompt-item');
+        const promptItem = createPromptListItem(prompt, index, 'prompt-item', this.state.categoryColors.get(prompt.category));
         promptList.appendChild(promptItem);
       });
     } else {
@@ -1836,19 +1862,24 @@ export class PromptLibraryInjector {
     const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
     const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
     
-    // Temporarily add selector to DOM to measure its dimensions
-    selector.style.visibility = 'hidden';
+    // Measure it in the DOM: a selector not shown yet is added hidden for the measure, an open one
+    // (repositioned on scroll or resize) is measured in place and stays open
+    const isOpen = selector.isConnected;
     selector.style.position = 'absolute';
     selector.style.zIndex = '1000000';
-    document.body.appendChild(selector);
-    
+    if (!isOpen) {
+      selector.style.visibility = 'hidden';
+      document.body.appendChild(selector);
+    }
+
     const selectorRect = selector.getBoundingClientRect();
     const selectorHeight = selectorRect.height;
     const selectorWidth = selectorRect.width;
-    
-    // Remove from DOM temporarily
-    document.body.removeChild(selector);
-    selector.style.visibility = 'visible';
+
+    if (!isOpen) {
+      document.body.removeChild(selector);
+      selector.style.visibility = 'visible';
+    }
     
     // Calculate available space
     const viewportHeight = window.innerHeight;
@@ -1940,8 +1971,59 @@ export class PromptLibraryInjector {
   }
 
   private async handlePromptSelection(prompt: Prompt, targetElement: HTMLElement): Promise<void> {
+    const variables = extractVariables(prompt.content);
+    if (variables.length > 0 && this.state.promptSelector) {
+      this.showVariableForm(this.state.promptSelector, prompt, variables, targetElement);
+      return;
+    }
+    await this.insertSelectedPrompt(prompt, prompt.content, targetElement);
+  }
+
+  /**
+   * Replaces the prompt list with a form to fill in the prompt's Variables before inserting it.
+   * The list stays in the DOM (hidden) so the click that opened the form still counts as a click
+   * inside the selector for the outside-click handler.
+   */
+  private showVariableForm(selector: HTMLElement, prompt: Prompt, variables: string[], targetElement: HTMLElement): void {
+    debug('[CONTENT] Showing variable form', { promptId: prompt.id, variableCount: variables.length });
+
+    // The list's keyboard navigation would take Enter and Escape away from the form
+    if (this.keyboardNav) {
+      this.keyboardNav.destroy();
+      this.keyboardNav = null;
+    }
+
+    for (const element of selector.querySelectorAll<HTMLElement>('.prompt-search, .prompt-list')) {
+      element.style.display = 'none';
+    }
+
+    const title = selector.querySelector('#prompt-selector-title');
+    if (title) {
+      title.textContent = prompt.title;
+    }
+
+    let settled = false;
+    const insertOnce = (content: string) => {
+      if (settled) {return;}
+      settled = true;
+      void this.insertSelectedPrompt(prompt, content, targetElement);
+    };
+
+    const form = createVariableForm(variables, {
+      onSubmit: (values) => { insertOnce(fillVariables(prompt.content, values)); },
+      onSkip: () => { insertOnce(prompt.content); }
+    });
+    selector.appendChild(form);
+    form.querySelector<HTMLInputElement>('input')?.focus();
+  }
+
+  private async insertSelectedPrompt(prompt: Prompt, content: string, targetElement: HTMLElement): Promise<void> {
+    // The selector this Prompt was chosen from: one the user opens meanwhile is not this Insertion's to close
+    const selector = this.state.promptSelector;
     try {
-      const result = await this.insertPrompt(targetElement, prompt.content);
+      const result = await this.insertPrompt(targetElement, content);
+      // Close once the text is in, before the use is reported to the service worker
+      this.closePromptSelector(selector);
 
       if (result.success) {
         try {
@@ -1971,7 +2053,7 @@ export class PromptLibraryInjector {
         promptId: prompt.id
       });
     } finally {
-      this.closePromptSelector();
+      this.closePromptSelector(selector);
     }
   }
 
@@ -2008,7 +2090,9 @@ export class PromptLibraryInjector {
     }
 
     // Outside click to close
-    setTimeout(() => {
+    this.clearOutsideClickTimeout();
+    this.state.outsideClickTimeout = window.setTimeout(() => {
+      this.state.outsideClickTimeout = null;
       const outsideClickHandler = (e: Event) => {
         const target = e.target;
         if (!(target instanceof HTMLElement)) {
@@ -2075,7 +2159,7 @@ export class PromptLibraryInjector {
     if (filteredPrompts.length > 0) {
       const newPromptItems: HTMLElement[] = [];
       filteredPrompts.forEach((prompt, index) => {
-        const promptItem = createPromptListItem(prompt, index, 'filtered-prompt-item');
+        const promptItem = createPromptListItem(prompt, index, 'filtered-prompt-item', this.state.categoryColors.get(prompt.category));
         promptList.appendChild(promptItem);
         newPromptItems.push(promptItem);
       });
@@ -2127,9 +2211,15 @@ export class PromptLibraryInjector {
   }
 
   /**
-   * Closes the prompt selector
+   * Closes the prompt selector. Given `only`, closes it only while that selector is still the open one.
    */
-  private closePromptSelector(): void {
+  private closePromptSelector(only?: HTMLElement | null): void {
+    if (only !== undefined && this.state.promptSelector !== only) {
+      return;
+    }
+
+    this.clearOutsideClickTimeout();
+
     if (this.state.promptSelector) {
       this.state.promptSelector.remove();
       this.state.promptSelector = null;
@@ -2141,6 +2231,13 @@ export class PromptLibraryInjector {
     }
     // Clear the stored target element
     this.state.currentTargetElement = null;
+  }
+
+  private clearOutsideClickTimeout(): void {
+    if (this.state.outsideClickTimeout !== null) {
+      clearTimeout(this.state.outsideClickTimeout);
+      this.state.outsideClickTimeout = null;
+    }
   }
 
   /**

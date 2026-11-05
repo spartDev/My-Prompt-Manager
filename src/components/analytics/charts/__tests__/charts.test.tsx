@@ -5,8 +5,8 @@
  * PlatformPieChart, DayOfWeekChart, CategoryBarChart, and TimeOfDayChart.
  */
 
-import { render, screen, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeAll, beforeEach, Mock } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, type Mock, type MockInstance, vi } from 'vitest';
 
 import { ThemeProvider } from '../../../../contexts/ThemeContext';
 import { getChromeMockFunctions, getMockStorageManager } from '../../../../test/mocks';
@@ -190,10 +190,10 @@ describe('DayOfWeekChart', () => {
 
 describe('CategoryBarChart', () => {
   const mockData = [
-    { categoryId: '1', name: 'Development', count: 25 },
-    { categoryId: '2', name: 'Writing', count: 18 },
-    { categoryId: '3', name: 'Marketing', count: 12 },
-    { categoryId: '4', name: 'Design', count: 8 }
+    { categoryId: '1', name: 'Development', count: 25, color: '#2563EB' },
+    { categoryId: '2', name: 'Writing', count: 18, color: '#2563EB' },
+    { categoryId: '3', name: 'Marketing', count: 12, color: '#2563EB' },
+    { categoryId: '4', name: 'Design', count: 8, color: '#2563EB' }
   ];
 
   it('should render with data', async () => {
@@ -211,12 +211,12 @@ describe('CategoryBarChart', () => {
 
   it('should limit categories when maxCategories is set', async () => {
     const manyCategories = [
-      { categoryId: '1', name: 'Cat 1', count: 10 },
-      { categoryId: '2', name: 'Cat 2', count: 9 },
-      { categoryId: '3', name: 'Cat 3', count: 8 },
-      { categoryId: '4', name: 'Cat 4', count: 7 },
-      { categoryId: '5', name: 'Cat 5', count: 6 },
-      { categoryId: '6', name: 'Cat 6', count: 5 }
+      { categoryId: '1', name: 'Cat 1', count: 10, color: '#2563EB' },
+      { categoryId: '2', name: 'Cat 2', count: 9, color: '#2563EB' },
+      { categoryId: '3', name: 'Cat 3', count: 8, color: '#2563EB' },
+      { categoryId: '4', name: 'Cat 4', count: 7, color: '#2563EB' },
+      { categoryId: '5', name: 'Cat 5', count: 6, color: '#2563EB' },
+      { categoryId: '6', name: 'Cat 6', count: 5, color: '#2563EB' }
     ];
 
     await renderWithTheme(<CategoryBarChart data={manyCategories} maxCategories={3} />);
@@ -292,7 +292,7 @@ describe('Chart Accessibility', () => {
   });
 
   it('CategoryBarChart should have accessible aria-label', async () => {
-    const data = [{ categoryId: '1', name: 'Test', count: 5 }];
+    const data = [{ categoryId: '1', name: 'Test', count: 5, color: '#2563EB' }];
     await renderWithTheme(<CategoryBarChart data={data} />);
 
     expect(screen.getByRole('img')).toHaveAttribute('aria-label');
@@ -303,5 +303,139 @@ describe('Chart Accessibility', () => {
     await renderWithTheme(<TimeOfDayChart data={data} />);
 
     expect(screen.getByRole('img')).toHaveAttribute('aria-label');
+  });
+});
+
+describe('Chart Tooltips', () => {
+  let layout: MockInstance<HTMLElement['getBoundingClientRect']>;
+
+  // happy-dom lays nothing out: give each element a size so the charts draw and can be hovered
+  beforeEach(() => {
+    layout = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 400, 200));
+  });
+
+  afterEach(() => {
+    layout.mockRestore();
+  });
+
+  /** Hovers the middle of a chart, as a user does to read a value */
+  const hoverChart = (container: HTMLElement) => {
+    const chart = container.querySelector('.recharts-wrapper');
+    expect(chart, 'chart drawn').not.toBeNull();
+    fireEvent.mouseMove(chart as Element, { clientX: 200, clientY: 100 });
+  };
+
+  /** The Tooltip shows exactly this line: name, separator, value */
+  const expectTooltipLine = async (container: HTMLElement, line: string) => {
+    await waitFor(() => {
+      expect(container.querySelector('.recharts-tooltip-item')?.textContent).toBe(line);
+    });
+  };
+
+  it('UsageLineChart shows the uses of the hovered day', async () => {
+    const { container } = await renderWithTheme(<UsageLineChart data={[{ date: '2026-01-11', count: 5 }]} />);
+
+    hoverChart(container);
+
+    await expectTooltipLine(container, 'Uses : 5');
+  });
+
+  it('UsageLineChart labels the hovered day with its own date, west of UTC too', async () => {
+    const systemTimeZone = process.env.TZ;
+    process.env.TZ = 'America/New_York';
+    try {
+      const { container } = await renderWithTheme(<UsageLineChart data={[{ date: '2026-01-11', count: 5 }]} />);
+
+      hoverChart(container);
+
+      await waitFor(() => {
+        expect(container.querySelector('.recharts-tooltip-label')?.textContent).toBe('Jan 11');
+      });
+    } finally {
+      if (systemTimeZone === undefined) {
+        delete process.env.TZ;
+      } else {
+        process.env.TZ = systemTimeZone;
+      }
+    }
+  });
+
+  it('DayOfWeekChart shows the uses of the hovered day', async () => {
+    const { container } = await renderWithTheme(<DayOfWeekChart data={[{ day: 'Mon', dayIndex: 1, count: 15 }]} />);
+
+    hoverChart(container);
+
+    await expectTooltipLine(container, 'Uses : 15');
+  });
+
+  it('CategoryBarChart shows the uses of the hovered Category', async () => {
+    const { container } = await renderWithTheme(
+      <CategoryBarChart data={[{ categoryId: '1', name: 'Development', count: 25, color: '#2563EB' }]} />
+    );
+
+    hoverChart(container);
+
+    await expectTooltipLine(container, 'Uses : 25');
+  });
+
+  it('TimeOfDayChart shows the uses of the hovered time of day', async () => {
+    const { container } = await renderWithTheme(<TimeOfDayChart data={[{ bucket: 'Morning', count: 12 }]} />);
+
+    hoverChart(container);
+
+    await expectTooltipLine(container, 'Uses : 12');
+  });
+
+  it('PlatformPieChart shows the hovered Platform and its uses', async () => {
+    const { container } = await renderWithTheme(
+      <PlatformPieChart data={[{ platform: 'claude', count: 20, percentage: 100 }]} />
+    );
+
+    const sector = await waitFor(() => {
+      const drawn = container.querySelector('.recharts-pie-sector');
+      expect(drawn, 'Platform sector drawn').not.toBeNull();
+      return drawn as Element;
+    });
+    fireEvent.mouseOver(sector);
+
+    await expectTooltipLine(container, 'Claude : 20 uses');
+  });
+});
+
+describe('CategoryBarChart drawn', () => {
+  let layout: MockInstance<HTMLElement['getBoundingClientRect']>;
+
+  const data = [
+    { categoryId: '1', name: 'Work', count: 4, color: '#3B82F6' },
+    { categoryId: '2', name: 'Development', count: 3, color: '#8B5CF6' },
+    { categoryId: '3', name: 'Personal', count: 2, color: '#10B981' },
+    { categoryId: '4', name: 'Customer Support Escalations', count: 1, color: '#2563EB' }
+  ];
+
+  // happy-dom lays nothing out: give each element a size so the chart draws its axes and bars
+  beforeEach(() => {
+    layout = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 400, 200));
+  });
+
+  afterEach(() => {
+    layout.mockRestore();
+  });
+
+  it('names each Category, and ends a name over 12 characters with an ellipsis', async () => {
+    const { container } = await renderWithTheme(<CategoryBarChart data={data} />);
+
+    await waitFor(() => {
+      const ticks = container.querySelectorAll('.recharts-yAxis-tick-labels .recharts-cartesian-axis-tick-value');
+      expect(Array.from(ticks, tick => tick.textContent)).toEqual(['Work', 'Development', 'Personal', 'Customer Su…']);
+    });
+  });
+
+  it("paints each bar in its Category's color", async () => {
+    const { container } = await renderWithTheme(<CategoryBarChart data={data} />);
+
+    await waitFor(() => {
+      const bars = container.querySelectorAll('.recharts-bar-rectangle path');
+      expect(Array.from(bars, bar => bar.getAttribute('fill'))).toEqual(['#3B82F6', '#8B5CF6', '#10B981', '#2563EB']);
+    });
   });
 });

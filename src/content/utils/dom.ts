@@ -3,9 +3,8 @@
  * Provides safe DOM element creation and manipulation utilities
  */
 
-import { warn, error as logError } from './logger';
+import { error as logError } from './logger';
 
-// eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class DOMUtils {
   /**
    * Helper function to safely create DOM elements with text content
@@ -283,33 +282,6 @@ export class DOMUtils {
     } catch (err) {
       logError('Failed to set attributes', err as Error, { attributes });
       return false;
-    }
-  }
-
-  /**
-   * Escape HTML to ensure user-generated content is displayed safely
-   */
-  static escapeHtml(text: string): string {
-    try {
-      if (typeof text !== 'string') {
-        warn('escapeHtml received non-string input', {
-          type: typeof text,
-          value: text
-        });
-        return String(text);
-      }
-
-      // Use explicit character replacement for safety
-      return text
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#x27;')
-        .replace(/\//g, '&#x2F;');
-    } catch (err) {
-      logError('Failed to escape HTML', err as Error, { text });
-      return ''; // Safe fallback
     }
   }
 

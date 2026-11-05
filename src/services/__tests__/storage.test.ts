@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { buildPrompt } from '../../test/builders';
-import { Prompt, Category, DEFAULT_CATEGORY } from '../../types';
+import { type Category, DEFAULT_CATEGORY, type Prompt } from '../../types';
+import { PROMPT_LIMITS } from '../promptAdmission';
 import { StorageManager } from '../storage';
 
 const FIXED_TIME = new Date('2025-01-01T00:00:00Z');
@@ -40,7 +41,8 @@ describe('StorageManager', () => {
       expect(savedPrompt.createdAt).toBeDefined();
       expect(savedPrompt.updatedAt).toBeDefined();
       expect(savedPrompt.usageCount).toBe(0);
-      expect(savedPrompt.lastUsedAt).toBeUndefined();
+      // An unused prompt was last used when it was created (the same value every read gives it)
+      expect(savedPrompt.lastUsedAt).toBe(savedPrompt.createdAt);
 
       // Verify using chrome.storage API
       const result = await chrome.storage.local.get('prompts');
@@ -59,6 +61,25 @@ describe('StorageManager', () => {
       const prompts = await storageManager.getPrompts();
 
       expect(prompts).toEqual([prompt1]);
+    });
+
+    it('should read a legacy prompt without writing, backfilling its usage fields in memory only', async () => {
+      const legacy = {
+        id: 'legacy',
+        title: 'Legacy',
+        content: 'Content',
+        category: DEFAULT_CATEGORY,
+        createdAt: 1000,
+        updatedAt: 2000
+      };
+      await chrome.storage.local.set({ prompts: [legacy] });
+      vi.mocked(chrome.storage.local.set).mockClear();
+
+      const prompts = await storageManager.getPrompts();
+
+      expect(prompts[0]).toMatchObject({ id: 'legacy', usageCount: 0, lastUsedAt: 1000 });
+      expect(chrome.storage.local.set).not.toHaveBeenCalled();
+      expect((await chrome.storage.local.get('prompts')).prompts).toEqual([legacy]);
     });
 
     it('should update an existing prompt', async () => {
@@ -130,6 +151,138 @@ describe('StorageManager', () => {
       const prompts = result.prompts as Prompt[];
       expect(prompts[0].usageCount).toBe(3);
       expect(prompts[0].lastUsedAt).toBe(updatedPrompt.lastUsedAt);
+    });
+
+    it('should pin and unpin a prompt without changing updatedAt', async () => {
+      const originalUpdatedAt = FIXED_TIME.getTime() - 60_000;
+      await chrome.storage.local.set({ prompts: [buildPrompt({ id: 'pin-test', updatedAt: originalUpdatedAt })] });
+      vi.setSystemTime(FIXED_TIME.getTime() + 60_000);
+
+      const pinned = await storageManager.togglePinned('pin-test');
+      expect(pinned.pinned).toBe(true);
+      expect(pinned.updatedAt).toBe(originalUpdatedAt);
+
+      let stored = (await chrome.storage.local.get('prompts')).prompts as Prompt[];
+      expect(stored[0].pinned).toBe(true);
+      expect(stored[0].updatedAt).toBe(originalUpdatedAt);
+
+      const unpinned = await storageManager.togglePinned('pin-test');
+      expect(unpinned.pinned).toBe(false);
+      stored = (await chrome.storage.local.get('prompts')).prompts as Prompt[];
+      expect(stored[0].pinned).toBe(false);
+      expect(stored[0].updatedAt).toBe(originalUpdatedAt);
+    });
+
+    it('should leave a prompt unpinned after two concurrent toggles', async () => {
+      await chrome.storage.local.set({ prompts: [buildPrompt({ id: 'pin-test' })] });
+
+      await Promise.all([
+        storageManager.togglePinned('pin-test'),
+        storageManager.togglePinned('pin-test')
+      ]);
+
+      const stored = (await chrome.storage.local.get('prompts')).prompts as Prompt[];
+      expect(stored[0].pinned).toBe(false);
+    });
+
+    it('should reject toggling the pin of an unknown prompt', async () => {
+      await expect(storageManager.togglePinned('missing')).rejects.toThrow();
+    });
+  });
+
+  describe('Library size', () => {
+    const library = (count: number, content: string) =>
+      Array.from({ length: count }, (_, i) => buildPrompt({ id: `long-${String(i)}`, title: `Long ${String(i)}`, content }));
+    const onePrompt = { title: 'One more', content: 'Résume la transcription.', category: DEFAULT_CATEGORY };
+
+    it('takes one more Prompt when 220 Prompts of 19,000 ASCII characters store 4.2 MB, under the 8 MB cap', async () => {
+      await chrome.storage.local.set({ prompts: library(220, 'x'.repeat(19_000)) });
+
+      await expect(storageManager.savePrompt(onePrompt)).resolves.toMatchObject({ title: 'One more' });
+      expect(await storageManager.getPrompts()).toHaveLength(221);
+    });
+
+    it('refuses a Prompt that takes a Library of Chinese text, 3 bytes per character, past the 8 MB cap', async () => {
+      const chinese = '中'.repeat(19_000);
+      await chrome.storage.local.set({ prompts: library(139, chinese) });
+
+      await expect(storageManager.savePrompt({ ...onePrompt, content: chinese })).rejects.toMatchObject({
+        type: 'STORAGE_QUOTA_EXCEEDED',
+        message: 'Storage quota exceeded. Please delete old prompts to free up space.'
+      });
+      expect(await storageManager.getPrompts()).toHaveLength(139);
+    });
+
+    it('refuses to import a Prompt that takes the Library past the 8 MB cap', async () => {
+      const chinese = '中'.repeat(19_000);
+      await chrome.storage.local.set({ prompts: library(139, chinese) });
+
+      await expect(storageManager.importPrompt(buildPrompt({ id: 'imported', content: chinese }))).rejects.toMatchObject({
+        type: 'STORAGE_QUOTA_EXCEEDED',
+        message: 'Storage quota exceeded. Please delete old prompts to free up space.'
+      });
+      expect(await storageManager.getPrompts()).toHaveLength(139);
+    });
+
+    describe('with a Prompt that grows in a Library just under the 8 MB cap', () => {
+      const chinese = '中'.repeat(19_000);
+
+      beforeEach(async () => {
+        await chrome.storage.local.set({ prompts: [...library(139, chinese), buildPrompt({ id: 'short', content: 'x' })] });
+      });
+
+      it('refuses the edit that takes the Library past the cap', async () => {
+        await expect(storageManager.updatePrompt('short', { content: chinese })).rejects.toMatchObject({ type: 'STORAGE_QUOTA_EXCEEDED' });
+        expect((await storageManager.getPrompts()).find(p => p.id === 'short')?.content).toBe('x');
+      });
+
+      it('refuses the import that replaces it and takes the Library past the cap', async () => {
+        await expect(storageManager.importPrompt(buildPrompt({ id: 'short', content: chinese }))).rejects.toMatchObject({ type: 'STORAGE_QUOTA_EXCEEDED' });
+        expect((await storageManager.getPrompts()).find(p => p.id === 'short')?.content).toBe('x');
+      });
+
+      it('takes an edit that shrinks a Prompt of a Library already past the cap', async () => {
+        await chrome.storage.local.set({ prompts: library(141, chinese) });
+
+        await expect(storageManager.updatePrompt('long-0', { content: 'Shorter' })).resolves.toMatchObject({ content: 'Shorter' });
+      });
+    });
+
+    it('restores a backup of 150 Prompts of 19,000 ASCII characters, 2.9 MB stored, within a 5 MB quota', async () => {
+      expect(chrome.storage.local.QUOTA_BYTES).toBe(5_242_880);
+
+      // One Prompt at a time, as SettingsView restores a Backup
+      for (const prompt of library(150, 'x'.repeat(19_000))) {
+        await storageManager.importPrompt(prompt);
+      }
+
+      expect(await storageManager.getPrompts()).toHaveLength(150);
+    });
+
+    it('takes a Prompt of 20,000 Chinese characters, 60 KB stored, as Admission allows 20,000 characters', async () => {
+      const chinese = '中'.repeat(PROMPT_LIMITS.content);
+
+      await expect(storageManager.savePrompt({ ...onePrompt, content: chinese })).resolves.toMatchObject({ content: chinese });
+    });
+
+    describe('with Chrome storage 97.5% full, 26 KB under the 98% safety threshold', () => {
+      const asciiText = 'x'.repeat(19_000);
+
+      beforeEach(() => {
+        // The Promise form of getBytesInUse: vi.mocked would type its last overload, the callback one
+        const getBytesInUse: () => Promise<number> = chrome.storage.local.getBytesInUse;
+        vi.mocked(getBytesInUse).mockResolvedValue(0.975 * chrome.storage.local.QUOTA_BYTES);
+      });
+
+      it('takes a new Prompt of 19,000 ASCII characters, which stores 19 KB', async () => {
+        await expect(storageManager.savePrompt({ ...onePrompt, content: asciiText })).resolves.toMatchObject({ content: asciiText });
+      });
+
+      it('takes an edit that adds 19,000 ASCII characters to a Prompt', async () => {
+        await chrome.storage.local.set({ prompts: [buildPrompt({ id: 'short', content: 'x' })] });
+
+        await expect(storageManager.updatePrompt('short', { content: asciiText })).resolves.toMatchObject({ content: asciiText });
+      });
     });
   });
 
@@ -251,7 +404,6 @@ describe('StorageManager', () => {
       expect(savedPrompt1.id).not.toBe(savedPrompt2.id);
 
       // Verify using chrome.storage API
-      // Note: prompts may have lastUsedAt added due to auto-migration during getPrompts()
       const result = await chrome.storage.local.get('prompts');
       const prompts = result.prompts as Prompt[];
       expect(prompts).toHaveLength(2);
@@ -572,6 +724,22 @@ describe('StorageManager', () => {
       expect(usage.total).toBe(chrome.storage.local.QUOTA_BYTES);
     });
 
+    // The levels are QUOTA_THRESHOLDS: 70%, 85% and 95% of the quota each start the next one
+    it.each([
+      [69.9, 'safe'],
+      [70, 'warning'],
+      [84.9, 'warning'],
+      [85, 'critical'],
+      [94.9, 'critical'],
+      [95, 'danger']
+    ] as const)('gives the warning level of Chrome storage %s%% full: %s', async (percentFull, warningLevel) => {
+      // The Promise form of getBytesInUse: vi.mocked would type its last overload, the callback one
+      const getBytesInUse: () => Promise<number> = chrome.storage.local.getBytesInUse;
+      vi.mocked(getBytesInUse).mockResolvedValue((chrome.storage.local.QUOTA_BYTES * percentFull) / 100);
+
+      await expect(storageManager.getStorageUsageWithWarnings()).resolves.toMatchObject({ warningLevel });
+    });
+
     it('should export data as JSON', async () => {
       const exportedData = await storageManager.exportData();
       const parsedData = JSON.parse(exportedData) as Record<string, unknown>;
@@ -581,276 +749,10 @@ describe('StorageManager', () => {
       expect(parsedData).toHaveProperty('settings');
     });
 
-    it('should import valid data', async () => {
-      const importData = {
-        prompts: [],
-        categories: [{ id: '1', name: DEFAULT_CATEGORY }],
-        settings: { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt' as const, sortDirection: 'desc' as const, theme: 'system' as const }
-      };
-
-      await storageManager.importData(JSON.stringify(importData));
-
-
-      expect(chrome.storage.local.clear).toHaveBeenCalled();
-
-      expect(chrome.storage.local.set).toHaveBeenCalledWith({ prompts: importData.prompts });
-    });
-
-    it('should reject invalid import data', async () => {
-      const invalidData = JSON.stringify({ invalid: 'data' });
-
-      await expect(storageManager.importData(invalidData))
-        .rejects.toThrow(/Invalid import data structure.*Missing required field/);
-    });
-  });
-
-  describe('Import Rollback Scenarios', () => {
-    it('should rollback to backup if import fails', async () => {
-      // Setup: Create initial data
-      const timestamp = FIXED_TIME.getTime();
-      const initialPrompts: Prompt[] = [{
-        id: '1',
-        title: 'Original Prompt',
-        content: 'Original Content',
-        category: DEFAULT_CATEGORY,
-        createdAt: timestamp,
-        updatedAt: timestamp,
-        usageCount: 0,
-        lastUsedAt: timestamp
-      }];
-      await chrome.storage.local.set({ prompts: initialPrompts });
-
-      // Mock: Track calls and fail on the first import write
-      let setCallCount = 0;
-      const originalSetImpl = vi.mocked(chrome.storage.local.set).getMockImplementation();
-
-      vi.mocked(chrome.storage.local.set).mockImplementation((items: Record<string, unknown>) => {
-        setCallCount++;
-        // First call is prompts import - make it fail
-        if (setCallCount === 1) {
-          return Promise.reject(new Error('Quota exceeded'));
-        }
-        // All other calls (rollback) should succeed using the original implementation
-        return originalSetImpl ? (originalSetImpl as any)(items) : Promise.resolve();
-      });
-
-      const importData = {
-        prompts: [{
-          id: '2',
-          title: 'New Prompt',
-          content: 'New Content',
-          category: DEFAULT_CATEGORY,
-          createdAt: FIXED_TIME.getTime(),
-          updatedAt: FIXED_TIME.getTime()
-        }],
-        categories: [{ id: '1', name: DEFAULT_CATEGORY }],
-        settings: { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt' as const, sortDirection: 'desc' as const, theme: 'system' as const }
-      };
-
-      // Verify: Import fails and data is rolled back
-      await expect(
-        storageManager.importData(JSON.stringify(importData))
-      ).rejects.toThrow('Quota exceeded');
-
-      // Verify: Original prompts are restored
-      const finalPrompts = await storageManager.getPrompts();
-      expect(finalPrompts).toEqual(initialPrompts);
-    });
-
-    it('should report partial rollback failures with detailed error', async () => {
-      // Setup: Create initial data
-      const timestamp = FIXED_TIME.getTime();
-      const initialPrompts: Prompt[] = [{
-        id: '1',
-        title: 'Original Prompt',
-        content: 'Original Content',
-        category: DEFAULT_CATEGORY,
-        createdAt: timestamp,
-        updatedAt: timestamp,
-        usageCount: 0,
-        lastUsedAt: timestamp
-      }];
-      await chrome.storage.local.set({ prompts: initialPrompts });
-
-      // Track which phase we're in: import or rollback
-      let importPhase = true;
-      const originalSetImpl = vi.mocked(chrome.storage.local.set).getMockImplementation();
-
-      vi.mocked(chrome.storage.local.set).mockImplementation((items: Record<string, unknown>) => {
-        const keys = Object.keys(items);
-        const key = keys[0];
-
-        // During import phase, fail categories
-        if (importPhase && key === 'categories') {
-          importPhase = false; // Switch to rollback phase
-          return Promise.reject(new Error('Import quota exceeded'));
-        }
-
-        // During rollback phase, fail categories
-        if (!importPhase && key === 'categories') {
-          return Promise.reject(new Error('Rollback quota exceeded'));
-        }
-
-        // All other calls succeed using the original implementation
-        return originalSetImpl ? (originalSetImpl as any)(items) : Promise.resolve();
-      });
-
-      const importData = {
-        prompts: [{
-          id: '2',
-          title: 'New Prompt',
-          content: 'New Content',
-          category: DEFAULT_CATEGORY,
-          createdAt: FIXED_TIME.getTime(),
-          updatedAt: FIXED_TIME.getTime()
-        }],
-        categories: [{ id: '1', name: DEFAULT_CATEGORY }],
-        settings: { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt' as const, sortDirection: 'desc' as const, theme: 'system' as const }
-      };
-
-      let capturedError: Error | null = null;
-
-      // Verify: Import fails with detailed rollback error
-      await expect(async () => {
-        try {
-          await storageManager.importData(JSON.stringify(importData));
-        } catch (error) {
-          capturedError = error as Error;
-          throw error;
-        }
-      }).rejects.toThrow(/rollback partially failed.*1\/3 operations failed/);
-
-      expect(capturedError).toBeInstanceOf(Error);
-      // Type assertion: after toBeInstanceOf check, we know it's an Error
-      const errorMessage = (capturedError as unknown as Error).message;
-      expect(errorMessage).toContain('categories: Rollback quota exceeded');
-      expect(errorMessage).toContain('Original error: Import quota exceeded');
-    });
-
-    it('should successfully rollback all data when all operations succeed', async () => {
-      // Setup: Create complete initial data
-      const timestamp = FIXED_TIME.getTime();
-      const initialPrompts: Prompt[] = [{
-        id: '1',
-        title: 'Original Prompt',
-        content: 'Original Content',
-        category: DEFAULT_CATEGORY,
-        createdAt: timestamp,
-        updatedAt: timestamp,
-        usageCount: 0,
-        lastUsedAt: timestamp
-      }];
-      const initialCategories: Category[] = [
-        { id: 'cat1', name: 'Work' },
-        { id: 'default', name: DEFAULT_CATEGORY }
-      ];
-      const initialSettings = { defaultCategory: 'Work', sortOrder: 'createdAt' };
-
-      await chrome.storage.local.set({
-        prompts: initialPrompts,
-        categories: initialCategories,
-        settings: initialSettings
-      });
-
-      // Mock: Make import fail but rollback succeed
-      let setCallCount = 0;
-      const originalSetImpl = vi.mocked(chrome.storage.local.set).getMockImplementation();
-
-      vi.mocked(chrome.storage.local.set).mockImplementation((items: Record<string, unknown>) => {
-        setCallCount++;
-        // First import write fails
-        if (setCallCount === 1) {
-          return Promise.reject(new Error('Import failed'));
-        }
-        // All rollback operations succeed using the original implementation
-        return originalSetImpl ? (originalSetImpl as any)(items) : Promise.resolve();
-      });
-
-      const importData = {
-        prompts: [{ id: '2', title: 'New', content: 'New', category: DEFAULT_CATEGORY, createdAt: FIXED_TIME.getTime(), updatedAt: FIXED_TIME.getTime() }],
-        categories: [{ id: '1', name: DEFAULT_CATEGORY }],
-        settings: { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt' as const, sortDirection: 'desc' as const, theme: 'system' as const }
-      };
-
-      // Verify: Import fails with original error (not rollback error)
-      await expect(
-        storageManager.importData(JSON.stringify(importData))
-      ).rejects.toThrow('Import failed');
-
-      // Verify: All original data is restored
-      const result = await chrome.storage.local.get(['prompts', 'categories', 'settings']);
-      const prompts = result.prompts as Prompt[];
-      const categories = result.categories as Category[];
-      const settings = result.settings as Record<string, unknown>;
-      expect(prompts).toEqual(initialPrompts);
-      expect(categories).toEqual(expect.arrayContaining(initialCategories));
-      expect(settings).toEqual(initialSettings);
-    });
-
-    it('should attempt all rollback operations even if first one fails', async () => {
-      // Setup initial data
-      const timestamp = FIXED_TIME.getTime();
-      const initialPrompts: Prompt[] = [{
-        id: '1',
-        title: 'Original',
-        content: 'Content',
-        category: DEFAULT_CATEGORY,
-        createdAt: timestamp,
-        updatedAt: timestamp,
-        usageCount: 0,
-        lastUsedAt: timestamp
-      }];
-      const initialCategories: Category[] = [{ id: 'cat1', name: 'Work' }];
-      const initialSettings = { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt' };
-
-      await chrome.storage.local.set({
-        prompts: initialPrompts,
-        categories: initialCategories,
-        settings: initialSettings
-      });
-
-      // Track which phase we're in: import or rollback
-      let importPhase = true;
-      const originalSetImpl = vi.mocked(chrome.storage.local.set).getMockImplementation();
-
-      vi.mocked(chrome.storage.local.set).mockImplementation((items: Record<string, unknown>) => {
-        const keys = Object.keys(items);
-        const key = keys[0];
-
-        // During import phase, fail categories
-        if (importPhase && key === 'categories') {
-          importPhase = false; // Switch to rollback phase
-          return Promise.reject(new Error('Import failed'));
-        }
-
-        // During rollback phase, fail prompts
-        if (!importPhase && key === 'prompts') {
-          return Promise.reject(new Error('Prompts restore failed'));
-        }
-
-        // All other calls succeed using the original implementation
-        return originalSetImpl ? (originalSetImpl as any)(items) : Promise.resolve();
-      });
-
-      const importData = {
-        prompts: [],
-        categories: [{ id: '1', name: DEFAULT_CATEGORY }],
-        settings: { defaultCategory: DEFAULT_CATEGORY, sortOrder: 'updatedAt' as const, sortDirection: 'desc' as const, theme: 'system' as const }
-      };
-
-      // Verify: Import fails
-      await expect(
-        storageManager.importData(JSON.stringify(importData))
-      ).rejects.toThrow();
-
-      // Verify: Data that could be restored was restored
-      const result = await chrome.storage.local.get(['prompts', 'categories', 'settings']);
-      const prompts = result.prompts as Prompt[];
-      const categories = result.categories as Category[];
-      const settings = result.settings as Record<string, unknown>;
-      expect(prompts).toEqual(initialPrompts);
-      expect(categories).toEqual(expect.arrayContaining(initialCategories));
-      expect(settings).toEqual(initialSettings);
+    it('should keep the pinned flag when importing a single prompt', async () => {
+      await storageManager.importPrompt(buildPrompt({ id: 'single', pinned: true }));
+      const prompts = await storageManager.getPrompts();
+      expect(prompts.find(p => p.id === 'single')?.pinned).toBe(true);
     });
   });
 });

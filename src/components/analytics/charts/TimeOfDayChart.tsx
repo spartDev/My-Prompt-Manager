@@ -1,18 +1,19 @@
-import { FC, memo } from 'react';
+import { type FC, memo } from 'react';
 import {
-  BarChart,
   Bar,
-  XAxis,
-  YAxis,
+  BarChart,
   CartesianGrid,
-  Tooltip,
+  Cell, 
   ResponsiveContainer,
-  Cell
+  Tooltip,
+  XAxis,
+  YAxis
 } from 'recharts';
 
-import { useChartTheme } from '../../../hooks/useChartTheme';
-import { CHART_PRIMARY, TIME_BUCKET_COLORS } from '../../../theme/chartColors';
-import { TimeOfDayDistribution } from '../../../types/hooks';
+import { CHART_PRIMARY, CHART_THEME, TIME_BUCKET_COLORS } from '../../../theme/chartColors';
+import type { TimeOfDayDistribution } from '../../../types/hooks';
+import { NO_THROTTLED_EVENTS } from '../constants';
+import { formatUsesTooltip } from './tooltipFormatters';
 
 export interface TimeOfDayChartProps {
   /** Time of day distribution data */
@@ -42,17 +43,17 @@ const TimeOfDayChart: FC<TimeOfDayChartProps> = memo(({
   showGrid = true,
   highlightPeak = true
 }) => {
-  const { gridColor, textColor, tooltipBg, tooltipBorder, tooltipLabelColor, cursorColor } = useChartTheme();
+  const { gridColor, textColor, tooltipBg, tooltipBorder, tooltipLabelColor, cursorColor } = CHART_THEME;
 
   if (data.length === 0) {
     return (
       <div
-        className="flex items-center justify-center bg-gray-50 dark:bg-gray-800/50 rounded-xl"
+        className="flex items-center justify-center bg-raised rounded-xl"
         style={{ height }}
         role="img"
         aria-label="No time of day data available"
       >
-        <p className="text-sm text-gray-500 dark:text-gray-400">No time of day data</p>
+        <p className="text-sm text-tertiary">No time of day data</p>
       </div>
     );
   }
@@ -73,7 +74,7 @@ const TimeOfDayChart: FC<TimeOfDayChartProps> = memo(({
       aria-label="Time of day usage chart"
     >
       <ResponsiveContainer width="100%" height={height}>
-        <BarChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+        <BarChart data={chartData} margin={{ top: 5, right: 10, left: 4, bottom: 5 }} throttledEvents={NO_THROTTLED_EVENTS}>
           {showGrid && (
             <CartesianGrid
               strokeDasharray="3 3"
@@ -92,10 +93,10 @@ const TimeOfDayChart: FC<TimeOfDayChartProps> = memo(({
             tickLine={false}
             axisLine={false}
             allowDecimals={false}
-            width={30}
+            width="auto"
           />
           <Tooltip
-            formatter={(value: number | undefined) => [value ?? 0, 'Uses']}
+            formatter={formatUsesTooltip}
             contentStyle={{
               backgroundColor: tooltipBg,
               border: `1px solid ${tooltipBorder}`,

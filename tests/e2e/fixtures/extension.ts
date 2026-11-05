@@ -1,12 +1,11 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unnecessary-condition, @typescript-eslint/no-unsafe-argument, react-hooks/rules-of-hooks */
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
 import type { BrowserContext, Page, Worker } from '@playwright/test';
-import { chromium, test as base } from '@playwright/test';
+import { test as base, chromium } from '@playwright/test';
 
-import type { Prompt, Category, Settings } from '../../../src/types';
+import type { Category, Prompt, Settings } from '../../../src/types';
 
 const extensionPath = path.resolve(process.cwd(), 'dist');
 
@@ -50,7 +49,7 @@ const waitForBackgroundTarget = async (context: BrowserContext): Promise<Backgro
   if (isCI) {
     // Wait for the extension to fully load first
     await new Promise(resolve => setTimeout(resolve, 3000));
-    // eslint-disable-next-line no-console
+
     console.log('[CI] Waiting for extension background target...');
   }
 
@@ -60,14 +59,14 @@ const waitForBackgroundTarget = async (context: BrowserContext): Promise<Backgro
 
     // Log progress in CI for debugging
     if (isCI && attemptCount % 10 === 0) {
-      // eslint-disable-next-line no-console
+
       console.log(`[CI] Background target search attempt ${String(attemptCount)}...`);
     }
 
     const worker = findWorker();
     if (worker) {
       if (isCI) {
-        // eslint-disable-next-line no-console
+
         console.log(`[CI] Found service worker after ${String(attemptCount)} attempts`);
       }
       return worker;
@@ -76,7 +75,7 @@ const waitForBackgroundTarget = async (context: BrowserContext): Promise<Backgro
     const backgroundPage = findBackgroundPage();
     if (backgroundPage) {
       if (isCI) {
-        // eslint-disable-next-line no-console
+
         console.log(`[CI] Found background page after ${String(attemptCount)} attempts`);
       }
       return backgroundPage;
@@ -89,7 +88,7 @@ const waitForBackgroundTarget = async (context: BrowserContext): Promise<Backgro
       });
       if (awaitedWorker) {
         if (isCI) {
-          // eslint-disable-next-line no-console
+
           console.log(`[CI] Service worker event triggered after ${String(attemptCount)} attempts`);
         }
         return awaitedWorker;
@@ -97,7 +96,7 @@ const waitForBackgroundTarget = async (context: BrowserContext): Promise<Backgro
     } catch (error) {
       // Log errors in CI for debugging
       if (isCI && attemptCount % 20 === 0) {
-        // eslint-disable-next-line no-console
+
         console.log(`[CI] Service worker wait failed: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
@@ -110,7 +109,7 @@ const waitForBackgroundTarget = async (context: BrowserContext): Promise<Backgro
   const fallbackWorker = findWorker();
   if (fallbackWorker) {
     if (isCI) {
-      // eslint-disable-next-line no-console
+
       console.log('[CI] Found service worker in final attempt');
     }
     return fallbackWorker;
@@ -119,7 +118,7 @@ const waitForBackgroundTarget = async (context: BrowserContext): Promise<Backgro
   const fallbackPage = findBackgroundPage();
   if (fallbackPage) {
     if (isCI) {
-      // eslint-disable-next-line no-console
+
       console.log('[CI] Found background page in final attempt');
     }
     return fallbackPage;
@@ -151,7 +150,9 @@ const waitForBackgroundTarget = async (context: BrowserContext): Promise<Backgro
 
 const createStorageController = (target: BackgroundTarget): ExtensionStorage => {
   const wrapChromeCall = <T, Arg>(fn: (arg: Arg) => Promise<T>, arg: Arg): Promise<T> => {
-    return target.evaluate(fn, arg);
+    // Page and Worker share this evaluate signature, but TypeScript cannot call it on their union, and
+    // Playwright types the function's argument as Unboxed<Arg>, which a generic Arg cannot be shown to match
+    return (target as Worker).evaluate(fn as (arg: unknown) => Promise<T>, arg);
   };
 
   const normalizeErrors = async <T>(promise: Promise<T>): Promise<T> => {
@@ -330,10 +331,12 @@ export const test = base.extend<ExtensionFixtures>({
     await use(extensionId);
   },
 
-  page: async ({ context, extensionId, storage }, use) => {
+  // Starts on about:blank: the extension app must not run before the test seeds storage,
+  // otherwise its first reads (e.g. getCategories() writing [Uncategorized]) race the seed.
+  // Tests navigate themselves (page.goto(...) / navigateToContext).
+  page: async ({ context, storage }, use) => {
     void storage;
     const page = await context.newPage();
-    await page.goto(`chrome-extension://${extensionId}/src/popup.html`);
     await use(page);
     await page.close();
   },
