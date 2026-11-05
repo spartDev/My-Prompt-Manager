@@ -15,10 +15,10 @@ Codex reviews every pull request, and `main` requires every conversation resolve
 scripts/pr-review.sh <PR>
 ```
 
-One line per bot comment nobody has replied to: `id`, `path:line`, priority, title. `(outdated)` after the line means the code moved since; the line is the one Codex read. Read each comment's full body:
+One line per unresolved thread a bot started, the threads that block the merge: comment id, thread id, `path:line`, priority, title. `(outdated)` after the line means the code moved since; the line is the one Codex read. Read each comment's full body:
 
 ```bash
-gh api repos/{owner}/{repo}/pulls/comments/<id> --jq .body
+gh api repos/{owner}/{repo}/pulls/comments/<comment id> --jq .body
 ```
 
 Done when: you hold the full body of every listed comment. An empty list means nothing is open: say so and stop.
@@ -57,19 +57,17 @@ For each finding the user approved, in turn:
 4. Reply in the thread, following the replies already on this repository's PRs: what reproduced and how, the commit that fixes it, the test that failed before it.
 
    ```bash
-   gh api repos/{owner}/{repo}/pulls/<PR>/comments/<id>/replies -f body='Confirmed: … Fixed in <sha>: … <test> fails without the change.'
+   gh api repos/{owner}/{repo}/pulls/<PR>/comments/<comment id>/replies -f body='Confirmed: … Fixed in <sha>: … <test> fails without the change.'
    ```
 
    A finding not reproduced or out of scope gets the reply the user approved: the evidence, or the ticket it went to.
 5. Resolve the thread, which is what unblocks the merge:
 
    ```bash
-   gh api graphql -f query='{repository(owner:"spartDev",name:"My-Prompt-Manager"){pullRequest(number:<PR>){reviewThreads(first:100){nodes{id isResolved comments(first:1){nodes{databaseId}}}}}}}' \
-     --jq '.data.repository.pullRequest.reviewThreads.nodes[] | select(.comments.nodes[0].databaseId == <id>) | .id'
    gh api graphql -f query='mutation{resolveReviewThread(input:{threadId:"<thread id>"}){thread{isResolved}}}'
    ```
 
-Done when: `scripts/pr-review.sh <PR>` prints nothing, and the first query shows `isResolved: true` on every Codex thread.
+Done when: `scripts/pr-review.sh <PR>` prints nothing. It lists unresolved threads, so a reply whose resolve failed still shows.
 
 ## 5. Record
 
