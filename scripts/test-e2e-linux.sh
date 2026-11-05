@@ -56,5 +56,5 @@ git archive HEAD | docker run -i --rm --ipc=host \
     HUSKY=0 npm ci --no-audit --no-fund --loglevel=error
     apt-get update -qq && apt-get install -y -qq fonts-dejavu-core >/dev/null
     npx playwright install chromium
-    CI=true npx playwright test --retries=0 --reporter=list --output=/out "$@"
+    CI=true npx playwright test --retries=0 --trace=retain-on-failure --reporter=list --output=/out "$@"
   ' bash "$@"
