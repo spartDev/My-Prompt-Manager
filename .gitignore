@@ -2,6 +2,8 @@
 
 # Build output
 dist/
+# Test-only build of the custom-site e2e (tests/e2e/fixtures/custom-site-build.ts)
+dist-e2e-custom-site/
 build/
 
 # Node.js dependencies
