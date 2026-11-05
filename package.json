@@ -10,6 +10,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "postbuild": "npm run check:custom-site-chunks",
+    "check:custom-site-chunks": "node scripts/custom-site-chunks.mjs",
     "preview": "vite preview",
     "package": "node package-extension.cjs",
     "test": "vitest",
