@@ -52,11 +52,15 @@ export function chunksReachableFrom(dist, entry) {
   return [...seen];
 }
 
-/** The resource patterns of the `web_accessible_resources` entries that match every https and http origin. */
-export function customSiteResources(dist) {
+/**
+ * The resource patterns open to every origin of `scheme` ('https' or 'http'), from all the `web_accessible_resources`
+ * entries whose matches cover that scheme. Chrome applies each entry on its own, so a chunk may be open to https
+ * origins through one entry and to http origins through another.
+ */
+export function resourcesOpenTo(dist, scheme) {
   const entries = readManifest(dist).web_accessible_resources ?? [];
   return entries
-    .filter((entry) => Object.values(CUSTOM_SITE_MATCHES).every((covering) => covering.some((match) => entry.matches?.includes(match))))
+    .filter((entry) => CUSTOM_SITE_MATCHES[scheme].some((match) => entry.matches?.includes(match)))
     .flatMap((entry) => entry.resources ?? []);
 }
 
@@ -66,15 +70,17 @@ export function matchesResourcePattern(pattern, resource) {
   return new RegExp(`^${escaped.join('.*')}$`).test(resource);
 }
 
-/** The chunks the content script loads on a custom site, and those no custom-site pattern matches. */
+/** The chunks the content script loads on a custom site, and those not open to every https and every http origin. */
 export function checkCustomSiteChunks(dist) {
   const entries = loadedByContentScriptLoader(dist);
   if (entries.length !== 1) {
     throw new Error(`The content-script loader should import exactly one entry chunk, found ${entries.length}: ${entries.join(', ')}`);
   }
   const chunks = chunksReachableFrom(dist, entries[0]);
-  const patterns = customSiteResources(dist);
-  const unmatched = chunks.filter((chunk) => !patterns.some((pattern) => matchesResourcePattern(pattern, `assets/${chunk}`)));
+  const patternsByScheme = Object.keys(CUSTOM_SITE_MATCHES).map((scheme) => resourcesOpenTo(dist, scheme));
+  const unmatched = chunks.filter((chunk) =>
+    patternsByScheme.some((patterns) => !patterns.some((pattern) => matchesResourcePattern(pattern, `assets/${chunk}`)))
+  );
   return { chunks, unmatched };
 }
 
@@ -90,7 +96,7 @@ function main() {
     for (const chunk of unmatched) {
       process.stderr.write(`  assets/${chunk}\n`);
     }
-    process.stderr.write('Add a pattern for each to that entry in manifest.json, or the content script fails on every custom site.\n');
+    process.stderr.write('Add a pattern for each to the custom-site web_accessible_resources entry in manifest.json, or the content script fails on every custom site.\n');
     process.exit(1);
   }
   process.stdout.write(`custom-site-chunks: all ${chunks.length} chunks the content script loads are web-accessible on custom sites.\n`);

@@ -12,7 +12,14 @@ const SCRIPT = path.resolve(__dirname, '..', 'custom-site-chunks.mjs');
 const PLATFORM_ENTRY = { matches: ['https://claude.ai/*'], resources: ['assets/*'] };
 
 /** A dist shaped like the build: a loader that imports the content entry, which imports two shared chunks, minified and not. */
-const writeDist = (dist: string, customSiteResources: string[], customSiteMatches = ['https://*/*', 'http://*/*']) => {
+type ResourceEntry = { matches: string[]; resources: string[] };
+
+const writeDist = (
+  dist: string,
+  customSiteResources: string[],
+  customSiteMatches = ['https://*/*', 'http://*/*'],
+  moreEntries: ResourceEntry[] = []
+) => {
   mkdirSync(path.join(dist, 'assets'), { recursive: true });
   const files: Record<string, string> = {
     'assets/index.ts-loader-a1.js': '(function(){import(chrome.runtime.getURL("assets/src-content-index.ts-b2.js"))})();',
@@ -28,7 +35,7 @@ const writeDist = (dist: string, customSiteResources: string[], customSiteMatche
     path.join(dist, 'manifest.json'),
     JSON.stringify({
       content_scripts: [{ js: ['assets/index.ts-loader-a1.js'] }],
-      web_accessible_resources: [PLATFORM_ENTRY, { matches: customSiteMatches, resources: customSiteResources }]
+      web_accessible_resources: [PLATFORM_ENTRY, { matches: customSiteMatches, resources: customSiteResources }, ...moreEntries]
     })
   );
 };
@@ -65,6 +72,19 @@ describe('custom-site-chunks', () => {
     writeDist(dist, ALL_PATTERNS, ['https://*/*']);
 
     expect(checkCustomSiteChunks(dist).unmatched).toHaveLength(4);
+  });
+
+  it('combines an https entry and an http entry that each open every chunk', () => {
+    writeDist(dist, ALL_PATTERNS, ['https://*/*'], [{ matches: ['http://*/*'], resources: ALL_PATTERNS }]);
+
+    expect(checkCustomSiteChunks(dist).unmatched).toEqual([]);
+  });
+
+  it('names a chunk the https entry opens but the http entry does not', () => {
+    const withoutCategoryChip = ALL_PATTERNS.filter((pattern) => !pattern.includes('categoryChip'));
+    writeDist(dist, ALL_PATTERNS, ['https://*/*'], [{ matches: ['http://*/*'], resources: withoutCategoryChip }]);
+
+    expect(checkCustomSiteChunks(dist).unmatched).toEqual(['categoryChip-e5.js']);
   });
 
   it('names a chunk whose pattern is missing, though a built-in Platform entry matches it', () => {
