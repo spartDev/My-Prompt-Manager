@@ -246,7 +246,7 @@ function scrubCategoryReference(name: string, renames: ReadonlyMap<string, strin
 }
 
 /**
- * The one-time upgrade pass: removes Hidden characters from the title, content and
+ * The upgrade pass: removes Hidden characters from the title, content and
  * category of raw stored entries. It works on the raw value, never refuses, and never
  * shortens or drops anything (including over-limit and malformed entries), so existing
  * Prompts are cleaned without ever being lost. The title and the content are never trimmed;
@@ -374,7 +374,36 @@ export function planCategoryMerge(names: readonly (CategoryName | undefined)[]):
 }
 
 /**
- * The one-time upgrade pass for Category names, the counterpart of scrubStored: removes
+ * The upgrade pass's other repair: a raw stored entry with a string title and content but no
+ * string id is not a readable Prompt, so it is hidden from the Library and cannot be edited or
+ * deleted. It is given an id from `newId` and nothing else about it changes. Other entries are
+ * returned as the same objects; `changed` tells the caller whether a write is needed.
+ */
+export function identifyStored(
+  entries: readonly unknown[],
+  newId: () => string
+): { entries: unknown[]; changed: boolean } {
+  let changed = false;
+
+  const identified = entries.map((entry: unknown) => {
+    if (
+      !isRecord(entry) ||
+      typeof entry.id === 'string' ||
+      typeof entry.title !== 'string' ||
+      typeof entry.content !== 'string'
+    ) {
+      return entry;
+    }
+
+    changed = true;
+    return { ...entry, id: newId() };
+  });
+
+  return { entries: identified, changed };
+}
+
+/**
+ * The upgrade pass for Category names, the counterpart of scrubStored: removes
  * Hidden characters from the `name` of raw stored Categories and trims it, as Admission does,
  * and never refuses or shortens a name or drops a malformed entry. Entries with nothing to
  * clean are returned as the same objects.
@@ -423,7 +452,7 @@ export function scrubStoredCategories(raw: unknown): {
 }
 
 /**
- * The one-time upgrade pass for the settings: the default Category names a Category, so it is
+ * The upgrade pass for the settings: the default Category names a Category, so it is
  * cleaned of Hidden characters, trimmed, and re-pointed through the same merges as the Prompts
  * (one that becomes empty names the default Category). Never refuses; anything that is not a
  * settings object with a string defaultCategory, or one with nothing to change, is returned as

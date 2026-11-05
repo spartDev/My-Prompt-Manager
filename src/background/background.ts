@@ -1075,9 +1075,10 @@ async function handleExtensionUpdate(): Promise<void> {
 }
 
 /**
- * Clean stored Prompts and Category names of Hidden characters, once, on extension update
- * (ADR-001). Independent of the re-injection above: nothing waits for it, and a failure is
- * logged here and never reaches the caller.
+ * Clean stored Prompts and Category names of Hidden characters on extension update, and again
+ * at every browser startup so a pass that failed or was cut short is retried (ADR-001). The pass
+ * writes nothing on a clean Library. Independent of the re-injection above: nothing waits for
+ * it, and a failure is logged here and never reaches the caller.
  */
 async function upgradeStoredData(): Promise<void> {
   try {
@@ -1085,7 +1086,7 @@ async function upgradeStoredData(): Promise<void> {
       await storageManager.upgradeStoredData();
 
     if (promptsChanged || categoriesChanged) {
-      Logger.info("Cleaned stored data of Hidden characters after update", {
+      Logger.info("Cleaned stored data of Hidden characters", {
         component: "Background",
         promptsChanged,
         categoriesChanged,
@@ -1093,9 +1094,9 @@ async function upgradeStoredData(): Promise<void> {
     }
   } catch (error) {
     Logger.error(
-      "Error cleaning stored data after extension update",
+      "Error cleaning stored data of Hidden characters",
       toError(error),
-      { component: "Background", phase: "extension_update" },
+      { component: "Background", phase: "upgrade_pass" },
     );
   }
 }
@@ -1485,6 +1486,9 @@ chrome.runtime.onInstalled.addListener((details) => {
 
 // Initialize interface mode on browser startup
 chrome.runtime.onStartup.addListener(() => {
+  // Retry the upgrade pass: one that failed or was cut short on update left stored data uncleaned
+  void upgradeStoredData();
+
   void (async () => {
     try {
       const mode = await getInterfaceMode();
