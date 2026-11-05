@@ -65,6 +65,14 @@ The Quality Gate passes only when every one of the seven jobs ends in `success`.
 - 🌐 Chrome Web Store package preparation
 - 📊 Release summary and documentation
 
+### 4. 📊 Coverage Report Comment (`pr-coverage-comment.yml`)
+
+**Triggers**: `workflow_run`, when 🔍 Pull Request Checks completes, whatever its conclusion. It runs the workflow file of the default branch, so a change to it takes effect once merged.
+
+**What it does**: downloads the `coverage-summary` artifact that the `test` job uploads (Node 22.x) into `runner.temp`, and runs `.github/scripts/generate-coverage-comment.cjs`, which keeps one coverage comment on the pull request current: the report, or a notice when the run left no summary. It posts nothing on a draft, or for a run whose commit is no longer the head of the pull request. The artifact comes from the pull request's own code, so the script validates every value before it reaches the comment. Details and the security model: `docs/PR_COVERAGE_REPORTING.md`.
+
+It is not part of the Quality Gate and is not a required check.
+
 ## 🎯 Usage Guide
 
 ### For Pull Requests

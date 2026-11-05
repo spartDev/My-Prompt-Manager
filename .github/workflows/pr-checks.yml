@@ -203,12 +203,26 @@ jobs:
           path: coverage/
           retention-days: 7
 
+      # Read by pr-coverage-comment.yml, which posts it on the PR. Uploaded after a missed coverage
+      # threshold too (the summary is written before Vitest checks the thresholds), so the PR comment
+      # shows the coverage when it matters most.
+      - name: 📈 Upload Coverage Summary
+        if: ${{ !cancelled() && matrix.node-version == '22.x' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-summary
+          path: coverage/coverage-summary.json
+          if-no-files-found: ignore
+          # A re-run of the job replaces the summary of the earlier attempt instead of failing on it
+          overwrite: true
+          retention-days: 7
+
       - name: 📋 Coverage Summary
-        if: matrix.node-version == '22.x'
+        if: ${{ !cancelled() && matrix.node-version == '22.x' }}
         run: |
           echo "📊 Test Coverage Summary:"
           if [ -f coverage/coverage-summary.json ]; then
-            cat coverage/coverage-summary.json
+            jq '.total' coverage/coverage-summary.json
           fi
 
   # Job 5: Build verification for both dev and production

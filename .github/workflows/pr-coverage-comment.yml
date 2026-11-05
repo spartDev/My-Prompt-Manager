@@ -1,0 +1,65 @@
+name: 📊 Coverage Report Comment
+
+# Posts the coverage of a pull request as one comment, updated on each push.
+#
+# SECURITY: workflow_run runs the workflow file and scripts of the default branch, with the base
+# repository's token, never code of the pull request. The one thing that comes from the pull
+# request is the coverage-summary artifact, which its own code wrote (a fork can upload anything
+# under that name). So the artifact is downloaded outside the workspace, into runner.temp, where
+# no later step loads code from, and the script reads it as data and validates every value.
+on:
+  workflow_run:
+    workflows: ["🔍 Pull Request Checks"]
+    types:
+      - completed
+
+permissions: {}
+
+# One report at a time per pull request branch, so two runs never write the comment at once.
+concurrency:
+  group: coverage-comment-${{ github.event.workflow_run.head_repository.full_name }}-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+jobs:
+  coverage-comment:
+    name: 📊 Post Coverage Report
+    runs-on: ubuntu-latest
+    # Runs whatever the checks concluded: on a failure the script reports the coverage when there is
+    # some (a missed threshold) and says why when there is none, rather than leave an older report.
+    if: github.event.workflow_run.event == 'pull_request'
+    permissions:
+      actions: read         # download the artifact of the PR checks run
+      contents: read        # check out the script
+      pull-requests: write  # create, update and delete the coverage comment
+
+    steps:
+      - name: 🛎️ Checkout Repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+
+      - name: 📥 Download Coverage Summary
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        # A run that failed before the coverage step uploads no artifact: the script then says so.
+        continue-on-error: true
+        with:
+          name: coverage-summary
+          path: ${{ runner.temp }}/coverage-summary
+          github-token: ${{ github.token }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: 📊 Post Coverage Comment
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          COVERAGE_SUMMARY: ${{ runner.temp }}/coverage-summary/coverage-summary.json
+        with:
+          script: |
+            const { generateCoverageComment } = require('./.github/scripts/generate-coverage-comment.cjs');
+            await generateCoverageComment({
+              github,
+              context,
+              core,
+              summaryPath: process.env.COVERAGE_SUMMARY,
+              workspace: process.env.GITHUB_WORKSPACE
+            });
