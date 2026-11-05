@@ -57,7 +57,7 @@ Branch off `origin/main` as `release/vX.Y.Z`, then:
   Keep only the subsections that have entries. Write each entry in the user's terms and the domain terms of `CONTEXT.md` (Prompt, Library, Category…), one per user-visible change; leave out `test`, `ci` and `chore` commits unless the user would notice them.
 - **`README.md`**: the version badge, the `prompt-library-extension-vX.Y.Z.zip` name, and the `### Version X.Y (Current)` heading of the Roadmap when the minor changes.
 
-Done when: `node -p` from step 1 prints `X.Y.Z` three times, and `grep -rn "$OLD_VERSION" README.md` finds no stale version.
+Done when: `node -p` from step 1 prints `X.Y.Z` three times, and `grep -nF "${LAST#v}" README.md` (`$LAST` from step 1) finds only lines unrelated to the release, such as a dependency that happens to share the number.
 
 ## 4. Check
 
@@ -80,7 +80,12 @@ git fetch -q origin main
 git tag -a vX.Y.Z -m "Release vX.Y.Z" origin/main
 ```
 
-Confirm with the user before `git push origin vX.Y.Z`: the push publishes the GitHub Release. Then watch the run in the background with `gh run watch "$(gh run list --workflow release.yml --limit 1 --json databaseId -q '.[0].databaseId')" --exit-status`.
+Confirm with the user before `git push origin vX.Y.Z`: the push publishes the GitHub Release. A tag run carries the tag as its branch, and GitHub takes a few seconds to register it, so wait for that run before watching it, in the background:
+
+```bash
+until RUN=$(gh run list --workflow release.yml --branch vX.Y.Z --limit 1 --json databaseId -q '.[0].databaseId') && [ -n "$RUN" ]; do sleep 5; done
+gh run watch "$RUN" --exit-status
+```
 
 Done when: the run is green and `gh release view vX.Y.Z` shows the release.
 
