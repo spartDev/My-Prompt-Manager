@@ -146,45 +146,14 @@ $details
 ## Your Mission
 
 1. **Implement**: Make the necessary code changes
-2. **Verify**: Run npm test && npm run lint && npm run typecheck
-3. **Commit**: Use a conventional commit message
-4. **Push**: git push -u origin $branch_name
-5. **Create PR**: Use gh pr create (see command below)
-6. **Close issue**: bd close $issue_id
-
-## MANDATORY: Create Pull Request
-
-After pushing, you MUST create a PR. Use this command:
-
-gh pr create --title "$prefix($issue_id): $title" --body "## Summary
-<describe what was fixed/added>
-
-## Changes
-<list changes with reasoning>
-
-## Testing
-- [x] npm test passes
-- [x] npm run lint passes
-- [x] npm run typecheck passes
-
-Fixes issue $issue_id
-
-Generated with Claude Code"
+2. **Commit**: "$prefix($issue_id): <description>", a conventional commit message
+3. **Push, open the PR and hand back**, as below
 
 ## Rules
 - Work ONLY in this worktree
 - Do NOT merge to main - create PR only
-- Do NOT close issue until PR is created
 
-## CRITICAL: Completion Checklist
-
-Your work is NOT complete until ALL of these are done:
-[ ] Code changes committed
-[ ] Branch pushed to origin
-[ ] Pull request created (you should see a PR URL)
-[ ] Issue closed with bd close $issue_id
-
-DO NOT stop or say you are done until you have created the PR and see the PR URL.
+$(sed "s|<branch>|$branch_name|g" "$REPO_DIR/.claude/skills/parallel-claude/agent-brief.md")
 PROMPT
 }
 

@@ -126,63 +126,13 @@ This will:
 2. Launch tmux session `claude-parallel`
 3. Start Claude in each pane with task-specific prompts
 
-### The Prompt Each Instance Receives
+### The brief each instance receives
 
-Each Claude instance gets a detailed prompt:
-
-```
-You are working on issue <ID>: <TITLE>
-
-## Task Details
-<Full bd show output>
-
-## Your Mission
-1. Implement the fix/feature in this worktree
-2. Run tests: npm test
-3. Run lint: npm run lint
-4. Run typecheck: npm run typecheck
-5. Commit your changes with a descriptive message
-6. Create a detailed PR with:
-   - Summary of what the issue was
-   - What changes were made and WHY
-   - Testing done
-7. Close the issue: bd close <ID>
-
-## PR Template
-Use this format for your PR:
-
-gh pr create --title "<type>(<scope>): <description>" --body "$(cat <<'EOF'
-## Summary
-- What problem this solves
-- High-level approach taken
-
-## Changes Made
-- Specific code changes with reasoning
-
-## Technical Details
-- Architectural decisions
-- Why this approach over alternatives
-
-## Testing
-- [ ] Unit tests pass
-- [ ] Lint passes
-- [ ] TypeScript checks pass
-- [ ] Manual testing: <describe>
-
-## Related
-- Fixes issue <ID>
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
-EOF
-)"
-
-## Important
-- Work ONLY in this worktree
-- Do NOT merge to main - create PR only
-- Push your branch: git push -u origin fix-<ID>
-```
+`generate_prompt` in `scripts/dev-workflow.sh` writes it: the ticket's `bd show`, the steps to implement, commit and push, then `.claude/skills/parallel-claude/agent-brief.md` with the instance's branch filled in. That file is the single source of the rules for any agent working beside others, a tmux instance or a subagent you brief yourself: its own scratch directory named after its branch, one hand-back with the PR URL and head SHA, CI left to the coordinator.
 
 ## Phase 4: Monitoring
+
+You are the coordinator: watch CI on each pull request an instance hands back, one background `gh pr checks <number> --watch` per PR, and send a red check to the instance that owns the branch.
 
 ### tmux Navigation
 
