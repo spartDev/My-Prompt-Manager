@@ -48,7 +48,7 @@ Done when: the check prints `ok`, and the user confirms the version and the grou
 
 Branch off `$BASE` as `release/vX.Y.Z`, then:
 
-- **`package.json` and `package-lock.json`**: `npm version X.Y.Z --no-git-tag-version`. It edits both files in place and installs nothing, which keeps a worktree's symlinked `node_modules` intact.
+- **`package.json` and `package-lock.json`**: `npm version X.Y.Z --no-git-tag-version --allow-same-version`. It edits both files in place and installs nothing, which keeps a worktree's symlinked `node_modules` intact; `--allow-same-version` lets the step 5 recovery rerun it when the version did not change.
 - **`manifest.json`**: set `"version"` to `X.Y.Z`.
 - **`CHANGELOG.md`**: insert the section right under `## [Unreleased]`. The workflow extracts the release notes with an `awk` on the heading `## [X.Y.Z]`, up to the next `## [`, so the heading shape is fixed:
 
