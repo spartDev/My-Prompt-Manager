@@ -7,7 +7,12 @@ import { test as base, chromium } from '@playwright/test';
 
 import type { Category, Prompt, Settings } from '../../../src/types';
 
-const extensionPath = path.resolve(process.cwd(), 'dist');
+/** The extension Chromium loads: the build in dist/, unless a spec sets another with test.use({ extensionPath }) */
+export const DEFAULT_EXTENSION_PATH = path.resolve(process.cwd(), 'dist');
+
+type ExtensionOptions = {
+  extensionPath: string;
+};
 
 type ExtensionFixtures = {
   context: BrowserContext;
@@ -267,8 +272,10 @@ const createStorageController = (target: BackgroundTarget): ExtensionStorage => 
   };
 };
 
-export const test = base.extend<ExtensionFixtures>({
-  context: async ({}, use) => {
+export const test = base.extend<ExtensionOptions & ExtensionFixtures>({
+  extensionPath: [DEFAULT_EXTENSION_PATH, { option: true }],
+
+  context: async ({ extensionPath }, use) => {
     const userDataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'playwright-claude-ext-'));
 
     const headless = process.env.CI ? true : false;

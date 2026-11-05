@@ -108,19 +108,10 @@ You are working on issue $issue_id: $title
 ## Your Mission
 1. Run bd show $issue_id to understand the task
 2. Implement the fix/feature
-3. Verify: npm test && npm run lint && npm run typecheck
-4. Commit with conventional commit message
-5. Push: git push -u origin $branch_name
-6. Create PR: gh pr create --title "fix($issue_id): $title" --body "## Summary\n<describe changes>\n\n## Testing\n- [x] Tests pass\n\nFixes $issue_id\n\nGenerated with Claude Code"
-7. Close issue: bd close $issue_id
+3. Commit with conventional commit message
+4. Push, open the PR and hand back, as below
 
-## CRITICAL
-Work is NOT complete until you:
-- Push the branch
-- Create the PR (you must see the PR URL)
-- Close the issue
-
-DO NOT stop until PR is created.
+$(sed "s|<branch>|$branch_name|g" "$REPO_DIR/.claude/skills/parallel-claude/agent-brief.md")
 EOF
 }
 

@@ -130,19 +130,15 @@ $details
 1. Read issue details above
 2. Find relevant files before changes
 3. Implement minimal focused changes
-4. Verify: npm test && npm run lint && npm run typecheck
-5. Commit: $prefix($issue_id): description
-6. Push: git push -u origin $branch
-7. Load /git-pr skill and create PR
-8. Close: bd close $issue_id
+4. Commit: $prefix($issue_id): description
+5. Push, open the PR and hand back, as below
 
 ## Rules
 - Work ONLY in this worktree
 - Minimal changes only
 - Do NOT merge to main
-- Do NOT stop until PR URL visible
 
-STOP when you see: https://github.com/...
+$(sed "s|<branch>|$branch|g" "$REPO_DIR/.claude/skills/parallel-claude/agent-brief.md")
 PROMPT
 }
 
