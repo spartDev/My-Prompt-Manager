@@ -3,7 +3,6 @@
 [![Version](https://img.shields.io/badge/version-1.9.0-blue.svg)](https://github.com/spartDev/My-Prompt-Manager)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Chrome](https://img.shields.io/badge/Chrome-116%2B-yellow.svg)](https://www.google.com/chrome/)
-[![Tests](https://img.shields.io/badge/tests-1692%20passing-brightgreen.svg)](https://github.com/spartDev/My-Prompt-Manager)
 
 Transform your AI interactions with a powerful personal prompt library that integrates seamlessly with Claude, ChatGPT, Gemini, Mistral, Perplexity, and Microsoft Copilot. Store, organize, share, and instantly insert your best prompts with one click.
 
@@ -127,7 +126,7 @@ Versions: `package.json`.
 |---------|-------------|--------|
 | `npm run dev` | Start development server with HMR | Development |
 | `npm run build` | Create production build | Deployment |
-| `npm test` | Run test suite (1692 tests) | Testing |
+| `npm test` | Run the Vitest suite | Testing |
 | `npm run test:ui` | Run tests with Vitest UI | Interactive Testing |
 | `npm run test:coverage` | Generate coverage report | Code Coverage |
 | `npm run lint` | Run Biome lint checks | Code Quality |
@@ -256,7 +255,7 @@ The extension automatically detects your system theme preference. You can also t
 
 ## 🧪 Testing
 
-The project includes a comprehensive test suite with 1692 tests across 607 test files.
+The project includes a Vitest unit and integration suite and a Playwright end-to-end suite.
 
 ### Running Tests
 
@@ -458,7 +457,7 @@ window.__promptLibraryDebug?.testInsertion?.('test content')
 - [x] Multi-platform AI integration (8 platforms)
 - [x] Dark mode support
 - [x] Custom site configuration
-- [x] Comprehensive testing (1692 tests)
+- [x] Comprehensive testing (Vitest and Playwright)
 - [x] Side Panel Support (Chrome 116+)
 - [x] Enhanced Security Architecture
 - [x] Import/Export functionality (JSON)

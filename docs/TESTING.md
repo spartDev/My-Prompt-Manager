@@ -56,6 +56,8 @@ Some tests check the source rather than behavior, and fail the build when a rule
 - `src/test/guardrails/admission-guardrails.test.ts`: no route skips Admission.
 - `src/theme/__tests__/rawColors.test.ts`: components on the color tokens, and the guidance docs that prescribe classes, use no raw palette class and no `dark:` color variant. Counter-examples (a `// Before` example, a code block under **DON'T:**) are exempt.
 - `src/test/guardrails/docPaths.test.ts`: every `src/` and `tests/` path cited by this page, [COMPONENTS.md](./COMPONENTS.md) and [SERVICES_AND_HOOKS.md](./SERVICES_AND_HOOKS.md) exists.
+- `src/test/guardrails/readmeChromeVersion.test.ts`: every Chrome version in `README.md`, badge and text, equals `manifest.json` `minimum_chrome_version`.
+- `src/test/guardrails/viewScrollContainer.test.ts`: every view that renders `<ViewHeader` puts `data-scroll-container` on its scrolling element, which the scroll lines of `src/popup.css` follow.
 
 ## Playwright
 
@@ -64,6 +66,7 @@ The config is `playwright.config.ts`. Its global setup (`tests/e2e/global-setup.
 - Page objects are in `tests/e2e/pages/`, workflows and assertions in `tests/e2e/utils/`, seeded data in `tests/e2e/fixtures/`. `tests/e2e/README.md` describes them.
 - Locally the browser is headed; CI runs headless with one retry.
 - `tests/e2e/` has its own `tsconfig.json`, which `npm run typecheck` checks.
+- A locator assertion (`toHaveAttribute`, `toHaveText`, `toHaveClass`…) takes a string or a RegExp. An asymmetric matcher such as `expect.stringContaining(...)` makes it pass whatever the value, and `npm run lint` rejects it in `tests/e2e/` (the GritQL plugin in `biome-plugins/`).
 
 ## CI
 

@@ -2,7 +2,7 @@
 
 Chrome extension that keeps a Library of Prompts and inserts them into AI chat platforms, through two surfaces: the React 19 popup / side panel, and content scripts injected into the platforms (`src/content/`).
 
-Before writing or reviewing code, read `CODING_STANDARDS.md`: Verbatim Prompt text, logging, forms, colors.
+Before writing or reviewing code, read `CODING_STANDARDS.md`: Verbatim Prompt text, logging, forms, colors, and updating every doc that states a count, limit or version you change.
 
 Use the domain terms of `CONTEXT.md` (Prompt, Library, Category, Admission, Verbatim…) in code, tests, commits and replies.
 

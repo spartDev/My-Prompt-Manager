@@ -18,6 +18,10 @@ Validate and submit forms with React 19's `useActionState`. Patterns: `docs/REAC
 
 Color with the token classes of `src/theme/tokens.css` (`bg-card`, `text-secondary`, `border-input`…). They follow the theme on their own, so one class covers light and dark. A raw palette class (`bg-purple-600`) or a `dark:` color variant bypasses the tokens. Design system: `docs/DESIGN_GUIDELINES.md`.
 
+## Docs that state a number
+
+A change to a count, limit or version updates every doc that states it: `grep` the old value across `README.md`, `docs/` and the agent guidance before you commit. `README.md`'s Chrome version is checked against `manifest.json`; the others are not.
+
 ## Going deeper
 
 - Changing how the popup, background and content scripts exchange messages or store data → `docs/ARCHITECTURE.md`

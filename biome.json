@@ -263,6 +263,10 @@
 			}
 		},
 		{
+			"includes": ["tests/e2e/**"],
+			"plugins": ["./biome-plugins/noAsymmetricMatcherInLocatorAssertion.grit"]
+		},
+		{
 			"includes": ["**/*.cjs"],
 			"linter": {
 				"rules": {
