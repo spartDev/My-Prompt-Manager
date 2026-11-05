@@ -106,8 +106,12 @@ test.describe('Categories view on the tokens', () => {
       await expect(rows.nth(1)).toHaveCSS('border-bottom-width', '1px');
       await expect(rows.nth(1)).toHaveCSS('border-bottom-color', colors.divider);
       await expect(rows.nth(1)).toHaveCSS('background-color', TRANSPARENT);
-      await rows.nth(1).hover();
-      await expect(rows.nth(1)).toHaveCSS('background-color', colors.muted);
+      // :hover follows the pointer's last event: a stray one (the real macOS cursor over a headed window, or
+      // another worker's window opening under it) moves the hit off the row, so hover again until it holds
+      await expect(async () => {
+        await rows.nth(1).hover();
+        await expect(rows.nth(1)).toHaveCSS('background-color', colors.muted, { timeout: 1_000 });
+      }).toPass();
       await expect(rows.nth(1).getByRole('button', { name: 'Edit category' })).toHaveCSS('opacity', '1');
       await page.screenshot({ path: `${SCREENSHOT_DIR}/row-hover-${theme}.png` });
     });
