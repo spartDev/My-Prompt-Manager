@@ -250,6 +250,8 @@ jobs:
       - name: 🏗️ Production Build
         run: |
           echo "🏗️ Building Chrome extension for production..."
+          # postbuild runs check:custom-site-chunks: every chunk the content script
+          # loads must match a web_accessible_resources pattern for custom sites
           npm run build
         env:
           NODE_ENV: production
