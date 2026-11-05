@@ -81,7 +81,7 @@ Done when: all five pass.
 
 Commit as `chore: bump version to X.Y.Z`, push, and open the PR on `.github/PULL_REQUEST_TEMPLATE.md` with the CHANGELOG section as its summary and a line `Base: <full $BASE SHA>`. Shell variables do not outlive a command, and step 6 runs after the merge, so it reads `BASE` back from that line.
 
-Right before the hand-off, `git fetch -q origin main && git log --no-merges --format='%h %s' "$BASE..origin/main"` must print nothing. Commits there would ship in the release without a CHANGELOG entry. Rebase the bump branch on `origin/main` and set `BASE` to it, then go back through steps 1 to 4 on the new `$LAST..$BASE`: both logs, the version (a breaking footer can now call for a higher bump), every file of step 3 with that version, the checks. Commit the result, push, and update the PR's title and `Base:` line before checking this log again.
+Right before the hand-off, `git fetch -q origin main && git log --no-merges --format='%h %s' "$BASE..origin/main"` must print nothing. Commits there would ship in the release without a CHANGELOG entry. Rebase the bump branch on `origin/main` and set `BASE` to it, then go back through steps 1 to 4 on the new `$LAST..$BASE`: both logs, the version (a breaking footer can now call for a higher bump), every file of step 3 with that version, the checks. In `CHANGELOG.md`, rewrite the section the branch already holds, heading and compare link included, so a single section remains for the version that ships. Commit the result, push, and update the PR's title and `Base:` line before checking this log again.
 
 Done when: the PR's checks are green and that log is empty. **Hand-off: the user merges it, with nothing else merged in between.**
 
