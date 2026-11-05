@@ -5,7 +5,12 @@ language js
 
 `$assertion($args)` where {
   $assertion <: `$_.$name`,
-  $name <: or { `toHaveAttribute`, `toHaveCSS`, `toHaveText`, `toContainText`, `toHaveClass`, `toHaveValue` },
+  // Every LocatorAssertions and PageAssertions method whose expected value is a string or a RegExp
+  $name <: or {
+    `toHaveAttribute`, `toHaveCSS`, `toHaveText`, `toContainText`, `toHaveClass`, `toContainClass`,
+    `toHaveValue`, `toHaveValues`, `toHaveId`, `toHaveRole`, `toHaveAccessibleName`,
+    `toHaveAccessibleDescription`, `toHaveAccessibleErrorMessage`, `toHaveTitle`, `toHaveURL`
+  },
   $args <: contains or { `expect.$matcher($...)`, `expect.not.$matcher($...)` } as $asymmetric,
   register_diagnostic(
     span = $asymmetric,
