@@ -62,9 +62,11 @@ Branch off `$BASE` as `release/vX.Y.Z`, then:
   ### 🐛 Fixed
   ### 🔒 Security
   ### 📚 Documentation
+
+  [X.Y.Z]: https://github.com/spartDev/My-Prompt-Manager/compare/$LAST...vX.Y.Z
   ```
 
-  Keep only the subsections that have entries. Write each entry in the user's terms and the domain terms of `CONTEXT.md` (Prompt, Library, Category…), one per user-visible change; leave out `test`, `ci` and `chore` commits unless the user would notice them.
+  The last line defines the heading's link and closes the section, as in every earlier release, so the extracted notes carry it too. Keep only the subsections that have entries. Write each entry in the user's terms and the domain terms of `CONTEXT.md` (Prompt, Library, Category…), one per user-visible change; leave out `test`, `ci` and `chore` commits unless the user would notice them.
 - **`README.md`**: the version badge, the `prompt-library-extension-vX.Y.Z.zip` name, and the `### Version X.Y (Current)` heading of the Roadmap when the minor changes.
 
 Done when: `node -p "[require('./package.json').version, require('./package-lock.json').version, require('./manifest.json').version].join(' ')"` prints `X.Y.Z` three times, and `grep -nF "${LAST#v}" README.md` (`$LAST` from step 1) finds only lines unrelated to the release, such as a dependency that happens to share the number.
@@ -90,11 +92,11 @@ After the merge, tag the bump PR's own merge commit, not the tip of `main`: anot
 ```bash
 SHA=$(gh pr view <bump PR number> --json mergeCommit -q .mergeCommit.oid)
 git fetch -q origin main
-git log --no-merges --format='%h %s' "$BASE..$SHA^1"
-git tag -a vX.Y.Z -m "Release vX.Y.Z" "$SHA"
+EXTRA=$(git log --no-merges --format='%h %s' "$BASE..$SHA^1")
+if [ -z "$EXTRA" ]; then git tag -a vX.Y.Z -m "Release vX.Y.Z" "$SHA"; else printf '%s\n' "$EXTRA"; fi
 ```
 
-The `git log` lists what reached `main` between `$BASE` and the merge; it must print nothing before you tag. Anything it prints would ship unlisted: stop, show the user, and leave the version untagged until they decide.
+`EXTRA` lists what reached `main` between `$BASE` and the merge, and the tag exists only when it is empty. Anything it prints would ship unlisted: show the user, and leave the version untagged until they decide.
 
 Confirm with the user before `git push origin vX.Y.Z`: the push publishes the GitHub Release. A tag run carries the tag as its branch, and GitHub takes a few seconds to register it, so wait for that run before watching it, in the background:
 
