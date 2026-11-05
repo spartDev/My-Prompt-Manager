@@ -233,9 +233,10 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
         await refreshPrompts();
       }
       showToast('Category updated successfully', 'success');
-    } catch (error) {
-      showToast('Failed to update category', 'error');
-      throw error;
+    } catch (error: unknown) {
+      const appError = error as AppError;
+      showToast(appError.message || 'Failed to update category', 'error');
+      throw new Error(appError.message || 'Failed to update category');
     }
   };
 

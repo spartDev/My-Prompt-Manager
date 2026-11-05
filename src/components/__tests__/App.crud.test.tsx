@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import App from '../../App';
+import { PROMPT_LIMITS } from '../../services/promptAdmission';
 import { getMockPromptManager, getMockStorageManager } from '../../test/mocks';
 import type { AppError, Category, Prompt } from '../../types';
 
@@ -246,6 +247,56 @@ describe('App prompt workflows', () => {
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Add' })).toHaveFocus();
+  });
+
+  it('shows Admission’s reason when a rename is refused, and keeps the pasted name whole', async () => {
+    const storageMock = getMockStorageManager();
+    const longName = 'R'.repeat(PROMPT_LIMITS.category + 1);
+    const reason = `Category name cannot exceed ${PROMPT_LIMITS.category} characters`;
+
+    await renderApp();
+    await userEvent.click(screen.getByRole('tab', { name: 'Categories' }));
+
+    const workRow = await screen.findByRole('button', { name: 'Edit category' });
+    await userEvent.click(workRow);
+    const editInput = await screen.findByDisplayValue('Work');
+    await userEvent.clear(editInput);
+    await userEvent.click(editInput);
+    await userEvent.paste(longName);
+
+    expect(editInput).toHaveValue(longName);
+
+    await userEvent.keyboard('{Enter}');
+
+    const status = await screen.findAllByText(reason, { exact: false });
+    // The toast and the inline error both give Admission's reason
+    expect(status.length).toBeGreaterThanOrEqual(2);
+    expect(screen.queryByText(/failed to update category/i)).not.toBeInTheDocument();
+    expect(editInput).toHaveValue(longName);
+    expect(storageMock.updateCategory).not.toHaveBeenCalled();
+  });
+
+  it('keeps a long pasted Category name whole on create and shows Admission’s reason', async () => {
+    const storageMock = getMockStorageManager();
+    const longName = 'N'.repeat(PROMPT_LIMITS.category + 1);
+    const reason = `Category name cannot exceed ${PROMPT_LIMITS.category} characters`;
+
+    await renderApp();
+    await userEvent.click(screen.getByRole('tab', { name: 'Categories' }));
+
+    const nameInput = await screen.findByPlaceholderText('Enter category name...');
+    await userEvent.click(nameInput);
+    await userEvent.paste(longName);
+
+    expect(nameInput).toHaveValue(longName);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+
+    const status = await screen.findAllByText(reason, { exact: false });
+    expect(status.length).toBeGreaterThanOrEqual(2);
+    expect(screen.queryByText(/failed to create category/i)).not.toBeInTheDocument();
+    expect(nameInput).toHaveValue(longName);
+    expect(storageMock.saveCategory).not.toHaveBeenCalled();
   });
 
   it('opens the storage warning, not an alert, when storage stops a Settings import', async () => {

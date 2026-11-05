@@ -2,7 +2,6 @@ import type { FC, FormEvent } from 'react';
 import { useCallback, useId, useRef, useState } from 'react';
 
 import { DEFAULT_CATEGORY_COLOR, getColorName } from '../constants/colors';
-import { PROMPT_LIMITS } from '../services/promptAdmission';
 import type { Category } from '../types';
 import { Logger, toError } from '../utils';
 
@@ -62,8 +61,9 @@ const CategoryManager: FC<CategoryManagerProps> = ({
 
       setNewCategoryName('');
       setNewCategoryColor(DEFAULT_CATEGORY_COLOR);
-    } catch {
-      setError('Failed to create category');
+    } catch (err: unknown) {
+      // Show why it was refused (Admission's reason), as the toast does
+      setError(toError(err).message || 'Failed to create category');
     } finally {
       setLoading(false);
     }
@@ -90,8 +90,8 @@ const CategoryManager: FC<CategoryManagerProps> = ({
 
       await onUpdateCategory(category.id, updates);
       setEditingCategory(null);
-    } catch {
-      setError('Failed to update category');
+    } catch (err: unknown) {
+      setError(toError(err).message || 'Failed to update category');
     } finally {
       setLoading(false);
     }
@@ -178,7 +178,6 @@ const CategoryManager: FC<CategoryManagerProps> = ({
                     placeholder="Enter category name..."
                     className="flex-1 min-w-0 px-4 py-3 h-12 border border-input rounded-xl focus-input text-sm text-primary bg-subtle transition-all duration-200 placeholder:text-tertiary"
                     disabled={loading}
-                    maxLength={PROMPT_LIMITS.category}
                   />
                   
                   <button
@@ -266,7 +265,6 @@ const CategoryManager: FC<CategoryManagerProps> = ({
                           }}
                           placeholder="Category name"
                           className="flex-1 min-w-0 text-sm border border-input rounded-lg px-3 py-2.5 focus-input bg-subtle font-medium text-primary placeholder:text-tertiary"
-                          maxLength={PROMPT_LIMITS.category}
                           disabled={loading}
                         />
                         <div className="flex items-center space-x-1 shrink-0">
