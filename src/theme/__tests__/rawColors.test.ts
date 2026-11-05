@@ -70,8 +70,13 @@ const MIGRATED = [
 ];
 
 // Agent guidance that prescribes classes follows the same rule, or it steers UI work off the tokens
-// (My-Prompt-Manager-192). Paths from the repository root.
-const GUIDANCE = ['.claude/skills/design-system/SKILL.md', '.claude/skills/add-platform/SKILL.md'];
+// (My-Prompt-Manager-192, My-Prompt-Manager-uxu.3). Paths from the repository root.
+const GUIDANCE = [
+  '.claude/skills/design-system/SKILL.md',
+  '.claude/skills/add-platform/SKILL.md',
+  'docs/COMPONENTS.md',
+  'docs/DESIGN_GUIDELINES.md'
+];
 
 const PALETTE = 'white|black|slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose';
 const COLOR_UTILITY = 'bg|text|border(?:-[trblxy])?|ring|ring-offset|outline|from|via|to|fill|stroke|divide|placeholder|decoration|shadow|accent|caret';
@@ -80,6 +85,41 @@ const COLOR_UTILITY = 'bg|text|border(?:-[trblxy])?|ring|ring-offset|outline|fro
 const RAW_PALETTE_CLASS = new RegExp(`(?<![\\w-])(?:[\\w-]+:)*(?:${COLOR_UTILITY})-(?:(?:${PALETTE})(?:-\\d{2,3})?|primary-\\d{2,3})(?:\\/\\d+)?(?![\\w-])`, 'g');
 /** dark:bg-card, dark:hover:text-secondary: a token class switches theme by itself */
 const DARK_COLOR_VARIANT = new RegExp(`(?<![\\w-])dark:(?:[\\w-]+:)*(?:${COLOR_UTILITY})-[\\w()/-]+`, 'g');
+
+/** A `// Before` or `// Don't` comment line in a code block opens a counter-example */
+const COUNTER_EXAMPLE = /^\s*\/\/\s*(?:Before|Don't)\b/i;
+
+/** An `// After` comment line opens the prescribed version, so it ends a counter-example */
+const PRESCRIBED_EXAMPLE = /^\s*\/\/\s*After\b/i;
+
+/**
+ * Guidance minus the counter-examples it shows on purpose: in a fenced code block, the lines from a
+ * `// Before` or `// Don't` comment to the next blank line, `// After` comment or the end of the block.
+ */
+function withoutCounterExamples(markdown: string): string {
+  let inBlock = false;
+  let inCounterExample = false;
+
+  return markdown
+    .split('\n')
+    .filter((line) => {
+      if (line.trim().startsWith('```')) {
+        inBlock = !inBlock;
+        inCounterExample = false;
+        return true;
+      }
+      if (!inBlock) {
+        return true;
+      }
+      if (COUNTER_EXAMPLE.test(line)) {
+        inCounterExample = true;
+      } else if (line.trim() === '' || PRESCRIBED_EXAMPLE.test(line)) {
+        inCounterExample = false;
+      }
+      return !inCounterExample;
+    })
+    .join('\n');
+}
 
 describe('Components on the color tokens', () => {
   it.each(MIGRATED)('%s uses no raw palette class and no dark: color variant', (file) => {
@@ -90,9 +130,34 @@ describe('Components on the color tokens', () => {
   });
 
   it.each(GUIDANCE)('%s prescribes no raw palette class and no dark: color variant', (file) => {
-    const source = readFileSync(path.resolve(SRC, '..', file), 'utf8');
+    const source = withoutCounterExamples(readFileSync(path.resolve(SRC, '..', file), 'utf8'));
 
     expect(source.match(RAW_PALETTE_CLASS) ?? [], 'raw palette classes').toEqual([]);
     expect(source.match(DARK_COLOR_VARIANT) ?? [], 'dark: color variants').toEqual([]);
+  });
+
+  it('exempts only the counter-examples of a guide', () => {
+    const guide = [
+      '```tsx',
+      '// Before',
+      '<div className="bg-white dark:bg-gray-800">',
+      '',
+      '// After',
+      '<div className="bg-card text-gray-500">',
+      "// Don't pair a raw class with a dark: variant",
+      '<p className="text-gray-900 dark:text-gray-100">',
+      '```',
+      '<p className="text-purple-600">'
+    ].join('\n');
+    const kept = withoutCounterExamples(guide);
+
+    expect(kept.match(RAW_PALETTE_CLASS)).toEqual(['text-gray-500', 'text-purple-600']);
+    expect(kept.match(DARK_COLOR_VARIANT)).toBeNull();
+  });
+
+  it('ends a counter-example at an `// After` comment, blank line or not', () => {
+    const guide = ['```tsx', '// Before', '<div className="bg-white">', '// After', '<div className="bg-card text-gray-500">', '```'].join('\n');
+
+    expect(withoutCounterExamples(guide).match(RAW_PALETTE_CLASS)).toEqual(['text-gray-500']);
   });
 });

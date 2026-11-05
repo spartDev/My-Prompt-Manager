@@ -1,8 +1,5 @@
 # Design Guidelines
 
-**Version:** 2.4.0
-**Last Updated:** 2026-10-23
-
 This document provides comprehensive visual design guidelines for the Prompt Library Chrome Extension. All AI agents and developers working on this project **MUST** follow these guidelines to maintain visual consistency.
 
 ---
@@ -45,7 +42,7 @@ Visual reference (both modes side by side): the palette canvas linked from beads
 | `bg-backdrop` | `#2A2140` at 45% | `#07050C` at 70% | Behind an open dialog or drawer, with `backdrop-blur-sm` |
 | `bg-highlight` | `#FEF3C7` | `#33270F` | Search match in a Prompt title or preview (`<mark className="bg-highlight text-inherit">`) |
 
-Surfaces are **opaque**. `bg-backdrop` is the only translucent one: no more `bg-white/70` + `backdrop-blur-sm` glass on headers or sections.
+Surfaces are **opaque**. `bg-backdrop` is the only translucent one: no translucent white + `backdrop-blur-sm` glass on headers or sections.
 
 ### Borders
 
@@ -1547,43 +1544,3 @@ z-1000002  /* Content script debug */
   </div>
 </div>
 ```
-
----
-
-## Version History
-
-**v2.4.0** (2026-10-23)
-- `bg-warning` for warning graphics (toast-type marks, the storage bar); segmented control pattern (the theme)
-
-**v2.3.0** (2026-10-23)
-- List card pattern (the Categories): rows split by `border-divider`, `hover:bg-muted`; the chosen swatch of a color picker takes an accent ring
-
-**v2.2.0** (2026-10-23)
-- Form card pattern: one card on `bg-app`, sections split by `border-divider`, button bar with the `scroll-edge-bottom` line
-
-**v2.1.0** (2026-10-23)
-- `bg-highlight` for search matches and `bg-brand` for the logo gradient
-- Header and tab bar lines drawn by CSS from the view's scroll (`scroll-edge-top`, `scroll-edge-bottom`)
-
-**v2.0.0** (2026-10-21)
-- Semantic color tokens for light and dark (`src/theme/tokens.css`): one class per color, no `dark:` color variant
-- Every pattern and example moved to the token classes: flat accent instead of the purple-indigo gradient, opaque surfaces instead of glass, dark toasts
-- Focus rings drawn as a 2px accent outline with a transparent gap
-
-**v1.0.0** (2025-10-06)
-- Initial comprehensive design guidelines
-- Documented all color, typography, and spacing systems
-- Added complete component patterns
-- Included dark mode implementation guide
-- Added accessibility guidelines
-
----
-
-## Contact
-
-For questions or suggestions about these design guidelines, please open an issue on the project repository.
-
----
-
-**Last Updated:** 2026-10-23
-**Maintained By:** AI Development Team
