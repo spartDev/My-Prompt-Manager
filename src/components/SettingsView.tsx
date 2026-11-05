@@ -242,10 +242,17 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
 
   // Debounced persistence: save settings after user stops making changes
   useEffect(() => {
+    // Nothing to save before the settings are loaded. A timer armed then would hold the empty settings
+    // Settings starts with: firing after the load and before its re-render, it would save them and
+    // disable every Platform (My-Prompt-Manager-ds8)
+    if (storedSettings.current === null) {
+      return;
+    }
+
     // Debounce: wait 150ms after last change before saving
     const timeoutId = setTimeout(() => {
-      // Nothing to save before the settings are loaded, or when storage already has them
-      if (storedSettings.current === null || JSON.stringify(settings) === JSON.stringify(storedSettings.current)) {
+      // Nothing to save when storage already has them
+      if (JSON.stringify(settings) === JSON.stringify(storedSettings.current)) {
         return;
       }
       saveSettings(settings).catch((err: unknown) => {
