@@ -19,6 +19,8 @@ description: Visual design of the popup, side panel and Analytics page: color to
 
 Color with the token classes of `src/theme/tokens.css`: surfaces `bg-app`, `bg-card`, `bg-subtle`; text `text-primary`, `text-secondary`, `text-tertiary`; fields `border-input` with `focus-input`; actions `bg-accent hover:bg-accent-hover` and `bg-danger hover:bg-danger-hover`. A token class follows the theme on its own, so one class covers light and dark. When no token fits, add one as "Adding or changing a token" describes.
 
+Check a contrast with `npx tsx scripts/contrast.ts <fg> <bg>`: it prints the ratio of the app's own `getContrastRatio`, the one the unit tests use.
+
 ## Review
 
 Check every class of the component against the sections above, and report each one the guidelines do not prescribe, with the token or pattern that replaces it.

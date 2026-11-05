@@ -74,6 +74,10 @@ Once user selects, launch directly (script claims issues automatically):
 .claude/skills/parallel-claude/scripts/launch.sh abc def
 ```
 
+## Coordinating
+
+Each instance's brief ends with `agent-brief.md`, the rules for an agent working beside others: its own scratch directory, `${TMPDIR:-/tmp}/my-prompt-manager-scratch/<branch>/`, then push and one hand-back with the PR URL and head SHA. Append it, with `<branch>` filled in, to any brief you write yourself for a parallel subagent. CI is yours: one background `gh pr checks <number> --watch` per handed-back PR.
+
 ## Monitoring (tell user)
 
 ```
