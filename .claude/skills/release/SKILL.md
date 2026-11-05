@@ -23,7 +23,7 @@ git log --no-merges --format='%h %s' -E --grep='BREAKING[ -]CHANGE' "$LAST..$BAS
 
 `$BASE` is the `main` the version and the CHANGELOG are built from; steps 5 and 6 check that nothing landed after it. The versions are read at `$BASE`, not in the working tree, so the branch you start from does not matter.
 
-Done when: `git status --porcelain` prints nothing, the three versions are equal to `$LAST` without its `v`, and you hold `$BASE` and both commit lists. Uncommitted changes go back to the user to commit or set aside before anything else; three unequal versions are a bug to report.
+Done when: `git status --porcelain` prints nothing, the three versions are equal to `$LAST` without its `v`, and you hold `$BASE` and a non-empty commit list. An empty list means nothing shipped since `$LAST`: tell the user there is nothing to release and stop. Uncommitted changes go back to the user to commit or set aside before anything else; three unequal versions are a bug to report.
 
 ## 2. Pick the version
 
