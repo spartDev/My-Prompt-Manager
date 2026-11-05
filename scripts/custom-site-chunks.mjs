@@ -14,7 +14,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-const CUSTOM_SITE_MATCHES = ['https://*/*', 'http://*/*'];
+/** The match patterns that cover every https, resp. http, origin. */
+const CUSTOM_SITE_MATCHES = {
+  https: ['https://*/*', '*://*/*', '<all_urls>'],
+  http: ['http://*/*', '*://*/*', '<all_urls>']
+};
 
 /** The chunks a built chunk imports: `from"./x.js"`, `import"./x.js"` and `import("./x.js")`, in any quotes, minified or not. */
 export function importsOf(dist, file) {
@@ -48,11 +52,11 @@ export function chunksReachableFrom(dist, entry) {
   return [...seen];
 }
 
-/** The resource patterns of the `web_accessible_resources` entries that match every custom-site origin. */
+/** The resource patterns of the `web_accessible_resources` entries that match every https and http origin. */
 export function customSiteResources(dist) {
   const entries = readManifest(dist).web_accessible_resources ?? [];
   return entries
-    .filter((entry) => CUSTOM_SITE_MATCHES.every((match) => entry.matches?.includes(match)))
+    .filter((entry) => Object.values(CUSTOM_SITE_MATCHES).every((covering) => covering.some((match) => entry.matches?.includes(match))))
     .flatMap((entry) => entry.resources ?? []);
 }
 

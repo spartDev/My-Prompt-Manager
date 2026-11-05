@@ -12,7 +12,7 @@ const SCRIPT = path.resolve(__dirname, '..', 'custom-site-chunks.mjs');
 const PLATFORM_ENTRY = { matches: ['https://claude.ai/*'], resources: ['assets/*'] };
 
 /** A dist shaped like the build: a loader that imports the content entry, which imports two shared chunks, minified and not. */
-const writeDist = (dist: string, customSiteResources: string[]) => {
+const writeDist = (dist: string, customSiteResources: string[], customSiteMatches = ['https://*/*', 'http://*/*']) => {
   mkdirSync(path.join(dist, 'assets'), { recursive: true });
   const files: Record<string, string> = {
     'assets/index.ts-loader-a1.js': '(function(){import(chrome.runtime.getURL("assets/src-content-index.ts-b2.js"))})();',
@@ -28,7 +28,7 @@ const writeDist = (dist: string, customSiteResources: string[]) => {
     path.join(dist, 'manifest.json'),
     JSON.stringify({
       content_scripts: [{ js: ['assets/index.ts-loader-a1.js'] }],
-      web_accessible_resources: [PLATFORM_ENTRY, { matches: ['https://*/*', 'http://*/*'], resources: customSiteResources }]
+      web_accessible_resources: [PLATFORM_ENTRY, { matches: customSiteMatches, resources: customSiteResources }]
     })
   );
 };
@@ -53,6 +53,18 @@ describe('custom-site-chunks', () => {
       chunks: ['src-content-index.ts-b2.js', 'content-c3.js', 'rolldown-runtime-d4.js', 'categoryChip-e5.js'],
       unmatched: []
     });
+  });
+
+  it.each([[['*://*/*']], [['<all_urls>']]])('accepts an entry matching %j as covering both schemes', (matches) => {
+    writeDist(dist, ALL_PATTERNS, matches);
+
+    expect(checkCustomSiteChunks(dist).unmatched).toEqual([]);
+  });
+
+  it('does not count an entry that matches https origins only', () => {
+    writeDist(dist, ALL_PATTERNS, ['https://*/*']);
+
+    expect(checkCustomSiteChunks(dist).unmatched).toHaveLength(4);
   });
 
   it('names a chunk whose pattern is missing, though a built-in Platform entry matches it', () => {
