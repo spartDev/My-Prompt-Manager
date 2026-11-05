@@ -1,6 +1,6 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 import { ThemeProvider } from '../../contexts/ThemeContext';
 import { AdmissionRefusedError } from '../../services/promptAdmission';
@@ -17,7 +17,8 @@ const createJsonFile = (contents: string): File => {
   return file;
 };
 
-const renderSettings = async (showToastMock = vi.fn(), onStorageRefusedMock = vi.fn()) => {
+// Renders Settings without waiting for it to load
+const renderSettingsView = (showToastMock = vi.fn(), onStorageRefusedMock = vi.fn()) => {
   const mockToastSettings = {
     position: 'top-right' as const,
     enabledTypes: {
@@ -40,7 +41,10 @@ const renderSettings = async (showToastMock = vi.fn(), onStorageRefusedMock = vi
       />
     </ThemeProvider>
   );
+};
 
+const renderSettings = async (showToastMock = vi.fn(), onStorageRefusedMock = vi.fn()) => {
+  renderSettingsView(showToastMock, onStorageRefusedMock);
   await screen.findByRole('heading', { name: /settings/i });
   return { showToastMock, onStorageRefusedMock };
 };
@@ -602,6 +606,55 @@ describe('SettingsView', () => {
       expect(siteSettingsWrites()).toHaveLength(0);
       expect(chromeMock.tabs.sendMessage).not.toHaveBeenCalled();
       expect(screen.getByRole('radio', { name: /select side panel mode/i })).toBeEnabled();
+    });
+
+    // My-Prompt-Manager-ds8: React re-renders on its own scheduler, not on setTimeout, so with only the
+    // timers faked the debounce timer of the first render, which holds the empty settings Settings starts
+    // with, fires after the load and before the re-render that would have cleared it
+    describe('with fake timers', () => {
+      const SAVE_DEBOUNCE_MS = 150;
+      const fakeTheTimers = () => vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      // Lets promise callbacks run, and not the re-render React schedules
+      const flushPromises = async () => {
+        for (let tick = 0; tick < 5; tick++) {
+          // eslint-disable-next-line no-await-in-loop -- each tick lets the next callback run
+          await Promise.resolve();
+        }
+      };
+
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      it('saves nothing when the debounce timer of the first render fires after the load', async () => {
+        const chromeMock = getChromeMockFunctions();
+        fakeTheTimers();
+
+        renderSettingsView();
+        await flushPromises();
+        // The load has read the site settings and gone on to the Prompts: only the re-render is left
+        expect(getMockStorageManager().getPrompts).toHaveBeenCalled();
+        vi.advanceTimersByTime(PAST_THE_DEBOUNCE_MS);
+        await flushPromises();
+
+        expect(siteSettingsWrites()).toEqual([]);
+        expect(chromeMock.tabs.sendMessage).not.toHaveBeenCalled();
+      });
+
+      it('saves a site setting the user changes 150 ms after the change', async () => {
+        await renderSettings();
+        const claude = await screen.findByRole('switch', { name: 'Enable Claude integration' });
+        await waitPastTheDebounce();
+        fakeTheTimers();
+
+        act(() => { claude.click(); });
+        vi.advanceTimersByTime(SAVE_DEBOUNCE_MS - 1);
+        expect(siteSettingsWrites()).toHaveLength(0);
+        vi.advanceTimersByTime(1);
+        await flushPromises();
+
+        expect(siteSettingsWrites()).toHaveLength(1);
+      });
     });
 
     it('saves a site setting the user changes once, and sends it to the tabs', async () => {
