@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
@@ -154,10 +154,77 @@ describe('SettingsView', () => {
       expect(storageMock.importPrompt).toHaveBeenCalledTimes(3);
     });
     await waitFor(() => {
-      expect(showToastMock).toHaveBeenCalledWith(
-        expect.stringMatching(/imported 2 prompts.*skipped 1.*Too long.*Content cannot exceed 20,000 characters/is),
-        'warning'
-      );
+      expect(showToastMock).toHaveBeenCalledWith('Imported 2 prompts and 0 categories. Skipped 1: see Backup & Restore.', 'warning');
+    });
+    const report = screen.getByRole('status', { name: 'Import report' });
+    expect(within(report).getByText('"Too long"')).toBeInTheDocument();
+    expect(within(report).getByText('Content cannot exceed 20,000 characters')).toBeInTheDocument();
+  });
+
+  // My-Prompt-Manager-1xi: a toast shows 80 characters, so the skipped titles and reasons stay in
+  // the Backup & Restore card, every one of them, until dismissed; the toast only points there
+  it('lists every skipped Prompt with its reason in full, past what a toast shows', async () => {
+    const storageMock = getMockStorageManager();
+    const refusal = () => new AdmissionRefusedError({
+      content: { field: 'content', reason: 'too_long', length: 20_001, max: 20_000, message: 'Content cannot exceed 20,000 characters' }
+    });
+    (storageMock.importPrompt as unknown as Mock).mockImplementation((prompt: Prompt) =>
+      prompt.id.startsWith('bad') ? Promise.reject(refusal()) : Promise.resolve(prompt)
+    );
+
+    const { showToastMock } = await renderSettings();
+    await waitFor(() => {
+      expect(storageMock.getPrompts).toHaveBeenCalled();
+    });
+
+    const titles = [
+      'Quarterly business review summary for the leadership team, with every open risk',
+      'Detailed onboarding checklist for new engineers joining the platform squad this year',
+      'Long-form blog post outline about migrating a legacy monolith to small services'
+    ];
+    const prompts: Prompt[] = [
+      { id: 'good', title: 'Fine', content: 'Hello', category: 'Uncategorized', createdAt: 1, updatedAt: 1 },
+      ...titles.map((title, i) => ({ id: `bad${String(i)}`, title, content: 'x', category: 'Uncategorized', createdAt: 1, updatedAt: 1 }))
+    ];
+    const fileInput = document.querySelector<HTMLInputElement>('input[type="file"]') as HTMLInputElement;
+    await userEvent.upload(fileInput, createJsonFile(JSON.stringify({ prompts, categories: [], version: '1.0' })));
+
+    const report = await screen.findByRole('status', { name: 'Import report' });
+    expect(within(report).getByText('Skipped 3 items')).toBeInTheDocument();
+    for (const title of titles) {
+      const item = within(report).getByText(`"${title}"`).closest('li') as HTMLElement;
+      expect(item).toHaveTextContent('Content cannot exceed 20,000 characters');
+    }
+    const toast = (showToastMock.mock.calls.find(call => call[1] === 'warning') as [string])[0];
+    expect(toast).toBe('Imported 1 prompt and 0 categories. Skipped 3: see Backup & Restore.');
+    expect(toast.length).toBeLessThanOrEqual(80);
+
+    await userEvent.click(within(report).getByRole('button', { name: 'Dismiss import report' }));
+    expect(screen.queryByRole('status', { name: 'Import report' })).not.toBeInTheDocument();
+  });
+
+  // My-Prompt-Manager-lqu: one reads in the singular, and the Categories a restore creates for the
+  // Prompts that name them (PR #487) count with the Backup's own
+  it('says "1 prompt and 1 category", counting the Category a restore creates', async () => {
+    const storageMock = getMockStorageManager();
+    let library: Category[] = [];
+    storageMock.getCategories.mockImplementation(() => Promise.resolve(library));
+    (storageMock.importPrompt as unknown as Mock).mockImplementation((prompt: Prompt) => {
+      library = [...library, { id: 'created', name: prompt.category }];
+      return Promise.resolve(prompt);
+    });
+
+    const { showToastMock } = await renderSettings();
+    await waitFor(() => {
+      expect(storageMock.getCategories).toHaveBeenCalled();
+    });
+
+    const prompt = { id: 'p1', title: 'Chess opening drill', content: 'Hello', category: 'Play', createdAt: 1, updatedAt: 1 };
+    const fileInput = document.querySelector<HTMLInputElement>('input[type="file"]') as HTMLInputElement;
+    await userEvent.upload(fileInput, createJsonFile(JSON.stringify({ prompts: [prompt], version: '1.0' })));
+
+    await waitFor(() => {
+      expect(showToastMock).toHaveBeenCalledWith('Successfully imported 1 prompt and 1 category!', 'success');
     });
   });
 
@@ -280,30 +347,45 @@ describe('SettingsView', () => {
     alertSpy.mockRestore();
   });
 
-  it('says in an error toast that an import failed for another reason, without blaming the file', async () => {
+  // My-Prompt-Manager-5ar: the Prompts imported before the error stay in the Library, so an import
+  // stopped by an error other than storage says how many, and why it stopped
+  it('says how many Prompts were imported, and why, when another error stops an import', async () => {
     const storageMock = getMockStorageManager();
     const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => undefined);
-    (storageMock.importPrompt as unknown as Mock).mockRejectedValue(
-      Object.assign(new Error('Storage API is unavailable. Please try again later.'), { type: 'STORAGE_UNAVAILABLE' })
-    );
+    let stored = 0;
+    (storageMock.importPrompt as unknown as Mock).mockImplementation((prompt: Prompt) => {
+      if (stored === 2) {
+        return Promise.reject(
+          Object.assign(new Error('Storage API is unavailable. Please try again later.'), { type: 'STORAGE_UNAVAILABLE' })
+        );
+      }
+      stored += 1;
+      return Promise.resolve(prompt);
+    });
 
     const { showToastMock, onStorageRefusedMock } = await renderSettings();
     await waitFor(() => {
       expect(storageMock.getPrompts).toHaveBeenCalled();
     });
+    const loadsBeforeImport = storageMock.getPrompts.mock.calls.length;
 
-    const fileInput = document.querySelector<HTMLInputElement>('input[type="file"]');
-    const prompt = { id: 'p1', title: 'Fine', content: 'Hello', category: 'Uncategorized', createdAt: 1, updatedAt: 1 };
-    await userEvent.upload(
-      fileInput as HTMLInputElement,
-      createJsonFile(JSON.stringify({ prompts: [prompt], categories: [], version: '1.0' }))
-    );
+    const prompts: Prompt[] = Array.from({ length: 4 }, (_, i) => (
+      { id: `p${String(i)}`, title: `Prompt ${String(i)}`, content: 'Hello', category: 'Uncategorized', createdAt: 1, updatedAt: 1 }
+    ));
+    const fileInput = document.querySelector<HTMLInputElement>('input[type="file"]') as HTMLInputElement;
+    await userEvent.upload(fileInput, createJsonFile(JSON.stringify({ prompts, categories: [], version: '1.0' })));
 
-    await waitFor(() => {
-      expect(showToastMock).toHaveBeenCalledWith('Import failed: Storage API is unavailable. Please try again later.', 'error');
-    });
+    const report = await screen.findByRole('status', { name: 'Import report' });
+    expect(report).toHaveTextContent('The import stopped: 2 of 4 prompts were imported.');
+    expect(report).toHaveTextContent('Storage API is unavailable. Please try again later.');
+    expect(showToastMock).toHaveBeenCalledWith('Import stopped: 2 of 4 prompts were imported. See Backup & Restore.', 'error');
+    expect(storageMock.importPrompt).toHaveBeenCalledTimes(3);
     expect(onStorageRefusedMock).not.toHaveBeenCalled();
     expect(alertSpy).not.toHaveBeenCalled();
+    // Settings shows the Prompts that were imported
+    await waitFor(() => {
+      expect(storageMock.getPrompts.mock.calls.length).toBeGreaterThan(loadsBeforeImport);
+    });
     alertSpy.mockRestore();
   });
 

@@ -8,6 +8,7 @@ export {
 export { cn } from './cn';
 export { debounce } from './debounce';
 export { getErrorMessage, toError } from './error';
+export { formatCount } from './formatCount';
 export { formatPlatformName } from './formatPlatformName';
 export { formatRelativeTime } from './formatRelativeTime';
 export * as Logger from './logger';

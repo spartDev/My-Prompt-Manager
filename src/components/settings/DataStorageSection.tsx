@@ -3,11 +3,22 @@ import { type FC, useCallback, useRef, useState } from 'react';
 import type { Category, Prompt } from '../../types';
 import type { ToastType } from '../../types/components';
 import type {} from '../../types/file-system-access-api';
-import { findInvalidImportCategory, findInvalidImportPrompt, Logger, toError } from '../../utils';
+import { findInvalidImportCategory, findInvalidImportPrompt, formatCount, Logger, toError } from '../../utils';
 import { describeStorageUsage } from '../../utils/storageQuota';
 import { DatabaseIcon, ExportIcon, ImportIcon } from '../icons/SettingsIcons';
 
 import SettingsSection from './SettingsSection';
+
+/**
+ * What the last import left to read at the user's pace: every item it skipped and why, and why it
+ * stopped, if it did. A toast shows 80 characters for a few seconds, too little for a list of titles.
+ */
+export interface ImportReport {
+  /** `key` tells the items apart: the kind and id (or name) of the Prompt or Category */
+  skipped: { key: string; label: string; reason: string }[];
+  /** Set when an error stopped the import: the Prompts imported before it stay in the Library */
+  stopped?: { imported: number; total: number; reason: string };
+}
 
 interface DataStorageSectionProps {
   prompts: Prompt[];
@@ -15,6 +26,9 @@ interface DataStorageSectionProps {
   /** The bytes Chrome stores (getBytesInUse) and its quota (QUOTA_BYTES); null until they are read */
   storageUsage: { used: number; total: number } | null;
   onImport: (data: { prompts: Prompt[]; categories: Category[] }) => Promise<void>;
+  /** The last import's report, shown under Import until dismissed; null when there is none */
+  importReport?: ImportReport | null;
+  onDismissImportReport?: () => void;
   onClearData: () => Promise<void>;
   onShowToast: (message: string, type?: ToastType) => void;
 }
@@ -24,6 +38,8 @@ const DataStorageSection: FC<DataStorageSectionProps> = ({
   categories,
   storageUsage,
   onImport,
+  importReport = null,
+  onDismissImportReport,
   onClearData,
   onShowToast
 }) => {
@@ -198,8 +214,8 @@ const DataStorageSection: FC<DataStorageSectionProps> = ({
             />
           </div>
           <div className="mt-2 flex items-center justify-between text-xs text-secondary">
-            <span>{prompts.length} prompts</span>
-            <span>{categories.length} categories</span>
+            <span>{formatCount(prompts.length, 'prompt', 'prompts')}</span>
+            <span>{formatCount(categories.length, 'category', 'categories')}</span>
           </div>
         </div>
 
@@ -246,6 +262,53 @@ const DataStorageSection: FC<DataStorageSectionProps> = ({
           <p className="mt-2 text-xs text-tertiary">
             Export your prompts as JSON for backup or sharing
           </p>
+
+          {importReport && (
+            <div
+              role="status"
+              aria-label="Import report"
+              className={`mt-3 rounded-lg border p-3 text-xs ${importReport.stopped ? 'bg-danger-subtle border-danger' : 'bg-warning-subtle border-warning'}`}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="space-y-1">
+                  {importReport.stopped && (
+                    <>
+                      <p className="font-medium text-danger">
+                        The import stopped: {importReport.stopped.imported} of {formatCount(importReport.stopped.total, 'prompt was', 'prompts were')} imported.
+                      </p>
+                      <p className="text-primary break-words">{importReport.stopped.reason}</p>
+                    </>
+                  )}
+                  {importReport.skipped.length > 0 && (
+                    <p className="font-medium text-warning">
+                      Skipped {formatCount(importReport.skipped.length, 'item', 'items')}
+                    </p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={onDismissImportReport}
+                  aria-label="Dismiss import report"
+                  className="shrink-0 rounded p-0.5 text-secondary hover:text-primary focus-secondary"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              {importReport.skipped.length > 0 && (
+                <ul className="mt-2 space-y-1.5 max-h-48 overflow-y-auto">
+                  {importReport.skipped.map((item) => (
+                    <li key={item.key} className="break-words text-secondary">
+                      <span className="font-medium text-primary">&quot;{item.label}&quot;</span>
+                      {' '}
+                      <span>{item.reason}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Clear Data */}
