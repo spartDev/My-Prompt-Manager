@@ -213,6 +213,8 @@ jobs:
           name: coverage-summary
           path: coverage/coverage-summary.json
           if-no-files-found: ignore
+          # A re-run of the job replaces the summary of the earlier attempt instead of failing on it
+          overwrite: true
           retention-days: 7
 
       - name: 📋 Coverage Summary
