@@ -25,6 +25,6 @@ gh api --paginate --slurp "repos/{owner}/{repo}/pulls/$1/comments" | jq -r '
       .id,
       "\(.path):\(.line // .original_line)\(if .line == null then " (outdated)" else "" end)",
       ($head | capture("!\\[(?<p>P[0-9]) Badge\\]").p // "-"),
-      ($head | gsub("<[^>]*>|!\\[[^]]*\\]\\([^)]*\\)|\\*\\*"; "") | gsub("^\\s+|\\s+$"; ""))
+      ($head | gsub("<[^>]*>|!\\[[^]]*\\]\\([^)]*\\)|\\*\\*"; "") | gsub("^[#\\s]+|\\s+$"; ""))
     ]
   | @tsv'

@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -75,12 +75,19 @@ describe('pr-review.sh', () => {
     expect(run('505').stdout).toBe('7\tscripts/x.mjs:55 (outdated)\tP2\tMoved code\n');
   });
 
+  it('reads the title of a bot comment written as a heading, such as CodeQL', () => {
+    const codeql = { login: 'github-advanced-security[bot]', type: 'Bot' };
+    fakeGh([[{ id: 9, user: codeql, path: 'src/a.ts', line: 3, original_line: 3, body: '## CodeQL / Unnecessary use of `cat` process\n\nDetails.' }]]);
+
+    expect(run('508').stdout).toBe('9\tsrc/a.ts:3\t-\tCodeQL / Unnecessary use of `cat` process\n');
+  });
+
   it('asks gh for every page of the pull request comments of the current repository', () => {
     fakeGh([[]]);
 
     run('451');
 
-    expect(spawnSync('cat', [path.join(bin, 'args')], { encoding: 'utf8' }).stdout).toBe(
+    expect(readFileSync(path.join(bin, 'args'), 'utf8')).toBe(
       'api --paginate --slurp repos/{owner}/{repo}/pulls/451/comments\n'
     );
   });
