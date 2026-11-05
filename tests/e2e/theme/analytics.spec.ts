@@ -192,7 +192,14 @@ test.describe('Analytics on the tokens', () => {
       await expect(confirm).toHaveCSS('background-color', DANGER);
       await expect(confirm).toHaveCSS('color', ON_ACCENT);
 
-      await page.screenshot({ path: `${SCREENSHOT_DIR}/clear-dialog-${theme}.png` });
+      await expect(cancel).toBeFocused();
+      await page.keyboard.press('Tab');
+      await expect(confirm).toBeFocused();
+      await page.screenshot({ path: `${SCREENSHOT_DIR}/clear-dialog-${theme}.png`, animations: 'disabled' });
+
+      await page.keyboard.press('Escape');
+      await expect(dialog).toBeHidden();
+      await expect(page.getByRole('button', { name: 'Clear history' })).toBeFocused();
     });
 
     test(`with no usage yet, the empty state shows an accent-subtle icon circle on bg-app (${theme})`, async ({ page, storage, extensionId }) => {
