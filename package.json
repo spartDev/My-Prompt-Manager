@@ -23,6 +23,7 @@
     "lint:renovate": "npx -y --package renovate@44.197.1 renovate-config-validator --strict",
     "prepare": "node scripts/prepare.mjs",
     "test:e2e": "playwright test",
+    "test:e2e:linux": "scripts/test-e2e-linux.sh",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tests/e2e/tsconfig.json && tsc --noEmit -p tsconfig.node.json"
   },
   "devDependencies": {

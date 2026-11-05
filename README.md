@@ -133,6 +133,7 @@ Versions: `package.json`.
 | `npm run lint:fix` | Auto-fix Biome lint issues | Code Formatting |
 | `npm run typecheck` | TypeScript type checking | Code Quality |
 | `npm run test:e2e` | Run Playwright E2E tests | E2E Testing |
+| `npm run test:e2e:linux -- <spec>` | Run a spec like Linux CI, in Docker with DejaVu fonts | E2E Testing |
 | `npm run package` | Package extension for distribution | Chrome Web Store |
 
 ## 🏗️ Architecture
