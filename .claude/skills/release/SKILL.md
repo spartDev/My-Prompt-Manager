@@ -32,7 +32,14 @@ The argument wins when given. Otherwise read the commit list as conventional com
 
 The version is always three integers, `X.Y.Z`. Chrome's `manifest.json` accepts only dot-separated integers, and `release.yml` requires the built manifest to equal the tag, so a suffixed version (`-beta.1`) cannot pass the workflow. A request for a pre-release goes back to the user as out of scope for this skill.
 
-Done when: the user confirms the version and the grouped change list you showed them.
+The new version must move past `$LAST` and be untagged; this prints `ok` only then:
+
+```bash
+V=X.Y.Z
+[ "$V" != "${LAST#v}" ] && [ "$(printf '%s\n' "${LAST#v}" "$V" | sort -V | tail -1)" = "$V" ] && ! git rev-parse -q --verify "refs/tags/v$V" >/dev/null && echo ok
+```
+
+Done when: the check prints `ok`, and the user confirms the version and the grouped change list you showed them. A version that fails the check goes back to the user.
 
 ## 3. Write the bump
 
@@ -73,11 +80,12 @@ Done when: the PR's checks are green. **Hand-off: the user merges it.**
 
 ## 6. Tag
 
-After the merge, on the merge commit of `main`:
+After the merge, tag the bump PR's own merge commit, not the tip of `main`: another PR may have landed since, and its changes are not in the CHANGELOG you confirmed.
 
 ```bash
+SHA=$(gh pr view <bump PR number> --json mergeCommit -q .mergeCommit.oid)
 git fetch -q origin main
-git tag -a vX.Y.Z -m "Release vX.Y.Z" origin/main
+git tag -a vX.Y.Z -m "Release vX.Y.Z" "$SHA"
 ```
 
 Confirm with the user before `git push origin vX.Y.Z`: the push publishes the GitHub Release. A tag run carries the tag as its branch, and GitHub takes a few seconds to register it, so wait for that run before watching it, in the background:
