@@ -288,7 +288,7 @@ describe('readPrompts: malformed entries and backfill', () => {
   });
 });
 
-describe('scrubStored (the one-time upgrade pass)', () => {
+describe('scrubStored (the upgrade pass)', () => {
   const entry = {
     id: 'p1',
     title: 'Title',
@@ -380,7 +380,7 @@ describe('scrubStored (the one-time upgrade pass)', () => {
   });
 });
 
-describe('scrubStoredCategories (the one-time upgrade pass, Category names)', () => {
+describe('scrubStoredCategories (the upgrade pass, Category names)', () => {
   const work = { id: 'c1', name: 'Work', color: '#ff0000' };
 
   it('removes Hidden characters from a Category name, and nothing else', () => {
@@ -629,7 +629,7 @@ describe('planCategoryMerge (the one rule for Categories whose names a pass made
   });
 });
 
-describe('scrubStoredSettings (the one-time upgrade pass, the default Category)', () => {
+describe('scrubStoredSettings (the upgrade pass, the default Category)', () => {
   const settings = { defaultCategory: 'Work', sortOrder: 'updatedAt' };
   const renames = new Map([['work\u{200B}', 'Work']]);
 

@@ -4,8 +4,8 @@ import { DEFAULT_CATEGORY } from '../../types';
 import { StorageManager } from '../storage';
 
 /**
- * The one-time upgrade pass (ADR-001, "Existing data"): stored Prompts and Categories are
- * cleaned of Hidden characters once, on extension update. It is idempotent and never
+ * The upgrade pass (ADR-001, "Existing data"): stored Prompts and Categories are
+ * cleaned of Hidden characters on extension update and at every browser startup. It is idempotent and never
  * refuses, deletes, trims or shortens a stored Prompt, including one already over the limits.
  */
 describe('StorageManager.upgradeStoredData', () => {
@@ -418,4 +418,63 @@ describe('StorageManager.upgradeStoredData', () => {
       expect((await chrome.storage.local.get('settings')).settings).toEqual({ defaultCategory: 'Work', sortOrder: 'title' });
     });
   });
+
+  describe('entries that are not readable Prompts', () => {
+    const withoutId = { title: 'Kept title', content: 'Kept body', category: 'Work', createdAt: 1, updatedAt: 2 };
+    const malformed = [null, 'text', { id: 7 }, { id: 'p9', title: 'No content' }];
+    const newPrompt = { title: 'New', content: 'New body', category: 'Work' };
+
+    it('keeps a stored Prompt without an id through the next ordinary save', async () => {
+      await seed({ prompts: [withoutId, prompt('p1')] });
+
+      await storageManager.savePrompt(newPrompt);
+
+      expect(await storedPrompts()).toEqual(expect.arrayContaining([withoutId]));
+    });
+
+    it.each([
+      ['a Prompt is saved', (m: StorageManager) => m.savePrompt(newPrompt)],
+      ['a Prompt is edited', (m: StorageManager) => m.updatePrompt('p1', { title: 'Edited' })],
+      ['a Prompt is deleted', (m: StorageManager) => m.deletePrompt('p1')],
+      ['a Prompt is used', (m: StorageManager) => m.incrementUsageCount('p1')],
+      ['a Prompt is pinned', (m: StorageManager) => m.togglePinned('p1')]
+    ])('keeps the entries the upgrade pass keeps when %s', async (_case, write) => {
+      await seed({ prompts: [...malformed, prompt('p1')] });
+
+      await write(storageManager);
+
+      expect(await storedPrompts()).toEqual(expect.arrayContaining(malformed));
+    });
+
+    it('gives a stored Prompt without an id an id, so it is listed and can be edited and deleted', async () => {
+      await seed({ prompts: [withoutId, prompt('p1')] });
+
+      const result = await storageManager.upgradeStoredData();
+
+      expect(result).toEqual({ promptsChanged: true, categoriesChanged: false });
+      const listed = (await storageManager.getPrompts()).find(p => p.title === 'Kept title');
+      expect(listed).toMatchObject({ id: expect.any(String), content: 'Kept body', category: 'Work' });
+      if (!listed) {return;}
+
+      await storageManager.updatePrompt(listed.id, { title: 'Edited title' });
+      expect((await storageManager.getPrompts()).find(p => p.id === listed.id)?.title).toBe('Edited title');
+
+      await storageManager.deletePrompt(listed.id);
+      expect((await storageManager.getPrompts()).map(p => p.id)).toEqual(['p1']);
+    });
+
+    it('gives an id only to an entry with a title and content, and keeps it on the next run', async () => {
+      await seed({ prompts: [...malformed, withoutId] });
+
+      await storageManager.upgradeStoredData();
+      const firstRun = (await storedPrompts()) as unknown[];
+      vi.mocked(chrome.storage.local.set).mockClear();
+      await storageManager.upgradeStoredData();
+
+      expect(firstRun.slice(0, malformed.length)).toEqual(malformed);
+      expect(firstRun[malformed.length]).toEqual({ ...withoutId, id: expect.any(String) });
+      expect(chrome.storage.local.set).not.toHaveBeenCalled();
+    });
+  });
 });
+

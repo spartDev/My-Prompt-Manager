@@ -10,26 +10,39 @@ vi.mock('../../utils/logger', () => ({
 }));
 
 type InstalledListener = (details: chrome.runtime.InstalledDetails) => void;
+type StartupListener = () => void;
 
 /**
- * Loads the background script afresh and returns the listener it registered for
- * chrome.runtime.onInstalled, plus the Logger that fresh copy of the script uses.
+ * Loads the background script afresh and returns the listeners it registered for
+ * chrome.runtime.onInstalled and chrome.runtime.onStartup, plus the Logger that fresh copy of the script uses.
  */
-async function loadBackground(): Promise<{ onInstalled: InstalledListener; Logger: typeof import('../../utils/logger') }> {
+async function loadBackground(): Promise<{
+  onInstalled: InstalledListener;
+  onStartup: StartupListener;
+  Logger: typeof import('../../utils/logger');
+}> {
   vi.resetModules();
 
-  const addListener = vi.mocked(getChromeMock().runtime.onInstalled.addListener);
-  addListener.mockClear();
+  const addInstalled = vi.mocked(getChromeMock().runtime.onInstalled.addListener);
+  const addStartup = vi.mocked(getChromeMock().runtime.onStartup.addListener);
+  addInstalled.mockClear();
+  addStartup.mockClear();
 
   await import('../background');
   const Logger = await import('../../utils/logger');
 
-  const onInstalled = addListener.mock.calls[addListener.mock.calls.length - 1]?.[0];
+  const onInstalled = addInstalled.mock.calls[addInstalled.mock.calls.length - 1]?.[0];
   if (!onInstalled) {
     throw new Error('The background script did not register a chrome.runtime.onInstalled listener');
   }
+  const startupListeners = addStartup.mock.calls.map(([listener]) => listener as StartupListener);
+  const onStartup: StartupListener = () => {
+    for (const listener of startupListeners) {
+      listener();
+    }
+  };
 
-  return { onInstalled, Logger };
+  return { onInstalled, onStartup, Logger };
 }
 
 const storedPrompts = async (): Promise<unknown> => (await chrome.storage.local.get('prompts')).prompts;
@@ -117,5 +130,58 @@ describe('background: stored data on extension update', () => {
       expect(chrome.storage.local.set).toHaveBeenCalled();
       expect(chrome.tabs.query).toHaveBeenCalledWith({});
     });
+  });
+});
+
+describe('background: stored data on browser startup', () => {
+  const entry = {
+    id: 'p1',
+    title: 'Title',
+    content: 'Body',
+    category: 'Work',
+    createdAt: 1,
+    updatedAt: 2,
+    usageCount: 0,
+    lastUsedAt: 1
+  };
+  const dirtyPrompt = { ...entry, title: 'Ti\u{200B}tle', content: 'Bo\u{202E}dy' };
+  const dirtyCategory = { id: 'c1', name: 'Wo\u{200B}rk' };
+
+  it('cleans at the next browser startup the Hidden characters that a failed update pass left', async () => {
+    await chrome.storage.local.set({ prompts: [dirtyPrompt], categories: [dirtyCategory] });
+    vi.mocked(chrome.storage.local.set).mockClear();
+    vi.mocked(chrome.storage.local.set).mockRejectedValueOnce(new Error('QUOTA_EXCEEDED'));
+    const { onInstalled, onStartup, Logger } = await loadBackground();
+
+    onInstalled(UPDATE);
+    await vi.waitFor(() => {
+      expect(Logger.error).toHaveBeenCalledWith(
+        expect.stringContaining('stored data'),
+        expect.anything(),
+        expect.objectContaining({ component: 'Background' })
+      );
+    });
+    expect(await storedPrompts()).toEqual([dirtyPrompt]);
+
+    onStartup();
+
+    await vi.waitFor(async () => {
+      expect(await storedPrompts()).toEqual([entry]);
+      expect(await storedCategories()).toEqual([{ id: 'c1', name: 'Work' }]);
+    });
+  });
+
+  it('writes nothing at startup when the Library is already clean', async () => {
+    await chrome.storage.local.set({ prompts: [entry], categories: [{ id: 'c1', name: 'Work' }] });
+    vi.mocked(chrome.storage.local.set).mockClear();
+    const { onStartup } = await loadBackground();
+
+    onStartup();
+
+    await vi.waitFor(() => {
+      expect(chrome.action.setPopup).toHaveBeenCalled();
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(chrome.storage.local.set).not.toHaveBeenCalled();
   });
 });

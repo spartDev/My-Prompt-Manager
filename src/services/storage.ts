@@ -26,6 +26,7 @@ import {
   admitEdit,
   admitNew,
   admitRestored,
+  identifyStored,
   matchStoredCategory,
   type PromptTextPatch,
   readPrompt,
@@ -549,15 +550,16 @@ export class StorageManager {
   }
 
   /**
-   * The one-time upgrade pass (ADR-001, "Existing data"): cleans stored Prompts, Category names
+   * The upgrade pass (ADR-001, "Existing data"): cleans stored Prompts, Category names
    * and the default Category of Hidden characters. It works on the raw stored values, so it never
    * refuses, shortens or drops a Prompt, including a malformed one or one already over the
    * limits, and never trims Prompt text; it trims the labels that Admission trims (Category
    * names, a Prompt's category, the default Category). The only Categories it drops are later
    * ones whose name becomes the same as an earlier one's once cleaned, and ones whose name
    * becomes empty; every Prompt, and the default Category, that named a dropped Category is
-   * re-pointed to the kept one (the default Category for an emptied name) in the same write. It
-   * writes nothing when there is nothing to clean, and every key that changed in one atomic
+   * re-pointed to the kept one (the default Category for an emptied name) in the same write. A
+   * stored Prompt with a title and content but no id is given one. It writes nothing when there is
+   * nothing to clean, and every key that changed in one atomic
    * write. Safe to run any number of times.
    */
   upgradeStoredData(): Promise<{ promptsChanged: boolean; categoriesChanged: boolean }> {
@@ -568,7 +570,10 @@ export class StorageManager {
           try {
             // Raw values: getPrompts drops malformed entries and getCategories may write the default Category
             const categories = scrubStoredCategories(await this.getStorageData<unknown>(this.STORAGE_KEYS.CATEGORIES));
-            const prompts = scrubStored(await this.getStorageData<unknown>(this.STORAGE_KEYS.PROMPTS), categories.renames);
+            const scrubbed = scrubStored(await this.getStorageData<unknown>(this.STORAGE_KEYS.PROMPTS), categories.renames);
+            // A Prompt stored without an id is hidden and cannot be edited or deleted: it is given one
+            const identified = identifyStored(scrubbed.entries, uuidv4);
+            const prompts = { entries: identified.entries, changed: scrubbed.changed || identified.changed };
             const settings = scrubStoredSettings(
               await this.getStorageData<unknown>(this.STORAGE_KEYS.SETTINGS),
               categories.renames
@@ -706,11 +711,20 @@ export class StorageManager {
 
   /**
    * The only way to write the prompts key. It accepts only values produced by the
-   * Admission module, so a route that skips Admission does not compile.
+   * Admission module, so a route that skips Admission does not compile. The stored entries
+   * that are not readable Prompts (malformed ones, which the upgrade pass keeps) are written
+   * back after them as they are: every caller read only the readable ones, and a write must
+   * not drop what it could not read. Callers hold the PROMPTS lock.
    */
   private async writePrompts(prompts: readonly StoredPrompt[]): Promise<void> {
-    await ensureStorageAvailable();
-    await chrome.storage.local.set({ [STORAGE_KEYS.PROMPTS]: prompts });
+    await chrome.storage.local.set({ [STORAGE_KEYS.PROMPTS]: await this.withUnreadable(prompts) });
+  }
+
+  /** The Prompts to write, followed by the stored entries that are not readable Prompts, as they are. */
+  private async withUnreadable(prompts: readonly StoredPrompt[]): Promise<unknown[]> {
+    const stored = await this.getStorageData<unknown>(STORAGE_KEYS.PROMPTS);
+    const unreadable = Array.isArray(stored) ? stored.filter(entry => readPrompt(entry) === null) : [];
+    return [...prompts, ...unreadable];
   }
 
   /**
@@ -734,16 +748,16 @@ export class StorageManager {
 
   /**
    * Writes categories and prompts together (one atomic set), prompts typed as above. The categories
-   * may hold the malformed entries the upgrade pass keeps, written back as they are.
+   * may hold the malformed entries the upgrade pass keeps, written back as they are, and the stored
+   * Prompt entries that are not readable are kept as writePrompts keeps them.
    */
   private async writeCategoriesAndPrompts(
     categories: readonly unknown[],
     prompts: readonly StoredPrompt[]
   ): Promise<void> {
-    await ensureStorageAvailable();
     await chrome.storage.local.set({
       [STORAGE_KEYS.CATEGORIES]: categories,
-      [STORAGE_KEYS.PROMPTS]: prompts
+      [STORAGE_KEYS.PROMPTS]: await this.withUnreadable(prompts)
     });
   }
 
