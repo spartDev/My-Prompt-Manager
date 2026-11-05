@@ -1,0 +1,14 @@
+// Playwright locator assertions take a string or a RegExp. An asymmetric matcher such as
+// expect.stringContaining('x') types as any, so TypeScript accepts it, and the assertion then
+// passes whatever the value (My-Prompt-Manager-bk1).
+language js
+
+`$assertion($args)` where {
+  $assertion <: `$_.$name`,
+  $name <: or { `toHaveAttribute`, `toHaveCSS`, `toHaveText`, `toContainText`, `toHaveClass`, `toHaveValue` },
+  $args <: contains or { `expect.$matcher($...)`, `expect.not.$matcher($...)` } as $asymmetric,
+  register_diagnostic(
+    span = $asymmetric,
+    message = "Playwright locator assertions take a string or a RegExp: an asymmetric matcher (expect.stringContaining…) passes whatever the value. Use a RegExp."
+  )
+}
