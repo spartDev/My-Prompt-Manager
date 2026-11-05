@@ -682,7 +682,10 @@ describe('SettingsView', () => {
       await waitPastTheDebounce();
       expect(siteSettingsWrites()).toHaveLength(0);
 
-      await userEvent.click(await screen.findByRole('switch', { name: 'Enable Claude integration' }));
+      // The defaults are shown: Claude is on, where storage would have had it off
+      const claudeSwitch = await screen.findByRole('switch', { name: 'Enable Claude integration' });
+      expect(claudeSwitch).toHaveAttribute('aria-checked', 'true');
+      await userEvent.click(claudeSwitch);
       await waitPastTheDebounce();
 
       const writes = siteSettingsWrites();
@@ -690,6 +693,33 @@ describe('SettingsView', () => {
       const saved = (writes[0][0] as { promptLibrarySettings: { enabledSites: string[] } }).promptLibrarySettings;
       expect(saved.enabledSites).not.toContain('claude.ai');
       expect(chromeMock.tabs.sendMessage).toHaveBeenCalledWith(7, { action: 'settingsUpdated', settings: saved });
+    });
+
+    // My-Prompt-Manager-3v1: the site settings loaded, so a failed Prompts read must not replace them with the defaults
+    it('keeps the stored site settings when the Prompts fail to load, and saves nothing', async () => {
+      const chromeMock = getChromeMockFunctions();
+      (chromeMock.storage.local.get as Mock).mockResolvedValue({
+        promptLibrarySettings: {
+          enabledSites: ['chatgpt.com'],
+          customSites: [{ hostname: 'my-ai.example.com', displayName: 'My AI', enabled: true, dateAdded: 1 }]
+        },
+        interfaceMode: 'sidepanel',
+        settings: DEFAULT_SETTINGS
+      });
+      getMockStorageManager().getPrompts.mockRejectedValue(new Error('locked'));
+
+      await renderSettings();
+      // Updates made inside an async act flush when it ends: the first wait lets the load finish,
+      // the second lets a save armed by it run
+      await waitPastTheDebounce();
+      await waitPastTheDebounce();
+
+      expect(siteSettingsWrites()).toHaveLength(0);
+      expect(chromeMock.tabs.sendMessage).not.toHaveBeenCalled();
+      expect(screen.getByRole('switch', { name: 'Enable ChatGPT integration' })).toHaveAttribute('aria-checked', 'true');
+      expect(screen.getByRole('switch', { name: 'Enable Claude integration' })).toHaveAttribute('aria-checked', 'false');
+      expect(screen.getByRole('switch', { name: /enable my ai integration/i })).toHaveAttribute('aria-checked', 'true');
+      expect(screen.getByRole('radio', { name: /select side panel mode/i })).toBeChecked();
     });
   });
 

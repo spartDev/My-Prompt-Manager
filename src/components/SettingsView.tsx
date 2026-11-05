@@ -132,7 +132,8 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
     floatingFallback: true
   }), []);
 
-  // Load settings
+  // Load settings. The site settings and the Library are read apart: a Library that fails to load
+  // leaves the site settings as storage has them, so the defaults are never saved over them.
   const loadSettings = useCallback(async () => {
     try {
       // Load extension settings
@@ -146,18 +147,26 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
       // A later load (after an import, Clear All Data or a reset) is still sent if it differs.
       storedSettings.current ??= loadedSettings;
       setSettings(loadedSettings);
-      
+
       // Load interface mode
       const savedInterfaceMode = result.interfaceMode as 'popup' | 'sidepanel' | undefined;
       setInterfaceMode(savedInterfaceMode ?? (DEFAULT_SETTINGS.interfaceMode as 'popup' | 'sidepanel'));
-      
+
       // Load user settings (theme, view mode, etc.)
       const savedUserSettings = result.settings as UserSettings | undefined;
       if (savedUserSettings) {
         setUserSettings(savedUserSettings);
       }
-      
-      // Load prompts and categories
+    } catch (error) {
+      Logger.error('Failed to load settings', toError(error));
+      // Shown, not saved: only a change the user makes to them is saved
+      storedSettings.current ??= defaultSettings;
+      setSettings(defaultSettings);
+      setInterfaceMode(DEFAULT_SETTINGS.interfaceMode as 'popup' | 'sidepanel');
+    }
+
+    try {
+      // Load the Library, for its export and its count
       const [loadedPrompts, loadedCategories] = await Promise.all([
         storageManager.getPrompts(),
         storageManager.getCategories()
@@ -165,11 +174,7 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
       setPrompts(loadedPrompts);
       setCategories(loadedCategories);
     } catch (error) {
-      Logger.error('Failed to load settings', toError(error));
-      // Shown, not saved: only a change the user makes to them is saved
-      storedSettings.current ??= defaultSettings;
-      setSettings(defaultSettings);
-      setInterfaceMode(DEFAULT_SETTINGS.interfaceMode as 'popup' | 'sidepanel');
+      Logger.error('Failed to load the Library', toError(error), { component: 'SettingsView', operation: 'loadLibrary' });
     } finally {
       setLoading(false);
     }
