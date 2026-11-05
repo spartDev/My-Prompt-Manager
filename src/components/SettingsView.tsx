@@ -10,13 +10,13 @@ import type { AppError, Category, CustomSite as ImportedCustomSite, Prompt, Sort
 import { DEFAULT_SETTINGS } from '../types';
 import type { ToastType } from '../types/components';
 import type { ToastSettings } from '../types/hooks';
-import { Logger, toError } from '../utils';
+import { formatCount, Logger, toError } from '../utils';
 
 import { ChatGPTIcon, ClaudeIcon, CopilotIcon, GeminiIcon, MistralIcon, PerplexityIcon } from './icons/SiteIcons';
 import AboutSection from './settings/AboutSection';
 import AdvancedSection from './settings/AdvancedSection';
 import AppearanceSection from './settings/AppearanceSection';
-import DataStorageSection from './settings/DataStorageSection';
+import DataStorageSection, { type ImportReport } from './settings/DataStorageSection';
 import LibrarySection from './settings/LibrarySection';
 import NotificationSection from './settings/NotificationSection';
 import SiteIntegrationSection from './settings/SiteIntegrationSection';
@@ -77,6 +77,9 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
   // Interface mode states
   const [interfaceMode, setInterfaceMode] = useState<'popup' | 'sidepanel'>(DEFAULT_SETTINGS.interfaceMode as 'popup' | 'sidepanel');
   const [interfaceModeChanging, setInterfaceModeChanging] = useState(false);
+
+  // What the last import skipped, or why it stopped, until the user dismisses it
+  const [importReport, setImportReport] = useState<ImportReport | null>(null);
 
   // Data for import/export
   const [prompts, setPrompts] = useState<Prompt[]>([]);
@@ -419,14 +422,19 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
 
   // Handle import data
   const handleImportData = async (data: { prompts: Prompt[]; categories: Category[] }) => {
+    setImportReport(null);
     // An item that is refused at Admission (ADR-001) is skipped and reported; the rest are restored.
-    const skipped: { label: string; reason: string }[] = [];
+    const skipped: ImportReport['skipped'] = [];
     // Counted as they go: an import that stops keeps what it imported before
     const imported = { categories: 0, prompts: 0 };
+    // The Categories a restored Prompt names that neither the Backup nor the Library has are created
+    // with it (PR #487): they count with the Backup's own
+    let createdCategories = 0;
 
     const importEach = async <T,>(
       items: readonly T[],
       kind: keyof typeof imported,
+      id: (item: T) => string,
       label: (item: T) => string,
       importItem: (item: T) => Promise<unknown>
     ): Promise<void> => {
@@ -438,45 +446,52 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
           if (!(error instanceof AdmissionRefusedError)) {
             throw error;
           }
-          skipped.push({ label: label(item), reason: error.message });
+          skipped.push({ key: `${kind}:${id(item)}`, label: label(item), reason: error.message });
         }
       }
     };
 
     try {
       // Import categories first (prompts reference categories)
-      await importEach(data.categories, 'categories', (category) => category.name, (category) => storageManager.importCategory(category));
-      await importEach(data.prompts, 'prompts', (prompt) => prompt.title, (prompt) => storageManager.importPrompt(prompt));
+      await importEach(data.categories, 'categories', (category) => category.id || category.name, (category) => category.name, (category) => storageManager.importCategory(category));
+      const namesBefore = new Set((await storageManager.getCategories()).map((category) => category.name));
+      await importEach(data.prompts, 'prompts', (prompt) => prompt.id, (prompt) => prompt.title, (prompt) => storageManager.importPrompt(prompt));
+      createdCategories = (await storageManager.getCategories()).filter((category) => !namesBefore.has(category.name)).length;
     } catch (error) {
       Logger.error('Import failed', toError(error));
       // Show the Prompts imported before it stopped
       await loadSettings();
 
-      // Like a refused save, a refusal for storage opens the storage warning (not the file's fault)
       const appError = error as AppError;
+      const total = data.prompts.length;
+      const count = `${imported.prompts.toString()} of ${formatCount(total, 'prompt was', 'prompts were')}`;
+      // Like a refused save, a refusal for storage opens the storage warning (not the file's fault)
       if (appError.type === 'STORAGE_QUOTA_EXCEEDED') {
-        const total = data.prompts.length;
-        const count = `${imported.prompts.toString()} of ${total.toString()} ${total === 1 ? 'prompt was' : 'prompts were'}`;
         onStorageRefused(`The import stopped when storage was full: ${count} imported. ${appError.message}`);
         return;
       }
-      throw error;
+      // Any other error: the report says how many were imported and why it stopped, which a toast
+      // cut at 80 characters cannot hold
+      const reason = error instanceof Error ? error.message : 'Unknown error occurred';
+      setImportReport({ skipped, stopped: { imported: imported.prompts, total, reason } });
+      showToast(`Import stopped: ${count} imported. See Backup & Restore.`, 'error');
+      return;
     }
 
     // Reload data
     await loadSettings();
 
+    const summary = `${formatCount(imported.prompts, 'prompt', 'prompts')} and ${formatCount(imported.categories + createdCategories, 'category', 'categories')}`;
     if (skipped.length === 0) {
-      showToast(`Successfully imported ${data.prompts.length.toString()} prompts and ${data.categories.length.toString()} categories!`, 'success');
+      showToast(`Successfully imported ${summary}!`, 'success');
     } else {
-      const details = skipped.slice(0, 3).map((item) => `"${item.label}" (${item.reason})`).join('; ');
-      const more = skipped.length > 3 ? ` and ${(skipped.length - 3).toString()} more` : '';
-      showToast(
-        `Imported ${imported.prompts.toString()} prompts and ${imported.categories.toString()} categories. Skipped ${skipped.length.toString()}: ${details}${more}.`,
-        'warning'
-      );
+      // Every skipped title and reason stays in Backup & Restore: a toast shows 80 characters
+      setImportReport({ skipped });
+      showToast(`Imported ${summary}. Skipped ${skipped.length.toString()}: see Backup & Restore.`, 'warning');
     }
   };
+
+  const dismissImportReport = useCallback(() => { setImportReport(null); }, []);
 
   // Handle clear data
   const handleClearData = async () => {
@@ -629,6 +644,8 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
             categories={categories}
             storageUsage={storageUsage}
             onImport={handleImportData}
+            importReport={importReport}
+            onDismissImportReport={dismissImportReport}
             onClearData={handleClearData}
             onShowToast={showToast}
           />
