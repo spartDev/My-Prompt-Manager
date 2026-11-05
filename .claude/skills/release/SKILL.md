@@ -14,13 +14,16 @@ A release is two hand-offs: a **bump PR** that the user merges, then an annotate
 ```bash
 git status --porcelain
 git fetch -q origin --tags
-LAST=$(git describe --tags --abbrev=0 origin/main)
-node -p "[require('./package.json').version, require('./package-lock.json').version, require('./manifest.json').version].join(' ')"
-git log --no-merges --format='%h %s' "$LAST..origin/main"
-git log --no-merges --format='%h %s' -E --grep='BREAKING[ -]CHANGE' "$LAST..origin/main"
+BASE=$(git rev-parse origin/main)
+LAST=$(git describe --tags --abbrev=0 "$BASE")
+for f in package.json package-lock.json manifest.json; do git show "$BASE:$f" | node -p "JSON.parse(require('fs').readFileSync(0)).version"; done
+git log --no-merges --format='%h %s' "$LAST..$BASE"
+git log --no-merges --format='%h %s' -E --grep='BREAKING[ -]CHANGE' "$LAST..$BASE"
 ```
 
-Done when: `git status --porcelain` prints nothing, the three versions are equal to `$LAST` without its `v`, and you hold both commit lists. Uncommitted changes go back to the user to commit or set aside before anything else; three unequal versions are a bug to report.
+`$BASE` is the `main` the version and the CHANGELOG are built from; steps 5 and 6 check that nothing landed after it. The versions are read at `$BASE`, not in the working tree, so the branch you start from does not matter.
+
+Done when: `git status --porcelain` prints nothing, the three versions are equal to `$LAST` without its `v`, and you hold `$BASE` and both commit lists. Uncommitted changes go back to the user to commit or set aside before anything else; three unequal versions are a bug to report.
 
 ## 2. Pick the version
 
@@ -43,7 +46,7 @@ Done when: the check prints `ok`, and the user confirms the version and the grou
 
 ## 3. Write the bump
 
-Branch off `origin/main` as `release/vX.Y.Z`, then:
+Branch off `$BASE` as `release/vX.Y.Z`, then:
 
 - **`package.json` and `package-lock.json`**: `npm version X.Y.Z --no-git-tag-version`. It edits both files in place and installs nothing, which keeps a worktree's symlinked `node_modules` intact.
 - **`manifest.json`**: set `"version"` to `X.Y.Z`.
@@ -64,7 +67,7 @@ Branch off `origin/main` as `release/vX.Y.Z`, then:
   Keep only the subsections that have entries. Write each entry in the user's terms and the domain terms of `CONTEXT.md` (Prompt, Library, Category…), one per user-visible change; leave out `test`, `ci` and `chore` commits unless the user would notice them.
 - **`README.md`**: the version badge, the `prompt-library-extension-vX.Y.Z.zip` name, and the `### Version X.Y (Current)` heading of the Roadmap when the minor changes.
 
-Done when: `node -p` from step 1 prints `X.Y.Z` three times, and `grep -nF "${LAST#v}" README.md` (`$LAST` from step 1) finds only lines unrelated to the release, such as a dependency that happens to share the number.
+Done when: `node -p "[require('./package.json').version, require('./package-lock.json').version, require('./manifest.json').version].join(' ')"` prints `X.Y.Z` three times, and `grep -nF "${LAST#v}" README.md` (`$LAST` from step 1) finds only lines unrelated to the release, such as a dependency that happens to share the number.
 
 ## 4. Check
 
@@ -74,9 +77,11 @@ Done when: all five pass.
 
 ## 5. Open the bump PR
 
-Commit as `chore: bump version to X.Y.Z`, push, and open the PR on `.github/PULL_REQUEST_TEMPLATE.md` with the CHANGELOG section as its summary.
+Commit as `chore: bump version to X.Y.Z`, push, and open the PR on `.github/PULL_REQUEST_TEMPLATE.md` with the CHANGELOG section as its summary and a line `Base: <full $BASE SHA>`. Shell variables do not outlive a command, and step 6 runs after the merge, so it reads `BASE` back from that line.
 
-Done when: the PR's checks are green. **Hand-off: the user merges it.**
+Right before the hand-off, `git fetch -q origin main && git log --no-merges --format='%h %s' "$BASE..origin/main"` must print nothing. Commits there would ship in the release without a CHANGELOG entry: rebase the bump branch on `origin/main`, set `BASE` to it and update the PR's `Base:` line, add their entries, rerun the step 2 check, and push again.
+
+Done when: the PR's checks are green and that log is empty. **Hand-off: the user merges it, with nothing else merged in between.**
 
 ## 6. Tag
 
@@ -85,8 +90,11 @@ After the merge, tag the bump PR's own merge commit, not the tip of `main`: anot
 ```bash
 SHA=$(gh pr view <bump PR number> --json mergeCommit -q .mergeCommit.oid)
 git fetch -q origin main
+git log --no-merges --format='%h %s' "$BASE..$SHA^1"
 git tag -a vX.Y.Z -m "Release vX.Y.Z" "$SHA"
 ```
+
+The `git log` lists what reached `main` between `$BASE` and the merge; it must print nothing before you tag. Anything it prints would ship unlisted: stop, show the user, and leave the version untagged until they decide.
 
 Confirm with the user before `git push origin vX.Y.Z`: the push publishes the GitHub Release. A tag run carries the tag as its branch, and GitHub takes a few seconds to register it, so wait for that run before watching it, in the background:
 
