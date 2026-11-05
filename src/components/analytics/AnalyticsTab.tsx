@@ -1,5 +1,6 @@
-import { type FC, useState } from 'react';
+import { type FC, useCallback, useRef, useState } from 'react';
 
+import { useModalFocus } from '../../hooks/useModalFocus';
 import { useNow } from '../../hooks/useNow';
 import { useSummaryMetrics } from '../../hooks/useSummaryMetrics';
 import { useUsageStats } from '../../hooks/useUsageStats';
@@ -32,6 +33,17 @@ const AnalyticsTab: FC<AnalyticsTabProps> = ({
   const { stats, loading, error, clearHistory } = useUsageStats();
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
+  const clearDialogRef = useRef<HTMLDivElement>(null);
+  const clearCancelRef = useRef<HTMLButtonElement>(null);
+  const closeClearConfirm = useCallback(() => {
+    if (!isClearing) {setShowClearConfirm(false);}
+  }, [isClearing]);
+  useModalFocus({
+    isOpen: showClearConfirm,
+    onClose: closeClearConfirm,
+    containerRef: clearDialogRef,
+    initialFocusRef: clearCancelRef
+  });
 
   // Compute summary metrics using shared hook
   const summaryMetrics = useSummaryMetrics(stats);
@@ -249,6 +261,7 @@ const AnalyticsTab: FC<AnalyticsTabProps> = ({
             data-testid="modal-backdrop"
           />
           <div
+            ref={clearDialogRef}
             className="relative z-10 bg-card rounded-xl p-6 max-w-sm mx-4 shadow-2xl"
             role="dialog"
             aria-modal="true"
@@ -267,6 +280,7 @@ const AnalyticsTab: FC<AnalyticsTabProps> = ({
             </p>
             <div className="flex gap-3">
               <button
+                ref={clearCancelRef}
                 onClick={() => { setShowClearConfirm(false); }}
                 className="flex-1 px-4 py-2 text-sm font-semibold text-secondary bg-card hover:bg-muted border border-strong rounded-xl transition-colors focus-secondary"
                 disabled={isClearing}

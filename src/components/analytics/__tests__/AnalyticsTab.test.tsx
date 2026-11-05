@@ -6,6 +6,7 @@
  */
 
 import { fireEvent, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useUsageStats } from '../../../hooks/useUsageStats';
@@ -591,6 +592,42 @@ describe('AnalyticsTab', () => {
 
       fireEvent.click(screen.getByTestId('modal-backdrop'));
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('moves focus into the dialog and keeps Tab and Shift+Tab inside it', async () => {
+      mockUseUsageStats.mockReturnValue(createMockReturn());
+      const user = userEvent.setup();
+
+      render(<AnalyticsTab />);
+
+      await user.click(screen.getByRole('button', { name: /clear history/i }));
+      const dialog = screen.getByRole('dialog', { name: 'Clear Usage History?' });
+      const cancel = within(dialog).getByRole('button', { name: 'Cancel' });
+      const confirm = within(dialog).getByRole('button', { name: 'Clear History' });
+
+      expect(cancel).toHaveFocus();
+      await user.tab();
+      expect(confirm).toHaveFocus();
+      await user.tab();
+      expect(cancel).toHaveFocus();
+      await user.tab({ shift: true });
+      expect(confirm).toHaveFocus();
+    });
+
+    it('closes on Escape and returns focus to the Clear history button', async () => {
+      mockUseUsageStats.mockReturnValue(createMockReturn());
+      const user = userEvent.setup();
+
+      render(<AnalyticsTab />);
+
+      const opener = screen.getByRole('button', { name: /clear history/i });
+      await user.click(opener);
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+      await user.keyboard('{Escape}');
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(opener).toHaveFocus();
     });
   });
 });

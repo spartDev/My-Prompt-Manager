@@ -1,6 +1,8 @@
 import type { FC, ReactNode } from 'react';
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import { createPortal } from 'react-dom';
+
+import { useModalFocus } from '../hooks/useModalFocus';
 
 export type ConfirmDialogVariant = 'danger' | 'warning' | 'info';
 
@@ -62,49 +64,10 @@ const ConfirmDialog: FC<ConfirmDialogProps> = ({
   variant = 'danger'
 }) => {
   const dialogRef = useRef<HTMLDivElement>(null);
-  const confirmButtonRef = useRef<HTMLButtonElement>(null);
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
 
-  // Focus management
-  useEffect(() => {
-    if (isOpen) {
-      // Focus the cancel button by default for safety
-      if (cancelButtonRef.current) {
-        cancelButtonRef.current.focus();
-      }
-    }
-  }, [isOpen]);
-
-  // Handle ESC key and trap focus
-  useEffect(() => {
-    if (!isOpen) {return;}
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onCancel();
-      } else if (e.key === 'Tab') {
-        // Simple focus trap between the two buttons
-        const focusableElements = [cancelButtonRef.current, confirmButtonRef.current].filter(Boolean);
-        if (focusableElements.length === 2) {
-          const currentIndex = focusableElements.indexOf(document.activeElement as HTMLButtonElement);
-          if (e.shiftKey) {
-            // Shift+Tab: go backwards
-            const nextIndex = currentIndex <= 0 ? focusableElements.length - 1 : currentIndex - 1;
-            e.preventDefault();
-            focusableElements[nextIndex]?.focus();
-          } else {
-            // Tab: go forwards
-            const nextIndex = currentIndex >= focusableElements.length - 1 ? 0 : currentIndex + 1;
-            e.preventDefault();
-            focusableElements[nextIndex]?.focus();
-          }
-        }
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => { document.removeEventListener('keydown', handleKeyDown); };
-  }, [isOpen, onCancel]);
+  // Cancel takes the focus first, for safety
+  useModalFocus({ isOpen, onClose: onCancel, containerRef: dialogRef, initialFocusRef: cancelButtonRef });
 
   if (!isOpen) {return null;}
 
@@ -155,7 +118,6 @@ const ConfirmDialog: FC<ConfirmDialogProps> = ({
         </div>
         <div className="mt-3 flex flex-row-reverse gap-2">
           <button
-            ref={confirmButtonRef}
             type="button"
             onClick={onConfirm}
             className={`inline-flex justify-center rounded-lg px-3 py-1.5 text-xs font-semibold text-on-accent shadow-sm focus-secondary transition-colors ${styles.confirmButton}`}
