@@ -35,11 +35,11 @@ The argument wins when given. Otherwise read the commit list as conventional com
 
 The version is always three integers, `X.Y.Z`. Chrome's `manifest.json` accepts only dot-separated integers, and `release.yml` requires the built manifest to equal the tag, so a suffixed version (`-beta.1`) cannot pass the workflow. A request for a pre-release goes back to the user as out of scope for this skill.
 
-The new version must move past `$LAST` and be untagged; this prints `ok` only then:
+The new version must be three integers, move past `$LAST` and be untagged; this prints `ok` only then:
 
 ```bash
 V=X.Y.Z
-[ "$V" != "${LAST#v}" ] && [ "$(printf '%s\n' "${LAST#v}" "$V" | sort -V | tail -1)" = "$V" ] && ! git rev-parse -q --verify "refs/tags/v$V" >/dev/null && echo ok
+printf '%s\n' "$V" | grep -Eqx '(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)' && [ "$V" != "${LAST#v}" ] && [ "$(printf '%s\n' "${LAST#v}" "$V" | sort -V | tail -1)" = "$V" ] && ! git rev-parse -q --verify "refs/tags/v$V" >/dev/null && echo ok
 ```
 
 Done when: the check prints `ok`, and the user confirms the version and the grouped change list you showed them. A version that fails the check goes back to the user.
