@@ -44,7 +44,7 @@ Other keys of `chrome.storage.local` belong to the code that owns them, which wr
 | `src/services/SearchIndex.ts` | The inverted index behind `PromptManager`'s search |
 | `src/services/SimilarityAlgorithms.ts` | The string similarity behind duplicate detection |
 | `src/services/libraryFilter.ts` | The Library filter (All, Pinned, Most Used, one Category): which Categories get a pill, and which Prompts a filter keeps |
-| `src/services/UsageTracker.ts` | Usage events for Analytics: one per insertion into a Platform (the service worker records it), kept 30 days |
+| `src/services/UsageTracker.ts` | Usage events for Analytics: one per insertion into a Platform (the service worker records it). Analytics reads the last 30 days; storage drops older events only once the history reaches 9,000 events, and keeps at most 10,000 (`cleanup()` has no production caller) |
 | `src/services/promptEncoder.ts` | Share codes: one Prompt as compact text, decoded without changing the text (Admission happens when the Prompt is saved) |
 | `src/services/configurationEncoder.ts` | Import and export codes of a custom site configuration: compression, checksum, validation of the decoded configuration |
 
