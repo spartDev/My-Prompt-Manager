@@ -614,6 +614,25 @@ describe('AnalyticsTab', () => {
       expect(confirm).toHaveFocus();
     });
 
+    it('keeps Tab inside the dialog while the clear is pending and both buttons are disabled', async () => {
+      mockUseUsageStats.mockReturnValue(createMockReturn({
+        clearHistory: vi.fn().mockReturnValue(new Promise<void>(() => { /* never settles: the clear stays pending */ }))
+      }));
+      const user = userEvent.setup();
+
+      render(<AnalyticsTab />);
+
+      await user.click(screen.getByRole('button', { name: /clear history/i }));
+      const dialog = screen.getByRole('dialog', { name: 'Clear Usage History?' });
+      await user.click(within(dialog).getByRole('button', { name: 'Clear History' }));
+      expect(within(dialog).getByRole('button', { name: 'Clearing...' })).toBeDisabled();
+
+      await user.tab();
+      expect(dialog.contains(document.activeElement)).toBe(true);
+      await user.tab({ shift: true });
+      expect(dialog.contains(document.activeElement)).toBe(true);
+    });
+
     it('closes on Escape and returns focus to the Clear history button', async () => {
       mockUseUsageStats.mockReturnValue(createMockReturn());
       const user = userEvent.setup();

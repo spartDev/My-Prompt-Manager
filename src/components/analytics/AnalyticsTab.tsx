@@ -262,7 +262,8 @@ const AnalyticsTab: FC<AnalyticsTabProps> = ({
           />
           <div
             ref={clearDialogRef}
-            className="relative z-10 bg-card rounded-xl p-6 max-w-sm mx-4 shadow-2xl"
+            tabIndex={-1}
+            className="relative z-10 bg-card rounded-xl p-6 max-w-sm mx-4 shadow-2xl focus:outline-none"
             role="dialog"
             aria-modal="true"
             aria-labelledby="clear-history-title"

@@ -7,7 +7,10 @@ export interface UseModalFocusOptions {
   isOpen: boolean;
   /** Called on Escape */
   onClose: () => void;
-  /** The dialog panel: Tab and Shift+Tab cycle through its enabled focusable elements */
+  /**
+   * The dialog panel, with tabIndex={-1}: Tab and Shift+Tab cycle through its enabled focusable
+   * elements, and focus the panel itself when every one is disabled
+   */
   containerRef: RefObject<HTMLElement | null>;
   /** The element focused when the dialog opens (the safe choice, e.g. Cancel) */
   initialFocusRef: RefObject<HTMLElement | null>;
@@ -39,9 +42,13 @@ export function useModalFocus({ isOpen, onClose, containerRef, initialFocusRef }
 
       const focusable = Array.from(containerRef.current.querySelectorAll<HTMLElement>(FOCUSABLE))
         .filter(element => !element.hasAttribute('disabled'));
-      if (focusable.length === 0) {return;}
-
       event.preventDefault();
+      if (focusable.length === 0) {
+        // Every control is disabled (an action in progress): hold the focus on the panel itself
+        containerRef.current.focus();
+        return;
+      }
+
       const current = focusable.indexOf(document.activeElement as HTMLElement);
       const step = event.shiftKey ? -1 : 1;
       const next = current === -1
