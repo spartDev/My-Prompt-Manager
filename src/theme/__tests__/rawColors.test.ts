@@ -89,9 +89,12 @@ const DARK_COLOR_VARIANT = new RegExp(`(?<![\\w-])dark:(?:[\\w-]+:)*(?:${COLOR_U
 /** A `// Before` or `// Don't` comment line in a code block opens a counter-example */
 const COUNTER_EXAMPLE = /^\s*\/\/\s*(?:Before|Don't)\b/i;
 
+/** An `// After` comment line opens the prescribed version, so it ends a counter-example */
+const PRESCRIBED_EXAMPLE = /^\s*\/\/\s*After\b/i;
+
 /**
  * Guidance minus the counter-examples it shows on purpose: in a fenced code block, the lines from a
- * `// Before` or `// Don't` comment to the next blank line or the end of the block.
+ * `// Before` or `// Don't` comment to the next blank line, `// After` comment or the end of the block.
  */
 function withoutCounterExamples(markdown: string): string {
   let inBlock = false;
@@ -110,7 +113,7 @@ function withoutCounterExamples(markdown: string): string {
       }
       if (COUNTER_EXAMPLE.test(line)) {
         inCounterExample = true;
-      } else if (line.trim() === '') {
+      } else if (line.trim() === '' || PRESCRIBED_EXAMPLE.test(line)) {
         inCounterExample = false;
       }
       return !inCounterExample;
@@ -150,5 +153,11 @@ describe('Components on the color tokens', () => {
 
     expect(kept.match(RAW_PALETTE_CLASS)).toEqual(['text-gray-500', 'text-purple-600']);
     expect(kept.match(DARK_COLOR_VARIANT)).toBeNull();
+  });
+
+  it('ends a counter-example at an `// After` comment, blank line or not', () => {
+    const guide = ['```tsx', '// Before', '<div className="bg-white">', '// After', '<div className="bg-card text-gray-500">', '```'].join('\n');
+
+    expect(withoutCounterExamples(guide).match(RAW_PALETTE_CLASS)).toEqual(['text-gray-500']);
   });
 });
