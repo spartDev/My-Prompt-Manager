@@ -46,8 +46,11 @@ git archive HEAD | docker run -i --rm --ipc=host \
   -v mpm-e2e-linux-npm:/root/.npm \
   -v mpm-e2e-linux-browsers:/ms-playwright \
   -v "$out:/out" \
+  -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
   "$image" bash -c '
     set -euo pipefail
+    # The container runs as root: on a rootful Linux daemon, hand the output back so the next run can clear it
+    trap '\''chown -R "$HOST_UID:$HOST_GID" /out'\'' EXIT
     mkdir /work && tar -x -C /work && cd /work
     HUSKY=0 npm ci --no-audit --no-fund --loglevel=error
     apt-get update -qq && apt-get install -y -qq fonts-dejavu-core >/dev/null
