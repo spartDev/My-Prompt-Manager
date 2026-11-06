@@ -721,6 +721,51 @@ describe('SettingsView', () => {
       expect(screen.getByRole('switch', { name: /enable my ai integration/i })).toHaveAttribute('aria-checked', 'true');
       expect(screen.getByRole('radio', { name: /select side panel mode/i })).toBeChecked();
     });
+
+    // My-Prompt-Manager-4ax: an import loads the settings again; when that read fails, the settings shown are
+    // still what storage has, so the defaults must not be saved over them
+    it('keeps the stored site settings when the load after an import fails, and saves nothing', async () => {
+      const chromeMock = getChromeMockFunctions();
+      const stored = {
+        promptLibrarySettings: {
+          enabledSites: ['chatgpt.com'],
+          customSites: [{ hostname: 'my-ai.example.com', displayName: 'My AI', enabled: true, dateAdded: 1 }]
+        },
+        interfaceMode: 'sidepanel',
+        settings: DEFAULT_SETTINGS
+      };
+      (chromeMock.storage.local.get as Mock).mockResolvedValue(stored);
+      const siteSettingsReads = () =>
+        (chromeMock.storage.local.get as Mock).mock.calls.filter(([keys]) => Array.isArray(keys) && keys.includes('promptLibrarySettings'));
+
+      await renderSettings();
+      await screen.findByRole('switch', { name: /enable my ai integration/i });
+      await waitPastTheDebounce();
+      // From now on the site settings cannot be read; the import's own reads of the Library still work
+      (chromeMock.storage.local.get as Mock).mockImplementation((keys: unknown) =>
+        Array.isArray(keys) && keys.includes('promptLibrarySettings')
+          ? Promise.reject(new Error('storage unavailable'))
+          : Promise.resolve(stored)
+      );
+
+      const prompts: Prompt[] = [
+        { id: 'p1', title: 'Greeting', content: 'Hello', category: 'Uncategorized', createdAt: 1, updatedAt: 1 }
+      ];
+      const fileInput = document.querySelector<HTMLInputElement>('input[type="file"]');
+      await userEvent.upload(fileInput as HTMLInputElement, createJsonFile(JSON.stringify({ prompts, categories: [] })));
+      await waitFor(() => {
+        expect(siteSettingsReads()).toHaveLength(2);
+      });
+      await waitPastTheDebounce();
+      await waitPastTheDebounce();
+
+      expect(siteSettingsWrites()).toHaveLength(0);
+      expect(chromeMock.tabs.sendMessage).not.toHaveBeenCalled();
+      expect(screen.getByRole('switch', { name: 'Enable ChatGPT integration' })).toHaveAttribute('aria-checked', 'true');
+      expect(screen.getByRole('switch', { name: 'Enable Claude integration' })).toHaveAttribute('aria-checked', 'false');
+      expect(screen.getByRole('switch', { name: /enable my ai integration/i })).toHaveAttribute('aria-checked', 'true');
+      expect(screen.getByRole('radio', { name: /select side panel mode/i })).toBeChecked();
+    });
   });
 
   it('changes the interface mode when a different option is selected', async () => {
@@ -1152,6 +1197,54 @@ describe('SettingsView', () => {
     // The DataStorageSection shows count info
     expect(screen.getByText('3 prompts')).toBeInTheDocument();
     expect(screen.getByText('2 categories')).toBeInTheDocument();
+  });
+
+  // My-Prompt-Manager-spi: a Library that cannot be read is not an empty one. Saying "0 prompts" and exporting
+  // an empty Backup would let the user believe the Library is saved.
+  describe('when the Library cannot be read', () => {
+    afterEach(() => {
+      delete window.showSaveFilePicker;
+    });
+
+    it.each(['getPrompts', 'getCategories'] as const)('says so and exports no Backup when %s fails', async (read) => {
+      getMockStorageManager()[read].mockRejectedValue(new Error('locked'));
+      const showSaveFilePicker = vi.fn();
+      window.showSaveFilePicker = showSaveFilePicker;
+      const createObjectURL = vi.spyOn(URL, 'createObjectURL');
+
+      await renderSettings();
+      const dataStorage = screen.getByRole('region', { name: 'Data & Storage' });
+
+      expect(within(dataStorage).getByText('The Library could not be read')).toBeInTheDocument();
+      expect(within(dataStorage).queryByText('0 prompts')).not.toBeInTheDocument();
+      expect(within(dataStorage).queryByText('0 categories')).not.toBeInTheDocument();
+      const exportButton = within(dataStorage).getByRole('button', { name: 'Export' });
+      expect(exportButton).toBeDisabled();
+      expect(exportButton).toHaveAccessibleDescription(/the Library could not be read/i);
+      await userEvent.click(exportButton);
+      expect(showSaveFilePicker).not.toHaveBeenCalled();
+      expect(createObjectURL).not.toHaveBeenCalled();
+    });
+
+    it('counts the Library and exports it again once a later load reads it', async () => {
+      const storageMock = getMockStorageManager();
+      storageMock.getPrompts.mockRejectedValueOnce(new Error('locked'));
+
+      await renderSettings();
+      const dataStorage = screen.getByRole('region', { name: 'Data & Storage' });
+      expect(within(dataStorage).getByRole('button', { name: 'Export' })).toBeDisabled();
+
+      // An import loads the Library again
+      storageMock.getPrompts.mockResolvedValue([
+        { id: 'p1', title: 'Greeting', content: 'Hello', category: 'Uncategorized', createdAt: 1, updatedAt: 1 }
+      ]);
+      const fileInput = document.querySelector<HTMLInputElement>('input[type="file"]');
+      await userEvent.upload(fileInput as HTMLInputElement, createJsonFile(JSON.stringify({ prompts: [], categories: [] })));
+
+      expect(await within(dataStorage).findByText('1 prompt')).toBeInTheDocument();
+      expect(within(dataStorage).queryByText('The Library could not be read')).not.toBeInTheDocument();
+      expect(within(dataStorage).getByRole('button', { name: 'Export' })).toBeEnabled();
+    });
   });
 
   it('handles export button click without crashing', async () => {
