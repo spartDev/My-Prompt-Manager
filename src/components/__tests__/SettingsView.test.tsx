@@ -722,11 +722,9 @@ describe('SettingsView', () => {
       expect(screen.getByRole('radio', { name: /select side panel mode/i })).toBeChecked();
     });
 
-    // My-Prompt-Manager-4ax: an import loads the settings again; when that read fails, the settings shown are
-    // still what storage has, so the defaults must not be saved over them
-    it('keeps the stored site settings when the load after an import fails, and saves nothing', async () => {
-      const chromeMock = getChromeMockFunctions();
-      const stored = {
+    // A later load: after an import, Clear All Data or a reset, Settings loads the site settings again
+    describe('when the load after an action fails', () => {
+      const STORED_WITH_A_CUSTOM_SITE = {
         promptLibrarySettings: {
           enabledSites: ['chatgpt.com'],
           customSites: [{ hostname: 'my-ai.example.com', displayName: 'My AI', enabled: true, dateAdded: 1 }]
@@ -734,37 +732,83 @@ describe('SettingsView', () => {
         interfaceMode: 'sidepanel',
         settings: DEFAULT_SETTINGS
       };
-      (chromeMock.storage.local.get as Mock).mockResolvedValue(stored);
+      const readsTheSiteSettings = (keys: unknown) => Array.isArray(keys) && keys.includes('promptLibrarySettings');
       const siteSettingsReads = () =>
-        (chromeMock.storage.local.get as Mock).mock.calls.filter(([keys]) => Array.isArray(keys) && keys.includes('promptLibrarySettings'));
+        (getChromeMockFunctions().storage.local.get as Mock).mock.calls.filter(([keys]) => readsTheSiteSettings(keys));
 
-      await renderSettings();
-      await screen.findByRole('switch', { name: /enable my ai integration/i });
-      await waitPastTheDebounce();
-      // From now on the site settings cannot be read; the import's own reads of the Library still work
-      (chromeMock.storage.local.get as Mock).mockImplementation((keys: unknown) =>
-        Array.isArray(keys) && keys.includes('promptLibrarySettings')
-          ? Promise.reject(new Error('storage unavailable'))
-          : Promise.resolve(stored)
-      );
+      // Opens Settings on the stored site settings; from then on they cannot be read, while the other reads
+      // (the Library, which an import reads and writes) still work
+      const openSettingsThenFailSiteSettingsReads = async () => {
+        const get = getChromeMockFunctions().storage.local.get as Mock;
+        get.mockResolvedValue(STORED_WITH_A_CUSTOM_SITE);
+        await renderSettings();
+        await screen.findByRole('switch', { name: /enable my ai integration/i });
+        await waitPastTheDebounce();
+        get.mockImplementation((keys: unknown) =>
+          readsTheSiteSettings(keys) ? Promise.reject(new Error('storage unavailable')) : Promise.resolve(STORED_WITH_A_CUSTOM_SITE)
+        );
+      };
+      const waitForTheFailedLoad = async () => {
+        await waitFor(() => {
+          expect(siteSettingsReads()).toHaveLength(2);
+        });
+        // Updates made inside an async act flush when it ends: the first wait lets the load finish,
+        // the second lets a save armed by it run
+        await waitPastTheDebounce();
+        await waitPastTheDebounce();
+      };
 
-      const prompts: Prompt[] = [
-        { id: 'p1', title: 'Greeting', content: 'Hello', category: 'Uncategorized', createdAt: 1, updatedAt: 1 }
-      ];
-      const fileInput = document.querySelector<HTMLInputElement>('input[type="file"]');
-      await userEvent.upload(fileInput as HTMLInputElement, createJsonFile(JSON.stringify({ prompts, categories: [] })));
-      await waitFor(() => {
-        expect(siteSettingsReads()).toHaveLength(2);
+      // My-Prompt-Manager-4ax: an import leaves the site settings as they were, so the settings shown are still
+      // what storage has, and the defaults must not be saved over them
+      it('keeps the stored site settings when the load after an import fails, and saves nothing', async () => {
+        const chromeMock = getChromeMockFunctions();
+        await openSettingsThenFailSiteSettingsReads();
+
+        const prompts: Prompt[] = [
+          { id: 'p1', title: 'Greeting', content: 'Hello', category: 'Uncategorized', createdAt: 1, updatedAt: 1 }
+        ];
+        const fileInput = document.querySelector<HTMLInputElement>('input[type="file"]');
+        await userEvent.upload(fileInput as HTMLInputElement, createJsonFile(JSON.stringify({ prompts, categories: [] })));
+        await waitForTheFailedLoad();
+
+        expect(siteSettingsWrites()).toHaveLength(0);
+        expect(chromeMock.tabs.sendMessage).not.toHaveBeenCalled();
+        expect(screen.getByRole('switch', { name: 'Enable ChatGPT integration' })).toHaveAttribute('aria-checked', 'true');
+        expect(screen.getByRole('switch', { name: 'Enable Claude integration' })).toHaveAttribute('aria-checked', 'false');
+        expect(screen.getByRole('switch', { name: /enable my ai integration/i })).toHaveAttribute('aria-checked', 'true');
+        expect(screen.getByRole('radio', { name: /select side panel mode/i })).toBeChecked();
       });
-      await waitPastTheDebounce();
-      await waitPastTheDebounce();
 
-      expect(siteSettingsWrites()).toHaveLength(0);
-      expect(chromeMock.tabs.sendMessage).not.toHaveBeenCalled();
-      expect(screen.getByRole('switch', { name: 'Enable ChatGPT integration' })).toHaveAttribute('aria-checked', 'true');
-      expect(screen.getByRole('switch', { name: 'Enable Claude integration' })).toHaveAttribute('aria-checked', 'false');
-      expect(screen.getByRole('switch', { name: /enable my ai integration/i })).toHaveAttribute('aria-checked', 'true');
-      expect(screen.getByRole('radio', { name: /select side panel mode/i })).toBeChecked();
+      // Review round 1 (Codex): Clear All Data and a reset leave the default site settings in storage. When the
+      // load after them fails, Settings shows the defaults, not the settings from before, which a change the
+      // user makes would save back; and the save that follows sends the defaults to the tabs
+      // Clear All Data leaves no interface mode, which reads as the default; a reset writes the popup window
+      it.each([
+        ['Clear All Data', /select side panel mode/i, async () => {
+          await userEvent.click(screen.getByRole('button', { name: 'Clear All Data' }));
+          await userEvent.click(await screen.findByRole('button', { name: 'Yes, Clear All Data' }));
+        }],
+        ['a reset', /select popup window mode/i, async () => {
+          await userEvent.click(await screen.findByRole('button', { name: /about & reset/i }));
+          await userEvent.click(await screen.findByRole('button', { name: /reset to defaults/i }));
+          await userEvent.click(await screen.findByRole('button', { name: /yes, reset settings/i }));
+        }]
+      ])('shows the default site settings when the load after %s fails, and sends them to the tabs', async (_action, interfaceModeShown, runAction) => {
+        const chromeMock = getChromeMockFunctions();
+        await openSettingsThenFailSiteSettingsReads();
+
+        await runAction();
+        await waitForTheFailedLoad();
+
+        expect(screen.queryByRole('switch', { name: /enable my ai integration/i })).not.toBeInTheDocument();
+        expect(screen.getByRole('switch', { name: 'Enable Claude integration' })).toHaveAttribute('aria-checked', 'true');
+        expect(screen.getByRole('radio', { name: interfaceModeShown })).toBeChecked();
+        expect(chromeMock.tabs.sendMessage).toHaveBeenCalledTimes(1);
+        expect(chromeMock.tabs.sendMessage).toHaveBeenCalledWith(7, {
+          action: 'settingsUpdated',
+          settings: expect.objectContaining({ customSites: [], enabledSites: expect.arrayContaining(['chatgpt.com', 'claude.ai']) })
+        });
+      });
     });
   });
 

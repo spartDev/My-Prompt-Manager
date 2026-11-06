@@ -163,8 +163,9 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
     } catch (error) {
       Logger.error('Failed to load settings', toError(error));
       // A first load that fails shows the defaults. Shown, not saved: only a change the user makes to
-      // them is saved. A later load that fails keeps the settings shown: an import leaves the site
-      // settings as they were, and the defaults would be saved over them (My-Prompt-Manager-4ax)
+      // them is saved. A later load that fails keeps the settings shown, which are what storage has: an
+      // import leaves the site settings as they were, and the defaults would be saved over them
+      // (My-Prompt-Manager-4ax); Clear All Data and a reset show the defaults they leave before reloading
       if (storedSettings.current === null) {
         storedSettings.current = defaultSettings;
         setSettings(defaultSettings);
@@ -514,10 +515,19 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
 
   const dismissImportReport = useCallback(() => { setImportReport(null); }, []);
 
+  // Clear All Data and a reset leave the default site settings in storage. Shown before the reload, they
+  // stay shown when it fails, rather than the settings from before, which a change the user makes would
+  // save back. When they differ from the stored settings, the save that follows sends them to the tabs.
+  const showDefaultSiteSettings = (interfaceModeInStorage: 'popup' | 'sidepanel') => {
+    setSettings(defaultSettings);
+    setInterfaceMode(interfaceModeInStorage);
+  };
+
   // Handle clear data
   const handleClearData = async () => {
     try {
       await storageManager.clearAllData();
+      showDefaultSiteSettings(DEFAULT_SETTINGS.interfaceMode as 'popup' | 'sidepanel');
       await loadSettings();
       showToast('All data has been cleared.', 'success');
     } catch (error) {
@@ -543,7 +553,8 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
         };
         await storageManager.updateSettings(defaultUserSettings);
       }
-      
+
+      showDefaultSiteSettings('popup');
       await loadSettings();
       showToast('Settings have been reset to defaults.', 'success');
     } catch (error) {
