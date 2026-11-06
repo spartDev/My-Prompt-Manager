@@ -65,7 +65,7 @@ describe('App tab bar navigation', () => {
     await screen.findByLabelText(/title/i);
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
 
-    await user.click(screen.getByTestId('back-button'));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
     await screen.findByRole('heading', { name: /my prompt manager/i });
     expect(screen.getByRole('tab', { name: 'Library' })).toHaveAttribute('aria-selected', 'true');

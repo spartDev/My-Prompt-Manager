@@ -205,22 +205,18 @@ test.describe('Power User Prompt Management', () => {
     const socialMediaCard = sidepanelPage.getByTestId('prompt-card').filter({ hasText: 'Social Media Content' }).first();
     await socialMediaCard.getByRole('button', { name: /^Edit / }).click();
 
-    await expect(sidepanelPage.getByRole('heading', { name: 'Edit Prompt' })).toBeVisible();
-    await sidepanelPage.getByLabel('Category').click();
-    await sidepanelPage.getByRole('menu', { name: 'Select category' }).waitFor();
-    await sidepanelPage.getByRole('menuitem', { name: 'Work' }).click();
-    await sidepanelPage.getByRole('button', { name: 'Save Changes' }).click();
+    await expect(sidepanelPage.getByRole('heading', { name: 'Edit prompt', exact: true })).toBeVisible();
+    await sidepanelPage.getByRole('radio', { name: 'Work', exact: true }).click();
+    await sidepanelPage.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(sidepanelPage.getByText('Prompt updated successfully').first()).toBeVisible();
 
     // Move second marketing prompt to Work category
     const campaignAnalysisCard = sidepanelPage.getByTestId('prompt-card').filter({ hasText: 'Campaign Analysis' }).first();
     await campaignAnalysisCard.getByRole('button', { name: /^Edit / }).click();
 
-    await expect(sidepanelPage.getByRole('heading', { name: 'Edit Prompt' })).toBeVisible();
-    await sidepanelPage.getByLabel('Category').click();
-    await sidepanelPage.getByRole('menu', { name: 'Select category' }).waitFor();
-    await sidepanelPage.getByRole('menuitem', { name: 'Work' }).click();
-    await sidepanelPage.getByRole('button', { name: 'Save Changes' }).click();
+    await expect(sidepanelPage.getByRole('heading', { name: 'Edit prompt', exact: true })).toBeVisible();
+    await sidepanelPage.getByRole('radio', { name: 'Work', exact: true }).click();
+    await sidepanelPage.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(sidepanelPage.getByText('Prompt updated successfully').first()).toBeVisible();
 
     // Verify Marketing category is now empty: its pill is gone and the Library is back to All
@@ -310,11 +306,9 @@ test.describe('Power User Prompt Management', () => {
       const promptCard = sidepanelPage.getByTestId('prompt-card').filter({ hasText: promptTitle }).first();
       await promptCard.getByRole('button', { name: /^Edit / }).click();
 
-      await expect(sidepanelPage.getByRole('heading', { name: 'Edit Prompt' })).toBeVisible();
-      await sidepanelPage.getByLabel('Category').click();
-      await sidepanelPage.getByRole('menu', { name: 'Select category' }).waitFor();
-      await sidepanelPage.getByRole('menuitem', { name: 'Work' }).click();
-      await sidepanelPage.getByRole('button', { name: 'Save Changes' }).click();
+      await expect(sidepanelPage.getByRole('heading', { name: 'Edit prompt', exact: true })).toBeVisible();
+      await sidepanelPage.getByRole('radio', { name: 'Work', exact: true }).click();
+      await sidepanelPage.getByRole('button', { name: 'Save', exact: true }).click();
       await expect(sidepanelPage.getByText('Prompt updated successfully').first()).toBeVisible();
     }
 

@@ -272,7 +272,7 @@ export const modalNavigation = {
    */
   openPromptForm: async (page: Page): Promise<void> => {
     await page.getByRole('button', { name: 'Add new prompt' }).click();
-    await expect(page.getByRole('heading', { name: 'Add New Prompt' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'New prompt', exact: true })).toBeVisible();
   },
 
   /**
@@ -283,7 +283,7 @@ export const modalNavigation = {
       .filter({ has: page.getByRole('heading', { name: promptTitle }) })
       .first();
     await promptCard.getByRole('button', { name: /^Edit / }).click();
-    await expect(page.getByRole('heading', { name: 'Edit Prompt' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Edit prompt', exact: true })).toBeVisible();
   },
 };
 

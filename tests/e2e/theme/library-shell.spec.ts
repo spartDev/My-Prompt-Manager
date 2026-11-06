@@ -96,7 +96,7 @@ test.describe('App shell and Library on the tokens', () => {
       await expect(header).toHaveCSS('border-bottom-color', TRANSPARENT);
     });
 
-    test(`the Add and Edit forms show the header line once they scroll (${theme})`, async ({ page, storage, extensionId }) => {
+    test(`the Prompt editor, new and edit, shows the header line once it scrolls (${theme})`, async ({ page, storage, extensionId }) => {
       await openLibrary(page, storage, extensionId, { theme, library: [{ ...prompts[0], content: 'Ligne\n'.repeat(40) }] });
       const header = page.getByRole('banner');
 
@@ -104,11 +104,11 @@ test.describe('App shell and Library on the tokens', () => {
         await page.getByRole('button', { name: form === 'add' ? 'Add new prompt' : `Edit ${prompts[0].title}` }).click();
         await expect(header).toHaveCSS('border-bottom-color', TRANSPARENT);
 
-        await page.locator(`#${form}-prompt-form`).hover({ position: { x: 8, y: 8 } });
+        await page.locator('form').hover({ position: { x: 8, y: 8 } });
         await page.mouse.wheel(0, 300);
         await expect(header, `${form} form scrolled`).toHaveCSS('border-bottom-color', colors.strong);
 
-        await page.getByRole('button', { name: 'Cancel' }).click();
+        await page.getByRole('button', { name: 'Cancel', exact: true }).click();
         await expect(page.getByTestId('prompt-card')).toHaveCount(1);
       }
     });
@@ -180,7 +180,8 @@ test.describe('App shell and Library on the tokens', () => {
       }
       await page.getByTestId('tab-library').click();
       await page.getByTestId('new-prompt-button').click();
-      await expect(page.getByRole('img', { name: /icon$/ })).toHaveCSS('background-color', colors.accentSubtle);
+      // The Prompt editor has its own header bar: Cancel, the heading, Save (tests/e2e/library/prompt-editor.spec.ts)
+      await expect(page.getByRole('heading', { name: 'New prompt', exact: true })).toBeVisible();
       await page.screenshot({ path: `${SCREENSHOT_DIR}/header-add-${theme}.png` });
     });
   }

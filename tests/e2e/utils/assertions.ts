@@ -205,14 +205,14 @@ export const navigationAssertions = {
    * Expect prompt form to be in create mode
    */
   promptFormCreate: async (page: Page): Promise<void> => {
-    await expect(page.getByRole('heading', { name: 'Add New Prompt' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'New prompt', exact: true })).toBeVisible();
   },
 
   /**
    * Expect prompt form to be in edit mode
    */
   promptFormEdit: async (page: Page): Promise<void> => {
-    await expect(page.getByRole('heading', { name: 'Edit Prompt' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Edit prompt', exact: true })).toBeVisible();
   },
 };
 

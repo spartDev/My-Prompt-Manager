@@ -151,7 +151,7 @@ test.describe('Library cards & Pinned Prompts', () => {
     if (preview) {
       await page.mouse.click(preview.x + preview.width / 2, preview.y + preview.height / 2);
     }
-    await expect(page.getByRole('button', { name: 'Save Changes' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
   });
 
   test('AT5: deleting from the edit form asks for confirmation then removes the prompt', async ({ page, storage, extensionId }) => {

@@ -22,8 +22,9 @@ const MIGRATED = [
   'components/SearchBar.tsx',
   'components/PromptCard.tsx',
   // My-Prompt-Manager-el4.4: forms, dialogs and toasts
-  'components/AddPromptForm.tsx',
-  'components/EditPromptForm.tsx',
+  'components/PromptEditor.tsx',
+  'components/editor/CategoryChips.tsx',
+  'components/editor/VariableTextarea.tsx',
   'components/Dropdown.tsx',
   'components/ConfirmDialog.tsx',
   'components/StorageWarning.tsx',

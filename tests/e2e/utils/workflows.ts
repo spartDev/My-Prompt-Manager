@@ -37,20 +37,16 @@ export const promptWorkflows = {
 
     // Fill form
     if (promptData.title) {
-      await page.getByLabel('Title (optional)').fill(promptData.title);
+      await page.getByLabel('Title', { exact: true }).fill(promptData.title);
     }
-    await page.getByLabel('Content *').fill(promptData.content);
+    await page.getByLabel('Content', { exact: true }).fill(promptData.content);
     if (promptData.category) {
       // Click the dropdown button to open it
-      await page.getByLabel('Category').click();
-      // Wait for the menu to appear
-      await page.getByRole('menu', { name: 'Select category' }).waitFor();
-      // Click the desired category option
-      await page.getByRole('menuitem', { name: promptData.category }).click();
+      await page.getByRole('radio', { name: promptData.category, exact: true }).click();
     }
 
     // Save and verify
-    await page.getByRole('button', { name: 'Save Prompt' }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
     await assertions.prompts.createdSuccessfully(page);
   },
 
@@ -65,26 +61,22 @@ export const promptWorkflows = {
 
     // Apply updates
     if (updates.title !== undefined) {
-      const titleField = page.getByLabel('Title (optional)');
+      const titleField = page.getByLabel('Title', { exact: true });
       await titleField.clear();
       await titleField.fill(updates.title);
     }
     if (updates.content !== undefined) {
-      const contentField = page.getByLabel('Content *');
+      const contentField = page.getByLabel('Content', { exact: true });
       await contentField.clear();
       await contentField.fill(updates.content);
     }
     if (updates.category) {
       // Click the dropdown button to open it
-      await page.getByLabel('Category').click();
-      // Wait for the menu to appear
-      await page.getByRole('menu', { name: 'Select category' }).waitFor();
-      // Click the desired category option
-      await page.getByRole('menuitem', { name: updates.category }).click();
+      await page.getByRole('radio', { name: updates.category, exact: true }).click();
     }
 
     // Save and verify
-    await page.getByRole('button', { name: 'Save Changes' }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
     await assertions.prompts.updatedSuccessfully(page);
   },
 

@@ -97,8 +97,8 @@ test.describe('Bottom tab bar navigation', () => {
     await expect(newButton).toHaveAccessibleName('Add new prompt');
     await newButton.click();
 
-    await expect(page.getByRole('heading', { name: 'Add New Prompt' })).toBeVisible();
-    await expect(page.getByLabel('Content *')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'New prompt', exact: true })).toBeVisible();
+    await expect(page.getByLabel('Content', { exact: true })).toBeVisible();
   });
 
   test('ArrowRight moves the selection to the next tab', async ({ context, extensionId }) => {

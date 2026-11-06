@@ -30,7 +30,7 @@ interface ValidationLogOptions {
  * generated on save, so only a non-empty title is judged, unless the form has no title to
  * generate (`requireTitle`, an edit).
  *
- * This shared validation logic is used by both AddPromptForm and EditPromptForm
+ * This shared validation logic is used by PromptEditor, for new Prompts and edits,
  * to ensure consistent validation rules across all prompt forms.
  *
  * @param title - The prompt title to validate (optional field)
@@ -40,7 +40,7 @@ interface ValidationLogOptions {
  *
  * @example
  * ```ts
- * const errors = validatePromptFields(title, content, { component: 'AddPromptForm' });
+ * const errors = validatePromptFields(title, content, { component: 'PromptEditor' });
  * if (Object.keys(errors).length > 0) {
  *   return errors; // Has validation errors
  * }

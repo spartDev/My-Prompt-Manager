@@ -24,18 +24,18 @@ export interface SearchBarProps {
   placeholder?: string;
 }
 
-export interface AddPromptFormProps {
+export interface PromptEditorProps {
+  /** The Prompt to edit; omit to write a new one (or open a Share code) */
+  prompt?: Prompt;
   categories: Category[];
+  /** Saves the Prompt; rejects with the reason when it is refused, and the editor stays open */
   onSubmit: (data: { title: string; content: string; category: string }) => Promise<void> | void;
-  onCancel: () => void;
-}
-
-export interface EditPromptFormProps {
-  prompt: Prompt;
-  categories: Category[];
-  onSubmit: (data: { title: string; content: string; category: string }) => Promise<void> | void;
-  onCancel: () => void;
-  onDelete: (id: string) => void;
+  /** Leaves the editor: after a save, or on Cancel */
+  onClose: () => void;
+  /** Deletes the edited Prompt (edit only) */
+  onDelete?: (id: string) => void;
+  /** Creates a Category from the editor and resolves to it as stored */
+  onCreateCategory?: (category: { name: string; color: string }) => Promise<Category>;
 }
 
 export interface LibraryViewProps {

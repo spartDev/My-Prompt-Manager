@@ -161,7 +161,7 @@ test.describe('Prompt size limits', () => {
       await promptFormPage.expectEditMode();
 
       // Update only the content (not the title) to avoid label mismatch issue
-      // between AddPromptForm ("Title (optional)") and EditPromptForm ("Title")
+      // between the new Prompt and the edit of one
       await promptFormPage.editPrompt({
         content: LARGE_CONTENT_19K,
       });

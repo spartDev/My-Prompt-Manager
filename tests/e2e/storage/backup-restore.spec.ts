@@ -121,7 +121,7 @@ test.describe('Backup restore', () => {
       // Verbatim: the edit form shows the text exactly as it was exported
       const card = page.getByTestId('prompt-card').filter({ has: page.getByRole('heading', { name: 'Release checklist' }) });
       await card.getByRole('button', { name: /^Edit / }).click();
-      await expect(page.getByLabel('Content *')).toHaveValue(prompts[0].content);
+      await expect(page.getByLabel('Content', { exact: true })).toHaveValue(prompts[0].content);
     });
   }
 });

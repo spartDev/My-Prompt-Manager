@@ -13,7 +13,7 @@ import { AdmissionRefusedError, admit } from '../../services/promptAdmission';
 import { encode } from '../../services/promptEncoder';
 import { PromptManager } from '../../services/promptManager';
 import type { Category, Prompt } from '../../types';
-import AddPromptForm from '../AddPromptForm';
+import PromptEditor from '../PromptEditor';
 
 const defaultCategories: Category[] = [
   { id: 'default', name: 'Uncategorized', color: '#888888' },
@@ -30,18 +30,18 @@ const testPrompt: Prompt = {
   updatedAt: Date.now()
 };
 
-const renderForm = (props: Partial<React.ComponentProps<typeof AddPromptForm>> = {}) => {
-  const defaultProps: React.ComponentProps<typeof AddPromptForm> = {
+const renderForm = (props: Partial<React.ComponentProps<typeof PromptEditor>> = {}) => {
+  const defaultProps: React.ComponentProps<typeof PromptEditor> = {
     categories: [...defaultCategories],
     onSubmit: vi.fn().mockResolvedValue(undefined),
-    onCancel: vi.fn(),
+    onClose: vi.fn(),
     ...props
   };
 
-  return { ...render(<AddPromptForm {...defaultProps} />), props: defaultProps };
+  return { ...render(<PromptEditor {...defaultProps} />), props: defaultProps };
 };
 
-describe('AddPromptForm - Import Integration Tests', () => {
+describe('PromptEditor - Import Integration Tests', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -53,16 +53,16 @@ describe('AddPromptForm - Import Integration Tests', () => {
     const { props } = renderForm();
 
     // Switch to import mode
-    const importButton = screen.getByRole('button', { name: /import shared prompt/i });
+    const importButton = screen.getByRole('button', { name: 'Paste a Share code' });
     await userEvent.click(importButton);
 
     // Paste the sharing code
-    const codeInput = screen.getByLabelText(/sharing code/i);
+    const codeInput = screen.getByLabelText('Share code');
     await userEvent.type(codeInput, sharingCode);
 
     // Wait for debounced validation
     await waitFor(() => {
-      expect(screen.getByText(/valid sharing code detected/i)).toBeInTheDocument();
+      expect(screen.getByText('Share code opened')).toBeInTheDocument();
     }, { timeout: 600 });
 
     // Verify decoded data is displayed
@@ -70,7 +70,7 @@ describe('AddPromptForm - Import Integration Tests', () => {
     expect(screen.getByText(testPrompt.content)).toBeInTheDocument();
 
     // Submit the import
-    const submitButton = screen.getByRole('button', { name: /import prompt/i });
+    const submitButton = screen.getByRole('button', { name: 'Import' });
     expect(submitButton).not.toBeDisabled();
     await userEvent.click(submitButton);
 
@@ -95,25 +95,23 @@ describe('AddPromptForm - Import Integration Tests', () => {
     const { props } = renderForm();
 
     // Switch to import mode
-    const importButton = screen.getByRole('button', { name: /import shared prompt/i });
+    const importButton = screen.getByRole('button', { name: 'Paste a Share code' });
     await userEvent.click(importButton);
 
     // Paste the sharing code
-    const codeInput = screen.getByLabelText(/sharing code/i);
+    const codeInput = screen.getByLabelText('Share code');
     await userEvent.type(codeInput, sharingCode);
 
     // Wait for validation
     await waitFor(() => {
-      expect(screen.getByText(/valid sharing code detected/i)).toBeInTheDocument();
+      expect(screen.getByText('Share code opened')).toBeInTheDocument();
     }, { timeout: 600 });
 
-    // Verify category dropdown trigger falls back to default
-    const categoryButton = screen.getByRole('button', { name: /import to category/i });
-    expect(categoryButton).toBeInTheDocument();
-    expect(categoryButton).toHaveTextContent('Uncategorized');
+    // The default Category is chosen instead
+    expect(screen.getByRole('radio', { name: 'Uncategorized' })).toHaveAttribute('aria-checked', 'true');
 
     // Submit the import
-    const submitButton = screen.getByRole('button', { name: /import prompt/i });
+    const submitButton = screen.getByRole('button', { name: 'Import' });
     await userEvent.click(submitButton);
 
     // Verify onSubmit was called with the default category
@@ -132,29 +130,25 @@ describe('AddPromptForm - Import Integration Tests', () => {
     const { props } = renderForm();
 
     // Switch to import mode
-    const importButton = screen.getByRole('button', { name: /import shared prompt/i });
+    const importButton = screen.getByRole('button', { name: 'Paste a Share code' });
     await userEvent.click(importButton);
 
     // Paste the sharing code
-    const codeInput = screen.getByLabelText(/sharing code/i);
+    const codeInput = screen.getByLabelText('Share code');
     await userEvent.type(codeInput, sharingCode);
 
     // Wait for validation
     await waitFor(() => {
-      expect(screen.getByText(/valid sharing code detected/i)).toBeInTheDocument();
+      expect(screen.getByText('Share code opened')).toBeInTheDocument();
     }, { timeout: 600 });
 
-    // Open category dropdown and select 'Personal'
-    const categoryButton = screen.getByRole('button', { name: /import to category/i });
-    await userEvent.click(categoryButton);
-    const personalOption = await screen.findByRole('menuitem', { name: /personal/i });
-    await userEvent.click(personalOption);
-
-    // Verify the help text shows the change
-    expect(screen.getByText(/importing to "personal" instead of "work"/i)).toBeInTheDocument();
+    // The Category the code names is chosen; choose 'Personal' instead
+    expect(screen.getByRole('radio', { name: 'Work' })).toHaveAttribute('aria-checked', 'true');
+    await userEvent.click(screen.getByRole('radio', { name: 'Personal' }));
+    expect(screen.getByRole('radio', { name: 'Personal' })).toHaveAttribute('aria-checked', 'true');
 
     // Submit the import
-    const submitButton = screen.getByRole('button', { name: /import prompt/i });
+    const submitButton = screen.getByRole('button', { name: 'Import' });
     await userEvent.click(submitButton);
 
     // Verify onSubmit was called with the new category
@@ -179,23 +173,23 @@ describe('AddPromptForm - Import Integration Tests', () => {
     const { props } = renderForm();
 
     // Switch to import mode
-    const importButton = screen.getByRole('button', { name: /import shared prompt/i });
+    const importButton = screen.getByRole('button', { name: 'Paste a Share code' });
     await userEvent.click(importButton);
 
     // Paste the sharing code
-    const codeInput = screen.getByLabelText(/sharing code/i);
+    const codeInput = screen.getByLabelText('Share code');
     await userEvent.type(codeInput, sharingCode);
 
     // Wait for validation
     await waitFor(() => {
-      expect(screen.getByText(/valid sharing code detected/i)).toBeInTheDocument();
+      expect(screen.getByText('Share code opened')).toBeInTheDocument();
     }, { timeout: 600 });
 
     // Check character count is displayed
-    expect(screen.getByText(/9000 characters/i)).toBeInTheDocument();
+    expect(screen.getByText(/9,000 characters/)).toBeInTheDocument();
 
     // Submit the import
-    const submitButton = screen.getByRole('button', { name: /import prompt/i });
+    const submitButton = screen.getByRole('button', { name: 'Import' });
     await userEvent.click(submitButton);
 
     // Verify onSubmit was called with the long content
@@ -219,23 +213,23 @@ describe('AddPromptForm - Import Integration Tests', () => {
     const { props } = renderForm();
 
     // Switch to import mode
-    const importButton = screen.getByRole('button', { name: /import shared prompt/i });
+    const importButton = screen.getByRole('button', { name: 'Paste a Share code' });
     await userEvent.click(importButton);
 
     // Paste the sharing code
-    const codeInput = screen.getByLabelText(/sharing code/i);
+    const codeInput = screen.getByLabelText('Share code');
     await userEvent.type(codeInput, sharingCode);
 
     // Wait for validation
     await waitFor(() => {
-      expect(screen.getByText(/valid sharing code detected/i)).toBeInTheDocument();
+      expect(screen.getByText('Share code opened')).toBeInTheDocument();
     }, { timeout: 600 });
 
     // The preview shows the text as shared, tags included
     expect(screen.getByText('Test 💡 Prompt with "quotes" & <tags>')).toBeInTheDocument();
 
     // Submit the import
-    const submitButton = screen.getByRole('button', { name: /import prompt/i });
+    const submitButton = screen.getByRole('button', { name: 'Import' });
     await userEvent.click(submitButton);
 
     await waitFor(() => {
@@ -251,18 +245,18 @@ describe('AddPromptForm - Import Integration Tests', () => {
     const { props } = renderForm();
 
     // Switch to import mode
-    const importButton = screen.getByRole('button', { name: /import shared prompt/i });
+    const importButton = screen.getByRole('button', { name: 'Paste a Share code' });
     await userEvent.click(importButton);
 
     // Switch back to create mode without entering code
-    const createButton = screen.getByRole('button', { name: /create new prompt/i });
+    const createButton = screen.getByRole('button', { name: 'Write a new prompt instead' });
     await userEvent.click(createButton);
 
     // Switch back to import mode
     await userEvent.click(importButton);
 
     // Try to submit (should be disabled)
-    const submitButton = screen.getByRole('button', { name: /import prompt/i });
+    const submitButton = screen.getByRole('button', { name: 'Import' });
     expect(submitButton).toBeDisabled();
 
     // Try clicking anyway (shouldn't do anything due to disabled state)
@@ -285,11 +279,11 @@ describe('AddPromptForm - Import Integration Tests', () => {
     renderForm();
 
     // Switch to import mode
-    const importButton = screen.getByRole('button', { name: /import shared prompt/i });
+    const importButton = screen.getByRole('button', { name: 'Paste a Share code' });
     await userEvent.click(importButton);
 
     // Paste first sharing code
-    const codeInput = screen.getByLabelText(/sharing code/i);
+    const codeInput = screen.getByLabelText('Share code');
     await userEvent.type(codeInput, sharingCode1);
 
     // Wait for validation
@@ -309,7 +303,7 @@ describe('AddPromptForm - Import Integration Tests', () => {
   });
 });
 
-describe('AddPromptForm - End-to-End Workflow Tests', () => {
+describe('PromptEditor - End-to-End Workflow Tests', () => {
   it('complete workflow: create mode -> import mode -> create mode with submission', async () => {
     const { props } = renderForm();
 
@@ -317,19 +311,19 @@ describe('AddPromptForm - End-to-End Workflow Tests', () => {
     await userEvent.type(screen.getByLabelText(/content/i), 'Initial content');
 
     // Switch to import mode
-    const importButton = screen.getByRole('button', { name: /import shared prompt/i });
+    const importButton = screen.getByRole('button', { name: 'Paste a Share code' });
     await userEvent.click(importButton);
 
     // Import a prompt
     const sharingCode = encode(testPrompt);
-    const codeInput = screen.getByLabelText(/sharing code/i);
+    const codeInput = screen.getByLabelText('Share code');
     await userEvent.type(codeInput, sharingCode);
 
     await waitFor(() => {
-      expect(screen.getByText(/valid sharing code detected/i)).toBeInTheDocument();
+      expect(screen.getByText('Share code opened')).toBeInTheDocument();
     }, { timeout: 600 });
 
-    const importSubmitButton = screen.getByRole('button', { name: /import prompt/i });
+    const importSubmitButton = screen.getByRole('button', { name: 'Import' });
     await userEvent.click(importSubmitButton);
 
     // Verify import submission
@@ -351,7 +345,7 @@ describe('AddPromptForm - End-to-End Workflow Tests', () => {
  * Verbatim, and Hidden characters must be removed once, when the Prompt is saved. These tests go
  * through the real form, PromptManager and StorageManager over the in-memory chrome.storage.
  */
-describe('AddPromptForm - Share code Admission (real StorageManager)', () => {
+describe('PromptEditor - Share code Admission (real StorageManager)', () => {
   const storedPrompts = async (): Promise<Prompt[]> =>
     ((await chrome.storage.local.get('prompts')).prompts ?? []) as Prompt[];
 
@@ -370,12 +364,12 @@ describe('AddPromptForm - Share code Admission (real StorageManager)', () => {
     });
     renderForm({ onSubmit });
 
-    await userEvent.click(screen.getByRole('button', { name: /import shared prompt/i }));
-    await userEvent.click(screen.getByLabelText(/sharing code/i));
+    await userEvent.click(screen.getByRole('button', { name: 'Paste a Share code' }));
+    await userEvent.click(screen.getByLabelText('Share code'));
     await userEvent.paste(code);
 
-    await screen.findByText(/valid sharing code detected/i);
-    await userEvent.click(screen.getByRole('button', { name: /import prompt/i }));
+    await screen.findByText('Share code opened');
+    await userEvent.click(screen.getByRole('button', { name: 'Import' }));
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalled();
     });
@@ -424,13 +418,13 @@ describe('AddPromptForm - Share code Admission (real StorageManager)', () => {
     const code = encode({ ...testPrompt, content: 'x'.repeat(20_001) });
     const { props } = renderForm();
 
-    await userEvent.click(screen.getByRole('button', { name: /import shared prompt/i }));
-    await userEvent.click(screen.getByLabelText(/sharing code/i));
+    await userEvent.click(screen.getByRole('button', { name: 'Paste a Share code' }));
+    await userEvent.click(screen.getByLabelText('Share code'));
     await userEvent.paste(code);
 
     expect(await screen.findByText('Content cannot exceed 20,000 characters')).toBeInTheDocument();
-    expect(screen.queryByText(/valid sharing code detected/i)).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /import prompt/i })).toBeDisabled();
+    expect(screen.queryByText('Share code opened')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Import' })).toBeDisabled();
     expect(props.onSubmit).not.toHaveBeenCalled();
     expect(await storedPrompts()).toEqual([]);
   });
@@ -469,11 +463,11 @@ describe('AddPromptForm - Share code Admission (real StorageManager)', () => {
     const onSubmit = vi.fn().mockRejectedValue(new AdmissionRefusedError(refusal.errors));
     renderForm({ onSubmit });
 
-    await userEvent.click(screen.getByRole('button', { name: /import shared prompt/i }));
-    await userEvent.click(screen.getByLabelText(/sharing code/i));
+    await userEvent.click(screen.getByRole('button', { name: 'Paste a Share code' }));
+    await userEvent.click(screen.getByLabelText('Share code'));
     await userEvent.paste(encode(testPrompt));
-    await screen.findByText(/valid sharing code detected/i);
-    await userEvent.click(screen.getByRole('button', { name: /import prompt/i }));
+    await screen.findByText('Share code opened');
+    await userEvent.click(screen.getByRole('button', { name: 'Import' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Content cannot exceed 20,000 characters');
   });

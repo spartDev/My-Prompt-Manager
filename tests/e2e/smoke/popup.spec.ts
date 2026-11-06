@@ -70,12 +70,12 @@ test.describe('Prompt creation flow', () => {
     await expect(promptCreationTrigger).toBeVisible();
     await promptCreationTrigger.click();
 
-    await expect(page.getByRole('heading', { name: 'Add New Prompt' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'New prompt', exact: true })).toBeVisible();
 
-    await page.getByLabel('Title (optional)').fill('Focus Mode Kickoff');
-    await page.getByLabel('Content *').fill('Take three deep breaths and outline the top task.');
+    await page.getByLabel('Title', { exact: true }).fill('Focus Mode Kickoff');
+    await page.getByLabel('Content', { exact: true }).fill('Take three deep breaths and outline the top task.');
 
-    const savePromptButton = page.getByRole('button', { name: 'Save Prompt' });
+    const savePromptButton = page.getByRole('button', { name: 'Save', exact: true });
     await expect(savePromptButton).toBeEnabled();
     await savePromptButton.click();
 
@@ -119,12 +119,12 @@ test.describe('Prompt management', () => {
 
     await page.getByRole('button', { name: `Edit ${originalPrompt.title}` }).click();
 
-    await expect(page.getByRole('heading', { name: 'Edit Prompt' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Edit prompt', exact: true })).toBeVisible();
 
     await page.getByLabel('Title').fill('Focus Mode Kickoff');
-    await page.getByLabel('Content *').fill('Take three deep breaths and outline the top task.');
+    await page.getByLabel('Content', { exact: true }).fill('Take three deep breaths and outline the top task.');
 
-    const saveButton = page.getByRole('button', { name: 'Save Changes' });
+    const saveButton = page.getByRole('button', { name: 'Save', exact: true });
     await expect(saveButton).toBeEnabled();
     await saveButton.click();
 

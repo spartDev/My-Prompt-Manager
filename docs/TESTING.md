@@ -21,7 +21,7 @@ The config is `vitest.config.ts`; read it for the exact settings. What matters w
 
 Every test file runs in **happy-dom** unless it says otherwise in a comment at its top:
 
-- `@vitest-environment jsdom` for a test whose assertions depend on how a real browser parses HTML. happy-dom keeps `<script>` text where DOMPurify strips the tag, so XSS assertions fail under happy-dom although real browsers pass. Examples: `src/services/__tests__/promptEncoder.test.ts`, `src/components/__tests__/AddPromptForm.integration.test.tsx`, `src/content/utils/__tests__/prompt-list-item-escaping.test.ts`.
+- `@vitest-environment jsdom` for a test whose assertions depend on how a real browser parses HTML. happy-dom keeps `<script>` text where DOMPurify strips the tag, so XSS assertions fail under happy-dom although real browsers pass. Examples: `src/services/__tests__/promptEncoder.test.ts`, `src/components/__tests__/PromptEditor.integration.test.tsx`, `src/content/utils/__tests__/prompt-list-item-escaping.test.ts`.
 - `@vitest-environment node` for a test that touches no DOM, such as a test that reads source files. Examples: `src/theme/__tests__/rawColors.test.ts`, `src/test/guardrails/admission-guardrails.test.ts`.
 
 `globals: true` is on, but import `describe`, `it`, `expect` and `vi` from `vitest` explicitly, as the existing tests do.

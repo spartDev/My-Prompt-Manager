@@ -1,7 +1,7 @@
 /**
  * E2E: forms, dialogs and toasts on the color tokens (My-Prompt-Manager-el4.4)
  *
- * The prompt forms are a card on bg-app with bg-subtle fields and danger-colored validation; the
+ * The Prompt editor is a card with a bg-subtle text field and danger-colored validation; the
  * delete confirmation is a card on the backdrop; every toast type sits on bg-inverse with its bright
  * icon; a save refused for lack of storage opens the storage warning on the backdrop and keeps the
  * Add form (My-Prompt-Manager-jnu). Also captures light/dark screenshots as visual proof
@@ -64,24 +64,25 @@ test.describe('Forms, dialogs and toasts on the tokens', () => {
   for (const theme of ['light', 'dark'] as const) {
     const colors = EXPECTED[theme];
 
-    test(`the Add form is a card with subtle fields and a danger-colored validation error (${theme})`, async ({ page, storage, extensionId }) => {
+    test(`the new Prompt editor is a card with a subtle text field and a danger-colored validation error (${theme})`, async ({ page, storage, extensionId }) => {
       await openPopup(page, storage, extensionId, theme);
       await page.getByTestId('new-prompt-button').click();
 
-      const form = page.locator('#add-prompt-form');
-      await expect(form).toHaveCSS('background-color', colors.card);
-      const title = page.getByLabel('Title (optional)');
-      await expect(title).toHaveCSS('background-color', colors.subtle);
-      await expect(title).toHaveCSS('border-top-color', colors.input);
-      // The form overflows the popup: the footer line shows while fields remain below
-      await expect(page.getByRole('button', { name: 'Save Prompt' }).locator('xpath=../..')).toHaveCSS('border-top-color', colors.strong);
-      await expect(page.getByRole('button', { name: 'Save Prompt' })).toHaveCSS('background-color', colors.accent);
+      const editor = page.getByRole('heading', { name: 'New prompt', exact: true }).locator('xpath=../..');
+      await expect(editor).toHaveCSS('background-color', colors.card);
+      const title = page.getByLabel('Title', { exact: true });
+      const contentField = page.getByTestId('variable-mirror').locator('..');
+      await expect(contentField).toHaveCSS('background-color', colors.subtle);
+      await expect(contentField).toHaveCSS('border-top-color', colors.input);
+      await expect(page.getByRole('button', { name: 'Save', exact: true })).toHaveCSS('background-color', colors.accent);
+      await page.screenshot({ path: `${SCREENSHOT_DIR}/new-prompt-${theme}.png` });
 
       await title.fill('T'.repeat(101));
-      await page.getByLabel('Content *').fill('Résume la transcription ci-dessous.');
-      await page.getByRole('button', { name: 'Save Prompt' }).click();
+      await page.getByLabel('Content', { exact: true }).fill('Résume la transcription ci-dessous pour {{audience}}.');
+      await expect(page.getByTestId('variable-mirror').locator('mark')).toHaveText('{{audience}}');
+      await page.getByRole('button', { name: 'Save', exact: true }).click();
 
-      await expect(title).toHaveCSS('border-top-color', DANGER_FILL);
+      await expect(title).toHaveAttribute('aria-invalid', 'true');
       await expect(page.getByText('Title cannot exceed 100 characters')).toHaveCSS('color', colors.dangerText);
       await title.scrollIntoViewIfNeeded();
       await page.screenshot({ path: `${SCREENSHOT_DIR}/add-form-error-${theme}.png` });
@@ -92,9 +93,10 @@ test.describe('Forms, dialogs and toasts on the tokens', () => {
       await page.getByRole('button', { name: `Edit ${prompt.title}` }).click();
 
       const title = page.getByLabel('Title', { exact: true });
+      await page.screenshot({ path: `${SCREENSHOT_DIR}/edit-prompt-${theme}.png` });
       await title.fill('T'.repeat(101));
-      await page.getByRole('button', { name: 'Save Changes' }).click();
-      await expect(title).toHaveCSS('border-top-color', DANGER_FILL);
+      await page.getByRole('button', { name: 'Save', exact: true }).click();
+      await expect(title).toHaveAttribute('aria-invalid', 'true');
       await expect(page.getByText(/Title cannot exceed 100 characters/)).toHaveCSS('color', colors.dangerText);
       await title.scrollIntoViewIfNeeded();
       await page.screenshot({ path: `${SCREENSHOT_DIR}/edit-form-error-${theme}.png` });
@@ -116,9 +118,9 @@ test.describe('Forms, dialogs and toasts on the tokens', () => {
       await openPopup(page, storage, extensionId, theme, fullLibrary);
 
       await page.getByTestId('new-prompt-button').click();
-      const content = page.getByLabel('Content *');
+      const content = page.getByLabel('Content', { exact: true });
       await content.fill('Résume la transcription ci-dessous.');
-      await page.getByRole('button', { name: 'Save Prompt' }).click();
+      await page.getByRole('button', { name: 'Save', exact: true }).click();
 
       const warning = page.getByRole('dialog', { name: 'Storage Limit Reached' });
       await expect(warning).toBeVisible();
@@ -143,7 +145,7 @@ test.describe('Forms, dialogs and toasts on the tokens', () => {
       await expect(warning.getByRole('button', { name: 'Continue' })).toBeFocused();
       await page.keyboard.press('Escape');
       await expect(warning).toHaveCount(0);
-      await expect(page.getByRole('button', { name: 'Save Prompt' })).toBeFocused();
+      await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeFocused();
       await expect(content).toHaveValue('Résume la transcription ci-dessous.');
       await expect(page.getByRole('alert')).toContainText(/storage/i);
       await page.screenshot({ path: `${SCREENSHOT_DIR}/save-refused-${theme}.png` });

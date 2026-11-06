@@ -41,7 +41,7 @@ export interface UseCategoriesReturn {
   categories: Category[];
   loading: boolean;
   error: AppError | null;
-  createCategory: (category: Omit<Category, 'id'>) => Promise<void>;
+  createCategory: (category: Omit<Category, 'id'>) => Promise<Category>;
   updateCategory: (id: string, updates: Partial<Category>) => Promise<void>;
   deleteCategory: (id: string) => Promise<void>;
   refreshCategories: () => Promise<void>;

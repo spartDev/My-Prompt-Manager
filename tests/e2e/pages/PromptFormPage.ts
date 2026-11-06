@@ -14,36 +14,28 @@ export class PromptFormPage extends BasePage {
    * Fill the prompt title field
    */
   async fillTitle(title: string): Promise<void> {
-    await this.page.getByLabel('Title (optional)').fill(title);
+    await this.page.getByLabel('Title', { exact: true }).fill(title);
   }
 
   /**
    * Fill the prompt content field
    */
   async fillContent(content: string): Promise<void> {
-    await this.page.getByLabel('Content *').fill(content);
+    await this.page.getByLabel('Content', { exact: true }).fill(content);
   }
 
   /**
-   * Select a category from the dropdown
+   * Choose a Category among the chips
    */
   async selectCategory(category: string): Promise<void> {
-    // Click the dropdown button to open it
-    const categoryButton = this.page.getByLabel('Category');
-    await categoryButton.click();
-
-    // Wait for the menu to appear
-    await this.page.getByRole('menu', { name: 'Select category' }).waitFor();
-
-    // Click the desired category option
-    await this.page.getByRole('menuitem', { name: category }).click();
+    await this.getCategorySelect().getByRole('radio', { name: category, exact: true }).click();
   }
 
   /**
    * Save a new prompt
    */
   async savePrompt(): Promise<void> {
-    await this.page.getByRole('button', { name: 'Save Prompt' }).click();
+    await this.page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(this.getSuccessMessage('Prompt created successfully')).toBeVisible();
   }
 
@@ -51,7 +43,7 @@ export class PromptFormPage extends BasePage {
    * Save changes to an existing prompt
    */
   async saveChanges(): Promise<void> {
-    await this.page.getByRole('button', { name: 'Save Changes' }).click();
+    await this.page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(this.getSuccessMessage('Prompt updated successfully')).toBeVisible();
   }
 
@@ -74,51 +66,51 @@ export class PromptFormPage extends BasePage {
    * Expect the form to be in create mode
    */
   async expectCreateMode(): Promise<void> {
-    await expect(this.page.getByRole('heading', { name: 'Add New Prompt' })).toBeVisible();
-    await expect(this.page.getByRole('button', { name: 'Save Prompt' })).toBeVisible();
+    await expect(this.page.getByRole('heading', { name: 'New prompt', exact: true })).toBeVisible();
+    await expect(this.page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
   }
 
   /**
    * Expect the form to be in edit mode
    */
   async expectEditMode(): Promise<void> {
-    await expect(this.page.getByRole('heading', { name: 'Edit Prompt' })).toBeVisible();
-    await expect(this.page.getByRole('button', { name: 'Save Changes' })).toBeVisible();
+    await expect(this.page.getByRole('heading', { name: 'Edit prompt', exact: true })).toBeVisible();
+    await expect(this.page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
   }
 
   /**
    * Get the title input field
    */
   getTitleInput(): Locator {
-    return this.page.getByLabel('Title (optional)');
+    return this.page.getByLabel('Title', { exact: true });
   }
 
   /**
    * Get the content textarea
    */
   getContentInput(): Locator {
-    return this.page.getByLabel('Content *');
+    return this.page.getByLabel('Content', { exact: true });
   }
 
   /**
-   * Get the category dropdown button
+   * Get the Category chips (a radio group)
    */
   getCategorySelect(): Locator {
-    return this.page.getByLabel('Category');
+    return this.page.getByRole('radiogroup', { name: 'Category' });
   }
 
   /**
    * Get the save button (for create mode)
    */
   getSaveButton(): Locator {
-    return this.page.getByRole('button', { name: 'Save Prompt' });
+    return this.page.getByRole('button', { name: 'Save', exact: true });
   }
 
   /**
    * Get the save changes button (for edit mode)
    */
   getSaveChangesButton(): Locator {
-    return this.page.getByRole('button', { name: 'Save Changes' });
+    return this.page.getByRole('button', { name: 'Save', exact: true });
   }
 
   /**
@@ -196,8 +188,7 @@ export class PromptFormPage extends BasePage {
     }
 
     if (expected.category !== undefined) {
-      // For the custom dropdown, check the button text content
-      await expect(this.getCategorySelect()).toHaveText(expected.category);
+      await expect(this.getCategorySelect().getByRole('radio', { name: expected.category, exact: true })).toBeChecked();
     }
   }
 }
