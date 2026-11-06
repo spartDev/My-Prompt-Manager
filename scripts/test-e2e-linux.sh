@@ -38,23 +38,25 @@ fi
 
 out="$root/test-results-linux"
 rm -rf "$out"
-mkdir -p "$out"
 
 # The image's bundled browser is not the one the fixture launches: install chromium. The npm cache and
-# the browsers stay in named volumes, so a second run skips those downloads.
-git archive HEAD | docker run -i --rm --ipc=host \
+# the browsers stay in named volumes, so a second run skips those downloads. The output is not a bind
+# mount: docker cp copies it out as the host user, whatever the daemon does with user IDs (rootless,
+# userns-remap).
+cid=$(docker create -i --ipc=host \
   -v mpm-e2e-linux-npm:/root/.npm \
   -v mpm-e2e-linux-browsers:/ms-playwright \
-  -v "$out:/out" \
   "$image" bash -c '
     set -euo pipefail
-    # The container runs as root: give the output the owner the mount had, so the next run can clear it.
-    # A rootful daemon shows the host user as is; a rootless one shows them as root, and this changes nothing
-    owner=$(stat -c %u:%g /out)
-    trap '\''chown -R "$owner" /out'\'' EXIT
     mkdir /work && tar -x -C /work && cd /work
     HUSKY=0 npm ci --no-audit --no-fund --loglevel=error
     apt-get update -qq && apt-get install -y -qq fonts-dejavu-core >/dev/null
     npx playwright install chromium
     CI=true npx playwright test --retries=0 --trace=retain-on-failure --reporter=list --output=/out "$@"
-  ' bash "$@"
+  ' bash "$@")
+trap 'docker rm -f "$cid" >/dev/null' EXIT
+
+status=0
+git archive HEAD | docker start -a -i "$cid" || status=$?
+docker cp "$cid:/out" "$out" 2>/dev/null || true
+exit "$status"
