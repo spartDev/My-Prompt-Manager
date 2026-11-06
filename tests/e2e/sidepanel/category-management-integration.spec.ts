@@ -119,29 +119,25 @@ test.describe('Category Management - Integration with Prompt System', () => {
 
       // Create a prompt in the "Coding" category
       await sidepanelPage.getByRole('button', { name: 'Add new prompt' }).click();
-      await expect(sidepanelPage.getByRole('heading', { name: 'Add New Prompt' })).toBeVisible();
+      await expect(sidepanelPage.getByRole('heading', { name: 'New prompt', exact: true })).toBeVisible();
 
-      await sidepanelPage.getByLabel('Title (optional)').fill('Debug Function');
-      await sidepanelPage.getByLabel('Content *').fill('Add console.log statements to trace execution flow');
+      await sidepanelPage.getByLabel('Title', { exact: true }).fill('Debug Function');
+      await sidepanelPage.getByLabel('Content', { exact: true }).fill('Add console.log statements to trace execution flow');
 
       // Select "Coding" category from dropdown
-      await sidepanelPage.getByLabel('Category').click();
-      await sidepanelPage.getByRole('menu', { name: 'Select category' }).waitFor();
-      await sidepanelPage.getByRole('menuitem', { name: 'Coding' }).click();
+      await sidepanelPage.getByRole('radio', { name: 'Coding', exact: true }).click();
 
-      await sidepanelPage.getByRole('button', { name: 'Save Prompt' }).click();
+      await sidepanelPage.getByRole('button', { name: 'Save', exact: true }).click();
       await expect(sidepanelPage.getByText('Prompt created successfully').first()).toBeVisible();
 
       // Create another prompt in "Writing" category
       await sidepanelPage.getByRole('button', { name: 'Add new prompt' }).click();
-      await sidepanelPage.getByLabel('Title (optional)').fill('Blog Post Outline');
-      await sidepanelPage.getByLabel('Content *').fill('Create a structured outline for a technical blog post');
+      await sidepanelPage.getByLabel('Title', { exact: true }).fill('Blog Post Outline');
+      await sidepanelPage.getByLabel('Content', { exact: true }).fill('Create a structured outline for a technical blog post');
 
-      await sidepanelPage.getByLabel('Category').click();
-      await sidepanelPage.getByRole('menu', { name: 'Select category' }).waitFor();
-      await sidepanelPage.getByRole('menuitem', { name: 'Writing' }).click();
+      await sidepanelPage.getByRole('radio', { name: 'Writing', exact: true }).click();
 
-      await sidepanelPage.getByRole('button', { name: 'Save Prompt' }).click();
+      await sidepanelPage.getByRole('button', { name: 'Save', exact: true }).click();
       await expect(sidepanelPage.getByText('Prompt created successfully').first()).toBeVisible();
 
       // Verify both prompts are visible in main view
@@ -275,30 +271,15 @@ test.describe('Category Management - Integration with Prompt System', () => {
 
       // Try to create a prompt
       await sidepanelPage.getByRole('button', { name: 'Add new prompt' }).click();
-      await sidepanelPage.getByLabel('Title (optional)').fill('Test Prompt');
-      await sidepanelPage.getByLabel('Content *').fill('Test content');
+      await sidepanelPage.getByLabel('Title', { exact: true }).fill('Test Prompt');
+      await sidepanelPage.getByLabel('Content', { exact: true }).fill('Test content');
 
-      // Verify only "Uncategorized" is available in category dropdown
-      const categoryButton = sidepanelPage.getByLabel('Category');
-
-      // Verify the dropdown shows "Uncategorized" as the only available option
-      await expect(categoryButton).toHaveText(DEFAULT_CATEGORY);
-
-      // Open the dropdown to verify no other options
-      await categoryButton.click();
-      await sidepanelPage.getByRole('menu', { name: 'Select category' }).waitFor();
-
-      // Count the menuitem elements
-      const menuItems = sidepanelPage.getByRole('menuitem');
-      const itemCount = await menuItems.count();
-      expect(itemCount).toBe(1);
-
-      // Verify the only menuitem is "Uncategorized"
-      await expect(menuItems.first()).toHaveText(DEFAULT_CATEGORY);
-
-      // Select Uncategorized (which should already be selected, but click to close dropdown)
-      await menuItems.first().click();
-      await sidepanelPage.getByRole('button', { name: 'Save Prompt' }).click();
+      // Verify "Uncategorized" is the only Category offered, and it is chosen
+      const categoryChips = sidepanelPage.getByRole('radiogroup', { name: 'Category' }).getByRole('radio');
+      await expect(categoryChips).toHaveCount(1);
+      await expect(categoryChips.first()).toHaveText(DEFAULT_CATEGORY);
+      await expect(categoryChips.first()).toBeChecked();
+      await sidepanelPage.getByRole('button', { name: 'Save', exact: true }).click();
 
       // Verify prompt was created in Uncategorized
       await expect(sidepanelPage.getByText('Prompt created successfully')).toBeVisible();
@@ -341,21 +322,10 @@ test.describe('Category Management - Integration with Prompt System', () => {
 
       await sidepanelPage.getByRole('button', { name: 'Edit Editable Prompt' }).click();
 
-      // Change category to the valid one using the custom dropdown
-      const categoryButton = sidepanelPage.getByLabel('Category');
-
-      // Open the category dropdown
-      await categoryButton.click();
-      await sidepanelPage.getByRole('menu', { name: 'Select category' }).waitFor();
-
-      // Verify both options exist
-      const menuItems = sidepanelPage.getByRole('menuitem');
-      const itemCount = await menuItems.count();
-      expect(itemCount).toBe(2);
-
-      // Select Valid Category
-      await sidepanelPage.getByRole('menuitem', { name: 'Valid Category' }).click();
-      await sidepanelPage.getByRole('button', { name: 'Save Changes' }).click();
+      // Both Categories are offered; choose the valid one
+      await expect(sidepanelPage.getByRole('radiogroup', { name: 'Category' }).getByRole('radio')).toHaveCount(2);
+      await sidepanelPage.getByRole('radio', { name: 'Valid Category', exact: true }).click();
+      await sidepanelPage.getByRole('button', { name: 'Save', exact: true }).click();
 
       // Verify update succeeded
       await expect(sidepanelPage.getByText('Prompt updated successfully')).toBeVisible();

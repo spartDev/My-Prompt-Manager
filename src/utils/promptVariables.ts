@@ -33,3 +33,33 @@ export const fillVariables = (text: string, values: Readonly<Record<string, stri
     const value = Object.prototype.hasOwnProperty.call(values, name) ? values[name] : '';
     return value ? value : raw;
   });
+
+/** A run of a Prompt's text: plain text, or one Variable as written ({{ name }}), with its name. */
+export type TextSegment =
+  | { kind: 'text'; text: string }
+  | { kind: 'variable'; text: string; name: string };
+
+/**
+ * Cuts the text into plain runs and Variables, in order. Joining every segment's `text` gives the
+ * text back exactly, so a view built from the segments shows the Prompt as written.
+ */
+export const splitVariables = (text: string): TextSegment[] => {
+  const segments: TextSegment[] = [];
+  let last = 0;
+  for (const match of text.matchAll(VARIABLE_PATTERN)) {
+    const name = match[1].trim();
+    if (!name) {
+      continue;
+    }
+    const start = match.index;
+    if (start > last) {
+      segments.push({ kind: 'text', text: text.slice(last, start) });
+    }
+    segments.push({ kind: 'variable', text: match[0], name });
+    last = start + match[0].length;
+  }
+  if (last < text.length) {
+    segments.push({ kind: 'text', text: text.slice(last) });
+  }
+  return segments;
+};

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { extractVariables, fillVariables } from '../promptVariables';
+import { extractVariables, fillVariables, splitVariables } from '../promptVariables';
 
 describe('extractVariables', () => {
   it('returns no variables for text without placeholders', () => {
@@ -44,5 +44,37 @@ describe('fillVariables', () => {
 
   it('leaves malformed placeholders untouched', () => {
     expect(fillVariables('{{}} {name}', { name: 'x' })).toBe('{{}} {name}');
+  });
+});
+
+describe('splitVariables', () => {
+  const join = (text: string): string => splitVariables(text).map(segment => segment.text).join('');
+
+  it('returns one plain run for text without Variables', () => {
+    expect(splitVariables('Summarize this.')).toEqual([{ kind: 'text', text: 'Summarize this.' }]);
+  });
+
+  it('returns nothing for empty text', () => {
+    expect(splitVariables('')).toEqual([]);
+  });
+
+  it('cuts plain runs and Variables in order, keeping each Variable as written', () => {
+    expect(splitVariables('Email {{ recipient }} about {{goal}}.')).toEqual([
+      { kind: 'text', text: 'Email ' },
+      { kind: 'variable', text: '{{ recipient }}', name: 'recipient' },
+      { kind: 'text', text: ' about ' },
+      { kind: 'variable', text: '{{goal}}', name: 'goal' },
+      { kind: 'text', text: '.' }
+    ]);
+  });
+
+  it('leaves {{}}, {{ }}, {name} and a Variable across lines as plain text', () => {
+    const segments = splitVariables('{{}} {{  }} {name} {{a\nb}}');
+    expect(segments.every(segment => segment.kind === 'text')).toBe(true);
+  });
+
+  it('gives the text back exactly, spaces and line breaks at both ends included (Verbatim)', () => {
+    const text = '  \n{{a}}{{b}}\t text {{ c }}\n\n ';
+    expect(join(text)).toBe(text);
   });
 });

@@ -1,11 +1,10 @@
 import type { FC } from 'react';
 import { useCallback, useOptimistic, useRef, useState, useTransition } from 'react';
 
-import AddPromptForm from './components/AddPromptForm';
 import { AnalyticsTab } from './components/analytics';
 import CategoryManager from './components/CategoryManager';
-import EditPromptForm from './components/EditPromptForm';
 import LibraryView from './components/LibraryView';
+import PromptEditor from './components/PromptEditor';
 import SettingsView from './components/SettingsView';
 import StorageWarning from './components/StorageWarning';
 import TabBar, { type Section } from './components/TabBar';
@@ -17,7 +16,7 @@ import { usePrompts } from './hooks/usePrompts';
 import { useSearchWithDebounce } from './hooks/useSearchWithDebounce';
 import { useToast } from './hooks/useToast';
 import { ALL_PROMPTS } from './services/libraryFilter';
-import type { AppError, LibraryFilter, Prompt, ViewType } from './types';
+import type { AppError, Category, LibraryFilter, Prompt, ViewType } from './types';
 import { Logger, toError } from './utils';
 
 type ExtendedViewType = ViewType | Section;
@@ -183,8 +182,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
         });
         showToast('Prompt updated successfully', 'success');
       }
-      setCurrentView('library');
-      setSelectedPrompt(null);
+      // The editor shows "Saved", then closes itself (onClose)
     } catch (error: unknown) {
       const appError = error as AppError;
       Logger.error('Failed to save prompt', toError(appError), {
@@ -220,6 +218,24 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
         setStorageRefusal(appError.message || 'Failed to create category');
       } else {
         showToast(appError.message || 'Failed to create category', 'error');
+      }
+      throw new Error(appError.message || 'Failed to create category');
+    }
+  };
+
+  // From the editor's "New category": the editor shows a refusal itself, so only a full storage
+  // opens the storage warning, and success has its toast like in Categories
+  const handleCreateCategoryFromEditor = async (categoryData: { name: string; color: string }): Promise<Category> => {
+    const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    try {
+      const created = await createCategory(categoryData);
+      showToast('Category created successfully', 'success');
+      return created;
+    } catch (error: unknown) {
+      const appError = error as AppError;
+      if (appError.type === 'STORAGE_QUOTA_EXCEEDED') {
+        storageRefusalTriggerRef.current = trigger;
+        setStorageRefusal(appError.message || 'Failed to create category');
       }
       throw new Error(appError.message || 'Failed to create category');
     }
@@ -327,20 +343,23 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
       )}
 
       {currentView === 'add' && (
-        <AddPromptForm
+        <PromptEditor
           categories={categories}
           onSubmit={handleFormSubmit}
-          onCancel={handleFormCancel}
+          onClose={handleFormCancel}
+          onCreateCategory={handleCreateCategoryFromEditor}
         />
       )}
 
       {currentView === 'edit' && selectedPrompt && (
-        <EditPromptForm
+        <PromptEditor
+          key={selectedPrompt.id}
           prompt={selectedPrompt}
           categories={categories}
           onSubmit={handleFormSubmit}
-          onCancel={handleFormCancel}
+          onClose={handleFormCancel}
           onDelete={handleDeleteFromEdit}
+          onCreateCategory={handleCreateCategoryFromEditor}
         />
       )}
 

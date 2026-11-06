@@ -99,11 +99,11 @@ test.describe('Admission', () => {
 
       // Paste the code into Import, as the person receiving it does
       await library.clickAddNewPrompt();
-      await sidePanel.getByRole('button', { name: 'Import shared prompt' }).click();
-      await sidePanel.getByLabel('Sharing Code *').focus();
+      await sidePanel.getByRole('button', { name: 'Paste a Share code' }).click();
+      await sidePanel.getByLabel('Share code', { exact: true }).focus();
       await sidePanel.keyboard.press('ControlOrMeta+V');
-      await expect(sidePanel.getByText('Valid sharing code detected')).toBeVisible();
-      await sidePanel.getByRole('button', { name: 'Import Prompt' }).click();
+      await expect(sidePanel.getByText('Share code opened')).toBeVisible();
+      await sidePanel.getByRole('button', { name: 'Import', exact: true }).click();
       await expect(sidePanel.getByText('Prompt created successfully').first()).toBeVisible();
 
       const imported = (await storage.getPrompts()).find((prompt) => prompt.id !== original.id);

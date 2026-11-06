@@ -17,7 +17,7 @@ new suites target:
 
 | Workflow | Primary Modules |
 | --- | --- |
-| Prompt CRUD (create/edit/delete/copy) | `src/App.tsx`, `src/components/AddPromptForm.tsx`, `src/components/EditPromptForm.tsx`, `src/components/PromptCard.tsx`, `src/hooks/usePrompts.ts` |
+| Prompt CRUD (create/edit/delete/copy) | `src/App.tsx`, `src/components/PromptEditor.tsx`, `src/components/PromptCard.tsx`, `src/hooks/usePrompts.ts` |
 | Category CRUD & validation | `src/components/CategoryManager.tsx`, `src/hooks/useCategories.ts`, `src/services/storage.ts` |
 | Settings import/export & interface mode | `src/components/SettingsView.tsx`, `src/components/settings/DataStorageSection.tsx`, `src/components/InterfaceModeSelector.tsx`, `src/services/storage.ts` |
 | Toast notifications | `src/hooks/useToast.ts`, `src/components/ToastContainer.tsx` |

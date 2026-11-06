@@ -1,6 +1,6 @@
 # Component Catalog
 
-Which component does which job in the popup and the side panel, and the conventions they share. This page does not copy Props or code: the source file is the reference. Most components declare their Props interface at the top of the file; `LibraryView`, `PromptCard`, `AddPromptForm`, `EditPromptForm` and `SearchBar` import theirs from `src/types/components.ts`. Open them before you use or change a component.
+Which component does which job in the popup and the side panel, and the conventions they share. This page does not copy Props or code: the source file is the reference. Most components declare their Props interface at the top of the file; `LibraryView`, `PromptCard`, `PromptEditor` and `SearchBar` import theirs from `src/types/components.ts`. Open them before you use or change a component.
 
 ---
 
@@ -32,8 +32,9 @@ Which component does which job in the popup and the side panel, and the conventi
 | Component | Job |
 |-----------|-----|
 | `src/components/PromptCard.tsx` | One Prompt in the Library: title, preview, Category, use count, copy and the actions menu. Memoized with its own props comparison |
-| `src/components/AddPromptForm.tsx` | New Prompt, typed or imported from a Share code |
-| `src/components/EditPromptForm.tsx` | Edit a stored Prompt |
+| `src/components/PromptEditor.tsx` | The one editor for a Prompt: new (typed, or opened from a Share code) and edit. Header bar Cancel / heading / Save, Cmd/Ctrl+S saves, Escape asks before discarding changes |
+| `src/components/editor/CategoryChips.tsx` | The Category of a Prompt as a radio group of chips, with "New category" to create one in place |
+| `src/components/editor/VariableTextarea.tsx` | The Prompt text field: Variables highlighted by a mirror under a transparent textarea; the field grows with its text |
 | `src/components/LibraryFilterBar.tsx` | The Library filter pills (All, Pinned, Most Used, one per non-empty Category); the filter logic is `src/services/libraryFilter.ts` |
 | `src/components/SearchBar.tsx` | The search field; the debounce is in `useSearchWithDebounce`, not here |
 | `src/components/CategoryBadge.tsx` | A Category name on its color, with readable text contrast |

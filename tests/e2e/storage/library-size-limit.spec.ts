@@ -187,8 +187,8 @@ test.describe('Library size in Chrome storage', () => {
       expect(available).toBe(512);
 
       await page.getByTestId('new-prompt-button').click();
-      await page.getByLabel('Content *').fill('Résume la transcription ci-dessous. '.repeat(100));
-      await page.getByRole('button', { name: 'Save Prompt' }).click();
+      await page.getByLabel('Content', { exact: true }).fill('Résume la transcription ci-dessous. '.repeat(100));
+      await page.getByRole('button', { name: 'Save', exact: true }).click();
 
       const warning = page.getByRole('dialog', { name: 'Storage Limit Reached' });
       await expect(warning).toBeVisible();
@@ -219,9 +219,9 @@ test.describe('Library size in Chrome storage', () => {
       expect(usage).toBeLessThan(0.42);
 
       await page.getByTestId('new-prompt-button').click();
-      await page.getByLabel('Title (optional)').fill('Résumé de réunion');
-      await page.getByLabel('Content *').fill('Résume la transcription ci-dessous en 5 points clés.');
-      await page.getByRole('button', { name: 'Save Prompt' }).click();
+      await page.getByLabel('Title', { exact: true }).fill('Résumé de réunion');
+      await page.getByLabel('Content', { exact: true }).fill('Résume la transcription ci-dessous en 5 points clés.');
+      await page.getByRole('button', { name: 'Save', exact: true }).click();
 
       await expect(page.getByText('Prompt created successfully')).toBeVisible();
       await expect(page.getByTestId('prompt-card').filter({ hasText: 'Résumé de réunion' })).toBeVisible();

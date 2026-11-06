@@ -50,13 +50,13 @@ export const LogoIcon: FC = () => logoIconElement;
 
 /**
  * Add Icon - Plus symbol
- * Used in AddPromptForm header
+ * ViewHeader icon "add"
  */
 export const AddIcon: FC = () => addIconElement;
 
 /**
  * Edit Icon - Pencil
- * Used in EditPromptForm header
+ * ViewHeader icon "edit"
  */
 export const EditIcon: FC = () => editIconElement;
 

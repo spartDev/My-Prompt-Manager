@@ -26,8 +26,7 @@ This project has been migrated to React 19, leveraging new hooks for improved fo
 React 19's `useActionState` hook replaces manual form state management by integrating directly with the native form `action` attribute. It provides automatic loading states, error handling, and progressive enhancement.
 
 **Used In:**
-- `src/components/AddPromptForm.tsx`
-- `src/components/EditPromptForm.tsx`
+- `src/components/PromptEditor.tsx`
 
 ### Basic Pattern
 
@@ -129,7 +128,7 @@ interface FieldErrors {
 - React enhances with client-side validation and UX
 - `action={submitAction}` enables React interception
 
-### Full Example: AddPromptForm.tsx
+### Full Example: a Prompt form
 
 ```typescript
 const [errors, submitAction, isPending] = useActionState(
@@ -610,7 +609,7 @@ const [field, setField] = useState('');
 <input defaultValue={field} name="field" onChange={(e) => setField(e.target.value)} />
 ```
 
-The input stays uncontrolled (FormData still reads it). `AddPromptForm` sets the state back to `''` on success so the reset clears the form as before; `EditPromptForm` keeps the values it tracks, since the form closes after a successful save.
+The input stays uncontrolled (FormData still reads it). `PromptEditor` keeps the values it tracks, since it closes after a successful save.
 
 ---
 
@@ -691,6 +690,6 @@ const [errors, submitAction, isPending] = useActionState(
 ## Questions?
 
 For implementation questions or issues:
-1. Check the actual implementations in `AddPromptForm.tsx` and `EditPromptForm.tsx`
+1. Check the actual implementation in `PromptEditor.tsx`
 2. Review git commits `5c07a1b` through `02b58a9` for migration context
 3. Refer to official React 19 documentation
