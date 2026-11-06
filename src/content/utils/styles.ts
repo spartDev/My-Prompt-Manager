@@ -98,10 +98,18 @@ export function getCSS(): string {
       --prompt-library-icon-ring: #844bf2;
     }
 
-    /* Base Prompt Manager Icon Styles */
+    /*
+      Base Prompt Manager Icon Styles. The icon is a <button>: reset Chrome's default button look
+      (buttonface background, bevelled border, padding, black buttontext), which shows on a page with no
+      button styles of its own. At rest it is transparent and drawn in the page's text color.
+    */
     .prompt-library-icon-base {
       min-width: 32px;
       min-height: 32px;
+      padding: 0;
+      border: none;
+      background: transparent;
+      color: inherit;
       border-radius: .5rem;
       display: flex;
       align-items: center;
