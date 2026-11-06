@@ -58,7 +58,7 @@ Which component does which job in the popup and the side panel, and the conventi
 | `src/components/settings/SettingsSection.tsx` | The frame of every Settings section |
 | `src/components/settings/ToggleSwitch.tsx` | The switch for every boolean setting |
 | `src/components/settings/AppearanceSection.tsx`, `LibrarySection.tsx`, `NotificationSection.tsx`, `AdvancedSection.tsx`, `AboutSection.tsx` | One Settings section each |
-| `src/components/settings/DataStorageSection.tsx` | Storage use, Backup export (`handleExport` builds and writes the file), the restore file picker, Clear All Data |
+| `src/components/settings/DataStorageSection.tsx` | Storage use, Backup export (`handleExport` builds and writes the file; off while the Library cannot be read, so no empty Backup is saved), the restore file picker, Clear All Data |
 | `src/components/settings/SiteIntegrationSection.tsx` | Platforms and custom sites: lists, add flow, element picker, import and export of a site configuration |
 | `src/components/settings/SiteCard.tsx` | One Platform or custom site, with its switch |
 

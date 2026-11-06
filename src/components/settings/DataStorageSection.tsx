@@ -1,4 +1,4 @@
-import { type FC, useCallback, useRef, useState } from 'react';
+import { type FC, useCallback, useId, useRef, useState } from 'react';
 
 import type { Category, Prompt } from '../../types';
 import type { ToastType } from '../../types/components';
@@ -23,6 +23,11 @@ export interface ImportReport {
 interface DataStorageSectionProps {
   prompts: Prompt[];
   categories: Category[];
+  /**
+   * Set when Settings could not read the Library: `prompts` and `categories` are then unknown, not
+   * empty, so they are not counted and Export is off, which keeps an empty Backup from being saved
+   */
+  libraryUnavailable?: boolean;
   /** The bytes Chrome stores (getBytesInUse) and its quota (QUOTA_BYTES); null until they are read */
   storageUsage: { used: number; total: number } | null;
   onImport: (data: { prompts: Prompt[]; categories: Category[] }) => Promise<void>;
@@ -36,6 +41,7 @@ interface DataStorageSectionProps {
 const DataStorageSection: FC<DataStorageSectionProps> = ({
   prompts,
   categories,
+  libraryUnavailable = false,
   storageUsage,
   onImport,
   importReport = null,
@@ -47,6 +53,7 @@ const DataStorageSection: FC<DataStorageSectionProps> = ({
   const [clearing, setClearing] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const exportHintId = useId();
 
   const handleExport = useCallback(async () => {
     const data = {
@@ -213,10 +220,14 @@ const DataStorageSection: FC<DataStorageSectionProps> = ({
               style={{ width: `${String(usage?.percentage ?? 0)}%` }}
             />
           </div>
-          <div className="mt-2 flex items-center justify-between text-xs text-secondary">
-            <span>{formatCount(prompts.length, 'prompt', 'prompts')}</span>
-            <span>{formatCount(categories.length, 'category', 'categories')}</span>
-          </div>
+          {libraryUnavailable ? (
+            <p className="mt-2 text-xs font-medium text-danger">The Library could not be read</p>
+          ) : (
+            <div className="mt-2 flex items-center justify-between text-xs text-secondary">
+              <span>{formatCount(prompts.length, 'prompt', 'prompts')}</span>
+              <span>{formatCount(categories.length, 'category', 'categories')}</span>
+            </div>
+          )}
         </div>
 
         {/* Export/Import */}
@@ -227,7 +238,9 @@ const DataStorageSection: FC<DataStorageSectionProps> = ({
           <div className="flex gap-2">
             <button
               onClick={() => void handleExport()}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover text-on-accent rounded-lg transition-all duration-200 focus-primary"
+              disabled={libraryUnavailable}
+              aria-describedby={exportHintId}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover text-on-accent rounded-lg transition-all duration-200 focus-primary disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-accent"
             >
               <ExportIcon />
               <span className="text-sm font-medium">Export</span>
@@ -259,8 +272,10 @@ const DataStorageSection: FC<DataStorageSectionProps> = ({
               className="hidden"
             />
           </div>
-          <p className="mt-2 text-xs text-tertiary">
-            Export your prompts as JSON for backup or sharing
+          <p id={exportHintId} className={`mt-2 text-xs ${libraryUnavailable ? 'text-danger' : 'text-tertiary'}`}>
+            {libraryUnavailable
+              ? 'Export is off: the Library could not be read. Leave Settings and open it again to retry.'
+              : 'Export your prompts as JSON for backup or sharing'}
           </p>
 
           {importReport && (
