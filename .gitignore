@@ -54,6 +54,7 @@ Thumbs.db
 coverage/
 .nyc_output
 test-results/
+test-results-linux/
 test-results.json
 playwright-report/
 

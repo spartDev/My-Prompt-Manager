@@ -5,6 +5,7 @@
  * multiple test files to ensure consistency and reduce duplication.
  */
 
+import { PRESET_COLORS } from '../../../src/constants/colors';
 import { DEFAULT_SETTINGS, type UsageEvent } from '../../../src/types';
 import { createCategorySeed, createPromptSeed } from '../utils/storage';
 
@@ -19,18 +20,9 @@ export const createUsageEventSeed = (overrides: Partial<UsageEvent>): UsageEvent
 });
 
 /**
- * Standard color palette for categories
+ * The Category colors of the extension: the values of PRESET_COLORS, in its order
  */
-export const CATEGORY_COLORS = [
-  '#3B82F6', // Blue
-  '#10B981', // Green
-  '#8B5CF6', // Purple
-  '#F59E0B', // Amber
-  '#EF4444', // Red
-  '#EC4899', // Pink
-  '#6366F1', // Indigo
-  '#14B8A6', // Teal
-] as const;
+export const CATEGORY_COLORS = PRESET_COLORS.map(color => color.value);
 
 /**
  * Standard category fixtures organized by use case

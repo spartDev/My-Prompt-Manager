@@ -43,7 +43,7 @@ Centralized utilities reduce code duplication and improve maintainability:
 
 Standardized test data for consistent testing:
 
-- **`test-data.ts`** - Predefined prompt and category fixtures
+- **`test-data.ts`** - Predefined prompt and category fixtures; `CATEGORY_COLORS` are the values of `PRESET_COLORS` (`src/constants/colors.ts`), the Category colors of the extension
 - **`SCENARIO_FIXTURES`** - Complete test scenarios
 - **`TestDataManager`** - Advanced data seeding utilities
 
@@ -238,6 +238,20 @@ test.describe('Feature Name', () => {
   });
 });
 ```
+
+## 🐧 Running a spec like Linux CI
+
+Linux CI renders DejaVu Sans, which is wider than the Mac fonts: a title that fits on the Mac can wrap or be cut on CI, so a layout assertion passes locally and fails there. When a spec that checks layout (a size, a position, a line count, a cut title) fails on CI only, reproduce it with:
+
+```bash
+npm run test:e2e:linux -- tests/e2e/library/card-preview.spec.ts
+```
+
+It needs Docker (Docker Desktop, or colima). It runs the committed HEAD, not your working tree, so commit first; in the Playwright noble image whose tag is the `@playwright/test` version of `package.json`, with DejaVu fonts installed, `CI=true` and no retries. Options after the spec go to `playwright test` (`--grep`, `--repeat-each`). Failure screenshots and traces land in `test-results-linux/`. The first run downloads the image, the npm packages and Chromium, a few minutes; later runs reuse them.
+
+## 📸 Proof screenshots
+
+A spec that takes proof screenshots for a pull request passes `animations: 'disabled'` to `page.screenshot()`, or the picture can catch a transition halfway (a tab still highlighted, an icon mid-fade). It writes them under `test-results/<topic>/` (`const SCREENSHOT_DIR = 'test-results/<topic>'`), as `<name>-light.png` and `<name>-dark.png`; `scripts/pr-assets.sh <topic> test-results/<topic>/*.png` pushes them and prints the markdown for the pull request.
 
 ## 🎯 Migration Guide
 
