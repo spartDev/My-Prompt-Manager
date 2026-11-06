@@ -10,8 +10,8 @@
  * the test origin in host_permissions, which Chrome grants on load. Everything else runs as built.
  *
  * Also takes, light and dark, the custom-site screenshots el4.7 never took (test-results/custom-site/):
- * the selector with a keyboard-selected Prompt, the Variable form, the icon on hover and with its
- * focus ring.
+ * the selector with a keyboard-selected Prompt, the Variable form, the icon at rest, on hover and
+ * with its focus ring.
  */
 
 import type { BrowserContext, Page } from '@playwright/test';
@@ -26,6 +26,12 @@ test.use({ extensionPath: CUSTOM_SITE_EXTENSION_PATH });
 
 const SCREENSHOT_DIR = 'test-results/custom-site';
 const ICON = '.prompt-library-icon-base';
+// The page's heading, input and floating icon: the icon is 32px, too small to judge on the whole page
+const ICON_AREA = { x: 0, y: 0, width: 800, height: 300 };
+
+// The hover background and focus ring el4.7 gave the floating icon (src/content/utils/styles.ts)
+const ICON_HOVER = { light: 'rgb(241, 237, 248)', dark: 'rgba(255, 255, 255, 0.08)' };
+const ICON_RING = { light: 'rgb(109, 40, 217)', dark: 'rgb(132, 75, 242)' };
 
 // The floating icon takes its hover color and focus ring from the host page's theme (a .dark ancestor),
 // as the page's own buttons would, so the dark screenshots are of a dark page
@@ -148,23 +154,52 @@ test.describe('Content script on a custom site', () => {
   });
 
   for (const theme of ['light', 'dark'] as const) {
-    test(`PROOF: icon on hover and with its focus ring, selector, Variable form (${theme})`, async ({ context, storage }) => {
+    // My-Prompt-Manager-nvr: the icon is a <button>, and on a page with no button styles it kept Chrome's
+    // default button look (grey background, bevelled border, black icon even on a dark page)
+    test(`PROOF: the floating icon has no button look at rest, and keeps its hover background and focus ring (${theme})`, async ({
+      context,
+      storage,
+    }) => {
       await seedWithCustomSite(storage, theme);
       const target = await openCustomSite(context, theme);
 
       const icon = target.locator(ICON);
       await expect(icon).toBeVisible();
+      await target.mouse.move(0, 0);
+
+      // At rest: transparent, no border, drawn in the page's own text color
+      const pageText = await target.locator('body').evaluate((body) => getComputedStyle(body).color);
+      await expect(icon).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await expect(icon).toHaveCSS('border-style', 'none');
+      await expect(icon).toHaveCSS('border-width', '0px');
+      await expect(icon).toHaveCSS('color', pageText);
+      await target.screenshot({ path: `${SCREENSHOT_DIR}/icon-rest-${theme}.png`, clip: ICON_AREA, animations: 'disabled' });
 
       await icon.hover();
-      await target.screenshot({ path: `${SCREENSHOT_DIR}/icon-hover-${theme}.png`, animations: 'disabled' });
+      await expect(icon).toHaveCSS('background-color', ICON_HOVER[theme]);
+      await expect(icon).toHaveCSS('border-style', 'none');
+      await target.screenshot({ path: `${SCREENSHOT_DIR}/icon-hover-${theme}.png`, clip: ICON_AREA, animations: 'disabled' });
 
       // Keyboard focus, so :focus-visible draws the ring
       await target.mouse.move(0, 0);
       await target.locator('#notes').focus();
       await target.keyboard.press('Tab');
       await expect(icon).toBeFocused();
-      await target.screenshot({ path: `${SCREENSHOT_DIR}/icon-focus-${theme}.png`, animations: 'disabled' });
+      await expect(icon).toHaveCSS('outline', `${ICON_RING[theme]} solid 2px`);
+      await expect(icon).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await target.screenshot({ path: `${SCREENSHOT_DIR}/icon-focus-${theme}.png`, clip: ICON_AREA, animations: 'disabled' });
+    });
 
+    test(`PROOF: selector with a keyboard-selected Prompt, Variable form (${theme})`, async ({ context, storage }) => {
+      await seedWithCustomSite(storage, theme);
+      const target = await openCustomSite(context, theme);
+
+      const icon = target.locator(ICON);
+      await expect(icon).toBeVisible();
+
+      await target.locator('#notes').focus();
+      await target.keyboard.press('Tab');
+      await expect(icon).toBeFocused();
       await target.keyboard.press('Enter');
       const selector = target.locator('.prompt-library-selector');
       await expect(selector).toBeVisible();
