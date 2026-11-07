@@ -22,7 +22,7 @@ Which component does which job in the popup and the side panel, and the conventi
 | Component | Job |
 |-----------|-----|
 | `src/components/LibraryView.tsx` | The Library: search, the Library filter pills, the Prompt cards, the empty states |
-| `src/components/CategoryManager.tsx` | The Categories section: the list of Categories, each row (but the default one) opening `CategorySheet` to rename, recolor or delete it, and "Add category" below the list to create one. Steps the screen back while the sheet is open, and pops in a Category that appears (created, or back from Undo) |
+| `src/components/CategoryManager.tsx` | The Categories section: the list of Categories, each row (but the default one) opening `CategorySheet` to rename, recolor or delete it, and "Add category" below the list to create one. Steps the screen back while the sheet is open, out of reach with App's tab bar (`onSheetOpenChange`), and pops in a Category that appears (created, or back from Undo) |
 | `src/components/CategorySheet.tsx` | The bottom sheet that creates or edits a Category (`mode: 'create' \| 'edit'`): name, one of the 12 `PRESET_COLORS`, a live preview. Its state (open, closing, draft) is `useCategorySheet`; its keyboard is `useModalFocus` |
 | `src/components/analytics/AnalyticsTab.tsx` | The Analytics section; `src/components/analytics/AnalyticsDashboard.tsx` is the full page it expands to |
 | `src/components/SettingsView.tsx` | Settings: assembles the sections of `src/components/settings/`, and runs Backup restore (`handleImportData`, passed down as `onImport`) |

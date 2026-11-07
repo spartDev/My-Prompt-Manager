@@ -46,6 +46,8 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   const [libraryFilter, setLibraryFilter] = useState<LibraryFilter>(ALL_PROMPTS);
   // Why the last save or Settings import was refused for lack of storage: the storage warning shows it
   const [storageRefusal, setStorageRefusal] = useState<string | null>(null);
+  // The Category sheet is open: the tab bar is out of reach behind it
+  const [categorySheetOpen, setCategorySheetOpen] = useState(false);
   // What had the keyboard when the refused save started (Save, or the field where Enter was
   // pressed): it gets the keyboard back when the warning closes
   const storageRefusalTriggerRef = useRef<HTMLElement | null>(null);
@@ -343,6 +345,8 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
             <p className="text-secondary">{promptsError.message}</p>
           </div>
         </div>
+        {/* A Notification stays: the Undo of a deletion whose Prompts could not be read again is in it */}
+        <ToastContainer toast={toast} onDismiss={hideToast} />
       </ThemeProvider>
     );
   }
@@ -398,6 +402,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
           onDeleteCategory={handleDeleteCategory}
           // No Undo without Notifications: confirm while they are off, or not known to be on yet
           confirmDelete={!settings.enabled || !settingsLoaded}
+          onSheetOpenChange={setCategorySheetOpen}
           context={context}
         />
       )}
@@ -421,7 +426,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
       </div>
 
       {showTabBar && (
-        <TabBar activeSection={currentView} onSelect={handleSelectSection} />
+        <TabBar activeSection={currentView} onSelect={handleSelectSection} inert={categorySheetOpen} />
       )}
 
       {storageRefusal !== null && (

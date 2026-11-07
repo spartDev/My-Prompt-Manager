@@ -362,6 +362,39 @@ describe('App prompt workflows', () => {
     expect(screen.queryByTestId('toast')).not.toBeInTheDocument();
   });
 
+  it('keeps the Undo of a deletion on screen when the Prompts cannot be read again after it', async () => {
+    const storageMock = getMockStorageManager();
+    const work = defaultCategories[1];
+    const deleted: DeletedCategory = { category: work, index: 1, movedPrompts: [] };
+    vi.mocked(storageMock.deleteCategory).mockResolvedValue(deleted);
+    vi.mocked(storageMock.restoreCategory).mockResolvedValue(work);
+
+    await renderApp();
+    await userEvent.click(screen.getByRole('tab', { name: 'Categories' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit category Work' }));
+    storageMock.getPrompts.mockRejectedValueOnce(new Error('Storage unavailable'));
+    await userEvent.click(within(screen.getByRole('dialog', { name: 'Edit category' })).getByRole('button', { name: 'Delete' }));
+
+    expect(await screen.findByText('Error Loading Data')).toBeInTheDocument();
+    const notification = await screen.findByTestId('toast');
+    await userEvent.click(within(notification).getByRole('button', { name: 'Undo' }));
+
+    expect(storageMock.restoreCategory).toHaveBeenCalledWith(deleted);
+    expect(await screen.findByRole('button', { name: 'Edit category Work' })).toBeInTheDocument();
+  });
+
+  it('puts the tab bar out of reach while the Category sheet is open', async () => {
+    await renderApp();
+    await userEvent.click(screen.getByRole('tab', { name: 'Categories' }));
+    const navigation = screen.getByRole('navigation', { name: 'Main navigation' });
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Add category' }));
+    expect(navigation).toHaveAttribute('inert');
+
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => { expect(navigation).not.toHaveAttribute('inert'); });
+  });
+
   it('asks before deleting a Category when the Notifications are off, as there is no Undo', async () => {
     const storageMock = getMockStorageManager();
     await getChromeMock().storage.local.set({ toast_settings: { enabled: false } });

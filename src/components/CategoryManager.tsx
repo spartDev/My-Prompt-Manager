@@ -25,6 +25,8 @@ interface CategoryManagerProps {
   onDeleteCategory: (category: Category) => Promise<void>;
   /** Ask before deleting: there is no Undo, the Notifications being off */
   confirmDelete?: boolean;
+  /** Told when the sheet opens and closes, so App can put what it draws outside this view (the tab bar) out of reach */
+  onSheetOpenChange?: (open: boolean) => void;
   context?: 'popup' | 'sidepanel';
 }
 
@@ -58,6 +60,7 @@ const CategoryManager: FC<CategoryManagerProps> = ({
   onUpdateCategory,
   onDeleteCategory,
   confirmDelete = false,
+  onSheetOpenChange,
   context = 'popup'
 }) => {
   const listTitleId = useId();
@@ -79,6 +82,14 @@ const CategoryManager: FC<CategoryManagerProps> = ({
       setAppearing(prev => (prev?.waiting ? { id: prev.id, waiting: false } : prev));
     }
   });
+
+  // Open, the sheet is the one dialog: App's tab bar goes out of reach with this view, until it closes
+  // or this view goes away
+  useEffect(() => {
+    if (!sheet.isOpen) {return;}
+    onSheetOpenChange?.(true);
+    return () => { onSheetOpenChange?.(false); };
+  }, [sheet.isOpen, onSheetOpenChange]);
 
   const currentIds = categories.map(category => category.id);
   if (currentIds.length !== knownIds.size || currentIds.some(id => !knownIds.has(id))) {
@@ -135,6 +146,13 @@ const CategoryManager: FC<CategoryManagerProps> = ({
   // One deletion at a time: a second click would fail, and its failure Notification would replace
   // the one that offers Undo
   const deletingRef = useRef(false);
+
+  // While a deletion runs, the sheet that started it stays open: its end closes that sheet, not another
+  const closeSheet = useCallback(() => {
+    if (!deletingRef.current) {
+      sheet.close();
+    }
+  }, [sheet.close]);
 
   const deleteNow = async (category: Category): Promise<void> => {
     if (deletingRef.current) {return;}
@@ -309,7 +327,7 @@ const CategoryManager: FC<CategoryManagerProps> = ({
           onColorChange={sheet.setColor}
           onSubmit={handleSubmit}
           onDelete={handleDelete}
-          onClose={sheet.close}
+          onClose={closeSheet}
         />
       )}
 

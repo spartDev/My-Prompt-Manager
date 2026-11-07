@@ -1036,7 +1036,9 @@ rises from the bottom (`sheet-in`, `translateY(100%)` to rest, 0.5s ease-sheet) 
 behind steps back (`.sheet-behind[data-stepped-back]`: `scale(.93) translateY(10px)`, 22px corners,
 `brightness(.96)`, 0.5s ease-sheet). Swatches move on `transform` over 0.35s ease-spring; a Category
 that appears in the list pops in (`category-pop`: scale .3, 1.2, then 1, 0.5s ease-spring). Under
-`prefers-reduced-motion`, all of them last 1ms.
+`prefers-reduced-motion`, all of them last 1ms. Only one dialog is reachable at a time, by assistive
+technology too: while the sheet is open, the screen behind and the tab bar are `inert`, and the sheet
+is `inert` while it leaves or while the delete confirmation is on top of it.
 
 ```tsx
 <div className="fixed inset-0 z-40">

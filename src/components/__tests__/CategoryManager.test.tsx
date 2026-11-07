@@ -289,6 +289,24 @@ describe('CategoryManager', () => {
       await sheetGone();
     });
 
+    it('stays open while the deletion runs: Escape, Cancel and the backdrop wait for it to end', async () => {
+      const resolvers: Array<() => void> = [];
+      const slowDelete = vi.fn(() => new Promise<void>(resolve => { resolvers.push(resolve); }));
+      const { user } = renderManager({ onDeleteCategory: slowDelete });
+
+      await user.click(screen.getByRole('button', { name: 'Edit category Ideas' }));
+      const sheet = screen.getByRole('dialog', { name: 'Edit category' });
+      await user.click(within(sheet).getByRole('button', { name: 'Delete' }));
+      await user.keyboard('{Escape}');
+      await user.click(within(sheet).getByRole('button', { name: 'Cancel' }));
+      await user.click(screen.getByTestId('category-sheet-backdrop'));
+      // Still the sheet that started the deletion, so its end applies to it and to nothing else
+      expect(sheet).toHaveClass('sheet-in');
+
+      resolvers.forEach(resolve => { resolve(); });
+      await sheetGone();
+    });
+
     it('has no Delete when creating', async () => {
       const { user } = renderManager();
 
