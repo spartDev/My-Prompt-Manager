@@ -285,9 +285,12 @@ describe('CategoryManager', () => {
 
       const confirm = screen.getByRole('dialog', { name: 'Delete Category' });
       expect(props.onDeleteCategory).not.toHaveBeenCalled();
+      // One modal dialog at a time: the sheet behind is out of reach, assistive technology included
+      expect(screen.getByRole('dialog', { name: 'Edit category', hidden: true }).closest('[inert]')).not.toBeNull();
       await user.click(within(confirm).getByRole('button', { name: 'Cancel' }));
       // Back in the sheet, which has the keyboard again
       await waitFor(() => { expect(screen.getByRole('textbox', { name: 'Category name' })).toHaveFocus(); });
+      expect(screen.getByRole('dialog', { name: 'Edit category' }).closest('[inert]')).toBeNull();
 
       await user.click(within(screen.getByRole('dialog', { name: 'Edit category' })).getByRole('button', { name: 'Delete' }));
       await user.click(within(screen.getByRole('dialog', { name: 'Delete Category' })).getByRole('button', { name: 'Delete' }));

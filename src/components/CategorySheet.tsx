@@ -11,7 +11,7 @@ export interface CategorySheetProps {
   mode: CategorySheetMode;
   /** False while the sheet plays its exit: it no longer takes input */
   open: boolean;
-  /** Another dialog is on top (the delete confirmation): the sheet lets go of the keyboard until it closes */
+  /** Another dialog is on top (the delete confirmation): the sheet is inert and lets go of the keyboard until it closes */
   paused?: boolean;
   name: string;
   color: string;
@@ -105,7 +105,8 @@ const CategorySheet: FC<CategorySheetProps> = ({
   };
 
   return createPortal(
-    <div className={cn('fixed inset-0 z-40', !open && 'pointer-events-none')} inert={!open}>
+    // Inert while it leaves, and while the delete confirmation is on top: one modal dialog at a time
+    <div className={cn('fixed inset-0 z-40', !open && 'pointer-events-none')} inert={!open || paused}>
       <div
         aria-hidden="true"
         data-testid="category-sheet-backdrop"
