@@ -27,6 +27,7 @@ jobs:
       - name: 🛎️ Checkout Repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0 # Full history for better analysis
 
       - name: 🟢 Setup Node.js
@@ -97,6 +98,8 @@ jobs:
     steps:
       - name: 🛎️ Checkout Repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: 🟢 Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -159,6 +162,8 @@ jobs:
     steps:
       - name: 🛎️ Checkout Repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: 🟢 Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -280,6 +285,7 @@ jobs:
       - name: 🛎️ Checkout Repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - name: 📋 Check Version Changes
@@ -303,8 +309,10 @@ jobs:
 
       - name: 🏷️ Prepare Release Notes
         if: steps.version-check.outputs.version_bump == 'true'
+        env:
+          CURRENT_VERSION: ${{ steps.version-check.outputs.current_version }}
         run: |
-          echo "🏷️ Preparing release notes for version ${{ steps.version-check.outputs.current_version }}"
+          echo "🏷️ Preparing release notes for version $CURRENT_VERSION"
           
           # Generate changelog since last tag
           last_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "")

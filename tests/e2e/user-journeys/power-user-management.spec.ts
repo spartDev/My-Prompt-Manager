@@ -203,7 +203,7 @@ test.describe('Power User Prompt Management', () => {
     await socialMediaCard.getByRole('button', { name: /^Edit / }).click();
 
     await expect(sidepanelPage.getByRole('heading', { name: 'Edit prompt', exact: true })).toBeVisible();
-    await sidepanelPage.getByRole('radio', { name: 'Work', exact: true }).click();
+    await sidepanelPage.getByRole('radiogroup', { name: 'Category' }).getByRole('radio', { name: 'Work', exact: true }).click();
     await sidepanelPage.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(sidepanelPage.getByText('Prompt saved', { exact: true }).first()).toBeVisible();
 
@@ -212,7 +212,7 @@ test.describe('Power User Prompt Management', () => {
     await campaignAnalysisCard.getByRole('button', { name: /^Edit / }).click();
 
     await expect(sidepanelPage.getByRole('heading', { name: 'Edit prompt', exact: true })).toBeVisible();
-    await sidepanelPage.getByRole('radio', { name: 'Work', exact: true }).click();
+    await sidepanelPage.getByRole('radiogroup', { name: 'Category' }).getByRole('radio', { name: 'Work', exact: true }).click();
     await sidepanelPage.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(sidepanelPage.getByText('Prompt saved', { exact: true }).first()).toBeVisible();
 
@@ -304,7 +304,7 @@ test.describe('Power User Prompt Management', () => {
       await promptCard.getByRole('button', { name: /^Edit / }).click();
 
       await expect(sidepanelPage.getByRole('heading', { name: 'Edit prompt', exact: true })).toBeVisible();
-      await sidepanelPage.getByRole('radio', { name: 'Work', exact: true }).click();
+      await sidepanelPage.getByRole('radiogroup', { name: 'Category' }).getByRole('radio', { name: 'Work', exact: true }).click();
       await sidepanelPage.getByRole('button', { name: 'Save', exact: true }).click();
       await expect(sidepanelPage.getByText('Prompt saved', { exact: true }).first()).toBeVisible();
     }

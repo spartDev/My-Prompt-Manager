@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, waitForElementToBeRemoved } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -56,19 +56,47 @@ describe('App tab bar navigation', () => {
     expect(screen.queryByTestId('back-button')).not.toBeInTheDocument();
   });
 
-  it('hides the tab bar on the add form and restores it on cancel', async () => {
+  it('opens the editor as a sheet over the Library, which waits inert, and gives New the keyboard back once the sheet has left', async () => {
+    const user = userEvent.setup();
+    await renderApp();
+    const newButton = screen.getByRole('button', { name: /add new prompt/i });
+
+    await user.click(newButton);
+
+    const sheet = await screen.findByTestId('editor-sheet');
+    expect(sheet).toHaveClass('animate-sheet-in');
+    expect(screen.getByLabelText(/title/i)).toHaveFocus();
+    // The Library and the tab bar stay in the document, beneath the sheet and out of reach
+    expect(screen.getByRole('heading', { name: /my prompt manager/i }).closest('[inert]')).not.toBeNull();
+    expect(screen.getByRole('tablist').closest('[inert]')).not.toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    // The sheet leaves to the bottom, out of reach, then unmounts
+    expect(sheet).toHaveClass('animate-sheet-out');
+    expect(sheet).toHaveAttribute('inert');
+    await waitForElementToBeRemoved(sheet);
+    expect(newButton).toHaveFocus();
+    expect(screen.getByRole('heading', { name: /my prompt manager/i }).closest('[inert]')).toBeNull();
+    expect(screen.getByRole('tab', { name: 'Library' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('opens a fresh editor when New is pressed again while the sheet is leaving', async () => {
     const user = userEvent.setup();
     await renderApp();
 
     await user.click(screen.getByRole('button', { name: /add new prompt/i }));
-
-    await screen.findByLabelText(/title/i);
-    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
-
+    await user.type(await screen.findByLabelText(/title/i), 'Draft');
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    await user.click(screen.getByRole('button', { name: 'Discard' }));
+    expect(screen.getByTestId('editor-sheet')).toHaveClass('animate-sheet-out');
 
-    await screen.findByRole('heading', { name: /my prompt manager/i });
-    expect(screen.getByRole('tab', { name: 'Library' })).toHaveAttribute('aria-selected', 'true');
+    await user.click(screen.getByRole('button', { name: /add new prompt/i }));
+
+    const sheet = screen.getByTestId('editor-sheet');
+    expect(sheet).toHaveClass('animate-sheet-in');
+    expect(screen.getAllByTestId('editor-sheet')).toHaveLength(1);
+    expect(screen.getByLabelText(/title/i)).toHaveValue('');
   });
 
   it('keeps the search query when switching Sections and coming back', async () => {

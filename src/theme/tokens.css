@@ -101,10 +101,35 @@
   --shadow-xl: 0 20px 25px -5px var(--shadow-tint-10), 0 8px 10px -6px var(--shadow-tint-10);
   --shadow-2xl: 0 25px 50px -12px var(--shadow-tint-25);
 
-  /* Motion (Atelier 1C), the same in both themes: ease-sheet for what slides in and out (the
-     Category sheet and the screen behind it), ease-spring for what pops (swatches, a new row) */
+  /* Motion (Atelier 1C): panels slide with ease-sheet, pops and presses spring. Durations are
+     mirrored in src/theme/motion.ts for the timers; each animation is a class, animate-<name>.
+     The Category sheet's classes in popup.css run on these curves and keyframes */
   --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --animate-sheet-in: sheet-in 500ms var(--ease-sheet) both;
+  --animate-sheet-out: sheet-out 320ms var(--ease-sheet) both;
+  --animate-pop: pop 450ms var(--ease-spring) both;
+  --animate-pop-check: pop 400ms var(--ease-spring) both;
+  --animate-toast-in: toast-in 450ms var(--ease-spring) both;
+  --animate-toast-mark: pop 450ms var(--ease-spring) 80ms both;
+
+  @keyframes sheet-in {
+    from { transform: translateY(100%); }
+    to { transform: none; }
+  }
+  @keyframes sheet-out {
+    from { transform: none; }
+    to { transform: translateY(100%); }
+  }
+  @keyframes pop {
+    0% { opacity: 0; transform: scale(0.3); }
+    60% { opacity: 1; transform: scale(1.2); }
+    100% { transform: scale(1); }
+  }
+  @keyframes toast-in {
+    0% { opacity: 0; transform: translate(-50%, -14px) scale(0.9); }
+    100% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  }
 }
 
 @layer base {

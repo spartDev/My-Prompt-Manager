@@ -150,7 +150,7 @@ test.describe('Forms, dialogs and toasts on the tokens', () => {
       await page.keyboard.press('Enter');
       const confirmation = page.getByRole('dialog', { name: 'Clear All Data' });
       await expect(confirmation).toBeVisible();
-      await expect(page.locator('[inert]').getByText('Storage Limit Reached')).toBeVisible();
+      await expect(warning.locator('xpath=ancestor-or-self::*[@inert]')).toHaveCount(1);
       await expect(confirmation.getByRole('button', { name: 'Cancel' })).toBeFocused();
       await page.keyboard.press('Tab');
       await expect(confirmation.getByRole('button', { name: 'Clear All Data' })).toBeFocused();
@@ -159,7 +159,7 @@ test.describe('Forms, dialogs and toasts on the tokens', () => {
       await page.screenshot({ path: `${SCREENSHOT_DIR}/storage-warning-confirmation-${theme}.png` });
       await page.keyboard.press('Escape');
       await expect(confirmation).toHaveCount(0);
-      await expect(page.locator('[inert]')).toHaveCount(0);
+      await expect(warning.locator('xpath=ancestor-or-self::*[@inert]')).toHaveCount(0);
       await expect(warning.getByRole('button', { name: 'Clear All Data' })).toBeFocused();
 
       // Escape closes the warning and gives the keyboard back to Save
