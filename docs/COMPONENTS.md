@@ -6,7 +6,7 @@ Which component does which job in the popup and the side panel, and the conventi
 
 ## Where things live
 
-`src/App.tsx` is the shell: it holds the Prompts and Categories (`usePrompts`, `useCategories`), the Notification (`useToast`) and the current section, and renders one view plus the `TabBar`. The same `App` runs in the popup and in the side panel; it receives the context as a prop.
+`src/App.tsx` is the shell: it holds the Prompts and Categories (`usePrompts`, `useCategories`), the Notification (`useToast`) and the current section, and renders one view plus the `TabBar`. The editor is a sheet above them: it rises from the bottom (`animate-sheet-in`), the Section and the `TabBar` wait `inert` beneath it, and on close it leaves to the bottom and unmounts after its animation (`useAnimatedPresence`), when the keyboard returns to what opened it. The same `App` runs in the popup and in the side panel; it receives the context as a prop.
 
 | Folder | What is in it |
 |--------|---------------|
@@ -32,7 +32,7 @@ Which component does which job in the popup and the side panel, and the conventi
 | Component | Job |
 |-----------|-----|
 | `src/components/PromptCard.tsx` | One Prompt in the Library: title, preview, Category, use count, copy and the actions menu. Memoized with its own props comparison |
-| `src/components/PromptEditor.tsx` | The one editor for a Prompt: new (typed, or opened from a Share code) and edit. Header bar Cancel / heading / Save, Cmd/Ctrl+S saves, Escape asks before discarding changes |
+| `src/components/PromptEditor.tsx` | The one editor for a Prompt: new (typed, or opened from a Share code) and edit. Header bar Cancel / heading / Save, Cmd/Ctrl+S saves, Escape asks before discarding changes. Save shows "Saved" for `MOTION.savedPause`, then closes; the title has the keyboard on open |
 | `src/components/editor/CategoryChips.tsx` | The Category of a Prompt as a radio group of chips, with "New category" to create one in place |
 | `src/components/editor/VariableTextarea.tsx` | The Prompt text field: Variables highlighted by a mirror under a transparent textarea; the field grows with its text |
 | `src/components/LibraryFilterBar.tsx` | The Library filter pills (All, Pinned, Most Used, one per non-empty Category); the filter logic is `src/services/libraryFilter.ts` |

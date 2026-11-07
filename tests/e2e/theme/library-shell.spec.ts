@@ -98,7 +98,8 @@ test.describe('App shell and Library on the tokens', () => {
 
     test(`the Prompt editor, new and edit, shows the header line once it scrolls (${theme})`, async ({ page, storage, extensionId }) => {
       await openLibrary(page, storage, extensionId, { theme, library: [{ ...prompts[0], content: 'Ligne\n'.repeat(40) }] });
-      const header = page.getByRole('banner');
+      // The editor's own header: the Library's waits inert beneath the sheet
+      const header = page.getByTestId('editor-sheet').getByRole('banner');
 
       for (const form of ['add', 'edit'] as const) {
         await page.getByRole('button', { name: form === 'add' ? 'Add new prompt' : `Edit ${prompts[0].title}` }).click();

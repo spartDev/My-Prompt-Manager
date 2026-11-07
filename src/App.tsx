@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { useCallback, useOptimistic, useRef, useState, useTransition } from 'react';
+import { useCallback, useEffect, useOptimistic, useRef, useState, useTransition } from 'react';
 
 import { AnalyticsTab } from './components/analytics';
 import CategoryManager from './components/CategoryManager';
@@ -10,20 +10,26 @@ import StorageWarning from './components/StorageWarning';
 import TabBar, { type Section } from './components/TabBar';
 import ToastContainer from './components/ToastContainer';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { useAnimatedPresence } from './hooks/useAnimatedPresence';
 import { useCategories } from './hooks/useCategories';
 import { useClipboard } from './hooks/useClipboard';
 import { usePrompts } from './hooks/usePrompts';
 import { useSearchWithDebounce } from './hooks/useSearchWithDebounce';
 import { useToast } from './hooks/useToast';
 import { ALL_PROMPTS } from './services/libraryFilter';
-import type { AppError, Category, LibraryFilter, Prompt, ViewType } from './types';
+import { MOTION } from './theme/motion';
+import type { AppError, Category, LibraryFilter, Prompt } from './types';
 import { Logger, toError } from './utils';
+import { cn } from './utils/cn';
 
-type ExtendedViewType = ViewType | Section;
+/** The editor, open over the Library: writing a new Prompt, or editing one */
+type EditorState = { mode: 'add' } | { mode: 'edit'; prompt: Prompt };
 
-const SECTIONS: readonly ExtendedViewType[] = ['library', 'categories', 'analytics', 'settings'];
-
-const isSection = (view: ExtendedViewType): view is Section => SECTIONS.includes(view);
+/** What the Notification says once the editor has closed after a save */
+interface SavedNotice {
+  message: string;
+  sub: string;
+}
 
 interface AppProps {
   context?: 'popup' | 'sidepanel';
@@ -34,8 +40,17 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   const urlParams = new URLSearchParams(window.location.search);
   const isPickerMode = urlParams.get('picker') === 'true';
   
-  const [currentView, setCurrentView] = useState<ExtendedViewType>(isPickerMode ? 'settings' : 'library');
-  const [selectedPrompt, setSelectedPrompt] = useState<Prompt | null>(null);
+  const [currentView, setCurrentView] = useState<Section>(isPickerMode ? 'settings' : 'library');
+  // The editor rises as a sheet over the Section and leaves to the bottom: it stays in the
+  // document for its exit animation, then unmounts
+  const [editor, setEditor] = useState<EditorState | null>(null);
+  const editorSheet = useAnimatedPresence(editor, MOTION.sheetOut);
+  // One instance per opening: reopening while the sheet leaves starts from a blank editor
+  const [editorKey, setEditorKey] = useState(0);
+  // What had the keyboard when the editor opened (New, or Edit on a card): it gets it back once the sheet has left
+  const editorTriggerRef = useRef<HTMLElement | null>(null);
+  // The Notification of a save, shown when the editor closes, with the sheet
+  const savedNoticeRef = useRef<SavedNotice | null>(null);
   // The Library filter lasts while the popup or side panel stays open, across Sections
   const [libraryFilter, setLibraryFilter] = useState<LibraryFilter>(ALL_PROMPTS);
   // Why the last save or Settings import was refused for lack of storage: the storage warning shows it
@@ -80,15 +95,25 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   // Initialize search with debounce functionality using optimistic prompts
   const searchWithDebounce = useSearchWithDebounce(optimisticPrompts);
 
-  const handleAddNew = () => {
-    setCurrentView('add');
-    setSelectedPrompt(null);
+  const openEditor = (next: EditorState) => {
+    editorTriggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setEditorKey(key => key + 1);
+    setEditor(next);
   };
 
-  const handleEditPrompt = (prompt: Prompt) => {
-    setSelectedPrompt(prompt);
-    setCurrentView('edit');
-  };
+  const handleAddNew = () => { openEditor({ mode: 'add' }); };
+
+  const handleEditPrompt = (prompt: Prompt) => { openEditor({ mode: 'edit', prompt }); };
+
+  const editorShown = editorSheet.shown !== null;
+  useEffect(() => {
+    if (editorShown) { return; }
+    const trigger = editorTriggerRef.current;
+    editorTriggerRef.current = null;
+    if (trigger?.isConnected) {
+      trigger.focus();
+    }
+  }, [editorShown]);
 
   const handleDeletePrompt = async (id: string) => {
     const title = prompts.find(p => p.id === id)?.title;
@@ -136,8 +161,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   };
 
   const handleDeleteFromEdit = (id: string) => {
-    setCurrentView('library');
-    setSelectedPrompt(null);
+    setEditor(null);
     void handleDeletePrompt(id);
   };
 
@@ -165,30 +189,30 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
     // The form calls this before Save is disabled, so Save (or the field) still has the keyboard
     const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     try {
-      if (currentView === 'add') {
+      if (editor?.mode === 'edit') {
+        await updatePrompt(editor.prompt.id, data);
+        Logger.info('Prompt updated successfully', {
+          component: 'App',
+          operation: 'updatePrompt',
+          promptId: editor.prompt.id,
+          category: data.category
+        });
+        savedNoticeRef.current = { message: 'Prompt saved', sub: data.title };
+      } else {
         await createPrompt(data);
         Logger.info('Prompt created successfully', {
           component: 'App',
           operation: 'createPrompt',
           category: data.category
         });
-        showToast('Prompt created', 'success', { sub: data.title });
-      } else if (currentView === 'edit' && selectedPrompt) {
-        await updatePrompt(selectedPrompt.id, data);
-        Logger.info('Prompt updated successfully', {
-          component: 'App',
-          operation: 'updatePrompt',
-          promptId: selectedPrompt.id,
-          category: data.category
-        });
-        showToast('Prompt saved', 'success', { sub: data.title });
+        savedNoticeRef.current = { message: 'Prompt created', sub: data.title };
       }
-      // The editor shows "Saved", then closes itself (onClose)
+      // The editor shows "Saved", then closes itself (onClose), and the Notification comes with the close
     } catch (error: unknown) {
       const appError = error as AppError;
       Logger.error('Failed to save prompt', toError(appError), {
         component: 'App',
-        operation: currentView === 'add' ? 'createPrompt' : 'updatePrompt',
+        operation: editor?.mode === 'edit' ? 'updatePrompt' : 'createPrompt',
         errorType: appError.type,
         category: data.category
       });
@@ -202,9 +226,13 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
     }
   };
 
-  const handleFormCancel = () => {
-    setCurrentView('library');
-    setSelectedPrompt(null);
+  const handleEditorClose = () => {
+    setEditor(null);
+    const notice = savedNoticeRef.current;
+    savedNoticeRef.current = null;
+    if (notice) {
+      showToast(notice.message, 'success', { sub: notice.sub });
+    }
   };
 
   const handleCreateCategory = async (categoryData: { name: string; color?: string }) => {
@@ -308,7 +336,6 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   }, []);
 
   const loading = promptsLoading || categoriesLoading;
-  const showTabBar = isSection(currentView);
 
   if (promptsError) {
     return (
@@ -326,6 +353,8 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   return (
     <ThemeProvider>
       <div className={`h-full w-full bg-app section-scroll-scope relative flex flex-col ${context === 'sidepanel' ? 'sidepanel' : ''}`}>
+      {/* The Section and the tab bar wait, out of reach, while the editor is open above them */}
+      <div className="contents" inert={editor !== null}>
       <div ref={sectionContentRef} className="flex-1 min-h-0">
       {currentView === 'library' && (
         <LibraryView
@@ -341,27 +370,6 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
           onLibraryFilterChange={setLibraryFilter}
           loading={loading}
           context={context}
-        />
-      )}
-
-      {currentView === 'add' && (
-        <PromptEditor
-          categories={categories}
-          onSubmit={handleFormSubmit}
-          onClose={handleFormCancel}
-          onCreateCategory={handleCreateCategoryFromEditor}
-        />
-      )}
-
-      {currentView === 'edit' && selectedPrompt && (
-        <PromptEditor
-          key={selectedPrompt.id}
-          prompt={selectedPrompt}
-          categories={categories}
-          onSubmit={handleFormSubmit}
-          onClose={handleFormCancel}
-          onDelete={handleDeleteFromEdit}
-          onCreateCategory={handleCreateCategoryFromEditor}
         />
       )}
 
@@ -393,8 +401,26 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
       )}
       </div>
 
-      {showTabBar && (
-        <TabBar activeSection={currentView} onSelect={handleSelectSection} />
+      <TabBar activeSection={currentView} onSelect={handleSelectSection} />
+      </div>
+
+      {editorSheet.shown && (
+        <div
+          data-testid="editor-sheet"
+          inert={editorSheet.exiting}
+          // Its own scroll scope: the editor's header line follows the editor's scrolling, not the Section's
+          className={cn('absolute inset-0 z-30 bg-card section-scroll-scope', editorSheet.exiting ? 'animate-sheet-out' : 'animate-sheet-in')}
+        >
+          <PromptEditor
+            key={editorKey}
+            prompt={editorSheet.shown.mode === 'edit' ? editorSheet.shown.prompt : undefined}
+            categories={categories}
+            onSubmit={handleFormSubmit}
+            onClose={handleEditorClose}
+            onDelete={editorSheet.shown.mode === 'edit' ? handleDeleteFromEdit : undefined}
+            onCreateCategory={handleCreateCategoryFromEditor}
+          />
+        </div>
       )}
 
       {storageRefusal !== null && (

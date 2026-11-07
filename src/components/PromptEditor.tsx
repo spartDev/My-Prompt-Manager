@@ -3,6 +3,7 @@ import { useActionState, useEffect, useId, useRef, useState } from 'react';
 
 import { formatCharacterCount } from '../constants/validation';
 import { PROMPT_LIMITS } from '../services/promptAdmission';
+import { MOTION, motionDuration } from '../theme/motion';
 import { DEFAULT_CATEGORY } from '../types';
 import type { PromptEditorProps } from '../types/components';
 import { type FieldErrors, Logger, toError, validatePromptFields } from '../utils';
@@ -16,9 +17,6 @@ import VariableTextarea from './editor/VariableTextarea';
 
 type EditorMode = 'write' | 'import';
 
-/** How long Save shows "Saved" before the editor closes */
-export const SAVED_PAUSE_MS = 600;
-
 /** Share of a limit from which the counter shows the limit too */
 const NEAR_LIMIT = 0.9;
 
@@ -30,7 +28,7 @@ const countLabel = (length: number, limit: number): string =>
   length >= limit * NEAR_LIMIT ? formatCharacterCount(length, limit) : plural(length, 'character');
 
 const CheckIcon: FC = () => (
-  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <svg className="w-4 h-4 animate-pop-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="m5 12.5 4.5 4.5L19 7.5" />
   </svg>
 );
@@ -57,7 +55,11 @@ const PromptEditor: FC<PromptEditorProps> = ({
   const shareCodeId = useId();
   const shareCodeStatusId = useId();
   const saveRef = useRef<HTMLButtonElement>(null);
+  const titleRef = useRef<HTMLInputElement>(null);
   const formId = useId();
+
+  // The title takes the keyboard as the editor opens, while the sheet is still rising
+  useEffect(() => { titleRef.current?.focus(); }, []);
 
   const [mode, setMode] = useState<EditorMode>('write');
   // The text as typed, kept as the fields' defaultValue: React 19 resets a form's uncontrolled
@@ -138,7 +140,7 @@ const PromptEditor: FC<PromptEditorProps> = ({
   useEffect(() => { onCloseRef.current = onClose; });
   useEffect(() => {
     if (!saved) { return; }
-    const timer = setTimeout(() => { onCloseRef.current(); }, SAVED_PAUSE_MS);
+    const timer = setTimeout(() => { onCloseRef.current(); }, motionDuration(MOTION.savedPause));
     return () => { clearTimeout(timer); };
   }, [saved]);
 
@@ -221,7 +223,7 @@ const PromptEditor: FC<PromptEditorProps> = ({
           aria-keyshortcuts="Meta+S Control+S"
           title={isImport ? 'Import (⌘S)' : 'Save (⌘S)'}
           className={cn(
-            'justify-self-end h-9 px-4 inline-flex items-center gap-1.5 rounded-full text-sm font-bold transition-colors focus-primary disabled:cursor-not-allowed active:scale-95',
+            'justify-self-end h-9 px-4 inline-flex items-center gap-1.5 rounded-full text-sm font-bold transition-save focus-primary disabled:cursor-not-allowed active:scale-94',
             saved
               ? 'bg-success-subtle text-success'
               : 'bg-accent text-on-accent hover:bg-accent-hover disabled:opacity-50'
@@ -245,6 +247,7 @@ const PromptEditor: FC<PromptEditorProps> = ({
               <label htmlFor={titleId} className="sr-only">Title</label>
               <input
                 id={titleId}
+                ref={titleRef}
                 type="text"
                 name="title"
                 defaultValue={title}
@@ -356,10 +359,11 @@ const PromptEditor: FC<PromptEditorProps> = ({
                 <span className="text-xs font-bold text-secondary">Variables</span>
                 {variables.length > 0 ? (
                   <ul className="flex flex-wrap gap-1.5">
+                    {/* Keyed by name: a Variable already there keeps its element, so only a new one pops in */}
                     {variables.map(name => (
                       <li
                         key={name}
-                        className="h-7 px-2.5 inline-flex items-center rounded-full border-[1.5px] border-dashed border-accent bg-accent-subtle text-xs font-bold text-accent-strong"
+                        className="animate-pop h-7 px-2.5 inline-flex items-center rounded-full border-[1.5px] border-dashed border-accent bg-accent-subtle text-xs font-bold text-accent-strong"
                       >
                         {name}
                       </li>

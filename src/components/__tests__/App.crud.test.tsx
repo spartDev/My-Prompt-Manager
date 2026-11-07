@@ -59,7 +59,7 @@ describe('App prompt workflows', () => {
     const titleInput = await screen.findByLabelText(/title/i);
     await userEvent.type(titleInput, 'Greeting');
 
-    const contentInput = screen.getByLabelText(/content/i);
+    const contentInput = screen.getByLabelText('Content');
     await userEvent.type(contentInput, 'Hello testers');
 
     await userEvent.click(screen.getByRole('radio', { name: 'Work' }));
@@ -94,7 +94,7 @@ describe('App prompt workflows', () => {
     await screen.findByText(basePrompt.title);
     await userEvent.click(await screen.findByRole('button', { name: `Edit ${basePrompt.title}` }));
 
-    const contentInput = await screen.findByLabelText(/content/i);
+    const contentInput = await screen.findByLabelText('Content');
     await userEvent.clear(contentInput);
     await userEvent.type(contentInput, 'Updated body copy');
 
@@ -194,7 +194,7 @@ describe('App prompt workflows', () => {
     const createButton = await within(emptyState).findByRole('button', { name: /create your first prompt/i });
     await userEvent.click(createButton);
 
-    await userEvent.type(screen.getByLabelText(/content/i), 'Some content');
+    await userEvent.type(screen.getByLabelText('Content'), 'Some content');
 
     const saveFromEmpty = await screen.findByRole('button', { name: 'Save' });
     await userEvent.click(saveFromEmpty);
@@ -207,7 +207,7 @@ describe('App prompt workflows', () => {
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent('Quota reached');
-    expect(screen.getByLabelText(/content/i)).toHaveValue('Some content');
+    expect(screen.getByLabelText('Content')).toHaveValue('Some content');
   });
 
   it('gives the keyboard back to Save when the storage warning closes', async () => {
@@ -219,7 +219,7 @@ describe('App prompt workflows', () => {
 
     const emptyState = await screen.findByRole('region', { name: /empty state/i });
     await userEvent.click(await within(emptyState).findByRole('button', { name: /create your first prompt/i }));
-    await userEvent.type(screen.getByLabelText(/content/i), 'Some content');
+    await userEvent.type(screen.getByLabelText('Content'), 'Some content');
     await userEvent.click(await screen.findByRole('button', { name: 'Save' }));
 
     const warning = await screen.findByRole('dialog', { name: 'Storage Limit Reached' });
@@ -360,7 +360,7 @@ describe('App prompt workflows', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: `Edit ${basePrompt.title}` }));
 
-    const contentInput = await screen.findByLabelText(/content/i);
+    const contentInput = await screen.findByLabelText('Content');
     await userEvent.type(contentInput, ' additional');
 
     const saveButton = await screen.findByRole('button', { name: 'Save' });
@@ -373,7 +373,7 @@ describe('App prompt workflows', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Title is required');
     expect(screen.getAllByText(/title is required/i)).toHaveLength(1);
     expect(screen.queryByText(/error loading data/i)).not.toBeInTheDocument();
-    expect(screen.getByLabelText(/content/i)).toHaveValue(`${basePrompt.content} additional`);
+    expect(screen.getByLabelText('Content')).toHaveValue(`${basePrompt.content} additional`);
     expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
   });
 });
