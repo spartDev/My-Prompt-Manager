@@ -304,6 +304,9 @@ test.describe('Site integration Settings on the tokens', () => {
         await section.getByLabel('Encoded configuration string').focus();
         await page.keyboard.press('ControlOrMeta+V');
         await section.getByRole('button', { name: 'Preview Configuration' }).click();
+        // The click leaves the pointer where the modal then puts Replace & Import: move it off, so the
+        // button reads its resting color and not its hover
+        await page.mouse.move(0, 0);
 
         const dialog = page.getByRole('dialog', { name: 'Review Configuration' });
         await expect(dialog.locator('> div').first()).toHaveCSS('background-color', colors.backdrop);
