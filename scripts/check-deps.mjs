@@ -6,8 +6,9 @@
  *
  * npm writes node_modules/.package-lock.json from the tree it installed, so the check compares every entry of
  * package-lock.json "packages" with it: a version that differs, a package that is not installed, and one installed
- * that the lockfile does not list. An optional package that is absent is not a difference, since npm skips the ones
- * built for other platforms (@biomejs/cli-linux-x64 on macOS).
+ * that the lockfile does not list. An optional package built for another platform is expected to be absent, since
+ * npm skips it (@biomejs/cli-linux-x64 on macOS); one built for this platform is not, since the toolchain needs it
+ * (@rolldown/binding-darwin-arm64 on an Apple-silicon Mac).
  *
  * Runs as the npm `pretest` script, so `npm test` stops at once on a stale install, and as a Claude Code SessionStart
  * hook (.claude/settings.json). Prints nothing when the two agree. Otherwise it prints the packages that differ and
@@ -30,12 +31,65 @@ const readJson = (file) => JSON.parse(readFileSync(file, 'utf8'));
 /** `vite` for `node_modules/vite`; `jsdom/node_modules/lru-cache` for a nested entry. */
 const packageName = (key) => key.replace(/^node_modules\//, '');
 
+/** `node_modules/jsdom` for `node_modules/jsdom/node_modules/lru-cache`; '' for a top-level entry. */
+const parentKey = (key) => {
+  const index = key.lastIndexOf('/node_modules/');
+  return index === -1 ? '' : key.slice(0, index);
+};
+
+/** The libc of a Linux host: glibc when Node reports a runtime version for it, else musl. */
+const currentLibc = () => {
+  try {
+    return process.report?.getReport?.()?.header?.glibcVersionRuntime ? 'glibc' : 'musl';
+  } catch {
+    return undefined;
+  }
+};
+
+/** The platform npm installs for, as package.json "os", "cpu" and "libc" name it. */
+export const currentPlatform = () => ({
+  os: process.platform,
+  cpu: process.arch,
+  libc: process.platform === 'linux' ? currentLibc() : undefined,
+});
+
+/** True when a package.json "os", "cpu" or "libc" list admits `actual`: any value, or a listed one, and no `!actual`. */
+const listAdmits = (list, actual) => {
+  if (!Array.isArray(list) || list.length === 0 || actual === undefined) {
+    return true;
+  }
+  if (list.includes(`!${actual}`)) {
+    return false;
+  }
+  const named = list.filter((value) => !value.startsWith('!'));
+  return named.length === 0 || named.includes('any') || named.includes(actual);
+};
+
+/** True when a lockfile entry is built for `platform`, by its "os", "cpu" and "libc" lists. */
+export const builtForPlatform = (entry, platform) =>
+  listAdmits(entry.os, platform.os) && listAdmits(entry.cpu, platform.cpu) && listAdmits(entry.libc, platform.libc);
+
+/**
+ * True when npm is expected to leave the lockfile entry at `key` out of an install for `platform`: it is an optional
+ * package built for another platform, or it sits under one (the bundled dependencies of a wasm32 build).
+ */
+const expectedAbsent = (key, wanted, platform) => {
+  for (let ancestor = key; ancestor !== ''; ancestor = parentKey(ancestor)) {
+    const entry = wanted[ancestor];
+    if (entry?.optional && !builtForPlatform(entry, platform)) {
+      return true;
+    }
+  }
+  return false;
+};
+
 /**
  * The differences between the packages package-lock.json lists and the ones node_modules/.package-lock.json says
  * npm installed, as { name, expected, installed }: the lockfile's version and the installed one, either undefined
- * for a package that is not installed or not in the lockfile. An absent optional package is not a difference.
+ * for a package that is not installed or not in the lockfile. An optional package built for another platform is
+ * expected to be absent and is not a difference; one built for `platform` is.
  */
-export function compareLockfiles(lockfile, installed) {
+export function compareLockfiles(lockfile, installed, platform = currentPlatform()) {
   const wanted = lockfile.packages ?? {};
   const present = installed.packages ?? {};
   const differences = [];
@@ -45,7 +99,7 @@ export function compareLockfiles(lockfile, installed) {
     }
     const actual = present[key];
     if (actual === undefined) {
-      if (!entry.optional) {
+      if (!expectedAbsent(key, wanted, platform)) {
         differences.push({ name: packageName(key), expected: entry.version, installed: undefined });
       }
     } else if (actual.version !== entry.version) {
