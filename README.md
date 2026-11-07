@@ -126,7 +126,7 @@ Versions: `package.json`.
 |---------|-------------|--------|
 | `npm run dev` | Start development server with HMR | Development |
 | `npm run build` | Create production build | Deployment |
-| `npm test` | Run the Vitest suite | Testing |
+| `npm test` | Check node_modules against package-lock.json, then run the Vitest suite | Testing |
 | `npm run test:ui` | Run tests with Vitest UI | Interactive Testing |
 | `npm run test:coverage` | Generate coverage report | Code Coverage |
 | `npm run lint` | Run Biome lint checks | Code Quality |

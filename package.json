@@ -14,6 +14,7 @@
     "check:custom-site-chunks": "node scripts/custom-site-chunks.mjs",
     "preview": "vite preview",
     "package": "node package-extension.cjs",
+    "pretest": "node scripts/check-deps.mjs",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
