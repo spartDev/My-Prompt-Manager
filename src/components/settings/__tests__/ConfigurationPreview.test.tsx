@@ -1,8 +1,27 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { type ComponentProps, type FC, useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { CustomSiteConfiguration, SecurityWarning } from '../../../types';
 import ConfigurationPreview from '../ConfigurationPreview';
+
+interface ImportFlowProps {
+  preview: ComponentProps<typeof ConfigurationPreview>;
+  onClose: () => void;
+}
+
+/** The Settings import flow around the preview: a button opens it, and closing it gives the button the keyboard back */
+const ImportFlow: FC<ImportFlowProps> = ({ preview, onClose }) => {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <button type="button" onClick={() => { setOpen(true); }}>Preview Configuration</button>
+      <ConfigurationPreview {...preview} isOpen={open} onClose={() => { setOpen(false); onClose(); }} />
+    </>
+  );
+};
 
 describe('ConfigurationPreview', () => {
   const mockOnClose = vi.fn();
@@ -92,6 +111,43 @@ describe('ConfigurationPreview', () => {
       fireEvent.keyDown(document, { key: 'Enter' });
 
       expect(mockOnClose).not.toHaveBeenCalled();
+    });
+
+    // A modal: Tab and Shift+Tab stay on its three buttons, and the page behind it is out of reach
+    it('keeps Tab and Shift+Tab on Close, Cancel and Import', async () => {
+      const user = userEvent.setup();
+      render(
+        <>
+          <button type="button">Preview Configuration</button>
+          <ConfigurationPreview {...defaultProps} />
+        </>
+      );
+      const close = screen.getByRole('button', { name: /close preview/i });
+      const cancel = screen.getByRole('button', { name: /cancel/i });
+      const importButton = screen.getByRole('button', { name: /import configuration/i });
+      await waitFor(() => { expect(close).toHaveFocus(); });
+
+      await user.tab();
+      expect(cancel).toHaveFocus();
+      await user.tab();
+      expect(importButton).toHaveFocus();
+      await user.tab();
+      expect(close).toHaveFocus();
+      await user.tab({ shift: true });
+      expect(importButton).toHaveFocus();
+    });
+
+    it('gives the keyboard back to Preview Configuration when it closes', async () => {
+      const user = userEvent.setup();
+      render(<ImportFlow preview={defaultProps} onClose={mockOnClose} />);
+      await user.click(screen.getByRole('button', { name: 'Preview Configuration' }));
+      await waitFor(() => { expect(screen.getByTestId('close-modal')).toHaveFocus(); });
+
+      await user.keyboard('{Escape}');
+
+      expect(mockOnClose).toHaveBeenCalledTimes(1);
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Preview Configuration' })).toHaveFocus();
     });
   });
 
@@ -302,7 +358,7 @@ describe('ConfigurationPreview', () => {
       expect(screen.getByLabelText(/close preview/i)).toBeInTheDocument();
     });
 
-    it('focuses first focusable element when opened', async () => {
+    it('focuses Close, the safe choice, when it opens', async () => {
       render(<ConfigurationPreview {...defaultProps} />);
 
       await waitFor(() => {

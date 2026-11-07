@@ -15,6 +15,10 @@ env:
   # Fail fast - stop immediately on any quality gate failure
   CI: true
 
+# Least privilege: every job reads the code, nothing more. A job that needs more asks for it.
+permissions:
+  contents: read
+
 jobs:
   # Job 1: Setup dependencies and cache for all subsequent jobs
   setup:
@@ -436,6 +440,10 @@ jobs:
     needs: [setup, type-check, lint, test, build, e2e, security]
     # Run even if jobs are cancelled or fail, but not for draft PRs
     if: always() && github.event.pull_request.draft == false
+    # Posts, and deletes its previous, results comment on the PR
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - name: 📋 Quality Gate Results
         run: |

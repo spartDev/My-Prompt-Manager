@@ -262,7 +262,7 @@ chrome.runtime.sendMessage({
 
 ### Phase 3: Update Storage Schema
 
-**File**: `src/utils/storage.ts`
+**File**: `src/types/index.ts` (`CustomSite['positioning']`, read and written by `src/services/storage.ts`)
 
 ```typescript
 export interface CustomSitePositioning {

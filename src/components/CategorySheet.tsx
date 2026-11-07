@@ -133,7 +133,9 @@ const CategorySheet: FC<CategorySheetProps> = ({
         onClick={dismiss}
       />
       <div
-        ref={panelRef}
+        // useModalFocus pauses a dialog still in the document (beneath a confirmation). Leaving, the sheet
+        // stays in it for its exit, yet is closed: without the ref, the focus goes back to the opener at once
+        ref={open ? panelRef : undefined}
         role="dialog"
         aria-modal="true"
         aria-label={title}

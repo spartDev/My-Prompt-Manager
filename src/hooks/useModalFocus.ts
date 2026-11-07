@@ -3,7 +3,10 @@ import { type RefObject, useEffect, useRef } from 'react';
 const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
 
 export interface UseModalFocusOptions {
-  /** True while the dialog is rendered */
+  /**
+   * True while the dialog has the keyboard: false once it is closed, and false while a confirmation
+   * is open above it (the dialog then stays in the document, `inert`, and pauses)
+   */
   isOpen: boolean;
   /** Called on Escape */
   onClose: () => void;
@@ -19,7 +22,10 @@ export interface UseModalFocusOptions {
 /**
  * The keyboard behavior of a modal dialog (role="dialog" aria-modal="true"): focus moves into it
  * on open, Tab and Shift+Tab wrap inside it, Escape calls onClose, and on close the focus returns
- * to the element that had it before the dialog opened.
+ * to the element that had it before the dialog opened. Beneath a confirmation (isOpen false while
+ * the panel stays in the document) the dialog pauses: it gives nothing back and keeps its opener,
+ * and when it resumes it leaves the focus where the confirmation put it, on the button that opened
+ * the confirmation.
  */
 export function useModalFocus({ isOpen, onClose, containerRef, initialFocusRef }: UseModalFocusOptions): void {
   const onCloseRef = useRef(onClose);
@@ -27,11 +33,20 @@ export function useModalFocus({ isOpen, onClose, containerRef, initialFocusRef }
     onCloseRef.current = onClose;
   }, [onClose]);
 
+  // The element that had the focus when the dialog opened: kept through a pause, null once closed
+  const openerRef = useRef<{ element: HTMLElement | null } | null>(null);
+
   useEffect(() => {
     if (!isOpen) {return;}
 
-    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    initialFocusRef.current?.focus();
+    const active = document.activeElement;
+    if (openerRef.current === null) {
+      openerRef.current = { element: active instanceof HTMLElement ? active : null };
+    }
+    // Resuming beneath a closed confirmation: the focus is already inside, where the confirmation left it
+    if (!containerRef.current?.contains(active)) {
+      initialFocusRef.current?.focus();
+    }
 
     const handleKeyDown = (event: KeyboardEvent): void => {
       if (event.key === 'Escape') {
@@ -60,6 +75,10 @@ export function useModalFocus({ isOpen, onClose, containerRef, initialFocusRef }
     document.addEventListener('keydown', handleKeyDown);
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
+      // Paused beneath a confirmation, which has the keyboard now: nothing to give back yet
+      if (containerRef.current?.isConnected) {return;}
+      const opener = openerRef.current?.element;
+      openerRef.current = null;
       if (opener?.isConnected) {
         opener.focus();
       }

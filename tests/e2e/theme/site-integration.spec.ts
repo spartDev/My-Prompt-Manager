@@ -348,8 +348,26 @@ test.describe('Site integration Settings on the tokens', () => {
         await expect(cancel).toHaveCSS('color', colors.secondary);
         await expect(dialog.getByRole('button', { name: 'Replace & Import' })).toHaveCSS('background-color', colors.accent);
 
+        // A modal: the keyboard starts on Close and wraps over Cancel and Replace & Import; Escape gives it
+        // back to Preview Configuration (My-Prompt-Manager-xaz)
+        const close = dialog.getByRole('button', { name: 'Close preview' });
+        const replace = dialog.getByRole('button', { name: 'Replace & Import' });
+        await expect(close).toBeFocused();
+        await page.keyboard.press('Tab');
+        await expect(cancel).toBeFocused();
+        await page.keyboard.press('Tab');
+        await expect(replace).toBeFocused();
+        await page.keyboard.press('Tab');
+        await expect(close).toBeFocused();
+        await page.keyboard.press('Shift+Tab');
+        await expect(replace).toBeFocused();
+
         await duplicate.scrollIntoViewIfNeeded();
         await page.screenshot({ path: `${SCREENSHOT_DIR}/configuration-preview-${theme}.png` });
+
+        await page.keyboard.press('Escape');
+        await expect(dialog).toHaveCount(0);
+        await expect(section.getByRole('button', { name: 'Preview Configuration' })).toBeFocused();
       });
     }
   });
