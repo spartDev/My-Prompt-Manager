@@ -2,7 +2,7 @@
  * E2E: the Category sheet (Atelier 1C 2b, 2c) in the real extension
  *
  * The Categories section creates and edits a Category in one bottom sheet: it rises from the bottom
- * in 0.5 s on the sheet ease, cubic-bezier(0.32, 0.72, 0, 1), and leaves in 0.28 s on the same ease,
+ * in 0.5 s on the sheet ease (EASE.sheet of src/theme/motion.ts), and leaves in 0.28 s on the same ease,
  * while the screen behind it steps back. Captures light/dark screenshots as visual proof, at the
  * popup size and in the side panel (test-results/category-sheet/): the Categories screen at rest,
  * the create sheet with a name typed and a color chosen, and the edit sheet with the edited row's
@@ -11,13 +11,14 @@
 
 import type { Page } from '@playwright/test';
 
+import { EASE } from '../../../src/theme/motion';
 import type { Category } from '../../../src/types';
 import { type ExtensionStorage, expect, test } from '../fixtures/extension';
 import { CategoryManagerPage } from '../pages/CategoryManagerPage';
 import { createPromptSeed, seedLibrary } from '../utils/storage';
 
 const SCREENSHOT_DIR = 'test-results/category-sheet';
-const EASE_SHEET = 'cubic-bezier(0.32, 0.72, 0, 1)';
+const EASE_SHEET = EASE.sheet;
 
 /** The popup is 400 x 500; the side panel is as wide as the user makes it, 360 here */
 const SURFACES = {

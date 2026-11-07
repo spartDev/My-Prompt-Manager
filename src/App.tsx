@@ -381,8 +381,16 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   return (
     <ThemeProvider>
       <div className={`h-full w-full bg-app section-scroll-scope relative flex flex-col ${context === 'sidepanel' ? 'sidepanel' : ''}`}>
-      {/* The Section and the tab bar wait, out of reach, while the editor is open above them */}
-      <div className="contents" inert={editor !== null}>
+      {/* The Section and the tab bar wait, out of reach, while the editor is open above them; they
+          recede a little as it rises and come back as it leaves */}
+      <div
+        data-testid="editor-beneath"
+        className={cn(
+          'flex flex-1 min-h-0 flex-col origin-top',
+          editorSheet.shown && (editorSheet.exiting ? 'animate-recede-out' : 'animate-recede-in')
+        )}
+        inert={editor !== null}
+      >
       <div ref={sectionContentRef} className="flex-1 min-h-0">
       {currentView === 'library' && (
         <LibraryView
@@ -435,6 +443,14 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
 
       <TabBar activeSection={currentView} onSelect={handleSelectSection} inert={categorySheetOpen} />
       </div>
+
+      {editorSheet.shown && (
+        <div
+          data-testid="editor-scrim"
+          aria-hidden="true"
+          className={cn('absolute inset-0 z-20 bg-backdrop backdrop-blur-sm pointer-events-none', editorSheet.exiting ? 'animate-scrim-out' : 'animate-scrim-in')}
+        />
+      )}
 
       {editorSheet.shown && (
         <div

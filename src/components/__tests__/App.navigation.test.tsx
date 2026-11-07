@@ -69,13 +69,24 @@ describe('App tab bar navigation', () => {
     // The Library and the tab bar stay in the document, beneath the sheet and out of reach
     expect(screen.getByRole('heading', { name: /my prompt manager/i }).closest('[inert]')).not.toBeNull();
     expect(screen.getByRole('tablist').closest('[inert]')).not.toBeNull();
+    // ...and recede a little under a scrim as the sheet rises
+    const beneath = screen.getByTestId('editor-beneath');
+    const scrim = screen.getByTestId('editor-scrim');
+    expect(beneath).toHaveClass('animate-recede-in');
+    expect(scrim).toHaveClass('animate-scrim-in');
+    // The backdrop of a drawer, as the design system prescribes it
+    expect(scrim).toHaveClass('bg-backdrop', 'backdrop-blur-sm');
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
-    // The sheet leaves to the bottom, out of reach, then unmounts
+    // The sheet leaves to the bottom, out of reach, then unmounts; the Library comes back with it
     expect(sheet).toHaveClass('animate-sheet-out');
     expect(sheet).toHaveAttribute('inert');
+    expect(beneath).toHaveClass('animate-recede-out');
+    expect(scrim).toHaveClass('animate-scrim-out');
     await waitForElementToBeRemoved(sheet);
+    expect(scrim).not.toBeInTheDocument();
+    expect(beneath).not.toHaveClass('animate-recede-out');
     // The focus comes back in an effect of the commit that removed the sheet, which React may run
     // a scheduler task later on a slow machine
     await waitFor(() => { expect(newButton).toHaveFocus(); });

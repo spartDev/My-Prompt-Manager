@@ -6,7 +6,7 @@ Which component does which job in the popup and the side panel, and the conventi
 
 ## Where things live
 
-`src/App.tsx` is the shell: it holds the Prompts and Categories (`usePrompts`, `useCategories`), the Notification (`useToast`) and the current section, and renders one view plus the `TabBar`. The editor is a sheet above them: it rises from the bottom (`animate-sheet-in`), the Section and the `TabBar` wait `inert` beneath it, and on close it leaves to the bottom and unmounts after its animation (`useAnimatedPresence`), when the keyboard returns to what opened it. The same `App` runs in the popup and in the side panel; it receives the context as a prop.
+`src/App.tsx` is the shell: it holds the Prompts and Categories (`usePrompts`, `useCategories`), the Notification (`useToast`) and the current section, and renders one view plus the `TabBar`. The editor is a sheet above them: it rises from the bottom (`animate-sheet-in`), the Section and the `TabBar` wait `inert` beneath it, receding a little under a scrim (`animate-recede-in`, `animate-scrim-in`), and on close it leaves to the bottom and unmounts after its animation (`useAnimatedPresence`), when the keyboard returns to what opened it. The same `App` runs in the popup and in the side panel; it receives the context as a prop.
 
 | Folder | What is in it |
 |--------|---------------|
