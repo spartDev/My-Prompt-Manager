@@ -1,15 +1,29 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useToast } from '../useToast';
+import { TOAST_DURATION, TOAST_SETTINGS_KEY, useToast } from '../useToast';
+
+const mockStored = (stored: unknown) => {
+  (vi.spyOn(chrome.storage.local, 'get') as any).mockResolvedValue(
+    stored === undefined ? {} : { [TOAST_SETTINGS_KEY]: stored }
+  );
+};
+
+// Lets the settings load (a resolved promise) finish under fake timers
+const flushLoad = async () => {
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+};
 
 describe('useToast', () => {
+  let setSpy: ReturnType<typeof vi.fn>;
+
   beforeEach(() => {
     vi.useFakeTimers();
-
-    // Mock chrome.storage.local to return immediately
-    (vi.spyOn(chrome.storage.local, 'get') as any).mockResolvedValue({});
-    (vi.spyOn(chrome.storage.local, 'set') as any).mockResolvedValue(undefined);
+    mockStored(undefined);
+    setSpy = (vi.spyOn(chrome.storage.local, 'set') as any).mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -17,627 +31,246 @@ describe('useToast', () => {
     vi.restoreAllMocks();
   });
 
-  it('adds toasts with correct properties', () => {
+  it('shows a Notification with its message, sub and type', () => {
     const { result } = renderHook(() => useToast());
 
     act(() => {
-      result.current.showToast('Hello', 'success', 1000);
+      result.current.showToast('Prompt saved', 'success', { sub: 'Weekly status update' });
     });
 
-    expect(result.current.toasts).toHaveLength(1);
-    expect(result.current.toasts[0]?.message).toBe('Hello');
-    expect(result.current.toasts[0]?.type).toBe('success');
-    expect(result.current.toasts[0]?.duration).toBe(1000);
-    const toastId = result.current.toasts[0]?.id;
-    expect(toastId).toBeTruthy();
-
-    // Manual dismissal works
-    act(() => {
-      if (toastId) {
-        result.current.hideToast(toastId);
-      }
-    });
-
-    expect(result.current.toasts).toHaveLength(0);
+    expect(result.current.toast).toMatchObject({ message: 'Prompt saved', sub: 'Weekly status update', type: 'success' });
+    expect(result.current.toast?.id).toBeTruthy();
   });
 
-  it('allows manual dismissal and queue management', () => {
+  it('shows info when no type is given, and drops an empty sub', () => {
     const { result } = renderHook(() => useToast());
 
     act(() => {
-      result.current.showToast('Manual hide', 'info', 5000);
+      result.current.showToast('Hello', undefined, { sub: '' });
     });
 
-    const toastId = result.current.toasts[0]?.id;
-    expect(result.current.toasts).toHaveLength(1);
-
-    act(() => {
-      if (toastId) {
-        result.current.hideToast(toastId);
-      }
-    });
-
-    expect(result.current.toasts).toHaveLength(0);
-
-    // With queue system, only one toast shows at a time
-    act(() => {
-      result.current.showToast('First', 'info', 5000);
-    });
-
-    act(() => {
-      result.current.showToast('Second', 'info', 5000);
-    });
-
-    // First toast shows immediately, second is queued
-    expect(result.current.toasts).toHaveLength(1);
-    expect(result.current.toasts[0]?.message).toBe('First');
-
-    act(() => {
-      result.current.clearAllToasts();
-    });
-
-    expect(result.current.toasts).toHaveLength(0);
+    expect(result.current.toast?.type).toBe('info');
+    expect(result.current.toast?.sub).toBeUndefined();
   });
 
-  it('supports warning type with correct duration', () => {
+  it('keeps the whole message, however long', () => {
+    const { result } = renderHook(() => useToast());
+    const message = 'x'.repeat(200);
+
+    act(() => {
+      result.current.showToast(message, 'error');
+    });
+
+    expect(result.current.toast?.message).toBe(message);
+  });
+
+  it('replaces the Notification on screen with a new one, without a queue', () => {
     const { result } = renderHook(() => useToast());
 
     act(() => {
-      result.current.showToast('Warning message', 'warning');
+      result.current.showToast('Prompt copied', 'success', { sub: 'First' });
     });
-
-    expect(result.current.toasts).toHaveLength(1);
-    expect(result.current.toasts[0]?.type).toBe('warning');
-    expect(result.current.toasts[0]?.duration).toBe(5000);
-    expect(result.current.toasts[0]?.message).toBe('Warning message');
-  });
-
-  it('truncates messages longer than 80 characters', () => {
-    const { result } = renderHook(() => useToast());
-    const longMessage = 'A'.repeat(100);
-
+    const firstId = result.current.toast?.id;
     act(() => {
-      result.current.showToast(longMessage, 'info');
+      result.current.showToast('Prompt copied', 'success', { sub: 'Second' });
     });
 
-    expect(result.current.toasts).toHaveLength(1);
-    expect(result.current.toasts[0]?.message).toHaveLength(80);
-    expect(result.current.toasts[0]?.message).toMatch(/\.\.\.$/);
+    expect(result.current.toast?.sub).toBe('Second');
+    expect(result.current.toast?.id).not.toBe(firstId);
+    expect(result.current).not.toHaveProperty('queueLength');
   });
 
-  it('applies correct durations for all toast types', () => {
+  it.each([
+    ['success', TOAST_DURATION.confirmation],
+    ['info', TOAST_DURATION.confirmation],
+    ['error', TOAST_DURATION.failure],
+    ['warning', TOAST_DURATION.failure]
+  ] as const)('a %s Notification leaves after %i ms', (type, duration) => {
     const { result } = renderHook(() => useToast());
 
     act(() => {
-      result.current.showToast('Error', 'error');
+      result.current.showToast('Message', type);
     });
-    expect(result.current.toasts[0]?.duration).toBe(7000);
+    expect(result.current.toast?.duration).toBe(duration);
 
     act(() => {
-      result.current.clearAllToasts();
+      vi.advanceTimersByTime(duration - 1);
     });
-
+    expect(result.current.toast).not.toBeNull();
     act(() => {
-      result.current.showToast('Warning', 'warning');
+      vi.advanceTimersByTime(1);
     });
-    expect(result.current.toasts[0]?.duration).toBe(5000);
-
-    act(() => {
-      result.current.clearAllToasts();
-    });
-
-    act(() => {
-      result.current.showToast('Success', 'success');
-    });
-    expect(result.current.toasts[0]?.duration).toBe(2750);
-
-    act(() => {
-      result.current.clearAllToasts();
-    });
-
-    act(() => {
-      result.current.showToast('Info', 'info');
-    });
-    expect(result.current.toasts[0]?.duration).toBe(2750);
+    expect(result.current.toast).toBeNull();
   });
 
-  it('supports action buttons', () => {
-    const { result } = renderHook(() => useToast());
-    const mockAction = vi.fn();
-
-    act(() => {
-      result.current.showToast('Action toast', 'info', 5000, {
-        label: 'Undo',
-        onClick: mockAction
-      });
-    });
-
-    expect(result.current.toasts).toHaveLength(1);
-    expect(result.current.toasts[0]?.action).toBeDefined();
-    expect(result.current.toasts[0]?.action?.label).toBe('Undo');
+  it('gives a confirmation 2.7 s and a failure 6 s', () => {
+    expect(TOAST_DURATION).toEqual({ confirmation: 2700, failure: 6000 });
   });
 
-  it('tracks queue length', async () => {
+  it('starts the time again for the Notification that replaces another', () => {
     const { result } = renderHook(() => useToast());
 
-    // Wait for settings to load (useEffect with chrome.storage.local.get)
-    await act(async () => {
-      await Promise.resolve();
-    });
-
-    expect(result.current.settings).toBeDefined();
-
     act(() => {
-      result.current.showToast('First', 'info');
+      result.current.showToast('First', 'success');
     });
-
     act(() => {
-      result.current.showToast('Second', 'info');
+      vi.advanceTimersByTime(2000);
+      result.current.showToast('Second', 'success');
     });
-
     act(() => {
-      result.current.showToast('Third', 'info');
+      vi.advanceTimersByTime(2000);
     });
 
-    expect(result.current.toasts).toHaveLength(1);
-    expect(result.current.queueLength).toBe(2);
+    expect(result.current.toast?.message).toBe('Second');
+    act(() => {
+      vi.advanceTimersByTime(700);
+    });
+    expect(result.current.toast).toBeNull();
   });
 
-  it('respects enabled types setting', () => {
+  it('takes a duration of its own, and 0 stays until dismissed', () => {
     const { result } = renderHook(() => useToast());
 
-    // Disable info toasts
     act(() => {
-      result.current.updateSettings({
-        enabledTypes: {
-          success: true,
-          error: true,
-          info: false,
-          warning: true
-        }
-      });
+      result.current.showToast('Stays', 'info', { duration: 0 });
     });
-
     act(() => {
-      result.current.showToast('Info message', 'info');
+      vi.advanceTimersByTime(60_000);
     });
-
-    // Should not show disabled type
-    expect(result.current.toasts).toHaveLength(0);
-
-    act(() => {
-      result.current.showToast('Success message', 'success');
-    });
-
-    // Should show enabled type
-    expect(result.current.toasts).toHaveLength(1);
+    expect(result.current.toast?.message).toBe('Stays');
   });
 
-  it('handles synchronous toast calls without dropping toasts', () => {
+  it('hides the Notification on screen, and ignores an id that is no longer shown', () => {
     const { result } = renderHook(() => useToast());
 
-    // Fire two toasts synchronously (in the same tick)
     act(() => {
-      result.current.showToast('First toast', 'info');
-      result.current.showToast('Second toast', 'success');
+      result.current.showToast('First', 'success');
     });
-
-    // First should be displayed, second should be queued
-    expect(result.current.toasts).toHaveLength(1);
-    expect(result.current.toasts[0]?.message).toBe('First toast');
-    expect(result.current.queueLength).toBe(1);
-
-    // Fire three toasts synchronously when no toast is displayed
+    const firstId = result.current.toast?.id ?? '';
     act(() => {
-      result.current.clearAllToasts();
+      result.current.showToast('Second', 'success');
     });
+    act(() => {
+      result.current.hideToast(firstId);
+    });
+    expect(result.current.toast?.message).toBe('Second');
 
     act(() => {
-      result.current.showToast('Toast A', 'info');
-      result.current.showToast('Toast B', 'warning');
-      result.current.showToast('Toast C', 'error');
+      result.current.hideToast(result.current.toast?.id ?? '');
     });
-
-    // First should display, other two should be queued
-    expect(result.current.toasts).toHaveLength(1);
-    expect(result.current.toasts[0]?.message).toBe('Toast A');
-    expect(result.current.queueLength).toBe(2);
+    expect(result.current.toast).toBeNull();
   });
 
-  describe('error handling', () => {
-    it('handles action onClick errors gracefully', () => {
-      const { result } = renderHook(() => useToast());
+  it('keeps the action of a Notification', () => {
+    const { result } = renderHook(() => useToast());
+    const onClick = vi.fn();
 
-      const errorAction = {
-        label: 'Error Action',
-        onClick: () => {
-          throw new Error('Action failed');
-        }
-      };
-
-      act(() => {
-        result.current.showToast('Test', 'info', 5000, errorAction);
-      });
-
-      const toast = result.current.toasts[0];
-      expect(toast).toBeDefined();
-      expect(toast?.action).toBeDefined();
-
-      // Should not crash when action throws
-      expect(() => toast?.action?.onClick()).toThrow('Action failed');
-
-      // Toast should still be dismissible
-      act(() => {
-        if (toast?.id) {
-          result.current.hideToast(toast.id);
-        }
-      });
-
-      expect(result.current.toasts).toHaveLength(0);
+    act(() => {
+      result.current.showToast('Category deleted', 'success', { sub: 'Marketing', action: { label: 'Undo', onClick } });
     });
 
-    it('handles exactly 80 character messages', () => {
-      const { result } = renderHook(() => useToast());
-
-      const exactly80 = 'a'.repeat(80);
-
-      act(() => {
-        result.current.showToast(exactly80, 'info');
-      });
-
-      expect(result.current.toasts).toHaveLength(1);
-      expect(result.current.toasts[0]?.message).toBe(exactly80);
-      expect(result.current.toasts[0]?.message).toHaveLength(80);
-    });
-
-    it('handles 79 character messages without truncation', () => {
-      const { result } = renderHook(() => useToast());
-
-      const exactly79 = 'b'.repeat(79);
-
-      act(() => {
-        result.current.showToast(exactly79, 'info');
-      });
-
-      expect(result.current.toasts).toHaveLength(1);
-      expect(result.current.toasts[0]?.message).toBe(exactly79);
-      expect(result.current.toasts[0]?.message).toHaveLength(79);
-    });
-
-    it('handles 81 character messages with truncation', () => {
-      const { result } = renderHook(() => useToast());
-
-      const exactly81 = 'c'.repeat(81);
-
-      act(() => {
-        result.current.showToast(exactly81, 'info');
-      });
-
-      expect(result.current.toasts).toHaveLength(1);
-      expect(result.current.toasts[0]?.message).toHaveLength(80);
-      expect(result.current.toasts[0]?.message).toMatch(/\.\.\.$/);
-      expect(result.current.toasts[0]?.message).toMatch(/^c+\.\.\.$/);
-    });
-
-    it('preserves queue when clearing displayed toast', async () => {
-      const { result } = renderHook(() => useToast());
-
-      // Add multiple toasts quickly
-      act(() => {
-        result.current.showToast('First', 'success');
-        result.current.showToast('Second', 'error');
-        result.current.showToast('Third', 'warning');
-      });
-
-      // First should display, other two should be queued
-      expect(result.current.toasts).toHaveLength(1);
-      expect(result.current.toasts[0]?.message).toBe('First');
-      expect(result.current.queueLength).toBe(2);
-
-      // Clear the displayed toast
-      const firstToastId = result.current.toasts[0]?.id;
-      act(() => {
-        if (firstToastId) {
-          result.current.hideToast(firstToastId);
-        }
-      });
-
-      // Queue should still have items
-      expect(result.current.queueLength).toBe(2);
-
-      // Next toast should be processed from queue
-      await act(async () => {
-        await Promise.resolve();
-      });
-
-      expect(result.current.toasts).toHaveLength(1);
-      expect(result.current.toasts[0]?.message).toBe('Second');
-      expect(result.current.queueLength).toBe(1);
-    });
-
-    it('handles empty message strings', () => {
-      const { result } = renderHook(() => useToast());
-
-      act(() => {
-        result.current.showToast('', 'info');
-      });
-
-      expect(result.current.toasts).toHaveLength(1);
-      expect(result.current.toasts[0]?.message).toBe('');
-    });
-
-    it('handles whitespace-only messages', () => {
-      const { result } = renderHook(() => useToast());
-
-      act(() => {
-        result.current.showToast('   ', 'info');
-      });
-
-      expect(result.current.toasts).toHaveLength(1);
-      expect(result.current.toasts[0]?.message).toBe('   ');
-    });
+    expect(result.current.toast?.action).toEqual({ label: 'Undo', onClick });
   });
 
-  describe('settings persistence', () => {
-    it('loads settings from storage on mount', async () => {
-      const mockSettings = {
-        toast_settings: {
-          position: 'bottom-right',
-          enabledTypes: {
-            success: true,
-            error: true,
-            info: false,
-            warning: true
-          },
-          enableGrouping: false,
-          groupingWindow: 1000
-        }
-      };
-
-      (vi.mocked(chrome.storage.local.get) as any).mockResolvedValue(mockSettings);
-
+  describe('settings', () => {
+    it('shows Notifications by default, with nothing stored', async () => {
       const { result } = renderHook(() => useToast());
+      await flushLoad();
 
-      // Wait for settings to load
-      await act(async () => {
-        await Promise.resolve();
-      });
-
-      expect(result.current.settings).toBeDefined();
-      expect(result.current.settings.position).toBe('bottom-right');
-      expect(result.current.settings.enabledTypes.info).toBe(false);
-      expect(result.current.settings.enableGrouping).toBe(false);
-      expect(result.current.settings.groupingWindow).toBe(1000);
+      expect(result.current.settings).toEqual({ enabled: true });
+      expect(setSpy).not.toHaveBeenCalled();
     });
 
-    it('uses default settings when storage is empty', async () => {
-      (vi.mocked(chrome.storage.local.get) as any).mockResolvedValue({});
-
+    it('shows no Notification at all when turned off, failures included', () => {
       const { result } = renderHook(() => useToast());
 
-      // Wait for settings to load
-      await act(async () => {
-        await Promise.resolve();
+      act(() => {
+        result.current.updateSettings({ enabled: false });
+      });
+      act(() => {
+        result.current.showToast('Saved', 'success');
+        result.current.showToast("Couldn't delete Prompt", 'error');
+        result.current.showToast('Skipped 2', 'warning');
       });
 
-      expect(result.current.settings).toBeDefined();
-      expect(result.current.settings.position).toBe('top-right');
-      expect(result.current.settings.enabledTypes.info).toBe(true);
-      expect(result.current.settings.enableGrouping).toBe(true);
-      expect(result.current.settings.groupingWindow).toBe(500);
+      expect(result.current.toast).toBeNull();
+      expect(setSpy).toHaveBeenCalledWith({ [TOAST_SETTINGS_KEY]: { enabled: false } });
     });
 
-    it('saves settings to storage when updated', async () => {
+    it('hides the Notification on screen when turned off', () => {
       const { result } = renderHook(() => useToast());
 
-      const newSettings = {
-        position: 'bottom-right' as const,
-        enabledTypes: {
-          success: true,
-          error: true,
-          info: false,
-          warning: false
-        }
-      };
-
       act(() => {
-        result.current.updateSettings(newSettings);
+        result.current.showToast('Saved', 'success');
+      });
+      act(() => {
+        result.current.updateSettings({ enabled: false });
       });
 
-      // Wait for async storage operation
-      await act(async () => {
-        await Promise.resolve();
-      });
-
-      expect(chrome.storage.local.set).toHaveBeenCalledWith({
-        toast_settings: expect.objectContaining({
-          position: 'bottom-right',
-          enabledTypes: {
-            success: true,
-            error: true,
-            info: false,
-            warning: false
-          }
-        })
-      });
+      expect(result.current.toast).toBeNull();
     });
 
-    it('handles storage errors gracefully when loading', async () => {
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      vi.mocked(chrome.storage.local.get).mockRejectedValue(new Error('Storage error'));
-
+    it('can show a Notification right after being turned on, in the same handler', () => {
       const { result } = renderHook(() => useToast());
 
-      // Wait for settings load attempt
-      await act(async () => {
-        await Promise.resolve();
+      act(() => {
+        result.current.updateSettings({ enabled: false });
+      });
+      act(() => {
+        result.current.updateSettings({ enabled: true });
+        result.current.showToast('Notifications on', 'success');
       });
 
-      // Should use default settings on error
-      expect(result.current.settings).toBeDefined();
-      expect(result.current.settings.position).toBe('top-right');
-
-      consoleErrorSpy.mockRestore();
+      expect(result.current.toast?.message).toBe('Notifications on');
+      expect(result.current.settings).toEqual({ enabled: true });
     });
 
-    it('handles storage errors gracefully when saving', async () => {
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      vi.mocked(chrome.storage.local.set).mockRejectedValue(new Error('Storage error'));
-
+    it('loads a stored switch and does not write it back', async () => {
+      mockStored({ enabled: false });
       const { result } = renderHook(() => useToast());
+      await flushLoad();
 
+      expect(result.current.settings).toEqual({ enabled: false });
       act(() => {
-        result.current.updateSettings({ position: 'bottom-right' });
+        result.current.showToast("Couldn't delete Prompt", 'error');
       });
-
-      // Wait for async storage operation
-      await act(async () => {
-        await Promise.resolve();
-      });
-
-      // Settings should still update in memory despite storage error
-      expect(result.current.settings.position).toBe('bottom-right');
-
-      consoleErrorSpy.mockRestore();
-    });
-  });
-
-  describe('queue processing', () => {
-    it('processes queue in FIFO order', async () => {
-      const { result } = renderHook(() => useToast());
-
-      act(() => {
-        result.current.showToast('First', 'info');
-        result.current.showToast('Second', 'success');
-        result.current.showToast('Third', 'warning');
-      });
-
-      expect(result.current.toasts[0]?.message).toBe('First');
-
-      // Dismiss first toast
-      const firstId = result.current.toasts[0]?.id;
-      act(() => {
-        if (firstId) {
-          result.current.hideToast(firstId);
-        }
-      });
-
-      // Wait for queue processing
-      await act(async () => {
-        await Promise.resolve();
-      });
-
-      expect(result.current.toasts[0]?.message).toBe('Second');
-
-      // Dismiss second toast
-      const secondId = result.current.toasts[0]?.id;
-      act(() => {
-        if (secondId) {
-          result.current.hideToast(secondId);
-        }
-      });
-
-      // Wait for queue processing
-      await act(async () => {
-        await Promise.resolve();
-      });
-
-      expect(result.current.toasts[0]?.message).toBe('Third');
+      expect(result.current.toast).toBeNull();
+      expect(setSpy).not.toHaveBeenCalled();
     });
 
-    it('clears entire queue when clearAllToasts is called', () => {
+    it('migrates old settings with all four types off to off', async () => {
+      mockStored({
+        position: 'bottom-right',
+        enabledTypes: { success: false, error: false, info: false, warning: false },
+        enableGrouping: true,
+        groupingWindow: 500
+      });
       const { result } = renderHook(() => useToast());
+      await flushLoad();
 
-      act(() => {
-        result.current.showToast('First', 'info');
-        result.current.showToast('Second', 'success');
-        result.current.showToast('Third', 'warning');
-        result.current.showToast('Fourth', 'error');
-      });
-
-      expect(result.current.toasts).toHaveLength(1);
-      expect(result.current.queueLength).toBe(3);
-
-      act(() => {
-        result.current.clearAllToasts();
-      });
-
-      expect(result.current.toasts).toHaveLength(0);
-      expect(result.current.queueLength).toBe(0);
+      expect(result.current.settings).toEqual({ enabled: false });
+      expect(setSpy).toHaveBeenCalledWith({ [TOAST_SETTINGS_KEY]: { enabled: false } });
     });
 
-    it('does not process queue if toasts are still displayed', () => {
+    it.each([
+      ['one type on', { position: 'top-right', enabledTypes: { success: false, error: true, info: false, warning: false } }],
+      ['only info off', { enabledTypes: { success: true, error: true, info: false, warning: true } }],
+      ['no types stored', { position: 'bottom-right' }]
+    ])('migrates old settings with %s to on', async (_name, stored) => {
+      mockStored(stored);
       const { result } = renderHook(() => useToast());
+      await flushLoad();
 
-      act(() => {
-        result.current.showToast('First', 'info');
-        result.current.showToast('Second', 'success');
-      });
-
-      expect(result.current.toasts).toHaveLength(1);
-      expect(result.current.toasts[0]?.message).toBe('First');
-      expect(result.current.queueLength).toBe(1);
-
-      // Add another toast while first is still showing
-      act(() => {
-        result.current.showToast('Third', 'warning');
-      });
-
-      // Should still show only first toast
-      expect(result.current.toasts).toHaveLength(1);
-      expect(result.current.toasts[0]?.message).toBe('First');
-      expect(result.current.queueLength).toBe(2);
-    });
-  });
-
-  describe('action buttons', () => {
-    it('preserves action properties', () => {
-      const { result } = renderHook(() => useToast());
-      const mockAction = vi.fn();
-
-      act(() => {
-        result.current.showToast('Action toast', 'info', 5000, {
-          label: 'Undo',
-          onClick: mockAction
-        });
-      });
-
-      const toast = result.current.toasts[0];
-      expect(toast?.action).toBeDefined();
-      expect(toast?.action?.label).toBe('Undo');
-      expect(toast?.action?.onClick).toBe(mockAction);
-
-      // Verify action can be called
-      act(() => {
-        toast?.action?.onClick();
-      });
-
-      expect(mockAction).toHaveBeenCalledTimes(1);
+      expect(result.current.settings).toEqual({ enabled: true });
+      expect(setSpy).toHaveBeenCalledWith({ [TOAST_SETTINGS_KEY]: { enabled: true } });
     });
 
-    it('handles toasts without actions', () => {
+    it('keeps the default when the settings cannot be read', async () => {
+      (vi.spyOn(chrome.storage.local, 'get') as any).mockRejectedValue(new Error('read failed'));
       const { result } = renderHook(() => useToast());
+      await flushLoad();
 
-      act(() => {
-        result.current.showToast('No action', 'info');
-      });
-
-      expect(result.current.toasts[0]?.action).toBeUndefined();
-    });
-
-    it('allows actions with empty label', () => {
-      const { result } = renderHook(() => useToast());
-      const mockAction = vi.fn();
-
-      act(() => {
-        result.current.showToast('Action toast', 'info', 5000, {
-          label: '',
-          onClick: mockAction
-        });
-      });
-
-      expect(result.current.toasts[0]?.action).toBeDefined();
-      expect(result.current.toasts[0]?.action?.label).toBe('');
+      expect(result.current.settings).toEqual({ enabled: true });
     });
   });
 });

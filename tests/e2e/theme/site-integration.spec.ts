@@ -313,7 +313,7 @@ test.describe('Site integration Settings on the tokens', () => {
 
         // Export Notion, then import its code back: the preview reports it as a duplicate
         await siteCard(section, 'Notion').getByRole('button', { name: 'Export custom site configuration' }).click();
-        await expect(page.getByText('Configuration copied to clipboard')).toBeVisible();
+        await expect(page.getByText('Configuration copied', { exact: true })).toBeVisible();
         await section.getByRole('button', { name: 'Add new custom site integration' }).click();
         await page.mouse.move(0, 0);
         await section.getByRole('button', { name: /Import Configuration/ }).click();

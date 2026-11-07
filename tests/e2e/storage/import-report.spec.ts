@@ -1,7 +1,7 @@
 /**
  * E2E: what a Settings import tells the user when it does not restore everything
  *
- * - My-Prompt-Manager-1xi: a toast shows 80 characters, so the titles and reasons of the skipped
+ * - My-Prompt-Manager-1xi: a Notification shows one line, so the titles and reasons of the skipped
  *   Prompts stay in the Backup & Restore card, every one in full, until dismissed.
  * - My-Prompt-Manager-5ar: an import stopped by an error other than storage says how many Prompts
  *   were imported before it stopped, and why.
@@ -51,7 +51,9 @@ test.describe('Settings import report', () => {
       };
       await importBackup(page, backup);
 
-      await expect(page.getByText('Imported 1 prompt and 0 categories. Skipped 3: see Backup & Restore.')).toBeVisible();
+      const notification = page.getByRole('alert').filter({ hasText: 'Skipped 3' });
+      await expect(notification).toBeVisible();
+      await expect(notification).toContainText('Imported 1 prompt and 0 categories. See Backup & Restore.');
       const report = page.getByRole('status', { name: 'Import report' });
       await expect(report.getByText('Skipped 3 items')).toBeVisible();
       for (const title of titles) {
@@ -97,7 +99,9 @@ test.describe('Settings import report', () => {
       };
       await importBackup(page, backup);
 
-      await expect(page.getByText('Import stopped: 2 of 4 prompts were imported. See Backup & Restore.')).toBeVisible();
+      const notification = page.getByRole('alert').filter({ hasText: 'Import stopped' });
+      await expect(notification).toBeVisible();
+      await expect(notification).toContainText('2 of 4 prompts were imported. See Backup & Restore.');
       const report = page.getByRole('status', { name: 'Import report' });
       await expect(report).toContainText('The import stopped: 2 of 4 prompts were imported.');
       await expect(report).toContainText('Storage API is unavailable. Please try again later.');

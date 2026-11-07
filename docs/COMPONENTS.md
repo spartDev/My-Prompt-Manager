@@ -6,7 +6,7 @@ Which component does which job in the popup and the side panel, and the conventi
 
 ## Where things live
 
-`src/App.tsx` is the shell: it holds the Prompts and Categories (`usePrompts`, `useCategories`), the toasts (`useToast`) and the current section, and renders one view plus the `TabBar`. The same `App` runs in the popup and in the side panel; it receives the context as a prop.
+`src/App.tsx` is the shell: it holds the Prompts and Categories (`usePrompts`, `useCategories`), the Notification (`useToast`) and the current section, and renders one view plus the `TabBar`. The same `App` runs in the popup and in the side panel; it receives the context as a prop.
 
 | Folder | What is in it |
 |--------|---------------|
@@ -46,7 +46,7 @@ Which component does which job in the popup and the side panel, and the conventi
 | `src/components/ViewHeader.tsx` | The header of every view. Compound component: `ViewHeader.Actions`, `ViewHeader.BackButton`, `ViewHeader.SettingsButton`, `ViewHeader.NewButton`, `ViewHeader.CloseButton` |
 | `src/components/Dropdown.tsx` | Every menu and popover: a list of items, or custom content that reads the controls through `useDropdown()`. Positioning and closing come from `useEnhancedFloatingPosition` and `useDropdownClose` |
 | `src/components/ConfirmDialog.tsx` | Confirmation modal; its `variant` sets the confirm button's color |
-| `src/components/ToastContainer.tsx` | Renders the toasts of `useToast` |
+| `src/components/ToastContainer.tsx` | Renders the one Notification of `useToast`, as the top-center pill |
 | `src/components/StorageWarning.tsx` | "Storage Limit Reached": App opens it when storage refuses a save (`STORAGE_QUOTA_EXCEEDED`); usage is shown through `describeStorageUsage`, like the Settings storage bar |
 | `src/components/ColorPicker.tsx` | Category color: the presets of `src/constants/colors.ts`, or a custom hex ([CATEGORY_COLOR_IMPLEMENTATION.md](./CATEGORY_COLOR_IMPLEMENTATION.md)) |
 | `src/components/InterfaceModeSelector.tsx` | Popup or side panel |
@@ -75,7 +75,7 @@ Imported from `src/components/analytics/index.ts`. Each chart takes its data fro
 - **Focus:** the focus classes of `tailwind.config.js` (`focus-primary`, `focus-input`…); see "Focus States" in DESIGN_GUIDELINES.md.
 - **Verbatim Prompt text:** a component shows a Prompt's title and content exactly as stored. React renders them as text; nothing sanitizes or rewrites them (`CONTEXT.md`, ADR-001).
 - **Forms:** submit with React 19's `useActionState` (`CODING_STANDARDS.md`, [REACT_19_MIGRATION.md](./REACT_19_MIGRATION.md)). Character counters read `PROMPT_LIMITS`, and storage runs Admission on save: a form never keeps its own copy of the limits or the rules.
-- **Memo:** `PromptCard`, `SearchBar` and `ToastContainer` use a custom props comparison. Adding a prop to one of them means adding it to its comparison, or the component will not re-render when the prop changes.
+- **Memo:** `PromptCard` and `SearchBar` use a custom props comparison. Adding a prop to one of them means adding it to its comparison, or the component will not re-render when the prop changes.
 - **Accessibility:** icon-only buttons carry an `aria-label`; dialogs use `useModalFocus` (`src/hooks/useModalFocus.ts`): focus moves in, Tab wraps inside, Escape closes and the focus returns to the opener; menus are keyboard-navigable (`Dropdown` does it for you).
 
 ## Adding a component

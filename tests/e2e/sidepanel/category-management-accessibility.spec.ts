@@ -44,7 +44,7 @@ test.describe('Category Manager - Keyboard Navigation and Accessibility', () => 
       await addButton.press('Enter');
 
       // Verify category was created
-      await expect(sidepanelPage.getByText('Keyboard Test')).toBeVisible();
+      await expect(sidepanelPage.getByTestId('category-row').getByText('Keyboard Test')).toBeVisible();
       await expect(sidepanelPage.getByText('2 categories', { exact: true }).first()).toBeVisible();
     });
 
@@ -111,7 +111,7 @@ test.describe('Category Manager - Keyboard Navigation and Accessibility', () => 
       await editInput.press('Enter');
 
       // Verify changes were saved
-      await expect(sidepanelPage.getByText('Updated Name')).toBeVisible();
+      await expect(sidepanelPage.getByTestId('category-row').getByText('Updated Name')).toBeVisible();
       await expect(sidepanelPage.getByText('Save Test')).toBeHidden();
       await expect(editInput).toBeHidden();
     });
@@ -249,7 +249,7 @@ test.describe('Category Manager - Keyboard Navigation and Accessibility', () => 
 
       // Verify state updated correctly
       await expect(sidepanelPage.getByText('4 categories', { exact: true }).first()).toBeVisible();
-      await expect(sidepanelPage.getByText('Category 3')).toBeVisible();
+      await expect(sidepanelPage.getByTestId('category-row').getByText('Category 3')).toBeVisible();
 
       // Verify other categories are still visible
       await expect(sidepanelPage.getByText('Category 1')).toBeVisible();

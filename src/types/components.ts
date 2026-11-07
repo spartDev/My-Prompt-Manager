@@ -1,4 +1,4 @@
-import type { UseSearchWithDebounceReturn } from './hooks';
+import type { ShowToast, UseSearchWithDebounceReturn } from './hooks';
 
 import type { Category, LibraryFilter, Prompt } from './index';
 
@@ -10,9 +10,9 @@ export interface PromptCardProps {
   prompt: Prompt;
   categories: Category[];
   onEdit: (prompt: Prompt) => void;
-  onCopy: (content: string) => void;
+  onCopy: (prompt: Prompt) => void;
   onTogglePin: (id: string) => void;
-  showToast: (message: string, type: ToastType) => void;
+  showToast: ShowToast;
   isSelected?: boolean;
   searchQuery?: string;
 }
@@ -46,8 +46,8 @@ export interface LibraryViewProps {
   onAddNew: () => void;
   onEditPrompt: (prompt: Prompt) => void;
   onTogglePin: (id: string) => void;
-  onCopyPrompt: (content: string) => void;
-  showToast: (message: string, type: ToastType) => void;
+  onCopyPrompt: (prompt: Prompt) => void;
+  showToast: ShowToast;
   onLibraryFilterChange: (filter: LibraryFilter) => void;
   loading?: boolean;
   context?: 'popup' | 'sidepanel';
@@ -58,13 +58,6 @@ export interface ModalProps {
   onClose: () => void;
   title?: string;
   children: React.ReactNode;
-}
-
-export interface ToastProps {
-  message: string;
-  type: ToastType;
-  duration?: number;
-  onClose: () => void;
 }
 
 export interface ConfirmDialogProps {

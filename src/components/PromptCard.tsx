@@ -92,7 +92,7 @@ const PromptCard: FC<PromptCardProps> = ({
 
   const handleCopyClick = (e?: MouseEvent | KeyboardEvent) => {
     e?.stopPropagation();
-    onCopy(prompt.content);
+    onCopy(prompt);
   };
 
   const isPinned = prompt.pinned === true;
@@ -113,14 +113,14 @@ const PromptCard: FC<PromptCardProps> = ({
     try {
       const encoded = encode(prompt);
       await navigator.clipboard.writeText(encoded);
-      showToast('Share link copied to clipboard!', 'success');
+      showToast('Share code copied', 'success', { sub: prompt.title });
     } catch (err) {
       Logger.error('Share failed', toError(err), {
         component: 'PromptCard',
         operation: 'share',
         promptId: prompt.id
       });
-      showToast('Failed to share prompt. Please try again.', 'error');
+      showToast("Couldn't share Prompt", 'error', { sub: 'Please try again.' });
     } finally {
       setIsSharing(false);
     }

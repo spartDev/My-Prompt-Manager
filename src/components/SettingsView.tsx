@@ -8,8 +8,7 @@ import { AdmissionRefusedError } from '../services/promptAdmission';
 import { StorageManager } from '../services/storage';
 import type { AppError, Category, CustomSite as ImportedCustomSite, Prompt, SortOrder, Settings as UserSettings } from '../types';
 import { DEFAULT_SETTINGS } from '../types';
-import type { ToastType } from '../types/components';
-import type { ToastSettings } from '../types/hooks';
+import type { ShowToast, ToastSettings } from '../types/hooks';
 import { formatCount, Logger, toError } from '../utils';
 
 import { ChatGPTIcon, ClaudeIcon, CopilotIcon, GeminiIcon, MistralIcon, PerplexityIcon } from './icons/SiteIcons';
@@ -53,7 +52,7 @@ interface Settings {
 
 interface SettingsViewProps {
   context?: 'popup' | 'sidepanel';
-  showToast: (message: string, type?: ToastType) => void;
+  showToast: ShowToast;
   toastSettings: ToastSettings;
   onToastSettingsChange: (settings: Partial<ToastSettings>) => void;
   /** Opens the storage warning with why storage refused the import */
@@ -291,7 +290,7 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
     setUserSettings(prev => ({ ...(prev ?? DEFAULT_SETTINGS), sortOrder, sortDirection }));
     storageManager.updateSettings({ sortOrder, sortDirection }).catch((error: unknown) => {
       Logger.error('Failed to save sort order', toError(error), { component: 'SettingsView' });
-      showToast('Failed to save the sort order', 'error');
+      showToast("Couldn't save the sort order", 'error');
     });
   }, [storageManager, showToast]);
 
@@ -492,11 +491,11 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
         onStorageRefused(`The import stopped when storage was full: ${count} imported. ${appError.message}`);
         return;
       }
-      // Any other error: the report says how many were imported and why it stopped, which a toast
-      // cut at 80 characters cannot hold
+      // Any other error: the report says how many were imported and why it stopped, which a
+      // one-line Notification cannot hold
       const reason = error instanceof Error ? error.message : 'Unknown error occurred';
       setImportReport({ skipped, stopped: { imported: imported.prompts, total, reason } });
-      showToast(`Import stopped: ${count} imported. See Backup & Restore.`, 'error');
+      showToast('Import stopped', 'error', { sub: `${count} imported. See Backup & Restore.` });
       return;
     }
 
@@ -505,11 +504,11 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
 
     const summary = `${formatCount(imported.prompts, 'prompt', 'prompts')} and ${formatCount(imported.categories + createdCategories, 'category', 'categories')}`;
     if (skipped.length === 0) {
-      showToast(`Successfully imported ${summary}!`, 'success');
+      showToast('Backup imported', 'success', { sub: summary });
     } else {
-      // Every skipped title and reason stays in Backup & Restore: a toast shows 80 characters
+      // Every skipped title and reason stays in Backup & Restore: a Notification shows one line
       setImportReport({ skipped });
-      showToast(`Imported ${summary}. Skipped ${skipped.length.toString()}: see Backup & Restore.`, 'warning');
+      showToast(`Skipped ${skipped.length.toString()}`, 'warning', { sub: `Imported ${summary}. See Backup & Restore.` });
     }
   };
 
@@ -529,7 +528,7 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
       await storageManager.clearAllData();
       showDefaultSiteSettings(DEFAULT_SETTINGS.interfaceMode as 'popup' | 'sidepanel');
       await loadSettings();
-      showToast('All data has been cleared.', 'success');
+      showToast('All data cleared', 'success');
     } catch (error) {
       Logger.error('Failed to clear data', toError(error));
       throw error;
@@ -556,7 +555,7 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
 
       showDefaultSiteSettings('popup');
       await loadSettings();
-      showToast('Settings have been reset to defaults.', 'success');
+      showToast('Settings reset', 'success', { sub: 'Back to defaults' });
     } catch (error) {
       Logger.error('Failed to reset settings', toError(error));
       throw error;
@@ -592,11 +591,15 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
     [handleAddCustomSite]
   );
 
-  const handleTestToastCallback = useCallback(
-    (type: ToastType) => {
-      showToast(`This is a ${type} notification`, type);
+  // Turning Notifications on shows one at once, as a preview of what comes back
+  const handleNotificationsChange = useCallback(
+    (enabled: boolean) => {
+      onToastSettingsChange({ enabled });
+      if (enabled) {
+        showToast('Notifications on', 'success');
+      }
     },
-    [showToast]
+    [onToastSettingsChange, showToast]
   );
 
   const handleDebugModeChangeCallback = useCallback(
@@ -686,8 +689,7 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
           {/* Notification Settings Section */}
           <NotificationSection
             settings={toastSettings}
-            onSettingsChange={onToastSettingsChange}
-            onTestToast={handleTestToastCallback}
+            onEnabledChange={handleNotificationsChange}
           />
 
           {/* Advanced Section */}

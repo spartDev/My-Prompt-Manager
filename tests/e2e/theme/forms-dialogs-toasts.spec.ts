@@ -2,8 +2,9 @@
  * E2E: forms, dialogs and toasts on the color tokens (My-Prompt-Manager-el4.4)
  *
  * The Prompt editor is a card with a bg-subtle text field and danger-colored validation; the
- * delete confirmation is a card on the backdrop; every toast type sits on bg-inverse with its bright
- * icon; a save refused for lack of storage opens the storage warning on the backdrop and keeps the
+ * delete confirmation is a card on the backdrop; a Notification is the Atelier 1C pill at the top
+ * center on bg-inverse, with a violet round for a confirmation and a red one for a failure, and the
+ * Notifications switch silences both (My-Prompt-Manager-dds); a save refused for lack of storage opens the storage warning on the backdrop and keeps the
  * Add form (My-Prompt-Manager-jnu). Also captures light/dark screenshots as visual proof
  * (test-results/forms-dialogs-toasts/).
  */
@@ -31,12 +32,10 @@ const EXPECTED = {
 } as const;
 
 const ON_INVERSE = 'rgb(201, 191, 230)';
-const TOAST_ICONS = [
-  { type: 'success', role: 'status', color: 'rgb(110, 231, 183)' },
-  { type: 'error', role: 'alert', color: 'rgb(252, 165, 165)' },
-  { type: 'warning', role: 'alert', color: 'rgb(252, 211, 77)' },
-  { type: 'info', role: 'status', color: 'rgb(196, 181, 253)' }
-] as const;
+const WHITE = 'rgb(255, 255, 255)';
+const MARK = 'rgb(167, 139, 250)';
+const ALERT = 'rgb(252, 165, 165)';
+const VIEWPORT_WIDTH = 400;
 
 const categories: Category[] = [{ id: 'writing', name: 'Rédaction', color: '#2563EB' }];
 const prompt = createPromptSeed({
@@ -151,21 +150,76 @@ test.describe('Forms, dialogs and toasts on the tokens', () => {
       await page.screenshot({ path: `${SCREENSHOT_DIR}/save-refused-${theme}.png` });
     });
 
-    test(`every toast type sits on bg-inverse with its bright icon (${theme})`, async ({ page, storage, extensionId }) => {
+    test(`a Notification is the top-center pill, violet for a confirmation, red for a failure, and the switch silences both (${theme})`, async ({ page, storage, extensionId }) => {
       await openPopup(page, storage, extensionId, theme);
       await page.getByTestId('tab-settings').click();
-      await page.getByRole('button', { name: /Notifications/ }).first().click();
+      const notificationsSwitch = page.getByRole('switch', { name: 'Show notifications' });
+      await expect(notificationsSwitch).toHaveAttribute('aria-checked', 'true');
 
-      for (const { type, role, color } of TOAST_ICONS) {
-        await page.getByRole('button', { name: 'Test', exact: true }).click();
-        const toast = page.getByRole(role).filter({ hasText: new RegExp(type, 'i') }).last();
-        await expect(toast).toHaveCSS('background-color', colors.inverse);
-        await expect(toast).toHaveCSS('color', ON_INVERSE);
-        await expect(toast.locator('svg').first().locator('..')).toHaveCSS('color', color);
-        await page.screenshot({ path: `${SCREENSHOT_DIR}/toast-${type}-${theme}.png` });
-        await toast.getByRole('button', { name: 'Dismiss notification' }).click();
-        await expect(toast).toHaveCount(0);
-      }
+      // Waits for the entrance (the drop, then the round's pop) to end before measuring or capturing
+      const settle = async (toast: ReturnType<Page['getByTestId']>) => {
+        await toast.evaluate(element => Promise.all(element.getAnimations({ subtree: true }).map(animation => animation.finished)));
+      };
+
+      // Turning the switch back on shows a confirmation at once
+      await notificationsSwitch.click();
+      await notificationsSwitch.click();
+      const confirmation = page.getByRole('status').filter({ hasText: 'Notifications on' });
+      await expect(confirmation).toBeVisible();
+      await settle(confirmation);
+      await expect(confirmation).toHaveCSS('background-color', colors.inverse);
+      await expect(confirmation).toHaveCSS('height', '40px');
+      await expect(confirmation.getByText('Notifications on')).toHaveCSS('color', WHITE);
+      await expect(confirmation.getByTestId('toast-mark')).toHaveCSS('background-color', MARK);
+      await expect(confirmation.getByRole('button')).toHaveCount(0);
+      const box = await confirmation.boundingBox();
+      expect(box?.y).toBeCloseTo(12, 0);
+      expect((box?.x ?? 0) + (box?.width ?? 0) / 2).toBeCloseTo(VIEWPORT_WIDTH / 2, 0);
+      await page.screenshot({ path: `${SCREENSHOT_DIR}/toast-success-${theme}.png` });
+      await page.keyboard.press('Escape');
+      await expect(confirmation).toHaveCount(0);
+
+      // A failure: a red round, announced at once, its reason cut to fit the pill
+      const importBackup = async () => {
+        const fileChooser = page.waitForEvent('filechooser');
+        await page.getByRole('button', { name: 'Import', exact: true }).click();
+        await (await fileChooser).setFiles({ name: 'notes.json', mimeType: 'application/json', buffer: Buffer.from('not a backup') });
+      };
+      await importBackup();
+      const failure = page.getByRole('alert').filter({ hasText: 'Import failed' });
+      await expect(failure).toBeVisible();
+      await settle(failure);
+      await expect(failure).toHaveCSS('background-color', colors.inverse);
+      await expect(failure.getByTestId('toast-mark')).toHaveCSS('background-color', ALERT);
+      const message = failure.getByText('Import failed', { exact: true });
+      expect(await message.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+      const reason = failure.getByText(/Invalid JSON format/);
+      await expect(reason).toHaveCSS('color', ON_INVERSE);
+      await expect(reason).toHaveCSS('text-overflow', 'ellipsis');
+      expect(await reason.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(true);
+      expect((await failure.boundingBox())?.width).toBeLessThanOrEqual(VIEWPORT_WIDTH - 32);
+      await page.screenshot({ path: `${SCREENSHOT_DIR}/toast-error-${theme}.png` });
+
+      // A message longer than the pill is cut inside it: the round, the gaps and the spacer keep their room
+      const pill = page.getByTestId('toast');
+      const longMessage = pill.getByTestId('toast-text').locator('> span').first();
+      await longMessage.evaluate(element => { element.textContent = 'Import failed '.repeat(12); });
+      const pillBox = await pill.boundingBox();
+      const messageBox = await longMessage.boundingBox();
+      expect(pillBox?.width).toBeLessThanOrEqual(VIEWPORT_WIDTH - 32);
+      expect((messageBox?.x ?? 0) + (messageBox?.width ?? 0)).toBeLessThanOrEqual((pillBox?.x ?? 0) + (pillBox?.width ?? 0) - 14);
+      expect((await pill.getByTestId('toast-mark').boundingBox())?.width).toBe(20);
+      expect(await longMessage.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(true);
+
+      await page.keyboard.press('Escape');
+      await expect(pill).toHaveCount(0);
+
+      // Off: no Notification at all, a failure included
+      await notificationsSwitch.click();
+      await expect(notificationsSwitch).toHaveAttribute('aria-checked', 'false');
+      await importBackup();
+      await expect(page.getByText('Import failed')).toHaveCount(0);
+      await expect(page.getByTestId('toast')).toHaveCount(0);
     });
   }
 });

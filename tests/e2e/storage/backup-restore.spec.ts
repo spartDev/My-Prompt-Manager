@@ -100,7 +100,7 @@ test.describe('Backup restore', () => {
       const fileChooser = page.waitForEvent('filechooser');
       await page.getByRole('button', { name: 'Import', exact: true }).click();
       await (await fileChooser).setFiles({ name: 'my-prompt-manager-backup.json', mimeType: 'application/json', buffer: Buffer.from(backup) });
-      await expect(page.getByText(/^Successfully imported/)).toBeVisible();
+      await expect(page.getByText('Backup imported', { exact: true })).toBeVisible();
 
       // Storage: every Prompt and Category as exported, in full
       const restored = await storage.get<{ prompts: unknown[]; categories: unknown[] }>(['prompts', 'categories']);

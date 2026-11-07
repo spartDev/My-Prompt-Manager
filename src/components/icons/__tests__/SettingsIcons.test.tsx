@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 
 import {
   BellIcon,
-  CheckCircleIcon,
   ChevronDownIcon,
   DatabaseIcon,
   DebugInfoIcon,
@@ -17,8 +16,7 @@ import {
   ImportIcon,
   InfoCircleIcon,
   IssueIcon,
-  SortIcon,
-  TestBellIcon
+  SortIcon
 } from '../SettingsIcons';
 
 describe('SettingsIcons', () => {
@@ -121,7 +119,6 @@ describe('SettingsIcons', () => {
   describe('Consistency Across Icons', () => {
     const icons = [
       { component: BellIcon, name: 'Bell' },
-      { component: CheckCircleIcon, name: 'CheckCircle' },
       { component: ChevronDownIcon, name: 'ChevronDown' },
       { component: DatabaseIcon, name: 'Database' },
       { component: DebugInfoIcon, name: 'DebugInfo' },
@@ -135,8 +132,7 @@ describe('SettingsIcons', () => {
       { component: ImportIcon, name: 'Import' },
       { component: InfoCircleIcon, name: 'InfoCircle' },
       { component: IssueIcon, name: 'Issue' },
-      { component: SortIcon, name: 'Sort' },
-      { component: TestBellIcon, name: 'TestBell' }
+      { component: SortIcon, name: 'Sort' }
     ];
 
     it('should ensure all icons render an SVG element', () => {

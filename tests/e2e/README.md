@@ -271,7 +271,7 @@ test('create category', async ({ page }) => {
   await expect(page.getByRole('heading', { level: 1, name: 'Categories', exact: true })).toBeVisible();
   await page.getByPlaceholder('Enter category name...').fill('Test Category');
   await page.getByRole('button', { name: 'Add' }).click();
-  await expect(page.getByText('Category created successfully')).toBeVisible();
+  await expect(page.getByText('Category created', { exact: true })).toBeVisible();
   const libraryTab = page.getByTestId('tab-library');
   await libraryTab.click();
 });

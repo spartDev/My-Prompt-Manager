@@ -96,7 +96,11 @@ describe('Color tokens', () => {
       // A Platform switched off: its logo square (My-Prompt-Manager-el4.5.3)
       ['tertiary', 'muted'],
       // Empty states and dashed panels
-      ['tertiary', 'raised']
+      ['tertiary', 'raised'],
+      // The Notification pill: its message, and the glyph on its round
+      ['on-inverse-strong', 'inverse'],
+      ['on-inverse-mark', 'inverse-mark'],
+      ['on-inverse-mark', 'inverse-alert']
     ];
 
     for (const mode of [tokens.light, tokens.dark]) {
@@ -122,10 +126,9 @@ describe('Color tokens', () => {
       ['--outline-color-accent', 'card'],
       ['--text-color-pin', 'card'],
       ['--background-color-warning', 'card'],
-      ['--text-color-inverse-success', 'inverse'],
-      ['--text-color-inverse-danger', 'inverse'],
-      ['--text-color-inverse-warning', 'inverse'],
-      ['--text-color-inverse-info', 'inverse'],
+      // The Notification's round, a confirmation's and a failure's
+      ['--background-color-inverse-mark', 'inverse'],
+      ['--background-color-inverse-alert', 'inverse'],
       ['--scrollbar-color-thumb', 'app'],
       ['--scrollbar-color-thumb', 'card'],
       ['--scrollbar-color-thumb', 'subtle'],
@@ -165,7 +168,7 @@ describe('Color tokens', () => {
       'bg-warning', 'bg-warning-subtle', 'border-warning', 'text-warning',
       'bg-danger', 'bg-danger-hover', 'bg-danger-subtle', 'border-danger', 'text-danger',
       'border-focus', 'border-error', 'outline-danger',
-      'text-pin', 'text-inverse-success', 'text-inverse-danger', 'text-inverse-warning', 'text-inverse-info'
+      'text-pin', 'text-on-inverse-strong', 'text-on-inverse-mark', 'bg-inverse-mark', 'bg-inverse-alert', 'bg-inverse-action'
     ];
     const css = await buildCss(classes);
 

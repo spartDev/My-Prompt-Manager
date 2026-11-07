@@ -165,10 +165,10 @@ test.describe('Power User Prompt Management', () => {
     await nameInput.fill('Professional');
 
     await sidepanelPage.getByRole('button', { name: 'Save changes (Enter)' }).click();
-    await expect(sidepanelPage.getByText('Category updated successfully')).toBeVisible();
+    await expect(sidepanelPage.getByText('Category saved', { exact: true })).toBeVisible();
 
     // Verify category name changed
-    await expect(sidepanelPage.getByText('Professional')).toBeVisible();
+    await expect(sidepanelPage.getByTestId('category-row').getByText('Professional')).toBeVisible();
     await expect(sidepanelPage.getByText('Work')).toBeHidden();
 
     // Switch to the Library tab and verify prompts updated
@@ -208,7 +208,7 @@ test.describe('Power User Prompt Management', () => {
     await expect(sidepanelPage.getByRole('heading', { name: 'Edit prompt', exact: true })).toBeVisible();
     await sidepanelPage.getByRole('radio', { name: 'Work', exact: true }).click();
     await sidepanelPage.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect(sidepanelPage.getByText('Prompt updated successfully').first()).toBeVisible();
+    await expect(sidepanelPage.getByText('Prompt saved', { exact: true }).first()).toBeVisible();
 
     // Move second marketing prompt to Work category
     const campaignAnalysisCard = sidepanelPage.getByTestId('prompt-card').filter({ hasText: 'Campaign Analysis' }).first();
@@ -217,7 +217,7 @@ test.describe('Power User Prompt Management', () => {
     await expect(sidepanelPage.getByRole('heading', { name: 'Edit prompt', exact: true })).toBeVisible();
     await sidepanelPage.getByRole('radio', { name: 'Work', exact: true }).click();
     await sidepanelPage.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect(sidepanelPage.getByText('Prompt updated successfully').first()).toBeVisible();
+    await expect(sidepanelPage.getByText('Prompt saved', { exact: true }).first()).toBeVisible();
 
     // Verify Marketing category is now empty: its pill is gone and the Library is back to All
     await expect(libraryPage.getLibraryFilterPill('Marketing')).toHaveCount(0);
@@ -236,7 +236,7 @@ test.describe('Power User Prompt Management', () => {
 
     await expect(sidepanelPage.getByRole('heading', { name: 'Delete Category' })).toBeVisible();
     await sidepanelPage.getByRole('button', { name: 'Delete', exact: true }).click();
-    await expect(sidepanelPage.getByText('Category deleted successfully')).toBeVisible();
+    await expect(sidepanelPage.getByText('Category deleted', { exact: true })).toBeVisible();
 
     // Verify Marketing category removed
     await expect(sidepanelPage.getByText('Marketing')).toBeHidden();
@@ -309,7 +309,7 @@ test.describe('Power User Prompt Management', () => {
       await expect(sidepanelPage.getByRole('heading', { name: 'Edit prompt', exact: true })).toBeVisible();
       await sidepanelPage.getByRole('radio', { name: 'Work', exact: true }).click();
       await sidepanelPage.getByRole('button', { name: 'Save', exact: true }).click();
-      await expect(sidepanelPage.getByText('Prompt updated successfully').first()).toBeVisible();
+      await expect(sidepanelPage.getByText('Prompt saved', { exact: true }).first()).toBeVisible();
     }
 
     // Verify Development category now has only 1 prompt

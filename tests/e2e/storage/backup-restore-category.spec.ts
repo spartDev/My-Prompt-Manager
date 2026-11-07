@@ -31,7 +31,7 @@ test.describe('Backup restore and the Categories its Prompts name', () => {
       const fileChooser = page.waitForEvent('filechooser');
       await page.getByRole('button', { name: 'Import', exact: true }).click();
       await (await fileChooser).setFiles({ name: 'backup.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(backup)) });
-      await expect(page.getByText(/^Successfully imported/)).toBeVisible();
+      await expect(page.getByText('Backup imported', { exact: true })).toBeVisible();
 
       // Stored once, without a colour, and every Prompt names an existing Category
       const categories = await storage.getCategories();

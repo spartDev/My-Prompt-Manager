@@ -109,41 +109,42 @@ export interface TextHighlight {
   text: string;
 }
 
-// Toast hook types
+// Notification (toast) hook types
 export interface ToastAction {
   label: string;
   onClick: () => void;
-  variant?: 'primary' | 'secondary';
+}
+
+export interface ToastOptions {
+  /** Second, lighter part of the Notification, cut with an ellipsis when it does not fit: the object's name or the reason */
+  sub?: string;
+  /** Milliseconds on screen; by default 2.7 s for success and info, 6 s for error and warning */
+  duration?: number;
+  action?: ToastAction;
 }
 
 export interface Toast {
   id: string;
   message: string;
+  sub?: string;
   type: ToastType;
-  duration?: number;
+  duration: number;
   action?: ToastAction;
-  groupKey?: string; // For grouping similar toasts
 }
 
 export interface ToastSettings {
-  position: 'top-right' | 'bottom-right';
-  enabledTypes: {
-    success: boolean;
-    error: boolean;
-    info: boolean;
-    warning: boolean;
-  };
-  enableGrouping: boolean;
-  groupingWindow: number; // milliseconds
+  /** Off: no Notification at all, failures included */
+  enabled: boolean;
 }
 
+export type ShowToast = (message: string, type?: ToastType, options?: ToastOptions) => void;
+
 export interface UseToastReturn {
-  toasts: Toast[];
-  queueLength: number;
+  /** The one Notification on screen: a new one replaces it */
+  toast: Toast | null;
   settings: ToastSettings;
-  showToast: (message: string, type?: Toast['type'], duration?: number, action?: ToastAction) => void;
+  showToast: ShowToast;
   hideToast: (id: string) => void;
-  clearAllToasts: () => void;
   updateSettings: (settings: Partial<ToastSettings>) => void;
 }
 

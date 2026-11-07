@@ -60,7 +60,7 @@ test.describe('Prompt editor', () => {
     await page.getByRole('button', { name: 'New category' }).click();
     await page.getByLabel('New category name').fill('  Research  ');
     await page.keyboard.press('Enter');
-    await expect(page.getByText('Category created successfully')).toBeVisible();
+    await expect(page.getByText('Category created', { exact: true })).toBeVisible();
     await expect(categoryChip(page, 'Research')).toBeChecked();
     await expect(categoryChip(page, 'Uncategorized')).not.toBeChecked();
 
@@ -79,7 +79,7 @@ test.describe('Prompt editor', () => {
 
     await page.keyboard.press('ControlOrMeta+s');
     await expect(page.getByRole('button', { name: 'Saved' })).toBeVisible();
-    await expect(page.getByText('Prompt created successfully')).toBeVisible();
+    await expect(page.getByText('Prompt created', { exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Interview notes' })).toBeVisible();
 
     const saved = (await storage.getPrompts()).find(p => p.title === 'Interview notes');

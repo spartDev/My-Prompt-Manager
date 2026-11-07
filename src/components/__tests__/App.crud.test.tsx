@@ -71,7 +71,9 @@ describe('App prompt workflows', () => {
       expect(promptMock.createPrompt).toHaveBeenCalledWith('Greeting', 'Hello testers', 'Work');
     });
 
-    await screen.findByText(/prompt created successfully/i);
+    const created = await screen.findByRole('status');
+    expect(created).toHaveTextContent('Prompt created');
+    expect(created).toHaveTextContent('Greeting');
 
     // The editor shows "Saved" for a moment, then the Library is back
     expect(await screen.findByRole('heading', { name: /my prompt manager/i })).toBeInTheDocument();
@@ -107,7 +109,7 @@ describe('App prompt workflows', () => {
       });
     });
 
-    await screen.findByText(/prompt updated successfully/i);
+    expect(await screen.findByRole('status')).toHaveTextContent('Prompt saved');
   });
 
   it('deletes a prompt from the edit form after confirming the dialog', async () => {
@@ -131,7 +133,9 @@ describe('App prompt workflows', () => {
       expect(storageMock.deletePrompt).toHaveBeenCalledWith(basePrompt.id);
     });
 
-    await screen.findByText(/prompt deleted successfully/i);
+    const deleted = await screen.findByRole('status');
+    expect(deleted).toHaveTextContent('Prompt deleted');
+    expect(deleted).toHaveTextContent(basePrompt.title);
   });
 
   it('keeps the Library, brings the Prompt back and shows a toast when a delete fails', async () => {
@@ -145,8 +149,8 @@ describe('App prompt workflows', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Delete prompt' }));
     await userEvent.click(await screen.findByRole('button', { name: /^delete$/i }));
 
-    await screen.findByText(/failed to delete prompt/i);
-    expect(screen.getByText(basePrompt.title)).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't delete Prompt");
+    expect(screen.getByRole('button', { name: `Edit ${basePrompt.title}` })).toBeInTheDocument();
     expect(screen.queryByText(/error loading data/i)).not.toBeInTheDocument();
   });
 
@@ -168,7 +172,9 @@ describe('App prompt workflows', () => {
       expect(clipboardWrite).toHaveBeenCalledWith(basePrompt.content);
     });
 
-    await screen.findByText(/prompt copied to clipboard/i);
+    const copied = await screen.findByRole('status');
+    expect(copied).toHaveTextContent('Prompt copied');
+    expect(copied).toHaveTextContent(basePrompt.title);
   });
 
   it('opens the storage warning over the Add form, which keeps the typed text, when a save exceeds the quota', async () => {
@@ -266,9 +272,11 @@ describe('App prompt workflows', () => {
     await userEvent.keyboard('{Enter}');
 
     const status = await screen.findAllByText(reason, { exact: false });
-    // The toast and the inline error both give Admission's reason
+    // The Notification and the inline error both give Admission's reason
     expect(status.length).toBeGreaterThanOrEqual(2);
-    expect(screen.queryByText(/failed to update category/i)).not.toBeInTheDocument();
+    const notification = screen.getByTestId('toast');
+    expect(notification).toHaveTextContent("Couldn't save Category");
+    expect(notification).toHaveTextContent(reason);
     expect(editInput).toHaveValue(longName);
     expect(storageMock.updateCategory).not.toHaveBeenCalled();
   });
@@ -291,7 +299,9 @@ describe('App prompt workflows', () => {
 
     const status = await screen.findAllByText(reason, { exact: false });
     expect(status.length).toBeGreaterThanOrEqual(2);
-    expect(screen.queryByText(/failed to create category/i)).not.toBeInTheDocument();
+    const notification = screen.getByTestId('toast');
+    expect(notification).toHaveTextContent("Couldn't create Category");
+    expect(notification).toHaveTextContent(reason);
     expect(nameInput).toHaveValue(longName);
     expect(storageMock.saveCategory).not.toHaveBeenCalled();
   });
@@ -328,7 +338,7 @@ describe('App prompt workflows', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: `Pin ${basePrompt.title}` }));
 
-    await screen.findByText(/failed to update pin/i);
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't update pin");
     expect(screen.getByText(basePrompt.title)).toBeInTheDocument();
     expect(screen.queryByText(/error loading data/i)).not.toBeInTheDocument();
 

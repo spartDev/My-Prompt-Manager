@@ -153,7 +153,7 @@ test.describe('Library size in Chrome storage', () => {
 
       await page.getByRole('button', { name: 'Clear All Data' }).click();
       await page.getByRole('button', { name: 'Yes, Clear All Data' }).click();
-      await expect(page.getByText('All data has been cleared.')).toBeVisible();
+      await expect(page.getByText('All data cleared', { exact: true })).toBeVisible();
 
       await expectBarToMatchChrome(page, label);
       await page.getByRole('heading', { name: 'Storage Usage' }).scrollIntoViewIfNeeded();
@@ -223,7 +223,7 @@ test.describe('Library size in Chrome storage', () => {
       await page.getByLabel('Content', { exact: true }).fill('Résume la transcription ci-dessous en 5 points clés.');
       await page.getByRole('button', { name: 'Save', exact: true }).click();
 
-      await expect(page.getByText('Prompt created successfully')).toBeVisible();
+      await expect(page.getByText('Prompt created', { exact: true })).toBeVisible();
       await expect(page.getByTestId('prompt-card').filter({ hasText: 'Résumé de réunion' })).toBeVisible();
       await expect(page.getByRole('dialog', { name: 'Storage Limit Reached' })).toHaveCount(0);
       expect(await storage.getPrompts()).toHaveLength(221);

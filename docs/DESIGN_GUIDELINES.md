@@ -38,7 +38,7 @@ Visual reference (both modes side by side): the palette canvas linked from beads
 | `bg-subtle` | `#F4F1FA` | `#2B2340` | Chips and fields **on a card**. Never directly on `bg-app`: same value in light |
 | `bg-raised` | `#F8F6FC` | `#1B1528` | Light fills: empty states, nested panels |
 | `bg-muted` | `#F1EDF8` | `#2E2645` | Hover of neutral elements (`hover:bg-muted`) |
-| `bg-inverse` | `#1D1530` | `#4A3D6B` | Toasts |
+| `bg-inverse` | `#1D1530` | `#4A3D6B` | Notification pill, tooltips |
 | `bg-backdrop` | `#2A2140` at 45% | `#07050C` at 70% | Behind an open dialog or drawer, with `backdrop-blur-sm` |
 | `bg-highlight` | `#FEF3C7` | `#33270F` | Search match in a Prompt title or preview (`<mark className="bg-highlight text-inherit">`) |
 
@@ -97,7 +97,9 @@ The Prompt selector and the Variable form injected on Platforms are plain CSS (`
 | `bg-danger` / `bg-danger-hover` | `#DC2626` / `#B91C1C` | `#DC2626` / `#B91C1C` | Destructive button |
 | `bg-danger-subtle` / `border-danger` / `text-danger` | `#FDECEC` / `#F6CFCF` / `#991B1B` | `#3A1518` / `#5E2228` / `#FCA5A5` | Error banner and message |
 | `text-pin` | `#D97706` | `#FBBF24` | Filled star of a Pinned Prompt |
-| `text-inverse-success`, `-danger`, `-warning`, `-info` | `#6EE7B7`, `#FCA5A5`, `#FCD34D`, `#C4B5FD` | same | Status icons on `bg-inverse` (toasts), in both modes |
+| `text-on-inverse-strong` / `text-on-inverse-mark` | `#FFFFFF` / `#1D1530` | same | Notification message / glyph on the Notification's round |
+| `bg-inverse-mark` / `bg-inverse-alert` | `#A78BFA` / `#FCA5A5` | same | Notification round: a confirmation's check / a failure's ! |
+| `bg-inverse-action` | `rgba(255, 255, 255, 0.14)` | same | Action button of a Notification |
 
 Information uses the accent family (`bg-accent-subtle`, `border-accent`, `text-accent`): there is no blue info color.
 
@@ -856,40 +858,35 @@ On: `bg-accent`. Off: the track is filled with the field-outline token (`border-
 </button>
 ```
 
-### Toast Notifications
+### Notification
 
-Toasts are dark in both modes (`bg-inverse`). The status icon takes its bright variant (`text-inverse-success`, `-danger`, `-warning`, `-info`), and the progress bar takes the icon color through `bg-current`:
+A Notification (Atelier 1C) is a 40px pill at the top center of the popup or side panel, on
+`bg-inverse` in both modes (`#1D1530` in light, `#4A3D6B` in dark). Only one shows at a time: a new
+one replaces it. A confirmation (success, info) has a violet check round (`bg-inverse-mark`) and
+leaves after 2.7s; a failure (error, warning) has a red ! round (`bg-inverse-alert`), is a
+`role="alert"`, and leaves after 6s. There is no close button and no progress bar: Escape closes it.
+Settings has one switch for all of them.
+
+The bold message stays whole; the optional sub (the object's name, or the reason) is cut with an
+ellipsis when the pill runs out of room. Write the message short (`Prompt saved`, `Couldn't delete
+Prompt`) and put the name in the sub.
 
 ```tsx
-<div className="
-  relative flex items-start p-4
-  rounded-lg shadow-lg
-  bg-inverse
-  text-on-inverse
-  overflow-hidden
+<div role="status" className="
+  toast-in fixed top-3 left-1/2 z-50
+  flex items-center gap-[9px] h-10 max-w-[calc(100%-32px)] pl-3.5 pr-1.5
+  rounded-full bg-inverse text-on-inverse-strong shadow-toast
 ">
-  {/* Icon */}
-  <div className="shrink-0 text-inverse-success">
-    <svg className="h-5 w-5">{/* Icon */}</svg>
-  </div>
-
-  {/* Message */}
-  <div className="ml-3 flex-1">
-    <p className="text-sm font-medium">Message text</p>
-  </div>
-
-  {/* Dismiss */}
-  <button className="ml-4 shrink-0">
-    <svg className="h-4 w-4">{/* X icon */}</svg>
-  </button>
-
-  {/* Progress bar */}
-  <div className="absolute bottom-0 left-0 h-1 bg-current text-inverse-success"
-       style={{
-         width: '100%',
-         animation: 'shrink-width 3s linear'
-       }}
-  />
+  <span className="toast-mark-pop grid place-items-center size-5 rounded-full bg-inverse-mark text-on-inverse-mark">
+    {/* check, or ! for a failure */}
+  </span>
+  {/* Only the text gives way; inside it, the message only once it alone is too long */}
+  <span className="flex min-w-0 items-center gap-[9px]">
+    <span className="shrink-0 max-w-full truncate text-[13px] font-semibold">Prompt saved</span>
+    <span className="min-w-0 truncate text-[12.5px] text-on-inverse">Weekly status update</span>
+  </span>
+  {/* An action, as a pill button, or an 8px spacer */}
+  <button className="h-7 px-[11px] rounded-full bg-inverse-action text-[12.5px] font-semibold">Undo</button>
 </div>
 ```
 
@@ -1013,16 +1010,20 @@ transition-transform duration-200
 
 ### Keyframe Animations
 
-#### Toast Progress Bar
+#### Notification Entrance
+
+`src/popup.css`: the pill drops 14px into the top center with a spring (`toast-in`, 0.45s,
+`cubic-bezier(0.34, 1.56, 0.64, 1)`), and its round pops 80ms later (`toast-mark-pop`). It has no
+exit animation: it leaves at once. Under `prefers-reduced-motion`, both last 1ms.
 
 ```css
-@keyframes shrink-width {
-  from { width: 100%; }
-  to { width: 0%; }
+.toast-in {
+  transform: translateX(-50%);
+  animation: toast-in 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
-
-/* Usage */
-animation: shrink-width 3s linear;
+.toast-mark-pop {
+  animation: toast-mark-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) 0.08s both;
+}
 ```
 
 #### Modal Fade In
@@ -1177,8 +1178,8 @@ text-danger      /* Error */
 text-warning     /* Warning */
 text-accent      /* Info: there is no blue */
 
-/* Status, on bg-inverse (toasts) */
-text-inverse-success  text-inverse-danger  text-inverse-warning  text-inverse-info
+/* Notification, on bg-inverse */
+text-on-inverse-strong  text-on-inverse  bg-inverse-mark  bg-inverse-alert  text-on-inverse-mark
 
 /* Pinned Prompt */
 text-pin         /* Filled star */
@@ -1301,7 +1302,7 @@ All interactive elements MUST have appropriate ARIA labels:
 **Verified by `src/theme/__tests__/tokens.test.ts`, in light and dark:**
 - `text-primary`, `text-secondary` and `text-tertiary` on `bg-app`, `bg-card` and `bg-subtle`: 4.5:1
 - Text on fills and tints (`text-on-accent` on `bg-accent` and `bg-danger`, each state text on its `-subtle` background, `text-on-inverse` on `bg-inverse`): 4.5:1
-- Controls (`border-input`, the focus ring, `text-pin`, the toast icons, the scrollbar thumb): 3:1
+- Controls (`border-input`, the focus ring, `text-pin`, the Notification rounds, the scrollbar thumb): 3:1
 - `text-faint` is under 3:1: decorative and disabled content only
 
 ### Screen Reader Support

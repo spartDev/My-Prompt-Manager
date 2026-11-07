@@ -1,153 +1,118 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 
-import type { Toast, ToastAction, ToastSettings, UseToastReturn } from '../types/hooks';
+import type { ToastType } from '../types/components';
+import type { ShowToast, Toast, ToastSettings, UseToastReturn } from '../types/hooks';
 import { Logger, toError } from '../utils';
 
-const TOAST_SETTINGS_KEY = 'toast_settings';
+export const TOAST_SETTINGS_KEY = 'toast_settings';
 
-const DEFAULT_SETTINGS: ToastSettings = {
-  position: 'top-right',
-  enabledTypes: {
-    success: true,
-    error: true,
-    info: true,
-    warning: true
-  },
-  enableGrouping: true,
-  groupingWindow: 500 // 500ms window for grouping
+/** How long a Notification stays: a confirmation is glanced at, a failure must be read */
+export const TOAST_DURATION = {
+  confirmation: 2700,
+  failure: 6000
+} as const;
+
+const DEFAULT_SETTINGS: ToastSettings = { enabled: true };
+
+const isFailure = (type: ToastType): boolean => type === 'error' || type === 'warning';
+
+/**
+ * Reads the stored settings. Before { enabled }, they held one switch per type and a position: only
+ * a user who had turned all four types off wanted silence. Returns whether the stored shape is old.
+ */
+const readSettings = (stored: unknown): { settings: ToastSettings; outdated: boolean } => {
+  if (typeof stored !== 'object' || stored === null) {
+    return { settings: DEFAULT_SETTINGS, outdated: false };
+  }
+  const record = stored as Record<string, unknown>;
+  if (typeof record.enabled === 'boolean') {
+    return { settings: { enabled: record.enabled }, outdated: false };
+  }
+  const types = record.enabledTypes;
+  const allOff = typeof types === 'object' && types !== null
+    && (['success', 'error', 'info', 'warning'] as const).every(type => (types as Record<string, unknown>)[type] === false);
+  return { settings: { enabled: !allOff }, outdated: true };
 };
 
 export const useToast = (): UseToastReturn => {
-  const [toasts, setToasts] = useState<Toast[]>([]);
-  const [queue, setQueue] = useState<Toast[]>([]);
+  const [toast, setToast] = useState<Toast | null>(null);
   const [settings, setSettings] = useState<ToastSettings>(DEFAULT_SETTINGS);
-  const toastsCountRef = useRef(0);
+  // showToast reads the latest switch, so turning Notifications on can show one at once
+  const enabledRef = useRef(DEFAULT_SETTINGS.enabled);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const shownIdRef = useRef<string | null>(null);
 
-  // Keep ref in sync with toasts length for use in callbacks
-  useEffect(() => {
-    toastsCountRef.current = toasts.length;
-  }, [toasts.length]);
+  const clearTimer = useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
 
-  // Load settings from Chrome storage on mount
   useEffect(() => {
     const loadSettings = async () => {
       try {
         const result = await chrome.storage.local.get(TOAST_SETTINGS_KEY);
-        if (result[TOAST_SETTINGS_KEY]) {
-          const savedSettings = result[TOAST_SETTINGS_KEY] as ToastSettings;
-          setSettings({ ...DEFAULT_SETTINGS, ...savedSettings });
+        const { settings: loaded, outdated } = readSettings(result[TOAST_SETTINGS_KEY]);
+        enabledRef.current = loaded.enabled;
+        setSettings(loaded);
+        if (outdated) {
+          await chrome.storage.local.set({ [TOAST_SETTINGS_KEY]: loaded });
         }
       } catch (error) {
         Logger.error('Failed to load toast settings', toError(error));
       }
     };
     void loadSettings();
-  }, []);
-
-  // Process queue when current toast is dismissed
-  useEffect(() => {
-    if (toasts.length === 0 && queue.length > 0) {
-      // Use microtask to avoid synchronous setState in effect
-      queueMicrotask(() => {
-        setQueue(prevQueue => {
-          if (prevQueue.length === 0) {
-            return prevQueue; // No items to process
-          }
-
-          const nextToast = prevQueue[0];
-          toastsCountRef.current = 1; // Update ref synchronously
-          setToasts([nextToast]);
-          return prevQueue.slice(1);
-        });
-      });
-    }
-  }, [toasts.length, queue.length]);
-
-  const showToast = useCallback((
-    message: string,
-    type: Toast['type'] = 'info',
-    duration?: number,
-    action?: ToastAction
-  ) => {
-    // Check if this toast type is enabled
-    if (!settings.enabledTypes[type]) {
-      return;
-    }
-
-    // Truncate message if it exceeds 80 characters (Material Design recommendation)
-    const MAX_LENGTH = 80;
-    const truncatedMessage = message.length > MAX_LENGTH
-      ? `${message.substring(0, MAX_LENGTH - 3)}...`
-      : message;
-
-    // Set duration based on type if not explicitly provided
-    const toastDuration = duration !== undefined ? duration : (() => {
-      switch (type) {
-        case 'error':
-          return 7000; // 7 seconds for errors
-        case 'warning':
-          return 5000; // 5 seconds for warnings
-        case 'success':
-        case 'info':
-        default:
-          return 2750; // 2.75 seconds for success/info
-      }
-    })();
-
-    const toast: Toast = {
-      id: uuidv4(),
-      message: truncatedMessage,
-      type,
-      duration: toastDuration,
-      action
-    };
-
-    // Check state via ref and call appropriate setter (avoids nested setState anti-pattern)
-    if (toastsCountRef.current === 0) {
-      // No toast showing, show immediately
-      toastsCountRef.current = 1; // Update ref synchronously for rapid successive calls
-      setToasts([toast]);
-    } else {
-      // Toast already showing, queue this one
-      setQueue(prev => [...prev, toast]);
-    }
-  }, [settings.enabledTypes]);
+    return clearTimer;
+  }, [clearTimer]);
 
   const hideToast = useCallback((id: string) => {
-    setToasts(prev => {
-      const filtered = prev.filter(toast => toast.id !== id);
-      toastsCountRef.current = filtered.length; // Update ref synchronously
-      return filtered;
+    if (shownIdRef.current !== id) {return;}
+    shownIdRef.current = null;
+    clearTimer();
+    setToast(null);
+  }, [clearTimer]);
+
+  const showToast: ShowToast = useCallback((message, type = 'info', options = {}) => {
+    if (!enabledRef.current) {return;}
+
+    const next: Toast = {
+      id: uuidv4(),
+      message,
+      sub: options.sub || undefined,
+      type,
+      duration: options.duration ?? (isFailure(type) ? TOAST_DURATION.failure : TOAST_DURATION.confirmation),
+      action: options.action
+    };
+
+    // A new Notification replaces the one on screen, and its own time starts
+    clearTimer();
+    shownIdRef.current = next.id;
+    setToast(next);
+    if (next.duration > 0) {
+      timerRef.current = setTimeout(() => { hideToast(next.id); }, next.duration);
+    }
+  }, [clearTimer, hideToast]);
+
+  const updateSettings = useCallback((changes: Partial<ToastSettings>) => {
+    const updated: ToastSettings = { enabled: changes.enabled ?? enabledRef.current };
+    enabledRef.current = updated.enabled;
+    setSettings(updated);
+    if (!updated.enabled && shownIdRef.current) {
+      hideToast(shownIdRef.current);
+    }
+    chrome.storage.local.set({ [TOAST_SETTINGS_KEY]: updated }).catch((error: unknown) => {
+      Logger.error('Failed to save toast settings', toError(error));
     });
-  }, []);
-
-  const clearAllToasts = useCallback(() => {
-    toastsCountRef.current = 0; // Update ref synchronously
-    setToasts([]);
-    setQueue([]);
-  }, []);
-
-  const updateSettings = useCallback((newSettings: Partial<ToastSettings>) => {
-    setSettings(prevSettings => {
-      const updatedSettings = { ...prevSettings, ...newSettings };
-
-      // Save to storage asynchronously
-      chrome.storage.local.set({ [TOAST_SETTINGS_KEY]: updatedSettings }).catch((error: unknown) => {
-        Logger.error('Failed to save toast settings', toError(error));
-      });
-
-      return updatedSettings;
-    });
-  }, []);
+  }, [hideToast]);
 
   return {
-    toasts,
-    queueLength: queue.length,
+    toast,
     settings,
     showToast,
     hideToast,
-    clearAllToasts,
     updateSettings
   };
 };

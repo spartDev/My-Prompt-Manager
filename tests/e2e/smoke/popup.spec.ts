@@ -79,7 +79,7 @@ test.describe('Prompt creation flow', () => {
     await expect(savePromptButton).toBeEnabled();
     await savePromptButton.click();
 
-    await expect(page.getByText('Prompt created successfully')).toBeVisible();
+    await expect(page.getByText('Prompt created', { exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Focus Mode Kickoff' })).toBeVisible();
 
     const prompts = await storage.getPrompts();
@@ -128,7 +128,7 @@ test.describe('Prompt management', () => {
     await expect(saveButton).toBeEnabled();
     await saveButton.click();
 
-    await expect(page.getByText('Prompt updated successfully')).toBeVisible();
+    await expect(page.getByText('Prompt saved', { exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Focus Mode Kickoff' })).toBeVisible();
 
     const prompts = await storage.getPrompts();
@@ -170,7 +170,7 @@ test.describe('Prompt management', () => {
     await expect(confirmDialog).toBeVisible();
     await confirmDialog.getByRole('button', { name: 'Delete' }).click();
 
-    await expect(page.getByText('Prompt deleted successfully')).toBeVisible();
+    await expect(page.getByText('Prompt deleted', { exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: promptToDelete.title })).toHaveCount(0);
 
     const prompts = await storage.getPrompts();

@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import * as promptEncoder from '../../services/promptEncoder';
 import type { Category, Prompt } from '../../types';
+import type { ShowToast } from '../../types/hooks';
 import PromptCard from '../PromptCard';
 
 describe('PromptCard - Basic Rendering', () => {
@@ -26,7 +27,7 @@ describe('PromptCard - Basic Rendering', () => {
     onEdit: vi.fn(),
     onCopy: vi.fn(),
     onTogglePin: vi.fn(),
-    showToast: vi.fn<(message: string, type: 'success' | 'error' | 'info' | 'warning') => void>(),
+    showToast: vi.fn<ShowToast>(),
     searchQuery: ''
   };
 
@@ -225,7 +226,7 @@ describe('PromptCard - Content preview prefix', () => {
     onEdit: vi.fn(),
     onCopy: vi.fn(),
     onTogglePin: vi.fn(),
-    showToast: vi.fn<(message: string, type: 'success' | 'error' | 'info' | 'warning') => void>(),
+    showToast: vi.fn<ShowToast>(),
   };
 
   /** Renders a card and returns the text of its content preview (the card's only <p>). */
@@ -314,7 +315,7 @@ describe('PromptCard - Variables chip', () => {
       />
     );
     await userEvent.click(screen.getByRole('button', { name: /Copy content of Translate/ }));
-    expect(onCopy).toHaveBeenCalledWith('Hi {{name}}');
+    expect(onCopy).toHaveBeenCalledWith(expect.objectContaining({ content: 'Hi {{name}}' }));
   });
 });
 
@@ -332,7 +333,7 @@ describe('PromptCard - Share Button', () => {
     { id: '1', name: 'Test Category', color: '#FF0000' }
   ];
 
-  let mockShowToast: ReturnType<typeof vi.fn<(message: string, type: 'success' | 'error' | 'info' | 'warning') => void>>;
+  let mockShowToast: ReturnType<typeof vi.fn<ShowToast>>;
   let mockWriteText: ReturnType<typeof vi.fn>;
    
   let mockEncode: any;
@@ -344,7 +345,7 @@ describe('PromptCard - Share Button', () => {
   });
 
   beforeEach(() => {
-    mockShowToast = vi.fn<(message: string, type: 'success' | 'error' | 'info' | 'warning') => void>();
+    mockShowToast = vi.fn<ShowToast>();
     mockWriteText = vi.fn().mockResolvedValue(undefined);
     mockEncode = vi.spyOn(promptEncoder, 'encode');
 
@@ -438,7 +439,7 @@ describe('PromptCard - Share Button', () => {
 
     await waitFor(() => {
       expect(mockEncode).toHaveBeenCalledWith(mockPrompt);
-      expect(mockShowToast).toHaveBeenCalledWith('Share link copied to clipboard!', 'success');
+      expect(mockShowToast).toHaveBeenCalledWith('Share code copied', 'success', { sub: expect.any(String) });
     });
   });
 
@@ -455,7 +456,7 @@ describe('PromptCard - Share Button', () => {
 
     await waitFor(() => {
       expect(mockEncode).toHaveBeenCalledWith(mockPrompt);
-      expect(mockShowToast).toHaveBeenCalledWith('Failed to share prompt. Please try again.', 'error');
+      expect(mockShowToast).toHaveBeenCalledWith("Couldn't share Prompt", 'error', { sub: 'Please try again.' });
     }, { timeout: 1000 });
   });
 
@@ -502,7 +503,7 @@ describe('PromptCard - Share Button', () => {
 
     await waitFor(() => {
       expect(mockEncode).toHaveBeenCalledWith(mockPrompt);
-      expect(mockShowToast).toHaveBeenCalledWith('Share link copied to clipboard!', 'success');
+      expect(mockShowToast).toHaveBeenCalledWith('Share code copied', 'success', { sub: expect.any(String) });
     });
   });
 
@@ -518,7 +519,7 @@ describe('PromptCard - Share Button', () => {
 
     await waitFor(() => {
       expect(mockEncode).toHaveBeenCalledWith(mockPrompt);
-      expect(mockShowToast).toHaveBeenCalledWith('Share link copied to clipboard!', 'success');
+      expect(mockShowToast).toHaveBeenCalledWith('Share code copied', 'success', { sub: expect.any(String) });
     });
   });
 });

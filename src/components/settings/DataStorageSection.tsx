@@ -1,8 +1,8 @@
 import { type FC, useCallback, useId, useRef, useState } from 'react';
 
 import type { Category, Prompt } from '../../types';
-import type { ToastType } from '../../types/components';
 import type {} from '../../types/file-system-access-api';
+import type { ShowToast } from '../../types/hooks';
 import { findInvalidImportCategory, findInvalidImportPrompt, formatCount, Logger, toError } from '../../utils';
 import { describeStorageUsage } from '../../utils/storageQuota';
 import { DatabaseIcon, ExportIcon, ImportIcon } from '../icons/SettingsIcons';
@@ -11,7 +11,7 @@ import SettingsSection from './SettingsSection';
 
 /**
  * What the last import left to read at the user's pace: every item it skipped and why, and why it
- * stopped, if it did. A toast shows 80 characters for a few seconds, too little for a list of titles.
+ * stopped, if it did. A Notification shows one line for a few seconds, too little for a list of titles.
  */
 export interface ImportReport {
   /** `key` tells the items apart: the kind and id (or name) of the Prompt or Category */
@@ -35,7 +35,7 @@ interface DataStorageSectionProps {
   importReport?: ImportReport | null;
   onDismissImportReport?: () => void;
   onClearData: () => Promise<void>;
-  onShowToast: (message: string, type?: ToastType) => void;
+  onShowToast: ShowToast;
 }
 
 const DataStorageSection: FC<DataStorageSectionProps> = ({
@@ -169,7 +169,7 @@ const DataStorageSection: FC<DataStorageSectionProps> = ({
       // An invalid file says so in its message; any other failure is not blamed on the file. An
       // import stopped by storage never reaches here: Settings opens the storage warning for it.
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      onShowToast(`Import failed: ${errorMessage}`, 'error');
+      onShowToast('Import failed', 'error', { sub: errorMessage });
     } finally {
       setImporting(false);
     }

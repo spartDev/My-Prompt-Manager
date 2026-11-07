@@ -46,7 +46,7 @@ test.describe('Example: Refactored Category Management Tests', () => {
     // await expect(page.getByRole('heading', { level: 1, name: 'Categories', exact: true })).toBeVisible();
     // await page.getByPlaceholder('Enter category name...').fill('New Category');
     // await page.getByRole('button', { name: 'Add' }).click();
-    // await expect(page.getByText('Category created successfully')).toBeVisible();
+    // await expect(page.getByText('Category created', { exact: true })).toBeVisible();
 
     // AFTER (using POMs and workflows):
     await workflows.categories.create(libraryPage.page, { name: 'New Category' });

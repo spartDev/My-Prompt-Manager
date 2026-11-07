@@ -42,7 +42,7 @@ export class CategoryManagerPage extends BasePage {
     await expect(addButton).toBeEnabled();
     await addButton.click();
 
-    await expect(this.getSuccessMessage('Category created successfully')).toBeVisible();
+    await expect(this.getSuccessMessage('Category created')).toBeVisible();
 
     // Verify input is cleared
     await expect(nameInput).toHaveValue('');
@@ -62,10 +62,10 @@ export class CategoryManagerPage extends BasePage {
     await editInput.fill(newName);
 
     await this.page.getByRole('button', { name: 'Save changes (Enter)' }).click();
-    await expect(this.getSuccessMessage('Category updated successfully')).toBeVisible();
+    await expect(this.getSuccessMessage('Category saved')).toBeVisible();
 
     // Verify name changed
-    await expect(this.page.getByText(newName)).toBeVisible();
+    await expect(this.page.getByTestId('category-row').getByText(newName)).toBeVisible();
     await expect(this.page.getByText(currentName)).toBeHidden();
   }
 
@@ -81,7 +81,7 @@ export class CategoryManagerPage extends BasePage {
 
     if (confirmDelete) {
       await this.page.getByRole('button', { name: 'Delete', exact: true }).click();
-      await expect(this.getSuccessMessage('Category deleted successfully')).toBeVisible();
+      await expect(this.getSuccessMessage('Category deleted')).toBeVisible();
       await expect(this.page.getByText(name)).toBeHidden();
     } else {
       await this.page.getByRole('button', { name: 'Cancel' }).click();
