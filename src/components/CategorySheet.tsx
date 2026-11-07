@@ -107,6 +107,13 @@ const CategorySheet: FC<CategorySheetProps> = ({
     }
   };
 
+  // Nor does a deletion start alongside a save: whichever ended first would close the sheet
+  const handleDelete = () => {
+    if (!isPending) {
+      onDelete?.();
+    }
+  };
+
   // Focus in the name on open, Tab kept inside, Escape closes, focus back to the opener on close
   useModalFocus({ isOpen: open && !paused, onClose: dismiss, containerRef: panelRef, initialFocusRef: inputRef });
 
@@ -211,7 +218,8 @@ const CategorySheet: FC<CategorySheetProps> = ({
             {isEdit && onDelete && (
               <button
                 type="button"
-                onClick={onDelete}
+                onClick={handleDelete}
+                aria-disabled={isPending ? true : undefined}
                 className="h-10 px-2 rounded-lg text-sm font-bold text-danger hover:bg-danger-subtle transition-colors focus-danger"
               >
                 Delete

@@ -329,6 +329,42 @@ describe('CategoryManager', () => {
       await sheetGone();
     });
 
+    it('starts no deletion while a save runs: whichever ended first would close the sheet', async () => {
+      const resolvers: Array<() => void> = [];
+      const slowUpdate = vi.fn(() => new Promise<void>(resolve => { resolvers.push(resolve); }));
+      const { user, props } = renderManager({ onUpdateCategory: slowUpdate });
+
+      await user.click(screen.getByRole('button', { name: 'Edit category Ideas' }));
+      const sheet = screen.getByRole('dialog', { name: 'Edit category' });
+      await user.type(within(sheet).getByRole('textbox', { name: 'Category name' }), ' 2');
+      await user.click(within(sheet).getByRole('button', { name: 'Save' }));
+      const remove = within(sheet).getByRole('button', { name: 'Delete' });
+      expect(remove).toHaveAttribute('aria-disabled', 'true');
+      await user.click(remove);
+      expect(props.onDeleteCategory).not.toHaveBeenCalled();
+
+      resolvers.forEach(resolve => { resolve(); });
+      await sheetGone();
+      expect(slowUpdate).toHaveBeenCalledTimes(1);
+    });
+
+    it('saves nothing while a deletion runs', async () => {
+      const resolvers: Array<() => void> = [];
+      const slowDelete = vi.fn(() => new Promise<void>(resolve => { resolvers.push(resolve); }));
+      const { user, props } = renderManager({ onDeleteCategory: slowDelete });
+
+      await user.click(screen.getByRole('button', { name: 'Edit category Ideas' }));
+      const sheet = screen.getByRole('dialog', { name: 'Edit category' });
+      await user.click(within(sheet).getByRole('button', { name: 'Pink' }));
+      await user.click(within(sheet).getByRole('button', { name: 'Delete' }));
+      await user.click(within(sheet).getByRole('button', { name: 'Save' }));
+      expect(props.onUpdateCategory).not.toHaveBeenCalled();
+      expect(sheet).toHaveClass('sheet-in');
+
+      resolvers.forEach(resolve => { resolve(); });
+      await sheetGone();
+    });
+
     it('has no Delete when creating', async () => {
       const { user } = renderManager();
 

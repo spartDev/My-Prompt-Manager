@@ -113,7 +113,13 @@ const CategoryManager: FC<CategoryManagerProps> = ({
     }
   };
 
+  // One deletion at a time: a second click would fail, and its failure Notification would replace
+  // the one that offers Undo
+  const deletingRef = useRef(false);
+
   const handleSubmit = async (): Promise<void> => {
+    // A deletion runs and closes the sheet when it ends: there is nothing left to save
+    if (deletingRef.current) {return;}
     const { name, color, category } = sheet;
 
     if (sheet.mode === 'create') {
@@ -142,10 +148,6 @@ const CategoryManager: FC<CategoryManagerProps> = ({
     }
     sheet.close();
   };
-
-  // One deletion at a time: a second click would fail, and its failure Notification would replace
-  // the one that offers Undo
-  const deletingRef = useRef(false);
 
   // While a deletion runs, the sheet that started it stays open: its end closes that sheet, not another
   const closeSheet = useCallback(() => {
