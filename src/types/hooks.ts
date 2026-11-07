@@ -1,6 +1,6 @@
 import type { ToastType } from './components';
 
-import type { AppError, Category, Prompt, UsageEvent } from './index';
+import type { AppError, Category, DeletedCategory, Prompt, UsageEvent } from './index';
 
 /**
  * Type guard function that validates an unknown value is of type T.
@@ -42,8 +42,9 @@ export interface UseCategoriesReturn {
   loading: boolean;
   error: AppError | null;
   createCategory: (category: Omit<Category, 'id'>) => Promise<Category>;
-  updateCategory: (id: string, updates: Partial<Category>) => Promise<void>;
-  deleteCategory: (id: string) => Promise<void>;
+  updateCategory: (id: string, updates: Partial<Category>) => Promise<Category>;
+  deleteCategory: (id: string) => Promise<DeletedCategory>;
+  restoreCategory: (deleted: DeletedCategory) => Promise<Category>;
   refreshCategories: () => Promise<void>;
 }
 

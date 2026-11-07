@@ -4,8 +4,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import App from '../../App';
 import { PROMPT_LIMITS } from '../../services/promptAdmission';
-import { getMockPromptManager, getMockStorageManager } from '../../test/mocks';
-import type { AppError, Category, Prompt } from '../../types';
+import { getChromeMock, getMockPromptManager, getMockStorageManager } from '../../test/mocks';
+import type { AppError, Category, DeletedCategory, Prompt } from '../../types';
 
 const defaultCategories: Category[] = [
   { id: 'default', name: 'Uncategorized', color: '#888888' },
@@ -231,7 +231,7 @@ describe('App prompt workflows', () => {
     expect(screen.getByRole('button', { name: 'Save' })).toHaveFocus();
   });
 
-  it('gives the keyboard back to Add when the storage warning of a refused Category closes', async () => {
+  it('gives the keyboard back to Add category when the storage warning of a refused Category closes', async () => {
     const storageMock = getMockStorageManager();
     const quotaError: AppError = { type: 'STORAGE_QUOTA_EXCEEDED', message: 'Quota reached' };
     vi.mocked(storageMock.saveCategory).mockRejectedValue(quotaError);
@@ -239,20 +239,22 @@ describe('App prompt workflows', () => {
     await renderApp();
 
     await userEvent.click(screen.getByRole('tab', { name: 'Categories' }));
-    await userEvent.type(await screen.findByPlaceholderText('Enter category name...'), 'Research');
-    await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Add category' }));
+    await userEvent.keyboard('Research');
+    await userEvent.click(screen.getByRole('button', { name: 'Create' }));
 
+    // The sheet makes way for the warning
     const warning = await screen.findByRole('dialog', { name: 'Storage Limit Reached' });
     expect(within(warning).getByText('Quota reached')).toBeInTheDocument();
     await waitFor(() => { expect(within(warning).getByRole('button', { name: 'Continue' })).toHaveFocus(); });
 
     await userEvent.keyboard('{Escape}');
 
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Add' })).toHaveFocus();
+    await waitFor(() => { expect(screen.queryByRole('dialog')).not.toBeInTheDocument(); });
+    expect(screen.getByRole('button', { name: 'Add category' })).toHaveFocus();
   });
 
-  it('shows Admission’s reason when a rename is refused, and keeps the pasted name whole', async () => {
+  it('shows Admission’s reason in the sheet when a rename is refused, keeps the pasted name whole, and adds no failure Notification', async () => {
     const storageMock = getMockStorageManager();
     const longName = 'R'.repeat(PROMPT_LIMITS.category + 1);
     const reason = `Category name cannot exceed ${PROMPT_LIMITS.category} characters`;
@@ -260,50 +262,121 @@ describe('App prompt workflows', () => {
     await renderApp();
     await userEvent.click(screen.getByRole('tab', { name: 'Categories' }));
 
-    const workRow = await screen.findByRole('button', { name: 'Edit category' });
-    await userEvent.click(workRow);
-    const editInput = await screen.findByDisplayValue('Work');
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit category Work' }));
+    const sheet = screen.getByRole('dialog', { name: 'Edit category' });
+    const editInput = within(sheet).getByRole('textbox', { name: 'Category name' });
     await userEvent.clear(editInput);
-    await userEvent.click(editInput);
     await userEvent.paste(longName);
 
     expect(editInput).toHaveValue(longName);
 
     await userEvent.keyboard('{Enter}');
 
-    const status = await screen.findAllByText(reason, { exact: false });
-    // The Notification and the inline error both give Admission's reason
-    expect(status.length).toBeGreaterThanOrEqual(2);
-    const notification = screen.getByTestId('toast');
-    expect(notification).toHaveTextContent("Couldn't save Category");
-    expect(notification).toHaveTextContent(reason);
+    expect(await within(sheet).findByRole('alert')).toHaveTextContent(reason);
+    expect(screen.queryByTestId('toast')).not.toBeInTheDocument();
     expect(editInput).toHaveValue(longName);
     expect(storageMock.updateCategory).not.toHaveBeenCalled();
   });
 
-  it('keeps a long pasted Category name whole on create and shows Admission’s reason', async () => {
+  it('keeps a long pasted Category name whole on create and shows Admission’s reason in the sheet', async () => {
     const storageMock = getMockStorageManager();
     const longName = 'N'.repeat(PROMPT_LIMITS.category + 1);
     const reason = `Category name cannot exceed ${PROMPT_LIMITS.category} characters`;
 
     await renderApp();
     await userEvent.click(screen.getByRole('tab', { name: 'Categories' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Add category' }));
 
-    const nameInput = await screen.findByPlaceholderText('Enter category name...');
-    await userEvent.click(nameInput);
+    const sheet = screen.getByRole('dialog', { name: 'New category' });
+    const nameInput = within(sheet).getByRole('textbox', { name: 'Category name' });
     await userEvent.paste(longName);
 
     expect(nameInput).toHaveValue(longName);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Create' }));
 
-    const status = await screen.findAllByText(reason, { exact: false });
-    expect(status.length).toBeGreaterThanOrEqual(2);
-    const notification = screen.getByTestId('toast');
-    expect(notification).toHaveTextContent("Couldn't create Category");
-    expect(notification).toHaveTextContent(reason);
+    expect(await within(sheet).findByRole('alert')).toHaveTextContent(reason);
+    expect(screen.queryByTestId('toast')).not.toBeInTheDocument();
     expect(nameInput).toHaveValue(longName);
     expect(storageMock.saveCategory).not.toHaveBeenCalled();
+  });
+
+  it('creates a Category from the sheet and confirms it with its name', async () => {
+    const storageMock = getMockStorageManager();
+    vi.mocked(storageMock.saveCategory).mockImplementation((category: Omit<Category, 'id'>) =>
+      Promise.resolve({ id: 'research', ...category, name: category.name.trim() }));
+
+    await renderApp();
+    await userEvent.click(screen.getByRole('tab', { name: 'Categories' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Add category' }));
+    await userEvent.keyboard('  Research {Enter}');
+
+    const notification = await screen.findByTestId('toast');
+    expect(notification).toHaveTextContent('Category created');
+    expect(notification).toHaveTextContent('Research');
+    expect(await screen.findByRole('button', { name: 'Edit category Research' })).toBeInTheDocument();
+  });
+
+  it('saves a Category from the sheet and confirms it with its new name', async () => {
+    const storageMock = getMockStorageManager();
+    vi.mocked(storageMock.updateCategory).mockResolvedValue({ id: 'work', name: 'Office', color: '#E11D48' });
+
+    await renderApp();
+    await userEvent.click(screen.getByRole('tab', { name: 'Categories' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit category Work' }));
+    const name = screen.getByRole('textbox', { name: 'Category name' });
+    await userEvent.clear(name);
+    await userEvent.type(name, 'Office');
+    await userEvent.click(screen.getByRole('button', { name: 'Rose' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(storageMock.updateCategory).toHaveBeenCalledWith('work', { name: 'Office', color: '#E11D48' });
+    const notification = await screen.findByTestId('toast');
+    expect(notification).toHaveTextContent('Category saved');
+    expect(notification).toHaveTextContent('Office');
+    expect(await screen.findByRole('button', { name: 'Edit category Office' })).toBeInTheDocument();
+  });
+
+  it('deletes a Category at once and puts it back, with its Prompts, from the Undo of its Notification', async () => {
+    const storageMock = getMockStorageManager();
+    const work = defaultCategories[1];
+    const deleted: DeletedCategory = { category: work, index: 1, movedPrompts: [{ id: 'prompt-1', updatedAt: 1, movedAt: 2 }] };
+    vi.mocked(storageMock.deleteCategory).mockResolvedValue(deleted);
+    vi.mocked(storageMock.restoreCategory).mockResolvedValue(work);
+
+    await renderApp();
+    await userEvent.click(screen.getByRole('tab', { name: 'Categories' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit category Work' }));
+    await userEvent.click(within(screen.getByRole('dialog', { name: 'Edit category' })).getByRole('button', { name: 'Delete' }));
+
+    expect(storageMock.deleteCategory).toHaveBeenCalledWith('work');
+    const notification = await screen.findByTestId('toast');
+    expect(notification).toHaveTextContent('Category deleted');
+    expect(notification).toHaveTextContent('Work');
+    await waitFor(() => { expect(screen.queryByRole('button', { name: 'Edit category Work' })).not.toBeInTheDocument(); });
+
+    await userEvent.click(within(notification).getByRole('button', { name: 'Undo' }));
+
+    expect(storageMock.restoreCategory).toHaveBeenCalledWith(deleted);
+    expect(await screen.findByRole('button', { name: 'Edit category Work' })).toBeInTheDocument();
+    expect(screen.queryByTestId('toast')).not.toBeInTheDocument();
+  });
+
+  it('asks before deleting a Category when the Notifications are off, as there is no Undo', async () => {
+    const storageMock = getMockStorageManager();
+    await getChromeMock().storage.local.set({ toast_settings: { enabled: false } });
+    vi.mocked(storageMock.deleteCategory).mockResolvedValue({ category: defaultCategories[1], index: 1, movedPrompts: [] });
+
+    await renderApp();
+    await userEvent.click(screen.getByRole('tab', { name: 'Categories' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit category Work' }));
+    await userEvent.click(within(screen.getByRole('dialog', { name: 'Edit category' })).getByRole('button', { name: 'Delete' }));
+
+    const confirm = screen.getByRole('dialog', { name: 'Delete Category' });
+    expect(storageMock.deleteCategory).not.toHaveBeenCalled();
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Delete' }));
+
+    expect(storageMock.deleteCategory).toHaveBeenCalledWith('work');
   });
 
   it('opens the storage warning, not an alert, when storage stops a Settings import', async () => {

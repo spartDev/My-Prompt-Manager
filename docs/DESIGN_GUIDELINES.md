@@ -1026,6 +1026,34 @@ exit animation: it leaves at once. Under `prefers-reduced-motion`, both last 1ms
 }
 ```
 
+#### Category Sheet
+
+`src/popup.css`, with the motion tokens of `src/theme/tokens.css` (`--ease-sheet`:
+`cubic-bezier(0.32, 0.72, 0, 1)`, `--ease-spring`: `cubic-bezier(0.34, 1.56, 0.64, 1)`). The sheet
+rises from the bottom (`sheet-in`, `translateY(100%)` to rest, 0.5s ease-sheet) and leaves faster
+(`sheet-out`, 0.28s): `useCategorySheet` takes it off the page only once the exit has ended
+(`SHEET_EXIT_MS`). The backdrop fades in over 0.3s and out over 0.28s. While it is open, the screen
+behind steps back (`.sheet-behind[data-stepped-back]`: `scale(.93) translateY(10px)`, 22px corners,
+`brightness(.96)`, 0.5s ease-sheet). Swatches move on `transform` over 0.35s ease-spring; a Category
+that appears in the list pops in (`category-pop`: scale .3, 1.2, then 1, 0.5s ease-spring). Under
+`prefers-reduced-motion`, all of them last 1ms.
+
+```tsx
+<div className="fixed inset-0 z-40">
+  <div className="absolute inset-0 bg-backdrop backdrop-in" onClick={onClose} />
+  <div role="dialog" aria-modal="true" aria-label={title} className="
+    absolute inset-x-0 bottom-0
+    rounded-t-3xl bg-card shadow-2xl
+    sheet-in
+  ">
+    {/* handle, header, name, palette, footer */}
+  </div>
+</div>
+```
+
+The sheet sits at `z-40`, under the Notification (`z-50`), so a Notification's Undo stays within
+reach; its backdrop has no blur, so what is behind it (the edited row's border) stays sharp.
+
 #### Modal Fade In
 
 ```css

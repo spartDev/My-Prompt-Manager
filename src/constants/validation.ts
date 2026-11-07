@@ -4,12 +4,6 @@
  */
 
 /**
- * Maximum length for hex color input (#RRGGBB format)
- * Used in: ColorPicker
- */
-export const MAX_HEX_COLOR_LENGTH = 7;
-
-/**
  * Character count display helper
  */
 export const formatCharacterCount = (current: number, max: number): string => {

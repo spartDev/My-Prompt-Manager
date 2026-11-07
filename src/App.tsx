@@ -16,7 +16,7 @@ import { usePrompts } from './hooks/usePrompts';
 import { useSearchWithDebounce } from './hooks/useSearchWithDebounce';
 import { useToast } from './hooks/useToast';
 import { ALL_PROMPTS } from './services/libraryFilter';
-import type { AppError, Category, LibraryFilter, Prompt, ViewType } from './types';
+import type { AppError, Category, DeletedCategory, LibraryFilter, Prompt, ViewType } from './types';
 import { Logger, toError } from './utils';
 
 type ExtendedViewType = ViewType | Section;
@@ -24,6 +24,12 @@ type ExtendedViewType = ViewType | Section;
 const SECTIONS: readonly ExtendedViewType[] = ['library', 'categories', 'analytics', 'settings'];
 
 const isSection = (view: ExtendedViewType): view is Section => SECTIONS.includes(view);
+
+/** How long the Notification of a deleted Category stays, so its Undo can be reached */
+const UNDO_DURATION_MS = 6000;
+
+/** A Category name refused (by Admission, or taken): the Category sheet shows why, so no failure Notification */
+const isRefusal = (error: AppError): boolean => error.type === 'VALIDATION_ERROR';
 
 interface AppProps {
   context?: 'popup' | 'sidepanel';
@@ -71,6 +77,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
     createCategory,
     updateCategory,
     deleteCategory,
+    restoreCategory,
     refreshCategories
   } = useCategories();
 
@@ -207,20 +214,22 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
     setSelectedPrompt(null);
   };
 
-  const handleCreateCategory = async (categoryData: { name: string; color?: string }) => {
-    const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  // From the Category sheet: a refusal is shown in the sheet, a full storage opens the storage
+  // warning, which gives the keyboard back to `trigger`; the AppError goes back to the sheet
+  const handleCreateCategory = async (categoryData: { name: string; color: string }, trigger: HTMLElement | null): Promise<Category> => {
     try {
-      await createCategory(categoryData);
-      showToast('Category created', 'success', { sub: categoryData.name });
+      const created = await createCategory(categoryData);
+      showToast('Category created', 'success', { sub: created.name });
+      return created;
     } catch (error: unknown) {
       const appError = error as AppError;
       if (appError.type === 'STORAGE_QUOTA_EXCEEDED') {
         storageRefusalTriggerRef.current = trigger;
         setStorageRefusal(appError.message || 'Failed to create category');
-      } else {
+      } else if (!isRefusal(appError)) {
         showToast("Couldn't create Category", 'error', { sub: appError.message });
       }
-      throw new Error(appError.message || 'Failed to create category');
+      throw error;
     }
   };
 
@@ -244,28 +253,43 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
 
   const handleUpdateCategory = async (id: string, updates: Partial<{ name: string; color?: string }>) => {
     try {
-      await updateCategory(id, updates);
+      const updated = await updateCategory(id, updates);
       // Refresh prompts to show the updated category names
-      if (updates.name) {
+      if (updates.name !== undefined) {
         await refreshPrompts();
       }
-      showToast('Category saved', 'success', { sub: updates.name ?? categories.find(c => c.id === id)?.name });
+      showToast('Category saved', 'success', { sub: updated.name });
     } catch (error: unknown) {
       const appError = error as AppError;
-      showToast("Couldn't save Category", 'error', { sub: appError.message });
-      throw new Error(appError.message || 'Failed to update category');
+      if (!isRefusal(appError)) {
+        showToast("Couldn't save Category", 'error', { sub: appError.message });
+      }
+      throw error;
     }
   };
 
-  const handleDeleteCategory = async (id: string) => {
-    const name = categories.find(c => c.id === id)?.name;
+  // Undo of a deletion: the Category comes back with its Prompts
+  const handleRestoreCategory = async (deleted: DeletedCategory) => {
     try {
-      await deleteCategory(id);
+      await restoreCategory(deleted);
+      await refreshPrompts();
+    } catch (error: unknown) {
+      showToast("Couldn't restore Category", 'error', { sub: toError(error).message });
+    }
+  };
+
+  const handleDeleteCategory = async (category: Category) => {
+    try {
+      const deleted = await deleteCategory(category.id);
       // Refresh prompts to show them as Uncategorized after category deletion
       await refreshPrompts();
-      showToast('Category deleted', 'success', { sub: name });
+      showToast('Category deleted', 'success', {
+        sub: category.name,
+        duration: UNDO_DURATION_MS,
+        action: { label: 'Undo', onClick: () => { void handleRestoreCategory(deleted); } }
+      });
     } catch (error) {
-      showToast("Couldn't delete Category", 'error', { sub: name });
+      showToast("Couldn't delete Category", 'error', { sub: category.name });
       throw error;
     }
   };
@@ -368,9 +392,11 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
       {currentView === 'categories' && (
         <CategoryManager
           categories={categories}
+          prompts={prompts}
           onCreateCategory={handleCreateCategory}
           onUpdateCategory={handleUpdateCategory}
           onDeleteCategory={handleDeleteCategory}
+          confirmDelete={!settings.enabled}
           context={context}
         />
       )}

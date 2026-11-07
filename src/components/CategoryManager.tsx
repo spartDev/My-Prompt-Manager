@@ -1,134 +1,191 @@
-import type { FC, FormEvent } from 'react';
-import { useCallback, useId, useRef, useState } from 'react';
+import type { AnimationEvent, FC } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
-import { DEFAULT_CATEGORY_COLOR, getColorName } from '../constants/colors';
-import type { Category } from '../types';
-import { Logger, toError } from '../utils';
+import { DEFAULT_CATEGORY_COLOR, getColorName, nextCategoryColor } from '../constants/colors';
+import { useCategorySheet } from '../hooks/useCategorySheet';
+import { type AppError, type Category, DEFAULT_CATEGORY, type Prompt } from '../types';
+import { cn, Logger, toError } from '../utils';
 
-import ColorPicker from './ColorPicker';
+import CategorySheet from './CategorySheet';
 import ConfirmDialog from './ConfirmDialog';
 import ViewHeader from './ViewHeader';
 
 interface CategoryManagerProps {
   categories: Category[];
-  onCreateCategory: (category: { name: string; color?: string }) => Promise<void>;
+  /** The Library's Prompts, to tell how many each Category holds */
+  prompts: Prompt[];
+  /**
+   * Creates a Category and resolves to it as stored; rejects with the AppError when it is refused
+   * or fails. `trigger` gets the keyboard back if a full storage warning opens.
+   */
+  onCreateCategory: (category: { name: string; color: string }, trigger: HTMLElement | null) => Promise<Category>;
   onUpdateCategory: (id: string, updates: Partial<Category>) => Promise<void>;
-  onDeleteCategory: (id: string) => Promise<void>;
+  /** Deletes a Category; the Notification that confirms it offers Undo */
+  onDeleteCategory: (category: Category) => Promise<void>;
+  /** Ask before deleting: there is no Undo, the Notifications being off */
+  confirmDelete?: boolean;
   context?: 'popup' | 'sidepanel';
 }
 
+/** The Category a deletion leaves the keyboard to: the next editable one, else the one before */
+const neighbourOf = (categories: Category[], deleted: Category): Category | undefined => {
+  const editable = categories.filter(category => category.name !== DEFAULT_CATEGORY);
+  const index = editable.findIndex(category => category.id === deleted.id);
+  return editable[index + 1] ?? editable[index - 1];
+};
+
+const isStorageFull = (error: unknown): boolean =>
+  (error as Partial<AppError> | null)?.type === 'STORAGE_QUOTA_EXCEEDED';
+
+const prefersReducedMotion = (): boolean =>
+  typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const PlusIcon = (
+  <svg className="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" aria-hidden="true">
+    <path d="M12 5v14M5 12h14" />
+  </svg>
+);
+
+/**
+ * The Categories section: the list of Categories, each one opening the Category sheet to rename,
+ * recolor or delete it, and "Add category" below, which opens the sheet to create one.
+ */
 const CategoryManager: FC<CategoryManagerProps> = ({
   categories,
+  prompts,
   onCreateCategory,
   onUpdateCategory,
   onDeleteCategory,
+  confirmDelete = false,
   context = 'popup'
 }) => {
-  const [newCategoryName, setNewCategoryName] = useState('');
-  const [newCategoryColor, setNewCategoryColor] = useState(DEFAULT_CATEGORY_COLOR);
-  const [editingCategory, setEditingCategory] = useState<{ category: Category; name: string; color: string } | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; category: Category | null }>({
-    isOpen: false,
-    category: null
-  });
-  const ignoreBlurRef = useRef(false);
-  const addTitleId = useId();
   const listTitleId = useId();
+  const addButtonRef = useRef<HTMLButtonElement>(null);
+  const rowRefs = useRef(new Map<string, HTMLElement>());
+  const [confirming, setConfirming] = useState<Category | null>(null);
 
-  const handleCreateCategory = useCallback(async (e: FormEvent) => {
-    e.preventDefault();
+  // A Category that appears in the list pops in: one created here once the sheet has gone, or one
+  // back from Undo at once. The first list is the one already there, which does not pop.
+  const [knownIds, setKnownIds] = useState<ReadonlySet<string>>(() => new Set(categories.map(c => c.id)));
+  const [appearing, setAppearing] = useState<{ id: string; waiting: boolean } | null>(null);
 
-    if (!newCategoryName.trim()) {
-      setError('Category name is required');
+  const reveal = useCallback((id: string) => {
+    rowRefs.current.get(id)?.scrollIntoView({ block: 'nearest', behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
+  }, []);
+
+  const sheet = useCategorySheet({
+    onClosed: () => {
+      setAppearing(prev => (prev?.waiting ? { id: prev.id, waiting: false } : prev));
+    }
+  });
+
+  const currentIds = categories.map(category => category.id);
+  if (currentIds.length !== knownIds.size || currentIds.some(id => !knownIds.has(id))) {
+    const added = knownIds.size > 0 ? currentIds.find(id => !knownIds.has(id)) : undefined;
+    setKnownIds(new Set(currentIds));
+    if (added !== undefined) {
+      setAppearing({ id: added, waiting: sheet.isMounted });
+    }
+  }
+
+  // The list scrolls to the row as it pops, which may be below the fold
+  useEffect(() => {
+    if (appearing && !appearing.waiting) {
+      reveal(appearing.id);
+    }
+  }, [appearing, reveal]);
+
+  const handleAppeared = (event: AnimationEvent<HTMLElement>) => {
+    if (event.animationName === 'category-pop') {
+      setAppearing(null);
+    }
+  };
+
+  const handleSubmit = async (): Promise<void> => {
+    const { name, color, category } = sheet;
+
+    if (sheet.mode === 'create') {
+      try {
+        await onCreateCategory({ name, color }, addButtonRef.current);
+      } catch (error) {
+        // A full storage opens its own warning, which takes the place of the sheet
+        if (isStorageFull(error)) {
+          sheet.close();
+          return;
+        }
+        throw error;
+      }
+      sheet.close();
       return;
     }
 
-    if (categories.some(c => c.name.toLowerCase() === newCategoryName.toLowerCase())) {
-      setError('Category already exists');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      await onCreateCategory({
-        name: newCategoryName.trim(),
-        color: newCategoryColor
-      });
-
-      setNewCategoryName('');
-      setNewCategoryColor(DEFAULT_CATEGORY_COLOR);
-    } catch (err: unknown) {
-      // Show why it was refused (Admission's reason), as the toast does
-      setError(toError(err).message || 'Failed to create category');
-    } finally {
-      setLoading(false);
-    }
-  }, [newCategoryName, newCategoryColor, categories, onCreateCategory]);
-
-  const handleUpdateCategory = useCallback(async () => {
-    if (!editingCategory) {return;}
-
-    const { category, name, color } = editingCategory;
-
-    // Check if there are actual changes
-    if (name === category.name && color === (category.color || DEFAULT_CATEGORY_COLOR)) {
-      setEditingCategory(null);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      const updates: Partial<Category> = {};
-      if (name !== category.name) {updates.name = name.trim();}
-      if (color !== category.color) {updates.color = color;}
-
+    if (!category) {return;}
+    // Admission trims the name, so spaces around it are no change
+    const updates: Partial<Category> = {
+      ...(name.trim() !== category.name && { name }),
+      ...(color !== (category.color || DEFAULT_CATEGORY_COLOR) && { color })
+    };
+    if (Object.keys(updates).length > 0) {
       await onUpdateCategory(category.id, updates);
-      setEditingCategory(null);
-    } catch (err: unknown) {
-      setError(toError(err).message || 'Failed to update category');
-    } finally {
-      setLoading(false);
     }
-  }, [editingCategory, onUpdateCategory]);
+    sheet.close();
+  };
 
-  const handleDeleteCategory = useCallback((category: Category) => {
-    if (category.name === 'Uncategorized') {
-      setError('Cannot delete the default category');
+  // One deletion at a time: a second click would fail, and its failure Notification would replace
+  // the one that offers Undo
+  const deletingRef = useRef(false);
+
+  const deleteNow = async (category: Category): Promise<void> => {
+    if (deletingRef.current) {return;}
+    deletingRef.current = true;
+    const neighbour = neighbourOf(categories, category);
+    try {
+      await onDeleteCategory(category);
+    } catch (error) {
+      // The failure Notification says why; the sheet stays open
+      Logger.error('Failed to delete category', toError(error), { component: 'CategoryManager' });
+      return;
+    } finally {
+      deletingRef.current = false;
+    }
+    sheet.close();
+    // The row that opened the sheet is gone: the keyboard goes to the one that took its place
+    (neighbour ? rowRefs.current.get(neighbour.id) : addButtonRef.current)?.focus();
+  };
+
+  const handleDelete = () => {
+    const category = sheet.category;
+    if (!category) {return;}
+    if (confirmDelete) {
+      setConfirming(category);
       return;
     }
+    void deleteNow(category);
+  };
 
-    setDeleteConfirm({ isOpen: true, category });
-  }, []);
-
-  const handleConfirmDelete = useCallback(async () => {
-    if (!deleteConfirm.category) {return;}
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      await onDeleteCategory(deleteConfirm.category.id);
-      setDeleteConfirm({ isOpen: false, category: null });
-    } catch {
-      setError('Failed to delete category');
-    } finally {
-      setLoading(false);
+  const handleConfirmDelete = () => {
+    const category = confirming;
+    setConfirming(null);
+    if (category) {
+      void deleteNow(category);
     }
-  }, [deleteConfirm.category, onDeleteCategory]);
+  };
 
-  const handleCancelDelete = useCallback(() => {
-    setDeleteConfirm({ isOpen: false, category: null });
-  }, []);
+  const editedId = sheet.isMounted ? sheet.category?.id : undefined;
+  const promptCount = sheet.category
+    ? prompts.filter(prompt => prompt.category === sheet.category?.name).length
+    : 0;
 
+  const setRowRef = (id: string) => (element: HTMLElement | null) => {
+    if (element) {
+      rowRefs.current.set(id, element);
+    } else {
+      rowRefs.current.delete(id);
+    }
+  };
 
   return (
-    <div className="h-full flex flex-col bg-app">
+    <div className="h-full flex flex-col bg-app sheet-behind" data-stepped-back={sheet.isOpen ? '' : undefined}>
       {/* Header */}
       <ViewHeader
         icon={
@@ -147,69 +204,8 @@ const CategoryManager: FC<CategoryManagerProps> = ({
         )}
       </ViewHeader>
 
-      {/* Content: two cards on bg-app */}
+      {/* Content: the list card on bg-app, "Add category" below it */}
       <div className="flex-1 overflow-auto p-4 space-y-4" data-scroll-container>
-          {/* Error Display */}
-          {error && (
-            <div className="p-4 text-sm font-medium text-danger bg-danger-subtle border border-danger rounded-xl">
-              ⚠️ {error}
-            </div>
-          )}
-
-          {/* Add New Category Form */}
-          <section aria-labelledby={addTitleId} className="relative bg-card border border-default rounded-2xl shadow-sm p-5">
-            <form onSubmit={(e) => { void handleCreateCategory(e); }} className="space-y-4">
-              <h3 id={addTitleId} className="font-bold text-primary flex items-center space-x-2">
-                <svg className="w-5 h-5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-                <span className='text-sm'>Add New Category</span>
-              </h3>
-              
-              <div className="space-y-4">
-                <div className="flex items-center space-x-3">
-                  <input
-                    type="text"
-                    value={newCategoryName}
-                    onChange={(e) => {
-                      setNewCategoryName(e.target.value);
-                      setError(null);
-                    }}
-                    placeholder="Enter category name..."
-                    className="flex-1 min-w-0 px-4 py-3 h-12 border border-input rounded-xl focus-input text-sm text-primary bg-subtle transition-all duration-200 placeholder:text-tertiary"
-                    disabled={loading}
-                  />
-                  
-                  <button
-                    type="submit"
-                    className="px-6 py-3 h-12 bg-accent hover:bg-accent-hover text-on-accent rounded-xl transition-all duration-200 text-sm font-semibold shadow-lg hover:shadow-xl disabled:opacity-50 flex items-center justify-center shrink-0 min-w-[80px] focus-primary"
-                    disabled={loading || !newCategoryName.trim()}
-                  >
-                    {loading ? (
-                      <div className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin"></div>
-                    ) : (
-                      <>
-                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                        </svg>
-                        Add
-                      </>
-                    )}
-                  </button>
-                </div>
-                
-                <div className="relative" style={{ zIndex: 200 }}>
-                  <ColorPicker
-                    value={newCategoryColor}
-                    onChange={setNewCategoryColor}
-                    label="Category Color"
-                    disabled={loading}
-                  />
-                </div>
-              </div>
-            </form>
-          </section>
-
           {/* Category List: rows split by dividers */}
           <section aria-labelledby={listTitleId} className="bg-card border border-default rounded-2xl shadow-sm overflow-hidden divide-y divide-divider">
             <h3 id={listTitleId} className="font-bold text-primary flex items-center space-x-2 p-5">
@@ -218,149 +214,110 @@ const CategoryManager: FC<CategoryManagerProps> = ({
               </svg>
               <span className='text-sm'>Your Categories</span>
             </h3>
-            
+
             {categories.length === 0 ? (
               <div className="p-8 text-center">
                 <svg className="w-12 h-12 mx-auto text-faint mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                 </svg>
-                <p className="text-tertiary text-sm">No categories yet. Create your first category above!</p>
+                <p className="text-tertiary text-sm">No categories yet. Create your first category below!</p>
               </div>
             ) : (
-              categories.map((category) => (
-                <div key={category.id} data-testid="category-row" data-category-name={category.name} className={`relative group flex items-center justify-between p-5 transition-colors duration-200 ${editingCategory ? '' : 'hover:bg-muted'}`}>
-                  {editingCategory?.category.id === category.id ? (
-                    // Edit Mode - Show both color and name editors
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-3">
-                        <div className="relative shrink-0" style={{ zIndex: 100 }}>
-                          <ColorPicker
-                            value={editingCategory.color}
-                            onChange={(newColor) => { setEditingCategory({ ...editingCategory, color: newColor }); }}
-                            label=""
-                            disabled={loading}
-                            compact={true}
-                          />
-                        </div>
-                        <input
-                          type="text"
-                          value={editingCategory.name}
-                          onChange={(e) => { setEditingCategory({ ...editingCategory, name: e.target.value }); }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && editingCategory.name.trim()) {
-                              e.preventDefault();
-                              void handleUpdateCategory();
-                            } else if (e.key === 'Escape') {
-                              e.preventDefault();
-                              setEditingCategory(null);
-                            }
-                          }}
-                          onBlur={() => {
-                            // Don't auto-save if user is clicking on action buttons
-                            if (!ignoreBlurRef.current && editingCategory.name.trim()) {
-                              void handleUpdateCategory();
-                            }
-                            // Reset the flag after handling blur
-                            ignoreBlurRef.current = false;
-                          }}
-                          placeholder="Category name"
-                          className="flex-1 min-w-0 text-sm border border-input rounded-lg px-3 py-2.5 focus-input bg-subtle font-medium text-primary placeholder:text-tertiary"
-                          disabled={loading}
-                        />
-                        <div className="flex items-center space-x-1 shrink-0">
-                          <button
-                            onClick={() => { void handleUpdateCategory(); }}
-                            onMouseDown={() => { ignoreBlurRef.current = true; }}
-                            className="p-2 bg-accent hover:bg-accent-hover text-on-accent rounded-lg transition-all shadow-sm hover:shadow-md disabled:opacity-50 focus-primary"
-                            disabled={loading || !editingCategory.name.trim()}
-                            title="Save changes (Enter)"
-                            type="button"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                          </button>
-                          <button
-                            onClick={() => { setEditingCategory(null); }}
-                            onMouseDown={() => { ignoreBlurRef.current = true; }}
-                            className="p-2 text-tertiary hover:text-primary hover:bg-muted rounded-lg transition-colors focus-interactive"
-                            title="Cancel (Esc)"
-                            type="button"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    // Display Mode - Show color swatch and name
-                    <div className="flex items-center space-x-4 flex-1">
-                      <div
-                        className="w-8 h-8 rounded-lg border border-default shadow-sm"
-                        style={{ backgroundColor: category.color || '#6B7280' }}
-                        title={getColorName(category.color || '#6B7280')}
-                      />
-                      <div className="flex-1">
-                        <span className="text-sm font-semibold text-primary">{category.name}</span>
-                        {category.name === 'Uncategorized' && (
-                          <span className="ml-2 text-xs text-tertiary italic">Default</span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {!editingCategory && (
-                    <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      {category.name !== 'Uncategorized' && (
-                        <>
-                          <button
-                            onClick={() => { 
-                              setEditingCategory({ 
-                                category, 
-                                name: category.name, 
-                                color: category.color || DEFAULT_CATEGORY_COLOR 
-                              }); 
-                            }}
-                            className="p-2 text-tertiary hover:text-accent hover:bg-accent-subtle rounded-lg transition-colors focus-interactive"
-                            disabled={loading}
-                            title="Edit category"
-                          >
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                          </button>
-                          
-                          <button
-                            onClick={() => { handleDeleteCategory(category); }}
-                            className="p-2 text-tertiary hover:text-danger hover:bg-danger-subtle rounded-lg transition-colors focus-danger"
-                            disabled={loading}
-                            title="Delete category"
-                          >
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                          </button>
-                        </>
+              categories.map((category) => {
+                const isDefault = category.name === DEFAULT_CATEGORY;
+                const swatchColor = category.color || '#6B7280';
+                const content = (
+                  <span className="flex items-center space-x-4 flex-1">
+                    <span
+                      className="w-8 h-8 rounded-lg border border-default shadow-sm"
+                      style={{ backgroundColor: swatchColor }}
+                      title={getColorName(swatchColor)}
+                    />
+                    <span className="flex-1">
+                      <span className="text-sm font-semibold text-primary">{category.name}</span>
+                      {isDefault && (
+                        <span className="ml-2 text-xs text-tertiary italic">Default</span>
                       )}
+                    </span>
+                  </span>
+                );
+                const rowProps = {
+                  'data-testid': 'category-row',
+                  'data-category-name': category.name,
+                  onAnimationEnd: handleAppeared,
+                  className: cn(
+                    'relative flex w-full items-center justify-between p-5 text-left transition-colors duration-200',
+                    appearing?.id === category.id && (appearing.waiting ? 'opacity-0' : 'category-pop')
+                  )
+                };
+
+                // The default Category is neither renamed, recolored nor deleted
+                if (isDefault) {
+                  return (
+                    <div key={category.id} ref={setRowRef(category.id)} {...rowProps}>
+                      {content}
                     </div>
-                  )}
-                </div>
-              ))
+                  );
+                }
+
+                return (
+                  <button
+                    key={category.id}
+                    ref={setRowRef(category.id)}
+                    type="button"
+                    aria-haspopup="dialog"
+                    aria-label={`Edit category ${category.name}`}
+                    onClick={() => { sheet.openEdit(category); }}
+                    {...rowProps}
+                    className={cn(rowProps.className, 'cursor-pointer hover:bg-muted focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent')}
+                    // While the sheet edits it, the row keeps a border of its color, seen behind the backdrop
+                    style={editedId === category.id ? { boxShadow: `inset 0 0 0 2px ${swatchColor}` } : undefined}
+                  >
+                    {content}
+                  </button>
+                );
+              })
             )}
           </section>
+
+          <button
+            ref={addButtonRef}
+            type="button"
+            aria-haspopup="dialog"
+            onClick={() => { sheet.openCreate(nextCategoryColor(categories)); }}
+            className="flex w-full h-14 items-center justify-center gap-2 rounded-2xl border-[1.5px] border-dashed border-accent text-sm font-bold text-accent hover:bg-card transition-colors focus-interactive"
+          >
+            {PlusIcon}
+            Add category
+          </button>
       </div>
 
-      {/* Delete Confirmation Dialog */}
+      {sheet.isMounted && (
+        <CategorySheet
+          key={sheet.session}
+          mode={sheet.mode}
+          open={sheet.isOpen}
+          paused={confirming !== null}
+          name={sheet.name}
+          color={sheet.color}
+          promptCount={promptCount}
+          onNameChange={sheet.setName}
+          onColorChange={sheet.setColor}
+          onSubmit={handleSubmit}
+          onDelete={handleDelete}
+          onClose={sheet.close}
+        />
+      )}
+
+      {/* With the Notifications off there is no Undo, so a deletion is confirmed first */}
       <ConfirmDialog
-        isOpen={deleteConfirm.isOpen}
-        onConfirm={() => { handleConfirmDelete().catch((err: unknown) => { Logger.error('Failed to delete category', toError(err)); }); }}
-        onCancel={handleCancelDelete}
+        isOpen={confirming !== null}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => { setConfirming(null); }}
         title="Delete Category"
-        message={deleteConfirm.category ? 
-          `Delete category "${deleteConfirm.category.name}"? All prompts in this category will be moved to "Uncategorized".` : 
-          'Are you sure you want to delete this category?'
+        message={confirming
+          ? `Delete category "${confirming.name}"? All prompts in this category will be moved to "Uncategorized".`
+          : ''
         }
         confirmText="Delete"
         cancelText="Cancel"

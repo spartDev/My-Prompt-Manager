@@ -22,7 +22,8 @@ Which component does which job in the popup and the side panel, and the conventi
 | Component | Job |
 |-----------|-----|
 | `src/components/LibraryView.tsx` | The Library: search, the Library filter pills, the Prompt cards, the empty states |
-| `src/components/CategoryManager.tsx` | The Categories section: create, rename, recolor and delete Categories |
+| `src/components/CategoryManager.tsx` | The Categories section: the list of Categories, each row (but the default one) opening `CategorySheet` to rename, recolor or delete it, and "Add category" below the list to create one. Steps the screen back while the sheet is open, and pops in a Category that appears (created, or back from Undo) |
+| `src/components/CategorySheet.tsx` | The bottom sheet that creates or edits a Category (`mode: 'create' \| 'edit'`): name, one of the 12 `PRESET_COLORS`, a live preview. Its state (open, closing, draft) is `useCategorySheet`; its keyboard is `useModalFocus` |
 | `src/components/analytics/AnalyticsTab.tsx` | The Analytics section; `src/components/analytics/AnalyticsDashboard.tsx` is the full page it expands to |
 | `src/components/SettingsView.tsx` | Settings: assembles the sections of `src/components/settings/`, and runs Backup restore (`handleImportData`, passed down as `onImport`) |
 | `src/components/TabBar.tsx` | The bottom tab bar; its `Section` type names the four sections |
@@ -48,7 +49,6 @@ Which component does which job in the popup and the side panel, and the conventi
 | `src/components/ConfirmDialog.tsx` | Confirmation modal; its `variant` sets the confirm button's color |
 | `src/components/ToastContainer.tsx` | Renders the one Notification of `useToast`, as the top-center pill |
 | `src/components/StorageWarning.tsx` | "Storage Limit Reached": App opens it when storage refuses a save (`STORAGE_QUOTA_EXCEEDED`); usage is shown through `describeStorageUsage`, like the Settings storage bar |
-| `src/components/ColorPicker.tsx` | Category color: the presets of `src/constants/colors.ts`, or a custom hex ([CATEGORY_COLOR_IMPLEMENTATION.md](./CATEGORY_COLOR_IMPLEMENTATION.md)) |
 | `src/components/InterfaceModeSelector.tsx` | Popup or side panel |
 | `src/components/ErrorBoundary.tsx` | Catches a render error and shows a fallback instead of a blank popup |
 

@@ -100,6 +100,11 @@
   --shadow-lg: 0 10px 15px -3px var(--shadow-tint-10), 0 4px 6px -4px var(--shadow-tint-10);
   --shadow-xl: 0 20px 25px -5px var(--shadow-tint-10), 0 8px 10px -6px var(--shadow-tint-10);
   --shadow-2xl: 0 25px 50px -12px var(--shadow-tint-25);
+
+  /* Motion (Atelier 1C), the same in both themes: ease-sheet for what slides in and out (the
+     Category sheet and the screen behind it), ease-spring for what pops (swatches, a new row) */
+  --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 @layer base {
