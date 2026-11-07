@@ -1,6 +1,7 @@
 import type { FC } from 'react';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
+import { useModalFocus } from '../hooks/useModalFocus';
 import { StorageManager } from '../services/storage';
 import { Logger, toError } from '../utils';
 import { describeStorageUsage, type StorageWarningLevel } from '../utils/storageQuota';
@@ -40,37 +41,23 @@ const StorageWarning: FC<StorageWarningProps> = ({ reason, onClose }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const titleId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
   const continueButtonRef = useRef<HTMLButtonElement>(null);
-  const clearButtonRef = useRef<HTMLButtonElement>(null);
 
-  // Focus the safe choice when it opens: the form behind it must not take the keyboard
-  useEffect(() => {
-    continueButtonRef.current?.focus();
-  }, []);
+  // Escape closes it like Continue, except while the data clears
+  const closeUnlessClearing = useCallback(() => {
+    if (!isLoading) {onClose();}
+  }, [isLoading, onClose]);
 
-  // Escape closes it like Continue; Tab and Shift+Tab stay on its two buttons. The Clear All Data
-  // confirmation handles the keyboard itself while it is open.
-  useEffect(() => {
-    if (showClearConfirm) {return;}
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (!isLoading) {onClose();}
-        return;
-      }
-      if (e.key !== 'Tab') {return;}
-      const buttons = [continueButtonRef.current, clearButtonRef.current].filter(Boolean);
-      const currentIndex = buttons.indexOf(document.activeElement as HTMLButtonElement);
-      const nextIndex = e.shiftKey
-        ? (currentIndex <= 0 ? buttons.length - 1 : currentIndex - 1)
-        : (currentIndex + 1) % buttons.length;
-      e.preventDefault();
-      buttons[nextIndex]?.focus();
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => { document.removeEventListener('keydown', handleKeyDown); };
-  }, [showClearConfirm, isLoading, onClose]);
+  // Continue, the safe choice, takes the focus first: the form behind it must not take the keyboard.
+  // While the Clear All Data confirmation is open the warning is inert beneath it and pauses: the
+  // confirmation has the keyboard alone, and gives it back to Clear All Data when it closes.
+  useModalFocus({
+    isOpen: !showClearConfirm,
+    onClose: closeUnlessClearing,
+    containerRef: dialogRef,
+    initialFocusRef: continueButtonRef
+  });
 
   useEffect(() => {
     const loadStorageInfo = async () => {
@@ -106,10 +93,9 @@ const StorageWarning: FC<StorageWarningProps> = ({ reason, onClose }) => {
     }
   };
 
+  // The confirmation gives the keyboard back to Clear All Data on its own
   const handleCancelClear = () => {
     setShowClearConfirm(false);
-    // The confirmation's buttons go away: the keyboard comes back where it left
-    clearButtonRef.current?.focus();
   };
 
   // Rounded and formatted like the Settings bar, so the two never disagree
@@ -126,12 +112,14 @@ const StorageWarning: FC<StorageWarningProps> = ({ reason, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-backdrop backdrop-blur-sm flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-backdrop backdrop-blur-sm flex items-center justify-center z-50" inert={showClearConfirm}>
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="bg-card border border-default rounded-lg shadow-xl w-full max-w-md p-6"
+        className="bg-card border border-default rounded-lg shadow-xl w-full max-w-md p-6 focus:outline-none"
       >
         {/* Header */}
         <div className="flex items-center mb-4">
@@ -184,7 +172,6 @@ const StorageWarning: FC<StorageWarningProps> = ({ reason, onClose }) => {
           </button>
 
           <button
-            ref={clearButtonRef}
             onClick={() => { handleClearData(); }}
             className="flex-1 px-4 py-2 text-sm font-medium text-on-accent bg-danger rounded-lg hover:bg-danger-hover transition-colors disabled:opacity-50 focus-danger"
             disabled={isLoading}
