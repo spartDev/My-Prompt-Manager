@@ -34,46 +34,31 @@
   }
 }
 
-/* Notification (Atelier 1C): the pill drops in from above the top center with a spring, then its
-   round pops. It leaves at once, with no exit animation. */
-@keyframes toast-in {
-  0% {
-    opacity: 0;
-    transform: translate(-50%, -14px) scale(0.9);
-  }
-  100% {
-    opacity: 1;
-    transform: translate(-50%, 0) scale(1);
-  }
+/* Motion (Atelier 1C). The keyframes, easings and animate-* classes are tokens in theme/tokens.css;
+   these are the transitions of the editor's controls. Under prefers-reduced-motion everything
+   is near instant, and the timers of theme/motion.ts wait for nothing. */
+@utility transition-save {
+  transition: background-color 300ms, color 300ms, scale 250ms var(--ease-spring);
 }
 
-@keyframes toast-mark-pop {
-  0% {
-    opacity: 0;
-    transform: scale(0.3);
-  }
-  60% {
-    opacity: 1;
-    transform: scale(1.2);
-  }
-  100% {
-    transform: scale(1);
-  }
-}
-
-.toast-in {
-  transform: translateX(-50%);
-  animation: toast-in 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-}
-
-.toast-mark-pop {
-  animation: toast-mark-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) 0.08s both;
+@utility transition-chip {
+  transition: background-color 250ms, border-color 250ms, color 250ms, scale 250ms var(--ease-spring);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .toast-in,
-  .toast-mark-pop {
+  .animate-sheet-in,
+  .animate-sheet-out,
+  .animate-pop,
+  .animate-pop-check,
+  .animate-toast-in,
+  .animate-toast-mark {
     animation-duration: 1ms;
+    animation-delay: 0ms;
+  }
+
+  .transition-save,
+  .transition-chip {
+    transition-duration: 1ms;
   }
 }
 

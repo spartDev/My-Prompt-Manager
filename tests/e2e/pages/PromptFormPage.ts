@@ -37,6 +37,14 @@ export class PromptFormPage extends BasePage {
   async savePrompt(): Promise<void> {
     await this.page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(this.getSuccessMessage('Prompt created')).toBeVisible();
+    await this.expectClosed();
+  }
+
+  /**
+   * The editor sheet has left (its exit animation played and it unmounted): the Library is back in reach
+   */
+  async expectClosed(): Promise<void> {
+    await expect(this.page.getByTestId('editor-sheet')).toHaveCount(0);
   }
 
   /**
@@ -45,6 +53,7 @@ export class PromptFormPage extends BasePage {
   async saveChanges(): Promise<void> {
     await this.page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(this.getSuccessMessage('Prompt saved')).toBeVisible();
+    await this.expectClosed();
   }
 
   /**
@@ -52,6 +61,7 @@ export class PromptFormPage extends BasePage {
    */
   async cancel(): Promise<void> {
     await this.page.getByRole('button', { name: 'Cancel' }).click();
+    await this.expectClosed();
   }
 
   /**

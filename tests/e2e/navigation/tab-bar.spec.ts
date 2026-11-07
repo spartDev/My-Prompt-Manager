@@ -74,17 +74,21 @@ test.describe('Bottom tab bar navigation', () => {
     }
   });
 
-  test('tab bar is hidden on the add form and returns after cancel', async ({ context, extensionId }) => {
+  test('tab bar waits inert beneath the editor sheet and is back once the sheet has left', async ({ context, extensionId }) => {
     const page = await openSidepanel(context, extensionId);
     const libraryPage = new LibraryPage(page);
     const formPage = new PromptFormPage(page);
+    const inertAncestors = tabNavigation.getTabBar(page).locator('xpath=ancestor::*[@inert]');
 
     await libraryPage.clickAddNewPrompt();
     await formPage.expectCreateMode();
-    await expect(tabNavigation.getTabBar(page)).toBeHidden();
+    await expect(page.getByTestId('editor-sheet')).toBeVisible();
+    await expect(inertAncestors).toHaveCount(1);
 
     await formPage.cancel();
 
+    await expect(page.getByTestId('editor-sheet')).toHaveCount(0);
+    await expect(inertAncestors).toHaveCount(0);
     await libraryPage.expectLibraryLoaded();
     await expect(tabNavigation.getTabBar(page)).toBeVisible();
     await expect(tabNavigation.getTab(page, 'library')).toHaveAttribute('aria-selected', 'true');

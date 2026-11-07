@@ -873,11 +873,11 @@ Prompt`) and put the name in the sub.
 
 ```tsx
 <div role="status" className="
-  toast-in fixed top-3 left-1/2 z-50
+  animate-toast-in fixed top-3 left-1/2 [transform:translateX(-50%)] z-50
   flex items-center gap-[9px] h-10 max-w-[calc(100%-32px)] pl-3.5 pr-1.5
   rounded-full bg-inverse text-on-inverse-strong shadow-toast
 ">
-  <span className="toast-mark-pop grid place-items-center size-5 rounded-full bg-inverse-mark text-on-inverse-mark">
+  <span className="animate-toast-mark grid place-items-center size-5 rounded-full bg-inverse-mark text-on-inverse-mark">
     {/* check, or ! for a failure */}
   </span>
   {/* Only the text gives way; inside it, the message only once it alone is too long */}
@@ -1008,23 +1008,46 @@ transition-shadow duration-200
 transition-transform duration-200
 ```
 
+### Motion tokens (Atelier 1C)
+
+The curves, keyframes and animations of the Atelier 1C design are tokens in `src/theme/tokens.css`,
+and their durations are mirrored in `src/theme/motion.ts` (`MOTION`, `EASE`) for the timers of the
+components; `src/theme/__tests__/motion.test.ts` keeps the two in step. A component never writes a
+duration or a curve: it uses a class, and a timer reads `MOTION`.
+
+| Token | Value | Use |
+|-------|-------|-----|
+| `--ease-sheet` (`ease-sheet`) | `cubic-bezier(0.32, 0.72, 0, 1)` | panels entering and leaving |
+| `--ease-spring` (`ease-spring`) | `cubic-bezier(0.34, 1.56, 0.64, 1)` | pops, bounces, presses |
+| `animate-sheet-in` | `sheet-in` 500ms, ease-sheet | a full-screen panel rising from the bottom (the editor) |
+| `animate-sheet-out` | `sheet-out` 320ms, ease-sheet | the panel leaving; it unmounts after (`useAnimatedPresence`) |
+| `animate-pop` | `pop` 450ms, ease-spring | a new chip (a Variable) |
+| `animate-pop-check` | `pop` 400ms, ease-spring | a check mark appearing, the inline "New category" row |
+| `animate-toast-in` | `toast-in` 450ms, ease-spring | the Notification pill, from 14px above the top center |
+| `animate-toast-mark` | `pop` 450ms, ease-spring, 80ms delay | the round of the Notification |
+| `transition-save` (`src/popup.css`) | background and color 300ms, scale 250ms ease-spring | the Save button, which slides to the success color on "Saved" |
+| `transition-chip` (`src/popup.css`) | background, border and color 250ms, scale 250ms ease-spring | the Category chips and "New category" |
+
+Presses are `active:scale-92` on a chip and `active:scale-94` on Save, carried by the spring of their
+transition. Only a new element pops: a list keyed by a stable value (the name of a Variable) keeps
+the elements already there, so their entrance does not replay.
+
+**Save sequence:** Save shows "Saved" at once (`transition-save` slides its background), then after
+`MOTION.savedPause` (620ms) the editor closes with `animate-sheet-out` and the Notification appears
+with it. The Notification has no exit animation: it leaves at once.
+
+**Reduced motion:** under `prefers-reduced-motion`, `src/popup.css` makes every animation and
+transition above last 1ms, and `motionDuration()` of `src/theme/motion.ts` makes the timers wait
+for nothing: the Save sequence keeps its order without its pause, and a panel unmounts at once.
+
+#### Animated presence
+
+`src/hooks/useAnimatedPresence.ts` keeps a panel in the document for the length of its exit
+animation: pass the open value (null when closed) and `MOTION.sheetOut`, render `shown`, and switch
+to the exit animation while `exiting`. Opening again while leaving cancels the unmount; the timer is
+cleared on unmount. The editor sheet of `App` uses it; the Collections sheet will.
+
 ### Keyframe Animations
-
-#### Notification Entrance
-
-`src/popup.css`: the pill drops 14px into the top center with a spring (`toast-in`, 0.45s,
-`cubic-bezier(0.34, 1.56, 0.64, 1)`), and its round pops 80ms later (`toast-mark-pop`). It has no
-exit animation: it leaves at once. Under `prefers-reduced-motion`, both last 1ms.
-
-```css
-.toast-in {
-  transform: translateX(-50%);
-  animation: toast-in 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-}
-.toast-mark-pop {
-  animation: toast-mark-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) 0.08s both;
-}
-```
 
 #### Modal Fade In
 
