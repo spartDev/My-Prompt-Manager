@@ -13,7 +13,6 @@ import { createPromptSeed, seedLibrary } from '../utils/storage';
 const SCREENSHOT_DIR = 'test-results/settings';
 const TRANSPARENT = 'rgba(0, 0, 0, 0)';
 const DANGER_FILL = 'rgb(220, 38, 38)';
-const SUCCESS_FILL = 'rgb(16, 185, 129)';
 const ON_INVERSE = 'rgb(201, 191, 230)';
 
 const EXPECTED = {
@@ -160,37 +159,27 @@ test.describe('General Settings sections on the tokens', () => {
       await page.getByRole('button', { name: 'Import', exact: true }).click();
       await (await fileChooser).setFiles({ name: 'notes.json', mimeType: 'application/json', buffer: Buffer.from('not a backup') });
 
-      const toast = page.getByRole('alert').filter({ hasText: 'Import failed: Invalid JSON format. Please select a valid backup file.' });
+      const toast = page.getByRole('alert').filter({ hasText: 'Import failed' });
       await expect(toast).toBeVisible();
       await expect(toast).toHaveCSS('background-color', colors.inverse);
-      await expect(toast).toHaveCSS('color', ON_INVERSE);
+      await expect(toast.getByText('Invalid JSON format. Please select a valid backup file.')).toHaveCSS('color', ON_INVERSE);
       expect(await storage.getPrompts()).toHaveLength(prompts.length);
       expect(nativeDialogs).toEqual([]);
       await page.screenshot({ path: `${SCREENSHOT_DIR}/import-invalid-${theme}.png` });
     });
 
-    test(`Notifications mark each type in its state color, with accent switches and an accent-selected position (${theme})`, async ({ page, storage, extensionId }) => {
+    test(`Notifications is one accent switch, input-colored when off (${theme})`, async ({ page, storage, extensionId }) => {
       await openSettings(page, storage, extensionId, theme);
-      await page.getByRole('button', { name: /Notifications/ }).first().click();
+      const section = page.getByRole('region', { name: 'Notifications' });
 
-      const topRight = page.getByRole('button', { name: /Top Right/ });
-      await expect(topRight).toHaveCSS('background-color', colors.selected);
-      await expect(topRight).toHaveCSS('border-top-color', colors.accentBorder);
-      await expect(page.getByRole('button', { name: /Bottom Right/ })).toHaveCSS('background-color', colors.card);
-      await expect(page.getByRole('button', { name: 'Test', exact: true })).toHaveCSS('border-top-color', colors.strong);
-
-      const marks = page.getByTestId('notification-type-mark');
-      for (const [index, color] of [SUCCESS_FILL, DANGER_FILL, colors.warning, colors.accent].entries()) {
-        await expect(marks.nth(index)).toHaveCSS('background-color', color);
-      }
-
-      const info = page.getByRole('switch', { name: 'Enable info notifications' });
-      await expect(info).toHaveCSS('background-color', colors.accent);
-      await info.click();
-      await expect(info).toHaveAttribute('aria-checked', 'false');
-      await expect(info).toHaveCSS('background-color', colors.input);
-      await expect(marks.nth(3)).toHaveCSS('background-color', colors.input);
-      await marks.nth(3).scrollIntoViewIfNeeded();
+      await expect(section.getByRole('switch')).toHaveCount(1);
+      await expect(section.getByRole('button')).toHaveCount(0);
+      const toggle = section.getByRole('switch', { name: 'Show notifications' });
+      await expect(toggle).toHaveCSS('background-color', colors.accent);
+      await toggle.click();
+      await expect(toggle).toHaveAttribute('aria-checked', 'false');
+      await expect(toggle).toHaveCSS('background-color', colors.input);
+      await section.scrollIntoViewIfNeeded();
       await page.screenshot({ path: `${SCREENSHOT_DIR}/notifications-${theme}.png` });
     });
 

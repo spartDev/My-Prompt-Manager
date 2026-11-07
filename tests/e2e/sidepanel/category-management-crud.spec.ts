@@ -41,7 +41,7 @@ test.describe('Category Management - Core CRUD Operations', () => {
       await addButton.click();
 
       // Verify category appears in list
-      await expect(sidepanelPage.getByText('Coding')).toBeVisible();
+      await expect(sidepanelPage.getByTestId('category-row').getByText('Coding')).toBeVisible();
       await expect(sidepanelPage.getByText('2 categories', { exact: true }).first()).toBeVisible(); // Should include default "Uncategorized" + new one
 
       // Verify input is cleared after creation
@@ -201,7 +201,7 @@ test.describe('Category Management - Core CRUD Operations', () => {
       await saveButton.click();
 
       // Verify changes applied
-      await expect(sidepanelPage.getByText('Analysis')).toBeVisible();
+      await expect(sidepanelPage.getByTestId('category-row').getByText('Analysis')).toBeVisible();
       await expect(sidepanelPage.getByText('Research')).toBeHidden();
 
       // Verify persistence in storage
@@ -292,7 +292,7 @@ test.describe('Category Management - Core CRUD Operations', () => {
       await editInput.press('Enter');
 
       // Verify changes saved
-      await expect(sidepanelPage.getByText('New Name')).toBeVisible();
+      await expect(sidepanelPage.getByTestId('category-row').getByText('New Name')).toBeVisible();
       await expect(sidepanelPage.getByText('Old Name')).toBeHidden();
 
       // Verify storage updated

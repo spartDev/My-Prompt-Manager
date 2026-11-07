@@ -111,7 +111,7 @@ A refusal keeps its type through `StorageManager` and `PromptManager`, so a call
 | `src/hooks/useCategories.ts` | The Categories with loading and error state; create, update, delete | `App` |
 | `src/hooks/useSearchWithDebounce.ts` | Search field state: the typed query at once, the search after a debounce | `App` |
 | `src/hooks/useSearch.ts` | The filtering and highlights behind `useSearchWithDebounce` | `useSearchWithDebounce` |
-| `src/hooks/useToast.ts` | Toast queue and the toast settings | `App` |
+| `src/hooks/useToast.ts` | The one Notification on screen (a new one replaces it) and the on/off switch of `toast_settings` | `App` |
 | `src/hooks/useTheme.ts` | Theme (light, dark, system), applied to `<html>` and stored | `src/contexts/ThemeContext.tsx` only |
 | `src/hooks/useClipboard.ts` | Copy to the clipboard, with a status that resets | `App`, site integration Settings |
 | `src/hooks/useExtensionContext.ts` | Popup or side panel, detected once | `ViewHeader` |

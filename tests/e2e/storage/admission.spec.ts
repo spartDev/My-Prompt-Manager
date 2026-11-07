@@ -95,7 +95,7 @@ test.describe('Admission', () => {
 
       await library.expectPromptVisible(original.title);
       await sidePanel.getByRole('button', { name: `Share ${original.title}` }).click();
-      await expect(sidePanel.getByText('Share link copied to clipboard!')).toBeVisible();
+      await expect(sidePanel.getByText('Share code copied', { exact: true })).toBeVisible();
 
       // Paste the code into Import, as the person receiving it does
       await library.clickAddNewPrompt();
@@ -104,7 +104,7 @@ test.describe('Admission', () => {
       await sidePanel.keyboard.press('ControlOrMeta+V');
       await expect(sidePanel.getByText('Share code opened')).toBeVisible();
       await sidePanel.getByRole('button', { name: 'Import', exact: true }).click();
-      await expect(sidePanel.getByText('Prompt created successfully').first()).toBeVisible();
+      await expect(sidePanel.getByText('Prompt created', { exact: true }).first()).toBeVisible();
 
       const imported = (await storage.getPrompts()).find((prompt) => prompt.id !== original.id);
       expect(imported).toMatchObject({

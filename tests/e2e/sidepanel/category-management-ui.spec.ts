@@ -188,7 +188,7 @@ test.describe('Category Manager - UI/UX Tests', () => {
       await sidepanelPage.getByRole('button', { name: 'Add' }).click();
 
       // Wait for the success message to confirm the category was added
-      await expect(sidepanelPage.getByText('Category created successfully').first()).toBeVisible();
+      await expect(sidepanelPage.getByText('Category created', { exact: true }).first()).toBeVisible();
 
       // Verify count updated to 3
       await expect(sidepanelPage.getByText('3 categories', { exact: true }).first()).toBeVisible();
@@ -234,7 +234,7 @@ test.describe('Category Manager - UI/UX Tests', () => {
       await sidepanelPage.getByRole('button', { name: 'Add' }).click();
 
       // Verify category was created and has a color swatch
-      await expect(sidepanelPage.getByText('Design')).toBeVisible();
+      await expect(sidepanelPage.getByTestId('category-row').getByText('Design')).toBeVisible();
 
       // Find the color swatch for the Design category
       const designCategoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Design', { exact: true }) }).first();

@@ -18,25 +18,15 @@ const createJsonFile = (contents: string): File => {
 };
 
 // Renders Settings without waiting for it to load
-const renderSettingsView = (showToastMock = vi.fn(), onStorageRefusedMock = vi.fn()) => {
-  const mockToastSettings = {
-    position: 'top-right' as const,
-    enabledTypes: {
-      success: true,
-      error: true,
-      info: true,
-      warning: true
-    },
-    enableGrouping: true,
-    groupingWindow: 500
-  };
+const renderSettingsView = (showToastMock = vi.fn(), onStorageRefusedMock = vi.fn(), onToastSettingsChange = vi.fn()) => {
+  const mockToastSettings = { enabled: true };
 
   render(
     <ThemeProvider>
       <SettingsView
         showToast={showToastMock}
         toastSettings={mockToastSettings}
-        onToastSettingsChange={vi.fn()}
+        onToastSettingsChange={onToastSettingsChange}
         onStorageRefused={onStorageRefusedMock}
       />
     </ThemeProvider>
@@ -114,7 +104,7 @@ describe('SettingsView', () => {
       expect(storageMock.importPrompt).toHaveBeenCalledWith(prompts[0]);
     });
 
-    expect(showToastMock).toHaveBeenCalledWith(expect.stringMatching(/successfully imported/i), 'success');
+    expect(showToastMock).toHaveBeenCalledWith('Backup imported', 'success', { sub: expect.stringMatching(/prompt/) });
     expect((chromeMock.storage.local.get as Mock).mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 
@@ -158,7 +148,7 @@ describe('SettingsView', () => {
       expect(storageMock.importPrompt).toHaveBeenCalledTimes(3);
     });
     await waitFor(() => {
-      expect(showToastMock).toHaveBeenCalledWith('Imported 2 prompts and 0 categories. Skipped 1: see Backup & Restore.', 'warning');
+      expect(showToastMock).toHaveBeenCalledWith('Skipped 1', 'warning', { sub: 'Imported 2 prompts and 0 categories. See Backup & Restore.' });
     });
     const report = screen.getByRole('status', { name: 'Import report' });
     expect(within(report).getByText('"Too long"')).toBeInTheDocument();
@@ -199,9 +189,8 @@ describe('SettingsView', () => {
       const item = within(report).getByText(`"${title}"`).closest('li') as HTMLElement;
       expect(item).toHaveTextContent('Content cannot exceed 20,000 characters');
     }
-    const toast = (showToastMock.mock.calls.find(call => call[1] === 'warning') as [string])[0];
-    expect(toast).toBe('Imported 1 prompt and 0 categories. Skipped 3: see Backup & Restore.');
-    expect(toast.length).toBeLessThanOrEqual(80);
+    // The Notification only counts them: the titles stay in the report
+    expect(showToastMock).toHaveBeenCalledWith('Skipped 3', 'warning', { sub: 'Imported 1 prompt and 0 categories. See Backup & Restore.' });
 
     await userEvent.click(within(report).getByRole('button', { name: 'Dismiss import report' }));
     expect(screen.queryByRole('status', { name: 'Import report' })).not.toBeInTheDocument();
@@ -228,7 +217,7 @@ describe('SettingsView', () => {
     await userEvent.upload(fileInput, createJsonFile(JSON.stringify({ prompts: [prompt], version: '1.0' })));
 
     await waitFor(() => {
-      expect(showToastMock).toHaveBeenCalledWith('Successfully imported 1 prompt and 1 category!', 'success');
+      expect(showToastMock).toHaveBeenCalledWith('Backup imported', 'success', { sub: '1 prompt and 1 category' });
     });
   });
 
@@ -248,7 +237,7 @@ describe('SettingsView', () => {
     await userEvent.upload(fileInput as HTMLInputElement, badFile);
 
     await waitFor(() => {
-      expect(showToastMock).toHaveBeenCalledWith(expect.stringMatching(/invalid json/i), 'error');
+      expect(showToastMock).toHaveBeenCalledWith('Import failed', 'error', { sub: expect.stringMatching(/invalid json/i) });
     });
     expect(alertSpy).not.toHaveBeenCalled();
     expect(storageMock.importPrompt).not.toHaveBeenCalled();
@@ -275,7 +264,7 @@ describe('SettingsView', () => {
     );
 
     await waitFor(() => {
-      expect(showToastMock).toHaveBeenCalledWith(expect.stringMatching(/one or more prompts have invalid structure/i), 'error');
+      expect(showToastMock).toHaveBeenCalledWith('Import failed', 'error', { sub: expect.stringMatching(/one or more prompts have invalid structure/i) });
     });
     expect(alertSpy).not.toHaveBeenCalled();
     expect(storageMock.importPrompt).not.toHaveBeenCalled();
@@ -297,11 +286,9 @@ describe('SettingsView', () => {
       createJsonFile(JSON.stringify({ prompts: [], categories: [{ id: 'c1', name: 'Custom' }, null], version: '1.0' }))
     );
 
-    // A toast shows 80 characters: the whole message fits
     await waitFor(() => {
-      expect(showToastMock).toHaveBeenCalledWith(expect.stringMatching(/^Import failed: Invalid backup file: one or more categories .*\.$/), 'error');
+      expect(showToastMock).toHaveBeenCalledWith('Import failed', 'error', { sub: expect.stringMatching(/^Invalid backup file: one or more categories .*\.$/) });
     });
-    expect((showToastMock.mock.calls[0] as [string])[0].length).toBeLessThanOrEqual(80);
     expect(alertSpy).not.toHaveBeenCalled();
     expect(storageMock.importCategory).not.toHaveBeenCalled();
     alertSpy.mockRestore();
@@ -343,7 +330,7 @@ describe('SettingsView', () => {
     });
     expect(storageMock.importPrompt).toHaveBeenCalledTimes(3);
     expect(alertSpy).not.toHaveBeenCalled();
-    expect(showToastMock).not.toHaveBeenCalledWith(expect.anything(), 'error');
+    expect(showToastMock).not.toHaveBeenCalledWith(expect.anything(), 'error', expect.anything());
     // Settings shows the Prompts that were imported
     await waitFor(() => {
       expect(storageMock.getPrompts.mock.calls.length).toBeGreaterThan(loadsBeforeImport);
@@ -382,7 +369,7 @@ describe('SettingsView', () => {
     const report = await screen.findByRole('status', { name: 'Import report' });
     expect(report).toHaveTextContent('The import stopped: 2 of 4 prompts were imported.');
     expect(report).toHaveTextContent('Storage API is unavailable. Please try again later.');
-    expect(showToastMock).toHaveBeenCalledWith('Import stopped: 2 of 4 prompts were imported. See Backup & Restore.', 'error');
+    expect(showToastMock).toHaveBeenCalledWith('Import stopped', 'error', { sub: '2 of 4 prompts were imported. See Backup & Restore.' });
     expect(storageMock.importPrompt).toHaveBeenCalledTimes(3);
     expect(onStorageRefusedMock).not.toHaveBeenCalled();
     expect(alertSpy).not.toHaveBeenCalled();
@@ -467,7 +454,7 @@ describe('SettingsView', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Yes, Clear All Data' }));
 
     await waitFor(() => {
-      expect(showToastMock).toHaveBeenCalledWith('All data has been cleared.', 'success');
+      expect(showToastMock).toHaveBeenCalledWith('All data cleared', 'success');
     });
     expect(storageMock.clearAllData).toHaveBeenCalledTimes(1);
     // The one clear is StorageManager's: a direct clear would skip the locks another context's write holds
@@ -550,7 +537,7 @@ describe('SettingsView', () => {
       defaultCategory: 'Uncategorized'
     });
 
-    expect(showToastMock).toHaveBeenCalledWith(expect.stringMatching(/reset to defaults/i), 'success');
+    expect(showToastMock).toHaveBeenCalledWith('Settings reset', 'success', { sub: 'Back to defaults' });
   });
 
   it('shows the saved Library sort and saves a new one in its natural direction', async () => {
@@ -837,12 +824,7 @@ describe('SettingsView', () => {
       <ThemeProvider>
         <SettingsView
           showToast={vi.fn()}
-          toastSettings={{
-            position: 'top-right',
-            enabledTypes: { success: true, error: true, info: true, warning: true },
-            enableGrouping: true,
-            groupingWindow: 500
-          }}
+          toastSettings={{ enabled: true }}
           onToastSettingsChange={vi.fn()}
           onStorageRefused={vi.fn()}
         />
@@ -861,12 +843,7 @@ describe('SettingsView', () => {
         <ThemeProvider>
           <SettingsView
             showToast={vi.fn()}
-            toastSettings={{
-              position: 'top-right',
-              enabledTypes: { success: true, error: true, info: true, warning: true },
-              enableGrouping: true,
-              groupingWindow: 500
-            }}
+            toastSettings={{ enabled: true }}
             onToastSettingsChange={vi.fn()}
             onStorageRefused={vi.fn()}
           />
@@ -1131,7 +1108,7 @@ describe('SettingsView', () => {
       expect(chromeMock.storage.local.clear).toHaveBeenCalled();
     });
 
-    expect(showToastMock).toHaveBeenCalledWith('All data has been cleared.', 'success');
+    expect(showToastMock).toHaveBeenCalledWith('All data cleared', 'success');
   });
 
   it('cancels the clear data confirmation', async () => {
@@ -1215,7 +1192,7 @@ describe('SettingsView', () => {
     // updateSettings should NOT be called when userSettings is null
     expect(storageMock.updateSettings).not.toHaveBeenCalled();
 
-    expect(showToastMock).toHaveBeenCalledWith(expect.stringMatching(/reset to defaults/i), 'success');
+    expect(showToastMock).toHaveBeenCalledWith('Settings reset', 'success', { sub: 'Back to defaults' });
   });
 
   it('displays prompts and categories counts from loaded data', async () => {
@@ -1307,28 +1284,42 @@ describe('SettingsView', () => {
     expect(exportButton).toBeInTheDocument();
   });
 
-  it('notification section expands and shows test button', async () => {
+  it('turns Notifications off, and shows one as a preview when turned back on', async () => {
     const storageMock = getMockStorageManager();
     const showToastMock = vi.fn();
+    const onToastSettingsChange = vi.fn();
 
-    await renderSettings(showToastMock);
+    renderSettingsView(showToastMock, vi.fn(), onToastSettingsChange);
+    await screen.findByRole('heading', { name: /settings/i });
     await waitFor(() => {
       expect(storageMock.getPrompts).toHaveBeenCalled();
     });
 
-    // Expand the Notifications section
-    const notificationsToggle = await screen.findByRole('button', { name: /notifications/i });
-    await userEvent.click(notificationsToggle);
+    const toggle = screen.getByRole('switch', { name: 'Show notifications' });
+    await userEvent.click(toggle);
+    expect(onToastSettingsChange).toHaveBeenLastCalledWith({ enabled: false });
+    expect(showToastMock).not.toHaveBeenCalled();
+  });
 
-    // Find and click the Test button
-    const testButton = await screen.findByRole('button', { name: /test/i });
-    await userEvent.click(testButton);
+  it('shows "Notifications on" when the switch is turned on', async () => {
+    const showToastMock = vi.fn();
+    const onToastSettingsChange = vi.fn();
 
-    // showToast should be called with a test notification
-    expect(showToastMock).toHaveBeenCalledWith(
-      expect.stringMatching(/this is a .+ notification/i),
-      expect.any(String)
+    render(
+      <ThemeProvider>
+        <SettingsView
+          showToast={showToastMock}
+          toastSettings={{ enabled: false }}
+          onToastSettingsChange={onToastSettingsChange}
+          onStorageRefused={vi.fn()}
+        />
+      </ThemeProvider>
     );
+    await screen.findByRole('heading', { name: /settings/i });
+
+    await userEvent.click(screen.getByRole('switch', { name: 'Show notifications' }));
+    expect(onToastSettingsChange).toHaveBeenLastCalledWith({ enabled: true });
+    expect(showToastMock).toHaveBeenCalledWith('Notifications on', 'success');
   });
 
   it('renders all section headers on the page', async () => {

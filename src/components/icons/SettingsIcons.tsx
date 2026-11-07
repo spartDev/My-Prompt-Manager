@@ -98,26 +98,6 @@ export const BellIcon: FC<IconProps> = ({ className = 'w-5 h-5' }) => (
 );
 
 /**
- * Check Circle Icon - Selected state indicator
- * Used for position selection in notification settings
- */
-export const CheckCircleIcon: FC<IconProps> = ({ className = 'w-5 h-5' }) => (
-  <svg className={className} fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-  </svg>
-);
-
-/**
- * Test Notification Icon - Bell for testing
- * Used for test notification button
- */
-export const TestBellIcon: FC<IconProps> = ({ className = 'w-4 h-4' }) => (
-  <svg className={className} fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-    <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
-  </svg>
-);
-
-/**
  * Database Icon - Storage indicator
  * Used for data storage section header
  */

@@ -66,7 +66,7 @@ test.describe('Category Management - Integration with Prompt System', () => {
       await editInput.press('Enter');
 
       // Verify category name changed in UI
-      await expect(sidepanelPage.getByText('Analysis')).toBeVisible();
+      await expect(sidepanelPage.getByTestId('category-row').getByText('Analysis')).toBeVisible();
       await expect(sidepanelPage.getByText('Research')).toBeHidden();
 
       // Return to the Library via the tab bar
@@ -128,7 +128,7 @@ test.describe('Category Management - Integration with Prompt System', () => {
       await sidepanelPage.getByRole('radio', { name: 'Coding', exact: true }).click();
 
       await sidepanelPage.getByRole('button', { name: 'Save', exact: true }).click();
-      await expect(sidepanelPage.getByText('Prompt created successfully').first()).toBeVisible();
+      await expect(sidepanelPage.getByText('Prompt created', { exact: true }).first()).toBeVisible();
 
       // Create another prompt in "Writing" category
       await sidepanelPage.getByRole('button', { name: 'Add new prompt' }).click();
@@ -138,7 +138,7 @@ test.describe('Category Management - Integration with Prompt System', () => {
       await sidepanelPage.getByRole('radio', { name: 'Writing', exact: true }).click();
 
       await sidepanelPage.getByRole('button', { name: 'Save', exact: true }).click();
-      await expect(sidepanelPage.getByText('Prompt created successfully').first()).toBeVisible();
+      await expect(sidepanelPage.getByText('Prompt created', { exact: true }).first()).toBeVisible();
 
       // Verify both prompts are visible in main view
       await expect(sidepanelPage.getByRole('heading', { name: 'Debug Function' })).toBeVisible();
@@ -282,7 +282,7 @@ test.describe('Category Management - Integration with Prompt System', () => {
       await sidepanelPage.getByRole('button', { name: 'Save', exact: true }).click();
 
       // Verify prompt was created in Uncategorized
-      await expect(sidepanelPage.getByText('Prompt created successfully')).toBeVisible();
+      await expect(sidepanelPage.getByText('Prompt created', { exact: true })).toBeVisible();
       await expect(sidepanelPage.getByRole('heading', { name: 'Test Prompt' })).toBeVisible();
 
       const prompts = await storage.getPrompts();
@@ -328,7 +328,7 @@ test.describe('Category Management - Integration with Prompt System', () => {
       await sidepanelPage.getByRole('button', { name: 'Save', exact: true }).click();
 
       // Verify update succeeded
-      await expect(sidepanelPage.getByText('Prompt updated successfully')).toBeVisible();
+      await expect(sidepanelPage.getByText('Prompt saved', { exact: true })).toBeVisible();
 
       // Verify in storage
       const updatedPrompts = await storage.getPrompts();

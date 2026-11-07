@@ -79,11 +79,15 @@
   /* Idle scrollbar thumb on a transparent track: 3:1 on every surface, in both modes */
   --scrollbar-color-thumb: #8b5cf6;
 
-  /* Status icons on bg-inverse (toasts): the bright variants, in both modes */
-  --text-color-inverse-success: #6ee7b7;
-  --text-color-inverse-danger: #fca5a5;
-  --text-color-inverse-warning: #fcd34d;
-  --text-color-inverse-info: #c4b5fd;
+  /* Notification pill on bg-inverse (Atelier 1C), the same colors in both modes: a white message, a violet
+     check round for a confirmation, a red one for a failure, a dark glyph on the round, and a
+     translucent action button */
+  --text-color-on-inverse-strong: #ffffff;
+  --text-color-on-inverse-mark: #1d1530;
+  --background-color-inverse-mark: #a78bfa;
+  --background-color-inverse-alert: #fca5a5;
+  --background-color-inverse-action: rgba(255, 255, 255, 0.14);
+  --shadow-toast: 0 14px 30px -12px rgba(29, 21, 48, 0.6);
 
   /* Shadows: Tailwind's shapes and alphas, tinted violet (black at alpha x 1.6 in dark) */
   --shadow-tint-5: rgba(45, 25, 90, 0.05);
@@ -155,11 +159,13 @@
     /* Scrollbar thumb */
     --scrollbar-color-thumb: #8b5cf6;
 
-    /* Status icons on bg-inverse */
-    --text-color-inverse-success: #6ee7b7;
-    --text-color-inverse-danger: #fca5a5;
-    --text-color-inverse-warning: #fcd34d;
-    --text-color-inverse-info: #c4b5fd;
+    /* Notification pill: the same as light, its shadow black like the other dark shadows */
+    --text-color-on-inverse-strong: #ffffff;
+    --text-color-on-inverse-mark: #1d1530;
+    --background-color-inverse-mark: #a78bfa;
+    --background-color-inverse-alert: #fca5a5;
+    --background-color-inverse-action: rgba(255, 255, 255, 0.14);
+    --shadow-toast: 0 14px 30px -12px rgba(0, 0, 0, 0.6);
 
     /* Shadows */
     --shadow-tint-5: rgba(0, 0, 0, 0.08);

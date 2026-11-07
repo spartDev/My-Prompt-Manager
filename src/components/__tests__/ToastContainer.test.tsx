@@ -1,289 +1,103 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Toast } from '../../types/hooks';
 import ToastContainer from '../ToastContainer';
 
 describe('ToastContainer', () => {
-  const mockOnDismiss = vi.fn();
+  const onDismiss = vi.fn();
 
   beforeEach(() => {
-    vi.useFakeTimers();
-    mockOnDismiss.mockClear();
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
+    onDismiss.mockClear();
   });
 
   const createToast = (overrides?: Partial<Toast>): Toast => ({
-    id: 'test-id',
-    message: 'Test message',
-    type: 'info',
-    duration: 3000,
+    id: 'toast-1',
+    message: 'Prompt saved',
+    type: 'success',
+    duration: 2700,
     ...overrides
   });
 
-  it('renders nothing when toasts array is empty', () => {
-    const { container } = render(
-      <ToastContainer toasts={[]} onDismiss={mockOnDismiss} />
-    );
+  it('renders nothing without a Notification', () => {
+    const { container } = render(<ToastContainer toast={null} onDismiss={onDismiss} />);
     expect(container.firstChild).toBeNull();
   });
 
-  it('renders toasts in top-right position by default', () => {
-    const toast = createToast();
-    const { container } = render(
-      <ToastContainer toasts={[toast]} onDismiss={mockOnDismiss} />
-    );
+  it('is a pill at the top center, entering with the Atelier 1C animation', () => {
+    render(<ToastContainer toast={createToast()} onDismiss={onDismiss} />);
 
-    const positionedDiv = container.querySelector('.fixed.top-4.right-4');
-    expect(positionedDiv).toBeInTheDocument();
+    const pill = screen.getByTestId('toast');
+    expect(pill).toHaveClass('fixed', 'top-3', 'left-1/2', 'toast-in', 'h-10', 'rounded-full', 'bg-inverse', 'shadow-toast');
+    expect(pill.className).not.toMatch(/bottom-|right-4/);
+    expect(screen.getByTestId('toast-mark')).toHaveClass('toast-mark-pop');
   });
 
-  it('renders toasts in bottom-right position when specified', () => {
-    const toast = createToast();
-    const { container } = render(
-      <ToastContainer
-        toasts={[toast]}
-        onDismiss={mockOnDismiss}
-        position="bottom-right"
-      />
-    );
-
-    const positionedDiv = container.querySelector('.fixed.bottom-4.right-4');
-    expect(positionedDiv).toBeInTheDocument();
-  });
-
-  // Toasts sit on bg-inverse in both modes; the icon and the progress bar take the type's bright variant
   it.each([
-    ['success', 'status', 'text-inverse-success'],
-    ['error', 'alert', 'text-inverse-danger'],
-    ['warning', 'alert', 'text-inverse-warning'],
-    ['info', 'status', 'text-inverse-info']
-  ] as const)('renders a %s toast on bg-inverse with its bright icon and progress bar', (type, role, tone) => {
-    const toast = createToast({ type, message: `A ${type} message`, duration: 3000 });
-    const { container } = render(<ToastContainer toasts={[toast]} onDismiss={mockOnDismiss} />);
+    ['success', 'status', 'polite', 'bg-inverse-mark'],
+    ['info', 'status', 'polite', 'bg-inverse-mark'],
+    ['error', 'alert', 'assertive', 'bg-inverse-alert'],
+    ['warning', 'alert', 'assertive', 'bg-inverse-alert']
+  ] as const)('a %s Notification is a %s with its round in %s', (type, role, live, round) => {
+    render(<ToastContainer toast={createToast({ type })} onDismiss={onDismiss} />);
 
-    const element = screen.getByRole(role);
-    expect(element).toHaveClass('bg-inverse', 'text-on-inverse');
-    expect(element.querySelector('svg')?.closest('div')).toHaveClass(tone);
-    expect(container.querySelector('.absolute.bottom-0.left-0.h-1.w-full')).toHaveClass('bg-current', tone);
+    const pill = screen.getByRole(role);
+    expect(pill).toHaveAttribute('aria-live', live);
+    expect(pill).toHaveAttribute('aria-atomic', 'true');
+    expect(screen.getByTestId('toast-mark')).toHaveClass(round);
   });
 
-  it('calls onDismiss when dismiss button is clicked', () => {
-    const toast = createToast();
-    render(<ToastContainer toasts={[toast]} onDismiss={mockOnDismiss} />);
+  it('shows the message and its sub, and cuts only the sub', () => {
+    render(<ToastContainer toast={createToast({ sub: 'Weekly status update' })} onDismiss={onDismiss} />);
 
-    const dismissButton = screen.getByLabelText('Dismiss notification');
-
-    act(() => {
-      fireEvent.click(dismissButton);
-    });
-
-    // Fast-forward through the animation delay (250ms)
-    act(() => {
-      vi.advanceTimersByTime(250);
-    });
-
-    expect(mockOnDismiss).toHaveBeenCalledWith('test-id');
+    expect(screen.getByText('Prompt saved')).toHaveClass('font-semibold', 'shrink-0', 'max-w-full');
+    const sub = screen.getByText('Weekly status update');
+    expect(sub).toHaveClass('truncate', 'text-on-inverse');
   });
 
-  it('auto-dismisses after duration', () => {
-    const toast = createToast({ duration: 1000 });
-    render(<ToastContainer toasts={[toast]} onDismiss={mockOnDismiss} />);
+  it('has no close button and no progress bar', () => {
+    render(<ToastContainer toast={createToast()} onDismiss={onDismiss} />);
 
-    expect(mockOnDismiss).not.toHaveBeenCalled();
-
-    // Fast-forward time (duration + animation delay)
-    act(() => {
-      vi.advanceTimersByTime(1250);
-    });
-
-    expect(mockOnDismiss).toHaveBeenCalledWith('test-id');
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(screen.getByTestId('toast').querySelector('[style*="shrink-width"]')).toBeNull();
   });
 
-  it('does not auto-dismiss when duration is 0', () => {
-    const toast = createToast({ duration: 0 });
-    render(<ToastContainer toasts={[toast]} onDismiss={mockOnDismiss} />);
+  it('closes on Escape', () => {
+    render(<ToastContainer toast={createToast()} onDismiss={onDismiss} />);
 
-    act(() => {
-      vi.advanceTimersByTime(5000);
-    });
-
-    expect(mockOnDismiss).not.toHaveBeenCalled();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(onDismiss).toHaveBeenCalledWith('toast-1');
   });
 
-  it('dismisses on ESC key press', () => {
-    const toast = createToast();
-    render(<ToastContainer toasts={[toast]} onDismiss={mockOnDismiss} />);
+  it('ignores other keys, and Escape once the Notification is gone', () => {
+    const { rerender } = render(<ToastContainer toast={createToast()} onDismiss={onDismiss} />);
+    fireEvent.keyDown(window, { key: 'Enter' });
 
-    act(() => {
-      fireEvent.keyDown(window, { key: 'Escape' });
-    });
+    rerender(<ToastContainer toast={null} onDismiss={onDismiss} />);
+    fireEvent.keyDown(window, { key: 'Escape' });
 
-    // Fast-forward through animation delay
-    act(() => {
-      vi.advanceTimersByTime(250);
-    });
-
-    expect(mockOnDismiss).toHaveBeenCalledWith('test-id');
+    expect(onDismiss).not.toHaveBeenCalled();
   });
 
-  it('renders action button when action is provided', () => {
-    const mockAction = vi.fn();
-    const toast = createToast({
-      action: {
-        label: 'Undo',
-        onClick: mockAction
-      }
-    });
+  it('runs its action, then leaves', () => {
+    const onClick = vi.fn();
+    render(<ToastContainer toast={createToast({ sub: 'Marketing', action: { label: 'Undo', onClick } })} onDismiss={onDismiss} />);
 
-    render(<ToastContainer toasts={[toast]} onDismiss={mockOnDismiss} />);
+    const undo = screen.getByRole('button', { name: 'Undo' });
+    expect(undo).toHaveClass('bg-inverse-action', 'rounded-full', 'h-7');
+    fireEvent.click(undo);
 
-    const actionButton = screen.getByText('Undo');
-    expect(actionButton).toBeInTheDocument();
+    expect(onClick).toHaveBeenCalledTimes(1);
+    expect(onDismiss).toHaveBeenCalledWith('toast-1');
   });
 
-  it('calls action onClick and dismisses when action button is clicked', () => {
-    const mockAction = vi.fn();
-    const toast = createToast({
-      action: {
-        label: 'Undo',
-        onClick: mockAction
-      }
-    });
+  it('mounts a new pill for a new Notification, so the entrance plays again', () => {
+    const { rerender } = render(<ToastContainer toast={createToast()} onDismiss={onDismiss} />);
+    const first = screen.getByTestId('toast');
 
-    render(<ToastContainer toasts={[toast]} onDismiss={mockOnDismiss} />);
+    rerender(<ToastContainer toast={createToast({ id: 'toast-2', message: 'Prompt copied' })} onDismiss={onDismiss} />);
 
-    const actionButton = screen.getByText('Undo');
-
-    act(() => {
-      fireEvent.click(actionButton);
-    });
-
-    expect(mockAction).toHaveBeenCalled();
-
-    // Fast-forward through animation delay
-    act(() => {
-      vi.advanceTimersByTime(250);
-    });
-
-    expect(mockOnDismiss).toHaveBeenCalledWith('test-id');
-  });
-
-  it('renders secondary action button with correct styling', () => {
-    const toast = createToast({
-      action: {
-        label: 'Dismiss',
-        onClick: vi.fn(),
-        variant: 'secondary'
-      }
-    });
-
-    render(<ToastContainer toasts={[toast]} onDismiss={mockOnDismiss} />);
-
-    // Outlined in the message color, on bg-inverse
-    const actionButton = screen.getByText('Dismiss');
-    expect(actionButton).toHaveClass('text-on-inverse', 'border');
-  });
-
-  it('renders progress bar when duration is set', () => {
-    const toast = createToast({ duration: 3000 });
-    const { container } = render(
-      <ToastContainer toasts={[toast]} onDismiss={mockOnDismiss} />
-    );
-
-    const progressBar = container.querySelector('.absolute.bottom-0.left-0.h-1.w-full');
-    expect(progressBar).toBeInTheDocument();
-  });
-
-  it('does not render progress bar when duration is 0', () => {
-    const toast = createToast({ duration: 0 });
-    const { container } = render(
-      <ToastContainer toasts={[toast]} onDismiss={mockOnDismiss} />
-    );
-
-    const progressBar = container.querySelector('.absolute.bottom-0.left-0.h-1.w-full');
-    expect(progressBar).not.toBeInTheDocument();
-  });
-
-  it('displays queue indicator when queueLength is provided', () => {
-    const toast = createToast();
-    render(
-      <ToastContainer
-        toasts={[toast]}
-        onDismiss={mockOnDismiss}
-        queueLength={3}
-      />
-    );
-
-    expect(screen.getByText('3 more notifications')).toBeInTheDocument();
-  });
-
-  it('uses singular form for queue indicator when queueLength is 1', () => {
-    const toast = createToast();
-    render(
-      <ToastContainer
-        toasts={[toast]}
-        onDismiss={mockOnDismiss}
-        queueLength={1}
-      />
-    );
-
-    expect(screen.getByText('1 more notification')).toBeInTheDocument();
-  });
-
-  it('does not display queue indicator when queueLength is 0', () => {
-    const toast = createToast();
-    render(
-      <ToastContainer
-        toasts={[toast]}
-        onDismiss={mockOnDismiss}
-        queueLength={0}
-      />
-    );
-
-    expect(screen.queryByText(/more notification/)).not.toBeInTheDocument();
-  });
-
-  it('renders multiple toasts', () => {
-    const toasts = [
-      createToast({ id: '1', message: 'First' }),
-      createToast({ id: '2', message: 'Second' })
-    ];
-
-    render(<ToastContainer toasts={toasts} onDismiss={mockOnDismiss} />);
-
-    expect(screen.getByText('First')).toBeInTheDocument();
-    expect(screen.getByText('Second')).toBeInTheDocument();
-  });
-
-  it('uses assertive aria-live for error and warning toasts', () => {
-    const errorToast = createToast({ type: 'error' });
-    const { rerender } = render(
-      <ToastContainer toasts={[errorToast]} onDismiss={mockOnDismiss} />
-    );
-
-    expect(screen.getByRole('alert')).toHaveAttribute('aria-live', 'assertive');
-
-    const warningToast = createToast({ type: 'warning' });
-    rerender(<ToastContainer toasts={[warningToast]} onDismiss={mockOnDismiss} />);
-
-    expect(screen.getByRole('alert')).toHaveAttribute('aria-live', 'assertive');
-  });
-
-  it('uses polite aria-live for success and info toasts', () => {
-    const successToast = createToast({ type: 'success' });
-    const { rerender } = render(
-      <ToastContainer toasts={[successToast]} onDismiss={mockOnDismiss} />
-    );
-
-    expect(screen.getByRole('status')).toHaveAttribute('aria-live', 'polite');
-
-    const infoToast = createToast({ type: 'info' });
-    rerender(<ToastContainer toasts={[infoToast]} onDismiss={mockOnDismiss} />);
-
-    expect(screen.getByRole('status')).toHaveAttribute('aria-live', 'polite');
+    expect(screen.getByTestId('toast')).not.toBe(first);
+    expect(screen.getAllByTestId('toast')).toHaveLength(1);
   });
 });

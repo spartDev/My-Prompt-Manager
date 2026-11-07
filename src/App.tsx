@@ -75,7 +75,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   } = useCategories();
 
   const { copyToClipboard } = useClipboard();
-  const { toasts, showToast, hideToast, queueLength, settings, updateSettings } = useToast();
+  const { toast, showToast, hideToast, settings, updateSettings } = useToast();
 
   // Initialize search with debounce functionality using optimistic prompts
   const searchWithDebounce = useSearchWithDebounce(optimisticPrompts);
@@ -91,6 +91,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   };
 
   const handleDeletePrompt = async (id: string) => {
+    const title = prompts.find(p => p.id === id)?.title;
     // React 19 useOptimistic: Remove from UI immediately for instant feedback
     // Wrap in startTransition as required by React for optimistic updates
     startTransition(() => {
@@ -104,7 +105,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
         promptId: id,
         operation: 'deletePrompt'
       });
-      showToast('Prompt deleted successfully', 'success');
+      showToast('Prompt deleted', 'success', { sub: title });
     } catch (err) {
       Logger.error('Failed to delete prompt', toError(err), {
         component: 'App',
@@ -130,7 +131,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
         });
       }
 
-      showToast('Failed to delete prompt', 'error');
+      showToast("Couldn't delete Prompt", 'error', { sub: title });
     }
   };
 
@@ -147,16 +148,16 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
         promptId: id,
         operation: 'togglePin'
       });
-      showToast('Failed to update pin', 'error');
+      showToast("Couldn't update pin", 'error');
     });
   }, [togglePin, showToast]);
 
-  const handleCopyPrompt = async (content: string) => {
-    const success = await copyToClipboard(content);
+  const handleCopyPrompt = async (prompt: Prompt) => {
+    const success = await copyToClipboard(prompt.content);
     if (success) {
-      showToast('Prompt copied to clipboard', 'success');
+      showToast('Prompt copied', 'success', { sub: prompt.title });
     } else {
-      showToast('Failed to copy prompt', 'error');
+      showToast("Couldn't copy Prompt", 'error', { sub: prompt.title });
     }
   };
 
@@ -171,7 +172,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
           operation: 'createPrompt',
           category: data.category
         });
-        showToast('Prompt created successfully', 'success');
+        showToast('Prompt created', 'success', { sub: data.title });
       } else if (currentView === 'edit' && selectedPrompt) {
         await updatePrompt(selectedPrompt.id, data);
         Logger.info('Prompt updated successfully', {
@@ -180,7 +181,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
           promptId: selectedPrompt.id,
           category: data.category
         });
-        showToast('Prompt updated successfully', 'success');
+        showToast('Prompt saved', 'success', { sub: data.title });
       }
       // The editor shows "Saved", then closes itself (onClose)
     } catch (error: unknown) {
@@ -210,14 +211,14 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
     const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     try {
       await createCategory(categoryData);
-      showToast('Category created successfully', 'success');
+      showToast('Category created', 'success', { sub: categoryData.name });
     } catch (error: unknown) {
       const appError = error as AppError;
       if (appError.type === 'STORAGE_QUOTA_EXCEEDED') {
         storageRefusalTriggerRef.current = trigger;
         setStorageRefusal(appError.message || 'Failed to create category');
       } else {
-        showToast(appError.message || 'Failed to create category', 'error');
+        showToast("Couldn't create Category", 'error', { sub: appError.message });
       }
       throw new Error(appError.message || 'Failed to create category');
     }
@@ -229,7 +230,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
     const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     try {
       const created = await createCategory(categoryData);
-      showToast('Category created successfully', 'success');
+      showToast('Category created', 'success', { sub: created.name });
       return created;
     } catch (error: unknown) {
       const appError = error as AppError;
@@ -248,22 +249,23 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
       if (updates.name) {
         await refreshPrompts();
       }
-      showToast('Category updated successfully', 'success');
+      showToast('Category saved', 'success', { sub: updates.name ?? categories.find(c => c.id === id)?.name });
     } catch (error: unknown) {
       const appError = error as AppError;
-      showToast(appError.message || 'Failed to update category', 'error');
+      showToast("Couldn't save Category", 'error', { sub: appError.message });
       throw new Error(appError.message || 'Failed to update category');
     }
   };
 
   const handleDeleteCategory = async (id: string) => {
+    const name = categories.find(c => c.id === id)?.name;
     try {
       await deleteCategory(id);
       // Refresh prompts to show them as Uncategorized after category deletion
       await refreshPrompts();
-      showToast('Category deleted successfully', 'success');
+      showToast('Category deleted', 'success', { sub: name });
     } catch (error) {
-      showToast('Failed to delete category', 'error');
+      showToast("Couldn't delete Category", 'error', { sub: name });
       throw error;
     }
   };
@@ -334,7 +336,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
           onAddNew={handleAddNew}
           onEditPrompt={handleEditPrompt}
           onTogglePin={handleTogglePin}
-          onCopyPrompt={(content: string) => { void handleCopyPrompt(content); }}
+          onCopyPrompt={(prompt: Prompt) => { void handleCopyPrompt(prompt); }}
           showToast={showToast}
           onLibraryFilterChange={setLibraryFilter}
           loading={loading}
@@ -399,13 +401,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
         <StorageWarning reason={storageRefusal} onClose={handleCloseStorageWarning} />
       )}
 
-      <ToastContainer
-        toasts={toasts}
-        onDismiss={hideToast}
-        position={settings.position}
-        queueLength={queueLength}
-        aboveTabBar={showTabBar}
-      />
+      <ToastContainer toast={toast} onDismiss={hideToast} />
       </div>
     </ThemeProvider>
   );

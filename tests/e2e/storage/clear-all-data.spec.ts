@@ -31,7 +31,7 @@ test.describe('Clear All Data', () => {
       await page.getByTestId('tab-settings').click();
       await page.getByRole('button', { name: 'Clear All Data' }).click();
       await page.getByRole('button', { name: 'Yes, Clear All Data' }).click();
-      await expect(page.getByText('All data has been cleared.')).toBeVisible();
+      await expect(page.getByText('All data cleared', { exact: true })).toBeVisible();
 
       const stored = await page.evaluate(() => chrome.storage.local.get(['prompts', 'categories']));
       expect(stored.prompts).toBeUndefined();

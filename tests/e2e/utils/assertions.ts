@@ -53,21 +53,21 @@ export const promptAssertions = {
    * Expect prompt creation success
    */
   createdSuccessfully: async (page: Page): Promise<void> => {
-    await expectSuccessMessage(page, 'Prompt created successfully');
+    await expectSuccessMessage(page, 'Prompt created');
   },
 
   /**
    * Expect prompt update success
    */
   updatedSuccessfully: async (page: Page): Promise<void> => {
-    await expectSuccessMessage(page, 'Prompt updated successfully');
+    await expectSuccessMessage(page, 'Prompt saved');
   },
 
   /**
    * Expect prompt deletion success
    */
   deletedSuccessfully: async (page: Page): Promise<void> => {
-    await expectSuccessMessage(page, 'Prompt deleted successfully');
+    await expectSuccessMessage(page, 'Prompt deleted');
   },
 
   /**
@@ -110,21 +110,21 @@ export const categoryAssertions = {
    * Expect category creation success
    */
   createdSuccessfully: async (page: Page): Promise<void> => {
-    await expectSuccessMessage(page, 'Category created successfully');
+    await expectSuccessMessage(page, 'Category created');
   },
 
   /**
    * Expect category update success
    */
   updatedSuccessfully: async (page: Page): Promise<void> => {
-    await expectSuccessMessage(page, 'Category updated successfully');
+    await expectSuccessMessage(page, 'Category saved');
   },
 
   /**
    * Expect category deletion success
    */
   deletedSuccessfully: async (page: Page): Promise<void> => {
-    await expectSuccessMessage(page, 'Category deleted successfully');
+    await expectSuccessMessage(page, 'Category deleted');
   },
 
   /**

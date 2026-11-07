@@ -6,6 +6,7 @@ import { useSitePermissions } from '../../hooks/useSitePermissions';
 import { ConfigurationEncoder, ConfigurationEncoderError } from '../../services/configurationEncoder';
 import type { CustomSite, CustomSiteConfiguration, SecurityWarning } from '../../types';
 import type { ToastType } from '../../types/components';
+import type { ShowToast } from '../../types/hooks';
 import { Logger, toError } from '../../utils';
 
 import AddCustomSiteForm from './AddCustomSiteForm';
@@ -140,8 +141,25 @@ interface SiteIntegrationSectionProps {
   onAddCustomSite?: (siteData: Omit<CustomSite, 'dateAdded'> & { positioning?: CustomSite['positioning'] }) => Promise<void> | void;
   interfaceMode?: 'popup' | 'sidepanel';
   saving?: boolean;
-  onShowToast?: (message: string, type?: ToastType) => void;
+  onShowToast?: ShowToast;
 }
+
+// The message an import shows for an encoder error
+const mapEncoderErrorToMessage = (error: ConfigurationEncoderError): string => {
+  switch (error.code) {
+    case 'INVALID_FORMAT':
+      return 'Invalid configuration code. Please check the value and try again.';
+    case 'UNSUPPORTED_VERSION':
+      return 'This configuration was created with a newer version that is not supported yet.';
+    case 'CHECKSUM_FAILED':
+      return 'The configuration appears to be corrupted or tampered with.';
+    case 'SECURITY_VIOLATION':
+      return 'Import blocked because the configuration failed security checks.';
+    case 'VALIDATION_ERROR':
+    default:
+      return error.message || 'Configuration failed validation.';
+  }
+};
 
 const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
   enabledSites,
@@ -180,9 +198,9 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
   const { requestSitePermission } = useSitePermissions();
 
   const notify = useCallback(
-    (message: string, type: ToastType = 'info') => {
+    (message: string, type: ToastType = 'info', sub?: string) => {
       if (onShowToast) {
-        onShowToast(message, type);
+        onShowToast(message, type, { sub });
       }
     },
     [onShowToast]
@@ -223,37 +241,21 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
 
         if (copied) {
           importDispatch({ type: 'END_EXPORT' });
-          notify('Configuration copied to clipboard', 'success');
+          notify('Configuration copied', 'success', site.hostname);
         } else {
           importDispatch({ type: 'EXPORT_FALLBACK', payload: encoded });
           openImportFlow();
-          notify('Clipboard access was blocked. The configuration code has been added to the import field.', 'error');
+          notify('Clipboard access blocked', 'error', 'The code is in the import field.');
         }
       } catch (error) {
         importDispatch({ type: 'END_EXPORT' });
-        const message = error instanceof ConfigurationEncoderError ? error.message : 'Failed to export configuration';
-        notify(message, 'error');
+        notify("Couldn't export configuration", 'error', error instanceof ConfigurationEncoderError ? error.message : undefined);
       }
     },
     [copyToClipboard, notify, openImportFlow]
   );
 
   // Import functionality
-  const mapEncoderErrorToMessage = (error: ConfigurationEncoderError): string => {
-    switch (error.code) {
-      case 'INVALID_FORMAT':
-        return 'Invalid configuration code. Please check the value and try again.';
-      case 'UNSUPPORTED_VERSION':
-        return 'This configuration was created with a newer version that is not supported yet.';
-      case 'CHECKSUM_FAILED':
-        return 'The configuration appears to be corrupted or tampered with.';
-      case 'SECURITY_VIOLATION':
-        return 'Import blocked because the configuration failed security checks.';
-      case 'VALIDATION_ERROR':
-      default:
-        return error.message || 'Configuration failed validation.';
-    }
-  };
 
   const handleClearImport = useCallback(() => {
     importDispatch({ type: 'CLEAR' });
@@ -282,7 +284,7 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
       if (isBuiltIn) {
         const message = 'This hostname already has a built-in integration and cannot be imported as custom.';
         importDispatch({ type: 'DECODE_FAILURE', payload: message });
-        notify(message, 'error');
+        notify("Couldn't import configuration", 'error', message);
         return;
       }
 
@@ -301,7 +303,7 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
           ? mapEncoderErrorToMessage(error)
           : 'Failed to decode configuration. Please verify the code and try again.';
       importDispatch({ type: 'DECODE_FAILURE', payload: message });
-      notify(message, 'error');
+      notify("Couldn't import configuration", 'error', message);
     }
   }, [importState.code, customSites, siteConfigs, notify, openImportFlow]);
 
@@ -324,7 +326,7 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
       if (!granted) {
         const message = 'Permission denied. Please allow access to the site and try again.';
         importDispatch({ type: 'CONFIRM_FAILURE', payload: message });
-        notify(message, 'error');
+        notify("Couldn't import configuration", 'error', message);
         return;
       }
 
@@ -345,11 +347,11 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
 
       importDispatch({ type: 'CONFIRM_SUCCESS' });
       closeAllForms();
-      notify('Configuration imported successfully', 'success');
+      notify('Configuration imported', 'success', pendingImport.config.hostname);
     } catch (error) {
       Logger.error('Failed to import configuration', toError(error));
       importDispatch({ type: 'CONFIRM_FAILURE', payload: 'Failed to import configuration. Please try again.' });
-      notify('Failed to import configuration. Please try again.', 'error');
+      notify("Couldn't import configuration", 'error', 'Please try again.');
     }
   }, [importState, requestSitePermission, onRemoveCustomSite, onAddCustomSite, notify, closeAllForms]);
 
