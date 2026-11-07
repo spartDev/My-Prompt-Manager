@@ -48,6 +48,10 @@
 @media (prefers-reduced-motion: reduce) {
   .animate-sheet-in,
   .animate-sheet-out,
+  .animate-recede-in,
+  .animate-recede-out,
+  .animate-scrim-in,
+  .animate-scrim-out,
   .animate-pop,
   .animate-pop-check,
   .animate-toast-in,

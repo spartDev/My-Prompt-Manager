@@ -1017,10 +1017,13 @@ duration or a curve: it uses a class, and a timer reads `MOTION`.
 
 | Token | Value | Use |
 |-------|-------|-----|
-| `--ease-sheet` (`ease-sheet`) | `cubic-bezier(0.32, 0.72, 0, 1)` | panels entering and leaving |
+| `--ease-sheet` (`ease-sheet`) | `cubic-bezier(0.25, 0.8, 0.3, 1)` | a panel entering: a gentle ease-out, not front-loaded, so it glides in rather than lands |
+| `--ease-sheet-out` (`ease-sheet-out`) | `cubic-bezier(0.5, 0, 0.75, 0)` | a panel leaving: an ease-in, it gathers speed as it goes |
 | `--ease-spring` (`ease-spring`) | `cubic-bezier(0.34, 1.56, 0.64, 1)` | pops, bounces, presses |
-| `animate-sheet-in` | `sheet-in` 500ms, ease-sheet | a full-screen panel rising from the bottom (the editor) |
-| `animate-sheet-out` | `sheet-out` 320ms, ease-sheet | the panel leaving; it unmounts after (`useAnimatedPresence`) |
+| `animate-sheet-in` | `sheet-in` 400ms, ease-sheet | a full-screen panel rising from the bottom (the editor) |
+| `animate-sheet-out` | `sheet-out` 340ms, ease-sheet-out | the panel leaving; it unmounts after (`useAnimatedPresence`) |
+| `animate-recede-in` / `animate-recede-out` | `recede-in` 400ms ease-sheet / `recede-out` 340ms ease-sheet-out | what lies beneath the panel (the Section and the tab bar) shrinks to `scale(0.96)` from its top as the panel rises, and comes back as it leaves |
+| `animate-scrim-in` / `animate-scrim-out` | `scrim-in` 400ms ease-sheet / `scrim-out` 340ms ease-sheet-out | a `bg-backdrop` scrim between the two, from 0 to 0.6 opacity and back |
 | `animate-pop` | `pop` 450ms, ease-spring | a new chip (a Variable) |
 | `animate-pop-check` | `pop` 400ms, ease-spring | a check mark appearing, the inline "New category" row |
 | `animate-toast-in` | `toast-in` 450ms, ease-spring | the Notification pill, from 14px above the top center |
@@ -1045,7 +1048,8 @@ for nothing: the Save sequence keeps its order without its pause, and a panel un
 `src/hooks/useAnimatedPresence.ts` keeps a panel in the document for the length of its exit
 animation: pass the open value (null when closed) and `MOTION.sheetOut`, render `shown`, and switch
 to the exit animation while `exiting`. Opening again while leaving cancels the unmount; the timer is
-cleared on unmount. The editor sheet of `App` uses it; the Collections sheet will.
+cleared on unmount. The editor sheet of `App` uses it, with its scrim and the recede of the Section
+beneath; the Collections sheet will.
 
 ### Keyframe Animations
 

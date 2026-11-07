@@ -4,18 +4,19 @@
  * (src/theme/__tests__/motion.test.ts checks it).
  */
 
-/** The two curves: panels slide with `sheet`, pops, bounces and presses with `spring` */
+/** The curves: panels rise with `sheet` and leave with `sheetOut`; pops, bounces and presses use `spring` */
 export const EASE = {
-  sheet: 'cubic-bezier(0.32, 0.72, 0, 1)',
+  sheet: 'cubic-bezier(0.25, 0.8, 0.3, 1)',
+  sheetOut: 'cubic-bezier(0.5, 0, 0.75, 0)',
   spring: 'cubic-bezier(0.34, 1.56, 0.64, 1)'
 } as const;
 
 /** Durations and delays, in milliseconds */
 export const MOTION = {
-  /** A panel rising from the bottom */
-  sheetIn: 500,
+  /** A panel rising from the bottom, while what lies beneath recedes under a scrim */
+  sheetIn: 400,
   /** A panel leaving to the bottom; the component unmounts after it */
-  sheetOut: 320,
+  sheetOut: 340,
   /** How long Save shows "Saved" before the editor closes and the Notification appears */
   savedPause: 620,
   /** A new chip (a Variable) popping in */

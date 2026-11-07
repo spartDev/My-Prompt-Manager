@@ -69,13 +69,22 @@ describe('App tab bar navigation', () => {
     // The Library and the tab bar stay in the document, beneath the sheet and out of reach
     expect(screen.getByRole('heading', { name: /my prompt manager/i }).closest('[inert]')).not.toBeNull();
     expect(screen.getByRole('tablist').closest('[inert]')).not.toBeNull();
+    // ...and recede a little under a scrim as the sheet rises
+    const beneath = screen.getByTestId('editor-beneath');
+    const scrim = screen.getByTestId('editor-scrim');
+    expect(beneath).toHaveClass('animate-recede-in');
+    expect(scrim).toHaveClass('animate-scrim-in');
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
-    // The sheet leaves to the bottom, out of reach, then unmounts
+    // The sheet leaves to the bottom, out of reach, then unmounts; the Library comes back with it
     expect(sheet).toHaveClass('animate-sheet-out');
     expect(sheet).toHaveAttribute('inert');
+    expect(beneath).toHaveClass('animate-recede-out');
+    expect(scrim).toHaveClass('animate-scrim-out');
     await waitForElementToBeRemoved(sheet);
+    expect(scrim).not.toBeInTheDocument();
+    expect(beneath).not.toHaveClass('animate-recede-out');
     expect(newButton).toHaveFocus();
     expect(screen.getByRole('heading', { name: /my prompt manager/i }).closest('[inert]')).toBeNull();
     expect(screen.getByRole('tab', { name: 'Library' })).toHaveAttribute('aria-selected', 'true');

@@ -1,8 +1,9 @@
 /**
  * E2E: the motion of the Prompt editor (My-Prompt-Manager-8kh, Atelier 1C)
  *
- * The editor rises as a sheet over the Library (sheet-in), which waits inert beneath it; Cancel
- * sends it down (sheet-out) and unmounts it after; Save shows "Saved", then the sheet leaves and
+ * The editor rises as a sheet over the Library (sheet-in), which waits inert beneath it and
+ * recedes under a scrim (My-Prompt-Manager-ozy); Cancel sends it down (sheet-out), brings the
+ * Library back and unmounts the sheet after; Save shows "Saved", then the sheet leaves and
  * the Notification appears; a new Variable and the check of a chosen chip pop in. Under
  * prefers-reduced-motion everything is near instant. Also captures light/dark screenshots as
  * visual proof (test-results/editor-motion/).
@@ -46,6 +47,26 @@ test.describe('Prompt editor motion', () => {
       await expect(sheet).toHaveCSS('animation-name', 'sheet-in');
       await expect(sheet).toHaveCSS('animation-duration', seconds(MOTION.sheetIn));
       await expect(sheet).toHaveCSS('animation-timing-function', EASE.sheet);
+      const beneath = page.getByTestId('editor-beneath');
+      const scrim = page.getByTestId('editor-scrim');
+      await expect(beneath).toHaveCSS('animation-name', 'recede-in');
+      await expect(beneath).toHaveCSS('animation-duration', seconds(MOTION.sheetIn));
+      await expect(scrim).toHaveCSS('animation-name', 'scrim-in');
+      // Halfway up, as proof of the motion: the sheet rising, the Library receding under the scrim
+      await page.evaluate((at) => {
+        for (const animation of document.getAnimations()) {
+          if (animation instanceof CSSAnimation && ['sheet-in', 'recede-in', 'scrim-in'].includes(animation.animationName)) {
+            animation.pause();
+            animation.currentTime = at;
+          }
+        }
+      }, MOTION.sheetIn / 2);
+      await page.screenshot({ path: `${SCREENSHOT_DIR}/editor-sheet-rising-${theme}.png` });
+      await page.evaluate(() => {
+        for (const animation of document.getAnimations()) {
+          if (animation instanceof CSSAnimation && animation.playState === 'paused') animation.finish();
+        }
+      });
       await expect(page.getByLabel('Title', { exact: true })).toBeFocused();
       // The Library waits beneath, out of reach
       await expect(page.getByTestId('prompt-card').first().locator('xpath=ancestor::*[@inert]')).toHaveCount(1);
@@ -55,7 +76,10 @@ test.describe('Prompt editor motion', () => {
 
       await expect(sheet).toHaveCSS('animation-name', 'sheet-out');
       await expect(sheet).toHaveCSS('animation-duration', seconds(MOTION.sheetOut));
+      await expect(sheet).toHaveCSS('animation-timing-function', EASE.sheetOut);
+      await expect(beneath).toHaveCSS('animation-name', 'recede-out');
       await expect(sheet).toHaveCount(0);
+      await expect(scrim).toHaveCount(0);
       await expect(newButton).toBeFocused();
     });
 
