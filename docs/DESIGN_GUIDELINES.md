@@ -1025,7 +1025,7 @@ duration or a curve: it uses a class, and a timer reads `MOTION`.
 | `animate-sheet-in` | `sheet-in` 400ms, ease-sheet | a full-screen panel rising from the bottom (the editor) |
 | `animate-sheet-out` | `sheet-out` 340ms, ease-sheet-out | the panel leaving; it unmounts after (`useAnimatedPresence`) |
 | `animate-recede-in` / `animate-recede-out` | `recede-in` 400ms ease-sheet / `recede-out` 340ms ease-sheet-out | what lies beneath the panel (the Section and the tab bar) shrinks to `scale(0.96)` from its top as the panel rises, and comes back as it leaves |
-| `animate-scrim-in` / `animate-scrim-out` | `scrim-in` 400ms ease-sheet / `scrim-out` 340ms ease-sheet-out | a `bg-backdrop` scrim between the two, from 0 to 0.6 opacity and back |
+| `animate-scrim-in` / `animate-scrim-out` | `scrim-in` 400ms ease-sheet / `scrim-out` 340ms ease-sheet-out | a `bg-backdrop backdrop-blur-sm` scrim between the two, from 0 to 0.6 opacity and back |
 | `animate-pop` | `pop` 450ms, ease-spring | a new chip (a Variable) |
 | `animate-pop-check` | `pop` 400ms, ease-spring | a check mark appearing, the inline "New category" row |
 | `animate-toast-in` | `toast-in` 450ms, ease-spring | the Notification pill, from 14px above the top center |

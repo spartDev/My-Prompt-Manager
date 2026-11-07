@@ -448,7 +448,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
         <div
           data-testid="editor-scrim"
           aria-hidden="true"
-          className={cn('absolute inset-0 z-20 bg-backdrop pointer-events-none', editorSheet.exiting ? 'animate-scrim-out' : 'animate-scrim-in')}
+          className={cn('absolute inset-0 z-20 bg-backdrop backdrop-blur-sm pointer-events-none', editorSheet.exiting ? 'animate-scrim-out' : 'animate-scrim-in')}
         />
       )}
 

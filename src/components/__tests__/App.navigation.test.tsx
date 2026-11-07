@@ -74,6 +74,8 @@ describe('App tab bar navigation', () => {
     const scrim = screen.getByTestId('editor-scrim');
     expect(beneath).toHaveClass('animate-recede-in');
     expect(scrim).toHaveClass('animate-scrim-in');
+    // The backdrop of a drawer, as the design system prescribes it
+    expect(scrim).toHaveClass('bg-backdrop', 'backdrop-blur-sm');
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
