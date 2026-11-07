@@ -56,3 +56,10 @@
 
 agent:
     profile: team-maintainer
+
+# bd prime: cap the persistent memories it injects, so that the SessionStart hook output stays under
+# Claude Code's 10,000-character inline limit (over it, the output goes to a file most sessions never read).
+# Whole memories past the cap are left out, with a banner that says how many; browse them with bd memories.
+# Budget: .beads/PRIME.md (~1.7 KB) + headers (~0.5 KB) + this cap stays under 8.5 KB.
+prime:
+    max-memory-chars: 6000
