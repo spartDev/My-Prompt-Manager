@@ -184,6 +184,16 @@ describe('check-deps', () => {
     expect(result.stdout).toContain('tsx: 4.23.15 in package-lock.json, not installed');
   });
 
+  it('reports a folder holding another version than node_modules/.package-lock.json says, as after a copy', () => {
+    writeCheckout(root, WANTED, WANTED);
+    writeFileSync(path.join(root, 'node_modules', 'vite', 'package.json'), JSON.stringify({ name: 'vite', version: '7.3.7' }));
+
+    const result = runCheck(root);
+
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain('vite: 7.3.7 installed, 8.3.5 in package-lock.json');
+  });
+
   it('reports a node_modules/.package-lock.json that is not valid JSON as an install to redo, under --hook too', () => {
     writeCheckout(root, WANTED, WANTED);
     writeFileSync(path.join(root, 'node_modules', '.package-lock.json'), '{"packages": {');

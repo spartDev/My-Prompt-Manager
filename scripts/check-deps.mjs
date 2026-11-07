@@ -7,7 +7,8 @@
  * npm writes node_modules/.package-lock.json from the tree it installed, so the check compares every entry of
  * package-lock.json "packages" with it: a version that differs, a package that is not installed, and one installed
  * that the lockfile does not list. An entry counts as installed only while its folder still holds a package.json,
- * since npm leaves that file as it was when a folder is deleted by hand or an install is cut short. An optional package built for another platform is expected to be absent, since
+ * and at that file's version, since npm leaves node_modules/.package-lock.json as it was when a folder is deleted by
+ * hand, copied in from another install, or left by an install cut short. An optional package built for another platform is expected to be absent, since
  * npm skips it (@biomejs/cli-linux-x64 on macOS); one built for this platform is not, since the toolchain needs it
  * (@rolldown/binding-darwin-arm64 on an Apple-silicon Mac).
  *
@@ -212,6 +213,24 @@ export function fixCommand(root) {
   return withReason(install, linked ? 'linked worktree' : 'main checkout');
 }
 
+/**
+ * The hidden lockfile's entries as they are on disk: an entry whose folder holds no readable package.json is dropped,
+ * and the version is the folder's own, since a folder copied in from another install keeps the hidden lockfile's entry.
+ */
+const installedPackages = (root, entries) => {
+  const packages = {};
+  for (const [key, entry] of Object.entries(entries)) {
+    let manifest;
+    try {
+      manifest = readJson(path.join(root, key, 'package.json'));
+    } catch {
+      continue;
+    }
+    packages[key] = { ...entry, version: manifest.version ?? entry.version };
+  }
+  return packages;
+};
+
 /** The report for the checkout at `root`, or an empty string when node_modules matches package-lock.json. */
 export function check(root) {
   const lockfilePath = path.join(root, 'package-lock.json');
@@ -238,9 +257,7 @@ export function check(root) {
   } catch (error) {
     return `node_modules/.package-lock.json cannot be read in ${root} (${describeError(error)}); an install cut short leaves it so (scripts/check-deps.mjs).\nFix: ${fixCommand(root)}`;
   }
-  installed.packages = Object.fromEntries(
-    Object.entries(installed.packages ?? {}).filter(([key]) => existsSync(path.join(root, key, 'package.json'))),
-  );
+  installed.packages = installedPackages(root, installed.packages ?? {});
   const differences = compareLockfiles(lockfile, installed);
   return differences.length === 0 ? '' : report(differences, fixCommand(root));
 }
