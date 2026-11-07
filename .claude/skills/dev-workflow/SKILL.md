@@ -5,6 +5,7 @@ description: |
   breaking work into beads tasks, selecting tasks to parallelize (max 4), launching Claude instances in
   tmux worktrees, and cleaning up after completion. Triggers: "plan feature", "plan refactor", "plan bugfix",
   "start parallel work", "launch parallel", "cleanup worktrees", "kill parallel", or /dev-workflow.
+disable-model-invocation: true
 ---
 
 # Dev Workflow Orchestrator
