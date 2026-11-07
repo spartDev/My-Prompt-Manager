@@ -9,6 +9,7 @@ All workflows enforce the **MANDATORY** requirements from `CLAUDE.md`:
 - ✅ **All tests must pass** (`npm test`)
 - ✅ **Build verification** for Chrome extension
 - ✅ **Security scanning** with `npm audit`
+- ✅ **Workflow files pass zizmor** (`uvx zizmor .github/workflows`)
 
 ## 📋 Available Workflows
 
@@ -29,11 +30,20 @@ All workflows enforce the **MANDATORY** requirements from `CLAUDE.md`:
 │           └── 🎯 End-to-End Tests (e2e)             npm run test:e2e (Playwright, ~10 min)
 └── 🔒 Security & Dependencies (security)             npm audit --audit-level=moderate,
                                                       dependency review, manifest check
-✅ Quality Gate Summary (quality-gate)                needs all seven jobs, always runs,
+🌈 Workflow Lint (workflow-lint)                      zizmor over .github/workflows; needs
+                                                      no Setup, fails on any finding
+✅ Quality Gate Summary (quality-gate)                needs all eight jobs, always runs,
                                                       comments the results on the PR
 ```
 
-The Quality Gate passes only when every one of the seven jobs ends in `success`. A job that is skipped (every job is skipped once Setup fails) or cancelled fails the gate. A run cancelled by a newer push fails on a commit that is no longer the head of the PR, so it blocks nothing.
+The Quality Gate passes only when every one of the eight jobs ends in `success`. A job that is skipped (every job but Workflow Lint is skipped once Setup fails) or cancelled fails the gate. A run cancelled by a newer push fails on a commit that is no longer the head of the PR, so it blocks nothing.
+
+**Workflow Lint** runs [zizmor](https://docs.zizmor.sh/) over `.github/workflows` and fails on any finding: a `${{ }}` expression inside a `run:` script, an action not pinned to a commit, a job with more permissions than it uses, a cache read in a release workflow, a checkout that keeps its credentials. The action pins the zizmor release it runs (1.32.0 at v0.8.1), so Renovate's bump of the action is the bump of zizmor. A finding kept on purpose carries `# zizmor: ignore[rule]` and a one-line reason, as a comment on the line zizmor points at or on a line of the step (`release.yml` keeps `softprops/action-gh-release`, `pr-coverage-comment.yml` its `workflow_run` trigger). Locally, with [uv](https://docs.astral.sh/uv/) installed:
+
+```bash
+uvx zizmor .github/workflows                            # the offline audits
+GH_TOKEN=$(gh auth token) uvx zizmor .github/workflows  # plus the online audits CI runs
+```
 
 ### 2. 🚀 Main Branch Deployment (`main-deploy.yml`)
 
@@ -60,6 +70,7 @@ The Quality Gate passes only when every one of the seven jobs ends in `success`.
 
 **Release Process**:
 - 🔍 Release validation and version consistency
+- 🔐 Job-level permissions, and no read of the Actions cache (a release never restores what another run wrote)
 - 🏗️ Optimized production builds
 - 🏷️ GitHub release creation with assets
 - 🌐 Chrome Web Store package preparation
@@ -100,6 +111,7 @@ npm run build        # Production build
 npm run package      # Chrome extension packaging
 npm audit --audit-level=moderate # Security check
 npm run lint:renovate # Validate renovate.json (pinned Renovate, via npx)
+uvx zizmor .github/workflows # Workflow lint (zizmor, via uv)
 ```
 
 ## 🔧 Configuration
@@ -162,6 +174,7 @@ gh api repos/spartDev/My-Prompt-Manager/branches/main/protection \
 ## 🔒 Security Features
 
 - Dependency vulnerability scanning
+- Workflow lint with zizmor on every pull request
 - Chrome extension manifest validation
 - License compliance checking
 - Secure artifact handling

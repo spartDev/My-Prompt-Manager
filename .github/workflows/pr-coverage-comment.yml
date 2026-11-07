@@ -8,7 +8,7 @@ name: 📊 Coverage Report Comment
 # under that name). So the artifact is downloaded outside the workspace, into runner.temp, where
 # no later step loads code from, and the script reads it as data and validates every value.
 on:
-  workflow_run:
+  workflow_run: # zizmor: ignore[dangerous-triggers] on purpose: see the SECURITY note above and docs/PR_COVERAGE_REPORTING.md
     workflows: ["🔍 Pull Request Checks"]
     types:
       - completed
