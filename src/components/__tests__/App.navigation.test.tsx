@@ -85,7 +85,9 @@ describe('App tab bar navigation', () => {
     await waitForElementToBeRemoved(sheet);
     expect(scrim).not.toBeInTheDocument();
     expect(beneath).not.toHaveClass('animate-recede-out');
-    expect(newButton).toHaveFocus();
+    // The focus comes back in an effect of the commit that removed the sheet, which React may run
+    // a scheduler task later on a slow machine
+    await waitFor(() => { expect(newButton).toHaveFocus(); });
     expect(screen.getByRole('heading', { name: /my prompt manager/i }).closest('[inert]')).toBeNull();
     expect(screen.getByRole('tab', { name: 'Library' })).toHaveAttribute('aria-selected', 'true');
   });

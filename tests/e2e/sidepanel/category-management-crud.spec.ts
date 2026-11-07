@@ -1,490 +1,424 @@
+import type { Page } from '@playwright/test';
+
 import { DEFAULT_CATEGORY, DEFAULT_SETTINGS } from '../../../src/types';
-import { expect, test } from '../fixtures/extension';
+import { type ExtensionStorage, expect, test } from '../fixtures/extension';
+import { CategoryManagerPage, SHEET_DISMISSALS } from '../pages/CategoryManagerPage';
+import { LibraryPage } from '../pages/LibraryPage';
 import { createCategorySeed, createPromptSeed, seedLibrary } from '../utils/storage';
+
+type SeedOptions = Parameters<typeof seedLibrary>[1];
+
+/** Seeds the Library, opens the side panel on the Categories section */
+const openCategories = async (
+  page: Page,
+  storage: ExtensionStorage,
+  extensionId: string,
+  seed: SeedOptions = {}
+): Promise<CategoryManagerPage> => {
+  await seedLibrary(storage, {
+    ...seed,
+    settings: { ...DEFAULT_SETTINGS, interfaceMode: 'sidepanel', ...seed.settings },
+    interfaceMode: 'sidepanel'
+  });
+  await page.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+  const categories = new CategoryManagerPage(page);
+  await categories.openFromLibrary();
+  return categories;
+};
+
+const categoryNames = async (storage: ExtensionStorage): Promise<string[]> =>
+  (await storage.getCategories()).map(category => category.name);
 
 test.describe('Category Management - Core CRUD Operations', () => {
 
-  test.beforeEach(async ({ storage }) => {
-    // Start with clean state and sidepanel mode for consistent UI
-    await seedLibrary(storage, {
-      settings: {
-        ...DEFAULT_SETTINGS,
-        interfaceMode: 'sidepanel',
-      },
-      interfaceMode: 'sidepanel',
-    });
-  });
-
   test.describe('Category Creation', () => {
-    test('should create a new category with name and color', async ({ context, storage, extensionId }) => {
-      const sidepanelPage = await context.newPage();
-      await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+    test('creates a Category with the Create button, in the color chosen', async ({ page, storage, extensionId }) => {
+      const categories = await openCategories(page, storage, extensionId);
 
-      // Navigate to category manager (button is in the main library view)
-      await expect(sidepanelPage.getByRole('heading', { name: 'My Prompt Manager' })).toBeVisible();
+      await categories.openCreateSheet();
+      await expect(categories.getSheet()).toContainText('Add prompts to it from the editor.');
+      await expect(categories.getSheetPreview()).toHaveText('?');
+      // No Delete when creating
+      await expect(categories.getSheetDeleteButton()).toHaveCount(0);
 
-      const manageCategoriesButton = sidepanelPage.getByTestId('tab-categories');
-      await expect(manageCategoriesButton).toBeVisible();
-      await manageCategoriesButton.click();
+      await categories.fillSheetName('Coding');
+      await expect(categories.getSheetPreview()).toHaveText('C');
+      await categories.chooseColor('Teal');
+      await expect(categories.getSheetPreview()).toHaveCSS('background-color', 'rgb(15, 118, 110)');
+      await categories.getSubmitButton().click();
 
-      // Verify category manager opened
-      await expect(sidepanelPage.getByRole('heading', { level: 1, name: 'Categories', exact: true })).toBeVisible();
+      await categories.expectSheetClosed();
+      await categories.expectNotification('Category created', 'Coding');
+      await categories.expectCategoryExists('Coding');
+      await categories.expectCategoryCount(2);
+      // The keyboard goes back to what opened the sheet
+      await expect(categories.getAddCategoryButton()).toBeFocused();
 
-      // Create new category
-      const categoryNameInput = sidepanelPage.getByPlaceholder('Enter category name...');
-      await expect(categoryNameInput).toBeVisible();
-      await categoryNameInput.fill('Coding');
-
-      // Add button should be enabled when name is provided
-      const addButton = sidepanelPage.getByRole('button', { name: 'Add' });
-      await expect(addButton).toBeEnabled();
-      await addButton.click();
-
-      // Verify category appears in list
-      await expect(sidepanelPage.getByTestId('category-row').getByText('Coding')).toBeVisible();
-      await expect(sidepanelPage.getByText('2 categories', { exact: true }).first()).toBeVisible(); // Should include default "Uncategorized" + new one
-
-      // Verify input is cleared after creation
-      await expect(categoryNameInput).toHaveValue('');
-
-      // Verify persistence in storage
-      const categories = await storage.getCategories();
-      expect(categories).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            name: 'Coding',
-          }),
-        ])
+      expect(await storage.getCategories()).toEqual(
+        expect.arrayContaining([expect.objectContaining({ name: 'Coding', color: '#0F766E' })])
       );
     });
 
-    test('should show validation error for duplicate category names', async ({ context, storage, extensionId }) => {
-      // Seed existing category
-      await seedLibrary(storage, {
-        categories: [
-          createCategorySeed({ name: 'Coding', color: '#3B82F6' })
-        ],
-        settings: {
-          ...DEFAULT_SETTINGS,
-          interfaceMode: 'sidepanel',
-        },
+    test('creates a Category with Enter in the name, in the first color no Category uses', async ({ page, storage, extensionId }) => {
+      const categories = await openCategories(page, storage, extensionId, {
+        categories: [createCategorySeed({ name: 'Email', color: '#2563EB' })] // Ocean Blue, the first preset
       });
 
-      const sidepanelPage = await context.newPage();
-      await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+      await categories.openCreateSheet();
+      await expect(categories.getColorSwatch('Sky Blue')).toHaveAttribute('aria-pressed', 'true');
+      await expect(categories.getSheet().getByRole('button', { pressed: true })).toHaveCount(1);
 
-      // Navigate to category manager
-      await sidepanelPage.getByTestId('tab-categories').click();
+      await categories.fillSheetName('  Writing  ');
+      await categories.submitSheet('enter');
 
-      // Try to create duplicate category (case-insensitive test)
-      const categoryNameInput = sidepanelPage.getByPlaceholder('Enter category name...');
-      await categoryNameInput.fill('coding'); // lowercase to test case-insensitive validation
-
-      const addButton = sidepanelPage.getByRole('button', { name: 'Add' });
-      await addButton.click();
-
-      // Verify error message appears
-      await expect(sidepanelPage.getByText('⚠️ Category already exists')).toBeVisible();
-
-      // Verify category count hasn't changed
-      await expect(sidepanelPage.getByText('2 categories', { exact: true }).first()).toBeVisible(); // Default + seeded category
-
-      // Verify storage unchanged
-      const categories = await storage.getCategories();
-      const codingCategories = categories.filter(c => c.name.toLowerCase() === 'coding');
-      expect(codingCategories).toHaveLength(1); // Only the original one
+      await categories.expectSheetClosed();
+      // Admitted on the way in: surrounding spaces are removed from the name
+      await categories.expectNotification('Category created', 'Writing');
+      await categories.expectCategoryExists('Writing');
+      expect(await storage.getCategories()).toEqual(
+        expect.arrayContaining([expect.objectContaining({ name: 'Writing', color: '#0369A1' })])
+      );
     });
 
-    test('should show validation error for empty category name', async ({ context, extensionId }) => {
-      const sidepanelPage = await context.newPage();
-      await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
-
-      // Navigate to category manager
-      await sidepanelPage.getByTestId('tab-categories').click();
-
-      // Verify add button is disabled when input is empty
-      const addButton = sidepanelPage.getByRole('button', { name: 'Add' });
-      await expect(addButton).toBeDisabled();
-
-      // Try to submit empty name by filling and clearing
-      const categoryNameInput = sidepanelPage.getByPlaceholder('Enter category name...');
-      await categoryNameInput.fill('test');
-      await expect(addButton).toBeEnabled();
-
-      await categoryNameInput.clear();
-      await expect(addButton).toBeDisabled();
-
-      // Try with only whitespace
-      await categoryNameInput.fill('   ');
-      await expect(addButton).toBeDisabled();
-    });
-
-    test('should clear error message when correcting input', async ({ context, storage, extensionId }) => {
-      // Seed existing category to trigger duplicate error
-      await seedLibrary(storage, {
-        categories: [
-          createCategorySeed({ name: 'Existing', color: '#3B82F6' })
-        ],
-        settings: {
-          ...DEFAULT_SETTINGS,
-          interfaceMode: 'sidepanel',
-        },
+    test('refuses a name already taken, ignoring case, in the sheet, until the name changes', async ({ page, storage, extensionId }) => {
+      const categories = await openCategories(page, storage, extensionId, {
+        categories: [createCategorySeed({ name: 'Coding', color: '#2563EB' })]
       });
 
-      const sidepanelPage = await context.newPage();
-      await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+      await categories.openCreateSheet();
+      await categories.fillSheetName('coding');
+      await categories.submitSheet();
 
-      // Navigate to category manager
-      await sidepanelPage.getByTestId('tab-categories').click();
+      // The sheet stays open with the reason under the name, and no failure Notification
+      await categories.expectRefusal('Category with name "coding" already exists');
+      await expect(categories.getCreateSheet()).toBeVisible();
+      await expect(categories.getSheetNameInput()).toHaveValue('coding');
+      await expect(categories.getNotification()).toHaveCount(0);
+      await categories.expectCategoryCount(2);
+      expect((await categoryNames(storage)).filter(name => name.toLowerCase() === 'coding')).toEqual(['Coding']);
 
-      const categoryNameInput = sidepanelPage.getByPlaceholder('Enter category name...');
+      // Correcting the name clears the reason, and the Category is created
+      await categories.fillSheetName('Coding tips');
+      await expect(categories.getSheetRefusal()).toHaveCount(0);
+      await expect(categories.getSheetNameInput()).not.toHaveAttribute('aria-invalid', 'true');
+      await categories.submitSheet();
+      await categories.expectSheetClosed();
+      await categories.expectCategoryExists('Coding tips');
+    });
 
-      // Trigger duplicate error
-      await categoryNameInput.fill('Existing');
-      await sidepanelPage.getByRole('button', { name: 'Add' }).click();
-      await expect(sidepanelPage.getByText('⚠️ Category already exists')).toBeVisible();
+    test('refuses a name over 50 characters in the sheet, never shortening it', async ({ page, storage, extensionId }) => {
+      const categories = await openCategories(page, storage, extensionId);
+      const tooLong = 'A'.repeat(51);
 
-      // Correct the input
-      await categoryNameInput.clear();
-      await categoryNameInput.fill('New Category');
+      await categories.openCreateSheet();
+      await categories.fillSheetName(tooLong);
+      await categories.submitSheet();
 
-      // Error should disappear
-      await expect(sidepanelPage.getByText('⚠️ Category already exists')).toBeHidden();
+      await categories.expectRefusal('Category name cannot exceed 50 characters');
+      await expect(categories.getSheetNameInput()).toHaveValue(tooLong);
+      await expect(categories.getNotification()).toHaveCount(0);
+      expect(await categoryNames(storage)).toEqual([DEFAULT_CATEGORY]);
+
+      // 50 is admitted
+      await categories.fillSheetName('A'.repeat(50));
+      await categories.submitSheet();
+      await categories.expectSheetClosed();
+      await categories.expectCategoryExists('A'.repeat(50));
+    });
+
+    test('does nothing with an empty or blank name', async ({ page, storage, extensionId }) => {
+      const categories = await openCategories(page, storage, extensionId);
+
+      await categories.openCreateSheet();
+      const create = categories.getSubmitButton();
+      await expect(create).toHaveText('Create');
+      await expect(create).toHaveAttribute('aria-disabled', 'true');
+      await expect(create).toBeDisabled();
+
+      // Clicked or submitted with Enter, an empty name creates nothing and keeps the sheet open
+      await create.click({ force: true });
+      await categories.getSheetNameInput().press('Enter');
+      await expect(categories.getCreateSheet()).toBeVisible();
+
+      await categories.fillSheetName('Test');
+      await expect(create).toBeEnabled();
+
+      await categories.fillSheetName('   ');
+      await expect(create).toBeDisabled();
+      await expect(categories.getSheetPreview()).toHaveText('?');
+      await create.click({ force: true });
+      await categories.getSheetNameInput().press('Enter');
+
+      await expect(categories.getCreateSheet()).toBeVisible();
+      await expect(categories.getSheetRefusal()).toHaveCount(0);
+      await expect(categories.getNotification()).toHaveCount(0);
+      await categories.expectCategoryCount(1);
+      expect(await categoryNames(storage)).toEqual([DEFAULT_CATEGORY]);
     });
   });
 
   test.describe('Category Editing', () => {
-    test('should edit category name and color inline', async ({ context, storage, extensionId }) => {
-      // Seed category to edit
-      const testCategory = createCategorySeed({
-        name: 'Research',
-        color: '#3B82F6' // Blue
+    test('edits the name and color in the sheet, and the Prompts follow the new name', async ({ page, storage, extensionId }) => {
+      const research = createCategorySeed({ name: 'Research', color: '#2563EB' }); // Ocean Blue
+      const categories = await openCategories(page, storage, extensionId, {
+        categories: [research],
+        prompts: [
+          createPromptSeed({ title: 'Literature review', category: 'Research' }),
+          createPromptSeed({ title: 'Data analysis', category: 'Research' })
+        ]
       });
 
-      await seedLibrary(storage, {
-        categories: [testCategory],
-        settings: {
-          ...DEFAULT_SETTINGS,
-          interfaceMode: 'sidepanel',
-        },
-      });
+      await categories.openEditSheet('Research');
+      await expect(categories.getSheet()).toContainText('Used by 2 prompts');
+      await expect(categories.getColorSwatch('Ocean Blue')).toHaveAttribute('aria-pressed', 'true');
+      await expect(categories.getSheetPreview()).toHaveText('R');
+      // The edited row keeps a border of its color, seen behind the backdrop
+      await expect(categories.getEditButton('Research')).toHaveCSS('box-shadow', 'rgb(37, 99, 235) 0px 0px 0px 2px inset');
 
-      const sidepanelPage = await context.newPage();
-      await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+      await categories.fillSheetName('Analysis');
+      await categories.chooseColor('Rose');
+      await expect(categories.getColorSwatch('Ocean Blue')).toHaveAttribute('aria-pressed', 'false');
+      await expect(categories.getSubmitButton()).toHaveText('Save');
+      await categories.submitSheet();
 
-      // Navigate to category manager
-      await sidepanelPage.getByTestId('tab-categories').click();
+      await categories.expectSheetClosed();
+      await categories.expectNotification('Category saved', 'Analysis');
+      await categories.expectCategoryExists('Analysis');
+      await categories.expectCategoryNotExists('Research');
+      await expect(categories.getRowSwatch('Analysis')).toHaveCSS('background-color', 'rgb(225, 29, 72)');
+      // The keyboard goes back to the row, which no longer carries the border
+      await expect(categories.getEditButton('Analysis')).toBeFocused();
+      await expect(categories.getEditButton('Analysis')).toHaveCSS('box-shadow', 'none');
 
-      // Verify category is displayed
-      await expect(sidepanelPage.getByText('Research')).toBeVisible();
-
-      // Hover to reveal edit button and click it
-      const categoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Research', { exact: true }) }).first();
-      await categoryRow.hover();
-
-      const editButton = categoryRow.getByRole('button', { name: 'Edit category' });
-      await expect(editButton).toBeVisible();
-      await editButton.click();
-
-      // Verify edit mode activated - input should be visible and focused
-      const editInput = sidepanelPage.getByPlaceholder('Category name', { exact: true });
-      await expect(editInput).toBeVisible();
-      await expect(editInput).toHaveValue('Research');
-
-      // Change the name
-      await editInput.clear();
-      await editInput.fill('Analysis');
-
-      // Save changes by clicking save button
-      const saveButton = sidepanelPage.getByRole('button', { name: 'Save changes (Enter)' });
-      await expect(saveButton).toBeVisible();
-      await saveButton.click();
-
-      // Verify changes applied
-      await expect(sidepanelPage.getByTestId('category-row').getByText('Analysis')).toBeVisible();
-      await expect(sidepanelPage.getByText('Research')).toBeHidden();
-
-      // Verify persistence in storage
-      const categories = await storage.getCategories();
-      expect(categories).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            id: testCategory.id,
-            name: 'Analysis',
-          }),
-        ])
+      expect(await storage.getCategories()).toEqual(
+        expect.arrayContaining([expect.objectContaining({ id: research.id, name: 'Analysis', color: '#E11D48' })])
       );
+      expect((await storage.getPrompts()).map(prompt => prompt.category)).toEqual(['Analysis', 'Analysis']);
     });
 
-    test('should cancel edit with Escape key', async ({ context, storage, extensionId }) => {
-      const testCategory = createCategorySeed({ name: 'Original Name' });
-
-      await seedLibrary(storage, {
-        categories: [testCategory],
-        settings: {
-          ...DEFAULT_SETTINGS,
-          interfaceMode: 'sidepanel',
-        },
-      });
-
-      const sidepanelPage = await context.newPage();
-      await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
-
-      // Navigate to category manager
-      await sidepanelPage.getByTestId('tab-categories').click();
-
-      // Start editing
-      const categoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Original Name', { exact: true }) }).first();
-      await categoryRow.hover();
-      await categoryRow.getByRole('button', { name: 'Edit category' }).click();
-
-      // Make changes
-      const editInput = sidepanelPage.getByPlaceholder('Category name', { exact: true });
-      await editInput.clear();
-      await editInput.fill('Changed Name');
-
-      // Press Escape to cancel
-      await editInput.press('Escape');
-
-      // Verify original name restored and edit mode exited
-      await expect(sidepanelPage.getByText('Original Name')).toBeVisible();
-      await expect(sidepanelPage.getByText('Changed Name')).toBeHidden();
-      await expect(editInput).toBeHidden();
-
-      // Verify storage unchanged
-      const categories = await storage.getCategories();
-      expect(categories).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            id: testCategory.id,
-            name: 'Original Name',
-          }),
-        ])
-      );
-    });
-
-    test('should save edit with Enter key', async ({ context, storage, extensionId }) => {
+    test('saves with Enter in the name, and says when no Prompt uses the Category', async ({ page, storage, extensionId }) => {
       const testCategory = createCategorySeed({ name: 'Old Name' });
+      const categories = await openCategories(page, storage, extensionId, { categories: [testCategory] });
 
-      await seedLibrary(storage, {
-        categories: [testCategory],
-        settings: {
-          ...DEFAULT_SETTINGS,
-          interfaceMode: 'sidepanel',
-        },
+      await categories.openEditSheet('Old Name');
+      await expect(categories.getSheet()).toContainText('Not used yet');
+      await categories.fillSheetName('New Name');
+      await categories.submitSheet('enter');
+
+      await categories.expectSheetClosed();
+      await categories.expectNotification('Category saved', 'New Name');
+      await categories.expectCategoryExists('New Name');
+      await categories.expectCategoryNotExists('Old Name');
+      expect(await storage.getCategories()).toEqual(
+        expect.arrayContaining([expect.objectContaining({ id: testCategory.id, name: 'New Name' })])
+      );
+    });
+
+    test('refuses to rename a Category into another one\'s name', async ({ page, storage, extensionId }) => {
+      const categories = await openCategories(page, storage, extensionId, {
+        categories: [createCategorySeed({ name: 'Work' }), createCategorySeed({ name: 'Personal' })]
       });
 
-      const sidepanelPage = await context.newPage();
-      await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+      await categories.openEditSheet('Personal');
+      await categories.fillSheetName('WORK');
+      await categories.submitSheet();
 
-      // Navigate to category manager
-      await sidepanelPage.getByTestId('tab-categories').click();
+      await categories.expectRefusal('Category with name "WORK" already exists');
+      await expect(categories.getEditSheet()).toBeVisible();
+      await expect(categories.getNotification()).toHaveCount(0);
+      expect(await categoryNames(storage)).toEqual([DEFAULT_CATEGORY, 'Work', 'Personal']);
+    });
 
-      // Start editing
-      const categoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Old Name', { exact: true }) }).first();
-      await categoryRow.hover();
-      await categoryRow.getByRole('button', { name: 'Edit category' }).click();
+    for (const how of SHEET_DISMISSALS) {
+      test(`closing with ${how} saves nothing, creating or editing`, async ({ page, storage, extensionId }) => {
+        const testCategory = createCategorySeed({ name: 'Original Name', color: '#2563EB' });
+        const categories = await openCategories(page, storage, extensionId, { categories: [testCategory] });
 
-      // Make changes and press Enter
-      const editInput = sidepanelPage.getByPlaceholder('Category name', { exact: true });
-      await editInput.clear();
-      await editInput.fill('New Name');
-      await editInput.press('Enter');
+        // Creating
+        await categories.openCreateSheet();
+        await categories.fillSheetName('Never created');
+        await categories.chooseColor('Lime');
+        await categories.dismissSheet(how);
+        await expect(categories.getAddCategoryButton()).toBeFocused();
+        await categories.expectCategoryNotExists('Never created');
 
-      // Verify changes saved
-      await expect(sidepanelPage.getByTestId('category-row').getByText('New Name')).toBeVisible();
-      await expect(sidepanelPage.getByText('Old Name')).toBeHidden();
+        // Editing
+        await categories.openEditSheet('Original Name');
+        await categories.fillSheetName('Changed Name');
+        await categories.chooseColor('Amber');
+        await categories.dismissSheet(how);
+        await expect(categories.getEditButton('Original Name')).toBeFocused();
+        await categories.expectCategoryNotExists('Changed Name');
+        await expect(categories.getRowSwatch('Original Name')).toHaveCSS('background-color', 'rgb(37, 99, 235)');
 
-      // Verify storage updated
-      const categories = await storage.getCategories();
-      expect(categories).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            id: testCategory.id,
-            name: 'New Name',
-          }),
-        ])
-      );
+        await expect(categories.getNotification()).toHaveCount(0);
+        expect(await storage.getCategories()).toEqual([
+          expect.objectContaining({ name: DEFAULT_CATEGORY }),
+          { id: testCategory.id, name: 'Original Name', color: '#2563EB' }
+        ]);
+
+        // Opened again, the sheet starts afresh from the stored Category
+        await categories.openEditSheet('Original Name');
+        await expect(categories.getColorSwatch('Ocean Blue')).toHaveAttribute('aria-pressed', 'true');
+      });
+    }
+
+    test('reopening right after closing gives exactly one sheet, a fresh one', async ({ page, storage, extensionId }) => {
+      const categories = await openCategories(page, storage, extensionId);
+
+      // Keyboard: Escape gives the keyboard back to Add category, and Enter opens it again during the exit
+      await categories.openCreateSheet();
+      await categories.fillSheetName('Draft');
+      await page.keyboard.press('Escape');
+      await expect(categories.getAddCategoryButton()).toBeFocused();
+      await page.keyboard.press('Enter');
+
+      await expect(categories.getSheetsOnPage()).toHaveCount(1);
+      await expect(categories.getCreateSheet()).toHaveClass(/sheet-in/);
+      await expect(categories.getSheetNameInput()).toHaveValue('');
+      await expect(categories.getSheetNameInput()).toBeFocused();
+
+      // Pointer: Close, then Add category two frames later, while the first sheet plays its 280 ms exit
+      const reopenedDuringExit = await page.evaluate(async () => {
+        const sheet = () => document.querySelector('[role="dialog"][aria-label="New category"]');
+        const nextFrame = () => new Promise<void>(resolve => { requestAnimationFrame(() => { resolve(); }); });
+        sheet()?.querySelector<HTMLButtonElement>('button[aria-label="Close"]')?.click();
+        await nextFrame();
+        await nextFrame();
+        const closing = sheet()?.classList.contains('sheet-out') ?? false;
+        [...document.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent?.trim() === 'Add category')?.click();
+        return closing;
+      });
+      expect(reopenedDuringExit, 'the first sheet was still playing its exit').toBe(true);
+
+      await expect(categories.getSheetsOnPage()).toHaveCount(1);
+      await expect(categories.getCreateSheet()).toHaveClass(/sheet-in/);
+      // Still one, still open, once the first one's exit would have ended
+      await page.waitForTimeout(600);
+      await expect(categories.getSheetsOnPage()).toHaveCount(1);
+      await expect(categories.getSheetBackdrop()).toHaveCount(1);
+      await expect(categories.getCreateSheet()).toBeVisible();
+      await expect(categories.getSheetNameInput()).toHaveValue('');
+
+      // And it works: it creates one Category
+      await categories.fillSheetName('Only once');
+      await categories.submitSheet();
+      await categories.expectSheetClosed();
+      await categories.expectCategoryExists('Only once');
+      expect(await categoryNames(storage)).toEqual([DEFAULT_CATEGORY, 'Only once']);
     });
   });
 
   test.describe('Category Deletion', () => {
-    test('should delete category with confirmation dialog', async ({ context, storage, extensionId }) => {
-      const testCategory = createCategorySeed({ name: 'Temporary Category' });
-
-      await seedLibrary(storage, {
-        categories: [testCategory],
-        settings: {
-          ...DEFAULT_SETTINGS,
-          interfaceMode: 'sidepanel',
-        },
-      });
-
-      const sidepanelPage = await context.newPage();
-      await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
-
-      // Navigate to category manager
-      await sidepanelPage.getByTestId('tab-categories').click();
-
-      // Verify category exists
-      await expect(sidepanelPage.getByText('Temporary Category')).toBeVisible();
-      await expect(sidepanelPage.getByText('2 categories', { exact: true }).first()).toBeVisible();
-
-      // Hover to reveal delete button and click it
-      const categoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Temporary Category', { exact: true }) }).first();
-      await categoryRow.hover();
-
-      const deleteButton = categoryRow.getByRole('button', { name: 'Delete category' });
-      await expect(deleteButton).toBeVisible();
-      await deleteButton.click();
-
-      // Verify confirmation dialog appears
-      const confirmDialog = sidepanelPage.getByRole('dialog', { name: 'Delete Category' });
-      await expect(confirmDialog).toBeVisible();
-      await expect(confirmDialog.getByText('Delete category "Temporary Category"?')).toBeVisible();
-      await expect(confirmDialog.getByText('All prompts in this category will be moved to "Uncategorized"')).toBeVisible();
-
-      // Confirm deletion
-      const confirmDeleteButton = confirmDialog.getByRole('button', { name: 'Delete' });
-      await confirmDeleteButton.click();
-
-      // Verify category removed from list (not from dialog which should be closed)
-      await expect(sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Temporary Category', { exact: true }) })).toBeHidden();
-      await expect(sidepanelPage.getByText('1 category', { exact: true }).first()).toBeVisible(); // Only "Uncategorized" remains
-
-      // Verify storage updated
-      const categories = await storage.getCategories();
-      expect(categories).not.toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ id: testCategory.id }),
-        ])
-      );
-    });
-
-    test('should prevent deletion of "Uncategorized" default category', async ({ context, extensionId }) => {
-      const sidepanelPage = await context.newPage();
-      await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
-
-      // Navigate to category manager
-      await sidepanelPage.getByTestId('tab-categories').click();
-
-      // Find the Uncategorized category row
-      const uncategorizedRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Uncategorized', { exact: true }) }).first();
-      await expect(uncategorizedRow).toBeVisible();
-
-      // Hover over it
-      await uncategorizedRow.hover();
-
-      // Verify no delete button is present (only edit should be missing too for default category)
-      await expect(uncategorizedRow.getByRole('button', { name: 'Delete category' })).toBeHidden();
-      await expect(uncategorizedRow.getByRole('button', { name: 'Edit category' })).toBeHidden();
-    });
-
-    test('should cancel deletion dialog', async ({ context, storage, extensionId }) => {
-      const testCategory = createCategorySeed({ name: 'Keep This Category' });
-
-      await seedLibrary(storage, {
-        categories: [testCategory],
-        settings: {
-          ...DEFAULT_SETTINGS,
-          interfaceMode: 'sidepanel',
-        },
-      });
-
-      const sidepanelPage = await context.newPage();
-      await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
-
-      // Navigate to category manager
-      await sidepanelPage.getByTestId('tab-categories').click();
-
-      // Click delete button
-      const categoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Keep This Category', { exact: true }) }).first();
-      await categoryRow.hover();
-      await categoryRow.getByRole('button', { name: 'Delete category' }).click();
-
-      // Verify dialog appears
-      const confirmDialog = sidepanelPage.getByRole('dialog', { name: 'Delete Category' });
-      await expect(confirmDialog).toBeVisible();
-
-      // Cancel deletion
-      const cancelButton = confirmDialog.getByRole('button', { name: 'Cancel' });
-      await cancelButton.click();
-
-      // Verify category remains
-      await expect(sidepanelPage.getByText('Keep This Category')).toBeVisible();
-      await expect(sidepanelPage.getByText('2 categories', { exact: true }).first()).toBeVisible();
-
-      // Verify dialog closed
-      await expect(confirmDialog).toBeHidden();
-
-      // Verify storage unchanged
-      const categories = await storage.getCategories();
-      expect(categories).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            id: testCategory.id,
-            name: 'Keep This Category',
-          }),
-        ])
-      );
-    });
-
-    test('should move prompts to "Uncategorized" when category deleted', async ({ context, storage, extensionId }) => {
-      const testCategory = createCategorySeed({ name: 'Work' });
-      const testPrompts = [
-        createPromptSeed({
-          title: 'Work Prompt 1',
-          content: 'First work prompt',
-          category: 'Work'
-        }),
-        createPromptSeed({
-          title: 'Work Prompt 2',
-          content: 'Second work prompt',
-          category: 'Work'
-        }),
+    test('deletes from the sheet at once, and Undo brings the Category and its Prompts back', async ({ page, storage, extensionId }) => {
+      const work = createCategorySeed({ id: 'work', name: 'Work', color: '#0F766E' });
+      const personal = createCategorySeed({ id: 'personal', name: 'Personal', color: '#DB2777' });
+      const prompts = [
+        createPromptSeed({ id: 'w1', title: 'Work Prompt 1', category: 'Work' }),
+        createPromptSeed({ id: 'w2', title: 'Work Prompt 2', category: 'Work' }),
+        createPromptSeed({ id: 'p1', title: 'Personal Prompt', category: 'Personal' })
       ];
+      const categories = await openCategories(page, storage, extensionId, { categories: [work, personal], prompts });
 
-      await seedLibrary(storage, {
-        categories: [testCategory],
-        prompts: testPrompts,
-        settings: {
-          ...DEFAULT_SETTINGS,
-          interfaceMode: 'sidepanel',
-        },
+      await categories.deleteCategory('Work');
+
+      // No confirmation with the Notifications on: Undo stands in for it
+      await categories.expectCategoryCount(2);
+      // The keyboard goes to the row that took its place
+      await expect(categories.getEditButton('Personal')).toBeFocused();
+      await expect.poll(() => categoryNames(storage)).toEqual([DEFAULT_CATEGORY, 'Personal']);
+      expect((await storage.getPrompts()).map(prompt => prompt.category)).toEqual([DEFAULT_CATEGORY, DEFAULT_CATEGORY, 'Personal']);
+
+      await categories.undoDelete();
+
+      // Back at its place, with its color, and its Prompts back in it
+      await expect(categories.getCategoryRows()).toHaveText([/Uncategorized/, /Work/, /Personal/]);
+      await expect(categories.getRowSwatch('Work')).toHaveCSS('background-color', 'rgb(15, 118, 110)');
+      await categories.expectCategoryCount(3);
+      await expect.poll(() => storage.getCategories()).toEqual([
+        expect.objectContaining({ name: DEFAULT_CATEGORY }),
+        { id: 'work', name: 'Work', color: '#0F766E' },
+        { id: 'personal', name: 'Personal', color: '#DB2777' }
+      ]);
+      expect((await storage.getPrompts()).map(prompt => prompt.category)).toEqual(['Work', 'Work', 'Personal']);
+
+      // The Library lists them in Work again
+      await categories.closeToLibrary();
+      const library = new LibraryPage(page);
+      await library.filterByCategory('Work');
+      await expect(library.getPromptCards()).toHaveCount(2);
+      await library.expectPromptVisible('Work Prompt 1');
+      await library.expectPromptVisible('Work Prompt 2');
+    });
+
+    test('moves the Prompts of a deleted Category to "Uncategorized"', async ({ page, storage, extensionId }) => {
+      const categories = await openCategories(page, storage, extensionId, {
+        categories: [createCategorySeed({ name: 'Work' })],
+        prompts: [
+          createPromptSeed({ title: 'Work Prompt 1', content: 'First work prompt', category: 'Work' }),
+          createPromptSeed({ title: 'Work Prompt 2', content: 'Second work prompt', category: 'Work' })
+        ]
       });
 
-      const sidepanelPage = await context.newPage();
-      await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+      await categories.deleteCategory('Work');
+      await categories.closeToLibrary();
 
-      // Navigate to category manager
-      await sidepanelPage.getByTestId('tab-categories').click();
+      await expect(page.getByRole('heading', { name: 'Work Prompt 1' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Work Prompt 2' })).toBeVisible();
+      const library = new LibraryPage(page);
+      await expect(library.getLibraryFilterPill('Work')).toHaveCount(0);
 
-      // Delete the "Work" category
-      const categoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Work', { exact: true }) }).first();
-      await categoryRow.hover();
-      await categoryRow.getByRole('button', { name: 'Delete category' }).click();
-
-      // Confirm deletion
-      const confirmDialog = sidepanelPage.getByRole('dialog', { name: 'Delete Category' });
-      await confirmDialog.getByRole('button', { name: 'Delete' }).click();
-
-      // Return to the Library via the tab bar to verify prompts moved to Uncategorized
-      // Categories has no back button; use the Library tab
-      const closeButton = sidepanelPage.getByTestId('tab-library');
-      await closeButton.click();
-      await expect(sidepanelPage.getByRole('heading', { name: 'My Prompt Manager' })).toBeVisible();
-
-      // Verify prompts still exist and are now in Uncategorized
-      await expect(sidepanelPage.getByRole('heading', { name: 'Work Prompt 1' })).toBeVisible();
-      await expect(sidepanelPage.getByRole('heading', { name: 'Work Prompt 2' })).toBeVisible();
-
-      // Verify prompts moved to Uncategorized in storage
-      const prompts = await storage.getPrompts();
-      const workPrompts = prompts.filter(p => p.title.startsWith('Work Prompt'));
+      const workPrompts = (await storage.getPrompts()).filter(prompt => prompt.title.startsWith('Work Prompt'));
       expect(workPrompts).toHaveLength(2);
-      workPrompts.forEach(prompt => {
+      for (const prompt of workPrompts) {
         expect(prompt.category).toBe(DEFAULT_CATEGORY);
+      }
+    });
+
+    test('the default Category "Uncategorized" opens no sheet: it is neither edited nor deleted', async ({ page, storage, extensionId }) => {
+      const categories = await openCategories(page, storage, extensionId, {
+        categories: [createCategorySeed({ name: 'Work' })]
       });
+
+      const uncategorized = categories.getCategoryRow(DEFAULT_CATEGORY);
+      await expect(uncategorized).toBeVisible();
+      await expect(uncategorized).toContainText('Default');
+      await expect(categories.getEditButton(DEFAULT_CATEGORY)).toHaveCount(0);
+      await expect(uncategorized.getByRole('button')).toHaveCount(0);
+
+      await uncategorized.click();
+      await expect(categories.getSheetsOnPage()).toHaveCount(0);
+      // The other rows do open it
+      await expect(categories.getEditButton('Work')).toHaveAttribute('aria-haspopup', 'dialog');
+    });
+
+    test('with the Notifications off, Delete asks first, as there is no Undo', async ({ page, storage, extensionId }) => {
+      await storage.seed({ toast_settings: { enabled: false } });
+      const categories = await openCategories(page, storage, extensionId, {
+        categories: [createCategorySeed({ name: 'Keep This Category' })]
+      });
+
+      // Cancelled: nothing is deleted and the sheet stays open on the Category
+      await categories.deleteCategoryWithConfirmation('Keep This Category', false);
+      await expect(categories.getDeleteConfirmation()).toHaveCount(0);
+      await expect(categories.getSheet()).toBeVisible();
+      await expect(categories.getSheetNameInput()).toHaveValue('Keep This Category');
+      await categories.dismissSheet();
+      await categories.expectCategoryExists('Keep This Category');
+      expect(await categoryNames(storage)).toEqual([DEFAULT_CATEGORY, 'Keep This Category']);
+
+      // Confirmed: the Category goes, with no Notification
+      await categories.openEditSheet('Keep This Category');
+      await categories.getSheetDeleteButton().click();
+      const confirmation = categories.getDeleteConfirmation();
+      await expect(confirmation).toContainText('All prompts in this category will be moved to "Uncategorized"');
+      await confirmation.getByRole('button', { name: 'Delete', exact: true }).click();
+
+      await categories.expectSheetClosed();
+      await categories.expectCategoryNotExists('Keep This Category');
+      await categories.expectCategoryCount(1);
+      await expect(categories.getNotification()).toHaveCount(0);
+      await expect.poll(() => categoryNames(storage)).toEqual([DEFAULT_CATEGORY]);
     });
   });
 });

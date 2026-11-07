@@ -103,7 +103,8 @@
 
   /* Motion (Atelier 1C): panels rise with ease-sheet and leave with ease-sheet-out, pops and
      presses spring. Durations are mirrored in src/theme/motion.ts for the timers; each animation is
-     a class, animate-<name>. While a sheet is up, what lies beneath recedes under a scrim */
+     a class, animate-<name>. While a sheet is up, what lies beneath recedes under a scrim.
+     The Category sheet's classes in popup.css run on these curves and keyframes */
   --ease-sheet: cubic-bezier(0.25, 0.8, 0.3, 1);
   --ease-sheet-out: cubic-bezier(0.5, 0, 0.75, 0);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);

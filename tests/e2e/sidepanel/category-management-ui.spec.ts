@@ -1,5 +1,7 @@
+import { PRESET_COLORS } from '../../../src/constants/colors';
 import { DEFAULT_SETTINGS } from '../../../src/types';
 import { expect, test } from '../fixtures/extension';
+import { CategoryManagerPage } from '../pages/CategoryManagerPage';
 import { createCategorySeed, seedLibrary } from '../utils/storage';
 
 test.describe('Category Manager - UI/UX Tests', () => {
@@ -42,11 +44,16 @@ test.describe('Category Manager - UI/UX Tests', () => {
       await expect(categoriesTab).toHaveAttribute('aria-selected', 'true');
       await expect(sidepanelPage.getByRole('heading', { level: 1, name: 'Categories', exact: true })).toBeVisible();
 
-      // Verify UI components are present
-      await expect(sidepanelPage.getByText('Add New Category')).toBeVisible();
+      // The list, and "Add category" below it: no form on the screen, the sheet creates and edits
       await expect(sidepanelPage.getByText('Your Categories')).toBeVisible();
-      await expect(sidepanelPage.getByPlaceholder('Enter category name...')).toBeVisible();
-      await expect(sidepanelPage.getByRole('button', { name: 'Add' })).toBeVisible();
+      const addCategory = sidepanelPage.getByRole('button', { name: 'Add category', exact: true });
+      await expect(addCategory).toBeVisible();
+      await expect(addCategory).toHaveAttribute('aria-haspopup', 'dialog');
+      await expect(sidepanelPage.getByRole('textbox')).toHaveCount(0);
+      await expect(sidepanelPage.getByRole('dialog')).toHaveCount(0);
+      const listBox = await sidepanelPage.getByRole('region', { name: 'Your Categories' }).boundingBox();
+      const addBox = await addCategory.boundingBox();
+      expect(addBox?.y ?? 0, 'Add category is below the list').toBeGreaterThan((listBox?.y ?? 0) + (listBox?.height ?? 0));
     });
 
     test('should close category manager and return to main library view', async ({ context, storage, extensionId }) => {
@@ -102,11 +109,8 @@ test.describe('Category Manager - UI/UX Tests', () => {
       // Verify count shows seeded categories + default "Uncategorized"
       await expect(sidepanelPage.getByText('4 categories', { exact: true }).first()).toBeVisible();
 
-      // Verify all categories are displayed
-      await expect(sidepanelPage.getByText('Work')).toBeVisible();
-      await expect(sidepanelPage.getByText('Personal')).toBeVisible();
-      await expect(sidepanelPage.getByText('Research')).toBeVisible();
-      await expect(sidepanelPage.getByText('Uncategorized')).toBeVisible();
+      // Verify all categories are displayed, in their order
+      await expect(sidepanelPage.getByTestId('category-row')).toHaveText([/Uncategorized/, /Work/, /Personal/, /Research/]);
     });
 
     test('should display singular category count correctly', async ({ context, storage, extensionId }) => {
@@ -130,7 +134,7 @@ test.describe('Category Manager - UI/UX Tests', () => {
       await expect(sidepanelPage.locator('span').filter({ hasText: /^\d+ categories$/ })).toBeHidden();
     });
 
-    test('should show empty state when no custom categories exist', async ({ context, storage, extensionId }) => {
+    test('should show only the default Category, with Add category ready, when no custom categories exist', async ({ context, storage, extensionId }) => {
       // Start with clean state (only default category exists)
       await seedLibrary(storage, {
         settings: {
@@ -149,97 +153,96 @@ test.describe('Category Manager - UI/UX Tests', () => {
       await expect(sidepanelPage.getByText('1 category', { exact: true }).first()).toBeVisible();
 
       // Verify only "Uncategorized" is shown
+      await expect(sidepanelPage.getByTestId('category-row')).toHaveCount(1);
       await expect(sidepanelPage.getByText('Uncategorized')).toBeVisible();
       await expect(sidepanelPage.getByText('Default')).toBeVisible();
 
-      // Verify the form is available to create first custom category
-      await expect(sidepanelPage.getByPlaceholder('Enter category name...')).toBeVisible();
-      await expect(sidepanelPage.getByRole('button', { name: 'Add' })).toBeDisabled(); // Should be disabled when empty
+      // "Add category" is there to create the first custom one
+      await expect(sidepanelPage.getByRole('button', { name: 'Add category', exact: true })).toBeEnabled();
     });
 
-    test('should update category count dynamically when categories are added/removed', async ({ context, storage, extensionId }) => {
-      await seedLibrary(storage, {
-        settings: {
-          ...DEFAULT_SETTINGS,
-          interfaceMode: 'sidepanel',
-        },
-      });
-
+    test('should update category count dynamically when categories are added/removed', async ({ context, extensionId }) => {
       const sidepanelPage = await context.newPage();
       await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
-
-      // Open category manager
-      await sidepanelPage.getByTestId('tab-categories').click();
+      const categories = new CategoryManagerPage(sidepanelPage);
+      await categories.openFromLibrary();
 
       // Initial state: only default category
-      await expect(sidepanelPage.getByText('1 category', { exact: true }).first()).toBeVisible();
+      await categories.expectCategoryCount(1);
 
       // Add a new category
-      const categoryNameInput = sidepanelPage.getByPlaceholder('Enter category name...');
-      await categoryNameInput.fill('Testing');
-      await sidepanelPage.getByRole('button', { name: 'Add' }).click();
-
-      // Verify count updated to 2
-      await expect(sidepanelPage.getByText('2 categories', { exact: true }).first()).toBeVisible();
-      await expect(sidepanelPage.getByText('1 category', { exact: true }).first()).toBeHidden();
+      await categories.createCategory('Testing');
+      await categories.expectCategoryCount(2);
+      await expect(sidepanelPage.getByText('1 category', { exact: true })).toHaveCount(0);
 
       // Add another category
-      await categoryNameInput.fill('Development');
-      await sidepanelPage.getByRole('button', { name: 'Add' }).click();
+      await categories.createCategory('Development', { submitWith: 'enter' });
+      await categories.expectCategoryCount(3);
 
-      // Wait for the success message to confirm the category was added
-      await expect(sidepanelPage.getByText('Category created', { exact: true }).first()).toBeVisible();
+      // Delete a category (Testing): at once, the Notification offering Undo
+      await categories.deleteCategory('Testing');
+      await categories.expectCategoryCount(2);
+      await expect(sidepanelPage.getByText('3 categories', { exact: true })).toHaveCount(0);
 
-      // Verify count updated to 3
-      await expect(sidepanelPage.getByText('3 categories', { exact: true }).first()).toBeVisible();
+      // Undo counts it again
+      await categories.undoDelete();
+      await categories.expectCategoryExists('Testing');
+      await categories.expectCategoryCount(3);
+    });
 
-      // Delete a category (Testing)
-      const testingCategoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Testing', { exact: true }) }).first();
-      await testingCategoryRow.hover();
-      await testingCategoryRow.getByRole('button', { name: 'Delete category' }).first().click();
+    test('should step the Categories view back while the sheet is open', async ({ context, extensionId }) => {
+      const sidepanelPage = await context.newPage();
+      await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+      const categories = new CategoryManagerPage(sidepanelPage);
+      await categories.openFromLibrary();
 
-      // Confirm deletion in dialog
-      const confirmDialog = sidepanelPage.getByRole('dialog', { name: 'Delete Category' });
-      await confirmDialog.getByRole('button', { name: 'Delete' }).click();
+      const view = categories.getView();
+      await expect(view).not.toHaveAttribute('data-stepped-back');
+      await expect(view).toHaveCSS('transform', 'none');
 
-      // Verify count decreased to 2
-      await expect(sidepanelPage.getByText('2 categories', { exact: true }).first()).toBeVisible();
-      await expect(sidepanelPage.getByText('3 categories', { exact: true }).first()).toBeHidden();
+      await categories.openCreateSheet();
+      await expect(view).toHaveAttribute('data-stepped-back', '');
+      // scale(.93) translateY(10px), once its transition has ended
+      await expect.poll(() => view.evaluate(element => {
+        const matrix = new DOMMatrix(getComputedStyle(element).transform);
+        return [matrix.a, matrix.d, matrix.f].map(value => Math.round(value * 100) / 100);
+      })).toEqual([0.93, 0.93, 9.3]);
+      await expect(view).toHaveCSS('border-radius', '22px');
+
+      await categories.dismissSheet('escape');
+      await expect(view).not.toHaveAttribute('data-stepped-back');
+      await expect(view).toHaveCSS('transform', 'none');
     });
   });
 
-  test.describe('Color Picker Integration', () => {
-    test('should display color picker and allow color selection for new categories', async ({ context, storage, extensionId }) => {
-      await seedLibrary(storage, {
-        settings: {
-          ...DEFAULT_SETTINGS,
-          interfaceMode: 'sidepanel',
-        },
-      });
-
+  test.describe('Category colors in the sheet', () => {
+    test('offers the 12 Category colors, one chosen, and a new Category takes the one chosen', async ({ context, storage, extensionId }) => {
       const sidepanelPage = await context.newPage();
       await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+      const categories = new CategoryManagerPage(sidepanelPage);
+      await categories.openFromLibrary();
 
-      // Open category manager
-      await sidepanelPage.getByTestId('tab-categories').click();
+      await categories.openCreateSheet();
+      const swatches = categories.getSheet().getByRole('button', { name: new RegExp(`^(${PRESET_COLORS.map(color => color.name).join('|')})$`) });
+      await expect(swatches).toHaveCount(PRESET_COLORS.length);
+      for (const [index, color] of PRESET_COLORS.entries()) {
+        await expect(swatches.nth(index)).toHaveAccessibleName(color.name);
+      }
+      // A new Category starts with the first color no Category uses: Ocean Blue, in an empty Library
+      await expect(categories.getSheet().getByRole('button', { pressed: true })).toHaveAccessibleName('Ocean Blue');
 
-      // Verify color picker section is present in the form
-      await expect(sidepanelPage.getByText('Category Color')).toBeVisible();
+      await categories.fillSheetName('Design');
+      await categories.chooseColor('Purple');
+      await expect(categories.getSheet().getByRole('button', { pressed: true })).toHaveCount(1);
+      await expect(categories.getSheetPreview()).toHaveCSS('background-color', 'rgb(147, 51, 234)');
+      await categories.submitSheet();
 
-      // Create a category with a specific color
-      await sidepanelPage.getByPlaceholder('Enter category name...').fill('Design');
-
-      // The color picker should have a default color selected
-      // We'll verify this by creating the category and checking the resulting color swatch
-      await sidepanelPage.getByRole('button', { name: 'Add' }).click();
-
-      // Verify category was created and has a color swatch
-      await expect(sidepanelPage.getByTestId('category-row').getByText('Design')).toBeVisible();
-
-      // Find the color swatch for the Design category
-      const designCategoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Design', { exact: true }) }).first();
-      const colorSwatch = designCategoryRow.locator('div[style*="background-color"]').first();
-      await expect(colorSwatch).toBeVisible();
+      await categories.expectSheetClosed();
+      await expect(categories.getRowSwatch('Design')).toHaveCSS('background-color', 'rgb(147, 51, 234)');
+      await expect(categories.getRowSwatch('Design')).toHaveAttribute('title', 'Purple');
+      expect(await storage.getCategories()).toEqual(
+        expect.arrayContaining([expect.objectContaining({ name: 'Design', color: '#9333EA' })])
+      );
     });
 
     test('should display category color swatches correctly', async ({ context, storage, extensionId }) => {
@@ -260,31 +263,17 @@ test.describe('Category Manager - UI/UX Tests', () => {
 
       const sidepanelPage = await context.newPage();
       await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+      const categoryManager = new CategoryManagerPage(sidepanelPage);
+      await categoryManager.openFromLibrary();
 
-      // Open category manager
-      await sidepanelPage.getByTestId('tab-categories').click();
-
-      // Verify each category has its color swatch visible
-      const redCategoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Red Category', { exact: true }) }).first();
-      // Find the color swatch with the specific background color inline style
-      const redSwatch = redCategoryRow.locator('div[style*="background-color: rgb(239, 68, 68)"]').first();
-      await expect(redSwatch).toBeVisible();
-      // Verify the background color is applied
-      await expect(redSwatch).toHaveCSS('background-color', 'rgb(239, 68, 68)');
-
-      const blueCategoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Blue Category', { exact: true }) }).first();
-      const blueSwatch = blueCategoryRow.locator('div[style*="background-color: rgb(59, 130, 246)"]').first();
-      await expect(blueSwatch).toBeVisible();
-      await expect(blueSwatch).toHaveCSS('background-color', 'rgb(59, 130, 246)');
-
-      const greenCategoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Green Category', { exact: true }) }).first();
-      const greenSwatch = greenCategoryRow.locator('div[style*="background-color: rgb(16, 185, 129)"]').first();
-      await expect(greenSwatch).toBeVisible();
-      await expect(greenSwatch).toHaveCSS('background-color', 'rgb(16, 185, 129)');
+      // Each row shows its Category's color
+      await expect(categoryManager.getRowSwatch('Red Category')).toHaveCSS('background-color', 'rgb(239, 68, 68)');
+      await expect(categoryManager.getRowSwatch('Blue Category')).toHaveCSS('background-color', 'rgb(59, 130, 246)');
+      await expect(categoryManager.getRowSwatch('Green Category')).toHaveCSS('background-color', 'rgb(16, 185, 129)');
     });
 
-    test('should allow editing category color through inline color picker', async ({ context, storage, extensionId }) => {
-      const testCategory = createCategorySeed({ name: 'Color Test', color: '#3B82F6' }); // Blue
+    test('recolors a Category through its sheet', async ({ context, storage, extensionId }) => {
+      const testCategory = createCategorySeed({ name: 'Color Test', color: '#2563EB' }); // Ocean Blue
 
       await seedLibrary(storage, {
         categories: [testCategory],
@@ -296,36 +285,78 @@ test.describe('Category Manager - UI/UX Tests', () => {
 
       const sidepanelPage = await context.newPage();
       await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+      const categories = new CategoryManagerPage(sidepanelPage);
+      await categories.openFromLibrary();
 
-      // Open category manager
-      await sidepanelPage.getByTestId('tab-categories').click();
+      await categories.openEditSheet('Color Test');
+      await expect(categories.getColorSwatch('Ocean Blue')).toHaveAttribute('aria-pressed', 'true');
+      await expect(categories.getSheetPreview()).toHaveCSS('background-color', 'rgb(37, 99, 235)');
+      await categories.chooseColor('Amber');
+      // Amber takes black text, the other presets white
+      await expect(categories.getSheetPreview()).toHaveCSS('color', 'rgb(0, 0, 0)');
+      await categories.submitSheet();
 
-      // Start editing the category
-      const categoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Color Test', { exact: true }) }).first();
-      await categoryRow.hover();
-      await categoryRow.getByRole('button', { name: 'Edit category' }).click();
+      await categories.expectSheetClosed();
+      await categories.expectNotification('Category saved', 'Color Test');
+      await expect(categories.getRowSwatch('Color Test')).toHaveCSS('background-color', 'rgb(217, 119, 6)');
+      expect(await storage.getCategories()).toEqual(
+        expect.arrayContaining([expect.objectContaining({ id: testCategory.id, name: 'Color Test', color: '#D97706' })])
+      );
+    });
 
-      // Verify we're in edit mode and color picker is visible
-      const editInput = sidepanelPage.getByPlaceholder('Category name', { exact: true });
-      await expect(editInput).toBeVisible();
-      await expect(editInput).toHaveValue('Color Test');
+    test('keeps a color that is not one of the 12, with no swatch chosen, when only the name changes', async ({ context, storage, extensionId }) => {
+      const navy = createCategorySeed({ name: 'Archives', color: '#1E40AF' }); // Navy, no longer a preset
 
-      // Verify color picker is available in edit mode (compact mode)
-      // In edit mode, there should be a ColorPicker component present
-      // We'll verify this by checking that the input has been converted to edit mode (edit input is visible)
-      await expect(editInput).toBeVisible();
+      await seedLibrary(storage, {
+        categories: [navy],
+        settings: {
+          ...DEFAULT_SETTINGS,
+          interfaceMode: 'sidepanel',
+        },
+      });
 
-      // The color picker in edit mode should be present - we can verify this by
-      // checking that there's a different structure when in edit mode
-      // Since the edit mode has both input and color picker, just verify the input is working
-      await expect(editInput).toHaveValue('Color Test');
+      const sidepanelPage = await context.newPage();
+      await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+      const categories = new CategoryManagerPage(sidepanelPage);
+      await categories.openFromLibrary();
 
-      // Save the edit (without changing color for this test)
-      await editInput.press('Enter');
+      await categories.openEditSheet('Archives');
+      await expect(categories.getSheet().getByRole('button', { pressed: true })).toHaveCount(0);
+      await expect(categories.getSheetPreview()).toHaveCSS('background-color', 'rgb(30, 64, 175)');
+      await categories.fillSheetName('Old archives');
+      await categories.submitSheet();
 
-      // Verify edit mode exited
-      await expect(editInput).toBeHidden();
-      await expect(sidepanelPage.getByText('Color Test')).toBeVisible();
+      await categories.expectSheetClosed();
+      expect(await storage.getCategories()).toEqual(
+        expect.arrayContaining([{ id: navy.id, name: 'Old archives', color: '#1E40AF' }])
+      );
+    });
+  });
+
+  test.describe('The sheet in the popup', () => {
+    test('creates, edits and deletes a Category through the sheet in the popup', async ({ page, storage, extensionId }) => {
+      await seedLibrary(storage, { categories: [createCategorySeed({ name: 'Work', color: '#2563EB' })] });
+      await page.setViewportSize({ width: 400, height: 500 });
+      await page.goto(`chrome-extension://${extensionId}/src/popup.html`);
+      const categories = new CategoryManagerPage(page);
+      await categories.openFromLibrary();
+
+      // The panel rises from the bottom of the popup, across its width
+      await categories.openCreateSheet();
+      const panel = await categories.getSheet().boundingBox();
+      expect(panel?.x).toBe(0);
+      expect(panel?.width).toBe(400);
+      expect((panel?.y ?? 0) + (panel?.height ?? 0)).toBeCloseTo(500, 0);
+      await categories.dismissSheet('backdrop');
+
+      await categories.createCategory('Personal', { color: 'Pink' });
+      await categories.editCategory('Personal', 'Home', { color: 'Lime', submitWith: 'enter' });
+      await categories.deleteCategory('Work');
+
+      await expect.poll(async () => (await storage.getCategories()).map(({ name, color }) => ({ name, color }))).toEqual([
+        { name: 'Uncategorized', color: undefined },
+        { name: 'Home', color: '#4D7C0F' }
+      ]);
     });
   });
 });

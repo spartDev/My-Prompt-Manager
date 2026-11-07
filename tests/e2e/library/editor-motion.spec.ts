@@ -103,6 +103,12 @@ test.describe('Prompt editor motion', () => {
 
       const save = page.getByRole('button', { name: 'Save', exact: true });
       await expect(save).toHaveCSS('transition-duration', '0.3s, 0.3s, 0.25s');
+      // The exit can end before an assertion reads it in flight: record the animations the sheet starts
+      await sheet.evaluate((element) => {
+        const started: string[] = [];
+        (window as unknown as { sheetAnimations: string[] }).sheetAnimations = started;
+        element.addEventListener('animationstart', (event) => started.push((event as AnimationEvent).animationName));
+      });
       await save.click();
 
       const saved = page.getByRole('button', { name: 'Saved', exact: true });
@@ -113,7 +119,7 @@ test.describe('Prompt editor motion', () => {
       // The sheet leaves and the Notification comes with it
       const toast = page.getByRole('status');
       await expect(toast).toContainText('Prompt created');
-      await expect(sheet).toHaveCSS('animation-name', 'sheet-out');
+      await expect.poll(() => page.evaluate(() => (window as unknown as { sheetAnimations: string[] }).sheetAnimations)).toContain('sheet-out');
       await expect(toast).toHaveCSS('animation-name', 'toast-in');
       await expect(toast).toHaveCSS('animation-timing-function', EASE.spring);
       await expect(toast.getByTestId('toast-mark')).toHaveCSS('animation-delay', seconds(MOTION.toastMarkDelay));

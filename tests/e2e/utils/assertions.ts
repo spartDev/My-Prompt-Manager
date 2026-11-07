@@ -128,10 +128,12 @@ export const categoryAssertions = {
   },
 
   /**
-   * Expect category already exists validation error
+   * Expect the Category sheet to have refused a name already taken: it stays open, the reason under
+   * the name. Give the name to check the whole message
    */
-  duplicateError: async (page: Page): Promise<void> => {
-    await expectErrorMessage(page, '⚠️ Category already exists');
+  duplicateError: async (page: Page, name?: string): Promise<void> => {
+    const refusal = page.getByRole('dialog', { name: /^(New|Edit) category$/ }).getByRole('alert');
+    await expect(refusal).toContainText(name === undefined ? 'already exists' : `Category with name "${name}" already exists`);
   },
 };
 

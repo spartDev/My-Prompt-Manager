@@ -99,6 +99,7 @@ A refusal keeps its type through `StorageManager` and `PromptManager`, so a call
 ### Backup restore
 
 - `importCategory` matches a Backup's Category to a stored one by admitted name; the stored Category keeps its id and name and takes the other fields (color) from the Backup. Matched by id, it never renames the default Category and never renames a Category into another's name, and a rename it does apply moves the Prompts with it (`repointPrompt`), in one atomic write under CATEGORIES then PROMPTS. A Category without a string id is given one; a color that is not a hex color is dropped.
+- `deleteCategory` moves the Category's Prompts to the default Category in one atomic write and resolves to a `DeletedCategory` (the Category, its place, the Prompts it moved with their last edit before and after). `restoreCategory` takes it to undo the deletion: the Category comes back at its place with its id and color, its name admitted again and refused if another Category took it meanwhile, and the Prompts still in the default Category move back (`returnPrompt`), those not edited since getting back their last edit from before the move. CATEGORIES then PROMPTS.
 - `importPrompt` uses `matchStoredCategory`, so a Prompt whose Category the Library spells differently takes the stored spelling. A Category that neither the Backup nor the Library has is created from the admitted name, in one atomic write with the Prompt (CATEGORIES then PROMPTS).
 
 ---
@@ -108,7 +109,8 @@ A refusal keeps its type through `StorageManager` and `PromptManager`, so a call
 | File | Job | Used by |
 |------|-----|---------|
 | `src/hooks/usePrompts.ts` | The Prompts with loading and error state; create, update, delete, pin | `App` |
-| `src/hooks/useCategories.ts` | The Categories with loading and error state; create, update, delete | `App` |
+| `src/hooks/useCategories.ts` | The Categories with loading and error state; create, update, delete, and restore (the Undo of a delete) | `App` |
+| `src/hooks/useCategorySheet.ts` | State of the Category sheet, apart from its drawing: open, closing (`SHEET_EXIT_MS`, cancelled by opening again) or gone, the mode, the draft name and color | `CategoryManager` |
 | `src/hooks/useSearchWithDebounce.ts` | Search field state: the typed query at once, the search after a debounce | `App` |
 | `src/hooks/useSearch.ts` | The filtering and highlights behind `useSearchWithDebounce` | `useSearchWithDebounce` |
 | `src/hooks/useToast.ts` | The one Notification on screen (a new one replaces it) and the on/off switch of `toast_settings` | `App` |
@@ -124,7 +126,7 @@ A refusal keeps its type through `StorageManager` and `PromptManager`, so a call
 | `src/hooks/useNow.ts` | The current time, refreshed at an interval, for relative dates | Analytics |
 | `src/hooks/useRadioGroup.ts` | Keyboard behavior of a WAI-ARIA radio group: one tab stop, arrows, Home and End move focus and selection, `locked` ignores input. `src/components/__tests__/radioGroups.test.ts` fails when a component renders `role="radio"` without it | `LibraryFilterBar`, `AppearanceSection`, `InterfaceModeSelector` |
 | `src/hooks/useAnimatedPresence.ts` | Keeps a panel in the document for its exit animation (`MOTION.sheetOut`): `shown` is what to render, `exiting` says to play the exit; reopening while leaving cancels the unmount, and the timer is cleared on unmount. Instant under `prefers-reduced-motion` | `App` (the editor sheet) |
-| `src/hooks/useModalFocus.ts` | Keyboard behavior of a modal dialog: focus moves in, Tab and Shift+Tab wrap inside (onto the panel when every control is disabled), Escape closes, the focus returns to the opener. Beneath a confirmation (`isOpen` false while the panel stays in the document, `inert`) it pauses, keeps its opener, and resumes where the confirmation leaves the focus | `ConfirmDialog`, `AnalyticsTab`, `StorageWarning`, `ConfigurationPreview` |
+| `src/hooks/useModalFocus.ts` | Keyboard behavior of a modal dialog: focus moves in, Tab and Shift+Tab wrap inside (onto the panel when every control is disabled), Escape closes, the focus returns to the opener. Beneath a confirmation (`isOpen` false while the panel stays in the document, `inert`) it pauses, keeps its opener, and resumes where the confirmation leaves the focus | `ConfirmDialog`, `AnalyticsTab`, `StorageWarning`, `ConfigurationPreview`, `CategorySheet` |
 
 Components read the theme through `useThemeContext()` of `src/contexts/ThemeContext.tsx`, never `useTheme()` directly: `ThemeProvider` calls `useTheme` once, so every component sees the same theme.
 

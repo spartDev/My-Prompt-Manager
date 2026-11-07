@@ -17,13 +17,15 @@ export interface TabBarProps {
   activeSection: Section;
   /** Fired on every tab press, including the already active tab (used for scroll-to-top). */
   onSelect: (section: Section) => void;
+  /** Behind a modal sheet: out of reach, assistive technology included, until it closes */
+  inert?: boolean;
 }
 
 /**
  * iOS-style bottom tab bar switching between the four Sections.
  * Implements the WAI-ARIA tabs pattern: roving tabindex and arrow-key navigation.
  */
-const TabBar: FC<TabBarProps> = ({ activeSection, onSelect }) => {
+const TabBar: FC<TabBarProps> = ({ activeSection, onSelect, inert = false }) => {
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLButtonElement>, index: number) => {
@@ -43,6 +45,7 @@ const TabBar: FC<TabBarProps> = ({ activeSection, onSelect }) => {
     <nav
       className="shrink-0 bg-app border-t border-transparent scroll-edge-bottom px-2 pt-2 pb-2"
       aria-label="Main navigation"
+      inert={inert}
     >
       <div className="grid grid-cols-4 gap-1" role="tablist" aria-label="Sections">
         {TABS.map(({ section, label, icon: Icon }, index) => {

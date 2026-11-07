@@ -140,6 +140,70 @@ describe('useToast', () => {
     expect(result.current.toast?.message).toBe('Stays');
   });
 
+  it('stops its time while paused (hovered or focused), and runs out the rest once resumed', () => {
+    const { result } = renderHook(() => useToast());
+
+    act(() => {
+      result.current.showToast('Category deleted', 'success', { duration: 6000 });
+    });
+    const id = result.current.toast?.id ?? '';
+    act(() => {
+      vi.advanceTimersByTime(4000);
+    });
+    act(() => {
+      result.current.pauseToast(id);
+    });
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(result.current.toast?.message).toBe('Category deleted');
+
+    act(() => {
+      result.current.resumeToast(id);
+    });
+    act(() => {
+      vi.advanceTimersByTime(1999);
+    });
+    expect(result.current.toast?.message).toBe('Category deleted');
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(result.current.toast).toBeNull();
+  });
+
+  it('ignores a pause or resume for a Notification no longer shown, or one that stays anyway', () => {
+    const { result } = renderHook(() => useToast());
+
+    act(() => {
+      result.current.showToast('First', 'success');
+    });
+    const firstId = result.current.toast?.id ?? '';
+    act(() => {
+      result.current.showToast('Second', 'success', { duration: 3000 });
+    });
+    act(() => {
+      result.current.pauseToast(firstId);
+      result.current.resumeToast(firstId);
+    });
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+    expect(result.current.toast).toBeNull();
+
+    act(() => {
+      result.current.showToast('Stays', 'info', { duration: 0 });
+    });
+    const staysId = result.current.toast?.id ?? '';
+    act(() => {
+      result.current.pauseToast(staysId);
+      result.current.resumeToast(staysId);
+    });
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(result.current.toast?.message).toBe('Stays');
+  });
+
   it('hides the Notification on screen, and ignores an id that is no longer shown', () => {
     const { result } = renderHook(() => useToast());
 
@@ -173,6 +237,24 @@ describe('useToast', () => {
   });
 
   describe('settings', () => {
+    it('says when the stored settings have been read', async () => {
+      mockStored({ enabled: false });
+      const { result } = renderHook(() => useToast());
+
+      expect(result.current.settingsLoaded).toBe(false);
+      await flushLoad();
+      expect(result.current).toMatchObject({ settingsLoaded: true, settings: { enabled: false } });
+    });
+
+    it('counts the settings as read when reading them failed, with Notifications on', async () => {
+      (vi.spyOn(chrome.storage.local, 'get') as any).mockRejectedValue(new Error('Storage unavailable'));
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const { result } = renderHook(() => useToast());
+
+      await flushLoad();
+      expect(result.current).toMatchObject({ settingsLoaded: true, settings: { enabled: true } });
+    });
+
     it('shows Notifications by default, with nothing stored', async () => {
       const { result } = renderHook(() => useToast());
       await flushLoad();

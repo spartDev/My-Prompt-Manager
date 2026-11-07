@@ -18,7 +18,7 @@ import { useSearchWithDebounce } from './hooks/useSearchWithDebounce';
 import { useToast } from './hooks/useToast';
 import { ALL_PROMPTS } from './services/libraryFilter';
 import { MOTION } from './theme/motion';
-import type { AppError, Category, LibraryFilter, Prompt } from './types';
+import type { AppError, Category, DeletedCategory, LibraryFilter, Prompt } from './types';
 import { Logger, toError } from './utils';
 import { cn } from './utils/cn';
 
@@ -30,6 +30,12 @@ interface SavedNotice {
   message: string;
   sub: string;
 }
+
+/** How long the Notification of a deleted Category stays, so its Undo can be reached */
+const UNDO_DURATION_MS = 6000;
+
+/** A Category name refused (by Admission, or taken): the Category sheet shows why, so no failure Notification */
+const isRefusal = (error: AppError): boolean => error.type === 'VALIDATION_ERROR';
 
 interface AppProps {
   context?: 'popup' | 'sidepanel';
@@ -55,6 +61,8 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   const [libraryFilter, setLibraryFilter] = useState<LibraryFilter>(ALL_PROMPTS);
   // Why the last save or Settings import was refused for lack of storage: the storage warning shows it
   const [storageRefusal, setStorageRefusal] = useState<string | null>(null);
+  // The Category sheet is open: the tab bar is out of reach behind it
+  const [categorySheetOpen, setCategorySheetOpen] = useState(false);
   // What had the keyboard when the refused save started (Save, or the field where Enter was
   // pressed): it gets the keyboard back when the warning closes
   const storageRefusalTriggerRef = useRef<HTMLElement | null>(null);
@@ -86,11 +94,12 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
     createCategory,
     updateCategory,
     deleteCategory,
+    restoreCategory,
     refreshCategories
   } = useCategories();
 
   const { copyToClipboard } = useClipboard();
-  const { toast, showToast, hideToast, settings, updateSettings } = useToast();
+  const { toast, showToast, hideToast, pauseToast, resumeToast, settings, settingsLoaded, updateSettings } = useToast();
 
   // Initialize search with debounce functionality using optimistic prompts
   const searchWithDebounce = useSearchWithDebounce(optimisticPrompts);
@@ -235,20 +244,22 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
     }
   };
 
-  const handleCreateCategory = async (categoryData: { name: string; color?: string }) => {
-    const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  // From the Category sheet: a refusal is shown in the sheet, a full storage opens the storage
+  // warning, which gives the keyboard back to `trigger`; the AppError goes back to the sheet
+  const handleCreateCategory = async (categoryData: { name: string; color: string }, trigger: HTMLElement | null): Promise<Category> => {
     try {
-      await createCategory(categoryData);
-      showToast('Category created', 'success', { sub: categoryData.name });
+      const created = await createCategory(categoryData);
+      showToast('Category created', 'success', { sub: created.name });
+      return created;
     } catch (error: unknown) {
       const appError = error as AppError;
       if (appError.type === 'STORAGE_QUOTA_EXCEEDED') {
         storageRefusalTriggerRef.current = trigger;
         setStorageRefusal(appError.message || 'Failed to create category');
-      } else {
+      } else if (!isRefusal(appError)) {
         showToast("Couldn't create Category", 'error', { sub: appError.message });
       }
-      throw new Error(appError.message || 'Failed to create category');
+      throw error;
     }
   };
 
@@ -272,28 +283,43 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
 
   const handleUpdateCategory = async (id: string, updates: Partial<{ name: string; color?: string }>) => {
     try {
-      await updateCategory(id, updates);
+      const updated = await updateCategory(id, updates);
       // Refresh prompts to show the updated category names
-      if (updates.name) {
+      if (updates.name !== undefined) {
         await refreshPrompts();
       }
-      showToast('Category saved', 'success', { sub: updates.name ?? categories.find(c => c.id === id)?.name });
+      showToast('Category saved', 'success', { sub: updated.name });
     } catch (error: unknown) {
       const appError = error as AppError;
-      showToast("Couldn't save Category", 'error', { sub: appError.message });
-      throw new Error(appError.message || 'Failed to update category');
+      if (!isRefusal(appError)) {
+        showToast("Couldn't save Category", 'error', { sub: appError.message });
+      }
+      throw error;
     }
   };
 
-  const handleDeleteCategory = async (id: string) => {
-    const name = categories.find(c => c.id === id)?.name;
+  // Undo of a deletion: the Category comes back with its Prompts
+  const handleRestoreCategory = async (deleted: DeletedCategory) => {
     try {
-      await deleteCategory(id);
+      await restoreCategory(deleted);
+      await refreshPrompts();
+    } catch (error: unknown) {
+      showToast("Couldn't restore Category", 'error', { sub: toError(error).message });
+    }
+  };
+
+  const handleDeleteCategory = async (category: Category) => {
+    try {
+      const deleted = await deleteCategory(category.id);
       // Refresh prompts to show them as Uncategorized after category deletion
       await refreshPrompts();
-      showToast('Category deleted', 'success', { sub: name });
+      showToast('Category deleted', 'success', {
+        sub: category.name,
+        duration: UNDO_DURATION_MS,
+        action: { label: 'Undo', onClick: () => { void handleRestoreCategory(deleted); } }
+      });
     } catch (error) {
-      showToast("Couldn't delete Category", 'error', { sub: name });
+      showToast("Couldn't delete Category", 'error', { sub: category.name });
       throw error;
     }
   };
@@ -346,6 +372,8 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
             <p className="text-secondary">{promptsError.message}</p>
           </div>
         </div>
+        {/* A Notification stays: the Undo of a deletion whose Prompts could not be read again is in it */}
+        <ToastContainer toast={toast} onDismiss={hideToast} onPause={pauseToast} onResume={resumeToast} />
       </ThemeProvider>
     );
   }
@@ -384,9 +412,13 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
       {currentView === 'categories' && (
         <CategoryManager
           categories={categories}
+          prompts={prompts}
           onCreateCategory={handleCreateCategory}
           onUpdateCategory={handleUpdateCategory}
           onDeleteCategory={handleDeleteCategory}
+          // No Undo without Notifications: confirm while they are off, or not known to be on yet
+          confirmDelete={!settings.enabled || !settingsLoaded}
+          onSheetOpenChange={setCategorySheetOpen}
           context={context}
         />
       )}
@@ -409,7 +441,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
       )}
       </div>
 
-      <TabBar activeSection={currentView} onSelect={handleSelectSection} />
+      <TabBar activeSection={currentView} onSelect={handleSelectSection} inert={categorySheetOpen} />
       </div>
 
       {editorSheet.shown && (
@@ -443,7 +475,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
         <StorageWarning reason={storageRefusal} onClose={handleCloseStorageWarning} />
       )}
 
-      <ToastContainer toast={toast} onDismiss={hideToast} />
+      <ToastContainer toast={toast} onDismiss={hideToast} onPause={pauseToast} onResume={resumeToast} />
       </div>
     </ThemeProvider>
   );

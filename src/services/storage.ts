@@ -6,6 +6,7 @@ import {
   type Category,
   DEFAULT_CATEGORY,
   DEFAULT_SETTINGS,
+  type DeletedCategory,
   type ErrorType,
   type Prompt,
   type Settings,
@@ -33,6 +34,7 @@ import {
   readPrompts,
   recordUse,
   repointPrompt,
+  returnPrompt,
   type StoredPrompt, 
   scrubStored,
   scrubStoredCategories,
@@ -509,12 +511,17 @@ export class StorageManager {
     });
   }
 
-  async deleteCategory(id: string): Promise<void> {
-    // Lock CATEGORIES first (always modified), then PROMPTS if prompts need updating
-    await this.mutex.withLock(this.STORAGE_KEYS.CATEGORIES, async () => {
+  /**
+   * Deletes a Category and moves its Prompts to the default Category, in one atomic write. Resolves
+   * to what it changed, which restoreCategory takes to undo the deletion.
+   */
+  deleteCategory(id: string): Promise<DeletedCategory> {
+    // Lock CATEGORIES first (always modified), then PROMPTS
+    return this.mutex.withLock(this.STORAGE_KEYS.CATEGORIES, async () => {
       try {
         const existingCategories = await this.readCategoriesWithDefault();
-        const categoryToDelete = existingCategories.find(c => c.id === id);
+        const index = existingCategories.findIndex(c => c.id === id);
+        const categoryToDelete = index >= 0 ? existingCategories[index] : undefined;
 
         if (!categoryToDelete) {
           throw new Error(`Category with id ${id} not found`);
@@ -527,26 +534,81 @@ export class StorageManager {
 
         const filteredCategories = existingCategories.filter(c => c.id !== id);
 
-        // Check if any prompts need to be updated
-        // Lock PROMPTS only if we need to modify prompts
-        await this.mutex.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
+        return await this.mutex.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
           const prompts = await this.getPrompts();
-          const hasPromptsToUpdate = prompts.some(p => p.category === categoryToDelete.name);
+          const inCategory = prompts.filter(p => p.category === categoryToDelete.name);
 
-          if (hasPromptsToUpdate) {
-            const updatedPrompts = this.moveCategoryPrompts(prompts, categoryToDelete.name, DEFAULT_CATEGORY);
-
-            // Update both categories and prompts atomically with both locks held
-            await this.writeCategoriesAndPrompts(filteredCategories, updatedPrompts);
-          } else {
-            // No prompts to update, just delete category
+          if (inCategory.length === 0) {
             await this.setStorageData(this.STORAGE_KEYS.CATEGORIES, filteredCategories);
+            return { category: categoryToDelete, index, movedPrompts: [] };
           }
+
+          const updatedPrompts = this.moveCategoryPrompts(prompts, categoryToDelete.name, DEFAULT_CATEGORY);
+          const movedAt = new Map(updatedPrompts.map(p => [p.id, p.updatedAt]));
+
+          // Update both categories and prompts atomically with both locks held
+          await this.writeCategoriesAndPrompts(filteredCategories, updatedPrompts);
+
+          return {
+            category: categoryToDelete,
+            index,
+            movedPrompts: inCategory.map(p => ({ id: p.id, updatedAt: p.updatedAt, movedAt: movedAt.get(p.id) ?? p.updatedAt }))
+          };
         });
       } catch (error) {
         throw this.handleStorageError(error);
       }
     });
+  }
+
+  /**
+   * Undoes a deletion: puts the Category back at its place, with its id and colour, and moves back
+   * the Prompts the deletion moved that are still in the default Category. Restoring is a route of
+   * Admission, so the name is admitted again and refused if another Category took it meanwhile. A
+   * Prompt not edited since the move gets back its last edit from before the move.
+   */
+  restoreCategory(deleted: DeletedCategory): Promise<Category> {
+    // CATEGORIES before PROMPTS (lock order)
+    return this.mutex.withLock(this.STORAGE_KEYS.CATEGORIES, () => this.mutex.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
+      try {
+        const existingCategories = await this.readCategoriesWithDefault();
+        const name = this.admitCategoryName(deleted.category.name);
+
+        if (existingCategories.some(c => c.id === deleted.category.id)) {
+          throw new Error(`Category "${name}" is already in the Library`);
+        }
+        if (existingCategories.some(c => c.name.toLowerCase() === name.toLowerCase())) {
+          throw new Error(`Category with name "${name}" already exists`);
+        }
+
+        const restored: Category = { ...deleted.category, name };
+        const updatedCategories = [...existingCategories];
+        updatedCategories.splice(Math.min(deleted.index, updatedCategories.length), 0, restored);
+
+        const moved = new Map(deleted.movedPrompts.map(m => [m.id, m]));
+        const prompts = await this.getPrompts();
+        let returned = 0;
+        const updatedPrompts = prompts.map(prompt => {
+          const move = moved.get(prompt.id);
+          if (!move || prompt.category !== DEFAULT_CATEGORY) {
+            return prompt;
+          }
+          returned += 1;
+          return prompt.updatedAt === move.movedAt
+            ? returnPrompt(prompt, name, move.updatedAt)
+            : repointPrompt(prompt, name);
+        });
+
+        if (returned === 0) {
+          await this.setStorageData(this.STORAGE_KEYS.CATEGORIES, updatedCategories);
+        } else {
+          await this.writeCategoriesAndPrompts(updatedCategories, updatedPrompts);
+        }
+        return restored;
+      } catch (error) {
+        throw this.handleStorageError(error);
+      }
+    }));
   }
 
   /**
