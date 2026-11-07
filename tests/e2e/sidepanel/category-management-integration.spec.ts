@@ -1,5 +1,6 @@
 import { DEFAULT_CATEGORY, DEFAULT_SETTINGS } from '../../../src/types';
 import { expect, test } from '../fixtures/extension';
+import { CategoryManagerPage } from '../pages/CategoryManagerPage';
 import { LibraryPage } from '../pages/LibraryPage';
 import { createCategorySeed, createPromptSeed, seedLibrary } from '../utils/storage';
 
@@ -50,24 +51,20 @@ test.describe('Category Management - Integration with Prompt System', () => {
       const sidepanelPage = await context.newPage();
       await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
-      // Navigate to category manager and edit the Research category
-      await sidepanelPage.getByTestId('tab-categories').click();
-      await expect(sidepanelPage.getByText('Research')).toBeVisible();
+      // Navigate to category manager and rename the Research category in its sheet
+      const categoryManager = new CategoryManagerPage(sidepanelPage);
+      await categoryManager.openFromLibrary();
+      await categoryManager.openEditSheet('Research');
+      await expect(categoryManager.getSheet()).toContainText('Used by 2 prompts');
 
-      // Start editing the Research category
-      const categoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Research', { exact: true }) }).first();
-      await categoryRow.hover();
-      await categoryRow.getByRole('button', { name: 'Edit category' }).click();
-
-      // Change name to "Analysis"
-      const editInput = sidepanelPage.getByPlaceholder('Category name', { exact: true });
-      await editInput.clear();
-      await editInput.fill('Analysis');
-      await editInput.press('Enter');
+      // Change name to "Analysis", saved with Enter
+      await categoryManager.fillSheetName('Analysis');
+      await categoryManager.submitSheet('enter');
 
       // Verify category name changed in UI
-      await expect(sidepanelPage.getByTestId('category-row').getByText('Analysis')).toBeVisible();
-      await expect(sidepanelPage.getByText('Research')).toBeHidden();
+      await categoryManager.expectSheetClosed();
+      await categoryManager.expectCategoryExists('Analysis');
+      await categoryManager.expectCategoryNotExists('Research');
 
       // Return to the Library via the tab bar
       const backButton = sidepanelPage.getByTestId('tab-library');
@@ -223,16 +220,10 @@ test.describe('Category Management - Integration with Prompt System', () => {
       // Clear filter to show all prompts
       await libraryPage.selectLibraryFilter('All');
 
-      // Now rename the category
-      await sidepanelPage.getByTestId('tab-categories').click();
-      const categoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Development', { exact: true }) }).first();
-      await categoryRow.hover();
-      await categoryRow.getByRole('button', { name: 'Edit category' }).click();
-
-      const editInput = sidepanelPage.getByPlaceholder('Category name', { exact: true });
-      await editInput.clear();
-      await editInput.fill('Programming');
-      await editInput.press('Enter');
+      // Now rename the category in its sheet
+      const categoryManager = new CategoryManagerPage(sidepanelPage);
+      await categoryManager.openFromLibrary();
+      await categoryManager.editCategory('Development', 'Programming', { submitWith: 'enter' });
 
       // Return to the Library via the tab bar
       const backButton2 = sidepanelPage.getByTestId('tab-library');

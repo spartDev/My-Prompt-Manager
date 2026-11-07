@@ -24,7 +24,7 @@ Page Object Models encapsulate UI interactions and provide clean, reusable metho
 
 - **`BasePage`** - Common functionality shared across all pages
 - **`LibraryPage`** - Main prompt library interface
-- **`CategoryManagerPage`** - Category CRUD operations
+- **`CategoryManagerPage`** - The Categories section and its Category sheet: create, rename, recolor, delete and Undo
 - **`PromptFormPage`** - Prompt creation and editing
 - **`SettingsPage`** - Settings and configuration
 - **`ConfirmationDialog`** - Modal confirmations and dialogs
@@ -148,7 +148,7 @@ await assertions.prompts.createdSuccessfully(page);
 
 // Category assertions
 await assertions.categories.exists(page, 'Work');
-await assertions.categories.duplicateError(page);
+await assertions.categories.duplicateError(page, 'Work'); // the refusal under the name in the Category sheet
 
 // Navigation assertions
 await assertions.navigation.onLibraryPage(page);
@@ -166,8 +166,9 @@ await workflows.prompts.edit(page, 'Old Title', updates);
 await workflows.prompts.delete(page, 'Title to Delete');
 
 // Category workflows
-await workflows.categories.create(page, { name: 'New Category' });
+await workflows.categories.create(page, { name: 'New Category', color: 'Teal' });
 await workflows.categories.edit(page, 'Old Name', 'New Name');
+await workflows.categories.delete(page, 'Old Name'); // Notifications on: at once, with Undo
 
 // Search workflows
 await workflows.search.searchAndVerify(page, 'query', expectedCount);
@@ -269,8 +270,10 @@ A spec that takes proof screenshots for a pull request passes `animations: 'disa
 test('create category', async ({ page }) => {
   await page.getByTestId('tab-categories').click();
   await expect(page.getByRole('heading', { level: 1, name: 'Categories', exact: true })).toBeVisible();
-  await page.getByPlaceholder('Enter category name...').fill('Test Category');
-  await page.getByRole('button', { name: 'Add' }).click();
+  await page.getByRole('button', { name: 'Add category', exact: true }).click();
+  const sheet = page.getByRole('dialog', { name: 'New category' });
+  await sheet.getByRole('textbox', { name: 'Category name' }).fill('Test Category');
+  await sheet.getByRole('button', { name: 'Create' }).click();
   await expect(page.getByText('Category created', { exact: true })).toBeVisible();
   const libraryTab = page.getByTestId('tab-library');
   await libraryTab.click();
@@ -321,9 +324,14 @@ Platform integration testing:
 - `clickAddNewPrompt()` - Open prompt creation form
 
 #### CategoryManagerPage
-- `createCategory(name, color?)` - Create new category
-- `editCategory(current, new)` - Edit category name
-- `deleteCategory(name, confirm?)` - Delete category
+Everything goes through the Category sheet, a bottom sheet opened by "Add category" (create) or a
+Category's row (edit). It closes with a 280 ms exit, so the methods wait for it to leave the page.
+- `createCategory(name, { color?, submitWith? })` - Create a Category (`color` is a swatch name such as `'Teal'`; `submitWith` is `'button'` or `'enter'`)
+- `editCategory(current, new, { color?, submitWith? })` / `recolorCategory(name, color)` - Rename or recolor
+- `deleteCategory(name)` - Delete with the Notifications on: at once, the Notification offering Undo; `undoDelete()` clicks it
+- `deleteCategoryWithConfirmation(name, accept?)` - Delete with the Notifications off: the "Delete Category" dialog asks first
+- `openCreateSheet()`, `openEditSheet(name)`, `fillSheetName(name)`, `chooseColor(name)`, `submitSheet(how?)`, `dismissSheet('escape' | 'backdrop' | 'close' | 'cancel')` - The sheet step by step
+- `expectRefusal(message)` - The sheet stays open with the reason under the name (a taken or too long name)
 - `expectCategoryExists(name)` - Verify category exists
 
 #### PromptFormPage
@@ -342,7 +350,7 @@ Platform integration testing:
 #### Category Workflows
 - `workflows.categories.create(page, data)` - Complete category creation
 - `workflows.categories.edit(page, current, new)` - Edit category workflow
-- `workflows.categories.delete(page, name, confirm?)` - Delete category workflow
+- `workflows.categories.delete(page, name, { confirm? })` - Delete category workflow (`confirm` answers the dialog shown when the Notifications are off)
 
 ### Test Data Management
 

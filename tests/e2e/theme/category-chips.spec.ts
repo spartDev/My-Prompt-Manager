@@ -3,14 +3,16 @@
  *
  * A Library card shows its Category as a chip: the Category color at 13% as background, and the
  * text the chip rule derives for the active theme. Also captures light/dark screenshots as visual
- * proof (test-results/category-chips/): Library cards with several chips, and the Categories
- * color picker with the 12 presets.
+ * proof (test-results/category-chips/): Library cards with several chips, and the palette of the
+ * Category sheet with the 12 presets.
  */
 
 import type { Locator, Page } from '@playwright/test';
 
+import { PRESET_COLORS } from '../../../src/constants/colors';
 import type { Category, Prompt } from '../../../src/types';
 import { type ExtensionStorage, expect, test } from '../fixtures/extension';
+import { CategoryManagerPage } from '../pages/CategoryManagerPage';
 import { createPromptSeed, seedLibrary } from '../utils/storage';
 
 const SIDEPANEL_URL = 'src/sidepanel.html';
@@ -68,6 +70,12 @@ const paintedBackground = async (page: Page, chip: Locator): Promise<number[]> =
   }, shot.toString('base64'));
 };
 
+/** '#2563EB' as getComputedStyle writes it: 'rgb(37, 99, 235)' */
+const hexToRgb = (hex: string): string => {
+  const [r, g, b] = [1, 3, 5].map(start => Number.parseInt(hex.slice(start, start + 2), 16));
+  return `rgb(${String(r)}, ${String(g)}, ${String(b)})`;
+};
+
 const CHIP = {
   background: 'rgba(37, 99, 235, 0.13)',
   text: { light: 'rgb(27, 71, 169)', dark: 'rgb(120, 158, 243)' }
@@ -107,22 +115,24 @@ test.describe('Category chips follow the chip rule', () => {
       }
     });
 
-    test(`PROOF: Library chips and color picker screenshots (${theme} mode)`, async ({ page, storage, extensionId }) => {
+    test(`PROOF: Library chips and Category sheet palette screenshots (${theme} mode)`, async ({ page, storage, extensionId }) => {
       await openLibrary(page, storage, extensionId, theme);
       // Tall enough to show all six cards, the former preset (Navy) included
       await page.setViewportSize({ width: 400, height: 1450 });
       await page.screenshot({ path: `${SCREENSHOT_DIR}/library-chips-${theme}.png` });
 
-      await page.getByTestId('tab-categories').click();
-      await page.getByRole('button', { name: /Ocean Blue/ }).click();
-      await expect(page.getByText('Preset Colors')).toBeVisible();
-      const swatch = (name: string) => page.locator(`button[title="${name}"]`);
-      await expect(swatch('Ocean Blue')).toHaveAttribute('aria-current', 'true');
-      for (const name of ['Indigo', 'Amber', 'Lime']) {
-        await expect(swatch(name)).toBeVisible();
+      await page.setViewportSize({ width: 400, height: 600 });
+      const categoriesView = new CategoryManagerPage(page);
+      await categoriesView.openFromLibrary();
+      await categoriesView.openCreateSheet();
+      const sheet = categoriesView.getSheet();
+      // The 12 presets, the first one no Category uses chosen (Ocean Blue, Indigo, Amber, Lime and Yellow are)
+      await expect(sheet.getByRole('button', { pressed: true })).toHaveAccessibleName('Sky Blue');
+      for (const preset of PRESET_COLORS) {
+        await expect(categoriesView.getColorSwatch(preset.name)).toHaveCSS('background-color', hexToRgb(preset.value));
       }
-      await expect(swatch('Navy')).toHaveCount(0);
-      await page.screenshot({ path: `${SCREENSHOT_DIR}/color-picker-${theme}.png` });
+      await expect(categoriesView.getColorSwatch('Navy')).toHaveCount(0);
+      await sheet.screenshot({ path: `${SCREENSHOT_DIR}/color-palette-${theme}.png`, animations: 'disabled' });
     });
   }
 });

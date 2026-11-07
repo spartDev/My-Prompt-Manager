@@ -32,6 +32,31 @@ export const PRESET_COLORS: ColorOption[] = [
 // logger, so the content script shares them (src/theme/categoryChip.ts)
 export { DEFAULT_CATEGORY_COLOR, getSoftBadgeColors } from '../theme/categoryChip';
 
+const sameColor = (a: string | undefined, b: string): boolean => a?.toLowerCase() === b.toLowerCase();
+
+/** Index in PRESET_COLORS of the first color no Category uses yet, or -1 when all are used */
+const unusedColorIndex = (categories: readonly { color?: string }[]): number =>
+  PRESET_COLORS.findIndex(preset => !categories.some(category => sameColor(category.color, preset.value)));
+
+/** Index in PRESET_COLORS of the first color no Category uses yet (the first one when all are used) */
+export const firstUnusedColorIndex = (categories: readonly { color?: string }[]): number => {
+  const index = unusedColorIndex(categories);
+  return index === -1 ? 0 : index;
+};
+
+/**
+ * The color a new Category starts with in the Categories section: the first one no Category uses
+ * yet, then, once all 12 are used, the next one in turn with each Category added.
+ */
+export const nextCategoryColor = (categories: readonly { color?: string }[]): string => {
+  const index = unusedColorIndex(categories);
+  return PRESET_COLORS[index === -1 ? categories.length % PRESET_COLORS.length : index].value;
+};
+
+/** The preset with this color, if it is one of PRESET_COLORS */
+export const findPresetColor = (color: string): ColorOption | undefined =>
+  PRESET_COLORS.find(preset => sameColor(color, preset.value));
+
 // Function to get a random color from the palette
 export const getRandomPresetColor = (): string => {
   const randomIndex = Math.floor(Math.random() * PRESET_COLORS.length);
@@ -246,3 +271,9 @@ export const getColorName = (hexColor: string): string => {
   const preset = PRESET_COLORS.find(c => c.value.toLowerCase() === hexColor.toLowerCase());
   return preset ? preset.name : 'Custom';
 };
+/**
+ * The text drawn on a solid swatch of this color (a Category's initial, a checkmark): the preset's
+ * own, which meets AA, or for a custom color black or white, whichever contrasts more.
+ */
+export const swatchTextColor = (color: string): string =>
+  findPresetColor(color)?.textColor ?? getAccessibleTextColor(color);

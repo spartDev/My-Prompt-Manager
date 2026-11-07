@@ -380,6 +380,71 @@ describe('StorageManager', () => {
       await expect(storageManager.deleteCategory('default'))
         .rejects.toThrow('Cannot delete the default category');
     });
+
+    describe('undoing a deletion (restoreCategory)', () => {
+      const EARLIER = FIXED_TIME.getTime() - 60_000;
+      const work: Category = { id: 'work', name: 'Work', color: '#DB2777' };
+      const notes: Category = { id: 'notes', name: 'Notes', color: '#0F766E' };
+      const prompt = (id: string, category: string): Prompt =>
+        buildPrompt({ id, title: id, content: 'Content', category, createdAt: EARLIER, updatedAt: EARLIER });
+
+      beforeEach(async () => {
+        await chrome.storage.local.set({
+          categories: [{ id: 'default', name: DEFAULT_CATEGORY }, work, notes],
+          prompts: [prompt('in-work', 'Work'), prompt('already-uncategorized', DEFAULT_CATEGORY), prompt('in-notes', 'Notes')]
+        });
+      });
+
+      it('puts the Category back at its place with its colour, and its Prompts with their last edit', async () => {
+        const deleted = await storageManager.deleteCategory('work');
+        expect(deleted).toEqual({
+          category: work,
+          index: 1,
+          movedPrompts: [{ id: 'in-work', updatedAt: EARLIER, movedAt: FIXED_TIME.getTime() }]
+        });
+
+        const restored = await storageManager.restoreCategory(deleted);
+
+        expect(restored).toEqual(work);
+        const result = await chrome.storage.local.get(['categories', 'prompts']);
+        expect((result.categories as Category[]).map(c => c.id)).toEqual(['default', 'work', 'notes']);
+        const byId = new Map((result.prompts as Prompt[]).map(p => [p.id, p]));
+        expect(byId.get('in-work')).toMatchObject({ category: 'Work', updatedAt: EARLIER });
+        expect(byId.get('already-uncategorized')?.category).toBe(DEFAULT_CATEGORY);
+        expect(byId.get('in-notes')?.category).toBe('Notes');
+      });
+
+      it('moves back a Prompt edited since the deletion, keeping that edit', async () => {
+        const deleted = await storageManager.deleteCategory('work');
+        vi.setSystemTime(FIXED_TIME.getTime() + 5_000);
+        await storageManager.updatePrompt('in-work', { title: 'Edited' });
+
+        await storageManager.restoreCategory(deleted);
+
+        const result = await chrome.storage.local.get('prompts');
+        const edited = (result.prompts as Prompt[]).find(p => p.id === 'in-work');
+        expect(edited).toMatchObject({ category: 'Work', title: 'Edited', updatedAt: FIXED_TIME.getTime() + 5_000 });
+      });
+
+      it('leaves in its new Category a Prompt the user moved since the deletion', async () => {
+        const deleted = await storageManager.deleteCategory('work');
+        await storageManager.updatePrompt('in-work', { category: 'Notes' });
+
+        await storageManager.restoreCategory(deleted);
+
+        const result = await chrome.storage.local.get('prompts');
+        expect((result.prompts as Prompt[]).find(p => p.id === 'in-work')?.category).toBe('Notes');
+      });
+
+      it('is refused when another Category took the name meanwhile, ignoring case', async () => {
+        const deleted = await storageManager.deleteCategory('work');
+        await storageManager.saveCategory({ name: 'WORK' });
+
+        await expect(storageManager.restoreCategory(deleted)).rejects.toThrow('Category with name "Work" already exists');
+        const result = await chrome.storage.local.get('prompts');
+        expect((result.prompts as Prompt[]).find(p => p.id === 'in-work')?.category).toBe(DEFAULT_CATEGORY);
+      });
+    });
   });
 
   describe('Race Condition Prevention', () => {

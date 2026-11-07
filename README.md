@@ -13,7 +13,7 @@ Transform your AI interactions with a powerful personal prompt library that inte
 
 ### Popup Interface (Prompt Management)
 ✅ **Smart Prompt Management:** Store, organize, and search your prompts with custom categories  
-✅ **Rich Categorization:** Create unlimited categories with custom colors and icons  
+✅ **Rich Categorization:** Create unlimited categories, each in one of 12 colors, and undo a deletion  
 ✅ **Instant Search:** Real-time filtering with text highlighting across titles and content  
 ✅ **Quick Actions:** One-click copy to clipboard, edit in-place, and bulk operations  
 ✅ **Dark Mode Support:** Beautiful dark theme with automatic system preference detection  

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { PromptManager } from '../services/promptManager';
 import { StorageManager } from '../services/storage';
-import type { AppError, Category } from '../types';
+import type { AppError, Category, DeletedCategory } from '../types';
 import type { UseCategoriesReturn } from '../types/hooks';
 
 // The services are singletons, read where they are used, so no callback depends on them
@@ -48,7 +48,8 @@ export const useCategories = (): UseCategoriesReturn => {
     }
   }, []);
 
-  const updateCategory = useCallback(async (id: string, updates: Partial<Category>) => {
+  // Resolves to the Category as stored, its name admitted
+  const updateCategory = useCallback(async (id: string, updates: Partial<Category>): Promise<Category> => {
     try {
       setLoading(true);
       setError(null);
@@ -64,6 +65,7 @@ export const useCategories = (): UseCategoriesReturn => {
       setCategories(prev => 
         prev.map(category => category.id === id ? updatedCategory : category)
       );
+      return updatedCategory;
     } catch (err) {
       setError(err as AppError);
       throw err;
@@ -72,14 +74,38 @@ export const useCategories = (): UseCategoriesReturn => {
     }
   }, []);
 
-  const deleteCategory = useCallback(async (id: string) => {
+  // Resolves to what the deletion changed, which restoreCategory takes to undo it
+  const deleteCategory = useCallback(async (id: string): Promise<DeletedCategory> => {
     try {
       setLoading(true);
       setError(null);
       
-      await StorageManager.getInstance().deleteCategory(id);
+      const deleted = await StorageManager.getInstance().deleteCategory(id);
       
       setCategories(prev => prev.filter(category => category.id !== id));
+      return deleted;
+    } catch (err) {
+      setError(err as AppError);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Undoes a deletion: the Category comes back at its place
+  const restoreCategory = useCallback(async (deleted: DeletedCategory): Promise<Category> => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const restored = await StorageManager.getInstance().restoreCategory(deleted);
+
+      setCategories(prev => {
+        const next = prev.filter(category => category.id !== restored.id);
+        next.splice(Math.min(deleted.index, next.length), 0, restored);
+        return next;
+      });
+      return restored;
     } catch (err) {
       setError(err as AppError);
       throw err;
@@ -100,6 +126,7 @@ export const useCategories = (): UseCategoriesReturn => {
     createCategory,
     updateCategory,
     deleteCategory,
+    restoreCategory,
     refreshCategories
   };
 };

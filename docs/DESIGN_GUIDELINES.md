@@ -865,6 +865,8 @@ A Notification (Atelier 1C) is a 40px pill at the top center of the popup or sid
 one replaces it. A confirmation (success, info) has a violet check round (`bg-inverse-mark`) and
 leaves after 2.7s; a failure (error, warning) has a red ! round (`bg-inverse-alert`), is a
 `role="alert"`, and leaves after 6s. There is no close button and no progress bar: Escape closes it.
+Its time stops while the pointer or the focus is on it, so its action (the 6s Undo of a deleted
+Category) can be reached and read; it runs out the rest once neither is.
 Settings has one switch for all of them.
 
 The bold message stays whole; the optional sub (the object's name, or the reason) is cut with an
@@ -1025,6 +1027,39 @@ exit animation: it leaves at once. Under `prefers-reduced-motion`, both last 1ms
   animation: toast-mark-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) 0.08s both;
 }
 ```
+
+#### Category Sheet
+
+`src/popup.css`, with the motion tokens of `src/theme/tokens.css` (`--ease-sheet`:
+`cubic-bezier(0.32, 0.72, 0, 1)`, `--ease-spring`: `cubic-bezier(0.34, 1.56, 0.64, 1)`). The sheet
+rises from the bottom (`sheet-in`, `translateY(100%)` to rest, 0.5s ease-sheet) and leaves faster
+(`sheet-out`, 0.28s): `useCategorySheet` takes it off the page only once the exit has ended
+(`SHEET_EXIT_MS`). The backdrop fades in over 0.3s and out over 0.28s. While it is open, the screen
+behind steps back (`.sheet-behind[data-stepped-back]`: `scale(.93) translateY(10px)`, 22px corners,
+`brightness(.96)`, 0.5s ease-sheet). Swatches move on `transform` over 0.35s ease-spring; a Category
+that appears in the list pops in (`category-pop`: scale .3, 1.2, then 1, 0.5s ease-spring). Under
+`prefers-reduced-motion`, all of them last 1ms. Only one dialog is reachable at a time, by assistive
+technology too: while the sheet is open, the screen behind and the tab bar are `inert`, and the sheet
+is `inert` while it leaves or while the delete confirmation is on top of it. While a create, save or
+delete runs, Escape, the backdrop, Close and Cancel wait for it to end, and a save and a deletion never
+run together. While a create, save or deletion runs, the name is read-only and the swatches and Save are
+`aria-disabled`. A refused name has `border-error`, with the reason under it.
+
+```tsx
+<div className="fixed inset-0 z-40">
+  <div className="absolute inset-0 bg-backdrop backdrop-in" onClick={onClose} />
+  <div role="dialog" aria-modal="true" aria-label={title} className="
+    absolute inset-x-0 bottom-0
+    rounded-t-3xl bg-card shadow-2xl
+    sheet-in
+  ">
+    {/* handle, header, name, palette, footer */}
+  </div>
+</div>
+```
+
+The sheet sits at `z-40`, under the Notification (`z-50`), so a Notification's Undo stays within
+reach; its backdrop has no blur, so what is behind it (the edited row's border) stays sharp.
 
 #### Modal Fade In
 
