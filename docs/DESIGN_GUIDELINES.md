@@ -1038,7 +1038,8 @@ behind steps back (`.sheet-behind[data-stepped-back]`: `scale(.93) translateY(10
 that appears in the list pops in (`category-pop`: scale .3, 1.2, then 1, 0.5s ease-spring). Under
 `prefers-reduced-motion`, all of them last 1ms. Only one dialog is reachable at a time, by assistive
 technology too: while the sheet is open, the screen behind and the tab bar are `inert`, and the sheet
-is `inert` while it leaves or while the delete confirmation is on top of it.
+is `inert` while it leaves or while the delete confirmation is on top of it. While a create, save or
+delete runs, Escape, the backdrop, Close and Cancel wait for it to end.
 
 ```tsx
 <div className="fixed inset-0 z-40">

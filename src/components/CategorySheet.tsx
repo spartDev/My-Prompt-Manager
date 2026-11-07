@@ -23,7 +23,7 @@ export interface CategorySheetProps {
   onSubmit: () => Promise<void>;
   /** Edit mode: deletes the Category */
   onDelete?: () => void;
-  /** Closes without saving (Escape, the backdrop, the close button, Cancel) */
+  /** Closes without saving (Escape, the backdrop, the close button, Cancel); not called while a create or save runs */
   onClose: () => void;
 }
 
@@ -78,9 +78,6 @@ const CategorySheet: FC<CategorySheetProps> = ({
   // A custom color (from before the sheet, or a Backup) is kept, with no swatch chosen
   const selectedPreset = findPresetColor(color)?.value;
 
-  // Focus in the name on open, Tab kept inside, Escape closes, focus back to the opener on close
-  useModalFocus({ isOpen: open && !paused, onClose, containerRef: panelRef, initialFocusRef: inputRef });
-
   // The action reads these when it runs, which can be after a later render (actions queue up)
   const latestRef = useRef({ name, blank, open, onSubmit });
   useEffect(() => {
@@ -103,6 +100,16 @@ const CategorySheet: FC<CategorySheetProps> = ({
   );
   const shownRefusal = refusal?.name === name ? refusal.message : null;
 
+  // While a create or save runs, closing would look like cancelling it: the sheet waits for it to end
+  const dismiss = () => {
+    if (!isPending) {
+      onClose();
+    }
+  };
+
+  // Focus in the name on open, Tab kept inside, Escape closes, focus back to the opener on close
+  useModalFocus({ isOpen: open && !paused, onClose: dismiss, containerRef: panelRef, initialFocusRef: inputRef });
+
   const handlePrimaryClick = (event: MouseEvent<HTMLButtonElement>) => {
     if (blank || isPending) {
       event.preventDefault();
@@ -116,7 +123,7 @@ const CategorySheet: FC<CategorySheetProps> = ({
         aria-hidden="true"
         data-testid="category-sheet-backdrop"
         className={cn('absolute inset-0 bg-backdrop', open ? 'backdrop-in' : 'backdrop-out')}
-        onClick={onClose}
+        onClick={dismiss}
       />
       <div
         ref={panelRef}
@@ -147,7 +154,7 @@ const CategorySheet: FC<CategorySheetProps> = ({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={dismiss}
             aria-label="Close"
             title="Close (Esc)"
             className="grid size-[34px] flex-none place-items-center rounded-full border border-default bg-card text-secondary hover:bg-muted transition-colors focus-interactive active:scale-90"
@@ -213,7 +220,7 @@ const CategorySheet: FC<CategorySheetProps> = ({
             <span className="flex-1" />
             <button
               type="button"
-              onClick={onClose}
+              onClick={dismiss}
               className="h-11 px-[18px] rounded-full border border-strong bg-card text-sm font-bold text-secondary hover:bg-muted transition-colors focus-secondary"
             >
               Cancel

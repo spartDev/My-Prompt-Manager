@@ -126,6 +126,28 @@ describe('CategoryManager', () => {
       expect(screen.getByRole('button', { name: 'Add category' })).toHaveFocus();
     });
 
+    it('stays open while the Category is being created: Escape, Cancel, Close and the backdrop wait for it', async () => {
+      const resolvers: Array<() => void> = [];
+      const slowCreate = vi.fn((category: { name: string; color: string }) =>
+        new Promise<Category>(resolve => { resolvers.push(() => { resolve({ id: 'new', ...category }); }); }));
+      const { user } = renderManager({ onCreateCategory: slowCreate });
+
+      await user.click(screen.getByRole('button', { name: 'Add category' }));
+      const sheet = screen.getByRole('dialog', { name: 'New category' });
+      await user.type(within(sheet).getByRole('textbox', { name: 'Category name' }), 'Research');
+      await user.click(within(sheet).getByRole('button', { name: 'Create' }));
+      await user.keyboard('{Escape}');
+      await user.click(within(sheet).getByRole('button', { name: 'Cancel' }));
+      await user.click(within(sheet).getByRole('button', { name: 'Close' }));
+      await user.click(screen.getByTestId('category-sheet-backdrop'));
+      // Closing now would look like cancelling a Category that is created anyway
+      expect(sheet).toHaveClass('sheet-in');
+
+      resolvers.forEach(resolve => { resolve(); });
+      await sheetGone();
+      expect(slowCreate).toHaveBeenCalledTimes(1);
+    });
+
     it('creates with Enter in the name', async () => {
       const { user, props } = renderManager();
 
