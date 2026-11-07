@@ -55,7 +55,7 @@ const ToastContainer: FC<ToastContainerProps> = ({ toast, onDismiss }) => {
       data-testid="toast"
       data-type={toast.type}
       className="
-        toast-in fixed top-3 left-1/2 z-50
+        animate-toast-in fixed top-3 left-1/2 [transform:translateX(-50%)] z-50
         flex items-center gap-[9px] h-10 max-w-[calc(100%-32px)] pl-3.5 pr-1.5
         rounded-full bg-inverse text-on-inverse-strong shadow-toast
         leading-[1.4] antialiased
@@ -63,7 +63,7 @@ const ToastContainer: FC<ToastContainerProps> = ({ toast, onDismiss }) => {
     >
       <span
         data-testid="toast-mark"
-        className={`toast-mark-pop grid place-items-center size-5 flex-none rounded-full text-on-inverse-mark ${isFailure ? 'bg-inverse-alert' : 'bg-inverse-mark'}`}
+        className={`animate-toast-mark grid place-items-center size-5 flex-none rounded-full text-on-inverse-mark ${isFailure ? 'bg-inverse-alert' : 'bg-inverse-mark'}`}
       >
         {isFailure ? AlertGlyph : CheckGlyph}
       </span>

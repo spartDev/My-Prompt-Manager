@@ -28,9 +28,9 @@ describe('ToastContainer', () => {
     render(<ToastContainer toast={createToast()} onDismiss={onDismiss} />);
 
     const pill = screen.getByTestId('toast');
-    expect(pill).toHaveClass('fixed', 'top-3', 'left-1/2', 'toast-in', 'h-10', 'rounded-full', 'bg-inverse', 'shadow-toast');
+    expect(pill).toHaveClass('fixed', 'top-3', 'left-1/2', 'animate-toast-in', 'h-10', 'rounded-full', 'bg-inverse', 'shadow-toast');
     expect(pill.className).not.toMatch(/bottom-|right-4/);
-    expect(screen.getByTestId('toast-mark')).toHaveClass('toast-mark-pop');
+    expect(screen.getByTestId('toast-mark')).toHaveClass('animate-toast-mark');
   });
 
   it.each([

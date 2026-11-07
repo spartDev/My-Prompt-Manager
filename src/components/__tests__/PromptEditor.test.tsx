@@ -7,8 +7,9 @@ import { PRESET_COLORS } from '../../constants/colors';
 import { formatCharacterCount } from '../../constants/validation';
 import { PROMPT_LIMITS } from '../../services/promptAdmission';
 import * as promptEncoder from '../../services/promptEncoder';
+import { MOTION } from '../../theme/motion';
 import type { Category, Prompt } from '../../types';
-import PromptEditor, { SAVED_PAUSE_MS } from '../PromptEditor';
+import PromptEditor from '../PromptEditor';
 
 const categories: Category[] = [
   { id: 'default', name: 'Uncategorized', color: '#888888' },
@@ -199,6 +200,45 @@ describe('PromptEditor - Variables', () => {
   });
 });
 
+describe('PromptEditor - motion', () => {
+  it('chips change color over a transition, press with a spring, and the check of the chosen one pops', async () => {
+    renderEditor();
+    const work = chip('Work');
+    expect(work).toHaveClass('transition-chip', 'active:scale-92');
+    expect(work.querySelector('svg')).toBeNull();
+
+    await userEvent.click(work);
+
+    expect(work.querySelector('svg')).toHaveClass('animate-pop-check');
+  });
+
+  it('pops the new Category row in', async () => {
+    renderEditor();
+
+    await userEvent.click(screen.getByRole('button', { name: 'New category' }));
+
+    expect(screen.getByLabelText('New category name').closest('[data-keeps-escape]')).toHaveClass('animate-pop-check');
+  });
+
+  it('pops each new Variable in, and leaves the ones already there alone', async () => {
+    renderEditor();
+    const variables = () => within(screen.getByRole('region', { name: 'Variables' })).getAllByRole('listitem');
+
+    await userEvent.click(content());
+    await userEvent.paste('Hello {{name}}');
+    const [first] = variables();
+    expect(first).toHaveClass('animate-pop');
+
+    await userEvent.paste(', from {{city}}');
+
+    const after = variables();
+    expect(after).toHaveLength(2);
+    // The same element: its entrance has already played and does not replay
+    expect(after[0]).toBe(first);
+    expect(after[1]).toHaveClass('animate-pop');
+  });
+});
+
 describe('PromptEditor - save', () => {
   it('shows "Saved", then closes the editor', async () => {
     const { props } = renderEditor();
@@ -210,7 +250,44 @@ describe('PromptEditor - save', () => {
     expect(await screen.findByRole('button', { name: 'Saved' })).toBeDisabled();
     expect(props.onSubmit).toHaveBeenCalledWith({ title: 'My Title', content: 'My Content', category: 'Uncategorized' });
     expect(props.onClose).not.toHaveBeenCalled();
-    await waitFor(() => { expect(props.onClose).toHaveBeenCalledTimes(1); }, { timeout: SAVED_PAUSE_MS + 500 });
+    await waitFor(() => { expect(props.onClose).toHaveBeenCalledTimes(1); }, { timeout: MOTION.savedPause + 500 });
+  });
+
+  it('gives the title the keyboard as it opens', () => {
+    renderEditor();
+
+    expect(title()).toHaveFocus();
+  });
+
+  it('slides Save to the success color, with a check that pops, and presses with a spring', async () => {
+    renderEditor();
+    expect(save()).toHaveClass('transition-save', 'active:scale-94');
+
+    await userEvent.type(content(), 'My Content');
+    await userEvent.click(save());
+
+    const saved = await screen.findByRole('button', { name: 'Saved' });
+    expect(saved).toHaveClass('bg-success-subtle', 'text-success', 'transition-save');
+    expect(saved.querySelector('svg')).toHaveClass('animate-pop-check');
+  });
+
+  it('closes at once after "Saved" under prefers-reduced-motion', async () => {
+    vi.spyOn(window, 'matchMedia').mockImplementation((query) => ({
+      matches: query === '(prefers-reduced-motion: reduce)',
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn()
+    }));
+    const { props } = renderEditor();
+
+    await userEvent.type(content(), 'My Content');
+    await userEvent.click(save());
+
+    await waitFor(() => { expect(props.onClose).toHaveBeenCalledTimes(1); }, { timeout: 100 });
   });
 
   it.each([
