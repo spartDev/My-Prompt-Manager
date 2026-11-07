@@ -865,6 +865,8 @@ A Notification (Atelier 1C) is a 40px pill at the top center of the popup or sid
 one replaces it. A confirmation (success, info) has a violet check round (`bg-inverse-mark`) and
 leaves after 2.7s; a failure (error, warning) has a red ! round (`bg-inverse-alert`), is a
 `role="alert"`, and leaves after 6s. There is no close button and no progress bar: Escape closes it.
+Its time stops while the pointer or the focus is on it, so its action (the 6s Undo of a deleted
+Category) can be reached and read; it runs out the rest once neither is.
 Settings has one switch for all of them.
 
 The bold message stays whole; the optional sub (the object's name, or the reason) is cut with an

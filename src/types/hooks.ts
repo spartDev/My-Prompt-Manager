@@ -148,6 +148,10 @@ export interface UseToastReturn {
   settingsLoaded: boolean;
   showToast: ShowToast;
   hideToast: (id: string) => void;
+  /** Stops the time of the Notification on screen while it is hovered or focused */
+  pauseToast: (id: string) => void;
+  /** Runs out the time it had left */
+  resumeToast: (id: string) => void;
   updateSettings: (settings: Partial<ToastSettings>) => void;
 }
 

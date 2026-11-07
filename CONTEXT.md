@@ -83,7 +83,7 @@ One of the four top-level destinations (Library, Categories, Analytics, Settings
 _Avoid_: Tab, page, view
 
 **Notification**:
-A brief message at the top of the popup or side panel that confirms an action or reports its failure, then disappears on its own. One that confirms a deletion can offer to undo it while it shows. Only one shows at a time: a new one replaces it. The user turns all of them on or off in Settings, failures included.
+A brief message at the top of the popup or side panel that confirms an action or reports its failure, then disappears on its own, though not while the pointer or the focus is on it. One that confirms a deletion can offer to undo it while it shows. Only one shows at a time: a new one replaces it. The user turns all of them on or off in Settings, failures included.
 _Avoid_: Toast, alert, snackbar
 
 ## Relationships

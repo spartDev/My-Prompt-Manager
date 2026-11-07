@@ -84,7 +84,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   } = useCategories();
 
   const { copyToClipboard } = useClipboard();
-  const { toast, showToast, hideToast, settings, settingsLoaded, updateSettings } = useToast();
+  const { toast, showToast, hideToast, pauseToast, resumeToast, settings, settingsLoaded, updateSettings } = useToast();
 
   // Initialize search with debounce functionality using optimistic prompts
   const searchWithDebounce = useSearchWithDebounce(optimisticPrompts);
@@ -346,7 +346,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
           </div>
         </div>
         {/* A Notification stays: the Undo of a deletion whose Prompts could not be read again is in it */}
-        <ToastContainer toast={toast} onDismiss={hideToast} />
+        <ToastContainer toast={toast} onDismiss={hideToast} onPause={pauseToast} onResume={resumeToast} />
       </ThemeProvider>
     );
   }
@@ -433,7 +433,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
         <StorageWarning reason={storageRefusal} onClose={handleCloseStorageWarning} />
       )}
 
-      <ToastContainer toast={toast} onDismiss={hideToast} />
+      <ToastContainer toast={toast} onDismiss={hideToast} onPause={pauseToast} onResume={resumeToast} />
       </div>
     </ThemeProvider>
   );
