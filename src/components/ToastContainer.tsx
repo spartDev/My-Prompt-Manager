@@ -67,15 +67,18 @@ const ToastContainer: FC<ToastContainerProps> = ({ toast, onDismiss }) => {
       >
         {isFailure ? AlertGlyph : CheckGlyph}
       </span>
-      {/* The message never gives way to the sub: only a message longer than the whole pill is cut */}
-      <span className="shrink-0 max-w-full truncate text-[13px] font-semibold">
-        {toast.message}
-      </span>
-      {toast.sub && (
-        <span className="min-w-0 truncate text-[12.5px] text-on-inverse">
-          {toast.sub}
+      {/* The text is the one part that gives way, so the round, the gaps and the action keep their room.
+          Inside it, the message never gives way to the sub: only a message longer than the room left is cut */}
+      <span data-testid="toast-text" className="flex min-w-0 items-center gap-[9px]">
+        <span className="shrink-0 max-w-full truncate text-[13px] font-semibold">
+          {toast.message}
         </span>
-      )}
+        {toast.sub && (
+          <span className="min-w-0 truncate text-[12.5px] text-on-inverse">
+            {toast.sub}
+          </span>
+        )}
+      </span>
       {toast.action ? (
         <button
           type="button"

@@ -880,8 +880,11 @@ Prompt`) and put the name in the sub.
   <span className="toast-mark-pop grid place-items-center size-5 rounded-full bg-inverse-mark text-on-inverse-mark">
     {/* check, or ! for a failure */}
   </span>
-  <span className="shrink-0 max-w-full truncate text-[13px] font-semibold">Prompt saved</span>
-  <span className="min-w-0 truncate text-[12.5px] text-on-inverse">Weekly status update</span>
+  {/* Only the text gives way; inside it, the message only once it alone is too long */}
+  <span className="flex min-w-0 items-center gap-[9px]">
+    <span className="shrink-0 max-w-full truncate text-[13px] font-semibold">Prompt saved</span>
+    <span className="min-w-0 truncate text-[12.5px] text-on-inverse">Weekly status update</span>
+  </span>
   {/* An action, as a pill button, or an 8px spacer */}
   <button className="h-7 px-[11px] rounded-full bg-inverse-action text-[12.5px] font-semibold">Undo</button>
 </div>

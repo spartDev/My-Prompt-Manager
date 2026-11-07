@@ -199,8 +199,20 @@ test.describe('Forms, dialogs and toasts on the tokens', () => {
       expect(await reason.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(true);
       expect((await failure.boundingBox())?.width).toBeLessThanOrEqual(VIEWPORT_WIDTH - 32);
       await page.screenshot({ path: `${SCREENSHOT_DIR}/toast-error-${theme}.png` });
+
+      // A message longer than the pill is cut inside it: the round, the gaps and the spacer keep their room
+      const pill = page.getByTestId('toast');
+      const longMessage = pill.getByTestId('toast-text').locator('> span').first();
+      await longMessage.evaluate(element => { element.textContent = 'Import failed '.repeat(12); });
+      const pillBox = await pill.boundingBox();
+      const messageBox = await longMessage.boundingBox();
+      expect(pillBox?.width).toBeLessThanOrEqual(VIEWPORT_WIDTH - 32);
+      expect((messageBox?.x ?? 0) + (messageBox?.width ?? 0)).toBeLessThanOrEqual((pillBox?.x ?? 0) + (pillBox?.width ?? 0) - 14);
+      expect((await pill.getByTestId('toast-mark').boundingBox())?.width).toBe(20);
+      expect(await longMessage.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(true);
+
       await page.keyboard.press('Escape');
-      await expect(failure).toHaveCount(0);
+      await expect(pill).toHaveCount(0);
 
       // Off: no Notification at all, a failure included
       await notificationsSwitch.click();
