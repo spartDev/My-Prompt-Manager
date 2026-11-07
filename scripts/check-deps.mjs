@@ -5,8 +5,9 @@
  * script test with "exit code null".
  *
  * npm writes node_modules/.package-lock.json from the tree it installed, so the check compares every entry of
- * package-lock.json "packages" with it: a version that differs, a package that is not installed, and one installed
- * that the lockfile does not list. An entry counts as installed only while its folder still holds a package.json,
+ * package-lock.json "packages" with it: a version that differs, or at the same version other content (the integrity
+ * of a registry package, the resolved revision of a Git one), a package that is not installed, and one installed that
+ * the lockfile does not list. An entry counts as installed only while its folder still holds a package.json,
  * and at that file's version, since npm leaves node_modules/.package-lock.json as it was when a folder is deleted by
  * hand, copied in from another install, or left by an install cut short. An optional package built for another platform is expected to be absent, since
  * npm skips it (@biomejs/cli-linux-x64 on macOS); one built for this platform is not, since the toolchain needs it
@@ -86,10 +87,25 @@ const expectedAbsent = (key, wanted, platform) => {
 };
 
 /**
+ * Why two entries of one version still differ: the content npm would install (the integrity of a registry package,
+ * which a mirror leaves as it is) or, without one on both sides, its source (the resolved revision of a Git package).
+ */
+const contentDiffers = (wanted, actual) => {
+  if (wanted.integrity && actual.integrity) {
+    return wanted.integrity === actual.integrity ? undefined : 'integrity';
+  }
+  if (wanted.resolved && actual.resolved) {
+    return wanted.resolved === actual.resolved ? undefined : 'resolved';
+  }
+  return undefined;
+};
+
+/**
  * The differences between the packages package-lock.json lists and the ones node_modules/.package-lock.json says
- * npm installed, as { name, expected, installed }: the lockfile's version and the installed one, either undefined
- * for a package that is not installed or not in the lockfile. An optional package built for another platform is
- * expected to be absent and is not a difference; one built for `platform` is.
+ * npm installed, as { name, expected, installed, reason }: the lockfile's version and the installed one, either
+ * undefined for a package that is not installed or not in the lockfile; `reason` names what differs at one version
+ * ('integrity' or 'resolved'). An optional package built for another platform is expected to be absent and is not a
+ * difference; one built for `platform` is.
  */
 export function compareLockfiles(lockfile, installed, platform = currentPlatform()) {
   const wanted = lockfile.packages ?? {};
@@ -106,6 +122,11 @@ export function compareLockfiles(lockfile, installed, platform = currentPlatform
       }
     } else if (actual.version !== entry.version) {
       differences.push({ name: packageName(key), expected: entry.version, installed: actual.version });
+    } else {
+      const reason = contentDiffers(entry, actual);
+      if (reason !== undefined) {
+        differences.push({ name: packageName(key), expected: entry.version, installed: actual.version, reason });
+      }
     }
   }
   for (const [key, entry] of Object.entries(present)) {
@@ -116,7 +137,10 @@ export function compareLockfiles(lockfile, installed, platform = currentPlatform
   return differences;
 }
 
-const describeDifference = ({ name, expected, installed }) => {
+const describeDifference = ({ name, expected, installed, reason }) => {
+  if (reason !== undefined) {
+    return `${name}: ${installed} installed, but package-lock.json lists other content for it (${reason} differs)`;
+  }
   if (installed === undefined) {
     return `${name}: ${expected} in package-lock.json, not installed`;
   }

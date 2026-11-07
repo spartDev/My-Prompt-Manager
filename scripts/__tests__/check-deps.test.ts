@@ -10,7 +10,7 @@ import { builtForPlatform, check, compareLockfiles, fixCommand } from '../check-
 
 const SCRIPT = path.resolve(__dirname, '..', 'check-deps.mjs');
 
-type Entry = { version: string; optional?: boolean; os?: string[]; cpu?: string[]; libc?: string[] };
+type Entry = { version: string; optional?: boolean; os?: string[]; cpu?: string[]; libc?: string[]; integrity?: string; resolved?: string };
 type Packages = Record<string, Entry>;
 
 /** A package-lock.json: the project's own entry under "", then the packages. */
@@ -108,6 +108,31 @@ describe('compareLockfiles', () => {
     expect(compareLockfiles(lockfile(wanted), installed(WANTED), MAC)).toEqual([]);
   });
 
+  it('reports a package of the same version whose content the lockfile changed, by its integrity', () => {
+    const wanted = { ...WANTED, 'node_modules/vite': { version: '8.3.5', integrity: 'sha512-new', resolved: 'https://registry.npmjs.org/vite/-/vite-8.3.5.tgz' } };
+    const present = { ...WANTED, 'node_modules/vite': { version: '8.3.5', integrity: 'sha512-old', resolved: 'https://registry.npmjs.org/vite/-/vite-8.3.5.tgz' } };
+
+    expect(compareLockfiles(lockfile(wanted), installed(present), MAC)).toEqual([
+      { name: 'vite', expected: '8.3.5', installed: '8.3.5', reason: 'integrity' },
+    ]);
+  });
+
+  it('reports a Git package of the same version whose resolved revision changed, since it has no integrity', () => {
+    const wanted = { ...WANTED, 'node_modules/tool': { version: '1.0.0', resolved: 'git+ssh://git@github.com/x/tool.git#aaaa' } };
+    const present = { ...WANTED, 'node_modules/tool': { version: '1.0.0', resolved: 'git+ssh://git@github.com/x/tool.git#bbbb' } };
+
+    expect(compareLockfiles(lockfile(wanted), installed(present), MAC)).toEqual([
+      { name: 'tool', expected: '1.0.0', installed: '1.0.0', reason: 'resolved' },
+    ]);
+  });
+
+  it('finds no difference when the integrity matches although a registry mirror changed the resolved URL', () => {
+    const wanted = { ...WANTED, 'node_modules/vite': { version: '8.3.5', integrity: 'sha512-same', resolved: 'https://registry.npmjs.org/vite/-/vite-8.3.5.tgz' } };
+    const present = { ...WANTED, 'node_modules/vite': { version: '8.3.5', integrity: 'sha512-same', resolved: 'https://mirror.example.com/vite/-/vite-8.3.5.tgz' } };
+
+    expect(compareLockfiles(lockfile(wanted), installed(present), MAC)).toEqual([]);
+  });
+
   it('names a nested package by its path under node_modules', () => {
     const wanted = { ...WANTED, 'node_modules/jsdom/node_modules/lru-cache': { version: '10.4.3' } };
 
@@ -154,6 +179,15 @@ describe('check-deps', () => {
     expect(result.stdout).toContain('differs from package-lock.json in 1 package ');
     expect(result.stdout).toContain('vite: 7.3.7 installed, 8.3.5 in package-lock.json');
     expect(result.stdout).toContain('Fix: npm ci');
+  });
+
+  it('exits 1 and says what differs when the version is the same but the content is not', () => {
+    writeCheckout(root, { ...WANTED, 'node_modules/vite': { version: '8.3.5', integrity: 'sha512-new' } }, { ...WANTED, 'node_modules/vite': { version: '8.3.5', integrity: 'sha512-old' } });
+
+    const result = runCheck(root);
+
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain('vite: 8.3.5 installed, but package-lock.json lists other content for it (integrity differs)');
   });
 
   it('exits 1 and names a package that is not installed', () => {
