@@ -12,7 +12,7 @@ Log through the logger of the surface you are in: `Logger` from `src/utils` (`Lo
 
 ## Forms
 
-Validate and submit forms with React 19's `useActionState`. Patterns: `docs/REACT_19_MIGRATION.md`.
+Validate and submit forms with React 19's `useActionState`, as `src/components/PromptEditor.tsx` does; its unit tests in `src/components/__tests__/PromptEditor.test.tsx` show how to test one.
 
 ## Colors
 

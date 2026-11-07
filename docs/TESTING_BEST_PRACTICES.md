@@ -1533,7 +1533,7 @@ it('should render icon correctly', () => {
 
 ### Project-Specific Guides
 - [Testing Guide](./TESTING.md) - Test infrastructure and running tests
-- [React 19 Migration](./REACT_19_MIGRATION.md) - Testing React 19 hooks
+- `src/components/__tests__/PromptEditor.test.tsx` - unit tests of a `useActionState` form in happy-dom: submit, refusal, Cmd+S
 
 ---
 
