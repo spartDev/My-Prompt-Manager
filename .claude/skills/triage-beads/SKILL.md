@@ -11,12 +11,14 @@ A triage reads the backlog from one compact listing and opens a ticket only to d
 
 ## 1. Pull the listing
 
+Save the backlog once, in your scratch directory (`<scratch>` below, never the repository), and read it as one compact line per ticket:
+
 ```bash
-bd list --status=open,in_progress,blocked,deferred --json --limit 0 \
-  | jq -c '.[] | {id, p: .priority, t: .issue_type, s: .status, title, d: (.description // "" | .[0:200])}'
+bd list --status=open,in_progress,blocked,deferred --json --limit 0 > <scratch>/backlog.json
+jq -c '.[] | {id, p: .priority, t: .issue_type, s: .status, title, d: (.description // "" | .[0:200])}' <scratch>/backlog.json
 ```
 
-`--limit 0` lifts `bd list`'s default cap of 50 rows, which would drop tickets without saying so. The listing came to 3.9 KB for 11 tickets on 2026-11-05; when it passes 8 KB, cut `d` to 100 characters rather than paging through it.
+`--limit 0` lifts `bd list`'s default cap of 50 rows, which would drop tickets without saying so. The listing came to 3.9 KB for 11 tickets on 2026-11-05; when it passes 8 KB, cut `d` to 100 characters rather than paging through it. Every later step reads the saved snapshot, so the ranking and the groups describe the same backlog.
 
 Done when every live ticket is one line of that output, read once.
 
@@ -37,16 +39,16 @@ Run `bd show <id>` on each flagged ticket, and on no other. Decide each flag fro
 
 ## 4. Group by the files each ticket would touch
 
-Two tickets that would write the same file cannot run side by side. The files come from a second compact listing, the repository paths each ticket's description and design cite, not from `bd show`:
+Two tickets that would write the same file cannot run side by side. The files come from the step 1 snapshot, not from `bd show` or a second `bd list`: every path-like token in a ticket's description and design, kept when it exists in the checkout, so a root-level file (`package.json`, `manifest.json`, `vite.config.ts`) counts as much as one under `src/`. Run it from the repository root:
 
 ```bash
-bd list --status=open,in_progress,blocked,deferred --json --limit 0 \
-  | jq -c '.[] | {id, files: ([((.description // "") + " " + (.design // "")) | match("(?:src|tests|scripts|docs|\\.claude|\\.github|\\.beads)/[\\w./-]*\\w"; "g").string] | unique)}'
+jq -r '.[] | .id as $id | ((.description // "") + " " + (.design // "")) | [match("\\.?[A-Za-z0-9_@-]+(?:\\.[A-Za-z0-9_@-]+)*(?:/\\.?[A-Za-z0-9_@-]+(?:\\.[A-Za-z0-9_@-]+)*)+/?|\\.?[A-Za-z0-9_@-]+/|\\.?[A-Za-z0-9_@-]+(?:\\.[A-Za-z0-9_@-]+)+"; "g").string] | unique[] | "\($id) \(.)"' <scratch>/backlog.json \
+  | while read -r id path; do [ -e "$path" ] && echo "$id $path"; done
 ```
 
-A ticket that cites no path is placed from its title: the component, service or doc it names, found with one `grep -rl` of the code when the name is not a path. Say which placements are guesses. Then:
+A file the ticket would create is not in the checkout yet: add it from the ticket's line. A ticket that cites no path is placed from its title: the component, service or doc it names, found with one `grep -rl` of the code when the name is not a path. Say which placements are guesses. Then:
 
-- a ticket goes in the group of any ticket it shares a file with, and after any ticket it depends on (`dependencies` in the listing, `bd blocked`); the tickets of one group run one after another;
+- a ticket goes in the group of any ticket it shares a file with, and after any ticket it depends on (`dependencies` in the snapshot, `bd blocked`); the tickets of one group run one after another;
 - groups that share no file can run in parallel, each in its own session on its own branch;
 - an epic is placed by its children, not on its own.
 
