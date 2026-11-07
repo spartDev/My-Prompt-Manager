@@ -432,7 +432,7 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
           onClick={openAddMethodSelector}
           disabled={addActionDisabled}
           title={addActionReason}
-          className="w-full flex items-center gap-3 py-2.5 pr-2.5 pl-3.5 min-h-[54px] text-left text-sm font-bold text-accent hover:bg-raised transition-colors focus-interactive -outline-offset-2 disabled:text-tertiary disabled:hover:bg-transparent disabled:cursor-not-allowed"
+          className="w-full flex items-center gap-3 py-2.5 pr-2.5 pl-3.5 min-h-[54px] text-left text-sm font-bold text-accent hover:bg-muted transition-colors focus-interactive -outline-offset-2 disabled:text-tertiary disabled:hover:bg-transparent disabled:cursor-not-allowed"
         >
           <span aria-hidden="true" className="size-[30px] rounded-full flex items-center justify-center shrink-0 bg-accent-subtle">
             <svg className="size-4" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24">

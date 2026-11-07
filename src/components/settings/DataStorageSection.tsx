@@ -12,7 +12,7 @@ import SettingsGroup from './SettingsGroup';
 import SettingsRow from './SettingsRow';
 
 /** Export and Import: secondary pills, 40px high */
-const DATA_BUTTON_CLASSES = 'h-10 flex items-center justify-center gap-2 rounded-full border-[1.5px] border-strong bg-card text-sm font-semibold text-secondary hover:bg-raised transition-colors focus-secondary disabled:opacity-50 disabled:cursor-not-allowed';
+const DATA_BUTTON_CLASSES = 'h-10 flex items-center justify-center gap-2 rounded-full border-[1.5px] border-strong bg-card text-sm font-semibold text-secondary hover:bg-muted transition-colors focus-secondary disabled:opacity-50 disabled:cursor-not-allowed';
 
 /**
  * What the last import left to read at the user's pace: every item it skipped and why, and why it

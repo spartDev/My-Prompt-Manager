@@ -26,7 +26,7 @@ const HelpSection: FC = () => (
         href={link.href}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex items-center gap-3 min-h-[54px] py-2.5 pr-3.5 pl-3.5 text-sm font-semibold text-primary hover:bg-raised transition-colors focus-interactive -outline-offset-2"
+        className="flex items-center gap-3 min-h-[54px] py-2.5 pr-3.5 pl-3.5 text-sm font-semibold text-primary hover:bg-muted transition-colors focus-interactive -outline-offset-2"
       >
         <span className="text-accent shrink-0">{link.icon}</span>
         <span className="flex-1">{link.label}</span>
