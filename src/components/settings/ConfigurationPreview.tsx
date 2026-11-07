@@ -1,7 +1,8 @@
 import type { FC } from 'react';
-import { useCallback, useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import { createPortal } from 'react-dom';
 
+import { useModalFocus } from '../../hooks/useModalFocus';
 import type { CustomSiteConfiguration, SecurityWarning } from '../../types';
 
 interface ConfigurationPreviewProps {
@@ -15,8 +16,6 @@ interface ConfigurationPreviewProps {
   isProcessing?: boolean;
 }
 
-const FOCUSABLE_SELECTOR = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
-
 const ConfigurationPreview: FC<ConfigurationPreviewProps> = ({
   isOpen,
   config,
@@ -28,68 +27,11 @@ const ConfigurationPreview: FC<ConfigurationPreviewProps> = ({
   isProcessing = false
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
-  const previousActiveElement = useRef<HTMLElement | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
 
-  // Get all focusable elements within the modal
-  const getFocusableElements = useCallback(() => {
-    if (!modalRef.current) {return [];}
-    return Array.from(modalRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
-  }, []);
-
-  // Store the previously focused element and focus the first focusable element when opened
-  useEffect(() => {
-    if (isOpen) {
-      previousActiveElement.current = document.activeElement as HTMLElement;
-      // Focus the first focusable element (close button) after a brief delay to ensure modal is rendered
-      requestAnimationFrame(() => {
-        const focusable = getFocusableElements();
-        if (focusable.length > 0) {
-          focusable[0].focus();
-        }
-      });
-    }
-
-    return () => {
-      // Restore focus when modal closes
-      if (previousActiveElement.current && typeof previousActiveElement.current.focus === 'function') {
-        previousActiveElement.current.focus();
-      }
-    };
-  }, [isOpen, getFocusableElements]);
-
-  // Handle ESC key and trap focus
-  const handleKeyDown = useCallback((event: KeyboardEvent) => {
-    if (event.key === 'Escape') {
-      onClose();
-    } else if (event.key === 'Tab') {
-      const focusableElements = getFocusableElements();
-      if (focusableElements.length === 0) {return;}
-
-      const firstElement = focusableElements[0];
-      const lastElement = focusableElements[focusableElements.length - 1];
-
-      if (event.shiftKey) {
-        // Shift+Tab: if on first element, wrap to last
-        if (document.activeElement === firstElement) {
-          event.preventDefault();
-          lastElement.focus();
-        }
-      } else {
-        // Tab: if on last element, wrap to first
-        if (document.activeElement === lastElement) {
-          event.preventDefault();
-          firstElement.focus();
-        }
-      }
-    }
-  }, [onClose, getFocusableElements]);
-
-  useEffect(() => {
-    if (!isOpen) {return;}
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => { document.removeEventListener('keydown', handleKeyDown); };
-  }, [isOpen, handleKeyDown]);
+  // Close, the safe choice, takes the focus first; Tab and Shift+Tab wrap inside, Escape closes,
+  // and the focus goes back to Preview Configuration when the dialog closes
+  useModalFocus({ isOpen: isOpen && config !== null, onClose, containerRef: modalRef, initialFocusRef: closeButtonRef });
 
   if (!isOpen || !config) {
     return null;
@@ -105,7 +47,8 @@ const ConfigurationPreview: FC<ConfigurationPreviewProps> = ({
       <div className="absolute inset-0 bg-backdrop backdrop-blur-sm" aria-hidden="true" onClick={onClose}></div>
       <div
         ref={modalRef}
-        className="relative max-w-lg w-full bg-raised rounded-2xl shadow-2xl border border-default overflow-hidden"
+        tabIndex={-1}
+        className="relative max-w-lg w-full bg-raised rounded-2xl shadow-2xl border border-default overflow-hidden focus:outline-none"
       >
         {/* Header */}
         <div className="bg-card border-b border-default px-6 py-4">
@@ -126,6 +69,7 @@ const ConfigurationPreview: FC<ConfigurationPreviewProps> = ({
               </div>
             </div>
             <button
+              ref={closeButtonRef}
               type="button"
               onClick={onClose}
               className="text-tertiary hover:text-primary transition-colors"

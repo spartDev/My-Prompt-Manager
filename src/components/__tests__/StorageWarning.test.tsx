@@ -121,6 +121,48 @@ describe('StorageWarning', () => {
       expect(mockOnClose).not.toHaveBeenCalled();
       expect(screen.getByRole('button', { name: 'Clear All Data' })).toHaveFocus();
     });
+
+    // One aria-modal is reachable at a time: the warning is inert beneath its confirmation
+    it('is inert beneath the Clear All Data confirmation, and reachable again once it closes', async () => {
+      const user = userEvent.setup();
+      vi.mocked(mockStorageManager.getStorageUsageWithWarnings).mockResolvedValue(createStorageInfo(40, 'safe'));
+      render(<StorageWarning reason={REASON} onClose={mockOnClose} />);
+      const warning = screen.getByRole('dialog', { name: 'Storage Limit Reached' });
+      await waitFor(() => { expect(screen.getByRole('button', { name: 'Continue' })).toHaveFocus(); });
+      expect(warning.closest('[inert]')).toBeNull();
+
+      await user.click(screen.getByRole('button', { name: 'Clear All Data' }));
+
+      expect(warning.closest('[inert]')).not.toBeNull();
+      expect(screen.getByRole('dialog', { name: 'Clear All Data' }).closest('[inert]')).toBeNull();
+
+      await user.keyboard('{Escape}');
+
+      expect(warning.closest('[inert]')).toBeNull();
+    });
+
+    it('holds the keyboard on the warning itself while the data clears', async () => {
+      const user = userEvent.setup();
+      let resolveClear: (() => void) | undefined;
+      vi.mocked(mockStorageManager.getStorageUsageWithWarnings).mockResolvedValue(createStorageInfo(98, 'danger'));
+      vi.mocked(mockStorageManager.clearAllData).mockImplementation(() => new Promise<void>(resolve => { resolveClear = resolve; }));
+      render(<StorageWarning reason={REASON} onClose={mockOnClose} />);
+      const warning = screen.getByRole('dialog', { name: 'Storage Limit Reached' });
+      await waitFor(() => { expect(screen.getByRole('button', { name: 'Continue' })).toHaveFocus(); });
+
+      await user.click(screen.getByRole('button', { name: 'Clear All Data' }));
+      await user.click(within(screen.getByRole('dialog', { name: 'Clear All Data' })).getByRole('button', { name: 'Clear All Data' }));
+      await waitFor(() => { expect(screen.getByRole('button', { name: 'Clearing...' })).toBeDisabled(); });
+
+      // Both buttons are disabled: Tab keeps the focus on the warning, and Escape does not close it
+      await user.tab();
+      expect(warning).toHaveFocus();
+      await user.keyboard('{Escape}');
+      expect(mockOnClose).not.toHaveBeenCalled();
+
+      resolveClear?.();
+      await waitFor(() => { expect(mockOnClose).toHaveBeenCalledTimes(1); });
+    });
   });
 
   describe('storage percentage display', () => {
