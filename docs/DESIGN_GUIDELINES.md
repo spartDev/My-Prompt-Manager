@@ -1040,7 +1040,7 @@ that appears in the list pops in (`category-pop`: scale .3, 1.2, then 1, 0.5s ea
 technology too: while the sheet is open, the screen behind and the tab bar are `inert`, and the sheet
 is `inert` while it leaves or while the delete confirmation is on top of it. While a create, save or
 delete runs, Escape, the backdrop, Close and Cancel wait for it to end, and a save and a deletion never
-run together.
+run together. While a create or save runs, the name is read-only and the swatches are `aria-disabled`.
 
 ```tsx
 <div className="fixed inset-0 z-40">

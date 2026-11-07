@@ -179,6 +179,8 @@ const CategorySheet: FC<CategorySheetProps> = ({
               name="name"
               value={name}
               onChange={(event) => { onNameChange(event.target.value); }}
+              // The create or save that runs holds the draft: an edit now would show, then be lost
+              readOnly={isPending}
               aria-label="Category name"
               placeholder="Category name"
               autoComplete="off"
@@ -203,8 +205,13 @@ const CategorySheet: FC<CategorySheetProps> = ({
                   type="button"
                   aria-label={preset.name}
                   aria-pressed={selected}
+                  aria-disabled={isPending ? true : undefined}
                   title={preset.name}
-                  onClick={() => { onColorChange(preset.value); }}
+                  onClick={() => {
+                    if (!isPending) {
+                      onColorChange(preset.value);
+                    }
+                  }}
                   className="swatch-spring size-8 rounded-full cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-[5px] focus-visible:outline-accent"
                   style={{
                     backgroundColor: preset.value,

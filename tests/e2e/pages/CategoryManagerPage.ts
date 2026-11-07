@@ -340,7 +340,8 @@ export class CategoryManagerPage extends BasePage {
       await confirmation.getByRole('button', { name: 'Cancel', exact: true }).click();
       await expect(confirmation).toHaveCount(0);
       await expect(this.getEditSheet()).toBeVisible();
-      await expect(this.getSheetNameInput()).toBeFocused();
+      // The sheet resumes where the confirmation leaves the focus: on the Delete that opened it
+      await expect(this.getSheetDeleteButton()).toBeFocused();
     }
   }
 

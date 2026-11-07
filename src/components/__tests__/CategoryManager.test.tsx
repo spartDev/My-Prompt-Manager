@@ -148,6 +148,29 @@ describe('CategoryManager', () => {
       expect(slowCreate).toHaveBeenCalledTimes(1);
     });
 
+    it('freezes the name and the color while the Category is being created', async () => {
+      const resolvers: Array<() => void> = [];
+      const slowCreate = vi.fn((category: { name: string; color: string }) =>
+        new Promise<Category>(resolve => { resolvers.push(() => { resolve({ id: 'new', ...category }); }); }));
+      const { user } = renderManager({ onCreateCategory: slowCreate });
+
+      await user.click(screen.getByRole('button', { name: 'Add category' }));
+      const sheet = screen.getByRole('dialog', { name: 'New category' });
+      const name = within(sheet).getByRole('textbox', { name: 'Category name' });
+      await user.type(name, 'Research');
+      await user.click(within(sheet).getByRole('button', { name: 'Create' }));
+      // The request already holds the draft: what is typed or chosen now would show, then be lost
+      await user.type(name, ' notes');
+      await user.click(within(sheet).getByRole('button', { name: 'Teal' }));
+      expect(name).toHaveValue('Research');
+      expect(name).toHaveAttribute('readonly');
+      expect(within(sheet).getByRole('button', { name: 'Teal' })).toHaveAttribute('aria-pressed', 'false');
+
+      resolvers.forEach(resolve => { resolve(); });
+      await sheetGone();
+      expect(slowCreate).toHaveBeenCalledWith(expect.objectContaining({ name: 'Research' }), expect.anything());
+    });
+
     it('creates with Enter in the name', async () => {
       const { user, props } = renderManager();
 
