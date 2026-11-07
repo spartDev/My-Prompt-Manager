@@ -162,6 +162,11 @@ const isLinkedWorktree = (root) => {
 /** `value` as one word for sh: single-quoted, with an embedded single quote closed, escaped and reopened. */
 const shellQuote = (value) => `'${value.replace(/'/g, "'\\''")}'`;
 
+/** The fix as one sh command that can be pasted as it is, with its reason as a trailing comment. */
+const withReason = (command, reason) => `${command}   # ${reason}`;
+
+const describeError = (error) => (error instanceof Error ? error.message : String(error));
+
 /** True when the two checkouts have the same package-lock.json, byte for byte. */
 const sameLockfile = (a, b) => {
   try {
@@ -181,20 +186,30 @@ const sameLockfile = (a, b) => {
  */
 export function fixCommand(root) {
   const modules = path.join(root, 'node_modules');
-  const install = isLinkedWorktree(root) ? 'HUSKY=0 npm ci --no-audit --no-fund' : 'npm ci';
+  const linked = isLinkedWorktree(root);
+  const install = linked ? 'HUSKY=0 npm ci --no-audit --no-fund' : 'npm ci';
   if (isSymlink(modules)) {
     let checkout;
     try {
       checkout = path.dirname(realpathSync(modules));
     } catch {
-      return `rm node_modules && ${install} (node_modules is a symlink to ${readlinkSync(modules)}, which no longer exists; rm removes only the symlink, then this checkout gets its own install)`;
+      return withReason(
+        `rm node_modules && ${install}`,
+        `node_modules is a symlink to ${readlinkSync(modules)}, which no longer exists; rm removes only the symlink, then this checkout gets its own install`,
+      );
     }
     if (sameLockfile(root, checkout)) {
-      return `cd ${shellQuote(checkout)} && npm ci (node_modules is a symlink into that checkout, which has the same package-lock.json; an npm ci here would rewrite it)`;
+      return withReason(
+        `cd ${shellQuote(checkout)} && npm ci`,
+        'node_modules is a symlink into that checkout, which has the same package-lock.json; an npm ci here would rewrite it',
+      );
     }
-    return `rm node_modules && ${install} (node_modules is a symlink into ${checkout}, whose package-lock.json differs; rm removes only the symlink, then this checkout gets its own install)`;
+    return withReason(
+      `rm node_modules && ${install}`,
+      `node_modules is a symlink into ${checkout}, whose package-lock.json differs; rm removes only the symlink, then this checkout gets its own install`,
+    );
   }
-  return `${install} (${isLinkedWorktree(root) ? 'linked worktree' : 'main checkout'})`;
+  return withReason(install, linked ? 'linked worktree' : 'main checkout');
 }
 
 /** The report for the checkout at `root`, or an empty string when node_modules matches package-lock.json. */
@@ -211,18 +226,35 @@ export function check(root) {
   if (!existsSync(installedPath)) {
     return `node_modules/.package-lock.json is missing in ${root}, so the install cannot be checked; npm writes it on every install (scripts/check-deps.mjs).\nFix: ${fixCommand(root)}`;
   }
-  const installed = readJson(installedPath);
+  let lockfile;
+  try {
+    lockfile = readJson(lockfilePath);
+  } catch (error) {
+    return `package-lock.json cannot be read in ${root} (${describeError(error)}), so the install cannot be checked (scripts/check-deps.mjs).`;
+  }
+  let installed;
+  try {
+    installed = readJson(installedPath);
+  } catch (error) {
+    return `node_modules/.package-lock.json cannot be read in ${root} (${describeError(error)}); an install cut short leaves it so (scripts/check-deps.mjs).\nFix: ${fixCommand(root)}`;
+  }
   installed.packages = Object.fromEntries(
     Object.entries(installed.packages ?? {}).filter(([key]) => existsSync(path.join(root, key, 'package.json'))),
   );
-  const differences = compareLockfiles(readJson(lockfilePath), installed);
+  const differences = compareLockfiles(lockfile, installed);
   return differences.length === 0 ? '' : report(differences, fixCommand(root));
 }
 
 function main(args) {
   const hook = args.includes('--hook');
   const root = path.resolve(args.find((arg) => !arg.startsWith('--')) ?? ROOT);
-  const message = check(root);
+  let message;
+  try {
+    message = check(root);
+  } catch (error) {
+    // Whatever else fails (a folder that cannot be read, say), the session gets one line rather than a stack trace.
+    message = `node_modules in ${root} cannot be checked: ${describeError(error)} (scripts/check-deps.mjs).`;
+  }
   if (message === '') {
     return 0;
   }

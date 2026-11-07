@@ -184,6 +184,32 @@ describe('check-deps', () => {
     expect(result.stdout).toContain('tsx: 4.23.15 in package-lock.json, not installed');
   });
 
+  it('reports a node_modules/.package-lock.json that is not valid JSON as an install to redo, under --hook too', () => {
+    writeCheckout(root, WANTED, WANTED);
+    writeFileSync(path.join(root, 'node_modules', '.package-lock.json'), '{"packages": {');
+
+    const result = runCheck(root);
+    const hooked = runCheck(root, '--hook');
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toBe('');
+    expect(result.stdout).toContain('node_modules/.package-lock.json cannot be read');
+    expect(result.stdout).toContain('Fix: npm ci');
+    expect(hooked.status).toBe(0);
+    expect(hooked.stdout).toBe(result.stdout);
+  });
+
+  it('reports a package-lock.json that is not valid JSON instead of throwing', () => {
+    writeCheckout(root, WANTED, WANTED);
+    writeFileSync(path.join(root, 'package-lock.json'), 'not json');
+
+    const result = runCheck(root);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toBe('');
+    expect(result.stdout).toContain('package-lock.json cannot be read');
+  });
+
   it('exits 1 with the fix when node_modules is missing', () => {
     writeCheckout(root, WANTED, null);
 
@@ -235,15 +261,15 @@ describe('fixCommand', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  it('is npm ci in the main checkout', () => {
-    expect(fixCommand(main)).toBe('npm ci (main checkout)');
+  it('is npm ci in the main checkout, with the reason as a comment so the line can be pasted as it is', () => {
+    expect(fixCommand(main)).toBe('npm ci   # main checkout');
   });
 
   it('is npm ci with HUSKY=0 in a linked worktree', () => {
     const worktree = path.join(root, 'worktree');
     git(main, 'worktree', 'add', '--quiet', '--detach', worktree);
 
-    expect(fixCommand(worktree)).toBe('HUSKY=0 npm ci --no-audit --no-fund (linked worktree)');
+    expect(fixCommand(worktree)).toBe('HUSKY=0 npm ci --no-audit --no-fund   # linked worktree');
   });
 
   it('sends a worktree whose node_modules is a symlink into a checkout with the same lockfile to that checkout', () => {
@@ -255,7 +281,7 @@ describe('fixCommand', () => {
     writeFileSync(path.join(worktree, 'package-lock.json'), JSON.stringify(lockfile(WANTED)));
 
     expect(fixCommand(worktree)).toBe(
-      `cd '${main}' && npm ci (node_modules is a symlink into that checkout, which has the same package-lock.json; an npm ci here would rewrite it)`,
+      `cd '${main}' && npm ci   # node_modules is a symlink into that checkout, which has the same package-lock.json; an npm ci here would rewrite it`,
     );
   });
 
@@ -280,7 +306,7 @@ describe('fixCommand', () => {
     symlinkSync(gone, path.join(worktree, 'node_modules'));
 
     expect(fixCommand(worktree)).toBe(
-      `rm node_modules && HUSKY=0 npm ci --no-audit --no-fund (node_modules is a symlink to ${gone}, which no longer exists; rm removes only the symlink, then this checkout gets its own install)`,
+      `rm node_modules && HUSKY=0 npm ci --no-audit --no-fund   # node_modules is a symlink to ${gone}, which no longer exists; rm removes only the symlink, then this checkout gets its own install`,
     );
     const result = runCheck(worktree);
     expect(result.status).toBe(1);
@@ -298,11 +324,11 @@ describe('fixCommand', () => {
     writeFileSync(path.join(worktree, 'package-lock.json'), JSON.stringify(lockfile({ ...WANTED, 'node_modules/vite': { version: '8.4.0' } })));
 
     expect(fixCommand(worktree)).toBe(
-      `rm node_modules && HUSKY=0 npm ci --no-audit --no-fund (node_modules is a symlink into ${main}, whose package-lock.json differs; rm removes only the symlink, then this checkout gets its own install)`,
+      `rm node_modules && HUSKY=0 npm ci --no-audit --no-fund   # node_modules is a symlink into ${main}, whose package-lock.json differs; rm removes only the symlink, then this checkout gets its own install`,
     );
   });
 
   it('is npm ci outside a Git checkout', () => {
-    expect(fixCommand(root)).toBe('npm ci (main checkout)');
+    expect(fixCommand(root)).toBe('npm ci   # main checkout');
   });
 });
