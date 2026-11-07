@@ -116,6 +116,8 @@ const CategoryManager: FC<CategoryManagerProps> = ({
   // One deletion at a time: a second click would fail, and its failure Notification would replace
   // the one that offers Undo
   const deletingRef = useRef(false);
+  // The same, drawn: the sheet stays frozen until the deletion ends
+  const [deleting, setDeleting] = useState(false);
 
   const handleSubmit = async (): Promise<void> => {
     // A deletion runs and closes the sheet when it ends: there is nothing left to save
@@ -159,6 +161,7 @@ const CategoryManager: FC<CategoryManagerProps> = ({
   const deleteNow = async (category: Category): Promise<void> => {
     if (deletingRef.current) {return;}
     deletingRef.current = true;
+    setDeleting(true);
     const neighbour = neighbourOf(categories, category);
     try {
       await onDeleteCategory(category);
@@ -168,6 +171,7 @@ const CategoryManager: FC<CategoryManagerProps> = ({
       return;
     } finally {
       deletingRef.current = false;
+      setDeleting(false);
     }
     // Closed now, so the screen behind is no longer inert when it takes the focus
     flushSync(() => { sheet.close(); });
@@ -322,6 +326,7 @@ const CategoryManager: FC<CategoryManagerProps> = ({
           mode={sheet.mode}
           open={sheet.isOpen}
           paused={confirming !== null}
+          deleting={deleting}
           name={sheet.name}
           color={sheet.color}
           promptCount={promptCount}

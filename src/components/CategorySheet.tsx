@@ -13,6 +13,8 @@ export interface CategorySheetProps {
   open: boolean;
   /** Another dialog is on top (the delete confirmation): the sheet is inert and lets go of the keyboard until it closes */
   paused?: boolean;
+  /** Edit mode: a deletion of the Category runs. The sheet is frozen until it ends, as during its own create or save */
+  deleting?: boolean;
   name: string;
   color: string;
   /** Edit mode: how many Prompts are in the Category */
@@ -56,6 +58,7 @@ const CategorySheet: FC<CategorySheetProps> = ({
   mode,
   open,
   paused = false,
+  deleting = false,
   name,
   color,
   promptCount = 0,
@@ -79,16 +82,16 @@ const CategorySheet: FC<CategorySheetProps> = ({
   const selectedPreset = findPresetColor(color)?.value;
 
   // The action reads these when it runs, which can be after a later render (actions queue up)
-  const latestRef = useRef({ name, blank, open, onSubmit });
+  const latestRef = useRef({ name, blank, open, deleting, onSubmit });
   useEffect(() => {
-    latestRef.current = { name, blank, open, onSubmit };
-  }, [name, blank, open, onSubmit]);
+    latestRef.current = { name, blank, open, deleting, onSubmit };
+  }, [name, blank, open, deleting, onSubmit]);
 
   const [refusal, submitAction, isPending] = useActionState(
     async (previous: Refusal | null): Promise<Refusal | null> => {
       const latest = latestRef.current;
-      // An empty name does nothing, and neither does a second submit once the sheet is closing
-      if (latest.blank || !latest.open) {return previous;}
+      // An empty name does nothing, nor does a submit once the sheet is closing or its Category going
+      if (latest.blank || !latest.open || latest.deleting) {return previous;}
       try {
         await latest.onSubmit();
         return null;
@@ -99,17 +102,19 @@ const CategorySheet: FC<CategorySheetProps> = ({
     null
   );
   const shownRefusal = refusal?.name === name ? refusal.message : null;
+  // A create, save or deletion runs: it holds the draft, so the sheet is frozen until it ends
+  const busy = isPending || deleting;
 
-  // While a create or save runs, closing would look like cancelling it: the sheet waits for it to end
+  // While one runs, closing would look like cancelling it: the sheet waits for it to end
   const dismiss = () => {
-    if (!isPending) {
+    if (!busy) {
       onClose();
     }
   };
 
   // Nor does a deletion start alongside a save: whichever ended first would close the sheet
   const handleDelete = () => {
-    if (!isPending) {
+    if (!busy) {
       onDelete?.();
     }
   };
@@ -118,7 +123,7 @@ const CategorySheet: FC<CategorySheetProps> = ({
   useModalFocus({ isOpen: open && !paused, onClose: dismiss, containerRef: panelRef, initialFocusRef: inputRef });
 
   const handlePrimaryClick = (event: MouseEvent<HTMLButtonElement>) => {
-    if (blank || isPending) {
+    if (blank || busy) {
       event.preventDefault();
     }
   };
@@ -179,15 +184,18 @@ const CategorySheet: FC<CategorySheetProps> = ({
               name="name"
               value={name}
               onChange={(event) => { onNameChange(event.target.value); }}
-              // The create or save that runs holds the draft: an edit now would show, then be lost
-              readOnly={isPending}
+              // The create, save or deletion that runs holds the draft: an edit now would show, then be lost
+              readOnly={busy}
               aria-label="Category name"
               placeholder="Category name"
               autoComplete="off"
               spellCheck={false}
               aria-invalid={shownRefusal ? true : undefined}
               aria-describedby={shownRefusal ? errorId : undefined}
-              className="h-12 w-full rounded-xl border border-input bg-subtle px-4 text-[15px] font-semibold text-primary placeholder:text-tertiary placeholder:font-normal focus-input"
+              className={cn(
+                'h-12 w-full rounded-xl border bg-subtle px-4 text-[15px] font-semibold text-primary placeholder:text-tertiary placeholder:font-normal focus-input',
+                shownRefusal ? 'border-error' : 'border-input'
+              )}
             />
             {shownRefusal && (
               <p id={errorId} role="alert" className="text-xs font-medium text-danger">
@@ -205,10 +213,10 @@ const CategorySheet: FC<CategorySheetProps> = ({
                   type="button"
                   aria-label={preset.name}
                   aria-pressed={selected}
-                  aria-disabled={isPending ? true : undefined}
+                  aria-disabled={busy ? true : undefined}
                   title={preset.name}
                   onClick={() => {
-                    if (!isPending) {
+                    if (!busy) {
                       onColorChange(preset.value);
                     }
                   }}
@@ -228,7 +236,7 @@ const CategorySheet: FC<CategorySheetProps> = ({
               <button
                 type="button"
                 onClick={handleDelete}
-                aria-disabled={isPending ? true : undefined}
+                aria-disabled={busy ? true : undefined}
                 className="h-10 px-2 rounded-lg text-sm font-bold text-danger hover:bg-danger-subtle transition-colors focus-danger"
               >
                 Delete
@@ -244,7 +252,7 @@ const CategorySheet: FC<CategorySheetProps> = ({
             </button>
             <button
               type="submit"
-              aria-disabled={blank || isPending ? true : undefined}
+              aria-disabled={blank || busy ? true : undefined}
               onClick={handlePrimaryClick}
               className={cn(
                 'h-11 px-[22px] rounded-full bg-accent text-sm font-bold text-on-accent shadow-sm transition-[opacity,scale] duration-200 focus-primary',

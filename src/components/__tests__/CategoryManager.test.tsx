@@ -212,9 +212,14 @@ describe('CategoryManager', () => {
       const name = within(sheet).getByRole('textbox', { name: 'Category name' });
       expect(name).toHaveValue('ideas');
       expect(name).toHaveAccessibleDescription('Category with name "Ideas" already exists');
+      // A field in error has the error border (DESIGN_GUIDELINES, Fields)
+      expect(name).toHaveClass('border-error');
+      expect(name).not.toHaveClass('border-input');
 
       await user.type(name, '2');
       expect(within(sheet).queryByRole('alert')).not.toBeInTheDocument();
+      expect(name).toHaveClass('border-input');
+      expect(name).not.toHaveClass('border-error');
     });
 
     it('closes the sheet when the storage is full, for the storage warning to take its place', async () => {
@@ -371,7 +376,7 @@ describe('CategoryManager', () => {
       expect(slowUpdate).toHaveBeenCalledTimes(1);
     });
 
-    it('saves nothing while a deletion runs', async () => {
+    it('saves nothing while a deletion runs, and freezes the name, the colors and Save meanwhile', async () => {
       const resolvers: Array<() => void> = [];
       const slowDelete = vi.fn(() => new Promise<void>(resolve => { resolvers.push(resolve); }));
       const { user, props } = renderManager({ onDeleteCategory: slowDelete });
@@ -380,6 +385,15 @@ describe('CategoryManager', () => {
       const sheet = screen.getByRole('dialog', { name: 'Edit category' });
       await user.click(within(sheet).getByRole('button', { name: 'Pink' }));
       await user.click(within(sheet).getByRole('button', { name: 'Delete' }));
+      // An edit now would show, then be lost with the Category
+      const name = within(sheet).getByRole('textbox', { name: 'Category name' });
+      await user.type(name, ' 2');
+      await user.click(within(sheet).getByRole('button', { name: 'Teal' }));
+      expect(name).toHaveValue('Ideas');
+      expect(name).toHaveAttribute('readonly');
+      expect(within(sheet).getByRole('button', { name: 'Pink' })).toHaveAttribute('aria-pressed', 'true');
+      expect(within(sheet).getByRole('button', { name: 'Teal' })).toHaveAttribute('aria-disabled', 'true');
+      expect(within(sheet).getByRole('button', { name: 'Save' })).toHaveAttribute('aria-disabled', 'true');
       await user.click(within(sheet).getByRole('button', { name: 'Save' }));
       expect(props.onUpdateCategory).not.toHaveBeenCalled();
       expect(sheet).toHaveClass('sheet-in');
