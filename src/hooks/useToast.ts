@@ -38,10 +38,14 @@ const readSettings = (stored: unknown): { settings: ToastSettings; outdated: boo
 export const useToast = (): UseToastReturn => {
   const [toast, setToast] = useState<Toast | null>(null);
   const [settings, setSettings] = useState<ToastSettings>(DEFAULT_SETTINGS);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   // showToast reads the latest switch, so turning Notifications on can show one at once
   const enabledRef = useRef(DEFAULT_SETTINGS.enabled);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const shownIdRef = useRef<string | null>(null);
+  // When the Notification on screen ends; and while it is paused, the time it had left
+  const deadlineRef = useRef(0);
+  const remainingRef = useRef<number | null>(null);
 
   const clearTimer = useCallback(() => {
     if (timerRef.current) {
@@ -62,6 +66,8 @@ export const useToast = (): UseToastReturn => {
         }
       } catch (error) {
         Logger.error('Failed to load toast settings', toError(error));
+      } finally {
+        setSettingsLoaded(true);
       }
     };
     void loadSettings();
@@ -71,6 +77,7 @@ export const useToast = (): UseToastReturn => {
   const hideToast = useCallback((id: string) => {
     if (shownIdRef.current !== id) {return;}
     shownIdRef.current = null;
+    remainingRef.current = null;
     clearTimer();
     setToast(null);
   }, [clearTimer]);
@@ -90,11 +97,29 @@ export const useToast = (): UseToastReturn => {
     // A new Notification replaces the one on screen, and its own time starts
     clearTimer();
     shownIdRef.current = next.id;
+    remainingRef.current = null;
     setToast(next);
     if (next.duration > 0) {
+      deadlineRef.current = Date.now() + next.duration;
       timerRef.current = setTimeout(() => { hideToast(next.id); }, next.duration);
     }
   }, [clearTimer, hideToast]);
+
+  // Hovered or focused, the Notification on screen keeps its time: its action (Undo) stays within reach
+  const pauseToast = useCallback((id: string) => {
+    if (shownIdRef.current !== id || timerRef.current === null) {return;}
+    clearTimer();
+    remainingRef.current = Math.max(0, deadlineRef.current - Date.now());
+  }, [clearTimer]);
+
+  // Left alone again, it runs out the time it had left
+  const resumeToast = useCallback((id: string) => {
+    const remaining = remainingRef.current;
+    if (shownIdRef.current !== id || remaining === null) {return;}
+    remainingRef.current = null;
+    deadlineRef.current = Date.now() + remaining;
+    timerRef.current = setTimeout(() => { hideToast(id); }, remaining);
+  }, [hideToast]);
 
   const updateSettings = useCallback((changes: Partial<ToastSettings>) => {
     const updated: ToastSettings = { enabled: changes.enabled ?? enabledRef.current };
@@ -111,8 +136,11 @@ export const useToast = (): UseToastReturn => {
   return {
     toast,
     settings,
+    settingsLoaded,
     showToast,
     hideToast,
+    pauseToast,
+    resumeToast,
     updateSettings
   };
 };

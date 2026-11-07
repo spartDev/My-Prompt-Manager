@@ -91,6 +91,33 @@ describe('ToastContainer', () => {
     expect(onDismiss).toHaveBeenCalledWith('toast-1');
   });
 
+  it('holds its time while it is hovered or has the focus, so its action can be reached', () => {
+    const onPause = vi.fn();
+    const onResume = vi.fn();
+    render(
+      <ToastContainer
+        toast={createToast({ sub: 'Marketing', action: { label: 'Undo', onClick: vi.fn() } })}
+        onDismiss={onDismiss}
+        onPause={onPause}
+        onResume={onResume}
+      />
+    );
+    const pill = screen.getByTestId('toast');
+    const undo = screen.getByRole('button', { name: 'Undo' });
+
+    fireEvent.mouseEnter(pill);
+    expect(onPause).toHaveBeenCalledWith('toast-1');
+    undo.focus();
+    fireEvent.mouseLeave(pill);
+    // Still focused: the time stays held
+    expect(onResume).not.toHaveBeenCalled();
+
+    undo.blur();
+    expect(onResume).toHaveBeenCalledWith('toast-1');
+    expect(onPause).toHaveBeenCalledTimes(1);
+    expect(onResume).toHaveBeenCalledTimes(1);
+  });
+
   it('mounts a new pill for a new Notification, so the entrance plays again', () => {
     const { rerender } = render(<ToastContainer toast={createToast()} onDismiss={onDismiss} />);
     const first = screen.getByTestId('toast');

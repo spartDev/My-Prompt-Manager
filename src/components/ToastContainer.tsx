@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { memo, useEffect } from 'react';
+import { memo, useEffect, useRef } from 'react';
 
 import type { Toast } from '../types/hooks';
 
@@ -21,13 +21,58 @@ interface ToastContainerProps {
   /** The one Notification on screen, or none */
   toast: Toast | null;
   onDismiss: (id: string) => void;
+  /** The pointer or the focus came onto the Notification: its time stops */
+  onPause?: (id: string) => void;
+  /** Neither is on it any longer: its time runs on */
+  onResume?: (id: string) => void;
 }
 
 /**
  * The Notification pill of the Atelier 1C design: always at the top center, one at a time. A new
  * Notification has a new key, so it mounts again and replays its entrance; it leaves at once.
  */
-const ToastContainer: FC<ToastContainerProps> = ({ toast, onDismiss }) => {
+const ToastContainer: FC<ToastContainerProps> = ({ toast, onDismiss, onPause, onResume }) => {
+  const pillRef = useRef<HTMLDivElement>(null);
+  const toastId = toast?.id;
+
+  // Hovered or focused, the Notification keeps its time, so its action (Undo) can be reached and
+  // read; it runs on once neither is true. Each Notification starts unheld. Listened to on the
+  // element, as hovering or focusing the status region is no interaction with it.
+  useEffect(() => {
+    const pill = pillRef.current;
+    if (!pill || toastId === undefined) {return;}
+    let hovered = false;
+    let focused = false;
+    const update = (change: () => void) => {
+      const wasHeld = hovered || focused;
+      change();
+      const isHeld = hovered || focused;
+      if (isHeld && !wasHeld) {
+        onPause?.(toastId);
+      } else if (wasHeld && !isHeld) {
+        onResume?.(toastId);
+      }
+    };
+    const handleEnter = () => { update(() => { hovered = true; }); };
+    const handleLeave = () => { update(() => { hovered = false; }); };
+    const handleFocusIn = () => { update(() => { focused = true; }); };
+    const handleFocusOut = (event: FocusEvent) => {
+      if (!(event.relatedTarget instanceof Node && pill.contains(event.relatedTarget))) {
+        update(() => { focused = false; });
+      }
+    };
+    pill.addEventListener('mouseenter', handleEnter);
+    pill.addEventListener('mouseleave', handleLeave);
+    pill.addEventListener('focusin', handleFocusIn);
+    pill.addEventListener('focusout', handleFocusOut);
+    return () => {
+      pill.removeEventListener('mouseenter', handleEnter);
+      pill.removeEventListener('mouseleave', handleLeave);
+      pill.removeEventListener('focusin', handleFocusIn);
+      pill.removeEventListener('focusout', handleFocusOut);
+    };
+  }, [toastId, onPause, onResume]);
+
   useEffect(() => {
     if (!toast) {return;}
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -49,6 +94,7 @@ const ToastContainer: FC<ToastContainerProps> = ({ toast, onDismiss }) => {
   return (
     <div
       key={toast.id}
+      ref={pillRef}
       role={isFailure ? 'alert' : 'status'}
       aria-live={isFailure ? 'assertive' : 'polite'}
       aria-atomic="true"

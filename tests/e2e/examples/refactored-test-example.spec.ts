@@ -44,8 +44,10 @@ test.describe('Example: Refactored Category Management Tests', () => {
     // BEFORE (old approach):
     // await page.getByTestId('tab-categories').click();
     // await expect(page.getByRole('heading', { level: 1, name: 'Categories', exact: true })).toBeVisible();
-    // await page.getByPlaceholder('Enter category name...').fill('New Category');
-    // await page.getByRole('button', { name: 'Add' }).click();
+    // await page.getByRole('button', { name: 'Add category', exact: true }).click();
+    // const sheet = page.getByRole('dialog', { name: 'New category' });
+    // await sheet.getByRole('textbox', { name: 'Category name' }).fill('New Category');
+    // await sheet.getByRole('button', { name: 'Create' }).click();
     // await expect(page.getByText('Category created', { exact: true })).toBeVisible();
 
     // AFTER (using POMs and workflows):
@@ -62,7 +64,7 @@ test.describe('Example: Refactored Category Management Tests', () => {
 
   test('should edit category name using POMs', async () => {
     // BEFORE (old approach):
-    // Complex selector logic, hover states, input handling, etc.
+    // Find the row, open its sheet, fill the name, save, wait for the sheet to leave, etc.
 
     // AFTER (using POMs):
     await categoryManager.openFromLibrary();
@@ -77,12 +79,16 @@ test.describe('Example: Refactored Category Management Tests', () => {
 
   test('should delete category using POMs', async () => {
     // BEFORE (old approach):
-    // More complex selector logic and confirmation handling
+    // Open the sheet, Delete, then check the Notification and its Undo
 
-    // AFTER (using POMs):
+    // AFTER (using POMs): with the Notifications on, Delete takes effect at once and offers Undo
     await categoryManager.openFromLibrary();
-    await categoryManager.deleteCategory('Personal', true); // confirm deletion
+    await categoryManager.deleteCategory('Personal');
     await categoryManager.expectCategoryNotExists('Personal');
+
+    // Undo brings it back
+    await categoryManager.undoDelete();
+    await categoryManager.expectCategoryExists('Personal');
     await categoryManager.closeToLibrary();
 
     // Explicit assertion for linting
@@ -92,11 +98,12 @@ test.describe('Example: Refactored Category Management Tests', () => {
   test('should handle category validation using utilities', async () => {
     await categoryManager.openFromLibrary();
 
-    // Test duplicate category validation
+    // Test duplicate category validation: the sheet stays open with the reason under the name
     await categoryManager.testDuplicateValidation('Work');
 
     // Verify error message using assertions utility
-    await assertions.categories.duplicateError(libraryPage.page);
+    await assertions.categories.duplicateError(libraryPage.page, 'Work');
+    await categoryManager.dismissSheet();
 
     await categoryManager.closeToLibrary();
 

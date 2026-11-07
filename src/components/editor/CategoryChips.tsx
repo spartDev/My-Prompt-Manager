@@ -1,7 +1,7 @@
 import type { CSSProperties, FC, KeyboardEvent } from 'react';
 import { useEffect, useId, useRef, useState } from 'react';
 
-import { DEFAULT_CATEGORY_COLOR, getSoftBadgeColors, PRESET_COLORS } from '../../constants/colors';
+import { DEFAULT_CATEGORY_COLOR, firstUnusedColorIndex, getSoftBadgeColors, PRESET_COLORS } from '../../constants/colors';
 import { useRadioGroup } from '../../hooks/useRadioGroup';
 import type { Category } from '../../types';
 import { cn } from '../../utils/cn';
@@ -17,14 +17,6 @@ export interface CategoryChipsProps {
   onCreateCategory?: (category: { name: string; color: string }) => Promise<Category>;
   disabled?: boolean;
 }
-
-const sameColor = (a: string | undefined, b: string): boolean => a?.toLowerCase() === b.toLowerCase();
-
-/** Index in PRESET_COLORS of the first color no Category uses yet (the first one when all are used) */
-const firstUnusedColorIndex = (categories: Category[]): number => {
-  const index = PRESET_COLORS.findIndex(preset => !categories.some(category => sameColor(category.color, preset.value)));
-  return index === -1 ? 0 : index;
-};
 
 /** Pale tint and colored text of a chosen chip, in both themes (the Category chip rule) */
 const chosenStyle = (color: string): CSSProperties => {

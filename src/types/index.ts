@@ -39,6 +39,15 @@ export interface Category {
   color?: string; // hex color code (optional)
 }
 
+/** What deleting a Category changed, kept so the deletion can be undone */
+export interface DeletedCategory {
+  category: Category;
+  /** Its place among the stored Categories */
+  index: number;
+  /** The Prompts the deletion moved to the default Category, with their last edit before and after the move */
+  movedPrompts: ReadonlyArray<{ id: string; updatedAt: number; movedAt: number }>;
+}
+
 // Sort order types for prompts
 export type SortOrder = 'createdAt' | 'updatedAt' | 'title' | 'usageCount' | 'lastUsedAt';
 export type SortDirection = 'asc' | 'desc';
