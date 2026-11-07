@@ -13,7 +13,7 @@ Transform your AI interactions with a powerful personal prompt library that inte
 
 ### Popup Interface (Prompt Management)
 ✅ **Smart Prompt Management:** Store, organize, and search your prompts with custom categories  
-✅ **Rich Categorization:** Create unlimited categories with custom colors and icons  
+✅ **Rich Categorization:** Create unlimited categories, each in one of 12 colors, and undo a deletion  
 ✅ **Instant Search:** Real-time filtering with text highlighting across titles and content  
 ✅ **Quick Actions:** One-click copy to clipboard, edit in-place, and bulk operations  
 ✅ **Dark Mode Support:** Beautiful dark theme with automatic system preference detection  
@@ -126,7 +126,7 @@ Versions: `package.json`.
 |---------|-------------|--------|
 | `npm run dev` | Start development server with HMR | Development |
 | `npm run build` | Create production build | Deployment |
-| `npm test` | Run the Vitest suite | Testing |
+| `npm test` | Check node_modules against package-lock.json, then run the Vitest suite | Testing |
 | `npm run test:ui` | Run tests with Vitest UI | Interactive Testing |
 | `npm run test:coverage` | Generate coverage report | Code Coverage |
 | `npm run lint` | Run Biome lint checks | Code Quality |

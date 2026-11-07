@@ -34,20 +34,58 @@
   }
 }
 
-/* Notification (Atelier 1C): the pill drops in from above the top center with a spring, then its
-   round pops. It leaves at once, with no exit animation. */
-@keyframes toast-in {
-  0% {
-    opacity: 0;
-    transform: translate(-50%, -14px) scale(0.9);
+/* Motion (Atelier 1C). The keyframes, easings and animate-* classes are tokens in theme/tokens.css;
+   these are the transitions of the editor's controls. Under prefers-reduced-motion everything
+   is near instant, and the timers of theme/motion.ts wait for nothing. */
+@utility transition-save {
+  transition: background-color 300ms, color 300ms, scale 250ms var(--ease-spring);
+}
+
+@utility transition-chip {
+  transition: background-color 250ms, border-color 250ms, color 250ms, scale 250ms var(--ease-spring);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-sheet-in,
+  .animate-sheet-out,
+  .animate-pop,
+  .animate-pop-check,
+  .animate-toast-in,
+  .animate-toast-mark {
+    animation-duration: 1ms;
+    animation-delay: 0ms;
   }
-  100% {
-    opacity: 1;
-    transform: translate(-50%, 0) scale(1);
+
+  .transition-save,
+  .transition-chip {
+    transition-duration: 1ms;
   }
 }
 
-@keyframes toast-mark-pop {
+/* Category sheet (Atelier 1C 2b, 2c): it rises from the bottom over the backdrop, on the sheet-in
+   and sheet-out keyframes of theme/tokens.css, and leaves in 280ms, faster than the editor; the
+   screen behind it steps back while it is open. Removed from the page only once .sheet-out has
+   ended (useCategorySheet's SHEET_EXIT_MS). */
+@keyframes backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes backdrop-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* A Category that appears in the list (created, or back from Undo) pops in */
+@keyframes category-pop {
   0% {
     opacity: 0;
     transform: scale(0.3);
@@ -61,19 +99,59 @@
   }
 }
 
-.toast-in {
-  transform: translateX(-50%);
-  animation: toast-in 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+.sheet-in {
+  animation: sheet-in 0.5s var(--ease-sheet) both;
 }
 
-.toast-mark-pop {
-  animation: toast-mark-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) 0.08s both;
+.sheet-out {
+  animation: sheet-out 0.28s var(--ease-sheet) both;
+}
+
+.backdrop-in {
+  animation: backdrop-in 0.3s ease both;
+}
+
+.backdrop-out {
+  animation: backdrop-out 0.28s ease both;
+}
+
+.category-pop {
+  animation: category-pop 0.5s var(--ease-spring) both;
+}
+
+.sheet-behind {
+  transform-origin: 50% 0;
+  transition:
+    transform 0.5s var(--ease-sheet),
+    border-radius 0.5s var(--ease-sheet),
+    filter 0.5s var(--ease-sheet);
+}
+
+.sheet-behind[data-stepped-back] {
+  overflow: hidden;
+  transform: scale(0.93) translateY(10px);
+  border-radius: 22px;
+  filter: brightness(0.96);
+}
+
+.swatch-spring {
+  transition:
+    transform 0.35s var(--ease-spring),
+    box-shadow 0.2s ease;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .toast-in,
-  .toast-mark-pop {
+  .sheet-in,
+  .sheet-out,
+  .backdrop-in,
+  .backdrop-out,
+  .category-pop {
     animation-duration: 1ms;
+  }
+
+  .sheet-behind,
+  .swatch-spring {
+    transition-duration: 1ms;
   }
 }
 

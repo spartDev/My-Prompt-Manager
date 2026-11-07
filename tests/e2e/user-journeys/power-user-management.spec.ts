@@ -1,5 +1,6 @@
 import { DEFAULT_SETTINGS } from '../../../src/types';
 import { expect, test } from '../fixtures/extension';
+import { CategoryManagerPage } from '../pages/CategoryManagerPage';
 import { LibraryPage } from '../pages/LibraryPage';
 import { createCategorySeed, createPromptSeed, seedLibrary } from '../utils/storage';
 
@@ -152,24 +153,20 @@ test.describe('Power User Prompt Management', () => {
     await expect(sidepanelPage.getByTestId('prompt-card')).toHaveCount(17);
 
     // Open category manager
-    await sidepanelPage.getByTestId('tab-categories').click();
-    await expect(sidepanelPage.getByRole('heading', { level: 1, name: 'Categories', exact: true })).toBeVisible();
+    const categoryManager = new CategoryManagerPage(sidepanelPage);
+    await categoryManager.openFromLibrary();
 
-    // Rename "Work" category to "Professional"
-    const workCategoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Work', { exact: true }) }).first();
-    await workCategoryRow.hover();
-    await workCategoryRow.getByRole('button', { name: 'Edit category' }).click();
-
-    const nameInput = sidepanelPage.getByPlaceholder('Category name', { exact: true });
-    await nameInput.clear();
-    await nameInput.fill('Professional');
-
-    await sidepanelPage.getByRole('button', { name: 'Save changes (Enter)' }).click();
-    await expect(sidepanelPage.getByText('Category saved', { exact: true })).toBeVisible();
+    // Rename "Work" category to "Professional" in its sheet, which counts its Prompts
+    await categoryManager.openEditSheet('Work');
+    await expect(categoryManager.getSheet()).toContainText('Used by 5 prompts');
+    await categoryManager.fillSheetName('Professional');
+    await categoryManager.submitSheet();
 
     // Verify category name changed
-    await expect(sidepanelPage.getByTestId('category-row').getByText('Professional')).toBeVisible();
-    await expect(sidepanelPage.getByText('Work')).toBeHidden();
+    await categoryManager.expectSheetClosed();
+    await categoryManager.expectNotification('Category saved', 'Professional');
+    await categoryManager.expectCategoryExists('Professional');
+    await categoryManager.expectCategoryNotExists('Work');
 
     // Switch to the Library tab and verify prompts updated
     await sidepanelPage.getByTestId('tab-library').click();
@@ -206,7 +203,7 @@ test.describe('Power User Prompt Management', () => {
     await socialMediaCard.getByRole('button', { name: /^Edit / }).click();
 
     await expect(sidepanelPage.getByRole('heading', { name: 'Edit prompt', exact: true })).toBeVisible();
-    await sidepanelPage.getByRole('radio', { name: 'Work', exact: true }).click();
+    await sidepanelPage.getByRole('radiogroup', { name: 'Category' }).getByRole('radio', { name: 'Work', exact: true }).click();
     await sidepanelPage.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(sidepanelPage.getByText('Prompt saved', { exact: true }).first()).toBeVisible();
 
@@ -215,7 +212,7 @@ test.describe('Power User Prompt Management', () => {
     await campaignAnalysisCard.getByRole('button', { name: /^Edit / }).click();
 
     await expect(sidepanelPage.getByRole('heading', { name: 'Edit prompt', exact: true })).toBeVisible();
-    await sidepanelPage.getByRole('radio', { name: 'Work', exact: true }).click();
+    await sidepanelPage.getByRole('radiogroup', { name: 'Category' }).getByRole('radio', { name: 'Work', exact: true }).click();
     await sidepanelPage.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(sidepanelPage.getByText('Prompt saved', { exact: true }).first()).toBeVisible();
 
@@ -228,18 +225,18 @@ test.describe('Power User Prompt Management', () => {
     await libraryPage.filterByCategory('Work');
     await expect(sidepanelPage.getByTestId('prompt-card')).toHaveCount(7); // 5 original + 2 moved
 
-    // Delete the empty Marketing category
-    await sidepanelPage.getByTestId('tab-categories').click();
-    const marketingCategoryRow = sidepanelPage.getByTestId('category-row').filter({ has: sidepanelPage.getByText('Marketing', { exact: true }) }).first();
-    await marketingCategoryRow.hover();
-    await marketingCategoryRow.getByRole('button', { name: 'Delete category' }).click();
-
-    await expect(sidepanelPage.getByRole('heading', { name: 'Delete Category' })).toBeVisible();
-    await sidepanelPage.getByRole('button', { name: 'Delete', exact: true }).click();
-    await expect(sidepanelPage.getByText('Category deleted', { exact: true })).toBeVisible();
+    // Delete the empty Marketing category from its sheet: at once, the Notification offering Undo
+    const categoryManager = new CategoryManagerPage(sidepanelPage);
+    await categoryManager.openFromLibrary();
+    await categoryManager.openEditSheet('Marketing');
+    await expect(categoryManager.getSheet()).toContainText('Not used yet');
+    await categoryManager.getSheetDeleteButton().click();
+    await categoryManager.expectSheetClosed();
+    await categoryManager.expectNotification('Category deleted', 'Marketing');
 
     // Verify Marketing category removed
-    await expect(sidepanelPage.getByText('Marketing')).toBeHidden();
+    await categoryManager.expectCategoryNotExists('Marketing');
+    expect((await storage.getCategories()).map(category => category.name)).not.toContain('Marketing');
   });
 
   test('should filter and search across categories', async ({ context, storage, extensionId }) => {
@@ -307,7 +304,7 @@ test.describe('Power User Prompt Management', () => {
       await promptCard.getByRole('button', { name: /^Edit / }).click();
 
       await expect(sidepanelPage.getByRole('heading', { name: 'Edit prompt', exact: true })).toBeVisible();
-      await sidepanelPage.getByRole('radio', { name: 'Work', exact: true }).click();
+      await sidepanelPage.getByRole('radiogroup', { name: 'Category' }).getByRole('radio', { name: 'Work', exact: true }).click();
       await sidepanelPage.getByRole('button', { name: 'Save', exact: true }).click();
       await expect(sidepanelPage.getByText('Prompt saved', { exact: true }).first()).toBeVisible();
     }

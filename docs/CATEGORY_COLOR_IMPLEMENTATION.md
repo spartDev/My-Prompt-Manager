@@ -19,9 +19,11 @@ Category colors are **user data, not tokens**: each Category stores one hex colo
 | Pink | `#DB2777` | Yellow | `#EAB308` |
 | Rose | `#E11D48` | Slate | `#475569` |
 
-`textColor` is the checkmark drawn on a chosen swatch: white, or black on Amber and Yellow (4.5:1 or more on the swatch). `DEFAULT_CATEGORY_COLOR` is Ocean Blue.
+`textColor` is the text drawn on a solid swatch of the color (the Category sheet's initial, a checkmark): white, or black on Amber and Yellow (4.5:1 or more on the swatch). `swatchTextColor` gives it, and for a custom color picks black or white, whichever contrasts more. `DEFAULT_CATEGORY_COLOR` is Ocean Blue.
 
-**Stored colors are never migrated.** Nine colors left the presets in 2026-10 (Navy `#1E40AF`, Amber `#F59E0B`, Red `#DC2626`, Gray `#6B7280`, Stone `#78716C`, Zinc `#71717A`, Violet `#7C3AED`, Green `#15803D`, Emerald `#047857`): Violet looked like the accent, and Violet/Purple, Emerald/Teal and Emerald/Green were nearly indistinguishable as chips. A Category that uses one of them, or any custom color, keeps it: `getColorName` returns `Custom` and the color goes through the same chip rule.
+**Where a color is chosen.** The Category sheet (`CategorySheet`, in the Categories section) offers the 12 presets only, as round swatches; there is no custom hex input. A new Category starts with `nextCategoryColor`: the first preset no Category uses, then, once all 12 are used, the next one in turn with each Category added. The editor's "New category" starts with `firstUnusedColorIndex` (the first one when all are used) and cycles on click.
+
+**Stored colors are never migrated.** Nine colors left the presets in 2026-10 (Navy `#1E40AF`, Amber `#F59E0B`, Red `#DC2626`, Gray `#6B7280`, Stone `#78716C`, Zinc `#71717A`, Violet `#7C3AED`, Green `#15803D`, Emerald `#047857`): Violet looked like the accent, and Violet/Purple, Emerald/Teal and Emerald/Green were nearly indistinguishable as chips. A Category that uses one of them, or any custom color, keeps it: `getColorName` returns `Custom` and the color goes through the same chip rule. Edited in the Category sheet, such a Category shows no chosen swatch and keeps its color unless a preset is chosen.
 
 ---
 
@@ -45,6 +47,6 @@ None of the 12 presets triggers the net (lowest: Slate in dark at 5.03:1, Amber 
 ## Tests
 
 - `src/constants/__tests__/categoryPalette.test.ts`: the 12 presets in order; the expected chip text of each preset in both modes (the reference canvas's output); 4.5:1 on the Library card for the presets and the nine former presets; the safety net on `#000000` and `#1A1A2E`; `Custom` for a former preset.
-- `tests/e2e/theme/category-chips.spec.ts`: the computed background and text of a chip on a Library card, light and dark; the contrast of Navy and `#000000` chips measured on the painted pixels, light and dark; proof screenshots of the Library chips and the color picker.
+- `tests/e2e/theme/category-chips.spec.ts`: the computed background and text of a chip on a Library card, light and dark; the contrast of Navy and `#000000` chips measured on the painted pixels, light and dark; proof screenshots of the Library chips and of the Category sheet's palette.
 
 When the Library card's surface changes, update `SOFT_BADGE_SURFACES` and the `CARD` constant of `categoryPalette.test.ts` with it. The painted-contrast e2e fails when the painted card is lighter than the measured surface; a darker card stays readable but over-corrects the colors that need the net.

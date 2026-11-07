@@ -267,18 +267,19 @@ test.describe('User Journey: New User Setup & First Prompt Creation', () => {
     // Test search functionality
     await libraryPage.searchPrompts('JavaScript');
     await libraryPage.expectPromptVisible('JavaScript Debug Helper');
-    await expect(sidepanelPage.getByText('Python Code Review')).toBeHidden();
-    await expect(sidepanelPage.getByText('API Documentation')).toBeHidden();
+    // The cards only: the Notification of the last save may still name a Prompt
+    await expect(sidepanelPage.getByRole('button', { name: 'Edit Python Code Review' })).toBeHidden();
+    await expect(sidepanelPage.getByRole('button', { name: 'Edit API Documentation' })).toBeHidden();
 
     // Search by title
     await libraryPage.searchPrompts('Python');
     await libraryPage.expectPromptVisible('Python Code Review');
-    await expect(sidepanelPage.getByText('JavaScript Debug Helper')).toBeHidden();
+    await expect(sidepanelPage.getByRole('button', { name: 'Edit JavaScript Debug Helper' })).toBeHidden();
 
     // Search by content
     await libraryPage.searchPrompts('documentation');
     await libraryPage.expectPromptVisible('API Documentation');
-    await expect(sidepanelPage.getByText('JavaScript Debug Helper')).toBeHidden();
+    await expect(sidepanelPage.getByRole('button', { name: 'Edit JavaScript Debug Helper' })).toBeHidden();
 
     // Clear search to show all
     await libraryPage.clearFilters();

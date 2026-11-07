@@ -108,9 +108,38 @@
   /* Radius of a Settings group's card (Atelier 1C) */
   --radius-group: 20px;
 
-  /* Motion (Atelier 1C). ease-spring overshoots a little, then settles. Read durations through
-     duration-(--duration-*) and delays through delay-(--delay-*); reduced motion shortens them all below */
+  /* Motion (Atelier 1C): panels slide with ease-sheet, pops and presses spring. Durations are
+     mirrored in src/theme/motion.ts for the timers; each animation is a class, animate-<name>.
+     The Category sheet's classes in popup.css run on these curves and keyframes */
+  --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --animate-sheet-in: sheet-in 500ms var(--ease-sheet) both;
+  --animate-sheet-out: sheet-out 320ms var(--ease-sheet) both;
+  --animate-pop: pop 450ms var(--ease-spring) both;
+  --animate-pop-check: pop 400ms var(--ease-spring) both;
+  --animate-toast-in: toast-in 450ms var(--ease-spring) both;
+  --animate-toast-mark: pop 450ms var(--ease-spring) 80ms both;
+
+  @keyframes sheet-in {
+    from { transform: translateY(100%); }
+    to { transform: none; }
+  }
+  @keyframes sheet-out {
+    from { transform: none; }
+    to { transform: translateY(100%); }
+  }
+  @keyframes pop {
+    0% { opacity: 0; transform: scale(0.3); }
+    60% { opacity: 1; transform: scale(1.2); }
+    100% { transform: scale(1); }
+  }
+  @keyframes toast-in {
+    0% { opacity: 0; transform: translate(-50%, -14px) scale(0.9); }
+    100% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  }
+
+  /* Motion of the Settings controls (Atelier 1C), on ease-spring above. Read durations through
+     duration-(--duration-*) and delays through delay-(--delay-*); reduced motion shortens them all below */
   --duration-color: 200ms;
   --duration-dim: 250ms;
   --duration-track: 300ms;

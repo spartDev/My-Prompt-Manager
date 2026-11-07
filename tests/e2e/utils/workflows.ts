@@ -8,6 +8,7 @@
 import type { BrowserContext, Download, Page } from '@playwright/test';
 
 import { expect } from '../fixtures/extension';
+import { CategoryManagerPage } from '../pages/CategoryManagerPage';
 
 import { assertions } from './assertions';
 import { tabNavigation } from './navigation';
@@ -20,6 +21,7 @@ export interface PromptData {
 
 export interface CategoryData {
   name: string;
+  /** One of the 12 Category colors, by the name of its swatch (PRESET_COLORS), e.g. 'Teal' */
   color?: string;
 }
 
@@ -131,64 +133,38 @@ export const categoryWorkflows = {
   },
 
   /**
-   * Complete workflow to create a new category
+   * Complete workflow to create a new category, through the Category sheet
    */
   create: async (page: Page, categoryData: CategoryData): Promise<void> => {
     await categoryWorkflows.openManager(page);
-
-    // Fill name and add
-    await page.getByPlaceholder('Enter category name...').fill(categoryData.name);
-    await page.getByRole('button', { name: 'Add' }).click();
-    await assertions.categories.createdSuccessfully(page);
-
-    // Verify input cleared
-    await expect(page.getByPlaceholder('Enter category name...')).toHaveValue('');
-
+    await new CategoryManagerPage(page).createCategory(categoryData.name, { color: categoryData.color });
     await categoryWorkflows.closeManager(page);
   },
 
   /**
-   * Complete workflow to edit a category name
+   * Complete workflow to rename a category, through its Category sheet
    */
   edit: async (page: Page, currentName: string, newName: string): Promise<void> => {
     await categoryWorkflows.openManager(page);
-    const categoryRow = page.getByTestId('category-row').filter({ has: page.getByText(currentName, { exact: true }) }).first();
-
-    // Hover and click edit
-    await categoryRow.hover();
-    await categoryRow.getByRole('button', { name: 'Edit category' }).click();
-
-    // Edit name
-    const editInput = page.getByPlaceholder('Category name', { exact: true });
-    await editInput.clear();
-    await editInput.fill(newName);
-    await page.getByRole('button', { name: 'Save changes (Enter)' }).click();
-    await assertions.categories.updatedSuccessfully(page);
-
+    await new CategoryManagerPage(page).editCategory(currentName, newName);
     await categoryWorkflows.closeManager(page);
   },
 
   /**
-   * Complete workflow to delete a category
+   * Complete workflow to delete a category from its Category sheet. With the Notifications on (the
+   * default) it goes at once; with them off, pass `confirm` to answer the "Delete Category" dialog
    */
-  delete: async (page: Page, categoryName: string, confirm: boolean = true): Promise<void> => {
+  delete: async (page: Page, categoryName: string, options: { confirm?: boolean } = {}): Promise<void> => {
     await categoryWorkflows.openManager(page);
-    const categoryRow = page.getByTestId('category-row').filter({ has: page.getByText(categoryName, { exact: true }) }).first();
-
-    // Hover and click delete
-    await categoryRow.hover();
-    await categoryRow.getByRole('button', { name: 'Delete category' }).click();
-
-    // Handle confirmation
-    await assertions.dialogs.confirmationVisible(page, 'Delete Category');
-
-    if (confirm) {
-      await page.getByRole('button', { name: 'Delete', exact: true }).click();
-      await assertions.categories.deletedSuccessfully(page);
+    const categories = new CategoryManagerPage(page);
+    if (options.confirm === undefined) {
+      await categories.deleteCategory(categoryName);
     } else {
-      await page.getByRole('button', { name: 'Cancel' }).click();
+      await categories.deleteCategoryWithConfirmation(categoryName, options.confirm);
+      if (!options.confirm) {
+        await categories.dismissSheet();
+      }
     }
-
     await categoryWorkflows.closeManager(page);
   },
 };

@@ -651,3 +651,12 @@ export function togglePin(prompt: StoredPrompt): StoredPrompt {
 export function repointPrompt(prompt: StoredPrompt, category: string): StoredPrompt {
   return mintStored({ ...prompt, category });
 }
+
+/**
+ * A non-text change that keeps the result typed: puts back a Prompt that deleting its Category
+ * moved to the default Category, when the deletion is undone. The move was not the user's edit,
+ * so the Prompt's last edit goes back to `updatedAt`, the one it had before the move.
+ */
+export function returnPrompt(prompt: StoredPrompt, category: string, updatedAt: number): StoredPrompt {
+  return mintStored({ ...prompt, category, updatedAt });
+}

@@ -87,7 +87,7 @@ A named set of related preferences inside Settings (for example Appearance or th
 _Avoid_: Section, panel
 
 **Notification**:
-A brief message at the top of the popup or side panel that confirms an action or reports its failure, then disappears on its own. Only one shows at a time: a new one replaces it. The user turns all of them on or off in Settings, failures included.
+A brief message at the top of the popup or side panel that confirms an action or reports its failure, then disappears on its own, though not while the pointer or the focus is on it. One that confirms a deletion can offer to undo it while it shows. Only one shows at a time: a new one replaces it. The user turns all of them on or off in Settings, failures included.
 _Avoid_: Toast, alert, snackbar
 
 ## Relationships

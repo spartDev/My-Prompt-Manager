@@ -32,7 +32,7 @@ const MIGRATED = [
   'components/ErrorBoundary.tsx',
   // My-Prompt-Manager-el4.5.1: Categories
   'components/CategoryManager.tsx',
-  'components/ColorPicker.tsx',
+  'components/CategorySheet.tsx',
   'components/CategoryBadge.tsx',
   // My-Prompt-Manager-el4.5.2: general Settings sections
   'components/SettingsView.tsx',

@@ -830,6 +830,8 @@ A Notification (Atelier 1C) is a 40px pill at the top center of the popup or sid
 one replaces it. A confirmation (success, info) has a violet check round (`bg-inverse-mark`) and
 leaves after 2.7s; a failure (error, warning) has a red ! round (`bg-inverse-alert`), is a
 `role="alert"`, and leaves after 6s. There is no close button and no progress bar: Escape closes it.
+Its time stops while the pointer or the focus is on it, so its action (the 6s Undo of a deleted
+Category) can be reached and read; it runs out the rest once neither is.
 Settings has one switch for all of them.
 
 The bold message stays whole; the optional sub (the object's name, or the reason) is cut with an
@@ -838,11 +840,11 @@ Prompt`) and put the name in the sub.
 
 ```tsx
 <div role="status" className="
-  toast-in fixed top-3 left-1/2 z-50
+  animate-toast-in fixed top-3 left-1/2 [transform:translateX(-50%)] z-50
   flex items-center gap-[9px] h-10 max-w-[calc(100%-32px)] pl-3.5 pr-1.5
   rounded-full bg-inverse text-on-inverse-strong shadow-toast
 ">
-  <span className="toast-mark-pop grid place-items-center size-5 rounded-full bg-inverse-mark text-on-inverse-mark">
+  <span className="animate-toast-mark grid place-items-center size-5 rounded-full bg-inverse-mark text-on-inverse-mark">
     {/* check, or ! for a failure */}
   </span>
   {/* Only the text gives way; inside it, the message only once it alone is too long */}
@@ -973,13 +975,52 @@ transition-shadow duration-200
 transition-transform duration-200
 ```
 
-### Motion Tokens
+### Motion tokens (Atelier 1C)
 
-Atelier 1C's motion lives in `src/theme/tokens.css`. Read a duration through `duration-(--duration-*)` and a delay through `delay-(--delay-*)`; under `prefers-reduced-motion` every one of them drops to 1ms (0 for the delay), so a component needs no rule of its own.
+The curves, keyframes and animations of the Atelier 1C design are tokens in `src/theme/tokens.css`,
+and their durations are mirrored in `src/theme/motion.ts` (`MOTION`, `EASE`) for the timers of the
+components; `src/theme/__tests__/motion.test.ts` keeps the two in step. A component never writes a
+duration or a curve: it uses a class, and a timer reads `MOTION`.
+
+| Token | Value | Use |
+|-------|-------|-----|
+| `--ease-sheet` (`ease-sheet`) | `cubic-bezier(0.32, 0.72, 0, 1)` | panels entering and leaving |
+| `--ease-spring` (`ease-spring`) | `cubic-bezier(0.34, 1.56, 0.64, 1)` | pops, bounces, presses |
+| `animate-sheet-in` | `sheet-in` 500ms, ease-sheet | a full-screen panel rising from the bottom (the editor) |
+| `animate-sheet-out` | `sheet-out` 320ms, ease-sheet | the panel leaving; it unmounts after (`useAnimatedPresence`) |
+| `animate-pop` | `pop` 450ms, ease-spring | a new chip (a Variable) |
+| `animate-pop-check` | `pop` 400ms, ease-spring | a check mark appearing, the inline "New category" row |
+| `animate-toast-in` | `toast-in` 450ms, ease-spring | the Notification pill, from 14px above the top center |
+| `animate-toast-mark` | `pop` 450ms, ease-spring, 80ms delay | the round of the Notification |
+| `transition-save` (`src/popup.css`) | background and color 300ms, scale 250ms ease-spring | the Save button, which slides to the success color on "Saved" |
+| `transition-chip` (`src/popup.css`) | background, border and color 250ms, scale 250ms ease-spring | the Category chips and "New category" |
+
+Presses are `active:scale-92` on a chip and `active:scale-94` on Save, carried by the spring of their
+transition. Only a new element pops: a list keyed by a stable value (the name of a Variable) keeps
+the elements already there, so their entrance does not replay.
+
+**Save sequence:** Save shows "Saved" at once (`transition-save` slides its background), then after
+`MOTION.savedPause` (620ms) the editor closes with `animate-sheet-out` and the Notification appears
+with it. The Notification has no exit animation: it leaves at once.
+
+**Reduced motion:** under `prefers-reduced-motion`, `src/popup.css` makes every animation and
+transition above last 1ms, and `motionDuration()` of `src/theme/motion.ts` makes the timers wait
+for nothing: the Save sequence keeps its order without its pause, and a panel unmounts at once.
+
+#### Animated presence
+
+`src/hooks/useAnimatedPresence.ts` keeps a panel in the document for the length of its exit
+animation: pass the open value (null when closed) and `MOTION.sheetOut`, render `shown`, and switch
+to the exit animation while `exiting`. Opening again while leaving cancels the unmount; the timer is
+cleared on unmount. The editor sheet of `App` uses it; the Category sheet still has its own timer
+(see Category Sheet below).
+
+#### Settings controls
+
+The Settings controls read their durations from tokens, `duration-(--duration-*)` and `delay-(--delay-*)`, on `ease-spring`. Under `prefers-reduced-motion`, `src/theme/tokens.css` drops every one of them to 1ms (0 for the delay), so a component needs no rule of its own.
 
 | Token | Value | Use |
 |---|---|---|
-| `ease-spring` | `cubic-bezier(0.34, 1.56, 0.64, 1)` | A move that overshoots a little, then settles |
 | `--duration-color` | 200ms | Label color of a segmented control |
 | `--duration-dim` | 250ms | A site's logo greying when it is turned off |
 | `--duration-track` | 300ms | Switch track color |
@@ -988,21 +1029,38 @@ Atelier 1C's motion lives in `src/theme/tokens.css`. Read a duration through `du
 
 ### Keyframe Animations
 
-#### Notification Entrance
+#### Category Sheet
 
-`src/popup.css`: the pill drops 14px into the top center with a spring (`toast-in`, 0.45s,
-`cubic-bezier(0.34, 1.56, 0.64, 1)`), and its round pops 80ms later (`toast-mark-pop`). It has no
-exit animation: it leaves at once. Under `prefers-reduced-motion`, both last 1ms.
+`src/popup.css`, on the curves and keyframes of `src/theme/tokens.css` (`--ease-sheet`,
+`--ease-spring`, `sheet-in`, `sheet-out`). The sheet rises from the bottom (`.sheet-in`,
+`translateY(100%)` to rest, 0.5s ease-sheet) and leaves faster than the editor (`.sheet-out`, 0.28s):
+`useCategorySheet` takes it off the page only once the exit has ended (its own `SHEET_EXIT_MS`
+timer, not yet `useAnimatedPresence` and `MOTION`). The backdrop fades in over 0.3s and out over 0.28s. While it is open, the screen
+behind steps back (`.sheet-behind[data-stepped-back]`: `scale(.93) translateY(10px)`, 22px corners,
+`brightness(.96)`, 0.5s ease-sheet). Swatches move on `transform` over 0.35s ease-spring; a Category
+that appears in the list pops in (`category-pop`: scale .3, 1.2, then 1, 0.5s ease-spring). Under
+`prefers-reduced-motion`, all of them last 1ms. Only one dialog is reachable at a time, by assistive
+technology too: while the sheet is open, the screen behind and the tab bar are `inert`, and the sheet
+is `inert` while it leaves or while the delete confirmation is on top of it. While a create, save or
+delete runs, Escape, the backdrop, Close and Cancel wait for it to end, and a save and a deletion never
+run together. While a create, save or deletion runs, the name is read-only and the swatches and Save are
+`aria-disabled`. A refused name has `border-error`, with the reason under it.
 
-```css
-.toast-in {
-  transform: translateX(-50%);
-  animation: toast-in 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-}
-.toast-mark-pop {
-  animation: toast-mark-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) 0.08s both;
-}
+```tsx
+<div className="fixed inset-0 z-40">
+  <div className="absolute inset-0 bg-backdrop backdrop-in" onClick={onClose} />
+  <div role="dialog" aria-modal="true" aria-label={title} className="
+    absolute inset-x-0 bottom-0
+    rounded-t-3xl bg-card shadow-2xl
+    sheet-in
+  ">
+    {/* handle, header, name, palette, footer */}
+  </div>
+</div>
 ```
+
+The sheet sits at `z-40`, under the Notification (`z-50`), so a Notification's Undo stays within
+reach; its backdrop has no blur, so what is behind it (the edited row's border) stays sharp.
 
 #### Modal Fade In
 

@@ -1,7 +1,7 @@
 import type { CSSProperties, FC, KeyboardEvent } from 'react';
 import { useEffect, useId, useRef, useState } from 'react';
 
-import { DEFAULT_CATEGORY_COLOR, getSoftBadgeColors, PRESET_COLORS } from '../../constants/colors';
+import { DEFAULT_CATEGORY_COLOR, firstUnusedColorIndex, getSoftBadgeColors, PRESET_COLORS } from '../../constants/colors';
 import { useRadioGroup } from '../../hooks/useRadioGroup';
 import type { Category } from '../../types';
 import { cn } from '../../utils/cn';
@@ -18,14 +18,6 @@ export interface CategoryChipsProps {
   disabled?: boolean;
 }
 
-const sameColor = (a: string | undefined, b: string): boolean => a?.toLowerCase() === b.toLowerCase();
-
-/** Index in PRESET_COLORS of the first color no Category uses yet (the first one when all are used) */
-const firstUnusedColorIndex = (categories: Category[]): number => {
-  const index = PRESET_COLORS.findIndex(preset => !categories.some(category => sameColor(category.color, preset.value)));
-  return index === -1 ? 0 : index;
-};
-
 /** Pale tint and colored text of a chosen chip, in both themes (the Category chip rule) */
 const chosenStyle = (color: string): CSSProperties => {
   const light = getSoftBadgeColors(color, 'light');
@@ -40,7 +32,7 @@ const chosenStyle = (color: string): CSSProperties => {
 };
 
 const CheckIcon: FC = () => (
-  <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <svg className="w-3.5 h-3.5 shrink-0 animate-pop-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="m5 12.5 4.5 4.5L19 7.5" />
   </svg>
 );
@@ -153,7 +145,7 @@ const CategoryChips: FC<CategoryChipsProps> = ({
                 title={category.name}
                 style={checked ? chosenStyle(color) : undefined}
                 className={cn(
-                  'h-8 max-w-full px-3 inline-flex items-center gap-1.5 rounded-full border-[1.5px] text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50 disabled:cursor-not-allowed active:scale-95',
+                  'h-8 max-w-full px-3 inline-flex items-center gap-1.5 rounded-full border-[1.5px] text-sm font-semibold transition-chip focus:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50 disabled:cursor-not-allowed active:scale-92',
                   checked
                     ? 'bg-[var(--chip-bg)] text-[var(--chip-fg)] dark:bg-[var(--chip-bg-dark)] dark:text-[var(--chip-fg-dark)]'
                     : 'bg-card border-default text-secondary hover:bg-muted'
@@ -175,7 +167,7 @@ const CategoryChips: FC<CategoryChipsProps> = ({
             type="button"
             onClick={openAdd}
             disabled={disabled}
-            className="h-8 px-3 inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-dashed border-accent text-sm font-semibold text-accent hover:bg-accent-subtle transition-colors focus-interactive disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
+            className="h-8 px-3 inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-dashed border-accent text-sm font-semibold text-accent hover:bg-accent-subtle transition-chip focus-interactive disabled:opacity-50 disabled:cursor-not-allowed active:scale-92"
           >
             <PlusIcon />
             New category
@@ -184,8 +176,8 @@ const CategoryChips: FC<CategoryChipsProps> = ({
       </div>
 
       {onCreateCategory && adding && (
-        // Escape here closes the row, not the editor
-        <div className="flex flex-col gap-1" data-keeps-escape>
+        // Escape here closes the row, not the editor. The row pops in from the top left, where its button was
+        <div className="flex flex-col gap-1 origin-top-left animate-pop-check" data-keeps-escape>
           <div className="flex items-center gap-2 p-1.5 rounded-2xl border-[1.5px] border-accent bg-card">
             <button
               type="button"
