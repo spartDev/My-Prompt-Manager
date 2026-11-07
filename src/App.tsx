@@ -82,7 +82,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   } = useCategories();
 
   const { copyToClipboard } = useClipboard();
-  const { toast, showToast, hideToast, settings, updateSettings } = useToast();
+  const { toast, showToast, hideToast, settings, settingsLoaded, updateSettings } = useToast();
 
   // Initialize search with debounce functionality using optimistic prompts
   const searchWithDebounce = useSearchWithDebounce(optimisticPrompts);
@@ -396,7 +396,8 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
           onCreateCategory={handleCreateCategory}
           onUpdateCategory={handleUpdateCategory}
           onDeleteCategory={handleDeleteCategory}
-          confirmDelete={!settings.enabled}
+          // No Undo without Notifications: confirm while they are off, or not known to be on yet
+          confirmDelete={!settings.enabled || !settingsLoaded}
           context={context}
         />
       )}

@@ -173,6 +173,24 @@ describe('useToast', () => {
   });
 
   describe('settings', () => {
+    it('says when the stored settings have been read', async () => {
+      mockStored({ enabled: false });
+      const { result } = renderHook(() => useToast());
+
+      expect(result.current.settingsLoaded).toBe(false);
+      await flushLoad();
+      expect(result.current).toMatchObject({ settingsLoaded: true, settings: { enabled: false } });
+    });
+
+    it('counts the settings as read when reading them failed, with Notifications on', async () => {
+      (vi.spyOn(chrome.storage.local, 'get') as any).mockRejectedValue(new Error('Storage unavailable'));
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const { result } = renderHook(() => useToast());
+
+      await flushLoad();
+      expect(result.current).toMatchObject({ settingsLoaded: true, settings: { enabled: true } });
+    });
+
     it('shows Notifications by default, with nothing stored', async () => {
       const { result } = renderHook(() => useToast());
       await flushLoad();

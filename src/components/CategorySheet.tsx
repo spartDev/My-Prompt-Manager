@@ -39,8 +39,13 @@ const CloseIcon = (
   </svg>
 );
 
-/** The first character of the name, a whole emoji or letter, or ? while the name is empty */
-const initialOf = (name: string): string => (Array.from(name.trim())[0] ?? '?').toUpperCase();
+const graphemes = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+
+/** The first character of the name as one sees it (a whole emoji, flag or accented letter), or ? while the name is empty */
+const initialOf = (name: string): string => {
+  const [first] = graphemes.segment(name.trim());
+  return first ? first.segment.toUpperCase() : '?';
+};
 
 /**
  * The bottom sheet that creates a Category (2b of the Atelier 1C design) or edits one (2c): a name,

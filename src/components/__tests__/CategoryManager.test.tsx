@@ -90,6 +90,26 @@ describe('CategoryManager', () => {
       expect(within(sheet).getAllByRole('button', { pressed: false })).toHaveLength(11);
     });
 
+    it('shows the whole first character in the preview: an emoji, a flag or an accented letter', async () => {
+      const { user } = renderManager();
+      await user.click(screen.getByRole('button', { name: 'Add category' }));
+      const sheet = screen.getByRole('dialog', { name: 'New category' });
+      const name = within(sheet).getByRole('textbox', { name: 'Category name' });
+      const preview = within(sheet).getByTestId('category-sheet-preview');
+
+      const family = '\u{1F469}\u200D\u{1F469}\u200D\u{1F467}';
+      await user.paste(`${family} Family`);
+      expect(preview.textContent).toBe(family);
+
+      await user.clear(name);
+      await user.paste('\u{1F1EB}\u{1F1F7} France');
+      expect(preview.textContent).toBe('\u{1F1EB}\u{1F1F7}');
+
+      await user.clear(name);
+      await user.paste('e\u0301cole');
+      expect(preview.textContent).toBe('E\u0301');
+    });
+
     it('creates the Category with Create, closes the sheet and gives the keyboard back to Add category', async () => {
       const { user, props } = renderManager();
 
@@ -342,15 +362,19 @@ describe('CategoryManager', () => {
       expect(screen.getByRole('textbox', { name: 'Category name' })).toHaveValue('');
     });
 
-    it('steps the screen back while the sheet is open', async () => {
+    it('steps the screen back while the sheet is open, out of reach of assistive technology', async () => {
       const { user, container } = renderManager();
       const screenBehind = container.firstElementChild;
 
       expect(screenBehind).not.toHaveAttribute('data-stepped-back');
+      expect(screenBehind).not.toHaveAttribute('inert');
       await user.click(screen.getByRole('button', { name: 'Add category' }));
       expect(screenBehind).toHaveAttribute('data-stepped-back');
+      expect(screenBehind).toHaveAttribute('inert');
       await user.keyboard('{Escape}');
       expect(screenBehind).not.toHaveAttribute('data-stepped-back');
+      // Not during the exit: the keyboard goes back to what opened the sheet
+      expect(screenBehind).not.toHaveAttribute('inert');
     });
   });
 });

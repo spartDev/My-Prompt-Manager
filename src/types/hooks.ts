@@ -144,6 +144,8 @@ export interface UseToastReturn {
   /** The one Notification on screen: a new one replaces it */
   toast: Toast | null;
   settings: ToastSettings;
+  /** False until the stored settings have been read, or failed to be: until then settings holds the defaults */
+  settingsLoaded: boolean;
   showToast: ShowToast;
   hideToast: (id: string) => void;
   updateSettings: (settings: Partial<ToastSettings>) => void;

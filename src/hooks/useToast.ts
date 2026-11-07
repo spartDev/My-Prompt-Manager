@@ -38,6 +38,7 @@ const readSettings = (stored: unknown): { settings: ToastSettings; outdated: boo
 export const useToast = (): UseToastReturn => {
   const [toast, setToast] = useState<Toast | null>(null);
   const [settings, setSettings] = useState<ToastSettings>(DEFAULT_SETTINGS);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   // showToast reads the latest switch, so turning Notifications on can show one at once
   const enabledRef = useRef(DEFAULT_SETTINGS.enabled);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -62,6 +63,8 @@ export const useToast = (): UseToastReturn => {
         }
       } catch (error) {
         Logger.error('Failed to load toast settings', toError(error));
+      } finally {
+        setSettingsLoaded(true);
       }
     };
     void loadSettings();
@@ -111,6 +114,7 @@ export const useToast = (): UseToastReturn => {
   return {
     toast,
     settings,
+    settingsLoaded,
     showToast,
     hideToast,
     updateSettings

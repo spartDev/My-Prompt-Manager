@@ -1,5 +1,6 @@
 import type { AnimationEvent, FC } from 'react';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 
 import { DEFAULT_CATEGORY_COLOR, getColorName, nextCategoryColor } from '../constants/colors';
 import { useCategorySheet } from '../hooks/useCategorySheet';
@@ -148,7 +149,8 @@ const CategoryManager: FC<CategoryManagerProps> = ({
     } finally {
       deletingRef.current = false;
     }
-    sheet.close();
+    // Closed now, so the screen behind is no longer inert when it takes the focus
+    flushSync(() => { sheet.close(); });
     // The row that opened the sheet is gone: the keyboard goes to the one that took its place
     (neighbour ? rowRefs.current.get(neighbour.id) : addButtonRef.current)?.focus();
   };
@@ -185,7 +187,9 @@ const CategoryManager: FC<CategoryManagerProps> = ({
   };
 
   return (
-    <div className="h-full flex flex-col bg-app sheet-behind" data-stepped-back={sheet.isOpen ? '' : undefined}>
+    // Behind the open sheet, out of reach: only the sheet's dialog is there for assistive technology.
+    // Not during the exit, so the focus can go back to the row or button that opened it.
+    <div className="h-full flex flex-col bg-app sheet-behind" data-stepped-back={sheet.isOpen ? '' : undefined} inert={sheet.isOpen}>
       {/* Header */}
       <ViewHeader
         icon={
