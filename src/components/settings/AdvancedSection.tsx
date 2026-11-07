@@ -1,101 +1,97 @@
 import { type FC, useCallback, useId, useState } from 'react';
 
-import { ChevronDownIcon, DebugInfoIcon, GearIcon, HelpIcon } from '../icons/SettingsIcons';
+import { Logger, toError } from '../../utils';
+import { DebugInfoIcon } from '../icons/SettingsIcons';
 
-import ToggleSwitch from './ToggleSwitch';
+import { ROW_BUTTON_CLASSES } from './rowStyles';
+import SettingsGroup from './SettingsGroup';
+import SettingsRow from './SettingsRow';
+import Switch from './Switch';
 
 interface AdvancedSectionProps {
   debugMode: boolean;
   onDebugModeChange: (enabled: boolean) => void;
   saving: boolean;
+  /** Restores every setting to its default, keeping the Prompts and Categories */
+  onReset: () => Promise<void>;
 }
 
-const AdvancedSection: FC<AdvancedSectionProps> = ({
-  debugMode,
-  onDebugModeChange,
-  saving
-}) => {
-  const [isExpanded, setIsExpanded] = useState(false);
+/** The Advanced group: debug logging, and resetting the settings */
+const AdvancedSection: FC<AdvancedSectionProps> = ({ debugMode, onDebugModeChange, saving, onReset }) => {
+  const debugLabelId = useId();
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
-  const toggleExpanded = useCallback(() => { setIsExpanded(prev => !prev); }, []);
-  const titleId = useId();
+  const handleReset = useCallback(async () => {
+    if (!showResetConfirm) {
+      setShowResetConfirm(true);
+      return;
+    }
+
+    setResetting(true);
+    try {
+      await onReset();
+      setShowResetConfirm(false);
+    } catch (error) {
+      Logger.error('Failed to reset settings', toError(error));
+    } finally {
+      setResetting(false);
+    }
+  }, [showResetConfirm, onReset]);
 
   return (
-    <section aria-labelledby={titleId} className="border-t border-default pt-6">
-      <button
-        onClick={toggleExpanded}
-        className="w-full flex items-center justify-between text-left mb-4 group"
-        aria-expanded={isExpanded}
+    <SettingsGroup label="Advanced">
+      <SettingsRow
+        label="Debug mode"
+        labelId={debugLabelId}
+        control={<Switch checked={debugMode} onChange={onDebugModeChange} disabled={saving} labelledBy={debugLabelId} />}
       >
-        <div className="flex items-center gap-3">
-          <div data-testid="section-icon" className="w-10 h-10 bg-accent-subtle text-accent rounded-xl flex items-center justify-center shrink-0">
-            <GearIcon className="w-5 h-5" />
+        {debugMode && (
+          <div className="mt-2 p-2 bg-accent-subtle border border-accent rounded-lg flex items-center gap-2 text-xs text-accent-strong">
+            <DebugInfoIcon />
+            Debug logging is now active. Check browser console for detailed information.
           </div>
-          <div>
-            <h2 id={titleId} className="text-xl font-semibold text-primary">
-              Advanced
-            </h2>
-            <p className="text-sm text-tertiary">
-              Developer and advanced options
-            </p>
-          </div>
-        </div>
-        <ChevronDownIcon className={`w-5 h-5 text-tertiary transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-      </button>
+        )}
+      </SettingsRow>
 
-      {isExpanded && (
-        <div className="space-y-4 animate-in slide-in-from-top-2 duration-200">
-          {/* Developer Options */}
-          <div className="bg-card rounded-xl p-4 border border-default">
-            <h3 className="font-medium text-primary text-sm mb-3">
-              Developer Options
-            </h3>
-            
-            {/* Debug Mode Toggle */}
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <label htmlFor="debug-mode" className="text-sm font-medium text-secondary">
-                    Debug Mode
-                  </label>
-                  <div className="group relative">
-                    <HelpIcon className="w-4 h-4 text-tertiary cursor-help" />
-                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-inverse text-on-inverse text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
-                      Enable detailed console logging for debugging
-                      <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-(--background-color-inverse)"></div>
-                    </div>
-                  </div>
-                </div>
-                <p className="text-xs text-tertiary">
-                  Enable console logging for development and troubleshooting
-                </p>
-              </div>
-              
-              <div className="ml-4">
-                <ToggleSwitch
-                  checked={debugMode}
-                  onChange={onDebugModeChange}
-                  disabled={saving}
-                  ariaLabel="Debug mode"
-                  size="small"
-                />
-              </div>
+      <SettingsRow
+        label="Reset settings"
+        control={showResetConfirm ? undefined : (
+          <button type="button" onClick={() => void handleReset()} className={ROW_BUTTON_CLASSES}>
+            Reset to Defaults
+          </button>
+        )}
+      >
+        {showResetConfirm && (
+          <div className="mt-2 space-y-2">
+            <div className="p-3 bg-warning-subtle border border-warning rounded-lg">
+              <p className="text-sm text-warning">
+                ⚠️ This will reset all settings to defaults but keep your prompts and categories. Continue?
+              </p>
             </div>
-
-            {/* Debug Mode Status */}
-            {debugMode && (
-              <div className="mt-3 p-2 bg-accent-subtle border border-accent rounded-lg">
-                <div className="flex items-center gap-2 text-xs text-accent-strong">
-                  <DebugInfoIcon />
-                  Debug logging is now active. Check browser console for detailed information.
-                </div>
-              </div>
-            )}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => void handleReset()}
+                disabled={resetting}
+                className="flex-1 h-10 px-4 bg-accent hover:bg-accent-hover text-on-accent text-sm font-semibold rounded-full transition-colors focus-primary disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {resetting ? 'Resetting...' : 'Yes, Reset Settings'}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowResetConfirm(false); }}
+                disabled={resetting}
+                className="flex-1 h-10 px-4 bg-card text-secondary text-sm font-semibold border-[1.5px] border-strong rounded-full hover:bg-muted transition-colors focus-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
-        </div>
-      )}
-    </section>
+        )}
+      </SettingsRow>
+    </SettingsGroup>
   );
 };
 
-export default AdvancedSection; 
+export default AdvancedSection;

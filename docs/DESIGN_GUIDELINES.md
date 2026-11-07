@@ -105,7 +105,7 @@ Information uses the accent family (`bg-accent-subtle`, `border-accent`, `text-a
 
 ### Rules of use
 
-- **Chosen vs on.** One item chosen among several: `bg-accent-selected border-accent text-accent-strong font-semibold`. A setting that is on: `bg-accent`.
+- **Chosen vs on.** One item chosen among several: `bg-accent-selected border-accent text-accent-strong font-semibold`. A setting that is on: `bg-accent`. The one exception is a [Segmented Control](#segmented-control), whose chosen option sits on a `bg-card` puck with a `border-input` outline.
 - **Hover.** `hover:bg-accent-hover` on `bg-accent`, `hover:bg-danger-hover` on `bg-danger`, `hover:bg-muted` on neutral elements.
 - **Fields.** On a card: `bg-subtle border-input`; on `bg-app`: `bg-card border-input`; add `focus-input`; in error: `border-error` and a `text-danger` message.
 
@@ -289,6 +289,7 @@ rounded-md   /* 6px / 0.375rem  - Small elements */
 rounded-lg   /* 8px / 0.5rem    - Buttons, icons */
 rounded-xl   /* 12px / 0.75rem  - Cards, inputs, modals */
 rounded-full /* 9999px          - Pills, badges, toggle knobs */
+rounded-group /* 20px (--radius-group) - the card of a Settings group */
 ```
 
 ### Usage Patterns
@@ -342,6 +343,8 @@ shadow-md   /* 0 4px 6px -1px, tint 10       */
 shadow-lg   /* 0 10px 15px -3px, tint 10     */
 shadow-xl   /* 0 20px 25px -5px, tint 10     */
 shadow-2xl  /* 0 25px 50px -12px, tint 25 - dialogs */
+shadow-puck /* 0 2px 6px -2px, tint 25 - the puck of a segmented control */
+shadow-knob /* 0 2px 4px, tint 25 - the knob of a switch */
 ```
 
 ### Custom Shadows
@@ -680,20 +683,22 @@ A list of items (the Categories) is one card on `bg-app`: its title and rows are
 
 A color swatch is user data: it keeps its own color. In a picker, the chosen swatch takes an accent ring with a gap in the card's color (`ring-2 ring-accent ring-offset-2 ring-offset-(--background-color-card)`).
 
-#### Settings Card
+#### Settings Group
+
+Settings is a column of Settings groups (`src/components/settings/SettingsGroup.tsx`), 18px apart inside a 16px margin. A group is a label over one card; the card holds one row per setting (`SettingsRow.tsx`), with a `border-divider` line between rows and none above the first:
 
 ```tsx
-<div className="
-  bg-card
-  border border-default
-  rounded-xl
-  p-5
-  hover:shadow-md
-  transition-all duration-200
-">
-  {/* Card content */}
-</div>
+<section aria-labelledby={labelId} className="flex flex-col gap-2">
+  <h2 id={labelId} className="pl-1 text-[12.5px] font-bold text-secondary">Appearance</h2>
+  <div className="bg-card border border-default rounded-group overflow-hidden divide-y divide-(--border-color-divider)">
+    {/* A row: label at the left (text-sm font-semibold text-primary, an optional
+        text-[11.5px] text-tertiary detail under it), control at the right */}
+    <div className="py-2.5 pr-2.5 pl-3.5">…</div>
+  </div>
+</section>
 ```
+
+A row's action is a small secondary pill (`ROW_BUTTON_CLASSES` in `src/components/settings/rowStyles.ts`, 34px high, as tall as a segmented control). A destructive action keeps its confirmation inside its row.
 
 ### Badges & Pills
 
@@ -738,28 +743,10 @@ One item chosen among several (Library filter pill, active Section):
 
 #### Segmented Control
 
-A short choice among a few options (the theme) sits in a `bg-subtle` track. The chosen option takes the chosen-item colors; the others are transparent. It is a radio group:
+A choice among two or three options (the theme, popup or side panel): `src/components/settings/SegmentedControl.tsx`. A 186×34px `bg-subtle` track holds the options; a `bg-card` puck slides under the chosen one with the spring (`duration-(--duration-spring) ease-spring`). The puck carries a 1.5px `border-input` outline: card on subtle is about 1.1:1 in both modes, so the outline is what gives the chosen option 3:1 (WCAG 1.4.11). Labels are `text-[12.5px] font-bold`, `text-primary` when chosen, `text-tertiary` otherwise. It is a radio group, with the keyboard of `useRadioGroup`:
 
 ```tsx
-<div role="radiogroup" aria-labelledby={labelId} className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-subtle">
-  {options.map(option => (
-    <button
-      key={option.value}
-      type="button"
-      role="radio"
-      aria-checked={value === option.value}
-      className={`
-        h-9 rounded-lg border text-sm font-semibold transition-colors focus-interactive
-        ${value === option.value
-          ? 'bg-accent-selected border-accent text-accent-strong'
-          : 'border-transparent text-secondary hover:text-primary hover:bg-muted'
-        }
-      `}
-    >
-      {option.label}
-    </button>
-  ))}
-</div>
+<SegmentedControl options={THEME_OPTIONS} value={theme} onChange={setTheme} labelledBy={themeLabelId} />
 ```
 
 ### Modals & Dialogs
@@ -830,32 +817,10 @@ A short choice among a few options (the theme) sits in a `bg-subtle` track. The 
 
 ### Toggle Switch
 
-On: `bg-accent`. Off: the track is filled with the field-outline token (`border-input`, 3:1 on every surface). The knob is white in both modes, the `text-on-accent` color. Neither fill has a `bg-` class, so both read their token through an arbitrary value:
+`src/components/settings/Switch.tsx`: a 42×24px track, `bg-accent` when on and filled with the field-outline token when off (`border-input`, 3:1 on every surface; Atelier 1C's paler `#DCD4EA` is 1.4:1, so it is not used). The 18px knob is white in both modes (`text-on-accent`), with `shadow-knob`, and slides 18px with the spring. A switch is named by its row's label through `aria-labelledby`:
 
 ```tsx
-<button
-  type="button"
-  role="switch"
-  aria-checked={checked}
-  onClick={() => onChange(!checked)}
-  className={`
-    w-11 h-6
-    relative inline-flex items-center
-    rounded-full
-    transition-all duration-200
-    focus-interactive
-    ${checked ? 'bg-accent' : 'bg-(--border-color-input)'}
-    ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
-  `}
->
-  <span className={`
-    h-5 w-5
-    inline-block transform
-    rounded-full bg-(--text-color-on-accent) shadow-sm
-    transition-transform duration-200
-    ${checked ? 'translate-x-6' : 'translate-x-[2px]'}
-  `} />
-</button>
+<Switch checked={enabled} onChange={setEnabled} labelledBy={labelId} />
 ```
 
 ### Notification
@@ -1007,6 +972,19 @@ transition-shadow duration-200
 /* Transform transitions */
 transition-transform duration-200
 ```
+
+### Motion Tokens
+
+Atelier 1C's motion lives in `src/theme/tokens.css`. Read a duration through `duration-(--duration-*)` and a delay through `delay-(--delay-*)`; under `prefers-reduced-motion` every one of them drops to 1ms (0 for the delay), so a component needs no rule of its own.
+
+| Token | Value | Use |
+|---|---|---|
+| `ease-spring` | `cubic-bezier(0.34, 1.56, 0.64, 1)` | A move that overshoots a little, then settles |
+| `--duration-color` | 200ms | Label color of a segmented control |
+| `--duration-dim` | 250ms | A site's logo greying when it is turned off |
+| `--duration-track` | 300ms | Switch track color |
+| `--duration-spring` | 450ms | Switch knob, segmented control puck |
+| `--duration-fill`, `--delay-fill` | 1100ms, 200ms | `animate-fill-grow`: the storage bar grows from the left on arrival |
 
 ### Keyframe Animations
 

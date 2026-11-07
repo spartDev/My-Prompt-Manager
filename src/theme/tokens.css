@@ -1,5 +1,6 @@
 /*
-  Semantic color tokens (spec: beads epic My-Prompt-Manager-el4).
+  Semantic color tokens (spec: beads epic My-Prompt-Manager-el4), then the shadow, radius and motion
+  tokens of Atelier 1C.
   Each token is a Tailwind color for one property, so its class carries its name:
   --background-color-app is bg-app, --text-color-primary is text-primary.
   Light values live here; .dark (set on <html> by useTheme) overrides them below.
@@ -100,6 +101,42 @@
   --shadow-lg: 0 10px 15px -3px var(--shadow-tint-10), 0 4px 6px -4px var(--shadow-tint-10);
   --shadow-xl: 0 20px 25px -5px var(--shadow-tint-10), 0 8px 10px -6px var(--shadow-tint-10);
   --shadow-2xl: 0 25px 50px -12px var(--shadow-tint-25);
+  /* The chosen option's puck in a segmented control, and the knob of a switch (Atelier 1C) */
+  --shadow-puck: 0 2px 6px -2px var(--shadow-tint-25);
+  --shadow-knob: 0 2px 4px var(--shadow-tint-25);
+
+  /* Radius of a Settings group's card (Atelier 1C) */
+  --radius-group: 20px;
+
+  /* Motion (Atelier 1C). ease-spring overshoots a little, then settles. Read durations through
+     duration-(--duration-*) and delays through delay-(--delay-*); reduced motion shortens them all below */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --duration-color: 200ms;
+  --duration-dim: 250ms;
+  --duration-track: 300ms;
+  --duration-spring: 450ms;
+  --duration-fill: 1100ms;
+  --delay-fill: 200ms;
+  --animate-fill-grow: fill-grow var(--duration-fill) var(--ease-spring) var(--delay-fill) both;
+
+  @keyframes fill-grow {
+    from {
+      transform: scaleX(0);
+    }
+  }
+}
+
+/* Reduced motion: every motion token becomes near instant, so a component that reads them needs no
+   rule of its own */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-color: 1ms;
+    --duration-dim: 1ms;
+    --duration-track: 1ms;
+    --duration-spring: 1ms;
+    --duration-fill: 1ms;
+    --delay-fill: 0ms;
+  }
 }
 
 @layer base {

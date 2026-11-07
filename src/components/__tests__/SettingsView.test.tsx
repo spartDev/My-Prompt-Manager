@@ -148,7 +148,7 @@ describe('SettingsView', () => {
       expect(storageMock.importPrompt).toHaveBeenCalledTimes(3);
     });
     await waitFor(() => {
-      expect(showToastMock).toHaveBeenCalledWith('Skipped 1', 'warning', { sub: 'Imported 2 prompts and 0 categories. See Backup & Restore.' });
+      expect(showToastMock).toHaveBeenCalledWith('Skipped 1', 'warning', { sub: 'Imported 2 prompts and 0 categories. See Your data.' });
     });
     const report = screen.getByRole('status', { name: 'Import report' });
     expect(within(report).getByText('"Too long"')).toBeInTheDocument();
@@ -190,7 +190,7 @@ describe('SettingsView', () => {
       expect(item).toHaveTextContent('Content cannot exceed 20,000 characters');
     }
     // The Notification only counts them: the titles stay in the report
-    expect(showToastMock).toHaveBeenCalledWith('Skipped 3', 'warning', { sub: 'Imported 1 prompt and 0 categories. See Backup & Restore.' });
+    expect(showToastMock).toHaveBeenCalledWith('Skipped 3', 'warning', { sub: 'Imported 1 prompt and 0 categories. See Your data.' });
 
     await userEvent.click(within(report).getByRole('button', { name: 'Dismiss import report' }));
     expect(screen.queryByRole('status', { name: 'Import report' })).not.toBeInTheDocument();
@@ -369,7 +369,7 @@ describe('SettingsView', () => {
     const report = await screen.findByRole('status', { name: 'Import report' });
     expect(report).toHaveTextContent('The import stopped: 2 of 4 prompts were imported.');
     expect(report).toHaveTextContent('Storage API is unavailable. Please try again later.');
-    expect(showToastMock).toHaveBeenCalledWith('Import stopped', 'error', { sub: '2 of 4 prompts were imported. See Backup & Restore.' });
+    expect(showToastMock).toHaveBeenCalledWith('Import stopped', 'error', { sub: '2 of 4 prompts were imported. See Your data.' });
     expect(storageMock.importPrompt).toHaveBeenCalledTimes(3);
     expect(onStorageRefusedMock).not.toHaveBeenCalled();
     expect(alertSpy).not.toHaveBeenCalled();
@@ -412,7 +412,7 @@ describe('SettingsView', () => {
   });
 
   // My-Prompt-Manager-71n: the bar shows what Chrome counts (getBytesInUse) against its quota (QUOTA_BYTES)
-  it('shows the bytes Chrome stores against its quota in the Data & Storage bar', async () => {
+  it('shows the bytes Chrome stores against its quota in the Your data bar', async () => {
     const storageMock = getMockStorageManager();
     storageMock.getStorageUsage.mockResolvedValue({ used: 4_404_019, total: 10_485_760 });
 
@@ -422,7 +422,7 @@ describe('SettingsView', () => {
     await waitFor(() => {
       expect(bar).toHaveAttribute('aria-valuenow', '42');
     });
-    expect(screen.getByText('4.2 MB / 10 MB (42%)')).toBeInTheDocument();
+    expect(screen.getByText('4.2 MB of 10 MB')).toBeInTheDocument();
     expect(bar.firstElementChild).toHaveStyle({ width: '42%' });
   });
 
@@ -433,7 +433,7 @@ describe('SettingsView', () => {
     storageMock.getStorageUsage.mockResolvedValue({ used: 80, total: 10_485_760 });
 
     await renderSettings();
-    expect(await screen.findByText('80 Bytes / 10 MB (0%)')).toBeInTheDocument();
+    expect(await screen.findByText('80 Bytes of 10 MB')).toBeInTheDocument();
 
     storageMock.getStorageUsage.mockResolvedValue({ used: 309, total: 10_485_760 });
     await act(async () => {
@@ -441,7 +441,7 @@ describe('SettingsView', () => {
       await Promise.resolve();
     });
 
-    expect(await screen.findByText('309 Bytes / 10 MB (0%)')).toBeInTheDocument();
+    expect(await screen.findByText('309 Bytes of 10 MB')).toBeInTheDocument();
   });
 
   it('clears all data through StorageManager, which takes the storage locks', async () => {
@@ -486,10 +486,6 @@ describe('SettingsView', () => {
       expect(chromeMock.storage.local.get as Mock).toHaveBeenCalled();
     });
 
-    const aboutToggle = await screen.findByRole('button', { name: /about & reset/i });
-    await userEvent.click(aboutToggle);
-
-    // After expanding, find the reset button directly
     const resetButton = await screen.findByRole('button', { name: /reset to defaults/i });
     await userEvent.click(resetButton);
 
@@ -587,12 +583,12 @@ describe('SettingsView', () => {
       );
 
       await renderSettings();
-      await screen.findByRole('switch', { name: 'Enable ChatGPT integration' });
+      await screen.findByRole('switch', { name: 'ChatGPT' });
       await waitPastTheDebounce();
 
       expect(siteSettingsWrites()).toHaveLength(0);
       expect(chromeMock.tabs.sendMessage).not.toHaveBeenCalled();
-      expect(screen.getByRole('radio', { name: /select side panel mode/i })).toBeEnabled();
+      expect(screen.getByRole('radio', { name: 'Side panel' })).toBeEnabled();
     });
 
     // My-Prompt-Manager-ds8: React re-renders on its own scheduler, not on setTimeout, so with only the
@@ -630,7 +626,7 @@ describe('SettingsView', () => {
 
       it('saves a site setting the user changes 150 ms after the change', async () => {
         await renderSettings();
-        const claude = await screen.findByRole('switch', { name: 'Enable Claude integration' });
+        const claude = await screen.findByRole('switch', { name: 'Claude' });
         await waitPastTheDebounce();
         fakeTheTimers();
 
@@ -649,7 +645,7 @@ describe('SettingsView', () => {
 
       await renderSettings();
       await waitPastTheDebounce();
-      await userEvent.click(await screen.findByRole('switch', { name: 'Enable Claude integration' }));
+      await userEvent.click(await screen.findByRole('switch', { name: 'Claude' }));
       await waitPastTheDebounce();
 
       const writes = siteSettingsWrites();
@@ -670,7 +666,7 @@ describe('SettingsView', () => {
       expect(siteSettingsWrites()).toHaveLength(0);
 
       // The defaults are shown: Claude is on, where storage would have had it off
-      const claudeSwitch = await screen.findByRole('switch', { name: 'Enable Claude integration' });
+      const claudeSwitch = await screen.findByRole('switch', { name: 'Claude' });
       expect(claudeSwitch).toHaveAttribute('aria-checked', 'true');
       await userEvent.click(claudeSwitch);
       await waitPastTheDebounce();
@@ -703,10 +699,10 @@ describe('SettingsView', () => {
 
       expect(siteSettingsWrites()).toHaveLength(0);
       expect(chromeMock.tabs.sendMessage).not.toHaveBeenCalled();
-      expect(screen.getByRole('switch', { name: 'Enable ChatGPT integration' })).toHaveAttribute('aria-checked', 'true');
-      expect(screen.getByRole('switch', { name: 'Enable Claude integration' })).toHaveAttribute('aria-checked', 'false');
-      expect(screen.getByRole('switch', { name: /enable my ai integration/i })).toHaveAttribute('aria-checked', 'true');
-      expect(screen.getByRole('radio', { name: /select side panel mode/i })).toBeChecked();
+      expect(screen.getByRole('switch', { name: 'ChatGPT' })).toHaveAttribute('aria-checked', 'true');
+      expect(screen.getByRole('switch', { name: 'Claude' })).toHaveAttribute('aria-checked', 'false');
+      expect(screen.getByRole('switch', { name: 'My AI' })).toHaveAttribute('aria-checked', 'true');
+      expect(screen.getByRole('radio', { name: 'Side panel' })).toBeChecked();
     });
 
     // A later load: after an import, Clear All Data or a reset, Settings loads the site settings again
@@ -729,7 +725,7 @@ describe('SettingsView', () => {
         const get = getChromeMockFunctions().storage.local.get as Mock;
         get.mockResolvedValue(STORED_WITH_A_CUSTOM_SITE);
         await renderSettings();
-        await screen.findByRole('switch', { name: /enable my ai integration/i });
+        await screen.findByRole('switch', { name: 'My AI' });
         await waitPastTheDebounce();
         get.mockImplementation((keys: unknown) =>
           readsTheSiteSettings(keys) ? Promise.reject(new Error('storage unavailable')) : Promise.resolve(STORED_WITH_A_CUSTOM_SITE)
@@ -760,10 +756,10 @@ describe('SettingsView', () => {
 
         expect(siteSettingsWrites()).toHaveLength(0);
         expect(chromeMock.tabs.sendMessage).not.toHaveBeenCalled();
-        expect(screen.getByRole('switch', { name: 'Enable ChatGPT integration' })).toHaveAttribute('aria-checked', 'true');
-        expect(screen.getByRole('switch', { name: 'Enable Claude integration' })).toHaveAttribute('aria-checked', 'false');
-        expect(screen.getByRole('switch', { name: /enable my ai integration/i })).toHaveAttribute('aria-checked', 'true');
-        expect(screen.getByRole('radio', { name: /select side panel mode/i })).toBeChecked();
+        expect(screen.getByRole('switch', { name: 'ChatGPT' })).toHaveAttribute('aria-checked', 'true');
+        expect(screen.getByRole('switch', { name: 'Claude' })).toHaveAttribute('aria-checked', 'false');
+        expect(screen.getByRole('switch', { name: 'My AI' })).toHaveAttribute('aria-checked', 'true');
+        expect(screen.getByRole('radio', { name: 'Side panel' })).toBeChecked();
       });
 
       // Review round 1 (Codex): Clear All Data and a reset leave the default site settings in storage. When the
@@ -771,12 +767,11 @@ describe('SettingsView', () => {
       // user makes would save back; and the save that follows sends the defaults to the tabs
       // Clear All Data leaves no interface mode, which reads as the default; a reset writes the popup window
       it.each([
-        ['Clear All Data', /select side panel mode/i, async () => {
+        ['Clear All Data', 'Side panel', async () => {
           await userEvent.click(screen.getByRole('button', { name: 'Clear All Data' }));
           await userEvent.click(await screen.findByRole('button', { name: 'Yes, Clear All Data' }));
         }],
-        ['a reset', /select popup window mode/i, async () => {
-          await userEvent.click(await screen.findByRole('button', { name: /about & reset/i }));
+        ['a reset', 'Popup', async () => {
           await userEvent.click(await screen.findByRole('button', { name: /reset to defaults/i }));
           await userEvent.click(await screen.findByRole('button', { name: /yes, reset settings/i }));
         }]
@@ -787,8 +782,8 @@ describe('SettingsView', () => {
         await runAction();
         await waitForTheFailedLoad();
 
-        expect(screen.queryByRole('switch', { name: /enable my ai integration/i })).not.toBeInTheDocument();
-        expect(screen.getByRole('switch', { name: 'Enable Claude integration' })).toHaveAttribute('aria-checked', 'true');
+        expect(screen.queryByRole('switch', { name: 'My AI' })).not.toBeInTheDocument();
+        expect(screen.getByRole('switch', { name: 'Claude' })).toHaveAttribute('aria-checked', 'true');
         expect(screen.getByRole('radio', { name: interfaceModeShown })).toBeChecked();
         expect(chromeMock.tabs.sendMessage).toHaveBeenCalledTimes(1);
         expect(chromeMock.tabs.sendMessage).toHaveBeenCalledWith(7, {
@@ -807,7 +802,7 @@ describe('SettingsView', () => {
       expect(storageMock.getPrompts).toHaveBeenCalled();
     });
 
-    const sidePanelOption = await screen.findByRole('radio', { name: /select side panel mode/i });
+    const sidePanelOption = await screen.findByRole('radio', { name: 'Side panel' });
     await userEvent.click(sidePanelOption);
 
     await waitFor(() => {
@@ -854,7 +849,7 @@ describe('SettingsView', () => {
     // After error, loading completes and the settings heading is shown with defaults
     await screen.findByRole('heading', { name: /settings/i });
     // The component should have rendered (no crash)
-    expect(screen.getByText(/customize your experience/i)).toBeInTheDocument();
+    expect(screen.getByText(/^My Prompt Manager \d/)).toBeInTheDocument();
   });
 
   it('toggles a supported site and triggers debounced save', async () => {
@@ -880,7 +875,7 @@ describe('SettingsView', () => {
     });
 
     // Find the ChatGPT toggle (it's currently enabled) and disable it
-    const chatgptToggle = screen.getByRole('switch', { name: /enable chatgpt integration/i });
+    const chatgptToggle = screen.getByRole('switch', { name: 'ChatGPT' });
     expect(chatgptToggle).toHaveAttribute('aria-checked', 'true');
 
     await userEvent.click(chatgptToggle);
@@ -930,7 +925,7 @@ describe('SettingsView', () => {
       expect(storageMock.getPrompts).toHaveBeenCalled();
     });
 
-    const claudeToggle = screen.getByRole('switch', { name: /enable claude integration/i });
+    const claudeToggle = screen.getByRole('switch', { name: 'Claude' });
     expect(claudeToggle).toHaveAttribute('aria-checked', 'false');
 
     await userEvent.click(claudeToggle);
@@ -974,7 +969,7 @@ describe('SettingsView', () => {
     });
 
     // Toggle a site to trigger saveSettings
-    const chatgptToggle = screen.getByRole('switch', { name: /enable chatgpt integration/i });
+    const chatgptToggle = screen.getByRole('switch', { name: 'ChatGPT' });
     await userEvent.click(chatgptToggle);
 
     // Advance past debounce
@@ -1019,10 +1014,6 @@ describe('SettingsView', () => {
       expect(storageMock.getPrompts).toHaveBeenCalled();
     });
 
-    // Expand the Advanced section
-    const advancedToggle = await screen.findByRole('button', { name: /advanced/i });
-    await userEvent.click(advancedToggle);
-
     // Find the debug mode toggle
     const debugToggle = await screen.findByRole('switch', { name: /debug mode/i });
     expect(debugToggle).toHaveAttribute('aria-checked', 'false');
@@ -1064,9 +1055,6 @@ describe('SettingsView', () => {
     await waitFor(() => {
       expect(storageMock.getPrompts).toHaveBeenCalled();
     });
-
-    const advancedToggle = await screen.findByRole('button', { name: /advanced/i });
-    await userEvent.click(advancedToggle);
 
     const debugToggle = await screen.findByRole('switch', { name: /debug mode/i });
     expect(debugToggle).toHaveAttribute('aria-checked', 'true');
@@ -1175,10 +1163,7 @@ describe('SettingsView', () => {
       expect(storageMock.getPrompts).toHaveBeenCalled();
     });
 
-    // Expand About section and reset
-    const aboutToggle = await screen.findByRole('button', { name: /about & reset/i });
-    await userEvent.click(aboutToggle);
-
+    // Reset, in the Advanced group
     const resetButton = await screen.findByRole('button', { name: /reset to defaults/i });
     await userEvent.click(resetButton);
 
@@ -1216,8 +1201,7 @@ describe('SettingsView', () => {
     });
 
     // The DataStorageSection shows count info
-    expect(screen.getByText('3 prompts')).toBeInTheDocument();
-    expect(screen.getByText('2 categories')).toBeInTheDocument();
+    expect(screen.getByText('3 prompts · 2 categories')).toBeInTheDocument();
   });
 
   // My-Prompt-Manager-spi: a Library that cannot be read is not an empty one. Saying "0 prompts" and exporting
@@ -1234,11 +1218,11 @@ describe('SettingsView', () => {
       const createObjectURL = vi.spyOn(URL, 'createObjectURL');
 
       await renderSettings();
-      const dataStorage = screen.getByRole('region', { name: 'Data & Storage' });
+      const dataStorage = screen.getByRole('region', { name: 'Your data' });
 
       expect(within(dataStorage).getByText('The Library could not be read')).toBeInTheDocument();
-      expect(within(dataStorage).queryByText('0 prompts')).not.toBeInTheDocument();
-      expect(within(dataStorage).queryByText('0 categories')).not.toBeInTheDocument();
+      expect(within(dataStorage).queryByText(/0 prompts/)).not.toBeInTheDocument();
+      expect(within(dataStorage).queryByText(/0 categories/)).not.toBeInTheDocument();
       const exportButton = within(dataStorage).getByRole('button', { name: 'Export' });
       expect(exportButton).toBeDisabled();
       expect(exportButton).toHaveAccessibleDescription(/the Library could not be read/i);
@@ -1252,7 +1236,7 @@ describe('SettingsView', () => {
       storageMock.getPrompts.mockRejectedValueOnce(new Error('locked'));
 
       await renderSettings();
-      const dataStorage = screen.getByRole('region', { name: 'Data & Storage' });
+      const dataStorage = screen.getByRole('region', { name: 'Your data' });
       expect(within(dataStorage).getByRole('button', { name: 'Export' })).toBeDisabled();
 
       // An import loads the Library again
@@ -1262,7 +1246,7 @@ describe('SettingsView', () => {
       const fileInput = document.querySelector<HTMLInputElement>('input[type="file"]');
       await userEvent.upload(fileInput as HTMLInputElement, createJsonFile(JSON.stringify({ prompts: [], categories: [] })));
 
-      expect(await within(dataStorage).findByText('1 prompt')).toBeInTheDocument();
+      expect(await within(dataStorage).findByText(/^1 prompt ·/)).toBeInTheDocument();
       expect(within(dataStorage).queryByText('The Library could not be read')).not.toBeInTheDocument();
       expect(within(dataStorage).getByRole('button', { name: 'Export' })).toBeEnabled();
     });
@@ -1331,12 +1315,10 @@ describe('SettingsView', () => {
     });
 
     // Verify key section headings are present (use heading role for specificity)
-    expect(screen.getByRole('heading', { name: /^Appearance$/i })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /^Site Integration$/i })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /^Data & Storage$/i })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /^Notifications$/i })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /^Advanced$/i })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /^About & Reset$/i })).toBeInTheDocument();
+    // The Settings groups, in the order of Atelier 1C, then Help and Advanced
+    expect(screen.getAllByRole('heading', { level: 2 }).map(heading => heading.textContent)).toEqual([
+      'Appearance', 'Library', 'AI sites', 'Your data', 'Notifications', 'Help', 'Advanced'
+    ]);
   });
 
   it('loads and applies saved interface mode from storage', async () => {
@@ -1359,7 +1341,7 @@ describe('SettingsView', () => {
     });
 
     // The sidepanel radio should be checked
-    const sidePanelOption = screen.getByRole('radio', { name: /select side panel mode/i });
+    const sidePanelOption = screen.getByRole('radio', { name: 'Side panel' });
     expect(sidePanelOption).toBeChecked();
   });
 
@@ -1395,7 +1377,7 @@ describe('SettingsView', () => {
     expect(screen.getByText('my-ai.example.com')).toBeInTheDocument();
 
     // Find the custom site's toggle and click it to toggle off
-    const customSiteToggle = screen.getByRole('switch', { name: /enable my ai integration/i });
+    const customSiteToggle = screen.getByRole('switch', { name: 'My AI' });
     expect(customSiteToggle).toHaveAttribute('aria-checked', 'true');
 
     await userEvent.click(customSiteToggle);
@@ -1443,8 +1425,8 @@ describe('SettingsView', () => {
     expect(screen.getByText('Removable Site')).toBeInTheDocument();
 
     // Click the Remove button for the custom site
-    const removeButton = screen.getByRole('button', { name: /remove/i });
-    await userEvent.click(removeButton);
+    await userEvent.click(screen.getByRole('button', { name: 'More actions for Removable Site' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Remove' }));
 
     // Verify saveSettings was called with the custom site removed
     await waitFor(() => {
@@ -1473,7 +1455,7 @@ describe('SettingsView', () => {
     (chromeMock.storage.local.set as Mock).mockRejectedValueOnce(new Error('Write failed'));
 
     // Toggle a site to trigger debounced save
-    const chatgptToggle = screen.getByRole('switch', { name: /enable chatgpt integration/i });
+    const chatgptToggle = screen.getByRole('switch', { name: 'ChatGPT' });
     await userEvent.click(chatgptToggle);
 
     // Advance past debounce
@@ -1501,7 +1483,7 @@ describe('SettingsView', () => {
     // Make storage.local.set reject for the interface mode change
     (chromeMock.storage.local.set as Mock).mockRejectedValueOnce(new Error('Permission denied'));
 
-    const sidePanelOption = screen.getByRole('radio', { name: /select side panel mode/i });
+    const sidePanelOption = screen.getByRole('radio', { name: 'Side panel' });
     await userEvent.click(sidePanelOption);
 
     // Component should not crash - settings heading still visible

@@ -196,7 +196,7 @@ test.describe('Settings', () => {
     await page.getByTestId('tab-settings').click();
     await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
 
-    const sidePanelOption = page.getByRole('radio', { name: 'Select side panel mode' });
+    const sidePanelOption = page.getByRole('radio', { name: 'Side panel' });
     await sidePanelOption.click();
 
     await expect(sidePanelOption).toHaveAttribute('aria-checked', 'true');

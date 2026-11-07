@@ -43,9 +43,8 @@ const RADIO_FILES = sourceFiles(COMPONENTS)
 describe('Radio groups in src/components', () => {
   it('finds the known radio groups, so the scan is not silently empty', () => {
     expect(RADIO_FILES).toEqual(expect.arrayContaining([
-      'InterfaceModeSelector.tsx',
       'LibraryFilterBar.tsx',
-      'settings/AppearanceSection.tsx'
+      'settings/SegmentedControl.tsx'
     ]));
   });
 

@@ -82,6 +82,10 @@ _Avoid_: Preferences, options
 One of the four top-level destinations (Library, Categories, Analytics, Settings), each reachable from the tab bar.
 _Avoid_: Tab, page, view
 
+**Settings group**:
+A named set of related preferences inside Settings (for example Appearance or the Platforms), shown together under one label.
+_Avoid_: Section, panel
+
 **Notification**:
 A brief message at the top of the popup or side panel that confirms an action or reports its failure, then disappears on its own. Only one shows at a time: a new one replaces it. The user turns all of them on or off in Settings, failures included.
 _Avoid_: Toast, alert, snackbar

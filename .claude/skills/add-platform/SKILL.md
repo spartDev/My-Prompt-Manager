@@ -93,21 +93,20 @@ export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
 - 60-79: Secondary platforms (new additions)
 - < 60: Experimental/beta platforms
 
-### Step 2.1: Update SiteCard UI (Optional)
+### Step 2.1: Add the Platform's row in Settings (Optional)
 
-Add or update the platform card shown in settings so users can enable/disable the integration.
+Add the platform's row to the AI sites group of Settings, so users can turn the integration on or off.
 
 **When to do this:**
 - You're adding a core platform (not just a custom site).
 - You want the new platform visible in the Settings UI.
 
-**File:** `src/components/settings/SiteCard.tsx`
+**File:** `src/components/SettingsView.tsx` (`siteConfigs`, in the order the group lists the Platforms)
 
 **Actions:**
 1. Add an icon component in `src/components/icons/SiteIcons.tsx` (or reuse an existing one).
-2. Update `src/components/settings/SupportedSitesList.tsx`, which lists the cards, to include the new platform with the right icon.
-3. Make sure the new card passes the correct hostname and uses `getBrandColors(hostname)`.
-4. Verify the badge colors/labels look correct; adjust `brandColors` if needed.
+2. Add the platform to `siteConfigs` with its name and icon. `src/components/settings/SupportedSitesList.tsx` renders one `SiteRow` (`src/components/settings/SiteRow.tsx`) per entry, with the domain under the name, its linked Platforms' included.
+3. The row's logo takes `getBrandColors(hostname)`; adjust `brandColors` if the logo does not read on it.
 
 **Tip:** The label for the platform name comes from `displayName` in `SUPPORTED_PLATFORMS`. Keep them in sync.
 
@@ -743,7 +742,7 @@ Use this checklist when adding a new platform:
 
 - [ ] **Step 1:** Identified input element selector
 - [ ] **Step 2:** Added platform to `src/config/platforms.ts`
-- [ ] **Step 2.1:** Updated SiteCard UI (optional)
+- [ ] **Step 2.1:** Added the Platform's row in Settings (optional)
 - [ ] **Step 3:** Created strategy class in `src/content/platforms/`
 - [ ] **Step 4:** Registered strategy in `platform-manager.ts` and `index.ts`
 - [ ] **Step 5:** Updated manifest permissions (if needed)

@@ -42,7 +42,7 @@ test.describe('Side panel experience', () => {
     await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
     await sidepanelPage.getByTestId('tab-settings').click();
-    const popupRadio = sidepanelPage.getByRole('radio', { name: 'Select popup window mode' });
+    const popupRadio = sidepanelPage.getByRole('radio', { name: 'Popup' });
     await popupRadio.click();
 
     await expect(popupRadio).toHaveAttribute('aria-checked', 'true');

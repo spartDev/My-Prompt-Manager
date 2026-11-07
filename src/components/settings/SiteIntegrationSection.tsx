@@ -13,8 +13,7 @@ import AddCustomSiteForm from './AddCustomSiteForm';
 import AddMethodChooser from './AddMethodChooser';
 import ConfigurationPreview from './ConfigurationPreview';
 import CustomSitesList from './CustomSitesList';
-import EmptyCustomSitesState from './EmptyCustomSitesState';
-import SettingsSection from './SettingsSection';
+import SettingsGroup from './SettingsGroup';
 import SiteImportDrawer from './SiteImportDrawer';
 import SupportedSitesList, { type SiteConfig } from './SupportedSitesList';
 
@@ -360,109 +359,94 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
   const { isCurrentSiteIntegrated, currentSiteHostname } = currentTabState;
 
   const addActionDisabled = !isPickerWindow && isCurrentSiteIntegrated;
-  const addCardTooltip = addActionDisabled
-    ? `Current site (${currentSiteHostname}) is already integrated`
-    : 'Add a new custom site';
-  const addFirstSiteTooltip = addActionDisabled
-    ? `Current site (${currentSiteHostname}) is already integrated`
-    : 'Add your first custom site';
-  const addFirstSiteLabel = addActionDisabled ? 'Current Site Already Added' : 'Add Your First Site';
-
-  const icon = (
-    <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"
-      />
-    </svg>
-  );
+  const addActionReason = addActionDisabled ? `Current site (${currentSiteHostname}) is already integrated` : undefined;
 
   return (
     <>
-      <SettingsSection icon={icon} title="Site Integration" description="Choose which sites show the prompt library">
-        <div className="space-y-4">
-          {/* Supported Sites */}
-          <SupportedSitesList
-            siteConfigs={siteConfigs}
-            enabledSites={enabledSites}
-            onSiteToggle={onSiteToggle}
-            saving={saving}
-          />
-
-          {/* Custom Sites */}
-          <div className="flex flex-col gap-3">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <h3 className="font-medium text-primary text-sm">Custom Sites</h3>
-            </div>
-
-            {showAddMethodChooser && (
-              <AddMethodChooser
-                onManualClick={openManualFlow}
-                onImportClick={openImportFlow}
-                onCancel={() => { viewDispatch({ type: 'CLOSE_ALL' }); }}
-              />
-            )}
-
-            {showImportDrawer && (
-              <SiteImportDrawer
-                importCode={importState.code}
-                onImportCodeChange={(value) => {
-                  importDispatch({ type: 'SET_CODE', payload: value });
-                }}
-                onPreview={() => {
-                  void handlePreviewImport();
-                }}
-                onClear={() => {
-                  handleClearImport();
-                  viewDispatch({ type: 'CLOSE_ALL' });
-                }}
-                loading={importState.isDecoding}
-                error={importState.error}
-              />
-            )}
-
-            {showAddSite && (
-              <AddCustomSiteForm
-                siteConfigs={siteConfigs}
-                customSites={customSites}
-                onAddCustomSite={onAddCustomSite}
-                onCancel={closeAllForms}
-                pickerState={pickerState}
-                onStartElementPicker={startElementPicker}
-                pickerWindowState={pickerWindowState}
-                currentTabState={currentTabState}
-              />
-            )}
-
-            {/* Custom Sites List or Empty State */}
-            {customSites.length > 0 ? (
-              <CustomSitesList
-                customSites={customSites}
-                onCustomSiteToggle={onCustomSiteToggle}
-                onRemoveCustomSite={onRemoveCustomSite}
-                onExportCustomSite={handleExportCustomSite}
-                onAddClick={openAddMethodSelector}
-                exportingHostname={importState.exportingHostname}
-                saving={saving}
-                addActionDisabled={addActionDisabled}
-                addCardTooltip={addCardTooltip}
-              />
-            ) : (
-              !showAddSite &&
-              !showAddMethodChooser &&
-              !showImportDrawer && (
-                <EmptyCustomSitesState
-                  onAddClick={openAddMethodSelector}
-                  addActionDisabled={addActionDisabled}
-                  addFirstSiteTooltip={addFirstSiteTooltip}
-                  addFirstSiteLabel={addFirstSiteLabel}
+      <SettingsGroup
+        label="AI sites"
+        after={
+          (showAddMethodChooser || showImportDrawer || showAddSite) && (
+            <div className="flex flex-col gap-3">
+              {showAddMethodChooser && (
+                <AddMethodChooser
+                  onManualClick={openManualFlow}
+                  onImportClick={openImportFlow}
+                  onCancel={() => { viewDispatch({ type: 'CLOSE_ALL' }); }}
                 />
-              )
+              )}
+
+              {showImportDrawer && (
+                <SiteImportDrawer
+                  importCode={importState.code}
+                  onImportCodeChange={(value) => {
+                    importDispatch({ type: 'SET_CODE', payload: value });
+                  }}
+                  onPreview={() => {
+                    void handlePreviewImport();
+                  }}
+                  onClear={() => {
+                    handleClearImport();
+                    viewDispatch({ type: 'CLOSE_ALL' });
+                  }}
+                  loading={importState.isDecoding}
+                  error={importState.error}
+                />
+              )}
+
+              {showAddSite && (
+                <AddCustomSiteForm
+                  siteConfigs={siteConfigs}
+                  customSites={customSites}
+                  onAddCustomSite={onAddCustomSite}
+                  onCancel={closeAllForms}
+                  pickerState={pickerState}
+                  onStartElementPicker={startElementPicker}
+                  pickerWindowState={pickerWindowState}
+                  currentTabState={currentTabState}
+                />
+              )}
+            </div>
+          )
+        }
+      >
+        <SupportedSitesList
+          siteConfigs={siteConfigs}
+          enabledSites={enabledSites}
+          onSiteToggle={onSiteToggle}
+          saving={saving}
+        />
+
+        <CustomSitesList
+          customSites={customSites}
+          onCustomSiteToggle={onCustomSiteToggle}
+          onRemoveCustomSite={onRemoveCustomSite}
+          onExportCustomSite={handleExportCustomSite}
+          exportingHostname={importState.exportingHostname}
+          saving={saving}
+        />
+
+        {/* Opens the way to add a custom site: by hand, or from a configuration code */}
+        <button
+          type="button"
+          onClick={openAddMethodSelector}
+          disabled={addActionDisabled}
+          title={addActionReason}
+          className="w-full flex items-center gap-3 py-2.5 pr-2.5 pl-3.5 min-h-[54px] text-left text-sm font-bold text-accent hover:bg-raised transition-colors focus-interactive -outline-offset-2 disabled:text-tertiary disabled:hover:bg-transparent disabled:cursor-not-allowed"
+        >
+          <span aria-hidden="true" className="size-[30px] rounded-full flex items-center justify-center shrink-0 bg-accent-subtle">
+            <svg className="size-4" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" d="M12 5v14M5 12h14" />
+            </svg>
+          </span>
+          <span className="flex-1 min-w-0">
+            Add a custom site
+            {addActionReason && (
+              <span className="block text-[11.5px] font-normal text-tertiary truncate">{addActionReason}</span>
             )}
-          </div>
-        </div>
-      </SettingsSection>
+          </span>
+        </button>
+      </SettingsGroup>
       <ConfigurationPreview
         isOpen={importState.previewOpen}
         config={importState.pendingImport?.config ?? null}

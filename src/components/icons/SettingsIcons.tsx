@@ -5,26 +5,6 @@ interface IconProps {
 }
 
 /**
- * Chevron Down Icon - Expand/collapse indicator
- * Used for collapsible sections in settings
- */
-export const ChevronDownIcon: FC<IconProps> = ({ className = 'w-5 h-5' }) => (
-  <svg className={className} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-  </svg>
-);
-
-/**
- * Info Circle Icon - About/information indicator
- * Used for about section header
- */
-export const InfoCircleIcon: FC<IconProps> = ({ className = 'w-5 h-5' }) => (
-  <svg className={className} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-  </svg>
-);
-
-/**
  * GitHub Icon - Repository link
  * Used for external links to GitHub
  */
@@ -55,55 +35,12 @@ export const DocumentationIcon: FC<IconProps> = ({ className = 'w-4 h-4' }) => (
 );
 
 /**
- * Gear Icon - Settings indicator
- * Used for advanced settings section header
- */
-export const GearIcon: FC<IconProps> = ({ className = 'w-5 h-5' }) => (
-  <svg className={className} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-  </svg>
-);
-
-/**
- * Help Icon - Question mark in circle
- * Used for tooltips and help indicators
- */
-export const HelpIcon: FC<IconProps> = ({ className = 'w-4 h-4' }) => (
-  <svg className={className} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-    <circle cx="12" cy="12" r="10" />
-    <path d="M9,9h0a3,3,0,0,1,6,0c0,2-3,3-3,3" />
-    <path d="M12,17h0" />
-  </svg>
-);
-
-/**
  * Debug Info Icon - Small info indicator
  * Used for debug mode status messages
  */
 export const DebugInfoIcon: FC<IconProps> = ({ className = 'w-3 h-3' }) => (
   <svg className={className} fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
     <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-  </svg>
-);
-
-/**
- * Bell Icon - Notification indicator
- * Used for notification section header
- */
-export const BellIcon: FC<IconProps> = ({ className = 'w-5 h-5' }) => (
-  <svg className={className} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-  </svg>
-);
-
-/**
- * Database Icon - Storage indicator
- * Used for data storage section header
- */
-export const DatabaseIcon: FC<IconProps> = ({ className = 'w-5 h-5' }) => (
-  <svg className={className} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
   </svg>
 );
 
@@ -134,16 +71,6 @@ export const ImportIcon: FC<IconProps> = ({ className = 'w-4 h-4' }) => (
 export const FunnelIcon: FC<IconProps> = ({ className = 'w-4 h-4' }) => (
   <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-  </svg>
-);
-
-/**
- * Sort Icon - Up/down arrows
- * Used for sort controls
- */
-export const SortIcon: FC<IconProps> = ({ className = 'w-4 h-4' }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
   </svg>
 );
 

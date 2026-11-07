@@ -1,10 +1,11 @@
 import type { FC, ReactNode } from 'react';
 
-import SiteCard from './SiteCard';
+import { getLinkedPlatformHostnames } from '../../config/platforms';
+
+import SiteRow from './SiteRow';
 
 export interface SiteConfig {
   name: string;
-  description: string;
   icon: (isEnabled: boolean) => ReactNode;
 }
 
@@ -15,36 +16,35 @@ interface SupportedSitesListProps {
   saving?: boolean;
 }
 
+/** The domains a Platform's switch turns on: its own, then its linked Platforms' (Copilot and M365 Copilot) */
+export const platformDomains = (hostname: string): string =>
+  getLinkedPlatformHostnames(hostname).map(domain => domain.replace(/^www\./, '')).join(' · ');
+
+/** The Platforms, one row each, in the order of siteConfigs */
 const SupportedSitesList: FC<SupportedSitesListProps> = ({
   siteConfigs,
   enabledSites,
   onSiteToggle,
   saving = false,
-}) => {
-  return (
-    <div>
-      <h3 className="font-medium text-primary text-sm mb-3">
-        Supported Sites
-      </h3>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {Object.entries(siteConfigs).map(([hostname, config]) => {
-          const isEnabled = enabledSites.includes(hostname);
-          return (
-            <SiteCard
-              key={hostname}
-              hostname={hostname}
-              name={config.name}
-              description={config.description}
-              icon={config.icon(isEnabled)}
-              isEnabled={isEnabled}
-              onToggle={onSiteToggle}
-              saving={saving}
-            />
-          );
-        })}
-      </div>
-    </div>
-  );
-};
+}) => (
+  <>
+    {Object.entries(siteConfigs).map(([hostname, config]) => {
+      const isEnabled = enabledSites.includes(hostname);
+      return (
+        <SiteRow
+          key={hostname}
+          hostname={hostname}
+          name={config.name}
+          detail={platformDomains(hostname)}
+          // The logo keeps its brand colors; the row greys and dims it when the site is off
+          icon={config.icon(true)}
+          isEnabled={isEnabled}
+          onToggle={onSiteToggle}
+          saving={saving}
+        />
+      );
+    })}
+  </>
+);
 
 export default SupportedSitesList;

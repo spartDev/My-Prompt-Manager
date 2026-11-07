@@ -65,7 +65,7 @@ export class SettingsPage extends BasePage {
    * Add a custom site configuration
    */
   async addCustomSite(): Promise<void> {
-    await this.page.getByRole('button', { name: 'Add Custom Site' }).click();
+    await this.page.getByRole('button', { name: /Add a custom site/ }).click();
   }
 
   /**
@@ -107,7 +107,7 @@ export class SettingsPage extends BasePage {
    * Expect storage usage information to be displayed
    */
   async expectStorageUsageVisible(): Promise<void> {
-    await expect(this.page.getByText('Storage Usage')).toBeVisible();
+    await expect(this.page.getByText('Stored on this device')).toBeVisible();
     await expect(this.page.getByTestId('storage-bar')).toBeVisible();
   }
 

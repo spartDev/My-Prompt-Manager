@@ -34,7 +34,7 @@ const expectBarToMatchChrome = async (page: Page, label: Locator) => {
     return settled;
   }, { intervals: [500] }).toBe(true);
   const usage = describeStorageUsage(previous, await page.evaluate(() => chrome.storage.local.QUOTA_BYTES));
-  await expect(label).toHaveText(`${usage.used} / ${usage.total} (${String(usage.percentage)}%)`);
+  await expect(label).toHaveText(`${usage.used} of ${usage.total}`);
 };
 
 test.describe('Library size in Chrome storage', () => {
@@ -102,7 +102,7 @@ test.describe('Library size in Chrome storage', () => {
       await page.keyboard.press('Escape');
       await expect(warning).toHaveCount(0);
       await expect(importButton).toBeFocused();
-      await expect(page.getByText(`${String(library.length + imported)} prompts`, { exact: true })).toBeVisible();
+      await expect(page.getByText(new RegExp(`^${String(library.length + imported)} prompts · `))).toBeVisible();
       expect(nativeDialogs).toEqual([]);
     });
 
@@ -134,8 +134,8 @@ test.describe('Library size in Chrome storage', () => {
       await expect(bar).toHaveAttribute('aria-valuenow', String(percentage));
       await expect(bar.locator('> div')).toHaveAttribute('style', new RegExp(`width: ${String(percentage)}%`));
       const used = `${String(parseFloat((usage.used / 1024 ** 2).toFixed(2)))} MB`;
-      await expect(page.getByText(`${used} / 10 MB (${String(percentage)}%)`, { exact: true })).toBeVisible();
-      await page.getByRole('heading', { name: 'Storage Usage' }).scrollIntoViewIfNeeded();
+      await expect(page.getByText(`${used} of 10 MB`, { exact: true })).toBeVisible();
+      await page.getByText('Stored on this device').scrollIntoViewIfNeeded();
       await page.screenshot({ path: `${SCREENSHOT_DIR}/settings-storage-bar-${theme}.png` });
     });
 
@@ -147,7 +147,7 @@ test.describe('Library size in Chrome storage', () => {
       await page.goto(`chrome-extension://${extensionId}/src/popup.html`);
       await expect(page.locator('html')).toHaveClass(theme === 'dark' ? /dark/ : /^(?!.*dark)/);
       await page.getByTestId('tab-settings').click();
-      const label = page.getByRole('region', { name: 'Data & Storage' }).getByText(/ \/ 10 MB \(\d+%\)$/);
+      const label = page.getByRole('region', { name: 'Your data' }).getByText(/ of 10 MB$/);
 
       await expectBarToMatchChrome(page, label);
 
@@ -156,7 +156,7 @@ test.describe('Library size in Chrome storage', () => {
       await expect(page.getByText('All data cleared', { exact: true })).toBeVisible();
 
       await expectBarToMatchChrome(page, label);
-      await page.getByRole('heading', { name: 'Storage Usage' }).scrollIntoViewIfNeeded();
+      await page.getByText('Stored on this device').scrollIntoViewIfNeeded();
       await page.screenshot({ path: `${SCREENSHOT_DIR}/storage-bar-after-clear-${theme}.png` });
     });
 

@@ -239,7 +239,7 @@ describe('Color tokens', () => {
   });
 
   it('shadows take the violet tint in light and a stronger black in dark', async () => {
-    const shadows = ['shadow-2xs', 'shadow-xs', 'shadow-sm', 'shadow-md', 'shadow-lg', 'shadow-xl', 'shadow-2xl'];
+    const shadows = ['shadow-2xs', 'shadow-xs', 'shadow-sm', 'shadow-md', 'shadow-lg', 'shadow-xl', 'shadow-2xl', 'shadow-puck', 'shadow-knob'];
     const css = await buildCss(shadows);
     const { light, dark } = await readTokens();
 
@@ -252,6 +252,26 @@ describe('Color tokens', () => {
       expect(light[tint], `${tint} light`).toMatch(/^rgba\(45, 25, 90, /);
       expect(dark[tint], `${tint} dark`).toMatch(/^rgba\(0, 0, 0, /);
     }
+  });
+
+  it('motion comes from tokens, which reduced motion makes near instant', async () => {
+    const css = await buildCss(['ease-spring', 'rounded-group', 'animate-fill-grow', 'duration-(--duration-spring)', 'delay-(--delay-fill)']);
+    const { light } = await readTokens();
+    const durations = ['--duration-color', '--duration-dim', '--duration-track', '--duration-spring', '--duration-fill'];
+
+    expect(ruleFor(css, 'ease-spring')).toContain('var(--ease-spring)');
+    expect(ruleFor(css, 'rounded-group')).toContain('var(--radius-group)');
+    expect(ruleFor(css, 'animate-fill-grow')).toContain('var(--animate-fill-grow)');
+    expect(light['--ease-spring']).toBe('cubic-bezier(0.34, 1.56, 0.64, 1)');
+    for (const token of [...durations, '--delay-fill']) {
+      expect(light[token], token).toMatch(/^\d+ms$/);
+    }
+
+    const reduced = /@media \(prefers-reduced-motion: reduce\)\s*\{\s*:root\s*\{([^}]*)\}/.exec(css)?.[1] ?? '';
+    for (const token of durations) {
+      expect(reduced, `${token} under reduced motion`).toMatch(new RegExp(`${token}:\\s*1ms`));
+    }
+    expect(reduced).toMatch(/--delay-fill:\s*0ms/);
   });
 
   it('the focus utilities draw their ring from the tokens', async () => {
