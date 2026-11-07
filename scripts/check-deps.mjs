@@ -6,7 +6,8 @@
  *
  * npm writes node_modules/.package-lock.json from the tree it installed, so the check compares every entry of
  * package-lock.json "packages" with it: a version that differs, a package that is not installed, and one installed
- * that the lockfile does not list. An optional package built for another platform is expected to be absent, since
+ * that the lockfile does not list. An entry counts as installed only while its folder still holds a package.json,
+ * since npm leaves that file as it was when a folder is deleted by hand or an install is cut short. An optional package built for another platform is expected to be absent, since
  * npm skips it (@biomejs/cli-linux-x64 on macOS); one built for this platform is not, since the toolchain needs it
  * (@rolldown/binding-darwin-arm64 on an Apple-silicon Mac).
  *
@@ -18,7 +19,7 @@
  * Usage: node scripts/check-deps.mjs [--hook] [dir]   (dir defaults to the repository root)
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync, lstatSync, readFileSync, realpathSync } from 'node:fs';
+import { existsSync, lstatSync, readFileSync, readlinkSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -158,6 +159,9 @@ const isLinkedWorktree = (root) => {
   }
 };
 
+/** `value` as one word for sh: single-quoted, with an embedded single quote closed, escaped and reopened. */
+const shellQuote = (value) => `'${value.replace(/'/g, "'\\''")}'`;
+
 /** True when the two checkouts have the same package-lock.json, byte for byte. */
 const sameLockfile = (a, b) => {
   try {
@@ -172,16 +176,21 @@ const sameLockfile = (a, b) => {
  * runs npm ci with HUSKY=0, which keeps the core.hooksPath every checkout shares. A worktree whose node_modules is a
  * symlink into another checkout must not run npm ci through it, since that would rewrite the other checkout's
  * node_modules: when the two checkouts have the same package-lock.json, npm ci in that checkout fixes both; when
- * they differ, the worktree needs an install of its own, so the symlink goes first (rm removes the link, not the
- * target) and npm ci runs here.
+ * they differ, or the symlink's target is gone, the worktree needs an install of its own, so the symlink goes first
+ * (rm removes the link, not the target) and npm ci runs here.
  */
 export function fixCommand(root) {
   const modules = path.join(root, 'node_modules');
   const install = isLinkedWorktree(root) ? 'HUSKY=0 npm ci --no-audit --no-fund' : 'npm ci';
   if (isSymlink(modules)) {
-    const checkout = path.dirname(realpathSync(modules));
+    let checkout;
+    try {
+      checkout = path.dirname(realpathSync(modules));
+    } catch {
+      return `rm node_modules && ${install} (node_modules is a symlink to ${readlinkSync(modules)}, which no longer exists; rm removes only the symlink, then this checkout gets its own install)`;
+    }
     if (sameLockfile(root, checkout)) {
-      return `cd ${checkout} && npm ci (node_modules is a symlink into that checkout, which has the same package-lock.json; an npm ci here would rewrite it)`;
+      return `cd ${shellQuote(checkout)} && npm ci (node_modules is a symlink into that checkout, which has the same package-lock.json; an npm ci here would rewrite it)`;
     }
     return `rm node_modules && ${install} (node_modules is a symlink into ${checkout}, whose package-lock.json differs; rm removes only the symlink, then this checkout gets its own install)`;
   }
@@ -202,7 +211,11 @@ export function check(root) {
   if (!existsSync(installedPath)) {
     return `node_modules/.package-lock.json is missing in ${root}, so the install cannot be checked; npm writes it on every install (scripts/check-deps.mjs).\nFix: ${fixCommand(root)}`;
   }
-  const differences = compareLockfiles(readJson(lockfilePath), readJson(installedPath));
+  const installed = readJson(installedPath);
+  installed.packages = Object.fromEntries(
+    Object.entries(installed.packages ?? {}).filter(([key]) => existsSync(path.join(root, key, 'package.json'))),
+  );
+  const differences = compareLockfiles(readJson(lockfilePath), installed);
   return differences.length === 0 ? '' : report(differences, fixCommand(root));
 }
 

@@ -29,13 +29,20 @@ const WANTED: Packages = { 'node_modules/vite': { version: '8.3.5' }, 'node_modu
 /** An Apple-silicon Mac, whatever this test runs on. */
 const MAC = { os: 'darwin', cpu: 'arm64', libc: undefined };
 
-/** Writes a checkout at `dir` whose lockfile lists `wanted`; `present` is what node_modules holds, or null for none. */
+/**
+ * Writes a checkout at `dir` whose lockfile lists `wanted`; `present` is what node_modules holds, each package with
+ * its folder and package.json, or null for no node_modules at all.
+ */
 function writeCheckout(dir: string, wanted: Packages, present: Packages | null) {
   mkdirSync(dir, { recursive: true });
   writeFileSync(path.join(dir, 'package-lock.json'), JSON.stringify(lockfile(wanted)));
   if (present !== null) {
     mkdirSync(path.join(dir, 'node_modules'));
     writeFileSync(path.join(dir, 'node_modules', '.package-lock.json'), JSON.stringify(installed(present)));
+    for (const [key, entry] of Object.entries(present)) {
+      mkdirSync(path.join(dir, key), { recursive: true });
+      writeFileSync(path.join(dir, key, 'package.json'), JSON.stringify({ name: key.split('node_modules/').pop(), version: entry.version }));
+    }
   }
 }
 
@@ -167,6 +174,16 @@ describe('check-deps', () => {
     expect(result.stderr).toBe('');
   });
 
+  it('exits 1 and names a package whose folder is gone although node_modules/.package-lock.json still lists it', () => {
+    writeCheckout(root, WANTED, WANTED);
+    rmSync(path.join(root, 'node_modules', 'tsx'), { recursive: true });
+
+    const result = runCheck(root);
+
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain('tsx: 4.23.15 in package-lock.json, not installed');
+  });
+
   it('exits 1 with the fix when node_modules is missing', () => {
     writeCheckout(root, WANTED, null);
 
@@ -238,8 +255,38 @@ describe('fixCommand', () => {
     writeFileSync(path.join(worktree, 'package-lock.json'), JSON.stringify(lockfile(WANTED)));
 
     expect(fixCommand(worktree)).toBe(
-      `cd ${main} && npm ci (node_modules is a symlink into that checkout, which has the same package-lock.json; an npm ci here would rewrite it)`,
+      `cd '${main}' && npm ci (node_modules is a symlink into that checkout, which has the same package-lock.json; an npm ci here would rewrite it)`,
     );
+  });
+
+  it('quotes a checkout path with a space or a quote in the cd it prints', () => {
+    const shared = path.join(root, "it's shared");
+    git(root, 'init', '--quiet', shared);
+    mkdirSync(path.join(shared, 'node_modules'));
+    const worktree = path.join(root, 'worktree');
+    git(main, 'worktree', 'add', '--quiet', '--detach', worktree);
+    symlinkSync(path.join(shared, 'node_modules'), path.join(worktree, 'node_modules'));
+    writeFileSync(path.join(shared, 'package-lock.json'), JSON.stringify(lockfile(WANTED)));
+    writeFileSync(path.join(worktree, 'package-lock.json'), JSON.stringify(lockfile(WANTED)));
+
+    expect(fixCommand(worktree)).toContain(`cd '${root}/it'\\''s shared' && npm ci`);
+  });
+
+  it('has a worktree whose node_modules symlink points at a checkout that is gone install its own, without throwing', () => {
+    const worktree = path.join(root, 'worktree');
+    git(main, 'worktree', 'add', '--quiet', '--detach', worktree);
+    writeFileSync(path.join(worktree, 'package-lock.json'), JSON.stringify(lockfile(WANTED)));
+    const gone = path.join(root, 'removed-checkout', 'node_modules');
+    symlinkSync(gone, path.join(worktree, 'node_modules'));
+
+    expect(fixCommand(worktree)).toBe(
+      `rm node_modules && HUSKY=0 npm ci --no-audit --no-fund (node_modules is a symlink to ${gone}, which no longer exists; rm removes only the symlink, then this checkout gets its own install)`,
+    );
+    const result = runCheck(worktree);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toBe('');
+    expect(result.stdout).toContain('node_modules is missing');
+    expect(result.stdout).toContain(`Fix: rm node_modules && HUSKY=0 npm ci --no-audit --no-fund`);
   });
 
   it('has a worktree whose lockfile differs from the symlinked checkout replace the symlink and install its own', () => {
