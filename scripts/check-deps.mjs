@@ -168,6 +168,15 @@ const withReason = (command, reason) => `${command}   # ${reason}`;
 
 const describeError = (error) => (error instanceof Error ? error.message : String(error));
 
+/** True when the two paths name the same directory once symlinks are resolved. */
+const sameDirectory = (a, b) => {
+  try {
+    return realpathSync(a) === realpathSync(b);
+  } catch {
+    return false;
+  }
+};
+
 /** True when the two checkouts have the same package-lock.json, byte for byte. */
 const sameLockfile = (a, b) => {
   try {
@@ -183,19 +192,21 @@ const sameLockfile = (a, b) => {
  * symlink into another checkout must not run npm ci through it, since that would rewrite the other checkout's
  * node_modules: when the two checkouts have the same package-lock.json, npm ci in that checkout fixes both; when
  * they differ, or the symlink's target is gone, the worktree needs an install of its own, so the symlink goes first
- * (rm removes the link, not the target) and npm ci runs here.
+ * (rm removes the link, not the target) and npm ci runs here. When `root` is not the directory the script runs from
+ * (`node scripts/check-deps.mjs <dir>`), the command first changes to it, so it fixes the checkout that was checked.
  */
-export function fixCommand(root) {
+export function fixCommand(root, cwd = process.cwd()) {
   const modules = path.join(root, 'node_modules');
   const linked = isLinkedWorktree(root);
-  const install = linked ? 'HUSKY=0 npm ci --no-audit --no-fund' : 'npm ci';
+  const here = sameDirectory(root, cwd) ? '' : `cd ${shellQuote(root)} && `;
+  const install = `${here}${linked ? 'HUSKY=0 npm ci --no-audit --no-fund' : 'npm ci'}`;
   if (isSymlink(modules)) {
     let checkout;
     try {
       checkout = path.dirname(realpathSync(modules));
     } catch {
       return withReason(
-        `rm node_modules && ${install}`,
+        `${here}rm node_modules && ${install.slice(here.length)}`,
         `node_modules is a symlink to ${readlinkSync(modules)}, which no longer exists; rm removes only the symlink, then this checkout gets its own install`,
       );
     }
@@ -206,7 +217,7 @@ export function fixCommand(root) {
       );
     }
     return withReason(
-      `rm node_modules && ${install}`,
+      `${here}rm node_modules && ${install.slice(here.length)}`,
       `node_modules is a symlink into ${checkout}, whose package-lock.json differs; rm removes only the symlink, then this checkout gets its own install`,
     );
   }

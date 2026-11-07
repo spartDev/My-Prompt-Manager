@@ -46,7 +46,8 @@ function writeCheckout(dir: string, wanted: Packages, present: Packages | null) 
   }
 }
 
-const runCheck = (dir: string, ...args: string[]) => spawnSync(process.execPath, [SCRIPT, ...args, dir], { encoding: 'utf8' });
+/** Runs the script on `dir` from inside it, as the pretest script and the SessionStart hook do. */
+const runCheck = (dir: string, ...args: string[]) => spawnSync(process.execPath, [SCRIPT, ...args, dir], { cwd: dir, encoding: 'utf8' });
 
 const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
 
@@ -220,6 +221,15 @@ describe('check-deps', () => {
     expect(result.stdout).toContain('package-lock.json cannot be read');
   });
 
+  it('starts the fix with a cd when run on a directory from another one, so it fixes the checkout it checked', () => {
+    writeCheckout(root, WANTED, null);
+
+    const result = spawnSync(process.execPath, [SCRIPT, root], { cwd: tmpdir(), encoding: 'utf8' });
+
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain(`Fix: cd '${root}' && npm ci   # main checkout`);
+  });
+
   it('exits 1 with the fix when node_modules is missing', () => {
     writeCheckout(root, WANTED, null);
 
@@ -236,7 +246,7 @@ describe('check-deps', () => {
     const result = runCheck(root, '--hook');
 
     expect(result.status).toBe(0);
-    expect(result.stdout).toBe(`${check(root)}\n`);
+    expect(result.stdout).toBe(runCheck(root).stdout);
     expect(result.stdout).toContain('vite: 7.3.7 installed, 8.3.5 in package-lock.json');
   });
 
@@ -272,14 +282,18 @@ describe('fixCommand', () => {
   });
 
   it('is npm ci in the main checkout, with the reason as a comment so the line can be pasted as it is', () => {
-    expect(fixCommand(main)).toBe('npm ci   # main checkout');
+    expect(fixCommand(main, main)).toBe('npm ci   # main checkout');
+  });
+
+  it('changes to the checkout first when run from another directory', () => {
+    expect(fixCommand(main, root)).toBe(`cd '${main}' && npm ci   # main checkout`);
   });
 
   it('is npm ci with HUSKY=0 in a linked worktree', () => {
     const worktree = path.join(root, 'worktree');
     git(main, 'worktree', 'add', '--quiet', '--detach', worktree);
 
-    expect(fixCommand(worktree)).toBe('HUSKY=0 npm ci --no-audit --no-fund   # linked worktree');
+    expect(fixCommand(worktree, worktree)).toBe('HUSKY=0 npm ci --no-audit --no-fund   # linked worktree');
   });
 
   it('sends a worktree whose node_modules is a symlink into a checkout with the same lockfile to that checkout', () => {
@@ -290,7 +304,7 @@ describe('fixCommand', () => {
     writeFileSync(path.join(main, 'package-lock.json'), JSON.stringify(lockfile(WANTED)));
     writeFileSync(path.join(worktree, 'package-lock.json'), JSON.stringify(lockfile(WANTED)));
 
-    expect(fixCommand(worktree)).toBe(
+    expect(fixCommand(worktree, worktree)).toBe(
       `cd '${main}' && npm ci   # node_modules is a symlink into that checkout, which has the same package-lock.json; an npm ci here would rewrite it`,
     );
   });
@@ -305,7 +319,7 @@ describe('fixCommand', () => {
     writeFileSync(path.join(shared, 'package-lock.json'), JSON.stringify(lockfile(WANTED)));
     writeFileSync(path.join(worktree, 'package-lock.json'), JSON.stringify(lockfile(WANTED)));
 
-    expect(fixCommand(worktree)).toContain(`cd '${root}/it'\\''s shared' && npm ci`);
+    expect(fixCommand(worktree, worktree)).toContain(`cd '${root}/it'\\''s shared' && npm ci`);
   });
 
   it('has a worktree whose node_modules symlink points at a checkout that is gone install its own, without throwing', () => {
@@ -315,7 +329,7 @@ describe('fixCommand', () => {
     const gone = path.join(root, 'removed-checkout', 'node_modules');
     symlinkSync(gone, path.join(worktree, 'node_modules'));
 
-    expect(fixCommand(worktree)).toBe(
+    expect(fixCommand(worktree, worktree)).toBe(
       `rm node_modules && HUSKY=0 npm ci --no-audit --no-fund   # node_modules is a symlink to ${gone}, which no longer exists; rm removes only the symlink, then this checkout gets its own install`,
     );
     const result = runCheck(worktree);
@@ -333,12 +347,15 @@ describe('fixCommand', () => {
     writeFileSync(path.join(main, 'package-lock.json'), JSON.stringify(lockfile(WANTED)));
     writeFileSync(path.join(worktree, 'package-lock.json'), JSON.stringify(lockfile({ ...WANTED, 'node_modules/vite': { version: '8.4.0' } })));
 
-    expect(fixCommand(worktree)).toBe(
+    expect(fixCommand(worktree, worktree)).toBe(
       `rm node_modules && HUSKY=0 npm ci --no-audit --no-fund   # node_modules is a symlink into ${main}, whose package-lock.json differs; rm removes only the symlink, then this checkout gets its own install`,
+    );
+    expect(fixCommand(worktree, root)).toBe(
+      `cd '${worktree}' && rm node_modules && HUSKY=0 npm ci --no-audit --no-fund   # node_modules is a symlink into ${main}, whose package-lock.json differs; rm removes only the symlink, then this checkout gets its own install`,
     );
   });
 
   it('is npm ci outside a Git checkout', () => {
-    expect(fixCommand(root)).toBe('npm ci   # main checkout');
+    expect(fixCommand(root, root)).toBe('npm ci   # main checkout');
   });
 });
