@@ -229,13 +229,30 @@ describe('fixCommand', () => {
     expect(fixCommand(worktree)).toBe('HUSKY=0 npm ci --no-audit --no-fund (linked worktree)');
   });
 
-  it('sends a worktree whose node_modules is a symlink to the checkout the symlink points into', () => {
+  it('sends a worktree whose node_modules is a symlink into a checkout with the same lockfile to that checkout', () => {
     const worktree = path.join(root, 'worktree');
     git(main, 'worktree', 'add', '--quiet', '--detach', worktree);
     mkdirSync(path.join(main, 'node_modules'));
     symlinkSync(path.join(main, 'node_modules'), path.join(worktree, 'node_modules'));
+    writeFileSync(path.join(main, 'package-lock.json'), JSON.stringify(lockfile(WANTED)));
+    writeFileSync(path.join(worktree, 'package-lock.json'), JSON.stringify(lockfile(WANTED)));
 
-    expect(fixCommand(worktree)).toBe(`cd ${main} && npm ci (node_modules is a symlink into that checkout; an npm ci here would rewrite it)`);
+    expect(fixCommand(worktree)).toBe(
+      `cd ${main} && npm ci (node_modules is a symlink into that checkout, which has the same package-lock.json; an npm ci here would rewrite it)`,
+    );
+  });
+
+  it('has a worktree whose lockfile differs from the symlinked checkout replace the symlink and install its own', () => {
+    const worktree = path.join(root, 'worktree');
+    git(main, 'worktree', 'add', '--quiet', '--detach', worktree);
+    mkdirSync(path.join(main, 'node_modules'));
+    symlinkSync(path.join(main, 'node_modules'), path.join(worktree, 'node_modules'));
+    writeFileSync(path.join(main, 'package-lock.json'), JSON.stringify(lockfile(WANTED)));
+    writeFileSync(path.join(worktree, 'package-lock.json'), JSON.stringify(lockfile({ ...WANTED, 'node_modules/vite': { version: '8.4.0' } })));
+
+    expect(fixCommand(worktree)).toBe(
+      `rm node_modules && HUSKY=0 npm ci --no-audit --no-fund (node_modules is a symlink into ${main}, whose package-lock.json differs; rm removes only the symlink, then this checkout gets its own install)`,
+    );
   });
 
   it('is npm ci outside a Git checkout', () => {

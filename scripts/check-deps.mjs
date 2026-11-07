@@ -148,26 +148,44 @@ const isSymlink = (file) => {
   }
 };
 
+/** True when `root` is a linked Git worktree: its git dir differs from the common git dir of the repository. */
+const isLinkedWorktree = (root) => {
+  try {
+    const [gitDir, commonDir] = git(root, 'rev-parse', '--path-format=absolute', '--git-dir', '--git-common-dir').split('\n');
+    return realpathSync(gitDir) !== realpathSync(commonDir);
+  } catch {
+    return false; // not a Git checkout
+  }
+};
+
+/** True when the two checkouts have the same package-lock.json, byte for byte. */
+const sameLockfile = (a, b) => {
+  try {
+    return readFileSync(path.join(a, 'package-lock.json'), 'utf8') === readFileSync(path.join(b, 'package-lock.json'), 'utf8');
+  } catch {
+    return false;
+  }
+};
+
 /**
  * The command that brings node_modules in line with package-lock.json for the checkout at `root`. A linked worktree
  * runs npm ci with HUSKY=0, which keeps the core.hooksPath every checkout shares. A worktree whose node_modules is a
- * symlink into another checkout must not run npm ci at all: it would rewrite that checkout's node_modules.
+ * symlink into another checkout must not run npm ci through it, since that would rewrite the other checkout's
+ * node_modules: when the two checkouts have the same package-lock.json, npm ci in that checkout fixes both; when
+ * they differ, the worktree needs an install of its own, so the symlink goes first (rm removes the link, not the
+ * target) and npm ci runs here.
  */
 export function fixCommand(root) {
   const modules = path.join(root, 'node_modules');
+  const install = isLinkedWorktree(root) ? 'HUSKY=0 npm ci --no-audit --no-fund' : 'npm ci';
   if (isSymlink(modules)) {
     const checkout = path.dirname(realpathSync(modules));
-    return `cd ${checkout} && npm ci (node_modules is a symlink into that checkout; an npm ci here would rewrite it)`;
-  }
-  try {
-    const [gitDir, commonDir] = git(root, 'rev-parse', '--path-format=absolute', '--git-dir', '--git-common-dir').split('\n');
-    if (realpathSync(gitDir) !== realpathSync(commonDir)) {
-      return 'HUSKY=0 npm ci --no-audit --no-fund (linked worktree)';
+    if (sameLockfile(root, checkout)) {
+      return `cd ${checkout} && npm ci (node_modules is a symlink into that checkout, which has the same package-lock.json; an npm ci here would rewrite it)`;
     }
-  } catch {
-    // Not a Git checkout: the main-checkout command applies.
+    return `rm node_modules && ${install} (node_modules is a symlink into ${checkout}, whose package-lock.json differs; rm removes only the symlink, then this checkout gets its own install)`;
   }
-  return 'npm ci (main checkout)';
+  return `${install} (${isLinkedWorktree(root) ? 'linked worktree' : 'main checkout'})`;
 }
 
 /** The report for the checkout at `root`, or an empty string when node_modules matches package-lock.json. */
