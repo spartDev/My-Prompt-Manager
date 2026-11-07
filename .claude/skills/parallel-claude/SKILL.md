@@ -1,6 +1,7 @@
 ---
 name: parallel-claude
 description: Launch multiple Claude Code instances in parallel using tmux and git worktrees to tackle beads tasks concurrently. Use when user mentions parallel execution, multi-agent, parallel claude, or wants to run multiple Claude instances simultaneously on different tasks.
+disable-model-invocation: true
 ---
 
 # Parallel Claude Launcher
