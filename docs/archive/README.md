@@ -47,6 +47,10 @@ Linked from nowhere and out of date; kept for history, not as a reference for cu
 - `AUDIT_AREAS.md`, `AUDIT_SERVICES_CORE_BUSINESS_LOGIC.md`: one-off code audits.
 - `PR_156_PERFORMANCE_ANALYSIS.md`: the performance analysis of PR #156.
 
+### The React 19 migration log (archived 2026-11, My-Prompt-Manager-xds.4)
+
+- `REACT_19_MIGRATION.md`: the log of the move to React 19 (commits, patterns, pitfalls). Its section "Why No Unit Tests for React 19 Hooks?" is wrong: `src/components/__tests__/PromptEditor.test.tsx` unit-tests the `useActionState` editor in happy-dom. The patterns live in the code now, `src/components/PromptEditor.tsx` (`useActionState`) and `src/App.tsx` (`useOptimistic`), and the rule in `CODING_STANDARDS.md`.
+
 ## Current Documentation
 
 For up-to-date technical documentation, see:

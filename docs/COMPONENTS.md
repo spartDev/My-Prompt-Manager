@@ -74,7 +74,7 @@ Imported from `src/components/analytics/index.ts`. Each chart takes its data fro
 - **Colors:** token classes only (`bg-card`, `text-secondary`, `border-default`…), never a raw palette class or a `dark:` color variant. The rule is in `CODING_STANDARDS.md`, the tokens in [DESIGN_GUIDELINES.md](./DESIGN_GUIDELINES.md), and `src/theme/__tests__/rawColors.test.ts` enforces it on migrated components and on this page.
 - **Focus:** the focus classes of `tailwind.config.js` (`focus-primary`, `focus-input`…); see "Focus States" in DESIGN_GUIDELINES.md.
 - **Verbatim Prompt text:** a component shows a Prompt's title and content exactly as stored. React renders them as text; nothing sanitizes or rewrites them (`CONTEXT.md`, ADR-001).
-- **Forms:** submit with React 19's `useActionState` (`CODING_STANDARDS.md`, [REACT_19_MIGRATION.md](./REACT_19_MIGRATION.md)). Character counters read `PROMPT_LIMITS`, and storage runs Admission on save: a form never keeps its own copy of the limits or the rules.
+- **Forms:** submit with React 19's `useActionState`, as `src/components/PromptEditor.tsx` does (`CODING_STANDARDS.md`). Character counters read `PROMPT_LIMITS`, and storage runs Admission on save: a form never keeps its own copy of the limits or the rules.
 - **Memo:** `PromptCard` and `SearchBar` use a custom props comparison. Adding a prop to one of them means adding it to its comparison, or the component will not re-render when the prop changes.
 - **Accessibility:** icon-only buttons carry an `aria-label`; dialogs use `useModalFocus` (`src/hooks/useModalFocus.ts`): focus moves in, Tab wraps inside, Escape closes and the focus returns to the opener; menus are keyboard-navigable (`Dropdown` does it for you).
 
