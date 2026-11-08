@@ -309,19 +309,23 @@ try {
 ### 3. Build Manifest Resolution
 
 ```typescript
-// Robust content script file discovery
+// The loader the manifest names (assets/index.ts-loader-<hash>.js)
 private async getContentScriptFilename(): Promise<string> {
+  const contentScriptPath = chrome.runtime.getManifest().content_scripts?.[0]?.js?.[0];
+  // ... throw if the manifest declares none
   try {
-    // Try build manifest first
-    const manifest = await fetch('.vite/manifest.json');
-    // ... extract correct filename
+    await fetch(chrome.runtime.getURL(contentScriptPath));
+    return contentScriptPath;
   } catch {
-    // Fallback to common patterns
-    const fallbacks = ['assets/content.js', 'content.js'];
-    // ... try each fallback
+    // Not on disk: dist/ was rebuilt after Chrome loaded the extension
+    throw new Error(STALE_BUILD_ERROR); // "Reload it in chrome://extensions..."
   }
 }
 ```
+
+Chrome reads the manifest once, when it loads the extension. A rebuild writes the loader under a
+new hashed name, so until the extension is reloaded the manifest names a file that is gone; the
+error asks for that reload (tests/e2e/content/picker-stale-build.spec.ts).
 
 ## Testing Considerations
 

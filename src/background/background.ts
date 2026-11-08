@@ -23,6 +23,10 @@ const storageManager = StorageManager.getInstance();
 // Configuration constants
 const ORPHANED_TAB_DETECTION_WINDOW_MS = 10000; // 10 seconds after extension start
 
+// The extension files changed on disk since Chrome loaded them (a rebuild): only a reload recovers
+const STALE_BUILD_ERROR =
+  "The extension was updated on disk. Reload it in chrome://extensions, then refresh this page and try again.";
+
 /**
  * Content script injection controller
  * Handles programmatic injection of content scripts based on site enablement
@@ -531,109 +535,28 @@ export class ContentScriptInjector {
   }
 
   /**
-   * Get the correct content script filename from the extension manifest
+   * The content script loader the manifest names (crxjs writes it as assets/index.ts-loader-<hash>.js).
+   *
+   * Chrome reads the manifest once, when it loads the extension: after a rebuild that Chrome has not
+   * reloaded, the manifest still names a loader that is no longer on disk, and only a reload helps.
    */
   private async getContentScriptFilename(): Promise<string> {
-    try {
-      // Primary: Use Chrome's official API to get content script path
-      const manifest = chrome.runtime.getManifest();
-      const contentScripts = manifest.content_scripts;
-
-      if (contentScripts && contentScripts[0]?.js?.[0]) {
-        const contentScriptPath = contentScripts[0].js[0];
-
-        // Verify the file exists before returning
-        try {
-          await fetch(chrome.runtime.getURL(contentScriptPath));
-          return contentScriptPath;
-        } catch {
-          // File doesn't exist, continue to fallbacks
-          Logger.warn("Manifest content script path not accessible", {
-            component: "ContentScriptInjector",
-            contentScriptPath,
-          });
-        }
-      }
-    } catch (error) {
-      Logger.error("Failed to read manifest", toError(error), {
-        component: "ContentScriptInjector",
-      });
+    const contentScriptPath =
+      chrome.runtime.getManifest().content_scripts?.[0]?.js?.[0];
+    if (!contentScriptPath) {
+      throw new Error("The extension manifest declares no content script");
     }
 
     try {
-      // Secondary: Try to fetch the build manifest (works in development/local builds)
-      const manifestResponse = await fetch(
-        chrome.runtime.getURL(".vite/manifest.json"),
-      );
-      const buildManifest = (await manifestResponse.json()) as Record<
-        string,
-        { file?: string } | undefined
-      >;
-
-      // Look for the content script entry
-      const contentEntry = buildManifest["src/content/index.ts"];
-      if (contentEntry?.file) {
-        // Verify the file exists
-        try {
-          await fetch(chrome.runtime.getURL(contentEntry.file));
-          return contentEntry.file;
-        } catch {
-          Logger.warn("Build manifest content script not accessible", {
-            component: "ContentScriptInjector",
-            file: contentEntry.file,
-          });
-        }
-      }
-
-      // Fallback: try to find any file matching content-*.js pattern in build manifest
-      const contentFiles = Object.values(buildManifest)
-        .filter((entry): entry is { file: string } =>
-          Boolean(
-            entry?.file &&
-              entry.file.includes("content-") &&
-              entry.file.endsWith(".js"),
-          ),
-        )
-        .map((entry) => entry.file);
-
-      if (contentFiles.length > 0) {
-        try {
-          await fetch(chrome.runtime.getURL(contentFiles[0]));
-          return contentFiles[0];
-        } catch {
-          Logger.warn("Build manifest content file not accessible", {
-            component: "ContentScriptInjector",
-            file: contentFiles[0],
-          });
-        }
-      }
+      await fetch(chrome.runtime.getURL(contentScriptPath));
+      return contentScriptPath;
     } catch {
-      // .vite/manifest.json doesn't exist (expected in Chrome Web Store builds)
-      Logger.info(
-        "Build manifest not available, trying direct file discovery",
-        { component: "ContentScriptInjector" },
-      );
+      Logger.warn("Content script named by the manifest is not on disk", {
+        component: "ContentScriptInjector",
+        contentScriptPath,
+      });
+      throw new Error(STALE_BUILD_ERROR);
     }
-
-    // Tertiary: Ultimate fallback - try common patterns
-    const fallbackFiles = [
-      "assets/content.js",
-      "src/content/index.js",
-      "content.js",
-    ];
-
-    // Try each fallback in order
-    for (const file of fallbackFiles) {
-      try {
-        await fetch(chrome.runtime.getURL(file));
-        return file;
-      } catch {
-        // File doesn't exist, try next
-        continue;
-      }
-    }
-
-    throw new Error("Unable to locate content script file");
   }
 
   /**
