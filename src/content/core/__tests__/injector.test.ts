@@ -14,6 +14,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Prompt } from '../../types/index';
+import { AnchoredOverlay } from '../anchored-overlay';
 import { PromptLibraryInjector } from '../injector';
 
 // Mock all dependencies
@@ -866,6 +867,28 @@ describe('PromptLibraryInjector', () => {
   });
 
   describe('removeAllExistingIcons', () => {
+    it('releases a Floating UI icon while it is still in the document, then removes it', async () => {
+      const icon = document.createElement('button');
+      icon.classList.add('prompt-library-cleanup-target');
+      icon.setAttribute('data-positioning-method', 'floating-ui');
+      document.body.appendChild(icon);
+      let connectedAtRelease: boolean | null = null;
+      const release = vi.spyOn(AnchoredOverlay.prototype, 'release').mockImplementation((released) => {
+        if (released === icon) {
+          connectedAtRelease = released.isConnected;
+        }
+        return released === icon;
+      });
+
+      await injector.initialize();
+      injector.cleanup();
+
+      expect(release).toHaveBeenCalledWith(icon);
+      expect(connectedAtRelease).toBe(true);
+      expect(icon.isConnected).toBe(false);
+      release.mockRestore();
+    });
+
     it('should remove elements with prompt-library-cleanup-target class', async () => {
       const icon1 = document.createElement('button');
       icon1.classList.add('prompt-library-cleanup-target');

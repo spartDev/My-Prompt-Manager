@@ -636,10 +636,16 @@ export class PromptLibraryInjector {
    */
   private removeAllExistingIcons(): void {
     try {
-      // Remove icons by cleanup class selector (covers all instances)
+      // Remove icons by cleanup class selector (covers all instances). Every icon carries this class,
+      // so an icon Floating UI follows is released here, before it leaves the DOM: a later pass would not
+      // find it any more and its autoUpdate would keep running on a detached node
+      let floatingUICleanedUp = 0;
       const existingIcons = document.querySelectorAll('.prompt-library-cleanup-target');
       existingIcons.forEach(icon => {
         try {
+          if (this.overlay.release(icon as HTMLElement)) {
+            floatingUICleanedUp++;
+          }
           icon.remove();
         } catch (error) {
           // Expected errors: InvalidStateError (already removed), NotFoundError (parent changed)
@@ -735,9 +741,8 @@ export class PromptLibraryInjector {
         }
       });
 
-      // Clean up Floating UI elements and subscriptions
+      // Clean up Floating UI elements and subscriptions (icons without the cleanup class)
       const floatingUIIcons = document.querySelectorAll('[data-positioning-method="floating-ui"]');
-      let floatingUICleanedUp = 0;
       floatingUIIcons.forEach(icon => {
         try {
           // Stop the autoUpdate subscription before the icon goes
@@ -1993,6 +1998,7 @@ export class PromptLibraryInjector {
     // Clean up UI elements
     this.placement.reset();
     if (this.state.icon) {
+      this.overlay.release(this.state.icon);
       this.state.icon.remove();
       this.state.icon = null;
     }
@@ -2050,6 +2056,7 @@ export class PromptLibraryInjector {
     this.removeAllExistingIcons();
 
     if (this.state.icon) {
+      this.overlay.release(this.state.icon);
       this.state.icon.remove();
       this.state.icon = null;
     }
