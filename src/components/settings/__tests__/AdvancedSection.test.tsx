@@ -1,201 +1,193 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import AdvancedSection from '../AdvancedSection';
 
 describe('AdvancedSection', () => {
   const mockOnDebugModeChange = vi.fn();
+  const mockOnReset = vi.fn<() => Promise<void>>();
   const defaultProps = {
     debugMode: false,
     onDebugModeChange: mockOnDebugModeChange,
-    saving: false
+    saving: false,
+    onReset: mockOnReset
   };
 
   beforeEach(() => {
     mockOnDebugModeChange.mockClear();
+    mockOnReset.mockReset();
+    mockOnReset.mockResolvedValue(undefined);
   });
 
-  describe('Expand/Collapse Behavior', () => {
-    it('renders collapsed by default', () => {
+  describe('Group', () => {
+    it('is the Advanced group, open from the start', () => {
       render(<AdvancedSection {...defaultProps} />);
 
-      expect(screen.getByText('Advanced')).toBeInTheDocument();
-      expect(screen.queryByText('Developer Options')).not.toBeInTheDocument();
-    });
-
-    it('expands when header is clicked', () => {
-      render(<AdvancedSection {...defaultProps} />);
-
-      const expandButton = screen.getByRole('button', { expanded: false });
-      fireEvent.click(expandButton);
-
-      expect(screen.getByText('Developer Options')).toBeInTheDocument();
-      expect(screen.getByText('Debug Mode')).toBeInTheDocument();
-    });
-
-    it('collapses when header is clicked again', () => {
-      render(<AdvancedSection {...defaultProps} />);
-
-      const expandButton = screen.getByRole('button', { expanded: false });
-
-      // Expand
-      fireEvent.click(expandButton);
-      expect(screen.getByText('Developer Options')).toBeInTheDocument();
-
-      // Collapse
-      fireEvent.click(expandButton);
-      expect(screen.queryByText('Developer Options')).not.toBeInTheDocument();
-    });
-
-    it('has correct aria-expanded attribute', () => {
-      render(<AdvancedSection {...defaultProps} />);
-
-      const expandButton = screen.getByRole('button', { expanded: false });
-      expect(expandButton).toHaveAttribute('aria-expanded', 'false');
-
-      fireEvent.click(expandButton);
-      expect(expandButton).toHaveAttribute('aria-expanded', 'true');
+      expect(screen.getByRole('region', { name: 'Advanced' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 2, name: 'Advanced' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { expanded: false })).not.toBeInTheDocument();
+      expect(screen.getByRole('switch', { name: 'Debug mode' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Reset to Defaults' })).toBeInTheDocument();
     });
   });
 
-  describe('Debug Mode Toggle', () => {
-    it('renders debug mode toggle switch', () => {
-      render(<AdvancedSection {...defaultProps} />);
+  describe('Debug mode', () => {
+    it('reflects debugMode', () => {
+      const { rerender } = render(<AdvancedSection {...defaultProps} />);
+      expect(screen.getByRole('switch', { name: 'Debug mode' })).toHaveAttribute('aria-checked', 'false');
 
-      fireEvent.click(screen.getByRole('button', { expanded: false }));
-
-      expect(screen.getByRole('switch', { name: /debug mode/i })).toBeInTheDocument();
+      rerender(<AdvancedSection {...defaultProps} debugMode={true} />);
+      expect(screen.getByRole('switch', { name: 'Debug mode' })).toHaveAttribute('aria-checked', 'true');
     });
 
-    it('shows toggle as unchecked when debugMode is false', () => {
-      render(<AdvancedSection {...defaultProps} />);
+    it('asks for the opposite state', () => {
+      const { rerender } = render(<AdvancedSection {...defaultProps} />);
+      fireEvent.click(screen.getByRole('switch', { name: 'Debug mode' }));
+      expect(mockOnDebugModeChange).toHaveBeenLastCalledWith(true);
 
-      fireEvent.click(screen.getByRole('button', { expanded: false }));
-
-      const toggle = screen.getByRole('switch', { name: /debug mode/i });
-      expect(toggle).toHaveAttribute('aria-checked', 'false');
+      rerender(<AdvancedSection {...defaultProps} debugMode={true} />);
+      fireEvent.click(screen.getByRole('switch', { name: 'Debug mode' }));
+      expect(mockOnDebugModeChange).toHaveBeenLastCalledWith(false);
     });
 
-    it('shows toggle as checked when debugMode is true', () => {
-      render(<AdvancedSection {...defaultProps} debugMode={true} />);
-
-      fireEvent.click(screen.getByRole('button', { expanded: false }));
-
-      const toggle = screen.getByRole('switch', { name: /debug mode/i });
-      expect(toggle).toHaveAttribute('aria-checked', 'true');
-    });
-
-    it('calls onDebugModeChange when toggle is clicked', () => {
-      render(<AdvancedSection {...defaultProps} />);
-
-      fireEvent.click(screen.getByRole('button', { expanded: false }));
-
-      const toggle = screen.getByRole('switch', { name: /debug mode/i });
-      fireEvent.click(toggle);
-
-      expect(mockOnDebugModeChange).toHaveBeenCalledWith(true);
-    });
-
-    it('calls onDebugModeChange with false when toggle is already on', () => {
-      render(<AdvancedSection {...defaultProps} debugMode={true} />);
-
-      fireEvent.click(screen.getByRole('button', { expanded: false }));
-
-      const toggle = screen.getByRole('switch', { name: /debug mode/i });
-      fireEvent.click(toggle);
-
-      expect(mockOnDebugModeChange).toHaveBeenCalledWith(false);
-    });
-  });
-
-  describe('Debug Mode Status Message', () => {
-    it('does not show debug status message when debugMode is false', () => {
-      render(<AdvancedSection {...defaultProps} />);
-
-      fireEvent.click(screen.getByRole('button', { expanded: false }));
-
+    it('says debug logging is active only while it is on', () => {
+      const { rerender } = render(<AdvancedSection {...defaultProps} />);
       expect(screen.queryByText(/debug logging is now active/i)).not.toBeInTheDocument();
-    });
 
-    it('shows debug status message when debugMode is true', () => {
-      render(<AdvancedSection {...defaultProps} debugMode={true} />);
-
-      fireEvent.click(screen.getByRole('button', { expanded: false }));
-
+      rerender(<AdvancedSection {...defaultProps} debugMode={true} />);
       expect(screen.getByText(/debug logging is now active/i)).toBeInTheDocument();
     });
-  });
 
-  describe('Disabled State (Saving)', () => {
-    it('disables toggle when saving is true', () => {
+    it('cannot change while Settings saves', () => {
       render(<AdvancedSection {...defaultProps} saving={true} />);
 
-      fireEvent.click(screen.getByRole('button', { expanded: false }));
-
-      const toggle = screen.getByRole('switch', { name: /debug mode/i });
+      const toggle = screen.getByRole('switch', { name: 'Debug mode' });
       expect(toggle).toBeDisabled();
-    });
-
-    it('toggle is enabled when saving is false', () => {
-      render(<AdvancedSection {...defaultProps} saving={false} />);
-
-      fireEvent.click(screen.getByRole('button', { expanded: false }));
-
-      const toggle = screen.getByRole('switch', { name: /debug mode/i });
-      expect(toggle).not.toBeDisabled();
-    });
-
-    it('does not call onDebugModeChange when toggle is disabled', () => {
-      render(<AdvancedSection {...defaultProps} saving={true} />);
-
-      fireEvent.click(screen.getByRole('button', { expanded: false }));
-
-      const toggle = screen.getByRole('switch', { name: /debug mode/i });
       fireEvent.click(toggle);
-
       expect(mockOnDebugModeChange).not.toHaveBeenCalled();
     });
   });
 
-  describe('Section Content', () => {
-    it('displays section subtitle', () => {
+  describe('Reset Confirmation Flow', () => {
+    it('shows Reset to Defaults button initially', () => {
       render(<AdvancedSection {...defaultProps} />);
 
-      expect(screen.getByText('Developer and advanced options')).toBeInTheDocument();
+
+      expect(screen.getByRole('button', { name: /reset to defaults/i })).toBeInTheDocument();
+      expect(screen.queryByText(/this will reset all settings/i)).not.toBeInTheDocument();
     });
 
-    it('displays debug mode description', () => {
+    it('shows confirmation dialog when Reset to Defaults is clicked', () => {
       render(<AdvancedSection {...defaultProps} />);
 
-      fireEvent.click(screen.getByRole('button', { expanded: false }));
+      fireEvent.click(screen.getByRole('button', { name: /reset to defaults/i }));
 
-      expect(screen.getByText(/enable console logging for development/i)).toBeInTheDocument();
+      expect(screen.getByText(/this will reset all settings to defaults/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /yes, reset settings/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument();
     });
 
-    it('displays help tooltip icon', () => {
+    it('hides confirmation dialog when Cancel is clicked', () => {
       render(<AdvancedSection {...defaultProps} />);
 
-      fireEvent.click(screen.getByRole('button', { expanded: false }));
+      fireEvent.click(screen.getByRole('button', { name: /reset to defaults/i }));
 
-      // The tooltip text should be in the DOM (even if visually hidden until hover)
-      expect(screen.getByText(/enable detailed console logging for debugging/i)).toBeInTheDocument();
+      // Confirmation visible
+      expect(screen.getByText(/this will reset all settings/i)).toBeInTheDocument();
+
+      // Cancel
+      fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
+
+      // Confirmation hidden
+      expect(screen.queryByText(/this will reset all settings/i)).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /reset to defaults/i })).toBeInTheDocument();
+    });
+
+    it('calls onReset when confirm button is clicked', async () => {
+      render(<AdvancedSection {...defaultProps} />);
+
+      fireEvent.click(screen.getByRole('button', { name: /reset to defaults/i }));
+      fireEvent.click(screen.getByRole('button', { name: /yes, reset settings/i }));
+
+      await waitFor(() => {
+        expect(mockOnReset).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    it('shows "Resetting..." text while reset is in progress', async () => {
+      const resolver = { resolve: () => { /* replaced by the pending reset's resolve */ } };
+      mockOnReset.mockImplementation(() => new Promise<void>((resolve) => {
+        resolver.resolve = resolve;
+      }));
+
+      render(<AdvancedSection {...defaultProps} />);
+
+      fireEvent.click(screen.getByRole('button', { name: /reset to defaults/i }));
+      fireEvent.click(screen.getByRole('button', { name: /yes, reset settings/i }));
+
+      // Should show "Resetting..." while in progress
+      expect(screen.getByText('Resetting...')).toBeInTheDocument();
+
+      // Resolve the promise
+      resolver.resolve();
+
+      await waitFor(() => {
+        expect(screen.queryByText('Resetting...')).not.toBeInTheDocument();
+      });
+    });
+
+    it('disables buttons while reset is in progress', async () => {
+      const resolver = { resolve: () => { /* replaced by the pending reset's resolve */ } };
+      mockOnReset.mockImplementation(() => new Promise<void>((resolve) => {
+        resolver.resolve = resolve;
+      }));
+
+      render(<AdvancedSection {...defaultProps} />);
+
+      fireEvent.click(screen.getByRole('button', { name: /reset to defaults/i }));
+      fireEvent.click(screen.getByRole('button', { name: /yes, reset settings/i }));
+
+      // Both buttons should be disabled
+      expect(screen.getByText('Resetting...')).toBeDisabled();
+      expect(screen.getByRole('button', { name: /cancel/i })).toBeDisabled();
+
+      // Resolve the promise
+      resolver.resolve();
+
+      await waitFor(() => {
+        expect(screen.queryByText('Resetting...')).not.toBeInTheDocument();
+      });
+    });
+
+    it('hides confirmation after successful reset', async () => {
+      render(<AdvancedSection {...defaultProps} />);
+
+      fireEvent.click(screen.getByRole('button', { name: /reset to defaults/i }));
+      fireEvent.click(screen.getByRole('button', { name: /yes, reset settings/i }));
+
+      await waitFor(() => {
+        expect(screen.queryByText(/this will reset all settings/i)).not.toBeInTheDocument();
+      });
+
+      expect(screen.getByRole('button', { name: /reset to defaults/i })).toBeInTheDocument();
+    });
+
+    it('handles reset error gracefully', async () => {
+      mockOnReset.mockRejectedValue(new Error('Reset failed'));
+
+      render(<AdvancedSection {...defaultProps} />);
+
+      fireEvent.click(screen.getByRole('button', { name: /reset to defaults/i }));
+      fireEvent.click(screen.getByRole('button', { name: /yes, reset settings/i }));
+
+      // Should recover from error and not crash
+      await waitFor(() => {
+        expect(screen.queryByText('Resetting...')).not.toBeInTheDocument();
+      });
+
+      // Confirmation should still be visible after error (not auto-hidden)
+      expect(screen.getByText(/this will reset all settings/i)).toBeInTheDocument();
     });
   });
 
-  describe('Accessibility', () => {
-    it('has proper heading structure', () => {
-      render(<AdvancedSection {...defaultProps} />);
-
-      expect(screen.getByRole('heading', { name: /advanced/i })).toBeInTheDocument();
-    });
-
-    it('has accessible label for toggle switch', () => {
-      render(<AdvancedSection {...defaultProps} />);
-
-      fireEvent.click(screen.getByRole('button', { expanded: false }));
-
-      const toggle = screen.getByRole('switch', { name: /debug mode/i });
-      expect(toggle).toBeInTheDocument();
-    });
-  });
 });

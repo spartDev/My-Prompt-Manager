@@ -1,12 +1,9 @@
 import type { FC } from 'react';
 
 import type { SortOrder } from '../../types';
-import { SortIcon } from '../icons/SettingsIcons';
 
-import SettingsSection from './SettingsSection';
-
-// Hoisted static JSX - avoids recreation on every render
-const LibraryIcon = <SortIcon className="w-5 h-5" />;
+import SettingsGroup from './SettingsGroup';
+import SettingsRow from './SettingsRow';
 
 // Each sort has one direction (NATURAL_SORT_DIRECTION)
 const SORT_OPTIONS: Array<{ value: SortOrder; label: string }> = [
@@ -23,38 +20,27 @@ interface LibrarySectionProps {
   disabled?: boolean;
 }
 
-const LibrarySection: FC<LibrarySectionProps> = ({ sortOrder, onSortOrderChange, disabled = false }) => {
-  return (
-    <SettingsSection
-      icon={LibraryIcon}
-      title="Library"
-      description="Choose how the Library orders your prompts"
-    >
-      <div className="bg-card rounded-xl p-4 border border-default">
-        <label
-          htmlFor="library-sort-order"
-          className="block font-medium text-primary text-sm mb-2"
-        >
-          Sort prompts by
-        </label>
+/** The Library group: how the Library orders the Prompts */
+const LibrarySection: FC<LibrarySectionProps> = ({ sortOrder, onSortOrderChange, disabled = false }) => (
+  <SettingsGroup label="Library">
+    <SettingsRow
+      label="Sort prompts by"
+      labelFor="library-sort-order"
+      control={
         <select
           id="library-sort-order"
           value={sortOrder}
           disabled={disabled}
           onChange={(e) => { onSortOrderChange(e.target.value as SortOrder); }}
-          aria-describedby="library-sort-order-hint"
-          className="w-full px-3 py-2 text-sm border border-input rounded-lg bg-subtle text-primary focus-input disabled:opacity-50 disabled:cursor-not-allowed"
+          className="h-[34px] max-w-[186px] pl-3 pr-2 text-[12.5px] font-semibold border border-input rounded-full bg-subtle text-primary focus-input cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {SORT_OPTIONS.map(option => (
             <option key={option.value} value={option.value}>{option.label}</option>
           ))}
         </select>
-        <p id="library-sort-order-hint" className="text-xs text-tertiary mt-2">
-          Pinned prompts stay on top. Most Used always ranks by number of uses.
-        </p>
-      </div>
-    </SettingsSection>
-  );
-};
+      }
+    />
+  </SettingsGroup>
+);
 
 export default LibrarySection;

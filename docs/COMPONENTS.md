@@ -49,19 +49,20 @@ Which component does which job in the popup and the side panel, and the conventi
 | `src/components/ConfirmDialog.tsx` | Confirmation modal; its `variant` sets the confirm button's color |
 | `src/components/ToastContainer.tsx` | Renders the one Notification of `useToast`, as the top-center pill |
 | `src/components/StorageWarning.tsx` | "Storage Limit Reached": App opens it when storage refuses a save (`STORAGE_QUOTA_EXCEEDED`); usage is shown through `describeStorageUsage`, like the Settings storage bar |
-| `src/components/InterfaceModeSelector.tsx` | Popup or side panel |
 | `src/components/ErrorBoundary.tsx` | Catches a render error and shows a fallback instead of a blank popup |
 
 ### Settings
 
 | Component | Job |
 |-----------|-----|
-| `src/components/settings/SettingsSection.tsx` | The frame of every Settings section |
-| `src/components/settings/ToggleSwitch.tsx` | The switch for every boolean setting |
-| `src/components/settings/AppearanceSection.tsx`, `LibrarySection.tsx`, `NotificationSection.tsx`, `AdvancedSection.tsx`, `AboutSection.tsx` | One Settings section each |
-| `src/components/settings/DataStorageSection.tsx` | Storage use, Backup export (`handleExport` builds and writes the file; off while the Library cannot be read, so no empty Backup is saved), the restore file picker, Clear All Data |
+| `src/components/settings/SettingsGroup.tsx` | A Settings group: its label, then one card that holds its rows |
+| `src/components/settings/SettingsRow.tsx` | One setting in a group: label (and grey detail) at the left, control at the right, an optional status or confirmation under it |
+| `src/components/settings/SegmentedControl.tsx` | A choice among two or three options (theme, popup or side panel): a radio group with a sliding puck |
+| `src/components/settings/Switch.tsx` | The switch for every boolean setting, named by its row's label |
+| `src/components/settings/AppearanceSection.tsx`, `LibrarySection.tsx`, `NotificationSection.tsx`, `HelpSection.tsx`, `AdvancedSection.tsx` | One Settings group each (Advanced holds the reset) |
+| `src/components/settings/DataStorageSection.tsx` | The Your data group: storage use, Backup export (`handleExport` builds and writes the file; off while the Library cannot be read, so no empty Backup is saved), the restore file picker, Clear All Data |
 | `src/components/settings/SiteIntegrationSection.tsx` | Platforms and custom sites: lists, add flow, element picker, import and export of a site configuration |
-| `src/components/settings/SiteCard.tsx` | One Platform or custom site, with its switch |
+| `src/components/settings/SiteRow.tsx` | One Platform or custom site: logo, name, domain and switch; a custom site's Export and Remove in its ⋯ menu |
 
 ### Analytics charts
 
@@ -81,7 +82,7 @@ Imported from `src/components/analytics/index.ts`. Each chart takes its data fro
 ## Adding a component
 
 1. Put it in the folder of its area (table above), with an explicit Props interface at the top of the file.
-2. Reuse `Dropdown`, `ConfirmDialog`, `ToggleSwitch`, `ViewHeader` rather than building another menu, dialog, switch or header.
+2. Reuse `Dropdown`, `ConfirmDialog`, `Switch`, `SegmentedControl`, `ViewHeader` rather than building another menu, dialog, switch or header.
 3. Style it with the token classes and the patterns of [DESIGN_GUIDELINES.md](./DESIGN_GUIDELINES.md) ("Component Patterns").
 4. Test it in a `__tests__/` folder next to it ([TESTING.md](./TESTING.md)). If it is on the tokens, add it to `MIGRATED` in `src/theme/__tests__/rawColors.test.ts`.
 5. Add a row to the table of this page: one line on its job, no Props.

@@ -1,4 +1,4 @@
-import type { FC, ReactNode } from 'react';
+import type { FC } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import manifest from '../../manifest.json';
@@ -12,20 +12,15 @@ import type { ShowToast, ToastSettings } from '../types/hooks';
 import { formatCount, Logger, toError } from '../utils';
 
 import { ChatGPTIcon, ClaudeIcon, CopilotIcon, GeminiIcon, MistralIcon, PerplexityIcon } from './icons/SiteIcons';
-import AboutSection from './settings/AboutSection';
 import AdvancedSection from './settings/AdvancedSection';
 import AppearanceSection from './settings/AppearanceSection';
 import DataStorageSection, { type ImportReport } from './settings/DataStorageSection';
+import HelpSection from './settings/HelpSection';
 import LibrarySection from './settings/LibrarySection';
 import NotificationSection from './settings/NotificationSection';
 import SiteIntegrationSection from './settings/SiteIntegrationSection';
+import type { SiteConfig } from './settings/SupportedSitesList';
 import ViewHeader from './ViewHeader';
-
-interface SiteConfig {
-  name: string;
-  description: string;
-  icon: (isEnabled: boolean) => ReactNode;
-}
 
 interface CustomSite {
   hostname: string;
@@ -58,8 +53,6 @@ interface SettingsViewProps {
   /** Opens the storage warning with why storage refused the import */
   onStorageRefused: (reason: string) => void;
 }
-
-const SectionSeparator: FC = () => <hr className="border-default" />;
 
 const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toastSettings, onToastSettingsChange, onStorageRefused }) => {
   const [settings, setSettings] = useState<Settings>({
@@ -94,35 +87,30 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
   // Only settings that differ from them are saved and sent to the tabs.
   const storedSettings = useRef<Settings | null>(null);
 
+  // The Platforms, in the order the AI sites group lists them
   const siteConfigs: Record<string, SiteConfig> = useMemo(() => ({
-    'www.perplexity.ai': {
-      name: 'Perplexity',
-      description: 'AI-powered search engine',
-      icon: (isEnabled: boolean) => <PerplexityIcon disabled={!isEnabled} />
-    },
     'claude.ai': {
       name: 'Claude',
-      description: 'Anthropic\'s AI assistant',
       icon: (isEnabled: boolean) => <ClaudeIcon disabled={!isEnabled} />
     },
     'chatgpt.com': {
       name: 'ChatGPT',
-      description: 'OpenAI\'s conversational AI',
       icon: (isEnabled: boolean) => <ChatGPTIcon disabled={!isEnabled} />
     },
     'gemini.google.com': {
       name: 'Google Gemini',
-      description: 'Google\'s AI assistant',
       icon: (isEnabled: boolean) => <GeminiIcon disabled={!isEnabled} />
     },
     'chat.mistral.ai': {
       name: 'Mistral AI',
-      description: 'Mistral\'s conversational AI',
       icon: (isEnabled: boolean) => <MistralIcon disabled={!isEnabled} />
+    },
+    'www.perplexity.ai': {
+      name: 'Perplexity',
+      icon: (isEnabled: boolean) => <PerplexityIcon disabled={!isEnabled} />
     },
     'copilot.microsoft.com': {
       name: 'Microsoft Copilot',
-      description: 'Microsoft\'s AI assistant',
       icon: (isEnabled: boolean) => <CopilotIcon disabled={!isEnabled} className="scale-75" />
     }
   }), []);
@@ -495,7 +483,7 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
       // one-line Notification cannot hold
       const reason = error instanceof Error ? error.message : 'Unknown error occurred';
       setImportReport({ skipped, stopped: { imported: imported.prompts, total, reason } });
-      showToast('Import stopped', 'error', { sub: `${count} imported. See Backup & Restore.` });
+      showToast('Import stopped', 'error', { sub: `${count} imported. See Your data.` });
       return;
     }
 
@@ -506,9 +494,9 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
     if (skipped.length === 0) {
       showToast('Backup imported', 'success', { sub: summary });
     } else {
-      // Every skipped title and reason stays in Backup & Restore: a Notification shows one line
+      // Every skipped title and reason stays in Your data: a Notification shows one line
       setImportReport({ skipped });
-      showToast(`Skipped ${skipped.length.toString()}`, 'warning', { sub: `Imported ${summary}. See Backup & Restore.` });
+      showToast(`Skipped ${skipped.length.toString()}`, 'warning', { sub: `Imported ${summary}. See Your data.` });
     }
   };
 
@@ -622,24 +610,20 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
 
   return (
     <div className="h-full flex flex-col bg-app">
-      {/* Header */}
-      <ViewHeader
-        icon="settings"
-        title="Settings"
-        subtitle="Customize your experience"
-        context={context}
-      >
+      {/* Header (Atelier 1C): the version over the title. The side panel keeps its close button */}
+      <header className="shrink-0 bg-app flex items-start justify-between gap-3 px-5 pt-4 pb-2 border-b border-transparent scroll-edge-top">
+        <div>
+          <p className="text-[12.5px] font-semibold text-tertiary">My Prompt Manager {manifest.version}</p>
+          <h1 className="text-[27px] font-extrabold leading-[1.05] tracking-[-0.035em] text-primary">Settings</h1>
+        </div>
         {context === 'sidepanel' && (
-          <ViewHeader.Actions>
-            <ViewHeader.CloseButton onClick={() => { window.close(); }} context="sidepanel" />
-          </ViewHeader.Actions>
+          <ViewHeader.CloseButton onClick={() => { window.close(); }} context="sidepanel" />
         )}
-      </ViewHeader>
+      </header>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto p-6" data-scroll-container>
-        <div className="max-w-4xl mx-auto space-y-8">
-          {/* Appearance Section */}
+      {/* Settings groups */}
+      <div className="flex-1 overflow-y-auto" data-scroll-container>
+        <div className="max-w-2xl mx-auto flex flex-col gap-[18px] p-4">
           <AppearanceSection
             interfaceMode={interfaceMode}
             onInterfaceModeChange={handleInterfaceModeChangeCallback}
@@ -647,17 +631,11 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
             interfaceModeChanging={interfaceModeChanging}
           />
 
-          <SectionSeparator />
-
-          {/* Library Section */}
           <LibrarySection
             sortOrder={userSettings?.sortOrder ?? DEFAULT_SETTINGS.sortOrder}
             onSortOrderChange={handleSortOrderChange}
           />
 
-          <SectionSeparator />
-
-          {/* Site Integration Section */}
           <SiteIntegrationSection
             enabledSites={settings.enabledSites}
             customSites={settings.customSites}
@@ -671,9 +649,6 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
             onShowToast={showToast}
           />
 
-          <SectionSeparator />
-
-          {/* Data & Storage Section */}
           <DataStorageSection
             prompts={prompts}
             categories={categories}
@@ -686,22 +661,17 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
             onShowToast={showToast}
           />
 
-          {/* Notification Settings Section */}
           <NotificationSection
             settings={toastSettings}
             onEnabledChange={handleNotificationsChange}
           />
 
-          {/* Advanced Section */}
+          <HelpSection />
+
           <AdvancedSection
             debugMode={settings.debugMode}
             onDebugModeChange={handleDebugModeChangeCallback}
             saving={saving}
-          />
-
-          {/* About & Reset Section */}
-          <AboutSection
-            version={manifest.version}
             onReset={handleResetSettings}
           />
         </div>

@@ -5,9 +5,14 @@ import type {} from '../../types/file-system-access-api';
 import type { ShowToast } from '../../types/hooks';
 import { findInvalidImportCategory, findInvalidImportPrompt, formatCount, Logger, toError } from '../../utils';
 import { describeStorageUsage } from '../../utils/storageQuota';
-import { DatabaseIcon, ExportIcon, ImportIcon } from '../icons/SettingsIcons';
+import { ExportIcon, ImportIcon } from '../icons/SettingsIcons';
 
-import SettingsSection from './SettingsSection';
+import { ROW_BUTTON_CLASSES } from './rowStyles';
+import SettingsGroup from './SettingsGroup';
+import SettingsRow from './SettingsRow';
+
+/** Export and Import: secondary pills, 40px high */
+const DATA_BUTTON_CLASSES = 'h-10 flex items-center justify-center gap-2 rounded-full border-[1.5px] border-strong bg-card text-sm font-semibold text-secondary hover:bg-muted transition-colors focus-secondary disabled:opacity-50 disabled:cursor-not-allowed';
 
 /**
  * What the last import left to read at the user's pace: every item it skipped and why, and why it
@@ -196,180 +201,163 @@ const DataStorageSection: FC<DataStorageSectionProps> = ({
   const usage = storageUsage ? describeStorageUsage(storageUsage.used, storageUsage.total) : null;
 
   return (
-    <SettingsSection
-      icon={<DatabaseIcon />}
-      title="Data & Storage"
-      description="Manage your prompts and storage"
-    >
-      <div className="space-y-4">
-        {/* Storage Usage */}
-        <div className="bg-card rounded-xl p-4 border border-default">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="font-medium text-primary text-sm">
-              Storage Usage
-            </h3>
-            {usage && (
-              <span className="text-xs text-tertiary">
-                {usage.used} / {usage.total} ({usage.percentage}%)
-              </span>
+    <SettingsGroup label="Your data">
+      {/* Storage: what Chrome stores, and what the Library holds */}
+      <SettingsRow
+        label="Stored on this device"
+        control={usage && (
+          <span className="text-[12.5px] font-semibold text-tertiary">
+            {usage.used} of {usage.total}
+          </span>
+        )}
+      >
+        <div data-testid="storage-bar" role="progressbar" aria-valuenow={usage?.percentage} aria-valuemin={0} aria-valuemax={100} aria-label="Storage usage" className="mt-2 w-full h-2 bg-subtle rounded-full overflow-hidden">
+          {/* Grows from the left once, on arrival; then follows each write */}
+          <div
+            className="h-full bg-accent rounded-full origin-left animate-fill-grow transition-[width] duration-(--duration-track)"
+            style={{ width: `${String(usage?.percentage ?? 0)}%` }}
+          />
+        </div>
+        {libraryUnavailable ? (
+          <p className="mt-2 text-xs font-medium text-danger">The Library could not be read</p>
+        ) : (
+          <p className="mt-2 text-[11.5px] text-tertiary">
+            {formatCount(prompts.length, 'prompt', 'prompts')} · {formatCount(categories.length, 'category', 'categories')}
+          </p>
+        )}
+      </SettingsRow>
+
+      {/* Backup: Export and Import */}
+      <div className="py-2.5 pr-2.5 pl-3.5">
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => void handleExport()}
+            disabled={libraryUnavailable}
+            aria-describedby={libraryUnavailable ? exportHintId : undefined}
+            className={DATA_BUTTON_CLASSES}
+          >
+            <ExportIcon />
+            Export
+          </button>
+          <button
+            type="button"
+            onClick={handleImportClick}
+            aria-disabled={importing}
+            className={`${DATA_BUTTON_CLASSES} aria-disabled:opacity-50 aria-disabled:cursor-not-allowed`}
+          >
+            {importing ? (
+              <>
+                <span aria-hidden="true" className="size-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                Importing...
+              </>
+            ) : (
+              <>
+                <ImportIcon />
+                Import
+              </>
+            )}
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json"
+            onChange={(e) => void handleFileChange(e)}
+            className="hidden"
+          />
+        </div>
+        {libraryUnavailable && (
+          <p id={exportHintId} className="mt-2 text-xs text-danger">
+            Export is off: the Library could not be read. Leave Settings and open it again to retry.
+          </p>
+        )}
+
+        {importReport && (
+          <div
+            role="status"
+            aria-label="Import report"
+            className={`mt-3 rounded-lg border p-3 text-xs ${importReport.stopped ? 'bg-danger-subtle border-danger' : 'bg-warning-subtle border-warning'}`}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="space-y-1">
+                {importReport.stopped && (
+                  <>
+                    <p className="font-medium text-danger">
+                      The import stopped: {importReport.stopped.imported} of {formatCount(importReport.stopped.total, 'prompt was', 'prompts were')} imported.
+                    </p>
+                    <p className="text-primary break-words">{importReport.stopped.reason}</p>
+                  </>
+                )}
+                {importReport.skipped.length > 0 && (
+                  <p className="font-medium text-warning">
+                    Skipped {formatCount(importReport.skipped.length, 'item', 'items')}
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={onDismissImportReport}
+                aria-label="Dismiss import report"
+                className="shrink-0 rounded p-0.5 text-secondary hover:text-primary focus-secondary"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            {importReport.skipped.length > 0 && (
+              <ul className="mt-2 space-y-1.5 max-h-48 overflow-y-auto">
+                {importReport.skipped.map((item) => (
+                  <li key={item.key} className="break-words text-secondary">
+                    <span className="font-medium text-primary">&quot;{item.label}&quot;</span>
+                    {' '}
+                    <span>{item.reason}</span>
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
-          <div data-testid="storage-bar" role="progressbar" aria-valuenow={usage?.percentage} aria-valuemin={0} aria-valuemax={100} aria-label="Storage usage" className="w-full bg-subtle rounded-full h-2 overflow-hidden">
-            <div
-              className="h-full bg-accent transition-all duration-300"
-              style={{ width: `${String(usage?.percentage ?? 0)}%` }}
-            />
-          </div>
-          {libraryUnavailable ? (
-            <p className="mt-2 text-xs font-medium text-danger">The Library could not be read</p>
-          ) : (
-            <div className="mt-2 flex items-center justify-between text-xs text-secondary">
-              <span>{formatCount(prompts.length, 'prompt', 'prompts')}</span>
-              <span>{formatCount(categories.length, 'category', 'categories')}</span>
-            </div>
-          )}
-        </div>
-
-        {/* Export/Import */}
-        <div className="bg-card rounded-xl p-4 border border-default">
-          <h3 className="font-medium text-primary text-sm mb-3">
-            Backup & Restore
-          </h3>
-          <div className="flex gap-2">
-            <button
-              onClick={() => void handleExport()}
-              disabled={libraryUnavailable}
-              aria-describedby={exportHintId}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover text-on-accent rounded-lg transition-all duration-200 focus-primary disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-accent"
-            >
-              <ExportIcon />
-              <span className="text-sm font-medium">Export</span>
-            </button>
-            
-            <button
-              onClick={handleImportClick}
-              aria-disabled={importing}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-card text-secondary border border-strong rounded-lg hover:bg-muted transition-all duration-200 focus-secondary aria-disabled:opacity-50 aria-disabled:cursor-not-allowed"
-            >
-              {importing ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                  <span className="text-sm font-medium">Importing...</span>
-                </>
-              ) : (
-                <>
-                  <ImportIcon />
-                  <span className="text-sm font-medium">Import</span>
-                </>
-              )}
-            </button>
-            
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".json"
-              onChange={(e) => void handleFileChange(e)}
-              className="hidden"
-            />
-          </div>
-          <p id={exportHintId} className={`mt-2 text-xs ${libraryUnavailable ? 'text-danger' : 'text-tertiary'}`}>
-            {libraryUnavailable
-              ? 'Export is off: the Library could not be read. Leave Settings and open it again to retry.'
-              : 'Export your prompts as JSON for backup or sharing'}
-          </p>
-
-          {importReport && (
-            <div
-              role="status"
-              aria-label="Import report"
-              className={`mt-3 rounded-lg border p-3 text-xs ${importReport.stopped ? 'bg-danger-subtle border-danger' : 'bg-warning-subtle border-warning'}`}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="space-y-1">
-                  {importReport.stopped && (
-                    <>
-                      <p className="font-medium text-danger">
-                        The import stopped: {importReport.stopped.imported} of {formatCount(importReport.stopped.total, 'prompt was', 'prompts were')} imported.
-                      </p>
-                      <p className="text-primary break-words">{importReport.stopped.reason}</p>
-                    </>
-                  )}
-                  {importReport.skipped.length > 0 && (
-                    <p className="font-medium text-warning">
-                      Skipped {formatCount(importReport.skipped.length, 'item', 'items')}
-                    </p>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={onDismissImportReport}
-                  aria-label="Dismiss import report"
-                  className="shrink-0 rounded p-0.5 text-secondary hover:text-primary focus-secondary"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-              {importReport.skipped.length > 0 && (
-                <ul className="mt-2 space-y-1.5 max-h-48 overflow-y-auto">
-                  {importReport.skipped.map((item) => (
-                    <li key={item.key} className="break-words text-secondary">
-                      <span className="font-medium text-primary">&quot;{item.label}&quot;</span>
-                      {' '}
-                      <span>{item.reason}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Clear Data */}
-        <div className="bg-card rounded-xl p-4 border border-default">
-          <h3 className="font-medium text-primary text-sm mb-2">
-            Clear Data
-          </h3>
-          <p className="text-xs text-secondary mb-3">
-            Remove all prompts and categories from local storage
-          </p>
-          
-          {showClearConfirm ? (
-            <div className="space-y-3">
-              <div className="p-3 bg-danger-subtle border border-danger rounded-lg">
-                <p className="text-sm text-danger">
-                  ⚠️ This will permanently delete all your prompts and categories. This action cannot be undone.
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => void handleClearData()}
-                  disabled={clearing}
-                  className="flex-1 px-4 py-2 bg-danger hover:bg-danger-hover text-on-accent rounded-lg transition-all duration-200 focus-danger disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {clearing ? 'Clearing...' : 'Yes, Clear All Data'}
-                </button>
-                <button
-                  onClick={() => { setShowClearConfirm(false); }}
-                  disabled={clearing}
-                  className="flex-1 px-4 py-2 bg-card text-secondary border border-strong rounded-lg hover:bg-muted transition-all duration-200 focus-secondary"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          ) : (
-            <button
-              onClick={() => void handleClearData()}
-              className="px-4 py-2 text-danger border border-danger rounded-lg hover:bg-danger-subtle transition-all duration-200 focus-danger"
-            >
-              Clear All Data
-            </button>
-          )}
-        </div>
+        )}
       </div>
-    </SettingsSection>
+
+      {/* Clear all data: deletes every Prompt and Category, after a confirmation */}
+      <SettingsRow
+        label={<span className="text-danger">Clear all data</span>}
+        control={showClearConfirm ? undefined : (
+          <button type="button" onClick={() => void handleClearData()} className={ROW_BUTTON_CLASSES}>
+            Clear All Data
+          </button>
+        )}
+      >
+        {showClearConfirm && (
+          <div className="mt-2 space-y-2">
+            <div className="p-3 bg-danger-subtle border border-danger rounded-lg">
+              <p className="text-sm text-danger">
+                ⚠️ This will permanently delete all your prompts and categories. This action cannot be undone.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => void handleClearData()}
+                disabled={clearing}
+                className="flex-1 h-10 px-4 bg-danger hover:bg-danger-hover text-on-accent text-sm font-semibold rounded-full transition-colors focus-danger disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {clearing ? 'Clearing...' : 'Yes, Clear All Data'}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowClearConfirm(false); }}
+                disabled={clearing}
+                className="flex-1 h-10 px-4 bg-card text-secondary text-sm font-semibold border-[1.5px] border-strong rounded-full hover:bg-muted transition-colors focus-secondary"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </SettingsRow>
+    </SettingsGroup>
   );
 };
 

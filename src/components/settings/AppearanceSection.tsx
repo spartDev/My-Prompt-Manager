@@ -1,23 +1,20 @@
 import { type FC, useId } from 'react';
 
 import { useThemeContext } from '../../contexts/ThemeContext';
-import { useRadioGroup } from '../../hooks/useRadioGroup';
-import InterfaceModeSelector from '../InterfaceModeSelector';
 
-import SettingsSection from './SettingsSection';
+import SegmentedControl from './SegmentedControl';
+import SettingsGroup from './SettingsGroup';
+import SettingsRow from './SettingsRow';
 
-// Hoisted static JSX - avoids recreation on every render
-const AppearanceIcon = (
-  <svg fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
-  </svg>
-);
-
-// Theme options of the segmented control
 const THEME_OPTIONS = [
   { value: 'light' as const, label: 'Light' },
   { value: 'dark' as const, label: 'Dark' },
   { value: 'system' as const, label: 'System' }
+] as const;
+
+const INTERFACE_MODE_OPTIONS = [
+  { value: 'popup' as const, label: 'Popup' },
+  { value: 'sidepanel' as const, label: 'Side panel' }
 ] as const;
 
 interface AppearanceSectionProps {
@@ -27,6 +24,7 @@ interface AppearanceSectionProps {
   interfaceModeChanging?: boolean;
 }
 
+/** The Appearance group: the theme, and how the toolbar icon opens the extension */
 const AppearanceSection: FC<AppearanceSectionProps> = ({
   interfaceMode,
   onInterfaceModeChange,
@@ -35,59 +33,47 @@ const AppearanceSection: FC<AppearanceSectionProps> = ({
 }) => {
   const { theme, setTheme } = useThemeContext();
   const themeLabelId = useId();
-  const { getRadioProps } = useRadioGroup({
-    options: THEME_OPTIONS,
-    selectedIndex: THEME_OPTIONS.findIndex(option => option.value === theme),
-    onSelect: (option) => { void setTheme(option.value); }
-  });
+  const modeLabelId = useId();
 
   return (
-    <SettingsSection
-      icon={AppearanceIcon}
-      title="Appearance"
-      description="Customize how the extension looks and behaves"
-    >
-      <div className="space-y-4">
-        {/* Theme Selection */}
-        <div className="bg-card rounded-xl p-4 border border-default">
-          <h3 id={themeLabelId} className="font-medium text-primary text-sm mb-3">
-            Theme
-          </h3>
-          {/* Segmented control: the chosen theme takes the chosen-item colors. The theme saves on its own
-              (ThemeContext), so the Settings save in progress does not lock it */}
-          <div role="radiogroup" aria-labelledby={themeLabelId} className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-subtle">
-            {THEME_OPTIONS.map((option, index) => (
-              <button
-                key={option.value}
-                {...getRadioProps(index)}
-                type="button"
-                role="radio"
-                aria-checked={theme === option.value}
-                className={`
-                  h-9 rounded-lg border text-sm font-semibold transition-colors focus-interactive cursor-pointer
-                  ${theme === option.value
-                    ? 'bg-accent-selected border-accent text-accent-strong'
-                    : 'border-transparent text-secondary hover:text-primary hover:bg-muted'
-                  }
-                `}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Interface Mode */}
-        <div className="bg-card rounded-xl p-4 border border-default">
-          <InterfaceModeSelector
-            value={interfaceMode}
-            onChange={onInterfaceModeChange}
-            disabled={saving}
-            loading={interfaceModeChanging}
+    <SettingsGroup label="Appearance">
+      {/* The theme saves on its own (ThemeContext), so a Settings save in progress does not lock it */}
+      <SettingsRow
+        label="Theme"
+        labelId={themeLabelId}
+        control={
+          <SegmentedControl
+            options={THEME_OPTIONS}
+            value={theme}
+            onChange={(value) => { void setTheme(value); }}
+            labelledBy={themeLabelId}
           />
-        </div>
-      </div>
-    </SettingsSection>
+        }
+      />
+      {/* Locked while Settings saves, and for 3s after a change */}
+      <SettingsRow
+        label="Open in"
+        labelId={modeLabelId}
+        control={
+          <div className="flex items-center gap-2">
+            {interfaceModeChanging && (
+              <span
+                data-testid="interface-mode-spinner"
+                aria-hidden="true"
+                className="size-3 text-accent border-2 border-current/30 border-t-current rounded-full animate-spin"
+              />
+            )}
+            <SegmentedControl
+              options={INTERFACE_MODE_OPTIONS}
+              value={interfaceMode}
+              onChange={onInterfaceModeChange}
+              labelledBy={modeLabelId}
+              locked={saving || interfaceModeChanging}
+            />
+          </div>
+        }
+      />
+    </SettingsGroup>
   );
 };
 

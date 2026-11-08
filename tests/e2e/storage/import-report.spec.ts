@@ -2,10 +2,10 @@
  * E2E: what a Settings import tells the user when it does not restore everything
  *
  * - My-Prompt-Manager-1xi: a Notification shows one line, so the titles and reasons of the skipped
- *   Prompts stay in the Backup & Restore card, every one in full, until dismissed.
+ *   Prompts stay in the Your data group, every one in full, until dismissed.
  * - My-Prompt-Manager-5ar: an import stopped by an error other than storage says how many Prompts
  *   were imported before it stopped, and why.
- * - My-Prompt-Manager-lqu: Data & Storage reads "1 prompt" and "1 category".
+ * - My-Prompt-Manager-lqu: Your data reads "1 prompt" and "1 category".
  *
  * Also captures light/dark screenshots as visual proof (test-results/import-report/).
  */
@@ -53,15 +53,14 @@ test.describe('Settings import report', () => {
 
       const notification = page.getByRole('alert').filter({ hasText: 'Skipped 3' });
       await expect(notification).toBeVisible();
-      await expect(notification).toContainText('Imported 1 prompt and 0 categories. See Backup & Restore.');
+      await expect(notification).toContainText('Imported 1 prompt and 0 categories. See Your data.');
       const report = page.getByRole('status', { name: 'Import report' });
       await expect(report.getByText('Skipped 3 items')).toBeVisible();
       for (const title of titles) {
         await expect(report.getByRole('listitem').filter({ hasText: `"${title}"` })).toContainText('Content cannot exceed 20,000 characters');
       }
       // One Prompt and the default Category, in the singular
-      await expect(page.getByText('1 prompt', { exact: true })).toBeVisible();
-      await expect(page.getByText('1 category', { exact: true })).toBeVisible();
+      await expect(page.getByText('1 prompt · 1 category', { exact: true })).toBeVisible();
       expect((await storage.getPrompts()).map(prompt => prompt.id)).toEqual(['kept']);
       await page.getByRole('progressbar', { name: 'Storage usage' }).scrollIntoViewIfNeeded();
       await page.screenshot({ path: `${SCREENSHOT_DIR}/counts-${theme}.png`, animations: 'disabled' });
@@ -101,13 +100,13 @@ test.describe('Settings import report', () => {
 
       const notification = page.getByRole('alert').filter({ hasText: 'Import stopped' });
       await expect(notification).toBeVisible();
-      await expect(notification).toContainText('2 of 4 prompts were imported. See Backup & Restore.');
+      await expect(notification).toContainText('2 of 4 prompts were imported. See Your data.');
       const report = page.getByRole('status', { name: 'Import report' });
       await expect(report).toContainText('The import stopped: 2 of 4 prompts were imported.');
       await expect(report).toContainText('Storage API is unavailable. Please try again later.');
       // The Prompts imported before it stopped stay, and Settings counts them
       expect(await storage.getPrompts()).toHaveLength(2);
-      await expect(page.getByText('2 prompts', { exact: true })).toBeVisible();
+      await expect(page.getByText(/^2 prompts · /)).toBeVisible();
 
       await report.scrollIntoViewIfNeeded();
       await page.screenshot({ path: `${SCREENSHOT_DIR}/stopped-${theme}.png`, animations: 'disabled' });

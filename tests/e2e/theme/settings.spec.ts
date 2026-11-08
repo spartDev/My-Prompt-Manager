@@ -1,8 +1,8 @@
 /**
- * E2E: the general Settings sections on the color tokens (My-Prompt-Manager-el4.5.2)
+ * E2E: Settings after Atelier 1C (My-Prompt-Manager-7kd), on the color and motion tokens
  *
- * The view sits on bg-app: each section has an accent-subtle icon square and its blocks are cards.
- * Also captures light/dark screenshots as visual proof (test-results/settings/).
+ * Settings is a column of Settings groups on bg-app: a label over one card of rows. Choices are segmented
+ * controls, booleans switches. Also captures light/dark screenshots as visual proof (test-results/settings/).
  */
 
 import type { Locator, Page } from '@playwright/test';
@@ -17,7 +17,7 @@ const ON_INVERSE = 'rgb(201, 191, 230)';
 
 const EXPECTED = {
   light: {
-    app: 'rgb(244, 241, 250)', card: 'rgb(255, 255, 255)', subtle: 'rgb(244, 241, 250)', border: 'rgb(236, 230, 245)',
+    primary: 'rgb(29, 21, 48)', app: 'rgb(244, 241, 250)', card: 'rgb(255, 255, 255)', subtle: 'rgb(244, 241, 250)', border: 'rgb(236, 230, 245)',
     input: 'rgb(143, 135, 165)', tertiary: 'rgb(111, 103, 135)', secondary: 'rgb(92, 83, 112)', selected: 'rgb(237, 229, 255)', accentBorder: 'rgb(196, 181, 253)',
     accentStrong: 'rgb(76, 29, 149)', accentSubtle: 'rgb(241, 235, 253)', accentText: 'rgb(91, 33, 182)',
     accent: 'rgb(109, 40, 217)', strong: 'rgb(220, 212, 234)', warning: 'rgb(217, 119, 6)',
@@ -26,7 +26,7 @@ const EXPECTED = {
     inverse: 'rgb(29, 21, 48)'
   },
   dark: {
-    app: 'rgb(18, 14, 27)', card: 'rgb(35, 28, 52)', subtle: 'rgb(43, 35, 64)', border: 'rgb(53, 44, 76)',
+    primary: 'rgb(241, 237, 249)', app: 'rgb(18, 14, 27)', card: 'rgb(35, 28, 52)', subtle: 'rgb(43, 35, 64)', border: 'rgb(53, 44, 76)',
     input: 'rgb(118, 108, 142)', tertiary: 'rgb(163, 154, 187)', secondary: 'rgb(188, 179, 208)', selected: 'rgb(56, 41, 106)', accentBorder: 'rgb(109, 79, 196)',
     accentStrong: 'rgb(221, 211, 254)', accentSubtle: 'rgb(47, 35, 80)', accentText: 'rgb(196, 181, 253)',
     accent: 'rgb(132, 75, 242)', strong: 'rgb(65, 55, 90)', warning: 'rgb(251, 191, 36)',
@@ -36,7 +36,7 @@ const EXPECTED = {
   }
 } as const;
 
-const SECTIONS = ['Appearance', 'Library', 'Data & Storage', 'Notifications', 'Advanced', 'About & Reset'];
+const GROUPS = ['Appearance', 'Library', 'AI sites', 'Your data', 'Notifications', 'Help', 'Advanced'];
 
 const prompts = Array.from({ length: 3 }, (_, index) =>
   createPromptSeed({ id: `prompt-${String(index)}`, title: `Résumé ${String(index + 1)}`, content: 'Résume la transcription ci-dessous.' })
@@ -51,89 +51,89 @@ const openSettings = async (page: Page, storage: ExtensionStorage, extensionId: 
   await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
 };
 
-/** The color painted behind an element: its own background, else the first opaque one above it */
-const backdropOf = (locator: Locator) =>
-  locator.evaluate((element, transparent) => {
-    for (let node: Element | null = element; node; node = node.parentElement) {
-      const color = getComputedStyle(node).backgroundColor;
-      if (color !== transparent) {return color;}
-    }
-    return transparent;
-  }, TRANSPARENT);
+/** The card of a Settings group: the element after its label */
+const cardOf = (page: Page, name: string) => page.getByRole('region', { name }).locator('> div').first();
 
-test.describe('General Settings sections on the tokens', () => {
+test.describe('Settings after Atelier 1C', () => {
   for (const theme of ['light', 'dark'] as const) {
     const colors = EXPECTED[theme];
 
-    test(`every section has an accent-subtle icon square and its blocks are cards on bg-app (${theme})`, async ({ page, storage, extensionId }) => {
+    test(`Settings is a column of groups, each a label over one card on bg-app, under the version (${theme})`, async ({ page, storage, extensionId }) => {
       await openSettings(page, storage, extensionId, theme);
 
-      for (const name of SECTIONS) {
-        const icon = page.getByRole('region', { name }).getByTestId('section-icon');
-        await expect(icon, name).toHaveCSS('background-color', colors.accentSubtle);
-        await expect(icon, name).toHaveCSS('color', colors.accentText);
-      }
+      const version = page.getByText(/^My Prompt Manager \d+\.\d+\.\d+$/);
+      await expect(version).toHaveCSS('color', colors.tertiary);
+      await expect(page.getByRole('heading', { level: 1, name: 'Settings' })).toHaveCSS('font-size', '27px');
+      await expect(page.getByRole('heading', { level: 2 })).toHaveText(GROUPS);
 
-      const themeCard = page.getByRole('region', { name: 'Appearance' }).getByRole('heading', { name: 'Theme' }).locator('..');
-      await expect(themeCard).toHaveCSS('background-color', colors.card);
-      await expect(themeCard).toHaveCSS('border-top-color', colors.border);
-      expect(await backdropOf(themeCard.locator('..'))).toBe(colors.app);
-      await expect(page.getByRole('separator').first()).toHaveCSS('border-top-color', colors.border);
+      for (const name of GROUPS) {
+        await expect(page.getByRole('heading', { level: 2, name }), name).toHaveCSS('color', colors.secondary);
+        const card = cardOf(page, name);
+        await expect(card, name).toHaveCSS('background-color', colors.card);
+        await expect(card, name).toHaveCSS('border-top-color', colors.border);
+        await expect(card, name).toHaveCSS('border-top-left-radius', '20px');
+      }
+      await expect(page.locator('[data-scroll-container]')).toHaveCSS('background-color', TRANSPARENT);
+      await expect(page.locator('[data-scroll-container]').locator('..')).toHaveCSS('background-color', colors.app);
       await page.screenshot({ path: `${SCREENSHOT_DIR}/appearance-${theme}.png` });
     });
 
-    test(`the theme is a segmented control and the interface mode a card, the chosen one in accent-selected (${theme})`, async ({ page, storage, extensionId }) => {
+    test(`the theme and the opening mode are segmented controls: a card puck with an input outline under the chosen option (${theme})`, async ({ page, storage, extensionId }) => {
       await openSettings(page, storage, extensionId, theme);
 
       const themes = page.getByRole('radiogroup', { name: 'Theme' });
       await expect(themes).toHaveCSS('background-color', colors.subtle);
+      await expect(themes).toHaveCSS('width', '186px');
+      const puck = themes.getByTestId('segmented-puck');
+      await expect(puck).toHaveCSS('background-color', colors.card);
+      await expect(puck).toHaveCSS('border-top-color', colors.input);
       const chosen = themes.getByRole('radio', { name: theme === 'light' ? 'Light' : 'Dark' });
       await expect(chosen).toHaveAttribute('aria-checked', 'true');
-      await expect(chosen).toHaveCSS('background-color', colors.selected);
-      await expect(chosen).toHaveCSS('border-top-color', colors.accentBorder);
-      await expect(chosen).toHaveCSS('color', colors.accentStrong);
-      await expect(chosen).toHaveCSS('font-weight', '600');
+      await expect(chosen).toHaveCSS('color', colors.primary);
       const other = themes.getByRole('radio', { name: 'System' });
       await expect(other).toHaveAttribute('aria-checked', 'false');
-      await expect(other).toHaveCSS('background-color', TRANSPARENT);
-      await expect(other).toHaveCSS('color', colors.secondary);
+      await expect(other).toHaveCSS('color', colors.tertiary);
 
-      const modes = page.getByRole('radiogroup', { name: 'Interface Mode' });
-      const popup = modes.getByRole('radio', { name: 'Select popup window mode' });
-      await expect(popup).toHaveAttribute('aria-checked', 'true');
-      await expect(popup.locator('> div')).toHaveCSS('background-color', colors.selected);
-      await expect(popup.locator('> div')).toHaveCSS('border-top-color', colors.accentBorder);
-      await expect(modes.getByRole('radio', { name: 'Select side panel mode' }).locator('> div')).toHaveCSS('background-color', colors.card);
-
-      const info = page.getByText(/Popup mode opens a floating window/);
-      await expect(info).toHaveCSS('color', colors.accentStrong);
-      await expect(info.locator('../..')).toHaveCSS('background-color', colors.accentSubtle);
-      await expect(info.locator('../..')).toHaveCSS('border-top-color', colors.accentBorder);
-      await modes.scrollIntoViewIfNeeded();
+      const modes = page.getByRole('radiogroup', { name: 'Open in' });
+      await expect(modes.getByRole('radio', { name: 'Popup' })).toHaveAttribute('aria-checked', 'true');
+      await modes.getByRole('radio', { name: 'Side panel' }).click();
+      await expect(modes.getByRole('radio', { name: 'Side panel' })).toHaveAttribute('aria-checked', 'true');
+      // The mode saves, then stays locked for a few seconds, with a spinner beside it
+      await expect(page.getByTestId('interface-mode-spinner')).toBeVisible();
+      await expect(modes).toHaveAttribute('aria-disabled', 'true');
+      await expect.poll(async () => (await storage.get<{ interfaceMode?: string }>('interfaceMode')).interfaceMode).toBe('sidepanel');
       await page.screenshot({ path: `${SCREENSHOT_DIR}/interface-mode-${theme}.png` });
     });
 
-    test(`the Library sort order is a field on its card (${theme})`, async ({ page, storage, extensionId }) => {
+    test(`the Library sort order is a compact field in its row (${theme})`, async ({ page, storage, extensionId }) => {
       await openSettings(page, storage, extensionId, theme);
 
       const sort = page.getByLabel('Sort prompts by');
       await expect(sort).toHaveCSS('background-color', colors.subtle);
       await expect(sort).toHaveCSS('border-top-color', colors.input);
-      await expect(page.getByText('Pinned prompts stay on top.', { exact: false })).toHaveCSS('color', colors.tertiary);
+      await expect(sort).toHaveCSS('height', '34px');
       await page.getByRole('region', { name: 'Library' }).scrollIntoViewIfNeeded();
       await page.screenshot({ path: `${SCREENSHOT_DIR}/library-${theme}.png` });
     });
 
-    test(`Data & Storage shows an accent storage bar and asks for a danger-colored confirmation before clearing (${theme})`, async ({ page, storage, extensionId }) => {
+    test(`Your data shows what this device stores, Export and Import as pills, and a danger-colored confirmation before clearing (${theme})`, async ({ page, storage, extensionId }) => {
       await openSettings(page, storage, extensionId, theme);
+      const group = page.getByRole('region', { name: 'Your data' });
 
+      await expect(group.getByText(/ of 10 MB$/)).toHaveCSS('color', colors.tertiary);
+      await expect(group.getByText('3 prompts · 1 category')).toBeVisible();
       const bar = page.getByRole('progressbar', { name: 'Storage usage' });
       await expect(bar).toHaveCSS('background-color', colors.subtle);
+      await expect(bar).toHaveCSS('height', '8px');
       await expect(bar.locator('> div')).toHaveCSS('background-color', colors.accent);
-      await expect(page.getByRole('button', { name: 'Export', exact: true })).toHaveCSS('background-color', colors.accent);
-      const restore = page.getByRole('button', { name: 'Import', exact: true });
-      await expect(restore).toHaveCSS('border-top-color', colors.strong);
-      await expect(restore).toHaveCSS('color', colors.secondary);
+      for (const name of ['Export', 'Import']) {
+        const button = group.getByRole('button', { name, exact: true });
+        await expect(button, name).toHaveCSS('background-color', colors.card);
+        await expect(button, name).toHaveCSS('border-top-color', colors.strong);
+        await expect(button, name).toHaveCSS('height', '40px');
+      }
+      await group.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: `${SCREENSHOT_DIR}/your-data-${theme}.png` });
 
       await page.getByRole('button', { name: 'Clear All Data' }).click();
       const warning = page.getByText(/This will permanently delete all your prompts/);
@@ -141,7 +141,7 @@ test.describe('General Settings sections on the tokens', () => {
       await expect(warning.locator('..')).toHaveCSS('background-color', colors.dangerSubtle);
       await expect(warning.locator('..')).toHaveCSS('border-top-color', colors.dangerBorder);
       await expect(page.getByRole('button', { name: 'Yes, Clear All Data' })).toHaveCSS('background-color', DANGER_FILL);
-      await expect(page.getByRole('region', { name: 'Data & Storage' }).getByRole('button', { name: 'Cancel' })).toHaveCSS('border-top-color', colors.strong);
+      await expect(group.getByRole('button', { name: 'Cancel' })).toHaveCSS('border-top-color', colors.strong);
       await page.getByRole('button', { name: 'Yes, Clear All Data' }).scrollIntoViewIfNeeded();
       await page.screenshot({ path: `${SCREENSHOT_DIR}/clear-data-${theme}.png` });
     });
@@ -168,7 +168,7 @@ test.describe('General Settings sections on the tokens', () => {
       await page.screenshot({ path: `${SCREENSHOT_DIR}/import-invalid-${theme}.png` });
     });
 
-    test(`Notifications is one accent switch, input-colored when off (${theme})`, async ({ page, storage, extensionId }) => {
+    test(`Notifications is one row with one switch, input-colored when off (${theme})`, async ({ page, storage, extensionId }) => {
       await openSettings(page, storage, extensionId, theme);
       const section = page.getByRole('region', { name: 'Notifications' });
 
@@ -176,6 +176,7 @@ test.describe('General Settings sections on the tokens', () => {
       await expect(section.getByRole('button')).toHaveCount(0);
       const toggle = section.getByRole('switch', { name: 'Show notifications' });
       await expect(toggle).toHaveCSS('background-color', colors.accent);
+      await expect(toggle).toHaveCSS('width', '42px');
       await toggle.click();
       await expect(toggle).toHaveAttribute('aria-checked', 'false');
       await expect(toggle).toHaveCSS('background-color', colors.input);
@@ -183,13 +184,13 @@ test.describe('General Settings sections on the tokens', () => {
       await page.screenshot({ path: `${SCREENSHOT_DIR}/notifications-${theme}.png` });
     });
 
-    test(`Advanced switches debug mode from an input-colored track to accent, with an accent info box (${theme})`, async ({ page, storage, extensionId }) => {
+    test(`Help links out, and Advanced switches debug mode and asks before resetting, with nothing to expand (${theme})`, async ({ page, storage, extensionId }) => {
       await openSettings(page, storage, extensionId, theme);
-      await page.getByRole('button', { name: /Advanced/ }).click();
 
-      const tooltip = page.getByText('Enable detailed console logging for debugging');
-      await expect(tooltip).toHaveCSS('background-color', colors.inverse);
-      await expect(tooltip).toHaveCSS('color', ON_INVERSE);
+      await expect(page.getByRole('button', { expanded: false })).toHaveCount(0);
+      const github = page.getByRole('link', { name: 'GitHub Repository' });
+      await expect(github).toHaveCSS('color', colors.primary);
+      await expect(page.getByText('MIT · Thomas Roux')).toHaveCSS('color', colors.tertiary);
 
       const debug = page.getByRole('switch', { name: 'Debug mode' });
       await expect(debug).toHaveAttribute('aria-checked', 'false');
@@ -197,24 +198,15 @@ test.describe('General Settings sections on the tokens', () => {
       await debug.click();
       await expect(debug).toHaveAttribute('aria-checked', 'true');
       await expect(debug).toHaveCSS('background-color', colors.accent);
-
       const active = page.getByText(/Debug logging is now active/);
       await expect(active).toHaveCSS('color', colors.accentStrong);
-      await expect(active.locator('..')).toHaveCSS('background-color', colors.accentSubtle);
-      await expect(active.locator('..')).toHaveCSS('border-top-color', colors.accentBorder);
+      await expect(active).toHaveCSS('background-color', colors.accentSubtle);
       await active.scrollIntoViewIfNeeded();
       await page.screenshot({ path: `${SCREENSHOT_DIR}/advanced-${theme}.png` });
-    });
 
-    test(`About links in accent and asks for a warning-colored confirmation before resetting (${theme})`, async ({ page, storage, extensionId }) => {
-      await openSettings(page, storage, extensionId, theme);
-      await page.getByRole('button', { name: /About & Reset/ }).click();
-
-      await expect(page.getByRole('link', { name: 'GitHub Repository' })).toHaveCSS('color', colors.accentText);
       const reset = page.getByRole('button', { name: 'Reset to Defaults' });
       await expect(reset).toHaveCSS('border-top-color', colors.strong);
       await reset.click();
-
       const warning = page.getByText(/This will reset all settings to defaults/);
       await expect(warning).toHaveCSS('color', colors.warningText);
       await expect(warning.locator('..')).toHaveCSS('background-color', colors.warningSubtle);
@@ -225,7 +217,7 @@ test.describe('General Settings sections on the tokens', () => {
     });
   }
 
-  test('the theme and interface mode radio groups take one tab stop and follow the arrows, Home and End', async ({ page, storage, extensionId }) => {
+  test('the theme and opening mode radio groups take one tab stop and follow the arrows, Home and End', async ({ page, storage, extensionId }) => {
     await openSettings(page, storage, extensionId, 'light');
     const tabStops = (group: Locator) => group.getByRole('radio').evaluateAll(radios => radios.map(radio => (radio as HTMLElement).tabIndex));
 
@@ -242,14 +234,29 @@ test.describe('General Settings sections on the tokens', () => {
     await page.keyboard.press('Tab');
     await expect(themes.locator(':focus')).toHaveCount(0);
 
-    const modes = page.getByRole('radiogroup', { name: 'Interface Mode' });
-    const sidePanel = modes.getByRole('radio', { name: 'Select side panel mode' });
+    const modes = page.getByRole('radiogroup', { name: 'Open in' });
+    const sidePanel = modes.getByRole('radio', { name: 'Side panel' });
     expect(await tabStops(modes)).toEqual([0, -1]);
-    await modes.getByRole('radio', { name: 'Select popup window mode' }).focus();
+    await modes.getByRole('radio', { name: 'Popup' }).focus();
     await page.keyboard.press('ArrowRight');
     // The mode saves for a few seconds: the chosen radio keeps the focus meanwhile
     await expect(sidePanel).toHaveAttribute('aria-checked', 'true');
     await expect(sidePanel).toBeFocused();
     expect(await tabStops(modes)).toEqual([-1, 0]);
+  });
+
+  test('the switch knob and the segmented puck move on the spring, and at once under reduced motion', async ({ page, storage, extensionId }) => {
+    await openSettings(page, storage, extensionId, 'light');
+    const knob = page.getByRole('switch', { name: 'Show notifications' }).locator('span');
+    const puck = page.getByRole('radiogroup', { name: 'Theme' }).getByTestId('segmented-puck');
+
+    await expect(knob).toHaveCSS('transition-duration', '0.45s');
+    await expect(knob).toHaveCSS('transition-timing-function', 'cubic-bezier(0.34, 1.56, 0.64, 1)');
+    await expect(puck).toHaveCSS('transition-duration', '0.45s');
+
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await expect(knob).toHaveCSS('transition-duration', '0.001s');
+    await expect(puck).toHaveCSS('transition-duration', '0.001s');
+    await expect(page.getByRole('progressbar', { name: 'Storage usage' }).locator('> div')).toHaveCSS('animation-duration', '0.001s');
   });
 });

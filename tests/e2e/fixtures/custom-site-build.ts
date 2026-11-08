@@ -1,7 +1,7 @@
 /**
  * The test-only build the custom-site specs load (My-Prompt-Manager-aqe).
  *
- * A custom site is any https origin the user adds in Settings > Site Integration. The extension
+ * A custom site is any https origin the user adds in Settings > AI sites. The extension
  * asks for it as an optional host permission (`optional_host_permissions` in manifest.json), and
  * Chrome grants that only through its permission prompt, which Playwright can neither show nor
  * accept. The background then refuses to inject the content script, as it should without the

@@ -10,7 +10,8 @@ describe('NotificationSection', () => {
     expect(screen.getByRole('region', { name: 'Notifications' })).toBeInTheDocument();
     expect(screen.getAllByRole('switch')).toHaveLength(1);
     expect(screen.getByRole('switch', { name: 'Show notifications' })).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByText('Brief messages at the top after you save, copy or delete.')).toBeInTheDocument();
+    // One compact row, as Atelier 1C draws it: no line of help under the label
+    expect(screen.queryByText('Brief messages at the top after you save, copy or delete.')).not.toBeInTheDocument();
   });
 
   it('is open from the start: no expand button, position or Test button', () => {

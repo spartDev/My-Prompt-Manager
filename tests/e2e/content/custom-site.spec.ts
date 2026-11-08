@@ -123,13 +123,13 @@ test.describe('Content script on a custom site', () => {
     await expect(target.locator('#notes')).toBeVisible();
     await expect(target.locator(ICON)).toHaveCount(0);
 
-    // Settings > Site Integration > Add > Manual Configuration
+    // Settings > AI sites > Add a custom site > Manual Configuration
     const settings = await context.newPage();
     await settings.setViewportSize({ width: 400, height: 600 });
     await settings.goto(`chrome-extension://${extensionId}/src/popup.html`);
     await settings.getByTestId('tab-settings').click();
-    const section = settings.getByRole('region', { name: 'Site Integration' });
-    await section.getByRole('button', { name: 'Add Your First Site' }).click();
+    const section = settings.getByRole('region', { name: 'AI sites' });
+    await section.getByRole('button', { name: /Add a custom site/ }).click();
     await section.getByRole('button', { name: /Manual Configuration/ }).click();
     await section.getByLabel('Website URL *').fill(CUSTOM_SITE_HOSTNAME);
     await section.getByRole('button', { name: 'Add Site', exact: true }).click();

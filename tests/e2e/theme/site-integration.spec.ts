@@ -1,9 +1,9 @@
 /**
- * E2E: the site integration Settings on the color tokens (My-Prompt-Manager-el4.5.3)
+ * E2E: the AI sites group of Settings on the color tokens (My-Prompt-Manager-el4.5.3, My-Prompt-Manager-7kd)
  *
- * Platforms keep their brand colors when switched on; switched off, any site shows the one disabled
- * state (bg-muted, logo in text-tertiary). Also captures light/dark screenshots as visual proof
- * (test-results/site-integration/).
+ * One row per site in one card: logo, name, domain and switch. A site switched off keeps its logo, greyed
+ * and dimmed. Custom sites follow the Platforms, with Export and Remove in a ⋯ menu; the last row adds one.
+ * Also captures light/dark screenshots as visual proof (test-results/site-integration/).
  */
 
 import type { Locator, Page } from '@playwright/test';
@@ -14,7 +14,6 @@ import { seedLibrary } from '../utils/storage';
 
 const SCREENSHOT_DIR = 'test-results/site-integration';
 const TRANSPARENT = 'rgba(0, 0, 0, 0)';
-const ON_ACCENT = 'rgb(255, 255, 255)';
 const ERROR_BORDER = 'rgb(220, 38, 38)';
 
 const EXPECTED = {
@@ -72,19 +71,19 @@ const openSiteIntegration = async (
   await page.goto(`chrome-extension://${extensionId}/src/${surface}.html`);
   await expect(page.locator('html')).toHaveClass(theme === 'dark' ? /dark/ : /^(?!.*dark)/);
   await page.getByTestId('tab-settings').click();
-  const section = page.getByRole('region', { name: 'Site Integration' });
+  const section = page.getByRole('region', { name: 'AI sites' });
   await expect(section).toBeVisible();
   return section;
 };
 
 const openAddMethod = async (section: Locator, method: 'Manual Configuration' | 'Import Configuration') => {
-  await section.getByRole('button', { name: 'Add Your First Site' }).click();
-  // The button gives way to the chooser under the mouse: move it off, or the first option shows its hover
+  await section.getByRole('button', { name: /Add a custom site/ }).click();
+  // The chooser opens under the mouse: move it off, or the first option shows its hover
   await section.page().mouse.move(0, 0);
   return section.getByRole('button', { name: new RegExp(method) });
 };
 
-const siteCard = (section: Locator, name: string) => section.getByTestId('site-card').filter({ has: section.page().getByRole('heading', { name, exact: true }) });
+const siteRow = (section: Locator, name: string) => section.getByTestId('site-row').filter({ has: section.page().getByRole('switch', { name, exact: true }) });
 
 /** Fails when part of the element sticks out of the card, where the card's edge or the viewport clips it */
 const expectInside = async (element: Locator, card: Locator) => {
@@ -110,90 +109,74 @@ test.describe('Site integration Settings on the tokens', () => {
   for (const theme of ['light', 'dark'] as const) {
     const colors = EXPECTED[theme];
 
-    test(`the Platforms are cards on bg-app, one switched off shows its logo in text-tertiary on bg-muted (${theme})`, async ({ page, storage, extensionId }) => {
+    test(`the Platforms are rows of one card on bg-app, one switched off shows its logo greyed and dimmed (${theme})`, async ({ page, storage, extensionId }) => {
       const section = await openSiteIntegration(page, storage, extensionId, theme);
 
-      await expect(section.getByRole('heading', { name: 'Supported Sites' })).toHaveCSS('color', colors.primary);
+      await expect(section.getByRole('heading', { level: 2, name: 'AI sites' })).toHaveCSS('color', colors.secondary);
+      const card = section.locator('> div').first();
+      await expect(card).toHaveCSS('background-color', colors.card);
+      await expect(card).toHaveCSS('border-top-color', colors.border);
+      expect(await backdropOf(card.locator('..'))).toBe(colors.app);
+      await expect(section.getByTestId('site-row')).toHaveCount(6);
+      // In the order of Atelier 1C, Copilot showing the M365 domain its switch also turns on
+      await expect(section.getByTestId('site-row').locator('span[id]')).toHaveText(['Claude', 'ChatGPT', 'Google Gemini', 'Mistral AI', 'Perplexity', 'Microsoft Copilot']);
+      await expect(section.getByText('copilot.microsoft.com · m365.cloud.microsoft')).toBeVisible();
 
-      const chatgpt = siteCard(section, 'ChatGPT');
-      await expect(chatgpt).toHaveCSS('background-color', colors.card);
-      await expect(chatgpt).toHaveCSS('border-top-color', colors.border);
-      expect(await backdropOf(chatgpt.locator('..'))).toBe(colors.app);
-      await expect(chatgpt.getByTestId('site-enabled-mark')).toHaveCSS('color', colors.success);
-      await expect(chatgpt.getByText('chatgpt.com')).toHaveCSS('color', colors.tertiary);
+      const chatgpt = siteRow(section, 'ChatGPT');
+      await expect(chatgpt.getByText('chatgpt.com', { exact: true })).toHaveCSS('color', colors.tertiary);
+      await expect(chatgpt.getByRole('switch')).toHaveCSS('background-color', colors.accent);
+      await expect(chatgpt.getByTestId('site-logo')).toHaveCSS('opacity', '1');
+      await expect(chatgpt.getByTestId('site-logo')).toHaveCSS('width', '30px');
 
-      const claude = siteCard(section, 'Claude');
-      await expect(claude).toHaveCSS('background-color', colors.card);
-      await expect(claude.getByTestId('site-enabled-mark')).toHaveCount(0);
+      const claude = siteRow(section, 'Claude');
+      await expect(claude.getByRole('switch')).toHaveAttribute('aria-checked', 'false');
+      await expect(claude.getByRole('switch')).toHaveCSS('background-color', colors.input);
       const logo = claude.getByTestId('site-logo');
-      await expect(logo).toHaveCSS('background-color', colors.muted);
-      await expect(logo).toHaveCSS('color', colors.tertiary);
-      await expect(logo.locator('svg path').first()).toHaveCSS('fill', colors.tertiary);
+      await expect(logo).toHaveCSS('filter', 'grayscale(1)');
+      await expect(logo).toHaveCSS('opacity', '0.5');
 
-      await chatgpt.evaluate(card => { card.scrollIntoView({ block: 'center' }); });
+      await claude.getByRole('switch').click();
+      await expect(logo).toHaveCSS('opacity', '1');
+      await expect.poll(async () => ((await storage.get<{ promptLibrarySettings?: { enabledSites?: string[] } }>('promptLibrarySettings')).promptLibrarySettings?.enabledSites ?? []).includes('claude.ai')).toBe(true);
+
+      await card.evaluate(element => { element.scrollIntoView({ block: 'start' }); });
       await page.screenshot({ path: `${SCREENSHOT_DIR}/site-list-${theme}.png` });
     });
 
-    test(`a custom site shows the accent when on and the disabled state when off, with accent and danger actions (${theme})`, async ({ page, storage, extensionId }) => {
+    test(`a custom site is a row after the Platforms, with Export and Remove in its menu, and the last row adds one (${theme})`, async ({ page, storage, extensionId }) => {
       const section = await openSiteIntegration(page, storage, extensionId, theme, { customSites });
 
-      await expect(section.getByRole('heading', { name: 'Custom Sites' })).toHaveCSS('color', colors.primary);
-
-      const notion = siteCard(section, 'Notion');
-      await expect(notion).toHaveCSS('background-color', colors.card);
+      const notion = siteRow(section, 'Notion');
+      await expect(notion.getByText('notion.so', { exact: true })).toHaveCSS('color', colors.tertiary);
       await expect(notion.getByTestId('site-logo')).toHaveCSS('background-color', colors.accentSubtle);
       await expect(notion.getByTestId('site-logo')).toHaveCSS('color', colors.accentText);
-      const exportButton = notion.getByRole('button', { name: 'Export custom site configuration' });
-      await expect(exportButton).toHaveCSS('background-color', colors.accentSubtle);
-      await expect(exportButton).toHaveCSS('color', colors.accentText);
-      await expect(exportButton.locator('..')).toHaveCSS('border-top-color', colors.divider);
-      await expect(notion.getByRole('button', { name: 'Remove' })).toHaveCSS('color', colors.dangerText);
+      await expect(siteRow(section, 'Wiki interne').getByTestId('site-logo')).toHaveCSS('opacity', '0.5');
 
-      const wiki = siteCard(section, 'Wiki interne');
-      await expect(wiki.getByTestId('site-logo')).toHaveCSS('background-color', colors.muted);
-      await expect(wiki.getByTestId('site-logo')).toHaveCSS('color', colors.tertiary);
+      const addSite = section.getByRole('button', { name: /Add a custom site/ });
+      await expect(addSite).toHaveCSS('color', colors.accentText);
+      await expect(addSite).toBeEnabled();
 
-      const addSite = section.getByRole('button', { name: 'Add new custom site integration' });
-      await expect(addSite).toHaveCSS('background-color', colors.card);
-      await expect(addSite).toHaveCSS('border-top-color', colors.border);
-      await expect(addSite.locator('span').first()).toHaveCSS('background-color', colors.accentSubtle);
-      await expect(addSite.locator('span').first()).toHaveCSS('color', colors.accentText);
-      await expect(addSite.getByText('Configure a new AI platform integration')).toHaveCSS('color', colors.secondary);
-
-      await section.getByRole('heading', { name: 'Custom Sites' }).evaluate(heading => { heading.scrollIntoView({ block: 'start' }); });
+      await notion.getByRole('button', { name: 'More actions for Notion' }).click();
+      await expect(page.getByRole('menuitem', { name: 'Export configuration' })).toBeVisible();
+      await expect(page.getByRole('menuitem', { name: 'Remove' })).toHaveCSS('color', colors.dangerText);
+      await addSite.scrollIntoViewIfNeeded();
       await page.screenshot({ path: `${SCREENSHOT_DIR}/custom-sites-${theme}.png` });
+
+      await page.getByRole('menuitem', { name: 'Remove' }).click();
+      await expect(siteRow(section, 'Notion')).toHaveCount(0);
+      await expect.poll(async () => ((await storage.get<{ promptLibrarySettings?: { customSites?: CustomSite[] } }>('promptLibrarySettings')).promptLibrarySettings?.customSites ?? []).map(site => site.hostname)).toEqual(['wiki.example.com']);
     });
 
-    test(`with no custom site, the empty state is a dashed bg-raised panel with an accent button (${theme})`, async ({ page, storage, extensionId }) => {
-      const section = await openSiteIntegration(page, storage, extensionId, theme);
-
-      const message = section.getByText('No custom sites added');
-      await expect(message).toHaveCSS('color', colors.primary);
-      const empty = message.locator('..');
-      await expect(empty).toHaveCSS('background-color', colors.raised);
-      await expect(empty).toHaveCSS('border-top-style', 'dashed');
-      await expect(empty).toHaveCSS('border-top-color', colors.strong);
-      await expect(empty.locator('svg').first()).toHaveCSS('color', colors.faint);
-      await expect(section.getByText('Add any website to use your prompt library there')).toHaveCSS('color', colors.tertiary);
-      const add = section.getByRole('button', { name: 'Add Your First Site' });
-      await expect(add).toHaveCSS('background-color', colors.accent);
-      await expect(add).toHaveCSS('color', ON_ACCENT);
-
-      await empty.evaluate(panel => { panel.scrollIntoView({ block: 'center' }); });
-      await page.screenshot({ path: `${SCREENSHOT_DIR}/empty-state-${theme}.png` });
-    });
-
-    test(`the Add Custom Site card shows the disabled state while the current site is already integrated (${theme})`, async ({ page, storage, extensionId }) => {
+    test(`Add a custom site is turned off, and says why, while the current site is already integrated (${theme})`, async ({ page, storage, extensionId }) => {
       // The active tab is this popup page: a custom site on its hostname makes the current site integrated
       const section = await openSiteIntegration(page, storage, extensionId, theme, {
         customSites: [{ hostname: extensionId, displayName: 'Popup', enabled: true, dateAdded: 1_760_000_000_000 }]
       });
 
-      const addSite = section.getByRole('button', { name: 'Add new custom site integration' });
+      const addSite = section.getByRole('button', { name: /Add a custom site/ });
       await expect(addSite).toBeDisabled();
-      await expect(addSite).toHaveCSS('background-color', colors.card);
-      await expect(addSite.locator('span').first()).toHaveCSS('background-color', colors.muted);
-      await expect(addSite.locator('span').first()).toHaveCSS('color', colors.tertiary);
+      await expect(addSite).toHaveCSS('color', colors.tertiary);
+      await expect(addSite.getByText(`Current site (${extensionId}) is already integrated`)).toBeVisible();
     });
 
     test(`adding a site goes through a dashed chooser to a form of cards with fields on bg-subtle and an error in danger (${theme})`, async ({ page, storage, extensionId }) => {
@@ -275,15 +258,15 @@ test.describe('Site integration Settings on the tokens', () => {
     });
   }
 
-  test('in a 320 px side panel, the custom site actions and the Add Custom Site form stay inside their cards', async ({ page, storage, extensionId }) => {
+  test('in a 320 px side panel, a custom site row and the Add Custom Site form stay inside their cards', async ({ page, storage, extensionId }) => {
     const section = await openSiteIntegration(page, storage, extensionId, 'light', { customSites }, 'sidepanel');
 
-    const notion = siteCard(section, 'Notion');
-    for (const name of ['Export custom site configuration', 'Remove']) {
-      await expectInside(notion.getByRole('button', { name }), notion);
+    const notion = siteRow(section, 'Notion');
+    for (const control of [notion.getByRole('button', { name: 'More actions for Notion' }), notion.getByRole('switch')]) {
+      await expectInside(control, notion);
     }
 
-    await section.getByRole('button', { name: 'Add new custom site integration' }).click();
+    await section.getByRole('button', { name: /Add a custom site/ }).click();
     await page.mouse.move(0, 0);
     const chooser = section.getByText('Choose a method to continue').locator('..');
     for (const method of [/Manual Configuration/, /Import Configuration/]) {
@@ -312,14 +295,18 @@ test.describe('Site integration Settings on the tokens', () => {
         const section = await openSiteIntegration(page, storage, extensionId, theme, { customSites: customSites.slice(0, 1) });
 
         // Export Notion, then import its code back: the preview reports it as a duplicate
-        await siteCard(section, 'Notion').getByRole('button', { name: 'Export custom site configuration' }).click();
+        await siteRow(section, 'Notion').getByRole('button', { name: 'More actions for Notion' }).click();
+        await page.getByRole('menuitem', { name: 'Export configuration' }).click();
         await expect(page.getByText('Configuration copied', { exact: true })).toBeVisible();
-        await section.getByRole('button', { name: 'Add new custom site integration' }).click();
+        await section.getByRole('button', { name: /Add a custom site/ }).click();
         await page.mouse.move(0, 0);
         await section.getByRole('button', { name: /Import Configuration/ }).click();
         await section.getByLabel('Encoded configuration string').focus();
         await page.keyboard.press('ControlOrMeta+V');
         await section.getByRole('button', { name: 'Preview Configuration' }).click();
+        // The click leaves the pointer where the modal then puts Replace & Import: move it off, so the
+        // button reads its resting color and not its hover
+        await page.mouse.move(0, 0);
 
         const dialog = page.getByRole('dialog', { name: 'Review Configuration' });
         await expect(dialog.locator('> div').first()).toHaveCSS('background-color', colors.backdrop);

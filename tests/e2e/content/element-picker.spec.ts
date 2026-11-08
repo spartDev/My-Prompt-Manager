@@ -47,7 +47,7 @@ test.describe('Element picker integration', () => {
       }) as typeof chrome.runtime.sendMessage;
     });
 
-    await page.getByRole('button', { name: 'Add Your First Site' }).click();
+    await page.getByRole('button', { name: /Add a custom site/ }).click();
     await page.getByRole('button', { name: /Manual Configuration/i }).click();
 
     await page.getByLabel('Website URL').fill('https://claude.ai/qa');
