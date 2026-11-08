@@ -1039,7 +1039,7 @@ Arriving on a Section from the tab bar slides it 26px in from the side of its ta
 | `--ease-section` (`EASE.section`) | `cubic-bezier(0.32, 0.72, 0, 1)` | The slide: most of the way in its first half, then a long settle |
 | `--duration-section` (`MOTION.sectionIn`) | 450ms | Its length; 1ms under `prefers-reduced-motion` |
 
-The slide moves the Section with `left`, relatively positioned for the length of the animation only, never with `transform`: a transformed Section would become the containing block of the fixed dialogs rendered inside it (Clear history in Analytics), shut in above the tab bar until the slide ends. The sheets and dialogs that portal to `document.body` are out of its reach either way. The wrapper around the Section (`editor-beneath` in `App`) clips horizontal overflow (`overflow-x-clip`), so the 26px of the slide never make the popup scroll sideways; a clip, unlike a transform, leaves those fixed dialogs on the viewport.
+The slide moves the Section with `left`, relatively positioned for the length of the animation only, never with `transform`: a transformed Section would become the containing block of any fixed element inside it. The fade would still dim one, so every sheet and dialog opened from a Section portals to `document.body` (Clear history in Analytics included), out of reach of the slide and the fade. The wrapper around the Section (`editor-beneath` in `App`) clips horizontal overflow (`overflow-x-clip`), so the 26px of the slide never make the popup scroll sideways; a clip, unlike a transform, leaves those fixed dialogs on the viewport.
 
 ### Keyframe Animations
 

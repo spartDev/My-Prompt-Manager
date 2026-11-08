@@ -116,6 +116,15 @@ test.describe('Section transition', () => {
     const backdrop = page.getByRole('dialog', { name: 'Clear usage history?' }).locator('xpath=..');
     const viewport = page.viewportSize();
     expect(await backdrop.boundingBox()).toEqual({ x: 0, y: 0, width: viewport?.width, height: viewport?.height });
+    // ...and it shows at full strength: no fading ancestor (the Section) dims it
+    const strength = await backdrop.evaluate((element) => {
+      let opacity = 1;
+      for (let node: Element | null = element; node; node = node.parentElement) {
+        opacity *= Number(getComputedStyle(node).opacity);
+      }
+      return opacity;
+    });
+    expect(strength).toBe(1);
   });
 
   test('a Section sliding in from the right never makes the popup scroll sideways', async ({ page, storage, extensionId }) => {
