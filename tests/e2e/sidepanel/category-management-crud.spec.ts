@@ -274,7 +274,7 @@ test.describe('Category Management - Core CRUD Operations', () => {
       await page.keyboard.press('Enter');
 
       await expect(categories.getSheetsOnPage()).toHaveCount(1);
-      await expect(categories.getCreateSheet()).toHaveClass(/sheet-in/);
+      await expect(categories.getCreateSheet()).toHaveClass(/animate-category-sheet-in/);
       await expect(categories.getSheetNameInput()).toHaveValue('');
       await expect(categories.getSheetNameInput()).toBeFocused();
 
@@ -285,14 +285,14 @@ test.describe('Category Management - Core CRUD Operations', () => {
         sheet()?.querySelector<HTMLButtonElement>('button[aria-label="Close"]')?.click();
         await nextFrame();
         await nextFrame();
-        const closing = sheet()?.classList.contains('sheet-out') ?? false;
+        const closing = sheet()?.classList.contains('animate-category-sheet-out') ?? false;
         [...document.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent?.trim() === 'Add category')?.click();
         return closing;
       });
       expect(reopenedDuringExit, 'the first sheet was still playing its exit').toBe(true);
 
       await expect(categories.getSheetsOnPage()).toHaveCount(1);
-      await expect(categories.getCreateSheet()).toHaveClass(/sheet-in/);
+      await expect(categories.getCreateSheet()).toHaveClass(/animate-category-sheet-in/);
       // Still one, still open, once the first one's exit would have ended
       await page.waitForTimeout(600);
       await expect(categories.getSheetsOnPage()).toHaveCount(1);

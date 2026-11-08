@@ -2,7 +2,10 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DEFAULT_CATEGORY_COLOR } from '../../constants/colors';
-import { SHEET_EXIT_MS, useCategorySheet } from '../useCategorySheet';
+import { MOTION } from '../../theme/motion';
+import { useCategorySheet } from '../useCategorySheet';
+
+const SHEET_EXIT_MS = MOTION.categorySheetOut;
 
 describe('useCategorySheet', () => {
   beforeEach(() => {
@@ -11,6 +14,7 @@ describe('useCategorySheet', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   it('starts closed', () => {
@@ -49,7 +53,7 @@ describe('useCategorySheet', () => {
     expect(result.current).toMatchObject({ name: 'Research', color: '#E11D48' });
   });
 
-  it('plays the exit for SHEET_EXIT_MS, then leaves the page and says so once', () => {
+  it('plays the exit for MOTION.categorySheetOut, then leaves the page and says so once', () => {
     const onClosed = vi.fn();
     const { result } = renderHook(() => useCategorySheet({ onClosed }));
 
@@ -62,6 +66,28 @@ describe('useCategorySheet', () => {
     expect(result.current.isMounted).toBe(true);
 
     act(() => { vi.advanceTimersByTime(1); });
+    expect(result.current.isMounted).toBe(false);
+    expect(onClosed).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves the page at once under prefers-reduced-motion', () => {
+    vi.spyOn(window, 'matchMedia').mockImplementation((query) => ({
+      matches: query === '(prefers-reduced-motion: reduce)',
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn()
+    }));
+    const onClosed = vi.fn();
+    const { result } = renderHook(() => useCategorySheet({ onClosed }));
+
+    act(() => { result.current.openCreate('#2563EB'); });
+    act(() => { result.current.close(); });
+    act(() => { vi.advanceTimersByTime(0); });
+
     expect(result.current.isMounted).toBe(false);
     expect(onClosed).toHaveBeenCalledTimes(1);
   });

@@ -110,7 +110,7 @@ A refusal keeps its type through `StorageManager` and `PromptManager`, so a call
 |------|-----|---------|
 | `src/hooks/usePrompts.ts` | The Prompts with loading and error state; create, update, delete, pin | `App` |
 | `src/hooks/useCategories.ts` | The Categories with loading and error state; create, update, delete, and restore (the Undo of a delete) | `App` |
-| `src/hooks/useCategorySheet.ts` | State of the Category sheet, apart from its drawing: open, closing (`SHEET_EXIT_MS`, cancelled by opening again) or gone, the mode, the draft name and color | `CategoryManager` |
+| `src/hooks/useCategorySheet.ts` | State of the Category sheet, apart from its drawing: open, closing (`MOTION.categorySheetOut`, none under reduced motion; cancelled by opening again) or gone, the mode, the draft name and color | `CategoryManager` |
 | `src/hooks/useSearchWithDebounce.ts` | Search field state: the typed query at once, the search after a debounce | `App` |
 | `src/hooks/useSearch.ts` | The filtering and highlights behind `useSearchWithDebounce` | `useSearchWithDebounce` |
 | `src/hooks/useToast.ts` | The one Notification on screen (a new one replaces it) and the on/off switch of `toast_settings` | `App` |

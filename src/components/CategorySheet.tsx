@@ -134,7 +134,7 @@ const CategorySheet: FC<CategorySheetProps> = ({
       <div
         aria-hidden="true"
         data-testid="category-sheet-backdrop"
-        className={cn('absolute inset-0 bg-backdrop', open ? 'backdrop-in' : 'backdrop-out')}
+        className={cn('absolute inset-0 bg-backdrop', open ? 'animate-backdrop-in' : 'animate-backdrop-out')}
         onClick={dismiss}
       />
       <div
@@ -147,7 +147,7 @@ const CategorySheet: FC<CategorySheetProps> = ({
         tabIndex={-1}
         className={cn(
           'absolute inset-x-0 bottom-0 flex flex-col gap-4 px-[18px] pt-[9px] pb-[18px] rounded-t-3xl bg-card shadow-2xl focus:outline-none',
-          open ? 'sheet-in' : 'sheet-out'
+          open ? 'animate-category-sheet-in' : 'animate-category-sheet-out'
         )}
       >
         {/* Handle: decoration only */}

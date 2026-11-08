@@ -55,7 +55,12 @@
   .animate-pop,
   .animate-pop-check,
   .animate-toast-in,
-  .animate-toast-mark {
+  .animate-toast-mark,
+  .animate-category-sheet-in,
+  .animate-category-sheet-out,
+  .animate-backdrop-in,
+  .animate-backdrop-out,
+  .animate-category-pop {
     animation-duration: 1ms;
     animation-delay: 0ms;
   }
@@ -66,63 +71,8 @@
   }
 }
 
-/* Category sheet (Atelier 1C 2b, 2c): it rises from the bottom over the backdrop, on the sheet-in
-   and sheet-out keyframes of theme/tokens.css, and leaves in 280ms, faster than the editor; the
-   screen behind it steps back while it is open. Removed from the page only once .sheet-out has
-   ended (useCategorySheet's SHEET_EXIT_MS). */
-@keyframes backdrop-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes backdrop-out {
-  from {
-    opacity: 1;
-  }
-  to {
-    opacity: 0;
-  }
-}
-
-/* A Category that appears in the list (created, or back from Undo) pops in */
-@keyframes category-pop {
-  0% {
-    opacity: 0;
-    transform: scale(0.3);
-  }
-  60% {
-    opacity: 1;
-    transform: scale(1.2);
-  }
-  100% {
-    transform: scale(1);
-  }
-}
-
-.sheet-in {
-  animation: sheet-in 0.5s var(--ease-sheet) both;
-}
-
-.sheet-out {
-  animation: sheet-out 0.28s var(--ease-sheet) both;
-}
-
-.backdrop-in {
-  animation: backdrop-in 0.3s ease both;
-}
-
-.backdrop-out {
-  animation: backdrop-out 0.28s ease both;
-}
-
-.category-pop {
-  animation: category-pop 0.5s var(--ease-spring) both;
-}
-
+/* Category sheet (Atelier 1C 2b, 2c): its animate-* classes are tokens in theme/tokens.css. These
+   are its transitions: the screen behind steps back while it is open, and the swatches spring. */
 .sheet-behind {
   transform-origin: 50% 0;
   transition:
@@ -145,14 +95,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sheet-in,
-  .sheet-out,
-  .backdrop-in,
-  .backdrop-out,
-  .category-pop {
-    animation-duration: 1ms;
-  }
-
   .sheet-behind,
   .swatch-spring {
     transition-duration: 1ms;

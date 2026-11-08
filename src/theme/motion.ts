@@ -30,7 +30,17 @@ export const MOTION = {
   /** The round of the Notification pops this long after the pill */
   toastMarkDelay: 80,
   /** A Section sliding in from the side of its tab */
-  sectionIn: 450
+  sectionIn: 450,
+  /** The Category sheet rising from the bottom */
+  categorySheetIn: 500,
+  /** The Category sheet leaving, faster than the editor; useCategorySheet unmounts it after */
+  categorySheetOut: 280,
+  /** The backdrop of the Category sheet fading in */
+  backdropIn: 300,
+  /** The backdrop of the Category sheet fading out, with the sheet */
+  backdropOut: 280,
+  /** A Category appearing in the list (created, or back from Undo) */
+  categoryPop: 500
 } as const;
 
 const REDUCED_MOTION = '(prefers-reduced-motion: reduce)';

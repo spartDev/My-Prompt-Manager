@@ -993,6 +993,9 @@ duration or a curve: it uses a class, and a timer reads `MOTION`.
 | `animate-scrim-in` / `animate-scrim-out` | `scrim-in` 400ms ease-sheet / `scrim-out` 340ms ease-sheet-out | a `bg-backdrop backdrop-blur-sm` scrim between the two, from 0 to 0.6 opacity and back |
 | `animate-pop` | `pop` 450ms, ease-spring | a new chip (a Variable) |
 | `animate-pop-check` | `pop` 400ms, ease-spring | a check mark appearing, the inline "New category" row |
+| `animate-category-sheet-in` / `animate-category-sheet-out` (`MOTION.categorySheetIn` / `categorySheetOut`) | `sheet-in` 500ms / `sheet-out` 280ms, both ease-sheet | the Category sheet, which rises slower and leaves faster than the editor; it unmounts after (`useCategorySheet`) |
+| `animate-backdrop-in` / `animate-backdrop-out` (`MOTION.backdropIn` / `backdropOut`) | `backdrop-in` 300ms / `backdrop-out` 280ms, ease | the backdrop of the Category sheet, from 0 to full opacity and back |
+| `animate-category-pop` (`MOTION.categoryPop`) | `pop` 500ms, ease-spring | a Category appearing in the list (created, or back from Undo) |
 | `animate-toast-in` | `toast-in` 450ms, ease-spring | the Notification pill, from 14px above the top center |
 | `animate-toast-mark` | `pop` 450ms, ease-spring, 80ms delay | the round of the Notification |
 | `transition-save` (`src/popup.css`) | background and color 300ms, scale 250ms ease-spring | the Save button, which slides to the success color on "Saved" |
@@ -1016,7 +1019,7 @@ for nothing: the Save sequence keeps its order without its pause, and a panel un
 animation: pass the open value (null when closed) and `MOTION.sheetOut`, render `shown`, and switch
 to the exit animation while `exiting`. Opening again while leaving cancels the unmount; the timer is
 cleared on unmount. The editor sheet of `App` uses it, with its scrim and the recede of the Section
-beneath; the Category sheet still has its own timer (see Category Sheet below).
+beneath.
 
 #### Settings controls
 
@@ -1045,15 +1048,17 @@ The slide moves the Section with `left`, relatively positioned for the length of
 
 #### Category Sheet
 
-`src/popup.css`, on the curves and keyframes of `src/theme/tokens.css` (`--ease-sheet`,
-`--ease-spring`, `sheet-in`, `sheet-out`). The sheet rises from the bottom (`.sheet-in`,
-`translateY(100%)` to rest, 0.5s ease-sheet) and leaves faster than the editor (`.sheet-out`, 0.28s):
-`useCategorySheet` takes it off the page only once the exit has ended (its own `SHEET_EXIT_MS`
-timer, not yet `useAnimatedPresence` and `MOTION`). The backdrop fades in over 0.3s and out over 0.28s. While it is open, the screen
-behind steps back (`.sheet-behind[data-stepped-back]`: `scale(.93) translateY(10px)`, 22px corners,
-`brightness(.96)`, 0.5s ease-sheet). Swatches move on `transform` over 0.35s ease-spring; a Category
-that appears in the list pops in (`category-pop`: scale .3, 1.2, then 1, 0.5s ease-spring). Under
-`prefers-reduced-motion`, all of them last 1ms. Only one dialog is reachable at a time, by assistive
+Its animations are the motion tokens of `src/theme/tokens.css` (see Motion tokens above). The sheet
+rises from the bottom (`animate-category-sheet-in`, `translateY(100%)` to rest, 500ms ease-sheet) and
+leaves faster than the editor (`animate-category-sheet-out`, 280ms): `useCategorySheet` takes it off
+the page only once the exit has ended, after `motionDuration(MOTION.categorySheetOut)`, so under
+`prefers-reduced-motion` at once. The backdrop fades in over 300ms and out over 280ms
+(`animate-backdrop-in` / `animate-backdrop-out`). Its transitions are in `src/popup.css`: while it is
+open, the screen behind steps back (`.sheet-behind[data-stepped-back]`: `scale(.93) translateY(10px)`,
+22px corners, `brightness(.96)`, 0.5s ease-sheet), and swatches move on `transform` over 0.35s
+ease-spring (`.swatch-spring`). A Category that appears in the list pops in (`animate-category-pop`:
+the shared `pop` keyframes, scale .3, 1.2, then 1, 500ms ease-spring). Under `prefers-reduced-motion`,
+all of them last 1ms. Only one dialog is reachable at a time, by assistive
 technology too: while the sheet is open, the screen behind and the tab bar are `inert`, and the sheet
 is `inert` while it leaves or while the delete confirmation is on top of it. While a create, save or
 delete runs, Escape, the backdrop, Close and Cancel wait for it to end, and a save and a deletion never
@@ -1062,11 +1067,11 @@ run together. While a create, save or deletion runs, the name is read-only and t
 
 ```tsx
 <div className="fixed inset-0 z-40">
-  <div className="absolute inset-0 bg-backdrop backdrop-in" onClick={onClose} />
+  <div className="absolute inset-0 bg-backdrop animate-backdrop-in" onClick={onClose} />
   <div role="dialog" aria-modal="true" aria-label={title} className="
     absolute inset-x-0 bottom-0
     rounded-t-3xl bg-card shadow-2xl
-    sheet-in
+    animate-category-sheet-in
   ">
     {/* handle, header, name, palette, footer */}
   </div>
