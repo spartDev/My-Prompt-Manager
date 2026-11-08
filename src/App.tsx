@@ -389,7 +389,9 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
       <div
         data-testid="editor-beneath"
         className={cn(
-          'flex flex-1 min-h-0 flex-col origin-top',
+          // Clips the 26px of a Section sliding in from the side, which would make the popup scroll
+          // sideways; clip, unlike a transform, leaves the fixed dialogs inside it on the viewport
+          'flex flex-1 min-h-0 flex-col origin-top overflow-x-clip',
           editorSheet.shown && (editorSheet.exiting ? 'animate-recede-out' : 'animate-recede-in')
         )}
         inert={editor !== null}

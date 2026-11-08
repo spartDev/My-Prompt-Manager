@@ -118,6 +118,28 @@ test.describe('Section transition', () => {
     expect(await backdrop.boundingBox()).toEqual({ x: 0, y: 0, width: viewport?.width, height: viewport?.height });
   });
 
+  test('a Section sliding in from the right never makes the popup scroll sideways', async ({ page, storage, extensionId }) => {
+    await openPopup(page, storage, extensionId, 'light');
+    await page.evaluate((at) => {
+      document.addEventListener('animationstart', (event) => {
+        if (!event.animationName.startsWith('section-from-') || !(event.target instanceof HTMLElement)) return;
+        for (const animation of event.target.getAnimations()) {
+          animation.pause();
+          animation.currentTime = at;
+        }
+      });
+    }, MOTION.sectionIn / 8);
+
+    await goTo(page, 'settings');
+
+    await expect(page.getByTestId('section')).toHaveCSS('opacity', /^0\.\d+$/);
+    const overflow = await page.evaluate(() => {
+      const root = document.scrollingElement ?? document.documentElement;
+      return root.scrollWidth - root.clientWidth;
+    });
+    expect(overflow).toBe(0);
+  });
+
   test('pressing the active tab still scrolls its Section back to the top', async ({ page, storage, extensionId }) => {
     await openPopup(page, storage, extensionId, 'light');
     await goTo(page, 'settings');
