@@ -501,6 +501,12 @@ function scan(check: Checker, files: readonly SourceText[] = readSourceTree()): 
   return files.flatMap((file) => check(file.path, file.contents)).map(formatViolation);
 }
 
+/**
+ * Timeout of a test that reads or scans the whole of src/. A scan takes about 1 s in a plain run,
+ * but coverage instrumentation on the slower Node 22 CI runner took one past vitest's 5 s default.
+ */
+const WHOLE_TREE_TIMEOUT_MS = 20_000;
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -583,7 +589,7 @@ describe('Admission guardrails', () => {
 
     it('finds none in src', () => {
       expect(scan(findInvisibleCharacters)).toEqual([]);
-    });
+    }, WHOLE_TREE_TIMEOUT_MS);
   });
 
   describe('nominal type forgery', () => {
@@ -687,7 +693,7 @@ describe('Admission guardrails', () => {
 
     it('finds none in src', () => {
       expect(scan(findNominalTypeForgery)).toEqual([]);
-    });
+    }, WHOLE_TREE_TIMEOUT_MS);
   });
 
   describe('direct prompts-key writes', () => {
@@ -830,7 +836,7 @@ describe('Admission guardrails', () => {
 
     it('finds none in src', () => {
       expect(scan(findPromptsKeyWrites)).toEqual([]);
-    });
+    }, WHOLE_TREE_TIMEOUT_MS);
   });
 
   // A guard that quietly scans nothing, or that cannot read the structure of the real files, would
@@ -860,7 +866,7 @@ describe('Admission guardrails', () => {
           toRepoPath(fileURLToPath(import.meta.url))
         ])
       );
-    });
+    }, WHOLE_TREE_TIMEOUT_MS);
 
     it('catches an invisible character added to a real file', () => {
       const file = edited('src/services/promptAdmission.ts', append(`// note${cp(0x202e)}`));
