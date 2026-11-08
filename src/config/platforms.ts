@@ -37,7 +37,11 @@ export interface PlatformDefinition {
   defaultEnabled: boolean;
   /** CSS selectors for finding input elements */
   selectors: string[];
-  /** CSS selector for button container where icon should be placed */
+  /**
+   * Where the icon goes: a CSS selector list for the composer toolbar, the first match in document
+   * order. The single source: a strategy reads it from here. When none matches, the icon is anchored
+   * on the editor instead (src/content/core/anchored-overlay.ts).
+   */
   buttonContainerSelector?: string;
   /** Strategy class name to use for this platform */
   strategyClass: string;
@@ -87,8 +91,10 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
       'textarea[data-testid="chat-input"]',
       'textarea[placeholder*="Message"]',
     ],
-    buttonContainerSelector:
-      'div[data-testid="composer-trailing-actions"] .ms-auto.flex.items-center',
+    buttonContainerSelector: [
+      'div[data-testid="composer-trailing-actions"] .ms-auto.flex.items-center', // Since #46
+      ".ms-auto.flex.items-center.gap-1\\.5", // The first layout, kept as a fallback
+    ].join(", "),
     strategyClass: "ChatGPTStrategy",
     hostnamePatterns: ["openai", "chatgpt"],
     brandColors: {
@@ -130,8 +136,10 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
       'textarea[placeholder*="Ask"]',
       'textarea[placeholder*="follow"]',
     ],
-    buttonContainerSelector:
-      ".bg-background-50.dark\\:bg-offsetDark.flex.items-center",
+    buttonContainerSelector: [
+      ".flex.items-center.justify-self-end.col-start-3.row-start-2", // Since #21
+      ".bg-background-50.dark\\:bg-offsetDark.flex.items-center", // The first layout, kept as a fallback
+    ].join(", "),
     strategyClass: "PerplexityStrategy",
     hostnamePatterns: ["perplexity"],
     brandColors: {

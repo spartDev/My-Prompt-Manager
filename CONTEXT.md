@@ -53,6 +53,14 @@ An AI chat site the extension works on (for example Claude or ChatGPT).
 **Prompt selector**:
 The list a user opens from the icon shown inside a Platform's input area, to choose a Prompt to insert.
 
+**Toolbar**:
+The row of buttons in a Platform's input area (attach, voice, send…) where the icon is placed. Each Platform names its Toolbar once, in `src/config/platforms.ts`.
+_Avoid_: Button container, actions bar
+
+**Anchored overlay**:
+Where the icon goes when a Platform's Toolbar is not found, or where a custom site's positioning says: a layer that follows the element it is anchored on. On a Platform, inside the editor's bottom-end corner. An icon that stays there on a Platform means its Toolbar changed.
+_Avoid_: Floating icon (the custom-site icon's look, not its placement), absolute fallback
+
 **Insertion**:
 Putting a Prompt's content into a Platform's input field. A Prompt's content arrives exactly as saved (see Verbatim).
 
