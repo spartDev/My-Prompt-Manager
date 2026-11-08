@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { DEFAULT_CATEGORY_COLOR } from '../constants/colors';
+import { MOTION, motionDuration } from '../theme/motion';
 import type { Category } from '../types';
-
-/** How long the sheet's exit runs (.sheet-out in popup.css): it leaves the page once that has ended */
-export const SHEET_EXIT_MS = 280;
 
 export type CategorySheetMode = 'create' | 'edit';
 
@@ -59,8 +57,9 @@ const CLOSED: SheetState = {
 
 /**
  * The state of the Category sheet, apart from how it is drawn: whether it is open, closing or gone,
- * in which mode, and the draft name and color. Closing waits SHEET_EXIT_MS before taking the sheet
- * off the page; opening again meanwhile cancels that, so only one sheet is ever on the page.
+ * in which mode, and the draft name and color. Closing waits for the exit (MOTION.categorySheetOut;
+ * nothing under prefers-reduced-motion) before taking the sheet off the page; opening again meanwhile
+ * cancels that, so only one sheet is ever on the page.
  */
 export function useCategorySheet({ onClosed }: UseCategorySheetOptions = {}): UseCategorySheetReturn {
   const [state, setState] = useState<SheetState>(CLOSED);
@@ -110,7 +109,7 @@ export function useCategorySheet({ onClosed }: UseCategorySheetOptions = {}): Us
       phaseRef.current = 'closed';
       setState(prev => ({ ...CLOSED, session: prev.session }));
       onClosedRef.current?.();
-    }, SHEET_EXIT_MS);
+    }, motionDuration(MOTION.categorySheetOut));
   }, []);
 
   const setName = useCallback((name: string) => {

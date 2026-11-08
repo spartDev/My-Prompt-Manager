@@ -30,7 +30,12 @@ describe('motion tokens', () => {
     ['pop', `pop ${MOTION.pop}ms var(--ease-spring) both`],
     ['pop-check', `pop ${MOTION.popCheck}ms var(--ease-spring) both`],
     ['toast-in', `toast-in ${MOTION.toastIn}ms var(--ease-spring) both`],
-    ['toast-mark', `pop ${MOTION.toastIn}ms var(--ease-spring) ${MOTION.toastMarkDelay}ms both`]
+    ['toast-mark', `pop ${MOTION.toastIn}ms var(--ease-spring) ${MOTION.toastMarkDelay}ms both`],
+    ['category-sheet-in', `sheet-in ${MOTION.categorySheetIn}ms var(--ease-sheet) both`],
+    ['category-sheet-out', `sheet-out ${MOTION.categorySheetOut}ms var(--ease-sheet) both`],
+    ['backdrop-in', `backdrop-in ${MOTION.backdropIn}ms ease both`],
+    ['backdrop-out', `backdrop-out ${MOTION.backdropOut}ms ease both`],
+    ['category-pop', `pop ${MOTION.categoryPop}ms var(--ease-spring) both`]
   ])('animate-%s runs for the duration motion.ts gives', (name, animation) => {
     expect(tokens).toContain(`--animate-${name}: ${animation};`);
   });
@@ -55,7 +60,7 @@ describe('motion tokens', () => {
   });
 
   it('keeps the keyframes of the mockup', () => {
-    for (const name of ['sheet-in', 'sheet-out', 'recede-in', 'recede-out', 'scrim-in', 'scrim-out', 'pop', 'toast-in']) {
+    for (const name of ['sheet-in', 'sheet-out', 'recede-in', 'recede-out', 'scrim-in', 'scrim-out', 'pop', 'toast-in', 'backdrop-in', 'backdrop-out']) {
       expect(tokens).toContain(`@keyframes ${name}`);
     }
   });
@@ -63,6 +68,14 @@ describe('motion tokens', () => {
   it('lets the sheet rise in 400ms, gently, and leave a little faster', () => {
     expect(MOTION.sheetIn).toBe(400);
     expect(MOTION.sheetOut).toBeLessThan(MOTION.sheetIn);
+  });
+
+  it('keeps the timing approved for the Category sheet: in 500ms, out 280ms, backdrop 300/280ms, pop 500ms', () => {
+    expect(MOTION.categorySheetIn).toBe(500);
+    expect(MOTION.categorySheetOut).toBe(280);
+    expect(MOTION.backdropIn).toBe(300);
+    expect(MOTION.backdropOut).toBe(280);
+    expect(MOTION.categoryPop).toBe(500);
   });
 
   it('makes the Save pause the 620ms of the mockup', () => {

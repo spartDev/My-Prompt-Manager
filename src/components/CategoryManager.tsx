@@ -108,7 +108,8 @@ const CategoryManager: FC<CategoryManagerProps> = ({
   }, [appearing, reveal]);
 
   const handleAppeared = (event: AnimationEvent<HTMLElement>) => {
-    if (event.animationName === 'category-pop') {
+    // pop is shared: only the row's own animation settles it, not one bubbling up from inside it
+    if (event.target === event.currentTarget && event.animationName === 'pop') {
       setAppearing(null);
     }
   };
@@ -275,7 +276,7 @@ const CategoryManager: FC<CategoryManagerProps> = ({
                   onAnimationEnd: handleAppeared,
                   className: cn(
                     'relative flex w-full items-center justify-between p-5 text-left transition-colors duration-200',
-                    appearing?.id === category.id && (appearing.waiting ? 'opacity-0' : 'category-pop')
+                    appearing?.id === category.id && (appearing.waiting ? 'opacity-0' : 'animate-category-pop')
                   )
                 };
 

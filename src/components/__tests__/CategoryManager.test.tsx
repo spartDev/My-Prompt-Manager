@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type React from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -141,7 +141,7 @@ describe('CategoryManager', () => {
       await user.click(within(sheet).getByRole('button', { name: 'Close' }));
       await user.click(screen.getByTestId('category-sheet-backdrop'));
       // Closing now would look like cancelling a Category that is created anyway
-      expect(sheet).toHaveClass('sheet-in');
+      expect(sheet).toHaveClass('animate-category-sheet-in');
 
       resolvers.forEach(resolve => { resolve(); });
       await sheetGone();
@@ -243,7 +243,21 @@ describe('CategoryManager', () => {
       const row = () => screen.getAllByTestId('category-row').find(r => r.dataset.categoryName === 'Research');
       expect(row()).toHaveClass('opacity-0');
       await sheetGone();
-      expect(row()).toHaveClass('category-pop');
+      expect(row()).toHaveClass('animate-category-pop');
+    });
+
+    it('settles the new Category once its pop has ended', async () => {
+      const { user, props, rerender } = renderManager();
+
+      await user.click(screen.getByRole('button', { name: 'Add category' }));
+      await user.keyboard('Research{Enter}');
+      rerender(<CategoryManager {...props} categories={[...baseCategories, { id: 'new', name: 'Research', color: '#0369A1' }]} />);
+      await sheetGone();
+
+      const row = () => screen.getAllByTestId('category-row').find(r => r.dataset.categoryName === 'Research');
+      expect(row()).toHaveClass('animate-category-pop');
+      fireEvent.animationEnd(row() as HTMLElement, { animationName: 'pop' });
+      expect(row()).not.toHaveClass('animate-category-pop');
     });
   });
 
@@ -351,7 +365,7 @@ describe('CategoryManager', () => {
       await user.click(within(sheet).getByRole('button', { name: 'Cancel' }));
       await user.click(screen.getByTestId('category-sheet-backdrop'));
       // Still the sheet that started the deletion, so its end applies to it and to nothing else
-      expect(sheet).toHaveClass('sheet-in');
+      expect(sheet).toHaveClass('animate-category-sheet-in');
 
       resolvers.forEach(resolve => { resolve(); });
       await sheetGone();
@@ -396,7 +410,7 @@ describe('CategoryManager', () => {
       expect(within(sheet).getByRole('button', { name: 'Save' })).toHaveAttribute('aria-disabled', 'true');
       await user.click(within(sheet).getByRole('button', { name: 'Save' }));
       expect(props.onUpdateCategory).not.toHaveBeenCalled();
-      expect(sheet).toHaveClass('sheet-in');
+      expect(sheet).toHaveClass('animate-category-sheet-in');
 
       resolvers.forEach(resolve => { resolve(); });
       await sheetGone();
@@ -454,12 +468,12 @@ describe('CategoryManager', () => {
       const { user } = renderManager();
 
       await user.click(screen.getByRole('button', { name: 'Add category' }));
-      expect(screen.getByRole('dialog')).toHaveClass('sheet-in');
+      expect(screen.getByRole('dialog')).toHaveClass('animate-category-sheet-in');
       await user.keyboard('{Escape}');
 
       const leaving = screen.getByRole('dialog', { hidden: true });
-      expect(leaving).toHaveClass('sheet-out');
-      expect(screen.getByTestId('category-sheet-backdrop')).toHaveClass('backdrop-out');
+      expect(leaving).toHaveClass('animate-category-sheet-out');
+      expect(screen.getByTestId('category-sheet-backdrop')).toHaveClass('animate-backdrop-out');
       await sheetGone();
     });
 

@@ -61,7 +61,7 @@ const watchExit = (page: Page): Promise<void> =>
     (window as ExitWatch).categorySheetExit = new Promise(resolve => {
       if (!sheet) {return;}
       const observer = new MutationObserver(() => {
-        if (!sheet.classList.contains('sheet-out')) {return;}
+        if (!sheet.classList.contains('animate-category-sheet-out')) {return;}
         observer.disconnect();
         const style = getComputedStyle(sheet);
         resolve({
