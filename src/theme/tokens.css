@@ -175,6 +175,21 @@
       transform: scaleX(0);
     }
   }
+
+  /* Arriving on a Section (Atelier 1C): it slides 26px in from the side of its tab and fades in.
+     Only the from keyframe fills (backwards): once arrived, the Section keeps no transform, which
+     would make it the containing block of the fixed sheets inside it */
+  --ease-section: cubic-bezier(0.32, 0.72, 0, 1);
+  --duration-section: 450ms;
+  --animate-section-forward: section-from-right var(--duration-section) var(--ease-section) backwards;
+  --animate-section-back: section-from-left var(--duration-section) var(--ease-section) backwards;
+
+  @keyframes section-from-right {
+    from { opacity: 0; transform: translateX(26px); }
+  }
+  @keyframes section-from-left {
+    from { opacity: 0; transform: translateX(-26px); }
+  }
 }
 
 /* Reduced motion: every motion token becomes near instant, so a component that reads them needs no
@@ -187,6 +202,7 @@
     --duration-spring: 1ms;
     --duration-fill: 1ms;
     --delay-fill: 0ms;
+    --duration-section: 1ms;
   }
 }
 

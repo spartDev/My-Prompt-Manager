@@ -6,7 +6,7 @@ Which component does which job in the popup and the side panel, and the conventi
 
 ## Where things live
 
-`src/App.tsx` is the shell: it holds the Prompts and Categories (`usePrompts`, `useCategories`), the Notification (`useToast`) and the current section, and renders one view plus the `TabBar`. The editor is a sheet above them: it rises from the bottom (`animate-sheet-in`), the Section and the `TabBar` wait `inert` beneath it, receding a little under a scrim (`animate-recede-in`, `animate-scrim-in`), and on close it leaves to the bottom and unmounts after its animation (`useAnimatedPresence`), when the keyboard returns to what opened it. The same `App` runs in the popup and in the side panel; it receives the context as a prop.
+`src/App.tsx` is the shell: it holds the Prompts and Categories (`usePrompts`, `useCategories`), the Notification (`useToast`) and the current section, and renders one view plus the `TabBar`. Arriving on a Section from the tab bar slides it 26px in from the side of its tab with a fade (`animate-section-forward` or `animate-section-back`, by the order of `SECTION_ORDER`); the first Section shows at once. The editor is a sheet above them: it rises from the bottom (`animate-sheet-in`), the Section and the `TabBar` wait `inert` beneath it, receding a little under a scrim (`animate-recede-in`, `animate-scrim-in`), and on close it leaves to the bottom and unmounts after its animation (`useAnimatedPresence`), when the keyboard returns to what opened it. The same `App` runs in the popup and in the side panel; it receives the context as a prop.
 
 | Folder | What is in it |
 |--------|---------------|
@@ -26,7 +26,7 @@ Which component does which job in the popup and the side panel, and the conventi
 | `src/components/CategorySheet.tsx` | The bottom sheet that creates or edits a Category (`mode: 'create' \| 'edit'`): name, one of the 12 `PRESET_COLORS`, a live preview. Its state (open, closing, draft) is `useCategorySheet`; its keyboard is `useModalFocus` |
 | `src/components/analytics/AnalyticsTab.tsx` | The Analytics section; `src/components/analytics/AnalyticsDashboard.tsx` is the full page it expands to |
 | `src/components/SettingsView.tsx` | Settings: assembles the sections of `src/components/settings/`, and runs Backup restore (`handleImportData`, passed down as `onImport`) |
-| `src/components/TabBar.tsx` | The bottom tab bar; its `Section` type names the four sections |
+| `src/components/TabBar.tsx` | The bottom tab bar; its `Section` type names the four sections, `SECTION_ORDER` their order left to right |
 
 ### Prompts
 

@@ -56,6 +56,35 @@ describe('App tab bar navigation', () => {
     expect(screen.queryByTestId('back-button')).not.toBeInTheDocument();
   });
 
+  it('shows the first Section at once when the popup opens', async () => {
+    await renderApp();
+
+    expect(screen.getByTestId('section').className).not.toMatch(/animate-section/);
+  });
+
+  it('slides a Section further along the tab bar in from the right', async () => {
+    const user = userEvent.setup();
+    await renderApp();
+
+    await user.click(screen.getByRole('tab', { name: 'Settings' }));
+
+    await screen.findByRole('heading', { name: 'Settings', level: 1 });
+    expect(screen.getByTestId('section')).toHaveClass('animate-section-forward');
+  });
+
+  it('slides a Section further back along the tab bar in from the left', async () => {
+    const user = userEvent.setup();
+    await renderApp();
+    await user.click(screen.getByRole('tab', { name: 'Settings' }));
+    await screen.findByRole('heading', { name: 'Settings', level: 1 });
+
+    await user.click(screen.getByRole('tab', { name: 'Categories' }));
+
+    await screen.findByRole('heading', { name: 'Categories', level: 1 });
+    expect(screen.getByTestId('section')).toHaveClass('animate-section-back');
+    expect(screen.getByTestId('section')).not.toHaveClass('animate-section-forward');
+  });
+
   it('opens the editor as a sheet over the Library, which waits inert, and gives New the keyboard back once the sheet has left', async () => {
     const user = userEvent.setup();
     await renderApp();

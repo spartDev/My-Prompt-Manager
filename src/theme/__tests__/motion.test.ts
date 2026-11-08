@@ -35,6 +35,24 @@ describe('motion tokens', () => {
     expect(tokens).toContain(`--animate-${name}: ${animation};`);
   });
 
+  it.each([
+    ['forward', 'section-from-right'],
+    ['back', 'section-from-left']
+  ])('animate-section-%s slides the Section in on the Section curve, from the duration tokens', (name, keyframes) => {
+    expect(tokens).toContain(`--ease-section: ${EASE.section};`);
+    expect(tokens).toContain(`--duration-section: ${MOTION.sectionIn}ms;`);
+    expect(tokens).toContain(`--animate-section-${name}: ${keyframes} var(--duration-section) var(--ease-section) backwards;`);
+  });
+
+  it('slides a Section 26px over the 450ms of the mockup, near instant under reduced motion', () => {
+    expect(MOTION.sectionIn).toBe(450);
+    expect(EASE.section).toBe('cubic-bezier(0.32, 0.72, 0, 1)');
+    expect(tokens).toMatch(/@keyframes section-from-right \{\s*from \{ opacity: 0; transform: translateX\(26px\); \}/);
+    expect(tokens).toMatch(/@keyframes section-from-left \{\s*from \{ opacity: 0; transform: translateX\(-26px\); \}/);
+    const reduced = tokens.slice(tokens.indexOf('@media (prefers-reduced-motion: reduce)'));
+    expect(reduced).toContain('--duration-section: 1ms;');
+  });
+
   it('keeps the keyframes of the mockup', () => {
     for (const name of ['sheet-in', 'sheet-out', 'recede-in', 'recede-out', 'scrim-in', 'scrim-out', 'pop', 'toast-in']) {
       expect(tokens).toContain(`@keyframes ${name}`);

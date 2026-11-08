@@ -13,6 +13,9 @@ const TABS: Array<{ section: Section; label: string; icon: FC<{ className?: stri
   { section: 'settings', label: 'Settings', icon: SettingsTabIcon }
 ];
 
+/** The Sections in the order of the tab bar, left to right */
+export const SECTION_ORDER: readonly Section[] = TABS.map(({ section }) => section);
+
 export interface TabBarProps {
   activeSection: Section;
   /** Fired on every tab press, including the already active tab (used for scroll-to-top). */
