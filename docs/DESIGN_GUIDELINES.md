@@ -1030,6 +1030,17 @@ The Settings controls read their durations from tokens, `duration-(--duration-*)
 | `--duration-spring` | 450ms | Switch knob, segmented control puck |
 | `--duration-fill`, `--delay-fill` | 1100ms, 200ms | `animate-fill-grow`: the storage bar grows from the left on arrival |
 
+#### Section transition
+
+Arriving on a Section from the tab bar slides it 26px in from the side of its tab while it fades in: a tab further right enters from the right (`animate-section-forward`, keyframes `section-from-right`), one further left from the left (`animate-section-back`, `section-from-left`), by the tab order, as in the mockup. The popup opens on its first Section at once, and pressing the active tab plays nothing (it scrolls the Section to the top). The Section left behind has no animation: it is gone at once.
+
+| Token | Value | Use |
+|---|---|---|
+| `--ease-section` (`EASE.section`) | `cubic-bezier(0.32, 0.72, 0, 1)` | The slide: most of the way in its first half, then a long settle |
+| `--duration-section` (`MOTION.sectionIn`) | 450ms | Its length; 1ms under `prefers-reduced-motion` |
+
+The slide moves the Section with `left`, relatively positioned for the length of the animation only, never with `transform`: a transformed Section would become the containing block of any fixed element inside it. The fade would still dim one, so every sheet and dialog opened from a Section portals to `document.body` (Clear history in Analytics included), out of reach of the slide and the fade. The wrapper around the Section (`editor-beneath` in `App`) clips horizontal overflow (`overflow-x-clip`), so the 26px of the slide never make the popup scroll sideways; a clip, unlike a transform, leaves those fixed dialogs on the viewport.
+
 ### Keyframe Animations
 
 #### Category Sheet

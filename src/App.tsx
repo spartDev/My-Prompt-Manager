@@ -7,7 +7,7 @@ import LibraryView from './components/LibraryView';
 import PromptEditor from './components/PromptEditor';
 import SettingsView from './components/SettingsView';
 import StorageWarning from './components/StorageWarning';
-import TabBar, { type Section } from './components/TabBar';
+import TabBar, { SECTION_ORDER, type Section } from './components/TabBar';
 import ToastContainer from './components/ToastContainer';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { useAnimatedPresence } from './hooks/useAnimatedPresence';
@@ -47,6 +47,8 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   const isPickerMode = urlParams.get('picker') === 'true';
   
   const [currentView, setCurrentView] = useState<Section>(isPickerMode ? 'settings' : 'library');
+  // Arriving on a Section slides it in from the side of its tab; the first Section shows at once
+  const [sectionMotion, setSectionMotion] = useState<'forward' | 'back' | null>(null);
   // The editor rises as a sheet over the Section and leaves to the bottom: it stays in the
   // document for its exit animation, then unmounts
   const [editor, setEditor] = useState<EditorState | null>(null);
@@ -337,6 +339,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
       void refreshPrompts();
       void refreshCategories();
     }
+    setSectionMotion(SECTION_ORDER.indexOf(section) > SECTION_ORDER.indexOf(currentView) ? 'forward' : 'back');
     setCurrentView(section);
   }, [currentView, refreshPrompts, refreshCategories]);
 
@@ -386,12 +389,20 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
       <div
         data-testid="editor-beneath"
         className={cn(
-          'flex flex-1 min-h-0 flex-col origin-top',
+          // Clips the 26px of a Section sliding in from the side, which would make the popup scroll
+          // sideways; clip, unlike a transform, leaves the fixed dialogs inside it on the viewport
+          'flex flex-1 min-h-0 flex-col origin-top overflow-x-clip',
           editorSheet.shown && (editorSheet.exiting ? 'animate-recede-out' : 'animate-recede-in')
         )}
         inert={editor !== null}
       >
-      <div ref={sectionContentRef} className="flex-1 min-h-0">
+      {/* Keyed by the Section, so that every arrival plays its slide */}
+      <div
+        ref={sectionContentRef}
+        key={currentView}
+        data-testid="section"
+        className={cn('flex-1 min-h-0', sectionMotion && `animate-section-${sectionMotion}`)}
+      >
       {currentView === 'library' && (
         <LibraryView
           prompts={optimisticPrompts}

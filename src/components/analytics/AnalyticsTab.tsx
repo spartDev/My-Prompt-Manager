@@ -1,4 +1,5 @@
 import { type FC, useCallback, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import { useModalFocus } from '../../hooks/useModalFocus';
 import { useNow } from '../../hooks/useNow';
@@ -247,8 +248,9 @@ const AnalyticsTab: FC<AnalyticsTabProps> = ({
         )}
       </main>
 
-      {/* Clear History Confirmation Modal */}
-      {showClearConfirm && (
+      {/* Clear History Confirmation Modal: on the body, like the other dialogs, out of reach of the
+          Section's slide and fade */}
+      {showClearConfirm && createPortal(
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-backdrop backdrop-blur-sm"
           role="presentation"
@@ -297,7 +299,8 @@ const AnalyticsTab: FC<AnalyticsTabProps> = ({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

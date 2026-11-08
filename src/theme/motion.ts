@@ -8,7 +8,9 @@
 export const EASE = {
   sheet: 'cubic-bezier(0.25, 0.8, 0.3, 1)',
   sheetOut: 'cubic-bezier(0.5, 0, 0.75, 0)',
-  spring: 'cubic-bezier(0.34, 1.56, 0.64, 1)'
+  spring: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+  /** Arriving on a Section from the tab bar */
+  section: 'cubic-bezier(0.32, 0.72, 0, 1)'
 } as const;
 
 /** Durations and delays, in milliseconds */
@@ -26,7 +28,9 @@ export const MOTION = {
   /** The Notification pill dropping in */
   toastIn: 450,
   /** The round of the Notification pops this long after the pill */
-  toastMarkDelay: 80
+  toastMarkDelay: 80,
+  /** A Section sliding in from the side of its tab */
+  sectionIn: 450
 } as const;
 
 const REDUCED_MOTION = '(prefers-reduced-motion: reduce)';
