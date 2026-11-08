@@ -13,7 +13,7 @@ import type { Page } from '@playwright/test';
 import { EASE, MOTION } from '../../../src/theme/motion';
 import { type ExtensionStorage, expect, test } from '../fixtures/extension';
 import { SECTION_HEADINGS, type Section, tabNavigation } from '../utils/navigation';
-import { createPromptSeed, seedLibrary } from '../utils/storage';
+import { createPromptSeed, createUsageHistory, seedLibrary, seedUsageHistory } from '../utils/storage';
 
 const SCREENSHOT_DIR = 'test-results/section-transition';
 
@@ -87,11 +87,36 @@ test.describe('Section transition', () => {
         }
       }
 
-      // Arrived, the Section keeps no transform
+      // Arrived, the Section is back in the flow, with no offset and no transform
+      await expect(section).toHaveCSS('position', 'static');
       await expect(section).toHaveCSS('transform', 'none');
       await page.screenshot({ path: `${SCREENSHOT_DIR}/library-arrived-${theme}.png` });
     });
   }
+
+  test('a dialog opened while the Section slides in covers the whole popup', async ({ page, storage, extensionId }) => {
+    await seedUsageHistory(storage, createUsageHistory(5, { promptIds: [prompts[0].id] }));
+    await openPopup(page, storage, extensionId, 'light');
+    // Held early in its slide, as when Clear history is pressed during the 450ms of the entrance
+    await page.evaluate((at) => {
+      document.addEventListener('animationstart', (event) => {
+        if (!event.animationName.startsWith('section-from-') || !(event.target instanceof HTMLElement)) return;
+        for (const animation of event.target.getAnimations()) {
+          animation.pause();
+          animation.currentTime = at;
+        }
+      });
+    }, MOTION.sectionIn / 8);
+    await goTo(page, 'analytics');
+    await expect(page.getByTestId('section')).toHaveCSS('opacity', /^0\.\d+$/);
+
+    await page.getByRole('button', { name: 'Clear history' }).click();
+
+    // Its backdrop fills the popup, over the tab bar, not the Section alone, and the dialog is centered in it
+    const backdrop = page.getByRole('dialog', { name: 'Clear usage history?' }).locator('xpath=..');
+    const viewport = page.viewportSize();
+    expect(await backdrop.boundingBox()).toEqual({ x: 0, y: 0, width: viewport?.width, height: viewport?.height });
+  });
 
   test('pressing the active tab still scrolls its Section back to the top', async ({ page, storage, extensionId }) => {
     await openPopup(page, storage, extensionId, 'light');

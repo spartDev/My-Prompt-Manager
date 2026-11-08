@@ -47,8 +47,9 @@ describe('motion tokens', () => {
   it('slides a Section 26px over the 450ms of the mockup, near instant under reduced motion', () => {
     expect(MOTION.sectionIn).toBe(450);
     expect(EASE.section).toBe('cubic-bezier(0.32, 0.72, 0, 1)');
-    expect(tokens).toMatch(/@keyframes section-from-right \{\s*from \{ opacity: 0; transform: translateX\(26px\); \}/);
-    expect(tokens).toMatch(/@keyframes section-from-left \{\s*from \{ opacity: 0; transform: translateX\(-26px\); \}/);
+    // Offset with left, not transform: a transformed Section would hold the fixed dialogs inside it
+    expect(tokens).toMatch(/@keyframes section-from-right \{\s*from \{ opacity: 0; position: relative; left: 26px; \}\s*to \{ position: relative; left: 0; \}/);
+    expect(tokens).toMatch(/@keyframes section-from-left \{\s*from \{ opacity: 0; position: relative; left: -26px; \}\s*to \{ position: relative; left: 0; \}/);
     const reduced = tokens.slice(tokens.indexOf('@media (prefers-reduced-motion: reduce)'));
     expect(reduced).toContain('--duration-section: 1ms;');
   });

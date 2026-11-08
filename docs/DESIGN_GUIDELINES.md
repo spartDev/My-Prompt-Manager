@@ -1039,7 +1039,7 @@ Arriving on a Section from the tab bar slides it 26px in from the side of its ta
 | `--ease-section` (`EASE.section`) | `cubic-bezier(0.32, 0.72, 0, 1)` | The slide: most of the way in its first half, then a long settle |
 | `--duration-section` (`MOTION.sectionIn`) | 450ms | Its length; 1ms under `prefers-reduced-motion` |
 
-The animations fill `backwards` only: once arrived, the Section keeps no `transform`, which would make it the containing block of the fixed sheets inside it (the Category sheet).
+The slide moves the Section with `left`, relatively positioned for the length of the animation only, never with `transform`: a transformed Section would become the containing block of the fixed dialogs rendered inside it (Clear history in Analytics), shut in above the tab bar until the slide ends. The sheets and dialogs that portal to `document.body` are out of its reach either way.
 
 ### Keyframe Animations
 
