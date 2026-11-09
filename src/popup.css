@@ -101,12 +101,22 @@
   }
 }
 
+/* Schibsted Grotesk, self-hosted from public/fonts (source and licence: public/fonts/README.md).
+   One variable file covers weights 400 to 900; no request leaves the extension */
+@font-face {
+  font-family: 'Schibsted Grotesk';
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url('/fonts/SchibstedGrotesk-latin.woff2') format('woff2');
+}
+
 body {
   margin: 0;
   padding: 0;
   width: 400px;
   height: 500px;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: 'Schibsted Grotesk', ui-sans-serif, system-ui, sans-serif;
   background: var(--background-color-app);
 }
 
