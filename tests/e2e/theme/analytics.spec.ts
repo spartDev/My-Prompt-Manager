@@ -158,8 +158,9 @@ test.describe('Analytics on the tokens', () => {
       const quiet = (busiestIndex + 1) % 7;
       await expect(pills.nth(quiet)).toHaveCSS('background-color', 'rgba(255, 255, 255, 0.22)');
       await expect(bars.nth(quiet).locator(':scope > span')).toHaveCSS('color', colors.onInverseMuted);
-      // rounded-full: Tailwind 4 writes calc(infinity * 1px)
-      await expect(pills.first()).toHaveCSS('border-top-left-radius', /^(9999|1\.67772e\+07)px$/);
+      // rounded-full: Tailwind 4 writes calc(infinity * 1px), which Chromium clamps to a huge length
+      // whose value changes between versions (1.67772e+07px, 3.35544e+07px…)
+      await expect(pills.first()).toHaveCSS('border-top-left-radius', /^(9999|\d+(\.\d+)?e\+\d+)px$/);
 
       for (const label of ['Top platform', 'Top category'] as const) {
         const card = page.locator('div').filter({ has: page.getByRole('heading', { name: label, exact: true }) }).last();
