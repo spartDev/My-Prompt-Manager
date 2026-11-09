@@ -208,6 +208,8 @@ export interface UsageStats {
 export interface UseUsageStatsReturn {
   stats: UsageStats | null;
   history: UsageEvent[];
+  /** The Library's Prompts, as loaded with the history */
+  prompts: Prompt[];
   loading: boolean;
   error: AppError | null;
   refresh: () => Promise<void>;

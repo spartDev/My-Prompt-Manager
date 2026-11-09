@@ -50,11 +50,9 @@ test.describe('Analytics dashboard', () => {
       const analyticsPage = new AnalyticsPage(page);
       await analyticsWorkflows.navigateToAnalyticsTab(page);
 
-      // Verify empty state is shown
-      await analyticsAssertions.emptyState(page);
-
-      // Verify empty state container is visible
-      await expect(analyticsPage.getEmptyState()).toBeVisible();
+      // The tab shows no usage, and no way to a dashboard with nothing to show
+      await analyticsAssertions.tabEmptyState(page);
+      await expect(analyticsPage.getExpandDashboardButton()).toBeHidden();
     });
   });
 

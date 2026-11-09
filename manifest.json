@@ -53,7 +53,8 @@
         "assets/promptAdmission-*.js",
         "assets/promptVariables-*.js",
         "assets/floating-ui.dom-*.js",
-        "assets/categoryChip-*.js"
+        "assets/categoryChip-*.js",
+        "assets/truncate-*.js"
       ],
       "use_dynamic_url": false
     }

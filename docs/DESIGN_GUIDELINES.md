@@ -38,7 +38,8 @@ Visual reference (both modes side by side): the palette canvas linked from beads
 | `bg-subtle` | `#F4F1FA` | `#2B2340` | Chips and fields **on a card**. Never directly on `bg-app`: same value in light |
 | `bg-raised` | `#F8F6FC` | `#1B1528` | Light fills: empty states, nested panels |
 | `bg-muted` | `#F1EDF8` | `#2E2645` | Hover of neutral elements (`hover:bg-muted`) |
-| `bg-inverse` | `#1D1530` | `#4A3D6B` | Notification pill, tooltips |
+| `bg-inverse` | `#1D1530` | `#4A3D6B` | Notification pill, tooltips, the Analytics hero |
+| `bg-callout` | `#FFF8E6` | `#2B210E` | The Tidy up callout of Analytics, with `border-warning` and `text-callout` |
 | `bg-backdrop` | `#2A2140` at 45% | `#07050C` at 70% | Behind an open dialog or drawer, with `backdrop-blur-sm` |
 | `bg-highlight` | `#FEF3C7` | `#33270F` | Search match in a Prompt title or preview (`<mark className="bg-highlight text-inherit">`) |
 
@@ -64,6 +65,8 @@ Surfaces are **opaque**. `bg-backdrop` is the only translucent one: no transluce
 | `text-tertiary` | `#6F6787` | `#A39ABB` | Previews, metadata, placeholders (`placeholder:text-tertiary`) |
 | `text-faint` | `#B5ADC8` | `#7D7495` | Disabled and decorative only (2.15:1 in light: never for information) |
 | `text-on-inverse` | `#C9BFE6` | `#C9BFE6` | Message on `bg-inverse` |
+| `text-on-inverse-muted` | `#A99CC9` | `#C9BFE6` | Day labels under the Analytics bars, on `bg-inverse` (the mockup's dark `#A99CC9` is 3.8:1, so dark takes `on-inverse`) |
+| `text-callout` | `#78350F` | `#FDE68A` | Text of the Tidy up callout, on `bg-callout` |
 | `text-on-accent` | `#FFFFFF` | `#FFFFFF` | Text on `bg-accent` and `bg-danger` |
 
 ### Accent (violet)
@@ -100,6 +103,7 @@ The Prompt selector and the Variable form injected on Platforms are plain CSS (`
 | `text-on-inverse-strong` / `text-on-inverse-mark` | `#FFFFFF` / `#1D1530` | same | Notification message / glyph on the Notification's round |
 | `bg-inverse-mark` / `bg-inverse-alert` | `#A78BFA` / `#FCA5A5` | same | Notification round: a confirmation's check / a failure's ! |
 | `bg-inverse-action` | `rgba(255, 255, 255, 0.14)` | same | Action button of a Notification |
+| `bg-inverse-bar` / `bg-inverse-bar-hover` | `rgba(255, 255, 255, 0.22)` / `#FFFFFF` | same / `#231C34` | Analytics weekday bar at rest / hovered; the busiest takes `bg-inverse-mark` |
 
 Information uses the accent family (`bg-accent-subtle`, `border-accent`, `text-accent`): there is no blue info color.
 
@@ -297,7 +301,8 @@ rounded-md   /* 6px / 0.375rem  - Small elements */
 rounded-lg   /* 8px / 0.5rem    - Buttons, icons */
 rounded-xl   /* 12px / 0.75rem  - Cards, inputs, modals */
 rounded-full /* 9999px          - Pills, badges, toggle knobs */
-rounded-group /* 20px (--radius-group) - the card of a Settings group */
+rounded-group /* 20px (--radius-group) - the card of a Settings group, the Analytics cards */
+rounded-hero  /* 24px (--radius-hero) - the Analytics hero, with shadow-hero */
 ```
 
 ### Usage Patterns
@@ -934,14 +939,14 @@ The header is seamless: it shares `bg-app` with the page, and its bottom line (`
 ```tsx
 <header className="shrink-0 bg-app flex items-start justify-between gap-3 px-5 pt-4 pb-2 border-b border-transparent scroll-edge-top">
   <div>
-    <p className="text-[12.5px] font-semibold text-tertiary">Last 30 days of usage</p>
+    <p className="text-[12.5px] font-semibold text-tertiary">Last 30 days</p>
     <h1 className="text-[27px] font-extrabold leading-[1.05] tracking-[-0.035em] text-primary">Analytics</h1>
   </div>
   {/* Actions: the side panel's close button, a primary pill such as Full Dashboard */}
 </header>
 ```
 
-Write it as `<SectionHeader title="Analytics" eyebrow="Last 30 days of usage">{actions}</SectionHeader>`, never by hand. A primary action in it is a pill: `h-9 px-4 rounded-full bg-accent text-on-accent font-bold`.
+Write it as `<SectionHeader title="Analytics" eyebrow="Last 30 days">{actions}</SectionHeader>`, never by hand. A primary action in it is a pill: `h-9 px-4 rounded-full bg-accent text-on-accent font-bold`.
 
 ---
 
@@ -985,6 +990,10 @@ duration or a curve: it uses a class, and a timer reads `MOTION`.
 | `animate-backdrop-in` / `animate-backdrop-out` (`MOTION.backdropIn` / `backdropOut`) | `backdrop-in` 300ms / `backdrop-out` 280ms, ease | the backdrop of the Category sheet, from 0 to full opacity and back |
 | `animate-category-pop` (`MOTION.categoryPop`) | `pop` 500ms, ease-spring | a Category appearing in the list (created, or back from Undo) |
 | `animate-toast-in` | `toast-in` 450ms, ease-spring | the Notification pill, from 14px above the top center |
+| `animate-bar-grow` (`MOTION.barGrow`) | `bar-grow` 800ms, ease-spring | an Analytics weekday bar growing from the bottom; each sets `animationDelay` to `MOTION.barDelay` + index × `MOTION.barStagger` (200ms, then 60ms apart) |
+| `animate-card-rise` (`MOTION.cardRise`) | `card-rise` 500ms, ease-spring | the Top platform and Top category cards rising 12px, at 100ms and 180ms (`cardDelay`, `cardStagger`), and the Tidy up callout |
+| `animate-rank-fill` (`MOTION.rankFill`) | `fill-grow` 1000ms, ease-spring | a Most used bar filling from the left, 300ms then 90ms apart (`rankDelay`, `rankStagger`) |
+| `MOTION.countUp` (a timer, `useCountUp`) | 800ms, ease-out | the Analytics total counting up from 0 with the bars |
 | `animate-toast-mark` | `pop` 450ms, ease-spring, 80ms delay | the round of the Notification |
 | `transition-save` (`src/popup.css`) | background and color 300ms, scale 250ms ease-spring | the Save button, which slides to the success color on "Saved" |
 | `transition-chip` (`src/popup.css`) | background, border and color 250ms, scale 250ms ease-spring | the Category chips and "New category" |
@@ -998,8 +1007,9 @@ the elements already there, so their entrance does not replay.
 with it. The Notification has no exit animation: it leaves at once.
 
 **Reduced motion:** under `prefers-reduced-motion`, `src/popup.css` makes every animation and
-transition above last 1ms, and `motionDuration()` of `src/theme/motion.ts` makes the timers wait
-for nothing: the Save sequence keeps its order without its pause, and a panel unmounts at once.
+transition above last 1ms with no delay (an inline stagger delay included), and `motionDuration()` of `src/theme/motion.ts` makes the timers wait
+for nothing: the Save sequence keeps its order without its pause, a panel unmounts at once, and the
+Analytics total shows its value at once.
 
 #### Animated presence
 

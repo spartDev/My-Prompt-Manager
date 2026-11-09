@@ -1,38 +1,94 @@
-import { type FC, useCallback, useRef, useState } from 'react';
+import { type FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
+import { useDuplicateGroups } from '../../hooks/useDuplicateGroups';
 import { useModalFocus } from '../../hooks/useModalFocus';
-import { useNow } from '../../hooks/useNow';
-import { useSummaryMetrics } from '../../hooks/useSummaryMetrics';
 import { useUsageStats } from '../../hooks/useUsageStats';
-import type { PromptUsageSummary } from '../../types/hooks';
-import { formatPlatformName, formatRelativeTime } from '../../utils';
 import {
-  CalendarIcon,
-  CategoryIcon,
-  PlatformIcon,
-  TrashIcon, 
-  TrophyIcon,
-  UsageIcon
-} from '../icons/UIIcons';
+  countDuplicatePairs,
+  countNeverUsed,
+  duplicateReviewGroups,
+  rankByUses,
+  topCategory,
+  topPlatform,
+  weekdayUsage,
+  withLatestUsage
+} from '../../services/usageInsights';
+import { MOTION } from '../../theme/motion';
+import type { LibraryFilter, Prompt } from '../../types';
+import { formatPlatformName } from '../../utils';
+import { TrashIcon } from '../icons/UIIcons';
 import SectionHeader from '../SectionHeader';
 import ViewHeader from '../ViewHeader';
 
-import { REFRESH_INTERVAL_MS } from './constants';
-import SummaryCard from './SummaryCard';
+import MostUsedCard from './MostUsedCard';
+import StatsHero from './StatsHero';
+import TidyUpCard from './TidyUpCard';
+
+/** Rows of the Most used card, as in the Atelier 1C design */
+const MOST_USED_ROWS = 3;
+
+const StatCard: FC<{ label: string; name: string; count: number; delayIndex: number }> = ({ label, name, count, delayIndex }) => (
+  <div
+    className="p-3.5 rounded-group bg-card border border-default animate-card-rise min-w-0"
+    style={{ animationDelay: `${String(MOTION.cardDelay + delayIndex * MOTION.cardStagger)}ms` }}
+  >
+    <h2 className="text-xs font-semibold text-tertiary">{label}</h2>
+    <p className="mt-1 text-[19px] font-extrabold tracking-[-0.02em] text-primary truncate" title={name}>{name}</p>
+    <p className="text-xs text-secondary">{String(count)} {count === 1 ? 'use' : 'uses'}</p>
+  </div>
+);
 
 export interface AnalyticsTabProps {
   /** Callback when user wants to expand to full dashboard */
   onExpandDashboard?: () => void;
   /** Current context (popup or sidepanel) */
   context?: 'popup' | 'sidepanel';
+  /** The Library's Prompts, kept current by the app; the ones loaded with the history otherwise */
+  prompts?: Prompt[];
+  /** Opens a Prompt of Most used in the editor */
+  onEditPrompt?: (prompt: Prompt) => void;
+  /** Opens the Library on the Prompts Tidy up offers to review */
+  onReviewPrompts?: (filter: LibraryFilter) => void;
+  /** Take the keyboard (the Prompt opened from Most used has gone), then call onFocusTaken */
+  takeFocus?: boolean;
+  onFocusTaken?: () => void;
 }
 
 const AnalyticsTab: FC<AnalyticsTabProps> = ({
   onExpandDashboard,
-  context = 'sidepanel'
+  context = 'sidepanel',
+  prompts: livePrompts,
+  onEditPrompt,
+  onReviewPrompts,
+  takeFocus = false,
+  onFocusTaken
 }) => {
-  const { stats, loading, error, clearHistory } = useUsageStats();
+  const { stats, history, prompts: loadedPrompts, loading, error, clearHistory } = useUsageStats();
+  // The app's Prompts, with the usage stored since (Insertions on a Platform while it was open)
+  const prompts = useMemo(
+    () => (livePrompts ? withLatestUsage(livePrompts, loadedPrompts) : loadedPrompts),
+    [livePrompts, loadedPrompts]
+  );
+  const duplicateGroups = useDuplicateGroups(loading ? null : prompts);
+
+  const weekdays = useMemo(() => weekdayUsage(history), [history]);
+  const platform = useMemo(() => topPlatform(history), [history]);
+  const category = useMemo(() => topCategory(history, prompts), [history, prompts]);
+  const allRanked = useMemo(() => rankByUses(history, prompts, Number.POSITIVE_INFINITY), [history, prompts]);
+  const ranked = allRanked.slice(0, MOST_USED_ROWS);
+  const usedCount = allRanked.length;
+  const neverUsed = useMemo(() => countNeverUsed(prompts), [prompts]);
+
+  // The first Most used row left gets the keyboard, or the content when none is
+  const mainRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!takeFocus || loading) { return; }
+    const main = mainRef.current;
+    const row = main?.querySelector<HTMLElement>('section[aria-labelledby="most-used-title"] li button');
+    (row ?? main)?.focus();
+    onFocusTaken?.();
+  }, [takeFocus, loading, onFocusTaken]);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
   const clearDialogRef = useRef<HTMLDivElement>(null);
@@ -46,12 +102,6 @@ const AnalyticsTab: FC<AnalyticsTabProps> = ({
     containerRef: clearDialogRef,
     initialFocusRef: clearCancelRef
   });
-
-  // Compute summary metrics using shared hook
-  const summaryMetrics = useSummaryMetrics(stats);
-
-  // Current time for relative time calculations - updates every minute to trigger re-renders
-  const now = useNow(REFRESH_INTERVAL_MS);
 
   // Handle clear history with confirmation
   const handleClearHistory = async (): Promise<void> => {
@@ -80,12 +130,12 @@ const AnalyticsTab: FC<AnalyticsTabProps> = ({
     );
   }
 
-  const hasData = stats && stats.totalUses > 0;
+  const hasData = history.length > 0;
 
   return (
     <div className="h-full flex flex-col bg-app relative">
       {/* Section header: the period counted is the Eyebrow */}
-      <SectionHeader title="Analytics" eyebrow="Last 30 days of usage">
+      <SectionHeader title="Analytics" eyebrow="Last 30 days">
         {context === 'sidepanel' && (
           <>
             {hasData && onExpandDashboard && (
@@ -102,145 +152,59 @@ const AnalyticsTab: FC<AnalyticsTabProps> = ({
         )}
       </SectionHeader>
 
-      {/* Content */}
-      <main className="flex-1 overflow-auto custom-scrollbar p-4" data-scroll-container>
-        {!hasData && !loading ? (
-          /* Empty state */
-          <div className="flex flex-col items-center justify-center h-full text-center px-6" role="region" aria-label="Empty analytics">
-            <div data-testid="empty-analytics-icon" className="w-20 h-20 bg-accent-subtle text-accent rounded-full flex items-center justify-center mb-4">
-              <UsageIcon className="w-10 h-10" />
-            </div>
-            <h3 className="text-lg font-bold text-primary mb-2">No usage data yet</h3>
-            <p className="text-sm text-tertiary max-w-xs">
-              Start using your prompts on AI platforms to see your analytics here.
-            </p>
-          </div>
+      {/* Content (Atelier 1C): the hero, Top platform and Top category, Most used, Tidy up */}
+      <main
+        ref={mainRef}
+        tabIndex={-1}
+        aria-label="Analytics"
+        className="flex-1 overflow-auto custom-scrollbar px-4 pb-[18px] outline-none"
+        data-scroll-container
+      >
+        {loading && !stats ? (
+          <div className="mt-3.5 h-[220px] rounded-hero bg-muted animate-pulse" role="status" aria-label="Loading analytics" />
         ) : (
-          <div className="space-y-6">
-            {/* Summary Cards - 2x2 Grid */}
-            <section aria-label="Usage summary">
-              <h3 className="text-xs font-semibold text-tertiary uppercase tracking-wider mb-3">
-                Summary
-              </h3>
-              <div className="grid grid-cols-2 gap-3">
-                <SummaryCard
-                  label="Total Uses"
-                  value={summaryMetrics.totalUses}
-                  subtitle="prompts inserted"
-                  icon={<UsageIcon className="w-full h-full" />}
-                  loading={loading}
-                />
-                <SummaryCard
-                  label="Top Platform"
-                  value={summaryMetrics.topPlatform ? formatPlatformName(summaryMetrics.topPlatform.name) : '-'}
-                  subtitle={summaryMetrics.topPlatform ? `${String(summaryMetrics.topPlatform.count)} uses` : 'No data'}
-                  icon={<PlatformIcon className="w-full h-full" />}
-                  loading={loading}
-                />
-                <SummaryCard
-                  label="Peak Day"
-                  value={summaryMetrics.peakDay?.day ?? '-'}
-                  subtitle={summaryMetrics.peakDay ? `${String(summaryMetrics.peakDay.count)} uses` : 'No data'}
-                  icon={<CalendarIcon className="w-full h-full" />}
-                  loading={loading}
-                />
-                <SummaryCard
-                  label="Top Category"
-                  value={summaryMetrics.topCategory?.name ?? '-'}
-                  subtitle={summaryMetrics.topCategory ? `${String(summaryMetrics.topCategory.count)} uses` : 'No data'}
-                  icon={<CategoryIcon className="w-full h-full" />}
-                  loading={loading}
-                />
-              </div>
-            </section>
+          <>
+            <StatsHero total={history.length} weekdays={weekdays} />
 
-            {/* Top Prompts List */}
-            <section aria-label="Top prompts">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-xs font-semibold text-tertiary uppercase tracking-wider">
-                  Top Prompts
-                </h3>
-                {stats && stats.topPrompts.length > 5 && onExpandDashboard && (
-                  <button
-                    onClick={onExpandDashboard}
-                    className="text-xs font-medium text-accent hover:text-accent-strong transition-colors"
-                  >
-                    View all
-                  </button>
-                )}
-              </div>
-
-              {loading ? (
-                <div className="space-y-2">
-                  {[1, 2, 3, 4, 5].map((i) => (
-                    <div key={i} className="animate-pulse bg-card rounded-xl p-3 border border-default">
-                      <div className="h-4 bg-muted rounded w-3/4 mb-2" />
-                      <div className="h-3 bg-muted rounded w-1/4" />
-                    </div>
-                  ))}
-                </div>
-              ) : stats && stats.topPrompts.length > 0 ? (
-                <ul className="space-y-2">
-                  {stats.topPrompts.slice(0, 5).map((prompt: PromptUsageSummary, index: number) => (
-                    <li
-                      key={prompt.promptId}
-                      className="bg-card rounded-xl p-3 border border-default"
-                    >
-                      <div className="flex items-start gap-3">
-                        <div data-testid="rank-badge" className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
-                          index === 0
-                            ? 'bg-medal-gold text-on-accent'
-                            : index === 1
-                            ? 'bg-medal-silver text-on-accent'
-                            : index === 2
-                            ? 'bg-medal-bronze text-on-accent'
-                            : 'bg-subtle text-tertiary'
-                        }`}>
-                          {index < 3 ? (
-                            <TrophyIcon className="w-3.5 h-3.5" />
-                          ) : (
-                            <span className="text-xs font-bold">{index + 1}</span>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h4 className="text-sm font-medium text-primary truncate">
-                            {prompt.title}
-                          </h4>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-xs text-accent font-medium">
-                              {prompt.count} {prompt.count === 1 ? 'use' : 'uses'}
-                            </span>
-                            <span className="text-xs text-tertiary">
-                              {formatRelativeTime(prompt.lastUsed, now)}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <div className="bg-card rounded-xl p-4 border border-default text-center">
-                  <p className="text-sm text-tertiary">
-                    No prompts used yet
-                  </p>
-                </div>
-              )}
-            </section>
-
-            {/* Clear History Action */}
             {hasData && (
-              <div className="text-center pt-2">
+              <div className="mt-2.5 grid grid-cols-2 gap-2.5">
+                <StatCard label="Top platform" name={platform ? formatPlatformName(platform.platform) : '-'} count={platform?.count ?? 0} delayIndex={0} />
+                <StatCard label="Top category" name={category?.name ?? '-'} count={category?.count ?? 0} delayIndex={1} />
+              </div>
+            )}
+
+            {ranked.length > 0 && (
+              <MostUsedCard
+                ranked={ranked}
+                usedCount={usedCount}
+                onOpenPrompt={onEditPrompt}
+                onViewAll={onExpandDashboard}
+              />
+            )}
+
+            <TidyUpCard
+              neverUsed={neverUsed}
+              duplicatePairs={duplicateGroups ? countDuplicatePairs(duplicateGroups) : null}
+              onReviewNeverUsed={() => { onReviewPrompts?.({ kind: 'neverUsed' }); }}
+              onReviewDuplicates={() => {
+                if (duplicateGroups) {
+                  onReviewPrompts?.({ kind: 'duplicates', groups: duplicateReviewGroups(duplicateGroups) });
+                }
+              }}
+            />
+
+            {hasData && (
+              <div className="mt-3 text-center">
                 <button
+                  type="button"
                   onClick={() => { setShowClearConfirm(true); }}
-                  className="text-sm font-medium text-danger hover:bg-danger-subtle px-3 py-1.5 rounded-lg transition-colors inline-flex items-center gap-1.5 focus-danger"
+                  className="text-[12.5px] font-semibold text-tertiary hover:text-danger px-2 py-1 rounded-md transition-colors focus-danger"
                 >
-                  <TrashIcon className="w-4 h-4" />
                   Clear history
                 </button>
               </div>
             )}
-          </div>
+          </>
         )}
       </main>
 

@@ -1,9 +1,10 @@
 /**
  * E2E: Analytics on the color tokens (My-Prompt-Manager-el4.6)
  *
- * The Analytics tab and the full dashboard take the surfaces, text and borders of the tokens, the
- * charts draw their primary color from the accent of the current mode, and the gold, silver and
- * bronze medals keep their colors. Also captures light/dark screenshots as visual proof
+ * The Analytics tab (Atelier 1C: the bg-inverse hero, the cards, Most used and the Tidy up callout)
+ * and the full dashboard take the surfaces, text and borders of the tokens, the dashboard charts draw
+ * their primary color from the accent of the current mode, and its gold, silver and bronze medals keep
+ * their colors. Also captures light/dark screenshots as visual proof
  * (test-results/analytics/).
  */
 
@@ -17,6 +18,9 @@ import { seedLibrary, seedUsageHistory } from '../utils/storage';
 const SCREENSHOT_DIR = 'test-results/analytics';
 const TRANSPARENT = 'rgba(0, 0, 0, 0)';
 const ON_ACCENT = 'rgb(255, 255, 255)';
+/** The hero's label and the busiest bar, the same in both modes (Atelier 1C) */
+const ON_INVERSE = 'rgb(201, 191, 230)';
+const INVERSE_MARK = 'rgb(167, 139, 250)';
 const DANGER = 'rgb(220, 38, 38)';
 
 const EXPECTED = {
@@ -26,7 +30,9 @@ const EXPECTED = {
     accentSubtle: 'rgb(241, 235, 253)', accentText: 'rgb(91, 33, 182)', dangerText: 'rgb(153, 27, 27)', accent: 'rgb(109, 40, 217)',
     accentBorder: 'rgb(196, 181, 253)', muted: 'rgb(241, 237, 248)', raised: 'rgb(248, 246, 252)', divider: 'rgb(240, 235, 248)',
     accentSelected: 'rgb(237, 229, 255)', accentStrong: 'rgb(76, 29, 149)',
-    strong: 'rgb(220, 212, 234)', dangerSubtle: 'rgb(253, 236, 236)', backdrop: 'rgba(42, 33, 64, 0.45)'
+    strong: 'rgb(220, 212, 234)', dangerSubtle: 'rgb(253, 236, 236)', backdrop: 'rgba(42, 33, 64, 0.45)',
+    inverse: 'rgb(29, 21, 48)', onInverseMuted: 'rgb(169, 156, 201)', barHover: 'rgb(255, 255, 255)',
+    callout: 'rgb(255, 248, 230)', calloutText: 'rgb(120, 53, 15)', warningBorder: 'rgb(245, 223, 166)', warningText: 'rgb(146, 64, 14)'
   },
   dark: {
     app: 'rgb(18, 14, 27)', card: 'rgb(35, 28, 52)', border: 'rgb(53, 44, 76)', subtle: 'rgb(43, 35, 64)',
@@ -34,7 +40,9 @@ const EXPECTED = {
     accentSubtle: 'rgb(47, 35, 80)', accentText: 'rgb(196, 181, 253)', dangerText: 'rgb(252, 165, 165)', accent: 'rgb(132, 75, 242)',
     accentBorder: 'rgb(109, 79, 196)', muted: 'rgb(46, 38, 69)', raised: 'rgb(27, 21, 40)', divider: 'rgb(47, 39, 68)',
     accentSelected: 'rgb(56, 41, 106)', accentStrong: 'rgb(221, 211, 254)',
-    strong: 'rgb(65, 55, 90)', dangerSubtle: 'rgb(58, 21, 24)', backdrop: 'rgba(7, 5, 12, 0.7)'
+    strong: 'rgb(65, 55, 90)', dangerSubtle: 'rgb(58, 21, 24)', backdrop: 'rgba(7, 5, 12, 0.7)',
+    inverse: 'rgb(74, 61, 107)', onInverseMuted: 'rgb(201, 191, 230)', barHover: 'rgb(35, 28, 52)',
+    callout: 'rgb(43, 33, 14)', calloutText: 'rgb(253, 230, 138)', warningBorder: 'rgb(90, 69, 21)', warningText: 'rgb(252, 211, 77)'
   }
 } as const;
 
@@ -125,49 +133,73 @@ test.describe('Analytics on the tokens', () => {
   for (const theme of ['light', 'dark'] as const) {
     const colors = EXPECTED[theme];
 
-    test(`the Analytics tab shows opaque cards on bg-app, accent-subtle icon squares and the three medals (${theme})`, async ({ page, storage, extensionId }) => {
+    test(`the Analytics tab draws the Atelier 1C hero, cards, Most used and Tidy up on the tokens (${theme})`, async ({ page, storage, extensionId }) => {
+      await page.emulateMedia({ reducedMotion: 'reduce' });
       await openAnalyticsTab(page, storage, extensionId, theme);
 
-      const summary = page.getByRole('region', { name: 'Usage summary' });
-      await expect(summary.getByRole('heading', { name: 'Summary' })).toHaveCSS('color', colors.tertiary);
-      expect(await backdropOf(summary)).toBe(colors.app);
+      const hero = page.getByTestId('stats-hero');
+      expect(await backdropOf(hero.locator('..'))).toBe(colors.app);
+      await expect(hero).toHaveCSS('background-color', colors.inverse);
+      await expect(hero).toHaveCSS('border-top-left-radius', '24px');
+      await expect(hero.getByRole('heading', { name: 'Prompts used' })).toHaveCSS('color', ON_INVERSE);
+      await expect(page.getByTestId('stats-total')).toHaveText('10');
+      await expect(page.getByTestId('stats-total')).toHaveCSS('color', ON_ACCENT);
+      await expect(page.getByTestId('stats-hero-subtitle')).toHaveCSS('color', ON_INVERSE);
 
-      const totalUses = summary.getByRole('article', { name: /^Total Uses/ });
-      await expect(totalUses).toHaveCSS('background-color', colors.card);
-      await expect(totalUses).toHaveCSS('border-top-color', colors.border);
-      await expect(totalUses).toHaveCSS('backdrop-filter', 'none');
-      await expect(totalUses.getByText('Total Uses')).toHaveCSS('color', colors.tertiary);
-      await expect(totalUses.getByText('10', { exact: true })).toHaveCSS('color', colors.primary);
-      await expect(totalUses.getByText('prompts inserted')).toHaveCSS('color', colors.tertiary);
-      const iconSquare = totalUses.getByTestId('summary-icon');
-      await expect(iconSquare).toHaveCSS('background-color', colors.accentSubtle);
-      await expect(iconSquare.locator('svg')).toHaveCSS('color', colors.accentText);
+      // The busiest bar is violet and its label white; the others are translucent with a muted label
+      const bars = page.getByTestId('stats-bar');
+      const pills = bars.locator('.animate-bar-grow');
+      const busiest = await page.getByTestId('stats-hero-subtitle').textContent();
+      const busiestIndex = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+        .findIndex(name => busiest?.startsWith(name));
+      expect(busiestIndex).toBeGreaterThanOrEqual(0);
+      await expect(pills.nth(busiestIndex)).toHaveCSS('background-color', INVERSE_MARK);
+      await expect(bars.nth(busiestIndex).locator(':scope > span')).toHaveCSS('color', ON_ACCENT);
+      const quiet = (busiestIndex + 1) % 7;
+      await expect(pills.nth(quiet)).toHaveCSS('background-color', 'rgba(255, 255, 255, 0.22)');
+      await expect(bars.nth(quiet).locator(':scope > span')).toHaveCSS('color', colors.onInverseMuted);
+      // rounded-full: Tailwind 4 writes calc(infinity * 1px), which Chromium clamps to a huge length
+      // whose value changes between versions (1.67772e+07px, 3.35544e+07px…)
+      await expect(pills.first()).toHaveCSS('border-top-left-radius', /^(9999|\d+(\.\d+)?e\+\d+)px$/);
 
-      const topPrompts = page.getByRole('region', { name: 'Top prompts' });
-      await expect(topPrompts.getByRole('heading', { name: 'Top Prompts' })).toHaveCSS('color', colors.tertiary);
-      const items = topPrompts.getByRole('listitem');
-      await expect(items).toHaveCount(4);
-      const first = items.first();
-      await expect(first).toHaveCSS('background-color', colors.card);
-      await expect(first).toHaveCSS('border-top-color', colors.border);
-      await expect(first).toHaveCSS('backdrop-filter', 'none');
-      await expect(first.getByRole('heading', { name: 'Work Email Template' })).toHaveCSS('color', colors.primary);
-      await expect(first.getByText('4 uses')).toHaveCSS('color', colors.accentText);
-      await expect(first.getByText(/ago$/)).toHaveCSS('color', colors.tertiary);
+      for (const label of ['Top platform', 'Top category'] as const) {
+        const card = page.locator('div').filter({ has: page.getByRole('heading', { name: label, exact: true }) }).last();
+        await expect(card).toHaveCSS('background-color', colors.card);
+        await expect(card).toHaveCSS('border-top-color', colors.border);
+        await expect(card).toHaveCSS('border-top-left-radius', '20px');
+        await expect(card.getByRole('heading', { name: label })).toHaveCSS('color', colors.tertiary);
+      }
 
-      const ranks = topPrompts.getByTestId('rank-badge');
-      await expect(ranks.nth(0)).toHaveCSS('background-image', MEDALS.gold);
-      await expect(ranks.nth(1)).toHaveCSS('background-image', MEDALS.silver);
-      await expect(ranks.nth(2)).toHaveCSS('background-image', MEDALS.bronze);
-      await expect(ranks.nth(0)).toHaveCSS('color', ON_ACCENT);
-      await expect(ranks.nth(3)).toHaveCSS('background-color', colors.subtle);
-      await expect(ranks.nth(3)).toHaveCSS('color', colors.tertiary);
+      const mostUsed = page.getByRole('region', { name: 'Most used' });
+      await expect(mostUsed).toHaveCSS('background-color', colors.card);
+      const rows = mostUsed.getByTestId('most-used-row');
+      await expect(rows).toHaveCount(3);
+      await expect(rows.first()).toContainText('Work Email Template');
+      const rank = rows.first().locator('span').first();
+      await expect(rank).toHaveCSS('background-color', colors.accentSelected);
+      await expect(rank).toHaveCSS('color', colors.accentText);
+      await expect(rows.nth(1).locator('span').first()).toHaveCSS('background-color', colors.subtle);
+      await expect(rows.first().locator('.animate-rank-fill')).toHaveCSS('background-color', colors.accent);
+      await expect(rows.first().locator('.animate-rank-fill').locator('..')).toHaveCSS('background-color', colors.accentSubtle);
 
-      await expect(page.getByRole('button', { name: 'Clear history' })).toHaveCSS('color', colors.dangerText);
+      const tidyUp = page.getByTestId('tidy-up');
+      await expect(tidyUp).toHaveCSS('background-color', colors.callout);
+      await expect(tidyUp).toHaveCSS('border-top-color', colors.warningBorder);
+      await expect(tidyUp.getByRole('heading', { name: 'Tidy up' })).toHaveCSS('color', colors.calloutText);
+      const reviewButton = tidyUp.getByRole('button', { name: /^Review the/ }).first();
+      await expect(reviewButton).toHaveCSS('background-color', colors.card);
+      await expect(reviewButton).toHaveCSS('color', colors.warningText);
+
+      await expect(page.getByRole('button', { name: 'Clear history' })).toHaveCSS('color', colors.tertiary);
 
       await page.screenshot({ path: `${SCREENSHOT_DIR}/tab-${theme}.png` });
-      await topPrompts.evaluate(section => { section.scrollIntoView({ block: 'start' }); });
-      await page.screenshot({ path: `${SCREENSHOT_DIR}/tab-top-prompts-${theme}.png` });
+      await tidyUp.evaluate(section => { section.scrollIntoView({ block: 'end' }); });
+      await page.screenshot({ path: `${SCREENSHOT_DIR}/tab-bottom-${theme}.png` });
+
+      // A hovered bar turns to the bar-hover color and shows its count
+      await bars.nth(quiet).hover();
+      await expect(pills.nth(quiet)).toHaveCSS('background-color', colors.barHover);
+      await expect(page.getByTestId('stats-hero-subtitle')).toHaveText(/^\d+ on \w+days$/);
     });
 
     test(`clearing the history asks in a bg-card dialog on bg-backdrop, with a secondary Cancel and a danger confirm (${theme})`, async ({ page, storage, extensionId }) => {
@@ -202,16 +234,16 @@ test.describe('Analytics on the tokens', () => {
       await expect(page.getByRole('button', { name: 'Clear history' })).toBeFocused();
     });
 
-    test(`with no usage yet, the empty state shows an accent-subtle icon circle on bg-app (${theme})`, async ({ page, storage, extensionId }) => {
+    test(`with no usage yet, the hero shows no Prompts used and Tidy up still shows (${theme})`, async ({ page, storage, extensionId }) => {
+      await page.emulateMedia({ reducedMotion: 'reduce' });
       await openAnalyticsTab(page, storage, extensionId, theme, { withUsage: false });
 
-      const empty = page.getByRole('region', { name: 'Empty analytics' });
-      expect(await backdropOf(empty)).toBe(colors.app);
-      const circle = empty.getByTestId('empty-analytics-icon');
-      await expect(circle).toHaveCSS('background-color', colors.accentSubtle);
-      await expect(circle.locator('svg')).toHaveCSS('color', colors.accentText);
-      await expect(empty.getByRole('heading', { name: 'No usage data yet' })).toHaveCSS('color', colors.primary);
-      await expect(empty.getByText(/Start using your prompts/)).toHaveCSS('color', colors.tertiary);
+      await expect(page.getByTestId('stats-hero')).toHaveCSS('background-color', colors.inverse);
+      await expect(page.getByTestId('stats-total')).toHaveText('0');
+      await expect(page.getByTestId('stats-hero-subtitle')).toHaveText('No Prompts used yet.');
+      await expect(page.getByTestId('stats-bar')).toHaveCount(7);
+      await expect(page.getByRole('region', { name: 'Most used' })).toBeHidden();
+      await expect(page.getByTestId('tidy-up')).toHaveCSS('background-color', colors.callout);
 
       await page.screenshot({ path: `${SCREENSHOT_DIR}/tab-empty-${theme}.png` });
     });
@@ -227,8 +259,9 @@ test.describe('Analytics on the tokens', () => {
       expect(box, 'Full Dashboard box').not.toBeNull();
       expect((box?.x ?? 0) + (box?.width ?? 0), 'right edge in the panel').toBeLessThanOrEqual(SURFACES.sidepanel.width);
 
-      const totalUses = page.getByRole('article', { name: /^Total Uses/ });
-      await expect(totalUses).toHaveCSS('background-color', colors.card);
+      await expect(page.getByTestId('stats-hero')).toHaveCSS('background-color', colors.inverse);
+      const hero = await page.getByTestId('stats-hero').boundingBox();
+      expect((hero?.x ?? 0) + (hero?.width ?? 0), 'hero inside the panel').toBeLessThanOrEqual(SURFACES.sidepanel.width);
 
       await page.screenshot({ path: `${SCREENSHOT_DIR}/sidepanel-${theme}.png` });
     });

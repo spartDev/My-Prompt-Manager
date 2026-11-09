@@ -130,6 +130,36 @@ describe('applyLibraryFilter', () => {
       .toEqual(['Charlie', 'Alpha', 'Delta']);
   });
 
+  it('Never used lists the Prompts never inserted, in the chosen sort, pinned first', () => {
+    expect(titles(applyLibraryFilter(prompts, { kind: 'neverUsed' }, categories, 'title')))
+      .toEqual(['Bravo']);
+  });
+
+  it('Possible duplicates lists the pairs that still are, in review order', () => {
+    const twins = [
+      ...prompts,
+      buildPrompt({ id: '5', title: 'Echo', content: 'Same words exactly' }),
+      buildPrompt({ id: '6', title: 'Echo', content: 'Same words exactly' })
+    ];
+    const edited = twins.map(p => (p.id === '4' ? { ...p, content: 'Rewritten since the review' } : p));
+    const filter: LibraryFilter = { kind: 'duplicates', groups: [['6', '5'], ['1', 'gone'], ['3', '4']] };
+
+    // 1 lost its pair to a deletion, and 4 was edited away from 3: only 6 and 5 remain
+    expect(applyLibraryFilter(edited, filter, categories, 'title').map(p => p.id)).toEqual(['6', '5']);
+  });
+
+  it('Possible duplicates keeps a searched Prompt whose pair the search does not match', () => {
+    const twins = [
+      ...prompts,
+      buildPrompt({ id: '5', title: 'Echo', content: 'Same words exactly' }),
+      buildPrompt({ id: '6', title: 'Foxtrot', content: 'Same words exactly' })
+    ];
+    const searched = twins.filter(p => p.title === 'Foxtrot');
+    const filter: LibraryFilter = { kind: 'duplicates', groups: [['5', '6']] };
+
+    expect(applyLibraryFilter(searched, filter, categories, 'title', twins).map(p => p.id)).toEqual(['6']);
+  });
+
   it('a Category lists only its Prompts, pinned first', () => {
     expect(titles(applyLibraryFilter(prompts, { kind: 'category', categoryId: work.id }, categories, 'title')))
       .toEqual(['Delta', 'Alpha', 'Charlie']);

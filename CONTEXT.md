@@ -22,6 +22,14 @@ _Avoid_: Favorite, starred prompt
 The Prompts that have been inserted at least once, ranked by how many times each has ever been inserted, most first. A Prompt never inserted is not in Most Used, and copying a Prompt is not inserting it.
 _Avoid_: Popular, top prompts, favorites
 
+**Never used**:
+The Prompts that have never been inserted, the complement of Most Used. Copying a Prompt does not count as using it.
+_Avoid_: Unused, forgotten, stale
+
+**Duplicate pair**:
+Two Prompts with the same content, or with nearly identical titles and contents. Three such Prompts make two pairs, each later Prompt paired with the first.
+_Avoid_: Similar prompts, copies
+
 **Variable**:
 A named placeholder written {{name}} inside a Prompt's text, filled in by the user when the Prompt is inserted.
 _Avoid_: Blank, placeholder, field
@@ -63,7 +71,7 @@ The user's own collection of Prompts and Categories, and the top-level section t
 _Avoid_: Home, prompt list
 
 **Library filter**:
-The one choice that narrows which Prompts the Library lists: All, the Pinned Prompts, Most Used, or a single Category. Exactly one is active at a time, All each time the extension is opened, and a search looks only inside the active Library filter.
+The one choice that narrows which Prompts the Library lists: All, the Pinned Prompts, Most Used, a single Category, or, reached only from Analytics, the Never used Prompts or the Prompts in a Duplicate pair. Exactly one is active at a time, All each time the extension is opened, and a search looks only inside the active Library filter.
 _Avoid_: Pill, chip, tab, view
 
 **Categories**:

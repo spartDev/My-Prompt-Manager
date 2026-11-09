@@ -57,7 +57,11 @@ export type LibraryFilter =
   | { kind: 'all' }
   | { kind: 'pinned' }
   | { kind: 'mostUsed' }
-  | { kind: 'category'; categoryId: string };
+  | { kind: 'category'; categoryId: string }
+  // Reached only from Tidy up in Analytics
+  | { kind: 'neverUsed' }
+  // The Duplicate pairs found in Analytics: one list of ids per group, the original first
+  | { kind: 'duplicates'; groups: string[][] };
 
 export interface Settings {
   defaultCategory: string;

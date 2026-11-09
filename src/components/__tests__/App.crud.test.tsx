@@ -138,6 +138,20 @@ describe('App prompt workflows', () => {
     expect(deleted).toHaveTextContent(basePrompt.title);
   });
 
+  it('gives the keyboard to the active Library filter when the edited Prompt has left the list', async () => {
+    const storageMock = getMockStorageManager();
+    const other: Prompt = { ...basePrompt, id: 'prompt-2', title: 'Other prompt' };
+    storageMock.getPrompts.mockResolvedValue([basePrompt, other]);
+
+    await renderApp();
+
+    await userEvent.click(await screen.findByRole('button', { name: `Edit ${basePrompt.title}` }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete prompt' }));
+    await userEvent.click(await screen.findByRole('button', { name: /^delete$/i }));
+
+    await waitFor(() => { expect(screen.getByRole('radio', { name: 'All' })).toHaveFocus(); });
+  });
+
   it('keeps the Library, brings the Prompt back and shows a toast when a delete fails', async () => {
     const storageMock = getMockStorageManager();
     storageMock.getPrompts.mockResolvedValue([basePrompt]);

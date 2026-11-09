@@ -35,7 +35,10 @@ describe('motion tokens', () => {
     ['category-sheet-out', `sheet-out ${MOTION.categorySheetOut}ms var(--ease-sheet) both`],
     ['backdrop-in', `backdrop-in ${MOTION.backdropIn}ms ease both`],
     ['backdrop-out', `backdrop-out ${MOTION.backdropOut}ms ease both`],
-    ['category-pop', `pop ${MOTION.categoryPop}ms var(--ease-spring) both`]
+    ['category-pop', `pop ${MOTION.categoryPop}ms var(--ease-spring) both`],
+    ['bar-grow', `bar-grow ${MOTION.barGrow}ms var(--ease-spring) both`],
+    ['card-rise', `card-rise ${MOTION.cardRise}ms var(--ease-spring) both`],
+    ['rank-fill', `fill-grow ${MOTION.rankFill}ms var(--ease-spring) both`]
   ])('animate-%s runs for the duration motion.ts gives', (name, animation) => {
     expect(tokens).toContain(`--animate-${name}: ${animation};`);
   });
@@ -76,6 +79,23 @@ describe('motion tokens', () => {
     expect(MOTION.backdropIn).toBe(300);
     expect(MOTION.backdropOut).toBe(280);
     expect(MOTION.categoryPop).toBe(500);
+  });
+
+  it('keeps the Analytics timing of the mockup: bars 800ms from 200ms by 60ms, cards 500ms at 100/180ms, fills 1s from 300ms by 90ms', () => {
+    expect([MOTION.barGrow, MOTION.barDelay, MOTION.barStagger]).toEqual([800, 200, 60]);
+    expect([MOTION.cardRise, MOTION.cardDelay, MOTION.cardDelay + MOTION.cardStagger]).toEqual([500, 100, 180]);
+    expect([MOTION.rankFill, MOTION.rankDelay, MOTION.rankStagger]).toEqual([1000, 300, 90]);
+    expect(tokens).toContain('@keyframes bar-grow');
+    expect(tokens).toContain('@keyframes card-rise');
+  });
+
+  it('makes the Analytics animations near instant, with no delay, under reduced motion', () => {
+    const popupCss = readFileSync(path.resolve(__dirname, '../../popup.css'), 'utf8');
+    const reduced = popupCss.slice(popupCss.indexOf('@media (prefers-reduced-motion: reduce)'));
+    for (const name of ['bar-grow', 'card-rise', 'rank-fill']) {
+      expect(reduced).toContain(`.animate-${name}`);
+    }
+    expect(reduced).toMatch(/animation-duration: 1ms;\s*animation-delay: 0ms !important;/);
   });
 
   it('makes the Save pause the 620ms of the mockup', () => {

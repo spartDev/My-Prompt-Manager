@@ -60,9 +60,12 @@
   .animate-category-sheet-out,
   .animate-backdrop-in,
   .animate-backdrop-out,
-  .animate-category-pop {
+  .animate-category-pop,
+  .animate-bar-grow,
+  .animate-card-rise,
+  .animate-rank-fill {
     animation-duration: 1ms;
-    animation-delay: 0ms;
+    animation-delay: 0ms !important;
   }
 
   .transition-save,

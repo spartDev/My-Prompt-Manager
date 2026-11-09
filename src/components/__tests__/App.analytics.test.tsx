@@ -29,7 +29,8 @@ const createMockStats = (): UsageStats => ({
 
 const createMockReturn = (): UseUsageStatsReturn => ({
   stats: createMockStats(),
-  history: [],
+  history: [{ promptId: 'p1', timestamp: Date.now(), platform: 'claude', categoryId: null }],
+  prompts: [],
   loading: false,
   error: null,
   refresh: vi.fn(),
@@ -54,6 +55,58 @@ describe('App analytics integration', () => {
     storageMock.getPrompts.mockResolvedValue([]);
     // Mock usage stats with data so footer shows
     mockUseUsageStats.mockReturnValue(createMockReturn());
+  });
+
+  describe('Most used', () => {
+    it('gives the keyboard to the next row once the Prompt opened from a row is deleted', async () => {
+      const user = userEvent.setup();
+      const now = Date.now();
+      const first = { id: 'p1', title: 'First prompt', content: 'One', category: 'Work', createdAt: now, updatedAt: now };
+      const second = { id: 'p2', title: 'Second prompt', content: 'Two', category: 'Work', createdAt: now, updatedAt: now };
+      getMockStorageManager().getPrompts.mockResolvedValue([first, second]);
+      mockUseUsageStats.mockReturnValue({
+        ...createMockReturn(),
+        history: [
+          { promptId: 'p1', timestamp: now, platform: 'claude', categoryId: null },
+          { promptId: 'p1', timestamp: now, platform: 'claude', categoryId: null },
+          { promptId: 'p2', timestamp: now, platform: 'claude', categoryId: null }
+        ]
+      });
+      await renderApp();
+
+      await user.click(screen.getByRole('tab', { name: 'Analytics' }));
+      await user.click(await screen.findByRole('button', { name: 'First prompt, 2 uses. Open' }));
+      await user.click(await screen.findByRole('button', { name: 'Delete prompt' }));
+      await user.click(await screen.findByRole('button', { name: /^delete$/i }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Second prompt, 1 use. Open' })).toHaveFocus();
+      });
+    });
+  });
+
+  describe('Tidy up', () => {
+    it('reads the Library again before Review, so it lists what Analytics counted', async () => {
+      const user = userEvent.setup();
+      const now = Date.now();
+      const used = { id: 'p1', title: 'Used since', content: 'One', category: 'Work', createdAt: now, updatedAt: now, usageCount: 0 };
+      const idle = { id: 'p2', title: 'Never inserted', content: 'Two', category: 'Work', createdAt: now, updatedAt: now, usageCount: 0 };
+      const storageMock = getMockStorageManager();
+      // The panel read both unused; a Platform has inserted the first one since
+      storageMock.getPrompts.mockResolvedValueOnce([used, idle]).mockResolvedValue([{ ...used, usageCount: 1 }, idle]);
+      mockUseUsageStats.mockReturnValue({
+        ...createMockReturn(),
+        history: [{ promptId: 'p1', timestamp: now, platform: 'claude', categoryId: null }],
+        prompts: [{ ...used, usageCount: 1 }, idle]
+      });
+      await renderApp();
+
+      await user.click(screen.getByRole('tab', { name: 'Analytics' }));
+      await user.click(await screen.findByRole('button', { name: 'Review the 1 prompt never used' }));
+
+      await waitFor(() => { expect(screen.queryByRole('button', { name: 'Edit Used since' })).not.toBeInTheDocument(); });
+      expect(screen.getByRole('button', { name: 'Edit Never inserted' })).toBeInTheDocument();
+    });
   });
 
   describe('Analytics navigation', () => {
@@ -97,7 +150,7 @@ describe('App analytics integration', () => {
 
       // Should show analytics summary section
       await waitFor(() => {
-        expect(screen.getByText(/last 30 days of usage/i)).toBeInTheDocument();
+        expect(screen.getByText(/^last 30 days$/i)).toBeInTheDocument();
       });
     });
   });

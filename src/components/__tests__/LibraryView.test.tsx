@@ -1,5 +1,6 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ALL_PROMPTS } from '../../services/libraryFilter';
@@ -68,6 +69,20 @@ const defaultProps = {
   onLibraryFilterChange: vi.fn(),
   loading: false,
   context: 'popup' as const
+};
+
+/** A Library whose filter is held in state, starting on the Never used review */
+const ReviewHarness = ({ prompts }: { prompts: Prompt[] }) => {
+  const [filter, setFilter] = useState<LibraryFilter>({ kind: 'neverUsed' });
+  return (
+    <LibraryView
+      {...defaultProps}
+      prompts={prompts}
+      searchWithDebounce={createMockSearchWithDebounce(prompts)}
+      libraryFilter={filter}
+      onLibraryFilterChange={setFilter}
+    />
+  );
 };
 
 describe('LibraryView', () => {
@@ -223,6 +238,15 @@ describe('LibraryView', () => {
 
       expect(screen.getByRole('radio', { name: 'Work' })).toBeInTheDocument();
       expect(screen.queryByRole('radio', { name: 'Uncategorized' })).not.toBeInTheDocument();
+    });
+
+    it('moves focus to All when Show all prompts leaves an emptied review', async () => {
+      const user = userEvent.setup();
+      render(<ReviewHarness prompts={[used]} />);
+
+      await user.click(screen.getByRole('button', { name: 'Show all prompts' }));
+
+      expect(screen.getByRole('radio', { name: 'All' })).toHaveFocus();
     });
 
     it('reports the pill pressed', async () => {

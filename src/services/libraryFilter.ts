@@ -1,12 +1,14 @@
 /**
  * Library filter: the one choice that narrows which Prompts the Library lists
- * (All, the Pinned Prompts, Most Used, or a single Category — see CONTEXT.md).
+ * (All, the Pinned Prompts, Most Used, a single Category, or, from Analytics, the Never used Prompts
+ * or the Prompts of the Duplicate pairs — see CONTEXT.md).
  */
 
 import { NATURAL_SORT_DIRECTION } from '../constants';
 import type { Category, LibraryFilter, Prompt, SortOrder } from '../types';
 
 import { PromptManager } from './promptManager';
+import { isNeverUsed, remainingDuplicates } from './usageInsights';
 
 export const ALL_PROMPTS: LibraryFilter = { kind: 'all' };
 
@@ -40,12 +42,16 @@ export function rankMostUsed(prompts: Prompt[]): Prompt[] {
     );
 }
 
-/** The Prompts the Library lists for a filter, in display order */
+/**
+ * The Prompts the Library lists for a filter, in display order. `prompts` may already be narrowed by
+ * a search; `library` is the whole Library, which decides whether a Prompt still has its Duplicate pair.
+ */
 export function applyLibraryFilter(
   prompts: Prompt[],
   filter: LibraryFilter,
   categories: Category[],
-  sortOrder: SortOrder
+  sortOrder: SortOrder,
+  library: Prompt[] = prompts
 ): Prompt[] {
   const sort = (list: Prompt[]) =>
     PromptManager.getInstance().sortPrompts(list, sortOrder, NATURAL_SORT_DIRECTION[sortOrder]);
@@ -60,6 +66,16 @@ export function applyLibraryFilter(
     case 'category': {
       const category = categories.find(c => c.id === filter.categoryId);
       return category ? sort(prompts.filter(prompt => prompt.category === category.name)) : [];
+    }
+    case 'neverUsed':
+      return sort(prompts.filter(isNeverUsed));
+    case 'duplicates': {
+      // In review order, so each pair stays together; a pair resolved since (one Prompt deleted or
+      // edited away from the other) leaves the list. A search keeps the matching Prompts of the pairs
+      const manager = PromptManager.getInstance();
+      const shown = new Set(prompts.map(prompt => prompt.id));
+      return remainingDuplicates(filter.groups, library, (a, b) => manager.isDuplicatePair(a, b))
+        .filter(prompt => shown.has(prompt.id));
     }
   }
 }

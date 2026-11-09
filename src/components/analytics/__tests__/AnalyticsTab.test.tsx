@@ -1,69 +1,55 @@
 /**
- * AnalyticsTab Component Tests
- *
- * Tests that AnalyticsTab properly renders analytics summaries,
- * handles loading and error states, and displays top prompts.
+ * AnalyticsTab (Atelier 1C): the hero with its weekday bars, Top platform and Top category, Most
+ * used, Tidy up, and Clear history. The computations themselves are tested in usageInsights.test.ts.
  */
 
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { useDuplicateGroups } from '../../../hooks/useDuplicateGroups';
 import { useUsageStats } from '../../../hooks/useUsageStats';
+import { buildPrompt } from '../../../test/builders/buildPrompt';
+import type { UsageEvent } from '../../../types';
 import type { UsageStats, UseUsageStatsReturn } from '../../../types/hooks';
 import AnalyticsTab from '../AnalyticsTab';
 
-// Mock the useUsageStats hook
 vi.mock('../../../hooks/useUsageStats', () => ({
   useUsageStats: vi.fn()
 }));
+vi.mock('../../../hooks/useDuplicateGroups', () => ({
+  useDuplicateGroups: vi.fn()
+}));
 
 const mockUseUsageStats = vi.mocked(useUsageStats);
+const mockUseDuplicateGroups = vi.mocked(useDuplicateGroups);
 
-const createMockStats = (overrides: Partial<UsageStats> = {}): UsageStats => ({
-  totalUses: 42,
-  dailyUsage: [
-    { date: '2026-01-13', count: 5 },
-    { date: '2026-01-12', count: 10 }
-  ],
-  platformBreakdown: [
-    { platform: 'claude', count: 25, percentage: 60 },
-    { platform: 'chatgpt', count: 17, percentage: 40 }
-  ],
-  dayOfWeekDistribution: [
-    { day: 'Sun', dayIndex: 0, count: 5 },
-    { day: 'Mon', dayIndex: 1, count: 15 },
-    { day: 'Tue', dayIndex: 2, count: 8 },
-    { day: 'Wed', dayIndex: 3, count: 6 },
-    { day: 'Thu', dayIndex: 4, count: 4 },
-    { day: 'Fri', dayIndex: 5, count: 3 },
-    { day: 'Sat', dayIndex: 6, count: 1 }
-  ],
-  timeOfDayDistribution: [
-    { bucket: 'Morning', count: 10 },
-    { bucket: 'Afternoon', count: 20 },
-    { bucket: 'Evening', count: 8 },
-    { bucket: 'Night', count: 4 }
-  ],
-  categoryDistribution: [
-    { categoryId: '1', name: 'Development', count: 20, color: '#2563EB' },
-    { categoryId: '2', name: 'Writing', count: 15, color: '#2563EB' }
-  ],
-  topPrompts: [
-    { promptId: 'p1', title: 'Code Review Helper', category: 'Development', count: 15, lastUsed: Date.now() - 3600000 },
-    { promptId: 'p2', title: 'Email Composer', category: 'Writing', count: 10, lastUsed: Date.now() - 86400000 },
-    { promptId: 'p3', title: 'Bug Fixer', category: 'Development', count: 8, lastUsed: Date.now() - 172800000 }
-  ],
-  recentPrompts: [
-    { promptId: 'p1', title: 'Code Review Helper', category: 'Development', count: 15, lastUsed: Date.now() - 3600000 }
-  ],
-  forgottenPrompts: [],
-  ...overrides
-});
+// 2026-11-03 is a Tuesday
+const TUE = new Date(2026, 10, 3, 12).getTime();
+const WED = new Date(2026, 10, 4, 12).getTime();
+
+const review = buildPrompt({ id: 'p1', title: 'Code Review Helper', category: 'Development', usageCount: 3 });
+const email = buildPrompt({ id: 'p2', title: 'Email Composer', category: 'Writing', usageCount: 2 });
+const bug = buildPrompt({ id: 'p3', title: 'Bug Fixer', category: 'Development', usageCount: 1 });
+const notes = buildPrompt({ id: 'p4', title: 'Meeting Notes', category: 'Writing', usageCount: 1 });
+const unused = buildPrompt({ id: 'p5', title: 'Competitor Teardown', category: 'Research', usageCount: 0 });
+const PROMPTS = [review, email, bug, notes, unused];
+
+const event = (promptId: string, timestamp: number, platform = 'claude'): UsageEvent => ({ promptId, timestamp, platform, categoryId: null });
+
+const HISTORY: UsageEvent[] = [
+  event('p1', TUE), event('p1', TUE), event('p1', WED, 'chatgpt'),
+  event('p2', TUE), event('p2', WED),
+  event('p3', WED),
+  event('p4', TUE)
+];
+
+const stats = { totalUses: HISTORY.length } as UsageStats;
 
 const createMockReturn = (overrides: Partial<UseUsageStatsReturn> = {}): UseUsageStatsReturn => ({
-  stats: createMockStats(),
-  history: [],
+  stats,
+  history: HISTORY,
+  prompts: PROMPTS,
   loading: false,
   error: null,
   refresh: vi.fn(),
@@ -74,409 +60,213 @@ const createMockReturn = (overrides: Partial<UseUsageStatsReturn> = {}): UseUsag
 describe('AnalyticsTab', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUseUsageStats.mockReturnValue(createMockReturn());
+    mockUseDuplicateGroups.mockReturnValue([]);
   });
 
-  describe('Rendering', () => {
-    it('should render header with title', () => {
-      mockUseUsageStats.mockReturnValue(createMockReturn());
-
+  describe('Section header', () => {
+    it('is titled Analytics with the period as its Eyebrow', () => {
       render(<AnalyticsTab />);
 
-      expect(screen.getByText('Analytics')).toBeInTheDocument();
-      expect(screen.getByText('Last 30 days of usage')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 1, name: 'Analytics' })).toBeInTheDocument();
+      expect(screen.getByText('Last 30 days')).toBeInTheDocument();
     });
 
-    it('should render summary section', () => {
-      mockUseUsageStats.mockReturnValue(createMockReturn());
-
-      render(<AnalyticsTab />);
-
-      expect(screen.getByText('Summary')).toBeInTheDocument();
-    });
-
-    it('should render top prompts section', () => {
-      mockUseUsageStats.mockReturnValue(createMockReturn());
-
-      render(<AnalyticsTab />);
-
-      expect(screen.getByText('Top Prompts')).toBeInTheDocument();
-    });
-  });
-
-  describe('Summary Cards', () => {
-    it('should display total uses', () => {
-      mockUseUsageStats.mockReturnValue(createMockReturn());
-
-      render(<AnalyticsTab />);
-
-      expect(screen.getByText('Total Uses')).toBeInTheDocument();
-      expect(screen.getByText('42')).toBeInTheDocument();
-    });
-
-    it('should display top platform with formatted name', () => {
-      mockUseUsageStats.mockReturnValue(createMockReturn());
-
-      render(<AnalyticsTab />);
-
-      expect(screen.getByText('Top Platform')).toBeInTheDocument();
-      expect(screen.getByText('Claude')).toBeInTheDocument();
-    });
-
-    it('should display peak day', () => {
-      mockUseUsageStats.mockReturnValue(createMockReturn());
-
-      render(<AnalyticsTab />);
-
-      expect(screen.getByText('Peak Day')).toBeInTheDocument();
-      expect(screen.getByText('Mon')).toBeInTheDocument();
-    });
-
-    it('should display top category', () => {
-      mockUseUsageStats.mockReturnValue(createMockReturn());
-
-      render(<AnalyticsTab />);
-
-      expect(screen.getByText('Top Category')).toBeInTheDocument();
-      expect(screen.getByText('Development')).toBeInTheDocument();
-    });
-
-    it('should show dash for missing data', () => {
-      const emptyStats = createMockStats({
-        platformBreakdown: [],
-        categoryDistribution: [],
-        dayOfWeekDistribution: [
-          { day: 'Sun', dayIndex: 0, count: 0 },
-          { day: 'Mon', dayIndex: 1, count: 0 },
-          { day: 'Tue', dayIndex: 2, count: 0 },
-          { day: 'Wed', dayIndex: 3, count: 0 },
-          { day: 'Thu', dayIndex: 4, count: 0 },
-          { day: 'Fri', dayIndex: 5, count: 0 },
-          { day: 'Sat', dayIndex: 6, count: 0 }
-        ]
-      });
-
-      mockUseUsageStats.mockReturnValue(createMockReturn({ stats: emptyStats }));
-
-      render(<AnalyticsTab />);
-
-      // Should show dashes for empty data
-      const dashes = screen.getAllByText('-');
-      expect(dashes.length).toBeGreaterThan(0);
-    });
-  });
-
-  describe('Top Prompts List', () => {
-    it('should render top prompts with titles', () => {
-      mockUseUsageStats.mockReturnValue(createMockReturn());
-
-      render(<AnalyticsTab />);
-
-      expect(screen.getByText('Code Review Helper')).toBeInTheDocument();
-      expect(screen.getByText('Email Composer')).toBeInTheDocument();
-      expect(screen.getByText('Bug Fixer')).toBeInTheDocument();
-    });
-
-    it('should display usage counts for prompts', () => {
-      mockUseUsageStats.mockReturnValue(createMockReturn());
-
-      render(<AnalyticsTab />);
-
-      // Find the top prompts section and verify counts within it
-      const topPromptsSection = screen.getByLabelText('Top prompts');
-      expect(topPromptsSection).toBeInTheDocument();
-
-      // Verify counts are rendered (using getAllByText since counts may appear in multiple places)
-      const usageCounts = screen.getAllByText(/\d+ uses?/);
-      expect(usageCounts.length).toBeGreaterThanOrEqual(3);
-    });
-
-    it('should show singular "use" for count of 1', () => {
-      const stats = createMockStats({
-        topPrompts: [
-          { promptId: 'p1', title: 'Single Use Prompt', category: 'Test', count: 1, lastUsed: Date.now() }
-        ]
-      });
-
-      mockUseUsageStats.mockReturnValue(createMockReturn({ stats }));
-
-      render(<AnalyticsTab />);
-
-      expect(screen.getByText('1 use')).toBeInTheDocument();
-    });
-
-    it('should limit to 5 prompts', () => {
-      const stats = createMockStats({
-        topPrompts: [
-          { promptId: 'p1', title: 'Prompt 1', category: 'Test', count: 10, lastUsed: Date.now() },
-          { promptId: 'p2', title: 'Prompt 2', category: 'Test', count: 9, lastUsed: Date.now() },
-          { promptId: 'p3', title: 'Prompt 3', category: 'Test', count: 8, lastUsed: Date.now() },
-          { promptId: 'p4', title: 'Prompt 4', category: 'Test', count: 7, lastUsed: Date.now() },
-          { promptId: 'p5', title: 'Prompt 5', category: 'Test', count: 6, lastUsed: Date.now() },
-          { promptId: 'p6', title: 'Prompt 6', category: 'Test', count: 5, lastUsed: Date.now() },
-          { promptId: 'p7', title: 'Prompt 7', category: 'Test', count: 4, lastUsed: Date.now() }
-        ]
-      });
-
-      mockUseUsageStats.mockReturnValue(createMockReturn({ stats }));
-
-      render(<AnalyticsTab />);
-
-      expect(screen.getByText('Prompt 1')).toBeInTheDocument();
-      expect(screen.getByText('Prompt 5')).toBeInTheDocument();
-      expect(screen.queryByText('Prompt 6')).not.toBeInTheDocument();
-      expect(screen.queryByText('Prompt 7')).not.toBeInTheDocument();
-    });
-
-    it('should show "View all" button when more than 5 prompts', () => {
-      const stats = createMockStats({
-        topPrompts: Array.from({ length: 7 }, (_, i) => ({
-          promptId: `p${String(i)}`,
-          title: `Prompt ${String(i)}`,
-          category: 'Test',
-          count: 10 - i,
-          lastUsed: Date.now()
-        }))
-      });
-
-      mockUseUsageStats.mockReturnValue(createMockReturn({ stats }));
+    it('offers the full Dashboard and the close button in the side panel only', () => {
       const onExpand = vi.fn();
+      const { unmount } = render(<AnalyticsTab context="sidepanel" onExpandDashboard={onExpand} />);
+      fireEvent.click(screen.getByRole('button', { name: 'View full analytics dashboard' }));
+      expect(onExpand).toHaveBeenCalled();
+      unmount();
 
-      render(<AnalyticsTab onExpandDashboard={onExpand} />);
+      render(<AnalyticsTab context="popup" onExpandDashboard={onExpand} />);
+      expect(screen.queryByRole('button', { name: 'View full analytics dashboard' })).not.toBeInTheDocument();
+    });
+  });
 
-      const viewAllButton = screen.getByText('View all');
-      expect(viewAllButton).toBeInTheDocument();
+  describe('Hero', () => {
+    it('shows the Insertions of the period and names the busiest weekday', () => {
+      render(<AnalyticsTab />);
 
-      fireEvent.click(viewAllButton);
-      expect(onExpand).toHaveBeenCalledTimes(1);
+      const hero = screen.getByTestId('stats-hero');
+      expect(within(hero).getByText('Prompts used')).toBeInTheDocument();
+      expect(within(hero).getByText('7')).toBeInTheDocument();
+      expect(screen.getByTestId('stats-hero-subtitle')).toHaveTextContent('Tuesday is your busiest day.');
     });
 
-    it('should not show "View all" button with 5 or fewer prompts', () => {
-      mockUseUsageStats.mockReturnValue(createMockReturn());
+    it('draws a bar per weekday, Monday to Sunday, with a text alternative', () => {
+      render(<AnalyticsTab />);
 
+      expect(screen.getAllByTestId('stats-bar').map(bar => bar.textContent?.replace(/\d+/g, ''))).toEqual(
+        ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+      );
+      expect(screen.getByRole('img', { name: /Monday 0, Tuesday 4, Wednesday 3, .*Tuesday is the busiest/ })).toBeInTheDocument();
+    });
+
+    it("shows a hovered bar's count in the line under the total", () => {
+      render(<AnalyticsTab />);
+
+      const wednesday = screen.getAllByTestId('stats-bar')[2];
+      fireEvent.mouseEnter(wednesday);
+      expect(screen.getByTestId('stats-hero-subtitle')).toHaveTextContent('3 on Wednesdays');
+
+      fireEvent.mouseLeave(wednesday);
+      expect(screen.getByTestId('stats-hero-subtitle')).toHaveTextContent('Tuesday is your busiest day.');
+    });
+  });
+
+  describe('Top platform and Top category', () => {
+    it('name the Platform and the Category used most, with their uses', () => {
+      render(<AnalyticsTab />);
+
+      const platform = screen.getByRole('heading', { name: 'Top platform' }).parentElement as HTMLElement;
+      expect(within(platform).getByText('Claude')).toBeInTheDocument();
+      expect(within(platform).getByText('6 uses')).toBeInTheDocument();
+
+      const category = screen.getByRole('heading', { name: 'Top category' }).parentElement as HTMLElement;
+      expect(within(category).getByText('Development')).toBeInTheDocument();
+      expect(within(category).getByText('4 uses')).toBeInTheDocument();
+    });
+  });
+
+  describe('Most used', () => {
+    it('ranks the three Prompts used most in the period', () => {
+      render(<AnalyticsTab />);
+
+      const rows = screen.getAllByTestId('most-used-row');
+      expect(rows.map(row => row.getAttribute('aria-label'))).toEqual([
+        'Code Review Helper, 3 uses. Open',
+        'Email Composer, 2 uses. Open',
+        'Bug Fixer, 1 use. Open'
+      ]);
+    });
+
+    it('opens the Prompt of a row in the editor', () => {
+      const onEditPrompt = vi.fn();
+      render(<AnalyticsTab onEditPrompt={onEditPrompt} />);
+
+      fireEvent.click(screen.getAllByTestId('most-used-row')[1]);
+
+      expect(onEditPrompt).toHaveBeenCalledWith(email);
+    });
+
+    it('gives the keyboard to the first row left when asked to, once', () => {
+      const onFocusTaken = vi.fn();
+      render(<AnalyticsTab prompts={PROMPTS.filter(p => p.id !== 'p1')} takeFocus onFocusTaken={onFocusTaken} />);
+
+      expect(screen.getAllByTestId('most-used-row')[0]).toHaveFocus();
+      expect(screen.getAllByTestId('most-used-row')[0]).toHaveAccessibleName('Email Composer, 2 uses. Open');
+      expect(onFocusTaken).toHaveBeenCalledTimes(1);
+    });
+
+    it('gives the keyboard to the Analytics content when no row is left', () => {
+      render(<AnalyticsTab prompts={[unused]} takeFocus onFocusTaken={vi.fn()} />);
+
+      expect(screen.getByRole('main', { name: 'Analytics' })).toHaveFocus();
+    });
+
+    it('offers View all when more Prompts were used than the rows shown', () => {
+      const onExpand = vi.fn();
+      render(<AnalyticsTab context="popup" onExpandDashboard={onExpand} />);
+
+      fireEvent.click(screen.getByRole('button', { name: 'View all' }));
+
+      expect(onExpand).toHaveBeenCalled();
+    });
+
+    it('has no View all when every Prompt used is shown', () => {
+      mockUseUsageStats.mockReturnValue(createMockReturn({ history: HISTORY.filter(e => e.promptId !== 'p4') }));
       render(<AnalyticsTab onExpandDashboard={vi.fn()} />);
 
-      expect(screen.queryByText('View all')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'View all' })).not.toBeInTheDocument();
     });
   });
 
-  describe('Loading State', () => {
-    it('should show loading skeletons when loading', () => {
-      mockUseUsageStats.mockReturnValue(createMockReturn({ loading: true }));
+  describe('Tidy up', () => {
+    it('counts the Never used Prompts and the Duplicate pairs', () => {
+      mockUseDuplicateGroups.mockReturnValue([{ original: email, duplicates: [notes] }]);
+      render(<AnalyticsTab />);
 
-      const { container } = render(<AnalyticsTab />);
+      expect(screen.getByTestId('tidy-up-never-used')).toHaveTextContent('1 prompt never used');
+      expect(screen.getByTestId('tidy-up-duplicates')).toHaveTextContent('1 duplicate pair');
+    });
 
-      const skeletons = container.querySelectorAll('.animate-pulse');
-      expect(skeletons.length).toBeGreaterThan(0);
+    it('opens the Library on the Never used Prompts', () => {
+      const onReviewPrompts = vi.fn();
+      render(<AnalyticsTab onReviewPrompts={onReviewPrompts} />);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Review the 1 prompt never used' }));
+
+      expect(onReviewPrompts).toHaveBeenCalledWith({ kind: 'neverUsed' });
+    });
+
+    it('opens the Library on the Prompts of the Duplicate pairs, each original first', () => {
+      const onReviewPrompts = vi.fn();
+      mockUseDuplicateGroups.mockReturnValue([{ original: email, duplicates: [notes, bug] }]);
+      render(<AnalyticsTab onReviewPrompts={onReviewPrompts} />);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Review the 2 duplicate pairs' }));
+
+      expect(onReviewPrompts).toHaveBeenCalledWith({ kind: 'duplicates', groups: [['p2', 'p4', 'p3']] });
+    });
+
+    it('hides a line with nothing to review, and the line for duplicates while they are looked for', () => {
+      mockUseDuplicateGroups.mockReturnValue(null);
+      render(<AnalyticsTab />);
+
+      expect(screen.getByTestId('tidy-up-never-used')).toBeInTheDocument();
+      expect(screen.queryByTestId('tidy-up-duplicates')).not.toBeInTheDocument();
+    });
+
+    it('is hidden when there is nothing to review', () => {
+      mockUseUsageStats.mockReturnValue(createMockReturn({ prompts: PROMPTS.filter(p => p !== unused) }));
+      render(<AnalyticsTab />);
+
+      expect(screen.queryByTestId('tidy-up')).not.toBeInTheDocument();
+    });
+
+    it('uses the live Prompts the app passes, over the ones loaded with the history', () => {
+      render(<AnalyticsTab prompts={[review, email, bug, notes]} />);
+
+      expect(screen.queryByTestId('tidy-up')).not.toBeInTheDocument();
+    });
+
+    it('counts an Insertion stored since the app read its Prompts, so a used Prompt is not Never used', () => {
+      mockUseUsageStats.mockReturnValue(createMockReturn({ prompts: [...PROMPTS.filter(p => p !== unused), { ...unused, usageCount: 1 }] }));
+      render(<AnalyticsTab prompts={PROMPTS} />);
+
+      expect(screen.queryByTestId('tidy-up')).not.toBeInTheDocument();
     });
   });
 
-  describe('Error State', () => {
-    it('should display error message when error occurs', () => {
-      const errorReturn = createMockReturn({
-        stats: null,
-        error: { type: 'STORAGE_UNAVAILABLE', message: 'Storage is unavailable' }
-      });
-
-      mockUseUsageStats.mockReturnValue(errorReturn);
-
+  describe('Without usage', () => {
+    it('keeps the hero at 0 with flat bars, hides the usage cards and still shows Tidy up', () => {
+      mockUseUsageStats.mockReturnValue(createMockReturn({ history: [], stats: { totalUses: 0 } as UsageStats }));
       render(<AnalyticsTab />);
 
-      expect(screen.getByText('Unable to load analytics')).toBeInTheDocument();
-      expect(screen.getByText('Storage is unavailable')).toBeInTheDocument();
-    });
-
-    it('should have alert role on error', () => {
-      const errorReturn = createMockReturn({
-        stats: null,
-        error: { type: 'VALIDATION_ERROR', message: 'Test error' }
-      });
-
-      mockUseUsageStats.mockReturnValue(errorReturn);
-
-      render(<AnalyticsTab />);
-
-      expect(screen.getByRole('alert')).toBeInTheDocument();
+      expect(screen.getByTestId('stats-hero-subtitle')).toHaveTextContent('No Prompts used yet.');
+      expect(screen.getAllByTestId('stats-bar')).toHaveLength(7);
+      expect(screen.queryByRole('heading', { name: 'Top platform' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: 'Most used' })).not.toBeInTheDocument();
+      expect(screen.getByTestId('tidy-up')).toBeInTheDocument();
     });
   });
 
-  describe('Empty State', () => {
-    it('should show empty state when no usage data', () => {
-      const emptyStats = createMockStats({
-        totalUses: 0,
-        topPrompts: []
-      });
-
-      mockUseUsageStats.mockReturnValue(createMockReturn({ stats: emptyStats }));
-
+  describe('Loading and errors', () => {
+    it('shows a placeholder while loading', () => {
+      mockUseUsageStats.mockReturnValue(createMockReturn({ loading: true, stats: null, history: [] }));
       render(<AnalyticsTab />);
 
-      expect(screen.getByText('No usage data yet')).toBeInTheDocument();
-      expect(screen.getByText(/Start using your prompts/)).toBeInTheDocument();
+      expect(screen.getByRole('status', { name: 'Loading analytics' })).toBeInTheDocument();
     });
 
-    it('should show empty state when stats is null', () => {
-      mockUseUsageStats.mockReturnValue(createMockReturn({ stats: null, loading: false }));
-
+    it('reports an error as an alert', () => {
+      mockUseUsageStats.mockReturnValue(createMockReturn({
+        error: { type: 'STORAGE_UNAVAILABLE', message: 'Storage failed' } as UseUsageStatsReturn['error']
+      }));
       render(<AnalyticsTab />);
 
-      expect(screen.getByText('No usage data yet')).toBeInTheDocument();
-    });
-  });
-
-  describe('Expand Dashboard', () => {
-    it('should show expand button in sidepanel context', () => {
-      mockUseUsageStats.mockReturnValue(createMockReturn());
-      const onExpand = vi.fn();
-
-      render(<AnalyticsTab onExpandDashboard={onExpand} context="sidepanel" />);
-
-      const button = screen.getByText('Full Dashboard');
-      expect(button).toBeInTheDocument();
-    });
-
-    it('should call onExpandDashboard when button clicked', () => {
-      mockUseUsageStats.mockReturnValue(createMockReturn());
-      const onExpand = vi.fn();
-
-      render(<AnalyticsTab onExpandDashboard={onExpand} context="sidepanel" />);
-
-      fireEvent.click(screen.getByText('Full Dashboard'));
-      expect(onExpand).toHaveBeenCalledTimes(1);
-    });
-
-    it('should not show expand button in popup context', () => {
-      mockUseUsageStats.mockReturnValue(createMockReturn());
-
-      render(<AnalyticsTab onExpandDashboard={vi.fn()} context="popup" />);
-
-      expect(screen.queryByText('Full Dashboard')).not.toBeInTheDocument();
-    });
-
-    it('should not show expand button when no callback provided', () => {
-      mockUseUsageStats.mockReturnValue(createMockReturn());
-
-      render(<AnalyticsTab context="sidepanel" />);
-
-      expect(screen.queryByText('Full Dashboard')).not.toBeInTheDocument();
-    });
-  });
-
-  describe('Platform Name Formatting', () => {
-    it.each([
-      ['claude', 'Claude'],
-      ['chatgpt', 'ChatGPT'],
-      ['gemini', 'Gemini'],
-      ['perplexity', 'Perplexity'],
-      ['copilot', 'Copilot'],
-      ['mistral', 'Mistral'],
-      ['custom', 'Custom Site']
-    ])('should format %s as %s', (input, expected) => {
-      const stats = createMockStats({
-        platformBreakdown: [{ platform: input, count: 10, percentage: 100 }]
-      });
-
-      mockUseUsageStats.mockReturnValue(createMockReturn({ stats }));
-
-      render(<AnalyticsTab />);
-
-      expect(screen.getByText(expected)).toBeInTheDocument();
-    });
-
-    it('should capitalize and format unknown platform names', () => {
-      const stats = createMockStats({
-        platformBreakdown: [{ platform: 'new-platform', count: 10, percentage: 100 }]
-      });
-
-      mockUseUsageStats.mockReturnValue(createMockReturn({ stats }));
-
-      render(<AnalyticsTab />);
-
-      expect(screen.getByText('New-platform')).toBeInTheDocument();
-    });
-  });
-
-  describe('Relative Time Formatting', () => {
-    it('should show "Just now" for recent usage', () => {
-      const stats = createMockStats({
-        topPrompts: [
-          { promptId: 'p1', title: 'Recent', category: 'Test', count: 5, lastUsed: Date.now() - 30000 } // 30 seconds ago
-        ]
-      });
-
-      mockUseUsageStats.mockReturnValue(createMockReturn({ stats }));
-
-      render(<AnalyticsTab />);
-
-      expect(screen.getByText('Just now')).toBeInTheDocument();
-    });
-
-    it('should show minutes for usage within the hour', () => {
-      const stats = createMockStats({
-        topPrompts: [
-          { promptId: 'p1', title: 'Minutes', category: 'Test', count: 5, lastUsed: Date.now() - 30 * 60 * 1000 } // 30 minutes ago
-        ]
-      });
-
-      mockUseUsageStats.mockReturnValue(createMockReturn({ stats }));
-
-      render(<AnalyticsTab />);
-
-      expect(screen.getByText('30m ago')).toBeInTheDocument();
-    });
-
-    it('should show hours for usage within the day', () => {
-      const stats = createMockStats({
-        topPrompts: [
-          { promptId: 'p1', title: 'Hours', category: 'Test', count: 5, lastUsed: Date.now() - 5 * 60 * 60 * 1000 } // 5 hours ago
-        ]
-      });
-
-      mockUseUsageStats.mockReturnValue(createMockReturn({ stats }));
-
-      render(<AnalyticsTab />);
-
-      expect(screen.getByText('5h ago')).toBeInTheDocument();
-    });
-
-    it('should show days for older usage', () => {
-      const stats = createMockStats({
-        topPrompts: [
-          { promptId: 'p1', title: 'Days', category: 'Test', count: 5, lastUsed: Date.now() - 3 * 24 * 60 * 60 * 1000 } // 3 days ago
-        ]
-      });
-
-      mockUseUsageStats.mockReturnValue(createMockReturn({ stats }));
-
-      render(<AnalyticsTab />);
-
-      expect(screen.getByText('3d ago')).toBeInTheDocument();
-    });
-  });
-
-  describe('Accessibility', () => {
-    it('should have proper section labels', () => {
-      mockUseUsageStats.mockReturnValue(createMockReturn());
-
-      render(<AnalyticsTab />);
-
-      expect(screen.getByLabelText('Usage summary')).toBeInTheDocument();
-      expect(screen.getByLabelText('Top prompts')).toBeInTheDocument();
-    });
-
-    it('should have accessible header', () => {
-      mockUseUsageStats.mockReturnValue(createMockReturn());
-
-      render(<AnalyticsTab />);
-
-      expect(screen.getByRole('heading', { name: 'Analytics' })).toBeInTheDocument();
-    });
-
-    it('should have list role for top prompts', () => {
-      mockUseUsageStats.mockReturnValue(createMockReturn());
-
-      render(<AnalyticsTab />);
-
-      expect(screen.getByRole('list')).toBeInTheDocument();
+      expect(screen.getByRole('alert')).toHaveTextContent('Storage failed');
     });
   });
 
@@ -490,9 +280,7 @@ describe('AnalyticsTab', () => {
     });
 
     it('should not show clear history button when there is no data', () => {
-      mockUseUsageStats.mockReturnValue(createMockReturn({
-        stats: createMockStats({ totalUses: 0 })
-      }));
+      mockUseUsageStats.mockReturnValue(createMockReturn({ history: [] }));
 
       render(<AnalyticsTab />);
 

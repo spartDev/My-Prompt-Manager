@@ -14,6 +14,9 @@ export interface LibraryFilterBarProps {
   activeFilter: LibraryFilter;
   onChange: (filter: LibraryFilter) => void;
   disabled?: boolean;
+  /** Move focus to the active pill once it can take it (arriving from Review in Analytics), then call onFocusActiveDone */
+  focusActive?: boolean;
+  onFocusActiveDone?: () => void;
 }
 
 interface FilterOption {
@@ -36,16 +39,34 @@ const FADE_WIDTH = 32;
 const filterKey = (filter: LibraryFilter): string =>
   filter.kind === 'category' ? `category:${filter.categoryId}` : filter.kind;
 
+/** The name of a filter reached only from Tidy up in Analytics, shown while it is active */
+export const reviewFilterLabel = (filter: LibraryFilter): string | null =>
+  filter.kind === 'neverUsed' ? 'Never used' : filter.kind === 'duplicates' ? 'Possible duplicates' : null;
+
 /**
  * The Library filter as a row of pills that scrolls sideways: All, Pinned, Most Used,
- * then one pill per Category. A WAI-ARIA radio group (useRadioGroup).
+ * then one pill per Category. A WAI-ARIA radio group (useRadioGroup). While a filter reached from
+ * Analytics is active (Never used, Possible duplicates), its pill follows All, with a button that
+ * returns to All; it is gone once another filter is chosen.
  */
-const LibraryFilterBar: FC<LibraryFilterBarProps> = ({ categories, activeFilter, onChange, disabled = false }) => {
+const LibraryFilterBar: FC<LibraryFilterBarProps> = ({
+  categories,
+  activeFilter,
+  onChange,
+  disabled = false,
+  focusActive = false,
+  onFocusActiveDone
+}) => {
   const rowRef = useRef<HTMLDivElement>(null);
+  // Clearing a review filter removes the focused button with its pill: focus then goes to All
+  const focusAllNext = useRef(false);
   const [fades, setFades] = useState({ start: false, end: false });
 
+  const reviewLabel = reviewFilterLabel(activeFilter);
   const options: FilterOption[] = [
-    ...FIXED_OPTIONS,
+    FIXED_OPTIONS[0],
+    ...(reviewLabel ? [{ key: filterKey(activeFilter), label: reviewLabel, filter: activeFilter }] : []),
+    ...FIXED_OPTIONS.slice(1),
     ...categories.map(category => ({
       key: `category:${category.id}`,
       label: category.name,
@@ -98,6 +119,20 @@ const LibraryFilterBar: FC<LibraryFilterBarProps> = ({ categories, activeFilter,
     onSelect: (option) => { onChange(option.filter); }
   });
 
+  // Focus All after the review filter is cleared, and the active pill when asked to
+  useEffect(() => {
+    if (focusAllNext.current && activeIndex === 0) {
+      focusAllNext.current = false;
+      pills.current[0]?.focus();
+    }
+  }, [activeIndex, pills]);
+  useEffect(() => {
+    if (focusActive && !disabled && activeIndex >= 0) {
+      pills.current[activeIndex]?.focus();
+      onFocusActiveDone?.();
+    }
+  }, [focusActive, disabled, activeIndex, pills, onFocusActiveDone]);
+
   // Keep the active pill fully visible, clear of the edge fades
   useEffect(() => {
     const row = rowRef.current;
@@ -125,9 +160,10 @@ const LibraryFilterBar: FC<LibraryFilterBarProps> = ({ categories, activeFilter,
         {options.map((option, index) => {
           const isActive = option.key === activeKey;
           const Icon = option.icon;
-          return (
+          const isReview = reviewLabel !== null && option.key === activeKey;
+          const pill = (
             <button
-              key={option.key}
+              key={isReview ? undefined : option.key}
               {...getRadioProps(index)}
               type="button"
               role="radio"
@@ -152,6 +188,29 @@ const LibraryFilterBar: FC<LibraryFilterBarProps> = ({ categories, activeFilter,
               )}
               <span className="truncate max-w-[10rem]">{option.label}</span>
             </button>
+          );
+          if (!isReview) {
+            return pill;
+          }
+          return (
+            <span key={option.key} className="shrink-0 inline-flex items-center gap-1">
+              {pill}
+              <button
+                type="button"
+                onClick={() => {
+                  focusAllNext.current = true;
+                  onChange(ALL_PROMPTS);
+                }}
+                disabled={disabled}
+                aria-label={`Clear the ${option.label} filter`}
+                data-testid="library-filter-clear-review"
+                className="shrink-0 w-8 h-8 inline-flex items-center justify-center rounded-full border border-default bg-card text-secondary hover:bg-muted hover:text-primary transition-colors focus-interactive disabled:opacity-50"
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" aria-hidden="true">
+                  <path d="M6 6l12 12M18 6 6 18" />
+                </svg>
+              </button>
+            </span>
           );
         })}
       </div>

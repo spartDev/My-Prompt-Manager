@@ -24,7 +24,7 @@ Which component does which job in the popup and the side panel, and the conventi
 | `src/components/LibraryView.tsx` | The Library: search, the Library filter pills, the Prompt cards, the empty states |
 | `src/components/CategoryManager.tsx` | The Categories section: the list of Categories, each row (but the default one) opening `CategorySheet` to rename, recolor or delete it, and "Add category" below the list to create one. Steps the screen back while the sheet is open, out of reach with App's tab bar (`onSheetOpenChange`), and pops in a Category that appears (created, or back from Undo) |
 | `src/components/CategorySheet.tsx` | The bottom sheet that creates or edits a Category (`mode: 'create' \| 'edit'`): name, one of the 12 `PRESET_COLORS`, a live preview. Its state (open, closing, draft) is `useCategorySheet`; its keyboard is `useModalFocus` |
-| `src/components/analytics/AnalyticsTab.tsx` | The Analytics section; `src/components/analytics/AnalyticsDashboard.tsx` is the full page it expands to |
+| `src/components/analytics/AnalyticsTab.tsx` | The Analytics section (Atelier 1C): `StatsHero` (total and weekday bars), the Top platform and Top category cards, `MostUsedCard`, `TidyUpCard`, and Clear history; `src/components/analytics/AnalyticsDashboard.tsx` is the full page it expands to |
 | `src/components/SettingsView.tsx` | Settings: assembles the sections of `src/components/settings/`, and runs Backup restore (`handleImportData`, passed down as `onImport`) |
 | `src/components/TabBar.tsx` | The bottom tab bar; its `Section` type names the four sections, `SECTION_ORDER` their order left to right |
 
@@ -36,7 +36,7 @@ Which component does which job in the popup and the side panel, and the conventi
 | `src/components/PromptEditor.tsx` | The one editor for a Prompt: new (typed, or opened from a Share code) and edit. Header bar Cancel / heading / Save, Cmd/Ctrl+S saves, Escape asks before discarding changes. Save shows "Saved" for `MOTION.savedPause`, then closes; the title has the keyboard on open |
 | `src/components/editor/CategoryChips.tsx` | The Category of a Prompt as a radio group of chips, with "New category" to create one in place |
 | `src/components/editor/VariableTextarea.tsx` | The Prompt text field: Variables highlighted by a mirror under a transparent textarea; the field grows with its text |
-| `src/components/LibraryFilterBar.tsx` | The Library filter pills (All, Pinned, Most Used, one per non-empty Category); the filter logic is `src/services/libraryFilter.ts` |
+| `src/components/LibraryFilterBar.tsx` | The Library filter pills (All, Pinned, Most Used, one per non-empty Category, and while one is active the Never used or Possible duplicates pill reached from Analytics, with a button back to All); the filter logic is `src/services/libraryFilter.ts` |
 | `src/components/SearchBar.tsx` | The search field; the debounce is in `useSearchWithDebounce`, not here |
 | `src/components/CategoryBadge.tsx` | A Category name on its color, with readable text contrast |
 
@@ -66,7 +66,7 @@ Which component does which job in the popup and the side panel, and the conventi
 
 ### Analytics charts
 
-Imported from `src/components/analytics/index.ts`. Each chart takes its data from `useUsageStats` and its colors from `src/theme/chartColors.ts`; `src/components/analytics/SummaryCard.tsx` shows one metric of `useSummaryMetrics`.
+Imported from `src/components/analytics/index.ts`. Each chart takes its data from `useUsageStats` and its colors from `src/theme/chartColors.ts`; `src/components/analytics/SummaryCard.tsx` shows one metric of `useSummaryMetrics` on the dashboard. The Analytics tab draws no chart library: its weekday bars are plain elements in `StatsHero`, computed by `src/services/usageInsights.ts`.
 
 ---
 

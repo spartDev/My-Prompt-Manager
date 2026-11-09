@@ -43,49 +43,32 @@ test.describe('Analytics Tab', () => {
     });
   });
 
-  test.describe('Empty State', () => {
-    test('displays empty state when no usage data exists', async ({
+  test.describe('Without usage', () => {
+    test('keeps the hero at 0 with its bars, and offers to tidy up the Prompts never used', async ({
       context,
       storage,
       extensionId,
     }) => {
-      // Seed with prompts but no usage history
-      const prompt = createPromptSeed({
-        id: 'empty-state-prompt-1',
-        title: 'Unused Prompt',
-        content: 'This prompt has never been used',
-        category: 'Uncategorized',
-      });
-
       await seedLibrary(storage, {
-        prompts: [prompt],
+        prompts: [createPromptSeed({ id: 'never-used-1', title: 'Unused Prompt', content: 'This prompt has never been used' })],
         categories: [],
         settings: { ...DEFAULT_SETTINGS, interfaceMode: 'sidepanel' },
       });
-      // No usage history seeded - this creates the empty state
 
       const page = await context.newPage();
-      await page.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, {
-        waitUntil: 'domcontentloaded',
-      });
+      await page.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
       await analyticsWorkflows.navigateToAnalyticsTab(page);
       await analyticsAssertions.tabLoaded(page);
+      await analyticsAssertions.tabEmptyState(page);
 
-      // Verify empty state message
-      await analyticsAssertions.emptyState(page);
-
-      // Verify empty state container is visible
       const analyticsPage = new AnalyticsPage(page);
-      await expect(analyticsPage.getEmptyState()).toBeVisible();
+      await analyticsAssertions.totalUses(page, 0);
+      await expect(analyticsPage.getWeekdayBars()).toHaveCount(7);
+      await expect(analyticsPage.getTidyUp()).toContainText('1 prompt never used');
     });
 
-    test('displays empty state with no prompts and no usage', async ({
-      context,
-      storage,
-      extensionId,
-    }) => {
-      // Seed with completely empty state
+    test('shows no Tidy up with an empty Library', async ({ context, storage, extensionId }) => {
       await seedLibrary(storage, {
         prompts: [],
         categories: [],
@@ -93,18 +76,16 @@ test.describe('Analytics Tab', () => {
       });
 
       const page = await context.newPage();
-      await page.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, {
-        waitUntil: 'domcontentloaded',
-      });
+      await page.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
       await analyticsWorkflows.navigateToAnalyticsTab(page);
-      await analyticsAssertions.tabLoaded(page);
-      await analyticsAssertions.emptyState(page);
+      await analyticsAssertions.tabEmptyState(page);
+      await expect(new AnalyticsPage(page).getTidyUp()).toBeHidden();
     });
   });
 
-  test.describe('Summary Cards', () => {
-    test('displays total uses summary card with correct count', async ({
+  test.describe('Hero and cards', () => {
+    test('count the Insertions of the last 30 days and name the top Platform and Category', async ({
       context,
       storage,
       extensionId,
@@ -118,203 +99,175 @@ test.describe('Analytics Tab', () => {
       await seedUsageHistory(storage, scenario.usageHistory);
 
       const page = await context.newPage();
-      await page.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, {
-        waitUntil: 'domcontentloaded',
-      });
+      await page.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
       await analyticsWorkflows.navigateToAnalyticsTab(page);
       await analyticsAssertions.tabLoaded(page);
 
-      // Verify total uses (VARIED_USAGE has 8 usage events)
+      // VARIED_USAGE: 8 Insertions, 4 of them on Claude, most in Work
       await analyticsAssertions.totalUses(page, 8);
-    });
-
-    test('displays top platform summary card', async ({ context, storage, extensionId }) => {
-      const scenario = createAnalyticsScenario('VARIED_USAGE');
-      await seedLibrary(storage, {
-        prompts: scenario.prompts,
-        categories: scenario.categories,
-        settings: { ...DEFAULT_SETTINGS, interfaceMode: 'sidepanel' },
-      });
-      await seedUsageHistory(storage, scenario.usageHistory);
-
-      const page = await context.newPage();
-      await page.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, {
-        waitUntil: 'domcontentloaded',
-      });
-
-      await analyticsWorkflows.navigateToAnalyticsTab(page);
-      await analyticsAssertions.tabLoaded(page);
-
-      // VARIED_USAGE has Claude and ChatGPT as most used platforms
-      // Claude appears 4 times, ChatGPT appears 2 times
       await analyticsAssertions.topPlatform(page, 'Claude');
-    });
-
-    test('displays top category summary card', async ({ context, storage, extensionId }) => {
-      const scenario = createAnalyticsScenario('VARIED_USAGE');
-      await seedLibrary(storage, {
-        prompts: scenario.prompts,
-        categories: scenario.categories,
-        settings: { ...DEFAULT_SETTINGS, interfaceMode: 'sidepanel' },
-      });
-      await seedUsageHistory(storage, scenario.usageHistory);
-
-      const page = await context.newPage();
-      await page.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, {
-        waitUntil: 'domcontentloaded',
-      });
-
-      await analyticsWorkflows.navigateToAnalyticsTab(page);
-      await analyticsAssertions.tabLoaded(page);
-
-      // VARIED_USAGE has Work as the most used category
       await analyticsAssertions.topCategory(page, 'Work');
-    });
 
-    test('displays all summary cards for multi-platform usage', async ({
-      context,
-      storage,
-      extensionId,
-    }) => {
-      const scenario = createAnalyticsScenario('MULTI_PLATFORM');
-      await seedLibrary(storage, {
-        prompts: scenario.prompts,
-        categories: scenario.categories,
-        settings: { ...DEFAULT_SETTINGS, interfaceMode: 'sidepanel' },
-      });
-      await seedUsageHistory(storage, scenario.usageHistory);
-
-      const page = await context.newPage();
-      await page.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, {
-        waitUntil: 'domcontentloaded',
-      });
-
-      await analyticsWorkflows.navigateToAnalyticsTab(page);
-      await analyticsAssertions.tabLoaded(page);
-
-      // Verify summary section is present with expected cards
       const analyticsPage = new AnalyticsPage(page);
-      const totalUsesCard = analyticsPage.getSummaryCard('Total Uses');
-      const topPlatformCard = analyticsPage.getSummaryCard('Top Platform');
-      const topCategoryCard = analyticsPage.getSummaryCard('Top Category');
-
-      await expect(totalUsesCard).toBeVisible();
-      await expect(topPlatformCard).toBeVisible();
-      await expect(topCategoryCard).toBeVisible();
-    });
-  });
-
-  test.describe('Top Prompts List', () => {
-    test('displays top prompts sorted by usage count', async ({
-      context,
-      storage,
-      extensionId,
-    }) => {
-      const scenario = createAnalyticsScenario('VARIED_USAGE');
-      await seedLibrary(storage, {
-        prompts: scenario.prompts,
-        categories: scenario.categories,
-        settings: { ...DEFAULT_SETTINGS, interfaceMode: 'sidepanel' },
-      });
-      await seedUsageHistory(storage, scenario.usageHistory);
-
-      const page = await context.newPage();
-      await page.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, {
-        waitUntil: 'domcontentloaded',
-      });
-
-      await analyticsWorkflows.navigateToAnalyticsTab(page);
-      await analyticsAssertions.tabLoaded(page);
-
-      // Verify prompts appear in top list
-      // 'Work Email Template' has the most uses (4) in VARIED_USAGE
-      await analyticsAssertions.promptInTopList(page, 'Work Email Template');
+      await expect(analyticsPage.getWeekdayBars()).toHaveText([/Mon$/, /Tue$/, /Wed$/, /Thu$/, /Fri$/, /Sat$/, /Sun$/]);
+      await expect(analyticsPage.getHero().getByRole('img')).toHaveAttribute('aria-label', /^Prompts used per weekday: Monday \d+, .* is the busiest\.$/);
+      await expect(analyticsPage.getHeroSubtitle()).toHaveText(/^\w+day is your busiest day\.$/);
     });
 
-    test('displays correct number of prompts in top list', async ({
-      context,
-      storage,
-      extensionId,
-    }) => {
-      const scenario = createAnalyticsScenario('VARIED_USAGE');
+    test("hovering a bar shows that weekday's count", async ({ context, storage, extensionId }) => {
+      // Two Insertions on the Wednesday of last week
+      const wednesday = new Date();
+      wednesday.setDate(wednesday.getDate() - ((wednesday.getDay() + 4) % 7) - 7);
+      wednesday.setHours(12, 0, 0, 0);
       await seedLibrary(storage, {
-        prompts: scenario.prompts,
-        categories: scenario.categories,
-        settings: { ...DEFAULT_SETTINGS, interfaceMode: 'sidepanel' },
-      });
-      await seedUsageHistory(storage, scenario.usageHistory);
-
-      const page = await context.newPage();
-      await page.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, {
-        waitUntil: 'domcontentloaded',
-      });
-
-      await analyticsWorkflows.navigateToAnalyticsTab(page);
-      await analyticsAssertions.tabLoaded(page);
-
-      // VARIED_USAGE has 4 prompts used
-      await analyticsAssertions.topPromptsCount(page, 4);
-    });
-
-    test('displays trophy icons for top prompts', async ({ context, storage, extensionId }) => {
-      const scenario = createAnalyticsScenario('VARIED_USAGE');
-      await seedLibrary(storage, {
-        prompts: scenario.prompts,
-        categories: scenario.categories,
-        settings: { ...DEFAULT_SETTINGS, interfaceMode: 'sidepanel' },
-      });
-      await seedUsageHistory(storage, scenario.usageHistory);
-
-      const page = await context.newPage();
-      await page.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, {
-        waitUntil: 'domcontentloaded',
-      });
-
-      await analyticsWorkflows.navigateToAnalyticsTab(page);
-      await analyticsAssertions.tabLoaded(page);
-
-      // Verify trophy icons are visible for top 3 prompts
-      await analyticsAssertions.trophyIconsVisible(page);
-    });
-
-    test('shows top prompts section with single usage event', async ({
-      context,
-      storage,
-      extensionId,
-    }) => {
-      const prompt = createPromptSeed({
-        id: 'single-usage-prompt',
-        title: 'Single Use Prompt',
-        content: 'A prompt used only once',
-        category: 'Uncategorized',
-      });
-
-      const usageEvent = createUsageEventSeed({
-        promptId: 'single-usage-prompt',
-        timestamp: Date.now() - 3600000,
-        platform: 'claude',
-        categoryId: null,
-      });
-
-      await seedLibrary(storage, {
-        prompts: [prompt],
+        prompts: [createPromptSeed({ id: 'p1', title: 'Weekly Report', content: 'Write the weekly report', usageCount: 2 })],
         categories: [],
         settings: { ...DEFAULT_SETTINGS, interfaceMode: 'sidepanel' },
       });
-      await seedUsageHistory(storage, [usageEvent]);
+      await seedUsageHistory(storage, [
+        createUsageEventSeed({ promptId: 'p1', timestamp: wednesday.getTime(), platform: 'claude', categoryId: null }),
+        createUsageEventSeed({ promptId: 'p1', timestamp: wednesday.getTime() + 60_000, platform: 'claude', categoryId: null }),
+      ]);
 
       const page = await context.newPage();
-      await page.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, {
-        waitUntil: 'domcontentloaded',
+      await page.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+      await analyticsWorkflows.navigateToAnalyticsTab(page);
+
+      const analyticsPage = new AnalyticsPage(page);
+      await expect(analyticsPage.getHeroSubtitle()).toHaveText('Wednesday is your busiest day.');
+      await analyticsPage.getWeekdayBars().nth(2).hover();
+      await expect(analyticsPage.getHeroSubtitle()).toHaveText('2 on Wednesdays');
+    });
+
+    test('under reduced motion the total shows its value at once', async ({ context, storage, extensionId }) => {
+      const scenario = createAnalyticsScenario('VARIED_USAGE');
+      await seedLibrary(storage, {
+        prompts: scenario.prompts,
+        categories: scenario.categories,
+        settings: { ...DEFAULT_SETTINGS, interfaceMode: 'sidepanel' },
       });
+      await seedUsageHistory(storage, scenario.usageHistory);
+
+      const page = await context.newPage();
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await page.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+      await analyticsWorkflows.navigateToAnalyticsTab(page);
+
+      const analyticsPage = new AnalyticsPage(page);
+      await expect(analyticsPage.getHeroTotal()).toHaveText('8', { timeout: 200 });
+      const barAnimation = await analyticsPage.getWeekdayBars().first().locator('.animate-bar-grow')
+        .evaluate(element => getComputedStyle(element).animationDuration);
+      expect(barAnimation).toBe('0.001s');
+    });
+  });
+
+  test.describe('Most used', () => {
+    test('ranks the three Prompts used most in the last 30 days, and offers View all', async ({
+      context,
+      storage,
+      extensionId,
+    }) => {
+      const scenario = createAnalyticsScenario('VARIED_USAGE');
+      await seedLibrary(storage, {
+        prompts: scenario.prompts,
+        categories: scenario.categories,
+        settings: { ...DEFAULT_SETTINGS, interfaceMode: 'sidepanel' },
+      });
+      await seedUsageHistory(storage, scenario.usageHistory);
+
+      const page = await context.newPage();
+      await page.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
       await analyticsWorkflows.navigateToAnalyticsTab(page);
-      await analyticsAssertions.tabLoaded(page);
 
-      // Verify the single prompt appears in top list
-      await analyticsAssertions.promptInTopList(page, 'Single Use Prompt');
-      await analyticsAssertions.topPromptsCount(page, 1);
+      // VARIED_USAGE uses 4 Prompts; 'Work Email Template' most
+      const analyticsPage = new AnalyticsPage(page);
+      await expect(analyticsPage.getMostUsedRows()).toHaveCount(3);
+      await expect(analyticsPage.getMostUsedRows().first()).toContainText('Work Email Template');
+      await expect(analyticsPage.getMostUsedCard().getByRole('button', { name: 'View all' })).toBeVisible();
+    });
+
+    test('a row opens its Prompt in the editor', async ({ context, storage, extensionId }) => {
+      await seedLibrary(storage, {
+        prompts: [createPromptSeed({ id: 'single-usage-prompt', title: 'Single Use Prompt', content: 'A prompt used only once', usageCount: 1 })],
+        categories: [],
+        settings: { ...DEFAULT_SETTINGS, interfaceMode: 'sidepanel' },
+      });
+      await seedUsageHistory(storage, [
+        createUsageEventSeed({ promptId: 'single-usage-prompt', timestamp: Date.now() - 3600000, platform: 'claude', categoryId: null }),
+      ]);
+
+      const page = await context.newPage();
+      await page.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+      await analyticsWorkflows.navigateToAnalyticsTab(page);
+
+      await analyticsAssertions.mostUsedTitles(page, ['Single Use Prompt']);
+      await expect(new AnalyticsPage(page).getMostUsedCard().getByRole('button', { name: 'View all' })).toBeHidden();
+
+      await page.getByRole('button', { name: 'Single Use Prompt, 1 use. Open' }).click();
+      await expect(page.getByRole('heading', { name: 'Edit prompt', exact: true })).toBeVisible();
+      await expect(page.getByLabel('Title')).toHaveValue('Single Use Prompt');
+    });
+  });
+
+  test.describe('Tidy up', () => {
+    test('Review opens the Library on the Prompts never used, and its chip returns to All', async ({
+      context,
+      storage,
+      extensionId,
+    }) => {
+      await seedLibrary(storage, {
+        prompts: [
+          createPromptSeed({ id: 'used', title: 'Used Prompt', content: 'Used every day', usageCount: 3 }),
+          createPromptSeed({ id: 'unused-1', title: 'Forgotten Draft', content: 'Never sent anywhere' }),
+          createPromptSeed({ id: 'unused-2', title: 'Old Idea', content: 'Still waiting for its turn' }),
+        ],
+        categories: [],
+        settings: { ...DEFAULT_SETTINGS, interfaceMode: 'sidepanel' },
+      });
+
+      const page = await context.newPage();
+      await page.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+      await analyticsWorkflows.navigateToAnalyticsTab(page);
+
+      const tidyUp = new AnalyticsPage(page).getTidyUp();
+      await expect(tidyUp).toContainText('2 prompts never used');
+      await tidyUp.getByRole('button', { name: 'Review the 2 prompts never used' }).click();
+
+      await expect(page.getByRole('radio', { name: 'Never used' })).toHaveAttribute('aria-checked', 'true');
+      await expect(page.getByTestId('prompt-card')).toHaveCount(2);
+      await expect(page.getByTestId('prompt-card').filter({ hasText: 'Used Prompt' })).toHaveCount(0);
+
+      await page.getByRole('button', { name: 'Clear the Never used filter' }).click();
+      await expect(page.getByRole('radio', { name: 'All' })).toHaveAttribute('aria-checked', 'true');
+      await expect(page.getByRole('radio', { name: 'Never used' })).toHaveCount(0);
+      await expect(page.getByTestId('prompt-card')).toHaveCount(3);
+    });
+
+    test('Review opens the Library on the Prompts of the Duplicate pairs', async ({ context, storage, extensionId }) => {
+      await seedLibrary(storage, {
+        prompts: [
+          createPromptSeed({ id: 'email-1', title: 'Email Drafts', content: 'Write a concise email to {{recipient}}.', usageCount: 2 }),
+          createPromptSeed({ id: 'email-2', title: 'Email Drafts', content: 'Write a concise email to {{recipient}}.', usageCount: 1 }),
+          createPromptSeed({ id: 'other', title: 'Release Notes', content: 'Summarise these commits as release notes', usageCount: 1 }),
+        ],
+        categories: [],
+        settings: { ...DEFAULT_SETTINGS, interfaceMode: 'sidepanel' },
+      });
+
+      const page = await context.newPage();
+      await page.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
+      await analyticsWorkflows.navigateToAnalyticsTab(page);
+
+      const tidyUp = new AnalyticsPage(page).getTidyUp();
+      await expect(tidyUp).toContainText('1 duplicate pair');
+      await expect(tidyUp).not.toContainText('never used');
+      await tidyUp.getByRole('button', { name: 'Review the 1 duplicate pair' }).click();
+
+      await expect(page.getByRole('radio', { name: 'Possible duplicates' })).toHaveAttribute('aria-checked', 'true');
+      await expect(page.getByTestId('prompt-card')).toHaveCount(2);
+      await expect(page.getByTestId('prompt-card').filter({ hasText: 'Release Notes' })).toHaveCount(0);
     });
   });
 
