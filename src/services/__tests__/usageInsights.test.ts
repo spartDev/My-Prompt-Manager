@@ -222,6 +222,13 @@ describe('remainingDuplicates', () => {
     expect(remainingDuplicates([['a', 'b', 'c']], [edited, b, c], same).map(p => p.id)).toEqual(['b', 'c']);
   });
 
+  it('keeps a Prompt paired only with another duplicate, not with the original', () => {
+    // a still pairs with b, b with c, but a no longer with c
+    const pairs = new Set(['a-b', 'b-a', 'b-c', 'c-b']);
+    const paired = (x: { id: string }, y: { id: string }) => pairs.has(`${x.id}-${y.id}`);
+    expect(remainingDuplicates([['a', 'b', 'c']], [a, b, c], paired).map(p => p.id)).toEqual(['a', 'b', 'c']);
+  });
+
   it('keeps the rest of a group whose original is deleted, the first left becoming its original', () => {
     expect(remainingDuplicates([['a', 'b', 'c']], [b, c], same).map(p => p.id)).toEqual(['b', 'c']);
   });

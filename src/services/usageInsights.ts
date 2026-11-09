@@ -149,9 +149,9 @@ export function duplicateReviewGroups(groups: DuplicateGroup[]): string[][] {
 
 /**
  * The Prompts of the reviewed groups that still make Duplicate pairs, in review order. A group is
- * read again against the Library as it is now: a deleted Prompt drops out, the first left is the
- * original and keeps the Prompts still paired with it. An original paired with none, deleted or
- * edited away, hands the group to the next Prompt; Prompts left without a pair are gone.
+ * read again against the Library as it is now: a deleted Prompt drops out, and a Prompt stays while
+ * it still makes a Duplicate pair with another Prompt of its group, whichever one. A Prompt edited
+ * away from all the others leaves, and a group left with no pair is gone.
  */
 export function remainingDuplicates(
   groups: string[][],
@@ -160,16 +160,9 @@ export function remainingDuplicates(
 ): Prompt[] {
   const byId = new Map(prompts.map(prompt => [prompt.id, prompt]));
   return groups.flatMap(ids => {
-    const kept: Prompt[] = [];
-    let members = ids.flatMap(id => byId.get(id) ?? []);
-    while (members.length > 1) {
-      const [original, ...others] = members;
-      const duplicates = others.filter(other => isDuplicatePair(original, other));
-      if (duplicates.length > 0) {
-        kept.push(original, ...duplicates);
-      }
-      members = others.filter(other => !duplicates.includes(other));
-    }
-    return kept;
+    const members = ids.flatMap(id => byId.get(id) ?? []);
+    return members.filter(member =>
+      members.some(other => other !== member && isDuplicatePair(member, other))
+    );
   });
 }
