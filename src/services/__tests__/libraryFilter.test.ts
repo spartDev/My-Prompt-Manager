@@ -148,6 +148,18 @@ describe('applyLibraryFilter', () => {
     expect(applyLibraryFilter(edited, filter, categories, 'title').map(p => p.id)).toEqual(['6', '5']);
   });
 
+  it('Possible duplicates keeps a searched Prompt whose pair the search does not match', () => {
+    const twins = [
+      ...prompts,
+      buildPrompt({ id: '5', title: 'Echo', content: 'Same words exactly' }),
+      buildPrompt({ id: '6', title: 'Foxtrot', content: 'Same words exactly' })
+    ];
+    const searched = twins.filter(p => p.title === 'Foxtrot');
+    const filter: LibraryFilter = { kind: 'duplicates', groups: [['5', '6']] };
+
+    expect(applyLibraryFilter(searched, filter, categories, 'title', twins).map(p => p.id)).toEqual(['6']);
+  });
+
   it('a Category lists only its Prompts, pinned first', () => {
     expect(titles(applyLibraryFilter(prompts, { kind: 'category', categoryId: work.id }, categories, 'title')))
       .toEqual(['Delta', 'Alpha', 'Charlie']);

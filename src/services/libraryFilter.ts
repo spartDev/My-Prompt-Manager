@@ -42,12 +42,16 @@ export function rankMostUsed(prompts: Prompt[]): Prompt[] {
     );
 }
 
-/** The Prompts the Library lists for a filter, in display order */
+/**
+ * The Prompts the Library lists for a filter, in display order. `prompts` may already be narrowed by
+ * a search; `library` is the whole Library, which decides whether a Prompt still has its Duplicate pair.
+ */
 export function applyLibraryFilter(
   prompts: Prompt[],
   filter: LibraryFilter,
   categories: Category[],
-  sortOrder: SortOrder
+  sortOrder: SortOrder,
+  library: Prompt[] = prompts
 ): Prompt[] {
   const sort = (list: Prompt[]) =>
     PromptManager.getInstance().sortPrompts(list, sortOrder, NATURAL_SORT_DIRECTION[sortOrder]);
@@ -67,9 +71,11 @@ export function applyLibraryFilter(
       return sort(prompts.filter(isNeverUsed));
     case 'duplicates': {
       // In review order, so each pair stays together; a pair resolved since (one Prompt deleted or
-      // edited away from the other) leaves the list
+      // edited away from the other) leaves the list. A search keeps the matching Prompts of the pairs
       const manager = PromptManager.getInstance();
-      return remainingDuplicates(filter.groups, prompts, (a, b) => manager.isDuplicatePair(a, b));
+      const shown = new Set(prompts.map(prompt => prompt.id));
+      return remainingDuplicates(filter.groups, library, (a, b) => manager.isDuplicatePair(a, b))
+        .filter(prompt => shown.has(prompt.id));
     }
   }
 }

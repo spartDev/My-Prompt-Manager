@@ -217,6 +217,11 @@ describe('remainingDuplicates', () => {
     expect(remainingDuplicates([['a', 'b'], ['d', 'e']], [a, edited, d, e], same).map(p => p.id)).toEqual(['d', 'e']);
   });
 
+  it('hands the group to the next Prompt when its original is edited away', () => {
+    const edited = { ...a, content: 'something else' };
+    expect(remainingDuplicates([['a', 'b', 'c']], [edited, b, c], same).map(p => p.id)).toEqual(['b', 'c']);
+  });
+
   it('keeps the rest of a group whose original is deleted, the first left becoming its original', () => {
     expect(remainingDuplicates([['a', 'b', 'c']], [b, c], same).map(p => p.id)).toEqual(['b', 'c']);
   });
