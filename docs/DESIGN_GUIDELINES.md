@@ -136,8 +136,8 @@ text-xs    /* 12px / 0.75rem  - Helper text, character counts */
 text-sm    /* 14px / 0.875rem - Body text, form labels, buttons */
 text-base  /* 16px / 1rem     - Default body text */
 text-lg    /* 18px / 1.125rem - Emphasized text */
-text-xl    /* 20px / 1.25rem  - Section headers */
-text-2xl   /* 24px / 1.5rem   - Page titles (rare) */
+text-xl    /* 20px / 1.25rem  - The Library header title */
+text-2xl   /* 24px / 1.5rem   - Page titles (rare); a Section header title is text-[27px] */
 ```
 
 ### Font Weights
@@ -158,10 +158,11 @@ leading-relaxed /* 1.625 - Comfortable reading */
 
 ### Typography Patterns
 
-**Page Title:**
+**Section title and Eyebrow (Section header):**
 ```tsx
-<h1 className="text-xl font-bold text-primary">
-  Add New Prompt
+<p className="text-[12.5px] font-semibold text-tertiary">3 categories</p>
+<h1 className="text-[27px] font-extrabold leading-[1.05] tracking-[-0.035em] text-primary">
+  Categories
 </h1>
 ```
 
@@ -917,43 +918,23 @@ Prompt`) and put the name in the sub.
 
 ### Section Headers
 
-The header is seamless: it shares `bg-app` with the page, and its bottom line (`border-strong`) shows only once the content scrolls under it. The tab bar works the same way: its top line shows while content remains below. Both lines are drawn by CSS (`scroll-edge-top` and `scroll-edge-bottom` in `src/popup.css`), driven by the scroll of the view's `[data-scroll-container]` inside App's `section-scroll-scope`: no scroll state in React. `ViewHeader` and `TabBar` already carry them.
+Every Section but the Library has the same Section header, `SectionHeader` (`src/components/SectionHeader.tsx`): an Eyebrow over the Section's title, the Section's actions on the right, no icon square. Settings, Categories, the Analytics tab and the full-page Analytics view use it. The Library keeps `ViewHeader`, with its logo, until its own redesign.
 
-The icon square is `bg-accent-subtle` with a `text-accent` icon; the Library's logo takes `bg-brand` with a `text-on-accent` icon.
+The Eyebrow is the Section's context: the version in Settings, the number of Categories in Categories (announced with `eyebrowLive`), the period counted in Analytics.
+
+The header is seamless: it shares `bg-app` with the page, and its bottom line (`border-strong`) shows only once the content scrolls under it. The tab bar works the same way: its top line shows while content remains below. Both lines are drawn by CSS (`scroll-edge-top` and `scroll-edge-bottom` in `src/popup.css`), driven by the scroll of the view's `[data-scroll-container]` inside App's `section-scroll-scope`: no scroll state in React. `SectionHeader`, `ViewHeader` and `TabBar` already carry them.
 
 ```tsx
-<header className="
-  shrink-0 p-6
-  bg-app
-  border-b border-transparent scroll-edge-top
-">
-  <div className="flex items-center justify-between">
-    <div className="flex items-center space-x-3">
-      {/* Icon */}
-      <div className="
-        w-10 h-10
-        bg-accent-subtle
-        rounded-xl
-        flex items-center justify-center
-      ">
-        <svg className="w-6 h-6 text-accent">{/* Icon */}</svg>
-      </div>
-
-      {/* Text */}
-      <div>
-        <h2 className="text-xl font-bold text-primary">
-          Section Title
-        </h2>
-        <p className="text-sm text-tertiary">
-          Description text
-        </p>
-      </div>
-    </div>
-
-    {/* Action button */}
+<header className="shrink-0 bg-app flex items-start justify-between gap-3 px-5 pt-4 pb-2 border-b border-transparent scroll-edge-top">
+  <div>
+    <p className="text-[12.5px] font-semibold text-tertiary">Last 30 days of usage</p>
+    <h1 className="text-[27px] font-extrabold leading-[1.05] tracking-[-0.035em] text-primary">Analytics</h1>
   </div>
+  {/* Actions: the side panel's close button, a primary pill such as Full Dashboard */}
 </header>
 ```
+
+Write it as `<SectionHeader title="Analytics" eyebrow="Last 30 days of usage">{actions}</SectionHeader>`, never by hand. A primary action in it is a pill: `h-9 px-4 rounded-full bg-accent text-on-accent font-bold`.
 
 ---
 
@@ -1506,7 +1487,7 @@ transition-shadow duration-200
 
 **Section Header (line shown once the content scrolls under it):**
 ```
-shrink-0 p-6 bg-app
+shrink-0 bg-app px-5 pt-4 pb-2
 border-b border-transparent / border-strong
 ```
 

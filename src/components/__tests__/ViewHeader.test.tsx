@@ -47,7 +47,7 @@ describe('ViewHeader', () => {
       const { container } = render(<ViewHeader title="Test" />);
       const header = container.querySelector('header');
       expect(header).toBeInTheDocument();
-      expect(header).toHaveAttribute('role', 'banner');
+      expect(screen.getByRole('banner')).toBe(header);
     });
 
     it('renders with correct ARIA label for icon', () => {
@@ -438,7 +438,7 @@ describe('ViewHeader', () => {
       const searchRegion = container.querySelector('[role="search"]') as HTMLElement;
 
       expect(header).toBeInTheDocument();
-      expect(header).toHaveAttribute('role', 'banner');
+      expect(screen.getByRole('banner')).toBe(header);
       expect(searchRegion).toBeInTheDocument();
       expect(header).toContainElement(searchRegion);
     });

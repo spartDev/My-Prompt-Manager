@@ -298,9 +298,9 @@ test.describe('Analytics on the tokens', () => {
       await expect(header.getByRole('heading', { name: 'Analytics Dashboard' })).toHaveCSS('color', colors.primary);
       await expect(header.getByText('Last 30 days of usage')).toHaveCSS('color', colors.tertiary);
       await expect(header.getByRole('button', { name: 'Go back' })).toHaveCSS('color', colors.secondary);
-      const icon = header.getByTestId('dashboard-icon');
-      await expect(icon).toHaveCSS('background-color', colors.accentSubtle);
-      await expect(icon.locator('svg')).toHaveCSS('color', colors.accentText);
+      // The Section header of Settings: Eyebrow over a 27px title, no icon square
+      await expect(header.getByRole('heading', { name: 'Analytics Dashboard' })).toHaveCSS('font-size', '27px');
+      await expect(header.getByTestId('dashboard-icon')).toHaveCount(0);
 
       const summary = page.getByRole('region', { name: 'Usage summary' });
       expect(await backdropOf(summary)).toBe(colors.app);

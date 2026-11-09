@@ -12,6 +12,7 @@ import type { ShowToast, ToastSettings } from '../types/hooks';
 import { formatCount, Logger, toError } from '../utils';
 
 import { ChatGPTIcon, ClaudeIcon, CopilotIcon, GeminiIcon, MistralIcon, PerplexityIcon } from './icons/SiteIcons';
+import SectionHeader from './SectionHeader';
 import AdvancedSection from './settings/AdvancedSection';
 import AppearanceSection from './settings/AppearanceSection';
 import DataStorageSection, { type ImportReport } from './settings/DataStorageSection';
@@ -610,16 +611,12 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
 
   return (
     <div className="h-full flex flex-col bg-app">
-      {/* Header (Atelier 1C): the version over the title. The side panel keeps its close button */}
-      <header className="shrink-0 bg-app flex items-start justify-between gap-3 px-5 pt-4 pb-2 border-b border-transparent scroll-edge-top">
-        <div>
-          <p className="text-[12.5px] font-semibold text-tertiary">My Prompt Manager {manifest.version}</p>
-          <h1 className="text-[27px] font-extrabold leading-[1.05] tracking-[-0.035em] text-primary">Settings</h1>
-        </div>
+      {/* Section header: the version is the Eyebrow. The side panel keeps its close button */}
+      <SectionHeader title="Settings" eyebrow={`My Prompt Manager ${manifest.version}`}>
         {context === 'sidepanel' && (
           <ViewHeader.CloseButton onClick={() => { window.close(); }} context="sidepanel" />
         )}
-      </header>
+      </SectionHeader>
 
       {/* Settings groups */}
       <div className="flex-1 overflow-y-auto" data-scroll-container>
