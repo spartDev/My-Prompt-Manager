@@ -57,6 +57,34 @@ describe('App analytics integration', () => {
     mockUseUsageStats.mockReturnValue(createMockReturn());
   });
 
+  describe('Most used', () => {
+    it('gives the keyboard to the next row once the Prompt opened from a row is deleted', async () => {
+      const user = userEvent.setup();
+      const now = Date.now();
+      const first = { id: 'p1', title: 'First prompt', content: 'One', category: 'Work', createdAt: now, updatedAt: now };
+      const second = { id: 'p2', title: 'Second prompt', content: 'Two', category: 'Work', createdAt: now, updatedAt: now };
+      getMockStorageManager().getPrompts.mockResolvedValue([first, second]);
+      mockUseUsageStats.mockReturnValue({
+        ...createMockReturn(),
+        history: [
+          { promptId: 'p1', timestamp: now, platform: 'claude', categoryId: null },
+          { promptId: 'p1', timestamp: now, platform: 'claude', categoryId: null },
+          { promptId: 'p2', timestamp: now, platform: 'claude', categoryId: null }
+        ]
+      });
+      await renderApp();
+
+      await user.click(screen.getByRole('tab', { name: 'Analytics' }));
+      await user.click(await screen.findByRole('button', { name: 'First prompt, 2 uses. Open' }));
+      await user.click(await screen.findByRole('button', { name: 'Delete prompt' }));
+      await user.click(await screen.findByRole('button', { name: /^delete$/i }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Second prompt, 1 use. Open' })).toHaveFocus();
+      });
+    });
+  });
+
   describe('Analytics navigation', () => {
     it('navigates to analytics view when the Analytics tab is clicked', async () => {
       const user = userEvent.setup();

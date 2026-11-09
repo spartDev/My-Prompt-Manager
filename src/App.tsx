@@ -64,6 +64,9 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   // Ask the Library to focus its active filter pill: after Review, or when the card that opened the
   // editor has left the list
   const [focusLibraryFilter, setFocusLibraryFilter] = useState(false);
+  // The same in Analytics, when the Prompt opened from Most used has gone
+  const [focusAnalytics, setFocusAnalytics] = useState(false);
+  const handleAnalyticsFocused = useCallback(() => { setFocusAnalytics(false); }, []);
   // Why the last save or Settings import was refused for lack of storage: the storage warning shows it
   const [storageRefusal, setStorageRefusal] = useState<string | null>(null);
   // The Category sheet is open: the tab bar is out of reach behind it
@@ -129,6 +132,9 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
     } else if (trigger && currentView === 'library') {
       // Deleted, or edited out of the active Library filter: focus goes to that filter's pill
       setFocusLibraryFilter(true);
+    } else if (trigger && currentView === 'analytics') {
+      // Deleted from a Most used row: focus goes to the rows left
+      setFocusAnalytics(true);
     }
   }, [editorShown, currentView]);
 
@@ -470,6 +476,8 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
           prompts={optimisticPrompts}
           onEditPrompt={handleEditPrompt}
           onReviewPrompts={handleReviewPrompts}
+          takeFocus={focusAnalytics}
+          onFocusTaken={handleAnalyticsFocused}
         />
       )}
       </div>

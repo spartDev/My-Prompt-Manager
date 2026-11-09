@@ -150,6 +150,21 @@ describe('AnalyticsTab', () => {
       expect(onEditPrompt).toHaveBeenCalledWith(email);
     });
 
+    it('gives the keyboard to the first row left when asked to, once', () => {
+      const onFocusTaken = vi.fn();
+      render(<AnalyticsTab prompts={PROMPTS.filter(p => p.id !== 'p1')} takeFocus onFocusTaken={onFocusTaken} />);
+
+      expect(screen.getAllByTestId('most-used-row')[0]).toHaveFocus();
+      expect(screen.getAllByTestId('most-used-row')[0]).toHaveAccessibleName('Email Composer, 2 uses. Open');
+      expect(onFocusTaken).toHaveBeenCalledTimes(1);
+    });
+
+    it('gives the keyboard to the Analytics content when no row is left', () => {
+      render(<AnalyticsTab prompts={[unused]} takeFocus onFocusTaken={vi.fn()} />);
+
+      expect(screen.getByRole('main', { name: 'Analytics' })).toHaveFocus();
+    });
+
     it('offers View all when more Prompts were used than the rows shown', () => {
       const onExpand = vi.fn();
       render(<AnalyticsTab context="popup" onExpandDashboard={onExpand} />);

@@ -1,4 +1,4 @@
-import { type FC, useCallback, useMemo, useRef, useState } from 'react';
+import { type FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { useDuplicateGroups } from '../../hooks/useDuplicateGroups';
@@ -49,6 +49,9 @@ export interface AnalyticsTabProps {
   onEditPrompt?: (prompt: Prompt) => void;
   /** Opens the Library on the Prompts Tidy up offers to review */
   onReviewPrompts?: (filter: LibraryFilter) => void;
+  /** Take the keyboard (the Prompt opened from Most used has gone), then call onFocusTaken */
+  takeFocus?: boolean;
+  onFocusTaken?: () => void;
 }
 
 const AnalyticsTab: FC<AnalyticsTabProps> = ({
@@ -56,7 +59,9 @@ const AnalyticsTab: FC<AnalyticsTabProps> = ({
   context = 'sidepanel',
   prompts: livePrompts,
   onEditPrompt,
-  onReviewPrompts
+  onReviewPrompts,
+  takeFocus = false,
+  onFocusTaken
 }) => {
   const { stats, history, prompts: loadedPrompts, loading, error, clearHistory } = useUsageStats();
   const prompts = livePrompts ?? loadedPrompts;
@@ -69,6 +74,16 @@ const AnalyticsTab: FC<AnalyticsTabProps> = ({
   const ranked = allRanked.slice(0, MOST_USED_ROWS);
   const usedCount = allRanked.length;
   const neverUsed = useMemo(() => countNeverUsed(prompts), [prompts]);
+
+  // The first Most used row left gets the keyboard, or the content when none is
+  const mainRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!takeFocus || loading) { return; }
+    const main = mainRef.current;
+    const row = main?.querySelector<HTMLElement>('section[aria-labelledby="most-used-title"] li button');
+    (row ?? main)?.focus();
+    onFocusTaken?.();
+  }, [takeFocus, loading, onFocusTaken]);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
   const clearDialogRef = useRef<HTMLDivElement>(null);
@@ -133,7 +148,13 @@ const AnalyticsTab: FC<AnalyticsTabProps> = ({
       </SectionHeader>
 
       {/* Content (Atelier 1C): the hero, Top platform and Top category, Most used, Tidy up */}
-      <main className="flex-1 overflow-auto custom-scrollbar px-4 pb-[18px]" data-scroll-container>
+      <main
+        ref={mainRef}
+        tabIndex={-1}
+        aria-label="Analytics"
+        className="flex-1 overflow-auto custom-scrollbar px-4 pb-[18px] outline-none"
+        data-scroll-container
+      >
         {loading && !stats ? (
           <div className="mt-3.5 h-[220px] rounded-hero bg-muted animate-pulse" role="status" aria-label="Loading analytics" />
         ) : (
