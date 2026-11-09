@@ -163,7 +163,7 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
         leading={onBack && (
           <button
             onClick={onBack}
-            className="p-2 -ml-2 text-secondary hover:text-primary hover:bg-muted rounded-full transition-colors focus-interactive"
+            className="p-2 -ml-2 text-secondary hover:text-primary hover:bg-muted rounded-lg transition-colors focus-interactive"
             aria-label="Go back"
           >
             <BackIcon className="w-5 h-5" />
