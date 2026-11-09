@@ -42,7 +42,7 @@ const TidyUpCard: FC<TidyUpCardProps> = ({ neverUsed, duplicatePairs, onReviewNe
               type="button"
               onClick={line.onReview}
               aria-label={`Review the ${line.text}`}
-              className="h-[30px] px-3 rounded-full bg-card text-warning text-[12.5px] font-bold hover:bg-warning-subtle transition-colors focus-interactive"
+              className="h-[30px] px-3 rounded-full bg-card text-warning text-[12.5px] font-bold hover:bg-muted transition-colors focus-interactive"
             >
               Review
             </button>
