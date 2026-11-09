@@ -803,6 +803,12 @@ export class PromptLibraryInjector {
       // Forget the icon being replaced before it leaves the DOM, so its removal is not taken for a loss
       this.placement.reset();
 
+      // The icon being replaced may already be out of the DOM (the Platform removed it), where the
+      // queries below cannot find it: dispose of it first, with its observer and click listener
+      if (this.state.icon) {
+        this.disposeIcon(this.state.icon);
+      }
+
       // Remove ALL existing icons from the DOM (not just current instance)
       // This prevents duplicates after extension reloads
       this.removeAllExistingIcons();
@@ -1096,6 +1102,9 @@ export class PromptLibraryInjector {
               // OPTIMIZATION: Only load Floating UI (14KB) when CSS Anchor API is unavailable
               try {
                 customPositioned = await this.overlay.placeWithFloatingUI(icon, referenceElement, positioning);
+                if (this.dropIfStale(icon, textarea)) {
+                  return;
+                }
                 if (customPositioned) {
                   debug('Icon positioned successfully with Floating UI (Tier 1)', {
                     browser: 'chrome-114-124 or firefox/safari',
@@ -1208,11 +1217,52 @@ export class PromptLibraryInjector {
     icon.setAttribute('data-prompt-library-floating', 'true');
 
     const method = await this.overlay.place(icon, textarea, { placement: 'inside-bottom-end' });
+    if (this.dropIfStale(icon, textarea)) {
+      return;
+    }
     if (!method) {
       this.placeStatically(icon, textarea);
     }
     this.placement.track(icon, textarea, 'overlay');
     debug('Icon anchored on the editor', { method: method ?? 'static' });
+  }
+
+  /**
+   * After an await in a placement: the site was disabled, the icon replaced or the editor changed
+   * while Floating UI loaded. The stale icon is then disposed of instead of tracked, and true is
+   * returned so the caller stops.
+   */
+  private dropIfStale(icon: HTMLElement, textarea: HTMLElement): boolean {
+    const stale = !this.state.isSiteEnabled
+      || this.state.icon !== icon
+      || this.state.currentTextarea !== textarea;
+    if (stale) {
+      debug('Placement outdated while it awaited, the icon is dropped');
+      this.disposeIcon(icon);
+      if (this.state.icon === icon) {
+        this.state.icon = null;
+      }
+    }
+    return stale;
+  }
+
+  /**
+   * Throws one icon away whether or not it is still in the DOM: its Copilot observer, its
+   * Anchored overlay, its click listener, then the element itself.
+   */
+  private disposeIcon(icon: HTMLElement): void {
+    const cleanup = this.iconCleanups.get(icon);
+    if (cleanup) {
+      try {
+        cleanup();
+      } catch (err) {
+        warn('Icon cleanup failed', { error: err instanceof Error ? err.message : String(err) });
+      }
+      this.iconCleanups.delete(icon);
+    }
+    this.overlay.release(icon);
+    this.eventManager.removeTrackedListeners(icon);
+    icon.remove();
   }
 
   /**
