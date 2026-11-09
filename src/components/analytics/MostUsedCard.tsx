@@ -42,7 +42,7 @@ const MostUsedCard: FC<MostUsedCardProps> = ({ ranked, usedCount, onOpenPrompt, 
               onClick={() => { onOpenPrompt?.(prompt); }}
               aria-label={`${prompt.title}, ${String(count)} ${count === 1 ? 'use' : 'uses'}. Open`}
               data-testid="most-used-row"
-              className="w-full grid grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-2.5 py-2 pr-1 rounded-xl text-left hover:bg-raised transition-colors focus-interactive"
+              className="w-full grid grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-2.5 py-2 pr-1 rounded-xl text-left hover:bg-muted transition-colors focus-interactive"
             >
               <span
                 aria-hidden="true"
