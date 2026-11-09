@@ -30,6 +30,8 @@ const LibraryView: FC<LibraryViewProps> = ({
   onCopyPrompt,
   showToast,
   onLibraryFilterChange,
+  focusLibraryFilter,
+  onLibraryFilterFocused,
   loading,
   context = 'popup'
 }) => {
@@ -139,6 +141,8 @@ const LibraryView: FC<LibraryViewProps> = ({
             activeFilter={activeFilter}
             onChange={onLibraryFilterChange}
             disabled={loading}
+            focusActive={focusLibraryFilter}
+            onFocusActiveDone={onLibraryFilterFocused}
           />
         </div>
       </ViewHeader>

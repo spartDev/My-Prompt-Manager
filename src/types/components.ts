@@ -49,6 +49,9 @@ export interface LibraryViewProps {
   onCopyPrompt: (prompt: Prompt) => void;
   showToast: ShowToast;
   onLibraryFilterChange: (filter: LibraryFilter) => void;
+  /** Move focus to the active Library filter pill (arriving from Review in Analytics), then call onLibraryFilterFocused */
+  focusLibraryFilter?: boolean;
+  onLibraryFilterFocused?: () => void;
   loading?: boolean;
   context?: 'popup' | 'sidepanel';
 }

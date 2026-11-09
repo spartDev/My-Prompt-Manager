@@ -587,6 +587,11 @@ export class PromptManager {
     return new Promise(resolve => setTimeout(resolve, 0));
   }
 
+  /** Whether two Prompts make a Duplicate pair, by the rule findDuplicatePrompts applies */
+  isDuplicatePair(prompt1: Prompt, prompt2: Prompt): boolean {
+    return this.areSimilarPrompts(prompt1, prompt2);
+  }
+
   // Private helper methods
   private areSimilarPrompts(prompt1: Prompt, prompt2: Prompt): boolean {
     // Quick length-based rejection (saves expensive similarity calculations)

@@ -60,8 +60,8 @@ export type LibraryFilter =
   | { kind: 'category'; categoryId: string }
   // Reached only from Tidy up in Analytics
   | { kind: 'neverUsed' }
-  // The Prompts of the Duplicate pairs found in Analytics, each original before its duplicates
-  | { kind: 'duplicates'; promptIds: string[] };
+  // The Duplicate pairs found in Analytics: one list of ids per group, the original first
+  | { kind: 'duplicates'; groups: string[][] };
 
 export interface Settings {
   defaultCategory: string;

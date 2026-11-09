@@ -6,9 +6,10 @@ import {
   busiestWeekday,
   countDuplicatePairs,
   countNeverUsed,
-  duplicateReviewIds,
+  duplicateReviewGroups,
   isNeverUsed,
   rankByUses,
+  remainingDuplicates,
   topCategory,
   topPlatform,
   weekdayUsage
@@ -188,8 +189,35 @@ describe('Duplicate pairs', () => {
     expect(countDuplicatePairs([])).toBe(0);
   });
 
-  it('lists every Prompt of a pair for review, each original before its duplicates', () => {
-    expect(duplicateReviewIds([{ original: a, duplicates: [b, c] }, { original: d, duplicates: [e] }]))
+  it('keeps each group for review, its original before its duplicates', () => {
+    expect(duplicateReviewGroups([{ original: a, duplicates: [b, c] }, { original: d, duplicates: [e] }]))
+      .toEqual([['a', 'b', 'c'], ['d', 'e']]);
+  });
+});
+
+describe('remainingDuplicates', () => {
+  const same = (x: { content: string }, y: { content: string }) => x.content === y.content;
+  const a = buildPrompt({ id: 'a', content: 'one' });
+  const b = buildPrompt({ id: 'b', content: 'one' });
+  const c = buildPrompt({ id: 'c', content: 'one' });
+  const d = buildPrompt({ id: 'd', content: 'two' });
+  const e = buildPrompt({ id: 'e', content: 'two' });
+
+  it('lists the Prompts of the groups in review order', () => {
+    expect(remainingDuplicates([['a', 'b', 'c'], ['d', 'e']], [e, d, c, b, a], same).map(p => p.id))
       .toEqual(['a', 'b', 'c', 'd', 'e']);
+  });
+
+  it('drops a pair once one of its Prompts is deleted', () => {
+    expect(remainingDuplicates([['a', 'b'], ['d', 'e']], [a, d, e], same).map(p => p.id)).toEqual(['d', 'e']);
+  });
+
+  it('drops a pair once one of its Prompts is edited away from the other', () => {
+    const edited = { ...b, content: 'something else' };
+    expect(remainingDuplicates([['a', 'b'], ['d', 'e']], [a, edited, d, e], same).map(p => p.id)).toEqual(['d', 'e']);
+  });
+
+  it('keeps the rest of a group whose original is deleted, the first left becoming its original', () => {
+    expect(remainingDuplicates([['a', 'b', 'c']], [b, c], same).map(p => p.id)).toEqual(['b', 'c']);
   });
 });

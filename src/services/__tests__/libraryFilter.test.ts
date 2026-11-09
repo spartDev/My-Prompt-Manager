@@ -135,10 +135,17 @@ describe('applyLibraryFilter', () => {
       .toEqual(['Bravo']);
   });
 
-  it('Possible duplicates lists the reviewed Prompts in review order, dropping deleted ones', () => {
-    const filter: LibraryFilter = { kind: 'duplicates', promptIds: ['3', 'gone', '1'] };
+  it('Possible duplicates lists the pairs that still are, in review order', () => {
+    const twins = [
+      ...prompts,
+      buildPrompt({ id: '5', title: 'Echo', content: 'Same words exactly' }),
+      buildPrompt({ id: '6', title: 'Echo', content: 'Same words exactly' })
+    ];
+    const edited = twins.map(p => (p.id === '4' ? { ...p, content: 'Rewritten since the review' } : p));
+    const filter: LibraryFilter = { kind: 'duplicates', groups: [['6', '5'], ['1', 'gone'], ['3', '4']] };
 
-    expect(titles(applyLibraryFilter(prompts, filter, categories, 'title'))).toEqual(['Charlie', 'Alpha']);
+    // 1 lost its pair to a deletion, and 4 was edited away from 3: only 6 and 5 remain
+    expect(applyLibraryFilter(edited, filter, categories, 'title').map(p => p.id)).toEqual(['6', '5']);
   });
 
   it('a Category lists only its Prompts, pinned first', () => {

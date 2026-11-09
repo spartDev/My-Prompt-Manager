@@ -14,6 +14,9 @@ export interface LibraryFilterBarProps {
   activeFilter: LibraryFilter;
   onChange: (filter: LibraryFilter) => void;
   disabled?: boolean;
+  /** Move focus to the active pill once it can take it (arriving from Review in Analytics), then call onFocusActiveDone */
+  focusActive?: boolean;
+  onFocusActiveDone?: () => void;
 }
 
 interface FilterOption {
@@ -46,8 +49,17 @@ export const reviewFilterLabel = (filter: LibraryFilter): string | null =>
  * Analytics is active (Never used, Possible duplicates), its pill follows All, with a button that
  * returns to All; it is gone once another filter is chosen.
  */
-const LibraryFilterBar: FC<LibraryFilterBarProps> = ({ categories, activeFilter, onChange, disabled = false }) => {
+const LibraryFilterBar: FC<LibraryFilterBarProps> = ({
+  categories,
+  activeFilter,
+  onChange,
+  disabled = false,
+  focusActive = false,
+  onFocusActiveDone
+}) => {
   const rowRef = useRef<HTMLDivElement>(null);
+  // Clearing a review filter removes the focused button with its pill: focus then goes to All
+  const focusAllNext = useRef(false);
   const [fades, setFades] = useState({ start: false, end: false });
 
   const reviewLabel = reviewFilterLabel(activeFilter);
@@ -106,6 +118,20 @@ const LibraryFilterBar: FC<LibraryFilterBarProps> = ({ categories, activeFilter,
     selectedIndex: activeIndex,
     onSelect: (option) => { onChange(option.filter); }
   });
+
+  // Focus All after the review filter is cleared, and the active pill when asked to
+  useEffect(() => {
+    if (focusAllNext.current && activeIndex === 0) {
+      focusAllNext.current = false;
+      pills.current[0]?.focus();
+    }
+  }, [activeIndex, pills]);
+  useEffect(() => {
+    if (focusActive && !disabled && activeIndex >= 0) {
+      pills.current[activeIndex]?.focus();
+      onFocusActiveDone?.();
+    }
+  }, [focusActive, disabled, activeIndex, pills, onFocusActiveDone]);
 
   // Keep the active pill fully visible, clear of the edge fades
   useEffect(() => {
@@ -171,7 +197,10 @@ const LibraryFilterBar: FC<LibraryFilterBarProps> = ({ categories, activeFilter,
               {pill}
               <button
                 type="button"
-                onClick={() => { onChange(ALL_PROMPTS); }}
+                onClick={() => {
+                  focusAllNext.current = true;
+                  onChange(ALL_PROMPTS);
+                }}
                 disabled={disabled}
                 aria-label={`Clear the ${option.label} filter`}
                 data-testid="library-filter-clear-review"

@@ -7,7 +7,7 @@ import { useUsageStats } from '../../hooks/useUsageStats';
 import {
   countDuplicatePairs,
   countNeverUsed,
-  duplicateReviewIds,
+  duplicateReviewGroups,
   rankByUses,
   topCategory,
   topPlatform,
@@ -162,7 +162,7 @@ const AnalyticsTab: FC<AnalyticsTabProps> = ({
               onReviewNeverUsed={() => { onReviewPrompts?.({ kind: 'neverUsed' }); }}
               onReviewDuplicates={() => {
                 if (duplicateGroups) {
-                  onReviewPrompts?.({ kind: 'duplicates', promptIds: duplicateReviewIds(duplicateGroups) });
+                  onReviewPrompts?.({ kind: 'duplicates', groups: duplicateReviewGroups(duplicateGroups) });
                 }
               }}
             />

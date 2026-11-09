@@ -344,10 +344,14 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   }, [currentView, refreshPrompts, refreshCategories]);
 
   // Tidy up in Analytics: the Library on the Prompts to review, with no search hiding any of them
+  // Review's button leaves with Analytics, so focus lands on the review filter's pill
   const { clearSearch } = searchWithDebounce;
+  const [focusLibraryFilter, setFocusLibraryFilter] = useState(false);
+  const handleLibraryFilterFocused = useCallback(() => { setFocusLibraryFilter(false); }, []);
   const handleReviewPrompts = useCallback((filter: LibraryFilter) => {
     clearSearch();
     setLibraryFilter(filter);
+    setFocusLibraryFilter(true);
     handleSelectSection('library');
   }, [clearSearch, handleSelectSection]);
 
@@ -423,6 +427,8 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
           onCopyPrompt={(prompt: Prompt) => { void handleCopyPrompt(prompt); }}
           showToast={showToast}
           onLibraryFilterChange={setLibraryFilter}
+          focusLibraryFilter={focusLibraryFilter}
+          onLibraryFilterFocused={handleLibraryFilterFocused}
           loading={loading}
           context={context}
         />

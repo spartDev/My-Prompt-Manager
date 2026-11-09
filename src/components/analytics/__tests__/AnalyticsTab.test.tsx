@@ -192,7 +192,7 @@ describe('AnalyticsTab', () => {
 
       fireEvent.click(screen.getByRole('button', { name: 'Review the 2 duplicate pairs' }));
 
-      expect(onReviewPrompts).toHaveBeenCalledWith({ kind: 'duplicates', promptIds: ['p2', 'p4', 'p3'] });
+      expect(onReviewPrompts).toHaveBeenCalledWith({ kind: 'duplicates', groups: [['p2', 'p4', 'p3']] });
     });
 
     it('hides a line with nothing to review, and the line for duplicates while they are looked for', () => {

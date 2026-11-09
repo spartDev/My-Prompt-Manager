@@ -147,7 +147,7 @@ describe('LibraryFilterBar', () => {
     });
 
     it('names the duplicates filter Possible duplicates', () => {
-      renderBar({ kind: 'duplicates', promptIds: ['a', 'b'] });
+      renderBar({ kind: 'duplicates', groups: [['a', 'b']] });
 
       expect(screen.getByRole('radio', { name: 'Possible duplicates' })).toHaveAttribute('aria-checked', 'true');
     });
@@ -157,6 +157,33 @@ describe('LibraryFilterBar', () => {
 
       expect(screen.queryByRole('radio', { name: 'Never used' })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /Clear the/ })).not.toBeInTheDocument();
+    });
+
+    it('moves focus to All once its clear button has returned there', async () => {
+      const { rerender } = render(
+        <LibraryFilterBar categories={[work, personal]} activeFilter={{ kind: 'neverUsed' }} onChange={vi.fn()} />
+      );
+
+      await userEvent.click(screen.getByRole('button', { name: 'Clear the Never used filter' }));
+      rerender(<LibraryFilterBar categories={[work, personal]} activeFilter={ALL_PROMPTS} onChange={vi.fn()} />);
+
+      expect(screen.getByRole('radio', { name: 'All' })).toHaveFocus();
+    });
+
+    it('focuses its pill when asked to, once, and says so', () => {
+      const onFocusActiveDone = vi.fn();
+      render(
+        <LibraryFilterBar
+          categories={[work, personal]}
+          activeFilter={{ kind: 'neverUsed' }}
+          onChange={vi.fn()}
+          focusActive
+          onFocusActiveDone={onFocusActiveDone}
+        />
+      );
+
+      expect(screen.getByRole('radio', { name: 'Never used' })).toHaveFocus();
+      expect(onFocusActiveDone).toHaveBeenCalledTimes(1);
     });
 
     it('returns to All with its clear button', async () => {

@@ -8,7 +8,7 @@ import { NATURAL_SORT_DIRECTION } from '../constants';
 import type { Category, LibraryFilter, Prompt, SortOrder } from '../types';
 
 import { PromptManager } from './promptManager';
-import { isNeverUsed } from './usageInsights';
+import { isNeverUsed, remainingDuplicates } from './usageInsights';
 
 export const ALL_PROMPTS: LibraryFilter = { kind: 'all' };
 
@@ -66,9 +66,10 @@ export function applyLibraryFilter(
     case 'neverUsed':
       return sort(prompts.filter(isNeverUsed));
     case 'duplicates': {
-      // In review order, so each pair stays together; a Prompt deleted since drops out
-      const byId = new Map(prompts.map(prompt => [prompt.id, prompt]));
-      return filter.promptIds.flatMap(id => byId.get(id) ?? []);
+      // In review order, so each pair stays together; a pair resolved since (one Prompt deleted or
+      // edited away from the other) leaves the list
+      const manager = PromptManager.getInstance();
+      return remainingDuplicates(filter.groups, prompts, (a, b) => manager.isDuplicatePair(a, b));
     }
   }
 }

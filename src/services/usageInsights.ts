@@ -142,7 +142,28 @@ export function countDuplicatePairs(groups: DuplicateGroup[]): number {
   return groups.reduce((pairs, group) => pairs + group.duplicates.length, 0);
 }
 
-/** The Prompts to review, each original followed by its duplicates */
-export function duplicateReviewIds(groups: DuplicateGroup[]): string[] {
-  return groups.flatMap(group => [group.original.id, ...group.duplicates.map(prompt => prompt.id)]);
+/** The groups to review, as ids: each original followed by its duplicates */
+export function duplicateReviewGroups(groups: DuplicateGroup[]): string[][] {
+  return groups.map(group => [group.original.id, ...group.duplicates.map(prompt => prompt.id)]);
+}
+
+/**
+ * The Prompts of the reviewed groups that still make Duplicate pairs, in review order. A group is
+ * read again against the Library as it is now: a deleted Prompt drops out, the first left is the
+ * original, a Prompt edited away from it drops out, and a group left with one Prompt is gone.
+ */
+export function remainingDuplicates(
+  groups: string[][],
+  prompts: Prompt[],
+  isDuplicatePair: (a: Prompt, b: Prompt) => boolean
+): Prompt[] {
+  const byId = new Map(prompts.map(prompt => [prompt.id, prompt]));
+  return groups.flatMap(ids => {
+    const [original, ...others] = ids.flatMap(id => byId.get(id) ?? []);
+    if (!original) {
+      return [];
+    }
+    const duplicates = others.filter(other => isDuplicatePair(original, other));
+    return duplicates.length > 0 ? [original, ...duplicates] : [];
+  });
 }
