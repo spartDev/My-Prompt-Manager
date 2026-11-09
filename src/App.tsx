@@ -61,6 +61,9 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   const savedNoticeRef = useRef<SavedNotice | null>(null);
   // The Library filter lasts while the popup or side panel stays open, across Sections
   const [libraryFilter, setLibraryFilter] = useState<LibraryFilter>(ALL_PROMPTS);
+  // Ask the Library to focus its active filter pill: after Review, or when the card that opened the
+  // editor has left the list
+  const [focusLibraryFilter, setFocusLibraryFilter] = useState(false);
   // Why the last save or Settings import was refused for lack of storage: the storage warning shows it
   const [storageRefusal, setStorageRefusal] = useState<string | null>(null);
   // The Category sheet is open: the tab bar is out of reach behind it
@@ -123,8 +126,11 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
     editorTriggerRef.current = null;
     if (trigger?.isConnected) {
       trigger.focus();
+    } else if (trigger && currentView === 'library') {
+      // Deleted, or edited out of the active Library filter: focus goes to that filter's pill
+      setFocusLibraryFilter(true);
     }
-  }, [editorShown]);
+  }, [editorShown, currentView]);
 
   const handleDeletePrompt = async (id: string) => {
     const title = prompts.find(p => p.id === id)?.title;
@@ -346,7 +352,6 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   // Tidy up in Analytics: the Library on the Prompts to review, with no search hiding any of them
   // Review's button leaves with Analytics, so focus lands on the review filter's pill
   const { clearSearch } = searchWithDebounce;
-  const [focusLibraryFilter, setFocusLibraryFilter] = useState(false);
   const handleLibraryFilterFocused = useCallback(() => { setFocusLibraryFilter(false); }, []);
   const handleReviewPrompts = useCallback((filter: LibraryFilter) => {
     clearSearch();
