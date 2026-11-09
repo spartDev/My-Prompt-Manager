@@ -127,6 +127,22 @@ export function rankByUses(events: UsageEvent[], prompts: Prompt[], limit: numbe
     .slice(0, limit);
 }
 
+/**
+ * The app's Prompts, each with the higher usage of the two copies: the app's copy holds this
+ * surface's edits and deletions, while a copy read from storage since may hold Insertions made on a
+ * Platform meanwhile.
+ */
+export function withLatestUsage(prompts: Prompt[], stored: Prompt[]): Prompt[] {
+  const storedById = new Map(stored.map(prompt => [prompt.id, prompt]));
+  return prompts.map(prompt => {
+    const fresh = storedById.get(prompt.id);
+    if (!fresh || (fresh.usageCount ?? 0) <= (prompt.usageCount ?? 0)) {
+      return prompt;
+    }
+    return { ...prompt, usageCount: fresh.usageCount, lastUsedAt: fresh.lastUsedAt };
+  });
+}
+
 /** Never used: never inserted, the complement of Most Used */
 export function isNeverUsed(prompt: Prompt): boolean {
   const uses = prompt.usageCount;

@@ -11,7 +11,8 @@ import {
   rankByUses,
   topCategory,
   topPlatform,
-  weekdayUsage
+  weekdayUsage,
+  withLatestUsage
 } from '../../services/usageInsights';
 import { MOTION } from '../../theme/motion';
 import type { LibraryFilter, Prompt } from '../../types';
@@ -64,7 +65,11 @@ const AnalyticsTab: FC<AnalyticsTabProps> = ({
   onFocusTaken
 }) => {
   const { stats, history, prompts: loadedPrompts, loading, error, clearHistory } = useUsageStats();
-  const prompts = livePrompts ?? loadedPrompts;
+  // The app's Prompts, with the usage stored since (Insertions on a Platform while it was open)
+  const prompts = useMemo(
+    () => (livePrompts ? withLatestUsage(livePrompts, loadedPrompts) : loadedPrompts),
+    [livePrompts, loadedPrompts]
+  );
   const duplicateGroups = useDuplicateGroups(loading ? null : prompts);
 
   const weekdays = useMemo(() => weekdayUsage(history), [history]);

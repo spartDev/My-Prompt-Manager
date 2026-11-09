@@ -12,7 +12,8 @@ import {
   remainingDuplicates,
   topCategory,
   topPlatform,
-  weekdayUsage
+  weekdayUsage, 
+  withLatestUsage
 } from '../usageInsights';
 
 /** A local date: the weekday of an Insertion is the user's own calendar day */
@@ -231,5 +232,21 @@ describe('remainingDuplicates', () => {
 
   it('keeps the rest of a group whose original is deleted, the first left becoming its original', () => {
     expect(remainingDuplicates([['a', 'b', 'c']], [b, c], same).map(p => p.id)).toEqual(['b', 'c']);
+  });
+});
+
+describe('withLatestUsage', () => {
+  it("takes the Insertions stored since, and keeps the app's own edits", () => {
+    const app = [buildPrompt({ id: 'a', title: 'Edited here', usageCount: 0 })];
+    const stored = [buildPrompt({ id: 'a', title: 'Old title', usageCount: 2, lastUsedAt: WED })];
+
+    expect(withLatestUsage(app, stored)).toEqual([{ ...app[0], usageCount: 2, lastUsedAt: WED }]);
+  });
+
+  it("keeps the app's list: a Prompt deleted here stays gone, and a higher count here wins", () => {
+    const app = [buildPrompt({ id: 'a', usageCount: 3, lastUsedAt: WED })];
+    const stored = [buildPrompt({ id: 'a', usageCount: 1, lastUsedAt: MON }), buildPrompt({ id: 'gone', usageCount: 5 })];
+
+    expect(withLatestUsage(app, stored)).toEqual(app);
   });
 });

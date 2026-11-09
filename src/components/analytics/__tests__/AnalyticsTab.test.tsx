@@ -230,6 +230,13 @@ describe('AnalyticsTab', () => {
 
       expect(screen.queryByTestId('tidy-up')).not.toBeInTheDocument();
     });
+
+    it('counts an Insertion stored since the app read its Prompts, so a used Prompt is not Never used', () => {
+      mockUseUsageStats.mockReturnValue(createMockReturn({ prompts: [...PROMPTS.filter(p => p !== unused), { ...unused, usageCount: 1 }] }));
+      render(<AnalyticsTab prompts={PROMPTS} />);
+
+      expect(screen.queryByTestId('tidy-up')).not.toBeInTheDocument();
+    });
   });
 
   describe('Without usage', () => {
