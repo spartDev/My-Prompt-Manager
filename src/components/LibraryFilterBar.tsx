@@ -204,7 +204,7 @@ const LibraryFilterBar: FC<LibraryFilterBarProps> = ({
                 disabled={disabled}
                 aria-label={`Clear the ${option.label} filter`}
                 data-testid="library-filter-clear-review"
-                className="shrink-0 w-8 h-8 inline-flex items-center justify-center rounded-full border border-default bg-card text-secondary hover:bg-muted hover:text-primary transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"
+                className="shrink-0 w-8 h-8 inline-flex items-center justify-center rounded-full border border-default bg-card text-secondary hover:bg-muted hover:text-primary transition-colors focus-interactive disabled:opacity-50"
               >
                 <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" aria-hidden="true">
                   <path d="M6 6l12 12M18 6 6 18" />
