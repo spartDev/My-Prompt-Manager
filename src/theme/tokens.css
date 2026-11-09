@@ -90,6 +90,18 @@
   --background-color-inverse-action: rgba(255, 255, 255, 0.14);
   --shadow-toast: 0 14px 30px -12px rgba(29, 21, 48, 0.6);
 
+  /* Analytics hero on bg-inverse (Atelier 1C): the weekday bars at rest and hovered (the busiest takes
+     bg-inverse-mark), the day labels under them, and the hero's shadow */
+  --background-color-inverse-bar: rgba(255, 255, 255, 0.22);
+  --background-color-inverse-bar-hover: #ffffff;
+  --text-color-on-inverse-muted: #a99cc9;
+  --shadow-hero: 0 22px 40px -26px rgba(29, 21, 48, 0.9);
+
+  /* Tidy up callout in Analytics (Atelier 1C): cream with brown text; its border is border-warning, its
+     Review buttons bg-card with text-warning */
+  --background-color-callout: #fff8e6;
+  --text-color-callout: #78350f;
+
   /* Shadows: Tailwind's shapes and alphas, tinted violet (black at alpha x 1.6 in dark) */
   --shadow-tint-5: rgba(45, 25, 90, 0.05);
   --shadow-tint-10: rgba(45, 25, 90, 0.1);
@@ -107,6 +119,8 @@
 
   /* Radius of a Settings group's card (Atelier 1C) */
   --radius-group: 20px;
+  /* Radius of the Analytics hero (Atelier 1C) */
+  --radius-hero: 24px;
 
   /* Motion (Atelier 1C): panels rise with ease-sheet and leave with ease-sheet-out, pops and
      presses spring. Durations are mirrored in src/theme/motion.ts for the timers; each animation is
@@ -130,7 +144,20 @@
   --animate-backdrop-in: backdrop-in 300ms ease both;
   --animate-backdrop-out: backdrop-out 280ms ease both;
   --animate-category-pop: pop 500ms var(--ease-spring) both;
+  /* Analytics (Atelier 1C): the weekday bars grow from the bottom, the cards rise, the Most used bars
+     fill from the left; each element sets its own stagger delay from MOTION */
+  --animate-bar-grow: bar-grow 800ms var(--ease-spring) both;
+  --animate-card-rise: card-rise 500ms var(--ease-spring) both;
+  --animate-rank-fill: fill-grow 1000ms var(--ease-spring) both;
 
+  @keyframes bar-grow {
+    from { transform: scaleY(0); }
+    to { transform: scaleY(1); }
+  }
+  @keyframes card-rise {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: none; }
+  }
   @keyframes sheet-in {
     from { transform: translateY(100%); }
     to { transform: none; }
@@ -286,6 +313,17 @@
     --background-color-inverse-alert: #fca5a5;
     --background-color-inverse-action: rgba(255, 255, 255, 0.14);
     --shadow-toast: 0 14px 30px -12px rgba(0, 0, 0, 0.6);
+
+    /* Analytics hero: a hovered bar takes the card's color; the labels take on-inverse, since the
+       mockup's #a99cc9 is 3.8:1 on the dark hero */
+    --background-color-inverse-bar: rgba(255, 255, 255, 0.22);
+    --background-color-inverse-bar-hover: #231c34;
+    --text-color-on-inverse-muted: #c9bfe6;
+    --shadow-hero: 0 22px 40px -26px rgba(4, 2, 10, 0.92);
+
+    /* Tidy up callout */
+    --background-color-callout: #2b210e;
+    --text-color-callout: #fde68a;
 
     /* Shadows */
     --shadow-tint-5: rgba(0, 0, 0, 0.08);

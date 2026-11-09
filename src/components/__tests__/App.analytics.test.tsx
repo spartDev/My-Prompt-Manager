@@ -29,7 +29,8 @@ const createMockStats = (): UsageStats => ({
 
 const createMockReturn = (): UseUsageStatsReturn => ({
   stats: createMockStats(),
-  history: [],
+  history: [{ promptId: 'p1', timestamp: Date.now(), platform: 'claude', categoryId: null }],
+  prompts: [],
   loading: false,
   error: null,
   refresh: vi.fn(),
@@ -97,7 +98,7 @@ describe('App analytics integration', () => {
 
       // Should show analytics summary section
       await waitFor(() => {
-        expect(screen.getByText(/last 30 days of usage/i)).toBeInTheDocument();
+        expect(screen.getByText(/^last 30 days$/i)).toBeInTheDocument();
       });
     });
   });

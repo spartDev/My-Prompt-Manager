@@ -40,7 +40,21 @@ export const MOTION = {
   /** The backdrop of the Category sheet fading out, with the sheet */
   backdropOut: 280,
   /** A Category appearing in the list (created, or back from Undo) */
-  categoryPop: 500
+  categoryPop: 500,
+  /** Analytics: a weekday bar growing from the bottom; the first starts after barDelay, each next one barStagger later */
+  barGrow: 800,
+  barDelay: 200,
+  barStagger: 60,
+  /** Analytics: the "Prompts used" counter counting up, alongside the bars */
+  countUp: 800,
+  /** Analytics: the Top platform and Top category cards rising, the second cardStagger after the first */
+  cardRise: 500,
+  cardDelay: 100,
+  cardStagger: 80,
+  /** Analytics: a Most used bar filling from the left; the first starts after rankDelay, each next one rankStagger later */
+  rankFill: 1000,
+  rankDelay: 300,
+  rankStagger: 90
 } as const;
 
 const REDUCED_MOTION = '(prefers-reduced-motion: reduce)';

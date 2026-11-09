@@ -27,27 +27,47 @@ export class AnalyticsPage extends BasePage {
   }
 
   /**
-   * Get a summary card by its label
-   * @param label - The label of the summary card (e.g., "Total Uses", "Top Platform", "Peak Day", "Top Category")
+   * The dark hero of the Analytics tab: Prompts used, its subtitle and the weekday bars
    */
-  getSummaryCard(label: string): Locator {
-    return this.page.locator('section[aria-label="Usage summary"]')
-      .locator(`text=${label}`)
-      .locator('..');
+  getHero(): Locator {
+    return this.page.getByTestId('stats-hero');
+  }
+
+  /** The line under the total: the busiest weekday, a hovered bar's count, or no usage yet */
+  getHeroSubtitle(): Locator {
+    return this.page.getByTestId('stats-hero-subtitle');
+  }
+
+  /** The animated total of the hero */
+  getHeroTotal(): Locator {
+    return this.page.getByTestId('stats-total');
+  }
+
+  /** The seven weekday bars, Monday to Sunday */
+  getWeekdayBars(): Locator {
+    return this.page.getByTestId('stats-bar');
   }
 
   /**
-   * Get the top prompts section container
+   * The Top platform or Top category card of the Analytics tab
    */
-  getTopPromptsSection(): Locator {
-    return this.page.locator('section[aria-label="Top prompts"]');
+  getStatCard(label: 'Top platform' | 'Top category'): Locator {
+    return this.page.locator('div').filter({ has: this.page.getByRole('heading', { name: label, exact: true }) }).last();
   }
 
-  /**
-   * Get all top prompt list items
-   */
-  getTopPromptItems(): Locator {
-    return this.getTopPromptsSection().locator('ul li');
+  /** The Most used card of the Analytics tab */
+  getMostUsedCard(): Locator {
+    return this.page.getByRole('region', { name: 'Most used' });
+  }
+
+  /** The rows of the Most used card, each a button that opens its Prompt */
+  getMostUsedRows(): Locator {
+    return this.page.getByTestId('most-used-row');
+  }
+
+  /** The Tidy up callout of the Analytics tab */
+  getTidyUp(): Locator {
+    return this.page.getByTestId('tidy-up');
   }
 
   /**
@@ -106,7 +126,7 @@ export class AnalyticsPage extends BasePage {
   }
 
   /**
-   * Get the empty state container (when no usage data)
+   * Get the empty state container of the full dashboard (when no usage data)
    */
   getEmptyState(): Locator {
     return this.page.locator('[aria-label="Empty analytics"]');

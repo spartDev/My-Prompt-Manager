@@ -130,6 +130,17 @@ describe('applyLibraryFilter', () => {
       .toEqual(['Charlie', 'Alpha', 'Delta']);
   });
 
+  it('Never used lists the Prompts never inserted, in the chosen sort, pinned first', () => {
+    expect(titles(applyLibraryFilter(prompts, { kind: 'neverUsed' }, categories, 'title')))
+      .toEqual(['Bravo']);
+  });
+
+  it('Possible duplicates lists the reviewed Prompts in review order, dropping deleted ones', () => {
+    const filter: LibraryFilter = { kind: 'duplicates', promptIds: ['3', 'gone', '1'] };
+
+    expect(titles(applyLibraryFilter(prompts, filter, categories, 'title'))).toEqual(['Charlie', 'Alpha']);
+  });
+
   it('a Category lists only its Prompts, pinned first', () => {
     expect(titles(applyLibraryFilter(prompts, { kind: 'category', categoryId: work.id }, categories, 'title')))
       .toEqual(['Delta', 'Alpha', 'Charlie']);

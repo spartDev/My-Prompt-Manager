@@ -68,7 +68,11 @@ const MIGRATED = [
   'components/analytics/charts/DayOfWeekChart.tsx',
   'components/analytics/charts/CategoryBarChart.tsx',
   'components/analytics/charts/PlatformPieChart.tsx',
-  'components/analytics/charts/TimeOfDayChart.tsx'
+  'components/analytics/charts/TimeOfDayChart.tsx',
+  // My-Prompt-Manager-6k3: Analytics redesigned after Atelier 1C
+  'components/analytics/StatsHero.tsx',
+  'components/analytics/MostUsedCard.tsx',
+  'components/analytics/TidyUpCard.tsx'
 ];
 
 // Agent guidance that prescribes classes follows the same rule, or it steers UI work off the tokens

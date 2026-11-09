@@ -21,7 +21,7 @@ const EXPECTED = {
 const SECTIONS = [
   { tab: 'tab-settings', title: 'Settings', eyebrow: /^My Prompt Manager \d+\.\d+\.\d+$/ },
   { tab: 'tab-categories', title: 'Categories', eyebrow: /^\d+ categor(y|ies)$/ },
-  { tab: 'tab-analytics', title: 'Analytics', eyebrow: /^Last 30 days of usage$/ }
+  { tab: 'tab-analytics', title: 'Analytics', eyebrow: /^Last 30 days$/ }
 ] as const;
 
 const openPopup = async (page: Page, storage: ExtensionStorage, extensionId: string, theme: 'light' | 'dark') => {

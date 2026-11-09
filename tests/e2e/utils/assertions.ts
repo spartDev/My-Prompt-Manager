@@ -351,68 +351,52 @@ export const analyticsAssertions = {
   },
 
   /**
-   * Expect empty state when no usage data exists
+   * Expect the full dashboard's empty state when no usage data exists
    */
   emptyState: async (page: Page): Promise<void> => {
     await expect(page.getByText('No usage data yet')).toBeVisible();
   },
 
   /**
-   * Expect total uses summary card to show specific value
+   * Expect the Analytics tab without usage: the hero says so, and the usage cards are gone
+   */
+  tabEmptyState: async (page: Page): Promise<void> => {
+    await expect(page.getByTestId('stats-hero-subtitle')).toHaveText('No Prompts used yet.');
+    await expect(page.getByRole('heading', { name: 'Top platform' })).toBeHidden();
+    await expect(page.getByRole('region', { name: 'Most used' })).toBeHidden();
+  },
+
+  /**
+   * Expect the hero of the Analytics tab to count this many Prompts used
    */
   totalUses: async (page: Page, count: number): Promise<void> => {
-    const summarySection = page.locator('section[aria-label="Usage summary"]');
-    await expect(summarySection.getByText(String(count))).toBeVisible();
+    await expect(page.getByTestId('stats-total')).toHaveText(String(count));
   },
 
   /**
-   * Expect top platform summary card to show specific platform name
+   * Expect the Top platform card to name this Platform
    */
   topPlatform: async (page: Page, platformName: string): Promise<void> => {
-    const summarySection = page.locator('section[aria-label="Usage summary"]');
-    await expect(summarySection.getByText(platformName)).toBeVisible();
+    const card = page.locator('div').filter({ has: page.getByRole('heading', { name: 'Top platform', exact: true }) }).last();
+    await expect(card.getByText(platformName, { exact: true })).toBeVisible();
   },
 
   /**
-   * Expect peak day summary card to show specific day
-   */
-  peakDay: async (page: Page, day: string): Promise<void> => {
-    const summarySection = page.locator('section[aria-label="Usage summary"]');
-    await expect(summarySection.getByText(day)).toBeVisible();
-  },
-
-  /**
-   * Expect top category summary card to show specific category name
+   * Expect the Top category card to name this Category
    */
   topCategory: async (page: Page, categoryName: string): Promise<void> => {
-    const summarySection = page.locator('section[aria-label="Usage summary"]');
-    await expect(summarySection.getByText(categoryName)).toBeVisible();
+    const card = page.locator('div').filter({ has: page.getByRole('heading', { name: 'Top category', exact: true }) }).last();
+    await expect(card.getByText(categoryName, { exact: true })).toBeVisible();
   },
 
   /**
-   * Expect a prompt to appear in the top prompts list
+   * Expect the Most used card to list these Prompt titles, in this order
    */
-  promptInTopList: async (page: Page, promptTitle: string): Promise<void> => {
-    const topPromptsSection = page.locator('section[aria-label="Top prompts"]');
-    await expect(topPromptsSection.getByText(promptTitle)).toBeVisible();
-  },
-
-  /**
-   * Expect specific number of prompts in the top prompts list
-   */
-  topPromptsCount: async (page: Page, count: number): Promise<void> => {
-    const topPromptsSection = page.locator('section[aria-label="Top prompts"]');
-    await expect(topPromptsSection.locator('li')).toHaveCount(count);
-  },
-
-  /**
-   * Expect trophy icons to be visible for top 3 prompts
-   */
-  trophyIconsVisible: async (page: Page): Promise<void> => {
-    // Trophy icons are SVGs with the sparkle/trophy path, rendered for first 3 items
-    const topPromptsSection = page.locator('section[aria-label="Top prompts"]');
-    const trophyIcons = topPromptsSection.locator('svg[aria-hidden="true"]');
-    await expect(trophyIcons.first()).toBeVisible();
+  mostUsedTitles: async (page: Page, titles: string[]): Promise<void> => {
+    await expect(page.getByTestId('most-used-row')).toHaveCount(titles.length);
+    for (const [index, title] of titles.entries()) {
+      await expect(page.getByTestId('most-used-row').nth(index)).toContainText(title);
+    }
   },
 
   /**

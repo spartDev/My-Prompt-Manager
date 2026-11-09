@@ -270,17 +270,15 @@ export function useUsageStats(): UseUsageStatsReturn {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<AppError | null>(null);
 
-  const usageTracker = UsageTracker.getInstance();
-  const storageManager = StorageManager.getInstance();
-
   const refresh = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
 
       // Fetch history, prompts and categories in parallel
+      const storageManager = StorageManager.getInstance();
       const [usageHistory, allPrompts, allCategories] = await Promise.all([
-        usageTracker.getHistory(),
+        UsageTracker.getInstance().getHistory(),
         storageManager.getPrompts(),
         storageManager.getCategories()
       ]);
@@ -299,7 +297,7 @@ export function useUsageStats(): UseUsageStatsReturn {
     try {
       setLoading(true);
       setError(null);
-      await usageTracker.clearHistory();
+      await UsageTracker.getInstance().clearHistory();
       setHistory([]);
     } catch (err) {
       setError(err as AppError);
@@ -338,6 +336,7 @@ export function useUsageStats(): UseUsageStatsReturn {
   return {
     stats,
     history,
+    prompts,
     loading,
     error,
     refresh,

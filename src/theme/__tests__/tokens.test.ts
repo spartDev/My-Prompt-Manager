@@ -100,7 +100,11 @@ describe('Color tokens', () => {
       // The Notification pill: its message, and the glyph on its round
       ['on-inverse-strong', 'inverse'],
       ['on-inverse-mark', 'inverse-mark'],
-      ['on-inverse-mark', 'inverse-alert']
+      ['on-inverse-mark', 'inverse-alert'],
+      // The Analytics hero's day labels, and the Tidy up callout
+      ['on-inverse-muted', 'inverse'],
+      ['callout', 'callout'],
+      ['warning', 'card']
     ];
 
     for (const mode of [tokens.light, tokens.dark]) {
@@ -168,7 +172,8 @@ describe('Color tokens', () => {
       'bg-warning', 'bg-warning-subtle', 'border-warning', 'text-warning',
       'bg-danger', 'bg-danger-hover', 'bg-danger-subtle', 'border-danger', 'text-danger',
       'border-focus', 'border-error', 'outline-danger',
-      'text-pin', 'text-on-inverse-strong', 'text-on-inverse-mark', 'bg-inverse-mark', 'bg-inverse-alert', 'bg-inverse-action'
+      'text-pin', 'text-on-inverse-strong', 'text-on-inverse-mark', 'bg-inverse-mark', 'bg-inverse-alert', 'bg-inverse-action',
+      'bg-inverse-bar', 'bg-inverse-bar-hover', 'text-on-inverse-muted', 'bg-callout', 'text-callout'
     ];
     const css = await buildCss(classes);
 

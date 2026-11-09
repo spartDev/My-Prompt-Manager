@@ -143,7 +143,7 @@ test.describe('Analytics clear history', () => {
       expect(usageData[USAGE_STORAGE_KEY]).toEqual([]);
 
       // Verify empty state shown
-      await analyticsAssertions.emptyState(page);
+      await analyticsAssertions.tabEmptyState(page);
     });
 
     test('loading state is shown during clear operation', async ({ context, storage, extensionId }) => {
@@ -180,7 +180,7 @@ test.describe('Analytics clear history', () => {
       await expect(modal).toBeHidden();
 
       // Verify data was cleared
-      await expect(page.getByText('No usage data yet')).toBeVisible();
+      await analyticsAssertions.tabEmptyState(page);
     });
 
     test('Full Dashboard button hides after clear', async ({ context, storage, extensionId }) => {
@@ -228,7 +228,7 @@ test.describe('Analytics clear history', () => {
       await analyticsPage.navigateToAnalyticsTab();
 
       // Verify empty state is shown
-      await analyticsAssertions.emptyState(page);
+      await analyticsAssertions.tabEmptyState(page);
 
       // Verify clear button is NOT visible when no data
       await expect(analyticsPage.getClearHistoryButton()).toBeHidden();

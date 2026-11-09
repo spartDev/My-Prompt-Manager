@@ -145,6 +145,7 @@ const createMockStats = (overrides: Partial<UsageStats> = {}): UsageStats => ({
 const createMockReturn = (overrides: Partial<UseUsageStatsReturn> = {}): UseUsageStatsReturn => ({
   stats: createMockStats(),
   history: [],
+  prompts: [],
   loading: false,
   error: null,
   refresh: vi.fn(),

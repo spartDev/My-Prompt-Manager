@@ -13,8 +13,8 @@ import type { Prompt, Settings, SortOrder } from '../types';
 import type { LibraryViewProps } from '../types/components';
 import { Logger, toError } from '../utils';
 
-import { StarIcon, UsageIcon } from './icons/UIIcons';
-import LibraryFilterBar from './LibraryFilterBar';
+import { CheckIcon, StarIcon, UsageIcon } from './icons/UIIcons';
+import LibraryFilterBar, { reviewFilterLabel } from './LibraryFilterBar';
 import PromptCard from './PromptCard';
 import SearchBar from './SearchBar';
 import ViewHeader from './ViewHeader';
@@ -94,7 +94,7 @@ const LibraryView: FC<LibraryViewProps> = ({
 
   const activeFilterLabel = activeFilter.kind === 'category'
     ? categories.find(category => category.id === activeFilter.categoryId)?.name ?? ''
-    : activeFilter.kind === 'pinned' ? 'Pinned' : 'Most Used';
+    : reviewFilterLabel(activeFilter) ?? (activeFilter.kind === 'pinned' ? 'Pinned' : 'Most Used');
   const isSearchActive = debouncedQuery.trim() !== '';
 
   const totalLabel = `${String(prompts.length)} prompt${prompts.length !== 1 ? 's' : ''}`;
@@ -176,6 +176,21 @@ const LibraryView: FC<LibraryViewProps> = ({
                 </div>
                 <h2 className="text-base font-semibold text-primary mb-1">No pinned prompts yet</h2>
                 <p className="text-secondary text-sm">Pin a prompt with its star to keep it here.</p>
+              </div>
+            ) : !isSearchActive && reviewFilterLabel(activeFilter) ? (
+              <div className="max-w-sm mx-auto text-center px-6" role="region" aria-label={`No ${activeFilterLabel} prompts`}>
+                <div className="w-14 h-14 bg-accent-subtle rounded-full flex items-center justify-center mx-auto mb-3" aria-hidden="true">
+                  <CheckIcon className="w-7 h-7 text-accent" />
+                </div>
+                <h2 className="text-base font-semibold text-primary mb-1">Nothing left in {activeFilterLabel}</h2>
+                <p className="text-secondary text-sm mb-4">Every Prompt here has been tidied up.</p>
+                <button
+                  type="button"
+                  onClick={() => { onLibraryFilterChange(ALL_PROMPTS); }}
+                  className="px-4 py-2 text-sm font-semibold text-accent bg-accent-subtle border border-accent rounded-lg hover:bg-accent-selected transition-colors focus-interactive"
+                >
+                  Show all prompts
+                </button>
               </div>
             ) : !isSearchActive && activeFilter.kind === 'mostUsed' ? (
               <div className="max-w-sm mx-auto text-center px-6" role="region" aria-label="No used prompts">

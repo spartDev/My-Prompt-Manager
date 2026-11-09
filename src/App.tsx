@@ -343,6 +343,14 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
     setCurrentView(section);
   }, [currentView, refreshPrompts, refreshCategories]);
 
+  // Tidy up in Analytics: the Library on the Prompts to review, with no search hiding any of them
+  const { clearSearch } = searchWithDebounce;
+  const handleReviewPrompts = useCallback((filter: LibraryFilter) => {
+    clearSearch();
+    setLibraryFilter(filter);
+    handleSelectSection('library');
+  }, [clearSearch, handleSelectSection]);
+
   const handleExpandDashboard = useCallback(() => {
     // Open full analytics dashboard in a new tab
     void chrome.tabs.create({ url: chrome.runtime.getURL('src/analytics.html') });
@@ -448,6 +456,9 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
         <AnalyticsTab
           onExpandDashboard={handleExpandDashboard}
           context={context}
+          prompts={optimisticPrompts}
+          onEditPrompt={handleEditPrompt}
+          onReviewPrompts={handleReviewPrompts}
         />
       )}
       </div>

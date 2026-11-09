@@ -1,12 +1,14 @@
 /**
  * Library filter: the one choice that narrows which Prompts the Library lists
- * (All, the Pinned Prompts, Most Used, or a single Category — see CONTEXT.md).
+ * (All, the Pinned Prompts, Most Used, a single Category, or, from Analytics, the Never used Prompts
+ * or the Prompts of the Duplicate pairs — see CONTEXT.md).
  */
 
 import { NATURAL_SORT_DIRECTION } from '../constants';
 import type { Category, LibraryFilter, Prompt, SortOrder } from '../types';
 
 import { PromptManager } from './promptManager';
+import { isNeverUsed } from './usageInsights';
 
 export const ALL_PROMPTS: LibraryFilter = { kind: 'all' };
 
@@ -60,6 +62,13 @@ export function applyLibraryFilter(
     case 'category': {
       const category = categories.find(c => c.id === filter.categoryId);
       return category ? sort(prompts.filter(prompt => prompt.category === category.name)) : [];
+    }
+    case 'neverUsed':
+      return sort(prompts.filter(isNeverUsed));
+    case 'duplicates': {
+      // In review order, so each pair stays together; a Prompt deleted since drops out
+      const byId = new Map(prompts.map(prompt => [prompt.id, prompt]));
+      return filter.promptIds.flatMap(id => byId.get(id) ?? []);
     }
   }
 }
