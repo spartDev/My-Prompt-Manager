@@ -15,8 +15,8 @@ type IconType = 'logo' | 'add' | 'edit' | 'settings' | 'analytics';
 /**
  * Props for the ViewHeader component.
  *
- * Unified header component for all extension views providing consistent styling,
- * navigation patterns, and accessibility features across popup and sidepanel contexts.
+ * The Library's header. Every other Section has the Section header of SectionHeader; the
+ * subcomponents (CloseButton…) serve both.
  *
  * @example
  * // Main view with logo icon (default)
@@ -588,7 +588,6 @@ const ViewHeaderFC: FC<ViewHeaderProps> = ({
   return (
     <header
       className={`shrink-0 bg-app border-b border-transparent scroll-edge-top ${className}`}
-      role="banner"
     >
       <div className="p-6">
         <div className="flex items-center justify-between">

@@ -15,6 +15,7 @@ const MIGRATED = [
   // My-Prompt-Manager-el4.3: app shell and Library
   'App.tsx',
   'components/ViewHeader.tsx',
+  'components/SectionHeader.tsx',
   'components/icons/HeaderIcons.tsx',
   'components/TabBar.tsx',
   'components/LibraryView.tsx',

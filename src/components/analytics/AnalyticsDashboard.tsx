@@ -14,6 +14,7 @@ import {
   TrophyIcon, 
   UsageIcon
 } from '../icons/UIIcons';
+import SectionHeader from '../SectionHeader';
 
 import {
   CategoryBarChart,
@@ -154,37 +155,21 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
 
   return (
     <div className="h-screen flex flex-col bg-app section-scroll-scope">
-      {/* Header: seamless, its line shows once the content scrolls under it */}
-      <header className="shrink-0 bg-app border-b border-transparent scroll-edge-top">
-        <div className="px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              {onBack && (
-                <button
-                  onClick={onBack}
-                  className="p-2 text-secondary hover:text-primary hover:bg-muted rounded-xl transition-colors focus-interactive"
-                  aria-label="Go back"
-                >
-                  <BackIcon className="w-5 h-5" />
-                </button>
-              )}
-              <div className="flex items-center space-x-3">
-                <div data-testid="dashboard-icon" className="w-10 h-10 bg-accent-subtle text-accent rounded-xl flex items-center justify-center">
-                  <UsageIcon className="w-6 h-6" />
-                </div>
-                <div>
-                  <h1 className="text-xl font-bold text-primary">
-                    Analytics Dashboard
-                  </h1>
-                  <p className="text-sm text-tertiary">
-                    Last 30 days of usage
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
+      {/* Section header, like the Analytics tab: the period counted is the Eyebrow */}
+      <SectionHeader
+        title="Analytics Dashboard"
+        eyebrow="Last 30 days of usage"
+        className="sm:px-6 lg:px-8"
+        leading={onBack && (
+          <button
+            onClick={onBack}
+            className="p-2 -ml-2 text-secondary hover:text-primary hover:bg-muted rounded-full transition-colors focus-interactive"
+            aria-label="Go back"
+          >
+            <BackIcon className="w-5 h-5" />
+          </button>
+        )}
+      />
 
       {/* Content */}
       <main className="flex-1 overflow-auto custom-scrollbar px-4 sm:px-6 lg:px-8 py-6" data-scroll-container>

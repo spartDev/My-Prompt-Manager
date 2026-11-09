@@ -9,6 +9,7 @@ import { cn, Logger, toError } from '../utils';
 
 import CategorySheet from './CategorySheet';
 import ConfirmDialog from './ConfirmDialog';
+import SectionHeader from './SectionHeader';
 import ViewHeader from './ViewHeader';
 
 interface CategoryManagerProps {
@@ -215,23 +216,16 @@ const CategoryManager: FC<CategoryManagerProps> = ({
     // Behind the open sheet, out of reach: only the sheet's dialog is there for assistive technology.
     // Not during the exit, so the focus can go back to the row or button that opened it.
     <div className="h-full flex flex-col bg-app sheet-behind" data-stepped-back={sheet.isOpen ? '' : undefined} inert={sheet.isOpen}>
-      {/* Header */}
-      <ViewHeader
-        icon={
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-          </svg>
-        }
+      {/* Section header: the number of Categories is the Eyebrow */}
+      <SectionHeader
         title="Categories"
-        subtitle={`${String(categories.length)} ${categories.length === 1 ? 'category' : 'categories'}`}
-        context={context}
+        eyebrow={`${String(categories.length)} ${categories.length === 1 ? 'category' : 'categories'}`}
+        eyebrowLive
       >
         {context === 'sidepanel' && (
-          <ViewHeader.Actions>
-            <ViewHeader.CloseButton onClick={() => { window.close(); }} context="sidepanel" />
-          </ViewHeader.Actions>
+          <ViewHeader.CloseButton onClick={() => { window.close(); }} context="sidepanel" />
         )}
-      </ViewHeader>
+      </SectionHeader>
 
       {/* Content: the list card on bg-app, "Add category" below it */}
       <div className="flex-1 overflow-auto p-4 space-y-4" data-scroll-container>

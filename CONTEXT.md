@@ -82,6 +82,14 @@ _Avoid_: Preferences, options
 One of the four top-level destinations (Library, Categories, Analytics, Settings), each reachable from the tab bar.
 _Avoid_: Tab, page, view
 
+**Section header**:
+The band at the top of every Section but the Library: an Eyebrow over the Section's title, with the Section's own actions on the right. The full-page Analytics view has one too.
+_Avoid_: Page header, title bar, view header
+
+**Eyebrow**:
+The short line above a Section header's title that gives the Section's context: the extension's version in Settings, the number of Categories in Categories, the period counted in Analytics.
+_Avoid_: Subtitle, overline, sur-titre
+
 **Settings group**:
 A named set of related preferences inside Settings (for example Appearance or the Platforms), shown together under one label.
 _Avoid_: Section, panel

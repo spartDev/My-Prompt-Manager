@@ -15,6 +15,7 @@ import {
   TrophyIcon,
   UsageIcon
 } from '../icons/UIIcons';
+import SectionHeader from '../SectionHeader';
 import ViewHeader from '../ViewHeader';
 
 import { REFRESH_INTERVAL_MS } from './constants';
@@ -83,28 +84,23 @@ const AnalyticsTab: FC<AnalyticsTabProps> = ({
 
   return (
     <div className="h-full flex flex-col bg-app relative">
-      {/* Header */}
-      <ViewHeader
-        icon="analytics"
-        title="Analytics"
-        subtitle="Last 30 days of usage"
-        context={context}
-      >
+      {/* Section header: the period counted is the Eyebrow */}
+      <SectionHeader title="Analytics" eyebrow="Last 30 days of usage">
         {context === 'sidepanel' && (
-          <ViewHeader.Actions>
+          <>
             {hasData && onExpandDashboard && (
               <button
                 onClick={onExpandDashboard}
-                className="px-3 py-2 text-sm font-semibold text-on-accent bg-accent hover:bg-accent-hover rounded-lg shadow-sm transition-colors focus-primary"
+                className="h-9 px-4 text-sm font-bold text-on-accent bg-accent hover:bg-accent-hover rounded-full shadow-sm transition-colors focus-primary"
                 aria-label="View full analytics dashboard"
               >
                 Full Dashboard
               </button>
             )}
             <ViewHeader.CloseButton onClick={() => { window.close(); }} context="sidepanel" />
-          </ViewHeader.Actions>
+          </>
         )}
-      </ViewHeader>
+      </SectionHeader>
 
       {/* Content */}
       <main className="flex-1 overflow-auto custom-scrollbar p-4" data-scroll-container>
