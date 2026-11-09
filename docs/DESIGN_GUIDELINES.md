@@ -124,10 +124,15 @@ Declare it in both blocks of `src/theme/tokens.css` (`@theme static` and `.dark`
 ### Font Family
 
 ```css
-font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+font-family: 'Schibsted Grotesk', ui-sans-serif, system-ui, sans-serif;
 ```
 
-**Tailwind:** No custom font classes needed; uses default system font stack.
+The popup, side panel and Analytics page set in **Schibsted Grotesk** (Atelier 1C), set once on `body` in `src/popup.css`. Buttons and fields inherit it through Tailwind's preflight, so no component sets a font class.
+
+- **Self-hosted.** One variable woff2 (`wght` 400 to 900, Latin subset) lives in `public/fonts/` with its SIL OFL licence `OFL.txt`, and Vite copies both to `dist/fonts/`. `public/fonts/README.md` gives its source commit in google/fonts and the subset command. The `@font-face` uses `font-display: swap`. Never load a font from Google Fonts or any other host: the extension makes no network request when it opens.
+- **Fallback.** Characters outside the Latin subset (Cyrillic, Greek, CJK, emoji) and the instant before the font loads use the system font of the stack.
+- **Content scripts keep their own stacks.** The picker and the icon that `src/content/` draws on AI platforms do not load Schibsted Grotesk.
+- `tests/e2e/theme/typography.spec.ts` checks the computed stack and `document.fonts` on all three surfaces, and that none requests a remote host.
 
 ### Font Sizes
 
@@ -143,9 +148,11 @@ text-2xl   /* 24px / 1.5rem   - Page titles (rare); a Section header title is te
 ### Font Weights
 
 ```css
-font-medium   /* 500 - Secondary headings, emphasized text */
-font-semibold /* 600 - Primary headings, button text */
-font-bold     /* 700 - Major section titles */
+font-normal    /* 400 - Body text */
+font-medium    /* 500 - Secondary headings, emphasized text */
+font-semibold  /* 600 - Primary headings, button text */
+font-bold      /* 700 - Major section titles */
+font-extrabold /* 800 - Section title, Category sheet title */
 ```
 
 ### Line Heights
