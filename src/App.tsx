@@ -359,12 +359,14 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   // Review's button leaves with Analytics, so focus lands on the review filter's pill
   const { clearSearch } = searchWithDebounce;
   const handleLibraryFilterFocused = useCallback(() => { setFocusLibraryFilter(false); }, []);
+  // The Library is read again first: Analytics counts Insertions stored since this surface opened
   const handleReviewPrompts = useCallback((filter: LibraryFilter) => {
     clearSearch();
+    void refreshPrompts();
     setLibraryFilter(filter);
     setFocusLibraryFilter(true);
     handleSelectSection('library');
-  }, [clearSearch, handleSelectSection]);
+  }, [clearSearch, refreshPrompts, handleSelectSection]);
 
   const handleExpandDashboard = useCallback(() => {
     // Open full analytics dashboard in a new tab

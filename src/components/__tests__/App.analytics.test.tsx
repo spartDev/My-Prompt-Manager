@@ -85,6 +85,30 @@ describe('App analytics integration', () => {
     });
   });
 
+  describe('Tidy up', () => {
+    it('reads the Library again before Review, so it lists what Analytics counted', async () => {
+      const user = userEvent.setup();
+      const now = Date.now();
+      const used = { id: 'p1', title: 'Used since', content: 'One', category: 'Work', createdAt: now, updatedAt: now, usageCount: 0 };
+      const idle = { id: 'p2', title: 'Never inserted', content: 'Two', category: 'Work', createdAt: now, updatedAt: now, usageCount: 0 };
+      const storageMock = getMockStorageManager();
+      // The panel read both unused; a Platform has inserted the first one since
+      storageMock.getPrompts.mockResolvedValueOnce([used, idle]).mockResolvedValue([{ ...used, usageCount: 1 }, idle]);
+      mockUseUsageStats.mockReturnValue({
+        ...createMockReturn(),
+        history: [{ promptId: 'p1', timestamp: now, platform: 'claude', categoryId: null }],
+        prompts: [{ ...used, usageCount: 1 }, idle]
+      });
+      await renderApp();
+
+      await user.click(screen.getByRole('tab', { name: 'Analytics' }));
+      await user.click(await screen.findByRole('button', { name: 'Review the 1 prompt never used' }));
+
+      await waitFor(() => { expect(screen.queryByRole('button', { name: 'Edit Used since' })).not.toBeInTheDocument(); });
+      expect(screen.getByRole('button', { name: 'Edit Never inserted' })).toBeInTheDocument();
+    });
+  });
+
   describe('Analytics navigation', () => {
     it('navigates to analytics view when the Analytics tab is clicked', async () => {
       const user = userEvent.setup();
