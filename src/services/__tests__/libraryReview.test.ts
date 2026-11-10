@@ -63,6 +63,16 @@ describe('requestLibraryReview', () => {
   });
 });
 
+describe('requestLibraryReview, when the review cannot be left for the panel', () => {
+  it('fails, though the side panel opened', async () => {
+    const { open, session } = installSession();
+    session.set.mockRejectedValue(new Error('session storage failed'));
+
+    await expect(requestLibraryReview({ kind: 'neverUsed' }, 7)).rejects.toThrow('session storage failed');
+    expect(open).toHaveBeenCalledWith({ windowId: 7 });
+  });
+});
+
 describe('takePendingLibraryReview', () => {
   beforeEach(() => {
     Reflect.deleteProperty(chrome.storage, 'session');

@@ -30,15 +30,20 @@ export function isReviewFilter(value: unknown): value is ReviewFilter {
  * Opens the side panel of a window on the Prompts to review. Call it from a click: Chrome opens the
  * side panel only in answer to a user gesture, so the panel is asked for before anything is awaited.
  * The review is left for that window alone: a side panel open in another window does not take it.
- * When the panel cannot be opened, no review is left waiting and the call fails.
+ * When the panel cannot be opened, no review is left waiting and the call fails. It fails too when
+ * the review cannot be left for the panel, which then opens where it was.
  */
 export async function requestLibraryReview(filter: ReviewFilter, windowId: number): Promise<void> {
   const opened = chrome.sidePanel.open({ windowId });
-  const [panel] = await Promise.allSettled([opened, chrome.storage.session.set({ [PENDING_REVIEW_KEY]: { windowId, filter } })]);
+  const [panel, written] = await Promise.allSettled([opened, chrome.storage.session.set({ [PENDING_REVIEW_KEY]: { windowId, filter } })]);
   if (panel.status === 'rejected') {
     // No panel took the review: left waiting, it would redirect the Library the next time the panel opens
     await chrome.storage.session.remove(PENDING_REVIEW_KEY);
     throw panel.reason;
+  }
+  if (written.status === 'rejected') {
+    // The panel opened with no review to take: the caller says so
+    throw written.reason;
   }
 }
 

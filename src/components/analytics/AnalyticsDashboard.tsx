@@ -117,7 +117,7 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({ onBack }) => {
     }
     setReviewFailed(false);
     requestLibraryReview(filter, windowId).catch((err: unknown) => {
-      Logger.error('Could not open the side panel for a review', toError(err), {
+      Logger.error('Could not open a review in the side panel', toError(err), {
         component: 'AnalyticsDashboard'
       });
       setReviewFailed(true);
@@ -201,7 +201,7 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({ onBack }) => {
                 />
                 {reviewFailed && (
                   <p role="alert" className="mt-2 px-1 text-xs text-secondary">
-                    The side panel could not be opened. Open My Prompt Manager and review from Analytics.
+                    The review could not be opened in the side panel. Open My Prompt Manager and review from Analytics.
                   </p>
                 )}
               </div>

@@ -249,7 +249,7 @@ describe('AnalyticsDashboard', () => {
 
       fireEvent.click(screen.getByRole('button', { name: 'Review the 1 prompt never used' }));
 
-      expect(await screen.findByRole('alert')).toHaveTextContent('The side panel could not be opened.');
+      expect(await screen.findByRole('alert')).toHaveTextContent('The review could not be opened in the side panel.');
     });
 
     it('shows the page, and says Review cannot open the side panel, where the chrome tabs API is not there yet', async () => {
@@ -262,7 +262,7 @@ describe('AnalyticsDashboard', () => {
         expect(screen.getByRole('heading', { level: 1, name: 'Analytics' })).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Review the 1 prompt never used' }));
 
-        expect(await screen.findByRole('alert')).toHaveTextContent('The side panel could not be opened.');
+        expect(await screen.findByRole('alert')).toHaveTextContent('The review could not be opened in the side panel.');
         expect(mockRequestLibraryReview).not.toHaveBeenCalled();
       } finally {
         Object.assign(chrome, { tabs });
