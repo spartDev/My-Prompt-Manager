@@ -146,7 +146,7 @@ test.describe('Full-page Analytics view', () => {
       expect(panel, 'a used Prompt is filtered out').not.toContain(used[0].title);
       await expect(page.getByRole('alert')).toHaveCount(0);
       // The review was taken: none waits for another opening
-      expect(await page.evaluate(() => chrome.storage.session.get('pendingLibraryReview'))).toEqual({});
+      expect(await page.evaluate(() => chrome.storage.session.get())).toEqual({});
     });
   }
 

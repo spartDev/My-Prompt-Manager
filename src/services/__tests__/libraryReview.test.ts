@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   isReviewFilter,
   onLibraryReviewRequested,
-  PENDING_REVIEW_KEY,
+  pendingReviewKey,
   requestLibraryReview,
   takePendingLibraryReview
 } from '../libraryReview';
@@ -50,7 +50,7 @@ describe('requestLibraryReview', () => {
     expect(open).toHaveBeenCalledWith({ windowId: 7 });
     expect(open.mock.invocationCallOrder[0]).toBeLessThan(session.set.mock.invocationCallOrder[0]);
     await request;
-    expect(data[PENDING_REVIEW_KEY]).toEqual({ windowId: 7, filter: { kind: 'neverUsed' } });
+    expect(data[pendingReviewKey(7)]).toEqual({ kind: 'neverUsed' });
   });
 
   it('fails when the side panel cannot be opened, and leaves no review waiting for a later opening', async () => {
@@ -79,7 +79,7 @@ describe('takePendingLibraryReview', () => {
   });
 
   it('gives the waiting review once', async () => {
-    installSession({ [PENDING_REVIEW_KEY]: { windowId: 7, filter: { kind: 'duplicates', groups: [['a', 'b']] } } });
+    installSession({ [pendingReviewKey(7)]: { kind: 'duplicates', groups: [['a', 'b']] } });
 
     expect(await takePendingLibraryReview()).toEqual({ kind: 'duplicates', groups: [['a', 'b']] });
     expect(await takePendingLibraryReview()).toBeNull();
@@ -92,18 +92,26 @@ describe('takePendingLibraryReview', () => {
   });
 
   it('drops what is not a review filter', async () => {
-    const { data } = installSession({ [PENDING_REVIEW_KEY]: { windowId: 7, filter: { kind: 'category', categoryId: 'x' } } });
+    const { data } = installSession({ [pendingReviewKey(7)]: { kind: 'category', categoryId: 'x' } });
 
     expect(await takePendingLibraryReview()).toBeNull();
     expect(data).toEqual({});
   });
 
   it('leaves a review asked in another window for the side panel of that window', async () => {
-    const pending = { windowId: 8, filter: { kind: 'neverUsed' } };
-    const { data } = installSession({ [PENDING_REVIEW_KEY]: pending });
+    const { data } = installSession({ [pendingReviewKey(8)]: { kind: 'neverUsed' } });
 
     expect(await takePendingLibraryReview()).toBeNull();
-    expect(data[PENDING_REVIEW_KEY]).toEqual(pending);
+    expect(data[pendingReviewKey(8)]).toEqual({ kind: 'neverUsed' });
+  });
+
+  it('keeps the reviews of two windows apart: one asked in another window does not replace this one', async () => {
+    const { data } = installSession();
+    await requestLibraryReview({ kind: 'neverUsed' }, 7);
+    await requestLibraryReview({ kind: 'duplicates', groups: [['a', 'b']] }, 8);
+
+    expect(await takePendingLibraryReview()).toEqual({ kind: 'neverUsed' });
+    expect(data).toEqual({ [pendingReviewKey(8)]: { kind: 'duplicates', groups: [['a', 'b']] } });
   });
 
   it('gives none where session storage does not exist', async () => {
@@ -120,9 +128,9 @@ describe('onLibraryReviewRequested', () => {
 
     const unsubscribe = onLibraryReviewRequested(listener);
     const emit = listeners[listeners.length - 1];
-    emit({ [PENDING_REVIEW_KEY]: { newValue: { kind: 'neverUsed' } } }, 'session');
-    emit({ [PENDING_REVIEW_KEY]: { oldValue: { kind: 'neverUsed' } } }, 'session');
-    emit({ [PENDING_REVIEW_KEY]: { newValue: { kind: 'neverUsed' } } }, 'local');
+    emit({ [pendingReviewKey(7)]: { newValue: { kind: 'neverUsed' } } }, 'session');
+    emit({ [pendingReviewKey(7)]: { oldValue: { kind: 'neverUsed' } } }, 'session');
+    emit({ [pendingReviewKey(7)]: { newValue: { kind: 'neverUsed' } } }, 'local');
     emit({ other: { newValue: 1 } }, 'session');
 
     expect(listener).toHaveBeenCalledTimes(1);

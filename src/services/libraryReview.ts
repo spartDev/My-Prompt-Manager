@@ -9,7 +9,9 @@ import type { LibraryFilter } from '../types';
 /** The Library filters Tidy up offers to review (see CONTEXT.md) */
 export type ReviewFilter = Extract<LibraryFilter, { kind: 'neverUsed' | 'duplicates' }>;
 
-export const PENDING_REVIEW_KEY = 'pendingLibraryReview';
+/** A review waits under a key of its own window, so two windows asking at once do not replace each other */
+export const PENDING_REVIEW_PREFIX = 'pendingLibraryReview:';
+export const pendingReviewKey = (windowId: number): string => `${PENDING_REVIEW_PREFIX}${String(windowId)}`;
 
 const isStringArray = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every(item => typeof item === 'string');
@@ -34,11 +36,12 @@ export function isReviewFilter(value: unknown): value is ReviewFilter {
  * the review cannot be left for the panel, which then opens where it was.
  */
 export async function requestLibraryReview(filter: ReviewFilter, windowId: number): Promise<void> {
+  const key = pendingReviewKey(windowId);
   const opened = chrome.sidePanel.open({ windowId });
-  const [panel, written] = await Promise.allSettled([opened, chrome.storage.session.set({ [PENDING_REVIEW_KEY]: { windowId, filter } })]);
+  const [panel, written] = await Promise.allSettled([opened, chrome.storage.session.set({ [key]: filter })]);
   if (panel.status === 'rejected') {
     // No panel took the review: left waiting, it would redirect the Library the next time the panel opens
-    await chrome.storage.session.remove(PENDING_REVIEW_KEY);
+    await chrome.storage.session.remove(key);
     throw panel.reason;
   }
   if (written.status === 'rejected') {
@@ -53,23 +56,27 @@ export async function takePendingLibraryReview(): Promise<ReviewFilter | null> {
   if (!session) {
     return null;
   }
-  const stored = await session.get(PENDING_REVIEW_KEY);
-  const pending = stored[PENDING_REVIEW_KEY] as { windowId?: unknown; filter?: unknown } | undefined;
-  if (typeof pending !== 'object' || pending === null) {
-    return null;
-  }
   const { id } = await chrome.windows.getCurrent();
-  if (pending.windowId !== id) {
+  if (id === undefined) {
     return null;
   }
-  await session.remove(PENDING_REVIEW_KEY);
-  return isReviewFilter(pending.filter) ? pending.filter : null;
+  const key = pendingReviewKey(id);
+  const stored = await session.get(key);
+  const pending: unknown = stored[key];
+  if (pending === undefined) {
+    return null;
+  }
+  await session.remove(key);
+  return isReviewFilter(pending) ? pending : null;
 }
 
-/** Calls back when a review is asked while the side panel is already open; returns the unsubscribe */
+/**
+ * Calls back when a review is asked, in any window, while the side panel is open: the panel then
+ * takes the one of its own window, if there is one. Returns the unsubscribe.
+ */
 export function onLibraryReviewRequested(listener: () => void): () => void {
   const handler = (changes: Record<string, chrome.storage.StorageChange>, areaName: string): void => {
-    if (areaName === 'session' && changes[PENDING_REVIEW_KEY]?.newValue !== undefined) {
+    if (areaName === 'session' && Object.entries(changes).some(([key, change]) => key.startsWith(PENDING_REVIEW_PREFIX) && change.newValue !== undefined)) {
       listener();
     }
   };
