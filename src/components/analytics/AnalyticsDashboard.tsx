@@ -17,6 +17,7 @@ import {
 } from '../../services/usageInsights';
 import { MOTION } from '../../theme/motion';
 import { formatPlatformName, formatRelativeTime, Logger, toError } from '../../utils';
+import { ensureStorageAvailable } from '../../utils/chromeStorage';
 import ErrorBoundary from '../ErrorBoundary';
 import { BackIcon } from '../icons/UIIcons';
 import SectionHeader from '../SectionHeader';
@@ -99,7 +100,14 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({ onBack }) => {
   const windowIdRef = useRef<number | null>(null);
   const [reviewFailed, setReviewFailed] = useState(false);
   useEffect(() => {
-    void chrome.tabs.getCurrent().then(tab => { windowIdRef.current = tab?.windowId ?? null; });
+    let cancelled = false;
+    // In a tab that has just opened, the chrome API may not be there yet: wait for it, as the usage
+    // history does, and never fail the page for a window id only Review needs
+    ensureStorageAvailable()
+      .then(() => (chrome.tabs as Partial<typeof chrome.tabs> | undefined)?.getCurrent?.())
+      .then(tab => { if (!cancelled) { windowIdRef.current = tab?.windowId ?? null; } })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
   }, []);
   const review = useCallback((filter: ReviewFilter) => {
     const windowId = windowIdRef.current;

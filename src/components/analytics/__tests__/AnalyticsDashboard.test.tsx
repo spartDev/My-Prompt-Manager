@@ -252,6 +252,23 @@ describe('AnalyticsDashboard', () => {
       expect(await screen.findByRole('alert')).toHaveTextContent('The side panel could not be opened.');
     });
 
+    it('shows the page, and says Review cannot open the side panel, where the chrome tabs API is not there yet', async () => {
+      const tabs = chrome.tabs;
+      Reflect.deleteProperty(chrome, 'tabs');
+      try {
+        render(<AnalyticsDashboard />);
+        await Promise.resolve();
+
+        expect(screen.getByRole('heading', { level: 1, name: 'Analytics' })).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Review the 1 prompt never used' }));
+
+        expect(await screen.findByRole('alert')).toHaveTextContent('The side panel could not be opened.');
+        expect(mockRequestLibraryReview).not.toHaveBeenCalled();
+      } finally {
+        Object.assign(chrome, { tabs });
+      }
+    });
+
     it('is hidden with nothing to review', () => {
       mockUseUsageStats.mockReturnValue(createMockReturn({ prompts: [review, email, bug] }));
       render(<AnalyticsDashboard />);
