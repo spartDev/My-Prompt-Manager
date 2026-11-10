@@ -279,6 +279,23 @@ describe('PromptSelectorController', () => {
     expect(controller.isOpen).toBe(false);
   });
 
+  it('a second click while the first opening is still loading cancels it, and a third opens', async () => {
+    const loaded: { resolve?: (value: typeof library) => void } = {};
+    callbacks.loadLibrary.mockReturnValueOnce(new Promise((resolve) => { loaded.resolve = resolve; }));
+
+    controller.toggle(field, button);
+    controller.toggle(field, button);
+    loaded.resolve?.(library);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(dialog()).toBeNull();
+    expect(controller.isOpen).toBe(false);
+    expect(callbacks.loadLibrary).toHaveBeenCalledTimes(1);
+
+    controller.toggle(field, button);
+    await opened();
+  });
+
   it('opens on All again after a tab was shown', async () => {
     await controller.open(field, button);
     await opened();

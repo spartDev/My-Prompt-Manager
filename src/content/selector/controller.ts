@@ -54,6 +54,8 @@ export class PromptSelectorController {
   private closeTimer: number | null = null;
   /** Counts the openings, so one still loading when another starts (or when it is closed) is dropped. */
   private openings = 0;
+  /** The opening still loading its Library and React, if any: a second click cancels it. */
+  private loading: number | null = null;
   private readonly onThemeChange = (theme: 'light' | 'dark'): void => {
     this.host?.setAttribute('data-theme', theme);
   };
@@ -72,6 +74,13 @@ export class PromptSelectorController {
 
   /** Opens the selector over `target`, or closes it when it is open: a second click on the button. */
   toggle(target: HTMLElement, trigger: HTMLElement | null): void {
+    // Clicked again while the first click's opening was still loading: that opening is dropped,
+    // or the selector would show up after the click meant to close it
+    if (this.loading !== null) {
+      this.openings++;
+      this.loading = null;
+      return;
+    }
     if (this.session && this.store.getState().phase !== 'closing') {
       this.close();
       return;
@@ -81,6 +90,7 @@ export class PromptSelectorController {
 
   async open(target: HTMLElement, trigger: HTMLElement | null): Promise<void> {
     const opening = ++this.openings;
+    this.loading = opening;
     try {
       this.finishClose();
 
@@ -102,12 +112,17 @@ export class PromptSelectorController {
     } catch (err) {
       logError('Failed to open the prompt selector', err instanceof Error ? err : new Error(String(err)));
       this.finishClose();
+    } finally {
+      if (this.loading === opening) {
+        this.loading = null;
+      }
     }
   }
 
   /** Starts closing. `restoreFocus` false leaves the focus where it is (the input field is gone, or the user clicked elsewhere). */
   close(restoreFocus = true): void {
     this.openings++;
+    this.loading = null;
     if (!this.session) {
       return;
     }
