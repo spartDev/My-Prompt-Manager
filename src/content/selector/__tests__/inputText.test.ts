@@ -170,6 +170,34 @@ describe('removeTypedTrigger', () => {
     refused.mockRestore();
   });
 
+  it('removes a // typed on a new line of a contenteditable, after a <br>', () => {
+    const field = editable('First line<br>//');
+    document.getSelection()?.collapse(field.lastChild, 2);
+    const refused = vi.spyOn(document, 'execCommand').mockReturnValue(false);
+    expect(textBeforeCaret(field)).toBe('First line\n//');
+
+    // The <br> is then the last thing in the field: read as the break that keeps the line open
+    expect(removeTypedTrigger(field)).toBe(true);
+
+    expect(field.textContent).toBe('First line');
+    refused.mockRestore();
+  });
+
+  it('removes a // typed in a new paragraph that the editor then fills with a <br>', () => {
+    const field = editable('<p>First line</p><p>//</p>');
+    const second = field.querySelectorAll('p')[1];
+    document.getSelection()?.collapse(second.firstChild, 2);
+    const refused = vi.spyOn(document, 'execCommand').mockReturnValue(false);
+    field.addEventListener('input', () => {
+      if (second.textContent === '') {
+        second.innerHTML = '<br>';
+      }
+    });
+
+    expect(removeTypedTrigger(field)).toBe(true);
+    refused.mockRestore();
+  });
+
   it('reports a contenteditable whose editor puts the // back on input', () => {
     const field = editable('<p>Before //</p>');
     document.getSelection()?.collapse(field.querySelector('p')?.firstChild ?? null, 9);

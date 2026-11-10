@@ -181,6 +181,26 @@ test.describe('Insertion confirmation: time and motion', () => {
   });
 });
 
+test.describe('// on a new line', () => {
+  for (const platform of ['claude', 'gemini', 'copilot'] as const) {
+    test(`${platform}: // typed at the start of a second line opens the selector and is removed`, async ({ context, storage }) => {
+      await seed(storage);
+      const page = await openPlatform(context, platform);
+      await expect(promptsButton(page)).toHaveCount(1);
+      const input = field(page, platform);
+
+      await input.click();
+      await page.keyboard.type('First line');
+      await page.keyboard.press('Shift+Enter');
+      await page.keyboard.type('//');
+
+      await expect(promptSelector(page)).toBeVisible();
+      expect((await fieldText(input)).replace(/\s+$/, '')).toBe('First line');
+      expect(await fieldText(input)).not.toContain('//');
+    });
+  }
+});
+
 test.describe('Insertion on a React-controlled field', () => {
   test('chatgpt: React hears the // being removed, the Insertion and the Undo', async ({ context, storage }) => {
     await seed(storage);
