@@ -18,9 +18,9 @@ Chosen option: "React in one shadow root on `body`, loaded on first use", becaus
 
 What this means:
 
-* **One shadow host.** A single element appended to `document.body` holds a shadow root. The selector, the insertion confirmation and the sweep over the input field render inside it, positioned from the input field's rectangle. Nothing of the selector is added to the Platform's own tree, so an `overflow: hidden` container cannot clip it.
+* **One shadow host.** A single element appended to `document.body` holds a shadow root. The selector renders inside it, positioned from the input field's rectangle; what is later drawn over the page around an Insertion (My-Prompt-Manager-q9j.3) goes there too. Nothing of the selector is added to the Platform's own tree, so an `overflow: hidden` container cannot clip it.
 * **Styles inside the shadow root only.** The selector's CSS and tokens live in the shadow root. The `<style>` in the Platform's `<head>` keeps only what the Prompts button needs, since the button stays in the Platform's action bar.
-* **React on first use.** The React chunk is imported when the selector first opens (button or `//`), not when the content script starts. Detection, the button and the `//` listener stay plain TypeScript.
+* **React on first use.** The React chunk is imported when the selector first opens, not when the content script starts. Detection and the button stay plain TypeScript.
 * **The font is loaded from the extension.** Schibsted Grotesk comes from the extension package, never from a CDN.
 * **State outside React.** The selector's state machine and its keyboard handling are pure functions; React renders their state.
 

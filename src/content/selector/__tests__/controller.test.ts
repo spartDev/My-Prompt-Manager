@@ -107,6 +107,27 @@ describe('PromptSelectorController', () => {
     expect(row('p3')?.textContent).toContain('2 variables');
   });
 
+  it('keeps the focus in a search field that takes no room until text is typed or composed', async () => {
+    await controller.open(field, button);
+    await opened();
+    const search = shadow()?.querySelector<HTMLInputElement>('input.mpm-search');
+
+    expect(shadow()?.activeElement).toBe(search);
+    expect(search?.getAttribute('data-collapsed')).toBe('true');
+    expect(search?.getAttribute('aria-activedescendant')).toBe(row('p2')?.id);
+    expect(shadow()?.querySelector('h2')?.textContent).toBe('Insert a prompt');
+
+    // An input method starts composing: the field shows before any text is committed
+    search?.dispatchEvent(new Event('compositionstart', { bubbles: true }));
+    await vi.waitFor(() => { expect(search?.getAttribute('data-collapsed')).toBe('false'); });
+    expect(shadow()?.querySelector('h2')).toBeNull();
+    // Keys of a composition are the input method's, not the selector's
+    const composingKey = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, composed: true, cancelable: true, isComposing: true });
+    search?.dispatchEvent(composingKey);
+    expect(composingKey.defaultPrevented).toBe(false);
+    expect(dialog()?.getAttribute('data-closing')).toBe('false');
+  });
+
   it('follows the extension theme, when it opens and when the theme changes', async () => {
     theme.current = 'dark';
     await controller.open(field, button);

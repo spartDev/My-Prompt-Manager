@@ -46,6 +46,16 @@ describe('Keyboard in the list step', () => {
     expect(press(list, 'w')).toMatchObject({ query: 'w', index: 0 });
   });
 
+  it('a character typed in the search field is left to it, so an input method can compose there', () => {
+    expect(keyTransition(list, { key: 'w', inSearchField: true })).toBeNull();
+    expect(keyTransition(list, { key: 'Process', inSearchField: true })).toBeNull();
+  });
+
+  it('the arrows typed in the empty search field still change tab and row', () => {
+    expect(keyTransition(list, { key: 'ArrowRight', inSearchField: true })).toMatchObject({ tab: 'pinned' });
+    expect(keyTransition(list, { key: 'ArrowDown', inSearchField: true })).toMatchObject({ index: 1 });
+  });
+
   it('a space, or a character with a modifier, starts no search', () => {
     expect(keyTransition(list, { key: ' ' })).toBeNull();
     expect(keyTransition(list, { key: 'v', metaKey: true })).toBeNull();

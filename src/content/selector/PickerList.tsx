@@ -25,8 +25,8 @@ export const rowId = (listId: string, promptId: string): string => `${listId}-${
 const variablesLabel = (count: number): string => `${String(count)} variable${count > 1 ? 's' : ''}`;
 
 /**
- * The list of Prompts: a listbox that keeps the focus while its selected row moves
- * (aria-activedescendant). Each row shows the Prompt's title, its Category and how many
+ * The list of Prompts: a listbox whose selected row is named by aria-activedescendant, here and on
+ * the search field, which holds the focus. Each row shows the Prompt's title, its Category and how many
  * Variables it has. Text is rendered as text, never as markup (Verbatim).
  */
 export const PickerList: FC<PickerListProps> = ({ id, prompts, index, listKey, categoryColors, emptyMessage, listRef, onSelect, onChoose }) => {
@@ -50,7 +50,7 @@ export const PickerList: FC<PickerListProps> = ({ id, prompts, index, listKey, c
       role="listbox"
       aria-label="Prompts"
       aria-activedescendant={selected ? rowId(id, selected.id) : undefined}
-      tabIndex={0}
+      tabIndex={-1}
     >
       {prompts.map((prompt, i) => {
         const variables = variableCount(prompt);

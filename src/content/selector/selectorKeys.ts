@@ -9,7 +9,7 @@ import { type SelectorState, selectorReducer } from './selectorMachine';
 
 export interface SelectorKey {
   key: string;
-  /** Whether the key was typed in the search field, which then handles text keys natively. */
+  /** Whether the key was typed in the search field, which handles text keys natively. */
   inSearchField?: boolean;
   ctrlKey?: boolean;
   metaKey?: boolean;
@@ -57,10 +57,10 @@ export function keyTransition(state: SelectorState, key: SelectorKey): SelectorS
       // Typed before the search field had the focus: the search loses its last character all the same
       return searching && !key.inSearchField ? selectorReducer(state, { type: 'setQuery', query: state.query.slice(0, -1) }) : null;
     default:
-      // A character typed in the list starts a search, or goes on with it when the search field
-      // does not have the focus yet (fast typing); once it has, the field takes the characters itself
+      // The search field holds the focus and takes characters itself. A character typed elsewhere
+      // in the dialog (the close button has the focus) goes into the search all the same.
       // A space starts no search: on the list it is not text
-      return isCharacter(key) && !(searching && key.inSearchField) && (searching || key.key !== ' ')
+      return isCharacter(key) && !key.inSearchField && (searching || key.key !== ' ')
         ? selectorReducer(state, { type: 'setQuery', query: state.query + key.key })
         : null;
   }

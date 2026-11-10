@@ -156,6 +156,14 @@ export function getSelectorCSS(): string {
       caret-color: var(--background-color-accent);
     }
 
+    /* Not searching: the field keeps the focus but takes no room, and the title shows */
+    .mpm-search[data-collapsed="true"] {
+      position: absolute;
+      width: 0;
+      height: 0;
+      opacity: 0;
+    }
+
     .mpm-close {
       flex: none;
       display: grid;

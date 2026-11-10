@@ -189,15 +189,35 @@ describe('UIElementFactory', () => {
       expect(button.classList.contains('prompt-library-pill-compact')).toBe(true);
     });
 
-    it('finds the button inside Claude\'s wrapper', () => {
+    it('finds Claude\'s action bar above the wrappers that grow with the button', () => {
       const { container, icon } = factory.createClaudeIcon();
+      // The injector wraps Claude's container once more before it goes into the bar
+      const wrapper = document.createElement('div');
       const bar = document.createElement('div');
       Object.defineProperty(bar, 'scrollWidth', { configurable: true, value: 500 });
       Object.defineProperty(bar, 'clientWidth', { configurable: true, value: 300 });
-      bar.appendChild(container);
+      wrapper.appendChild(container);
+      bar.appendChild(wrapper);
+      document.body.appendChild(bar);
       fitPromptsPill(container);
 
       expect(icon.classList.contains('prompt-library-pill-compact')).toBe(true);
+      bar.remove();
+    });
+
+    it('ignores an overflow far above the button, which says nothing about its bar', () => {
+      let node: HTMLElement = factory.createChatGPTIcon();
+      const button = node;
+      for (let i = 0; i < 8; i++) {
+        const parent = document.createElement('div');
+        parent.appendChild(node);
+        node = parent;
+      }
+      Object.defineProperty(node, 'scrollWidth', { configurable: true, value: 900 });
+      Object.defineProperty(node, 'clientWidth', { configurable: true, value: 300 });
+      fitPromptsPill(button);
+
+      expect(button.classList.contains('prompt-library-pill-compact')).toBe(false);
     });
 
     it('does nothing for a button that is not in the page', () => {

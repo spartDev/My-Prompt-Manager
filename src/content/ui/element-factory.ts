@@ -17,19 +17,29 @@ const BADGE_PATH = 'M5.09 8.48a1 1 0 0 0 .64-.28 1 1 0 0 0 .25-.67 1 1 0 0 0-.25
 export const PILL_CLASS = 'prompt-library-pill';
 export const PILL_COMPACT_CLASS = 'prompt-library-pill-compact';
 
+/** How many ancestors of the button are checked for the bar that overflows (Claude: four wrappers, then the bar). */
+const BAR_SEARCH_DEPTH = 6;
+
 /**
  * Shrinks the Prompts button to its badge when the bar it sits in has no room for the label,
  * and gives the label back when there is room again.
  */
 export function fitPromptsPill(icon: HTMLElement): void {
   const pill = icon.matches(`.${PILL_CLASS}`) ? icon : icon.querySelector<HTMLElement>(`.${PILL_CLASS}`);
-  const bar = icon.parentElement;
-  if (!pill || !bar) {
+  if (!pill) {
     return;
   }
   pill.classList.remove(PILL_COMPACT_CLASS);
-  if (bar.scrollWidth > bar.clientWidth + 1) {
-    pill.classList.add(PILL_COMPACT_CLASS);
+  // The bar is not always the parent: Claude's button sits in wrappers that grow with it, so the
+  // element that runs out of room is a few levels up. Not further: a page that scrolls sideways
+  // for its own reasons says nothing about the bar.
+  let ancestor = pill.parentElement;
+  for (let level = 0; ancestor && ancestor !== document.body && level < BAR_SEARCH_DEPTH; level++) {
+    if (ancestor.scrollWidth > ancestor.clientWidth + 1) {
+      pill.classList.add(PILL_COMPACT_CLASS);
+      return;
+    }
+    ancestor = ancestor.parentElement;
   }
 }
 

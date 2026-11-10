@@ -1,7 +1,7 @@
-import { type FC, type KeyboardEvent, useId, useLayoutEffect, useMemo, useRef, useSyncExternalStore } from 'react';
+import { type FC, type KeyboardEvent, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
 import { PickerFill } from './PickerFill';
-import { PickerList } from './PickerList';
+import { PickerList, rowId } from './PickerList';
 import { PickerTabs } from './PickerTabs';
 import type { Placement } from './position';
 import { type TabKey, tabsOf } from './selectorData';
@@ -42,6 +42,8 @@ export const PickerPopover: FC<PickerPopoverProps> = ({ store, placement }) => {
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   const searchRef = useRef<HTMLInputElement | null>(null);
+  // An input method is composing text in the search field: the field shows before any text is committed
+  const [composing, setComposing] = useState(false);
 
   const tabs = useMemo(() => tabsOf(state.library), [state.library]);
   const categoryColors = useMemo(
@@ -51,23 +53,14 @@ export const PickerPopover: FC<PickerPopoverProps> = ({ store, placement }) => {
 
   const searching = state.query !== '';
 
-  // The focus goes to the list when the selector opens and when the search ends, and to the search
-  // field when a search starts: the first character was typed on the list, the next ones go there.
+  // The search field holds the focus for the whole list step, shown or not: text typed there
+  // starts a search natively, so an input method (Chinese, Japanese, Korean...) can compose in it.
   // In a layout effect, so the focus has moved before the next key arrives.
   useLayoutEffect(() => {
-    if (state.phase !== 'list') {
-      return;
+    if (state.phase === 'list') {
+      searchRef.current?.focus({ preventScroll: true });
     }
-    if (searching) {
-      const input = searchRef.current;
-      if (input && !input.matches(':focus')) {
-        input.focus({ preventScroll: true });
-        input.setSelectionRange(input.value.length, input.value.length);
-      }
-    } else {
-      listRef.current?.focus({ preventScroll: true });
-    }
-  }, [state.phase, searching]);
+  }, [state.phase]);
 
   if (state.phase === 'closed') {
     return null;
@@ -76,6 +69,8 @@ export const PickerPopover: FC<PickerPopoverProps> = ({ store, placement }) => {
   const prompts = listedPrompts(state);
   // The Prompt whose Variables are being filled in; it stays shown while the selector closes from that step
   const filling = chosenPrompt(state);
+  const selectedPrompt = prompts.at(state.index);
+  const selectedRowId = selectedPrompt ? rowId(listId, selectedPrompt.id) : undefined;
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
     if (event.nativeEvent.isComposing) {
@@ -118,7 +113,7 @@ export const PickerPopover: FC<PickerPopoverProps> = ({ store, placement }) => {
     // Choosing a tab leaves the search: the list is that tab's again
     store.dispatch({ type: 'setQuery', query: '' });
     store.dispatch({ type: 'selectTab', tab });
-    listRef.current?.focus({ preventScroll: true });
+    searchRef.current?.focus({ preventScroll: true });
   };
 
   return (
@@ -149,24 +144,26 @@ export const PickerPopover: FC<PickerPopoverProps> = ({ store, placement }) => {
       ) : (
         <>
           <div className="mpm-header">
-            {searching ? (
-              <input
-                ref={searchRef}
-                className="mpm-search"
-                type="text"
-                role="combobox"
-                aria-label="Search prompts"
-                aria-expanded="true"
-                aria-controls={listId}
-                aria-autocomplete="list"
-                autoComplete="off"
-                spellCheck={false}
-                value={state.query}
-                onChange={(event) => { store.dispatch({ type: 'setQuery', query: event.target.value }); }}
-              />
-            ) : (
-              <h2 className="mpm-title">Insert a prompt</h2>
-            )}
+            {!(searching || composing) && <h2 className="mpm-title">Insert a prompt</h2>}
+            <input
+              ref={searchRef}
+              className="mpm-search"
+              type="text"
+              role="combobox"
+              aria-label="Search prompts"
+              aria-expanded="true"
+              aria-controls={listId}
+              aria-activedescendant={selectedRowId}
+              aria-autocomplete="list"
+              autoComplete="off"
+              spellCheck={false}
+              data-collapsed={!(searching || composing)}
+              value={state.query}
+              // A search never starts with a space: on the list a space is not text
+              onChange={(event) => { store.dispatch({ type: 'setQuery', query: event.target.value.trimStart() }); }}
+              onCompositionStart={() => { setComposing(true); }}
+              onCompositionEnd={() => { setComposing(false); }}
+            />
             <button type="button" className="mpm-close" aria-label="Close" title="Close (esc)" onClick={() => { store.dispatch({ type: 'close' }); }}>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
             </button>

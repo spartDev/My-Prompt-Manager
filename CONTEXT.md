@@ -59,7 +59,7 @@ A file containing a user's Library, exported so it can be restored or moved.
 An AI chat site the extension works on (for example Claude or ChatGPT).
 
 **Prompt selector**:
-The list a user opens inside a Platform, from the Prompts button shown in its input area or by typing `//` in the input field, to choose a Prompt to insert. It lists All Prompts, the Pinned Prompts, the Recent Prompts, or the Prompts of one Category.
+The list a user opens inside a Platform, from the Prompts button shown in its input area, to choose a Prompt to insert. It lists All Prompts, the Pinned Prompts, the Recent Prompts, or the Prompts of one Category.
 _Avoid_: Picker (the Element picker is the tool that picks where the button goes on a custom site), palette, popover
 
 **Recent**:
@@ -67,7 +67,7 @@ The five Prompts inserted most recently, latest first, as the Prompt selector li
 _Avoid_: History, last used
 
 **Insertion**:
-Putting a Prompt's content into a Platform's input field. A Prompt's content arrives exactly as saved (see Verbatim). It replaces what the field held; the user can undo it right after, which puts back the text the field held before.
+Putting a Prompt's content into a Platform's input field. A Prompt's content arrives exactly as saved (see Verbatim). It replaces what the field held.
 
 ### Navigation
 
