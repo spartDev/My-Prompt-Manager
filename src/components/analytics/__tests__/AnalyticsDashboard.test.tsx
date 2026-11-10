@@ -8,6 +8,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { DEFAULT_CATEGORY_COLOR } from '../../../constants/colors';
 import { useDuplicateGroups } from '../../../hooks/useDuplicateGroups';
 import { useNow } from '../../../hooks/useNow';
 import { useUsageStats } from '../../../hooks/useUsageStats';
@@ -182,14 +183,14 @@ describe('AnalyticsDashboard', () => {
       expect(rows[1]).toHaveTextContent('ChatGPT');
     });
 
-    it("rank the Categories, each with its own color when it has one", () => {
+    it('rank the Categories, each with its own color, the default Category color when it has none', () => {
       render(<AnalyticsDashboard />);
 
       const card = screen.getByRole('region', { name: 'Categories' });
       const rows = within(card).getAllByRole('listitem');
       expect(rows.map(row => row.textContent)).toEqual([expect.stringContaining('Development'), expect.stringContaining('Writing')]);
       const dots = [...card.querySelectorAll<HTMLElement>('span[style*="background-color"]')];
-      expect(dots.map(dot => dot.style.backgroundColor)).toEqual(['#112233']);
+      expect(dots.map(dot => dot.style.backgroundColor)).toEqual(['#112233', DEFAULT_CATEGORY_COLOR]);
     });
   });
 

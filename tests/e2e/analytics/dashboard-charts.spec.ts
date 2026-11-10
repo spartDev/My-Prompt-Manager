@@ -10,6 +10,7 @@
 
 import type { Page } from '@playwright/test';
 
+import { DEFAULT_CATEGORY_COLOR } from '../../../src/theme/categoryChip';
 import { type ExtensionStorage, expect, test } from '../fixtures/extension';
 import { createUsageEventSeed } from '../fixtures/test-data';
 import { createCategorySeed, createPromptSeed, seedLibrary, seedUsageHistory } from '../utils/storage';
@@ -147,7 +148,7 @@ test.describe('Full-page Analytics cards and charts', () => {
       await page.screenshot({ path: `${SCREENSHOT_DIR}/dashboard-narrow-bottom-${theme}.png` });
     });
 
-    test(`the Categories card ranks each Category with its own color, and leaves out a Prompt whose Category is gone only when the Prompt is (${theme})`, async ({ page, storage, extensionId }) => {
+    test(`the Categories card ranks each Category with its own color, the default Category color once the Category no longer exists (${theme})`, async ({ page, storage, extensionId }) => {
       await openDashboard(page, storage, extensionId, theme);
 
       const card = page.getByRole('region', { name: 'Categories' });
@@ -158,9 +159,10 @@ test.describe('Full-page Analytics cards and charts', () => {
       await expect(rows.nth(1)).toContainText('Development');
       await expect(rows.nth(2)).toContainText('Personal');
 
-      // A stored Category shows its color as a dot; "Archived" is no longer stored and shows none
+      // A stored Category shows its color as a dot; "Archived" is no longer stored and takes the default Category color
       const dots = await card.locator('li span[style*="background-color"]').evaluateAll(spans => spans.map(span => getComputedStyle(span).backgroundColor));
-      expect(dots).toEqual(['Work', 'Development', 'Personal', LONG_NAME].map(name => rgbOf(categories.find(category => category.name === name)?.color ?? '')));
+      const storedColor = (name: string) => categories.find(category => category.name === name)?.color ?? '';
+      expect(dots).toEqual([...['Work', 'Development', 'Personal', LONG_NAME].map(storedColor), DEFAULT_CATEGORY_COLOR].map(rgbOf));
 
       // A long name is cut with an ellipsis inside its row
       const longRow = rows.filter({ hasText: LONG_NAME });

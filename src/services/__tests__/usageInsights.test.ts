@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { DEFAULT_CATEGORY_COLOR } from '../../constants/colors';
 import { buildPrompt } from '../../test/builders/buildPrompt';
 import type { UsageEvent } from '../../types';
 import {
@@ -279,29 +280,37 @@ describe('categoryRanking', () => {
     buildPrompt({ id: 'b', category: 'Code' }),
     buildPrompt({ id: 'c', category: 'Code' })
   ];
+  const categories = [{ id: '1', name: 'Code', color: '#112233' }, { id: '2', name: 'Writing', color: '#445566' }];
 
   it('counts each Insertion in the current Category of its Prompt, most first', () => {
-    const ranking = categoryRanking([event('a', MON), event('b', TUE), event('c', WED)], prompts);
+    const ranking = categoryRanking([event('a', MON), event('b', TUE), event('c', WED)], prompts, categories);
 
-    expect(ranking).toEqual([{ name: 'Code', count: 2 }, { name: 'Writing', count: 1 }]);
+    expect(ranking).toEqual([
+      { name: 'Code', count: 2, color: '#112233' },
+      { name: 'Writing', count: 1, color: '#445566' }
+    ]);
   });
 
   it('leaves out the Insertions of a deleted Prompt', () => {
-    expect(categoryRanking([event('gone', MON), event('a', TUE)], prompts)).toEqual([{ name: 'Writing', count: 1 }]);
+    expect(categoryRanking([event('gone', MON), event('a', TUE)], prompts, categories).map(entry => entry.name)).toEqual(['Writing']);
   });
 
-  it('gives each Category its own color when it has one', () => {
-    const categories = [{ id: '1', name: 'Code', color: '#112233' }, { id: '2', name: 'Writing' }];
+  it('gives the default Category color to a Category stored without a color, or no longer stored, as the Library does', () => {
+    const stored = [{ id: '2', name: 'Writing' }];
 
-    const ranking = categoryRanking([event('a', MON), event('b', TUE), event('c', WED)], prompts, categories);
+    const ranking = categoryRanking([event('a', MON), event('b', TUE)], prompts, stored);
 
-    expect(ranking).toEqual([{ name: 'Code', count: 2, color: '#112233' }, { name: 'Writing', count: 1 }]);
+    expect(ranking.map(entry => [entry.name, entry.color])).toEqual([
+      ['Code', DEFAULT_CATEGORY_COLOR],
+      ['Writing', DEFAULT_CATEGORY_COLOR]
+    ]);
   });
 
   it('starts with topCategory', () => {
     const events = [event('a', WED), event('b', MON)];
+    const first = categoryRanking(events, prompts)[0];
 
-    expect(topCategory(events, prompts)).toEqual(categoryRanking(events, prompts)[0]);
+    expect(topCategory(events, prompts)).toEqual({ name: first.name, count: first.count });
   });
 });
 

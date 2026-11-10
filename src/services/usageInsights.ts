@@ -4,6 +4,7 @@
  * Never used and Duplicate pair).
  */
 
+import { DEFAULT_CATEGORY_COLOR } from '../constants/colors';
 import type { Category, Prompt, UsageEvent } from '../types';
 
 export interface WeekdayUsage {
@@ -28,8 +29,8 @@ export interface PlatformUsage {
 export interface CategoryUsage {
   name: string;
   count: number;
-  /** The Category's own color, when it is stored with one */
-  color?: string;
+  /** The Category's own color, else the default Category color */
+  color: string;
 }
 
 export interface DuplicateGroup {
@@ -99,21 +100,24 @@ export function topPlatform(events: UsageEvent[]): PlatformUsage | null {
 
 /**
  * The Categories by Insertions, most first, each Insertion counted in its Prompt's current Category;
- * Insertions of a deleted Prompt are left out. Ties go to the one used most recently. A Category
- * gives its color when the Categories are passed and it has one.
+ * Insertions of a deleted Prompt are left out. Ties go to the one used most recently. Each has its
+ * own color; a Category stored without a color, or no longer stored, takes the default Category
+ * color, as in the Library.
  */
 export function categoryRanking(events: UsageEvent[], prompts: Prompt[], categories: Category[] = []): CategoryUsage[] {
   const categoryOf = new Map(prompts.map(prompt => [prompt.id, prompt.category]));
   const colorOf = new Map(categories.map(category => [category.name, category.color]));
-  return rankByKey(events, event => categoryOf.get(event.promptId)).map(({ key, count }) => {
-    const color = colorOf.get(key);
-    return color ? { name: key, count, color } : { name: key, count };
-  });
+  return rankByKey(events, event => categoryOf.get(event.promptId)).map(({ key, count }) => ({
+    name: key,
+    count,
+    color: colorOf.get(key) || DEFAULT_CATEGORY_COLOR
+  }));
 }
 
 /** The Category with the most Insertions: the first of categoryRanking */
 export function topCategory(events: UsageEvent[], prompts: Prompt[]): { name: string; count: number } | null {
-  return categoryRanking(events, prompts)[0] ?? null;
+  const top = categoryRanking(events, prompts).at(0);
+  return top ? { name: top.name, count: top.count } : null;
 }
 
 /** The entry with the highest count, the first on a tie; none when nothing was counted */

@@ -85,7 +85,7 @@ Surfaces are **opaque**. `bg-backdrop` is the only translucent one: no transluce
 
 The brand gradient (`bg-brand`: `#6D28D9` to `#4C1D95`, the same in both modes) is reserved for the logo. Every other surface is flat.
 
-The charts of the full-page Analytics view read the tokens as CSS variables (`src/theme/chartColors.ts`): every bar takes the accent and the axis labels `text-tertiary`, so they follow the mode without React. No chart has a palette of its own. A Category keeps its own color, as a dot before its name in the Categories card.
+The charts of the full-page Analytics view read the tokens as CSS variables (`src/theme/chartColors.ts`): every bar takes the accent and the axis labels `text-tertiary`, so they follow the mode without React. No chart has a palette of its own. A Category keeps its own color, as a dot before its name in the Categories card; one stored without a color, or no longer stored, takes the default Category color, as in the Library.
 
 The Prompt selector and the Variable form injected on Platforms are plain CSS (`src/content/utils/styles.ts`), not Tailwind: they declare the same tokens, under the same names, as CSS variables on `.prompt-library-selector` (light) and `.prompt-library-selector.dark-theme` (dark), and read them through `var()`. `styles.test.ts` fails when a value drifts from `tokens.css` or a color is written outside those declarations. Category chips there follow the same chip rule (`src/theme/categoryChip.ts`).
 
