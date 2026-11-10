@@ -141,18 +141,18 @@ export function removeTypedTrigger(field: HTMLElement): boolean {
   if (isTextControl(field)) {
     const caret = field.selectionStart ?? 0;
     const start = caret - SELECTOR_TRIGGER.length;
-    const length = field.value.length;
+    const original = field.value;
+    // The field as it must be afterwards: the same text, without the two characters
+    const expected = original.slice(0, start) + original.slice(caret);
     field.setSelectionRange(start, caret);
-    if (canExec && document.execCommand('delete') && field.value.length === length - SELECTOR_TRIGGER.length) {
-      return true;
-    }
-    if (field.value.length === length) {
+    if (!(canExec && document.execCommand('delete')) && field.value === original) {
       // No editing command here: remove the range, then tell the page as typing would
       field.setRangeText('', start, caret, 'end');
       field.setSelectionRange(start, start);
       field.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'deleteContentBackward' }));
     }
-    return true;
+    // A page whose own handler put the // back, or changed the rest of the draft, did not take it
+    return field.value === expected;
   }
 
   const selection = document.getSelection();

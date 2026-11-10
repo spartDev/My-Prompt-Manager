@@ -140,6 +140,20 @@ describe('removeTypedTrigger', () => {
     expect(heard).toBe(1);
   });
 
+  it('reports a textarea whose own handler puts the // back', () => {
+    const field = textarea('Before //', 9);
+    field.addEventListener('input', () => { field.value = 'Before //'; });
+
+    expect(removeTypedTrigger(field)).toBe(false);
+  });
+
+  it('reports a textarea whose own handler changes the rest of the draft', () => {
+    const field = textarea('Before // after', 9);
+    field.addEventListener('input', () => { field.value = field.value.toUpperCase(); });
+
+    expect(removeTypedTrigger(field)).toBe(false);
+  });
+
   it('takes the two characters out of a contenteditable that refuses the editing command, and tells the page', () => {
     const field = editable('<p>Before // after</p>');
     const text = field.querySelector('p')?.firstChild as Text;

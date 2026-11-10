@@ -420,6 +420,16 @@ export class PromptSelectorController {
     const previous = readInputText(target);
     // Where the field is now: the Platform may replace it while it takes the text
     const lastField = boxOf(target);
+    // A key the user presses in the field while the Platform takes the text: their typing comes
+    // after the snapshot above, so Undo would discard it. Only the user's own keys are trusted
+    // events; the events an Insertion sends are not keys
+    let typedMeanwhile = false;
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.isTrusted && event.composedPath().includes(target)) {
+        typedMeanwhile = true;
+      }
+    };
+    document.addEventListener('keydown', onKeyDown, true);
     let inserted = false;
     try {
       // A Prompt inserted as saved arrives Verbatim; filling its Variables in is the user's own change
@@ -427,9 +437,15 @@ export class PromptSelectorController {
       inserted = await this.callbacks.insert(prompt, content, target);
     } catch (err) {
       logError('Failed to insert the chosen prompt', err instanceof Error ? err : new Error(String(err)), { promptId: prompt.id });
+    } finally {
+      document.removeEventListener('keydown', onKeyDown, true);
     }
     // Another selector opened while the Platform took the text: its confirmation would cover it
     if (this.session) {
+      return;
+    }
+    // The user is already typing: the confirmation would leave at once, and the caret is theirs
+    if (inserted && typedMeanwhile) {
       return;
     }
     if (target.isConnected) {

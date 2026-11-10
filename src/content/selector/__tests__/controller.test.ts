@@ -539,6 +539,41 @@ describe('PromptSelectorController', () => {
       expect(sweep()).toBeNull();
     });
 
+    it('offers no Undo when the user typed in the field while the Platform took the text', async () => {
+      callbacks.insert.mockImplementation(async (_prompt: unknown, content: string) => {
+        field.value = content;
+        // The user's own key, which a script cannot send: a trusted event
+        const key = new KeyboardEvent('keydown', { key: 'a', bubbles: true, composed: true });
+        Object.defineProperty(key, 'isTrusted', { value: true });
+        field.dispatchEvent(key);
+        field.value += 'a';
+        await Promise.resolve();
+        return true;
+      });
+      await controller.open(field, button);
+      await opened();
+      field.setSelectionRange(0, 0);
+
+      row('p1')?.click();
+      await closed();
+      await vi.waitFor(() => { expect(callbacks.insert).toHaveBeenCalledTimes(1); });
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      expect(pill()).toBeNull();
+      expect(field.value).toBe('Content p1a');
+    });
+
+    it('still confirms when a script sends a key during the Insertion: only the user\'s keys count', async () => {
+      callbacks.insert.mockImplementation(() => {
+        field.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true, composed: true }));
+        return Promise.resolve(true);
+      });
+
+      await inserted();
+
+      expect(undoButton()).not.toBeNull();
+    });
+
     it('says so when the Insertion throws', async () => {
       callbacks.insert.mockRejectedValue(new Error('boom'));
 

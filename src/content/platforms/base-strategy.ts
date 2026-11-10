@@ -82,15 +82,22 @@ export abstract class PlatformStrategy implements PlatformStrategyInterface {
 
       if (element instanceof HTMLTextAreaElement || element instanceof HTMLInputElement) {
         const prototype = element instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
-        // The native setter, so a framework that tracks the value (React) sees the change
-        const setter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set as ((this: HTMLElement, value: string) => void) | undefined;
-        if (setter) {
-          setter.call(element, text);
+        // The native accessors, so a framework that tracks the value on the element (React) sees
+        // the change, and so what is read back is what the field really holds
+        const native = Object.getOwnPropertyDescriptor(prototype, 'value') as
+          | { get?: (this: HTMLElement) => string; set?: (this: HTMLElement, value: string) => void }
+          | undefined;
+        if (native?.set) {
+          native.set.call(element, text);
         } else {
           element.value = text;
         }
         element.dispatchEvent(new Event('input', { bubbles: true }));
         element.dispatchEvent(new Event('change', { bubbles: true }));
+        // A page whose own handler rewrote the value did not take the text back
+        if ((native?.get ? native.get.call(element) : element.value) !== text) {
+          return Promise.resolve({ success: false, error: 'The input field did not keep the restored text' });
+        }
         return Promise.resolve({ success: true, method: 'restore-value' });
       }
 

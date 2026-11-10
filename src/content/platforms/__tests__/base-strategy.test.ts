@@ -176,6 +176,16 @@ describe('PlatformStrategy', () => {
       field.remove();
     });
 
+    it('fails when the page rewrites the value it was given', async () => {
+      const field = document.createElement('textarea');
+      field.value = 'Inserted prompt';
+      field.addEventListener('input', () => { field.value = field.value.trim(); });
+
+      const result = await new TestStrategy().restore(field, '  Draft  ');
+
+      expect(result.success).toBe(false);
+    });
+
     it('empties a textarea that was empty before', async () => {
       const field = document.createElement('textarea');
       field.value = 'Inserted prompt';
