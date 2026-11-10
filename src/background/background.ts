@@ -425,9 +425,11 @@ export class ContentScriptInjector {
                 }
               });
 
-              // Remove any orphaned selectors
+              // Remove any orphaned selectors: the shadow host of the Prompt selector
+              // (SELECTOR_HOST_ID in src/content/selector/controller.ts; this function runs in
+              // the page and cannot import it), and the selector of versions before it
               const orphanedSelectors = document.querySelectorAll(
-                ".prompt-library-selector",
+                "#mpm-prompt-selector, .prompt-library-selector",
               );
               orphanedSelectors.forEach((selector) => {
                 try {

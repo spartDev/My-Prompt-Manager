@@ -52,7 +52,7 @@ vi.mock('../../ui/element-factory', () => {
   // Add static methods
   (MockUIElementFactory as any).convertToAbsolutePositioning = vi.fn();
   (MockUIElementFactory as any).convertToRelativePositioning = vi.fn();
-  return { UIElementFactory: MockUIElementFactory, fitPromptsPill: vi.fn() };
+  return { UIElementFactory: MockUIElementFactory, fitPromptsPill: vi.fn(), BAR_SEARCH_DEPTH: 6 };
 });
 
 // The Prompt selector's controller, replaced by a recorder: the injector's part is to wire it
@@ -342,6 +342,37 @@ describe('PromptLibraryInjector', () => {
       selector().callbacks.onOpenChange(false, button);
       expect(button.getAttribute('aria-expanded')).toBe('false');
       expect(() => selector().callbacks.onOpenChange(false, null)).not.toThrow();
+    });
+
+    it('fits the Prompts button again when the bar it sits in changes size, until the button is thrown away', async () => {
+      const observers: { callback: () => void; observed: Element[]; disconnect: ReturnType<typeof vi.fn> }[] = [];
+      vi.stubGlobal('ResizeObserver', vi.fn(function(callback: () => void) {
+        const observer = { callback, observed: [] as Element[], disconnect: vi.fn() };
+        observers.push(observer);
+        return { observe: (element: Element) => { observer.observed.push(element); }, disconnect: observer.disconnect };
+      }));
+      const { fitPromptsPill } = await import('../../ui/element-factory');
+      const bar = document.createElement('div');
+      const icon = document.createElement('button');
+      bar.appendChild(icon);
+      document.body.appendChild(bar);
+
+      // Counted for this button only: buttons of other injectors may still be fitted meanwhile
+      const fits = () => vi.mocked(fitPromptsPill).mock.calls.filter(([fitted]) => fitted === icon).length;
+      const observer = () => observers.find((candidate) => candidate.observed.includes(bar));
+
+      (injector as any).fitIconWhenPlaced(icon);
+      await vi.waitFor(() => { expect(fits()).toBe(1); });
+      expect(observer()?.observed).toEqual([bar]);
+
+      // The bar is resized: the button is fitted again
+      observer()?.callback();
+      await vi.waitFor(() => { expect(fits()).toBe(2); });
+
+      (injector as any).disposeIcon(icon);
+      expect(observer()?.disconnect).toHaveBeenCalled();
+      bar.remove();
+      vi.unstubAllGlobals();
     });
 
     it('removes the selector on cleanup', () => {

@@ -18,7 +18,7 @@ export const PILL_CLASS = 'prompt-library-pill';
 export const PILL_COMPACT_CLASS = 'prompt-library-pill-compact';
 
 /** How many ancestors of the button are checked for the bar that overflows (Claude: four wrappers, then the bar). */
-const BAR_SEARCH_DEPTH = 6;
+export const BAR_SEARCH_DEPTH = 6;
 
 /**
  * Shrinks the Prompts button to its badge when the bar it sits in has no room for the label,

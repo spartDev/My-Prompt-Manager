@@ -11,14 +11,22 @@ import { debug, error as logError } from "./logger";
 const STYLE_ID = "prompt-library-styles";
 
 /**
- * Inject CSS styles into the document head
- * Only injects once per page load
+ * Inject CSS styles into the document head.
+ * A style element left by an earlier version of the extension (the content script is injected
+ * again into open tabs after an update) is given this version's rules: its own would leave the
+ * Prompts button unstyled until the page is reloaded.
  */
 export function injectCSS(): void {
   try {
-    // Check if styles are already injected
-    if (document.getElementById(STYLE_ID)) {
-      debug("CSS styles already injected, skipping");
+    const existing = document.getElementById(STYLE_ID);
+    if (existing) {
+      const css = getCSS();
+      if (existing.textContent === css) {
+        debug("CSS styles already injected, skipping");
+      } else {
+        existing.textContent = css;
+        debug("CSS styles replaced with this version's");
+      }
       return;
     }
 

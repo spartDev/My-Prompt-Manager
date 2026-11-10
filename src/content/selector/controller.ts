@@ -59,6 +59,9 @@ export class PromptSelectorController {
   };
 
   constructor(private readonly callbacks: SelectorCallbacks) {
+    // A host already in the page belongs to an earlier instance of the content script (the
+    // extension was updated or reloaded): open or not, it is dead, so it goes
+    document.getElementById(SELECTOR_HOST_ID)?.remove();
     this.store.subscribe(() => { this.onStateChange(); });
   }
 

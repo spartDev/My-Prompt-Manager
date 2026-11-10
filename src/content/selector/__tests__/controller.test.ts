@@ -76,6 +76,17 @@ describe('PromptSelectorController', () => {
     document.body.innerHTML = '';
   });
 
+  it('removes a host left in the page by an earlier instance of the content script', () => {
+    const stale = document.createElement('div');
+    stale.id = SELECTOR_HOST_ID;
+    document.body.appendChild(stale);
+
+    const fresh = new PromptSelectorController(callbacks as unknown as SelectorCallbacks);
+
+    expect(document.getElementById(SELECTOR_HOST_ID)).toBeNull();
+    fresh.destroy();
+  });
+
   it('renders nothing in the page until it opens', () => {
     expect(document.getElementById(SELECTOR_HOST_ID)).toBeNull();
     expect(controller.isOpen).toBe(false);

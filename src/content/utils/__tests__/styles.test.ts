@@ -62,8 +62,19 @@ describe('StylesManager', () => {
       expect(Logger.debug).toHaveBeenCalledWith('CSS styles injected successfully');
     });
 
+    it('gives its rules to a style element left by an earlier version of the extension', () => {
+      const staleStyleElement = { id: 'prompt-library-styles', textContent: '.prompt-library-selector { color: red; }' };
+      documentMock.getElementById.mockReturnValue(staleStyleElement);
+
+      injectCSS();
+
+      expect(staleStyleElement.textContent).toBe(getCSS());
+      expect(documentMock.createElement).not.toHaveBeenCalled();
+      expect(documentMock.head.appendChild).not.toHaveBeenCalled();
+    });
+
     it('should skip injection when styles already exist', () => {
-      const existingStyleElement = { id: 'prompt-library-styles' };
+      const existingStyleElement = { id: 'prompt-library-styles', textContent: getCSS() };
       documentMock.getElementById.mockReturnValue(existingStyleElement);
 
       injectCSS();

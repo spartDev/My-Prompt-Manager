@@ -12,7 +12,7 @@ import { PromptSelectorController } from '../selector/controller';
 import { loadSelectorFont } from '../selector/font';
 import type { SelectorLibrary } from '../selector/selectorData';
 import type { InsertionResult, Prompt } from '../types/index';
-import { fitPromptsPill, UIElementFactory } from '../ui/element-factory';
+import { BAR_SEARCH_DEPTH, fitPromptsPill, UIElementFactory } from '../ui/element-factory';
 import { EventManager } from '../ui/event-manager';
 import { DOMUtils } from '../utils/dom';
 import { getElementFingerprintGenerator } from '../utils/element-fingerprint';
@@ -1487,8 +1487,44 @@ export class PromptLibraryInjector {
     window.requestAnimationFrame(() => {
       if (icon.isConnected) {
         fitPromptsPill(icon);
+        this.refitIconOnResize(icon);
       } else if (attempts > 0 && this.state.icon === icon) {
         this.fitIconWhenPlaced(icon, attempts - 1);
+      }
+    });
+  }
+
+  /**
+   * Fits the Prompts button again when the bar it sits in changes size (the window is resized, a
+   * sidebar opens): the label goes when the bar narrows and comes back when there is room again.
+   * Fitting ends in the same state for the same bar, so its own class change starts no loop.
+   */
+  private refitIconOnResize(icon: HTMLElement): void {
+    if (typeof ResizeObserver === 'undefined') {
+      return;
+    }
+    let frame: number | null = null;
+    const observer = new ResizeObserver(() => {
+      frame ??= window.requestAnimationFrame(() => {
+        frame = null;
+        if (icon.isConnected) {
+          fitPromptsPill(icon);
+        }
+      });
+    });
+    // The bar is one of the button's nearest ancestors (fitPromptsPill looks at the same ones)
+    let ancestor = icon.parentElement;
+    for (let level = 0; ancestor && ancestor !== document.body && level < BAR_SEARCH_DEPTH; level++) {
+      observer.observe(ancestor);
+      ancestor = ancestor.parentElement;
+    }
+
+    const earlier = this.iconCleanups.get(icon);
+    this.iconCleanups.set(icon, () => {
+      earlier?.();
+      observer.disconnect();
+      if (frame !== null) {
+        window.cancelAnimationFrame(frame);
       }
     });
   }
