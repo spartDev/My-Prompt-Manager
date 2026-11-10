@@ -11,7 +11,7 @@ import { compile } from '@tailwindcss/node';
 import { describe, expect, it } from 'vitest';
 
 import { getContrastRatio } from '../../constants/colors';
-import { CHART_PRIMARY, CHART_THEME, DAY_OF_WEEK_COLORS } from '../chartColors';
+import { CHART_PRIMARY, CHART_THEME } from '../chartColors';
 
 const POPUP_CSS = path.resolve(__dirname, '../../popup.css');
 
@@ -209,28 +209,9 @@ describe('Color tokens', () => {
     expect(dark['--background-image-brand'], 'no dark override').toBeUndefined();
   });
 
-  it('the Analytics medals keep the gold, silver and bronze Tailwind drew them with, the same in both modes', async () => {
-    const medals = {
-      gold: ['yellow-400', 'orange-500'],
-      silver: ['gray-300', 'gray-400'],
-      bronze: ['amber-600', 'amber-700']
-    };
-    const css = await buildCss(Object.keys(medals).map(medal => `bg-medal-${medal}`));
-    const { light, dark } = await readDeclarations();
-    // Tailwind's own values, read from the build: the medals look as they did before the tokens (My-Prompt-Manager-el4.6)
-    const palette = declarationsOf(await buildCss(Object.values(medals).flat().map(color => `from-${color}`)));
-
-    for (const [medal, [from, to]] of Object.entries(medals)) {
-      const token = `--background-image-medal-${medal}`;
-      expect(ruleFor(css, `bg-medal-${medal}`)).toContain(`background-image: var(${token})`);
-      expect(light[token], token).toBe(`linear-gradient(to bottom right in oklab, ${palette[`--color-${from}`]} 0%, ${palette[`--color-${to}`]} 100%)`);
-      expect(dark[token], `${token}: no dark override`).toBeUndefined();
-    }
-  });
-
   it('the Analytics charts draw their neutrals and primary color from tokens that exist in both modes', async () => {
     const tokens = await readTokens();
-    const chartColors = { ...CHART_THEME, ...CHART_PRIMARY, ...DAY_OF_WEEK_COLORS };
+    const chartColors: Record<string, string> = { ...CHART_THEME, ...CHART_PRIMARY };
 
     for (const [name, color] of Object.entries(chartColors)) {
       const token = /^var\((--[\w-]+-color-[\w-]+)\)$/.exec(color)?.[1];
@@ -240,7 +221,6 @@ describe('Color tokens', () => {
       expect(tokens.dark[token], `${name}: ${token} in dark`).toMatch(/^(#|rgba?\()/);
     }
     expect(CHART_PRIMARY.PRIMARY).toBe('var(--background-color-accent)');
-    expect(DAY_OF_WEEK_COLORS.PEAK).toBe('var(--background-color-accent)');
   });
 
   it('shadows take the violet tint in light and a stronger black in dark', async () => {

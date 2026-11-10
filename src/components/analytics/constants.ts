@@ -6,34 +6,17 @@
 /** Refresh interval for time-based updates (60 seconds) */
 export const REFRESH_INTERVAL_MS = 60_000;
 
-/** Chart height presets in pixels */
-export const CHART_HEIGHT = {
-  /** Small charts: pie, bar, time-of-day (200px) */
-  SMALL: 200,
-  /** Medium charts: line chart (250px) */
-  MEDIUM: 250,
-} as const;
+/** Height of the Daily use and Time of day charts, in pixels */
+export const CHART_HEIGHT = 180;
 
-/** Maximum categories to display in the category bar chart */
-export const MAX_CATEGORIES_DISPLAY = 6;
+/** Rows of the Most used card in the Analytics tab, as in the Atelier 1C design */
+export const MOST_USED_ROWS = 3;
 
-/** Pie chart dimension configuration */
-export const PIE_CHART = {
-  /** Inner radius for donut effect */
-  INNER_RADIUS: 50,
-  /** Outer radius of the pie */
-  OUTER_RADIUS: 70,
-  /** Padding angle between slices in degrees */
-  PADDING_ANGLE: 2,
-} as const;
+/** Rows of the Most used card in the full-page Analytics view */
+export const MOST_USED_ROWS_FULL = 10;
 
-/** Legend configuration for pie charts */
-export const PIE_LEGEND = {
-  /** Height of the legend area */
-  HEIGHT: 36,
-  /** Size of legend icons */
-  ICON_SIZE: 8,
-} as const;
+/** Rows of the Platforms and Categories cards in the full-page Analytics view */
+export const RANKED_ROWS = 6;
 
 /**
  * The chart events recharts may defer to the next animation frame: none. Recharts 3 defers mouse moves and does not

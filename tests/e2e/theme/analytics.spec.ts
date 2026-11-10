@@ -2,15 +2,14 @@
  * E2E: Analytics on the color tokens (My-Prompt-Manager-el4.6)
  *
  * The Analytics tab (Atelier 1C: the bg-inverse hero, the cards, Most used and the Tidy up callout)
- * and the full dashboard take the surfaces, text and borders of the tokens, the dashboard charts draw
- * their primary color from the accent of the current mode, and its gold, silver and bronze medals keep
- * their colors. Also captures light/dark screenshots as visual proof
+ * and the full-page view, which has the same design at the width of a page, take the surfaces, text
+ * and borders of the tokens, and the full-page charts draw their bars in the accent of the current
+ * mode. Also captures light/dark screenshots as visual proof
  * (test-results/analytics/).
  */
 
 import type { Locator, Page } from '@playwright/test';
 
-import { PIE_CHART } from '../../../src/components/analytics/constants';
 import { type ExtensionStorage, expect, test } from '../fixtures/extension';
 import { ANALYTICS_FIXTURES, createUsageEventSeed } from '../fixtures/test-data';
 import { seedLibrary, seedUsageHistory } from '../utils/storage';
@@ -46,17 +45,10 @@ const EXPECTED = {
   }
 } as const;
 
-/** The medals as Tailwind drew them before the tokens (yellow-400 to orange-500...): the same in both modes */
-const MEDALS = {
-  gold: 'linear-gradient(to right bottom, oklch(0.852 0.199 91.936) 0%, oklch(0.705 0.213 47.604) 100%)',
-  silver: 'linear-gradient(to right bottom, oklch(0.872 0.01 258.338) 0%, oklch(0.707 0.022 261.325) 100%)',
-  bronze: 'linear-gradient(to right bottom, oklch(0.666 0.179 58.318) 0%, oklch(0.555 0.163 48.998) 100%)'
-} as const;
-
 const MINUTE = 60 * 1000;
 const DAY = 24 * 60 * MINUTE;
 
-/** Four Prompts used 4, 3, 2 and 1 times on four different days: three medals, one numbered rank, one peak day */
+/** Four Prompts used 4, 3, 2 and 1 times on four different days: four ranked rows, one busiest day */
 const usageHistory = () => {
   const now = Date.now();
   const uses = (promptId: string, count: number, daysAgo: number) =>
@@ -87,19 +79,15 @@ const seed = async (storage: ExtensionStorage, theme: 'light' | 'dark', withUsag
 
 const openDashboard = async (page: Page, storage: ExtensionStorage, extensionId: string, theme: 'light' | 'dark', withUsage = true) => {
   await seed(storage, theme, withUsage);
-  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.setViewportSize({ width: 1280, height: 1100 });
   await page.goto(`chrome-extension://${extensionId}/src/analytics.html`);
   await expect(page.locator('html')).toHaveClass(theme === 'dark' ? /dark/ : /^(?!.*dark)/);
 };
 
-/** A chart card of the dashboard's breakdown, found by its heading */
-const chartCard = (page: Page, title: string) =>
-  page.getByRole('region', { name: 'Usage breakdown' }).locator('div').filter({ has: page.getByRole('heading', { name: title, exact: true }) }).last();
-
-/** Lets the recharts entry animations (1.5 s, reduced motion not honored) finish, so a screenshot shows the drawn charts */
+/** Lets the entry animations finish (the rank bars take the longest), so a screenshot shows the page drawn */
 const settleCharts = async (page: Page) => {
-  await expect(page.locator('.recharts-pie-sector').first()).toBeVisible();
-  await page.waitForTimeout(1600);
+  await expect(page.getByTestId('daily-use-chart').locator('.recharts-bar-rectangle').first()).toBeVisible();
+  await page.waitForTimeout(1800);
 };
 
 /** The fill each bar is painted with */
@@ -260,138 +248,106 @@ test.describe('Analytics on the tokens', () => {
       expect((box?.x ?? 0) + (box?.width ?? 0), 'right edge in the panel').toBeLessThanOrEqual(SURFACES.sidepanel.width);
 
       await expect(page.getByTestId('stats-hero')).toHaveCSS('background-color', colors.inverse);
-      const hero = await page.getByTestId('stats-hero').boundingBox();
-      expect((hero?.x ?? 0) + (hero?.width ?? 0), 'hero inside the panel').toBeLessThanOrEqual(SURFACES.sidepanel.width);
+      // Polled: the Section is still sliding in from the side of its tab when the hero first shows
+      await expect.poll(async () => {
+        const hero = await page.getByTestId('stats-hero').boundingBox();
+        return (hero?.x ?? 0) + (hero?.width ?? 0);
+      }, 'hero inside the panel').toBeLessThanOrEqual(SURFACES.sidepanel.width);
 
       await page.screenshot({ path: `${SCREENSHOT_DIR}/sidepanel-${theme}.png` });
     });
 
-    test(`the dashboard charts draw the accent of the mode, on token grid lines, axes and tooltip (${theme})`, async ({ page, storage, extensionId }) => {
+    test(`the full-page view draws the tab's hero, cards and rankings on the tokens, and its charts in the accent of the mode (${theme})`, async ({ page, storage, extensionId }) => {
       await openDashboard(page, storage, extensionId, theme);
 
-      const trend = page.getByRole('region', { name: 'Usage trend' });
-      await expect(trend.locator('.recharts-line-curve')).toHaveCSS('stroke', colors.accent);
-      await expect(trend.locator('.recharts-cartesian-grid-horizontal line').first()).toHaveCSS('stroke', colors.border);
-      await expect(trend.locator('.recharts-cartesian-axis-tick-value').first()).toHaveCSS('fill', colors.tertiary);
-
-      // One peak day (4 uses today) in the accent, the other days in accent/border
-      const dayBars = chartCard(page, 'Day of Week').locator('.recharts-bar-rectangle path');
-      // Recharts draws the bars once their entry animation starts, and redraws them when the chart gets its width
-      await expect.poll(async () => {
-        const fills = await fillsOf(dayBars);
-        return { peakDays: fills.filter(fill => fill === colors.accent).length, otherDays: [...new Set(fills.filter(fill => fill !== colors.accent))] };
-      }).toEqual({ peakDays: 1, otherDays: [colors.accentBorder] });
-
-      await expect.poll(() => fillsOf(chartCard(page, 'Time of Day').locator('.recharts-bar-rectangle path')), 'peak time of day in the accent')
-        .toContain(colors.accent);
-
-      await expect(chartCard(page, 'Platforms').locator('.recharts-legend-item-text span').first()).toHaveCSS('color', colors.secondary);
-
-      // Tooltip of the trend line: a bg-card box with a token border
-      await trend.locator('.recharts-surface').hover({ position: { x: 600, y: 120 } });
-      const tooltip = trend.locator('.recharts-default-tooltip');
-      await expect(tooltip).toBeVisible();
-      await expect(tooltip).toHaveCSS('background-color', colors.card);
-      await expect(tooltip).toHaveCSS('border-top-color', colors.border);
-      await expect(tooltip.locator('.recharts-tooltip-label')).toHaveCSS('color', colors.primary);
-      await expect(tooltip.locator('.recharts-tooltip-item')).toHaveCSS('color', colors.accentText);
-      await expect(tooltip.locator('.recharts-tooltip-item')).toHaveText(/^Uses : \d+$/);
-
-      // The hover band behind a bar
-      await dayBars.first().hover();
-      await expect(chartCard(page, 'Day of Week').locator('.recharts-tooltip-cursor')).toHaveCSS('fill', colors.muted);
-
-      // Once the charts are drawn, the trend line Tooltip of the last day, for the screenshot
-      await settleCharts(page);
-      const trendSurface = trend.locator('.recharts-surface');
-      const trendWidth = (await trendSurface.boundingBox())?.width ?? 0;
-      await trendSurface.hover({ position: { x: trendWidth - 30, y: 120 } });
-      await expect(tooltip.locator('.recharts-tooltip-item')).toHaveText(/^Uses : \d+$/);
-      await page.screenshot({ path: `${SCREENSHOT_DIR}/dashboard-tooltip-${theme}.png` });
-
-      // Tooltip of the Platforms pie: the Platform, then its uses. The middle of a sector's box is the donut hole,
-      // so the pointer goes to the top of the ring, inside the first sector (it starts at 3 o'clock, counterclockwise)
-      const platforms = chartCard(page, 'Platforms');
-      const sector = platforms.locator('.recharts-pie-sector path').first();
-      const [cx, cy] = await Promise.all([sector.getAttribute('cx'), sector.getAttribute('cy')]);
-      const ringMiddle = (PIE_CHART.INNER_RADIUS + PIE_CHART.OUTER_RADIUS) / 2;
-      const pie = platforms.locator('.recharts-surface').filter({ has: page.locator('.recharts-pie-sector') });
-      await pie.hover({ position: { x: Number(cx), y: Number(cy) - ringMiddle } });
-      await expect(platforms.locator('.recharts-tooltip-item')).toHaveText(/^(Claude|ChatGPT) : \d+ uses$/);
-      await page.screenshot({ path: `${SCREENSHOT_DIR}/dashboard-platform-tooltip-${theme}.png` });
-    });
-
-    test(`the dashboard is seamless on bg-app: its header line shows once the page scrolls, charts sit in cards, the chosen tab is accent-selected (${theme})`, async ({ page, storage, extensionId }) => {
-      await openDashboard(page, storage, extensionId, theme);
-
+      // The Section header of the tab: Eyebrow over a 27px title, seamless on bg-app
       const header = page.getByRole('banner');
       await expect(header).toHaveCSS('background-color', colors.app);
-      await expect(header).toHaveCSS('backdrop-filter', 'none');
       await expect(header).toHaveCSS('border-bottom-color', TRANSPARENT);
-      await expect(header.getByRole('heading', { name: 'Analytics Dashboard' })).toHaveCSS('color', colors.primary);
-      await expect(header.getByText('Last 30 days of usage')).toHaveCSS('color', colors.tertiary);
+      await expect(header.getByRole('heading', { level: 1, name: 'Analytics' })).toHaveCSS('color', colors.primary);
+      await expect(header.getByRole('heading', { level: 1, name: 'Analytics' })).toHaveCSS('font-size', '27px');
+      await expect(header.getByText('Last 30 days', { exact: true })).toHaveCSS('color', colors.tertiary);
       await expect(header.getByRole('button', { name: 'Go back' })).toHaveCSS('color', colors.secondary);
-      // The Section header of Settings: Eyebrow over a 27px title, no icon square
-      await expect(header.getByRole('heading', { name: 'Analytics Dashboard' })).toHaveCSS('font-size', '27px');
-      await expect(header.getByTestId('dashboard-icon')).toHaveCount(0);
 
-      const summary = page.getByRole('region', { name: 'Usage summary' });
-      expect(await backdropOf(summary)).toBe(colors.app);
-      await expect(summary.getByRole('heading', { name: 'Summary' })).toHaveCSS('color', colors.tertiary);
-      await expect(summary.getByRole('article', { name: /^Peak Day/ })).toHaveCSS('background-color', colors.card);
+      const hero = page.getByTestId('stats-hero');
+      await expect(hero).toHaveCSS('background-color', colors.inverse);
+      await expect(hero).toHaveCSS('border-top-left-radius', '24px');
+      await expect(hero.getByRole('heading', { name: 'Prompts used' })).toHaveCSS('color', ON_INVERSE);
+      await expect(page.getByTestId('stats-total')).toHaveCSS('color', ON_ACCENT);
+      // Wide: the total is larger than in the tab
+      await expect(page.getByTestId('stats-total')).toHaveCSS('font-size', '64px');
 
-      const platforms = chartCard(page, 'Platforms');
-      await expect(platforms).toHaveCSS('background-color', colors.card);
-      await expect(platforms).toHaveCSS('border-top-color', colors.border);
-      await expect(platforms.getByRole('heading', { name: 'Platforms' })).toHaveCSS('color', colors.primary);
-      await expect(page.getByRole('region', { name: 'Usage trend' }).locator('div').first()).toHaveCSS('background-color', colors.card);
+      for (const label of ['Top platform', 'Top category'] as const) {
+        const card = page.locator('div').filter({ has: page.getByRole('heading', { name: label, exact: true }) }).last();
+        await expect(card).toHaveCSS('background-color', colors.card);
+        await expect(card).toHaveCSS('border-top-color', colors.border);
+        await expect(card).toHaveCSS('border-top-left-radius', '20px');
+      }
 
-      const prompts = page.getByRole('region', { name: 'Prompt usage details' });
-      await expect(prompts.locator('div').first()).toHaveCSS('background-color', colors.card);
-      const tablist = prompts.getByRole('tablist', { name: 'Prompt tabs' });
-      await expect(tablist.locator('..')).toHaveCSS('border-bottom-color', colors.divider);
-      const mostUsed = tablist.getByRole('tab', { name: 'Most Used' });
-      await expect(mostUsed).toHaveAttribute('aria-selected', 'true');
-      await expect(mostUsed).toHaveCSS('background-color', colors.accentSelected);
-      await expect(mostUsed).toHaveCSS('color', colors.accentStrong);
-      await expect(mostUsed).toHaveCSS('font-weight', '600');
-      const forgotten = tablist.getByRole('tab', { name: 'Forgotten' });
-      await expect(forgotten).toHaveCSS('background-color', TRANSPARENT);
-      await expect(forgotten).toHaveCSS('color', colors.tertiary);
-
-      const rows = prompts.getByRole('tabpanel', { name: 'Most Used' }).getByRole('listitem');
+      const mostUsed = page.getByRole('region', { name: 'Most used' });
+      await expect(mostUsed).toHaveCSS('background-color', colors.card);
+      const rows = mostUsed.getByTestId('most-used-row');
       await expect(rows).toHaveCount(4);
-      const first = rows.first();
-      await expect(first).toHaveCSS('background-color', colors.raised);
-      await expect(first.getByRole('heading', { name: 'Work Email Template' })).toHaveCSS('color', colors.primary);
-      await expect(first.getByText('4 uses')).toHaveCSS('color', colors.accentText);
-      await expect(first.getByText(/ago$/)).toHaveCSS('color', colors.tertiary);
-      const ranks = prompts.getByRole('tabpanel', { name: 'Most Used' }).getByTestId('rank-badge');
-      await expect(ranks.nth(0)).toHaveCSS('background-image', MEDALS.gold);
-      await expect(ranks.nth(1)).toHaveCSS('background-image', MEDALS.silver);
-      await expect(ranks.nth(2)).toHaveCSS('background-image', MEDALS.bronze);
-      await expect(ranks.nth(3)).toHaveCSS('background-color', colors.subtle);
-      await expect(ranks.nth(3)).toHaveCSS('color', colors.tertiary);
+      await expect(rows.first()).toContainText('Work Email Template');
+      await expect(rows.first().locator('span').first()).toHaveCSS('background-color', colors.accentSelected);
+      await expect(rows.nth(1).locator('span').first()).toHaveCSS('background-color', colors.subtle);
+      await expect(rows.first().locator('.animate-rank-fill')).toHaveCSS('background-color', colors.accent);
+      await expect(rows.first().getByText(/ago$|Just now$/)).toHaveCSS('color', colors.tertiary);
+
+      for (const title of ['Platforms', 'Categories']) {
+        const card = page.getByRole('region', { name: title });
+        await expect(card).toHaveCSS('background-color', colors.card);
+        await expect(card).toHaveCSS('border-top-color', colors.border);
+        await expect(card).toHaveCSS('border-top-left-radius', '20px');
+        await expect(card.getByRole('heading', { name: title })).toHaveCSS('color', colors.primary);
+        await expect(card.locator('.animate-rank-fill').first()).toHaveCSS('background-color', colors.accent);
+        await expect(card.locator('.animate-rank-fill').first().locator('..')).toHaveCSS('background-color', colors.accentSubtle);
+      }
+
+      const tidyUp = page.getByTestId('tidy-up');
+      await expect(tidyUp).toHaveCSS('background-color', colors.callout);
+      await expect(tidyUp).toHaveCSS('border-top-color', colors.warningBorder);
+
+      // The charts: pill bars in the accent of the mode, tertiary axis labels, no raw color
+      for (const id of ['daily-use', 'time-of-day']) {
+        const card = page.getByTestId(id);
+        await expect(card).toHaveCSS('background-color', colors.card);
+        await expect(card.getByRole('heading')).toHaveCSS('color', colors.primary);
+        await expect(card.locator('.recharts-cartesian-axis-tick-value').first()).toHaveCSS('fill', colors.tertiary);
+        // Recharts draws the bars once their entry animation starts, and redraws them when the chart gets its width
+        await expect.poll(async () => [...new Set(await fillsOf(card.locator('.recharts-bar-rectangle path')))], `${id} bars`).toEqual([colors.accent]);
+      }
 
       await settleCharts(page);
       await page.screenshot({ path: `${SCREENSHOT_DIR}/dashboard-${theme}.png` });
 
+      // The tooltip is the hero's dark pill, over a muted band behind the hovered bar
+      const daily = page.getByTestId('daily-use');
+      const surface = daily.locator('svg.recharts-surface').first();
+      const width = (await surface.boundingBox())?.width ?? 0;
+      await surface.hover({ position: { x: width - 10, y: 80 } });
+      const tooltip = daily.getByTestId('chart-tooltip');
+      await expect(tooltip).toHaveText(/^\w{3} \d+ \d+ uses?$/);
+      await expect(tooltip).toHaveCSS('background-color', colors.inverse);
+      await expect(tooltip).toHaveCSS('color', ON_ACCENT);
+      await expect(tooltip.locator('span')).toHaveCSS('color', ON_INVERSE);
+      await expect(daily.locator('.recharts-tooltip-cursor')).toHaveCSS('fill', colors.muted);
+      await page.screenshot({ path: `${SCREENSHOT_DIR}/dashboard-tooltip-${theme}.png` });
+
       // Scrolled, the content passes under the header: its line shows
-      await prompts.evaluate(section => { section.scrollIntoView({ block: 'end' }); });
+      await page.setViewportSize({ width: 1280, height: 500 });
+      await page.getByTestId('time-of-day').evaluate(section => { section.scrollIntoView({ block: 'end' }); });
       await expect(header).toHaveCSS('border-bottom-color', colors.strong);
-      await page.screenshot({ path: `${SCREENSHOT_DIR}/dashboard-prompts-${theme}.png` });
     });
 
-    test(`with no usage yet, the dashboard shows the same empty state on bg-app (${theme})`, async ({ page, storage, extensionId }) => {
+    test(`with no usage yet, the full-page view shows the hero at zero and Tidy up on the tokens (${theme})`, async ({ page, storage, extensionId }) => {
       await openDashboard(page, storage, extensionId, theme, false);
 
-      const empty = page.getByRole('region', { name: 'Empty analytics' });
-      expect(await backdropOf(empty)).toBe(colors.app);
-      const circle = empty.getByTestId('empty-analytics-icon');
-      await expect(circle).toHaveCSS('background-color', colors.accentSubtle);
-      await expect(circle.locator('svg')).toHaveCSS('color', colors.accentText);
-      await expect(empty.getByRole('heading', { name: 'No usage data yet' })).toHaveCSS('color', colors.primary);
-      await expect(empty.getByText(/Start using your prompts/)).toHaveCSS('color', colors.tertiary);
+      await expect(page.getByTestId('stats-hero')).toHaveCSS('background-color', colors.inverse);
+      await expect(page.getByTestId('stats-hero-subtitle')).toHaveText('No Prompts used yet.');
+      await expect(page.getByTestId('tidy-up')).toHaveCSS('background-color', colors.callout);
+      await expect(page.getByRole('region', { name: 'Most used' })).toHaveCount(0);
+      await page.screenshot({ path: `${SCREENSHOT_DIR}/dashboard-empty-${theme}.png` });
     });
   }
 });

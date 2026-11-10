@@ -50,6 +50,7 @@ const createMockReturn = (overrides: Partial<UseUsageStatsReturn> = {}): UseUsag
   stats,
   history: HISTORY,
   prompts: PROMPTS,
+  categories: [],
   loading: false,
   error: null,
   refresh: vi.fn(),

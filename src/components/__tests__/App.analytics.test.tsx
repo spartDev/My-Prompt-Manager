@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import App from '../../App';
 import { useUsageStats } from '../../hooks/useUsageStats';
+import { onLibraryReviewRequested, takePendingLibraryReview } from '../../services/libraryReview';
 import { getChromeMock, getMockStorageManager } from '../../test/mocks';
 import type { Category } from '../../types';
 import type { UsageStats, UseUsageStatsReturn } from '../../types/hooks';
@@ -13,24 +14,26 @@ vi.mock('../../hooks/useUsageStats', () => ({
   useUsageStats: vi.fn()
 }));
 
+vi.mock('../../services/libraryReview', () => ({
+  takePendingLibraryReview: vi.fn(),
+  onLibraryReviewRequested: vi.fn()
+}));
+
 const mockUseUsageStats = vi.mocked(useUsageStats);
+const mockTakePendingLibraryReview = vi.mocked(takePendingLibraryReview);
+const mockOnLibraryReviewRequested = vi.mocked(onLibraryReviewRequested);
 
 const createMockStats = (): UsageStats => ({
   totalUses: 42,
   dailyUsage: [],
-  platformBreakdown: [{ platform: 'claude', count: 25, percentage: 100 }],
-  dayOfWeekDistribution: [{ day: 'Mon', dayIndex: 1, count: 15 }],
-  timeOfDayDistribution: [],
-  categoryDistribution: [{ categoryId: '1', name: 'Development', count: 20, color: '#2563EB' }],
-  topPrompts: [{ promptId: 'p1', title: 'Test Prompt', category: 'Development', count: 15, lastUsed: Date.now() }],
-  recentPrompts: [],
-  forgottenPrompts: []
+  timeOfDayDistribution: []
 });
 
 const createMockReturn = (): UseUsageStatsReturn => ({
   stats: createMockStats(),
   history: [{ promptId: 'p1', timestamp: Date.now(), platform: 'claude', categoryId: null }],
   prompts: [],
+  categories: [],
   loading: false,
   error: null,
   refresh: vi.fn(),
@@ -55,6 +58,42 @@ describe('App analytics integration', () => {
     storageMock.getPrompts.mockResolvedValue([]);
     // Mock usage stats with data so footer shows
     mockUseUsageStats.mockReturnValue(createMockReturn());
+    mockTakePendingLibraryReview.mockReset().mockResolvedValue(null);
+    mockOnLibraryReviewRequested.mockReset().mockReturnValue(() => undefined);
+  });
+
+  describe('A review asked from the full-page Analytics view', () => {
+    const now = Date.now();
+    const used = { id: 'p1', title: 'Used', content: 'One', category: 'Work', createdAt: now, updatedAt: now, usageCount: 2 };
+    const idle = { id: 'p2', title: 'Never inserted', content: 'Two', category: 'Work', createdAt: now, updatedAt: now, usageCount: 0 };
+
+    it('opens the side panel on the Library filter that waits', async () => {
+      getMockStorageManager().getPrompts.mockResolvedValue([used, idle]);
+      mockTakePendingLibraryReview.mockResolvedValueOnce({ kind: 'neverUsed' });
+      render(<App context="sidepanel" />);
+
+      expect(await screen.findByRole('button', { name: 'Edit Never inserted' })).toBeInTheDocument();
+      await waitFor(() => { expect(screen.queryByRole('button', { name: 'Edit Used' })).not.toBeInTheDocument(); });
+    });
+
+    it('applies one asked while the side panel is open', async () => {
+      getMockStorageManager().getPrompts.mockResolvedValue([used, idle]);
+      render(<App context="sidepanel" />);
+      expect(await screen.findByRole('button', { name: 'Edit Used' })).toBeInTheDocument();
+
+      mockTakePendingLibraryReview.mockResolvedValueOnce({ kind: 'neverUsed' });
+      const requested = mockOnLibraryReviewRequested.mock.calls.at(-1)?.[0];
+      requested?.();
+
+      await waitFor(() => { expect(screen.queryByRole('button', { name: 'Edit Used' })).not.toBeInTheDocument(); });
+      expect(screen.getByRole('button', { name: 'Edit Never inserted' })).toBeInTheDocument();
+    });
+
+    it('is left to the side panel: the popup does not take it', async () => {
+      await renderApp();
+
+      expect(mockTakePendingLibraryReview).not.toHaveBeenCalled();
+    });
   });
 
   describe('Most used', () => {

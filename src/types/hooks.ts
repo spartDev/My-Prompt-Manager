@@ -161,48 +161,15 @@ export interface DailyUsage {
   count: number;
 }
 
-export interface PlatformBreakdown {
-  platform: string;
-  count: number;
-  percentage: number;
-}
-
-export interface DayOfWeekDistribution {
-  day: string;  // 'Mon', 'Tue', etc.
-  dayIndex: number;  // 0-6 (Sunday = 0)
-  count: number;
-}
-
 export interface TimeOfDayDistribution {
   bucket: string;  // 'Morning', 'Afternoon', 'Evening', 'Night'
   count: number;
 }
 
-export interface CategoryDistribution {
-  categoryId: string | null;
-  name: string;
-  count: number;
-  color: string;  // The Category's stored color, else the default Category color
-}
-
-export interface PromptUsageSummary {
-  promptId: string;
-  title: string;
-  category: string;
-  count: number;
-  lastUsed: number;
-}
-
 export interface UsageStats {
   totalUses: number;
   dailyUsage: DailyUsage[];
-  platformBreakdown: PlatformBreakdown[];
-  dayOfWeekDistribution: DayOfWeekDistribution[];
   timeOfDayDistribution: TimeOfDayDistribution[];
-  categoryDistribution: CategoryDistribution[];
-  topPrompts: PromptUsageSummary[];
-  recentPrompts: PromptUsageSummary[];
-  forgottenPrompts: PromptUsageSummary[];  // Prompts not used in 14+ days
 }
 
 export interface UseUsageStatsReturn {
@@ -210,6 +177,8 @@ export interface UseUsageStatsReturn {
   history: UsageEvent[];
   /** The Library's Prompts, as loaded with the history */
   prompts: Prompt[];
+  /** The Library's Categories, loaded with them */
+  categories: Category[];
   loading: boolean;
   error: AppError | null;
   refresh: () => Promise<void>;

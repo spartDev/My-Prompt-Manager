@@ -38,7 +38,7 @@ Visual reference (both modes side by side): the palette canvas linked from beads
 | `bg-subtle` | `#F4F1FA` | `#2B2340` | Chips and fields **on a card**. Never directly on `bg-app`: same value in light |
 | `bg-raised` | `#F8F6FC` | `#1B1528` | Light fills: empty states, nested panels |
 | `bg-muted` | `#F1EDF8` | `#2E2645` | Hover of neutral elements (`hover:bg-muted`) |
-| `bg-inverse` | `#1D1530` | `#4A3D6B` | Notification pill, tooltips, the Analytics hero |
+| `bg-inverse` | `#1D1530` | `#4A3D6B` | Notification pill, tooltips (the chart tooltip included), the Analytics hero |
 | `bg-callout` | `#FFF8E6` | `#2B210E` | The Tidy up callout of Analytics, with `border-warning` and `text-callout` |
 | `bg-backdrop` | `#2A2140` at 45% | `#07050C` at 70% | Behind an open dialog or drawer, with `backdrop-blur-sm` |
 | `bg-highlight` | `#FEF3C7` | `#33270F` | Search match in a Prompt title or preview (`<mark className="bg-highlight text-inherit">`) |
@@ -83,9 +83,9 @@ Surfaces are **opaque**. `bg-backdrop` is the only translucent one: no transluce
 | `outline-accent`, `ring-accent` | accent | accent | Focus rings |
 | `--scrollbar-color-thumb` (variable, no class) | `#8B5CF6` | `#8B5CF6` | Scrollbar thumb, read by `popup.css` (at least 3:1 on every surface) |
 
-The brand gradient (`bg-brand`: `#6D28D9` to `#4C1D95`, the same in both modes) is reserved for the logo. Every other surface is flat, except the Analytics medals: `bg-medal-gold`, `bg-medal-silver` and `bg-medal-bronze` (the same in both modes, with a `text-on-accent` icon) mark the three most used Prompts.
+The brand gradient (`bg-brand`: `#6D28D9` to `#4C1D95`, the same in both modes) is reserved for the logo. Every other surface is flat.
 
-Charts read the tokens as CSS variables (`src/theme/chartColors.ts`): the primary series and the peak bar take the accent, the other bars `border-accent`, and grid, axes and tooltip the neutral tokens, so they follow the mode without React. The Platform and time-of-day palettes are data, the same in both modes, and each Category bar takes its Category's own color (the default Category color when it has none).
+The charts of the full-page Analytics view read the tokens as CSS variables (`src/theme/chartColors.ts`): every bar takes the accent and the axis labels `text-tertiary`, so they follow the mode without React. No chart has a palette of its own. A Category keeps its own color, as a dot before its name in the Categories card.
 
 The Prompt selector and the Variable form injected on Platforms are plain CSS (`src/content/utils/styles.ts`), not Tailwind: they declare the same tokens, under the same names, as CSS variables on `.prompt-library-selector` (light) and `.prompt-library-selector.dark-theme` (dark), and read them through `var()`. `styles.test.ts` fails when a value drifts from `tokens.css` or a color is written outside those declarations. Category chips there follow the same chip rule (`src/theme/categoryChip.ts`).
 
@@ -713,6 +713,23 @@ Settings is a column of Settings groups (`src/components/settings/SettingsGroup.
 
 A row's action is a small secondary pill (`ROW_BUTTON_CLASSES` in `src/components/settings/rowStyles.ts`, 34px high, as tall as a segmented control). A destructive action keeps its confirmation inside its row.
 
+#### Analytics cards
+
+The Analytics tab and the full-page Analytics view (`src/analytics.html`) are one design (Atelier 1C). The mockups draw the tab only; the full-page view extends it to a page and adds no pattern of its own. Both are built from the same components in `src/components/analytics/`:
+
+| Piece | Classes | Component |
+|---|---|---|
+| Hero | `bg-inverse rounded-hero shadow-hero`, the total in `text-on-inverse-strong`, weekday pill bars | `StatsHero` (`wide` in the full-page view: from `md` up the total at the left, 64px, and taller bars at the right) |
+| Stat card | `p-3.5 rounded-group bg-card border border-default animate-card-rise` | `StatCard` |
+| Ranked rows | a `w-7 h-7 rounded-full` rank round (`bg-accent-selected` for the first, `bg-subtle` after), the label over a `h-1.5 rounded-full bg-accent-subtle` track with a `bg-accent animate-rank-fill` bar, the count in `text-secondary` | `RankRowContent` in `RankedRows.tsx`, used by `MostUsedCard` and by the Platforms and Categories cards (`RankedRows`) |
+| Tidy up | `bg-callout border-[1.5px] border-warning rounded-group`, Review as a `bg-card text-warning rounded-full` pill | `TidyUpCard` |
+| Chart card | the stat card's surface, a `text-sm font-extrabold` title, a `text-xs text-secondary` line that says what the chart shows, then the chart | `ChartCard` in `AnalyticsDashboard.tsx` |
+| Chart tooltip | `px-3 py-1.5 rounded-full bg-inverse text-on-inverse-strong text-[11.5px] font-bold`, the label in `text-on-inverse` | `ChartTooltip` |
+
+A row is a button only where pressing it does something: Most used rows open their Prompt in the tab, and are plain rows (`readOnly`) in the full-page view, which has no editor. The count a bar draws is always in the text too: a row carries an `sr-only` "4 uses", and each chart is a `role="img"` whose `aria-label` gives its counts or its total and busiest entry.
+
+The full-page view keeps its content to a 1100px column (`lg:px-[max(2rem,calc(50vw-550px))]` on the header and on the scroll container). Under `lg` it is one column in the tab's order; from `lg` up Most used sits at the left of Top platform, Top category and Tidy up, and from `md` up the last four cards pair up. Cards are 10px apart (`mt-2.5`, `gap-x-2.5`).
+
 ### Badges & Pills
 
 #### Category Badge
@@ -991,8 +1008,8 @@ duration or a curve: it uses a class, and a timer reads `MOTION`.
 | `animate-category-pop` (`MOTION.categoryPop`) | `pop` 500ms, ease-spring | a Category appearing in the list (created, or back from Undo) |
 | `animate-toast-in` | `toast-in` 450ms, ease-spring | the Notification pill, from 14px above the top center |
 | `animate-bar-grow` (`MOTION.barGrow`) | `bar-grow` 800ms, ease-spring | an Analytics weekday bar growing from the bottom; each sets `animationDelay` to `MOTION.barDelay` + index × `MOTION.barStagger` (200ms, then 60ms apart) |
-| `animate-card-rise` (`MOTION.cardRise`) | `card-rise` 500ms, ease-spring | the Top platform and Top category cards rising 12px, at 100ms and 180ms (`cardDelay`, `cardStagger`), and the Tidy up callout |
-| `animate-rank-fill` (`MOTION.rankFill`) | `fill-grow` 1000ms, ease-spring | a Most used bar filling from the left, 300ms then 90ms apart (`rankDelay`, `rankStagger`) |
+| `animate-card-rise` (`MOTION.cardRise`) | `card-rise` 500ms, ease-spring | the Top platform and Top category cards rising 12px, at 100ms and 180ms (`cardDelay`, `cardStagger`), and the Tidy up callout; in the full-page view the Platforms, Categories, Daily use and Time of day cards follow, each `cardStagger` later |
+| `animate-rank-fill` (`MOTION.rankFill`) | `fill-grow` 1000ms, ease-spring | a Most used bar filling from the left, 300ms then 90ms apart (`rankDelay`, `rankStagger`); the rows of the Platforms and Categories cards too |
 | `MOTION.countUp` (a timer, `useCountUp`) | 800ms, ease-out | the Analytics total counting up from 0 with the bars |
 | `animate-toast-mark` | `pop` 450ms, ease-spring, 80ms delay | the round of the Notification |
 | `transition-save` (`src/popup.css`) | background and color 300ms, scale 250ms ease-spring | the Save button, which slides to the success color on "Saved" |

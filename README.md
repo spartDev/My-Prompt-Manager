@@ -32,10 +32,11 @@ Transform your AI interactions with a powerful personal prompt library that inte
 
 ### Analytics Dashboard (New in v1.8)
 ✅ **Usage Tracking:** Track prompt usage across all platforms
-✅ **Visual Analytics:** Interactive charts showing usage patterns
+✅ **Visual Analytics:** A full-page view with your most used prompts, daily use and time of day
 ✅ **Time Analysis:** View usage by day of week and time of day
 ✅ **Category Insights:** See which prompt categories you use most
 ✅ **Platform Stats:** Understand which AI platforms you prefer
+✅ **Tidy Up:** Review never-used prompts and duplicate pairs, straight from Analytics
 ✅ **Floating Dashboard:** Quick access via floating action button
 
 ## 🎯 Supported Platforms

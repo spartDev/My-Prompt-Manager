@@ -60,7 +60,7 @@ export class AnalyticsPage extends BasePage {
     return this.page.getByRole('region', { name: 'Most used' });
   }
 
-  /** The rows of the Most used card, each a button that opens its Prompt */
+  /** The rows of the Most used card: buttons that open their Prompt in the tab, plain rows in the full-page view */
   getMostUsedRows(): Locator {
     return this.page.getByTestId('most-used-row');
   }
@@ -92,22 +92,6 @@ export class AnalyticsPage extends BasePage {
   }
 
   /**
-   * Get a tab by its name in the full dashboard prompt tables
-   * @param tabName - The tab name ("Most Used", "Recently Used", or "Forgotten")
-   */
-  getTab(tabName: 'Most Used' | 'Recently Used' | 'Forgotten'): Locator {
-    return this.page.getByRole('tab', { name: tabName });
-  }
-
-  /**
-   * Switch to a specific tab in the full dashboard prompt tables
-   * @param tabName - The tab name to switch to
-   */
-  async switchTab(tabName: 'Most Used' | 'Recently Used' | 'Forgotten'): Promise<void> {
-    await this.getTab(tabName).click();
-  }
-
-  /**
    * Confirm clearing history in the confirmation modal
    */
   async confirmClearHistory(): Promise<void> {
@@ -126,13 +110,6 @@ export class AnalyticsPage extends BasePage {
   }
 
   /**
-   * Get the empty state container of the full dashboard (when no usage data)
-   */
-  getEmptyState(): Locator {
-    return this.page.locator('[aria-label="Empty analytics"]');
-  }
-
-  /**
    * Get the error alert container
    */
   getErrorAlert(): Locator {
@@ -147,10 +124,10 @@ export class AnalyticsPage extends BasePage {
   }
 
   /**
-   * Get the Analytics Dashboard header (full page view)
+   * The title of the full-page Analytics view: the same Section header as the tab
    */
   getDashboardHeader(): Locator {
-    return this.page.getByRole('heading', { name: 'Analytics Dashboard' });
+    return this.page.getByRole('heading', { level: 1, name: 'Analytics' });
   }
 
   /**
@@ -175,38 +152,23 @@ export class AnalyticsPage extends BasePage {
     await this.switchToSection('library');
   }
 
-  /**
-   * Get the usage trend section in the full dashboard
-   */
-  getUsageTrendSection(): Locator {
-    return this.page.locator('section[aria-label="Usage trend"]');
+  /** A card of ranked rows in the full-page view */
+  getRankedCard(title: 'Platforms' | 'Categories'): Locator {
+    return this.page.getByRole('region', { name: title });
   }
 
-  /**
-   * Get the breakdown charts section in the full dashboard
-   */
-  getBreakdownSection(): Locator {
-    return this.page.locator('section[aria-label="Usage breakdown"]');
+  /** The rows of a card of ranked rows, most used first */
+  getRankedRows(title: 'Platforms' | 'Categories'): Locator {
+    return this.getRankedCard(title).getByTestId('ranked-row');
   }
 
-  /**
-   * Get the prompts table section in the full dashboard
-   */
-  getPromptsSection(): Locator {
-    return this.page.locator('section[aria-label="Prompt usage details"]');
+  /** A chart card of the full-page view */
+  getChartCard(title: 'Daily use' | 'Time of day'): Locator {
+    return this.page.getByRole('region', { name: title });
   }
 
-  /**
-   * Get the tab panel content area in the full dashboard
-   */
-  getTabPanel(): Locator {
-    return this.page.getByRole('tabpanel');
-  }
-
-  /**
-   * Get all prompt items in the current tab panel
-   */
-  getPromptItems(): Locator {
-    return this.getTabPanel().locator('ul li');
+  /** A Review button of Tidy up, by what it reviews */
+  getReviewButton(what: RegExp): Locator {
+    return this.getTidyUp().getByRole('button', { name: what });
   }
 }

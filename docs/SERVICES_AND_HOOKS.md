@@ -44,7 +44,8 @@ Other keys of `chrome.storage.local` belong to the code that owns them, which wr
 | `src/services/SearchIndex.ts` | The inverted index behind `PromptManager`'s search |
 | `src/services/SimilarityAlgorithms.ts` | The string similarity behind duplicate detection |
 | `src/services/libraryFilter.ts` | The Library filter (All, Pinned, Most Used, one Category, and from Analytics Never used and Possible duplicates): which Categories get a pill, and which Prompts a filter keeps |
-| `src/services/usageInsights.ts` | What the Analytics tab shows, as pure functions: Insertions per weekday (Monday first) and the busiest one, the top Platform and Category, Prompts ranked by Insertions in the period, the Never used count, and the Duplicate pairs counted from `PromptManager.findDuplicatePrompts` groups |
+| `src/services/libraryReview.ts` | A review asked from the full-page Analytics view: `requestLibraryReview` opens the side panel of the window within the click and leaves the Library filter, with the window's id, under `pendingLibraryReview` in `chrome.storage.session`; the side panel takes it once (`takePendingLibraryReview`, on opening and through `onLibraryReviewRequested`) |
+| `src/services/usageInsights.ts` | What Analytics shows, as pure functions: Insertions per weekday (Monday first) and the busiest one, the Platforms and the Categories ranked by Insertions (`platformRanking`, `categoryRanking`, the first of each being the top one), the busiest entry of any counted series (`busiest`), Prompts ranked by Insertions in the period, the Never used count, and the Duplicate pairs counted from `PromptManager.findDuplicatePrompts` groups |
 | `src/services/UsageTracker.ts` | Usage events for Analytics: one per insertion into a Platform (the service worker records it). Analytics reads the last 30 days; storage drops older events only once the history reaches 9,000 events, and keeps at most 10,000 (`cleanup()` has no production caller) |
 | `src/services/promptEncoder.ts` | Share codes: one Prompt as compact text, decoded without changing the text (Admission happens when the Prompt is saved) |
 | `src/services/configurationEncoder.ts` | Import and export codes of a custom site configuration: compression, checksum, validation of the decoded configuration |
@@ -122,9 +123,8 @@ A refusal keeps its type through `StorageManager` and `PromptManager`, so a call
 | `src/hooks/useEnhancedFloatingPosition.ts` | Keep a menu in the viewport (flip, shift) | `Dropdown` |
 | `src/hooks/useSitePermissions.ts` | Check and request host permissions for a site | site integration Settings, `usePickerWindow` |
 | `src/hooks/usePickerWindow.ts` | The element picker flow for a custom site | `SiteIntegrationSection` |
-| `src/hooks/useUsageStats.ts` | Usage history and Prompts, loaded once, and their aggregates for the dashboard | Analytics, its dashboard |
-| `src/hooks/useSummaryMetrics.ts` | Top Platform, peak day and top Category from those stats | Analytics dashboard |
-| `src/hooks/useNow.ts` | The current time, refreshed at an interval, for relative dates | Analytics dashboard |
+| `src/hooks/useUsageStats.ts` | Usage history, Prompts and Categories, loaded once, with the Insertions per day and per time of day for the charts | Analytics, its full-page view |
+| `src/hooks/useNow.ts` | The current time, refreshed at an interval, for relative dates | Full-page Analytics view |
 | `src/hooks/useCountUp.ts` | A number counting up from 0 with an ease-out (`MOTION.countUp`); the value at once under reduced motion | Analytics hero |
 | `src/hooks/useDuplicateGroups.ts` | The Duplicate pairs of the Library, looked for after the first paint; null while looking or when the finder gives up (over 1,000 Prompts, timeout) | Analytics Tidy up |
 | `src/hooks/useRadioGroup.ts` | Keyboard behavior of a WAI-ARIA radio group: one tab stop, arrows, Home and End move focus and selection, `locked` ignores input. `src/components/__tests__/radioGroups.test.ts` fails when a component renders `role="radio"` without it | `LibraryFilterBar`, `AppearanceSection`, `InterfaceModeSelector` |

@@ -14,30 +14,17 @@ import {
   weekdayUsage,
   withLatestUsage
 } from '../../services/usageInsights';
-import { MOTION } from '../../theme/motion';
 import type { LibraryFilter, Prompt } from '../../types';
 import { formatPlatformName } from '../../utils';
 import { TrashIcon } from '../icons/UIIcons';
 import SectionHeader from '../SectionHeader';
 import ViewHeader from '../ViewHeader';
 
+import { MOST_USED_ROWS } from './constants';
 import MostUsedCard from './MostUsedCard';
+import StatCard from './StatCard';
 import StatsHero from './StatsHero';
 import TidyUpCard from './TidyUpCard';
-
-/** Rows of the Most used card, as in the Atelier 1C design */
-const MOST_USED_ROWS = 3;
-
-const StatCard: FC<{ label: string; name: string; count: number; delayIndex: number }> = ({ label, name, count, delayIndex }) => (
-  <div
-    className="p-3.5 rounded-group bg-card border border-default animate-card-rise min-w-0"
-    style={{ animationDelay: `${String(MOTION.cardDelay + delayIndex * MOTION.cardStagger)}ms` }}
-  >
-    <h2 className="text-xs font-semibold text-tertiary">{label}</h2>
-    <p className="mt-1 text-[19px] font-extrabold tracking-[-0.02em] text-primary truncate" title={name}>{name}</p>
-    <p className="text-xs text-secondary">{String(count)} {count === 1 ? 'use' : 'uses'}</p>
-  </div>
-);
 
 export interface AnalyticsTabProps {
   /** Callback when user wants to expand to full dashboard */

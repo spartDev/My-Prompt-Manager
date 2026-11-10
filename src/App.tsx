@@ -17,6 +17,7 @@ import { usePrompts } from './hooks/usePrompts';
 import { useSearchWithDebounce } from './hooks/useSearchWithDebounce';
 import { useToast } from './hooks/useToast';
 import { ALL_PROMPTS } from './services/libraryFilter';
+import { onLibraryReviewRequested, takePendingLibraryReview } from './services/libraryReview';
 import { MOTION } from './theme/motion';
 import type { AppError, Category, DeletedCategory, LibraryFilter, Prompt } from './types';
 import { Logger, toError } from './utils';
@@ -367,6 +368,19 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
     setFocusLibraryFilter(true);
     handleSelectSection('library');
   }, [clearSearch, refreshPrompts, handleSelectSection]);
+
+  // A review asked from the full-page Analytics view opens the side panel and waits in session
+  // storage: the side panel takes it, on opening or while it is already open
+  useEffect(() => {
+    if (context !== 'sidepanel') { return; }
+    const apply = (): void => {
+      takePendingLibraryReview()
+        .then(filter => { if (filter) { handleReviewPrompts(filter); } })
+        .catch((err: unknown) => { Logger.error('Could not read the pending review', toError(err), { component: 'App' }); });
+    };
+    apply();
+    return onLibraryReviewRequested(apply);
+  }, [context, handleReviewPrompts]);
 
   const handleExpandDashboard = useCallback(() => {
     // Open full analytics dashboard in a new tab
