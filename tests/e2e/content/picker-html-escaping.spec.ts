@@ -10,6 +10,7 @@ import type { BrowserContext, Page } from '@playwright/test';
 
 import { DEFAULT_SETTINGS, type Prompt } from '../../../src/types';
 import { type ExtensionStorage, expect, test } from '../fixtures/extension';
+import { listedTitles, promptRow, promptSelector, promptsButton } from '../fixtures/platform-pages';
 import { createPromptSeed, seedLibrary } from '../utils/storage';
 
 const MOCK_HOST = 'https://claude.ai/';
@@ -64,10 +65,9 @@ const openPicker = async (context: BrowserContext): Promise<Page> => {
   await targetPage.setViewportSize({ width: 900, height: 700 });
   await targetPage.goto(MOCK_HOST, { waitUntil: 'domcontentloaded' });
 
-  const toolbarButton = targetPage.locator('.prompt-library-integrated-icon');
-  await expect(toolbarButton).toHaveCount(1);
-  await toolbarButton.click();
-  await expect(targetPage.locator('.prompt-library-selector')).toBeVisible();
+  await expect(promptsButton(targetPage)).toHaveCount(1);
+  await promptsButton(targetPage).click();
+  await expect(promptSelector(targetPage)).toBeVisible();
   return targetPage;
 };
 
@@ -76,16 +76,15 @@ test.describe('Prompt picker special characters', () => {
     await seed(storage, 'light');
     const page = await openPicker(context);
 
-    const item = page.locator('.prompt-library-selector .prompt-list .prompt-item').first();
-    await expect(item.locator('.prompt-title')).toHaveText(TITLE);
-    await expect(item.locator('.prompt-category')).toHaveText(CATEGORY);
-    await expect(item.locator('.prompt-preview')).toHaveText(CONTENT);
+    const item = promptRow(page, 'decisions');
+    await expect(item.locator('.mpm-row-title')).toHaveText(TITLE);
+    await expect(item.locator('.mpm-row-category')).toHaveText(CATEGORY);
+    // The Category's tab shows its name as text too
+    await expect(promptSelector(page).getByRole('tab', { name: CATEGORY, exact: true })).toHaveText(CATEGORY);
 
     // Search results go through the same rendering path
-    await page.locator('.prompt-library-selector .search-input').fill('decisions');
-    await expect(
-      page.locator('.prompt-library-selector .prompt-list .prompt-title'),
-    ).toHaveText([TITLE]);
+    await page.keyboard.type('decisions');
+    await expect.poll(() => listedTitles(page)).toEqual([TITLE]);
   });
 
   for (const theme of ['light', 'dark'] as const) {
@@ -93,9 +92,8 @@ test.describe('Prompt picker special characters', () => {
       await seed(storage, theme);
       const page = await openPicker(context);
 
-      const selector = page.locator('.prompt-library-selector');
-      await expect(selector).toHaveClass(new RegExp(`${theme}-theme`));
-      await expect(selector.locator('.prompt-title').first()).toHaveText(TITLE);
+      await expect(page.locator('#mpm-prompt-selector')).toHaveAttribute('data-theme', theme);
+      await expect(promptRow(page, 'decisions').locator('.mpm-row-title')).toHaveText(TITLE);
 
       await page.screenshot({ path: `${SCREENSHOT_DIR}/picker${theme === 'dark' ? '-dark' : ''}.png`, animations: 'disabled' });
     });

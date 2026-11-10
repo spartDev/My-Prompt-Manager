@@ -83,6 +83,8 @@
   --background-color-inverse-alert: #fca5a5;
   --background-color-inverse-action: rgba(255, 255, 255, 0.14);
   --shadow-toast: 0 14px 30px -12px rgba(29, 21, 48, 0.6);
+  /* The Prompt selector shown on Platforms (Atelier 1C): one wide, soft shadow under the popover */
+  --shadow-selector: 0 30px 60px -24px rgba(45, 25, 90, 0.5);
 
   /* Analytics hero on bg-inverse (Atelier 1C): the weekday bars at rest and hovered (the busiest takes
      bg-inverse-mark), the day labels under them, and the hero's shadow */
@@ -307,6 +309,7 @@
     --background-color-inverse-alert: #fca5a5;
     --background-color-inverse-action: rgba(255, 255, 255, 0.14);
     --shadow-toast: 0 14px 30px -12px rgba(0, 0, 0, 0.6);
+    --shadow-selector: 0 30px 60px -24px rgba(4, 2, 10, 0.85);
 
     /* Analytics hero: a hovered bar takes the card's color; the labels take on-inverse, since the
        mockup's #a99cc9 is 3.8:1 on the dark hero */

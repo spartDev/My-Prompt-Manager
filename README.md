@@ -181,13 +181,16 @@ src/content/
 │   ├── logger.ts              # Debug logging
 │   ├── storage.ts             # Chrome storage wrapper
 │   ├── dom.ts                 # DOM utilities
-│   ├── styles.ts              # Style injection
+│   ├── styles.ts              # Style of the Prompts button
 │   ├── theme-manager.ts       # Theme synchronization
 │   └── element-fingerprint.ts # Element fingerprinting
 ├── ui/                         # UI components
 │   ├── element-factory.ts     # Element creation
-│   ├── keyboard-navigation.ts # Keyboard support
 │   └── event-manager.ts       # Event handling
+├── selector/                   # Prompt selector (React, in a shadow root)
+│   ├── controller.ts          # Opens, places and closes the selector
+│   ├── selectorMachine.ts     # State machine and keyboard rules (with selectorKeys.ts)
+│   └── Picker*.tsx            # Popover, tabs, list, variables step
 ├── platforms/                  # Platform-specific strategies
 │   ├── base-strategy.ts       # Abstract base class
 │   ├── claude-strategy.ts     # Claude.ai implementation

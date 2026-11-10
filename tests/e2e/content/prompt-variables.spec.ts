@@ -10,6 +10,7 @@ import type { BrowserContext, Page } from '@playwright/test';
 
 import { DEFAULT_CATEGORY } from '../../../src/types';
 import { type ExtensionStorage, expect, test } from '../fixtures/extension';
+import { promptSelector, promptsButton } from '../fixtures/platform-pages';
 import { createPromptSeed, seedLibrary } from '../utils/storage';
 
 const SIDEPANEL_URL = 'src/sidepanel.html';
@@ -72,12 +73,11 @@ const openMockPlatform = async (context: BrowserContext): Promise<Page> => {
 };
 
 const openSelectorAndPick = async (target: Page, title: string) => {
-  const icon = target.locator('.prompt-library-integrated-icon');
-  await expect(icon).toHaveCount(1);
-  await icon.click();
-  const selector = target.locator('.prompt-library-selector');
+  await expect(promptsButton(target)).toHaveCount(1);
+  await promptsButton(target).click();
+  const selector = promptSelector(target);
   await expect(selector).toBeVisible();
-  await selector.locator('.prompt-item').filter({ hasText: title }).click();
+  await selector.getByRole('option').filter({ hasText: title }).click();
   return selector;
 };
 
@@ -94,20 +94,23 @@ test.describe('Prompt Variables', () => {
     await expect(plainCard.getByTestId('prompt-variables-chip')).toHaveCount(0);
   });
 
-  test('AT5: picking a prompt with variables opens the form, and filling it inserts the filled text', async ({ context, storage }) => {
+  test('AT5: picking a prompt with variables opens the variables step, and filling it inserts the filled text', async ({ context, storage }) => {
     await seed(storage, 'light');
     const target = await openMockPlatform(context);
 
     const selector = await openSelectorAndPick(target, 'Translate a text');
 
-    const form = selector.getByRole('form', { name: 'Fill in variables' });
-    await expect(form).toBeVisible();
-    await expect(form.getByLabel('text', { exact: true })).toBeFocused();
-    await expect(form.getByLabel('language', { exact: true })).toBeVisible();
+    // The Prompt's text, with a field in place of each Variable, named after it
+    await expect(selector.getByRole('heading', { name: 'Translate a text' })).toBeVisible();
+    const text = selector.getByRole('textbox', { name: 'text', exact: true });
+    const language = selector.getByRole('textbox', { name: 'language', exact: true });
+    await expect(text).toBeFocused();
+    await expect(text).toHaveAttribute('placeholder', 'text');
+    await expect(language.first()).toBeVisible();
 
-    await form.getByLabel('text', { exact: true }).fill('the release notes');
-    await form.getByLabel('language', { exact: true }).fill('French');
-    await form.getByLabel('language', { exact: true }).press('Enter');
+    await text.fill('the release notes');
+    await language.first().fill('French');
+    await language.first().press('Enter');
 
     await expect(selector).toHaveCount(0);
     await expect(target.locator('.ProseMirror')).toHaveText(
@@ -115,13 +118,20 @@ test.describe('Prompt Variables', () => {
     );
   });
 
-  test('AT5: Escape in the form inserts the raw text', async ({ context, storage }) => {
+  test('AT5: Escape in the variables step goes back to the list, and inserting with nothing filled in inserts the text as saved', async ({ context, storage }) => {
     await seed(storage, 'light');
     const target = await openMockPlatform(context);
 
     const selector = await openSelectorAndPick(target, 'Translate a text');
-    await expect(selector.getByRole('form', { name: 'Fill in variables' })).toBeVisible();
+    await expect(selector.getByRole('textbox', { name: 'text', exact: true })).toBeFocused();
     await target.keyboard.press('Escape');
+
+    // Back on the list, on the same Prompt; nothing was inserted
+    await expect(selector.getByRole('option', { selected: true })).toContainText('Translate a text');
+    await expect(target.locator('.ProseMirror')).not.toContainText('Translate');
+
+    await target.keyboard.press('Enter');
+    await selector.getByRole('button', { name: /Insert into the chat/ }).click();
 
     await expect(selector).toHaveCount(0);
     await expect(target.locator('.ProseMirror')).toHaveText(translate.content);
@@ -154,9 +164,8 @@ test.describe('Prompt Variables', () => {
       const target = await openMockPlatform(context);
 
       const selector = await openSelectorAndPick(target, 'Translate a text');
-      await expect(selector).toHaveClass(new RegExp(`${theme}-theme`));
-      const form = selector.getByRole('form', { name: 'Fill in variables' });
-      await form.getByLabel('text', { exact: true }).fill('the release notes');
+      await expect(target.locator('#mpm-prompt-selector')).toHaveAttribute('data-theme', theme);
+      await selector.getByRole('textbox', { name: 'text', exact: true }).fill('the release notes');
 
       await target.screenshot({ path: `${SCREENSHOT_DIR}/form-${theme}.png` });
     });

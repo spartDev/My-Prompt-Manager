@@ -61,8 +61,8 @@ test.describe('Content script injector', () => {
     await expect(toolbarButton).toHaveCount(1);
     await toolbarButton.first().click();
 
-    const selector = targetPage.locator('.prompt-library-selector');
+    const selector = targetPage.locator('#mpm-prompt-selector').getByRole('dialog');
     await expect(selector).toBeVisible();
-    await expect(selector.locator('.prompt-item').first()).toContainText('Injected Prompt');
+    await expect(selector.getByRole('option').first()).toContainText('Injected Prompt');
   });
 });

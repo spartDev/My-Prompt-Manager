@@ -49,29 +49,30 @@ vi.mock('../../ui/element-factory', () => {
   // Add static methods
   (MockUIElementFactory as any).convertToAbsolutePositioning = vi.fn();
   (MockUIElementFactory as any).convertToRelativePositioning = vi.fn();
-  return { UIElementFactory: MockUIElementFactory };
+  return { UIElementFactory: MockUIElementFactory, fitPromptsPill: vi.fn() };
 });
 
-vi.mock('../../ui/keyboard-navigation', () => ({
-  KeyboardNavigationManager: vi.fn(function() {
-    return {
-      initialize: vi.fn(),
-      updateItems: vi.fn(),
-      destroy: vi.fn()
-    };
+// The Prompt selector's controller, replaced by a recorder: the injector's part is to wire it
+const selectorMock = vi.hoisted(() => ({
+  instances: [] as { callbacks: any; toggle: any; close: any; destroy: any; isOpen: boolean }[]
+}));
+
+vi.mock('../../selector/controller', () => ({
+  PromptSelectorController: vi.fn(function(callbacks: unknown) {
+    const instance = { callbacks, toggle: vi.fn(), close: vi.fn(), destroy: vi.fn(), isOpen: false };
+    selectorMock.instances.push(instance);
+    return instance;
   })
 }));
 
+vi.mock('../../selector/font', () => ({
+  SELECTOR_FONT_FAMILY: 'MPM Schibsted Grotesk',
+  loadSelectorFont: vi.fn().mockResolvedValue(true)
+}));
+
 vi.mock('../../utils/storage', () => ({
-  getCategoryColors: vi.fn().mockResolvedValue(new Map()),
+  getCategories: vi.fn().mockResolvedValue([]),
   getPrompts: vi.fn().mockResolvedValue([]),
-  createPromptListItem: vi.fn().mockImplementation((prompt, _index, className) => {
-    const item = document.createElement('div');
-    item.className = className;
-    item.dataset.promptId = prompt.id;
-    item.textContent = prompt.title;
-    return item;
-  }),
   isSiteEnabled: vi.fn().mockImplementation((hostname) => {
     // Make sure localhost is enabled for tests
     return Promise.resolve(hostname === 'localhost' || hostname === 'test.com');
@@ -187,6 +188,7 @@ describe('PromptLibraryInjector', () => {
   beforeEach(() => {
     // Reset all mocks
     vi.clearAllMocks();
+    selectorMock.instances.length = 0;
     
     // Create a mock textarea
     mockTextarea = document.createElement('textarea');
@@ -228,135 +230,121 @@ describe('PromptLibraryInjector', () => {
     });
   });
 
-  describe('showPromptSelector', () => {
-    const mockPrompts: Prompt[] = [
-      {
-        id: '1',
-        title: 'Test Prompt 1',
-        content: 'This is test content 1',
-        category: 'Test',
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        usageCount: 0,
-        lastUsedAt: Date.now()
-      },
-      {
-        id: '2',
-        title: 'Test Prompt 2',
-        content: 'This is test content 2',
-        category: 'Test',
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        usageCount: 0,
-        lastUsedAt: Date.now()
-      }
-    ];
+  describe('Prompt selector wiring', () => {
+    const prompt: Prompt = {
+      id: 'track1', title: 'Track Me', content: 'Track content', category: 'Tracking',
+      createdAt: 1, updatedAt: 1, usageCount: 0, lastUsedAt: 1
+    };
+    const selector = () => selectorMock.instances[0];
+    const platformManager = async () => {
+      const { PlatformInsertionManager } = await import('../insertion-manager');
+      return (PlatformInsertionManager as any).mock.results.at(-1).value;
+    };
 
-    beforeEach(async () => {
-      const { getPrompts } = await import('../../utils/storage');
-      (getPrompts as any).mockResolvedValue(mockPrompts);
+    it('creates one controller for the injector', () => {
+      expect(selectorMock.instances).toHaveLength(1);
     });
 
-    it('should create and display prompt selector', async () => {
-      await injector.showPromptSelector(mockTextarea);
-      
-      const selector = document.querySelector('.prompt-library-selector');
-      expect(selector).toBeTruthy();
+    it('showPromptSelector toggles the selector over the input field, with the Prompts button', async () => {
+      await injector.initialize();
+      await new Promise(resolve => setTimeout(resolve, 50));
+      const icon = (injector as any).state.icon;
+
+      injector.showPromptSelector(mockTextarea);
+
+      expect(selector().toggle).toHaveBeenCalledWith(mockTextarea, icon);
     });
 
-    it('should retrieve prompts from storage', async () => {
-      const { getPrompts } = await import('../../utils/storage');
-      await injector.showPromptSelector(mockTextarea);
+    it('the Prompts button toggles the selector when clicked', async () => {
+      await injector.initialize();
+      await new Promise(resolve => setTimeout(resolve, 50));
 
-      expect(getPrompts).toHaveBeenCalled();
+      const { EventManager } = await import('../../ui/event-manager');
+      const eventManagerInstance = (EventManager as any).mock.results.at(-1).value;
+      const click = eventManagerInstance.addTrackedEventListener.mock.calls.find((call: any[]) => call[1] === 'click');
+      expect(click).toBeDefined();
+
+      const event = new Event('click', { cancelable: true });
+      click[2](event);
+
+      expect(event.defaultPrevented).toBe(true);
+      expect(selector().toggle).toHaveBeenCalledTimes(1);
     });
 
-    it('should create prompt items for each prompt', async () => {
-      const { createPromptListItem } = await import('../../utils/storage');
-      await injector.showPromptSelector(mockTextarea);
+    it('reads the Prompts and the Categories each time the selector opens', async () => {
+      const { getPrompts, getCategories } = await import('../../utils/storage');
+      vi.mocked(getPrompts).mockResolvedValue([prompt]);
+      vi.mocked(getCategories).mockResolvedValue([{ name: 'Tracking', color: '#2563EB' }]);
 
-      expect(createPromptListItem).toHaveBeenCalledTimes(mockPrompts.length);
+      expect(await selector().callbacks.loadLibrary()).toEqual({ prompts: [prompt], categories: [{ name: 'Tracking', color: '#2563EB' }] });
     });
 
-    it('should initialize keyboard navigation', async () => {
-      const { KeyboardNavigationManager } = await import('../../ui/keyboard-navigation');
-      await injector.showPromptSelector(mockTextarea);
-      
-      expect(KeyboardNavigationManager).toHaveBeenCalled();
+    it('inserts the chosen Prompt through the Platform, with the content the selector gives', async () => {
+      await selector().callbacks.insert(prompt, 'Filled content', mockTextarea);
+
+      expect((await platformManager()).insertPrompt).toHaveBeenCalledWith(mockTextarea, 'Filled content');
     });
 
-    it('should handle empty prompts array', async () => {
-      const { getPrompts } = await import('../../utils/storage');
-      (getPrompts as any).mockResolvedValue([]);
-      
-      await injector.showPromptSelector(mockTextarea);
-      
-      const selector = document.querySelector('.prompt-library-selector');
-      expect(selector).toBeTruthy();
-      
-      const noPrompts = selector?.querySelector('.no-prompts');
-      expect(noPrompts).toBeTruthy();
-    });
+    it('reports the use after a successful insertion', async () => {
+      vi.mocked(chrome.runtime.sendMessage).mockResolvedValue(undefined);
 
-    describe('Pinned Prompts', () => {
-      const makePrompt = (id: string, pinned?: boolean): Prompt => ({
-        id,
-        title: `Prompt ${id}`,
-        content: `Content ${id}`,
-        category: 'Test',
-        createdAt: 1,
-        updatedAt: 1,
-        usageCount: 0,
-        lastUsedAt: 1,
-        ...(pinned === undefined ? {} : { pinned })
-      });
+      await selector().callbacks.insert(prompt, prompt.content, mockTextarea);
 
-      const listedIds = () =>
-        Array.from(document.querySelectorAll<HTMLElement>('.prompt-library-selector .prompt-list [data-prompt-id]'))
-          .map(item => item.dataset.promptId);
-
-      beforeEach(async () => {
-        const { getPrompts } = await import('../../utils/storage');
-        (getPrompts as any).mockResolvedValue([
-          makePrompt('a'),
-          makePrompt('b', true),
-          makePrompt('c', false),
-          makePrompt('d', true),
-          makePrompt('e')
-        ]);
-      });
-
-      it('lists Pinned Prompts first, keeping storage order within each group', async () => {
-        await injector.showPromptSelector(mockTextarea);
-
-        expect(listedIds()).toEqual(['b', 'd', 'a', 'c', 'e']);
-      });
-
-      it('keeps Pinned Prompts first in search results', async () => {
-        const { EventManager } = await import('../../ui/event-manager');
-        await injector.showPromptSelector(mockTextarea);
-
-        const eventManager = (EventManager as any).mock.results.at(-1).value;
-        const searchCall = eventManager.addTrackedEventListener.mock.calls.find(
-          ([element, type]: [Element, string]) => type === 'input' && element.classList.contains('search-input')
-        );
-        const searchInput = searchCall[0] as HTMLInputElement;
-        searchInput.value = 'Content';
-        searchCall[2]({ target: searchInput });
-
-        expect(listedIds()).toEqual(['b', 'd', 'a', 'c', 'e']);
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+        type: 'PROMPT_USAGE_INCREMENT',
+        data: { promptId: 'track1', platform: 'localhost', categoryId: 'Tracking' }
       });
     });
 
-    it('should handle storage errors gracefully', async () => {
-      const { getPrompts } = await import('../../utils/storage');
+    it('reports no use when the insertion fails', async () => {
+      (await platformManager()).insertPrompt.mockResolvedValue({ success: false, error: 'nope' });
+      vi.mocked(chrome.runtime.sendMessage).mockClear();
+
+      await selector().callbacks.insert(prompt, prompt.content, mockTextarea);
+
+      expect(chrome.runtime.sendMessage).not.toHaveBeenCalled();
       const Logger = await import('../../utils/logger');
+      expect(Logger.warn).toHaveBeenCalledWith('[CONTENT] Prompt insertion reported failure', { promptId: 'track1', error: 'nope' });
+    });
 
-      (getPrompts as any).mockRejectedValue(new Error('Storage error'));
+    it('does not throw when the insertion throws', async () => {
+      (await platformManager()).insertPrompt.mockRejectedValue(new Error('boom'));
 
-      await injector.showPromptSelector(mockTextarea);
+      await expect(selector().callbacks.insert(prompt, prompt.content, mockTextarea)).resolves.toBeUndefined();
+    });
 
-      expect(Logger.error).toHaveBeenCalled();
+    it('does not throw when the use cannot be reported', async () => {
+      vi.mocked(chrome.runtime.sendMessage).mockRejectedValue(new Error('Extension context invalidated'));
+
+      await selector().callbacks.insert(prompt, prompt.content, mockTextarea);
+
+      const Logger = await import('../../utils/logger');
+      expect(Logger.debug).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to report prompt usage'),
+        expect.any(Object)
+      );
+    });
+
+    it('the Prompts button says whether the selector is open', () => {
+      const button = document.createElement('button');
+      const wrapped = document.createElement('div');
+      const inner = document.createElement('button');
+      wrapped.appendChild(inner);
+
+      selector().callbacks.onOpenChange(true, button);
+      selector().callbacks.onOpenChange(true, wrapped);
+      expect(button.getAttribute('aria-expanded')).toBe('true');
+      expect(inner.getAttribute('aria-expanded')).toBe('true');
+
+      selector().callbacks.onOpenChange(false, button);
+      expect(button.getAttribute('aria-expanded')).toBe('false');
+      expect(() => selector().callbacks.onOpenChange(false, null)).not.toThrow();
+    });
+
+    it('removes the selector on cleanup', () => {
+      injector.cleanup();
+
+      expect(selector().destroy).toHaveBeenCalled();
     });
   });
 
@@ -399,44 +387,6 @@ describe('PromptLibraryInjector', () => {
   });
 
 
-
-  describe('accessibility', () => {
-    it('should create accessible prompt selector through public API', async () => {
-      const mockPrompts: Prompt[] = [
-        {
-          id: '1',
-          title: 'Test Prompt',
-          content: 'Test content',
-          category: 'Test',
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-          usageCount: 0,
-          lastUsedAt: Date.now()
-        }
-      ];
-
-      const { getPrompts } = await import('../../utils/storage');
-      vi.mocked(getPrompts).mockResolvedValue(mockPrompts);
-
-      await injector.showPromptSelector(mockTextarea);
-
-      const selector = document.querySelector('.prompt-library-selector');
-      expect(selector?.getAttribute('role')).toBe('dialog');
-      expect(selector?.getAttribute('aria-modal')).toBe('true');
-      expect(selector?.getAttribute('aria-labelledby')).toBe('prompt-selector-title');
-    });
-
-    it('should create accessible prompt list through public API', async () => {
-      const { getPrompts } = await import('../../utils/storage');
-      vi.mocked(getPrompts).mockResolvedValue([]);
-
-      await injector.showPromptSelector(mockTextarea);
-
-      const selector = document.querySelector('.prompt-library-selector');
-      const promptList = selector?.querySelector('.prompt-list');
-      expect(promptList?.getAttribute('role')).toBe('listbox');
-    });
-  });
 
   describe('initialize - full lifecycle', () => {
     it('should set up message listener and initialize for enabled site', async () => {
@@ -734,119 +684,10 @@ describe('PromptLibraryInjector', () => {
     });
   });
 
-  describe('prompt selector UI creation', () => {
-    const mockPrompts: Prompt[] = [
-      {
-        id: '1',
-        title: 'Test Prompt 1',
-        content: 'Content 1',
-        category: 'Category A',
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        usageCount: 0,
-        lastUsedAt: Date.now()
-      },
-      {
-        id: '2',
-        title: 'Test Prompt 2',
-        content: 'Content 2',
-        category: 'Category B',
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        usageCount: 0,
-        lastUsedAt: Date.now()
-      }
-    ];
-
-    it('should create header with title and close button', async () => {
-      const { getPrompts } = await import('../../utils/storage');
-      vi.mocked(getPrompts).mockResolvedValue(mockPrompts);
-
-      await injector.showPromptSelector(mockTextarea);
-
-      const selector = document.querySelector('.prompt-library-selector');
-      const title = selector?.querySelector('#prompt-selector-title');
-      expect(title?.textContent).toBe('Select a Prompt');
-
-      const closeButton = selector?.querySelector('.close-selector');
-      expect(closeButton).toBeTruthy();
-      expect(closeButton?.getAttribute('aria-label')).toBe('Close prompt selector');
-    });
-
-    it('should create search input', async () => {
-      const { getPrompts } = await import('../../utils/storage');
-      vi.mocked(getPrompts).mockResolvedValue(mockPrompts);
-
-      await injector.showPromptSelector(mockTextarea);
-
-      const selector = document.querySelector('.prompt-library-selector');
-      const searchInput = selector?.querySelector('.search-input') as HTMLInputElement;
-      expect(searchInput).toBeTruthy();
-      expect(searchInput?.placeholder).toBe('Search prompts...');
-      expect(searchInput?.getAttribute('autocomplete')).toBe('off');
-    });
-
-    it('should close existing selector when showing a new one', async () => {
-      const { getPrompts } = await import('../../utils/storage');
-      vi.mocked(getPrompts).mockResolvedValue(mockPrompts);
-
-      // Show first selector
-      await injector.showPromptSelector(mockTextarea);
-      const firstSelector = document.querySelector('.prompt-library-selector');
-      expect(firstSelector).toBeTruthy();
-
-      // Show second selector - first should be removed
-      await injector.showPromptSelector(mockTextarea);
-      const selectors = document.querySelectorAll('.prompt-library-selector');
-      expect(selectors.length).toBe(1);
-    });
-
-    it('should display no-prompts message for empty filtered results', async () => {
-      const { getPrompts } = await import('../../utils/storage');
-      vi.mocked(getPrompts).mockResolvedValue(mockPrompts);
-
-      await injector.showPromptSelector(mockTextarea);
-
-      const selector = document.querySelector('.prompt-library-selector');
-      const searchInput = selector?.querySelector('.search-input') as HTMLInputElement;
-
-      // Simulate search with no results
-      if (searchInput) {
-        searchInput.value = 'nonexistent query xyz';
-        const inputEvent = new Event('input', { bubbles: true });
-        Object.defineProperty(inputEvent, 'target', { value: searchInput });
-        searchInput.dispatchEvent(inputEvent);
-      }
-
-      // Wait a tick for event handler
-      await new Promise(resolve => setTimeout(resolve, 10));
-
-      // Verify selector was created and search input exists
-      expect(selector).toBeTruthy();
-      expect(searchInput).toBeTruthy();
-    });
-  });
-
   describe('cleanup - full lifecycle', () => {
     it('should clean up after initialization', async () => {
       await injector.initialize();
       expect(() => injector.cleanup()).not.toThrow();
-    });
-
-    it('should clean up DOM elements created during showPromptSelector', async () => {
-      const { getPrompts } = await import('../../utils/storage');
-      vi.mocked(getPrompts).mockResolvedValue([{
-        id: '1', title: 'Test', content: 'Content', category: 'Test',
-        createdAt: Date.now(), updatedAt: Date.now(), usageCount: 0, lastUsedAt: Date.now()
-      }]);
-
-      await injector.showPromptSelector(mockTextarea);
-      expect(document.querySelector('.prompt-library-selector')).toBeTruthy();
-
-      injector.cleanup();
-
-      // Selector should be removed from DOM after cleanup
-      expect(document.querySelector('.prompt-library-selector')).toBeNull();
     });
 
     it('should disconnect mutation observer during cleanup', async () => {
@@ -935,102 +776,6 @@ describe('PromptLibraryInjector', () => {
     });
   });
 
-  describe('prompt selector positioning', () => {
-    it('should position selector below textarea when space is available', async () => {
-      const { getPrompts } = await import('../../utils/storage');
-      vi.mocked(getPrompts).mockResolvedValue([{
-        id: '1', title: 'Test', content: 'Content', category: 'Test',
-        createdAt: Date.now(), updatedAt: Date.now(), usageCount: 0, lastUsedAt: Date.now()
-      }]);
-
-      // Textarea at top of viewport - plenty of space below
-      mockTextarea.getBoundingClientRect = vi.fn().mockReturnValue({
-        top: 50, left: 50, right: 250, bottom: 100, width: 200, height: 50
-      });
-
-      await injector.showPromptSelector(mockTextarea);
-
-      const selector = document.querySelector('.prompt-library-selector');
-      expect(selector).toBeTruthy();
-      expect((selector as HTMLElement)?.style.position).toBe('absolute');
-    });
-
-    it('should handle small viewport widths for mobile', async () => {
-      const { getPrompts } = await import('../../utils/storage');
-      vi.mocked(getPrompts).mockResolvedValue([{
-        id: '1', title: 'Test', content: 'Content', category: 'Test',
-        createdAt: Date.now(), updatedAt: Date.now(), usageCount: 0, lastUsedAt: Date.now()
-      }]);
-
-      // Simulate small viewport
-      Object.defineProperty(window, 'innerWidth', { value: 400, writable: true });
-      Object.defineProperty(window, 'innerHeight', { value: 600, writable: true });
-
-      await injector.showPromptSelector(mockTextarea);
-
-      const selector = document.querySelector('.prompt-library-selector');
-      expect(selector).toBeTruthy();
-
-      // Restore
-      Object.defineProperty(window, 'innerWidth', { value: 1024, writable: true });
-      Object.defineProperty(window, 'innerHeight', { value: 768, writable: true });
-    });
-  });
-
-  describe('prompt insertion via selector', () => {
-    const mockPrompts: Prompt[] = [
-      {
-        id: 'p1',
-        title: 'Insertable Prompt',
-        content: 'Hello, this is a prompt.',
-        category: 'Test',
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        usageCount: 0,
-        lastUsedAt: Date.now()
-      }
-    ];
-
-    it('should insert prompt on item click and close selector', async () => {
-      const { getPrompts, createPromptListItem } = await import('../../utils/storage');
-      vi.mocked(getPrompts).mockResolvedValue(mockPrompts);
-
-      // Make createPromptListItem return a clickable element
-      vi.mocked(createPromptListItem).mockImplementation((prompt, _index, className) => {
-        const item = document.createElement('div');
-        item.className = className ?? '';
-        item.dataset.promptId = prompt.id;
-        item.textContent = prompt.title;
-        return item;
-      });
-
-      await injector.showPromptSelector(mockTextarea);
-
-      const selector = document.querySelector('.prompt-library-selector');
-      expect(selector).toBeTruthy();
-
-      // The prompt items should exist in the DOM
-      const items = selector?.querySelectorAll('.prompt-item');
-      expect(items?.length).toBe(1);
-    });
-
-    it('should close selector when close button is clicked', async () => {
-      const { getPrompts } = await import('../../utils/storage');
-      vi.mocked(getPrompts).mockResolvedValue(mockPrompts);
-
-      await injector.showPromptSelector(mockTextarea);
-
-      const selector = document.querySelector('.prompt-library-selector');
-      expect(selector).toBeTruthy();
-
-      // The close button event is set up via addTrackedEventListener mock
-      // Verify it was set up
-      const { EventManager } = await import('../../ui/event-manager');
-      const eventManagerInstance = (EventManager as any).mock.results[0].value;
-      expect(eventManagerInstance.addTrackedEventListener).toHaveBeenCalled();
-    });
-  });
-
   describe('icon injection and detection', () => {
     it('should inject icon when textarea is detected during initialize', async () => {
       const { PlatformInsertionManager } = await import('../insertion-manager');
@@ -1078,134 +823,6 @@ describe('PromptLibraryInjector', () => {
       // the icon should be positioned with floating fallback.
       // Verify no errors occurred during the process.
       expect(Logger.error).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('search/filter functionality', () => {
-    const searchPrompts: Prompt[] = [
-      {
-        id: '1', title: 'React Hooks Guide', content: 'Use hooks for state', category: 'React',
-        createdAt: Date.now(), updatedAt: Date.now(), usageCount: 0, lastUsedAt: Date.now()
-      },
-      {
-        id: '2', title: 'Vue Composables', content: 'Composition API usage', category: 'Vue',
-        createdAt: Date.now(), updatedAt: Date.now(), usageCount: 0, lastUsedAt: Date.now()
-      },
-      {
-        id: '3', title: 'Angular Signals', content: 'Signal-based reactivity', category: 'Angular',
-        createdAt: Date.now(), updatedAt: Date.now(), usageCount: 0, lastUsedAt: Date.now()
-      }
-    ];
-
-    it('should filter prompts by title via search input', async () => {
-      const { getPrompts } = await import('../../utils/storage');
-      vi.mocked(getPrompts).mockResolvedValue(searchPrompts);
-
-      await injector.showPromptSelector(mockTextarea);
-
-      const selector = document.querySelector('.prompt-library-selector');
-      const searchInput = selector?.querySelector('.search-input') as HTMLInputElement;
-
-      expect(searchInput).toBeTruthy();
-
-      // Verify that the EventManager was called to add an input listener on the search input
-      const { EventManager } = await import('../../ui/event-manager');
-      const eventManagerInstance = (EventManager as any).mock.results[0].value;
-      const inputListenerCalls = eventManagerInstance.addTrackedEventListener.mock.calls.filter(
-        (call: any[]) => call[1] === 'input'
-      );
-      expect(inputListenerCalls.length).toBeGreaterThan(0);
-    });
-
-    it('should show no-prompts message when search matches nothing', async () => {
-      const { getPrompts } = await import('../../utils/storage');
-      vi.mocked(getPrompts).mockResolvedValue(searchPrompts);
-
-      await injector.showPromptSelector(mockTextarea);
-
-      // Get the event manager's addTrackedEventListener calls
-      const { EventManager } = await import('../../ui/event-manager');
-      const eventManagerInstance = (EventManager as any).mock.results[0].value;
-
-      // Find the input handler that was registered
-      const inputCalls = eventManagerInstance.addTrackedEventListener.mock.calls.filter(
-        (call: any[]) => call[1] === 'input'
-      );
-
-      expect(inputCalls.length).toBeGreaterThan(0);
-
-      // Simulate the input event by calling the handler directly
-      const handler = inputCalls[0][2];
-      const mockEvent = { target: { value: 'zzzzzznothing' } };
-      Object.setPrototypeOf(mockEvent.target, HTMLInputElement.prototype);
-      handler(mockEvent);
-
-      // Check that no-prompts message appeared
-      const selector = document.querySelector('.prompt-library-selector');
-      const noPrompts = selector?.querySelector('.no-prompts');
-      expect(noPrompts).toBeTruthy();
-      expect(noPrompts?.textContent).toBe('No matching prompts found.');
-    });
-
-    it('should filter prompts by content and category', async () => {
-      const { getPrompts, createPromptListItem } = await import('../../utils/storage');
-      vi.mocked(getPrompts).mockResolvedValue(searchPrompts);
-
-      await injector.showPromptSelector(mockTextarea);
-
-      const { EventManager } = await import('../../ui/event-manager');
-      const eventManagerInstance = (EventManager as any).mock.results[0].value;
-
-      const inputCalls = eventManagerInstance.addTrackedEventListener.mock.calls.filter(
-        (call: any[]) => call[1] === 'input'
-      );
-
-      expect(inputCalls.length).toBeGreaterThan(0);
-
-      const handler = inputCalls[0][2];
-
-      // Search by category
-      const mockEvent = { target: { value: 'Vue' } };
-      Object.setPrototypeOf(mockEvent.target, HTMLInputElement.prototype);
-      handler(mockEvent);
-
-      // Should have called createPromptListItem for the matching prompt; no Category color was
-      // loaded, so its color argument is undefined
-      expect(createPromptListItem).toHaveBeenCalledWith(
-        expect.objectContaining({ id: '2', category: 'Vue' }),
-        0,
-        'filtered-prompt-item',
-        undefined
-      );
-    });
-
-    it('should update keyboard navigation after filtering', async () => {
-      const { getPrompts } = await import('../../utils/storage');
-      vi.mocked(getPrompts).mockResolvedValue(searchPrompts);
-
-      await injector.showPromptSelector(mockTextarea);
-
-      const { EventManager } = await import('../../ui/event-manager');
-      const eventManagerInstance = (EventManager as any).mock.results[0].value;
-
-      const inputCalls = eventManagerInstance.addTrackedEventListener.mock.calls.filter(
-        (call: any[]) => call[1] === 'input'
-      );
-
-      expect(inputCalls.length).toBeGreaterThan(0);
-
-      const handler = inputCalls[0][2];
-      const mockEvent = { target: { value: 'React' } };
-      Object.setPrototypeOf(mockEvent.target, HTMLInputElement.prototype);
-      handler(mockEvent);
-
-      // The keyboard navigation's updateItems should be called
-      const { KeyboardNavigationManager } = await import('../../ui/keyboard-navigation');
-      const kbNavInstance = (KeyboardNavigationManager as any).mock.results[
-        (KeyboardNavigationManager as any).mock.results.length - 1
-      ]?.value;
-      expect(kbNavInstance).toBeTruthy();
-      expect(kbNavInstance.updateItems).toHaveBeenCalled();
     });
   });
 
@@ -1421,201 +1038,6 @@ describe('PromptLibraryInjector', () => {
     });
   });
 
-  describe('prompt selection and insertion', () => {
-    const prompts: Prompt[] = [
-      {
-        id: 'p1', title: 'Test Prompt', content: 'Hello world', category: 'Test',
-        createdAt: Date.now(), updatedAt: Date.now(), usageCount: 0, lastUsedAt: Date.now()
-      }
-    ];
-
-    it('should set up click handlers on prompt items', async () => {
-      const { getPrompts } = await import('../../utils/storage');
-      vi.mocked(getPrompts).mockResolvedValue(prompts);
-
-      await injector.showPromptSelector(mockTextarea);
-
-      // Verify event listeners were set up for prompt items
-      const { EventManager } = await import('../../ui/event-manager');
-      const eventManagerInstance = (EventManager as any).mock.results[0].value;
-      const clickCalls = eventManagerInstance.addTrackedEventListener.mock.calls.filter(
-        (call: any[]) => call[1] === 'click'
-      );
-      // At minimum: icon click + close button click + prompt item click
-      expect(clickCalls.length).toBeGreaterThanOrEqual(1);
-    });
-
-    it('should set up outside click handler for closing selector', async () => {
-      const { getPrompts } = await import('../../utils/storage');
-      vi.mocked(getPrompts).mockResolvedValue(prompts);
-
-      await injector.showPromptSelector(mockTextarea);
-
-      // Wait for the setTimeout in setupPromptSelectorEvents
-      await new Promise(resolve => setTimeout(resolve, 150));
-
-      // Verify that a click handler was added to document
-      const { EventManager } = await import('../../ui/event-manager');
-      const eventManagerInstance = (EventManager as any).mock.results[0].value;
-      const documentClickCalls = eventManagerInstance.addTrackedEventListener.mock.calls.filter(
-        (call: any[]) => call[0] === document && call[1] === 'click'
-      );
-      expect(documentClickCalls.length).toBeGreaterThanOrEqual(1);
-    });
-
-    it('should set up scroll and resize handlers for repositioning', async () => {
-      const { getPrompts } = await import('../../utils/storage');
-      vi.mocked(getPrompts).mockResolvedValue(prompts);
-
-      await injector.showPromptSelector(mockTextarea);
-
-      const { EventManager } = await import('../../ui/event-manager');
-      const eventManagerInstance = (EventManager as any).mock.results[0].value;
-
-      const scrollCalls = eventManagerInstance.addTrackedEventListener.mock.calls.filter(
-        (call: any[]) => call[0] === window && call[1] === 'scroll'
-      );
-      const resizeCalls = eventManagerInstance.addTrackedEventListener.mock.calls.filter(
-        (call: any[]) => call[0] === window && call[1] === 'resize'
-      );
-
-      expect(scrollCalls.length).toBeGreaterThanOrEqual(1);
-      expect(resizeCalls.length).toBeGreaterThanOrEqual(1);
-    });
-  });
-
-  describe('prompt selector event handling', () => {
-    const prompts: Prompt[] = [
-      {
-        id: 'p1', title: 'Click Me', content: 'Clicked content', category: 'Test',
-        createdAt: Date.now(), updatedAt: Date.now(), usageCount: 0, lastUsedAt: Date.now()
-      }
-    ];
-
-    it('should call insertPrompt via event handler when prompt item is clicked', async () => {
-      const { getPrompts } = await import('../../utils/storage');
-      vi.mocked(getPrompts).mockResolvedValue(prompts);
-
-      await injector.showPromptSelector(mockTextarea);
-
-      // Find the click handler for the prompt item
-      const { EventManager } = await import('../../ui/event-manager');
-      const eventManagerInstance = (EventManager as any).mock.results[0].value;
-
-      // Find click handlers that were attached to elements with prompt IDs
-      const clickCalls = eventManagerInstance.addTrackedEventListener.mock.calls.filter(
-        (call: any[]) => {
-          const el = call[0] as HTMLElement;
-          return call[1] === 'click' && el?.dataset?.promptId;
-        }
-      );
-
-      expect(clickCalls.length).toBeGreaterThan(0);
-
-      // Simulate clicking the prompt item
-      const clickHandler = clickCalls[0][2];
-      clickHandler(new Event('click'));
-
-      // Wait for async insertion
-      await new Promise(resolve => setTimeout(resolve, 50));
-
-      // The platformManager's insertPrompt should have been called
-      const { PlatformInsertionManager } = await import('../insertion-manager');
-      const pmInstance = (PlatformInsertionManager as any).mock.results[0].value;
-      expect(pmInstance.insertPrompt).toHaveBeenCalledWith(mockTextarea, 'Clicked content');
-    });
-
-    it('should close selector after successful prompt insertion', async () => {
-      const { getPrompts } = await import('../../utils/storage');
-      vi.mocked(getPrompts).mockResolvedValue(prompts);
-
-      await injector.showPromptSelector(mockTextarea);
-      expect(document.querySelector('.prompt-library-selector')).toBeTruthy();
-
-      // Find and trigger prompt item click
-      const { EventManager } = await import('../../ui/event-manager');
-      const eventManagerInstance = (EventManager as any).mock.results[0].value;
-      const clickCalls = eventManagerInstance.addTrackedEventListener.mock.calls.filter(
-        (call: any[]) => {
-          const el = call[0] as HTMLElement;
-          return call[1] === 'click' && el?.dataset?.promptId;
-        }
-      );
-
-      expect(clickCalls.length).toBeGreaterThan(0);
-
-      clickCalls[0][2](new Event('click'));
-      await new Promise(resolve => setTimeout(resolve, 50));
-
-      // Selector should be removed after insertion
-      expect(document.querySelector('.prompt-library-selector')).toBeNull();
-    });
-
-    it('should handle insertion failure gracefully', async () => {
-      const { getPrompts } = await import('../../utils/storage');
-      const { PlatformInsertionManager } = await import('../insertion-manager');
-      const Logger = await import('../../utils/logger');
-
-      vi.mocked(getPrompts).mockResolvedValue(prompts);
-
-      // Make insertPrompt return failure
-      const pmInstance = (PlatformInsertionManager as any).mock.results[0].value;
-      pmInstance.insertPrompt.mockResolvedValue({ success: false, error: 'Target not found' });
-
-      await injector.showPromptSelector(mockTextarea);
-
-      const { EventManager } = await import('../../ui/event-manager');
-      const eventManagerInstance = (EventManager as any).mock.results[0].value;
-      const clickCalls = eventManagerInstance.addTrackedEventListener.mock.calls.filter(
-        (call: any[]) => {
-          const el = call[0] as HTMLElement;
-          return call[1] === 'click' && el?.dataset?.promptId;
-        }
-      );
-
-      expect(clickCalls.length).toBeGreaterThan(0);
-
-      clickCalls[0][2](new Event('click'));
-      await new Promise(resolve => setTimeout(resolve, 50));
-
-      // Should have logged a warning
-      expect(Logger.warn).toHaveBeenCalledWith(
-        expect.stringContaining('insertion reported failure'),
-        expect.any(Object)
-      );
-    });
-
-    it('should handle insertPrompt throwing an error', async () => {
-      const { getPrompts } = await import('../../utils/storage');
-      const { PlatformInsertionManager } = await import('../insertion-manager');
-
-      vi.mocked(getPrompts).mockResolvedValue(prompts);
-
-      // Make insertPrompt throw
-      const pmInstance = (PlatformInsertionManager as any).mock.results[0].value;
-      pmInstance.insertPrompt.mockRejectedValue(new Error('Unexpected error'));
-
-      await injector.showPromptSelector(mockTextarea);
-
-      const { EventManager } = await import('../../ui/event-manager');
-      const eventManagerInstance = (EventManager as any).mock.results[0].value;
-      const clickCalls = eventManagerInstance.addTrackedEventListener.mock.calls.filter(
-        (call: any[]) => {
-          const el = call[0] as HTMLElement;
-          return call[1] === 'click' && el?.dataset?.promptId;
-        }
-      );
-
-      expect(clickCalls.length).toBeGreaterThan(0);
-
-      clickCalls[0][2](new Event('click'));
-      await new Promise(resolve => setTimeout(resolve, 50));
-
-      // Should still close the selector
-      expect(document.querySelector('.prompt-library-selector')).toBeNull();
-    });
-  });
-
   describe('icon click handler', () => {
     it('should set up click handler on icon after injection', async () => {
       await injector.initialize();
@@ -1663,35 +1085,6 @@ describe('PromptLibraryInjector', () => {
       // No error should have occurred
       const Logger = await import('../../utils/logger');
       expect(Logger.error).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('close button interaction', () => {
-    it('should close selector when close button handler fires', async () => {
-      const { getPrompts } = await import('../../utils/storage');
-      vi.mocked(getPrompts).mockResolvedValue([{
-        id: '1', title: 'Test', content: 'Content', category: 'Test',
-        createdAt: Date.now(), updatedAt: Date.now(), usageCount: 0, lastUsedAt: Date.now()
-      }]);
-
-      await injector.showPromptSelector(mockTextarea);
-      expect(document.querySelector('.prompt-library-selector')).toBeTruthy();
-
-      // Find the close button click handler
-      const { EventManager } = await import('../../ui/event-manager');
-      const eventManagerInstance = (EventManager as any).mock.results[0].value;
-
-      const closeClickCalls = eventManagerInstance.addTrackedEventListener.mock.calls.filter(
-        (call: any[]) => {
-          const el = call[0] as HTMLElement;
-          return call[1] === 'click' && el?.classList?.contains('close-selector');
-        }
-      );
-
-      expect(closeClickCalls.length).toBeGreaterThan(0);
-
-      closeClickCalls[0][2](new Event('click'));
-      expect(document.querySelector('.prompt-library-selector')).toBeNull();
     });
   });
 
@@ -1777,134 +1170,6 @@ describe('PromptLibraryInjector', () => {
           } as any;
         } as any);
       }
-    });
-  });
-
-  describe('outside click handler', () => {
-    it('should register a document click handler for outside clicks', async () => {
-      const { getPrompts } = await import('../../utils/storage');
-      vi.mocked(getPrompts).mockResolvedValue([{
-        id: '1', title: 'Test', content: 'Content', category: 'Test',
-        createdAt: Date.now(), updatedAt: Date.now(), usageCount: 0, lastUsedAt: Date.now()
-      }]);
-
-      await injector.showPromptSelector(mockTextarea);
-      expect(document.querySelector('.prompt-library-selector')).toBeTruthy();
-
-      // Wait for the outside click handler to be set up (it has a 100ms setTimeout)
-      await new Promise(resolve => setTimeout(resolve, 150));
-
-      const { EventManager } = await import('../../ui/event-manager');
-      const allResults = (EventManager as any).mock.results;
-      const eventManagerInstance = allResults[allResults.length - 1].value;
-
-      // Find the document click handler (the outside click handler)
-      const docClickCalls = eventManagerInstance.addTrackedEventListener.mock.calls.filter(
-        (call: any[]) => call[0] === document && call[1] === 'click'
-      );
-
-      // A document-level click handler should have been registered
-      expect(docClickCalls.length).toBeGreaterThanOrEqual(1);
-    });
-
-    it('should set up outside click handler with proper element checking', async () => {
-      const { getPrompts } = await import('../../utils/storage');
-      vi.mocked(getPrompts).mockResolvedValue([{
-        id: '1', title: 'Test', content: 'Content', category: 'Test',
-        createdAt: Date.now(), updatedAt: Date.now(), usageCount: 0, lastUsedAt: Date.now()
-      }]);
-
-      await injector.showPromptSelector(mockTextarea);
-      await new Promise(resolve => setTimeout(resolve, 150));
-
-      const { EventManager } = await import('../../ui/event-manager');
-      const allResults = (EventManager as any).mock.results;
-      const eventManagerInstance = allResults[allResults.length - 1].value;
-
-      const docClickCalls = eventManagerInstance.addTrackedEventListener.mock.calls.filter(
-        (call: any[]) => call[0] === document && call[1] === 'click'
-      );
-
-      // Verify the handler was registered (it performs instanceof HTMLElement check internally)
-      expect(docClickCalls.length).toBeGreaterThanOrEqual(1);
-    });
-  });
-
-  describe('prompt usage tracking', () => {
-    it('should send PROMPT_USAGE_INCREMENT message after successful insertion', async () => {
-      const prompts: Prompt[] = [{
-        id: 'track1', title: 'Track Me', content: 'Track content', category: 'Tracking',
-        createdAt: Date.now(), updatedAt: Date.now(), usageCount: 0, lastUsedAt: Date.now()
-      }];
-
-      const { getPrompts } = await import('../../utils/storage');
-      vi.mocked(getPrompts).mockResolvedValue(prompts);
-
-      // Setup chrome.runtime.sendMessage to resolve
-      vi.mocked(chrome.runtime.sendMessage).mockResolvedValue(undefined);
-
-      await injector.showPromptSelector(mockTextarea);
-
-      const { EventManager } = await import('../../ui/event-manager');
-      const eventManagerInstance = (EventManager as any).mock.results[0].value;
-
-      const clickCalls = eventManagerInstance.addTrackedEventListener.mock.calls.filter(
-        (call: any[]) => {
-          const el = call[0] as HTMLElement;
-          return call[1] === 'click' && el?.dataset?.promptId === 'track1';
-        }
-      );
-
-      expect(clickCalls.length).toBeGreaterThan(0);
-
-      clickCalls[0][2](new Event('click'));
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'PROMPT_USAGE_INCREMENT',
-          data: expect.objectContaining({
-            promptId: 'track1'
-          })
-        })
-      );
-    });
-
-    it('should handle sendMessage failure gracefully', async () => {
-      const prompts: Prompt[] = [{
-        id: 'track2', title: 'Track Me 2', content: 'Track content 2', category: 'Tracking',
-        createdAt: Date.now(), updatedAt: Date.now(), usageCount: 0, lastUsedAt: Date.now()
-      }];
-
-      const { getPrompts } = await import('../../utils/storage');
-      vi.mocked(getPrompts).mockResolvedValue(prompts);
-
-      // Make sendMessage reject
-      vi.mocked(chrome.runtime.sendMessage).mockRejectedValue(new Error('Extension context invalidated'));
-
-      await injector.showPromptSelector(mockTextarea);
-
-      const { EventManager } = await import('../../ui/event-manager');
-      const eventManagerInstance = (EventManager as any).mock.results[0].value;
-
-      const clickCalls = eventManagerInstance.addTrackedEventListener.mock.calls.filter(
-        (call: any[]) => {
-          const el = call[0] as HTMLElement;
-          return call[1] === 'click' && el?.dataset?.promptId === 'track2';
-        }
-      );
-
-      expect(clickCalls.length).toBeGreaterThan(0);
-
-      clickCalls[0][2](new Event('click'));
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      // Should not throw, just log debug
-      const Logger = await import('../../utils/logger');
-      expect(Logger.debug).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to report prompt usage'),
-        expect.any(Object)
-      );
     });
   });
 
@@ -2027,115 +1292,6 @@ describe('PromptLibraryInjector', () => {
 
       // Restore
       mockTextarea.style.display = '';
-    });
-  });
-
-  describe('prompt not found during click', () => {
-    it('should log debug when clicked prompt ID does not match any prompt', async () => {
-      const { getPrompts, createPromptListItem } = await import('../../utils/storage');
-      const prompts: Prompt[] = [{
-        id: 'existing', title: 'Existing', content: 'Content', category: 'Test',
-        createdAt: Date.now(), updatedAt: Date.now(), usageCount: 0, lastUsedAt: Date.now()
-      }];
-      vi.mocked(getPrompts).mockResolvedValue(prompts);
-
-      // Make createPromptListItem return an element with a different ID
-      vi.mocked(createPromptListItem).mockImplementation((_prompt, _index, className) => {
-        const item = document.createElement('div');
-        item.className = className ?? '';
-        item.dataset.promptId = 'nonexistent-id'; // Wrong ID
-        item.textContent = 'Wrong';
-        return item;
-      });
-
-      await injector.showPromptSelector(mockTextarea);
-
-      const { EventManager } = await import('../../ui/event-manager');
-      const eventManagerInstance = (EventManager as any).mock.results[0].value;
-
-      const clickCalls = eventManagerInstance.addTrackedEventListener.mock.calls.filter(
-        (call: any[]) => {
-          const el = call[0] as HTMLElement;
-          return call[1] === 'click' && el?.dataset?.promptId === 'nonexistent-id';
-        }
-      );
-
-      expect(clickCalls.length).toBeGreaterThan(0);
-
-      clickCalls[0][2](new Event('click'));
-      await new Promise(resolve => setTimeout(resolve, 50));
-
-      const Logger = await import('../../utils/logger');
-      expect(Logger.debug).toHaveBeenCalledWith(
-        expect.stringContaining('Prompt not found for ID'),
-        expect.any(Object)
-      );
-
-      // Restore createPromptListItem
-      vi.mocked(createPromptListItem).mockImplementation((prompt, _index, className) => {
-        const item = document.createElement('div');
-        item.className = className ?? '';
-        item.dataset.promptId = prompt.id;
-        item.textContent = prompt.title;
-        return item;
-      });
-    });
-  });
-
-  describe('selector repositioning on scroll/resize', () => {
-    it('should set up throttled scroll handler', async () => {
-      const { getPrompts } = await import('../../utils/storage');
-      vi.mocked(getPrompts).mockResolvedValue([{
-        id: '1', title: 'Test', content: 'Content', category: 'Test',
-        createdAt: Date.now(), updatedAt: Date.now(), usageCount: 0, lastUsedAt: Date.now()
-      }]);
-
-      await injector.showPromptSelector(mockTextarea);
-
-      const { EventManager } = await import('../../ui/event-manager');
-      const eventManagerInstance = (EventManager as any).mock.results[0].value;
-
-      // Verify scroll and resize handlers were registered on window
-      const windowEventCalls = eventManagerInstance.addTrackedEventListener.mock.calls.filter(
-        (call: any[]) => call[0] === window
-      );
-
-      const eventTypes = windowEventCalls.map((call: any[]) => call[1]);
-      expect(eventTypes).toContain('scroll');
-      expect(eventTypes).toContain('resize');
-    });
-
-    it('should throttle repositioning to approximately 60fps', async () => {
-      vi.useFakeTimers();
-
-      const { getPrompts } = await import('../../utils/storage');
-      vi.mocked(getPrompts).mockResolvedValue([{
-        id: '1', title: 'Test', content: 'Content', category: 'Test',
-        createdAt: Date.now(), updatedAt: Date.now(), usageCount: 0, lastUsedAt: Date.now()
-      }]);
-
-      await injector.showPromptSelector(mockTextarea);
-
-      const { EventManager } = await import('../../ui/event-manager');
-      const eventManagerInstance = (EventManager as any).mock.results[0].value;
-
-      const scrollCalls = eventManagerInstance.addTrackedEventListener.mock.calls.filter(
-        (call: any[]) => call[0] === window && call[1] === 'scroll'
-      );
-
-      expect(scrollCalls.length).toBeGreaterThan(0);
-
-      const scrollHandler = scrollCalls[0][2];
-
-      // Call multiple times rapidly
-      scrollHandler();
-      scrollHandler();
-      scrollHandler();
-
-      // The throttle should prevent more than one actual reposition within 16ms
-      vi.advanceTimersByTime(20);
-
-      vi.useRealTimers();
     });
   });
 

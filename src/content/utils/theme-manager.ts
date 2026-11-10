@@ -76,7 +76,7 @@ class ThemeManager {
    */
   private resolveTheme(theme: Theme): 'light' | 'dark' {
     if (theme === 'system') {
-      if (typeof window !== 'undefined') {
+      if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
         return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
       }
       // Fallback for test environment
@@ -90,8 +90,8 @@ class ThemeManager {
    */
   private updateUITheme(theme: 'light' | 'dark'): void {
     try {
-      // Find all prompt library selector elements
-      const selectors = document.querySelectorAll('.prompt-library-selector');
+      // The Prompts buttons in the page; the Prompt selector follows the theme through its controller
+      const selectors = document.querySelectorAll('.prompt-library-pill');
       
       selectors.forEach((selector) => {
         if (theme === 'dark') {
@@ -113,7 +113,9 @@ class ThemeManager {
    * Setup message listener for theme changes from popup
    */
   private setupMessageListener(): void {
-    if (typeof chrome !== 'undefined') {
+    // The Prompts button asks for the theme as soon as it is created, so a page where the extension
+    // context is gone (or a test without the messaging API) must not throw here
+    if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
       chrome.runtime.onMessage.addListener((message: { type?: string; theme?: Theme }, _sender, _sendResponse) => {
         if (message.type === 'themeChanged' && message.theme) {
           debug('Received theme change message', { theme: message.theme });

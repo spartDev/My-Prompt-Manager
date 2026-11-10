@@ -122,19 +122,19 @@ test.describe('User Journey: New User Setup & First Prompt Creation', () => {
     await expect(claudePage.getByText('Email Summary Template')).toBeVisible();
     await expect(claudePage.getByText('Creative Writing Starter')).toBeVisible();
 
-    // Test search functionality in content script (no category filter)
-    const searchInput = claudePage.locator('.search-input');
-    await expect(searchInput).toBeVisible();
-    await searchInput.fill('Email');
+    // Typing in the list searches the whole Library
+    await claudePage.keyboard.type('Email');
+    const searchInput = claudePage.getByRole('combobox', { name: 'Search prompts' });
+    await expect(searchInput).toHaveValue('Email');
     await expect(claudePage.getByText('Email Summary Template')).toBeVisible();
     await expect(claudePage.getByText('Creative Writing Starter')).toBeHidden();
 
-    // Clear search to see all prompts again
-    await searchInput.clear();
+    // Escape leaves the search: all prompts are listed again
+    await claudePage.keyboard.press('Escape');
     await expect(claudePage.getByText('Creative Writing Starter')).toBeVisible();
 
     // Select the email template prompt
-    await claudePage.locator('.prompt-item').filter({ hasText: 'Email Summary Template' }).click();
+    await claudePage.getByRole('option').filter({ hasText: 'Email Summary Template' }).click();
 
     // Verify prompt is inserted into the editor
     const editor = claudePage.locator('.ProseMirror');
@@ -169,16 +169,16 @@ test.describe('User Journey: New User Setup & First Prompt Creation', () => {
     await chatgptPage.locator('.prompt-library-integrated-icon').click();
 
     // Test search functionality to find creative writing prompt
-    const chatgptSearchInput = chatgptPage.locator('.search-input');
-    await chatgptSearchInput.fill('Creative');
+    await expect(chatgptPage.getByRole('dialog', { name: 'Insert a prompt' })).toBeVisible();
+    await chatgptPage.keyboard.type('Creative');
     await expect(chatgptPage.getByText('Creative Writing Starter')).toBeVisible();
     await expect(chatgptPage.getByText('Email Summary Template')).toBeHidden();
 
-    // Clear search to make selection
-    await chatgptSearchInput.clear();
+    // Leave the search to make the selection
+    await chatgptPage.keyboard.press('Escape');
     await expect(chatgptPage.getByText('Email Summary Template')).toBeVisible();
 
-    await chatgptPage.locator('.prompt-item').filter({ hasText: 'Creative Writing Starter' }).click();
+    await chatgptPage.getByRole('option').filter({ hasText: 'Creative Writing Starter' }).click();
 
     // Verify prompt inserted into ChatGPT textarea
     const textarea = chatgptPage.locator('#prompt-textarea');
