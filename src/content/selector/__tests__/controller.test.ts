@@ -625,6 +625,32 @@ describe('PromptSelectorController', () => {
       expect(document.activeElement).toBe(elsewhere);
     });
 
+    it('shows nothing, and leaves the focus alone, when the controller is destroyed while the Platform takes the text', async () => {
+      const elsewhere = document.createElement('input');
+      document.body.append(elsewhere);
+      let written: () => void = () => { /* set below */ };
+      callbacks.insert.mockImplementation(() => new Promise<boolean>((resolve) => { written = () => { resolve(true); }; }));
+      await controller.open(field, button);
+      await opened();
+      row('p1')?.click();
+      await closed();
+      await vi.waitFor(() => { expect(callbacks.insert).toHaveBeenCalledTimes(1); });
+
+      // The site is disabled, then enabled again and the selector opened and closed: the controller
+      // is alive when the earlier Insertion ends
+      controller.destroy();
+      await controller.open(field, button);
+      await opened();
+      controller.close(false);
+      await closed();
+      elsewhere.focus();
+      written();
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      expect(pill()).toBeNull();
+      expect(document.activeElement).toBe(elsewhere);
+    });
+
     it('says so when the Insertion throws', async () => {
       callbacks.insert.mockRejectedValue(new Error('boom'));
 

@@ -89,6 +89,8 @@ export class PromptSelectorController {
   private session: OpenSession | null = null;
   private feedback: Feedback | null = null;
   private feedbacks = 0;
+  /** Counts the destructions, so an Insertion still being written when the controller is removed ends silently. */
+  private destructions = 0;
   private closeTimer: number | null = null;
   /** Counts the openings, so one still loading when another starts (or when it is closed) is dropped. */
   private openings = 0;
@@ -200,6 +202,7 @@ export class PromptSelectorController {
 
   /** Removes the selector and its host from the page. */
   destroy(): void {
+    this.destructions++;
     this.openings++;
     this.loading = null;
     if (this.session) {
@@ -417,6 +420,7 @@ export class PromptSelectorController {
    * pill offers Undo. A failed Insertion is said, with nothing to undo. Never throws.
    */
   private async insert(prompt: Prompt, pending: PendingInsertion, target: HTMLElement): Promise<void> {
+    const destructions = this.destructions;
     const previous = readInputText(target);
     // Where the field is now: the Platform may replace it while it takes the text
     const lastField = boxOf(target);
@@ -446,6 +450,11 @@ export class PromptSelectorController {
       for (const type of USER_ACTIONS) {
         document.removeEventListener(type, onUserAction, true);
       }
+    }
+    // The controller was removed meanwhile (the site was disabled, the page navigated): nothing
+    // of it comes back, not even the focus
+    if (destructions !== this.destructions) {
+      return;
     }
     // The selector was opened again while the Platform took the text, or is loading to open: the
     // user has moved on, so neither the focus nor a confirmation with Undo comes after them
