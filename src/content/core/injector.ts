@@ -321,8 +321,11 @@ export class PromptLibraryInjector {
         if (before === null || !endsWithSelectorTrigger(before) || this.selector.isOpen) {
           return;
         }
+        // A // that cannot be removed stays as typed text: opening over it would leave it in the
+        // field when the selector is closed without an Insertion
         if (!removeTypedTrigger(field)) {
-          debug('Could not remove the // that opened the prompt selector');
+          debug('Could not remove the typed //, the prompt selector stays closed');
+          return;
         }
         void this.selector.open(field, this.state.icon);
       }, 0);

@@ -59,7 +59,7 @@ A file containing a user's Library, exported so it can be restored or moved.
 An AI chat site the extension works on (for example Claude or ChatGPT).
 
 **Prompt selector**:
-The list a user opens inside a Platform, from the Prompts button shown in its input area or by typing `//` in the input field, to choose a Prompt to insert. It lists All Prompts, the Pinned Prompts, the Recent Prompts, or the Prompts of one Category. `//` opens it only at the start of the field or after a space or a line break, so the `//` of a URL does not; the two characters are removed.
+The list a user opens inside a Platform, from the Prompts button shown in its input area or by typing `//` in the input field, to choose a Prompt to insert. It lists All Prompts, the Pinned Prompts, the Recent Prompts, or the Prompts of one Category. `//` opens it only at the start of the field or after a space or a line break, so the `//` of a URL does not; the two characters are removed, and where they cannot be the selector stays closed.
 _Avoid_: Picker (the Element picker is the tool that picks where the button goes on a custom site), palette, popover
 
 **Recent**:

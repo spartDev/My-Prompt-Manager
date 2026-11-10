@@ -481,6 +481,28 @@ describe('PromptSelectorController', () => {
       expect(field.selectionStart).toBe(field.value.length);
     });
 
+    it('says so when Undo fails: the Prompt is still in the field, and there is no second Undo', async () => {
+      callbacks.restore.mockResolvedValue(false);
+      await inserted();
+
+      undoButton()?.click();
+
+      await vi.waitFor(() => { expect(pill()?.textContent).toBe("Couldn't undo “Title p1”"); });
+      expect(pill()?.getAttribute('data-kind')).toBe('undoFailed');
+      expect(undoButton()).toBeNull();
+      expect(sweep()).toBeNull();
+      expect(document.activeElement).toBe(field);
+    });
+
+    it('says so when Undo throws', async () => {
+      callbacks.restore.mockRejectedValue(new Error('boom'));
+      await inserted();
+
+      undoButton()?.click();
+
+      await vi.waitFor(() => { expect(pill()?.getAttribute('data-kind')).toBe('undoFailed'); });
+    });
+
     it('says so when the Insertion failed: no Undo, no sweep', async () => {
       callbacks.insert.mockResolvedValue(false);
 

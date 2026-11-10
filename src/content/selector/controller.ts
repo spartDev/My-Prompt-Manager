@@ -61,7 +61,7 @@ interface OpenSession {
 /** The confirmation shown after an Insertion, until it leaves. */
 interface Feedback {
   id: number;
-  kind: 'inserted' | 'failed';
+  kind: 'inserted' | 'failed' | 'undoFailed';
   title: string;
   /** The input field, or null when it was gone before the Prompt could be inserted. */
   target: HTMLElement | null;
@@ -583,7 +583,8 @@ export class PromptSelectorController {
 
   /**
    * Undo: the input field takes back the plain text it held before the Insertion, with the focus
-   * and the caret at its end. The use of the Prompt stays counted. Never throws.
+   * and the caret at its end. The use of the Prompt stays counted. When the Platform refuses, the
+   * pill says so. Never throws.
    */
   private async undo(feedback: Feedback): Promise<void> {
     const target = feedback.target;
@@ -591,13 +592,19 @@ export class PromptSelectorController {
       return;
     }
     this.clearFeedback();
+    let restored = false;
     try {
-      await this.callbacks.restore(feedback.previous, target);
+      restored = await this.callbacks.restore(feedback.previous, target);
     } catch (err) {
       logError('Failed to undo the insertion', err instanceof Error ? err : new Error(String(err)));
     }
-    if (target.isConnected) {
-      focusAtEnd(target);
+    if (!target.isConnected) {
+      return;
+    }
+    focusAtEnd(target);
+    // The inserted text is still there: the user is told, or Undo would seem to have worked
+    if (!restored && !this.session) {
+      this.showFeedback({ kind: 'undoFailed', title: feedback.title, target, field: boxOf(target), previous: feedback.previous });
     }
   }
 }

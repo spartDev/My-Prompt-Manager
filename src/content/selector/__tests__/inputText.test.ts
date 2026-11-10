@@ -2,7 +2,7 @@
  * The plain text of an input field and the `//` that opens the Prompt selector.
  */
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { endsWithSelectorTrigger, focusAtEnd, plainTextOf, readInputText, removeTypedTrigger, textBeforeCaret } from '../inputText';
 
@@ -138,6 +138,34 @@ describe('removeTypedTrigger', () => {
     expect(field.value).toBe('Before  after');
     expect(field.selectionStart).toBe(7);
     expect(heard).toBe(1);
+  });
+
+  it('takes the two characters out of a contenteditable that refuses the editing command, and tells the page', () => {
+    const field = editable('<p>Before // after</p>');
+    const text = field.querySelector('p')?.firstChild as Text;
+    document.getSelection()?.collapse(text, 9);
+    const refused = vi.spyOn(document, 'execCommand').mockReturnValue(false);
+    let heard = 0;
+    field.addEventListener('input', () => { heard++; });
+
+    expect(removeTypedTrigger(field)).toBe(true);
+
+    expect(field.textContent).toBe('Before  after');
+    expect(textBeforeCaret(field)).toBe('Before ');
+    expect(heard).toBe(1);
+    refused.mockRestore();
+  });
+
+  it('reports a // it cannot remove: the caret is not in a text node that holds it', () => {
+    const field = editable('<p><b>/</b>/</p>');
+    const second = field.querySelector('p')?.lastChild as Text;
+    document.getSelection()?.collapse(second, 1);
+    const refused = vi.spyOn(document, 'execCommand').mockReturnValue(false);
+
+    expect(textBeforeCaret(field)).toBe('//');
+    expect(removeTypedTrigger(field)).toBe(false);
+    expect(field.textContent).toBe('//');
+    refused.mockRestore();
   });
 
   it('leaves the field alone when the text before the caret does not end with //', () => {

@@ -13,8 +13,11 @@ export interface FieldBox {
 export interface InsertionFeedbackProps {
   /** Changes with each Insertion, so a new confirmation animates in again. */
   id: number;
-  /** `inserted`: the Prompt arrived. `failed`: it did not, and there is nothing to undo. */
-  kind: 'inserted' | 'failed';
+  /**
+   * `inserted`: the Prompt arrived. `failed`: it did not, and there is nothing to undo.
+   * `undoFailed`: Undo could not put the earlier text back, so the Prompt is still in the field.
+   */
+  kind: 'inserted' | 'failed' | 'undoFailed';
   /** The title of the Prompt. */
   title: string;
   field: FieldBox;
@@ -28,6 +31,12 @@ export interface InsertionFeedbackProps {
   /** The pointer or the focus is on the confirmation, or has left it: it stays while held. */
   onHold: (held: boolean) => void;
 }
+
+const MESSAGE: Record<InsertionFeedbackProps['kind'], (title: string) => string> = {
+  inserted: (title) => `Inserted “${title}”`,
+  failed: (title) => `Couldn't insert “${title}”`,
+  undoFailed: (title) => `Couldn't undo “${title}”`
+};
 
 /** Space between the input field and the confirmation, and the least room it needs above the field. */
 const GAP = 10;
@@ -88,7 +97,7 @@ export const InsertionFeedback: FC<InsertionFeedbackProps> = ({ id, kind, title,
         ref={pillRef}
         style={place}
       >
-        <span className="mpm-inserted-text">{inserted ? `Inserted “${title}”` : `Couldn't insert “${title}”`}</span>
+        <span className="mpm-inserted-text">{MESSAGE[kind](title)}</span>
         {inserted && (
           <button type="button" className="mpm-inserted-undo" onClick={onUndo}>Undo</button>
         )}

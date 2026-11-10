@@ -127,7 +127,8 @@ export function endsWithSelectorTrigger(before: string): boolean {
 /**
  * Removes the `//` just typed before the caret, as two presses of Backspace would: the rest of the
  * field is not rewritten, and the Platform's editor hears of it through its usual input events.
- * Returns whether the two characters are gone.
+ * When the editing command is missing or refused, the two characters are taken out of their text
+ * node. Returns whether they are gone: the selector does not open over a `//` it could not remove.
  */
 export function removeTypedTrigger(field: HTMLElement): boolean {
   const before = textBeforeCaret(field);
@@ -155,17 +156,36 @@ export function removeTypedTrigger(field: HTMLElement): boolean {
   }
 
   const selection = document.getSelection();
-  if (!selection || typeof selection.modify !== 'function') {
+  if (!selection) {
     return false;
   }
-  for (let i = 0; i < SELECTOR_TRIGGER.length; i++) {
-    selection.modify('extend', 'backward', 'character');
+  if (canExec && typeof selection.modify === 'function') {
+    for (let i = 0; i < SELECTOR_TRIGGER.length; i++) {
+      selection.modify('extend', 'backward', 'character');
+    }
+    if (selection.toString() === SELECTOR_TRIGGER && document.execCommand('delete')) {
+      return true;
+    }
+    if (!selection.isCollapsed) {
+      selection.collapseToEnd();
+    }
   }
-  if (selection.toString() !== SELECTOR_TRIGGER || !canExec) {
-    selection.collapseToEnd();
+
+  // The editing command is missing or was refused: take the two characters out of their text
+  // node, then tell the page as typing would
+  const node = selection.focusNode;
+  const offset = selection.focusOffset;
+  const start = offset - SELECTOR_TRIGGER.length;
+  if (node?.nodeType !== Node.TEXT_NODE || start < 0 || (node.nodeValue ?? '').slice(start, offset) !== SELECTOR_TRIGGER) {
     return false;
   }
-  return document.execCommand('delete');
+  const range = document.createRange();
+  range.setStart(node, start);
+  range.setEnd(node, offset);
+  range.deleteContents();
+  selection.collapse(node, start);
+  field.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'deleteContentBackward' }));
+  return true;
 }
 
 /** Puts the focus in the input field, with the caret after its last character. */
