@@ -200,7 +200,7 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({ onBack }) => {
                   }}
                 />
                 {reviewFailed && (
-                  <p role="alert" className="mt-2 px-1 text-xs text-secondary">
+                  <p role="alert" className="mt-2 px-1 text-xs font-medium text-danger">
                     The review could not be opened in the side panel. Open My Prompt Manager and review from Analytics.
                   </p>
                 )}

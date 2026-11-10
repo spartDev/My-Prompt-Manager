@@ -249,7 +249,10 @@ describe('AnalyticsDashboard', () => {
 
       fireEvent.click(screen.getByRole('button', { name: 'Review the 1 prompt never used' }));
 
-      expect(await screen.findByRole('alert')).toHaveTextContent('The review could not be opened in the side panel.');
+      const alert = await screen.findByRole('alert');
+      expect(alert).toHaveTextContent('The review could not be opened in the side panel.');
+      // An error message takes the error token, as everywhere in the app
+      expect(alert).toHaveClass('text-danger');
     });
 
     it('shows the page, and says Review cannot open the side panel, where the chrome tabs API is not there yet', async () => {
