@@ -25,6 +25,21 @@ export class EventManager {
     }
   }
 
+  /**
+   * Removes the listeners tracked on one element, and forgets it, when that element is thrown away
+   * before the whole manager is cleaned up.
+   */
+  removeTrackedListeners(element: EventTarget): void {
+    const elementListeners = this.listeners.get(element);
+    if (!elementListeners) {
+      return;
+    }
+    elementListeners.forEach(({ event, handler }) => {
+      element.removeEventListener(event, handler);
+    });
+    this.listeners.delete(element);
+  }
+
   cleanup(): void {
     let removedCount = 0;
     let errorCount = 0;

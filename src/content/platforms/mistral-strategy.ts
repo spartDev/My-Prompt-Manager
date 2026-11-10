@@ -35,12 +35,7 @@ export class MistralStrategy extends PlatformStrategy {
         'textarea[placeholder*="chat"]',
         '[role="textbox"]'
       ],
-      // Target the exact button container from Mistral's DOM structure
-      buttonContainerSelector: [
-        '.flex.w-full.max-w-full.items-center.justify-start.gap-3', // Main chat interface
-        '.flex.w-full.items-center.justify-start.gap-3',           // Compact view
-        '.flex.items-center.justify-start.gap-3'                   // Mobile fallback
-      ].join(', '),
+      buttonContainerSelector: getPlatformById('mistral')?.buttonContainerSelector,
       priority: MISTRAL_PLATFORM_PRIORITY
     }, hostname);
   }

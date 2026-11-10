@@ -286,9 +286,11 @@ export class DOMUtils {
   }
 
   /**
-   * Check if CSS Anchor Positioning API is supported
-   * Requires Chrome 125+, Edge 125+, Safari 26+, Opera 111+
-   * @returns true if CSS Anchor Positioning is supported
+   * Check if CSS Anchor Positioning is supported as the extension writes it: anchor-name on the
+   * reference and position-area on the icon. Chrome 125 to 128 shipped anchor-name with the earlier
+   * inset-area name instead of position-area (renamed in Chrome 129), so they answer false here and
+   * the icon is positioned by Floating UI there, instead of a fixed box that never reaches its anchor.
+   * @returns true if CSS Anchor Positioning is supported (Chrome 129+, Edge 129+, Safari 26+)
    */
   static supportsCSSAnchorPositioning(): boolean {
     try {
@@ -297,8 +299,7 @@ export class DOMUtils {
         return false;
       }
 
-      // Check for anchor-name property support (core CSS Anchor API)
-      return CSS.supports('anchor-name', '--test');
+      return CSS.supports('anchor-name', '--test') && CSS.supports('position-area', 'center');
     } catch (err) {
       logError('Failed to check CSS Anchor Positioning support', err as Error);
       return false;

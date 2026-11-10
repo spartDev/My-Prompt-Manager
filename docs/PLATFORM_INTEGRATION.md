@@ -37,7 +37,7 @@ export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
       'div[contenteditable="true"]',
       '[role="textbox"]'
     ],
-    buttonContainerSelector: '.button-container', // Where to place icon
+    buttonContainerSelector: '.button-container', // The composer toolbar the icon goes in (a selector list works)
     strategyClass: 'YourPlatformStrategy', // For future custom logic
     hostnamePatterns: ['yourplatform'], // For hostname matching
     brandColors: {
@@ -71,7 +71,7 @@ export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
 | `priority` | number | ✅ | Strategy selection priority (100 = highest) |
 | `defaultEnabled` | boolean | ✅ | Include in default enabled platforms for new users |
 | `selectors` | string[] | ✅ | CSS selectors for finding text input elements |
-| `buttonContainerSelector` | string | ❌ | Where to place the library icon |
+| `buttonContainerSelector` | string | ❌ | Selector list for the composer toolbar the icon goes in, first match in document order. The one source: a strategy reads it from here (`getPlatformById(id)?.buttonContainerSelector`). When nothing matches, the icon is anchored inside the editor's bottom-end corner by `src/content/core/anchored-overlay.ts` and a warning is logged |
 | `strategyClass` | string | ✅ | Class name for custom strategy (future use) |
 | `hostnamePatterns` | string[] | ❌ | Additional hostname patterns for detection |
 | `brandColors` | `{ enabled: string }` | ❌ | Tailwind classes of the logo square when the site is on; the accent (`bg-accent-subtle text-accent`) when omitted. Every site shares one disabled state (`bg-muted text-tertiary`, `src/constants/brandColors.ts`), so its logo component takes `disabled` and draws in `currentColor` |
@@ -181,7 +181,7 @@ export class YourPlatformStrategy extends PlatformStrategy {
         'textarea[placeholder*="Enter your message"]',
         'div[contenteditable="true"][role="textbox"]'
       ],
-      buttonContainerSelector: '.toolbar, .input-actions', // Where to place the button
+      buttonContainerSelector: getPlatformById('your-platform')?.buttonContainerSelector, // Read from platforms.ts, never copied
       priority: 90 // Higher = more priority (Claude: 100, ChatGPT: 90, Perplexity: 80)
     });
   }
@@ -517,8 +517,8 @@ window.__promptLibraryDebug?.testInsertion?.('test content');
 - Check strategy is registered in platform-manager.ts
 
 **Button appears in wrong location:**
-- Adjust `buttonContainerSelector`
-- Add platform-specific positioning in injector.ts
+- Adjust `buttonContainerSelector` in `platforms.ts` (the strategy reads it from there)
+- A warning `Toolbar not found on this Platform` in the console means no selector matched and the icon fell back to the editor's corner
 - Check if container selector exists on page
 
 **Content doesn't insert:**
@@ -888,8 +888,10 @@ buttonContainerSelector: [
   '.generic-container'    // Generic fallback
 ].join(', ')
 
-// Or use DOM-based positioning in injector.ts
-// for platform-specific placement logic
+// When none matches, the icon is anchored inside the editor's bottom-end corner
+// (src/content/core/anchored-overlay.ts) and the console shows a warning:
+// "Toolbar not found on this Platform". If the Platform re-renders its toolbar,
+// src/content/core/icon-placement.ts places the icon again on its own.
 ```
 
 ### Content Doesn't Insert

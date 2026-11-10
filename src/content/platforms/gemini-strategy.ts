@@ -75,8 +75,7 @@ export class GeminiStrategy extends PlatformStrategy {
         '[data-placeholder*="Gemini"]',
         'div[contenteditable="true"]'
       ],
-      // Target the button container where mic and send buttons are located
-      buttonContainerSelector: '.input-buttons-wrapper-bottom',
+      buttonContainerSelector: getPlatformById('gemini')?.buttonContainerSelector,
       priority: GEMINI_PLATFORM_PRIORITY
     }, hostname);
   }

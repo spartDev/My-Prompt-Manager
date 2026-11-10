@@ -14,6 +14,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Prompt } from '../../types/index';
+import { AnchoredOverlay } from '../anchored-overlay';
+import { IconPlacementController } from '../icon-placement';
 import { PromptLibraryInjector } from '../injector';
 
 // Mock all dependencies
@@ -35,6 +37,7 @@ vi.mock('../../ui/event-manager', () => ({
   EventManager: vi.fn(function() {
     return {
       addTrackedEventListener: vi.fn(),
+      removeTrackedListeners: vi.fn(),
       cleanup: vi.fn()
     };
   })
@@ -866,6 +869,28 @@ describe('PromptLibraryInjector', () => {
   });
 
   describe('removeAllExistingIcons', () => {
+    it('releases a Floating UI icon while it is still in the document, then removes it', async () => {
+      const icon = document.createElement('button');
+      icon.classList.add('prompt-library-cleanup-target');
+      icon.setAttribute('data-positioning-method', 'floating-ui');
+      document.body.appendChild(icon);
+      let connectedAtRelease: boolean | null = null;
+      const release = vi.spyOn(AnchoredOverlay.prototype, 'release').mockImplementation((released) => {
+        if (released === icon) {
+          connectedAtRelease = released.isConnected;
+        }
+        return released === icon;
+      });
+
+      await injector.initialize();
+      injector.cleanup();
+
+      expect(release).toHaveBeenCalledWith(icon);
+      expect(connectedAtRelease).toBe(true);
+      expect(icon.isConnected).toBe(false);
+      release.mockRestore();
+    });
+
     it('should remove elements with prompt-library-cleanup-target class', async () => {
       const icon1 = document.createElement('button');
       icon1.classList.add('prompt-library-cleanup-target');
@@ -1078,6 +1103,66 @@ describe('PromptLibraryInjector', () => {
       // the icon should be positioned with floating fallback.
       // Verify no errors occurred during the process.
       expect(Logger.error).not.toHaveBeenCalled();
+    });
+
+    it('disposes of the icon being replaced even once the Platform took it out of the DOM', async () => {
+      const oldIcon = document.createElement('button');
+      const observerCleanup = vi.fn();
+      const internals = injector as any;
+      internals.state.icon = oldIcon; // detached: no DOM query can find it
+      internals.iconCleanups.set(oldIcon, observerCleanup);
+      const release = vi.spyOn(AnchoredOverlay.prototype, 'release');
+
+      await internals.injectIcon(mockTextarea);
+
+      expect(observerCleanup).toHaveBeenCalledTimes(1);
+      expect(internals.iconCleanups.has(oldIcon)).toBe(false);
+      expect(release).toHaveBeenCalledWith(oldIcon);
+      expect(internals.eventManager.removeTrackedListeners).toHaveBeenCalledWith(oldIcon);
+      expect(internals.state.icon).not.toBe(oldIcon);
+      release.mockRestore();
+    });
+
+    it('drops an Anchored overlay placement the editor changed under while it awaited', async () => {
+      const internals = injector as any;
+      internals.state.isSiteEnabled = true;
+      internals.state.currentTextarea = mockTextarea;
+      const otherEditor = document.createElement('textarea');
+      const pending: { finish?: (method: 'floating-ui') => void } = {};
+      const place = vi.spyOn(AnchoredOverlay.prototype, 'place').mockImplementation(
+        () => new Promise((resolve) => { pending.finish = resolve; })
+      );
+      const release = vi.spyOn(AnchoredOverlay.prototype, 'release');
+      const track = vi.spyOn(IconPlacementController.prototype, 'track');
+
+      const injecting = internals.injectIcon(mockTextarea);
+      await vi.waitFor(() => { expect(place).toHaveBeenCalled(); });
+      const icon = internals.state.icon as HTMLElement;
+      internals.state.currentTextarea = otherEditor; // the user moved to another editor meanwhile
+      pending.finish?.('floating-ui');
+      await injecting;
+
+      expect(track).not.toHaveBeenCalledWith(icon, mockTextarea, 'overlay');
+      expect(release).toHaveBeenCalledWith(icon);
+      expect(icon.isConnected).toBe(false);
+      expect(internals.state.icon).toBeNull();
+      place.mockRestore();
+      release.mockRestore();
+      track.mockRestore();
+    });
+
+    it('tracks an Anchored overlay placement still current once it resolves', async () => {
+      const internals = injector as any;
+      internals.state.isSiteEnabled = true;
+      internals.state.currentTextarea = mockTextarea;
+      const place = vi.spyOn(AnchoredOverlay.prototype, 'place').mockResolvedValue('floating-ui');
+      const track = vi.spyOn(IconPlacementController.prototype, 'track');
+
+      await internals.injectIcon(mockTextarea);
+
+      expect(track).toHaveBeenCalledWith(internals.state.icon, mockTextarea, 'overlay');
+      place.mockRestore();
+      track.mockRestore();
     });
   });
 
