@@ -12,13 +12,9 @@ import { expect, test } from '../fixtures/extension';
 import { ANALYTICS_FIXTURES } from '../fixtures/test-data';
 import { seedLibrary, seedUsageHistory } from '../utils/storage';
 
-/** A chart card of the dashboard's breakdown, found by its heading */
-const chartCard = (page: Page, title: string) =>
-  page.getByRole('region', { name: 'Usage breakdown' }).locator('div').filter({ has: page.getByRole('heading', { name: title, exact: true }) }).last();
-
 const CHARTS: Array<[name: string, chart: (page: Page) => Locator]> = [
-  ['Usage trend', page => page.getByRole('region', { name: 'Usage trend' }).locator('.recharts-wrapper')],
-  ['Day of Week', page => chartCard(page, 'Day of Week').locator('.recharts-wrapper')]
+  ['Daily use', page => page.getByTestId('daily-use').locator('.recharts-wrapper')],
+  ['Time of day', page => page.getByTestId('time-of-day').locator('.recharts-wrapper')]
 ];
 
 const tooltipShown = (chart: Locator) =>

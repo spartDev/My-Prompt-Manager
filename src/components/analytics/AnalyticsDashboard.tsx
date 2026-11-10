@@ -1,72 +1,70 @@
-import { type FC, useCallback, useRef, useState } from 'react';
+import { type FC, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { useDuplicateGroups } from '../../hooks/useDuplicateGroups';
 import { useNow } from '../../hooks/useNow';
-import { useSummaryMetrics } from '../../hooks/useSummaryMetrics';
 import { useUsageStats } from '../../hooks/useUsageStats';
-import type { PromptUsageSummary } from '../../types/hooks';
-import { formatPlatformName, formatRelativeTime } from '../../utils';
-import ErrorBoundary from '../ErrorBoundary';
+import { type ReviewFilter, requestLibraryReview } from '../../services/libraryReview';
 import {
-  BackIcon,
-  CalendarIcon,
-  CategoryIcon,
-  PlatformIcon,
-  TrophyIcon, 
-  UsageIcon
-} from '../icons/UIIcons';
+  busiest,
+  categoryRanking,
+  countDuplicatePairs,
+  countNeverUsed,
+  duplicateReviewGroups,
+  platformRanking,
+  type RankedPrompt,
+  rankByUses,
+  weekdayUsage
+} from '../../services/usageInsights';
+import { MOTION } from '../../theme/motion';
+import { formatPlatformName, formatRelativeTime, Logger, toError } from '../../utils';
+import { ensureStorageAvailable } from '../../utils/chromeStorage';
+import ErrorBoundary from '../ErrorBoundary';
+import { BackIcon } from '../icons/UIIcons';
 import SectionHeader from '../SectionHeader';
 
-import {
-  CategoryBarChart,
-  DayOfWeekChart,
-  PlatformPieChart,
-  TimeOfDayChart, 
-  UsageLineChart
-} from './charts';
-import { CHART_HEIGHT, MAX_CATEGORIES_DISPLAY, REFRESH_INTERVAL_MS } from './constants';
-import SummaryCard from './SummaryCard';
+import { DailyUseChart, TimeOfDayChart } from './charts';
+import { CHART_HEIGHT, MOST_USED_ROWS_FULL, RANKED_ROWS, REFRESH_INTERVAL_MS } from './constants';
+import MostUsedCard from './MostUsedCard';
+import RankedRows from './RankedRows';
+import StatCard from './StatCard';
+import StatsHero from './StatsHero';
+import TidyUpCard from './TidyUpCard';
 
-/** Fallback UI for chart rendering errors */
-const ChartErrorFallback: FC<{ height: number }> = ({ height }) => (
+/** The page's side gutter: the content keeps to a 1100px column on a wide screen, the header with it */
+const GUTTER = 'px-4 sm:px-6 lg:px-[max(2rem,calc(50vw-550px))]';
+
+/** Shown in place of a chart that failed to draw */
+const ChartErrorFallback: FC = () => (
   <div
-    className="flex items-center justify-center bg-raised rounded-xl"
-    style={{ height }}
+    className="flex items-center justify-center rounded-xl bg-subtle"
+    style={{ height: CHART_HEIGHT }}
     role="alert"
-    aria-label="Chart unavailable"
   >
-    <div className="text-center">
-      <svg
-        className="w-8 h-8 text-faint mx-auto mb-2"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-        aria-hidden="true"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={1.5}
-          d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-        />
-      </svg>
-      <p className="text-sm text-tertiary">Chart unavailable</p>
-    </div>
+    <p className="text-sm text-tertiary">Chart unavailable</p>
   </div>
 );
 
-const PROMPT_TABS = {
-  MOST_USED: 'most-used',
-  RECENTLY_USED: 'recently-used',
-  FORGOTTEN: 'forgotten',
-} as const;
-
-type PromptTab = typeof PROMPT_TABS[keyof typeof PROMPT_TABS];
-
-const TAB_LABELS: Record<PromptTab, string> = {
-  [PROMPT_TABS.MOST_USED]: 'Most Used',
-  [PROMPT_TABS.RECENTLY_USED]: 'Recently Used',
-  [PROMPT_TABS.FORGOTTEN]: 'Forgotten',
-};
+/** A chart in a card of the tab's style: its title, a line that says what the chart shows, the chart */
+const ChartCard: FC<{ id: string; title: string; subtitle: string; delayIndex: number; children: ReactNode }> = ({
+  id,
+  title,
+  subtitle,
+  delayIndex,
+  children
+}) => (
+  <section
+    aria-labelledby={`${id}-title`}
+    data-testid={id}
+    className="mt-2.5 p-3.5 rounded-group bg-card border border-default animate-card-rise min-w-0"
+    style={{ animationDelay: `${String(MOTION.cardDelay + delayIndex * MOTION.cardStagger)}ms` }}
+  >
+    <h2 id={`${id}-title`} className="text-sm font-extrabold text-primary">{title}</h2>
+    <p className="text-xs text-secondary">{subtitle}</p>
+    <div className="mt-2">
+      <ErrorBoundary fallback={<ChartErrorFallback />}>{children}</ErrorBoundary>
+    </div>
+  </section>
+);
 
 export interface AnalyticsDashboardProps {
   /** Callback when user wants to go back */
@@ -74,68 +72,57 @@ export interface AnalyticsDashboardProps {
 }
 
 /**
- * Full-page analytics dashboard with charts and prompt tables
+ * The full-page Analytics view, opened from the Analytics tab: the tab's design (Atelier 1C) at the
+ * width of a page. The hero, Top platform and Top category, Most used and Tidy up as in the tab, then
+ * the Platforms, the Categories, Daily use and Time of day.
  */
-const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
-  onBack
-}) => {
-  const { stats, loading, error } = useUsageStats();
-  const [activeTab, setActiveTab] = useState<PromptTab>(PROMPT_TABS.MOST_USED);
-  const tabRefs = useRef<Map<PromptTab, HTMLButtonElement>>(new Map());
-
-  // Current time for relative time calculations - updates every minute to trigger re-renders
+const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({ onBack }) => {
+  const { stats, history, prompts, categories, loading, error } = useUsageStats();
+  const duplicateGroups = useDuplicateGroups(loading ? null : prompts);
+  // Current time for "2 days ago": updates every minute
   const now = useNow(REFRESH_INTERVAL_MS);
 
-  // Compute summary metrics using shared hook
-  const summaryMetrics = useSummaryMetrics(stats);
+  const weekdays = useMemo(() => weekdayUsage(history), [history]);
+  const platforms = useMemo(() => platformRanking(history), [history]);
+  const rankedCategories = useMemo(() => categoryRanking(history, prompts, categories), [history, prompts, categories]);
+  const allRanked = useMemo(() => rankByUses(history, prompts, Number.POSITIVE_INFINITY), [history, prompts]);
+  const neverUsed = useMemo(() => countNeverUsed(prompts), [prompts]);
+  const busiestTime = useMemo(() => busiest(stats?.timeOfDayDistribution ?? []), [stats]);
+  const activeDays = useMemo(() => (stats?.dailyUsage ?? []).filter(day => day.count > 0).length, [stats]);
 
-  // Get prompts for a specific tab
-  const getPromptsForTab = useCallback((tab: PromptTab): PromptUsageSummary[] => {
-    if (!stats) { return []; }
-    switch (tab) {
-      case PROMPT_TABS.MOST_USED:
-        return stats.topPrompts;
-      case PROMPT_TABS.RECENTLY_USED:
-        return stats.recentPrompts;
-      case PROMPT_TABS.FORGOTTEN:
-        return stats.forgottenPrompts;
-    }
-  }, [stats]);
+  const rowMeta = useCallback(
+    ({ prompt, lastUsed }: RankedPrompt) => `${prompt.category} · ${formatRelativeTime(lastUsed, now)}`,
+    [now]
+  );
 
-  // Memoized tab click handler to avoid creating new function references on each render
-  const handleTabClick = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
-    const tab = e.currentTarget.dataset.tab as PromptTab;
-    setActiveTab(tab);
+  // Review opens the side panel of this window. Chrome wants the window's id within the click, so
+  // it is read once, ahead of it
+  const windowIdRef = useRef<number | null>(null);
+  const [reviewFailed, setReviewFailed] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    // In a tab that has just opened, the chrome API may not be there yet: wait for it, as the usage
+    // history does, and never fail the page for a window id only Review needs
+    ensureStorageAvailable()
+      .then(() => (chrome.tabs as Partial<typeof chrome.tabs> | undefined)?.getCurrent?.())
+      .then(tab => { if (!cancelled) { windowIdRef.current = tab?.windowId ?? null; } })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
   }, []);
-
-  // Keyboard navigation for tabs (Arrow keys, Home, End)
-  const handleTabKeyDown = useCallback((e: React.KeyboardEvent<HTMLButtonElement>) => {
-    const tabs = Object.values(PROMPT_TABS);
-    const currentIndex = tabs.indexOf(activeTab);
-    let newIndex = currentIndex;
-
-    switch (e.key) {
-      case 'ArrowLeft':
-        newIndex = currentIndex > 0 ? currentIndex - 1 : tabs.length - 1;
-        break;
-      case 'ArrowRight':
-        newIndex = currentIndex < tabs.length - 1 ? currentIndex + 1 : 0;
-        break;
-      case 'Home':
-        newIndex = 0;
-        break;
-      case 'End':
-        newIndex = tabs.length - 1;
-        break;
-      default:
-        return;
+  const review = useCallback((filter: ReviewFilter) => {
+    const windowId = windowIdRef.current;
+    if (windowId === null) {
+      setReviewFailed(true);
+      return;
     }
-
-    e.preventDefault();
-    setActiveTab(tabs[newIndex]);
-    // Focus the new tab button using ref
-    tabRefs.current.get(tabs[newIndex])?.focus();
-  }, [activeTab]);
+    setReviewFailed(false);
+    requestLibraryReview(filter, windowId).catch((err: unknown) => {
+      Logger.error('Could not open a review in the side panel', toError(err), {
+        component: 'AnalyticsDashboard'
+      });
+      setReviewFailed(true);
+    });
+  }, []);
 
   if (error) {
     return (
@@ -151,17 +138,20 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
     );
   }
 
-  const hasData = stats && stats.totalUses > 0;
+  const hasData = history.length > 0;
+  const topPlatform = platforms.at(0);
+  const topCategory = rankedCategories.at(0);
 
   return (
     <div className="h-screen flex flex-col bg-app section-scroll-scope">
-      {/* Section header, like the Analytics tab: the period counted is the Eyebrow */}
+      {/* Section header, as in the Analytics tab: the period counted is the Eyebrow */}
       <SectionHeader
-        title="Analytics Dashboard"
-        eyebrow="Last 30 days of usage"
-        className="sm:px-6 lg:px-8"
+        title="Analytics"
+        eyebrow="Last 30 days"
+        className={GUTTER}
         leading={onBack && (
           <button
+            type="button"
             onClick={onBack}
             className="p-2 -ml-2 text-secondary hover:text-primary hover:bg-muted rounded-lg transition-colors focus-interactive"
             aria-label="Go back"
@@ -171,273 +161,96 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({
         )}
       />
 
-      {/* Content */}
-      <main className="flex-1 overflow-auto custom-scrollbar px-4 sm:px-6 lg:px-8 py-6" data-scroll-container>
-        {!hasData && !loading ? (
-          /* Empty state */
-          <div className="flex flex-col items-center justify-center py-24 text-center" role="region" aria-label="Empty analytics">
-            <div data-testid="empty-analytics-icon" className="w-24 h-24 bg-accent-subtle text-accent rounded-full flex items-center justify-center mb-6">
-              <UsageIcon className="w-12 h-12" />
-            </div>
-            <h2 className="text-xl font-bold text-primary mb-2">No usage data yet</h2>
-            <p className="text-sm text-tertiary max-w-md">
-              Start using your prompts on AI platforms to see your analytics here.
-            </p>
-          </div>
+      <main className={`flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar pb-8 ${GUTTER}`} data-scroll-container>
+        {loading && !stats ? (
+          <div className="mt-3.5 h-[220px] rounded-hero bg-muted animate-pulse" role="status" aria-label="Loading analytics" />
         ) : (
-          <div className="space-y-8">
-            {/* Summary Cards Row */}
-            <section aria-label="Usage summary">
-              <h2 className="text-sm font-semibold text-tertiary uppercase tracking-wider mb-4">
-                Summary
-              </h2>
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <SummaryCard
-                  label="Total Uses"
-                  value={summaryMetrics.totalUses}
-                  subtitle="prompts inserted"
-                  icon={<UsageIcon className="w-full h-full" />}
-                  loading={loading}
-                />
-                <SummaryCard
-                  label="Top Platform"
-                  value={summaryMetrics.topPlatform ? formatPlatformName(summaryMetrics.topPlatform.name) : '-'}
-                  subtitle={summaryMetrics.topPlatform ? `${String(summaryMetrics.topPlatform.count)} uses` : 'No data'}
-                  icon={<PlatformIcon className="w-full h-full" />}
-                  loading={loading}
-                />
-                <SummaryCard
-                  label="Peak Day"
-                  value={summaryMetrics.peakDay?.day ?? '-'}
-                  subtitle={summaryMetrics.peakDay ? `${String(summaryMetrics.peakDay.count)} uses` : 'No data'}
-                  icon={<CalendarIcon className="w-full h-full" />}
-                  loading={loading}
-                />
-                <SummaryCard
-                  label="Top Category"
-                  value={summaryMetrics.topCategory?.name ?? '-'}
-                  subtitle={summaryMetrics.topCategory ? `${String(summaryMetrics.topCategory.count)} uses` : 'No data'}
-                  icon={<CategoryIcon className="w-full h-full" />}
-                  loading={loading}
-                />
-              </div>
-            </section>
+          <>
+            <StatsHero total={history.length} weekdays={weekdays} wide />
 
-            {/* Usage Trend Line Chart */}
-            <section aria-label="Usage trend">
-              <h2 className="text-sm font-semibold text-tertiary uppercase tracking-wider mb-4">
-                Usage Trend
-              </h2>
-              <div className="bg-card rounded-xl p-4 border border-default">
-                {loading ? (
-                  <div className="animate-pulse bg-muted rounded-xl" style={{ height: CHART_HEIGHT.MEDIUM }} />
-                ) : (
-                  <ErrorBoundary fallback={<ChartErrorFallback height={CHART_HEIGHT.MEDIUM} />}>
-                    <UsageLineChart
-                      data={stats?.dailyUsage ?? []}
-                      height={CHART_HEIGHT.MEDIUM}
-                    />
-                  </ErrorBoundary>
+            {/* From lg up, Most used at the left of Top platform, Top category and Tidy up; under it, the tab's order */}
+            <div className="grid grid-cols-1 gap-x-2.5 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:grid-rows-[auto_1fr] lg:items-start">
+              {hasData && (
+                <div className="mt-2.5 grid grid-cols-2 gap-2.5 lg:col-start-2 lg:row-start-1">
+                  <StatCard label="Top platform" name={topPlatform ? formatPlatformName(topPlatform.platform) : '-'} count={topPlatform?.count ?? 0} delayIndex={0} />
+                  <StatCard label="Top category" name={topCategory?.name ?? '-'} count={topCategory?.count ?? 0} delayIndex={1} />
+                </div>
+              )}
+
+              {allRanked.length > 0 && (
+                <div className="min-w-0 lg:col-start-1 lg:row-start-1 lg:row-span-2">
+                  <MostUsedCard
+                    ranked={allRanked.slice(0, MOST_USED_ROWS_FULL)}
+                    usedCount={allRanked.length}
+                    meta={rowMeta}
+                    readOnly
+                  />
+                </div>
+              )}
+
+              <div className="min-w-0 lg:col-start-2">
+                <TidyUpCard
+                  neverUsed={neverUsed}
+                  duplicatePairs={duplicateGroups ? countDuplicatePairs(duplicateGroups) : null}
+                  onReviewNeverUsed={() => { review({ kind: 'neverUsed' }); }}
+                  onReviewDuplicates={() => {
+                    if (duplicateGroups) {
+                      review({ kind: 'duplicates', groups: duplicateReviewGroups(duplicateGroups) });
+                    }
+                  }}
+                />
+                {reviewFailed && (
+                  <p role="alert" className="mt-2 px-1 text-xs font-medium text-danger">
+                    The review could not be opened in the side panel. Open My Prompt Manager and review from Analytics.
+                  </p>
                 )}
               </div>
-            </section>
+            </div>
 
-            {/* 2x2 Chart Grid */}
-            <section aria-label="Usage breakdown">
-              <h2 className="text-sm font-semibold text-tertiary uppercase tracking-wider mb-4">
-                Breakdown
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Platform Distribution */}
-                <div className="bg-card rounded-xl p-4 border border-default">
-                  <h3 className="text-sm font-medium text-primary mb-3">
-                    Platforms
-                  </h3>
-                  {loading ? (
-                    <div className="animate-pulse bg-muted rounded-xl" style={{ height: CHART_HEIGHT.SMALL }} />
-                  ) : (
-                    <ErrorBoundary fallback={<ChartErrorFallback height={CHART_HEIGHT.SMALL} />}>
-                      <PlatformPieChart
-                        data={stats?.platformBreakdown ?? []}
-                        height={CHART_HEIGHT.SMALL}
-                      />
-                    </ErrorBoundary>
-                  )}
-                </div>
-
-                {/* Day of Week */}
-                <div className="bg-card rounded-xl p-4 border border-default">
-                  <h3 className="text-sm font-medium text-primary mb-3">
-                    Day of Week
-                  </h3>
-                  {loading ? (
-                    <div className="animate-pulse bg-muted rounded-xl" style={{ height: CHART_HEIGHT.SMALL }} />
-                  ) : (
-                    <ErrorBoundary fallback={<ChartErrorFallback height={CHART_HEIGHT.SMALL} />}>
-                      <DayOfWeekChart
-                        data={stats?.dayOfWeekDistribution ?? []}
-                        height={CHART_HEIGHT.SMALL}
-                      />
-                    </ErrorBoundary>
-                  )}
-                </div>
-
-                {/* Category Distribution */}
-                <div className="bg-card rounded-xl p-4 border border-default">
-                  <h3 className="text-sm font-medium text-primary mb-3">
-                    Categories
-                  </h3>
-                  {loading ? (
-                    <div className="animate-pulse bg-muted rounded-xl" style={{ height: CHART_HEIGHT.SMALL }} />
-                  ) : (
-                    <ErrorBoundary fallback={<ChartErrorFallback height={CHART_HEIGHT.SMALL} />}>
-                      <CategoryBarChart
-                        data={stats?.categoryDistribution ?? []}
-                        height={CHART_HEIGHT.SMALL}
-                        maxCategories={MAX_CATEGORIES_DISPLAY}
-                      />
-                    </ErrorBoundary>
-                  )}
-                </div>
-
-                {/* Time of Day */}
-                <div className="bg-card rounded-xl p-4 border border-default">
-                  <h3 className="text-sm font-medium text-primary mb-3">
-                    Time of Day
-                  </h3>
-                  {loading ? (
-                    <div className="animate-pulse bg-muted rounded-xl" style={{ height: CHART_HEIGHT.SMALL }} />
-                  ) : (
-                    <ErrorBoundary fallback={<ChartErrorFallback height={CHART_HEIGHT.SMALL} />}>
-                      <TimeOfDayChart
-                        data={stats?.timeOfDayDistribution ?? []}
-                        height={CHART_HEIGHT.SMALL}
-                      />
-                    </ErrorBoundary>
-                  )}
-                </div>
+            {hasData && (
+              <div className="grid grid-cols-1 gap-x-2.5 md:grid-cols-2 md:items-start">
+                {platforms.length > 0 && (
+                  <RankedRows
+                    title="Platforms"
+                    delayIndex={2}
+                    rows={platforms.slice(0, RANKED_ROWS).map(entry => ({
+                      key: entry.platform,
+                      label: formatPlatformName(entry.platform),
+                      count: entry.count
+                    }))}
+                  />
+                )}
+                {rankedCategories.length > 0 && (
+                  <RankedRows
+                    title="Categories"
+                    delayIndex={3}
+                    rows={rankedCategories.slice(0, RANKED_ROWS).map(entry => ({
+                      key: entry.name,
+                      label: entry.name,
+                      count: entry.count,
+                      dotColor: entry.color
+                    }))}
+                  />
+                )}
+                <ChartCard
+                  id="daily-use"
+                  title="Daily use"
+                  subtitle={`Used on ${String(activeDays)} of the last ${String(stats?.dailyUsage.length ?? 0)} days.`}
+                  delayIndex={4}
+                >
+                  <DailyUseChart data={stats?.dailyUsage ?? []} />
+                </ChartCard>
+                <ChartCard
+                  id="time-of-day"
+                  title="Time of day"
+                  subtitle={busiestTime ? `${busiestTime.bucket} is your busiest time.` : 'No Prompts used yet.'}
+                  delayIndex={5}
+                >
+                  <TimeOfDayChart data={stats?.timeOfDayDistribution ?? []} />
+                </ChartCard>
               </div>
-            </section>
-
-            {/* Prompt Tables with Tabs */}
-            <section aria-label="Prompt usage details">
-              <h2 className="text-sm font-semibold text-tertiary uppercase tracking-wider mb-4">
-                Prompts
-              </h2>
-              <div className="bg-card rounded-xl border border-default overflow-hidden">
-                {/* Tabs */}
-                <div className="border-b border-divider p-2">
-                  <div className="flex gap-1" role="tablist" aria-label="Prompt tabs">
-                    {Object.values(PROMPT_TABS).map((tab) => (
-                      <button
-                        key={tab}
-                        ref={(el) => {
-                          if (el) {
-                            tabRefs.current.set(tab, el);
-                          }
-                        }}
-                        id={`tab-${tab}`}
-                        data-tab={tab}
-                        onClick={handleTabClick}
-                        onKeyDown={handleTabKeyDown}
-                        className={`px-4 py-2 text-sm rounded-lg transition-colors focus-interactive ${
-                          activeTab === tab
-                            ? 'bg-accent-selected text-accent-strong font-semibold'
-                            : 'text-tertiary font-medium hover:bg-muted hover:text-primary'
-                        }`}
-                        aria-selected={activeTab === tab}
-                        aria-controls={`tabpanel-${tab}`}
-                        tabIndex={activeTab === tab ? 0 : -1}
-                        role="tab"
-                      >
-                        {TAB_LABELS[tab]}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Tab Content - render all panels, hide inactive for valid aria-controls */}
-                {Object.values(PROMPT_TABS).map((tab) => {
-                  const isActive = activeTab === tab;
-                  const tabPrompts = getPromptsForTab(tab);
-                  return (
-                    <div
-                      key={tab}
-                      id={`tabpanel-${tab}`}
-                      className="p-4"
-                      role="tabpanel"
-                      aria-labelledby={`tab-${tab}`}
-                      hidden={!isActive}
-                    >
-                      {loading ? (
-                        <div className="space-y-3">
-                          {[1, 2, 3, 4, 5].map((i) => (
-                            <div key={i} className="animate-pulse bg-raised rounded-xl p-4">
-                              <div className="h-4 bg-muted rounded w-3/4 mb-2" />
-                              <div className="h-3 bg-muted rounded w-1/4" />
-                            </div>
-                          ))}
-                        </div>
-                      ) : tabPrompts.length > 0 ? (
-                        <ul className="space-y-2">
-                          {tabPrompts.map((prompt, index) => (
-                            <li
-                              key={prompt.promptId}
-                              className="bg-raised rounded-xl p-4"
-                            >
-                              <div className="flex items-start gap-4">
-                                <div data-testid="rank-badge" className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                                  tab === PROMPT_TABS.MOST_USED && index === 0
-                                    ? 'bg-medal-gold text-on-accent'
-                                    : tab === PROMPT_TABS.MOST_USED && index === 1
-                                    ? 'bg-medal-silver text-on-accent'
-                                    : tab === PROMPT_TABS.MOST_USED && index === 2
-                                    ? 'bg-medal-bronze text-on-accent'
-                                    : 'bg-subtle text-tertiary'
-                                }`}>
-                                  {tab === PROMPT_TABS.MOST_USED && index < 3 ? (
-                                    <TrophyIcon className="w-4 h-4" />
-                                  ) : (
-                                    <span className="text-xs font-bold">{index + 1}</span>
-                                  )}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <h4 className="text-sm font-medium text-primary truncate">
-                                    {prompt.title}
-                                  </h4>
-                                  <div className="flex items-center gap-3 mt-1">
-                                    <span className="text-xs text-accent font-medium">
-                                      {prompt.count} {prompt.count === 1 ? 'use' : 'uses'}
-                                    </span>
-                                    <span className="text-xs text-tertiary">
-                                      {formatRelativeTime(prompt.lastUsed, now)}
-                                    </span>
-                                    {prompt.category && (
-                                      <span className="text-xs px-2 py-0.5 bg-subtle text-secondary rounded-full">
-                                        {prompt.category}
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <div className="text-center py-8">
-                          <p className="text-sm text-tertiary">
-                            {tab === PROMPT_TABS.FORGOTTEN
-                              ? 'No forgotten prompts - you are using all your prompts!'
-                              : 'No prompts to display'}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-          </div>
+            )}
+          </>
         )}
       </main>
     </div>

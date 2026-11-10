@@ -4,7 +4,8 @@
  * Never used and Duplicate pair).
  */
 
-import type { Prompt, UsageEvent } from '../types';
+import { DEFAULT_CATEGORY_COLOR } from '../constants/colors';
+import type { Category, Prompt, UsageEvent } from '../types';
 
 export interface WeekdayUsage {
   /** Short label under the bar: 'Mon' */
@@ -18,6 +19,18 @@ export interface RankedPrompt {
   prompt: Prompt;
   count: number;
   lastUsed: number;
+}
+
+export interface PlatformUsage {
+  platform: string;
+  count: number;
+}
+
+export interface CategoryUsage {
+  name: string;
+  count: number;
+  /** The Category's own color, else the default Category color */
+  color: string;
 }
 
 export interface DuplicateGroup {
@@ -48,20 +61,14 @@ export function weekdayUsage(events: UsageEvent[]): WeekdayUsage[] {
 
 /** The weekday with the most Insertions, the first of the week on a tie; none without usage */
 export function busiestWeekday(series: WeekdayUsage[]): WeekdayUsage | null {
-  let busiest: WeekdayUsage | null = null;
-  for (const weekday of series) {
-    if (weekday.count > (busiest?.count ?? 0)) {
-      busiest = weekday;
-    }
-  }
-  return busiest;
+  return busiest(series);
 }
 
 /**
- * Counts Insertions per key and returns the key with the most, ties going to the one used most
- * recently; none when no event has a key.
+ * Counts Insertions per key, most first, ties going to the key used most recently; an event without
+ * a key is left out.
  */
-function topByCount(events: UsageEvent[], keyOf: (event: UsageEvent) => string | undefined): { key: string; count: number } | null {
+function rankByKey(events: UsageEvent[], keyOf: (event: UsageEvent) => string | undefined): { key: string; count: number }[] {
   const tally = new Map<string, { count: number; lastUsed: number }>();
   for (const event of events) {
     const key = keyOf(event);
@@ -76,30 +83,52 @@ function topByCount(events: UsageEvent[], keyOf: (event: UsageEvent) => string |
       tally.set(key, { count: 1, lastUsed: event.timestamp });
     }
   }
+  return [...tally.entries()]
+    .sort(([, a], [, b]) => b.count - a.count || b.lastUsed - a.lastUsed)
+    .map(([key, entry]) => ({ key, count: entry.count }));
+}
 
-  let top: { key: string; count: number; lastUsed: number } | null = null;
-  for (const [key, entry] of tally) {
-    if (!top || entry.count > top.count || (entry.count === top.count && entry.lastUsed > top.lastUsed)) {
-      top = { key, ...entry };
-    }
-  }
-  return top && { key: top.key, count: top.count };
+/** The Platforms by Insertions, most first, ties to the one used most recently */
+export function platformRanking(events: UsageEvent[]): PlatformUsage[] {
+  return rankByKey(events, event => event.platform).map(({ key, count }) => ({ platform: key, count }));
 }
 
 /** The Platform with the most Insertions, ties to the one used most recently */
-export function topPlatform(events: UsageEvent[]): { platform: string; count: number } | null {
-  const top = topByCount(events, event => event.platform);
-  return top && { platform: top.key, count: top.count };
+export function topPlatform(events: UsageEvent[]): PlatformUsage | null {
+  return platformRanking(events)[0] ?? null;
 }
 
 /**
- * The Category with the most Insertions, each counted in its Prompt's current Category; Insertions
- * of a deleted Prompt are left out. Ties go to the one used most recently.
+ * The Categories by Insertions, most first, each Insertion counted in its Prompt's current Category;
+ * Insertions of a deleted Prompt are left out. Ties go to the one used most recently. Each has its
+ * own color; a Category stored without a color, or no longer stored, takes the default Category
+ * color, as in the Library.
  */
-export function topCategory(events: UsageEvent[], prompts: Prompt[]): { name: string; count: number } | null {
+export function categoryRanking(events: UsageEvent[], prompts: Prompt[], categories: Category[] = []): CategoryUsage[] {
   const categoryOf = new Map(prompts.map(prompt => [prompt.id, prompt.category]));
-  const top = topByCount(events, event => categoryOf.get(event.promptId));
-  return top && { name: top.key, count: top.count };
+  const colorOf = new Map(categories.map(category => [category.name, category.color]));
+  return rankByKey(events, event => categoryOf.get(event.promptId)).map(({ key, count }) => ({
+    name: key,
+    count,
+    color: colorOf.get(key) || DEFAULT_CATEGORY_COLOR
+  }));
+}
+
+/** The Category with the most Insertions: the first of categoryRanking */
+export function topCategory(events: UsageEvent[], prompts: Prompt[]): { name: string; count: number } | null {
+  const top = categoryRanking(events, prompts).at(0);
+  return top ? { name: top.name, count: top.count } : null;
+}
+
+/** The entry with the highest count, the first on a tie; none when nothing was counted */
+export function busiest<T extends { count: number }>(series: readonly T[]): T | null {
+  let top: T | null = null;
+  for (const entry of series) {
+    if (entry.count > (top?.count ?? 0)) {
+      top = entry;
+    }
+  }
+  return top;
 }
 
 /**

@@ -1,10 +1,5 @@
-export type { CategoryBarChartProps } from './CategoryBarChart';
-export { default as CategoryBarChart } from './CategoryBarChart';
-export type { DayOfWeekChartProps } from './DayOfWeekChart';
-export { default as DayOfWeekChart } from './DayOfWeekChart';
-export type { PlatformPieChartProps } from './PlatformPieChart';
-export { default as PlatformPieChart } from './PlatformPieChart';
+export { default as ChartTooltip } from './ChartTooltip';
+export type { DailyUseChartProps } from './DailyUseChart';
+export { default as DailyUseChart } from './DailyUseChart';
 export type { TimeOfDayChartProps } from './TimeOfDayChart';
 export { default as TimeOfDayChart } from './TimeOfDayChart';
-export type { UsageLineChartProps } from './UsageLineChart';
-export { default as UsageLineChart } from './UsageLineChart';

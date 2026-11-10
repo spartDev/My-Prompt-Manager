@@ -12,7 +12,7 @@ Which component does which job in the popup and the side panel, and the conventi
 |--------|---------------|
 | `src/components/` | The views of the four sections, the forms and the shared primitives |
 | `src/components/settings/` | The sections and cards of the Settings view |
-| `src/components/analytics/` | The Analytics section, its full dashboard and the charts (`charts/`) |
+| `src/components/analytics/` | The Analytics section, its full-page view and that view's two charts (`charts/`) |
 | `src/components/icons/` | Inline SVG icons, one file per area |
 
 ## Which component for which job
@@ -24,7 +24,8 @@ Which component does which job in the popup and the side panel, and the conventi
 | `src/components/LibraryView.tsx` | The Library: search, the Library filter pills, the Prompt cards, the empty states |
 | `src/components/CategoryManager.tsx` | The Categories section: the list of Categories, each row (but the default one) opening `CategorySheet` to rename, recolor or delete it, and "Add category" below the list to create one. Steps the screen back while the sheet is open, out of reach with App's tab bar (`onSheetOpenChange`), and pops in a Category that appears (created, or back from Undo) |
 | `src/components/CategorySheet.tsx` | The bottom sheet that creates or edits a Category (`mode: 'create' \| 'edit'`): name, one of the 12 `PRESET_COLORS`, a live preview. Its state (open, closing, draft) is `useCategorySheet`; its keyboard is `useModalFocus` |
-| `src/components/analytics/AnalyticsTab.tsx` | The Analytics section (Atelier 1C): `StatsHero` (total and weekday bars), the Top platform and Top category cards, `MostUsedCard`, `TidyUpCard`, and Clear history; `src/components/analytics/AnalyticsDashboard.tsx` is the full page it expands to |
+| `src/components/analytics/AnalyticsTab.tsx` | The Analytics section (Atelier 1C): `StatsHero` (total and weekday bars), the Top platform and Top category cards, `MostUsedCard`, `TidyUpCard`, and Clear history |
+| `src/components/analytics/AnalyticsDashboard.tsx` | The full-page Analytics view the tab expands to (`src/analytics.html`): the same hero (`wide`), stat cards, Most used (10 rows, read not pressed) and Tidy up, then the Platforms and Categories as `RankedRows` and the Daily use and Time of day charts. Review in Tidy up opens the side panel on the Library filter through `src/services/libraryReview.ts` |
 | `src/components/SettingsView.tsx` | Settings: assembles the sections of `src/components/settings/`, and runs Backup restore (`handleImportData`, passed down as `onImport`) |
 | `src/components/TabBar.tsx` | The bottom tab bar; its `Section` type names the four sections, `SECTION_ORDER` their order left to right |
 
@@ -66,7 +67,7 @@ Which component does which job in the popup and the side panel, and the conventi
 
 ### Analytics charts
 
-Imported from `src/components/analytics/index.ts`. Each chart takes its data from `useUsageStats` and its colors from `src/theme/chartColors.ts`; `src/components/analytics/SummaryCard.tsx` shows one metric of `useSummaryMetrics` on the dashboard. The Analytics tab draws no chart library: its weekday bars are plain elements in `StatsHero`, computed by `src/services/usageInsights.ts`.
+`DailyUseChart` and `TimeOfDayChart` (`src/components/analytics/charts/`, recharts) are the two charts of the full-page view: pill bars in the accent, colors from `src/theme/chartColors.ts`, data from `useUsageStats`, a `ChartTooltip` in the hero's dark pill, and an `aria-label` that says what the bars show. Everything else on both surfaces is plain elements: the weekday bars of `StatsHero`, and the ranked rows of `MostUsedCard` and `RankedRows` (`RankRowContent`), computed by `src/services/usageInsights.ts`. The row counts are in `src/components/analytics/constants.ts`: 3 Most used rows in the tab, 10 in the full-page view, 6 per Platforms or Categories card.
 
 ---
 

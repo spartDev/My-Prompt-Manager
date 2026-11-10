@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
+import { DEFAULT_CATEGORY_COLOR } from '../../constants/colors';
 import { buildPrompt } from '../../test/builders/buildPrompt';
 import type { UsageEvent } from '../../types';
 import {
+  busiest,
   busiestWeekday,
+  categoryRanking,
   countDuplicatePairs,
   countNeverUsed,
   duplicateReviewGroups,
   isNeverUsed,
+  platformRanking,
   rankByUses,
   remainingDuplicates,
   topCategory,
@@ -248,5 +252,77 @@ describe('withLatestUsage', () => {
     const stored = [buildPrompt({ id: 'a', usageCount: 1, lastUsedAt: MON }), buildPrompt({ id: 'gone', usageCount: 5 })];
 
     expect(withLatestUsage(app, stored)).toEqual(app);
+  });
+});
+
+describe('platformRanking', () => {
+  it('lists the Platforms by Insertions, most first', () => {
+    const ranking = platformRanking([event('a', MON, 'chatgpt'), event('a', TUE, 'claude'), event('b', WED, 'claude')]);
+
+    expect(ranking).toEqual([{ platform: 'claude', count: 2 }, { platform: 'chatgpt', count: 1 }]);
+  });
+
+  it('puts the Platform used most recently first on a tie, as topPlatform does', () => {
+    const events = [event('a', WED, 'chatgpt'), event('a', MON, 'claude')];
+
+    expect(platformRanking(events).map(entry => entry.platform)).toEqual(['chatgpt', 'claude']);
+    expect(topPlatform(events)).toEqual(platformRanking(events)[0]);
+  });
+
+  it('is empty without usage', () => {
+    expect(platformRanking([])).toEqual([]);
+  });
+});
+
+describe('categoryRanking', () => {
+  const prompts = [
+    buildPrompt({ id: 'a', category: 'Writing' }),
+    buildPrompt({ id: 'b', category: 'Code' }),
+    buildPrompt({ id: 'c', category: 'Code' })
+  ];
+  const categories = [{ id: '1', name: 'Code', color: '#112233' }, { id: '2', name: 'Writing', color: '#445566' }];
+
+  it('counts each Insertion in the current Category of its Prompt, most first', () => {
+    const ranking = categoryRanking([event('a', MON), event('b', TUE), event('c', WED)], prompts, categories);
+
+    expect(ranking).toEqual([
+      { name: 'Code', count: 2, color: '#112233' },
+      { name: 'Writing', count: 1, color: '#445566' }
+    ]);
+  });
+
+  it('leaves out the Insertions of a deleted Prompt', () => {
+    expect(categoryRanking([event('gone', MON), event('a', TUE)], prompts, categories).map(entry => entry.name)).toEqual(['Writing']);
+  });
+
+  it('gives the default Category color to a Category stored without a color, or no longer stored, as the Library does', () => {
+    const stored = [{ id: '2', name: 'Writing' }];
+
+    const ranking = categoryRanking([event('a', MON), event('b', TUE)], prompts, stored);
+
+    expect(ranking.map(entry => [entry.name, entry.color])).toEqual([
+      ['Code', DEFAULT_CATEGORY_COLOR],
+      ['Writing', DEFAULT_CATEGORY_COLOR]
+    ]);
+  });
+
+  it('starts with topCategory', () => {
+    const events = [event('a', WED), event('b', MON)];
+    const first = categoryRanking(events, prompts)[0];
+
+    expect(topCategory(events, prompts)).toEqual({ name: first.name, count: first.count });
+  });
+});
+
+describe('busiest', () => {
+  it('is the entry with the highest count, the first on a tie', () => {
+    const series = [{ bucket: 'Morning', count: 2 }, { bucket: 'Afternoon', count: 5 }, { bucket: 'Evening', count: 5 }];
+
+    expect(busiest(series)?.bucket).toBe('Afternoon');
+  });
+
+  it('is none when nothing was counted', () => {
+    expect(busiest([{ count: 0 }, { count: 0 }])).toBeNull();
+    expect(busiest([])).toBeNull();
   });
 });

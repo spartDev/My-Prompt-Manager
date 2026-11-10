@@ -347,14 +347,8 @@ export const analyticsAssertions = {
    * Expect full analytics dashboard to be loaded (AnalyticsDashboard component)
    */
   dashboardLoaded: async (page: Page): Promise<void> => {
-    await expect(page.getByRole('heading', { name: 'Analytics Dashboard' })).toBeVisible();
-  },
-
-  /**
-   * Expect the full dashboard's empty state when no usage data exists
-   */
-  emptyState: async (page: Page): Promise<void> => {
-    await expect(page.getByText('No usage data yet')).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Analytics' })).toBeVisible();
+    await expect(page).toHaveURL(/analytics\.html/);
   },
 
   /**
@@ -425,20 +419,6 @@ export const analyticsAssertions = {
    */
   expandButtonHidden: async (page: Page): Promise<void> => {
     await expect(page.getByRole('button', { name: 'View full analytics dashboard' })).toBeHidden();
-  },
-
-  /**
-   * Expect a specific tab to be selected in the dashboard prompt tables
-   */
-  tabSelected: async (page: Page, tabName: 'Most Used' | 'Recently Used' | 'Forgotten'): Promise<void> => {
-    await expect(page.getByRole('tab', { name: tabName, selected: true })).toBeVisible();
-  },
-
-  /**
-   * Expect a chart section to be visible (Usage Trend, Platforms, etc.)
-   */
-  chartVisible: async (page: Page, chartLabel: string): Promise<void> => {
-    await expect(page.locator(`section[aria-label="${chartLabel}"]`)).toBeVisible();
   },
 };
 

@@ -1,23 +1,15 @@
 /**
- * Chart Components Tests
- *
- * Tests for all analytics chart components including UsageLineChart,
- * PlatformPieChart, DayOfWeekChart, CategoryBarChart, and TimeOfDayChart.
+ * The charts of the full-page Analytics view: Daily use and Time of day, their text alternatives and
+ * their tooltip.
  */
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, beforeAll, beforeEach, describe, expect, it, type Mock, type MockInstance, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, type MockInstance, vi } from 'vitest';
 
-import { ThemeProvider } from '../../../../contexts/ThemeContext';
-import { getChromeMockFunctions, getMockStorageManager } from '../../../../test/mocks';
-import { DEFAULT_SETTINGS } from '../../../../types';
-import CategoryBarChart from '../CategoryBarChart';
-import DayOfWeekChart from '../DayOfWeekChart';
-import PlatformPieChart from '../PlatformPieChart';
-import TimeOfDayChart from '../TimeOfDayChart';
-import UsageLineChart from '../UsageLineChart';
+import ChartTooltip from '../ChartTooltip';
+import DailyUseChart, { dailyUseSummary, formatDay } from '../DailyUseChart';
+import TimeOfDayChart, { timeOfDaySummary } from '../TimeOfDayChart';
 
-// Mock ResizeObserver as a proper class
 class MockResizeObserver {
   observe = vi.fn();
   unobserve = vi.fn();
@@ -28,285 +20,82 @@ beforeAll(() => {
   vi.stubGlobal('ResizeObserver', MockResizeObserver);
 });
 
-// Helper to render chart components with ThemeProvider
-const renderWithTheme = async (ui: React.ReactElement, theme: 'light' | 'dark' = 'light') => {
-  const chromeMock = getChromeMockFunctions();
-  const storageMock = getMockStorageManager();
+const DAYS = [
+  { date: '2026-01-11', count: 5 },
+  { date: '2026-01-12', count: 10 },
+  { date: '2026-01-13', count: 0 }
+];
 
-  (chromeMock.storage.local.get as Mock).mockResolvedValue({
-    settings: { ...DEFAULT_SETTINGS, theme }
+const TIMES = [
+  { bucket: 'Morning', count: 10 },
+  { bucket: 'Afternoon', count: 20 },
+  { bucket: 'Evening', count: 8 },
+  { bucket: 'Night', count: 0 }
+];
+
+describe('DailyUseChart', () => {
+  it('says the period, its total and the busiest day to assistive technology', () => {
+    render(<DailyUseChart data={DAYS} />);
+
+    expect(screen.getByRole('img')).toHaveAccessibleName(
+      'Prompts used per day over the last 3 days: 15 in all. The busiest day is Jan 12, with 10.'
+    );
   });
 
-  storageMock.getSettings.mockResolvedValue({
-    ...DEFAULT_SETTINGS,
-    theme
+  it('says so when no Prompt was used', () => {
+    expect(dailyUseSummary([{ date: '2026-01-11', count: 0 }])).toBe('Prompts used per day over the last 1 days: none yet.');
   });
 
-  const result = render(
-    <ThemeProvider>
-      {ui}
-    </ThemeProvider>
-  );
-
-  // Wait for theme initialization
-  await waitFor(() => {
-    expect(storageMock.getSettings).toHaveBeenCalled();
-  });
-
-  return result;
-};
-
-beforeEach(() => {
-  const chromeMock = getChromeMockFunctions();
-  (chromeMock.tabs.query as Mock).mockResolvedValue([]);
-});
-
-describe('UsageLineChart', () => {
-  const mockData = [
-    { date: '2026-01-11', count: 5 },
-    { date: '2026-01-12', count: 10 },
-    { date: '2026-01-13', count: 8 }
-  ];
-
-  it('should render with data', async () => {
-    await renderWithTheme(<UsageLineChart data={mockData} />);
-
-    const chart = screen.getByRole('img', { name: /usage trend chart/i });
-    expect(chart).toBeInTheDocument();
-  });
-
-  it('should show empty state when no data', async () => {
-    await renderWithTheme(<UsageLineChart data={[]} />);
-
-    expect(screen.getByText('No usage data')).toBeInTheDocument();
-  });
-
-  it('should render with custom height', async () => {
-    const { container } = await renderWithTheme(<UsageLineChart data={mockData} height={300} />);
-
-    // ResponsiveContainer should exist
-    expect(container.querySelector('.recharts-responsive-container')).toBeInTheDocument();
-  });
-
-  it('should render without grid when showGrid is false', async () => {
-    await renderWithTheme(<UsageLineChart data={mockData} showGrid={false} />);
-
-    const chart = screen.getByRole('img', { name: /usage trend chart/i });
-    expect(chart).toBeInTheDocument();
-  });
-
-  it('should adapt to dark mode from theme context', async () => {
-    await renderWithTheme(<UsageLineChart data={mockData} />, 'dark');
-
-    const chart = screen.getByRole('img', { name: /usage trend chart/i });
-    expect(chart).toBeInTheDocument();
-  });
-});
-
-describe('PlatformPieChart', () => {
-  const mockData = [
-    { platform: 'claude', count: 20, percentage: 50 },
-    { platform: 'chatgpt', count: 12, percentage: 30 },
-    { platform: 'gemini', count: 8, percentage: 20 }
-  ];
-
-  it('should render with data', async () => {
-    await renderWithTheme(<PlatformPieChart data={mockData} />);
-
-    const chart = screen.getByRole('img', { name: /platform breakdown chart/i });
-    expect(chart).toBeInTheDocument();
-  });
-
-  it('should show empty state when no data', async () => {
-    await renderWithTheme(<PlatformPieChart data={[]} />);
-
-    expect(screen.getByText('No platform data')).toBeInTheDocument();
-  });
-
-  it('should hide legend when showLegend is false', async () => {
-    await renderWithTheme(<PlatformPieChart data={mockData} showLegend={false} />);
-
-    const chart = screen.getByRole('img', { name: /platform breakdown chart/i });
-    expect(chart).toBeInTheDocument();
-  });
-
-  it('should adapt to dark mode from theme context', async () => {
-    await renderWithTheme(<PlatformPieChart data={mockData} />, 'dark');
-
-    const chart = screen.getByRole('img', { name: /platform breakdown chart/i });
-    expect(chart).toBeInTheDocument();
-  });
-
-  it('should handle unknown platforms', async () => {
-    const dataWithUnknown = [
-      { platform: 'new-platform', count: 10, percentage: 100 }
-    ];
-
-    await renderWithTheme(<PlatformPieChart data={dataWithUnknown} />);
-
-    const chart = screen.getByRole('img', { name: /platform breakdown chart/i });
-    expect(chart).toBeInTheDocument();
-  });
-});
-
-describe('DayOfWeekChart', () => {
-  const mockData = [
-    { day: 'Sun', dayIndex: 0, count: 3 },
-    { day: 'Mon', dayIndex: 1, count: 15 },
-    { day: 'Tue', dayIndex: 2, count: 10 },
-    { day: 'Wed', dayIndex: 3, count: 8 },
-    { day: 'Thu', dayIndex: 4, count: 12 },
-    { day: 'Fri', dayIndex: 5, count: 6 },
-    { day: 'Sat', dayIndex: 6, count: 4 }
-  ];
-
-  it('should render with data', async () => {
-    await renderWithTheme(<DayOfWeekChart data={mockData} />);
-
-    const chart = screen.getByRole('img', { name: /day of week usage chart/i });
-    expect(chart).toBeInTheDocument();
-  });
-
-  it('should show empty state when no data', async () => {
-    await renderWithTheme(<DayOfWeekChart data={[]} />);
-
-    expect(screen.getByText('No day of week data')).toBeInTheDocument();
-  });
-
-  it('should not highlight peak when highlightPeak is false', async () => {
-    await renderWithTheme(<DayOfWeekChart data={mockData} highlightPeak={false} />);
-
-    const chart = screen.getByRole('img', { name: /day of week usage chart/i });
-    expect(chart).toBeInTheDocument();
-  });
-
-  it('should adapt to dark mode from theme context', async () => {
-    await renderWithTheme(<DayOfWeekChart data={mockData} />, 'dark');
-
-    const chart = screen.getByRole('img', { name: /day of week usage chart/i });
-    expect(chart).toBeInTheDocument();
-  });
-});
-
-describe('CategoryBarChart', () => {
-  const mockData = [
-    { categoryId: '1', name: 'Development', count: 25, color: '#2563EB' },
-    { categoryId: '2', name: 'Writing', count: 18, color: '#2563EB' },
-    { categoryId: '3', name: 'Marketing', count: 12, color: '#2563EB' },
-    { categoryId: '4', name: 'Design', count: 8, color: '#2563EB' }
-  ];
-
-  it('should render with data', async () => {
-    await renderWithTheme(<CategoryBarChart data={mockData} />);
-
-    const chart = screen.getByRole('img', { name: /category usage chart/i });
-    expect(chart).toBeInTheDocument();
-  });
-
-  it('should show empty state when no data', async () => {
-    await renderWithTheme(<CategoryBarChart data={[]} />);
-
-    expect(screen.getByText('No category data')).toBeInTheDocument();
-  });
-
-  it('should limit categories when maxCategories is set', async () => {
-    const manyCategories = [
-      { categoryId: '1', name: 'Cat 1', count: 10, color: '#2563EB' },
-      { categoryId: '2', name: 'Cat 2', count: 9, color: '#2563EB' },
-      { categoryId: '3', name: 'Cat 3', count: 8, color: '#2563EB' },
-      { categoryId: '4', name: 'Cat 4', count: 7, color: '#2563EB' },
-      { categoryId: '5', name: 'Cat 5', count: 6, color: '#2563EB' },
-      { categoryId: '6', name: 'Cat 6', count: 5, color: '#2563EB' }
-    ];
-
-    await renderWithTheme(<CategoryBarChart data={manyCategories} maxCategories={3} />);
-
-    const chart = screen.getByRole('img', { name: /category usage chart showing 3 categories/i });
-    expect(chart).toBeInTheDocument();
-  });
-
-  it('should adapt to dark mode from theme context', async () => {
-    await renderWithTheme(<CategoryBarChart data={mockData} />, 'dark');
-
-    const chart = screen.getByRole('img', { name: /category usage chart/i });
-    expect(chart).toBeInTheDocument();
+  it('reads a day as a local day, west of UTC too', () => {
+    const systemTimeZone = process.env.TZ;
+    process.env.TZ = 'America/New_York';
+    try {
+      expect(formatDay('2026-01-11')).toBe('Jan 11');
+    } finally {
+      if (systemTimeZone === undefined) {
+        delete process.env.TZ;
+      } else {
+        process.env.TZ = systemTimeZone;
+      }
+    }
   });
 });
 
 describe('TimeOfDayChart', () => {
-  const mockData = [
-    { bucket: 'Morning', count: 15 },
-    { bucket: 'Afternoon', count: 25 },
-    { bucket: 'Evening', count: 12 },
-    { bucket: 'Night', count: 5 }
-  ];
+  it('says every count and the busiest time to assistive technology', () => {
+    render(<TimeOfDayChart data={TIMES} />);
 
-  it('should render with data', async () => {
-    await renderWithTheme(<TimeOfDayChart data={mockData} />);
-
-    const chart = screen.getByRole('img', { name: /time of day usage chart/i });
-    expect(chart).toBeInTheDocument();
+    expect(screen.getByRole('img')).toHaveAccessibleName(
+      'Prompts used per time of day: Morning 10, Afternoon 20, Evening 8, Night 0. Afternoon is the busiest.'
+    );
   });
 
-  it('should show empty state when no data', async () => {
-    await renderWithTheme(<TimeOfDayChart data={[]} />);
-
-    expect(screen.getByText('No time of day data')).toBeInTheDocument();
-  });
-
-  it('should not highlight peak when highlightPeak is false', async () => {
-    await renderWithTheme(<TimeOfDayChart data={mockData} highlightPeak={false} />);
-
-    const chart = screen.getByRole('img', { name: /time of day usage chart/i });
-    expect(chart).toBeInTheDocument();
-  });
-
-  it('should adapt to dark mode from theme context', async () => {
-    await renderWithTheme(<TimeOfDayChart data={mockData} />, 'dark');
-
-    const chart = screen.getByRole('img', { name: /time of day usage chart/i });
-    expect(chart).toBeInTheDocument();
+  it('says so when no Prompt was used', () => {
+    expect(timeOfDaySummary([{ bucket: 'Morning', count: 0 }])).toBe('Prompts used per time of day: none yet.');
   });
 });
 
-describe('Chart Accessibility', () => {
-  it('UsageLineChart should have accessible aria-label', async () => {
-    const data = [{ date: '2026-01-13', count: 5 }];
-    await renderWithTheme(<UsageLineChart data={data} />);
+describe('ChartTooltip', () => {
+  it('shows the label of the hovered bar and its uses', () => {
+    render(<ChartTooltip active payload={[{ value: 12 }]} label="Morning" formatLabel={label => `${label}, 6-12`} />);
 
-    expect(screen.getByRole('img')).toHaveAttribute('aria-label');
+    expect(screen.getByTestId('chart-tooltip')).toHaveTextContent('Morning, 6-12 12 uses');
   });
 
-  it('PlatformPieChart should have accessible aria-label', async () => {
-    const data = [{ platform: 'claude', count: 10, percentage: 100 }];
-    await renderWithTheme(<PlatformPieChart data={data} />);
+  it('counts one use in the singular', () => {
+    render(<ChartTooltip active payload={[{ value: 1 }]} label="Night" />);
 
-    expect(screen.getByRole('img')).toHaveAttribute('aria-label');
+    expect(screen.getByTestId('chart-tooltip')).toHaveTextContent('Night 1 use');
   });
 
-  it('DayOfWeekChart should have accessible aria-label', async () => {
-    const data = [{ day: 'Mon', dayIndex: 1, count: 5 }];
-    await renderWithTheme(<DayOfWeekChart data={data} />);
+  it('shows nothing while no bar is hovered', () => {
+    const { container } = render(<ChartTooltip active={false} payload={[{ value: 1 }]} label="Night" />);
 
-    expect(screen.getByRole('img')).toHaveAttribute('aria-label');
-  });
-
-  it('CategoryBarChart should have accessible aria-label', async () => {
-    const data = [{ categoryId: '1', name: 'Test', count: 5, color: '#2563EB' }];
-    await renderWithTheme(<CategoryBarChart data={data} />);
-
-    expect(screen.getByRole('img')).toHaveAttribute('aria-label');
-  });
-
-  it('TimeOfDayChart should have accessible aria-label', async () => {
-    const data = [{ bucket: 'Morning', count: 5 }];
-    await renderWithTheme(<TimeOfDayChart data={data} />);
-
-    expect(screen.getByRole('img')).toHaveAttribute('aria-label');
+    expect(container).toBeEmptyDOMElement();
   });
 });
 
-describe('Chart Tooltips', () => {
+describe('Chart tooltips, drawn', () => {
   let layout: MockInstance<HTMLElement['getBoundingClientRect']>;
 
   // happy-dom lays nothing out: give each element a size so the charts draw and can be hovered
@@ -325,117 +114,23 @@ describe('Chart Tooltips', () => {
     fireEvent.mouseMove(chart as Element, { clientX: 200, clientY: 100 });
   };
 
-  /** The Tooltip shows exactly this line: name, separator, value */
-  const expectTooltipLine = async (container: HTMLElement, line: string) => {
-    await waitFor(() => {
-      expect(container.querySelector('.recharts-tooltip-item')?.textContent).toBe(line);
-    });
-  };
-
-  it('UsageLineChart shows the uses of the hovered day', async () => {
-    const { container } = await renderWithTheme(<UsageLineChart data={[{ date: '2026-01-11', count: 5 }]} />);
+  it('DailyUseChart shows the hovered day and its uses', async () => {
+    const { container } = render(<DailyUseChart data={[{ date: '2026-01-11', count: 5 }]} />);
 
     hoverChart(container);
-
-    await expectTooltipLine(container, 'Uses : 5');
-  });
-
-  it('UsageLineChart labels the hovered day with its own date, west of UTC too', async () => {
-    const systemTimeZone = process.env.TZ;
-    process.env.TZ = 'America/New_York';
-    try {
-      const { container } = await renderWithTheme(<UsageLineChart data={[{ date: '2026-01-11', count: 5 }]} />);
-
-      hoverChart(container);
-
-      await waitFor(() => {
-        expect(container.querySelector('.recharts-tooltip-label')?.textContent).toBe('Jan 11');
-      });
-    } finally {
-      if (systemTimeZone === undefined) {
-        delete process.env.TZ;
-      } else {
-        process.env.TZ = systemTimeZone;
-      }
-    }
-  });
-
-  it('DayOfWeekChart shows the uses of the hovered day', async () => {
-    const { container } = await renderWithTheme(<DayOfWeekChart data={[{ day: 'Mon', dayIndex: 1, count: 15 }]} />);
-
-    hoverChart(container);
-
-    await expectTooltipLine(container, 'Uses : 15');
-  });
-
-  it('CategoryBarChart shows the uses of the hovered Category', async () => {
-    const { container } = await renderWithTheme(
-      <CategoryBarChart data={[{ categoryId: '1', name: 'Development', count: 25, color: '#2563EB' }]} />
-    );
-
-    hoverChart(container);
-
-    await expectTooltipLine(container, 'Uses : 25');
-  });
-
-  it('TimeOfDayChart shows the uses of the hovered time of day', async () => {
-    const { container } = await renderWithTheme(<TimeOfDayChart data={[{ bucket: 'Morning', count: 12 }]} />);
-
-    hoverChart(container);
-
-    await expectTooltipLine(container, 'Uses : 12');
-  });
-
-  it('PlatformPieChart shows the hovered Platform and its uses', async () => {
-    const { container } = await renderWithTheme(
-      <PlatformPieChart data={[{ platform: 'claude', count: 20, percentage: 100 }]} />
-    );
-
-    const sector = await waitFor(() => {
-      const drawn = container.querySelector('.recharts-pie-sector');
-      expect(drawn, 'Platform sector drawn').not.toBeNull();
-      return drawn as Element;
-    });
-    fireEvent.mouseOver(sector);
-
-    await expectTooltipLine(container, 'Claude : 20 uses');
-  });
-});
-
-describe('CategoryBarChart drawn', () => {
-  let layout: MockInstance<HTMLElement['getBoundingClientRect']>;
-
-  const data = [
-    { categoryId: '1', name: 'Work', count: 4, color: '#3B82F6' },
-    { categoryId: '2', name: 'Development', count: 3, color: '#8B5CF6' },
-    { categoryId: '3', name: 'Personal', count: 2, color: '#10B981' },
-    { categoryId: '4', name: 'Customer Support Escalations', count: 1, color: '#2563EB' }
-  ];
-
-  // happy-dom lays nothing out: give each element a size so the chart draws its axes and bars
-  beforeEach(() => {
-    layout = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 400, 200));
-  });
-
-  afterEach(() => {
-    layout.mockRestore();
-  });
-
-  it('names each Category, and ends a name over 12 characters with an ellipsis', async () => {
-    const { container } = await renderWithTheme(<CategoryBarChart data={data} />);
 
     await waitFor(() => {
-      const ticks = container.querySelectorAll('.recharts-yAxis-tick-labels .recharts-cartesian-axis-tick-value');
-      expect(Array.from(ticks, tick => tick.textContent)).toEqual(['Work', 'Development', 'Personal', 'Customer Su…']);
+      expect(screen.getByTestId('chart-tooltip')).toHaveTextContent('Jan 11 5 uses');
     });
   });
 
-  it("paints each bar in its Category's color", async () => {
-    const { container } = await renderWithTheme(<CategoryBarChart data={data} />);
+  it('TimeOfDayChart shows the hovered time of day, its hours and its uses', async () => {
+    const { container } = render(<TimeOfDayChart data={[{ bucket: 'Morning', count: 12 }]} />);
+
+    hoverChart(container);
 
     await waitFor(() => {
-      const bars = container.querySelectorAll('.recharts-bar-rectangle path');
-      expect(Array.from(bars, bar => bar.getAttribute('fill'))).toEqual(['#3B82F6', '#8B5CF6', '#10B981', '#2563EB']);
+      expect(screen.getByTestId('chart-tooltip')).toHaveTextContent('Morning, 6-12 12 uses');
     });
   });
 });

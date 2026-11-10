@@ -60,19 +60,19 @@ const MIGRATED = [
   'components/settings/SiteRow.tsx',
   'components/settings/HelpSection.tsx',
   'components/settings/rowStyles.ts',
-  // My-Prompt-Manager-el4.6: Analytics (medals are tokens; the categorical chart palettes are data in theme/chartColors.ts)
+  // My-Prompt-Manager-el4.6: Analytics (the chart colors of theme/chartColors.ts read tokens)
   'components/analytics/AnalyticsTab.tsx',
   'components/analytics/AnalyticsDashboard.tsx',
-  'components/analytics/SummaryCard.tsx',
-  'components/analytics/charts/UsageLineChart.tsx',
-  'components/analytics/charts/DayOfWeekChart.tsx',
-  'components/analytics/charts/CategoryBarChart.tsx',
-  'components/analytics/charts/PlatformPieChart.tsx',
   'components/analytics/charts/TimeOfDayChart.tsx',
   // My-Prompt-Manager-6k3: Analytics redesigned after Atelier 1C
   'components/analytics/StatsHero.tsx',
   'components/analytics/MostUsedCard.tsx',
-  'components/analytics/TidyUpCard.tsx'
+  'components/analytics/TidyUpCard.tsx',
+  // My-Prompt-Manager-160: the full-page Analytics view after the Analytics tab
+  'components/analytics/StatCard.tsx',
+  'components/analytics/RankedRows.tsx',
+  'components/analytics/charts/DailyUseChart.tsx',
+  'components/analytics/charts/ChartTooltip.tsx'
 ];
 
 // Agent guidance that prescribes classes follows the same rule, or it steers UI work off the tokens

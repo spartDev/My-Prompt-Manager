@@ -1,23 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { DEFAULT_CATEGORY_COLOR } from '../constants/colors';
 import { StorageManager } from '../services/storage';
 import { UsageTracker } from '../services/UsageTracker';
 import { type AppError, type Category, type Prompt, USAGE_RETENTION_DAYS, type UsageEvent } from '../types';
 import type {
-  CategoryDistribution,
   DailyUsage,
-  DayOfWeekDistribution,
-  PlatformBreakdown,
-  PromptUsageSummary, 
   TimeOfDayDistribution,
   UsageStats,
   UseUsageStatsReturn
 } from '../types/hooks';
 
-const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const TIME_BUCKETS = ['Night', 'Morning', 'Afternoon', 'Evening'] as const;
-const FORGOTTEN_DAYS_THRESHOLD = 14;
 
 /**
  * Get time bucket based on hour of day
@@ -74,51 +67,6 @@ function calculateDailyUsage(events: UsageEvent[]): DailyUsage[] {
 }
 
 /**
- * Calculate platform breakdown with percentages
- */
-function calculatePlatformBreakdown(events: UsageEvent[]): PlatformBreakdown[] {
-  const platformCounts = new Map<string, number>();
-
-  for (const event of events) {
-    platformCounts.set(event.platform, (platformCounts.get(event.platform) ?? 0) + 1);
-  }
-
-  const total = events.length;
-  return Array.from(platformCounts.entries())
-    .map(([platform, count]) => ({
-      platform,
-      count,
-      percentage: total > 0 ? Math.round((count / total) * 100) : 0
-    }))
-    .sort((a, b) => b.count - a.count);
-}
-
-/**
- * Calculate day of week distribution
- */
-function calculateDayOfWeekDistribution(events: UsageEvent[]): DayOfWeekDistribution[] {
-  const dayCounts = new Map<number, number>();
-
-  // Initialize all days with 0
-  for (let i = 0; i < 7; i++) {
-    dayCounts.set(i, 0);
-  }
-
-  for (const event of events) {
-    const dayIndex = new Date(event.timestamp).getDay();
-    dayCounts.set(dayIndex, (dayCounts.get(dayIndex) ?? 0) + 1);
-  }
-
-  return Array.from(dayCounts.entries())
-    .sort(([a], [b]) => a - b)
-    .map(([dayIndex, count]) => ({
-      day: DAY_NAMES[dayIndex],
-      dayIndex,
-      count
-    }));
-}
-
-/**
  * Calculate time of day distribution
  */
 function calculateTimeOfDayDistribution(events: UsageEvent[]): TimeOfDayDistribution[] {
@@ -140,124 +88,6 @@ function calculateTimeOfDayDistribution(events: UsageEvent[]): TimeOfDayDistribu
     bucket,
     count: bucketCounts.get(bucket) ?? 0
   }));
-}
-
-/**
- * Calculate category distribution
- */
-function calculateCategoryDistribution(
-  events: UsageEvent[],
-  prompts: Prompt[],
-  categories: Category[]
-): CategoryDistribution[] {
-  const categoryCounts = new Map<string, number>();
-
-  // Create a map of promptId to category name
-  const promptCategories = new Map<string, string>();
-  for (const prompt of prompts) {
-    promptCategories.set(prompt.id, prompt.category);
-  }
-
-  const categoryColors = new Map(categories.map(category => [category.name, category.color]));
-
-  for (const event of events) {
-    const categoryName = promptCategories.get(event.promptId) ?? 'Unknown';
-    categoryCounts.set(categoryName, (categoryCounts.get(categoryName) ?? 0) + 1);
-  }
-
-  return Array.from(categoryCounts.entries())
-    .map(([name, count]) => ({
-      categoryId: name, // Using name as ID since we have the name
-      name,
-      count,
-      // A Category stored without a color, or no longer stored, takes the default color, as in the Library
-      color: categoryColors.get(name) || DEFAULT_CATEGORY_COLOR
-    }))
-    .sort((a, b) => b.count - a.count);
-}
-
-/**
- * Calculate prompt usage summaries
- */
-function calculatePromptSummaries(
-  events: UsageEvent[],
-  prompts: Prompt[]
-): {
-  topPrompts: PromptUsageSummary[];
-  recentPrompts: PromptUsageSummary[];
-  forgottenPrompts: PromptUsageSummary[];
-} {
-  // Create a map for prompt details
-  const promptMap = new Map<string, Prompt>();
-  for (const prompt of prompts) {
-    promptMap.set(prompt.id, prompt);
-  }
-
-  // Aggregate usage by prompt
-  const usageByPrompt = new Map<string, { count: number; lastUsed: number }>();
-  for (const event of events) {
-    const existing = usageByPrompt.get(event.promptId);
-    if (existing) {
-      existing.count++;
-      existing.lastUsed = Math.max(existing.lastUsed, event.timestamp);
-    } else {
-      usageByPrompt.set(event.promptId, { count: 1, lastUsed: event.timestamp });
-    }
-  }
-
-  // Build summaries (only for prompts that still exist)
-  const summaries: PromptUsageSummary[] = [];
-  for (const [promptId, usage] of usageByPrompt.entries()) {
-    const prompt = promptMap.get(promptId);
-    if (prompt) {
-      summaries.push({
-        promptId,
-        title: prompt.title,
-        category: prompt.category,
-        count: usage.count,
-        lastUsed: usage.lastUsed
-      });
-    }
-  }
-
-  // Top prompts: sorted by count descending
-  const topPrompts = [...summaries]
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 10);
-
-  // Recent prompts: sorted by lastUsed descending
-  const recentPrompts = [...summaries]
-    .sort((a, b) => b.lastUsed - a.lastUsed)
-    .slice(0, 10);
-
-  // Forgotten prompts: prompts that exist but haven't been used in FORGOTTEN_DAYS_THRESHOLD days
-  const forgottenCutoff = Date.now() - (FORGOTTEN_DAYS_THRESHOLD * 24 * 60 * 60 * 1000);
-
-  // Find all prompts that have been used but not recently
-  const usedPromptIds = new Set(usageByPrompt.keys());
-  const forgottenFromUsage = summaries
-    .filter(s => s.lastUsed < forgottenCutoff)
-    .sort((a, b) => a.lastUsed - b.lastUsed);
-
-  // Also include prompts that have never been used (if they exist for a while)
-  const neverUsed: PromptUsageSummary[] = [];
-  for (const prompt of prompts) {
-    if (!usedPromptIds.has(prompt.id) && prompt.createdAt < forgottenCutoff) {
-      neverUsed.push({
-        promptId: prompt.id,
-        title: prompt.title,
-        category: prompt.category,
-        count: 0,
-        lastUsed: prompt.createdAt
-      });
-    }
-  }
-
-  const forgottenPrompts = [...forgottenFromUsage, ...neverUsed]
-    .sort((a, b) => a.lastUsed - b.lastUsed)
-    .slice(0, 10);
-
-  return { topPrompts, recentPrompts, forgottenPrompts };
 }
 
 /**
@@ -313,20 +143,12 @@ export function useUsageStats(): UseUsageStatsReturn {
       return null;
     }
 
-    const { topPrompts, recentPrompts, forgottenPrompts } = calculatePromptSummaries(history, prompts);
-
     return {
       totalUses: history.length,
       dailyUsage: calculateDailyUsage(history),
-      platformBreakdown: calculatePlatformBreakdown(history),
-      dayOfWeekDistribution: calculateDayOfWeekDistribution(history),
-      timeOfDayDistribution: calculateTimeOfDayDistribution(history),
-      categoryDistribution: calculateCategoryDistribution(history, prompts, categories),
-      topPrompts,
-      recentPrompts,
-      forgottenPrompts
+      timeOfDayDistribution: calculateTimeOfDayDistribution(history)
     };
-  }, [history, prompts, categories, loading]);
+  }, [history, loading]);
 
   // Initial load
   useEffect(() => {
@@ -337,6 +159,7 @@ export function useUsageStats(): UseUsageStatsReturn {
     stats,
     history,
     prompts,
+    categories,
     loading,
     error,
     refresh,
