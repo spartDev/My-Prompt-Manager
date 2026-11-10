@@ -122,6 +122,8 @@ export const PickerPopover: FC<PickerPopoverProps> = ({ store, placement }) => {
       ref={dialogRef}
       className="mpm-popover"
       role="dialog"
+      // Tab stays inside and a click outside closes it: the page behind is not reachable while it is open
+      aria-modal="true"
       aria-label={filling ? `Fill in the variables of ${filling.title}` : 'Insert a prompt'}
       data-side={placement.side}
       data-closing={state.phase === 'closing'}

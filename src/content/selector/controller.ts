@@ -111,7 +111,10 @@ export class PromptSelectorController {
       debug('Prompt selector opened', { promptCount: library.prompts.length, side });
     } catch (err) {
       logError('Failed to open the prompt selector', err instanceof Error ? err : new Error(String(err)));
-      this.finishClose();
+      // Only its own mess: a later opening may be showing a healthy selector by now
+      if (opening === this.openings) {
+        this.finishClose();
+      }
     } finally {
       if (this.loading === opening) {
         this.loading = null;
@@ -133,6 +136,7 @@ export class PromptSelectorController {
   /** Removes the selector and its host from the page. */
   destroy(): void {
     this.openings++;
+    this.loading = null;
     if (this.session) {
       this.session.restoreFocus = false;
     }

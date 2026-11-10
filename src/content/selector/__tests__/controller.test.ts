@@ -110,6 +110,7 @@ describe('PromptSelectorController', () => {
     await opened();
 
     expect(dialog()?.getAttribute('aria-label')).toBe('Insert a prompt');
+    expect(dialog()?.getAttribute('aria-modal')).toBe('true');
     expect(shadow()?.querySelector('[role="tablist"]')).not.toBeNull();
     expect([...(shadow()?.querySelectorAll('[role="tab"]') ?? [])].map((tab) => tab.textContent)).toEqual(['All', 'Pinned', 'Recent', 'Work', 'Home', 'Empty']);
     const listbox = shadow()?.querySelector('[role="listbox"]');
@@ -294,6 +295,33 @@ describe('PromptSelectorController', () => {
 
     controller.toggle(field, button);
     await opened();
+  });
+
+  it('an opening destroyed while it loads does not swallow the next click', async () => {
+    callbacks.loadLibrary.mockReturnValueOnce(new Promise(() => { /* never resolves */ }));
+    controller.toggle(field, button);
+
+    // The site is disabled, then enabled again: the same controller is used
+    controller.destroy();
+    controller.toggle(field, button);
+
+    await opened();
+  });
+
+  it('an opening that fails late leaves a later, healthy selector open', async () => {
+    const first: { reject?: (reason: Error) => void } = {};
+    callbacks.loadLibrary.mockReturnValueOnce(new Promise((_resolve, reject) => { first.reject = reject; }));
+
+    controller.toggle(field, button);
+    controller.toggle(field, button);
+    controller.toggle(field, button);
+    await opened();
+
+    first.reject?.(new Error('storage down'));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(dialog()?.getAttribute('data-closing')).toBe('false');
+    expect(controller.isOpen).toBe(true);
   });
 
   it('opens on All again after a tab was shown', async () => {
