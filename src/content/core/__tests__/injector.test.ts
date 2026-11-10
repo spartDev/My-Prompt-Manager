@@ -331,6 +331,20 @@ describe('PromptLibraryInjector', () => {
       await expect(selector().callbacks.insert(prompt, prompt.content, mockTextarea)).resolves.toBe(false);
     });
 
+    it('counts no use, and says the text did not arrive, when the input field is gone once the Platform has written', async () => {
+      const gone = document.createElement('textarea');
+      document.body.appendChild(gone);
+      (await platformManager()).insertPrompt.mockImplementation((element: HTMLElement) => {
+        element.remove();
+        return Promise.resolve({ success: true, method: 'direct' });
+      });
+      vi.mocked(chrome.runtime.sendMessage).mockClear();
+
+      await expect(selector().callbacks.insert(prompt, prompt.content, gone)).resolves.toBe(false);
+
+      expect(chrome.runtime.sendMessage).not.toHaveBeenCalled();
+    });
+
     it('Undo restores the text through the Platform, and reports no use', async () => {
       const manager = await platformManager();
       manager.restoreText = vi.fn().mockResolvedValue({ success: true, method: 'restore-value' });

@@ -1642,6 +1642,13 @@ export class PromptLibraryInjector {
         return false;
       }
 
+      // A field the Platform replaced or removed while it took the text holds no Prompt, whatever
+      // the strategy reported: the Insertion failed, and a failed Insertion counts no use
+      if (!targetElement.isConnected) {
+        warn('[CONTENT] The input field was gone once the prompt was inserted', { promptId: prompt.id });
+        return false;
+      }
+
       // The use is reported without being waited for: the confirmation, and the Undo it offers,
       // must not come after the user has gone on typing
       this.reportUse(prompt);
