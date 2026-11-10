@@ -214,12 +214,12 @@ test.describe('Usage Counter & Smart Sorting - Edge Cases', () => {
       });
     }
 
-    // Scenario 5.6: Performance: Large Library Sorting
-    // Tests that sorting operations complete efficiently with 1000 prompts
-    test.describe('Performance', () => {
+    // Scenario 5.6: Large Library Sorting
+    // Tests that a library of 1000 prompts is ranked correctly and stays responsive
+    test.describe('Large library', () => {
       for (const context of CONTEXTS) {
         test.describe(`${context.name} context`, () => {
-          test('sorts large library efficiently', async ({ page, storage, extensionId }) => {
+          test('ranks a library of 1000 prompts', async ({ page, storage, extensionId }) => {
             // Generate large library of 1000 prompts with random usage counts
             const prompts = Array.from({ length: 1000 }, (_, i) =>
               createPromptSeed({
@@ -240,22 +240,15 @@ test.describe('Usage Counter & Smart Sorting - Edge Cases', () => {
             const promptCards = page.getByTestId('prompt-card');
             await expect(promptCards).toHaveCount(1000);
 
-            // Measure ranking performance: "Most Used" re-ranks the whole library in place
+            // "Most Used" re-ranks the whole library in place. No duration is asserted: re-rendering
+            // 1000 cards takes 300ms locally and up to 1900ms on a CI runner, and the ranking is a few
+            // milliseconds of it. The cost of the ranking is guarded by the comparison count in
+            // src/services/__tests__/libraryFilter.test.ts; a frozen UI fails here on the expect timeout
             const libraryPage = new LibraryPage(page);
-            const startTime = performance.now();
-
             await libraryPage.selectLibraryFilter('Most Used');
 
             // Wait for re-render (never-used prompts drop out of the list)
             await expect(promptCards).toHaveCount(usedCount);
-
-            const endTime = performance.now();
-            const duration = endTime - startTime;
-
-            // Verify performance target: <1500ms for E2E test (includes Playwright overhead + CI variance)
-            // Local runs typically complete in <300ms, CI environments may be slower (observed up to 1180ms)
-            // Increased threshold to account for CI environment variability while still catching regressions
-            expect(duration).toBeLessThan(1500);
 
             const promptsData = await storage.getPrompts();
             const usageOf = (title: string) => promptsData.find(p => p.title === title)?.usageCount ?? 0;

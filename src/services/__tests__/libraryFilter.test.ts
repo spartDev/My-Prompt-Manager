@@ -1,8 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { buildCategory } from '../../test/builders/buildCategory';
 import { buildPrompt } from '../../test/builders/buildPrompt';
-import type { LibraryFilter } from '../../types';
+import type { LibraryFilter, Prompt } from '../../types';
 import {
   ALL_PROMPTS,
   applyLibraryFilter,
@@ -85,6 +85,62 @@ describe('rankMostUsed', () => {
     ];
 
     expect(titles(rankMostUsed(prompts))).toEqual(['Newer', 'Older']);
+  });
+
+  it('ranks a Library of 1000 Prompts with the built-in sort, in at most n log2 n comparisons', () => {
+    // Counted, not timed: a duration depends on the machine, a count does not. Two counts, taken
+    // while rankMostUsed runs and read before any assertion touches the Prompts:
+    // - the calls of the comparator given to Array.prototype.sort;
+    // - the reads of usageCount, which a hand-written quadratic loop over the Prompts multiplies.
+    // A ranking that sorts cached values with its own loop makes no comparator call, and fails on that
+    const SIZE = 1000;
+    let seed = 42;
+    const next = (max: number) => {
+      seed = (seed * 1664525 + 1013904223) % 4294967296;
+      return seed % max;
+    };
+    let reads = 0;
+    const prompts = Array.from({ length: SIZE }, (_, i) =>
+      new Proxy(buildPrompt({ id: String(i), usageCount: 1 + next(100), lastUsedAt: T - next(1_000_000) }), {
+        get(target, key, receiver) {
+          if (key === 'usageCount') {
+            reads++;
+          }
+          return Reflect.get(target, key, receiver) as unknown;
+        }
+      })
+    );
+
+    type Compare = (a: unknown, b: unknown) => number;
+    let comparisons = 0;
+    const counted = (compare?: Compare): Compare | undefined =>
+      compare && ((a, b) => {
+        comparisons++;
+        return compare(a, b);
+      });
+    const nativeSort = Array.prototype.sort as (this: unknown[], compare?: Compare) => unknown[];
+    const sortSpy = vi.spyOn(Array.prototype, 'sort').mockImplementation(function (this: unknown[], compare?: Compare) {
+      return nativeSort.call(this, counted(compare));
+    });
+
+    let ranked: Prompt[];
+    try {
+      ranked = rankMostUsed(prompts);
+    } finally {
+      sortSpy.mockRestore();
+    }
+    const comparisonsOfRanking = comparisons;
+    const readsOfRanking = reads;
+
+    // n log2 n rounded up: 10 000 comparisons for 1000 Prompts. A quadratic ranking needs about a million
+    const comparisonBudget = SIZE * Math.ceil(Math.log2(SIZE));
+    expect(comparisonsOfRanking).toBeGreaterThanOrEqual(SIZE - 1);
+    expect(comparisonsOfRanking).toBeLessThanOrEqual(comparisonBudget);
+    // One read per Prompt to drop the never used, then at most two per comparison
+    expect(readsOfRanking).toBeLessThanOrEqual(SIZE + 2 * comparisonBudget);
+
+    expect(ranked).toHaveLength(SIZE);
+    expect(ranked.every((prompt, i) => i === 0 || (ranked[i - 1].usageCount ?? 0) >= (prompt.usageCount ?? 0))).toBe(true);
   });
 
   it('treats a missing or broken usage count as never inserted', () => {
