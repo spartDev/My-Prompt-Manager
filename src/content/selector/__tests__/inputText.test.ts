@@ -218,6 +218,16 @@ describe('removeTypedTrigger', () => {
     refused.mockRestore();
   });
 
+  it('reports a contenteditable whose editor drops the one empty line after the // on input', () => {
+    const field = editable('<p>Before //</p><p><br></p>');
+    document.getSelection()?.collapse(field.querySelector('p')?.firstChild ?? null, 9);
+    const refused = vi.spyOn(document, 'execCommand').mockReturnValue(false);
+    field.addEventListener('input', () => { field.innerHTML = '<p>Before </p>'; });
+
+    expect(removeTypedTrigger(field)).toBe(false);
+    refused.mockRestore();
+  });
+
   it('reports a contenteditable whose editor drops the empty lines at the end of the draft on input', () => {
     const field = editable('<p>Before //</p><p><br></p><p><br></p><p><br></p>');
     document.getSelection()?.collapse(field.querySelector('p')?.firstChild ?? null, 9);

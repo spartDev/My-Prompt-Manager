@@ -167,9 +167,11 @@ export function removeTypedTrigger(field: HTMLElement): boolean {
   const spaces = (text: string): string => text.replace(/\u00a0/g, ' ');
   const original = plainTextOf(field);
   const expected = spaces(original.slice(0, before.length - SELECTOR_TRIGGER.length) + original.slice(before.length));
+  // Only a // with nothing after it can leave such a break: elsewhere a missing line is a change
+  const endedField = original.length === before.length;
   const removed = (): boolean => {
     const now = spaces(plainTextOf(field));
-    return now === expected || (expected.endsWith('\n') && now === expected.slice(0, -1));
+    return now === expected || (endedField && expected.endsWith('\n') && now === expected.slice(0, -1));
   };
 
   if (canExec && typeof selection.modify === 'function') {
