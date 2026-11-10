@@ -1551,10 +1551,13 @@ transition-colors focus-interactive
 - Width: 100%
 - Height: 100vh
 
-**Content Script Modal:**
-- Width: 400px
-- Max Height: 500px
-- Mobile: calc(100vw - 40px)
+**Prompt selector on a Platform** (`src/content/selector/position.ts`):
+- Width: 360px, never wider than the window minus 10px on each side
+- Placed 10px above the input field, below when a full popover (384px) does not fit above
+- Max height: the room left on that side; the list inside is at most 230px, the variables text 220px
+
+**Prompts button** (`src/content/utils/styles.ts`):
+- Height: 32px, badge 22px; the badge alone (32px wide) when its bar has no room or it is laid over the page
 
 ### Z-Index Layers
 
