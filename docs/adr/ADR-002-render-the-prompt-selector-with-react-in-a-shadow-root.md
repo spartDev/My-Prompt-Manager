@@ -10,7 +10,7 @@ Technical Story: Redesign of the Prompt selector after the Atelier 1C mockup. No
 
 The Prompt selector is built by hand with DOM calls in `src/content/core/injector.ts`, appended to the Platform's `document.body`, and styled by a `<style>` element added to the Platform's `<head>`. Only prefixed class names keep the Platform's CSS out of it and its CSS out of the Platform. The content bundle holds no React and weighs about 134 KB.
 
-The redesign adds tabs, a two-step flow with Variables filled in inside the text, enter and exit animations, a confirmation with Undo, and a state machine that must be testable without a DOM. It also requires that no style leaks either way and that the selector is never clipped by a Platform container. How should the selector be rendered and isolated?
+The redesign adds tabs, a two-step flow with Variables filled in inside the text, enter and exit animations, and a state machine that must be testable without a DOM. A later step of the same redesign (My-Prompt-Manager-q9j.3) draws over the page around an Insertion. It also requires that no style leaks either way and that the selector is never clipped by a Platform container. How should the selector be rendered and isolated?
 
 ## Decision Outcome
 
@@ -18,7 +18,7 @@ Chosen option: "React in one shadow root on `body`, loaded on first use", becaus
 
 What this means:
 
-* **One shadow host.** A single element appended to `document.body` holds a shadow root. The selector renders inside it, positioned from the input field's rectangle; what is later drawn over the page around an Insertion (My-Prompt-Manager-q9j.3) goes there too. Nothing of the selector is added to the Platform's own tree, so an `overflow: hidden` container cannot clip it.
+* **One shadow host.** A single element appended to `document.body` holds a shadow root. The selector renders inside it, positioned from the input field's rectangle; the host is also where that later step will draw. Nothing of the selector is added to the Platform's own tree, so an `overflow: hidden` container cannot clip it.
 * **Styles inside the shadow root only.** The selector's CSS and tokens live in the shadow root. The `<style>` in the Platform's `<head>` keeps only what the Prompts button needs, since the button stays in the Platform's action bar.
 * **React on first use.** The React chunk is imported when the selector first opens, not when the content script starts. Detection and the button stay plain TypeScript.
 * **The font is loaded from the extension.** Schibsted Grotesk comes from the extension package, never from a CDN.

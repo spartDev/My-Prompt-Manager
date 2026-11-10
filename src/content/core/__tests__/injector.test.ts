@@ -52,7 +52,7 @@ vi.mock('../../ui/element-factory', () => {
   // Add static methods
   (MockUIElementFactory as any).convertToAbsolutePositioning = vi.fn();
   (MockUIElementFactory as any).convertToRelativePositioning = vi.fn();
-  return { UIElementFactory: MockUIElementFactory, fitPromptsPill: vi.fn(), BAR_SEARCH_DEPTH: 6 };
+  return { UIElementFactory: MockUIElementFactory, fitPromptsPill: vi.fn(), syncPromptsPillTheme: vi.fn(), BAR_SEARCH_DEPTH: 6 };
 });
 
 // The Prompt selector's controller, replaced by a recorder: the injector's part is to wire it
@@ -351,7 +351,7 @@ describe('PromptLibraryInjector', () => {
         observers.push(observer);
         return { observe: (element: Element) => { observer.observed.push(element); }, disconnect: observer.disconnect };
       }));
-      const { fitPromptsPill } = await import('../../ui/element-factory');
+      const { fitPromptsPill, syncPromptsPillTheme } = await import('../../ui/element-factory');
       const bar = document.createElement('div');
       const icon = document.createElement('button');
       bar.appendChild(icon);
@@ -363,6 +363,8 @@ describe('PromptLibraryInjector', () => {
 
       (injector as any).fitIconWhenPlaced(icon);
       await vi.waitFor(() => { expect(fits()).toBe(1); });
+      // Once in the page, the button also takes the theme it may have missed while detached
+      expect(syncPromptsPillTheme).toHaveBeenCalledWith(icon);
       expect(observer()?.observed).toEqual([bar]);
 
       // The bar is resized: the button is fitted again

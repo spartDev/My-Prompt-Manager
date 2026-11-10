@@ -4,7 +4,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { fitPromptsPill, UIElementFactory } from '../element-factory';
+import { fitPromptsPill, syncPromptsPillTheme, UIElementFactory } from '../element-factory';
 
 const theme = vi.hoisted(() => ({ current: 'light' as 'light' | 'dark' }));
 
@@ -162,6 +162,27 @@ describe('UIElementFactory', () => {
 
       expect(icon.classList.contains('prompt-library-icon-absolute')).toBe(true);
       expect(icon.classList.contains('prompt-library-icon-relative')).toBe(false);
+    });
+  });
+
+  describe('syncPromptsPillTheme', () => {
+    it('gives a button made in light the dark theme read meanwhile, and takes it away again', () => {
+      const button = factory.createChatGPTIcon();
+      theme.current = 'dark';
+      syncPromptsPillTheme(button);
+      expect(button.classList.contains('dark-theme')).toBe(true);
+
+      theme.current = 'light';
+      syncPromptsPillTheme(button);
+      expect(button.classList.contains('dark-theme')).toBe(false);
+    });
+
+    it('finds the button inside Claude\'s wrapper', () => {
+      const { container, icon } = factory.createClaudeIcon();
+      theme.current = 'dark';
+      syncPromptsPillTheme(container);
+
+      expect(icon.classList.contains('dark-theme')).toBe(true);
     });
   });
 

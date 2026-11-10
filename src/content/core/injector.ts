@@ -12,7 +12,7 @@ import { PromptSelectorController } from '../selector/controller';
 import { loadSelectorFont } from '../selector/font';
 import type { SelectorLibrary } from '../selector/selectorData';
 import type { InsertionResult, Prompt } from '../types/index';
-import { BAR_SEARCH_DEPTH, fitPromptsPill, UIElementFactory } from '../ui/element-factory';
+import { BAR_SEARCH_DEPTH, fitPromptsPill, syncPromptsPillTheme, UIElementFactory } from '../ui/element-factory';
 import { EventManager } from '../ui/event-manager';
 import { DOMUtils } from '../utils/dom';
 import { getElementFingerprintGenerator } from '../utils/element-fingerprint';
@@ -1482,10 +1482,11 @@ export class PromptLibraryInjector {
     }
   }
 
-  /** Waits for the Prompts button to be in the page (some placements are asynchronous), then fits it. */
+  /** Waits for the Prompts button to be in the page (some placements are asynchronous), then themes and fits it. */
   private fitIconWhenPlaced(icon: HTMLElement, attempts = 30): void {
     window.requestAnimationFrame(() => {
       if (icon.isConnected) {
+        syncPromptsPillTheme(icon);
         fitPromptsPill(icon);
         this.refitIconOnResize(icon);
       } else if (attempts > 0 && this.state.icon === icon) {

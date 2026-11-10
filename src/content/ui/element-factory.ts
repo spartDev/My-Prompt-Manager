@@ -43,6 +43,16 @@ export function fitPromptsPill(icon: HTMLElement): void {
   }
 }
 
+/**
+ * Gives the Prompts button the extension's current theme. The button takes it when it is made,
+ * but the theme can be read from storage, or changed, while the button is not in the page yet
+ * (some placements are asynchronous), where the theme manager's update cannot find it.
+ */
+export function syncPromptsPillTheme(icon: HTMLElement): void {
+  const pill = icon.matches(`.${PILL_CLASS}`) ? icon : icon.querySelector<HTMLElement>(`.${PILL_CLASS}`);
+  pill?.classList.toggle('dark-theme', ThemeManager.getInstance().getCurrentTheme() === 'dark');
+}
+
 export class UIElementFactory {
   private instanceId: string;
 
