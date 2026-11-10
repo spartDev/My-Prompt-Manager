@@ -1642,31 +1642,41 @@ export class PromptLibraryInjector {
         return false;
       }
 
-      try {
-        // Get platform name from hostname lookup for accurate analytics
-        // Falls back to hostname for custom sites to enable per-site analytics
-        const platform = getPlatformByHostname(window.location.hostname)?.id ?? window.location.hostname;
-
-        await chrome.runtime.sendMessage({
-          type: 'PROMPT_USAGE_INCREMENT',
-          data: {
-            promptId: prompt.id,
-            platform,
-            categoryId: prompt.category || null
-          }
-        });
-      } catch (sendMessageError) {
-        debug('[CONTENT] Failed to report prompt usage', {
-          promptId: prompt.id,
-          error: sendMessageError instanceof Error ? sendMessageError.message : String(sendMessageError)
-        });
-      }
+      // The use is reported without being waited for: the confirmation, and the Undo it offers,
+      // must not come after the user has gone on typing
+      this.reportUse(prompt);
       return true;
     } catch (err) {
       error('[CONTENT] Error handling prompt selection', err instanceof Error ? err : new Error(String(err)), {
         promptId: prompt.id
       });
       return false;
+    }
+  }
+
+  /** Tells the background that the Prompt was inserted here. Never throws, and is not waited for. */
+  private reportUse(prompt: Prompt): void {
+    const failed = (reason: unknown): void => {
+      debug('[CONTENT] Failed to report prompt usage', {
+        promptId: prompt.id,
+        error: reason instanceof Error ? reason.message : String(reason)
+      });
+    };
+    try {
+      // Get platform name from hostname lookup for accurate analytics
+      // Falls back to hostname for custom sites to enable per-site analytics
+      const platform = getPlatformByHostname(window.location.hostname)?.id ?? window.location.hostname;
+
+      void Promise.resolve(chrome.runtime.sendMessage({
+        type: 'PROMPT_USAGE_INCREMENT',
+        data: {
+          promptId: prompt.id,
+          platform,
+          categoryId: prompt.category || null
+        }
+      })).catch(failed);
+    } catch (sendMessageError) {
+      failed(sendMessageError);
     }
   }
 

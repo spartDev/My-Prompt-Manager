@@ -503,9 +503,13 @@ export class PromptSelectorController {
       });
     };
 
-    // What the field holds once the Platform's editor has laid the inserted text out: read at the
-    // first tick, since an editor may normalise its content right after the Insertion
-    let settled: string | null = null;
+    // What the field holds now, read before the user can do anything: a field that changes
+    // without a key (the send button empties it) is seen from the first tick on. An editor may lay
+    // the inserted text out again right after the Insertion (paragraphs for line breaks), so only
+    // the characters other than spaces and line breaks are compared; one that has not shown the
+    // text yet gives its baseline at the first tick where it has
+    const characters = (text: string): string => text.replace(/\s+/g, '');
+    let baseline: string | null = target ? characters(readInputText(target)) || null : null;
     const watch = window.setInterval(() => {
       if (!target) {
         return;
@@ -514,9 +518,10 @@ export class PromptSelectorController {
         leave();
         return;
       }
-      const text = readInputText(target);
-      settled ??= text;
-      if (text !== settled) {
+      const now = characters(readInputText(target));
+      if (baseline === null) {
+        baseline = now || null;
+      } else if (now !== baseline) {
         leave();
       }
     }, 250);

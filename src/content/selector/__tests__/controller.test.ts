@@ -579,12 +579,35 @@ describe('PromptSelectorController', () => {
         return Promise.resolve(true);
       });
       await inserted();
-      // The watch has read the inserted text once
-      await new Promise((resolve) => { setTimeout(resolve, 300); });
-      expect(pill()).not.toBeNull();
 
+      // Right away, before the watch has run once
       field.value = '';
 
+      await vi.waitFor(() => { expect(pill()).toBeNull(); });
+    });
+
+    it('stays when the editor only lays the inserted text out again', async () => {
+      callbacks.insert.mockImplementation(() => {
+        field.value = 'Two lines\nof text';
+        return Promise.resolve(true);
+      });
+      await inserted();
+
+      field.value = 'Two lines\n\nof  text\n';
+      await new Promise((resolve) => { setTimeout(resolve, 600); });
+
+      expect(pill()?.getAttribute('data-leaving')).toBeNull();
+    });
+
+    it('takes its baseline from an editor that shows the text a moment later', async () => {
+      await inserted();
+      expect(field.value).toBe('');
+
+      field.value = 'Content p1';
+      await new Promise((resolve) => { setTimeout(resolve, 600); });
+      expect(pill()?.getAttribute('data-leaving')).toBeNull();
+
+      field.value = '';
       await vi.waitFor(() => { expect(pill()).toBeNull(); });
     });
 

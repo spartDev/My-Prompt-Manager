@@ -352,13 +352,23 @@ describe('PromptLibraryInjector', () => {
     it('does not throw when the use cannot be reported', async () => {
       vi.mocked(chrome.runtime.sendMessage).mockRejectedValue(new Error('Extension context invalidated'));
 
-      await selector().callbacks.insert(prompt, prompt.content, mockTextarea);
+      await expect(selector().callbacks.insert(prompt, prompt.content, mockTextarea)).resolves.toBe(true);
 
       const Logger = await import('../../utils/logger');
-      expect(Logger.debug).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to report prompt usage'),
-        expect.any(Object)
-      );
+      await vi.waitFor(() => {
+        expect(Logger.debug).toHaveBeenCalledWith(
+          expect.stringContaining('Failed to report prompt usage'),
+          expect.any(Object)
+        );
+      });
+    });
+
+    it('does not wait for the use to be reported before it says the text arrived', async () => {
+      // The background never answers
+      vi.mocked(chrome.runtime.sendMessage).mockReturnValue(new Promise(() => { /* pending */ }) as never);
+
+      await expect(selector().callbacks.insert(prompt, prompt.content, mockTextarea)).resolves.toBe(true);
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledTimes(1);
     });
 
     it('the Prompts button says whether the selector is open', () => {
