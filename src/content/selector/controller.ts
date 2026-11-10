@@ -468,7 +468,8 @@ export class PromptSelectorController {
     if (target.isConnected) {
       if (inserted) {
         focusAtEnd(target);
-      } else {
+      } else if (!movedOn) {
+        // A failure is still said to a user who has gone on, but the focus stays where they put it
         target.focus({ preventScroll: true });
       }
     }

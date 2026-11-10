@@ -156,7 +156,9 @@ test.describe('Insertion confirmation: time and motion', () => {
     await expect(insertionPill(page)).toHaveCSS('animation-duration', '0.001s');
     await expect(insertionSweep(page)).toHaveCount(0);
 
-    // The field is at the top of the window, with no room above it: the pill goes below
+    // The field is at the top of the window, with no room above it: the pill goes below.
+    // Measured once its entry has run: even at 1ms it starts 14px higher
+    await insertionPill(page).evaluate((element) => Promise.all(element.getAnimations().map((animation) => animation.finished)));
     const fieldBox = await field(page, 'claude').boundingBox();
     const pillBox = await insertionPill(page).boundingBox();
     expect(fieldBox && pillBox).toBeTruthy();

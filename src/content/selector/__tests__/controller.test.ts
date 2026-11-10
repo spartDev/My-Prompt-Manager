@@ -651,6 +651,24 @@ describe('PromptSelectorController', () => {
       expect(document.activeElement).toBe(elsewhere);
     });
 
+    it('says a failure to a user who clicked elsewhere meanwhile, without taking the focus back', async () => {
+      const elsewhere = document.createElement('input');
+      document.body.append(elsewhere);
+      callbacks.insert.mockImplementation(async () => {
+        const click = new Event('pointerdown', { bubbles: true, composed: true });
+        Object.defineProperty(click, 'isTrusted', { value: true });
+        elsewhere.dispatchEvent(click);
+        elsewhere.focus();
+        await Promise.resolve();
+        return false;
+      });
+
+      await inserted();
+
+      expect(pill()?.textContent).toBe("Couldn't insert “Title p1”");
+      expect(document.activeElement).toBe(elsewhere);
+    });
+
     it('says so when the Insertion throws', async () => {
       callbacks.insert.mockRejectedValue(new Error('boom'));
 
