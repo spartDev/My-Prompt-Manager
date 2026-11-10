@@ -159,12 +159,18 @@ export function removeTypedTrigger(field: HTMLElement): boolean {
   if (!selection) {
     return false;
   }
+  // The field as it must be afterwards: the same text, without the two characters. An editor
+  // whose own handler puts the // back, or changes the rest of the draft, did not take the removal
+  const original = plainTextOf(field);
+  const expected = original.slice(0, before.length - SELECTOR_TRIGGER.length) + original.slice(before.length);
+  const removed = (): boolean => plainTextOf(field) === expected;
+
   if (canExec && typeof selection.modify === 'function') {
     for (let i = 0; i < SELECTOR_TRIGGER.length; i++) {
       selection.modify('extend', 'backward', 'character');
     }
     if (selection.toString() === SELECTOR_TRIGGER && document.execCommand('delete')) {
-      return true;
+      return removed();
     }
     if (!selection.isCollapsed) {
       selection.collapseToEnd();
@@ -185,7 +191,7 @@ export function removeTypedTrigger(field: HTMLElement): boolean {
   range.deleteContents();
   selection.collapse(node, start);
   field.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'deleteContentBackward' }));
-  return true;
+  return removed();
 }
 
 /** Puts the focus in the input field, with the caret after its last character. */

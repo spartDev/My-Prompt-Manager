@@ -170,6 +170,26 @@ describe('removeTypedTrigger', () => {
     refused.mockRestore();
   });
 
+  it('reports a contenteditable whose editor puts the // back on input', () => {
+    const field = editable('<p>Before //</p>');
+    document.getSelection()?.collapse(field.querySelector('p')?.firstChild ?? null, 9);
+    const refused = vi.spyOn(document, 'execCommand').mockReturnValue(false);
+    field.addEventListener('input', () => { field.innerHTML = '<p>Before //</p>'; });
+
+    expect(removeTypedTrigger(field)).toBe(false);
+    refused.mockRestore();
+  });
+
+  it('reports a contenteditable whose editor changes the rest of the draft on input', () => {
+    const field = editable('<p>Before // after</p>');
+    document.getSelection()?.collapse(field.querySelector('p')?.firstChild ?? null, 9);
+    const refused = vi.spyOn(document, 'execCommand').mockReturnValue(false);
+    field.addEventListener('input', () => { field.innerHTML = '<p>BEFORE  AFTER</p>'; });
+
+    expect(removeTypedTrigger(field)).toBe(false);
+    refused.mockRestore();
+  });
+
   it('reports a // it cannot remove: the caret is not in a text node that holds it', () => {
     const field = editable('<p><b>/</b>/</p>');
     const second = field.querySelector('p')?.lastChild as Text;

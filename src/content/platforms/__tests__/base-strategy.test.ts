@@ -211,6 +211,33 @@ describe('PlatformStrategy', () => {
       field.remove();
     });
 
+    it('restores several lines in a contenteditable', async () => {
+      const field = document.createElement('div');
+      field.setAttribute('contenteditable', 'true');
+      field.innerHTML = '<p>Inserted prompt</p>';
+      document.body.append(field);
+
+      const result = await new TestStrategy().restore(field, 'First line\nSecond line');
+
+      expect(result.success).toBe(true);
+      expect(field.textContent).toBe('First line\nSecond line');
+      field.remove();
+    });
+
+    it('fails when the editor of a contenteditable rebuilds its content on input', async () => {
+      const field = document.createElement('div');
+      field.setAttribute('contenteditable', 'true');
+      field.innerHTML = '<p>Inserted prompt</p>';
+      document.body.append(field);
+      // A controlled editor: its own state wins over what was written in the DOM
+      field.addEventListener('input', () => { field.innerHTML = '<p>Inserted prompt</p>'; });
+
+      const result = await new TestStrategy().restore(field, 'Draft');
+
+      expect(result.success).toBe(false);
+      field.remove();
+    });
+
     it('leaves a contenteditable alone when it already holds the text', async () => {
       const field = document.createElement('div');
       field.setAttribute('contenteditable', 'true');

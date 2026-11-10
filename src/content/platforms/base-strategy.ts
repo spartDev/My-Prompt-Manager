@@ -121,6 +121,10 @@ export abstract class PlatformStrategy implements PlatformStrategyInterface {
         // No editing command, or the editor laid the text out differently: write it directly
         element.textContent = text;
         element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: text }));
+        // An editor whose own handler rebuilt its content did not take the text back
+        if (readInputText(element) !== text) {
+          return Promise.resolve({ success: false, error: 'The input field did not keep the restored text' });
+        }
         return Promise.resolve({ success: true, method: 'restore-dom' });
       }
 
