@@ -28,7 +28,7 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p tests/e2e/tsconfig.json && tsc --noEmit -p tsconfig.node.json"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.6.5",
+    "@biomejs/biome": "2.6.6",
     "@crxjs/vite-plugin": "3.0.0",
     "@playwright/test": "1.65.0",
     "@tailwindcss/node": "4.3.4",
