@@ -46,7 +46,7 @@ const TabBar: FC<TabBarProps> = ({ activeSection, onSelect, inert = false }) => 
 
   return (
     <nav
-      className="shrink-0 bg-app border-t border-transparent scroll-edge-bottom px-2 pt-2 pb-2"
+      className="shrink-0 bg-card border-t border-strong px-2 pt-2 pb-2"
       aria-label="Main navigation"
       inert={inert}
     >

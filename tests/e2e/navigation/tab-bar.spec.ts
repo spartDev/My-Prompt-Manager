@@ -139,4 +139,39 @@ test.describe('Bottom tab bar navigation', () => {
     await libraryPage.expectPromptCount(1);
     await libraryPage.expectPromptVisible('Meeting Notes Template');
   });
+  for (const theme of ['light', 'dark'] as const) {
+    test(`keeps its white card surface and top border at every scroll position (${theme})`, async ({ context, extensionId, storage }, testInfo) => {
+      await seedLibrary(storage, {
+        prompts: Array.from({ length: 30 }, (_, i) => createPromptSeed({
+          id: `tab-bar-scroll-${i}`,
+          title: `Scroll prompt ${i}`,
+          content: `Content ${i}`,
+          category: DEFAULT_CATEGORY,
+        })),
+        settings: { ...DEFAULT_SETTINGS, interfaceMode: 'sidepanel', theme },
+      });
+      const page = await openSidepanel(context, extensionId);
+      const nav = page.getByRole('navigation', { name: 'Main navigation' });
+      const scroller = page.locator('[data-scroll-container]').first();
+
+      const expectSurfaceAndBorder = async () => {
+        const style = await nav.evaluate((el) => {
+          const cs = getComputedStyle(el);
+          return { bg: cs.backgroundColor, border: cs.borderTopColor, width: cs.borderTopWidth };
+        });
+        expect(style.width).toBe('1px');
+        expect(style.border).not.toBe('rgba(0, 0, 0, 0)');
+        if (theme === 'light') { expect(style.bg).toBe('rgb(255, 255, 255)'); }
+      };
+
+      for (const position of ['top', 'middle', 'end'] as const) {
+        await scroller.evaluate((el, pos) => {
+          el.scrollTop = pos === 'top' ? 0 : pos === 'middle' ? (el.scrollHeight - el.clientHeight) / 2 : el.scrollHeight;
+        }, position);
+        await page.waitForTimeout(150);
+        await expectSurfaceAndBorder();
+        await page.screenshot({ path: testInfo.outputPath(`tab-bar-${theme}-${position}.png`) });
+      }
+    });
+  }
 });
