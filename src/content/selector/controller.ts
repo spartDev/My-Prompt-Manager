@@ -420,16 +420,21 @@ export class PromptSelectorController {
     const previous = readInputText(target);
     // Where the field is now: the Platform may replace it while it takes the text
     const lastField = boxOf(target);
-    // A key the user presses in the field while the Platform takes the text: their typing comes
-    // after the snapshot above, so Undo would discard it. Only the user's own keys are trusted
-    // events; the events an Insertion sends are not keys
-    let typedMeanwhile = false;
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.isTrusted && event.composedPath().includes(target)) {
-        typedMeanwhile = true;
+    // What the user does while the Platform takes the text: a key, a paste, a drop or a composed
+    // character in the field comes after the snapshot above, so Undo would discard it; a click
+    // anywhere puts the focus where they want it. Only the user's own actions are trusted events,
+    // and the events an Insertion sends are none of these
+    let movedOn = false;
+    const inField = (event: Event): boolean => event.composedPath().includes(target);
+    const onUserAction = (event: Event): void => {
+      if (event.isTrusted && (event.type === 'pointerdown' || inField(event))) {
+        movedOn = true;
       }
     };
-    document.addEventListener('keydown', onKeyDown, true);
+    const USER_ACTIONS = ['keydown', 'paste', 'drop', 'compositionstart', 'pointerdown'] as const;
+    for (const type of USER_ACTIONS) {
+      document.addEventListener(type, onUserAction, true);
+    }
     let inserted = false;
     try {
       // A Prompt inserted as saved arrives Verbatim; filling its Variables in is the user's own change
@@ -438,15 +443,17 @@ export class PromptSelectorController {
     } catch (err) {
       logError('Failed to insert the chosen prompt', err instanceof Error ? err : new Error(String(err)), { promptId: prompt.id });
     } finally {
-      document.removeEventListener('keydown', onKeyDown, true);
+      for (const type of USER_ACTIONS) {
+        document.removeEventListener(type, onUserAction, true);
+      }
     }
     // The selector was opened again while the Platform took the text, or is loading to open: the
     // user has moved on, so neither the focus nor a confirmation with Undo comes after them
     if (this.session || this.loading !== null) {
       return;
     }
-    // The user is already typing: the confirmation would leave at once, and the caret is theirs
-    if (inserted && typedMeanwhile) {
+    // The user has already gone on: the focus and the caret are theirs, and Undo is stale
+    if (inserted && movedOn) {
       return;
     }
     if (target.isConnected) {

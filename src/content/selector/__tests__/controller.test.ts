@@ -563,6 +563,33 @@ describe('PromptSelectorController', () => {
       expect(field.value).toBe('Content p1a');
     });
 
+    it.each([
+      ['a click elsewhere', 'pointerdown', false],
+      ['a paste in the field', 'paste', true],
+      ['a composed character in the field', 'compositionstart', true]
+    ])('offers no Undo, and leaves the focus alone, after %s while the Platform took the text', async (_what, type, onField) => {
+      const elsewhere = document.createElement('input');
+      document.body.append(elsewhere);
+      callbacks.insert.mockImplementation(async () => {
+        const action = new Event(type, { bubbles: true, composed: true });
+        Object.defineProperty(action, 'isTrusted', { value: true });
+        (onField ? field : elsewhere).dispatchEvent(action);
+        elsewhere.focus();
+        await Promise.resolve();
+        return true;
+      });
+      await controller.open(field, button);
+      await opened();
+
+      row('p1')?.click();
+      await closed();
+      await vi.waitFor(() => { expect(callbacks.insert).toHaveBeenCalledTimes(1); });
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      expect(pill()).toBeNull();
+      expect(document.activeElement).toBe(elsewhere);
+    });
+
     it('still confirms when a script sends a key during the Insertion: only the user\'s keys count', async () => {
       callbacks.insert.mockImplementation(() => {
         field.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true, composed: true }));
@@ -670,30 +697,47 @@ describe('PromptSelectorController', () => {
       await vi.waitFor(() => { expect(pill()).toBeNull(); });
     });
 
-    it('leaves after 2.8s, but stays while it is hovered or focused', async () => {
+    it('leaves after 2.8s, but stays while it is hovered or focused, until neither holds it', async () => {
       await inserted();
+      // React renders on a message channel, which the fake timers leave alone
+      const rendered = (): Promise<void> => new Promise((resolve) => {
+        const channel = new MessageChannel();
+        channel.port1.onmessage = () => { channel.port1.close(); resolve(); };
+        channel.port2.postMessage(null);
+      });
+      const leaving = async (): Promise<boolean> => {
+        await rendered();
+        await rendered();
+        return pill() === null || pill()?.getAttribute('data-leaving') === 'true';
+      };
       vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
       try {
         // The pointer comes on the pill before the time is up: it stays
         pill()?.dispatchEvent(new MouseEvent('mouseenter'));
         vi.advanceTimersByTime(10_000);
-        expect(pill()?.getAttribute('data-leaving')).toBeNull();
+        expect(await leaving()).toBe(false);
 
-        // The pointer leaves, the focus comes on Undo: it still stays
-        undoButton()?.focus();
+        // The focus comes on Undo, then the pointer leaves: the focus still holds it
+        undoButton()?.dispatchEvent(new FocusEvent('focusin', { bubbles: true, composed: true }));
         pill()?.dispatchEvent(new MouseEvent('mouseleave'));
         vi.advanceTimersByTime(10_000);
-        expect(pill()?.getAttribute('data-leaving')).toBeNull();
+        expect(await leaving()).toBe(false);
 
-        // Neither: 2.8s later it leaves
-        undoButton()?.blur();
+        // The pointer comes back, then the focus leaves: the pointer still holds it
+        pill()?.dispatchEvent(new MouseEvent('mouseenter'));
+        undoButton()?.dispatchEvent(new FocusEvent('focusout', { bubbles: true, composed: true }));
+        vi.advanceTimersByTime(10_000);
+        expect(await leaving()).toBe(false);
+
+        // Neither: 2.8s later it leaves, not before
+        pill()?.dispatchEvent(new MouseEvent('mouseleave'));
         vi.advanceTimersByTime(2799);
-        expect(pill()?.getAttribute('data-leaving')).toBeNull();
+        expect(await leaving()).toBe(false);
         vi.advanceTimersByTime(1);
+        expect(await leaving()).toBe(true);
       } finally {
         vi.useRealTimers();
       }
-      await vi.waitFor(() => { expect(pill() === null || pill()?.getAttribute('data-leaving') === 'true').toBe(true); });
     });
 
     it('goes when the selector opens again, and with it its Undo', async () => {

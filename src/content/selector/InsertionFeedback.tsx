@@ -65,17 +65,23 @@ export const InsertionFeedback: FC<InsertionFeedbackProps> = ({ id, kind, title,
     if (!pill) {
       return;
     }
-    const held = (): void => { hold.current(true); };
-    const released = (): void => { hold.current(false); };
-    pill.addEventListener('mouseenter', held);
-    pill.addEventListener('mouseleave', released);
-    pill.addEventListener('focusin', held);
-    pill.addEventListener('focusout', released);
+    // Held by the pointer, by the focus, or by both: it is released once neither is on it
+    let hovered = false;
+    let focused = false;
+    const tell = (): void => { hold.current(hovered || focused); };
+    const onEnter = (): void => { hovered = true; tell(); };
+    const onLeave = (): void => { hovered = false; tell(); };
+    const onFocusIn = (): void => { focused = true; tell(); };
+    const onFocusOut = (): void => { focused = false; tell(); };
+    pill.addEventListener('mouseenter', onEnter);
+    pill.addEventListener('mouseleave', onLeave);
+    pill.addEventListener('focusin', onFocusIn);
+    pill.addEventListener('focusout', onFocusOut);
     return () => {
-      pill.removeEventListener('mouseenter', held);
-      pill.removeEventListener('mouseleave', released);
-      pill.removeEventListener('focusin', held);
-      pill.removeEventListener('focusout', released);
+      pill.removeEventListener('mouseenter', onEnter);
+      pill.removeEventListener('mouseleave', onLeave);
+      pill.removeEventListener('focusin', onFocusIn);
+      pill.removeEventListener('focusout', onFocusOut);
     };
   }, []);
 
