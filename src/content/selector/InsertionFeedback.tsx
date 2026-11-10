@@ -1,4 +1,4 @@
-import { type CSSProperties, type FC, useCallback, useRef } from 'react';
+import { type CSSProperties, type FC, useCallback, useLayoutEffect, useRef } from 'react';
 
 /** Where the input field is in the window, and how round its corners are. */
 export interface FieldBox {
@@ -58,7 +58,9 @@ export const InsertionFeedback: FC<InsertionFeedbackProps> = ({ id, kind, title,
   // The pill is a status, not a control: it hears the pointer and the focus through its element.
   // A ref callback, so each new pill (one per Insertion) gets the listeners and gives them back
   const hold = useRef(onHold);
-  hold.current = onHold;
+  useLayoutEffect(() => {
+    hold.current = onHold;
+  });
   const pillRef = useCallback((pill: HTMLDivElement | null) => {
     if (!pill) {
       return;

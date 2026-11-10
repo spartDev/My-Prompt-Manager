@@ -418,6 +418,8 @@ export class PromptSelectorController {
    */
   private async insert(prompt: Prompt, pending: PendingInsertion, target: HTMLElement): Promise<void> {
     const previous = readInputText(target);
+    // Where the field is now: the Platform may replace it while it takes the text
+    const lastField = boxOf(target);
     let inserted = false;
     try {
       // A Prompt inserted as saved arrives Verbatim; filling its Variables in is the user's own change
@@ -437,11 +439,13 @@ export class PromptSelectorController {
         target.focus({ preventScroll: true });
       }
     }
+    // A field that is gone holds no Prompt, whatever the Platform's strategy reported
+    const there = target.isConnected;
     this.showFeedback({
-      kind: inserted ? 'inserted' : 'failed',
+      kind: inserted && there ? 'inserted' : 'failed',
       title: prompt.title,
-      target: target.isConnected ? target : null,
-      field: target.isConnected ? boxOf(target) : { top: 0, left: 0, width: 0, height: 0, radius: '0px' },
+      target: there ? target : null,
+      field: there ? boxOf(target) : lastField,
       previous
     });
   }

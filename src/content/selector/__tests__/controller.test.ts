@@ -514,6 +514,31 @@ describe('PromptSelectorController', () => {
       expect(sweep()).toBeNull();
     });
 
+    it('says so when the Platform replaces the input field while it takes the text', async () => {
+      callbacks.insert.mockImplementation(() => {
+        field.remove();
+        return Promise.resolve(false);
+      });
+
+      await inserted();
+
+      expect(pill()?.textContent).toBe("Couldn't insert “Title p1”");
+      expect(undoButton()).toBeNull();
+    });
+
+    it('offers no Undo for a field that is gone, even when the Platform reported the text as inserted', async () => {
+      callbacks.insert.mockImplementation(() => {
+        field.remove();
+        return Promise.resolve(true);
+      });
+
+      await inserted();
+
+      expect(pill()?.getAttribute('data-kind')).toBe('failed');
+      expect(undoButton()).toBeNull();
+      expect(sweep()).toBeNull();
+    });
+
     it('says so when the Insertion throws', async () => {
       callbacks.insert.mockRejectedValue(new Error('boom'));
 
