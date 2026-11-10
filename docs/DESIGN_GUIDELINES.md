@@ -362,7 +362,7 @@ shadow-knob /* 0 2px 4px, tint 25 - the knob of a switch */
 
 ### Custom Shadows
 
-The Prompt selector shown on Platforms is styled outside Tailwind (`src/content/selector/selectorStyles.ts`); its one shadow is the token `--shadow-selector`, declared in `tokens.css` in light and dark.
+The Prompt selector shown on Platforms is styled outside Tailwind (`src/content/selector/selectorStyles.ts`); its shadows are the tokens `--shadow-selector` (the popover) and `--shadow-toast` (the confirmation of an Insertion), declared in `tokens.css` in light and dark.
 
 **Icon Shadow (Legacy):**
 ```css
@@ -1555,6 +1555,11 @@ transition-colors focus-interactive
 - Width: 360px, never wider than the window minus 10px on each side
 - Placed 10px above the input field, below when a full popover (384px) does not fit above
 - Max height: the room left on that side; the list inside is at most 230px, the variables text 220px
+
+**Confirmation of an Insertion** (`src/content/selector/InsertionFeedback.tsx`):
+- Pill: 34px high, on `bg-inverse`, its right edge on the input field's, 10px above the field (below when the field is less than 48px from the top of the window); `role="status"`; `Inserted “title”` and an Undo button (26px high), or `Couldn't insert “title”` alone
+- It stays 2.8s, and while it is hovered or focused; it leaves when the user types in the field or sends
+- Sweep: a violet band (`bg-inverse-mark` at 32%) across the field, once, 1.1s on the sheet curve, inside the field's own corner radius; not drawn under reduced motion
 
 **Prompts button** (`src/content/utils/styles.ts`):
 - Height: 32px, badge 22px; the badge alone (32px wide) when its bar has no room or it is laid over the page

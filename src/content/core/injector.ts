@@ -10,6 +10,7 @@ import { getPlatformByHostname } from '../../config/platforms';
 import type { ElementFingerprint } from '../../types/index';
 import { PromptSelectorController } from '../selector/controller';
 import { loadSelectorFont } from '../selector/font';
+import { endsWithSelectorTrigger, removeTypedTrigger, textBeforeCaret } from '../selector/inputText';
 import type { SelectorLibrary } from '../selector/selectorData';
 import type { InsertionResult, Prompt } from '../types/index';
 import { BAR_SEARCH_DEPTH, fitPromptsPill, syncPromptsPillTheme, UIElementFactory } from '../ui/element-factory';
@@ -106,6 +107,7 @@ export class PromptLibraryInjector {
     this.selector = new PromptSelectorController({
       loadLibrary: () => this.loadSelectorLibrary(),
       insert: (prompt, content, target) => this.insertSelectedPrompt(prompt, content, target),
+      restore: (text, target) => this.restoreInputText(text, target),
       onOpenChange: (open, trigger) => { this.markIconOpen(open, trigger); }
     });
 
@@ -288,6 +290,45 @@ export class PromptLibraryInjector {
       }
     };
     this.eventManager.addTrackedEventListener(document, 'focusin', focusHandler);
+
+    this.listenForSelectorTrigger();
+  }
+
+  /**
+   * Opens the Prompt selector when the user types `//` in the input field, at its start or after
+   * a space or a line break (so the `//` of a URL opens nothing). The two characters are removed
+   * first, as Backspace would, and the rest of the field is left as it is.
+   */
+  private listenForSelectorTrigger(): void {
+    let scheduled = false;
+    const onSlash = (event: Event): void => {
+      const field = this.state.currentTextarea;
+      if (scheduled || !field?.isConnected || this.selector.isOpen || !event.composedPath().includes(field)) {
+        return;
+      }
+      // An editor that handles typing itself sends no input event: the key is heard as well
+      const typedSlash = event instanceof KeyboardEvent
+        ? event.key === '/' && !event.isComposing && !event.ctrlKey && !event.metaKey && !event.altKey
+        : event instanceof InputEvent && event.data === '/' && !event.isComposing;
+      if (!typedSlash) {
+        return;
+      }
+      scheduled = true;
+      // Once the Platform has handled the character itself: its editor is then up to date
+      window.setTimeout(() => {
+        scheduled = false;
+        const before = field.isConnected ? textBeforeCaret(field) : null;
+        if (before === null || !endsWithSelectorTrigger(before) || this.selector.isOpen) {
+          return;
+        }
+        if (!removeTypedTrigger(field)) {
+          debug('Could not remove the // that opened the prompt selector');
+        }
+        void this.selector.open(field, this.state.icon);
+      }, 0);
+    };
+    this.eventManager.addTrackedEventListener(document, 'keydown', onSlash);
+    this.eventManager.addTrackedEventListener(document, 'input', onSlash);
   }
 
   /**
@@ -1587,38 +1628,59 @@ export class PromptLibraryInjector {
 
   /**
    * Inserts the Prompt the user chose, once the selector has closed, and reports the use.
+   * Resolves to whether the text arrived: a failed Insertion counts no use.
    */
-  private async insertSelectedPrompt(prompt: Prompt, content: string, targetElement: HTMLElement): Promise<void> {
+  private async insertSelectedPrompt(prompt: Prompt, content: string, targetElement: HTMLElement): Promise<boolean> {
     try {
       const result = await this.insertPrompt(targetElement, content);
 
-      if (result.success) {
-        try {
-          // Get platform name from hostname lookup for accurate analytics
-          // Falls back to hostname for custom sites to enable per-site analytics
-          const platform = getPlatformByHostname(window.location.hostname)?.id ?? window.location.hostname;
-
-          await chrome.runtime.sendMessage({
-            type: 'PROMPT_USAGE_INCREMENT',
-            data: {
-              promptId: prompt.id,
-              platform,
-              categoryId: prompt.category || null
-            }
-          });
-        } catch (sendMessageError) {
-          debug('[CONTENT] Failed to report prompt usage', {
-            promptId: prompt.id,
-            error: sendMessageError instanceof Error ? sendMessageError.message : String(sendMessageError)
-          });
-        }
-      } else {
+      if (!result.success) {
         warn('[CONTENT] Prompt insertion reported failure', { promptId: prompt.id, error: result.error });
+        return false;
       }
+
+      try {
+        // Get platform name from hostname lookup for accurate analytics
+        // Falls back to hostname for custom sites to enable per-site analytics
+        const platform = getPlatformByHostname(window.location.hostname)?.id ?? window.location.hostname;
+
+        await chrome.runtime.sendMessage({
+          type: 'PROMPT_USAGE_INCREMENT',
+          data: {
+            promptId: prompt.id,
+            platform,
+            categoryId: prompt.category || null
+          }
+        });
+      } catch (sendMessageError) {
+        debug('[CONTENT] Failed to report prompt usage', {
+          promptId: prompt.id,
+          error: sendMessageError instanceof Error ? sendMessageError.message : String(sendMessageError)
+        });
+      }
+      return true;
     } catch (err) {
       error('[CONTENT] Error handling prompt selection', err instanceof Error ? err : new Error(String(err)), {
         promptId: prompt.id
       });
+      return false;
+    }
+  }
+
+  /**
+   * Undo after an Insertion: the input field takes back the plain text it held before, through the
+   * Platform's strategy. The use of the Prompt stays counted.
+   */
+  private async restoreInputText(text: string, targetElement: HTMLElement): Promise<boolean> {
+    try {
+      const result = await this.platformManager.restoreText(targetElement, text);
+      if (!result.success) {
+        warn('[CONTENT] Undo of the insertion reported failure', { error: result.error });
+      }
+      return result.success;
+    } catch (err) {
+      error('[CONTENT] Error undoing the insertion', err instanceof Error ? err : new Error(String(err)));
+      return false;
     }
   }
 

@@ -35,6 +35,11 @@ export function getSelectorCSS(): string {
       --border-color-accent: #c4b5fd;
       --scrollbar-color-thumb: #8b5cf6;
       --shadow-selector: 0 30px 60px -24px rgba(45, 25, 90, 0.5);
+      --text-color-on-inverse-strong: #ffffff;
+      --background-color-inverse-mark: #a78bfa;
+      --background-color-inverse-action: rgba(255, 255, 255, 0.14);
+      --background-color-inverse-bar: rgba(255, 255, 255, 0.22);
+      --shadow-toast: 0 14px 30px -12px rgba(29, 21, 48, 0.6);
     }
 
     :host([data-theme="dark"]) {
@@ -58,6 +63,11 @@ export function getSelectorCSS(): string {
       --border-color-accent: #6d4fc4;
       --scrollbar-color-thumb: #8b5cf6;
       --shadow-selector: 0 30px 60px -24px rgba(4, 2, 10, 0.85);
+      --text-color-on-inverse-strong: #ffffff;
+      --background-color-inverse-mark: #a78bfa;
+      --background-color-inverse-action: rgba(255, 255, 255, 0.14);
+      --background-color-inverse-bar: rgba(255, 255, 255, 0.22);
+      --shadow-toast: 0 14px 30px -12px rgba(0, 0, 0, 0.6);
     }
 
     *, *::before, *::after {
@@ -471,11 +481,99 @@ export function getSelectorCSS(): string {
       transform: scale(0.96);
     }
 
+    /* After an Insertion: a violet sweep over the input field, once, and a pill above it on the right */
+    .mpm-sweep {
+      position: fixed;
+      pointer-events: none;
+      background: linear-gradient(
+        100deg,
+        transparent 35%,
+        color-mix(in srgb, var(--background-color-inverse-mark) 32%, transparent) 50%,
+        transparent 65%
+      );
+      background-size: 260% 100%;
+      animation: mpm-sweep ${String(DURATION.sweep)}ms ${EASE.sheet} both;
+    }
+
+    @keyframes mpm-sweep {
+      from { background-position: 120% 0; opacity: 1; }
+      to { background-position: -20% 0; opacity: 0; }
+    }
+
+    .mpm-inserted {
+      position: fixed;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-sizing: border-box;
+      height: 34px;
+      max-width: min(420px, calc(100vw - 16px));
+      padding: 0 13px;
+      pointer-events: auto;
+      border-radius: 999px;
+      background: var(--background-color-inverse);
+      box-shadow: var(--shadow-toast);
+      color: var(--text-color-on-inverse-strong);
+      font-family: '${SELECTOR_FONT_FAMILY}', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+      font-size: 12.5px;
+      font-weight: 600;
+      line-height: 1.3;
+      text-align: left;
+      animation: mpm-inserted ${String(DURATION.inserted)}ms ${EASE.spring} both;
+    }
+
+    .mpm-inserted[data-undo="true"] {
+      padding-right: 5px;
+    }
+
+    .mpm-inserted[data-leaving="true"] {
+      animation: mpm-inserted-out ${String(DURATION.close)}ms ease-in both;
+    }
+
+    @keyframes mpm-inserted {
+      from { opacity: 0; transform: translateY(-14px) scale(0.9); }
+      to { opacity: 1; transform: none; }
+    }
+
+    @keyframes mpm-inserted-out {
+      from { opacity: 1; }
+      to { opacity: 0; }
+    }
+
+    .mpm-inserted-text {
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .mpm-inserted-undo {
+      flex: none;
+      height: 26px;
+      padding: 0 10px;
+      border-radius: 999px;
+      background: var(--background-color-inverse-action);
+      color: var(--text-color-on-inverse-strong);
+      font-size: 12px;
+      font-weight: 700;
+      transition: background 150ms;
+    }
+
+    .mpm-inserted-undo:hover {
+      background: var(--background-color-inverse-bar);
+    }
+
+    .mpm-inserted-undo:focus-visible {
+      outline-color: var(--text-color-on-inverse-strong);
+    }
+
     @media (prefers-reduced-motion: reduce) {
       .mpm-popover,
       .mpm-popover[data-closing="true"],
       .mpm-row,
-      .mpm-fill {
+      .mpm-fill,
+      .mpm-sweep,
+      .mpm-inserted,
+      .mpm-inserted[data-leaving="true"] {
         animation-duration: 1ms;
       }
 
@@ -483,7 +581,8 @@ export function getSelectorCSS(): string {
       .mpm-tab,
       .mpm-row,
       .mpm-variable,
-      .mpm-insert {
+      .mpm-insert,
+      .mpm-inserted-undo {
         transition-duration: 1ms;
       }
     }

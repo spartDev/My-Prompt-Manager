@@ -44,12 +44,12 @@ export class PlatformInsertionManager {
    * @param options - Insertion options (legacy parameter for backward compatibility)
    * @returns Promise<InsertionResult> Result of insertion attempt
    */
-  async insertContent(content: string, options: { element?: HTMLElement } = {}): Promise<InsertionResult> {
+  insertContent(content: string, options: { element?: HTMLElement } = {}): Promise<InsertionResult> {
     if (!options.element) {
-      return {
+      return Promise.resolve({
         success: false,
         error: 'No target element provided'
-      };
+      });
     }
 
     return this.platformManager.insertContent(options.element, content);
@@ -61,8 +61,18 @@ export class PlatformInsertionManager {
    * @param content - Content to insert
    * @returns Promise<InsertionResult> Result of insertion attempt
    */
-  async insertPrompt(element: HTMLElement, content: string): Promise<InsertionResult> {
+  insertPrompt(element: HTMLElement, content: string): Promise<InsertionResult> {
     return this.platformManager.insertContent(element, content);
+  }
+
+  /**
+   * Puts `text` back as the whole content of the input field: Undo after an Insertion
+   * @param element - The input field
+   * @param text - The plain text the field held before the Insertion
+   * @returns Promise<InsertionResult> Result of the attempt
+   */
+  restoreText(element: HTMLElement, text: string): Promise<InsertionResult> {
+    return this.platformManager.restoreContent(element, text);
   }
 
   /**

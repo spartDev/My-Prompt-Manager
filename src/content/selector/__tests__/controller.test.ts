@@ -50,6 +50,16 @@ describe('PromptSelectorController', () => {
     target?.dispatchEvent(event);
     return event;
   };
+  const pill = (): HTMLElement | null => shadow()?.querySelector<HTMLElement>('[role="status"]') ?? null;
+  const undoButton = (): HTMLButtonElement | null => pill()?.querySelector('button') ?? null;
+  const sweep = (): HTMLElement | null => shadow()?.querySelector<HTMLElement>('.mpm-sweep') ?? null;
+  /** Opens the selector, chooses p1 and waits for the confirmation of its Insertion. */
+  const inserted = async (): Promise<void> => {
+    await controller.open(field, button);
+    await opened();
+    row('p1')?.click();
+    await vi.waitFor(() => { expect(pill()).not.toBeNull(); });
+  };
   const opened = async (): Promise<void> => {
     await vi.waitFor(() => { expect(dialog()).not.toBeNull(); });
   };
@@ -61,11 +71,14 @@ describe('PromptSelectorController', () => {
     theme.current = 'light';
     theme.observers.clear();
     field = document.createElement('textarea');
+    // The test DOM lays nothing out: the input field gets a place in the window
+    field.getBoundingClientRect = () => new DOMRect(100, 400, 500, 60);
     button = document.createElement('button');
     document.body.append(field, button);
     callbacks = {
       loadLibrary: vi.fn().mockResolvedValue(library),
-      insert: vi.fn().mockResolvedValue(undefined),
+      insert: vi.fn().mockResolvedValue(true),
+      restore: vi.fn().mockResolvedValue(true),
       onOpenChange: vi.fn()
     };
     controller = new PromptSelectorController(callbacks as unknown as SelectorCallbacks);
@@ -313,6 +326,10 @@ describe('PromptSelectorController', () => {
     field.remove();
     await closed();
     expect(callbacks.insert).not.toHaveBeenCalled();
+    // The user is told: the Prompt went nowhere, and there is nothing to undo
+    await vi.waitFor(() => { expect(pill()?.textContent).toBe("Couldn't insert “Title p1”"); });
+    expect(undoButton()).toBeNull();
+    expect(sweep()).toBeNull();
   });
 
   it('drops an opening that was closed before its Library had loaded', async () => {
@@ -420,5 +437,151 @@ describe('PromptSelectorController', () => {
 
     await expect(controller.open(field, button)).resolves.toBeUndefined();
     expect(controller.isOpen).toBe(false);
+  });
+
+  describe('after an Insertion', () => {
+    it('confirms it: the pill names the Prompt and offers Undo, the sweep covers the field, the caret is at the end', async () => {
+      field.value = 'Draft';
+      callbacks.insert.mockImplementation((_prompt: unknown, content: string) => {
+        field.value = content;
+        return Promise.resolve(true);
+      });
+
+      await inserted();
+
+      expect(dialog()).toBeNull();
+      expect(pill()?.textContent).toBe('Inserted “Title p1”Undo');
+      expect(pill()?.getAttribute('data-kind')).toBe('inserted');
+      expect(undoButton()?.textContent).toBe('Undo');
+      expect(sweep()?.getAttribute('aria-hidden')).toBe('true');
+      expect(sweep()?.style.width).toBe('500px');
+      expect(document.activeElement).toBe(field);
+      expect(field.selectionStart).toBe('Content p1'.length);
+    });
+
+    it('Undo puts back the text the field held before, through the Platform, and the pill goes', async () => {
+      field.value = '  Draft, kept exactly\n';
+      callbacks.insert.mockImplementation((_prompt: unknown, content: string) => {
+        field.value = content;
+        return Promise.resolve(true);
+      });
+      callbacks.restore.mockImplementation((text: string) => {
+        field.value = text;
+        return Promise.resolve(true);
+      });
+      await inserted();
+
+      undoButton()?.click();
+
+      await vi.waitFor(() => { expect(pill()).toBeNull(); });
+      expect(callbacks.restore).toHaveBeenCalledTimes(1);
+      expect(callbacks.restore).toHaveBeenCalledWith('  Draft, kept exactly\n', field);
+      expect(callbacks.insert).toHaveBeenCalledTimes(1);
+      await vi.waitFor(() => { expect(document.activeElement).toBe(field); });
+      expect(field.selectionStart).toBe(field.value.length);
+    });
+
+    it('says so when the Insertion failed: no Undo, no sweep', async () => {
+      callbacks.insert.mockResolvedValue(false);
+
+      await inserted();
+
+      expect(pill()?.textContent).toBe("Couldn't insert “Title p1”");
+      expect(pill()?.getAttribute('data-kind')).toBe('failed');
+      expect(undoButton()).toBeNull();
+      expect(sweep()).toBeNull();
+    });
+
+    it('says so when the Insertion throws', async () => {
+      callbacks.insert.mockRejectedValue(new Error('boom'));
+
+      await inserted();
+
+      expect(pill()?.getAttribute('data-kind')).toBe('failed');
+    });
+
+    it('draws no sweep under reduced motion', async () => {
+      const matchMedia = vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => ({ matches: query.includes('reduce') }) as MediaQueryList);
+
+      await inserted();
+
+      expect(pill()?.getAttribute('data-kind')).toBe('inserted');
+      expect(sweep()).toBeNull();
+      matchMedia.mockRestore();
+    });
+
+    it('leaves when the user types in the input field', async () => {
+      await inserted();
+
+      field.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, data: 'a' }));
+
+      await vi.waitFor(() => { expect(pill()).toBeNull(); });
+    });
+
+    it('leaves when the user sends the message with Enter', async () => {
+      await inserted();
+
+      field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, composed: true }));
+
+      await vi.waitFor(() => { expect(pill()).toBeNull(); });
+    });
+
+    it('leaves when the field is emptied without a key (the send button was clicked)', async () => {
+      callbacks.insert.mockImplementation((_prompt: unknown, content: string) => {
+        field.value = content;
+        return Promise.resolve(true);
+      });
+      await inserted();
+      // The watch has read the inserted text once
+      await new Promise((resolve) => { setTimeout(resolve, 300); });
+      expect(pill()).not.toBeNull();
+
+      field.value = '';
+
+      await vi.waitFor(() => { expect(pill()).toBeNull(); });
+    });
+
+    it('leaves after 2.8s, but stays while it is hovered or focused', async () => {
+      await inserted();
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      try {
+        // The pointer comes on the pill before the time is up: it stays
+        pill()?.dispatchEvent(new MouseEvent('mouseenter'));
+        vi.advanceTimersByTime(10_000);
+        expect(pill()?.getAttribute('data-leaving')).toBeNull();
+
+        // The pointer leaves, the focus comes on Undo: it still stays
+        undoButton()?.focus();
+        pill()?.dispatchEvent(new MouseEvent('mouseleave'));
+        vi.advanceTimersByTime(10_000);
+        expect(pill()?.getAttribute('data-leaving')).toBeNull();
+
+        // Neither: 2.8s later it leaves
+        undoButton()?.blur();
+        vi.advanceTimersByTime(2799);
+        expect(pill()?.getAttribute('data-leaving')).toBeNull();
+        vi.advanceTimersByTime(1);
+      } finally {
+        vi.useRealTimers();
+      }
+      await vi.waitFor(() => { expect(pill() === null || pill()?.getAttribute('data-leaving') === 'true').toBe(true); });
+    });
+
+    it('goes when the selector opens again, and with it its Undo', async () => {
+      await inserted();
+
+      await controller.open(field, button);
+      await opened();
+
+      expect(pill()).toBeNull();
+    });
+
+    it('goes when the controller is destroyed', async () => {
+      await inserted();
+
+      controller.destroy();
+
+      expect(document.getElementById(SELECTOR_HOST_ID)).toBeNull();
+    });
   });
 });

@@ -5,10 +5,17 @@
 
 import { createRoot } from 'react-dom/client';
 
+import { InsertionFeedback, type InsertionFeedbackProps } from './InsertionFeedback';
 import { PickerPopover, type PickerPopoverProps } from './PickerPopover';
 
+/** What the shadow root shows: the open selector, the confirmation of the last Insertion, or neither. */
+export interface SelectorLayerProps {
+  popover: PickerPopoverProps | null;
+  feedback: InsertionFeedbackProps | null;
+}
+
 export interface SelectorRoot {
-  render: (props: PickerPopoverProps) => void;
+  render: (props: SelectorLayerProps) => void;
   unmount: () => void;
 }
 
@@ -16,8 +23,13 @@ export interface SelectorRoot {
 export function createSelectorRoot(container: HTMLElement): SelectorRoot {
   const root = createRoot(container);
   return {
-    render: (props) => {
-      root.render(<PickerPopover {...props} />);
+    render: ({ popover, feedback }) => {
+      root.render(
+        <>
+          {popover && <PickerPopover {...popover} />}
+          {feedback && <InsertionFeedback {...feedback} />}
+        </>
+      );
     },
     unmount: () => {
       root.unmount();

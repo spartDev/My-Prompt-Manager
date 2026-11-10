@@ -320,7 +320,33 @@ describe('PromptLibraryInjector', () => {
     it('does not throw when the insertion throws', async () => {
       (await platformManager()).insertPrompt.mockRejectedValue(new Error('boom'));
 
-      await expect(selector().callbacks.insert(prompt, prompt.content, mockTextarea)).resolves.toBeUndefined();
+      await expect(selector().callbacks.insert(prompt, prompt.content, mockTextarea)).resolves.toBe(false);
+    });
+
+    it('tells the selector whether the text arrived', async () => {
+      vi.mocked(chrome.runtime.sendMessage).mockResolvedValue(undefined);
+      await expect(selector().callbacks.insert(prompt, prompt.content, mockTextarea)).resolves.toBe(true);
+
+      (await platformManager()).insertPrompt.mockResolvedValue({ success: false, error: 'nope' });
+      await expect(selector().callbacks.insert(prompt, prompt.content, mockTextarea)).resolves.toBe(false);
+    });
+
+    it('Undo restores the text through the Platform, and reports no use', async () => {
+      const manager = await platformManager();
+      manager.restoreText = vi.fn().mockResolvedValue({ success: true, method: 'restore-value' });
+      vi.mocked(chrome.runtime.sendMessage).mockClear();
+
+      await expect(selector().callbacks.restore('Draft', mockTextarea)).resolves.toBe(true);
+
+      expect(manager.restoreText).toHaveBeenCalledWith(mockTextarea, 'Draft');
+      expect(chrome.runtime.sendMessage).not.toHaveBeenCalled();
+    });
+
+    it('Undo does not throw when the Platform fails', async () => {
+      const manager = await platformManager();
+      manager.restoreText = vi.fn().mockRejectedValue(new Error('boom'));
+
+      await expect(selector().callbacks.restore('Draft', mockTextarea)).resolves.toBe(false);
     });
 
     it('does not throw when the use cannot be reported', async () => {
