@@ -247,6 +247,35 @@ describe('PromptSelectorController', () => {
     expect(document.activeElement).toBe(elsewhere);
   });
 
+  it('takes the button that replaces its trigger: it says open, is not outside, and closes on a second click', async () => {
+    await controller.open(field, button);
+    await opened();
+    const replacement = document.createElement('button');
+    document.body.appendChild(replacement);
+    button.remove();
+
+    controller.setTrigger(replacement);
+    expect(callbacks.onOpenChange).toHaveBeenLastCalledWith(true, replacement);
+
+    // A press on the new button is not a click outside: the selector stays for toggle to close it
+    replacement.dispatchEvent(new Event('pointerdown', { bubbles: true, composed: true }));
+    expect(dialog()?.getAttribute('data-closing')).toBe('false');
+    controller.toggle(field, replacement);
+    await closed();
+    expect(callbacks.onOpenChange).toHaveBeenLastCalledWith(false, replacement);
+  });
+
+  it('inserts nothing when it is destroyed while it closes with an Insertion pending', async () => {
+    await controller.open(field, button);
+    await opened();
+    row('p1')?.click();
+
+    controller.destroy();
+    await new Promise((resolve) => setTimeout(resolve, 250));
+
+    expect(callbacks.insert).not.toHaveBeenCalled();
+  });
+
   it('closes without inserting when the Platform removes the input field', async () => {
     await controller.open(field, button);
     await opened();

@@ -835,6 +835,8 @@ export class PromptLibraryInjector {
       }
 
       this.state.icon = icon;
+      // The selector may be open over the button this one replaces
+      this.selector.setTrigger(icon);
       debug('Icon created successfully');
 
       // Store cleanup function if present (for Copilot icons with MutationObserver)

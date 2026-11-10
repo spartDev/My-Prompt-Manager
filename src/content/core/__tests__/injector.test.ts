@@ -57,12 +57,12 @@ vi.mock('../../ui/element-factory', () => {
 
 // The Prompt selector's controller, replaced by a recorder: the injector's part is to wire it
 const selectorMock = vi.hoisted(() => ({
-  instances: [] as { callbacks: any; toggle: any; close: any; destroy: any; isOpen: boolean }[]
+  instances: [] as { callbacks: any; toggle: any; setTrigger: any; close: any; destroy: any; isOpen: boolean }[]
 }));
 
 vi.mock('../../selector/controller', () => ({
   PromptSelectorController: vi.fn(function(callbacks: unknown) {
-    const instance = { callbacks, toggle: vi.fn(), close: vi.fn(), destroy: vi.fn(), isOpen: false };
+    const instance = { callbacks, toggle: vi.fn(), setTrigger: vi.fn(), close: vi.fn(), destroy: vi.fn(), isOpen: false };
     selectorMock.instances.push(instance);
     return instance;
   })
@@ -256,6 +256,13 @@ describe('PromptLibraryInjector', () => {
       injector.showPromptSelector(mockTextarea);
 
       expect(selector().toggle).toHaveBeenCalledWith(mockTextarea, icon);
+    });
+
+    it('tells the selector which button is the current one, each time a button is placed', async () => {
+      await injector.initialize();
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      expect(selector().setTrigger).toHaveBeenCalledWith((injector as any).state.icon);
     });
 
     it('the Prompts button toggles the selector when clicked', async () => {

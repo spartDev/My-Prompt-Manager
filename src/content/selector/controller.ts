@@ -104,7 +104,7 @@ export class PromptSelectorController {
       this.root ??= createSelectorRoot(container);
 
       const side = chooseSide(this.anchor({ target, trigger }), this.viewport());
-      this.session = { target, trigger, side, restoreFocus: true, teardown: this.listen(target, trigger) };
+      this.session = { target, trigger, side, restoreFocus: true, teardown: this.listen(target) };
       this.store.dispatch({ type: 'open', library });
       this.render();
       this.callbacks.onOpenChange?.(true, trigger);
@@ -120,6 +120,18 @@ export class PromptSelectorController {
         this.loading = null;
       }
     }
+  }
+
+  /**
+   * Tells the open selector that the Platform replaced the Prompts button (it re-rendered its
+   * toolbar): the new button is the one that closes it, that is not "outside", and that says it is open.
+   */
+  setTrigger(trigger: HTMLElement | null): void {
+    if (!this.session || this.session.trigger === trigger) {
+      return;
+    }
+    this.session.trigger = trigger;
+    this.callbacks.onOpenChange?.(true, trigger);
   }
 
   /** Starts closing. `restoreFocus` false leaves the focus where it is (the input field is gone, or the user clicked elsewhere). */
@@ -140,7 +152,8 @@ export class PromptSelectorController {
     if (this.session) {
       this.session.restoreFocus = false;
     }
-    this.finishClose();
+    // Nothing is inserted from a selector that is being removed (the site was disabled)
+    this.finishClose(true);
     this.root?.unmount();
     this.root = null;
     ThemeManager.getInstance().removeObserver(this.onThemeChange);
@@ -229,9 +242,11 @@ export class PromptSelectorController {
   }
 
   /** Listeners that live as long as the selector is open. Returns their removal. */
-  private listen(target: HTMLElement, trigger: HTMLElement | null): () => void {
+  private listen(target: HTMLElement): () => void {
     const onPointerDown = (event: Event): void => {
       const path = event.composedPath();
+      // Read at each click: the Platform may have replaced the button since the selector opened
+      const trigger = this.session?.trigger;
       if ((this.host && path.includes(this.host)) || (trigger && path.includes(trigger))) {
         return;
       }
@@ -278,8 +293,11 @@ export class PromptSelectorController {
     this.closeTimer = window.setTimeout(() => { this.finishClose(); }, prefersReducedMotion() ? 0 : DURATION.close);
   }
 
-  /** Ends the open session, if any: the selector leaves the page, then the pending Insertion is performed. */
-  private finishClose(): void {
+  /**
+   * Ends the open session, if any: the selector leaves the page, then the pending Insertion is
+   * performed, unless `discard` drops it.
+   */
+  private finishClose(discard = false): void {
     if (this.closeTimer !== null) {
       window.clearTimeout(this.closeTimer);
       this.closeTimer = null;
@@ -299,6 +317,9 @@ export class PromptSelectorController {
     this.store.dispatch({ type: 'closed' });
     this.callbacks.onOpenChange?.(false, session.trigger);
 
+    if (discard) {
+      return;
+    }
     if (pending && prompt && session.target.isConnected) {
       void this.insert(prompt, pending, session.target);
     } else if (session.restoreFocus && session.target.isConnected) {
