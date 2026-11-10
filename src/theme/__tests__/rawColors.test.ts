@@ -72,7 +72,12 @@ const MIGRATED = [
   'components/analytics/StatCard.tsx',
   'components/analytics/RankedRows.tsx',
   'components/analytics/charts/DailyUseChart.tsx',
-  'components/analytics/charts/ChartTooltip.tsx'
+  'components/analytics/charts/ChartTooltip.tsx',
+  // My-Prompt-Manager-q9j: the Prompt selector shown on Platforms (plain CSS in a shadow root, on the tokens)
+  'content/selector/PickerPopover.tsx',
+  'content/selector/PickerTabs.tsx',
+  'content/selector/PickerList.tsx',
+  'content/selector/PickerFill.tsx'
 ];
 
 // Agent guidance that prescribes classes follows the same rule, or it steers UI work off the tokens

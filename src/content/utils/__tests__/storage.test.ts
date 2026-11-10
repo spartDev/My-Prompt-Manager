@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DEFAULT_CATEGORY } from '../../../constants';
 import * as Logger from '../logger';
-import { createElement, createSVGElement, getCategoryColors, getPrompts } from '../storage';
+import { createElement, createSVGElement, getCategories, getPrompts } from '../storage';
 
 // Mock Logger
 vi.mock('../logger', () => ({
@@ -57,32 +57,32 @@ describe('StorageManager', () => {
     chromeMock.runtime.lastError = null;
   });
 
-  describe('getCategoryColors', () => {
+  describe('getCategories', () => {
     const storeRaw = (categories: unknown) => {
       chromeMock.storage.local.get.mockImplementation((_keys, callback) => {
         callback({ categories });
       });
     };
 
-    it('maps each Category name to its color, for the chips of the Prompt selector', async () => {
+    it('gives the Categories in their stored order, with their colors, for the tabs of the Prompt selector', async () => {
       storeRaw([{ id: 'a', name: 'Code', color: '#0F766E' }, { id: 'b', name: 'Writing', color: '#2563EB' }]);
 
-      expect(await getCategoryColors()).toEqual(new Map([['Code', '#0F766E'], ['Writing', '#2563EB']]));
+      expect(await getCategories()).toEqual([{ name: 'Code', color: '#0F766E' }, { name: 'Writing', color: '#2563EB' }]);
       expect(chromeMock.storage.local.get).toHaveBeenCalledWith(['categories'], expect.any(Function));
     });
 
-    it('leaves out a Category with no valid color, and anything that is not a Category', async () => {
+    it('keeps a Category with no valid color, without one, and leaves out anything that is not a Category', async () => {
       storeRaw([{ id: 'a', name: 'No color' }, { id: 'b', name: 'Bad', color: 'red' }, 'Code', null, { id: 'c', name: 'Ok', color: '#D97706' }]);
 
-      expect(await getCategoryColors()).toEqual(new Map([['Ok', '#D97706']]));
+      expect(await getCategories()).toEqual([{ name: 'No color' }, { name: 'Bad' }, { name: 'Ok', color: '#D97706' }]);
     });
 
-    it('gives an empty map when nothing is stored or storage fails', async () => {
+    it('gives no Category when nothing is stored or storage fails', async () => {
       storeRaw(undefined);
-      expect(await getCategoryColors()).toEqual(new Map());
+      expect(await getCategories()).toEqual([]);
 
       chromeMock.storage.local.get.mockImplementation(() => { throw new Error('storage down'); });
-      expect(await getCategoryColors()).toEqual(new Map());
+      expect(await getCategories()).toEqual([]);
     });
   });
 

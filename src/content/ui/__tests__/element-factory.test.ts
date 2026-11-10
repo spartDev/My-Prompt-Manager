@@ -1,25 +1,19 @@
 /**
- * Unit tests for UIElementFactory
+ * Unit tests for UIElementFactory: the Prompts button of each Platform
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { createElement, createSVGElement } from '../../utils/storage';
-import { UIElementFactory } from '../element-factory';
+import { fitPromptsPill, syncPromptsPillTheme, UIElementFactory } from '../element-factory';
 
-// Mock storage functions
+const theme = vi.hoisted(() => ({ current: 'light' as 'light' | 'dark' }));
+
+vi.mock('../../utils/theme-manager', () => ({
+  ThemeManager: { getInstance: () => ({ getCurrentTheme: () => theme.current }) }
+}));
+
 vi.mock('../../utils/storage', () => ({
-  createElement: vi.fn((tag: string, attributes: Record<string, unknown> = {}, textContent = '') => {
-      const element = document.createElement(tag);
-      Object.entries(attributes).forEach(([key, value]) => {
-        element.setAttribute(key, String(value));
-      });
-      if (textContent) {
-        element.textContent = textContent;
-      }
-      return element;
-    }),
-  createSVGElement: vi.fn((tag: string, attributes: Record<string, any> = {}) => {
+  createSVGElement: vi.fn((tag: string, attributes: Record<string, string | number> = {}) => {
     const element = document.createElementNS('http://www.w3.org/2000/svg', tag);
     Object.entries(attributes).forEach(([key, value]) => {
       element.setAttribute(key, String(value));
@@ -32,424 +26,223 @@ describe('UIElementFactory', () => {
   let factory: UIElementFactory;
   const testInstanceId = 'test-instance-123';
 
+  const buttons = (): [string, HTMLElement][] => [
+    ['Claude', factory.createClaudeIcon().icon],
+    ['ChatGPT', factory.createChatGPTIcon()],
+    ['Perplexity', factory.createPerplexityIcon()],
+    ['Mistral', factory.createMistralIcon()],
+    ['Gemini', factory.createGeminiIcon()],
+    ['Copilot', factory.createCopilotIcon().element],
+    ['custom site', factory.createFloatingIcon()]
+  ];
+
   beforeEach(() => {
+    theme.current = 'light';
     factory = new UIElementFactory(testInstanceId);
-    vi.clearAllMocks();
   });
 
-  describe('constructor', () => {
-    it('should create factory with instance ID', () => {
-      expect(factory).toBeInstanceOf(UIElementFactory);
+  describe('the Prompts button', () => {
+    it('is the same pill on every Platform: a badge and the label "Prompts"', () => {
+      for (const [platform, button] of buttons()) {
+        expect(button.tagName, platform).toBe('BUTTON');
+        expect(button.getAttribute('type'), platform).toBe('button');
+        expect(button.classList.contains('prompt-library-pill'), platform).toBe(true);
+        expect(button.querySelector('.prompt-library-pill-label')?.textContent, platform).toBe('Prompts');
+        expect(button.querySelector('.prompt-library-pill-badge svg path'), platform).not.toBeNull();
+        expect(button.querySelector('svg')?.getAttribute('aria-hidden'), platform).toBe('true');
+      }
+    });
+
+    it('has an accessible name that holds its visible label, and says it opens a dialog, closed at first', () => {
+      for (const [platform, button] of buttons()) {
+        expect(button.getAttribute('aria-label'), platform).toMatch(/^Prompts/);
+        expect(button.getAttribute('aria-haspopup'), platform).toBe('dialog');
+        expect(button.getAttribute('aria-expanded'), platform).toBe('false');
+        expect(button.getAttribute('title'), platform).toBe('My Prompt Manager');
+        expect(button.getAttribute('tabindex'), platform).toBe('0');
+      }
+    });
+
+    it('carries the instance id', () => {
+      for (const [platform, button] of buttons()) {
+        expect(button.getAttribute('data-instance-id'), platform).toBe(testInstanceId);
+      }
+    });
+
+    it('takes none of the Platform\'s own button classes', () => {
+      for (const [platform, button] of buttons()) {
+        const foreign = [...button.classList].filter((name) => !name.startsWith('prompt-library-'));
+        expect(foreign, platform).toEqual([]);
+      }
+    });
+
+    it('follows the extension\'s theme', () => {
+      expect(factory.createChatGPTIcon().classList.contains('dark-theme')).toBe(false);
+
+      theme.current = 'dark';
+      expect(factory.createChatGPTIcon().classList.contains('dark-theme')).toBe(true);
+    });
+
+    it('sets its label as text, never as markup', () => {
+      const button = factory.createChatGPTIcon();
+
+      expect(button.querySelectorAll('script, img, iframe').length).toBe(0);
+      expect(button.querySelector('.prompt-library-pill-label')?.children.length).toBe(0);
     });
   });
 
   describe('createClaudeIcon', () => {
-    it('should create Claude icon with proper structure', () => {
-      const result = factory.createClaudeIcon();
-      
-      expect(result).toHaveProperty('container');
-      expect(result).toHaveProperty('icon');
-      expect(result.container).toBeInstanceOf(HTMLElement);
-      expect(result.icon).toBeInstanceOf(HTMLElement);
+    it('wraps the button the way Claude\'s action bar wraps its own', () => {
+      const { container, icon } = factory.createClaudeIcon();
+
+      expect(container.className).toBe('relative shrink-0');
+      expect(container.contains(icon)).toBe(true);
+      expect(icon.parentElement?.className).toBe('flex shrink-0');
+      expect(icon.parentElement?.getAttribute('data-state')).toBe('closed');
     });
 
-    it('should set proper attributes on Claude icon', () => {
-      const result = factory.createClaudeIcon();
-      const icon = result.icon;
-      
-      expect(icon.getAttribute('type')).toBe('button');
-      expect(icon.getAttribute('aria-label')).toBe('Open my prompt manager - Access your saved prompts');
-      expect(icon.getAttribute('title')).toBe('My Prompt Manager - Access your saved prompts');
-      expect(icon.getAttribute('data-instance-id')).toBe(testInstanceId);
-      expect(icon.getAttribute('tabindex')).toBe('0');
-    });
-
-    it('should have proper CSS classes on Claude icon', () => {
-      const result = factory.createClaudeIcon();
-      const icon = result.icon;
-      
-      expect(icon.className).toContain('prompt-library-integrated-icon');
-      expect(icon.className).toContain('inline-flex');
-      expect(icon.className).toContain('items-center');
-    });
-
-    it('should contain SVG element', () => {
-      const result = factory.createClaudeIcon();
-      const svg = result.icon.querySelector('svg');
-
-      expect(svg).toBeTruthy();
-      expect(svg?.getAttribute('viewBox')).toBe('0 0 24 24');
-      expect(svg?.getAttribute('fill')).toBe('currentColor');
-    });
-
-    it('should not include text label', () => {
-      const result = factory.createClaudeIcon();
-      // Icon should not have "My Prompts" text - only the SVG icon
-      // The container may have whitespace, so we check the icon doesn't have a <p> element
-      const textElement = result.icon.querySelector('p');
-      expect(textElement).toBeNull();
+    it('is found by the class the injector looks for', () => {
+      expect(factory.createClaudeIcon().icon.classList.contains('prompt-library-integrated-icon')).toBe(true);
     });
   });
 
-  describe('createPerplexityIcon', () => {
-    it('should create Perplexity icon as HTMLElement', () => {
-      const icon = factory.createPerplexityIcon();
-      
-      expect(icon).toBeInstanceOf(HTMLElement);
-      expect(icon.tagName).toBe('BUTTON');
-    });
-
-    it('should set proper attributes on Perplexity icon', () => {
-      const icon = factory.createPerplexityIcon();
-      
-      expect(icon.getAttribute('type')).toBe('button');
-      expect(icon.getAttribute('aria-label')).toBe('Open my prompt manager - Access your saved prompts');
-      expect(icon.getAttribute('title')).toBe('My Prompt Manager - Access your saved prompts');
-      expect(icon.getAttribute('data-instance-id')).toBe(testInstanceId);
-      expect(icon.getAttribute('data-state')).toBe('closed');
-      expect(icon.getAttribute('tabindex')).toBe('0');
-    });
-
-    it('should have proper CSS classes on Perplexity icon', () => {
-      const icon = factory.createPerplexityIcon();
-
-      expect(icon.className).toContain('prompt-library-integrated-icon');
-      expect(icon.className).toContain('text-textOff');
-      expect(icon.className).toContain('hover:text-textMain');
-      // Background hover classes were removed for cleaner appearance
-      expect(icon.className).not.toContain('hover:bg-offsetPlus');
-    });
-
-    it('should contain SVG element with proper attributes', () => {
-      const icon = factory.createPerplexityIcon();
-      const svg = icon.querySelector('svg');
-      
-      expect(svg).toBeTruthy();
-      expect(svg?.getAttribute('viewBox')).toBe('0 0 24 24');
-      expect(svg?.getAttribute('fill')).toBe('currentColor');
-    });
-  });
-
-  describe('createChatGPTIcon', () => {
-    it('should create ChatGPT icon as HTMLElement', () => {
-      const icon = factory.createChatGPTIcon();
-      
-      expect(icon).toBeInstanceOf(HTMLElement);
-      expect(icon.tagName).toBe('BUTTON');
-    });
-
-    it('should set proper attributes on ChatGPT icon', () => {
-      const icon = factory.createChatGPTIcon();
-      
-      expect(icon.getAttribute('type')).toBe('button');
-      expect(icon.getAttribute('aria-label')).toBe('Open my prompt manager - Access your saved prompts');
-      expect(icon.getAttribute('title')).toBe('My Prompt Manager - Access your saved prompts');
-      expect(icon.getAttribute('data-instance-id')).toBe(testInstanceId);
-      expect(icon.getAttribute('data-dashlane-label')).toBe('true');
-      expect(icon.getAttribute('tabindex')).toBe('0');
-    });
-
-    it('should have proper CSS classes on ChatGPT icon', () => {
-      const icon = factory.createChatGPTIcon();
-      
-      expect(icon.className).toContain('prompt-library-integrated-icon');
-      expect(icon.className).toContain('composer-btn');
-    });
-
-    it('should contain SVG element with proper attributes', () => {
-      const icon = factory.createChatGPTIcon();
-      const svg = icon.querySelector('svg');
-      
-      expect(svg).toBeTruthy();
-      expect(svg?.getAttribute('viewBox')).toBe('0 0 24 24');
-      expect(svg?.getAttribute('fill')).toBe('currentColor');
-    });
-  });
-
-  describe('createFloatingIcon', () => {
-    it('should create floating icon as HTMLElement', () => {
-      const icon = factory.createFloatingIcon();
-      
-      expect(icon).toBeInstanceOf(HTMLElement);
-      expect(icon.tagName).toBe('BUTTON');
-    });
-
-    it('should set proper attributes on floating icon', () => {
-      const icon = factory.createFloatingIcon();
-      
-      expect(icon.getAttribute('type')).toBe('button');
-      expect(icon.getAttribute('aria-label')).toBe('Open my prompt manager - Access your saved prompts');
-      expect(icon.getAttribute('title')).toBe('My Prompt Manager - Access your saved prompts');
-      expect(icon.getAttribute('data-instance-id')).toBe(testInstanceId);
-      expect(icon.getAttribute('tabindex')).toBe('0');
-    });
-
-    it('should have proper CSS class on floating icon', () => {
-      const icon = factory.createFloatingIcon();
-      
-      expect(icon.className).toContain('prompt-library-icon');
-    });
-
-    it('should contain SVG element with proper attributes', () => {
-      const icon = factory.createFloatingIcon();
-      const svg = icon.querySelector('svg');
-      
-      expect(svg).toBeTruthy();
-      expect(svg?.getAttribute('viewBox')).toBe('0 0 24 24');
-      expect(svg?.getAttribute('fill')).toBe('currentColor');
+  describe('integrated buttons', () => {
+    it('ChatGPT, Perplexity, Mistral and Gemini are found by the integrated class', () => {
+      for (const button of [factory.createChatGPTIcon(), factory.createPerplexityIcon(), factory.createMistralIcon(), factory.createGeminiIcon()]) {
+        expect(button.classList.contains('prompt-library-integrated-icon')).toBe(true);
+      }
     });
   });
 
   describe('createCopilotIcon', () => {
-    it('should create Copilot icon button element', () => {
-      const { element: icon } = factory.createCopilotIcon();
+    it('is found by the Copilot class, and its cleanup does nothing', () => {
+      const { element, cleanup } = factory.createCopilotIcon();
 
-      expect(icon).toBeDefined();
-      expect(icon.tagName).toBe('BUTTON');
-      expect(icon.getAttribute('type')).toBe('button');
+      expect(element.classList.contains('prompt-library-integrated-icon')).toBe(true);
+      expect(element.classList.contains('prompt-library-copilot-icon')).toBe(true);
+      expect(() => { cleanup(); }).not.toThrow();
     });
 
-    it('should include prompt-library-integrated-icon class', () => {
-      const { element: icon } = factory.createCopilotIcon();
-      expect(icon.className).toContain('prompt-library-integrated-icon');
-    });
-
-    it('should include prompt-library-copilot-icon class', () => {
-      const { element: icon } = factory.createCopilotIcon();
-      expect(icon.className).toContain('prompt-library-copilot-icon');
-    });
-
-    it('should include Fluent UI button classes', () => {
-      const { element: icon } = factory.createCopilotIcon();
-      expect(icon.className).toContain('fui-Button');
-      expect(icon.className).toContain('r1alrhcs');
-    });
-
-    it('should have transparent background via inline styles', () => {
-      const { element: icon } = factory.createCopilotIcon();
-      expect(icon.style.background).toBe('transparent');
-      expect(icon.style.backgroundColor).toBe('transparent');
-    });
-
-    it('should have proper ARIA attributes', () => {
-      const { element: icon } = factory.createCopilotIcon();
-
-      expect(icon.getAttribute('aria-label')).toContain('Open my prompt manager');
-      expect(icon.getAttribute('title')).toContain('My Prompt Manager');
-      expect(icon.getAttribute('tabindex')).toBe('0');
-    });
-
-    it('should include instance ID', () => {
-      const { element: icon } = factory.createCopilotIcon();
-      expect(icon.getAttribute('data-instance-id')).toBe(testInstanceId);
-    });
-
-    it('should attempt theme detection based on body background', () => {
-      const { element: icon } = factory.createCopilotIcon();
-      const themeAttr = icon.getAttribute('data-theme');
-      // Theme detection depends on body background color which may not be available in test environment
-      // If body styles are available, verify the theme is set to light or dark
-      // Otherwise, the attribute will be null which is acceptable
-      const validThemes = ['light', 'dark', null];
-      expect(validThemes).toContain(themeAttr);
-      // Just verify the icon was created successfully
-      expect(icon).toBeDefined();
-    });
-
-    it('should contain icon wrapper span with Fluent UI classes', () => {
-      const { element: icon } = factory.createCopilotIcon();
-      const iconSpan = icon.querySelector('span.fui-Button__icon');
-
-      expect(iconSpan).toBeDefined();
-      expect(iconSpan?.className).toContain('rywnvv2');
-    });
-
-    it('should contain SVG icon element with 24px size', () => {
-      const { element: icon } = factory.createCopilotIcon();
-      const svg = icon.querySelector('svg');
-
-      expect(svg).toBeDefined();
-      expect(svg?.getAttribute('width')).toBe('24');
-      expect(svg?.getAttribute('height')).toBe('24');
-      expect(svg?.getAttribute('viewBox')).toBe('0 0 24 24');
-    });
-
-    it('should have SVG with Fluent UI icon classes', () => {
-      const { element: icon } = factory.createCopilotIcon();
-      const svg = icon.querySelector('svg');
-
-      expect(svg).toBeDefined();
-      const svgClass = svg?.getAttribute('class') || '';
-      expect(svgClass).toContain('fui-Icon-regular');
-    });
-
-    it('should not include text label', () => {
-      const { element: icon } = factory.createCopilotIcon();
-      // Icon should not have "My Prompts" text - only the SVG icon
-      expect(icon.textContent?.trim()).toBe('');
-    });
-
-    it('should inject hover styles into document head', () => {
+    it('adds nothing to the page\'s head', () => {
+      const before = document.head.children.length;
       factory.createCopilotIcon();
-      const styleEl = document.getElementById('prompt-library-copilot-hover-styles');
 
-      expect(styleEl).toBeDefined();
-      expect(styleEl?.tagName).toBe('STYLE');
-      expect(styleEl?.textContent).toContain('.prompt-library-copilot-icon[data-theme="light"]:hover');
-      expect(styleEl?.textContent).toContain('.prompt-library-copilot-icon[data-theme="dark"]:hover');
-    });
-
-    // NEW TESTS: MutationObserver cleanup
-    it('should return cleanup function along with element', () => {
-      const result = factory.createCopilotIcon();
-
-      expect(result).toBeDefined();
-      expect(result.element).toBeDefined();
-      expect(result.cleanup).toBeDefined();
-      expect(typeof result.cleanup).toBe('function');
-    });
-
-    it('should disconnect MutationObserver when cleanup is called', () => {
-      // Spy on MutationObserver.disconnect
-      const disconnectSpy = vi.fn();
-      const originalMutationObserver = globalThis.MutationObserver;
-
-      globalThis.MutationObserver = class extends originalMutationObserver {
-        disconnect() {
-          disconnectSpy();
-          super.disconnect();
-        }
-      } as typeof MutationObserver;
-
-      const { cleanup } = factory.createCopilotIcon();
-
-      expect(disconnectSpy).not.toHaveBeenCalled();
-
-      cleanup();
-
-      expect(disconnectSpy).toHaveBeenCalledOnce();
-
-      // Restore original MutationObserver
-      globalThis.MutationObserver = originalMutationObserver;
-    });
-
-    it('should not leak observers when creating multiple icons', () => {
-      const disconnectSpy = vi.fn();
-      const originalMutationObserver = globalThis.MutationObserver;
-
-      globalThis.MutationObserver = class extends originalMutationObserver {
-        disconnect() {
-          disconnectSpy();
-          super.disconnect();
-        }
-      } as typeof MutationObserver;
-
-      // Create multiple icons
-      const result1 = factory.createCopilotIcon();
-      const result2 = factory.createCopilotIcon();
-      const result3 = factory.createCopilotIcon();
-
-      // Each should have independent cleanup
-      expect(result1.cleanup).not.toBe(result2.cleanup);
-      expect(result2.cleanup).not.toBe(result3.cleanup);
-
-      // Cleanup all
-      result1.cleanup();
-      result2.cleanup();
-      result3.cleanup();
-
-      // All three observers should be disconnected
-      expect(disconnectSpy).toHaveBeenCalledTimes(3);
-
-      // Restore original MutationObserver
-      globalThis.MutationObserver = originalMutationObserver;
-    });
-
-    // NEW TESTS: color-scheme property detection
-    it('should detect dark theme from color-scheme property', () => {
-      const container = document.createElement('div');
-      container.id = 'officehome-scroll-container';
-      container.style.colorScheme = 'dark';
-      document.body.appendChild(container);
-
-      const { element } = factory.createCopilotIcon();
-
-      expect(element.getAttribute('data-theme')).toBe('dark');
-
-      // Cleanup
-      container.remove();
-    });
-
-    it('should detect light theme from color-scheme property', () => {
-      const container = document.createElement('div');
-      container.id = 'officehome-scroll-container';
-      container.style.colorScheme = 'light';
-      document.body.appendChild(container);
-
-      const { element } = factory.createCopilotIcon();
-
-      expect(element.getAttribute('data-theme')).toBe('light');
-
-      // Cleanup
-      container.remove();
-    });
-
-    it('should fallback to RGB parsing when container is not found', () => {
-      // Set body background to light color
-      document.body.style.backgroundColor = 'rgb(255, 255, 255)';
-
-      const { element } = factory.createCopilotIcon();
-
-      expect(element.getAttribute('data-theme')).toBe('light');
-
-      // Cleanup
-      document.body.style.backgroundColor = '';
-    });
-
-    it('should fallback to RGB parsing when color-scheme is not set', () => {
-      const container = document.createElement('div');
-      container.id = 'officehome-scroll-container';
-      // No color-scheme set
-      document.body.appendChild(container);
-
-      // Set body background to dark color
-      document.body.style.backgroundColor = 'rgb(31, 31, 31)';
-
-      const { element } = factory.createCopilotIcon();
-
-      expect(element.getAttribute('data-theme')).toBe('dark');
-
-      // Cleanup
-      container.remove();
-      document.body.style.backgroundColor = '';
-    });
-
-    it('should use any element with color-scheme as fallback', () => {
-      const container = document.createElement('div');
-      container.style.colorScheme = 'dark';
-      container.setAttribute('data-test', 'color-scheme-container');
-      document.body.appendChild(container);
-
-      const { element } = factory.createCopilotIcon();
-
-      expect(element.getAttribute('data-theme')).toBe('dark');
-
-      // Cleanup
-      container.remove();
+      expect(document.head.children.length).toBe(before);
     });
   });
 
-  describe('Storage integration', () => {
-    it('should use createElement for creating elements', () => {
-      factory.createPerplexityIcon();
+  describe('createFloatingIcon', () => {
+    it('is absolutely positioned by default', () => {
+      const icon = factory.createFloatingIcon();
 
-      expect(createElement).toHaveBeenCalled();
+      expect(icon.classList.contains('prompt-library-icon-base')).toBe(true);
+      expect(icon.classList.contains('prompt-library-icon-absolute')).toBe(true);
     });
 
-    it('should use createSVGElement for creating SVG elements', () => {
-      factory.createPerplexityIcon();
+    it('can be relatively positioned, for a button inserted in the page', () => {
+      expect(factory.createFloatingIcon('relative').classList.contains('prompt-library-icon-relative')).toBe(true);
+      expect(factory.createRelativeIcon().classList.contains('prompt-library-icon-relative')).toBe(true);
+      expect(factory.createAbsoluteIcon().classList.contains('prompt-library-icon-absolute')).toBe(true);
+    });
+  });
 
-      expect(createSVGElement).toHaveBeenCalled();
+  describe('positioning conversion', () => {
+    it('converts an absolute button to a relative one', () => {
+      const icon = factory.createFloatingIcon('absolute');
+      UIElementFactory.convertToRelativePositioning(icon);
+
+      expect(icon.classList.contains('prompt-library-icon-relative')).toBe(true);
+      expect(icon.classList.contains('prompt-library-icon-absolute')).toBe(false);
+      expect(icon.classList.contains('prompt-library-pill')).toBe(true);
+    });
+
+    it('converts a relative button to an absolute one', () => {
+      const icon = factory.createFloatingIcon('relative');
+      UIElementFactory.convertToAbsolutePositioning(icon);
+
+      expect(icon.classList.contains('prompt-library-icon-absolute')).toBe(true);
+      expect(icon.classList.contains('prompt-library-icon-relative')).toBe(false);
+    });
+  });
+
+  describe('syncPromptsPillTheme', () => {
+    it('gives a button made in light the dark theme read meanwhile, and takes it away again', () => {
+      const button = factory.createChatGPTIcon();
+      theme.current = 'dark';
+      syncPromptsPillTheme(button);
+      expect(button.classList.contains('dark-theme')).toBe(true);
+
+      theme.current = 'light';
+      syncPromptsPillTheme(button);
+      expect(button.classList.contains('dark-theme')).toBe(false);
+    });
+
+    it('finds the button inside Claude\'s wrapper', () => {
+      const { container, icon } = factory.createClaudeIcon();
+      theme.current = 'dark';
+      syncPromptsPillTheme(container);
+
+      expect(icon.classList.contains('dark-theme')).toBe(true);
+    });
+  });
+
+  describe('fitPromptsPill', () => {
+    const inBar = (scrollWidth: number, clientWidth: number): HTMLElement => {
+      const bar = document.createElement('div');
+      Object.defineProperty(bar, 'scrollWidth', { configurable: true, value: scrollWidth });
+      Object.defineProperty(bar, 'clientWidth', { configurable: true, value: clientWidth });
+      const button = factory.createChatGPTIcon();
+      bar.appendChild(button);
+      return button;
+    };
+
+    it('keeps the label when the bar has room', () => {
+      const button = inBar(300, 300);
+      fitPromptsPill(button);
+
+      expect(button.classList.contains('prompt-library-pill-compact')).toBe(false);
+    });
+
+    it('shrinks the button to its badge when the bar overflows', () => {
+      const button = inBar(340, 300);
+      fitPromptsPill(button);
+
+      expect(button.classList.contains('prompt-library-pill-compact')).toBe(true);
+    });
+
+    it('finds Claude\'s action bar above the wrappers that grow with the button', () => {
+      const { container, icon } = factory.createClaudeIcon();
+      // The injector wraps Claude's container once more before it goes into the bar
+      const wrapper = document.createElement('div');
+      const bar = document.createElement('div');
+      Object.defineProperty(bar, 'scrollWidth', { configurable: true, value: 500 });
+      Object.defineProperty(bar, 'clientWidth', { configurable: true, value: 300 });
+      wrapper.appendChild(container);
+      bar.appendChild(wrapper);
+      document.body.appendChild(bar);
+      fitPromptsPill(container);
+
+      expect(icon.classList.contains('prompt-library-pill-compact')).toBe(true);
+      bar.remove();
+    });
+
+    it('ignores an overflow far above the button, which says nothing about its bar', () => {
+      let node: HTMLElement = factory.createChatGPTIcon();
+      const button = node;
+      for (let i = 0; i < 8; i++) {
+        const parent = document.createElement('div');
+        parent.appendChild(node);
+        node = parent;
+      }
+      Object.defineProperty(node, 'scrollWidth', { configurable: true, value: 900 });
+      Object.defineProperty(node, 'clientWidth', { configurable: true, value: 300 });
+      fitPromptsPill(button);
+
+      expect(button.classList.contains('prompt-library-pill-compact')).toBe(false);
+    });
+
+    it('does nothing for a button that is not in the page', () => {
+      expect(() => { fitPromptsPill(factory.createChatGPTIcon()); }).not.toThrow();
     });
   });
 });

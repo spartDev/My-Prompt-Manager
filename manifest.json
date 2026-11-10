@@ -54,7 +54,10 @@
         "assets/promptVariables-*.js",
         "assets/floating-ui.dom-*.js",
         "assets/categoryChip-*.js",
-        "assets/truncate-*.js"
+        "assets/truncate-*.js",
+        "assets/render-*.js",
+        "assets/jsx-runtime-*.js",
+        "fonts/SchibstedGrotesk-latin.woff2"
       ],
       "use_dynamic_url": false
     }

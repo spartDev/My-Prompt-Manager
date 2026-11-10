@@ -295,14 +295,14 @@ export const contentScriptAssertions = {
    * Expect prompt selector to be visible (content script component)
    */
   selectorVisible: async (page: Page): Promise<void> => {
-    await expect(page.locator('.prompt-library-selector')).toBeVisible();
+    await expect(page.locator('#mpm-prompt-selector').getByRole('dialog')).toBeVisible();
   },
 
   /**
    * Expect prompt selector to be hidden (content script component)
    */
   selectorHidden: async (page: Page): Promise<void> => {
-    await expect(page.locator('.prompt-library-selector')).toBeHidden();
+    await expect(page.locator('#mpm-prompt-selector').getByRole('dialog')).toBeHidden();
   },
 
   /**

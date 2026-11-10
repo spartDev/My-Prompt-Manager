@@ -5,8 +5,7 @@
 
 import { getDefaultEnabledPlatforms } from "../../config/platforms";
 import { readPrompts } from "../../services/promptAdmission";
-import { DEFAULT_CATEGORY_COLOR, getSoftBadgeColors } from "../../theme/categoryChip";
-import { cutWithoutSplittingPairs } from "../../utils/truncate";
+import type { SelectorCategory } from "../selector/selectorData";
 import type { Prompt } from "../types/index";
 
 import { DOMUtils } from "./dom";
@@ -47,7 +46,7 @@ export interface CustomSite {
 /**
  * Get extension settings with validation and defaults
  */
-export async function getSettings(): Promise<ExtensionSettings> {
+export function getSettings(): Promise<ExtensionSettings> {
   return new Promise((resolve) => {
     try {
       chrome.storage.local.get(["promptLibrarySettings"], (result) => {
@@ -198,7 +197,7 @@ export async function isSiteEnabled(hostname: string): Promise<boolean> {
  * never changes or drops a Prompt because of what its text says: only entries that are not
  * Prompts at all are skipped.
  */
-export async function getPrompts(): Promise<Prompt[]> {
+export function getPrompts(): Promise<Prompt[]> {
   return new Promise((resolve) => {
     try {
       chrome.storage.local.get(["prompts"], (result) => {
@@ -238,10 +237,10 @@ export async function getPrompts(): Promise<Prompt[]> {
 }
 
 /**
- * The color of each Category, by name, for the Category chips of the Prompt selector.
- * A Category with no valid #RRGGBB color is left out: its chip takes the default color.
+ * The Categories of the Library, in their stored order, for the tabs of the Prompt selector.
+ * A Category with no valid #RRGGBB color has none here: its dot takes the default color.
  */
-export function getCategoryColors(): Promise<Map<string, string>> {
+export function getCategories(): Promise<SelectorCategory[]> {
   return new Promise((resolve) => {
     try {
       chrome.storage.local.get(["categories"], (result) => {
@@ -252,23 +251,25 @@ export function getCategoryColors(): Promise<Map<string, string>> {
               `Chrome storage error: ${chrome.runtime.lastError.message ?? "Unknown error"}`,
             ),
           );
-          resolve(new Map());
+          resolve([]);
           return;
         }
 
         const rawCategories: unknown = result.categories;
-        const colors = new Map<string, string>();
+        const categories: SelectorCategory[] = [];
         for (const category of Array.isArray(rawCategories) ? rawCategories : []) {
           const { name, color } = (category ?? {}) as { name?: unknown; color?: unknown };
-          if (typeof name === "string" && typeof color === "string" && /^#[0-9A-F]{6}$/i.test(color)) {
-            colors.set(name, color);
+          if (typeof name === "string") {
+            categories.push(
+              typeof color === "string" && /^#[0-9A-F]{6}$/i.test(color) ? { name, color } : { name },
+            );
           }
         }
-        resolve(colors);
+        resolve(categories);
       });
     } catch (err) {
       logError("Unexpected error accessing chrome storage", err as Error);
-      resolve(new Map()); // Graceful fallback
+      resolve([]); // Graceful fallback
     }
   });
 }
@@ -294,78 +295,4 @@ export function createSVGElement(
   attributes: Record<string, string | number> = {},
 ): SVGElement {
   return DOMUtils.createSVGElement(tag, attributes);
-}
-
-/**
- * Helper function to create a prompt list item for the Prompt selector.
- *
- * Shows the Prompt exactly as saved (Verbatim): text is set as text, so it needs no
- * escaping, and the id goes into the attribute unchanged so it can be matched later.
- * The Category chip takes the chip rule of `categoryColor` (the default Category color when
- * unknown), in light and dark: the selector's theme class picks one.
- */
-export function createPromptListItem(
-  prompt: Prompt,
-  index: number,
-  idPrefix: string = "prompt-item",
-  categoryColor: string = DEFAULT_CATEGORY_COLOR,
-): HTMLElement {
-  try {
-    const promptItem = DOMUtils.createElement("div", {
-      class: "prompt-item",
-      "data-prompt-id": prompt.id,
-      role: "option",
-      "aria-describedby": `${idPrefix}-${String(index)}-desc`,
-      tabindex: "-1",
-    });
-
-    const promptTitle = DOMUtils.createElement(
-      "div",
-      {
-        class: "prompt-title",
-      },
-      prompt.title,
-    );
-
-    const promptCategory = DOMUtils.createElement(
-      "div",
-      {
-        class: "prompt-category",
-      },
-      prompt.category,
-    );
-    const light = getSoftBadgeColors(categoryColor, "light");
-    promptCategory.style.setProperty("--prompt-category-bg", light.background);
-    promptCategory.style.setProperty("--prompt-category-text", light.text);
-    promptCategory.style.setProperty(
-      "--prompt-category-text-dark",
-      getSoftBadgeColors(categoryColor, "dark").text,
-    );
-
-    const promptPreview = DOMUtils.createElement(
-      "div",
-      {
-        class: "prompt-preview",
-        id: `${idPrefix}-${String(index)}-desc`,
-      },
-      cutWithoutSplittingPairs(prompt.content, 100) +
-        (prompt.content.length > 100 ? "..." : ""),
-    );
-
-    DOMUtils.appendChild(promptItem, promptTitle);
-    DOMUtils.appendChild(promptItem, promptCategory);
-    DOMUtils.appendChild(promptItem, promptPreview);
-
-    return promptItem;
-  } catch (err) {
-    logError("Failed to create prompt list item", err as Error, {
-      prompt,
-      index,
-    });
-    return DOMUtils.createElement(
-      "div",
-      { class: "prompt-item-error" },
-      "Error loading prompt",
-    );
-  }
 }

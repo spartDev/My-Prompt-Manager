@@ -56,6 +56,10 @@ export class ContentScriptInjector {
     }
   }
 
+  /**
+   * Injects the content script into the tab when its site is enabled, permitted and not injected
+   * yet. A tab left with elements of an earlier injection (the extension was updated) is cleaned first.
+   */
   private async _injectIfNeededInternal(tabId: number): Promise<void> {
     // Check our memory first for performance, but don't trust it completely
     // We'll verify actual injection state in injectContentScript
@@ -425,9 +429,11 @@ export class ContentScriptInjector {
                 }
               });
 
-              // Remove any orphaned selectors
+              // Remove any orphaned selectors: the shadow host of the Prompt selector
+              // (SELECTOR_HOST_ID in src/content/selector/controller.ts; this function runs in
+              // the page and cannot import it), and the selector of versions before it
               const orphanedSelectors = document.querySelectorAll(
-                ".prompt-library-selector",
+                "#mpm-prompt-selector, .prompt-library-selector",
               );
               orphanedSelectors.forEach((selector) => {
                 try {

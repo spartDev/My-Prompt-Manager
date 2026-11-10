@@ -87,7 +87,7 @@ The brand gradient (`bg-brand`: `#6D28D9` to `#4C1D95`, the same in both modes) 
 
 The charts of the full-page Analytics view read the tokens as CSS variables (`src/theme/chartColors.ts`): every bar takes the accent and the axis labels `text-tertiary`, so they follow the mode without React. No chart has a palette of its own. A Category keeps its own color, as a dot before its name in the Categories card; one stored without a color, or no longer stored, takes the default Category color, as in the Library.
 
-The Prompt selector and the Variable form injected on Platforms are plain CSS (`src/content/utils/styles.ts`), not Tailwind: they declare the same tokens, under the same names, as CSS variables on `.prompt-library-selector` (light) and `.prompt-library-selector.dark-theme` (dark), and read them through `var()`. `styles.test.ts` fails when a value drifts from `tokens.css` or a color is written outside those declarations. Category chips there follow the same chip rule (`src/theme/categoryChip.ts`).
+The Prompt selector shown on Platforms is plain CSS, not Tailwind, inside its own shadow root (`src/content/selector/selectorStyles.ts`, ADR-002): it declares the same tokens, under the same names, as CSS variables on `:host` (light) and `:host([data-theme="dark"])` (dark), and reads them through `var()`. The Prompts button, which sits in the Platform's own page, does the same on `.prompt-library-pill` and `.prompt-library-pill.dark-theme` (`src/content/utils/styles.ts`). Both follow the extension's theme, not the Platform's. `selectorStyles.test.ts` and `styles.test.ts` fail when a value drifts from `tokens.css` or a color is written outside those declarations. A Category shows there as a dot of its own color, before its name.
 
 ### States
 
@@ -135,7 +135,7 @@ The popup, side panel and Analytics page set in **Schibsted Grotesk** (Atelier 1
 
 - **Self-hosted.** One variable woff2 (`wght` 400 to 900, Latin subset) lives in `public/fonts/` with its SIL OFL licence `OFL.txt`, and Vite copies both to `dist/fonts/`. `public/fonts/README.md` gives its source commit in google/fonts and the subset command. The `@font-face` uses `font-display: swap`. Never load a font from Google Fonts or any other host: the extension makes no network request when it opens.
 - **Fallback.** Characters outside the Latin subset (Cyrillic, Greek, CJK, emoji) and the instant before the font loads use the system font of the stack.
-- **Content scripts keep their own stacks.** The picker and the icon that `src/content/` draws on AI platforms do not load Schibsted Grotesk.
+- **Content scripts load the same file another way.** The Prompt selector and the Prompts button that `src/content/` draws on Platforms are set in Schibsted Grotesk too. A Platform's Content Security Policy may refuse an extension font URL, and `@font-face` cannot be declared in a shadow root, so `src/content/selector/font.ts` reads the woff2 from the package and registers it on the document with the FontFace API, under the family name `MPM Schibsted Grotesk`, which no Platform font can collide with. When that fails, the stack falls back to the system font.
 - `tests/e2e/theme/typography.spec.ts` checks the computed stack and `document.fonts` on all three surfaces, and that none requests a remote host.
 
 ### Font Sizes
@@ -362,7 +362,7 @@ shadow-knob /* 0 2px 4px, tint 25 - the knob of a switch */
 
 ### Custom Shadows
 
-The Prompt selector injected on Platforms is styled in `src/content/utils/styles.ts`, outside Tailwind; its shadows and colors are not on the palette yet.
+The Prompt selector shown on Platforms is styled outside Tailwind (`src/content/selector/selectorStyles.ts`); its one shadow is the token `--shadow-selector`, declared in `tokens.css` in light and dark.
 
 **Icon Shadow (Legacy):**
 ```css
@@ -1195,14 +1195,16 @@ Write one token class, never a light class plus a `dark:` variant:
 
 ### Content Script Dark Mode
 
-Content scripts detect dark mode from host page:
+Content scripts follow the extension's theme (`ThemeManager`), not the Platform's:
 
-```javascript
-// Light theme class
-.prompt-library-selector.light-theme { ... }
+```css
+/* The Prompt selector's shadow host */
+:host { ... }
+:host([data-theme="dark"]) { ... }
 
-// Dark theme class
-.prompt-library-selector.dark-theme { ... }
+/* The Prompts button, in the Platform's page */
+.prompt-library-pill { ... }
+.prompt-library-pill.dark-theme { ... }
 ```
 
 ### Testing Dark Mode
@@ -1549,18 +1551,21 @@ transition-colors focus-interactive
 - Width: 100%
 - Height: 100vh
 
-**Content Script Modal:**
-- Width: 400px
-- Max Height: 500px
-- Mobile: calc(100vw - 40px)
+**Prompt selector on a Platform** (`src/content/selector/position.ts`):
+- Width: 360px, never wider than the window minus 10px on each side
+- Placed 10px above the input field, below when a full popover (384px) does not fit above
+- Max height: the room left on that side; the list inside is at most 230px, the variables text 220px
+
+**Prompts button** (`src/content/utils/styles.ts`):
+- Height: 32px, badge 22px; the badge alone (32px wide) when its bar has no room or it is laid over the page
 
 ### Z-Index Layers
 
 ```css
 z-10         /* Relative positioned elements */
 z-50         /* Modal overlays */
-z-999999   /* Content script icon */
-z-1000000  /* Content script modal */
+z-999999     /* Content script: Prompts button laid over a custom site */
+z-2147483647 /* Content script: shadow host of the Prompt selector */
 z-1000001  /* Content script feedback */
 z-1000002  /* Content script debug */
 ```

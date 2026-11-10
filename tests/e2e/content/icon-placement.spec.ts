@@ -19,6 +19,7 @@ import type { BrowserContext, Page } from '@playwright/test';
 
 import { DEFAULT_CATEGORY, DEFAULT_SETTINGS } from '../../../src/types';
 import { type ExtensionStorage, expect, test } from '../fixtures/extension';
+import { promptSelector } from '../fixtures/platform-pages';
 import { createPromptSeed, seedLibrary } from '../utils/storage';
 
 const SCREENSHOT_DIR = 'test-results/icon-placement';
@@ -26,7 +27,6 @@ const PLATFORM_URL = 'https://claude.ai/';
 /** The element the content script places: on Claude, a wrapper around the icon button */
 const ICON_ROOT = '[data-prompt-library-icon]';
 const ICON_BUTTON = '.prompt-library-integrated-icon';
-const SELECTOR = '.prompt-library-selector';
 const EDITOR = '.ProseMirror';
 const TOOLBAR = '.relative.flex-1.flex.items-center.gap-2.shrink.min-w-0';
 /** INSIDE_CORNER_INSET of src/content/core/anchored-overlay.ts: the icon's distance to the editor's edges */
@@ -163,9 +163,9 @@ const expectInsideBottomEnd = async (page: Page): Promise<void> => {
 
 const expectSelectorOpens = async (page: Page): Promise<void> => {
   await page.locator(ICON_BUTTON).click();
-  const selector = page.locator(SELECTOR);
+  const selector = promptSelector(page);
   await expect(selector).toBeVisible();
-  await expect(selector.locator('.prompt-item').first()).toContainText('Placement Prompt');
+  await expect(selector.getByRole('option').first()).toContainText('Placement Prompt');
   await page.keyboard.press('Escape');
   await expect(selector).toHaveCount(0);
 };
@@ -216,12 +216,15 @@ test.describe('Icon placement on a Platform', () => {
       await expect(icon).toHaveAttribute('data-positioning-method', 'css-anchor');
       await expectInsideBottomEnd(page);
 
-      // Alone on the editor, the icon wears the extension's look: no border, transparent, the page's text color
+      // Alone on the editor, the Prompts button is its badge only, in the extension's look (its theme
+      // is the extension's, light here, whatever the page's): no border, the accent-subtle pill
       const button = page.locator(ICON_BUTTON);
-      const pageText = await page.locator('body').evaluate((body) => getComputedStyle(body).color);
+      await page.mouse.move(0, 0);
       await expect(button).toHaveCSS('border-style', 'none');
-      await expect(button).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-      await expect(button).toHaveCSS('color', pageText);
+      await expect(button).toHaveCSS('background-color', 'rgb(241, 235, 253)');
+      await expect(button).toHaveCSS('width', '32px');
+      await expect(button).toHaveCSS('height', '32px');
+      await expect(button.locator('.prompt-library-pill-label')).toBeHidden();
 
       const composer = await page.locator('.composer').boundingBox();
       expect(composer).toBeTruthy();

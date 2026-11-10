@@ -10,12 +10,12 @@
 import type { Page } from '@playwright/test';
 
 import { expect, test } from '../fixtures/extension';
-import { openPlatform } from '../fixtures/platform-pages';
+import { openPlatform, openPromptSelector, promptRow, promptSelector } from '../fixtures/platform-pages';
 import { createPromptSeed, seedLibrary } from '../utils/storage';
 
 const SCREENSHOT_DIR = 'test-results/prompt-selector-scroll';
 
-/** Lets the selector's repositioning run: it waits 16 ms after a scroll or resize, a timer due before this one. */
+/** Lets the selector's repositioning run: it waits for the next frame after a scroll or resize, due before this timer. */
 const afterRepositioning = (page: Page) => page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 100)));
 
 test.describe('Prompt selector on a page that scrolls', () => {
@@ -33,10 +33,9 @@ test.describe('Prompt selector on a page that scrolls', () => {
       // A conversation longer than the window, as on the live site
       await page.addStyleTag({ content: 'main { min-height: 1600px; }' });
       await page.setViewportSize({ width: 900, height: 600 });
-      const selector = page.locator('.prompt-library-selector');
-      await page.locator('.prompt-library-integrated-icon').click();
-      await expect(selector).toBeVisible();
-      await expect(selector).toHaveClass(new RegExp(`${theme}-theme`));
+      const selector = promptSelector(page);
+      await openPromptSelector(page);
+      await expect(page.locator('#mpm-prompt-selector')).toHaveAttribute('data-theme', theme);
 
       await page.mouse.move(8, 300);
       await page.mouse.wheel(0, 120);
@@ -48,9 +47,9 @@ test.describe('Prompt selector on a page that scrolls', () => {
       await afterRepositioning(page);
       await expect(selector).toBeVisible();
 
-      // Still usable: a Prompt with Variables opens its form in it
-      await selector.locator('.prompt-item[data-prompt-id="translate"]').click();
-      await expect(selector.getByRole('button', { name: 'Insert as is' })).toBeVisible();
+      // Still usable: a Prompt with Variables opens its variables step in it
+      await promptRow(page, 'translate').click();
+      await expect(selector.getByRole('button', { name: /Insert into the chat/ })).toBeVisible();
       await page.screenshot({ path: `${SCREENSHOT_DIR}/selector-after-scroll-${theme}.png` });
     });
   }

@@ -5,5 +5,5 @@
 
 export { DOMUtils } from './dom';
 export { debug, error, info, isDebugMode, showDebugNotification, warn } from './logger';
-export { createElement, createPromptListItem, createSVGElement, getPrompts } from './storage';
+export { createElement, createSVGElement, getPrompts } from './storage';
 export { getCSS, injectCSS, isInjected, removeCSS } from './styles';

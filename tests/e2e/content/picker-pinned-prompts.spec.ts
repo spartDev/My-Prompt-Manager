@@ -9,6 +9,7 @@ import type { BrowserContext, Page } from '@playwright/test';
 
 import { DEFAULT_SETTINGS, type Prompt } from '../../../src/types';
 import { type ExtensionStorage, expect, test } from '../fixtures/extension';
+import { listedTitles, promptSelector, promptsButton } from '../fixtures/platform-pages';
 import { createPromptSeed, seedLibrary } from '../utils/storage';
 
 const MOCK_HOST = 'https://claude.ai/';
@@ -78,15 +79,13 @@ const openPicker = async (context: BrowserContext): Promise<Page> => {
   await targetPage.setViewportSize({ width: 900, height: 700 });
   await targetPage.goto(MOCK_HOST, { waitUntil: 'domcontentloaded' });
 
-  const toolbarButton = targetPage.locator('.prompt-library-integrated-icon');
-  await expect(toolbarButton).toHaveCount(1);
-  await toolbarButton.click();
-  await expect(targetPage.locator('.prompt-library-selector')).toBeVisible();
+  await expect(promptsButton(targetPage)).toHaveCount(1);
+  await promptsButton(targetPage).click();
+  await expect(promptSelector(targetPage)).toBeVisible();
   return targetPage;
 };
 
-const pickerTitles = (page: Page) =>
-  page.locator('.prompt-library-selector .prompt-list .prompt-title').allTextContents();
+const pickerTitles = (page: Page) => listedTitles(page);
 
 test.describe('Prompt picker & Pinned Prompts', () => {
   test('AT2: the Pinned Prompt is listed first in the injected picker, others keep their order', async ({ context, storage }) => {
@@ -100,7 +99,7 @@ test.describe('Prompt picker & Pinned Prompts', () => {
     ]);
 
     // Searching keeps the Pinned Prompt first among the matches
-    await page.locator('.prompt-library-selector .search-input').fill('notes');
+    await page.keyboard.type('notes');
     await expect.poll(() => pickerTitles(page)).toEqual([
       'Release Notes Draft',
       'Meeting Notes → Decisions and Owners',
@@ -112,9 +111,9 @@ test.describe('Prompt picker & Pinned Prompts', () => {
       await seed(storage, theme);
       const page = await openPicker(context);
 
-      const selector = page.locator('.prompt-library-selector');
-      await expect(selector).toHaveClass(new RegExp(`${theme}-theme`));
-      await expect(selector.locator('.prompt-title').first()).toHaveText('Release Notes Draft');
+      await expect(page.locator('#mpm-prompt-selector')).toHaveAttribute('data-theme', theme);
+      await expect.poll(() => pickerTitles(page)).toContain('Release Notes Draft');
+      expect((await pickerTitles(page))[0]).toBe('Release Notes Draft');
 
       await page.screenshot({ path: `${SCREENSHOT_DIR}/picker${theme === 'dark' ? '-dark' : ''}.png`, animations: 'disabled' });
     });

@@ -378,12 +378,21 @@ src/content/
 │   ├── logger.ts              # Centralized logging
 │   ├── dom.ts                 # DOM manipulation
 │   ├── storage.ts             # Storage access
-│   ├── styles.ts              # CSS injection
+│   ├── styles.ts              # CSS of the Prompts button, injected in the page
 │   └── theme-manager.ts       # Theme sync
 ├── ui/                         # UI components
-│   ├── element-factory.ts     # Platform-specific UI creation
-│   ├── keyboard-navigation.ts # Keyboard nav manager
+│   ├── element-factory.ts     # The Prompts button of each Platform
 │   └── event-manager.ts       # Event listener cleanup
+├── selector/                   # Prompt selector, in a shadow root (ADR-002)
+│   ├── controller.ts          # Shadow host, open/close, placement, insertion hand-off
+│   ├── selectorMachine.ts     # State machine (closed, list, variables, closing), pure
+│   ├── selectorKeys.ts        # Keyboard rules: (state, key) -> state, pure
+│   ├── selectorData.ts        # Tabs and the Prompts of each, search, pure
+│   ├── position.ts            # Above or below the input field, pure
+│   ├── selectorStyles.ts      # Stylesheet of the shadow root, on the color tokens
+│   ├── motion.ts, font.ts     # Durations and curves; Schibsted Grotesk from the package
+│   ├── render.tsx             # React root, imported on first opening
+│   └── Picker*.tsx            # PickerPopover, PickerTabs, PickerList, PickerFill
 ├── platforms/                  # Strategy implementations
 │   ├── base-strategy.ts       # Abstract base
 │   ├── claude-strategy.ts     # Claude.ai
@@ -415,7 +424,8 @@ src/content/
 | `StorageManager` | Centralized storage with keyed locks shared across contexts (Web Locks API) | Singleton |
 | `promptAdmission` | Admission of Prompt text, the one reader of stored Prompts, the upgrade scrubs (shared by popup, service worker and content script) | Pure module |
 | `PromptManager` | Business logic (search, validation, duplicates) | Service |
-| `KeyboardNavigationManager` | Handle keyboard interactions | Controller |
+| `PromptSelectorController` | Open, place and close the Prompt selector in its shadow root; hand the chosen Prompt back for Insertion | Controller |
+| `selectorMachine`, `selectorKeys` | State and keyboard rules of the Prompt selector | Pure modules |
 | `EventManager` | Centralized event listener cleanup | Manager |
 
 ---
@@ -1412,7 +1422,7 @@ On extension update (`chrome.runtime.onInstalled`, reason `update`) and at every
 ### Delivery: no HTML sink for Prompt text
 
 - **Reading**: the content script reads Prompts through the shared `readPrompts()` (`getPrompts()` in `src/content/utils/storage.ts`). Reading never writes. Entries that are not Prompts at all are skipped, but no Prompt is changed, truncated or dropped because of what its text says.
-- **Prompt selector**: `createPromptListItem()` sets title, Category and preview as text and passes the Prompt id through unchanged.
+- **Prompt selector**: its React components (`src/content/selector/`) render title, Category and Prompt text as text nodes, never as markup, and pass the Prompt id through unchanged.
 - **Insertion**: strategies only set text, through `value`, `textContent` or text nodes, `document.execCommand('insertText')`, or the editor's own text API (ProseMirror `insertText`, Quill `setText`). Nothing is parsed as markup.
 - **No HTML sink**: the only `innerHTML` assignment in the extension source sets a static help banner in the element picker, with no interpolated text.
 

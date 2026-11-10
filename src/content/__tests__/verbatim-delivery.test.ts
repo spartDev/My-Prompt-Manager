@@ -15,7 +15,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_CATEGORY } from '../../constants';
 import { StorageManager } from '../../services/storage';
 import { PromptLibraryInjector } from '../core/injector';
-import { createPromptListItem, getPrompts } from '../utils/storage';
+import { SELECTOR_HOST_ID } from '../selector/controller';
+import { getPrompts } from '../utils/storage';
 
 vi.mock('../utils/logger', () => ({
   info: vi.fn(),
@@ -58,20 +59,26 @@ describe('Prompt text reaches the chat exactly as saved', () => {
   const save = (content: string, title = 'Q&A / "FAQ"') =>
     StorageManager.getInstance().savePrompt({ title, content, category: DEFAULT_CATEGORY });
 
-  const openSelector = async (target: HTMLElement): Promise<void> => {
-    injector = new PromptLibraryInjector();
-    await injector.initialize();
-    await injector.showPromptSelector(target);
-  };
+  /** The Prompt selector's shadow root: the selector is not in the page's own tree. */
+  const selectorRoot = (): ShadowRoot | null => document.getElementById(SELECTOR_HOST_ID)?.shadowRoot ?? null;
 
   const itemFor = (promptId: string): HTMLElement | undefined =>
-    Array.from(document.querySelectorAll<HTMLElement>('.prompt-item')).find(
+    Array.from(selectorRoot()?.querySelectorAll<HTMLElement>('[role="option"]') ?? []).find(
       (candidate) => candidate.dataset.promptId === promptId
     );
 
+  /** Opens the selector over `target` and waits for its list: it loads the Library and React first. */
+  const openSelector = async (target: HTMLElement, promptId: string): Promise<void> => {
+    injector = new PromptLibraryInjector();
+    await injector.initialize();
+    injector.showPromptSelector(target);
+    await vi.waitFor(() => {
+      expect(itemFor(promptId)).toBeDefined();
+    });
+  };
+
   const openSelectorAndChoose = async (target: HTMLElement, promptId: string): Promise<void> => {
-    await openSelector(target);
-    expect(itemFor(promptId)).toBeDefined();
+    await openSelector(target, promptId);
     itemFor(promptId)?.click();
   };
 
@@ -87,17 +94,13 @@ describe('Prompt text reaches the chat exactly as saved', () => {
     expect(read).toMatchObject({ id: saved.id, title: 'Q&A / "FAQ"' });
     expect(read.content).toBe(HEADLINE);
 
-    // Listed by the Prompt selector as saved
-    const listed = createPromptListItem(read, 0);
-    expect(listed.querySelector('.prompt-title')?.textContent).toBe('Q&A / "FAQ"');
-    expect(listed.querySelector('.prompt-preview')?.textContent).toBe(HEADLINE.substring(0, 100) + '...');
-    expect(listed.dataset.promptId).toBe(saved.id);
-
-    // Chosen from the selector and inserted by the ChatGPT strategy
+    // Listed by the Prompt selector as saved, chosen there and inserted by the ChatGPT strategy
     const textarea = document.createElement('textarea');
     document.body.appendChild(textarea);
     input = textarea;
-    await openSelectorAndChoose(textarea, saved.id);
+    await openSelector(textarea, saved.id);
+    expect(itemFor(saved.id)?.querySelector('.mpm-row-title')?.textContent).toBe('Q&A / "FAQ"');
+    itemFor(saved.id)?.click();
 
     await vi.waitFor(() => {
       expect(textarea.value).toBe(HEADLINE);
@@ -129,11 +132,14 @@ describe('Prompt text reaches the chat exactly as saved', () => {
     const textarea = document.createElement('textarea');
     document.body.appendChild(textarea);
     input = textarea;
-    await openSelector(textarea);
+    await openSelector(textarea, saved.id);
 
-    // The selector shows the title as text, and nothing was made from the text
-    expect(itemFor(saved.id)?.querySelector('.prompt-title')?.textContent).toBe('<script>alert(1)</script>');
+    // The selector shows the title as text, and nothing was made from the text: no element in the
+    // page, and in the selector only its own close icon
+    expect(itemFor(saved.id)?.querySelector('.mpm-row-title')?.textContent).toBe('<script>alert(1)</script>');
     expect(document.querySelectorAll('img, svg, script')).toHaveLength(0);
+    expect(selectorRoot()?.querySelectorAll('img, script, iframe')).toHaveLength(0);
+    expect(selectorRoot()?.querySelectorAll('svg')).toHaveLength(1);
 
     itemFor(saved.id)?.click();
 

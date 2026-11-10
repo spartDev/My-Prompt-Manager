@@ -91,7 +91,7 @@ For platforms that need custom insertion logic or special handling, you'll need 
 
 #### Icon Method Reference
 
-When your platform needs bespoke icon styling, set the `iconMethod` field to one of the supported UI factory helpers:
+The Prompts button looks the same on every Platform (a pill with the extension's badge and the label "Prompts"); a helper only chooses the wrapper a Platform's action bar expects. Set the `iconMethod` field to one of the UI factory helpers:
 
 - `createFloatingIcon` – default floating action button (no additional config required)
 - `createAbsoluteIcon` / `createRelativeIcon` – positioning-specific variants

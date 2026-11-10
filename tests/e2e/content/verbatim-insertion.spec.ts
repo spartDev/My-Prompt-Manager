@@ -11,7 +11,7 @@ import type { Prompt } from '../../../src/types';
 import { DEFAULT_CATEGORY } from '../../../src/types';
 import { extractVariables } from '../../../src/utils/promptVariables';
 import { expect, test } from '../fixtures/extension';
-import { choosePrompt, openPlatform, routePlatform } from '../fixtures/platform-pages';
+import { choosePrompt, openPlatform, openPromptSelector, promptRow, promptSelector, routePlatform } from '../fixtures/platform-pages';
 import { createPromptSeed, seedLibrary } from '../utils/storage';
 
 const MARKUP =
@@ -47,7 +47,7 @@ const LINE_BREAKS = {
   content: '\n\nTwo leading line breaks,\n\tthen a tab,\n\nand two trailing line breaks\n\n',
 };
 
-/** `{{braces}}` is a Variable: the fill-in form opens and "Insert as is" must still deliver the exact text. */
+/** `{{braces}}` is a Variable: the variables step opens, and inserting with nothing filled in must still deliver the exact text. */
 const hasVariables = (content: string): boolean => extractVariables(content).length > 0;
 
 const toSeed = (sample: { id: string; title: string; content: string; category?: string }): Prompt =>
@@ -90,7 +90,7 @@ test.describe('Insertion is verbatim', () => {
     }
   });
 
-  test('the Prompt selector shows titles, categories and previews as text, never as markup', async ({ context, storage }) => {
+  test('the Prompt selector shows titles and categories as text, never as markup', async ({ context, storage }) => {
     const prompts = [
       toSeed({ id: 'img', title: '<img src=x onerror=alert(1)>', content: '<img src=x onerror=alert(1)>' }),
       toSeed({ id: 'script', title: '<script>alert(1)</script>', content: '<script>alert(1)</script>' }),
@@ -116,31 +116,34 @@ test.describe('Insertion is verbatim', () => {
     });
     await page.goto(url, { waitUntil: 'domcontentloaded' });
 
-    await page.locator('.prompt-library-integrated-icon').click();
-    const selector = page.locator('.prompt-library-selector');
-    const items = selector.locator('.prompt-item');
+    await openPromptSelector(page);
+    const selector = promptSelector(page);
+    const items = selector.getByRole('option');
     await expect(items).toHaveCount(prompts.length);
 
     for (const [index, prompt] of prompts.entries()) {
       const item = items.nth(index);
-      const preview = prompt.content.length > 100 ? `${prompt.content.slice(0, 100)}...` : prompt.content;
       expect(await item.getAttribute('data-prompt-id')).toBe(prompt.id);
-      expect(await item.locator('.prompt-title').textContent()).toBe(prompt.title);
-      expect(await item.locator('.prompt-category').textContent()).toBe(prompt.category);
-      expect(await item.locator('.prompt-preview').textContent()).toBe(preview);
+      expect(await item.locator('.mpm-row-title').textContent()).toBe(prompt.title);
+      expect(await item.locator('.mpm-row-category').textContent()).toBe(prompt.category);
     }
+    // A Category's name is text in its tab too
+    await expect(selector.getByRole('tab', { name: '<i>Work</i>', exact: true })).toHaveCount(1);
 
-    // Nothing was built from Prompt text: the list holds only the selector's own <div>s and no handler attributes
-    const tags = await selector.locator('.prompt-list').evaluate((list) => Array.from(list.querySelectorAll('*'), (element) => element.tagName));
-    expect(tags).toEqual(prompts.flatMap(() => ['DIV', 'DIV', 'DIV', 'DIV']));
-    const handlers = await page.evaluate(() =>
-      Array.from(document.querySelectorAll('*')).flatMap((element) =>
+    // Nothing was built from Prompt text: the list holds only the selector's own row markup, the
+    // dialog only its own close icon, and no element anywhere has a handler attribute
+    const tags = await selector.getByRole('listbox').evaluate((list) => Array.from(list.querySelectorAll('*'), (element) => element.tagName));
+    expect(tags).toEqual(prompts.flatMap(() => ['DIV', 'SPAN', 'SPAN', 'SPAN', 'SPAN']));
+    expect(await selector.evaluate((dialog) => Array.from(dialog.querySelectorAll('img, script, iframe, svg'), (element) => element.tagName.toLowerCase()))).toEqual(['svg']);
+    const handlers = await page.evaluate(() => {
+      const shadow = document.getElementById('mpm-prompt-selector')?.shadowRoot;
+      return [...document.querySelectorAll('*'), ...(shadow?.querySelectorAll('*') ?? [])].flatMap((element) =>
         element.getAttributeNames().filter((name) => name.toLowerCase().startsWith('on'))
-      )
-    );
+      );
+    });
     expect(handlers).toEqual([]);
 
-    await items.filter({ hasText: 'Q&A &amp; <b>bold</b>' }).click();
+    await promptRow(page, 'restored/a&b').click();
     await expect(selector).toBeHidden();
     await expect.poll(() => page.locator('.ProseMirror').textContent()).toBe(MARKUP);
 

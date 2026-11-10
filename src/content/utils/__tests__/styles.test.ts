@@ -57,13 +57,24 @@ describe('StylesManager', () => {
       expect(documentMock.getElementById).toHaveBeenCalledWith('prompt-library-styles');
       expect(documentMock.createElement).toHaveBeenCalledWith('style');
       expect(mockStyleElement.id).toBe('prompt-library-styles');
-      expect(mockStyleElement.textContent).toContain('.prompt-library-icon');
+      expect(mockStyleElement.textContent).toContain('.prompt-library-pill');
       expect(documentMock.head.appendChild).toHaveBeenCalledWith(mockStyleElement);
       expect(Logger.debug).toHaveBeenCalledWith('CSS styles injected successfully');
     });
 
+    it('gives its rules to a style element left by an earlier version of the extension', () => {
+      const staleStyleElement = { id: 'prompt-library-styles', textContent: '.prompt-library-selector { color: red; }' };
+      documentMock.getElementById.mockReturnValue(staleStyleElement);
+
+      injectCSS();
+
+      expect(staleStyleElement.textContent).toBe(getCSS());
+      expect(documentMock.createElement).not.toHaveBeenCalled();
+      expect(documentMock.head.appendChild).not.toHaveBeenCalled();
+    });
+
     it('should skip injection when styles already exist', () => {
-      const existingStyleElement = { id: 'prompt-library-styles' };
+      const existingStyleElement = { id: 'prompt-library-styles', textContent: getCSS() };
       documentMock.getElementById.mockReturnValue(existingStyleElement);
 
       injectCSS();
@@ -90,45 +101,42 @@ describe('StylesManager', () => {
   });
 
   describe('getCSS', () => {
-    it('should return CSS string with all required classes', () => {
+    it('styles the Prompts button and nothing of the Prompt selector, which has its own stylesheet in its shadow root', () => {
       const css = getCSS();
 
-      expect(css).toContain('.prompt-library-icon');
-      expect(css).toContain('.prompt-library-selector');
-      expect(css).toContain('.prompt-selector-header');
-      expect(css).toContain('.prompt-search');
-      expect(css).toContain('.search-input');
-      expect(css).toContain('.prompt-list');
-      expect(css).toContain('.prompt-item');
-      expect(css).toContain('.prompt-title');
-      expect(css).toContain('.prompt-category');
-      expect(css).toContain('.prompt-preview');
-      expect(css).toContain('.no-prompts');
+      expect(css).toContain('.prompt-library-pill');
+      expect(css).toContain('.prompt-library-pill-badge');
+      expect(css).toContain('.prompt-library-pill-compact');
+      expect(css).not.toContain('.prompt-library-selector');
+      expect(css).not.toContain('.mpm-');
     });
 
-    it('should include dark mode styles', () => {
-      const css = getCSS();
+    it('writes only rules scoped to the Prompts button, so none can reach the Platform\'s own elements', () => {
+      const rules = getCSS().replace(/\/\*[\s\S]*?\*\//g, '').replace(/@media[^{]+\{/g, '');
+      const selectors = [...rules.matchAll(/(^|\})\s*([^{}]+)\{/g)].map(([, , selector]) => selector.trim());
 
-      expect(css).toContain('.prompt-library-selector.dark-theme');
+      expect(selectors.length).toBeGreaterThan(5);
+      expect(selectors.filter((selector) => !selector.split(',').every((part) => /^(\[data-prompt-library-floating\] )?\.prompt-library-pill/.test(part.trim())))).toEqual([]);
     });
 
-    it('should include responsive design styles', () => {
-      const css = getCSS();
-
-      expect(css).toContain('@media (max-width: 480px)');
+    it('includes the dark theme', () => {
+      expect(getCSS()).toContain('.prompt-library-pill.dark-theme');
     });
 
-    it('should include animations', () => {
+    it('shows whether the selector is open, and answers a press with the spring curve', () => {
       const css = getCSS();
 
-      expect(css).toContain('@keyframes promptSelectorFadeIn');
+      expect(css).toContain('.prompt-library-pill[aria-expanded="true"]');
+      expect(css).toContain('transform: scale(0.92)');
+      expect(css).toContain('cubic-bezier(0.34, 1.56, 0.64, 1)');
+      expect(css).toContain('background 300ms');
     });
 
-    it('should include accessibility styles', () => {
+    it('includes a visible focus and honors reduced motion', () => {
       const css = getCSS();
 
-      expect(css).toContain('.sr-only');
       expect(css).toContain('focus-visible');
+      expect(css).toContain('@media (prefers-reduced-motion: reduce)');
     });
   });
 
@@ -207,28 +215,11 @@ describe('StylesManager', () => {
       expect(openBraces).toBe(closeBraces);
     });
 
-    it('should include all essential UI components', () => {
+    it('keeps the layers of the positioned buttons', () => {
       const css = getCSS();
 
-      // Essential components for functionality
-      const requiredClasses = [
-        '.prompt-library-icon',
-        '.prompt-library-selector',
-        '.prompt-item',
-        '.search-input',
-        '.close-selector',
-      ];
-
-      requiredClasses.forEach(className => {
-        expect(css).toContain(className);
-      });
-    });
-
-    it('should include proper z-index values for layering', () => {
-      const css = getCSS();
-
-      expect(css).toContain('z-index: 999999'); // Icon
-      expect(css).toContain('z-index: 1000000'); // Selector
+      expect(css).toContain('z-index: 999999'); // Absolutely positioned button
+      expect(css).toContain('z-index: 10'); // Button inserted in the page
     });
   });
 
@@ -252,12 +243,12 @@ describe('StylesManager', () => {
       dark: declarationsOf(blockOf(TOKENS_CSS, '.dark'))
     };
 
-    it('declares the popup tokens on the selector with their light values, and on its dark-theme variant with their dark values', () => {
+    it('declares the popup tokens on the button with their light values, and on its dark-theme variant with their dark values', () => {
       const css = getCSS();
-      const light = declarationsOf(blockOf(css, '.prompt-library-selector'));
-      const dark = declarationsOf(blockOf(css, '.prompt-library-selector.dark-theme'));
+      const light = declarationsOf(blockOf(css, '.prompt-library-pill'));
+      const dark = declarationsOf(blockOf(css, '.prompt-library-pill.dark-theme'));
 
-      expect(Object.keys(light).length).toBeGreaterThan(10);
+      expect(Object.keys(light).length).toBeGreaterThanOrEqual(5);
       for (const [name, value] of Object.entries(light)) {
         expect(popup.light[name], `${name} is a token of tokens.css`).toBeDefined();
         expect(value, `${name} (light)`).toBe(popup.light[name]);
@@ -278,9 +269,9 @@ describe('StylesManager', () => {
       expect(literals).toEqual([]);
     });
 
-    it('reads only tokens it declares on the selector', () => {
+    it('reads only tokens it declares on the button', () => {
       const css = getCSS();
-      const declared = new Set(Object.keys(declarationsOf(blockOf(css, '.prompt-library-selector'))));
+      const declared = new Set(Object.keys(declarationsOf(blockOf(css, '.prompt-library-pill'))));
       const used = [...css.matchAll(/var\((--(?:background|text|border)-color-[\w-]+|--shadow-[\w-]+)/g)].map(([, name]) => name);
 
       expect(used.length).toBeGreaterThan(0);

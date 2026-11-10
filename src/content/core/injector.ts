@@ -8,16 +8,16 @@
 
 import { getPlatformByHostname } from '../../config/platforms';
 import type { ElementFingerprint } from '../../types/index';
-import { extractVariables, fillVariables } from '../../utils/promptVariables';
+import { PromptSelectorController } from '../selector/controller';
+import { loadSelectorFont } from '../selector/font';
+import type { SelectorLibrary } from '../selector/selectorData';
 import type { InsertionResult, Prompt } from '../types/index';
-import { UIElementFactory } from '../ui/element-factory';
+import { BAR_SEARCH_DEPTH, fitPromptsPill, syncPromptsPillTheme, UIElementFactory } from '../ui/element-factory';
 import { EventManager } from '../ui/event-manager';
-import { KeyboardNavigationManager } from '../ui/keyboard-navigation';
-import { createVariableForm } from '../ui/variable-form';
 import { DOMUtils } from '../utils/dom';
 import { getElementFingerprintGenerator } from '../utils/element-fingerprint';
 import { debug, error, info, isDebugMode, refreshDebugMode, warn } from '../utils/logger';
-import { type CustomSite, createPromptListItem, type ExtensionSettings, getCategoryColors, getPrompts, getSettings, isSiteEnabled } from '../utils/storage';
+import { type CustomSite, type ExtensionSettings, getCategories, getPrompts, getSettings, isSiteEnabled } from '../utils/storage';
 import { injectCSS } from '../utils/styles';
 import { ThemeManager } from '../utils/theme-manager';
 
@@ -28,15 +28,9 @@ import { PlatformInsertionManager } from './insertion-manager';
 export interface InjectorState {
   icon: HTMLElement | null;
   currentTextarea: HTMLElement | null;
-  promptSelector: HTMLElement | null;
-  currentTargetElement: HTMLElement | null;
-  /** Color of each Category by name, read when the selector opens: its chips follow the chip rule */
-  categoryColors: Map<string, string>;
   isInitialized: boolean;
   isSiteEnabled: boolean;
   detectionTimeout: number | null;
-  /** Arms the open selector's outside-click listener; cleared when the selector closes before it fires */
-  outsideClickTimeout: number | null;
   mutationObserver: MutationObserver | null;
   spaMonitoringInterval: NodeJS.Timeout | null;
   hostname: string;
@@ -61,20 +55,14 @@ export interface SPAState {
   routeChangeTimeout: number | null;
 }
 
-/**
- * Stable partition: Pinned Prompts first, keeping the existing order within each group.
- * The picker deliberately ignores the Library sort setting.
- */
-const pinnedFirst = (prompts: Prompt[]): Prompt[] => [
-  ...prompts.filter(prompt => prompt.pinned === true),
-  ...prompts.filter(prompt => prompt.pinned !== true)
-];
+/** How many frames a Prompts button is waited for before it is fitted: about five seconds, for a placement that loads a library first. */
+const PLACEMENT_FRAMES = 300;
 
 export class PromptLibraryInjector {
   private state: InjectorState;
   private eventManager: EventManager;
   private uiFactory: UIElementFactory;
-  private keyboardNav: KeyboardNavigationManager | null;
+  private selector: PromptSelectorController;
   private platformManager: PlatformInsertionManager;
   private customSelectorRetry: CustomSelectorRetry;
   private spaState: SPAState;
@@ -86,8 +74,15 @@ export class PromptLibraryInjector {
   /** Watches the placed icon and asks for a new placement when the Platform removes it */
   private readonly placement: IconPlacementController;
   private iconCleanups: Map<HTMLElement, () => void>;
-  /** Counts the calls to showPromptSelector, so a selector still loading when another opens is dropped. */
-  private selectorOpenings = 0;
+  /**
+   * Themes the Prompts button when the extension's theme is read or changes. The theme manager
+   * finds buttons in the page only, and a button being placed asynchronously is not there yet.
+   */
+  private readonly onThemeChange = (): void => {
+    if (this.state.icon) {
+      syncPromptsPillTheme(this.state.icon);
+    }
+  };
 
   constructor() {
     const hostname = window.location.hostname || '';
@@ -95,13 +90,9 @@ export class PromptLibraryInjector {
     this.state = {
       icon: null,
       currentTextarea: null,
-      promptSelector: null,
-      currentTargetElement: null,
-      categoryColors: new Map(),
       isInitialized: false,
       isSiteEnabled: false,
       detectionTimeout: null,
-      outsideClickTimeout: null,
       mutationObserver: null,
       spaMonitoringInterval: null,
       hostname,
@@ -112,7 +103,11 @@ export class PromptLibraryInjector {
     // Initialize specialized components
     this.eventManager = new EventManager();
     this.uiFactory = new UIElementFactory(this.state.instanceId);
-    this.keyboardNav = null;
+    this.selector = new PromptSelectorController({
+      loadLibrary: () => this.loadSelectorLibrary(),
+      insert: (prompt, content, target) => this.insertSelectedPrompt(prompt, content, target),
+      onOpenChange: (open, trigger) => { this.markIconOpen(open, trigger); }
+    });
 
     // Initialize platform manager
     this.platformManager = new PlatformInsertionManager({
@@ -216,6 +211,9 @@ export class PromptLibraryInjector {
 
       // Inject CSS styles
       injectCSS();
+      ThemeManager.getInstance().addObserver(this.onThemeChange);
+      // The Prompts button is set in the extension's font; without it the system font shows
+      void loadSelectorFont();
 
       // Initialize platform strategies for enabled sites only
       debug('Initializing platform strategies for enabled site');
@@ -634,8 +632,25 @@ export class PromptLibraryInjector {
    * Removes all existing prompt library icons from the DOM
    * This prevents duplicate icons after extension reloads
    */
+  /** Runs what each icon registered to release (its resize observer), whether or not the icon is still in the page. */
+  private runIconCleanups(): void {
+    for (const cleanup of this.iconCleanups.values()) {
+      try {
+        cleanup();
+      } catch (err) {
+        warn('Icon cleanup failed', { error: err instanceof Error ? err.message : String(err) });
+      }
+    }
+    this.iconCleanups.clear();
+  }
+
+  /**
+   * Removes every Prompts button from the page, those of earlier instances of the content script
+   * included, after releasing what each registered (overlay, resize observer).
+   */
   private removeAllExistingIcons(): void {
     try {
+      this.runIconCleanups();
       // Remove icons by cleanup class selector (covers all instances). Every icon carries this class,
       // so an icon Floating UI follows is released here, before it leaves the DOM: a later pass would not
       // find it any more and its autoUpdate would keep running on a detached node
@@ -824,6 +839,8 @@ export class PromptLibraryInjector {
       }
 
       this.state.icon = icon;
+      // The selector may be open over the button this one replaces
+      this.selector.setTrigger(icon);
       debug('Icon created successfully');
 
       // Store cleanup function if present (for Copilot icons with MutationObserver)
@@ -838,11 +855,14 @@ export class PromptLibraryInjector {
       icon.setAttribute('data-prompt-library-icon', 'true');
       icon.setAttribute('data-instance-id', this.state.instanceId);
 
+      // Once it is in the page: the label goes when the Platform's bar has no room for it
+      this.fitIconWhenPlaced(icon);
+
       // Add click handler
       this.eventManager.addTrackedEventListener(icon, 'click', (e: Event) => {
         e.preventDefault();
         e.stopPropagation();
-        void this.showPromptSelector(textarea);
+        this.showPromptSelector(textarea);
       });
 
       // Try to inject into platform-specific container first
@@ -1209,8 +1229,8 @@ export class PromptLibraryInjector {
       debug('No toolbar selector for this site, the icon is anchored on the editor');
     }
 
-    // Alone on the editor, the icon wears the extension's own look: the Platform's button classes it
-    // borrows mean nothing outside the toolbar, and a bare <button> would show Chrome's default look
+    // Alone on the editor, the Prompts button is its badge only (the stylesheet reads
+    // data-prompt-library-floating): a corner of the editor has no room for the label
     UIElementFactory.convertToAbsolutePositioning(icon);
     const button = icon.matches('button') ? icon : icon.querySelector('button');
     button?.classList.add('prompt-library-icon-base');
@@ -1495,307 +1515,82 @@ export class PromptLibraryInjector {
     }
   }
 
-  /**
-   * Shows the prompt selector modal
-   */
-  async showPromptSelector(targetElement: HTMLElement): Promise<void> {
-    const opening = ++this.selectorOpenings;
-    try {
-      debug('Showing prompt selector', {
-        textareaTag: targetElement.tagName,
-        hasExistingSelector: !!this.state.promptSelector
-      });
-
-      // Remove existing selector
-      this.closePromptSelector();
-
-      // Store target element for use in filterPrompts
-      this.state.currentTargetElement = targetElement;
-
-      // Get prompts from storage, Pinned Prompts first (stable within each group), and the Category colors
-      const [storedPrompts, categoryColors] = await Promise.all([getPrompts(), getCategoryColors()]);
-      // The icon was clicked again while these loaded: the later opening shows its own selector
-      if (opening !== this.selectorOpenings) {
-        return;
+  /** Waits for the Prompts button to be in the page (some placements are asynchronous), then themes and fits it. */
+  private fitIconWhenPlaced(icon: HTMLElement, attempts = PLACEMENT_FRAMES): void {
+    window.requestAnimationFrame(() => {
+      if (icon.isConnected) {
+        syncPromptsPillTheme(icon);
+        fitPromptsPill(icon);
+        this.refitIconOnResize(icon);
+      } else if (attempts > 0 && this.state.icon === icon) {
+        this.fitIconWhenPlaced(icon, attempts - 1);
       }
-      const prompts = pinnedFirst(storedPrompts);
-      this.state.categoryColors = categoryColors;
-      debug('Retrieved prompts for selector', { count: prompts.length });
-
-      // Create selector UI
-      this.state.promptSelector = this.createPromptSelectorUI(prompts);
-      
-      // Position selector
-      this.positionPromptSelector(this.state.promptSelector, targetElement);
-
-      // Add to DOM first
-      document.body.appendChild(this.state.promptSelector);
-      debug('[CONTENT] Prompt selector added to DOM, setting up events', {
-        selectorInDOM: document.contains(this.state.promptSelector)
-      });
-
-      // IMPORTANT: Add event listeners AFTER DOM insertion to ensure querySelector works properly
-      try {
-        this.setupPromptSelectorEvents(this.state.promptSelector, prompts, targetElement);
-        debug('[CONTENT] setupPromptSelectorEvents completed successfully');
-      } catch (err) {
-        error('[CONTENT] Failed to setup prompt selector events', err as Error);
-      }
-
-      // Initialize keyboard navigation
-      this.keyboardNav = new KeyboardNavigationManager(this.state.promptSelector, this.eventManager);
-      this.keyboardNav.initialize();
-
-      debug('Prompt selector created and keyboard navigation initialized', {
-        promptCount: prompts.length
-      });
-
-    } catch (err) {
-      error('Failed to show prompt selector', err as Error);
-      this.closePromptSelector();
-    }
-  }
-
-  /**
-   * Creates the prompt selector UI
-   */
-  private createPromptSelectorUI(prompts: Prompt[]): HTMLElement {
-    const selector = document.createElement('div');
-    selector.className = 'prompt-library-selector';
-    selector.setAttribute('role', 'dialog');
-    selector.setAttribute('aria-modal', 'true');
-    selector.setAttribute('aria-labelledby', 'prompt-selector-title');
-
-    // Apply current theme
-    const themeManager = ThemeManager.getInstance();
-    const currentTheme = themeManager.getCurrentTheme();
-    selector.classList.add(`${currentTheme}-theme`);
-
-    // Create header
-    const header = document.createElement('div');
-    header.className = 'prompt-selector-header';
-    
-    const title = document.createElement('h3');
-    title.id = 'prompt-selector-title';
-    title.textContent = 'Select a Prompt';
-    
-    const closeButton = document.createElement('button');
-    closeButton.className = 'close-selector';
-    closeButton.type = 'button';
-    closeButton.setAttribute('aria-label', 'Close prompt selector');
-    closeButton.textContent = '×';
-    
-    header.appendChild(title);
-    header.appendChild(closeButton);
-
-    // Create search section
-    const searchDiv = document.createElement('div');
-    searchDiv.className = 'prompt-search';
-    
-    const searchInput = document.createElement('input');
-    searchInput.type = 'text';
-    searchInput.className = 'search-input';
-    searchInput.placeholder = 'Search prompts...';
-    searchInput.setAttribute('autocomplete', 'off');
-    
-    searchDiv.appendChild(searchInput);
-
-    // Create prompt list
-    const promptList = document.createElement('div');
-    promptList.className = 'prompt-list';
-    promptList.setAttribute('role', 'listbox');
-
-    // Add prompt items
-    if (prompts.length > 0) {
-      prompts.forEach((prompt, index) => {
-        const promptItem = createPromptListItem(prompt, index, 'prompt-item', this.state.categoryColors.get(prompt.category));
-        promptList.appendChild(promptItem);
-      });
-    } else {
-      const noPrompts = document.createElement('div');
-      noPrompts.className = 'no-prompts';
-      noPrompts.textContent = 'No prompts found. Add some in the extension popup!';
-      promptList.appendChild(noPrompts);
-    }
-
-    // Assemble selector
-    selector.appendChild(header);
-    selector.appendChild(searchDiv);
-    selector.appendChild(promptList);
-
-    return selector;
-  }
-
-  /**
-   * Positions the prompt selector with adaptive positioning
-   */
-  private positionPromptSelector(selector: HTMLElement, targetElement: HTMLElement): void {
-    const rect = targetElement.getBoundingClientRect();
-    const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-    const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
-    
-    // Measure it in the DOM: a selector not shown yet is added hidden for the measure, an open one
-    // (repositioned on scroll or resize) is measured in place and stays open
-    const isOpen = selector.isConnected;
-    selector.style.position = 'absolute';
-    selector.style.zIndex = '1000000';
-    if (!isOpen) {
-      selector.style.visibility = 'hidden';
-      document.body.appendChild(selector);
-    }
-
-    const selectorRect = selector.getBoundingClientRect();
-    const selectorHeight = selectorRect.height;
-    const selectorWidth = selectorRect.width;
-
-    if (!isOpen) {
-      document.body.removeChild(selector);
-      selector.style.visibility = 'visible';
-    }
-    
-    // Calculate available space
-    const viewportHeight = window.innerHeight;
-    const viewportWidth = window.innerWidth;
-    const spaceBelow = viewportHeight - rect.bottom;
-    const spaceAbove = rect.top;
-    
-    // Handle small viewports - adjust selector size if needed
-    const isMobile = viewportWidth <= 480;
-    if (isMobile) {
-      selector.style.width = `${String(Math.min(400, viewportWidth - 40))}px`;
-      selector.style.maxHeight = `${String(Math.min(500, viewportHeight * 0.7))}px`;
-    }
-    
-    // Determine vertical position
-    let top: number;
-    const verticalOffset = 5;
-    
-    if (spaceBelow >= selectorHeight + verticalOffset || spaceBelow > spaceAbove) {
-      // Position below if there's enough space or more space than above
-      top = rect.bottom + scrollTop + verticalOffset;
-      selector.classList.remove('positioned-above');
-      selector.classList.add('positioned-below');
-    } else {
-      // Position above if not enough space below
-      top = rect.top + scrollTop - selectorHeight - verticalOffset;
-      selector.classList.remove('positioned-below');
-      selector.classList.add('positioned-above');
-    }
-    
-    // Determine horizontal position
-    let left = rect.left + scrollLeft;
-    
-    // Adjust if selector would overflow right edge
-    if (left + selectorWidth > viewportWidth + scrollLeft) {
-      // Align with right edge of viewport or textarea, whichever is smaller
-      const rightAlignLeft = Math.min(
-        viewportWidth + scrollLeft - selectorWidth - 10,
-        rect.right + scrollLeft - selectorWidth
-      );
-      left = Math.max(scrollLeft + 10, rightAlignLeft); // Ensure minimum padding from left
-    }
-    
-    // Ensure selector doesn't go below viewport bottom when positioned below
-    if (top + selectorHeight - scrollTop > viewportHeight && spaceAbove > spaceBelow) {
-      // Recalculate to position above if it would overflow
-      top = rect.top + scrollTop - selectorHeight - verticalOffset;
-      selector.classList.remove('positioned-below');
-      selector.classList.add('positioned-above');
-    }
-    
-    // Apply final positioning
-    selector.style.position = 'absolute';
-    selector.style.top = `${String(Math.max(scrollTop + 10, top))}px`; // Ensure minimum padding from top
-    selector.style.left = `${String(left)}px`;
-    selector.style.zIndex = '1000000';
-    
-    debug('Prompt selector positioned adaptively', {
-      targetRect: { top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right },
-      selectorSize: { width: selectorWidth, height: selectorHeight },
-      viewport: { width: viewportWidth, height: viewportHeight },
-      position: { top, left },
-      placement: selector.classList.contains('positioned-above') ? 'above' : 'below'
     });
   }
 
   /**
-   * Sets up click event listeners on prompt items
+   * Fits the Prompts button again when the bar it sits in changes size (the window is resized, a
+   * sidebar opens): the label goes when the bar narrows and comes back when there is room again.
+   * Fitting ends in the same state for the same bar, so its own class change starts no loop.
    */
-  private setupPromptItemEventListeners(promptItems: NodeListOf<HTMLElement> | HTMLElement[], prompts: Prompt[], targetElement: HTMLElement): void {
-    promptItems.forEach(item => {
-      debug('[CONTENT] Adding click listener to prompt item', {
-        promptId: item.dataset.promptId,
-        hasDataset: !!item.dataset.promptId
-      });
-
-      this.eventManager.addTrackedEventListener(item, 'click', () => {
-        debug('[CONTENT] Prompt item clicked', { promptId: item.dataset.promptId });
-        const promptId = item.dataset.promptId;
-        const prompt = prompts.find(p => p.id === promptId);
-        if (prompt) {
-          debug('[CONTENT] Inserting prompt content', { promptId, contentLength: prompt.content.length });
-          void this.handlePromptSelection(prompt, targetElement);
-        } else {
-          debug('[CONTENT] Prompt not found for ID', { promptId });
+  private refitIconOnResize(icon: HTMLElement): void {
+    if (typeof ResizeObserver === 'undefined') {
+      return;
+    }
+    let frame: number | null = null;
+    const observer = new ResizeObserver(() => {
+      frame ??= window.requestAnimationFrame(() => {
+        frame = null;
+        if (icon.isConnected) {
+          fitPromptsPill(icon);
         }
       });
     });
-  }
-
-  private async handlePromptSelection(prompt: Prompt, targetElement: HTMLElement): Promise<void> {
-    const variables = extractVariables(prompt.content);
-    if (variables.length > 0 && this.state.promptSelector) {
-      this.showVariableForm(this.state.promptSelector, prompt, variables, targetElement);
-      return;
+    // The bar is one of the button's nearest ancestors (fitPromptsPill looks at the same ones)
+    let ancestor = icon.parentElement;
+    for (let level = 0; ancestor && ancestor !== document.body && level < BAR_SEARCH_DEPTH; level++) {
+      observer.observe(ancestor);
+      ancestor = ancestor.parentElement;
     }
-    await this.insertSelectedPrompt(prompt, prompt.content, targetElement);
+
+    const earlier = this.iconCleanups.get(icon);
+    this.iconCleanups.set(icon, () => {
+      earlier?.();
+      observer.disconnect();
+      if (frame !== null) {
+        window.cancelAnimationFrame(frame);
+      }
+    });
   }
 
   /**
-   * Replaces the prompt list with a form to fill in the prompt's Variables before inserting it.
-   * The list stays in the DOM (hidden) so the click that opened the form still counts as a click
-   * inside the selector for the outside-click handler.
+   * Opens the Prompt selector over the input field, or closes it when it is open (a second click
+   * on the Prompts button).
    */
-  private showVariableForm(selector: HTMLElement, prompt: Prompt, variables: string[], targetElement: HTMLElement): void {
-    debug('[CONTENT] Showing variable form', { promptId: prompt.id, variableCount: variables.length });
-
-    // The list's keyboard navigation would take Enter and Escape away from the form
-    if (this.keyboardNav) {
-      this.keyboardNav.destroy();
-      this.keyboardNav = null;
-    }
-
-    for (const element of selector.querySelectorAll<HTMLElement>('.prompt-search, .prompt-list')) {
-      element.style.display = 'none';
-    }
-
-    const title = selector.querySelector('#prompt-selector-title');
-    if (title) {
-      title.textContent = prompt.title;
-    }
-
-    let settled = false;
-    const insertOnce = (content: string) => {
-      if (settled) {return;}
-      settled = true;
-      void this.insertSelectedPrompt(prompt, content, targetElement);
-    };
-
-    const form = createVariableForm(variables, {
-      onSubmit: (values) => { insertOnce(fillVariables(prompt.content, values)); },
-      onSkip: () => { insertOnce(prompt.content); }
-    });
-    selector.appendChild(form);
-    form.querySelector<HTMLInputElement>('input')?.focus();
+  showPromptSelector(targetElement: HTMLElement): void {
+    debug('Toggling prompt selector', { textareaTag: targetElement.tagName, isOpen: this.selector.isOpen });
+    this.selector.toggle(targetElement, this.state.icon);
   }
 
+  /** What the Prompt selector lists: the Prompts and the Categories, read each time it opens. */
+  private async loadSelectorLibrary(): Promise<SelectorLibrary> {
+    const [prompts, categories] = await Promise.all([getPrompts(), getCategories()]);
+    debug('Retrieved prompts for selector', { count: prompts.length });
+    return { prompts, categories };
+  }
+
+  /** The Prompts button shows whether the selector it opens is open. */
+  private markIconOpen(open: boolean, icon: HTMLElement | null): void {
+    const button = icon?.matches('button') ? icon : icon?.querySelector('button');
+    button?.setAttribute('aria-expanded', String(open));
+  }
+
+  /**
+   * Inserts the Prompt the user chose, once the selector has closed, and reports the use.
+   */
   private async insertSelectedPrompt(prompt: Prompt, content: string, targetElement: HTMLElement): Promise<void> {
-    // The selector this Prompt was chosen from: one the user opens meanwhile is not this Insertion's to close
-    const selector = this.state.promptSelector;
     try {
       const result = await this.insertPrompt(targetElement, content);
-      // Close once the text is in, before the use is reported to the service worker
-      this.closePromptSelector(selector);
 
       if (result.success) {
         try {
@@ -1824,135 +1619,6 @@ export class PromptLibraryInjector {
       error('[CONTENT] Error handling prompt selection', err instanceof Error ? err : new Error(String(err)), {
         promptId: prompt.id
       });
-    } finally {
-      this.closePromptSelector(selector);
-    }
-  }
-
-  /**
-   * Sets up event listeners for the prompt selector
-   */
-  private setupPromptSelectorEvents(selector: HTMLElement, prompts: Prompt[], targetElement: HTMLElement): void {
-    // Close button
-    const closeButton = selector.querySelector<HTMLElement>('.close-selector');
-    if (closeButton) {
-      this.eventManager.addTrackedEventListener(closeButton, 'click', () => {
-        this.closePromptSelector();
-      });
-    }
-
-    // Prompt item clicks
-    const promptItems = selector.querySelectorAll<HTMLElement>('.prompt-item');
-    debug('[CONTENT] Setting up prompt item click handlers', {
-      promptItemsFound: promptItems.length,
-      selectorInDOM: document.contains(selector)
-    });
-
-    this.setupPromptItemEventListeners(promptItems, prompts, targetElement);
-
-    // Search functionality
-    const searchInput = selector.querySelector<HTMLInputElement>('.search-input');
-    if (searchInput) {
-      this.eventManager.addTrackedEventListener(searchInput, 'input', (e: Event) => {
-        const target = e.target;
-        if (target instanceof HTMLInputElement) {
-          this.filterPrompts(target.value, prompts, selector);
-        }
-      });
-    }
-
-    // Outside click to close
-    this.clearOutsideClickTimeout();
-    this.state.outsideClickTimeout = window.setTimeout(() => {
-      this.state.outsideClickTimeout = null;
-      const outsideClickHandler = (e: Event) => {
-        const target = e.target;
-        if (!(target instanceof HTMLElement)) {
-          return;
-        }
-
-        if (this.state.promptSelector &&
-            !this.state.promptSelector.contains(target) &&
-            this.state.icon &&
-            !this.state.icon.contains(target)) {
-          this.closePromptSelector();
-        }
-      };
-      this.eventManager.addTrackedEventListener(document, 'click', outsideClickHandler);
-    }, 100);
-    
-    // Add scroll and resize handlers for dynamic repositioning
-    const repositionHandler = () => {
-      if (this.state.promptSelector) {
-        this.positionPromptSelector(this.state.promptSelector, targetElement);
-      }
-    };
-    
-    // Throttle repositioning for performance
-    let repositionTimeout: number | null = null;
-    const throttledReposition = () => {
-      if (repositionTimeout !== null) {
-        return;
-      }
-      repositionTimeout = window.setTimeout(() => {
-        repositionHandler();
-        repositionTimeout = null;
-      }, 16); // ~60fps
-    };
-    
-    this.eventManager.addTrackedEventListener(window, 'scroll', throttledReposition);
-    this.eventManager.addTrackedEventListener(window, 'resize', throttledReposition);
-  }
-
-  /**
-   * Filters prompts based on search term
-   */
-  private filterPrompts(searchTerm: string, prompts: Prompt[], selector: HTMLElement): void {
-    debug('[CONTENT] filterPrompts called', {
-      searchTerm,
-      promptsCount: prompts.length,
-      stackTrace: new Error().stack
-    });
-    const filteredPrompts = prompts.filter(prompt => 
-      prompt.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      prompt.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      prompt.category.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-
-    const promptList = selector.querySelector('.prompt-list');
-    if (!promptList) {return;}
-
-    // Clear existing content
-    while (promptList.firstChild) {
-      promptList.removeChild(promptList.firstChild);
-    }
-
-    // Add filtered items
-    if (filteredPrompts.length > 0) {
-      const newPromptItems: HTMLElement[] = [];
-      filteredPrompts.forEach((prompt, index) => {
-        const promptItem = createPromptListItem(prompt, index, 'filtered-prompt-item', this.state.categoryColors.get(prompt.category));
-        promptList.appendChild(promptItem);
-        newPromptItems.push(promptItem);
-      });
-
-      // Setup event listeners on the newly created prompt items
-      if (this.state.currentTargetElement) {
-        debug('[CONTENT] Setting up event listeners on filtered prompt items', {
-          itemCount: newPromptItems.length
-        });
-        this.setupPromptItemEventListeners(newPromptItems, filteredPrompts, this.state.currentTargetElement);
-      }
-    } else {
-      const noPrompts = document.createElement('div');
-      noPrompts.className = 'no-prompts';
-      noPrompts.textContent = 'No matching prompts found.';
-      promptList.appendChild(noPrompts);
-    }
-
-    // Update keyboard navigation
-    if (this.keyboardNav) {
-      this.keyboardNav.updateItems();
     }
   }
 
@@ -1979,36 +1645,6 @@ export class PromptLibraryInjector {
         success: false,
         error: 'Insertion failed due to error'
       };
-    }
-  }
-
-  /**
-   * Closes the prompt selector. Given `only`, closes it only while that selector is still the open one.
-   */
-  private closePromptSelector(only?: HTMLElement | null): void {
-    if (only !== undefined && this.state.promptSelector !== only) {
-      return;
-    }
-
-    this.clearOutsideClickTimeout();
-
-    if (this.state.promptSelector) {
-      this.state.promptSelector.remove();
-      this.state.promptSelector = null;
-    }
-
-    if (this.keyboardNav) {
-      this.keyboardNav.destroy();
-      this.keyboardNav = null;
-    }
-    // Clear the stored target element
-    this.state.currentTargetElement = null;
-  }
-
-  private clearOutsideClickTimeout(): void {
-    if (this.state.outsideClickTimeout !== null) {
-      clearTimeout(this.state.outsideClickTimeout);
-      this.state.outsideClickTimeout = null;
     }
   }
 
@@ -2047,13 +1683,15 @@ export class PromptLibraryInjector {
 
     // Clean up UI elements
     this.placement.reset();
+    this.runIconCleanups();
+    ThemeManager.getInstance().removeObserver(this.onThemeChange);
     if (this.state.icon) {
       this.overlay.release(this.state.icon);
       this.state.icon.remove();
       this.state.icon = null;
     }
 
-    this.closePromptSelector();
+    this.selector.destroy();
 
     // Clean up managers (but not message listeners)
     this.eventManager.cleanup();
@@ -2105,13 +1743,15 @@ export class PromptLibraryInjector {
     this.placement.reset();
     this.removeAllExistingIcons();
 
+    this.runIconCleanups();
+    ThemeManager.getInstance().removeObserver(this.onThemeChange);
     if (this.state.icon) {
       this.overlay.release(this.state.icon);
       this.state.icon.remove();
       this.state.icon = null;
     }
 
-    this.closePromptSelector();
+    this.selector.destroy();
 
     // Clean up managers
     this.eventManager.cleanup();
