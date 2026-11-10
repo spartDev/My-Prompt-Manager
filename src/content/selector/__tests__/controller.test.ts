@@ -574,6 +574,30 @@ describe('PromptSelectorController', () => {
       expect(undoButton()).not.toBeNull();
     });
 
+    it('shows nothing, and leaves the focus alone, when the selector is opening again as the Insertion ends', async () => {
+      const elsewhere = document.createElement('input');
+      document.body.append(elsewhere);
+      callbacks.insert.mockImplementation(async () => {
+        // The user clicks the Prompts button again while the Platform takes the text; the
+        // Library of that opening is still being read when the Insertion ends
+        callbacks.loadLibrary.mockReturnValue(new Promise(() => { /* still loading */ }));
+        void controller.open(field, button);
+        elsewhere.focus();
+        await Promise.resolve();
+        return true;
+      });
+      await controller.open(field, button);
+      await opened();
+
+      row('p1')?.click();
+      await closed();
+      await vi.waitFor(() => { expect(callbacks.insert).toHaveBeenCalledTimes(1); });
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      expect(pill()).toBeNull();
+      expect(document.activeElement).toBe(elsewhere);
+    });
+
     it('says so when the Insertion throws', async () => {
       callbacks.insert.mockRejectedValue(new Error('boom'));
 

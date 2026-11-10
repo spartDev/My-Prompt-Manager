@@ -440,8 +440,9 @@ export class PromptSelectorController {
     } finally {
       document.removeEventListener('keydown', onKeyDown, true);
     }
-    // Another selector opened while the Platform took the text: its confirmation would cover it
-    if (this.session) {
+    // The selector was opened again while the Platform took the text, or is loading to open: the
+    // user has moved on, so neither the focus nor a confirmation with Undo comes after them
+    if (this.session || this.loading !== null) {
       return;
     }
     // The user is already typing: the confirmation would leave at once, and the caret is theirs
