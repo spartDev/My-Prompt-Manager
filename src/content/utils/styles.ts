@@ -134,13 +134,17 @@ export function getCSS(): string {
       the page (custom sites), whose place was chosen for a 32px button
     */
     .prompt-library-pill.prompt-library-pill-compact,
-    .prompt-library-pill.prompt-library-icon-absolute {
+    .prompt-library-pill.prompt-library-icon-absolute,
+    .prompt-library-pill[data-prompt-library-floating],
+    [data-prompt-library-floating] .prompt-library-pill {
       gap: 0;
       padding: 0 5px;
     }
 
     .prompt-library-pill.prompt-library-pill-compact .prompt-library-pill-label,
-    .prompt-library-pill.prompt-library-icon-absolute .prompt-library-pill-label {
+    .prompt-library-pill.prompt-library-icon-absolute .prompt-library-pill-label,
+    .prompt-library-pill[data-prompt-library-floating] .prompt-library-pill-label,
+    [data-prompt-library-floating] .prompt-library-pill .prompt-library-pill-label {
       display: none;
     }
 

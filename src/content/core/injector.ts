@@ -1196,8 +1196,8 @@ export class PromptLibraryInjector {
       debug('No toolbar selector for this site, the icon is anchored on the editor');
     }
 
-    // Alone on the editor, the icon wears the extension's own look: the Platform's button classes it
-    // borrows mean nothing outside the toolbar, and a bare <button> would show Chrome's default look
+    // Alone on the editor, the Prompts button is its badge only (the stylesheet reads
+    // data-prompt-library-floating): a corner of the editor has no room for the label
     UIElementFactory.convertToAbsolutePositioning(icon);
     const button = icon.matches('button') ? icon : icon.querySelector('button');
     button?.classList.add('prompt-library-icon-base');

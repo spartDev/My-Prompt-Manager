@@ -105,7 +105,7 @@ describe('StylesManager', () => {
       const selectors = [...rules.matchAll(/(^|\})\s*([^{}]+)\{/g)].map(([, , selector]) => selector.trim());
 
       expect(selectors.length).toBeGreaterThan(5);
-      expect(selectors.filter((selector) => !selector.split(',').every((part) => part.trim().startsWith('.prompt-library-pill')))).toEqual([]);
+      expect(selectors.filter((selector) => !selector.split(',').every((part) => /^(\[data-prompt-library-floating\] )?\.prompt-library-pill/.test(part.trim())))).toEqual([]);
     });
 
     it('includes the dark theme', () => {
