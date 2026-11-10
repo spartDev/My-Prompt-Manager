@@ -56,6 +56,8 @@ export class PromptSelectorController {
   private openings = 0;
   /** The opening still loading its Library and React, if any: a second click cancels it. */
   private loading: number | null = null;
+  /** The button of the opening that is loading: the latest one, if the Platform replaced it meanwhile. */
+  private loadingTrigger: HTMLElement | null = null;
   private readonly onThemeChange = (theme: 'light' | 'dark'): void => {
     this.host?.setAttribute('data-theme', theme);
   };
@@ -95,6 +97,7 @@ export class PromptSelectorController {
   async open(target: HTMLElement, trigger: HTMLElement | null): Promise<void> {
     const opening = ++this.openings;
     this.loading = opening;
+    this.loadingTrigger = trigger;
     try {
       this.finishClose();
 
@@ -107,11 +110,12 @@ export class PromptSelectorController {
       const container = this.mount();
       this.root ??= createSelectorRoot(container);
 
-      const side = chooseSide(this.anchor({ target, trigger }), this.viewport());
-      this.session = { target, trigger, side, restoreFocus: true, teardown: this.listen(target) };
+      const current = this.loadingTrigger;
+      const side = chooseSide(this.anchor({ target, trigger: current }), this.viewport());
+      this.session = { target, trigger: current, side, restoreFocus: true, teardown: this.listen(target) };
       this.store.dispatch({ type: 'open', library });
       this.render();
-      this.callbacks.onOpenChange?.(true, trigger);
+      this.callbacks.onOpenChange?.(true, current);
       debug('Prompt selector opened', { promptCount: library.prompts.length, side });
     } catch (err) {
       logError('Failed to open the prompt selector', err instanceof Error ? err : new Error(String(err)));
@@ -131,6 +135,11 @@ export class PromptSelectorController {
    * toolbar): the new button is the one that closes it, that is not "outside", and that says it is open.
    */
   setTrigger(trigger: HTMLElement | null): void {
+    // Replaced while the selector was still loading: the opening takes the new button when it shows
+    if (this.loading !== null) {
+      this.loadingTrigger = trigger;
+      return;
+    }
     if (!this.session || this.session.trigger === trigger) {
       return;
     }

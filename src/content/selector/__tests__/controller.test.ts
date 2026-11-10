@@ -265,6 +265,25 @@ describe('PromptSelectorController', () => {
     expect(callbacks.onOpenChange).toHaveBeenLastCalledWith(false, replacement);
   });
 
+  it('opens with the button that replaced its trigger while it was still loading', async () => {
+    const loaded: { resolve?: (value: typeof library) => void } = {};
+    callbacks.loadLibrary.mockReturnValueOnce(new Promise((resolve) => { loaded.resolve = resolve; }));
+    const replacement = document.createElement('button');
+    document.body.appendChild(replacement);
+
+    const opening = controller.open(field, button);
+    button.remove();
+    controller.setTrigger(replacement);
+    loaded.resolve?.(library);
+    await opening;
+    await opened();
+
+    expect(callbacks.onOpenChange).toHaveBeenLastCalledWith(true, replacement);
+    // The new button is the trigger: a press on it is not a click outside
+    replacement.dispatchEvent(new Event('pointerdown', { bubbles: true, composed: true }));
+    expect(dialog()?.getAttribute('data-closing')).toBe('false');
+  });
+
   it('inserts nothing when it is destroyed while it closes with an Insertion pending', async () => {
     await controller.open(field, button);
     await opened();
