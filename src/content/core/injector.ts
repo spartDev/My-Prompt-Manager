@@ -19,6 +19,7 @@ import { getElementFingerprintGenerator } from '../utils/element-fingerprint';
 import { debug, error, info, isDebugMode, refreshDebugMode, warn } from '../utils/logger';
 import { type CustomSite, type ExtensionSettings, getCategories, getPrompts, getSettings, isSiteEnabled } from '../utils/storage';
 import { injectCSS } from '../utils/styles';
+import { ThemeManager } from '../utils/theme-manager';
 
 import { AnchoredOverlay, INSIDE_CORNER_INSET } from './anchored-overlay';
 import { IconPlacementController } from './icon-placement';
@@ -54,6 +55,9 @@ export interface SPAState {
   routeChangeTimeout: number | null;
 }
 
+/** How many frames a Prompts button is waited for before it is fitted: about five seconds, for a placement that loads a library first. */
+const PLACEMENT_FRAMES = 300;
+
 export class PromptLibraryInjector {
   private state: InjectorState;
   private eventManager: EventManager;
@@ -70,6 +74,15 @@ export class PromptLibraryInjector {
   /** Watches the placed icon and asks for a new placement when the Platform removes it */
   private readonly placement: IconPlacementController;
   private iconCleanups: Map<HTMLElement, () => void>;
+  /**
+   * Themes the Prompts button when the extension's theme is read or changes. The theme manager
+   * finds buttons in the page only, and a button being placed asynchronously is not there yet.
+   */
+  private readonly onThemeChange = (): void => {
+    if (this.state.icon) {
+      syncPromptsPillTheme(this.state.icon);
+    }
+  };
 
   constructor() {
     const hostname = window.location.hostname || '';
@@ -198,6 +211,7 @@ export class PromptLibraryInjector {
 
       // Inject CSS styles
       injectCSS();
+      ThemeManager.getInstance().addObserver(this.onThemeChange);
       // The Prompts button is set in the extension's font; without it the system font shows
       void loadSelectorFont();
 
@@ -618,8 +632,21 @@ export class PromptLibraryInjector {
    * Removes all existing prompt library icons from the DOM
    * This prevents duplicate icons after extension reloads
    */
+  /** Runs what each icon registered to release (its resize observer), whether or not the icon is still in the page. */
+  private runIconCleanups(): void {
+    for (const cleanup of this.iconCleanups.values()) {
+      try {
+        cleanup();
+      } catch (err) {
+        warn('Icon cleanup failed', { error: err instanceof Error ? err.message : String(err) });
+      }
+    }
+    this.iconCleanups.clear();
+  }
+
   private removeAllExistingIcons(): void {
     try {
+      this.runIconCleanups();
       // Remove icons by cleanup class selector (covers all instances). Every icon carries this class,
       // so an icon Floating UI follows is released here, before it leaves the DOM: a later pass would not
       // find it any more and its autoUpdate would keep running on a detached node
@@ -1483,7 +1510,7 @@ export class PromptLibraryInjector {
   }
 
   /** Waits for the Prompts button to be in the page (some placements are asynchronous), then themes and fits it. */
-  private fitIconWhenPlaced(icon: HTMLElement, attempts = 30): void {
+  private fitIconWhenPlaced(icon: HTMLElement, attempts = PLACEMENT_FRAMES): void {
     window.requestAnimationFrame(() => {
       if (icon.isConnected) {
         syncPromptsPillTheme(icon);
@@ -1650,6 +1677,8 @@ export class PromptLibraryInjector {
 
     // Clean up UI elements
     this.placement.reset();
+    this.runIconCleanups();
+    ThemeManager.getInstance().removeObserver(this.onThemeChange);
     if (this.state.icon) {
       this.overlay.release(this.state.icon);
       this.state.icon.remove();
@@ -1708,6 +1737,8 @@ export class PromptLibraryInjector {
     this.placement.reset();
     this.removeAllExistingIcons();
 
+    this.runIconCleanups();
+    ThemeManager.getInstance().removeObserver(this.onThemeChange);
     if (this.state.icon) {
       this.overlay.release(this.state.icon);
       this.state.icon.remove();

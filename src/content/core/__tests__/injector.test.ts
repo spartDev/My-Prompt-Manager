@@ -377,6 +377,47 @@ describe('PromptLibraryInjector', () => {
       vi.unstubAllGlobals();
     });
 
+    it('releases the resize observer when the site is cleaned up, not only when the button is replaced', async () => {
+      const disconnect = vi.fn();
+      vi.stubGlobal('ResizeObserver', vi.fn(function() {
+        return { observe: vi.fn(), disconnect };
+      }));
+      const bar = document.createElement('div');
+      const icon = document.createElement('button');
+      bar.appendChild(icon);
+      document.body.appendChild(bar);
+      (injector as any).refitIconOnResize(icon);
+
+      (injector as any).partialCleanup();
+
+      expect(disconnect).toHaveBeenCalledTimes(1);
+      expect((injector as any).iconCleanups.size).toBe(0);
+      bar.remove();
+      vi.unstubAllGlobals();
+    });
+
+    it('themes a button that is not in the page yet when the extension theme is read', async () => {
+      await injector.initialize();
+      const { syncPromptsPillTheme } = await import('../../ui/element-factory');
+      const { ThemeManager } = await import('../../utils/theme-manager');
+      const detached = document.createElement('button');
+      (injector as any).state.icon = detached;
+      vi.mocked(syncPromptsPillTheme).mockClear();
+
+      // The theme manager tells its observers; it cannot find a detached button in the page itself
+      (ThemeManager.getInstance() as any).notifyObservers('dark');
+      expect(syncPromptsPillTheme).toHaveBeenCalledWith(detached);
+
+      // After cleanup the injector no longer listens
+      (injector as any).state.icon = null;
+      injector.cleanup();
+      (injector as any).state.icon = detached;
+      vi.mocked(syncPromptsPillTheme).mockClear();
+      (ThemeManager.getInstance() as any).notifyObservers('light');
+      expect(syncPromptsPillTheme).not.toHaveBeenCalled();
+      (injector as any).state.icon = null;
+    });
+
     it('removes the selector on cleanup', () => {
       injector.cleanup();
 
