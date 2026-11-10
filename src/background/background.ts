@@ -56,6 +56,10 @@ export class ContentScriptInjector {
     }
   }
 
+  /**
+   * Injects the content script into the tab when its site is enabled, permitted and not injected
+   * yet. A tab left with elements of an earlier injection (the extension was updated) is cleaned first.
+   */
   private async _injectIfNeededInternal(tabId: number): Promise<void> {
     // Check our memory first for performance, but don't trust it completely
     // We'll verify actual injection state in injectContentScript

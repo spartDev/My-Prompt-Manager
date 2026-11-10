@@ -66,8 +66,13 @@ export const chosenPrompt = (state: SelectorState): Prompt | undefined =>
 export const listedPrompts = (state: SelectorState): Prompt[] =>
   promptsOf(state.library, state.tab, state.query);
 
+/** `value`, kept between `min` and `max`. */
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 
+/**
+ * The state after `action`. Returns the same object when the action changes nothing, so a caller
+ * can tell by identity. While closed or closing, only `open` and `closed` have an effect.
+ */
 export function selectorReducer(state: SelectorState, action: SelectorAction): SelectorState {
   if (action.type === 'open') {
     return { ...closedState, phase: 'list', library: action.library };
@@ -143,6 +148,7 @@ export interface SelectorStore {
   subscribe: (listener: () => void) => () => void;
 }
 
+/** Creates a store that starts closed and notifies its subscribers only when the state changes. */
 export function createSelectorStore(): SelectorStore {
   let state = closedState;
   const listeners = new Set<() => void>();

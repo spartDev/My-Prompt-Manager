@@ -12,6 +12,7 @@ export interface SelectorRoot {
   unmount: () => void;
 }
 
+/** Creates the React root of the selector in `container`, the element inside the shadow root. */
 export function createSelectorRoot(container: HTMLElement): SelectorRoot {
   const root = createRoot(container);
   return {

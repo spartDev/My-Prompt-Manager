@@ -32,6 +32,7 @@ export interface SelectorLibrary {
 /** How many Prompts Recent lists. */
 export const RECENT_COUNT = 5;
 
+/** The key of a Category's tab. */
 export const categoryTabKey = (name: string): TabKey => `category:${name}`;
 
 /**
@@ -76,6 +77,7 @@ const recentOf = (prompts: readonly Prompt[]): Prompt[] =>
     .sort((a, b) => (b.lastUsedAt ?? 0) - (a.lastUsedAt ?? 0))
     .slice(0, RECENT_COUNT);
 
+/** Whether a search finds the Prompt: in its title, its content or the name of its Category, ignoring case. */
 const matches = (prompt: Prompt, query: string): boolean => {
   const needle = query.toLowerCase();
   return (

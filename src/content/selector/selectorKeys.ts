@@ -16,9 +16,15 @@ export interface SelectorKey {
   altKey?: boolean;
 }
 
+/** Whether the key types a character: one character long, with no Control, Command or Alt held. */
 const isCharacter = (key: SelectorKey): boolean =>
   key.key.length === 1 && !key.ctrlKey && !key.metaKey && !key.altKey;
 
+/**
+ * The state after `key` is pressed, or null when the key is not the selector's and the focused
+ * element handles it. The same state back means the key is the selector's and changes nothing
+ * (Enter on an empty list): the caller still keeps it from the Platform.
+ */
 export function keyTransition(state: SelectorState, key: SelectorKey): SelectorState | null {
   if (state.phase === 'variables') {
     switch (key.key) {

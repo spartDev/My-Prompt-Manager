@@ -15,6 +15,7 @@ export interface PickerPopoverProps {
 
 const FOCUSABLE = 'button:not([tabindex="-1"]), input, [tabindex="0"]';
 
+/** What the list says when it is empty: the Library has no Prompt, the search no match, or the tab nothing yet. */
 const emptyMessage = (state: SelectorState): string => {
   if (state.library.prompts.length === 0) {
     return 'No prompts yet. Add some in the extension popup!';
@@ -72,6 +73,7 @@ export const PickerPopover: FC<PickerPopoverProps> = ({ store, placement }) => {
   const selectedPrompt = prompts.at(state.index);
   const selectedRowId = selectedPrompt ? rowId(listId, selectedPrompt.id) : undefined;
 
+  /** Keys of the whole dialog: Tab stays inside it, a focused button keeps Enter and Space, the rest follows the keyboard rules. */
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
     if (event.nativeEvent.isComposing) {
       return;
@@ -109,6 +111,7 @@ export const PickerPopover: FC<PickerPopoverProps> = ({ store, placement }) => {
     store.setState(next);
   };
 
+  /** A click on a tab: shows that tab's Prompts and gives the focus back to the search field. */
   const selectTab = (tab: TabKey): void => {
     // Choosing a tab leaves the search: the list is that tab's again
     store.dispatch({ type: 'setQuery', query: '' });

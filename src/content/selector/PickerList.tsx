@@ -20,8 +20,10 @@ interface PickerListProps {
   onChoose: (index: number) => void;
 }
 
+/** The DOM id of a Prompt's row, which aria-activedescendant names. */
 export const rowId = (listId: string, promptId: string): string => `${listId}-${promptId}`;
 
+/** "1 variable", "2 variables": how many distinct Variables a Prompt has. */
 const variablesLabel = (count: number): string => `${String(count)} variable${count > 1 ? 's' : ''}`;
 
 /**

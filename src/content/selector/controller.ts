@@ -88,6 +88,10 @@ export class PromptSelectorController {
     void this.open(target, trigger);
   }
 
+  /**
+   * Opens the selector over `target`: reads the Library, loads React on the first opening, then
+   * shows the list. An opening that was superseded or cancelled while it loaded shows nothing.
+   */
   async open(target: HTMLElement, trigger: HTMLElement | null): Promise<void> {
     const opening = ++this.openings;
     this.loading = opening;
@@ -233,6 +237,7 @@ export class PromptSelectorController {
     return { width: document.documentElement.clientWidth || window.innerWidth, height: window.innerHeight };
   }
 
+  /** Renders the open selector where its input field is now; called again when the page scrolls or resizes. */
   private render(): void {
     if (!this.session || !this.root) {
       return;
@@ -285,6 +290,7 @@ export class PromptSelectorController {
     };
   }
 
+  /** When the state turns to closing, waits for the closing animation, once, before the selector is removed. */
   private onStateChange(): void {
     if (this.store.getState().phase !== 'closing' || this.closeTimer !== null) {
       return;
@@ -327,6 +333,7 @@ export class PromptSelectorController {
     }
   }
 
+  /** Hands the chosen Prompt back for Insertion, with its Variables filled in when the user filled some. Never throws. */
   private async insert(prompt: Prompt, pending: PendingInsertion, target: HTMLElement): Promise<void> {
     try {
       // A Prompt inserted as saved arrives Verbatim; filling its Variables in is the user's own change

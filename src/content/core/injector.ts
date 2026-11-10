@@ -644,6 +644,10 @@ export class PromptLibraryInjector {
     this.iconCleanups.clear();
   }
 
+  /**
+   * Removes every Prompts button from the page, those of earlier instances of the content script
+   * included, after releasing what each registered (overlay, resize observer).
+   */
   private removeAllExistingIcons(): void {
     try {
       this.runIconCleanups();

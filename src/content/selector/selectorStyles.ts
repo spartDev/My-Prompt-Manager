@@ -11,6 +11,7 @@
 import { SELECTOR_FONT_FAMILY } from './font';
 import { DURATION, EASE } from './motion';
 
+/** The stylesheet put in the selector's shadow root. */
 export function getSelectorCSS(): string {
   return `
     :host {
