@@ -87,6 +87,38 @@ describe('rankMostUsed', () => {
     expect(titles(rankMostUsed(prompts))).toEqual(['Newer', 'Older']);
   });
 
+  it('ranks a Library of 1000 Prompts in n log n comparisons, not n squared', () => {
+    // Counted, not timed: a duration depends on the machine, the number of comparisons does not.
+    // Every comparison reads usageCount on both Prompts, so the reads count the comparisons
+    const SIZE = 1000;
+    let seed = 42;
+    const next = (max: number) => {
+      seed = (seed * 1664525 + 1013904223) % 4294967296;
+      return seed % max;
+    };
+    let reads = 0;
+    const prompts = Array.from({ length: SIZE }, (_, i) =>
+      new Proxy(buildPrompt({ id: String(i), usageCount: 1 + next(100), lastUsedAt: T - next(1_000_000) }), {
+        get(target, key, receiver) {
+          if (key === 'usageCount') {
+            reads++;
+          }
+          return Reflect.get(target, key, receiver) as unknown;
+        }
+      })
+    );
+
+    const ranked = rankMostUsed(prompts);
+
+    expect(ranked).toHaveLength(SIZE);
+    expect(ranked.every((prompt, i) => i === 0 || (ranked[i - 1].usageCount ?? 0) >= (prompt.usageCount ?? 0))).toBe(true);
+    // One read per Prompt to drop the never used, then two per comparison of at most n log2 n
+    // comparisons: 21 000 reads at most. A quadratic ranking needs about a million
+    const budget = SIZE + 2 * SIZE * Math.ceil(Math.log2(SIZE));
+    expect(reads).toBeGreaterThan(SIZE);
+    expect(reads).toBeLessThanOrEqual(budget);
+  });
+
   it('treats a missing or broken usage count as never inserted', () => {
     const legacy = { ...buildPrompt({ id: '1', title: 'Legacy' }), usageCount: undefined };
     const broken = buildPrompt({ id: '2', title: 'Broken', usageCount: Number.NaN });
