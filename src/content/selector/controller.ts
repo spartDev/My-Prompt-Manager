@@ -404,7 +404,8 @@ export class PromptSelectorController {
       return;
     }
     if (pending && prompt && session.target.isConnected) {
-      void this.insert(prompt, pending, session.target);
+      // A click elsewhere while the selector was closing already put the focus where the user wants it
+      void this.insert(prompt, pending, session.target, !session.restoreFocus);
     } else if (pending && prompt) {
       // The Platform replaced its input field while the selector closed: the Prompt has nowhere to go
       this.showFeedback({ kind: 'failed', title: prompt.title, target: null, field: session.field, previous: '' });
@@ -419,7 +420,7 @@ export class PromptSelectorController {
    * some, then confirms it: the focus is in the input field with the caret at the end, and the
    * pill offers Undo. A failed Insertion is said, with nothing to undo. Never throws.
    */
-  private async insert(prompt: Prompt, pending: PendingInsertion, target: HTMLElement): Promise<void> {
+  private async insert(prompt: Prompt, pending: PendingInsertion, target: HTMLElement, movedOnAlready: boolean): Promise<void> {
     const destructions = this.destructions;
     const previous = readInputText(target);
     // Where the field is now: the Platform may replace it while it takes the text
@@ -428,7 +429,7 @@ export class PromptSelectorController {
     // character in the field comes after the snapshot above, so Undo would discard it; a click
     // anywhere puts the focus where they want it. Only the user's own actions are trusted events,
     // and the events an Insertion sends are none of these
-    let movedOn = false;
+    let movedOn = movedOnAlready;
     const inField = (event: Event): boolean => event.composedPath().includes(target);
     const onUserAction = (event: Event): void => {
       if (event.isTrusted && (event.type === 'pointerdown' || inField(event))) {
