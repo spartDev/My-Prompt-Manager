@@ -53,11 +53,13 @@ describe('requestLibraryReview', () => {
     expect(data[PENDING_REVIEW_KEY]).toEqual({ windowId: 7, filter: { kind: 'neverUsed' } });
   });
 
-  it('fails when the side panel cannot be opened', async () => {
-    const { open } = installSession();
+  it('fails when the side panel cannot be opened, and leaves no review waiting for a later opening', async () => {
+    const { data, open } = installSession();
     open.mockRejectedValue(new Error('no user gesture'));
 
     await expect(requestLibraryReview({ kind: 'neverUsed' }, 7)).rejects.toThrow('no user gesture');
+    expect(data).toEqual({});
+    expect(await takePendingLibraryReview()).toBeNull();
   });
 });
 
