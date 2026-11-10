@@ -380,6 +380,13 @@ export const analyticsWorkflows = {
     // Wait for the page to fully load (including all resources)
     await newPage.waitForLoadState('load');
 
+    // In headless Chromium (CI), a tab opened by chrome.tabs.create gets no extension API (chrome has no
+    // storage, no tabs) until it loads again: the page would wait 5 s for storage, then say it is unavailable.
+    // On main the old page hid this behind its loading skeleton. A real browser gives the tab its API at once.
+    if (await newPage.evaluate(() => typeof chrome.storage === 'undefined')) {
+      await newPage.reload({ waitUntil: 'load' });
+    }
+
     // Wait for React to render the dashboard component
     // CI environments are slower, so we use a longer timeout
     await expect(newPage.getByRole('heading', { level: 1, name: 'Analytics' })).toBeVisible({ timeout: 30000 });
