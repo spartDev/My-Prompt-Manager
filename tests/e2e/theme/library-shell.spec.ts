@@ -72,15 +72,15 @@ test.describe('App shell and Library on the tokens', () => {
   for (const theme of ['light', 'dark'] as const) {
     const colors = EXPECTED[theme];
 
-    test(`the header and tab bar lines show only where content scrolls under them (${theme})`, async ({ page, storage, extensionId }) => {
+    test(`the header line shows only where content scrolls under it, and the tab bar keeps its line (${theme})`, async ({ page, storage, extensionId }) => {
       await openLibrary(page, storage, extensionId, { theme });
       const header = page.getByRole('banner');
       const tabBar = page.getByRole('navigation', { name: 'Main navigation' });
 
       await expect(header).toHaveCSS('background-color', colors.app);
-      await expect(tabBar).toHaveCSS('background-color', colors.app);
+      await expect(tabBar).toHaveCSS('background-color', colors.card);
 
-      // Top of the list: nothing under the header, cards hidden under the tab bar
+      // Top of the list: nothing under the header; the tab bar line is always there
       await expect(header).toHaveCSS('border-bottom-color', TRANSPARENT);
       await expect(tabBar).toHaveCSS('border-top-color', colors.strong);
 
@@ -90,7 +90,7 @@ test.describe('App shell and Library on the tokens', () => {
 
       await scrollList(page, 'bottom');
       await expect(header).toHaveCSS('border-bottom-color', colors.strong);
-      await expect(tabBar).toHaveCSS('border-top-color', TRANSPARENT);
+      await expect(tabBar).toHaveCSS('border-top-color', colors.strong);
 
       await scrollList(page, 'top');
       await expect(header).toHaveCSS('border-bottom-color', TRANSPARENT);
@@ -114,15 +114,15 @@ test.describe('App shell and Library on the tokens', () => {
       }
     });
 
-    test(`a list that fits shows neither line (${theme})`, async ({ page, storage, extensionId }) => {
+    test(`a list that fits shows no header line, but the tab bar keeps its own (${theme})`, async ({ page, storage, extensionId }) => {
       // The side panel's height: in the popup, fonts that wrap the title (Linux CI) push one card a few
-      // pixels past the fold, and the tab bar line rightly shows
+      // pixels past the fold, and the header line rightly shows
       await openLibrary(page, storage, extensionId, { theme, surface: 'sidepanel', library: prompts.slice(0, 1) });
       const overflow = await page.locator('main[data-scroll-container]').evaluate(list => list.scrollHeight - list.clientHeight);
       expect(overflow, 'the list fits without scrolling').toBeLessThanOrEqual(0);
 
       await expect(page.getByRole('banner')).toHaveCSS('border-bottom-color', TRANSPARENT);
-      await expect(page.getByRole('navigation', { name: 'Main navigation' })).toHaveCSS('border-top-color', TRANSPARENT);
+      await expect(page.getByRole('navigation', { name: 'Main navigation' })).toHaveCSS('border-top-color', colors.strong);
     });
 
     test(`search, pills, tabs and cards take the ${theme} colors of the reference canvas`, async ({ page, storage, extensionId }) => {

@@ -33,7 +33,7 @@ Visual reference (both modes side by side): the palette canvas linked from beads
 
 | Class | Light | Dark | Use |
 |---|---|---|---|
-| `bg-app` | `#F4F1FA` | `#120E1B` | Page, header and tab bar (seamless, no white band) |
+| `bg-app` | `#F4F1FA` | `#120E1B` | Page and header (seamless, no white band) |
 | `bg-card` | `#FFFFFF` | `#231C34` | Cards, form sections, and the search field and pills that sit on `bg-app` |
 | `bg-subtle` | `#F4F1FA` | `#2B2340` | Chips and fields **on a card**. Never directly on `bg-app`: same value in light |
 | `bg-raised` | `#F8F6FC` | `#1B1528` | Light fills: empty states, nested panels |
@@ -667,7 +667,7 @@ Cards are opaque `bg-card` with a `border-default` border, floating on `bg-app`.
 
 #### Form Card
 
-A form (Add and Edit Prompt) is one card on `bg-app`: its sections are split by `border-divider`, its fields take `bg-subtle`. The button bar below it stays on `bg-app`, with a line only while fields remain below (`scroll-edge-bottom`, like the tab bar):
+A form (Add and Edit Prompt) is one card on `bg-app`: its sections are split by `border-divider`, its fields take `bg-subtle`. The button bar below it stays on `bg-app`, with a line only while fields remain below (`scroll-edge-bottom`):
 
 ```tsx
 <div className="flex-1 overflow-auto p-4" data-scroll-container>
@@ -934,7 +934,7 @@ Every Section but the Library has the same Section header, `SectionHeader` (`src
 
 The Eyebrow is the Section's context: the version in Settings, the number of Categories in Categories (announced with `eyebrowLive`), the period counted in Analytics.
 
-The header is seamless: it shares `bg-app` with the page, and its bottom line (`border-strong`) shows only once the content scrolls under it. The tab bar works the same way: its top line shows while content remains below. Both lines are drawn by CSS (`scroll-edge-top` and `scroll-edge-bottom` in `src/popup.css`), driven by the scroll of the view's `[data-scroll-container]` inside App's `section-scroll-scope`: no scroll state in React. `SectionHeader`, `ViewHeader` and `TabBar` already carry them.
+The header is seamless: it shares `bg-app` with the page, and its bottom line (`border-strong`) shows only once the content scrolls under it. The tab bar is the exception: it sits on `bg-card` (white in light) with a permanent `border-t border-strong`, which stays once the scroll reaches the end. The header line (`scroll-edge-top`) and the button bar line (`scroll-edge-bottom`) are drawn by CSS in `src/popup.css`, driven by the scroll of the view's `[data-scroll-container]` inside App's `section-scroll-scope`: no scroll state in React. `SectionHeader` and `ViewHeader` already carry `scroll-edge-top`.
 
 ```tsx
 <header className="shrink-0 bg-app flex items-start justify-between gap-3 px-5 pt-4 pb-2 border-b border-transparent scroll-edge-top">

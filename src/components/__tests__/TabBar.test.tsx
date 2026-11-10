@@ -13,6 +13,14 @@ describe('TabBar', () => {
     expect(tabs.map(tab => tab.textContent)).toEqual(['Library', 'Categories', 'Analytics', 'Settings']);
   });
 
+  it('sits on a white card surface with a permanent top border', () => {
+    render(<TabBar activeSection="library" onSelect={vi.fn()} />);
+
+    const nav = screen.getByRole('navigation', { name: /main navigation/i });
+    expect(nav).toHaveClass('bg-card', 'border-t', 'border-strong');
+    expect(nav).not.toHaveClass('scroll-edge-bottom', 'border-transparent');
+  });
+
   it('marks only the active Section as selected and focusable', () => {
     render(<TabBar activeSection="analytics" onSelect={vi.fn()} />);
 
