@@ -198,6 +198,26 @@ describe('removeTypedTrigger', () => {
     refused.mockRestore();
   });
 
+  it('reports a contenteditable whose editor changes only the spaces of the draft on input', () => {
+    const field = editable('<p>Before // after</p>');
+    document.getSelection()?.collapse(field.querySelector('p')?.firstChild ?? null, 9);
+    const refused = vi.spyOn(document, 'execCommand').mockReturnValue(false);
+    field.addEventListener('input', () => { field.innerHTML = '<p>Beforeafter</p>'; });
+
+    expect(removeTypedTrigger(field)).toBe(false);
+    refused.mockRestore();
+  });
+
+  it('takes a space the browser made non-breaking, once it ends the line, as the same space', () => {
+    const field = editable('<p>Before //</p>');
+    document.getSelection()?.collapse(field.querySelector('p')?.firstChild ?? null, 9);
+    const refused = vi.spyOn(document, 'execCommand').mockReturnValue(false);
+    field.addEventListener('input', () => { field.innerHTML = '<p>Before&nbsp;</p>'; });
+
+    expect(removeTypedTrigger(field)).toBe(true);
+    refused.mockRestore();
+  });
+
   it('reports a contenteditable whose editor puts the // back on input', () => {
     const field = editable('<p>Before //</p>');
     document.getSelection()?.collapse(field.querySelector('p')?.firstChild ?? null, 9);

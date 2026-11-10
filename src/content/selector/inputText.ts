@@ -161,12 +161,13 @@ export function removeTypedTrigger(field: HTMLElement): boolean {
   }
   // The field as it must be afterwards: the same text, without the two characters. An editor
   // whose own handler puts the // back, or changes the rest of the draft, did not take the removal.
-  // Spaces and line breaks are left out of the comparison: once the // is gone the editor may lay
-  // its lines out again (a <br> before the // becomes the one that keeps the last line open)
-  const characters = (text: string): string => text.replace(/\s+/g, '');
+  // Two things the removal itself changes are not differences: a line break before the // becomes
+  // the one that keeps the last line open, and the browser turns a space left at the end of a
+  // line into a non-breaking one
+  const settled = (text: string): string => text.replace(/\u00a0/g, ' ').replace(/\n+$/, '');
   const original = plainTextOf(field);
-  const expected = characters(original.slice(0, before.length - SELECTOR_TRIGGER.length) + original.slice(before.length));
-  const removed = (): boolean => characters(plainTextOf(field)) === expected;
+  const expected = settled(original.slice(0, before.length - SELECTOR_TRIGGER.length) + original.slice(before.length));
+  const removed = (): boolean => settled(plainTextOf(field)) === expected;
 
   if (canExec && typeof selection.modify === 'function') {
     for (let i = 0; i < SELECTOR_TRIGGER.length; i++) {

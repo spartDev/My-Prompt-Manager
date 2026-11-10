@@ -201,6 +201,24 @@ test.describe('// on a new line', () => {
   }
 });
 
+test.describe('// in a field that collapses spaces', () => {
+  // The stand-in fields keep spaces as typed (white-space: pre-wrap), as ProseMirror does. Without
+  // it Chrome turns the space left at the end of the line into a non-breaking one when the // goes
+  test('mistral: // after a space opens the selector in a contenteditable with white-space: normal', async ({ context, storage }) => {
+    await seed(storage);
+    const page = await openPlatform(context, 'mistral');
+    await page.addStyleTag({ content: '.field { white-space: normal; }' });
+    await expect(promptsButton(page)).toHaveCount(1);
+    const input = field(page, 'mistral');
+
+    await input.click();
+    await page.keyboard.type('Hello //');
+
+    await expect(promptSelector(page)).toBeVisible();
+    expect((await fieldText(input)).replace(/\u00a0/g, ' ')).toBe('Hello ');
+  });
+});
+
 test.describe('Insertion on a React-controlled field', () => {
   test('chatgpt: React hears the // being removed, the Insertion and the Undo', async ({ context, storage }) => {
     await seed(storage);
