@@ -2,7 +2,7 @@
  * Unit tests for DOMUtils utility module
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DOMUtils } from '../dom';
 import * as Logger from '../logger';
@@ -480,5 +480,26 @@ describe('DOMUtils', () => {
       );
       expect(result).toBe(false);
     });
+  });
+});
+
+describe('DOMUtils.supportsCSSAnchorPositioning', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('is true only when the browser has both anchor-name and position-area', () => {
+    vi.stubGlobal('CSS', { supports: (property: string) => property === 'anchor-name' || property === 'position-area' });
+    expect(DOMUtils.supportsCSSAnchorPositioning()).toBe(true);
+  });
+
+  it('is false on Chrome 125 to 128, which have anchor-name but inset-area instead of position-area', () => {
+    vi.stubGlobal('CSS', { supports: (property: string) => property === 'anchor-name' });
+    expect(DOMUtils.supportsCSSAnchorPositioning()).toBe(false);
+  });
+
+  it('is false without CSS.supports', () => {
+    vi.stubGlobal('CSS', undefined);
+    expect(DOMUtils.supportsCSSAnchorPositioning()).toBe(false);
   });
 });

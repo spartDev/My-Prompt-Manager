@@ -73,6 +73,29 @@ describe('EventManager', () => {
     });
   });
 
+  describe('removeTrackedListeners', () => {
+    it('removes the listeners of one element and leaves the others tracked', () => {
+      const other = document.createElement('div');
+      const otherHandler = vi.fn();
+      const removeSpy = vi.spyOn(mockElement, 'removeEventListener');
+      const otherRemoveSpy = vi.spyOn(other, 'removeEventListener');
+      eventManager.addTrackedEventListener(mockElement, 'click', mockHandler);
+      eventManager.addTrackedEventListener(other, 'click', otherHandler);
+
+      eventManager.removeTrackedListeners(mockElement);
+
+      expect(removeSpy).toHaveBeenCalledWith('click', mockHandler);
+      expect(otherRemoveSpy).not.toHaveBeenCalled();
+      eventManager.cleanup();
+      expect(removeSpy).toHaveBeenCalledTimes(1);
+      expect(otherRemoveSpy).toHaveBeenCalledWith('click', otherHandler);
+    });
+
+    it('does nothing for an element it does not track', () => {
+      expect(() => { eventManager.removeTrackedListeners(mockElement); }).not.toThrow();
+    });
+  });
+
   describe('cleanup', () => {
     it('should remove all tracked event listeners', () => {
       const removeEventListenerSpy = vi.spyOn(mockElement, 'removeEventListener');

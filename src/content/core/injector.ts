@@ -20,11 +20,9 @@ import { debug, error, info, isDebugMode, refreshDebugMode, warn } from '../util
 import { type CustomSite, type ExtensionSettings, getCategories, getPrompts, getSettings, isSiteEnabled } from '../utils/storage';
 import { injectCSS } from '../utils/styles';
 
+import { AnchoredOverlay, INSIDE_CORNER_INSET } from './anchored-overlay';
+import { IconPlacementController } from './icon-placement';
 import { PlatformInsertionManager } from './insertion-manager';
-
-// Floating UI imports for robust positioning fallback
-
-// Element fingerprinting for robust element identification
 
 export interface InjectorState {
   icon: HTMLElement | null;
@@ -67,7 +65,10 @@ export class PromptLibraryInjector {
   private selectorCache: Map<string, HTMLElement[]>;
   private lastCacheTime: number;
   private readonly cacheTimeout: number = 2000;
-  private floatingUICleanups: WeakMap<HTMLElement, () => void>;
+  /** Places the icon on the editor when the Platform's toolbar is not found, and on a custom site's element */
+  private readonly overlay: AnchoredOverlay;
+  /** Watches the placed icon and asks for a new placement when the Platform removes it */
+  private readonly placement: IconPlacementController;
   private iconCleanups: Map<HTMLElement, () => void>;
 
   constructor() {
@@ -125,8 +126,10 @@ export class PromptLibraryInjector {
     this.selectorCache = new Map();
     this.lastCacheTime = 0;
 
-    // Floating UI cleanup tracking (prevents memory leaks)
-    this.floatingUICleanups = new WeakMap();
+    this.overlay = new AnchoredOverlay();
+    this.placement = new IconPlacementController((editor) => {
+      this.handleIconLost(editor);
+    });
 
     // Icon cleanup tracking (prevents MutationObserver memory leaks)
     this.iconCleanups = new Map();
@@ -528,7 +531,10 @@ export class PromptLibraryInjector {
       if (textarea) {
         debug('Textarea found', { tagName: textarea.tagName, id: textarea.id });
 
-        if (textarea !== this.state.currentTextarea) {
+        // A new editor, or the same editor whose icon the Platform removed when it re-rendered its
+        // composer; while the controller already waits to place it again, this pass stands down
+        const needsIcon = textarea !== this.state.currentTextarea || this.placement.isLost(textarea);
+        if (needsIcon && !this.placement.isReplacementPending()) {
           this.state.currentTextarea = textarea;
           this.injectIcon(textarea).catch((err: unknown) => {
             error('Icon injection failed', err instanceof Error ? err : new Error(String(err)), {
@@ -614,10 +620,16 @@ export class PromptLibraryInjector {
    */
   private removeAllExistingIcons(): void {
     try {
-      // Remove icons by cleanup class selector (covers all instances)
+      // Remove icons by cleanup class selector (covers all instances). Every icon carries this class,
+      // so an icon Floating UI follows is released here, before it leaves the DOM: a later pass would not
+      // find it any more and its autoUpdate would keep running on a detached node
+      let floatingUICleanedUp = 0;
       const existingIcons = document.querySelectorAll('.prompt-library-cleanup-target');
       existingIcons.forEach(icon => {
         try {
+          if (this.overlay.release(icon as HTMLElement)) {
+            floatingUICleanedUp++;
+          }
           icon.remove();
         } catch (error) {
           // Expected errors: InvalidStateError (already removed), NotFoundError (parent changed)
@@ -713,16 +725,12 @@ export class PromptLibraryInjector {
         }
       });
 
-      // Clean up Floating UI elements and subscriptions
+      // Clean up Floating UI elements and subscriptions (icons without the cleanup class)
       const floatingUIIcons = document.querySelectorAll('[data-positioning-method="floating-ui"]');
-      let floatingUICleanedUp = 0;
       floatingUIIcons.forEach(icon => {
         try {
-          // Call cleanup function if it exists (stops autoUpdate subscription)
-          const cleanup = this.floatingUICleanups.get(icon as HTMLElement);
-          if (cleanup && typeof cleanup === 'function') {
-            cleanup();
-            this.floatingUICleanups.delete(icon as HTMLElement);
+          // Stop the autoUpdate subscription before the icon goes
+          if (this.overlay.release(icon as HTMLElement)) {
             floatingUICleanedUp++;
           }
           icon.remove();
@@ -775,6 +783,15 @@ export class PromptLibraryInjector {
   private async injectIcon(textarea: HTMLElement): Promise<void> {
     try {
       debug('Starting icon injection', { textareaTag: textarea.tagName });
+
+      // Forget the icon being replaced before it leaves the DOM, so its removal is not taken for a loss
+      this.placement.reset();
+
+      // The icon being replaced may already be out of the DOM (the Platform removed it), where the
+      // queries below cannot find it: dispose of it first, with its observer and click listener
+      if (this.state.icon) {
+        this.disposeIcon(this.state.icon);
+      }
 
       // Remove ALL existing icons from the DOM (not just current instance)
       // This prevents duplicates after extension reloads
@@ -973,6 +990,10 @@ export class PromptLibraryInjector {
         }
       }
 
+      if (injected) {
+        this.placement.track(icon, textarea, 'toolbar');
+      }
+
       // Check if we have custom positioning configuration (declare outside if block for scope)
       const customConfig = this.platformManager.getCustomSiteConfig();
 
@@ -1039,12 +1060,13 @@ export class PromptLibraryInjector {
               const supportsCSSAnchor = DOMUtils.supportsCSSAnchorPositioning();
 
               if (supportsCSSAnchor) {
-                customPositioned = customConfig ? this.positionIconWithCSSAnchor(icon, referenceElement, customConfig) : false;
+                customPositioned = this.overlay.placeWithCSSAnchor(icon, referenceElement, positioning);
                 if (customPositioned) {
                   debug('Icon positioned successfully with CSS Anchor (Tier 0 - Native)', {
                     browser: 'chrome-125+',
                     bundleSaved: '14KB (Floating UI not loaded)'
                   });
+                  this.placement.track(icon, textarea, 'custom');
                   return; // Exit here - positioning is complete
                 } else {
                   debug('CSS Anchor positioning failed, trying Floating UI');
@@ -1066,12 +1088,16 @@ export class PromptLibraryInjector {
               // Works on Chrome 114+, Firefox, older Safari
               // OPTIMIZATION: Only load Floating UI (14KB) when CSS Anchor API is unavailable
               try {
-                customPositioned = customConfig ? await this.positionIconWithFloatingUI(icon, referenceElement, customConfig) : false;
+                customPositioned = await this.overlay.placeWithFloatingUI(icon, referenceElement, positioning);
+                if (this.dropIfStale(icon, textarea)) {
+                  return;
+                }
                 if (customPositioned) {
                   debug('Icon positioned successfully with Floating UI (Tier 1)', {
                     browser: 'chrome-114-124 or firefox/safari',
                     bundleLoaded: '14KB (Floating UI lazy loaded)'
                   });
+                  this.placement.track(icon, textarea, 'custom');
                   return; // Exit here - positioning is complete
                 }
               } catch (floatingErr) {
@@ -1094,6 +1120,7 @@ export class PromptLibraryInjector {
                 customPositioned = customConfig ? this.positionCustomIcon(icon, referenceElement, customConfig) : false;
                 if (customPositioned) {
                   debug('Icon positioned successfully with DOM insertion (Tier 2)');
+                  this.placement.track(icon, textarea, 'custom');
                   return; // Exit here - positioning is complete
                 } else {
                   debug('DOM insertion failed, will try absolute positioning (Tier 3)');
@@ -1132,6 +1159,7 @@ export class PromptLibraryInjector {
               this.positionIconAbsolute(icon, referenceElement as HTMLElement, customConfig);
               document.body.appendChild(icon);
               debug('Icon positioned with absolute fallback');
+              this.placement.track(icon, textarea, 'custom');
               return; // Exit here - positioning is complete
             }
           } catch (fallbackError) {
@@ -1139,12 +1167,8 @@ export class PromptLibraryInjector {
           }
         }
 
-        // Ultimate fallback: default floating positioning
-        this.positionIcon(icon, textarea);
-        // Mark floating icons for easier cleanup
-        icon.setAttribute('data-prompt-library-floating', 'true');
-        document.body.appendChild(icon);
-        debug('Icon positioned with default floating position (final fallback)');
+        // No toolbar and no custom positioning: the icon is anchored on the editor itself
+        await this.placeOnEditor(icon, textarea, containerSelector);
       }
 
       debug('Icon injection completed', { 
@@ -1158,21 +1182,115 @@ export class PromptLibraryInjector {
   }
 
   /**
-   * Positions the icon relative to the textarea
+   * Places the icon on the editor when the Platform's toolbar was not found: anchored inside its
+   * bottom-end corner, following scroll and resize. On a built-in Platform, a toolbar selector that
+   * matched nothing is the sign its UI changed, so it is logged as a warning.
    */
-  private positionIcon(icon: HTMLElement, textarea: HTMLElement): void {
-    // Convert icon to use absolute positioning for default fallback
+  private async placeOnEditor(icon: HTMLElement, textarea: HTMLElement, containerSelector: string | null): Promise<void> {
+    if (containerSelector) {
+      warn('Toolbar not found on this Platform, the icon is anchored on the editor instead', {
+        hostname: this.state.hostname,
+        containerSelector
+      });
+    } else {
+      debug('No toolbar selector for this site, the icon is anchored on the editor');
+    }
+
+    // Alone on the editor, the icon wears the extension's own look: the Platform's button classes it
+    // borrows mean nothing outside the toolbar, and a bare <button> would show Chrome's default look
     UIElementFactory.convertToAbsolutePositioning(icon);
-    
+    const button = icon.matches('button') ? icon : icon.querySelector('button');
+    button?.classList.add('prompt-library-icon-base');
+    icon.setAttribute('data-prompt-library-floating', 'true');
+
+    const method = await this.overlay.place(icon, textarea, { placement: 'inside-bottom-end' });
+    if (this.dropIfStale(icon, textarea)) {
+      return;
+    }
+    if (!method) {
+      this.placeStatically(icon, textarea);
+    }
+    this.placement.track(icon, textarea, 'overlay');
+    debug('Icon anchored on the editor', { method: method ?? 'static' });
+  }
+
+  /**
+   * After an await in a placement: the site was disabled, the icon replaced or the editor changed
+   * while Floating UI loaded. The stale icon is then disposed of instead of tracked, and true is
+   * returned so the caller stops.
+   */
+  private dropIfStale(icon: HTMLElement, textarea: HTMLElement): boolean {
+    const stale = !this.state.isSiteEnabled
+      || this.state.icon !== icon
+      || this.state.currentTextarea !== textarea;
+    if (stale) {
+      debug('Placement outdated while it awaited, the icon is dropped');
+      this.disposeIcon(icon);
+      if (this.state.icon === icon) {
+        this.state.icon = null;
+      }
+    }
+    return stale;
+  }
+
+  /**
+   * Throws one icon away whether or not it is still in the DOM: its Copilot observer, its
+   * Anchored overlay, its click listener, then the element itself.
+   */
+  private disposeIcon(icon: HTMLElement): void {
+    const cleanup = this.iconCleanups.get(icon);
+    if (cleanup) {
+      try {
+        cleanup();
+      } catch (err) {
+        warn('Icon cleanup failed', { error: err instanceof Error ? err.message : String(err) });
+      }
+      this.iconCleanups.delete(icon);
+    }
+    this.overlay.release(icon);
+    this.eventManager.removeTrackedListeners(icon);
+    icon.remove();
+  }
+
+  /**
+   * Last resort when neither overlay tier could run: the icon is put once at the editor's
+   * bottom-end corner and does not follow it afterwards.
+   */
+  private placeStatically(icon: HTMLElement, textarea: HTMLElement): void {
+    warn('Anchored overlay unavailable, the icon is placed once at the editor corner', {
+      hostname: this.state.hostname
+    });
+    if (!icon.parentNode) {
+      document.body.appendChild(icon);
+    }
     const rect = textarea.getBoundingClientRect();
     const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
     const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
-
-    // Position icon to the right of the textarea
     icon.style.position = 'absolute';
-    icon.style.top = `${String(rect.top + scrollTop + 10)}px`;
-    icon.style.left = `${String(rect.right + scrollLeft + 10)}px`;
+    icon.style.top = `${String(rect.bottom + scrollTop - icon.offsetHeight - INSIDE_CORNER_INSET)}px`;
+    icon.style.left = `${String(rect.right + scrollLeft - icon.offsetWidth - INSIDE_CORNER_INSET)}px`;
     icon.style.zIndex = '999999';
+  }
+
+  /**
+   * The Platform removed the icon placed for this editor (its composer re-rendered): place it
+   * again on the same editor, or look for the editor anew when it went with the icon.
+   */
+  private handleIconLost(editor: HTMLElement): void {
+    if (!this.state.isSiteEnabled) {
+      return;
+    }
+    if (editor.isConnected) {
+      this.state.currentTextarea = editor;
+      this.injectIcon(editor).catch((err: unknown) => {
+        error('Icon re-placement failed', err instanceof Error ? err : new Error(String(err)));
+      });
+      return;
+    }
+    this.state.currentTextarea = null;
+    this.selectorCache.clear();
+    this.lastCacheTime = 0;
+    this.detectAndInjectIcon();
   }
 
   /**
@@ -1260,352 +1378,6 @@ export class PromptLibraryInjector {
         error: err instanceof Error ? err.message : String(err),
         url: window.location.hostname
       });
-    }
-  }
-
-  /**
-   * Position icon using CSS Anchor Positioning API (Tier 0 - Native browser API)
-   * Native CSS positioning for modern browsers (Chrome 125+, Edge 125+, Safari 26+, Opera 111+)
-   * Zero JavaScript, GPU-accelerated, best performance for 71%+ of users
-   * @param icon - The icon element to position
-   * @param referenceElement - The element to position relative to
-   * @param customConfig - Custom site configuration with positioning details
-   * @returns boolean - true if positioning was successful, false otherwise
-   */
-  private positionIconWithCSSAnchor(
-    icon: HTMLElement,
-    referenceElement: HTMLElement,
-    customConfig: CustomSite
-  ): boolean {
-    try {
-      // Check if CSS Anchor Positioning is supported
-      if (!DOMUtils.supportsCSSAnchorPositioning()) {
-        debug('CSS Anchor Positioning not supported, falling back to other methods');
-        return false;
-      }
-
-      if (!customConfig.positioning) {
-        return false;
-      }
-
-      const { placement, offset = { x: 0, y: 0 }, zIndex = 999999, anchorId } = customConfig.positioning as typeof customConfig.positioning & { anchorId?: string };
-
-      // Use existing data-mpm-anchor if present, otherwise use config anchorId or generate new
-      const existingAnchorId: string | null = referenceElement.getAttribute('data-mpm-anchor');
-      const fallbackAnchorId = `mpm-${String(Date.now())}-${Math.random().toString(36).substring(2, 9)}`;
-      // TypeScript knows anchorId is string | undefined
-       
-      const trackingAnchorId: string = existingAnchorId ?? anchorId ?? fallbackAnchorId;
-
-      // Generate a unique CSS anchor name for this element
-      const cssAnchorName = `--mpm-anchor-${String(Date.now())}-${Math.random().toString(36).substring(2, 9)}`;
-
-      // Set the reference element as the CSS anchor
-      referenceElement.style.anchorName = cssAnchorName;
-
-      // Add data-mpm-anchor for fast recovery lookup (only if not already present)
-      if (!existingAnchorId) {
-        referenceElement.setAttribute('data-mpm-anchor', trackingAnchorId);
-      }
-
-      // Store the CSS anchor name for cleanup
-      referenceElement.setAttribute('data-mpm-anchor-name', cssAnchorName);
-
-      // Configure icon for CSS Anchor Positioning
-      icon.style.position = 'fixed'; // Required for anchor positioning
-      icon.style.positionAnchor = cssAnchorName;
-      icon.style.zIndex = String(zIndex);
-
-      // Map placement to position-area values
-      // position-area uses a 9-cell grid around the anchor
-      const positionAreaMap: Record<string, string> = {
-        'before': 'left', // Left side of anchor
-        'after': 'right', // Right side of anchor
-        'inside-start': 'top', // Top of anchor
-        'inside-end': 'bottom' // Bottom of anchor
-      };
-
-      const positionArea = positionAreaMap[placement];
-      if (!positionArea) {
-        warn('Invalid placement for CSS Anchor positioning', { placement });
-        return false;
-      }
-
-      icon.style.positionArea = positionArea;
-
-      // Apply offsets using margin (CSS Anchor doesn't have built-in offset)
-      if (offset.x !== 0 || offset.y !== 0) {
-        icon.style.marginLeft = `${String(offset.x)}px`;
-        icon.style.marginTop = `${String(offset.y)}px`;
-      }
-
-      // Append to body (required for fixed positioning)
-      if (!icon.parentNode) {
-        document.body.appendChild(icon);
-      }
-
-      // Mark icon with positioning method for cleanup
-      icon.setAttribute('data-positioning-method', 'css-anchor');
-
-      debug('CSS Anchor positioning applied successfully (Tier 0)', {
-        placement,
-        positionArea,
-        offset,
-        zIndex,
-        anchorId: trackingAnchorId,
-        cssAnchorName,
-        referenceElement: {
-          tag: referenceElement.tagName,
-          id: referenceElement.id,
-          class: referenceElement.className
-        }
-      });
-
-      // Telemetry: Track positioning method usage
-       
-      info('[Telemetry] Positioning method used', {
-        method: 'css-anchor',
-        tier: 0,
-        success: true,
-        placement,
-        hasOffset: offset.x !== 0 || offset.y !== 0,
-        referenceType: referenceElement.tagName.toLowerCase(),
-        url: window.location.hostname
-      });
-
-      return true;
-    } catch (err) {
-      // Better error handling for non-Error objects
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      const errorStack = err instanceof Error ? err.stack : undefined;
-
-      error('Failed to apply CSS Anchor positioning', err instanceof Error ? err : null, {
-        errorMessage,
-        errorStack,
-        errorType: typeof err,
-        referenceElement: {
-          tag: referenceElement.tagName,
-          id: referenceElement.id,
-          exists: true
-        },
-        icon: {
-          exists: true,
-          isConnected: icon.isConnected
-        }
-      });
-      return false;
-    }
-  }
-
-  /**
-   * Position icon using Floating UI library (Tier 1 fallback)
-   *
-   * Provides production-grade positioning with collision detection, viewport boundaries,
-   * and automatic repositioning on scroll/resize.
-   *
-   * PERFORMANCE OPTIMIZATION:
-   * - Floating UI (14KB gzipped) is lazy loaded via dynamic import
-   * - Only loaded when CSS Anchor API is unavailable (Chrome <125)
-   * - ~71% of users (Chrome 125+) never load this bundle
-   *
-   * @param icon - The icon element to position
-   * @param referenceElement - The element to position relative to
-   * @param customConfig - Custom site configuration with positioning details
-   * @returns Promise<boolean> - true if positioning was successful, false otherwise
-   */
-  private async positionIconWithFloatingUI(
-    icon: HTMLElement,
-    referenceElement: HTMLElement,
-    customConfig: CustomSite
-  ): Promise<boolean> {
-    try {
-      // LAZY LOAD: Dynamic import loads Floating UI only when needed
-      // This reduces initial bundle size by 14KB for Chrome 125+ users
-      debug('Lazy loading Floating UI library (14KB gzipped)...', {
-        reason: 'CSS Anchor API not available',
-        browser: 'chrome-114-124 or firefox/safari'
-      });
-
-      const { computePosition, flip, shift, offset: floatingOffset, hide, autoUpdate } =
-        await import('@floating-ui/dom');
-
-      if (!customConfig.positioning) {
-        return false;
-      }
-
-      const { placement, offset = { x: 0, y: 0 }, zIndex = 999999 } = customConfig.positioning;
-
-      // Map our placement conventions to Floating UI's placement format
-      const placementMap: Record<string, string> = {
-        'before': 'left',
-        'after': 'right',
-        'inside-start': 'top-start',
-        'inside-end': 'bottom-end'
-      };
-
-      const floatingPlacement = placementMap[placement] || 'right';
-
-      // Elements are guaranteed to be non-null by function signature, but add runtime check
-      // Note: This condition is always falsy per signature but kept for runtime safety
-
-      // Append icon to body BEFORE positioning (required for computePosition)
-      // Note: We append early so Floating UI can measure the element
-      if (!icon.parentNode) {
-        document.body.appendChild(icon);
-      }
-
-      // Validate reference element is in the DOM and has dimensions
-      if (!document.body.contains(referenceElement)) {
-        warn('Reference element not in DOM', {
-          tag: referenceElement.tagName,
-          id: referenceElement.id
-        });
-        return false;
-      }
-
-      const refRect = referenceElement.getBoundingClientRect();
-      if (refRect.width === 0 && refRect.height === 0) {
-        warn('Reference element has no dimensions', {
-          tag: referenceElement.tagName,
-          id: referenceElement.id,
-          rect: { width: refRect.width, height: refRect.height }
-        });
-        return false;
-      }
-
-      // Define positioning update function
-      const updatePosition = async (): Promise<void> => {
-        try {
-          // Determine main/cross axis based on placement direction
-          // For left/right placements (before/after), main axis is horizontal (x)
-          // For top/bottom placements (inside-start/inside-end), main axis is vertical (y)
-          const isHorizontalPlacement = floatingPlacement === 'left' || floatingPlacement === 'right';
-          const mainAxisOffset = isHorizontalPlacement ? offset.x : offset.y;
-          const crossAxisOffset = isHorizontalPlacement ? offset.y : offset.x;
-
-          const result = await computePosition(referenceElement, icon, {
-            placement: floatingPlacement as 'left' | 'right' | 'top-start' | 'bottom-end',
-            middleware: [
-              // Apply user-defined offsets with correct axis mapping
-              floatingOffset({
-                mainAxis: mainAxisOffset,
-                crossAxis: crossAxisOffset
-              }),
-              // Smart collision detection - flips to opposite side if no room
-              flip({
-                fallbackPlacements: ['top', 'bottom', 'left', 'right'],
-                padding: 8 // Keep 8px away from viewport edges
-              }),
-              // Shifts element to stay within viewport
-              shift({ 
-                padding: 8
-              }),
-              // Detects when reference element is hidden/scrolled out of view
-              hide({
-                strategy: 'referenceHidden'
-              })
-            ]
-          });
-
-          const { x, y, middlewareData } = result;
-
-          // Apply computed position
-          Object.assign(icon.style, {
-            position: 'fixed',
-            left: `${String(x)}px`,
-            top: `${String(y)}px`,
-            zIndex: String(zIndex)
-          });
-
-          // Handle visibility based on hide middleware
-          if (middlewareData.hide?.referenceHidden) {
-            icon.style.visibility = 'hidden';
-          } else {
-            icon.style.visibility = 'visible';
-          }
-
-          debug('Floating UI position updated', {
-            x,
-            y,
-            finalPlacement: result.placement,
-            isHidden: middlewareData.hide?.referenceHidden
-          });
-        } catch (updateErr) {
-          const errorMessage = updateErr instanceof Error ? updateErr.message : String(updateErr);
-          const errorStack = updateErr instanceof Error ? updateErr.stack : undefined;
-          
-          warn('Failed to update Floating UI position', { 
-            errorMessage,
-            errorStack,
-            errorType: typeof updateErr,
-            referenceElementExists: !!referenceElement,
-            iconExists: !!icon
-          });
-        }
-      };
-
-      // Initial positioning
-      await updatePosition();
-
-      // Setup auto-update to reposition on scroll, resize, or DOM changes
-      const cleanup = autoUpdate(
-        referenceElement,
-        icon,
-        () => void updatePosition(),
-        {
-          // Optimize performance with RAF
-          animationFrame: true
-        }
-      );
-
-      // Store cleanup function in WeakMap for later removal (prevents memory leaks)
-      this.floatingUICleanups.set(icon, cleanup);
-      icon.setAttribute('data-positioning-method', 'floating-ui');
-
-      debug('Floating UI positioning applied successfully (Tier 1)', {
-        placement: floatingPlacement,
-        offset,
-        zIndex,
-        referenceElement: {
-          tag: referenceElement.tagName,
-          id: referenceElement.id,
-          class: referenceElement.className
-        }
-      });
-
-      // Telemetry: Track positioning method usage
-       
-      info('[Telemetry] Positioning method used', {
-        method: 'floating-ui',
-        tier: 1,
-        success: true,
-        placement: floatingPlacement,
-        hasOffset: offset.x !== 0 || offset.y !== 0,
-        referenceType: referenceElement.tagName.toLowerCase(),
-        url: window.location.hostname
-      });
-
-      return true;
-    } catch (err) {
-      // Better error handling for non-Error objects
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      const errorStack = err instanceof Error ? err.stack : undefined;
-      
-      error('Failed to apply Floating UI positioning', err instanceof Error ? err : null, {
-        errorMessage,
-        errorStack,
-        errorType: typeof err,
-        referenceElement: {
-          tag: referenceElement.tagName,
-          id: referenceElement.id,
-          exists: true
-        },
-        icon: {
-          exists: true,
-          isConnected: icon.isConnected
-        }
-      });
-      return false;
     }
   }
 
@@ -1840,7 +1612,9 @@ export class PromptLibraryInjector {
     }
 
     // Clean up UI elements
+    this.placement.reset();
     if (this.state.icon) {
+      this.overlay.release(this.state.icon);
       this.state.icon.remove();
       this.state.icon = null;
     }
@@ -1894,9 +1668,11 @@ export class PromptLibraryInjector {
     }
 
     // Clean up UI elements (including all Floating UI icons with cleanup functions)
+    this.placement.reset();
     this.removeAllExistingIcons();
 
     if (this.state.icon) {
+      this.overlay.release(this.state.icon);
       this.state.icon.remove();
       this.state.icon = null;
     }

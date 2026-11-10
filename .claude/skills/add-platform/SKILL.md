@@ -75,7 +75,7 @@ export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
       'div[contenteditable="true"][role="textbox"]',
       '[role="textbox"]'                         // Generic fallback
     ],
-    buttonContainerSelector: '.toolbar-container', // Where to place icon (optional)
+    buttonContainerSelector: '.toolbar-container', // Composer toolbar the icon goes in (optional; a selector list works)
     strategyClass: 'YourPlatformStrategy',        // Strategy class name
     hostnamePatterns: ['yourplatform', 'your-ai'], // Additional hostname patterns
     brandColors: {                                // Logo square when on: brand data, so arbitrary hex values
@@ -129,7 +129,7 @@ export class YourPlatformStrategy extends PlatformStrategy {
         'textarea[placeholder*="Enter your message"]',
         'div[contenteditable="true"][role="textbox"]'
       ],
-      buttonContainerSelector: '.toolbar-container',
+      buttonContainerSelector: getPlatformById('yourplatform')?.buttonContainerSelector, // From platforms.ts, never a copy
       priority: 70
     }, hostname);
   }
@@ -500,9 +500,9 @@ window.__promptLibraryDebug?.strategies
 **Symptoms:** Icon is visible but poorly positioned
 
 **Solutions:**
-1. Update `buttonContainerSelector` in `platforms.ts`
-2. Add platform-specific positioning in `src/content/core/injector.ts`
-3. Use multiple container selectors (comma-separated) for fallbacks
+1. Update `buttonContainerSelector` in `platforms.ts`; the strategy reads it from there, so never copy it into the strategy
+2. Use multiple container selectors (comma-separated) for fallbacks
+3. When none matches, the icon is anchored inside the editor's bottom-end corner (`src/content/core/anchored-overlay.ts`) and the console warns `Toolbar not found on this Platform`; when the Platform re-renders its toolbar, `src/content/core/icon-placement.ts` places the icon again
 
 **Example:**
 ```typescript

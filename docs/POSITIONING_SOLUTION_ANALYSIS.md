@@ -12,6 +12,8 @@ After thoroughly analyzing the three proposed solutions against your current cod
 
 Your codebase already implements a hybrid approach:
 
+> Since My-Prompt-Manager-tuh.1 the two overlay tiers below live in `src/content/core/anchored-overlay.ts` (`AnchoredOverlay.placeWithCSSAnchor`, `placeWithFloatingUI`), shared by custom sites and by the built-in Platforms' fallback; the injector keeps only the DOM insertion and absolute tiers. The method names and line numbers below are those of the analysis.
+
 1. **Primary Method**: CSS Anchor Positioning API (Chrome 125+) - `positionIconWithCSSAnchor()`
 2. **Fallback Method**: Direct DOM insertion with placement logic - `positionCustomIcon()`
 3. **Ultimate Fallback**: Absolute positioning - `positionIconAbsolute()`

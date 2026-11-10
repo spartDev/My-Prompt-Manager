@@ -31,7 +31,7 @@ export class ChatGPTStrategy extends PlatformStrategy {
         '[data-testid*="input"]',
         '[class*="input"]'
       ],
-      buttonContainerSelector: '.ms-auto.flex.items-center.gap-1\\.5',
+      buttonContainerSelector: getPlatformById('chatgpt')?.buttonContainerSelector,
       priority: 90
     }, hostname);
   }
