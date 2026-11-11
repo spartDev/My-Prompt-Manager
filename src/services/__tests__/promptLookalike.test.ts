@@ -78,19 +78,29 @@ describe('findLookalike', () => {
       expect(findLookalike(`${'a'.repeat(1000)}${'b'.repeat(400)}`, [existing])?.prompt).toBe(existing);
     });
 
+    it('finds a long Prompt with text appended or put in front, as alike as the whole texts are', () => {
+      const existing = libraryPrompt('a', 'Long', 'a'.repeat(10_000));
+
+      // 10,000 of 10,500 characters alike: 95%
+      for (const text of [`${'a'.repeat(10_000)}${'b'.repeat(500)}`, `${'b'.repeat(500)}${'a'.repeat(10_000)}`]) {
+        const found = findLookalike(text, [existing]);
+        expect(found?.prompt).toBe(existing);
+        expect(found?.similarity).toBeCloseTo(10_000 / 10_500, 2);
+      }
+    });
+
     it('does not take a long text for alike a much shorter Prompt it starts with', () => {
       expect(findLookalike(longest, [libraryPrompt('a', 'Start only', longest.slice(0, 2000))])).toBeNull();
     });
 
-    it('never compares more than the start of each text, so the Library is searched in bounded work', () => {
+    it('never compares texts over 1,000 characters character by character, the comparison whose cost is the product of their lengths', () => {
       vi.mocked(calculateSimilarityOptimized).mockClear();
       const library = Array.from({ length: 20 }, (_, i) => libraryPrompt(`p${String(i)}`, `P${String(i)}`, `${String(i)}${longest}`.slice(0, PROMPT_LIMITS.content)));
 
-      findLookalike(`${longest.slice(1)}!`, library);
+      expect(findLookalike(`${longest.slice(1)}!`, library)).not.toBeNull();
 
       const compared = vi.mocked(calculateSimilarityOptimized).mock.calls.flatMap(([a, b]) => [a.length, b.length]);
-      expect(compared.length).toBeGreaterThan(0);
-      expect(Math.max(...compared)).toBeLessThanOrEqual(LOOKALIKE_COMPARED_LENGTH);
+      expect(compared.every(length => length <= LOOKALIKE_COMPARED_LENGTH)).toBe(true);
     });
   });
 });

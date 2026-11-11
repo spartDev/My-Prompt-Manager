@@ -9,11 +9,14 @@ export const LOOKALIKE_THRESHOLD = 0.6;
 export const LOOKALIKE_MIN_LENGTH = 21;
 
 /**
- * The most of each text that is compared. The comparison costs the product of the two lengths, so
- * whole texts at Admission's limit would freeze typing for seconds: a longer text is compared on its
- * start and its end, and what that finds is capped by the ratio of the two lengths
+ * The longest text compared character by character (Levenshtein). That comparison costs the product
+ * of the two lengths, so whole texts at Admission's limit would freeze typing for seconds: a longer
+ * text is compared by the runs of characters the two texts share, in time proportional to their lengths
  */
 export const LOOKALIKE_COMPARED_LENGTH = 1000;
+
+/** The length of the runs of characters two long texts are compared by */
+const RUN_LENGTH = 4;
 
 export interface Lookalike {
   prompt: Prompt;
@@ -21,16 +24,32 @@ export interface Lookalike {
   similarity: number;
 }
 
-/** A text short enough to compare whole, or its start and its end */
-const sample = (text: string): string =>
-  text.length <= LOOKALIKE_COMPARED_LENGTH
-    ? text
-    : text.slice(0, LOOKALIKE_COMPARED_LENGTH / 2) + text.slice(-LOOKALIKE_COMPARED_LENGTH / 2);
+/** How many times each run of RUN_LENGTH characters appears in a text */
+const runCounts = (text: string): Map<string, number> => {
+  const counts = new Map<string, number>();
+  for (let i = 0; i + RUN_LENGTH <= text.length; i++) {
+    const run = text.slice(i, i + RUN_LENGTH);
+    counts.set(run, (counts.get(run) ?? 0) + 1);
+  }
+  return counts;
+};
+
+/** The share of their runs of characters two texts have in common (Dice), 0 to 1 */
+const sharedRuns = (a: string, b: string): number => {
+  const countsA = runCounts(a);
+  const countsB = runCounts(b);
+  let shared = 0;
+  for (const [run, count] of countsA) {
+    shared += Math.min(count, countsB.get(run) ?? 0);
+  }
+  const total = Math.max(0, a.length - RUN_LENGTH + 1) + Math.max(0, b.length - RUN_LENGTH + 1);
+  return total === 0 ? 0 : (2 * shared) / total;
+};
 
 /**
  * How alike two texts are, 0 to 1, or -1 when below LOOKALIKE_THRESHOLD. Two texts can be no more
  * alike than the shorter's length over the longer's, so texts whose lengths differ that much are
- * never compared, and the start and end a long text is cut to are no more alike than that ratio.
+ * never compared, and that ratio caps how alike two long texts are found by their shared runs.
  */
 export function lookalikeSimilarity(content: string, other: string): number {
   if (content === other) { return 1; }
@@ -40,9 +59,9 @@ export function lookalikeSimilarity(content: string, other: string): number {
   if (longer <= LOOKALIKE_COMPARED_LENGTH) {
     return calculateSimilarityOptimized(content, other, LOOKALIKE_THRESHOLD);
   }
-  // The samples already show part of the length difference: the ratio caps the result, not scales it
-  const sampled = calculateSimilarityOptimized(sample(content), sample(other), LOOKALIKE_THRESHOLD);
-  return sampled < 0 ? -1 : Math.min(sampled, lengthRatio);
+  // Shared runs overlook where a difference is, not how large it is; the length ratio caps them
+  const similarity = Math.min(sharedRuns(content, other), lengthRatio);
+  return similarity >= LOOKALIKE_THRESHOLD ? similarity : -1;
 }
 
 /**

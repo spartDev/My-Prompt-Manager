@@ -7,7 +7,7 @@ import type { Prompt } from '../types';
 export const LOOKALIKE_PAUSE_MS = 400;
 
 /** Prompts compared in one task: the editor answers between two slices */
-export const LOOKALIKE_SLICE = 25;
+export const LOOKALIKE_SLICE = 10;
 
 /**
  * The Lookalike of the text being written ("This looks familiar"), searched once typing pauses and
