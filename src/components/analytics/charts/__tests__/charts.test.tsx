@@ -3,22 +3,12 @@
  * their tooltip.
  */
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, beforeAll, beforeEach, describe, expect, it, type MockInstance, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
 
 import ChartTooltip from '../ChartTooltip';
 import DailyUseChart, { dailyUseSummary, formatDay } from '../DailyUseChart';
 import TimeOfDayChart, { timeOfDaySummary } from '../TimeOfDayChart';
-
-class MockResizeObserver {
-  observe = vi.fn();
-  unobserve = vi.fn();
-  disconnect = vi.fn();
-}
-
-beforeAll(() => {
-  vi.stubGlobal('ResizeObserver', MockResizeObserver);
-});
 
 const DAYS = [
   { date: '2026-01-11', count: 5 },
@@ -61,6 +51,16 @@ describe('DailyUseChart', () => {
   });
 });
 
+describe('DailyUseChart axis', () => {
+  it('names every seventh day, counting back from the last one', () => {
+    const fifteenDays = Array.from({ length: 15 }, (_, index) => ({ date: `2026-01-${String(index + 1).padStart(2, '0')}`, count: index }));
+
+    render(<DailyUseChart data={fifteenDays} />);
+
+    expect(screen.getAllByTestId('chart-axis-label').map(label => label.textContent)).toEqual(['Jan 1', 'Jan 8', 'Jan 15']);
+  });
+});
+
 describe('TimeOfDayChart', () => {
   it('says every count and the busiest time to assistive technology', () => {
     render(<TimeOfDayChart data={TIMES} />);
@@ -77,60 +77,68 @@ describe('TimeOfDayChart', () => {
 
 describe('ChartTooltip', () => {
   it('shows the label of the hovered bar and its uses', () => {
-    render(<ChartTooltip active payload={[{ value: 12 }]} label="Morning" formatLabel={label => `${label}, 6-12`} />);
+    render(<ChartTooltip label="Morning, 6-12" count={12} />);
 
     expect(screen.getByTestId('chart-tooltip')).toHaveTextContent('Morning, 6-12 12 uses');
   });
 
   it('counts one use in the singular', () => {
-    render(<ChartTooltip active payload={[{ value: 1 }]} label="Night" />);
+    render(<ChartTooltip label="Night" count={1} />);
 
     expect(screen.getByTestId('chart-tooltip')).toHaveTextContent('Night 1 use');
   });
-
-  it('shows nothing while no bar is hovered', () => {
-    const { container } = render(<ChartTooltip active={false} payload={[{ value: 1 }]} label="Night" />);
-
-    expect(container).toBeEmptyDOMElement();
-  });
 });
 
-describe('Chart tooltips, drawn', () => {
-  let layout: MockInstance<HTMLElement['getBoundingClientRect']>;
+describe('Chart hover', () => {
+  it('DailyUseChart shows the hovered day and its uses', () => {
+    render(<DailyUseChart data={DAYS} />);
 
-  // happy-dom lays nothing out: give each element a size so the charts draw and can be hovered
-  beforeEach(() => {
-    layout = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 400, 200));
+    fireEvent.mouseEnter(screen.getAllByTestId('chart-bar')[0]);
+
+    expect(screen.getByTestId('chart-tooltip')).toHaveTextContent('Jan 11 5 uses');
   });
 
-  afterEach(() => {
-    layout.mockRestore();
+  it('hides the tooltip as soon as the pointer leaves the bars', () => {
+    render(<DailyUseChart data={DAYS} />);
+    const [bar] = screen.getAllByTestId('chart-bar');
+
+    fireEvent.mouseEnter(bar);
+    fireEvent.mouseLeave(bar);
+
+    expect(screen.queryByTestId('chart-tooltip')).not.toBeInTheDocument();
   });
 
-  /** Hovers the middle of a chart, as a user does to read a value */
-  const hoverChart = (container: HTMLElement) => {
-    const chart = container.querySelector('.recharts-wrapper');
-    expect(chart, 'chart drawn').not.toBeNull();
-    fireEvent.mouseMove(chart as Element, { clientX: 200, clientY: 100 });
-  };
+  it('sizes each bar against the busiest one, and keeps an empty day visible', () => {
+    render(<DailyUseChart data={DAYS} />);
 
-  it('DailyUseChart shows the hovered day and its uses', async () => {
-    const { container } = render(<DailyUseChart data={[{ date: '2026-01-11', count: 5 }]} />);
-
-    hoverChart(container);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('chart-tooltip')).toHaveTextContent('Jan 11 5 uses');
-    });
+    const pills = screen.getAllByTestId('chart-pill');
+    expect(pills.map(pill => pill.style.height)).toEqual(['50%', '100%', '0%']);
+    expect(pills.map(pill => pill.style.minHeight)).toEqual(['4px', '4px', '4px']);
   });
 
-  it('TimeOfDayChart shows the hovered time of day, its hours and its uses', async () => {
-    const { container } = render(<TimeOfDayChart data={[{ bucket: 'Morning', count: 12 }]} />);
+  it('TimeOfDayChart shows the hovered time of day, its hours and its uses', () => {
+    render(<TimeOfDayChart data={TIMES} />);
 
-    hoverChart(container);
+    fireEvent.mouseEnter(screen.getAllByTestId('chart-bar')[0]);
 
-    await waitFor(() => {
-      expect(screen.getByTestId('chart-tooltip')).toHaveTextContent('Morning, 6-12 12 uses');
-    });
+    expect(screen.getByTestId('chart-tooltip')).toHaveTextContent('Morning, 6-12 10 uses');
+  });
+
+  it('TimeOfDayChart names every time of day on its axis', () => {
+    render(<TimeOfDayChart data={TIMES} />);
+
+    expect(screen.getAllByTestId('chart-axis-label').map(label => label.textContent)).toEqual(['Morning', 'Afternoon', 'Evening', 'Night']);
+  });
+
+  it('DailyUseChart lists every day and its uses to assistive technology', () => {
+    render(<DailyUseChart data={DAYS} />);
+
+    expect(screen.getAllByRole('listitem').map(item => item.textContent)).toEqual(['Jan 11: 5 uses', 'Jan 12: 10 uses', 'Jan 13: 0 uses']);
+  });
+
+  it('TimeOfDayChart lists every time of day, its hours and its uses to assistive technology', () => {
+    render(<TimeOfDayChart data={TIMES.slice(0, 2)} />);
+
+    expect(screen.getAllByRole('listitem').map(item => item.textContent)).toEqual(['Morning, 6-12: 10 uses', 'Afternoon, 12-18: 20 uses']);
   });
 });

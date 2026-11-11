@@ -1,13 +1,9 @@
 import { type FC, memo } from 'react';
-import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis } from 'recharts';
 
 import { busiest } from '../../../services/usageInsights';
-import { CHART_PRIMARY, CHART_THEME } from '../../../theme/chartColors';
-import { MOTION, prefersReducedMotion } from '../../../theme/motion';
 import type { DailyUsage } from '../../../types/hooks';
-import { CHART_HEIGHT, NO_THROTTLED_EVENTS } from '../constants';
 
-import ChartTooltip from './ChartTooltip';
+import PillBarChart from './PillBarChart';
 
 export interface DailyUseChartProps {
   /** Insertions per local day of the period, oldest first */
@@ -33,36 +29,17 @@ export const dailyUseSummary = (data: DailyUsage[]): string => {
 /**
  * Daily use in the full-page Analytics view: a pill bar per day of the period, in the accent.
  */
-const DailyUseChart: FC<DailyUseChartProps> = memo(({ data, height = CHART_HEIGHT }) => (
-  <div className="w-full" role="img" aria-label={dailyUseSummary(data)} data-testid="daily-use-chart">
-    <ResponsiveContainer width="100%" height={height}>
-      <BarChart data={data} margin={{ top: 8, right: 4, left: 4, bottom: 0 }} throttledEvents={NO_THROTTLED_EVENTS}>
-        <XAxis
-          dataKey="date"
-          tickFormatter={formatDay}
-          tick={{ fontSize: 11, fontWeight: 600, fill: CHART_THEME.textColor }}
-          tickLine={false}
-          axisLine={false}
-          interval="preserveStartEnd"
-          minTickGap={40}
-        />
-        <Tooltip
-          content={<ChartTooltip formatLabel={formatDay} />}
-          cursor={{ fill: CHART_THEME.cursorColor, radius: 8 }}
-          isAnimationActive={false}
-        />
-        <Bar
-          dataKey="count"
-          fill={CHART_PRIMARY.PRIMARY}
-          radius={99}
-          maxBarSize={14}
-          minPointSize={4}
-          isAnimationActive={!prefersReducedMotion()}
-          animationDuration={MOTION.barGrow}
-        />
-      </BarChart>
-    </ResponsiveContainer>
-  </div>
+const DailyUseChart: FC<DailyUseChartProps> = memo(({ data, height }) => (
+  <PillBarChart
+    bars={data.map(day => ({ key: day.date, count: day.count }))}
+    summary={dailyUseSummary(data)}
+    formatLabel={formatDay}
+    maxBarWidth={14}
+    minBarHeight={4}
+    labelEvery={7}
+    height={height}
+    data-testid="daily-use-chart"
+  />
 ));
 
 DailyUseChart.displayName = 'DailyUseChart';

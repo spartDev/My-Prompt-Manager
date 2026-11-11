@@ -23,12 +23,6 @@ vi.mock('../../../hooks/useDuplicateGroups', () => ({ useDuplicateGroups: vi.fn(
 vi.mock('../../../hooks/useNow', () => ({ useNow: vi.fn() }));
 vi.mock('../../../services/libraryReview', () => ({ requestLibraryReview: vi.fn() }));
 
-// recharts draws nothing without a layout: the charts are tested in charts.test.tsx
-vi.mock('../charts', () => ({
-  DailyUseChart: ({ data }: { data: unknown[] }) => <div data-testid="daily-use-chart">{data.length} days</div>,
-  TimeOfDayChart: ({ data }: { data: unknown[] }) => <div data-testid="time-of-day-chart">{data.length} times</div>
-}));
-
 const mockUseUsageStats = vi.mocked(useUsageStats);
 const mockUseDuplicateGroups = vi.mocked(useDuplicateGroups);
 const mockRequestLibraryReview = vi.mocked(requestLibraryReview);
@@ -200,7 +194,7 @@ describe('AnalyticsDashboard', () => {
 
       const card = screen.getByRole('region', { name: 'Daily use' });
       expect(card).toHaveTextContent('Used on 2 of the last 3 days.');
-      expect(within(card).getByTestId('daily-use-chart')).toHaveTextContent('3 days');
+      expect(within(card).getAllByTestId('chart-bar')).toHaveLength(3);
     });
 
     it('shows Time of day with the busiest time', () => {
@@ -208,7 +202,7 @@ describe('AnalyticsDashboard', () => {
 
       const card = screen.getByRole('region', { name: 'Time of day' });
       expect(card).toHaveTextContent('Afternoon is your busiest time.');
-      expect(within(card).getByTestId('time-of-day-chart')).toHaveTextContent('4 times');
+      expect(within(card).getAllByTestId('chart-bar')).toHaveLength(4);
     });
   });
 

@@ -67,7 +67,7 @@ Which component does which job in the popup and the side panel, and the conventi
 
 ### Analytics charts
 
-`DailyUseChart` and `TimeOfDayChart` (`src/components/analytics/charts/`, recharts) are the two charts of the full-page view: pill bars in the accent, colors from `src/theme/chartColors.ts`, data from `useUsageStats`, a `ChartTooltip` in the hero's dark pill, and an `aria-label` that says what the bars show. Everything else on both surfaces is plain elements: the weekday bars of `StatsHero`, and the ranked rows of `MostUsedCard` and `RankedRows` (`RankRowContent`), computed by `src/services/usageInsights.ts`. The row counts are in `src/components/analytics/constants.ts`: 3 Most used rows in the tab, 10 in the full-page view, 6 per Platforms or Categories card.
+`DailyUseChart` and `TimeOfDayChart` (`src/components/analytics/charts/`) are the two charts of the full-page view, both drawn by `PillBarChart`: plain elements, no chart library. A pill bar per entry in the accent (`bg-accent`), sized against the busiest and growing from the bottom like the hero's, axis labels in `text-tertiary` (Daily use names every seventh day back from today), a muted band and a `ChartTooltip` in the hero's dark pill on hover, data from `useUsageStats`, and an `aria-label` that says what the bars show. Everything else on both surfaces is plain elements too: the weekday bars of `StatsHero`, and the ranked rows of `MostUsedCard` and `RankedRows` (`RankRowContent`), computed by `src/services/usageInsights.ts`. The row counts are in `src/components/analytics/constants.ts`: 3 Most used rows in the tab, 10 in the full-page view, 6 per Platforms or Categories card.
 
 ---
 

@@ -41,7 +41,7 @@ export const MOTION = {
   backdropOut: 280,
   /** A Category appearing in the list (created, or back from Undo) */
   categoryPop: 500,
-  /** Analytics: a weekday bar growing from the bottom; the first starts after barDelay, each next one barStagger later */
+  /** Analytics: a bar growing from the bottom; the first starts after barDelay, each next one barStagger later */
   barGrow: 800,
   barDelay: 200,
   barStagger: 60,

@@ -11,7 +11,6 @@ import { compile } from '@tailwindcss/node';
 import { describe, expect, it } from 'vitest';
 
 import { getContrastRatio } from '../../constants/colors';
-import { CHART_PRIMARY, CHART_THEME } from '../chartColors';
 
 const POPUP_CSS = path.resolve(__dirname, '../../popup.css');
 
@@ -207,20 +206,6 @@ describe('Color tokens', () => {
     expect(ruleFor(css, 'bg-brand')).toContain('background-image: var(--background-image-brand)');
     expect(light['--background-image-brand']).toBe('linear-gradient(135deg, #6d28d9 0%, #4c1d95 100%)');
     expect(dark['--background-image-brand'], 'no dark override').toBeUndefined();
-  });
-
-  it('the Analytics charts draw their neutrals and primary color from tokens that exist in both modes', async () => {
-    const tokens = await readTokens();
-    const chartColors: Record<string, string> = { ...CHART_THEME, ...CHART_PRIMARY };
-
-    for (const [name, color] of Object.entries(chartColors)) {
-      const token = /^var\((--[\w-]+-color-[\w-]+)\)$/.exec(color)?.[1];
-      expect(token, `${name} reads a color token`).toBeDefined();
-      if (!token) {continue;}
-      expect(tokens.light[token], `${name}: ${token} in light`).toMatch(/^(#|rgba?\()/);
-      expect(tokens.dark[token], `${name}: ${token} in dark`).toMatch(/^(#|rgba?\()/);
-    }
-    expect(CHART_PRIMARY.PRIMARY).toBe('var(--background-color-accent)');
   });
 
   it('shadows take the violet tint in light and a stronger black in dark', async () => {

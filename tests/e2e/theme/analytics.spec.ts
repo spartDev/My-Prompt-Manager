@@ -86,12 +86,12 @@ const openDashboard = async (page: Page, storage: ExtensionStorage, extensionId:
 
 /** Lets the entry animations finish (the rank bars take the longest), so a screenshot shows the page drawn */
 const settleCharts = async (page: Page) => {
-  await expect(page.getByTestId('daily-use-chart').locator('.recharts-bar-rectangle').first()).toBeVisible();
+  await expect(page.getByTestId('daily-use-chart').getByTestId('chart-pill').first()).toBeVisible();
   await page.waitForTimeout(1800);
 };
 
-/** The fill each bar is painted with */
-const fillsOf = (bars: Locator) => bars.evaluateAll(paths => paths.map(path => getComputedStyle(path).fill));
+/** The color each bar is painted with */
+const fillsOf = (bars: Locator) => bars.evaluateAll(pills => pills.map(pill => getComputedStyle(pill).backgroundColor));
 
 const openAnalyticsTab = async (
   page: Page,
@@ -313,9 +313,8 @@ test.describe('Analytics on the tokens', () => {
         const card = page.getByTestId(id);
         await expect(card).toHaveCSS('background-color', colors.card);
         await expect(card.getByRole('heading')).toHaveCSS('color', colors.primary);
-        await expect(card.locator('.recharts-cartesian-axis-tick-value').first()).toHaveCSS('fill', colors.tertiary);
-        // Recharts draws the bars once their entry animation starts, and redraws them when the chart gets its width
-        await expect.poll(async () => [...new Set(await fillsOf(card.locator('.recharts-bar-rectangle path')))], `${id} bars`).toEqual([colors.accent]);
+        await expect(card.getByTestId('chart-axis-label').first()).toHaveCSS('color', colors.tertiary);
+        expect([...new Set(await fillsOf(card.getByTestId('chart-pill-fill')))], `${id} bars`).toEqual([colors.accent]);
       }
 
       await settleCharts(page);
@@ -323,15 +322,13 @@ test.describe('Analytics on the tokens', () => {
 
       // The tooltip is the hero's dark pill, over a muted band behind the hovered bar
       const daily = page.getByTestId('daily-use');
-      const surface = daily.locator('svg.recharts-surface').first();
-      const width = (await surface.boundingBox())?.width ?? 0;
-      await surface.hover({ position: { x: width - 10, y: 80 } });
+      await daily.getByTestId('chart-bar').last().hover();
       const tooltip = daily.getByTestId('chart-tooltip');
       await expect(tooltip).toHaveText(/^\w{3} \d+ \d+ uses?$/);
       await expect(tooltip).toHaveCSS('background-color', colors.inverse);
       await expect(tooltip).toHaveCSS('color', ON_ACCENT);
       await expect(tooltip.locator('span')).toHaveCSS('color', ON_INVERSE);
-      await expect(daily.locator('.recharts-tooltip-cursor')).toHaveCSS('fill', colors.muted);
+      await expect(daily.getByTestId('chart-band').last()).toHaveCSS('background-color', colors.muted);
       await page.screenshot({ path: `${SCREENSHOT_DIR}/dashboard-tooltip-${theme}.png` });
 
       // Scrolled, the content passes under the header: its line shows
