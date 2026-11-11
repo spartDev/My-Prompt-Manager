@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { calculateSimilarityOptimized } from '../../services/SimilarityAlgorithms';
 import type { Prompt } from '../../types';
-import { LOOKALIKE_PAUSE_MS, LOOKALIKE_SLICE, useLookalike } from '../useLookalike';
+import { LOOKALIKE_PAUSE_MS, LOOKALIKE_TASK_BUDGET_MS, useLookalike } from '../useLookalike';
 
 // The real comparison, watched: how much of it runs at once is what keeps the editor responsive
 vi.mock('../../services/SimilarityAlgorithms', async (importOriginal) => {
@@ -23,7 +23,7 @@ const libraryPrompt = (i: number, content: string): Prompt => ({
 });
 // A large Library, none of it alike enough, and the one alike Prompt last
 const LIBRARY = [
-  ...Array.from({ length: LOOKALIKE_SLICE * 4 }, (_, i) => libraryPrompt(i, `Unrelated text number ${String(i)} here.`)),
+  ...Array.from({ length: 40 }, (_, i) => libraryPrompt(i, `Unrelated text number ${String(i)} here.`)),
   libraryPrompt(999, `${TEXT} Please.`)
 ];
 
@@ -38,6 +38,8 @@ describe('useLookalike', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.restoreAllMocks();
+    comparisons.mockReset();
   });
 
   it('compares nothing until typing pauses, then finds the Lookalike', async () => {
@@ -50,13 +52,32 @@ describe('useLookalike', () => {
     expect(result.current?.prompt.id).toBe('p999');
   });
 
-  it('compares the Library a slice at a time, so no task holds the editor for long', () => {
+  /** Each comparison takes `ms` on the task's clock */
+  const comparisonsTake = (ms: number) => {
+    let clock = 0;
+    vi.spyOn(performance, 'now').mockImplementation(() => clock);
+    comparisons.mockImplementation(() => {
+      clock += ms;
+      return -1;
+    });
+  };
+
+  it('yields after a comparison that uses up the task budget, so no task holds the editor for long', () => {
+    comparisonsTake(LOOKALIKE_TASK_BUDGET_MS);
     renderHook(() => useLookalike(TEXT, LIBRARY));
     act(() => { vi.advanceTimersByTime(LOOKALIKE_PAUSE_MS); });
 
-    expect(comparisons.mock.calls.length).toBeLessThanOrEqual(LOOKALIKE_SLICE);
+    expect(comparisons).toHaveBeenCalledTimes(1);
     nextTask();
-    expect(comparisons.mock.calls.length).toBeLessThanOrEqual(LOOKALIKE_SLICE * 2);
+    expect(comparisons).toHaveBeenCalledTimes(2);
+  });
+
+  it('runs as many quick comparisons in one task as its budget allows', () => {
+    comparisonsTake(1);
+    renderHook(() => useLookalike(TEXT, LIBRARY));
+    act(() => { vi.advanceTimersByTime(LOOKALIKE_PAUSE_MS); });
+
+    expect(comparisons).toHaveBeenCalledTimes(LOOKALIKE_TASK_BUDGET_MS);
   });
 
   it('drops a scan as soon as the text changes', async () => {
