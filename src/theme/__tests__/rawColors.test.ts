@@ -60,7 +60,7 @@ const MIGRATED = [
   'components/settings/SiteRow.tsx',
   'components/settings/HelpSection.tsx',
   'components/settings/rowStyles.ts',
-  // My-Prompt-Manager-el4.6: Analytics (the chart colors of theme/chartColors.ts read tokens)
+  // My-Prompt-Manager-el4.6: Analytics
   'components/analytics/AnalyticsTab.tsx',
   'components/analytics/AnalyticsDashboard.tsx',
   'components/analytics/charts/TimeOfDayChart.tsx',
@@ -73,6 +73,8 @@ const MIGRATED = [
   'components/analytics/RankedRows.tsx',
   'components/analytics/charts/DailyUseChart.tsx',
   'components/analytics/charts/ChartTooltip.tsx',
+  // My-Prompt-Manager-qbi: the charts drawn without recharts
+  'components/analytics/charts/PillBarChart.tsx',
   // My-Prompt-Manager-q9j: the Prompt selector shown on Platforms (plain CSS in a shadow root, on the tokens)
   'content/selector/PickerPopover.tsx',
   'content/selector/PickerTabs.tsx',

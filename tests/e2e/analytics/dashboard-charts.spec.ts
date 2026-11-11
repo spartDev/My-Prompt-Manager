@@ -81,7 +81,7 @@ const rgbOf = (hex: string) => `rgb(${[1, 3, 5].map(i => parseInt(hex.slice(i, i
 
 /** Lets the entry animations finish (the rank bars take the longest), so the bars are at full size */
 const settle = async (page: Page) => {
-  await expect(page.getByTestId('daily-use-chart').locator('.recharts-bar-rectangle').first()).toBeVisible();
+  await expect(page.getByTestId('daily-use-chart').getByTestId('chart-pill').first()).toBeVisible();
   await page.waitForTimeout(1800);
 };
 
@@ -115,7 +115,7 @@ test.describe('Full-page Analytics cards and charts', () => {
 
       for (const id of ['daily-use', 'time-of-day']) {
         const card = page.getByTestId(id);
-        const [cardBox, chartBox] = await Promise.all([card.boundingBox(), card.locator('svg.recharts-surface').first().boundingBox()]);
+        const [cardBox, chartBox] = await Promise.all([card.boundingBox(), card.getByRole('img').boundingBox()]);
         if (!cardBox || !chartBox) { throw new Error(`${id} is not drawn`); }
         expect(chartBox.x, `${id} chart inside its card`).toBeGreaterThanOrEqual(cardBox.x);
         expect(chartBox.x + chartBox.width, `${id} chart inside its card`).toBeLessThanOrEqual(cardBox.x + cardBox.width);
@@ -199,10 +199,12 @@ test.describe('Full-page Analytics cards and charts', () => {
         `Prompts used per day over the last 30 days: 11 in all. The busiest day is ${today}, with ${String(TODAY_USES)}.`
       );
 
-      const surface = card.locator('svg.recharts-surface').first();
-      const width = (await surface.boundingBox())?.width ?? 0;
-      await surface.hover({ position: { x: width - 10, y: 80 } });
-      await expect(card.getByTestId('chart-tooltip')).toHaveText(`${today} ${String(TODAY_USES)} uses`);
+      await card.getByTestId('chart-bar').last().hover();
+      const tooltip = card.getByTestId('chart-tooltip');
+      await expect(tooltip).toHaveText(`${today} ${String(TODAY_USES)} uses`);
+      const [tooltipBox, cardBox] = await Promise.all([tooltip.boundingBox(), card.boundingBox()]);
+      if (!tooltipBox || !cardBox) { throw new Error('the tooltip is not drawn'); }
+      expect(tooltipBox.x + tooltipBox.width, 'the tooltip of the last day stays inside its card').toBeLessThanOrEqual(cardBox.x + cardBox.width);
       await card.screenshot({ path: `${SCREENSHOT_DIR}/daily-use-tooltip-${theme}.png` });
     });
 
@@ -212,7 +214,8 @@ test.describe('Full-page Analytics cards and charts', () => {
       const card = page.getByTestId('time-of-day');
       await expect(card.getByRole('img')).toHaveAccessibleName(/^Prompts used per time of day: Morning \d+, Afternoon \d+, Evening \d+, Night \d+\. \w+ is the busiest\.$/);
       await expect(card).toContainText(/is your busiest time\./);
-      await expect(card.locator('.recharts-bar-rectangle')).toHaveCount(4);
+      await expect(card.getByTestId('chart-pill')).toHaveCount(4);
+      await expect(card.getByTestId('chart-axis-label')).toHaveText(['Morning', 'Afternoon', 'Evening', 'Night']);
     });
   }
 });

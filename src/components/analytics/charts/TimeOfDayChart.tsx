@@ -1,13 +1,9 @@
 import { type FC, memo } from 'react';
-import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis } from 'recharts';
 
 import { busiest } from '../../../services/usageInsights';
-import { CHART_PRIMARY, CHART_THEME } from '../../../theme/chartColors';
-import { MOTION, prefersReducedMotion } from '../../../theme/motion';
 import type { TimeOfDayDistribution } from '../../../types/hooks';
-import { CHART_HEIGHT, NO_THROTTLED_EVENTS } from '../constants';
 
-import ChartTooltip from './ChartTooltip';
+import PillBarChart from './PillBarChart';
 
 export interface TimeOfDayChartProps {
   /** Insertions per time of day: Morning, Afternoon, Evening, Night */
@@ -38,33 +34,16 @@ export const timeOfDaySummary = (data: TimeOfDayDistribution[]): string => {
 /**
  * Time of day in the full-page Analytics view: a pill bar per time of day, in the accent.
  */
-const TimeOfDayChart: FC<TimeOfDayChartProps> = memo(({ data, height = CHART_HEIGHT }) => (
-  <div className="w-full" role="img" aria-label={timeOfDaySummary(data)} data-testid="time-of-day-chart">
-    <ResponsiveContainer width="100%" height={height}>
-      <BarChart data={data} margin={{ top: 8, right: 4, left: 4, bottom: 0 }} throttledEvents={NO_THROTTLED_EVENTS}>
-        <XAxis
-          dataKey="bucket"
-          tick={{ fontSize: 11, fontWeight: 600, fill: CHART_THEME.textColor }}
-          tickLine={false}
-          axisLine={false}
-        />
-        <Tooltip
-          content={<ChartTooltip formatLabel={withHours} />}
-          cursor={{ fill: CHART_THEME.cursorColor, radius: 8 }}
-          isAnimationActive={false}
-        />
-        <Bar
-          dataKey="count"
-          fill={CHART_PRIMARY.PRIMARY}
-          radius={99}
-          maxBarSize={26}
-          minPointSize={6}
-          isAnimationActive={!prefersReducedMotion()}
-          animationDuration={MOTION.barGrow}
-        />
-      </BarChart>
-    </ResponsiveContainer>
-  </div>
+const TimeOfDayChart: FC<TimeOfDayChartProps> = memo(({ data, height }) => (
+  <PillBarChart
+    bars={data.map(entry => ({ key: entry.bucket, count: entry.count }))}
+    summary={timeOfDaySummary(data)}
+    formatTooltipLabel={withHours}
+    maxBarWidth={26}
+    minBarHeight={6}
+    height={height}
+    data-testid="time-of-day-chart"
+  />
 ));
 
 TimeOfDayChart.displayName = 'TimeOfDayChart';
