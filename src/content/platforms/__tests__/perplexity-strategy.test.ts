@@ -195,6 +195,32 @@ describe('PerplexityStrategy', () => {
       expect(document.execCommand).not.toHaveBeenCalledWith('delete');
     });
 
+    it('takes a non-breaking space the editor shows for a space of the Prompt as the same text', async () => {
+      editor.addEventListener('paste', () => {
+        const span = editor.querySelector('span');
+        if (span) {
+          span.textContent = (span.textContent ?? '').replace(/ $/, '\u00a0');
+        }
+      });
+
+      const result = await strategy.insert(editor, 'ends with a space ');
+
+      expect(result).toEqual({ success: true, method: 'perplexity-paste' });
+    });
+
+    it('fails when the editor turns a non-breaking space of the Prompt into a space', async () => {
+      editor.addEventListener('paste', () => {
+        const span = editor.querySelector('span');
+        if (span) {
+          span.textContent = (span.textContent ?? '').replace(/\u00a0/g, ' ');
+        }
+      });
+
+      const result = await strategy.insert(editor, 'kept\u00a0together');
+
+      expect(result.success).toBe(false);
+    });
+
     it.each(HOSTILE_TEXTS)('inserts hostile-looking text %j as text', async (text) => {
       await strategy.insert(editor, text);
 
@@ -286,6 +312,16 @@ describe('PerplexityStrategy', () => {
       expect(result).toEqual({ success: true, method: 'perplexity-value' });
       expect(mockTextarea.value).toBe(MULTILINE_PROMPT);
       expect(heard).toHaveBeenCalledTimes(2);
+    });
+
+    it('fails when the page rewrites the value of the textarea', async () => {
+      mockTextarea.addEventListener('input', () => {
+        mockTextarea.value = 'rewritten by the page';
+      });
+
+      const result = await strategy.insert(mockTextarea, MULTILINE_PROMPT);
+
+      expect(result.success).toBe(false);
     });
 
     it('fails on an element that holds no editable text', async () => {

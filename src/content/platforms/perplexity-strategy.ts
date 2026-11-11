@@ -84,6 +84,10 @@ export class PerplexityStrategy extends PlatformStrategy {
       element.value = text;
       element.dispatchEvent(new Event('input', { bubbles: true }));
       element.dispatchEvent(new Event('change', { bubbles: true }));
+      // A page whose own handler rewrote the value did not take the text
+      if (element.value !== text) {
+        return { success: false, error: 'The input field did not keep the text' };
+      }
       return { success: true, method: `${via}-value` };
     }
 
@@ -180,10 +184,23 @@ export class PerplexityStrategy extends PlatformStrategy {
     });
   }
 
-  /** Whether the editor holds `text`, a non-breaking space it shows for a space being no difference. */
+  /**
+   * Whether the editor holds `text`. An editor may show a space of the text as a non-breaking
+   * space, and that is no difference. The other way round is one: a non-breaking space of the
+   * text must still be a non-breaking space in the field, or the Prompt is not Verbatim.
+   */
   private static _sameText(held: string, text: string): boolean {
-    const spaces = (value: string): string => value.replace(/\u00a0/g, ' ');
-    return spaces(held) === spaces(text);
+    if (held.length !== text.length) {
+      return false;
+    }
+    for (let index = 0; index < text.length; index++) {
+      const wanted = text[index];
+      const found = held[index];
+      if (found !== wanted && !(wanted === ' ' && found === '\u00a0')) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /**
