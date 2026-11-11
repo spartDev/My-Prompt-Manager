@@ -1023,6 +1023,12 @@ the elements already there, so their entrance does not replay.
 `MOTION.savedPause` (620ms) the editor closes with `animate-sheet-out` and the Notification appears
 with it. The Notification has no exit animation: it leaves at once.
 
+**Focus while a sheet rises:** a panel that takes the keyboard as it mounts (the editor's Title) does it
+with `focus({ preventScroll: true })`. The sheet starts a full panel height below the surface, and a
+plain `focus()` scrolls the nearest scroll container to reach the field: the side panel's `#root`
+(`overflow: hidden`) scrolls the whole app up at the first frame, so the sheet seems already risen
+and the Library never recedes in place. `tests/e2e/sidepanel/editor-motion.spec.ts` guards it.
+
 **Reduced motion:** under `prefers-reduced-motion`, `src/popup.css` makes every animation and
 transition above last 1ms with no delay (an inline stagger delay included), and `motionDuration()` of `src/theme/motion.ts` makes the timers wait
 for nothing: the Save sequence keeps its order without its pause, a panel unmounts at once, and the
