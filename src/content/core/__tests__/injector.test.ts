@@ -403,6 +403,27 @@ describe('PromptLibraryInjector', () => {
         expect(selector().close).not.toHaveBeenCalled();
         press('a');
         expect(selector().close).toHaveBeenCalledWith(false);
+
+        // A click on another field, a paste from the context menu in this one: no key, same result
+        const elsewhere = document.createElement('input');
+        document.body.appendChild(elsewhere);
+        for (const [type, target] of [['pointerdown', elsewhere], ['paste', mockTextarea], ['compositionstart', mockTextarea]] as const) {
+          selector().close.mockClear();
+          const action = new Event(type, { bubbles: true, composed: true });
+          Object.defineProperty(action, 'isTrusted', { value: true });
+          target.dispatchEvent(action);
+          expect(selector().close, type).toHaveBeenCalledWith(false);
+        }
+
+        // A paste in another field is not a click, and is not in this field: the opening stays
+        selector().close.mockClear();
+        const paste = new Event('paste', { bubbles: true, composed: true });
+        Object.defineProperty(paste, 'isTrusted', { value: true });
+        elsewhere.dispatchEvent(paste);
+        expect(selector().close).not.toHaveBeenCalled();
+        // And what a script sends is not the user
+        mockTextarea.dispatchEvent(new Event('paste', { bubbles: true, composed: true }));
+        expect(selector().close).not.toHaveBeenCalled();
       });
 
       it('leaves an open selector alone: once it shows, the keys typed are its own', async () => {

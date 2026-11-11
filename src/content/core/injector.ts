@@ -296,19 +296,32 @@ export class PromptLibraryInjector {
 
   /**
    * Opens the Prompt selector after a typed `//`. Reading the Library, and React the first time,
-   * can take a moment: a user who goes on typing in the field meanwhile wants their text, not a
-   * selector that takes the focus from under their fingers, so the opening is then dropped.
+   * can take a moment: a user who goes on typing in the field meanwhile, or clicks elsewhere,
+   * wants their text or that other field, not a selector that takes the focus from them, so the
+   * opening is then dropped.
    */
   private openFromTyping(field: HTMLElement): void {
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.isTrusted && !MODIFIER_KEYS.has(event.key) && event.composedPath().includes(field)) {
-        debug('Typing went on while the prompt selector was loading, opening dropped');
+    // A key, a paste, a drop or a composed character in the field, or a click anywhere (another
+    // field takes the focus): the user's own actions only, which are trusted events
+    const onUserAction = (event: Event): void => {
+      if (!event.isTrusted || (event instanceof KeyboardEvent && MODIFIER_KEYS.has(event.key))) {
+        return;
+      }
+      if (event.type === 'pointerdown' || event.composedPath().includes(field)) {
+        debug('The user went on while the prompt selector was loading, opening dropped', { action: event.type });
         this.selector.close(false);
       }
     };
-    const stop = (): void => { document.removeEventListener('keydown', onKeyDown, true); };
-    document.addEventListener('keydown', onKeyDown, true);
-    // Once the selector shows, its own keys are its own: the listener goes
+    const actions = ['keydown', 'paste', 'drop', 'compositionstart', 'pointerdown'] as const;
+    const stop = (): void => {
+      for (const type of actions) {
+        document.removeEventListener(type, onUserAction, true);
+      }
+    };
+    for (const type of actions) {
+      document.addEventListener(type, onUserAction, true);
+    }
+    // Once the selector shows, what the user does is its own business: the listeners go
     this.selector.open(field, this.state.icon).then(stop, stop);
   }
 
