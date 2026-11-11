@@ -393,21 +393,32 @@ describe('PromptLibraryInjector', () => {
         expect(fresh.value).toBe('Draft ');
       });
 
-      it('opens nothing for a // typed in a field the Platform does not name', async () => {
+      it('opens nothing for a // typed in another field of the page while the detected one is there', async () => {
         await injector.initialize();
         await new Promise(resolve => setTimeout(resolve, 50));
+        // A search box: the Platform's selectors name every textarea, but the input field is in the page
         const search = document.createElement('textarea');
-        const wrapper = document.createElement('section');
-        wrapper.appendChild(search);
-        document.body.appendChild(wrapper);
-        const manager = await platformManager();
-        manager.getAllSelectors.mockReturnValue(['div[contenteditable="true"]']);
+        document.body.appendChild(search);
         (injector as any).state.currentTextarea = mockTextarea;
 
         const open = await typeSlashes(search);
 
         expect(open).not.toHaveBeenCalled();
         expect(search.value).toBe('Draft //');
+      });
+
+      it('opens nothing, once the detected field is gone, for a // typed in a field the Platform does not name', async () => {
+        await injector.initialize();
+        await new Promise(resolve => setTimeout(resolve, 50));
+        const other = document.createElement('textarea');
+        document.body.appendChild(other);
+        (await platformManager()).getAllSelectors.mockReturnValue(['div[contenteditable="true"]']);
+        (injector as any).state.currentTextarea = document.createElement('textarea');
+
+        const open = await typeSlashes(other);
+
+        expect(open).not.toHaveBeenCalled();
+        expect(other.value).toBe('Draft //');
       });
     });
 

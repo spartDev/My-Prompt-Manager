@@ -295,15 +295,17 @@ export class PromptLibraryInjector {
   }
 
   /**
-   * The input field a `/` was typed in: the one the Prompts button was placed for, or, when the
-   * Platform has just replaced its input field and the new one is not detected yet, the element
-   * on the event's path that the Platform's selectors name.
+   * The input field a `/` was typed in: the one the Prompts button was placed for. Only when that
+   * one is out of the page (the Platform has just replaced its input field and the new one is not
+   * detected yet) is it the element on the event's path that the Platform's selectors name.
    */
   private triggerField(event: Event): HTMLElement | null {
     const path = event.composedPath();
     const current = this.state.currentTextarea;
-    if (current?.isConnected && path.includes(current)) {
-      return current;
+    if (current?.isConnected) {
+      // The detected field is in the page: a // typed anywhere else (a search box, a rename
+      // field) is not for the Prompt selector
+      return path.includes(current) ? current : null;
     }
     const selectors = this.platformManager.getAllSelectors();
     for (const node of path) {
