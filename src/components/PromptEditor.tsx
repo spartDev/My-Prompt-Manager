@@ -1,11 +1,11 @@
 import type { FC } from 'react';
-import { useActionState, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useActionState, useEffect, useId, useRef, useState } from 'react';
 
 import { formatCharacterCount } from '../constants/validation';
+import { useLookalike } from '../hooks/useLookalike';
 import { PROMPT_LIMITS } from '../services/promptAdmission';
-import { findLookalike } from '../services/promptLookalike';
 import { MOTION, motionDuration } from '../theme/motion';
-import { DEFAULT_CATEGORY } from '../types';
+import { DEFAULT_CATEGORY, type Prompt } from '../types';
 import type { PromptEditorProps } from '../types/components';
 import { type FieldErrors, Logger, toError, validatePromptFields } from '../utils';
 import { cn } from '../utils/cn';
@@ -19,8 +19,8 @@ import VariableTextarea from './editor/VariableTextarea';
 
 type EditorMode = 'write' | 'import';
 
-/** The pause in typing after which the text is compared with the Library (This looks familiar) */
-const LOOKALIKE_PAUSE_MS = 400;
+/** No Library given: one array, so the Lookalike search is not restarted at each render */
+const NO_PROMPTS: readonly Prompt[] = [];
 
 /** Share of a limit from which the counter shows the limit too */
 const NEAR_LIMIT = 0.9;
@@ -47,7 +47,7 @@ const CheckIcon: FC = () => (
 const PromptEditor: FC<PromptEditorProps> = ({
   prompt,
   categories,
-  library = [],
+  library = NO_PROMPTS,
   onSubmit,
   onClose,
   onDelete,
@@ -199,16 +199,8 @@ const PromptEditor: FC<PromptEditorProps> = ({
     setMode(next);
   };
 
-  // Compared once typing pauses, not at each keystroke: a long text against a large Library is not free
-  const [pausedContent, setPausedContent] = useState(content);
-  useEffect(() => {
-    const timer = setTimeout(() => { setPausedContent(content); }, LOOKALIKE_PAUSE_MS);
-    return () => { clearTimeout(timer); };
-  }, [content]);
-  const lookalike = useMemo(
-    () => (keepBoth ? null : findLookalike(pausedContent, library, prompt?.id)),
-    [keepBoth, pausedContent, library, prompt?.id]
-  );
+  const found = useLookalike(content, library, prompt?.id);
+  const lookalike = keepBoth ? null : found;
 
   const variables = extractVariables(content);
   const titleNearLimit = title.length >= PROMPT_LIMITS.title * NEAR_LIMIT;
@@ -377,7 +369,7 @@ const PromptEditor: FC<PromptEditorProps> = ({
               {lookalike && (
                 <LookalikeCallout
                   lookalike={lookalike}
-                  yours={pausedContent}
+                  yours={content}
                   onKeepBoth={() => { setKeepBoth(true); }}
                   disabled={locked}
                 />

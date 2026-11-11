@@ -65,6 +65,16 @@ describe('findLookalike', () => {
       expect(findLookalike(longest, [same])).toEqual({ prompt: same, similarity: 1 });
     });
 
+    it('does not take two long texts that start alike but end differently for alike', () => {
+      const sameStart = `${longest.slice(0, PROMPT_LIMITS.content / 2)}${'Another ending entirely. '.repeat(PROMPT_LIMITS.content).slice(0, PROMPT_LIMITS.content / 2)}`;
+
+      expect(findLookalike(longest, [libraryPrompt('a', 'Same start', sameStart)])).toBeNull();
+    });
+
+    it('does not take a long text for alike a much shorter Prompt it starts with', () => {
+      expect(findLookalike(longest, [libraryPrompt('a', 'Start only', longest.slice(0, 2000))])).toBeNull();
+    });
+
     it('never compares more than the start of each text, so the Library is searched in bounded work', () => {
       vi.mocked(calculateSimilarityOptimized).mockClear();
       const library = Array.from({ length: 20 }, (_, i) => libraryPrompt(`p${String(i)}`, `P${String(i)}`, `${String(i)}${longest}`.slice(0, PROMPT_LIMITS.content)));
