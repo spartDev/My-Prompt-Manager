@@ -153,6 +153,10 @@ const PromptEditor: FC<PromptEditorProps> = ({
   }, [saved]);
 
   const locked = isPending || saved;
+  // Nothing to point out once dismissed, while saving (the Library then holds this very Prompt) and
+  // while a Share code is imported instead
+  const found = useLookalike(content, library, prompt?.id);
+  const lookalike = keepBoth || locked || isImport ? null : found;
   const saveBlocked = isImport && (!shareCode.decoded || !!shareCode.error || shareCode.validating);
 
   const requestClose = () => {
@@ -199,8 +203,6 @@ const PromptEditor: FC<PromptEditorProps> = ({
     setMode(next);
   };
 
-  const found = useLookalike(content, library, prompt?.id);
-  const lookalike = keepBoth ? null : found;
 
   const variables = extractVariables(content);
   const titleNearLimit = title.length >= PROMPT_LIMITS.title * NEAR_LIMIT;

@@ -708,4 +708,35 @@ describe('PromptEditor - a Prompt that looks familiar', () => {
       expect(props.onSubmit).toHaveBeenCalledWith({ title: 'Mine', content: SIXTY_PERCENT_LIKE, category: 'Uncategorized' });
     });
   });
+
+  /** Longer than the pause after which the text is compared */
+  const pastThePause = () => new Promise(resolve => { setTimeout(resolve, 600); });
+  const announcement = (container: HTMLElement) => container.querySelector('[data-testid="lookalike-announcement"]');
+
+  it('never points out the Prompt just saved, which the Library now holds', async () => {
+    const saved: Prompt = { ...summarize, id: 'new', title: 'Mine', content: SIXTY_PERCENT_LIKE };
+    let rerenderWith: ((library: Prompt[]) => void) | undefined;
+    const onSubmit = vi.fn(() => { rerenderWith?.([saved]); });
+    const { container, rerender, props } = renderEditor({ library: [], onSubmit });
+    rerenderWith = (library) => { rerender(<PromptEditor {...props} library={library} />); };
+    await userEvent.type(title(), 'Mine');
+    await typeContent(SIXTY_PERCENT_LIKE);
+
+    await userEvent.click(save());
+    await screen.findByRole('button', { name: 'Saved' });
+    await pastThePause();
+
+    expect(callout()).not.toBeInTheDocument();
+    expect(announcement(container)).toBeEmptyDOMElement();
+  });
+
+  it('says nothing about the text written once the editor turns to a Share code', async () => {
+    const { container } = renderEditor({ library: [summarize] });
+    await typeContent(SIXTY_PERCENT_LIKE);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Paste a Share code' }));
+    await pastThePause();
+
+    expect(announcement(container)).toBeEmptyDOMElement();
+  });
 });
