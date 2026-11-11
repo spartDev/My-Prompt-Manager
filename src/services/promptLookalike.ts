@@ -11,7 +11,7 @@ export const LOOKALIKE_MIN_LENGTH = 21;
 /**
  * The most of each text that is compared. The comparison costs the product of the two lengths, so
  * whole texts at Admission's limit would freeze typing for seconds: a longer text is compared on its
- * start and its end, and what that finds is scaled by how far the two lengths differ
+ * start and its end, and what that finds is capped by the ratio of the two lengths
  */
 export const LOOKALIKE_COMPARED_LENGTH = 1000;
 
@@ -30,7 +30,7 @@ const sample = (text: string): string =>
 /**
  * How alike two texts are, 0 to 1, or -1 when below LOOKALIKE_THRESHOLD. Two texts can be no more
  * alike than the shorter's length over the longer's, so texts whose lengths differ that much are
- * never compared; a text cut to its start and its end is scaled by that ratio.
+ * never compared, and the start and end a long text is cut to are no more alike than that ratio.
  */
 export function lookalikeSimilarity(content: string, other: string): number {
   if (content === other) { return 1; }
@@ -40,8 +40,9 @@ export function lookalikeSimilarity(content: string, other: string): number {
   if (longer <= LOOKALIKE_COMPARED_LENGTH) {
     return calculateSimilarityOptimized(content, other, LOOKALIKE_THRESHOLD);
   }
-  const sampled = calculateSimilarityOptimized(sample(content), sample(other), LOOKALIKE_THRESHOLD / lengthRatio);
-  return sampled < 0 ? -1 : sampled * lengthRatio;
+  // The samples already show part of the length difference: the ratio caps the result, not scales it
+  const sampled = calculateSimilarityOptimized(sample(content), sample(other), LOOKALIKE_THRESHOLD);
+  return sampled < 0 ? -1 : Math.min(sampled, lengthRatio);
 }
 
 /**

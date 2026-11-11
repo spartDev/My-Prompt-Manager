@@ -71,6 +71,13 @@ describe('findLookalike', () => {
       expect(findLookalike(longest, [libraryPrompt('a', 'Same start', sameStart)])).toBeNull();
     });
 
+    it('finds a Prompt that is a long text with more appended, without counting the length difference twice', () => {
+      // 1,000 of 1,400 characters alike: 71%
+      const existing = libraryPrompt('a', 'Shorter', 'a'.repeat(1000));
+
+      expect(findLookalike(`${'a'.repeat(1000)}${'b'.repeat(400)}`, [existing])?.prompt).toBe(existing);
+    });
+
     it('does not take a long text for alike a much shorter Prompt it starts with', () => {
       expect(findLookalike(longest, [libraryPrompt('a', 'Start only', longest.slice(0, 2000))])).toBeNull();
     });
