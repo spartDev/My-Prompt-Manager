@@ -28,6 +28,9 @@ import { expect } from './extension';
  * (seen on 2026-11-11): a ProseMirror editor, which holds one <p> per line and reads a line
  * break written straight into its DOM as a space. See PARAGRAPH_EDITOR.
  *
+ * One more stands in for Perplexity's live composer, a Lexical editor that takes text as a paste
+ * and inserts a second time the text an `input` event carries. See LEXICAL_EDITOR.
+ *
  * Every page counts the Enter keys that reach it, other than on a button, in
  * `window.__enterKeys`: the live sites send the message on Enter, so a test can prove a key
  * pressed in the Prompt selector never got that far.
@@ -219,8 +222,90 @@ const MISTRAL_EDITOR_HTML = paragraphEditorPage(
   '<div class="bar flex w-full max-w-full items-center justify-start gap-3"><button type="button">Tools</button><div class="flex ms-auto"><button type="button">Send</button></div></div>'
 );
 
-/** The stand-ins for the live ProseMirror composers of ChatGPT and Mistral (see PARAGRAPH_EDITOR). */
-export type EditorFixture = 'chatgpt-editor' | 'mistral-editor';
+/**
+ * What Perplexity's Lexical composer does with what an Insertion can send it (seen on the live
+ * site on 2026-11-11). The editor keeps its own text and draws it: one <span> per line that has
+ * text, one <br> between two lines, and a last <br> that keeps an empty last line open.
+ * - A paste goes over the selection the editor knows of. It learns of a selection from the
+ *   `selectionchange` event, and only one that runs from the start of its paragraph to its end
+ *   covers the line breaks that end the field; any other paste lands after the text.
+ * - Text from the editing command arrives with its line breaks dropped.
+ * - An `input` event that carries text inserts that text again, after what the field holds.
+ * - A Backspace key removes the last character.
+ */
+const LEXICAL_EDITOR = /* html */ `
+    <script>
+      const editor = document.querySelector('#ask-input');
+      let text = '';
+      let allSelected = false;
+      const draw = () => {
+        const paragraph = document.createElement('p');
+        if (text === '') {
+          paragraph.append(document.createElement('br'));
+        } else {
+          const lines = text.split('\\n');
+          lines.forEach((line, index) => {
+            if (line !== '') {
+              const span = document.createElement('span');
+              span.textContent = line;
+              paragraph.append(span);
+            }
+            if (index < lines.length - 1) { paragraph.append(document.createElement('br')); }
+          });
+          if (lines.length > 1 && lines[lines.length - 1] === '') { paragraph.append(document.createElement('br')); }
+        }
+        editor.replaceChildren(paragraph);
+        allSelected = false;
+      };
+      document.addEventListener('selectionchange', () => {
+        const selection = document.getSelection();
+        const paragraph = editor.querySelector('p');
+        const range = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+        allSelected = range !== null && paragraph !== null
+          && range.startContainer === paragraph && range.startOffset === 0
+          && range.endContainer === paragraph && range.endOffset === paragraph.childNodes.length;
+      });
+      editor.addEventListener('paste', (event) => {
+        event.preventDefault();
+        const pasted = event.clipboardData.getData('text/plain');
+        text = allSelected ? pasted : text + pasted;
+        draw();
+      });
+      editor.addEventListener('beforeinput', (event) => {
+        event.preventDefault();
+        if (event.inputType === 'insertText' && event.data) {
+          const typed = event.data.replace(/\\n/g, '');
+          text = allSelected ? typed : text + typed;
+          draw();
+        }
+      });
+      editor.addEventListener('input', (event) => {
+        if (typeof event.data === 'string' && event.data !== '') {
+          text += event.data;
+          draw();
+        }
+      });
+      editor.addEventListener('keydown', (event) => {
+        if (event.key === 'Backspace') {
+          event.preventDefault();
+          text = text.slice(0, -1);
+          draw();
+        }
+      });
+      draw();
+    </script>`;
+
+const PERPLEXITY_EDITOR_HTML = plainPage(
+  'Perplexity',
+  '<div class="field" id="ask-input" data-lexical-editor="true" contenteditable="true" role="textbox" aria-label="Ask anything"></div>',
+  '<div class="bar flex items-center justify-self-end col-start-3 row-start-2"><button type="button">Voice</button></div>'
+).replace('</body>', `${LEXICAL_EDITOR}\n  </body>`);
+
+/**
+ * The stand-ins for the live composers that are rich text editors: ProseMirror on ChatGPT and
+ * Mistral (see PARAGRAPH_EDITOR), Lexical on Perplexity (see LEXICAL_EDITOR).
+ */
+export type EditorFixture = 'chatgpt-editor' | 'mistral-editor' | 'perplexity-editor';
 
 export const EDITOR_FIXTURES: readonly EditorFixture[] = ['chatgpt-editor', 'mistral-editor'];
 
@@ -238,6 +323,7 @@ export const PLATFORM_FIELD: Record<PlatformFixture, string> = {
 const FIXTURES: Record<PlatformFixture | EditorFixture, { url: string; html: string }> = {
   'chatgpt-editor': { url: 'https://chatgpt.com/', html: CHATGPT_EDITOR_HTML },
   'mistral-editor': { url: 'https://chat.mistral.ai/', html: MISTRAL_EDITOR_HTML },
+  'perplexity-editor': { url: 'https://www.perplexity.ai/', html: PERPLEXITY_EDITOR_HTML },
   chatgpt: { url: 'https://chatgpt.com/', html: CHATGPT_REACT_HTML },
   claude: { url: 'https://claude.ai/', html: CLAUDE_EDITOR_HTML },
   mistral: { url: 'https://chat.mistral.ai/', html: MISTRAL_HTML },
