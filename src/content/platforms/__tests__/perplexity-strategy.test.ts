@@ -4,7 +4,10 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { editorCommand, MULTILINE_PROMPT } from '../../../test/helpers/editor-command';
 import { expectNoMarkupIn, HOSTILE_TEXTS } from '../../../test/helpers/hostile-text';
+import { actAsLexicalEditor } from '../../../test/helpers/lexical-editor';
+import { readInputText } from '../../selector/inputText';
 import type { UIElementFactory } from '../../ui/element-factory';
 import { PerplexityStrategy } from '../perplexity-strategy';
 
@@ -97,203 +100,213 @@ describe('PerplexityStrategy', () => {
     });
   });
 
-  describe('insert', () => {
+  describe('insert - into the Lexical editor', () => {
+    let editor: HTMLElement;
+
     beforeEach(() => {
-      // Mock DOM methods
-      vi.spyOn(mockContentEditableDiv, 'focus').mockImplementation(() => {});
-      vi.spyOn(mockContentEditableDiv, 'dispatchEvent').mockImplementation(() => true);
-      vi.spyOn(mockTextarea, 'focus').mockImplementation(() => {});
-      vi.spyOn(mockTextarea, 'dispatchEvent').mockImplementation(() => true);
+      editor = mockContentEditableDiv;
+      editor.setAttribute('contenteditable', 'true');
+      document.body.appendChild(editor);
+      document.execCommand = vi.fn(actAsLexicalEditor(editor));
     });
 
-    it('should insert content into contenteditable div', async () => {
-      const result = await strategy.insert(mockContentEditableDiv, 'test content');
-      
-      expect(result.success).toBe(true);
-      expect(result.method).toBe('perplexity-selection');
-      expect(mockContentEditableDiv.textContent).toBe('test content');
-      expect(mockContentEditableDiv.focus).toHaveBeenCalled();
+    afterEach(() => {
+      editor.remove();
     });
 
-    it('should insert content into textarea', async () => {
-      const result = await strategy.insert(mockTextarea, 'test content');
-      
-      expect(result.success).toBe(true);
-      expect(result.method).toBe('perplexity-selection');
-      expect(mockTextarea.value).toBe('test content');
-      expect(mockTextarea.focus).toHaveBeenCalled();
+    it('puts the Prompt in once', async () => {
+      const result = await strategy.insert(editor, MULTILINE_PROMPT);
+
+      expect(result).toEqual({ success: true, method: 'perplexity-paste' });
+      expect(readInputText(editor)).toBe(MULTILINE_PROMPT);
     });
 
-    it('should dispatch comprehensive event set', async () => {
-      await strategy.insert(mockContentEditableDiv, 'test content');
-      
-      const expectedEvents = ['input', 'change', 'keyup', 'compositionend', 'blur', 'focus'];
-      expectedEvents.forEach(eventType => {
-        expect(mockContentEditableDiv.dispatchEvent).toHaveBeenCalledWith(
-          expect.objectContaining({
-            type: eventType,
-            bubbles: true
-          })
-        );
+    it('sends no input event carrying the text, which the editor would insert a second time', async () => {
+      const heard: string[] = [];
+      editor.addEventListener('input', (event) => {
+        heard.push(String((event as InputEvent).data));
       });
+
+      await strategy.insert(editor, 'one line');
+
+      expect(heard).toEqual([]);
+      expect(editor.textContent).toBe('one line');
     });
 
-    it('should handle errors gracefully', async () => {
-      vi.spyOn(mockContentEditableDiv, 'focus').mockImplementation(() => {
-        throw new Error('Focus failed');
+    it('does not use the editing command, which drops the line breaks', async () => {
+      await strategy.insert(editor, MULTILINE_PROMPT);
+
+      expect(document.execCommand).not.toHaveBeenCalledWith('insertText', false, expect.anything());
+    });
+
+    it('keeps each line of the Prompt, one <br> between two', async () => {
+      await strategy.insert(editor, MULTILINE_PROMPT);
+
+      expect(Array.from(editor.querySelectorAll('span')).map((span) => span.textContent)).toEqual([
+        '  You are a reviewer.', 'End with a verdict.', 'Diff:'
+      ]);
+      expect(editor.querySelectorAll('br')).toHaveLength(5);
+    });
+
+    it('replaces what the field held, the line breaks that ended it included', async () => {
+      await strategy.insert(editor, 'draft\n\n\n');
+
+      await strategy.insert(editor, 'one line');
+
+      expect(readInputText(editor)).toBe('one line');
+      expect(editor.querySelectorAll('br')).toHaveLength(0);
+    });
+
+    it('selects from the start of the first block to the end of the last one before pasting', async () => {
+      await strategy.insert(editor, 'draft\n\n');
+      const paragraph = editor.querySelector('p') as HTMLElement;
+      let selected: { start: Node; startOffset: number; end: Node; endOffset: number } | undefined;
+      editor.addEventListener('paste', () => {
+        const range = document.getSelection()?.getRangeAt(0);
+        if (range) {
+          selected = { start: range.startContainer, startOffset: range.startOffset, end: range.endContainer, endOffset: range.endOffset };
+        }
+      }, { capture: true });
+
+      await strategy.insert(editor, 'one line');
+
+      expect(selected).toEqual({ start: paragraph, startOffset: 0, end: paragraph, endOffset: 4 });
+    });
+
+    it('fails, and writes nothing more, when the editor took the paste but holds another text', async () => {
+      editor.addEventListener('paste', () => {
+        editor.querySelector('p')?.append('!');
       });
-      
-      const result = await strategy.insert(mockContentEditableDiv, 'test content');
-      
+
+      const result = await strategy.insert(editor, 'one line');
+
       expect(result.success).toBe(false);
-      expect(result.error).toBe('Focus failed');
+      expect(editor.textContent).toBe('one line!');
+      expect(document.execCommand).not.toHaveBeenCalledWith('insertText', false, expect.anything());
     });
 
-    it('should log debug message on successful insertion', async () => {
-      const Logger = await import('../../utils/logger');
-      
-      await strategy.insert(mockContentEditableDiv, 'test content');
-      
-      expect(Logger.debug).toHaveBeenCalledWith('[perplexity] Perplexity selection replacement successful', {});
-    });
+    it('empties the field with one pasted character and a Backspace, not with the delete command', async () => {
+      await strategy.insert(editor, MULTILINE_PROMPT);
 
-    it('should log error message on failed insertion', async () => {
-      const Logger = await import('../../utils/logger');
-      const error = new Error('Test error');
-      
-      vi.spyOn(mockContentEditableDiv, 'focus').mockImplementation(() => {
-        throw error;
-      });
-      
-      await strategy.insert(mockContentEditableDiv, 'test content');
-      
-      expect(Logger.error).toHaveBeenCalledWith('[perplexity] Perplexity insertion failed', error, {});
-    });
-  });
+      const result = await strategy.insert(editor, '');
 
-  describe('Perplexity-specific behavior', () => {
-    it('should handle both contenteditable and textarea elements', async () => {
-      // Test contenteditable
-      const contentEditableResult = await strategy.insert(mockContentEditableDiv, 'content 1');
-      expect(contentEditableResult.success).toBe(true);
-      expect(mockContentEditableDiv.textContent).toBe('content 1');
-      
-      // Test textarea
-      const textareaResult = await strategy.insert(mockTextarea, 'content 2');
-      expect(textareaResult.success).toBe(true);
-      expect(mockTextarea.value).toBe('content 2');
-    });
-
-    it('should only handle elements on www.perplexity.ai domain', () => {
-      // Reset hostname to www.perplexity.ai for this test
-      mockLocation.hostname = 'www.perplexity.ai';
-      const perplexityStrategy = new PerplexityStrategy();
-      expect(perplexityStrategy.canHandle(mockContentEditableDiv)).toBe(true);
-      
-      // Change hostname
-      mockLocation.hostname = 'claude.ai';
-      const newStrategy = new PerplexityStrategy();
-      expect(newStrategy.canHandle(mockContentEditableDiv)).toBe(false);
-      
-      // Reset for other tests
-      mockLocation.hostname = 'www.perplexity.ai';
-    });
-
-    it('should trigger all required events for Perplexity', async () => {
-      const eventSpy = vi.spyOn(mockContentEditableDiv, 'dispatchEvent');
-
-      await strategy.insert(mockContentEditableDiv, 'test content');
-
-      // Check that all expected events were dispatched
-      const calls = eventSpy.mock.calls;
-      const eventTypes = calls.map(call => call[0].type);
-
-      expect(eventTypes).toContain('input');
-      expect(eventTypes).toContain('change');
-      expect(eventTypes).toContain('keyup');
-      expect(eventTypes).toContain('compositionend');
-      expect(calls.length).toBeGreaterThanOrEqual(6); // At least 6 events (may vary by DOM implementation)
-    });
-
-    it('should handle elements without specific type gracefully', async () => {
-      const genericDiv = document.createElement('div');
-      vi.spyOn(genericDiv, 'focus').mockImplementation(() => {});
-      vi.spyOn(genericDiv, 'dispatchEvent').mockImplementation(() => true);
-      
-      const result = await strategy.insert(genericDiv, 'test content');
-      
       expect(result.success).toBe(true);
-      // Should set textContent as fallback method
-      expect(genericDiv.textContent).toBe('test content');
+      expect(readInputText(editor)).toBe('');
+      expect(document.execCommand).not.toHaveBeenCalledWith('delete');
+    });
+
+    it.each(HOSTILE_TEXTS)('inserts hostile-looking text %j as text', async (text) => {
+      await strategy.insert(editor, text);
+
+      expect(readInputText(editor)).toBe(text);
+      // Paragraph and span are the stand-in editor's own structure
+      expectNoMarkupIn(editor, ['p', 'span', 'br']);
     });
   });
 
-  describe('event handling', () => {
-    it('should create events with correct properties', async () => {
-      const eventSpy = vi.spyOn(mockContentEditableDiv, 'dispatchEvent');
-      
-      await strategy.insert(mockContentEditableDiv, 'test content');
-      
-      // Check that events have bubbles: true
-      eventSpy.mock.calls.forEach(call => {
-        const event = call[0];
-        expect(event.bubbles).toBe(true);
-      });
-    });
+  describe('restore - Undo in the Lexical editor', () => {
+    let editor: HTMLElement;
 
-    it('should dispatch events in correct order', async () => {
-      const eventSpy = vi.spyOn(mockContentEditableDiv, 'dispatchEvent');
-
-      await strategy.insert(mockContentEditableDiv, 'test content');
-
-      const eventTypes = eventSpy.mock.calls.map(call => call[0].type);
-      // Check that required events are present and maintain relative order (deduplicated)
-      const requiredEvents = ['input', 'change', 'keyup', 'compositionend', 'blur', 'focus'];
-      const filteredEvents = eventTypes.filter(type => requiredEvents.includes(type));
-      // Remove duplicates while preserving first occurrence order
-      const uniqueEvents = [...new Set(filteredEvents)];
-      expect(uniqueEvents).toEqual(requiredEvents);
-    });
-  });
-
-  describe.each(HOSTILE_TEXTS)('hostile-looking text %j', (text) => {
     beforeEach(() => {
-      vi.spyOn(mockContentEditableDiv, 'focus').mockImplementation(() => undefined);
-      vi.spyOn(mockContentEditableDiv, 'dispatchEvent').mockImplementation(() => true);
+      editor = mockContentEditableDiv;
+      editor.setAttribute('contenteditable', 'true');
+      document.body.appendChild(editor);
+      document.execCommand = vi.fn(actAsLexicalEditor(editor));
     });
 
-    it('goes to execCommand as the same text', async () => {
-      const execCommandSpy = vi.spyOn(document, 'execCommand').mockReturnValue(true);
-
-      const result = await strategy.insert(mockContentEditableDiv, text);
-
-      expect(result.method).toBe('perplexity-execCommand');
-      expect(execCommandSpy).toHaveBeenCalledWith('insertText', false, text);
-      expectNoMarkupIn(mockContentEditableDiv);
+    afterEach(() => {
+      editor.remove();
     });
 
-    it('is set as a text node when the editor is filled by replacing its selection', async () => {
-      vi.spyOn(document, 'execCommand').mockReturnValue(false);
+    it('puts a draft of several lines back, line for line', async () => {
+      await strategy.insert(editor, MULTILINE_PROMPT);
 
-      const result = await strategy.insert(mockContentEditableDiv, text);
+      const result = await strategy.restore(editor, 'my draft\n\nsecond paragraph');
 
-      expect(result.method).toBe('perplexity-selection');
-      expect(mockContentEditableDiv.textContent).toBe(text);
-      expectNoMarkupIn(mockContentEditableDiv);
+      expect(result).toEqual({ success: true, method: 'restore-paste' });
+      expect(readInputText(editor)).toBe('my draft\n\nsecond paragraph');
     });
 
-    it('is set as the text of the editor when it is filled directly', async () => {
-      vi.spyOn(document, 'execCommand').mockReturnValue(false);
-      // The selection is only used by the first two methods; making it fail leaves the direct one
-      vi.spyOn(window, 'getSelection').mockImplementation(() => {
-        throw new Error('No selection');
+    it('empties the field when it held nothing before the Insertion', async () => {
+      await strategy.insert(editor, MULTILINE_PROMPT);
+
+      const result = await strategy.restore(editor, '');
+
+      expect(result.success).toBe(true);
+      expect(readInputText(editor)).toBe('');
+      expect(document.execCommand).not.toHaveBeenCalledWith('delete');
+    });
+
+    it('touches nothing when the field already holds the text', async () => {
+      await strategy.insert(editor, 'one line');
+      const pasted = vi.fn();
+      editor.addEventListener('paste', pasted);
+
+      const result = await strategy.restore(editor, 'one line');
+
+      expect(result).toEqual({ success: true, method: 'restore-unchanged' });
+      expect(pasted).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('insert - where nothing takes a paste', () => {
+    it('goes through the editing command in a plain contenteditable', async () => {
+      const plain = document.createElement('div');
+      plain.setAttribute('contenteditable', 'true');
+      document.body.appendChild(plain);
+      document.execCommand = editorCommand(plain);
+
+      const result = await strategy.insert(plain, MULTILINE_PROMPT);
+
+      expect(result).toEqual({ success: true, method: 'perplexity-execCommand' });
+      expect(readInputText(plain)).toBe(MULTILINE_PROMPT);
+      plain.remove();
+    });
+
+    it('writes the lines itself when there is no editing command either', async () => {
+      const plain = document.createElement('div');
+      plain.setAttribute('contenteditable', 'true');
+      document.body.appendChild(plain);
+      document.execCommand = vi.fn().mockReturnValue(false);
+
+      const result = await strategy.insert(plain, MULTILINE_PROMPT);
+
+      expect(result).toEqual({ success: true, method: 'perplexity-dom' });
+      expect(readInputText(plain)).toBe(MULTILINE_PROMPT);
+      plain.remove();
+    });
+
+    it('sets the value of a textarea and tells the page', async () => {
+      const heard = vi.fn();
+      mockTextarea.addEventListener('input', heard);
+      mockTextarea.addEventListener('change', heard);
+
+      const result = await strategy.insert(mockTextarea, MULTILINE_PROMPT);
+
+      expect(result).toEqual({ success: true, method: 'perplexity-value' });
+      expect(mockTextarea.value).toBe(MULTILINE_PROMPT);
+      expect(heard).toHaveBeenCalledTimes(2);
+    });
+
+    it('fails on an element that holds no editable text', async () => {
+      const result = await strategy.insert(document.createElement('div'), 'test content');
+
+      expect(result.success).toBe(false);
+    });
+
+    it('fails without throwing when the page throws', async () => {
+      const plain = document.createElement('div');
+      plain.setAttribute('contenteditable', 'true');
+      document.body.appendChild(plain);
+      document.execCommand = vi.fn(() => {
+        throw new Error('editor broke');
       });
 
-      const result = await strategy.insert(mockContentEditableDiv, text);
+      const result = await strategy.insert(plain, 'test content');
 
-      expect(result.method).toBe('perplexity-direct');
-      expect(mockContentEditableDiv.textContent).toBe(text);
-      expectNoMarkupIn(mockContentEditableDiv);
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('editor broke');
+      plain.remove();
     });
   });
 });
