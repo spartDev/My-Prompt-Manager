@@ -100,12 +100,23 @@ describe('Prompt selector stylesheet: motion', () => {
     expect(css).toContain('from { opacity: 0; transform: translateX(26px); }');
   });
 
+  it('confirms an Insertion with a 450ms spring on the pill and one 1.1s sweep on the sheet curve', () => {
+    expect(DURATION).toMatchObject({ inserted: 450, sweep: 1100, insertedStay: 2800 });
+    expect(css).toContain(`animation: mpm-inserted 450ms ${EASE.spring} both`);
+    expect(css).toContain('from { opacity: 0; transform: translateY(-14px) scale(0.9); }');
+    expect(css).toContain(`animation: mpm-sweep 1100ms ${EASE.sheet} both`);
+    expect(css).toContain('from { background-position: 120% 0; opacity: 1; }');
+    expect(css).toContain('to { background-position: -20% 0; opacity: 0; }');
+    // The sweep is drawn over the Platform's input field: it must never take a click meant for it
+    expect(blockOf(css, '.mpm-sweep')).toContain('pointer-events: none');
+  });
+
   it('runs every animation and transition for 1ms under reduced motion', () => {
     const reduced = css.slice(css.indexOf('@media (prefers-reduced-motion: reduce)'));
 
     expect(reduced).toContain('animation-duration: 1ms');
     expect(reduced).toContain('transition-duration: 1ms');
-    for (const animated of ['.mpm-popover', '.mpm-row', '.mpm-fill']) {
+    for (const animated of ['.mpm-popover', '.mpm-row', '.mpm-fill', '.mpm-sweep', '.mpm-inserted']) {
       expect(reduced).toContain(animated);
     }
   });

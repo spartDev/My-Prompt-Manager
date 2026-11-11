@@ -5,6 +5,7 @@
  * Each platform must implement all abstract methods to ensure consistent behavior.
  */
 
+import { readInputText } from '../selector/inputText';
 import type { InsertionResult, PlatformConfig, PlatformStrategyInterface } from '../types/index';
 import type { UIElementFactory } from '../ui/element-factory';
 import { debug, error as logError, warn  } from '../utils/logger';
@@ -65,6 +66,89 @@ export abstract class PlatformStrategy implements PlatformStrategyInterface {
    * @abstract
    */
   abstract getSelectors(): string[];
+
+  /**
+   * Puts `text` back as the whole content of the input field: what Undo does after an Insertion.
+   * It replaces everything the field holds, whatever path the Insertion took (a strategy whose
+   * first path inserts at the caret still restores the whole field here), and tells the Platform
+   * through the events typing would send. Rich content comes back as plain text.
+   * @param element - The input field
+   * @param text - The plain text the field held before the Insertion
+   * @returns Result of the attempt
+   */
+  restore(element: HTMLElement, text: string): Promise<InsertionResult> {
+    try {
+      element.focus();
+
+      if (element instanceof HTMLTextAreaElement || element instanceof HTMLInputElement) {
+        const prototype = element instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+        // The native accessors, so a framework that tracks the value on the element (React) sees
+        // the change, and so what is read back is what the field really holds
+        const native = Object.getOwnPropertyDescriptor(prototype, 'value') as
+          | { get?: (this: HTMLElement) => string; set?: (this: HTMLElement, value: string) => void }
+          | undefined;
+        if (native?.set) {
+          native.set.call(element, text);
+        } else {
+          element.value = text;
+        }
+        element.dispatchEvent(new Event('input', { bubbles: true }));
+        element.dispatchEvent(new Event('change', { bubbles: true }));
+        // A page whose own handler rewrote the value did not take the text back
+        if ((native?.get ? native.get.call(element) : element.value) !== text) {
+          return Promise.resolve({ success: false, error: 'The input field did not keep the restored text' });
+        }
+        return Promise.resolve({ success: true, method: 'restore-value' });
+      }
+
+      if (element.isContentEditable || element.getAttribute('contenteditable') === 'true') {
+        if (readInputText(element) === text) {
+          return Promise.resolve({ success: true, method: 'restore-unchanged' });
+        }
+        const selection = element.ownerDocument.getSelection();
+        if (selection) {
+          const range = element.ownerDocument.createRange();
+          range.selectNodeContents(element);
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
+        const document = element.ownerDocument;
+        const edited = typeof document.execCommand === 'function'
+          && (text === '' ? document.execCommand('delete') : document.execCommand('insertText', false, text));
+        if (edited && readInputText(element) === text) {
+          return Promise.resolve({ success: true, method: 'restore-execCommand' });
+        }
+        // No editing command, or the editor laid the text out differently: write it directly,
+        // one <br> between two lines so the breaks show whatever the field does with spaces. A
+        // last line that is empty takes a second <br>, the one that keeps it open
+        const lines = text.split('\n');
+        const content = element.ownerDocument.createDocumentFragment();
+        lines.forEach((line, index) => {
+          if (line !== '') {
+            content.append(line);
+          }
+          if (index < lines.length - 1) {
+            content.append(element.ownerDocument.createElement('br'));
+          }
+        });
+        if (lines.length > 1 && lines[lines.length - 1] === '') {
+          content.append(element.ownerDocument.createElement('br'));
+        }
+        element.replaceChildren(content);
+        element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: text }));
+        // An editor whose own handler rebuilt its content did not take the text back
+        if (readInputText(element) !== text) {
+          return Promise.resolve({ success: false, error: 'The input field did not keep the restored text' });
+        }
+        return Promise.resolve({ success: true, method: 'restore-dom' });
+      }
+
+      return Promise.resolve({ success: false, error: 'The input field holds no editable text' });
+    } catch (error) {
+      this._error('Restoring the input field failed', error as Error);
+      return Promise.resolve({ success: false, error: (error as Error).message });
+    }
+  }
 
   /**
    * Gets the button container selector for icon placement (optional)

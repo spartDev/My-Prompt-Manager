@@ -11,6 +11,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { readInputText } from '../../selector/inputText';
 import type { InsertionResult, PlatformConfig } from '../../types/index';
 import type { UIElementFactory } from '../../ui/element-factory';
 import { PlatformStrategy } from '../base-strategy';
@@ -148,6 +149,119 @@ describe('PlatformStrategy', () => {
 
       // This test verifies the strategy can be instantiated without errors
       expect(() => new InvalidStrategy()).not.toThrow();
+    });
+  });
+
+  describe('restore: Undo after an Insertion', () => {
+    it('puts the text back in a textarea through the native setter, and tells the page', async () => {
+      const field = document.createElement('textarea');
+      document.body.append(field);
+      field.value = 'Inserted prompt';
+      // A framework that tracks the value (React) replaces the setter on the element
+      let tracked = 'Inserted prompt';
+      Object.defineProperty(field, 'value', {
+        configurable: true,
+        get: () => tracked,
+        set: (value: string) => { tracked = `tracked:${value}`; }
+      });
+      const heard: string[] = [];
+      field.addEventListener('input', () => heard.push('input'));
+      field.addEventListener('change', () => heard.push('change'));
+
+      const result = await new TestStrategy().restore(field, '  Draft\n');
+
+      expect(result).toEqual({ success: true, method: 'restore-value' });
+      Reflect.deleteProperty(field, 'value');
+      expect(field.value).toBe('  Draft\n');
+      expect(heard).toEqual(['input', 'change']);
+      field.remove();
+    });
+
+    it('fails when the page rewrites the value it was given', async () => {
+      const field = document.createElement('textarea');
+      field.value = 'Inserted prompt';
+      field.addEventListener('input', () => { field.value = field.value.trim(); });
+
+      const result = await new TestStrategy().restore(field, '  Draft  ');
+
+      expect(result.success).toBe(false);
+    });
+
+    it('empties a textarea that was empty before', async () => {
+      const field = document.createElement('textarea');
+      field.value = 'Inserted prompt';
+
+      await new TestStrategy().restore(field, '');
+
+      expect(field.value).toBe('');
+    });
+
+    it('replaces the whole content of a contenteditable with the plain text', async () => {
+      const field = document.createElement('div');
+      field.setAttribute('contenteditable', 'true');
+      field.innerHTML = '<p>Inserted <strong>prompt</strong></p><p>second line</p>';
+      document.body.append(field);
+      const heard: string[] = [];
+      field.addEventListener('input', () => heard.push('input'));
+
+      const result = await new TestStrategy().restore(field, 'Draft');
+
+      expect(result.success).toBe(true);
+      expect(field.textContent).toBe('Draft');
+      expect(heard).toEqual(['input']);
+      field.remove();
+    });
+
+    it.each([
+      ['First line\nSecond line', 'First line<br>Second line'],
+      ['First line\n\nThird line', 'First line<br><br>Third line'],
+      ['Ends with an empty line\n', 'Ends with an empty line<br><br>'],
+      ['\nStarts with an empty line', '<br>Starts with an empty line']
+    ])('restores the lines of %j in a contenteditable as line breaks, not as newlines in one text node', async (text, html) => {
+      const field = document.createElement('div');
+      field.setAttribute('contenteditable', 'true');
+      field.innerHTML = '<p>Inserted prompt</p>';
+      document.body.append(field);
+
+      const result = await new TestStrategy().restore(field, text);
+
+      expect(result.success).toBe(true);
+      expect(field.innerHTML).toBe(html);
+      expect(readInputText(field)).toBe(text);
+      field.remove();
+    });
+
+    it('fails when the editor of a contenteditable rebuilds its content on input', async () => {
+      const field = document.createElement('div');
+      field.setAttribute('contenteditable', 'true');
+      field.innerHTML = '<p>Inserted prompt</p>';
+      document.body.append(field);
+      // A controlled editor: its own state wins over what was written in the DOM
+      field.addEventListener('input', () => { field.innerHTML = '<p>Inserted prompt</p>'; });
+
+      const result = await new TestStrategy().restore(field, 'Draft');
+
+      expect(result.success).toBe(false);
+      field.remove();
+    });
+
+    it('leaves a contenteditable alone when it already holds the text', async () => {
+      const field = document.createElement('div');
+      field.setAttribute('contenteditable', 'true');
+      field.innerHTML = '<p>Draft</p>';
+      document.body.append(field);
+
+      const result = await new TestStrategy().restore(field, 'Draft');
+
+      expect(result).toEqual({ success: true, method: 'restore-unchanged' });
+      expect(field.innerHTML).toBe('<p>Draft</p>');
+      field.remove();
+    });
+
+    it('fails on an element that holds no editable text', async () => {
+      const result = await new TestStrategy().restore(document.createElement('div'), 'Draft');
+
+      expect(result.success).toBe(false);
     });
   });
 });

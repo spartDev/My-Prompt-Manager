@@ -59,7 +59,7 @@ A file containing a user's Library, exported so it can be restored or moved.
 An AI chat site the extension works on (for example Claude or ChatGPT).
 
 **Prompt selector**:
-The list a user opens inside a Platform, from the Prompts button shown in its input area, to choose a Prompt to insert. It lists All Prompts, the Pinned Prompts, the Recent Prompts, or the Prompts of one Category.
+The list a user opens inside a Platform, from the Prompts button shown in its input area or by typing `//` in the input field, to choose a Prompt to insert. It lists All Prompts, the Pinned Prompts, the Recent Prompts, or the Prompts of one Category. `//` opens it only at the start of the field or after a space or a line break, so the `//` of a URL does not; the two characters are removed, and where they cannot be the selector stays closed.
 _Avoid_: Picker (the Element picker is the tool that picks where the button goes on a custom site), palette, popover
 
 **Recent**:
@@ -75,7 +75,7 @@ Where the icon goes when a Platform's Toolbar is not found, or where a custom si
 _Avoid_: Floating icon (the custom-site icon's look, not its placement), absolute fallback
 
 **Insertion**:
-Putting a Prompt's content into a Platform's input field. A Prompt's content arrives exactly as saved (see Verbatim). It replaces what the field held.
+Putting a Prompt's content into a Platform's input field. A Prompt's content arrives exactly as saved (see Verbatim). It replaces what the field held. An Insertion can be undone right after, from the confirmation shown above the field: Undo puts back the text the field held, as plain text, and the use of the Prompt stays counted. An Insertion that fails is said, and counts no use.
 
 ### Navigation
 

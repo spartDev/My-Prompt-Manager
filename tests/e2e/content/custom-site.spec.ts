@@ -20,6 +20,7 @@ import type { CustomSite } from '../../../src/types';
 import { DEFAULT_CATEGORY } from '../../../src/types';
 import { CUSTOM_SITE_EXTENSION_PATH, CUSTOM_SITE_HOSTNAME, CUSTOM_SITE_URL } from '../fixtures/custom-site-build';
 import { type ExtensionStorage, expect, test } from '../fixtures/extension';
+import { expectInsertionFlow } from '../fixtures/insertion-flow';
 import { promptSelector } from '../fixtures/platform-pages';
 import { createPromptSeed, seedLibrary } from '../utils/storage';
 
@@ -154,6 +155,19 @@ test.describe('Content script on a custom site', () => {
 
     await expect(selector).toHaveCount(0);
     await expect(target.locator('#notes')).toHaveValue(verbatim.content);
+  });
+
+  // My-Prompt-Manager-q9j.3: the same flow as on the seven Platforms (prompt-insertion.spec.ts)
+  test('// opens the selector, the Insertion is confirmed and undone, a failure is said', async ({ context, storage }) => {
+    await seedWithCustomSite(storage, 'light');
+    const target = await openCustomSite(context);
+    await expect(target.locator(ICON)).toHaveCount(1);
+
+    await expectInsertionFlow(target, {
+      field: target.locator('#notes'),
+      prompt: summarize,
+      usageCount: async () => (await storage.getPrompts()).find((prompt) => prompt.id === summarize.id)?.usageCount ?? 0,
+    });
   });
 
   for (const theme of ['light', 'dark'] as const) {

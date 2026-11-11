@@ -101,7 +101,7 @@ export class PlatformManager {
    * Thread-safe with initialization lock to prevent race conditions
    * @public
    */
-  async initializeStrategies(): Promise<void> {
+  initializeStrategies(): Promise<void> {
     // Return existing initialization promise if one is in progress
     if (this.initializationLock) {
       return this.initializationLock;
@@ -109,7 +109,7 @@ export class PlatformManager {
 
     if (this.isInitialized) {
       debug('Strategies already initialized, skipping');
-      return;
+      return Promise.resolve();
     }
 
     // Create and store initialization promise to prevent concurrent initializations
@@ -455,6 +455,26 @@ export class PlatformManager {
       success: false,
       error: 'Strategy insertion failed'
     };
+  }
+
+  /**
+   * Puts `text` back as the whole content of the input field, through the strategy that inserts
+   * into it: Undo after an Insertion.
+   * @param element - The input field
+   * @param text - The plain text the field held before the Insertion
+   * @returns Result of the attempt
+   */
+  async restoreContent(element: HTMLElement, text: string): Promise<InsertionResult> {
+    const strategy = this.findBestStrategy(element);
+    if (!strategy) {
+      return { success: false, error: 'No compatible strategies found for target element' };
+    }
+    try {
+      return await strategy.restore(element, text);
+    } catch (error) {
+      warn(`${strategy.name} strategy threw error while restoring`, { error });
+      return { success: false, error: 'Strategy restore failed' };
+    }
   }
 
   /**

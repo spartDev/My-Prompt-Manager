@@ -20,7 +20,13 @@ export const DURATION = {
   /** A tab changes color */
   tab: 250,
   /** The Prompts button changes color */
-  button: 300
+  button: 300,
+  /** The confirmation of an Insertion appears */
+  inserted: 450,
+  /** The sweep crosses the input field after an Insertion */
+  sweep: 1100,
+  /** The confirmation of an Insertion stays, unless it is hovered or focused */
+  insertedStay: 2800
 } as const;
 
 /** Whether the user asked for reduced motion: animations then run for 1ms and timers do not wait. */

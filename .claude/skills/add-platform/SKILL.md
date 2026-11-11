@@ -413,7 +413,7 @@ The button that opens the Prompt selector is the same on every Platform: a pill 
 
 When a Platform's bar has no room for the label, `fitPromptsPill()` shrinks the button to its badge on its own.
 
-Add a stand-in page for the Platform to `tests/e2e/fixtures/platform-pages.ts` (its input field and its action bar), so `tests/e2e/content/prompt-selector.spec.ts` runs the whole flow on it.
+Add a stand-in page for the Platform to `tests/e2e/fixtures/platform-pages.ts` (its input field and its action bar), so `tests/e2e/content/prompt-selector.spec.ts` and `tests/e2e/content/prompt-insertion.spec.ts` (the `//` trigger, the confirmation, Undo) run the whole flow on it. Undo goes through `restore()` of the base strategy, which replaces the whole field; override it only when the Platform's editor does not take `execCommand`.
 
 #### The Platform's icon in Settings (React component)
 

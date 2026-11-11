@@ -320,19 +320,208 @@ describe('PromptLibraryInjector', () => {
     it('does not throw when the insertion throws', async () => {
       (await platformManager()).insertPrompt.mockRejectedValue(new Error('boom'));
 
-      await expect(selector().callbacks.insert(prompt, prompt.content, mockTextarea)).resolves.toBeUndefined();
+      await expect(selector().callbacks.insert(prompt, prompt.content, mockTextarea)).resolves.toBe(false);
+    });
+
+    it('tells the selector whether the text arrived', async () => {
+      vi.mocked(chrome.runtime.sendMessage).mockResolvedValue(undefined);
+      await expect(selector().callbacks.insert(prompt, prompt.content, mockTextarea)).resolves.toBe(true);
+
+      (await platformManager()).insertPrompt.mockResolvedValue({ success: false, error: 'nope' });
+      await expect(selector().callbacks.insert(prompt, prompt.content, mockTextarea)).resolves.toBe(false);
+    });
+
+    it('counts no use, and says the text did not arrive, when the input field is gone once the Platform has written', async () => {
+      const gone = document.createElement('textarea');
+      document.body.appendChild(gone);
+      (await platformManager()).insertPrompt.mockImplementation((element: HTMLElement) => {
+        element.remove();
+        return Promise.resolve({ success: true, method: 'direct' });
+      });
+      vi.mocked(chrome.runtime.sendMessage).mockClear();
+
+      await expect(selector().callbacks.insert(prompt, prompt.content, gone)).resolves.toBe(false);
+
+      expect(chrome.runtime.sendMessage).not.toHaveBeenCalled();
+    });
+
+    describe('typing // in the input field', () => {
+      const typeSlashes = async (field: HTMLTextAreaElement): Promise<ReturnType<typeof vi.fn>> => {
+        await injector.initialize();
+        await new Promise(resolve => setTimeout(resolve, 50));
+        const open = vi.fn().mockResolvedValue(undefined);
+        (selector() as unknown as { open: typeof open }).open = open;
+
+        const { EventManager } = await import('../../ui/event-manager');
+        const eventManagerInstance = (EventManager as any).mock.results.at(-1).value;
+        const keydown = eventManagerInstance.addTrackedEventListener.mock.calls.find((call: any[]) => call[0] === document && call[1] === 'keydown');
+        expect(keydown).toBeDefined();
+
+        field.value = 'Draft //';
+        field.setSelectionRange(8, 8);
+        // The event travels from the field to the document, where the injector listens
+        const heard = (event: Event) => { keydown[2](event); };
+        document.addEventListener('keydown', heard);
+        field.dispatchEvent(new KeyboardEvent('keydown', { key: '/', bubbles: true, composed: true }));
+        document.removeEventListener('keydown', heard);
+        await new Promise(resolve => setTimeout(resolve, 20));
+        return open;
+      };
+
+      it('opens the selector over the input field the Prompts button was placed for, without the //', async () => {
+        const open = await typeSlashes(mockTextarea);
+
+        expect(open).toHaveBeenCalledTimes(1);
+        expect(open.mock.calls[0][0]).toBe(mockTextarea);
+        expect(mockTextarea.value).toBe('Draft ');
+      });
+
+      it('drops the opening when the user goes on typing in the field while the selector loads', async () => {
+        const open = await typeSlashes(mockTextarea);
+        // typeSlashes resolves its opening at once; this one is still loading
+        open.mockReturnValue(new Promise(() => { /* still loading */ }));
+        mockTextarea.value = 'Draft //';
+        mockTextarea.setSelectionRange(8, 8);
+        const { EventManager } = await import('../../ui/event-manager');
+        const eventManagerInstance = (EventManager as any).mock.results.at(-1).value;
+        const keydown = eventManagerInstance.addTrackedEventListener.mock.calls.find((call: any[]) => call[0] === document && call[1] === 'keydown');
+        const heard = (event: Event) => { keydown[2](event); };
+        document.addEventListener('keydown', heard);
+        mockTextarea.dispatchEvent(new KeyboardEvent('keydown', { key: '/', bubbles: true, composed: true }));
+        document.removeEventListener('keydown', heard);
+        await new Promise(resolve => setTimeout(resolve, 20));
+        expect(open).toHaveBeenCalledTimes(2);
+        selector().close.mockClear();
+
+        // Shift alone is not typing; a letter is
+        const press = (key: string) => {
+          const event = new KeyboardEvent('keydown', { key, bubbles: true, composed: true });
+          Object.defineProperty(event, 'isTrusted', { value: true });
+          mockTextarea.dispatchEvent(event);
+        };
+        press('Shift');
+        expect(selector().close).not.toHaveBeenCalled();
+        press('a');
+        expect(selector().close).toHaveBeenCalledWith(false);
+
+        // A click on another field, a paste from the context menu in this one: no key, same result
+        const elsewhere = document.createElement('input');
+        document.body.appendChild(elsewhere);
+        for (const [type, target] of [['pointerdown', elsewhere], ['paste', mockTextarea], ['compositionstart', mockTextarea]] as const) {
+          selector().close.mockClear();
+          const action = new Event(type, { bubbles: true, composed: true });
+          Object.defineProperty(action, 'isTrusted', { value: true });
+          target.dispatchEvent(action);
+          expect(selector().close, type).toHaveBeenCalledWith(false);
+        }
+
+        // A paste in another field is not a click, and is not in this field: the opening stays
+        selector().close.mockClear();
+        const paste = new Event('paste', { bubbles: true, composed: true });
+        Object.defineProperty(paste, 'isTrusted', { value: true });
+        elsewhere.dispatchEvent(paste);
+        expect(selector().close).not.toHaveBeenCalled();
+        // And what a script sends is not the user
+        mockTextarea.dispatchEvent(new Event('paste', { bubbles: true, composed: true }));
+        expect(selector().close).not.toHaveBeenCalled();
+      });
+
+      it('leaves an open selector alone: once it shows, the keys typed are its own', async () => {
+        const open = await typeSlashes(mockTextarea);
+        expect(open).toHaveBeenCalledTimes(1);
+        selector().close.mockClear();
+
+        const event = new KeyboardEvent('keydown', { key: 'a', bubbles: true, composed: true });
+        Object.defineProperty(event, 'isTrusted', { value: true });
+        mockTextarea.dispatchEvent(event);
+
+        expect(selector().close).not.toHaveBeenCalled();
+      });
+
+      it('opens over the input field the Platform has just put in place of the detected one', async () => {
+        await injector.initialize();
+        await new Promise(resolve => setTimeout(resolve, 50));
+        // The Platform re-rendered its composer: the detected field is out of the page, and the
+        // new one has not been detected yet
+        const replaced = document.createElement('textarea');
+        (injector as any).state.currentTextarea = replaced;
+        const fresh = document.createElement('textarea');
+        document.body.appendChild(fresh);
+
+        const open = await typeSlashes(fresh);
+
+        expect(open).toHaveBeenCalledTimes(1);
+        expect(open.mock.calls[0][0]).toBe(fresh);
+        expect(fresh.value).toBe('Draft ');
+      });
+
+      it('opens nothing for a // typed in another field of the page while the detected one is there', async () => {
+        await injector.initialize();
+        await new Promise(resolve => setTimeout(resolve, 50));
+        // A search box: the Platform's selectors name every textarea, but the input field is in the page
+        const search = document.createElement('textarea');
+        document.body.appendChild(search);
+        (injector as any).state.currentTextarea = mockTextarea;
+
+        const open = await typeSlashes(search);
+
+        expect(open).not.toHaveBeenCalled();
+        expect(search.value).toBe('Draft //');
+      });
+
+      it('opens nothing, once the detected field is gone, for a // typed in a field the Platform does not name', async () => {
+        await injector.initialize();
+        await new Promise(resolve => setTimeout(resolve, 50));
+        const other = document.createElement('textarea');
+        document.body.appendChild(other);
+        (await platformManager()).getAllSelectors.mockReturnValue(['div[contenteditable="true"]']);
+        (injector as any).state.currentTextarea = document.createElement('textarea');
+
+        const open = await typeSlashes(other);
+
+        expect(open).not.toHaveBeenCalled();
+        expect(other.value).toBe('Draft //');
+      });
+    });
+
+    it('Undo restores the text through the Platform, and reports no use', async () => {
+      const manager = await platformManager();
+      manager.restoreText = vi.fn().mockResolvedValue({ success: true, method: 'restore-value' });
+      vi.mocked(chrome.runtime.sendMessage).mockClear();
+
+      await expect(selector().callbacks.restore('Draft', mockTextarea)).resolves.toBe(true);
+
+      expect(manager.restoreText).toHaveBeenCalledWith(mockTextarea, 'Draft');
+      expect(chrome.runtime.sendMessage).not.toHaveBeenCalled();
+    });
+
+    it('Undo does not throw when the Platform fails', async () => {
+      const manager = await platformManager();
+      manager.restoreText = vi.fn().mockRejectedValue(new Error('boom'));
+
+      await expect(selector().callbacks.restore('Draft', mockTextarea)).resolves.toBe(false);
     });
 
     it('does not throw when the use cannot be reported', async () => {
       vi.mocked(chrome.runtime.sendMessage).mockRejectedValue(new Error('Extension context invalidated'));
 
-      await selector().callbacks.insert(prompt, prompt.content, mockTextarea);
+      await expect(selector().callbacks.insert(prompt, prompt.content, mockTextarea)).resolves.toBe(true);
 
       const Logger = await import('../../utils/logger');
-      expect(Logger.debug).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to report prompt usage'),
-        expect.any(Object)
-      );
+      await vi.waitFor(() => {
+        expect(Logger.debug).toHaveBeenCalledWith(
+          expect.stringContaining('Failed to report prompt usage'),
+          expect.any(Object)
+        );
+      });
+    });
+
+    it('does not wait for the use to be reported before it says the text arrived', async () => {
+      // The background never answers
+      vi.mocked(chrome.runtime.sendMessage).mockReturnValue(new Promise(() => { /* pending */ }) as never);
+
+      await expect(selector().callbacks.insert(prompt, prompt.content, mockTextarea)).resolves.toBe(true);
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledTimes(1);
     });
 
     it('the Prompts button says whether the selector is open', () => {

@@ -190,7 +190,9 @@ src/content/
 ├── selector/                   # Prompt selector (React, in a shadow root)
 │   ├── controller.ts          # Opens, places and closes the selector
 │   ├── selectorMachine.ts     # State machine and keyboard rules (with selectorKeys.ts)
-│   └── Picker*.tsx            # Popover, tabs, list, variables step
+│   ├── inputText.ts           # Plain text of the input field, the // that opens the selector
+│   ├── Picker*.tsx            # Popover, tabs, list, variables step
+│   └── InsertionFeedback.tsx  # Confirmation of an Insertion: pill with Undo, sweep
 ├── platforms/                  # Platform-specific strategies
 │   ├── base-strategy.ts       # Abstract base class
 │   ├── claude-strategy.ts     # Claude.ai implementation

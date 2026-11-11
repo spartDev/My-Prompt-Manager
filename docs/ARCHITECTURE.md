@@ -384,7 +384,9 @@ src/content/
 │   ├── element-factory.ts     # The Prompts button of each Platform
 │   └── event-manager.ts       # Event listener cleanup
 ├── selector/                   # Prompt selector, in a shadow root (ADR-002)
-│   ├── controller.ts          # Shadow host, open/close, placement, insertion hand-off
+│   ├── controller.ts          # Shadow host, open/close, placement, insertion hand-off, confirmation and Undo
+│   ├── inputText.ts           # Plain text of the input field, the // trigger, caret at the end, pure DOM
+│   ├── InsertionFeedback.tsx  # Pill ('Inserted "title"' + Undo, or "Couldn't insert") and sweep over the field
 │   ├── selectorMachine.ts     # State machine (closed, list, variables, closing), pure
 │   ├── selectorKeys.ts        # Keyboard rules: (state, key) -> state, pure
 │   ├── selectorData.ts        # Tabs and the Prompts of each, search, pure
@@ -424,7 +426,7 @@ src/content/
 | `StorageManager` | Centralized storage with keyed locks shared across contexts (Web Locks API) | Singleton |
 | `promptAdmission` | Admission of Prompt text, the one reader of stored Prompts, the upgrade scrubs (shared by popup, service worker and content script) | Pure module |
 | `PromptManager` | Business logic (search, validation, duplicates) | Service |
-| `PromptSelectorController` | Open, place and close the Prompt selector in its shadow root; hand the chosen Prompt back for Insertion | Controller |
+| `PromptSelectorController` | Open, place and close the Prompt selector in its shadow root; hand the chosen Prompt back for Insertion; confirm it and undo it | Controller |
 | `selectorMachine`, `selectorKeys` | State and keyboard rules of the Prompt selector | Pure modules |
 | `EventManager` | Centralized event listener cleanup | Manager |
 

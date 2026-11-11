@@ -77,7 +77,9 @@ const MIGRATED = [
   'content/selector/PickerPopover.tsx',
   'content/selector/PickerTabs.tsx',
   'content/selector/PickerList.tsx',
-  'content/selector/PickerFill.tsx'
+  'content/selector/PickerFill.tsx',
+  // My-Prompt-Manager-q9j.3: confirmation of an Insertion
+  'content/selector/InsertionFeedback.tsx'
 ];
 
 // Agent guidance that prescribes classes follows the same rule, or it steers UI work off the tokens

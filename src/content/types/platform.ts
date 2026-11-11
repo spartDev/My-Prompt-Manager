@@ -17,6 +17,7 @@ export interface PlatformStrategyInterface {
   priority: number;
   canHandle(element: HTMLElement): boolean;
   insert(element: HTMLElement, content: string): Promise<InsertionResult>;
+  restore(element: HTMLElement, text: string): Promise<InsertionResult>;
   getSelectors(): string[];
   getButtonContainerSelector(): string | null;
   createIcon?(uiFactory: UIElementFactory): HTMLElement | null;
