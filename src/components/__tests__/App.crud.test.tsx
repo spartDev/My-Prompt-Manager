@@ -80,6 +80,19 @@ describe('App prompt workflows', () => {
     expect(storageMock.getPrompts).toHaveBeenCalled();
   });
 
+  it('points out a Prompt of the Library that the new Prompt looks like', async () => {
+    const existing = { ...basePrompt, title: 'Summarize', content: 'Summarize this article in three bullets.' };
+    getMockStorageManager().getPrompts.mockResolvedValue([existing]);
+
+    await renderApp();
+    await screen.findByText(existing.title);
+    await userEvent.click(screen.getByRole('button', { name: 'Add new prompt' }));
+    await userEvent.click(await screen.findByLabelText('Content'));
+    await userEvent.paste(existing.content);
+
+    expect(await screen.findByRole('region', { name: 'This looks familiar' })).toHaveTextContent('100% like “Summarize”');
+  });
+
   it('edits an existing prompt and shows a confirmation toast', async () => {
     const storageMock = getMockStorageManager();
     storageMock.getPrompts.mockResolvedValue([basePrompt]);

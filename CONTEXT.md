@@ -30,6 +30,10 @@ _Avoid_: Unused, forgotten, stale
 Two Prompts with the same content, or with nearly identical titles and contents. Three such Prompts make two pairs, each later Prompt paired with the first.
 _Avoid_: Similar prompts, copies
 
+**Lookalike**:
+The Prompt of the Library whose text is at least 60% like the text being written in the editor, pointed out as "This looks familiar". Looser than a Duplicate pair, and never blocks saving.
+_Avoid_: Similar prompt, near-duplicate
+
 **Variable**:
 A named placeholder written {{name}} inside a Prompt's text, filled in by the user when the Prompt is inserted.
 _Avoid_: Blank, placeholder, field

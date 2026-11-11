@@ -606,3 +606,137 @@ describe('PromptEditor - Share code', () => {
     expect(save()).toBeDisabled();
   });
 });
+
+describe('PromptEditor - a Prompt that looks familiar', () => {
+  // 40 characters; the text typed below changes 16 of them, so it is 60% like it
+  const summarize: Prompt = {
+    id: 'summarize',
+    title: 'Summarize an article',
+    content: 'Summarize this article in three bullets.',
+    category: 'Uncategorized',
+    createdAt: 1_700_000_000_000,
+    updatedAt: 1_700_000_000_000
+  };
+  const SIXTY_PERCENT_LIKE = 'x'.repeat(16) + summarize.content.slice(16);
+  const callout = () => screen.queryByRole('region', { name: 'This looks familiar' });
+
+  const typeContent = async (text: string) => {
+    await userEvent.click(content());
+    await userEvent.paste(text);
+  };
+
+  it('points out the Prompt of the Library the text is like, with how alike they are', async () => {
+    renderEditor({ library: [summarize] });
+
+    await typeContent(SIXTY_PERCENT_LIKE);
+
+    expect(await screen.findByRole('region', { name: 'This looks familiar' })).toHaveTextContent(
+      '60% like “Summarize an article”'
+    );
+  });
+
+  it('compares the text once typing pauses, not at each keystroke', async () => {
+    renderEditor({ library: [summarize] });
+
+    await typeContent(SIXTY_PERCENT_LIKE);
+
+    expect(callout()).not.toBeInTheDocument();
+    expect(await screen.findByRole('region', { name: 'This looks familiar' })).toBeInTheDocument();
+  });
+
+  it('announces the Prompt it is like to a screen reader once, without the percentage that changes as the text does', async () => {
+    const { container } = renderEditor({ library: [summarize] });
+    // Present before anything is announced, as a live region must be
+    const live = container.querySelector('[data-testid="lookalike-announcement"]');
+    expect(live).toHaveAttribute('aria-live', 'polite');
+    expect(live).toBeEmptyDOMElement();
+
+    await typeContent(`${summarize.content} Extra`); // 40 of 46 characters alike: 87%
+    expect(await screen.findByRole('region', { name: 'This looks familiar' })).toHaveTextContent('87%');
+    expect(live).toHaveTextContent('This looks familiar: it is like “Summarize an article”, a Prompt of your Library');
+
+    await userEvent.paste(' x'); // 40 of 48: 83%
+    await waitFor(() => { expect(screen.getByRole('region', { name: 'This looks familiar' })).toHaveTextContent('83%'); });
+    expect(live).toHaveTextContent('This looks familiar: it is like “Summarize an article”, a Prompt of your Library');
+  });
+
+  it('shows the first lines of the text typed and of the Prompt it is like', async () => {
+    renderEditor({ library: [summarize] });
+
+    await typeContent(SIXTY_PERCENT_LIKE);
+
+    const found = await screen.findByRole('region', { name: 'This looks familiar' });
+    expect(within(found).getByText('Yours').nextSibling).toHaveTextContent(SIXTY_PERCENT_LIKE);
+    expect(within(found).getByText('Existing').nextSibling).toHaveTextContent(summarize.content);
+  });
+
+  it('Keep both hides it until the editor is closed, however the text changes', async () => {
+    const { unmount } = renderEditor({ library: [summarize] });
+    await typeContent(SIXTY_PERCENT_LIKE);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Keep both' }));
+    expect(callout()).not.toBeInTheDocument();
+    await userEvent.clear(content());
+    await typeContent(summarize.content);
+    expect(callout()).not.toBeInTheDocument();
+
+    unmount();
+    renderEditor({ library: [summarize] });
+    await typeContent(SIXTY_PERCENT_LIKE);
+    expect(await screen.findByRole('region', { name: 'This looks familiar' })).toBeInTheDocument();
+  });
+
+  it('never points out the Prompt being edited', async () => {
+    const another = { ...summarize, id: 'another', title: 'Summarize again', content: `${summarize.content} Please.` };
+    renderEdit({ prompt: summarize, library: [summarize, another] });
+
+    await typeContent(' Keep it short.');
+
+    // Its own text is the most alike, yet the one pointed out is another Prompt
+    expect(await screen.findByRole('region', { name: 'This looks familiar' })).toHaveTextContent('like “Summarize again”');
+  });
+
+  it('never blocks saving', async () => {
+    const { props } = renderEditor({ library: [summarize] });
+    await userEvent.type(title(), 'Mine');
+    await typeContent(SIXTY_PERCENT_LIKE);
+    await screen.findByRole('region', { name: 'This looks familiar' });
+
+    await userEvent.click(save());
+
+    await waitFor(() => {
+      expect(props.onSubmit).toHaveBeenCalledWith({ title: 'Mine', content: SIXTY_PERCENT_LIKE, category: 'Uncategorized' });
+    });
+  });
+
+  /** Longer than the pause after which the text is compared */
+  const pastThePause = () => new Promise(resolve => { setTimeout(resolve, 600); });
+  const announcement = (container: HTMLElement) => container.querySelector('[data-testid="lookalike-announcement"]');
+
+  it('never points out the Prompt just saved, which the Library now holds', async () => {
+    const saved: Prompt = { ...summarize, id: 'new', title: 'Mine', content: SIXTY_PERCENT_LIKE };
+    let rerenderWith: ((library: Prompt[]) => void) | undefined;
+    const onSubmit = vi.fn(() => { rerenderWith?.([saved]); });
+    const { container, rerender, props } = renderEditor({ library: [], onSubmit });
+    rerenderWith = (library) => { rerender(<PromptEditor {...props} library={library} />); };
+    await userEvent.type(title(), 'Mine');
+    await typeContent(SIXTY_PERCENT_LIKE);
+
+    await userEvent.click(save());
+    await screen.findByRole('button', { name: 'Saved' });
+    await pastThePause();
+
+    expect(callout()).not.toBeInTheDocument();
+    expect(announcement(container)).toBeEmptyDOMElement();
+  });
+
+  it('says nothing about the text written once the editor turns to a Share code', async () => {
+    const { container } = renderEditor({ library: [summarize] });
+    await typeContent(SIXTY_PERCENT_LIKE);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Paste a Share code' }));
+    await pastThePause();
+
+    expect(announcement(container)).toBeEmptyDOMElement();
+  });
+});

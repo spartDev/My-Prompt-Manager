@@ -28,6 +28,8 @@ export interface PromptEditorProps {
   /** The Prompt to edit; omit to write a new one (or open a Share code) */
   prompt?: Prompt;
   categories: Category[];
+  /** The Prompts of the Library, to point out one the text looks like */
+  library?: readonly Prompt[];
   /** Saves the Prompt; rejects with the reason when it is refused, and the editor stays open */
   onSubmit: (data: { title: string; content: string; category: string }) => Promise<void> | void;
   /** Leaves the editor: after a save, or on Cancel */

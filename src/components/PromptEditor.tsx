@@ -2,9 +2,10 @@ import type { FC } from 'react';
 import { useActionState, useEffect, useId, useRef, useState } from 'react';
 
 import { formatCharacterCount } from '../constants/validation';
+import { useLookalike } from '../hooks/useLookalike';
 import { PROMPT_LIMITS } from '../services/promptAdmission';
 import { MOTION, motionDuration } from '../theme/motion';
-import { DEFAULT_CATEGORY } from '../types';
+import { DEFAULT_CATEGORY, type Prompt } from '../types';
 import type { PromptEditorProps } from '../types/components';
 import { type FieldErrors, Logger, toError, validatePromptFields } from '../utils';
 import { cn } from '../utils/cn';
@@ -12,10 +13,14 @@ import { extractVariables } from '../utils/promptVariables';
 
 import ConfirmDialog from './ConfirmDialog';
 import CategoryChips from './editor/CategoryChips';
+import LookalikeCallout from './editor/LookalikeCallout';
 import { useShareCodeImport } from './editor/useShareCodeImport';
 import VariableTextarea from './editor/VariableTextarea';
 
 type EditorMode = 'write' | 'import';
+
+/** No Library given: one array, so the Lookalike search is not restarted at each render */
+const NO_PROMPTS: readonly Prompt[] = [];
 
 /** Share of a limit from which the counter shows the limit too */
 const NEAR_LIMIT = 0.9;
@@ -42,6 +47,7 @@ const CheckIcon: FC = () => (
 const PromptEditor: FC<PromptEditorProps> = ({
   prompt,
   categories,
+  library = NO_PROMPTS,
   onSubmit,
   onClose,
   onDelete,
@@ -70,6 +76,8 @@ const PromptEditor: FC<PromptEditorProps> = ({
   const [category, setCategory] = useState(prompt?.category ?? DEFAULT_CATEGORY);
   const [saved, setSaved] = useState(false);
   const [confirming, setConfirming] = useState<'discard' | 'delete' | null>(null);
+  // Keep both: no more "This looks familiar" until the editor closes
+  const [keepBoth, setKeepBoth] = useState(false);
 
   const [importCategory, setImportCategory] = useState(DEFAULT_CATEGORY);
   // A Share code naming a Category of the Library imports into it; otherwise into the default one
@@ -145,6 +153,10 @@ const PromptEditor: FC<PromptEditorProps> = ({
   }, [saved]);
 
   const locked = isPending || saved;
+  // Nothing to point out once dismissed, while saving (the Library then holds this very Prompt) and
+  // while a Share code is imported instead
+  const found = useLookalike(content, library, prompt?.id);
+  const lookalike = keepBoth || locked || isImport ? null : found;
   const saveBlocked = isImport && (!shareCode.decoded || !!shareCode.error || shareCode.validating);
 
   const requestClose = () => {
@@ -190,6 +202,7 @@ const PromptEditor: FC<PromptEditorProps> = ({
     if (next === 'write') { shareCode.reset(); }
     setMode(next);
   };
+
 
   const variables = extractVariables(content);
   const titleNearLimit = title.length >= PROMPT_LIMITS.title * NEAR_LIMIT;
@@ -355,6 +368,15 @@ const PromptEditor: FC<PromptEditorProps> = ({
                 )}
               </div>
 
+              {lookalike && (
+                <LookalikeCallout
+                  lookalike={lookalike}
+                  yours={content}
+                  onKeepBoth={() => { setKeepBoth(true); }}
+                  disabled={locked}
+                />
+              )}
+
               <section aria-label="Variables" className="flex flex-col gap-2">
                 <span className="text-xs font-bold text-secondary">Variables</span>
                 {variables.length > 0 ? (
@@ -399,6 +421,12 @@ const PromptEditor: FC<PromptEditorProps> = ({
           )}
         </form>
       </div>
+
+      {/* "This looks familiar" for a screen reader, whose focus stays in the text: said once per Prompt
+          pointed out, without the percentage, which changes at each pause in typing */}
+      <p data-testid="lookalike-announcement" aria-live="polite" className="sr-only">
+        {lookalike && `This looks familiar: it is like “${lookalike.prompt.title}”, a Prompt of your Library`}
+      </p>
 
       <ConfirmDialog
         isOpen={confirming === 'discard'}
