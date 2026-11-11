@@ -10,7 +10,8 @@ import { expect } from './extension';
  * interception. The manifest's content_scripts match that hostname, so the extension's real
  * content script runs on these pages exactly as it does on the live site; only the page is
  * a fixture. Each page has the input field and the action bar the Platform's strategy looks for,
- * so the Prompts button is placed as on the live site.
+ * so the Prompts button is placed as on the live site. The input field is the first control Tab
+ * reaches: the keyboard-only flows start there (insertion-flow.ts).
  *
  * - chatgpt.com: a React 19 controlled <textarea>, so Insertion goes through the ChatGPT
  *   strategy and React's own change tracking. React's state is rendered into
@@ -31,8 +32,11 @@ export type PlatformFixture = 'chatgpt' | 'claude' | 'mistral' | 'gemini' | 'per
 
 export const PLATFORM_FIXTURES: readonly PlatformFixture[] = ['claude', 'chatgpt', 'mistral', 'gemini', 'perplexity', 'copilot', 'm365copilot'];
 
-/** Counts the Enter keys that reach the page, as the live sites' send-on-Enter listeners would see them. */
-const ENTER_COUNTER = /* html */ `
+/**
+ * Counts the Enter keys that reach the page, as the live sites' send-on-Enter listeners would see them.
+ * A custom site's page takes it too (custom-site.spec.ts).
+ */
+export const ENTER_COUNTER = /* html */ `
     <script>
       window.__enterKeys = 0;
       document.addEventListener('keydown', (event) => {
@@ -245,6 +249,9 @@ export async function openPlatform(
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   return page;
 }
+
+/** How many Enter keys have reached the page (see ENTER_COUNTER). */
+export const enterKeys = (page: Page) => page.evaluate(() => (window as unknown as { __enterKeys: number }).__enterKeys);
 
 /** The Prompts button the extension adds to the Platform's input area. */
 export const promptsButton = (page: Page) => page.locator('.prompt-library-pill');

@@ -5,7 +5,9 @@
  * Proves that typing `//` opens the Prompt selector (and that the `//` of a URL does not), that
  * an Insertion is confirmed by a pill with Undo and a sweep over the input field, that Undo puts
  * back exactly the text the field held, that the pill leaves when the user types, and that a
- * failed Insertion is said. The same flow runs on a custom site in custom-site.spec.ts.
+ * failed Insertion is said. With the keyboard alone, Undo is reached by the Tab key. Turning
+ * Notifications off in Settings changes none of it. The same flows run on a custom site in
+ * custom-site.spec.ts.
  * Captures light and dark screenshots (test-results/prompt-insertion/).
  */
 
@@ -13,7 +15,7 @@ import type { Page } from '@playwright/test';
 
 import { DEFAULT_SETTINGS, type Prompt } from '../../../src/types';
 import { type ExtensionStorage, expect, test } from '../fixtures/extension';
-import { expectInsertionFlow, fieldText, insertionPill, insertionSweep, undoButton } from '../fixtures/insertion-flow';
+import { expectInsertionFlow, expectKeyboardInsertionFlow, fieldText, insertionPill, insertionSweep, tabToUndo, undoButton } from '../fixtures/insertion-flow';
 import { openPlatform, PLATFORM_FIELD, PLATFORM_FIXTURES, type PlatformFixture, promptRow, promptSelector, promptsButton } from '../fixtures/platform-pages';
 import { createCategorySeed, createPromptSeed, seedLibrary } from '../utils/storage';
 
@@ -30,8 +32,6 @@ const seed = async (storage: ExtensionStorage, theme: 'light' | 'dark' = 'light'
 };
 
 const field = (page: Page, platform: PlatformFixture) => page.locator(PLATFORM_FIELD[platform]);
-
-const enterKeys = (page: Page) => page.evaluate(() => (window as unknown as { __enterKeys: number }).__enterKeys);
 
 /**
  * Opens the selector by typing // in the field, and inserts a Prompt with the mouse. `typed` is
@@ -63,35 +63,12 @@ test.describe('Insertion on each Platform', () => {
       expect(errors).toEqual([]);
     });
 
-    test(`${platform}: by keyboard alone, and Undo restores several lines`, async ({ context, storage }) => {
+    test(`${platform}: by keyboard alone, with Undo reached by the Tab key`, async ({ context, storage }) => {
       await seed(storage);
       const page = await openPlatform(context, platform);
       await expect(promptsButton(page)).toHaveCount(1);
-      const input = field(page, platform);
 
-      // The field holds text before the Insertion
-      await input.click();
-      await page.keyboard.type('Keep this  text ');
-      const before = await fieldText(input);
-      expect(before).toBe('Keep this  text ');
-
-      // // then Enter: the first Prompt of the list is inserted, and no Enter reaches the Platform
-      await page.keyboard.type('//');
-      await expect(promptSelector(page)).toBeVisible();
-      await expect(promptRow(page, 'review')).toHaveAttribute('aria-selected', 'true');
-      await page.keyboard.press('Enter');
-      await expect(promptSelector(page)).toBeHidden();
-      await expect.poll(() => fieldText(input)).toBe(review.content);
-      await expect(insertionPill(page)).toBeVisible();
-      expect(await enterKeys(page)).toBe(0);
-
-      // Undo by keyboard: the button takes the focus and Enter presses it
-      await undoButton(page).focus();
-      await page.keyboard.press('Enter');
-      await expect(insertionPill(page)).toBeHidden();
-      await expect.poll(() => fieldText(input)).toBe(before);
-      await expect(input).toBeFocused();
-      expect(await enterKeys(page)).toBe(0);
+      await expectKeyboardInsertionFlow(page, { field: field(page, platform), prompt: review });
     });
   }
 });
@@ -137,11 +114,12 @@ test.describe('Insertion confirmation: time and motion', () => {
     await page.mouse.move(5, 5);
     await expect(pill).toBeHidden({ timeout: 5000 });
 
-    // Focused, it stays
+    // Focused, it stays: the focus is taken to Undo with the Tab key, as a user does
     await insertByTyping(page, 'claude', 'review', ' //');
-    await undoButton(page).focus();
+    await tabToUndo(page);
     await page.waitForTimeout(3600);
     await expect(pill).toBeVisible();
+    await expect(undoButton(page)).toBeFocused();
   });
 
   test('under reduced motion there is no sweep, and the pill still confirms', async ({ context, storage }) => {
@@ -201,6 +179,36 @@ test.describe('Insertion confirmation: time and motion', () => {
     await undoButton(page).click();
     await expect(input).toHaveValue('');
     await expect(input).toBeFocused();
+  });
+});
+
+test.describe('Insertion confirmation and the Notifications switch', () => {
+  // The confirmation of an Insertion is not a Notification (My-Prompt-Manager-q9j): the switch that
+  // silences every Notification of the popup and side panel, failures included, leaves it alone
+  test('with Notifications turned off in Settings, an Insertion is confirmed and undone, and a failure is said, all the same', async ({ context, storage, extensionId }) => {
+    await seed(storage);
+
+    // Settings > Notifications > Show notifications: off, and still off when the popup opens again
+    const settings = await context.newPage();
+    await settings.setViewportSize({ width: 400, height: 600 });
+    await settings.goto(`chrome-extension://${extensionId}/src/popup.html`);
+    await settings.getByTestId('tab-settings').click();
+    const notifications = settings.getByRole('switch', { name: 'Show notifications' });
+    await expect(notifications).toHaveAttribute('aria-checked', 'true');
+    await notifications.click();
+    await expect(notifications).toHaveAttribute('aria-checked', 'false');
+    await settings.reload();
+    await settings.getByTestId('tab-settings').click();
+    await expect(notifications).toHaveAttribute('aria-checked', 'false');
+    await settings.close();
+
+    const page = await openPlatform(context, 'claude');
+    await expect(promptsButton(page)).toHaveCount(1);
+    await expectInsertionFlow(page, {
+      field: field(page, 'claude'),
+      prompt: review,
+      usageCount: async () => (await storage.getPrompts()).find((prompt) => prompt.id === review.id)?.usageCount ?? 0,
+    });
   });
 });
 
