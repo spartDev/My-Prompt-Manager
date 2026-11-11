@@ -520,6 +520,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
             key={editorKey}
             prompt={editorSheet.shown.mode === 'edit' ? editorSheet.shown.prompt : undefined}
             categories={categories}
+            library={prompts}
             onSubmit={handleFormSubmit}
             onClose={handleEditorClose}
             onDelete={editorSheet.shown.mode === 'edit' ? handleDeleteFromEdit : undefined}

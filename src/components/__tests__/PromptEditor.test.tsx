@@ -606,3 +606,80 @@ describe('PromptEditor - Share code', () => {
     expect(save()).toBeDisabled();
   });
 });
+
+describe('PromptEditor - a Prompt that looks familiar', () => {
+  // 40 characters; the text typed below changes 16 of them, so it is 60% like it
+  const summarize: Prompt = {
+    id: 'summarize',
+    title: 'Summarize an article',
+    content: 'Summarize this article in three bullets.',
+    category: 'Uncategorized',
+    createdAt: 1_700_000_000_000,
+    updatedAt: 1_700_000_000_000
+  };
+  const SIXTY_PERCENT_LIKE = 'x'.repeat(16) + summarize.content.slice(16);
+  const callout = () => screen.queryByRole('region', { name: 'This looks familiar' });
+
+  const typeContent = async (text: string) => {
+    await userEvent.click(content());
+    await userEvent.paste(text);
+  };
+
+  it('points out the Prompt of the Library the text is like, with how alike they are', async () => {
+    renderEditor({ library: [summarize] });
+
+    await typeContent(SIXTY_PERCENT_LIKE);
+
+    expect(await screen.findByRole('region', { name: 'This looks familiar' })).toHaveTextContent(
+      '60% like “Summarize an article”'
+    );
+  });
+
+  it('shows the first lines of the text typed and of the Prompt it is like', async () => {
+    renderEditor({ library: [summarize] });
+
+    await typeContent(SIXTY_PERCENT_LIKE);
+
+    const found = await screen.findByRole('region', { name: 'This looks familiar' });
+    expect(within(found).getByText('Yours').nextSibling).toHaveTextContent(SIXTY_PERCENT_LIKE);
+    expect(within(found).getByText('Existing').nextSibling).toHaveTextContent(summarize.content);
+  });
+
+  it('Keep both hides it until the editor is closed, however the text changes', async () => {
+    const { unmount } = renderEditor({ library: [summarize] });
+    await typeContent(SIXTY_PERCENT_LIKE);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Keep both' }));
+    expect(callout()).not.toBeInTheDocument();
+    await userEvent.clear(content());
+    await typeContent(summarize.content);
+    expect(callout()).not.toBeInTheDocument();
+
+    unmount();
+    renderEditor({ library: [summarize] });
+    await typeContent(SIXTY_PERCENT_LIKE);
+    expect(await screen.findByRole('region', { name: 'This looks familiar' })).toBeInTheDocument();
+  });
+
+  it('never points out the Prompt being edited', async () => {
+    renderEdit({ prompt: summarize, library: [summarize] });
+
+    await typeContent(' Keep it short.');
+
+    expect(content()).toHaveValue(`${summarize.content} Keep it short.`);
+    expect(callout()).not.toBeInTheDocument();
+  });
+
+  it('never blocks saving', async () => {
+    const { props } = renderEditor({ library: [summarize] });
+    await userEvent.type(title(), 'Mine');
+    await typeContent(SIXTY_PERCENT_LIKE);
+    await screen.findByRole('region', { name: 'This looks familiar' });
+
+    await userEvent.click(save());
+
+    await waitFor(() => {
+      expect(props.onSubmit).toHaveBeenCalledWith({ title: 'Mine', content: SIXTY_PERCENT_LIKE, category: 'Uncategorized' });
+    });
+  });
+});

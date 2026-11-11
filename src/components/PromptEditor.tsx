@@ -1,8 +1,9 @@
 import type { FC } from 'react';
-import { useActionState, useEffect, useId, useRef, useState } from 'react';
+import { useActionState, useDeferredValue, useEffect, useId, useMemo, useRef, useState } from 'react';
 
 import { formatCharacterCount } from '../constants/validation';
 import { PROMPT_LIMITS } from '../services/promptAdmission';
+import { findLookalike } from '../services/promptLookalike';
 import { MOTION, motionDuration } from '../theme/motion';
 import { DEFAULT_CATEGORY } from '../types';
 import type { PromptEditorProps } from '../types/components';
@@ -12,6 +13,7 @@ import { extractVariables } from '../utils/promptVariables';
 
 import ConfirmDialog from './ConfirmDialog';
 import CategoryChips from './editor/CategoryChips';
+import LookalikeCallout from './editor/LookalikeCallout';
 import { useShareCodeImport } from './editor/useShareCodeImport';
 import VariableTextarea from './editor/VariableTextarea';
 
@@ -42,6 +44,7 @@ const CheckIcon: FC = () => (
 const PromptEditor: FC<PromptEditorProps> = ({
   prompt,
   categories,
+  library = [],
   onSubmit,
   onClose,
   onDelete,
@@ -70,6 +73,8 @@ const PromptEditor: FC<PromptEditorProps> = ({
   const [category, setCategory] = useState(prompt?.category ?? DEFAULT_CATEGORY);
   const [saved, setSaved] = useState(false);
   const [confirming, setConfirming] = useState<'discard' | 'delete' | null>(null);
+  // Keep both: no more "This looks familiar" until the editor closes
+  const [keepBoth, setKeepBoth] = useState(false);
 
   const [importCategory, setImportCategory] = useState(DEFAULT_CATEGORY);
   // A Share code naming a Category of the Library imports into it; otherwise into the default one
@@ -190,6 +195,13 @@ const PromptEditor: FC<PromptEditorProps> = ({
     if (next === 'write') { shareCode.reset(); }
     setMode(next);
   };
+
+  // Compared once typing pauses: a long text against a large Library is not free
+  const deferredContent = useDeferredValue(content);
+  const lookalike = useMemo(
+    () => (keepBoth ? null : findLookalike(deferredContent, library, prompt?.id)),
+    [keepBoth, deferredContent, library, prompt?.id]
+  );
 
   const variables = extractVariables(content);
   const titleNearLimit = title.length >= PROMPT_LIMITS.title * NEAR_LIMIT;
@@ -354,6 +366,15 @@ const PromptEditor: FC<PromptEditorProps> = ({
                   <p id={contentErrorId} className="text-sm font-medium text-danger">{errors.content}</p>
                 )}
               </div>
+
+              {lookalike && (
+                <LookalikeCallout
+                  lookalike={lookalike}
+                  yours={deferredContent}
+                  onKeepBoth={() => { setKeepBoth(true); }}
+                  disabled={locked}
+                />
+              )}
 
               <section aria-label="Variables" className="flex flex-col gap-2">
                 <span className="text-xs font-bold text-secondary">Variables</span>
