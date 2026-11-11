@@ -584,6 +584,7 @@ describe('PromptSelectorController', () => {
 
     it.each([
       ['a click elsewhere', 'pointerdown', false],
+      ['a key pressed outside the field (Tab to another control)', 'keydown', false],
       ['a paste in the field', 'paste', true],
       ['a composed character in the field', 'compositionstart', true]
     ])('offers no Undo, and leaves the focus alone, after %s while the Platform took the text', async (_what, type, onField) => {

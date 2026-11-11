@@ -425,14 +425,15 @@ export class PromptSelectorController {
     const previous = readInputText(target);
     // Where the field is now: the Platform may replace it while it takes the text
     const lastField = boxOf(target);
-    // What the user does while the Platform takes the text: a key, a paste, a drop or a composed
-    // character in the field comes after the snapshot above, so Undo would discard it; a click
-    // anywhere puts the focus where they want it. Only the user's own actions are trusted events,
-    // and the events an Insertion sends are none of these
+    // What the user does while the Platform takes the text: a paste, a drop or a composed
+    // character in the field comes after the snapshot above, so Undo would discard it; a key or
+    // a click, wherever it lands, types in the field or takes the focus where they want it (Tab
+    // is pressed on whatever holds the focus by then). Only the user's own actions are trusted
+    // events, and the events an Insertion sends are none of these
     let movedOn = movedOnAlready;
     const inField = (event: Event): boolean => event.composedPath().includes(target);
     const onUserAction = (event: Event): void => {
-      if (event.isTrusted && (event.type === 'pointerdown' || inField(event))) {
+      if (event.isTrusted && (event.type === 'pointerdown' || event.type === 'keydown' || inField(event))) {
         movedOn = true;
       }
     };
