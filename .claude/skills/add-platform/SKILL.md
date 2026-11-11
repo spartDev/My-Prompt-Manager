@@ -509,7 +509,7 @@ window.__promptLibraryDebug?.strategies
 **Solutions:**
 1. Read `data-mpm-anchor` on the icon: `0` is the anchor the chain was written for; a higher index means the Platform's composer changed and a later anchor took over
 2. Update the `iconPlacement` chain in `platforms.ts` (the one source, no strategy keeps a copy), then refresh the Platform's file in `tests/fixtures/composers/` from the live composer
-3. When no anchor is found, the icon is anchored inside the editor's bottom-end corner (`src/content/core/anchored-overlay.ts`) and the console warns `No anchor of this Platform found in its composer, the icon is anchored on the editor instead`; when the Platform re-renders its Toolbar, `src/content/core/icon-placement.ts` places the icon again
+3. When no anchor is found, the icon is anchored inside the editor's bottom-end corner (`src/content/core/anchored-overlay.ts`) and, with debug mode on (`localStorage.setItem('prompt-library-debug', 'true')`, then reload; warnings are silent otherwise), the console warns `No anchor of this Platform found in its composer, the icon is anchored on the editor instead`; when the Platform re-renders its Toolbar, `src/content/core/icon-placement.ts` places the icon again
 
 **Example:**
 ```typescript

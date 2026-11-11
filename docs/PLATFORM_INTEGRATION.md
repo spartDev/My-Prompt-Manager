@@ -530,7 +530,7 @@ window.__promptLibraryDebug?.testInsertion?.('test content');
 
 **Button appears in wrong location:**
 - Adjust the `iconPlacement` chain in `platforms.ts` (no strategy keeps a copy)
-- A warning `No anchor of this Platform found in its composer, the icon is anchored on the editor instead` in the console means no anchor was found and the icon fell back to the editor's corner
+- With debug mode on (`localStorage.setItem('prompt-library-debug', 'true')`, then reload; warnings are silent otherwise), a warning `No anchor of this Platform found in its composer, the icon is anchored on the editor instead` in the console means no anchor was found and the icon fell back to the editor's corner
 - Check that `editor.closest(composer)` finds the composer, and that an anchor exists inside it
 
 **Content doesn't insert:**

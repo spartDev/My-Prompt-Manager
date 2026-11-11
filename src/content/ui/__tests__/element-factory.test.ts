@@ -200,7 +200,7 @@ describe('UIElementFactory', () => {
       expect(button.classList.contains('prompt-library-pill-compact')).toBe(true);
     });
 
-    it('finds the action bar above the wrappers that grow with the button', () => {
+    it('finds the Toolbar above the wrappers that grow with the button', () => {
       const icon = factory.createClaudeIcon();
       const wrapper = document.createElement('div');
       const bar = document.createElement('div');

@@ -9,7 +9,7 @@ import { expect } from './extension';
  * Stand-in input areas for the seven Platforms, served on each Platform's own hostname by route
  * interception. The manifest's content_scripts match that hostname, so the extension's real
  * content script runs on these pages exactly as it does on the live site; only the page is
- * a fixture. Each page has the input field and the action bar, inside the composer element, that the
+ * a fixture. Each page has the input field and the Toolbar, inside the composer element, that the
  * Platform's anchor chain (src/config/platforms.ts) looks for,
  * so the Prompts button is placed as on the live site. The input field is the first control Tab
  * reaches: the keyboard-only flows start there (insertion-flow.ts).
@@ -145,8 +145,8 @@ const CLAUDE_EDITOR_HTML = /* html */ `
 `;
 
 /**
- * A page with a plain input field and the action bar a Platform's strategy looks for, both in the
- * element the Platform's anchor chain takes for its composer (src/config/platforms.ts). The bar is
+ * A page with a plain input field and the Toolbar a Platform's anchor chain looks for, both in the
+ * element the Platform's anchor chain takes for its composer (src/config/platforms.ts). The Toolbar is
  * marked data-e2e="toolbar", so a test can tell the button is in it.
  */
 const plainPage = (title: string, field: string, bar: string, composer = 'form'): string => /* html */ `
