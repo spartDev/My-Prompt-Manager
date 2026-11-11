@@ -67,7 +67,7 @@ The five Prompts inserted most recently, latest first, as the Prompt selector li
 _Avoid_: History, last used
 
 **Toolbar**:
-The row of buttons in a Platform's input area (attach, voice, send…) where the icon is placed. Each Platform names its Toolbar once, in `src/config/platforms.ts`.
+The row of buttons in a Platform's input area (attach, voice, send…) where the icon is placed. Each Platform names where in it the icon goes once, in `src/config/platforms.ts`, as an anchor chain: buttons and groups named by what they are for (test ids, ARIA labels, custom elements), tried in order inside the composer.
 _Avoid_: Button container, actions bar
 
 **Anchored overlay**:

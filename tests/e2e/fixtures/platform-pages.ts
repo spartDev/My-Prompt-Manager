@@ -9,7 +9,8 @@ import { expect } from './extension';
  * Stand-in input areas for the seven Platforms, served on each Platform's own hostname by route
  * interception. The manifest's content_scripts match that hostname, so the extension's real
  * content script runs on these pages exactly as it does on the live site; only the page is
- * a fixture. Each page has the input field and the action bar the Platform's strategy looks for,
+ * a fixture. Each page has the input field and the action bar, inside the composer element, that the
+ * Platform's anchor chain (src/config/platforms.ts) looks for,
  * so the Prompts button is placed as on the live site. The input field is the first control Tab
  * reaches: the keyboard-only flows start there (insertion-flow.ts).
  *
@@ -75,8 +76,10 @@ const CHATGPT_REACT_HTML = /* html */ `
     </style>
   </head>
   <body>
-    <main id="root"></main>
-    <div class="ms-auto flex items-center gap-1.5" style="display: flex; gap: 6px; margin-top: 8px;"><button type="button">Voice</button></div>${ENTER_COUNTER}
+    <form>
+      <main id="root"></main>
+      <div data-e2e="toolbar" style="display: flex; gap: 6px; margin-top: 8px;"><button type="button" aria-label="Dictate">Mic</button><button type="button" aria-label="Start Voice">Voice</button></div>
+    </form>${ENTER_COUNTER}
     <script>
       const factories = {};
       const cache = {};
@@ -128,17 +131,25 @@ const CLAUDE_EDITOR_HTML = /* html */ `
   </head>
   <body>
     <main>
-      <div class="ProseMirror" contenteditable="true" role="textbox" aria-label="Write your prompt to Claude"></div>
-      <div class="relative flex-1 flex items-center gap-2 shrink min-w-0" style="display: flex; gap: 8px; margin-top: 8px;">
-        <div class="flex shrink"><button type="button">Tools</button></div>
+      <div>
+        <div class="ProseMirror" contenteditable="true" role="textbox" data-testid="chat-input" aria-label="Write your prompt to Claude"></div>
+        <div data-e2e="toolbar" style="display: flex; gap: 8px; margin-top: 8px;">
+          <button type="button" data-testid="chat-input-attach" aria-label="Add files, connectors, and more">+</button>
+          <div data-testid="composer-dictate"><button type="button" aria-label="Dictate">Mic</button></div>
+          <button type="button" data-testid="chat-input-send" aria-label="Send message">Send</button>
+        </div>
       </div>
     </main>${ENTER_COUNTER}
   </body>
 </html>
 `;
 
-/** A page with a plain input field and the action bar a Platform's strategy looks for. */
-const plainPage = (title: string, field: string, bar: string): string => /* html */ `
+/**
+ * A page with a plain input field and the action bar a Platform's strategy looks for, both in the
+ * element the Platform's anchor chain takes for its composer (src/config/platforms.ts). The bar is
+ * marked data-e2e="toolbar", so a test can tell the button is in it.
+ */
+const plainPage = (title: string, field: string, bar: string, composer = 'form'): string => /* html */ `
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -148,12 +159,15 @@ const plainPage = (title: string, field: string, bar: string): string => /* html
       body { font-family: sans-serif; margin: 24px; }
       .field { display: block; width: 480px; min-height: 120px; padding: 8px; border: 1px solid #ccc; white-space: pre-wrap; }
       .bar { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+      fieldset { border: 0; margin: 0; padding: 0; }
     </style>
   </head>
   <body>
     <main>
-      ${field}
-      ${bar}
+      <${composer}>
+        ${field}
+        ${bar}
+      </${composer.split(' ')[0]}>
     </main>${ENTER_COUNTER}
   </body>
 </html>
@@ -162,31 +176,34 @@ const plainPage = (title: string, field: string, bar: string): string => /* html
 const MISTRAL_HTML = plainPage(
   'Le Chat',
   '<div class="field" contenteditable="true" aria-label="Ask Le Chat"></div>',
-  '<div class="bar flex w-full max-w-full items-center justify-start gap-3"><button type="button">Tools</button><div class="flex ms-auto"><button type="button">Send</button></div></div>'
+  '<div class="bar" data-e2e="toolbar"><button type="button">Fast</button><button type="button" aria-label="Voice Mode">Voice</button></div>'
 );
 
 const GEMINI_HTML = plainPage(
   'Gemini',
   '<rich-textarea><div class="field ql-editor" contenteditable="true" role="textbox" data-placeholder="Ask Gemini"></div></rich-textarea>',
-  '<div class="bar input-buttons-wrapper-bottom"><button type="button">Mic</button></div>'
+  '<div class="bar trailing-actions-wrapper" data-e2e="toolbar"><div class="input-buttons-wrapper-bottom"><speech-dictation-mic-button><button type="button" aria-label="Dictate">Mic</button></speech-dictation-mic-button></div></div>',
+  'fieldset class="input-area-fieldset"'
 );
 
 const PERPLEXITY_HTML = plainPage(
   'Perplexity',
   '<div class="field" id="ask-input" contenteditable="true" role="textbox" aria-label="Ask anything"></div>',
-  '<div class="bar flex items-center justify-self-end col-start-3 row-start-2"><button type="button">Voice</button></div>'
+  '<div class="bar" data-e2e="toolbar"><div data-testid="ask-input-mode-toggle-indicator"></div><button type="button" aria-haspopup="menu" aria-label="Model">Model</button><button type="button" aria-label="Dictation">Mic</button></div>',
+  'div'
 );
 
 const COPILOT_HTML = plainPage(
   'Microsoft Copilot',
   '<textarea class="field" id="userInput" data-testid="composer-input" placeholder="Message Copilot"></textarea>',
-  '<div class="bar"><div class="relative"><button type="button" data-testid="audio-call-button" aria-label="Talk to Copilot">Mic</button></div></div>'
+  '<div class="bar" data-e2e="toolbar"><div><button type="button" data-testid="audio-call-button" aria-label="Talk to Copilot">Mic</button></div></div>'
 );
 
 const M365COPILOT_HTML = plainPage(
   'Microsoft 365 Copilot',
   '<span class="field" id="m365-chat-editor-target-element" data-lexical-editor="true" contenteditable="true" role="combobox" aria-label="Message Copilot"></span>',
-  '<div class="bar fai-ChatInput__actions"><button type="button">Mic</button></div>'
+  '<div class="bar fai-ChatInput__actions" data-e2e="toolbar"><button type="button">Mic</button></div>',
+  'div class="fai-ChatInput"'
 );
 
 /**
@@ -207,19 +224,20 @@ const PARAGRAPH_EDITOR = /* html */ `
       });
     </script>`;
 
-const paragraphEditorPage = (title: string, field: string, bar: string): string =>
-  plainPage(title, field, bar).replace('</body>', `${PARAGRAPH_EDITOR}\n  </body>`);
+const paragraphEditorPage = (title: string, field: string, bar: string, composer?: string): string =>
+  plainPage(title, field, bar, composer).replace('</body>', `${PARAGRAPH_EDITOR}\n  </body>`);
 
 const CHATGPT_EDITOR_HTML = paragraphEditorPage(
   'ChatGPT',
   '<div class="field ProseMirror" id="prompt-textarea" contenteditable="true" role="textbox" aria-label="Chat with ChatGPT"><p><br></p></div>',
-  '<div class="bar ms-auto flex items-center gap-1.5"><button type="button">Voice</button></div>'
+  '<div class="bar" data-e2e="toolbar"><button type="button" aria-label="Dictate">Mic</button><button type="button" aria-label="Start Voice">Voice</button></div>',
+  'fieldset'
 );
 
 const MISTRAL_EDITOR_HTML = paragraphEditorPage(
   'Le Chat',
   '<div class="field ProseMirror" contenteditable="true" aria-label="Ask Le Chat"><p><br></p></div>',
-  '<div class="bar flex w-full max-w-full items-center justify-start gap-3"><button type="button">Tools</button><div class="flex ms-auto"><button type="button">Send</button></div></div>'
+  '<div class="bar" data-e2e="toolbar"><button type="button">Fast</button><button type="button" aria-label="Voice Mode">Voice</button></div>'
 );
 
 /**
@@ -298,7 +316,8 @@ const LEXICAL_EDITOR = /* html */ `
 const PERPLEXITY_EDITOR_HTML = plainPage(
   'Perplexity',
   '<div class="field" id="ask-input" data-lexical-editor="true" contenteditable="true" role="textbox" aria-label="Ask anything"></div>',
-  '<div class="bar flex items-center justify-self-end col-start-3 row-start-2"><button type="button">Voice</button></div>'
+  '<div class="bar" data-e2e="toolbar"><div data-testid="ask-input-mode-toggle-indicator"></div><button type="button" aria-haspopup="menu" aria-label="Model">Model</button><button type="button" aria-label="Dictation">Mic</button></div>',
+  'div'
 ).replace('</body>', `${LEXICAL_EDITOR}\n  </body>`);
 
 /**

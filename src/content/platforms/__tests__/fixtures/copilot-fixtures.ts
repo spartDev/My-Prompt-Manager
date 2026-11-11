@@ -175,12 +175,6 @@ export const COPILOT_SELECTORS = [
 ] as const;
 
 /**
- * Expected button container selector for Copilot platform
- */
-export const COPILOT_BUTTON_CONTAINER_SELECTOR =
-  '.relative.bottom-0.flex.justify-between.pb-0\\.5.pe-2\\.5.ps-1\\.5 > .flex.gap-2.items-center:last-child';
-
-/**
  * Default hostname for Copilot platform
  */
 export const COPILOT_HOSTNAME = 'copilot.microsoft.com';
@@ -192,6 +186,5 @@ export const COPILOT_CONFIG = {
   name: 'copilot',
   priority: 80,
   hostname: COPILOT_HOSTNAME,
-  selectors: COPILOT_SELECTORS,
-  buttonContainerSelector: COPILOT_BUTTON_CONTAINER_SELECTOR
+  selectors: COPILOT_SELECTORS
 } as const;

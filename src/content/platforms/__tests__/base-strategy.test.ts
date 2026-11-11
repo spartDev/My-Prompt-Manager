@@ -90,24 +90,6 @@ describe('PlatformStrategy', () => {
     });
   });
 
-  describe('getButtonContainerSelector', () => {
-    it('should return button container selector from config', () => {
-      const config = { 
-        selectors: ['textarea'], 
-        buttonContainerSelector: '.button-container',
-        priority: 100 
-      };
-      const strategy = new TestStrategy('test', 50, config);
-
-      expect(strategy.getButtonContainerSelector()).toBe('.button-container');
-    });
-
-    it('should return null when no button container selector in config', () => {
-      const strategy = new TestStrategy();
-      expect(strategy.getButtonContainerSelector()).toBeNull();
-    });
-  });
-
   describe('createIcon', () => {
     it('should return null by default', () => {
       const strategy = new TestStrategy();

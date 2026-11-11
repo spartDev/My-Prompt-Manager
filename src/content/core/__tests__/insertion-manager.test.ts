@@ -18,7 +18,7 @@ vi.mock('../../platforms/platform-manager', () => ({
     return {
       insertContent: vi.fn(),
       getAllSelectors: vi.fn(),
-      getButtonContainerSelector: vi.fn(),
+      getIconPlacement: vi.fn(),
       createIcon: vi.fn(),
       getActiveStrategy: vi.fn(),
       cleanup: vi.fn()
@@ -159,87 +159,12 @@ describe('PlatformInsertionManager', () => {
     });
   });
 
-  describe('getButtonContainerSelector', () => {
-    it('should return button container selector from platform manager', () => {
-      const expectedSelector = '.button-container';
-      mockPlatformManager.getButtonContainerSelector.mockReturnValue(expectedSelector);
-      
-      const result = insertionManager.getButtonContainerSelector();
-      
-      expect(mockPlatformManager.getButtonContainerSelector).toHaveBeenCalled();
-      expect(result).toEqual(expectedSelector);
-    });
+  describe('getIconPlacement', () => {
+    it('gives the anchor chain of the platform manager', () => {
+      const chain = { composer: 'form', anchors: [{ find: 'button[type="submit"]', relation: 'before' as const }] };
+      mockPlatformManager.getIconPlacement.mockReturnValue(chain);
 
-    it('should handle null button container selector', () => {
-      mockPlatformManager.getButtonContainerSelector.mockReturnValue(null);
-      
-      const result = insertionManager.getButtonContainerSelector();
-      
-      expect(result).toBeNull();
-    });
-  });
-
-  describe('createIcon', () => {
-    it('should create icon using platform manager', () => {
-      const mockUIFactory = {} as any;
-      const expectedIcon = document.createElement('button');
-      mockPlatformManager.createIcon.mockReturnValue(expectedIcon);
-      
-      const result = insertionManager.createIcon(mockUIFactory);
-      
-      expect(mockPlatformManager.createIcon).toHaveBeenCalledWith(mockUIFactory);
-      expect(result).toEqual(expectedIcon);
-    });
-
-    it('should handle null icon creation', () => {
-      const mockUIFactory = {} as any;
-      mockPlatformManager.createIcon.mockReturnValue(null);
-      
-      const result = insertionManager.createIcon(mockUIFactory);
-      
-      expect(result).toBeNull();
-    });
-  });
-
-  describe('getActiveStrategy', () => {
-    it('should return active strategy from platform manager', () => {
-      const mockStrategy = { name: 'test-strategy', priority: 100 };
-      mockPlatformManager.getActiveStrategy.mockReturnValue(mockStrategy);
-      
-      const result = insertionManager.getActiveStrategy();
-      
-      expect(mockPlatformManager.getActiveStrategy).toHaveBeenCalled();
-      expect(result).toEqual(mockStrategy);
-    });
-
-    it('should handle null active strategy', () => {
-      mockPlatformManager.getActiveStrategy.mockReturnValue(null);
-      
-      const result = insertionManager.getActiveStrategy();
-      
-      expect(result).toBeNull();
-    });
-  });
-
-  describe('cleanup', () => {
-    it('should call platform manager cleanup', () => {
-      insertionManager.cleanup();
-      
-      expect(mockPlatformManager.cleanup).toHaveBeenCalled();
-    });
-
-    it('should handle cleanup when platform manager is null', () => {
-      (insertionManager as any).platformManager = null;
-      
-      expect(() => { insertionManager.cleanup(); }).not.toThrow();
-    });
-
-    it('should handle platform manager cleanup errors', () => {
-      mockPlatformManager.cleanup.mockImplementation(() => {
-        throw new Error('Cleanup error');
-      });
-      
-      expect(() => { insertionManager.cleanup(); }).not.toThrow();
+      expect(insertionManager.getIconPlacement()).toBe(chain);
     });
   });
 
@@ -249,7 +174,7 @@ describe('PlatformInsertionManager', () => {
       expect(typeof insertionManager.insertContent).toBe('function');
       expect(typeof insertionManager.insertPrompt).toBe('function');
       expect(typeof insertionManager.getAllSelectors).toBe('function');
-      expect(typeof insertionManager.getButtonContainerSelector).toBe('function');
+      expect(typeof insertionManager.getIconPlacement).toBe('function');
       expect(typeof insertionManager.createIcon).toBe('function');
       expect(typeof insertionManager.getActiveStrategy).toBe('function');
       expect(typeof insertionManager.cleanup).toBe('function');

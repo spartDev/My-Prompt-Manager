@@ -19,7 +19,6 @@ export class DefaultStrategy extends PlatformStrategy {
         'div[contenteditable="true"]',
         '[role="textbox"]'
       ],
-      buttonContainerSelector: undefined, // No specific container for default
       priority: 0
     }, hostname);
   }

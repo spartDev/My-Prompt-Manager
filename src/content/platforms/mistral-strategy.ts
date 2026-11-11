@@ -15,7 +15,6 @@ export class MistralStrategy extends PlatformStrategy {
         'textarea[placeholder*="chat"]',
         '[role="textbox"]'
       ],
-      buttonContainerSelector: getPlatformById('mistral')?.buttonContainerSelector,
       priority: MISTRAL_PLATFORM_PRIORITY
     }, hostname);
   }

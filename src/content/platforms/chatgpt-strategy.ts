@@ -31,7 +31,6 @@ export class ChatGPTStrategy extends PlatformStrategy {
         '[data-testid*="input"]',
         '[class*="input"]'
       ],
-      buttonContainerSelector: getPlatformById('chatgpt')?.buttonContainerSelector,
       priority: 90
     }, hostname);
   }

@@ -6,6 +6,7 @@
  * by the legacy code while using the improved modular architecture.
  */
 
+import type { IconPlacement } from '../../config/platforms';
 import { PlatformManager } from '../platforms/platform-manager';
 import type { InsertionResult } from '../types/index';
 import type { UIElementFactory } from '../ui/element-factory';
@@ -84,11 +85,11 @@ export class PlatformInsertionManager {
   }
 
   /**
-   * Gets button container selector for the current platform
-   * @returns string|null Button container selector
+   * Where the icon goes in the active Platform's composer
+   * @returns The anchor chain, or undefined on a custom site or a disabled one
    */
-  getButtonContainerSelector(): string | null {
-    return this.platformManager.getButtonContainerSelector();
+  getIconPlacement(): IconPlacement | undefined {
+    return this.platformManager.getIconPlacement();
   }
 
   /**

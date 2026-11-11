@@ -23,7 +23,7 @@ import { injectCSS } from '../utils/styles';
 import { ThemeManager } from '../utils/theme-manager';
 
 import { AnchoredOverlay, INSIDE_CORNER_INSET } from './anchored-overlay';
-import { IconPlacementController } from './icon-placement';
+import { IconPlacementController, placeAtAnchor, resolveIconPlacement } from './icon-placement';
 import { PlatformInsertionManager } from './insertion-manager';
 
 export interface InjectorState {
@@ -976,166 +976,13 @@ export class PromptLibraryInjector {
         this.showPromptSelector(textarea);
       });
 
-      // Try to inject into platform-specific container first
-      const containerSelector = this.platformManager.getButtonContainerSelector();
-      let injected = false;
-
-      debug(`Current hostname: ${this.state.hostname}, containerSelector: ${containerSelector ?? 'none'}`);
-
-      // For Copilot, find the microphone button and insert our icon before it
-      // Run this FIRST before checking containerSelector
-      if (this.state.hostname === 'copilot.microsoft.com') {
-        debug('Attempting Copilot-specific icon injection');
-
-        // Find the "Talk to Copilot" microphone button
-        const micButton = document.querySelector('button[data-testid="audio-call-button"]') ||
-                         document.querySelector('button[aria-label*="Talk to Copilot"]');
-
-        debug(`Microphone button found: ${micButton ? 'yes' : 'no'}`);
-
-        if (micButton) {
-          // Find the parent .relative wrapper first
-          const micWrapper = micButton.closest('div.relative');
-          debug(`Microphone wrapper found: ${micWrapper ? 'yes' : 'no'}`);
-
-          if (micWrapper) {
-            // Get the grandparent flex container
-            const micButtonContainer = micWrapper.parentElement;
-            debug(`Microphone button container found: ${micButtonContainer ? 'yes' : 'no'}, classes: ${micButtonContainer?.className ?? 'none'}`);
-
-            // If we found the container, insert our icon wrapper before the mic button wrapper
-            if (micButtonContainer) {
-              // Ensure the icon doesn't have absolute positioning class
-              icon.classList.remove('prompt-library-icon-absolute');
-
-              // Create a wrapper div for our icon to match Copilot's structure
-              const iconWrapper = document.createElement('div');
-              iconWrapper.className = 'relative';
-              iconWrapper.appendChild(icon);
-
-              // Insert our icon before the microphone button wrapper
-              micButtonContainer.insertBefore(iconWrapper, micWrapper);
-              injected = true;
-              debug('Icon injected before "Talk to Copilot" microphone button');
-            }
-          }
-        } else {
-          debug('Microphone button not found, will use fallback positioning');
-        }
-      }
-
-      if (containerSelector) {
-        // For Claude, find the clock/history button and inject after it
-        if (this.state.hostname === 'claude.ai') {
-          // Look for the toolbar container first
-          const toolbarContainer = document.querySelector(containerSelector);
-          let clockButtonContainer = null;
-
-          if (toolbarContainer) {
-            // Find all button containers within the toolbar
-            const buttonContainers = toolbarContainer.querySelectorAll('div.flex.shrink');
-
-            // The clock button is typically the last button before the empty flex spacer
-            // It contains an SVG with a specific clock icon path
-            for (const container of buttonContainers) {
-              const button = container.querySelector('button');
-              if (!button) {
-                continue;
-              }
-
-              // Check if this button has an SVG with the clock icon path
-              const svg = button.querySelector('svg');
-              if (svg) {
-                const path = svg.querySelector('path');
-                if (path) {
-                  const pathData = path.getAttribute('d');
-                  // Check for clock icon signature (path starts with coordinates around 10.38 or similar circle/clock pattern)
-                  if (pathData && (pathData.includes('M10.3857') || pathData.includes('M10 5.5'))) {
-                    clockButtonContainer = container;
-                    break;
-                  }
-                }
-              }
-            }
-
-            // Fallback: if we couldn't find by SVG path, use the last button container before flex-row
-            if (!clockButtonContainer && buttonContainers.length > 0) {
-              clockButtonContainer = buttonContainers[buttonContainers.length - 1];
-            }
-          }
-
-          if (clockButtonContainer && clockButtonContainer.parentElement) {
-            // Create a similar wrapper div structure for our button
-            const buttonWrapper = document.createElement('div');
-            buttonWrapper.className = 'flex min-w-8 !shrink-0';
-            buttonWrapper.setAttribute('data-state', 'closed');
-            buttonWrapper.style.opacity = '1';
-            buttonWrapper.style.transform = 'none';
-            buttonWrapper.appendChild(icon);
-
-            // Insert after the clock button container
-            clockButtonContainer.parentElement.insertBefore(buttonWrapper, clockButtonContainer.nextSibling);
-            injected = true;
-            debug('Icon injected after clock/history button in Claude toolbar');
-          }
-        }
-        
-        // For Perplexity, find the toolbar container and inject as first child
-        if (this.state.hostname === 'www.perplexity.ai' && !injected) {
-          // Use the strategy's button container selector
-          const toolbarContainer = document.querySelector(containerSelector);
-          if (toolbarContainer) {
-            // Insert as the first child in the container
-            toolbarContainer.insertBefore(icon, toolbarContainer.firstChild);
-            injected = true;
-            debug('Icon injected as first button in Perplexity toolbar');
-          }
-        }
-        
-        // For ChatGPT, find the container and inject as first child
-        if (this.state.hostname === 'chatgpt.com' && !injected) {
-          const container = document.querySelector(containerSelector);
-          if (container) {
-            // Insert as the first child in the container
-            container.insertBefore(icon, container.firstChild);
-            injected = true;
-            debug('Icon injected as first button in ChatGPT toolbar');
-          }
-        }
-        
-        // For Mistral, find the ms-auto div and insert our button before it
-        if (this.state.hostname === 'chat.mistral.ai' && !injected) {
-          const container = document.querySelector(containerSelector);
-          if (container) {
-            // Find the ms-auto div within the container
-            const msAutoDiv = container.querySelector('.flex.ms-auto');
-            if (msAutoDiv) {
-              // Insert our button before the ms-auto div
-              container.insertBefore(icon, msAutoDiv);
-              injected = true;
-              debug('Icon injected before ms-auto div in Mistral toolbar');
-            } else {
-              // Fallback: insert as last child before any potential ms-auto elements
-              container.appendChild(icon);
-              injected = true;
-              debug('Icon injected into Mistral container (ms-auto not found)');
-            }
-          }
-        }
-
-        // Fallback to generic container selector
-        if (!injected) {
-          const container = document.querySelector(containerSelector);
-          if (container) {
-            container.appendChild(icon);
-            injected = true;
-            debug('Icon injected into platform container');
-          }
-        }
-      }
-
-      if (injected) {
-        this.placement.track(icon, textarea, 'toolbar');
+      // Into the Platform's composer, at the first anchor of its chain that is found there
+      const iconPlacement = this.platformManager.getIconPlacement();
+      const resolution = resolveIconPlacement(textarea, iconPlacement);
+      const injected = resolution !== null;
+      if (resolution) {
+        placeAtAnchor(icon, resolution);
+        this.placement.track(icon, textarea, 'toolbar', resolution.index);
       }
 
       // Check if we have custom positioning configuration (declare outside if block for scope)
@@ -1312,7 +1159,7 @@ export class PromptLibraryInjector {
         }
 
         // No toolbar and no custom positioning: the icon is anchored on the editor itself
-        await this.placeOnEditor(icon, textarea, containerSelector);
+        await this.placeOnEditor(icon, textarea, iconPlacement !== undefined);
       }
 
       debug('Icon injection completed', { 
@@ -1327,17 +1174,16 @@ export class PromptLibraryInjector {
 
   /**
    * Places the icon on the editor when the Platform's toolbar was not found: anchored inside its
-   * bottom-end corner, following scroll and resize. On a built-in Platform, a toolbar selector that
-   * matched nothing is the sign its UI changed, so it is logged as a warning.
+   * bottom-end corner, following scroll and resize. On a built-in Platform, an anchor chain that
+   * found nothing is the sign its UI changed, so it is logged as a warning.
    */
-  private async placeOnEditor(icon: HTMLElement, textarea: HTMLElement, containerSelector: string | null): Promise<void> {
-    if (containerSelector) {
-      warn('Toolbar not found on this Platform, the icon is anchored on the editor instead', {
-        hostname: this.state.hostname,
-        containerSelector
+  private async placeOnEditor(icon: HTMLElement, textarea: HTMLElement, hasAnchorChain: boolean): Promise<void> {
+    if (hasAnchorChain) {
+      warn('No anchor of this Platform found in its composer, the icon is anchored on the editor instead', {
+        hostname: this.state.hostname
       });
     } else {
-      debug('No toolbar selector for this site, the icon is anchored on the editor');
+      debug('No anchor chain for this site, the icon is anchored on the editor');
     }
 
     // Alone on the editor, the Prompts button is its badge only (the stylesheet reads

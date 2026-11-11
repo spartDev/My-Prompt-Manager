@@ -46,7 +46,6 @@ export class ClaudeStrategy extends PlatformStrategy {
       selectors: [
         'div[contenteditable="true"][role="textbox"].ProseMirror'
       ],
-      buttonContainerSelector: getPlatformById('claude')?.buttonContainerSelector,
       priority: 100
     }, hostname);
   }
@@ -96,9 +95,7 @@ export class ClaudeStrategy extends PlatformStrategy {
    * Creates Claude-specific icon using the UI factory
    */
   createIcon(uiFactory: UIElementFactory): HTMLElement | null {
-    const result = uiFactory.createClaudeIcon();
-    // createClaudeIcon returns { container, icon }, we want the container for Claude
-    return result.container;
+    return uiFactory.createClaudeIcon();
   }
 
   /**

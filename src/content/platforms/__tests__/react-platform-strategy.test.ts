@@ -95,7 +95,6 @@ describe('ReactPlatformStrategy', () => {
     it('should initialize with custom configuration', () => {
       const customConfig: PlatformConfig = {
         selectors: ['textarea.custom'],
-        buttonContainerSelector: 'div.button-container',
         priority: 75
       };
 

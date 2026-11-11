@@ -8,7 +8,6 @@ import type { InsertionResult } from './index';
 
 export interface PlatformConfig {
   selectors: string[];
-  buttonContainerSelector?: string;
   priority: number;
 }
 
@@ -19,7 +18,6 @@ export interface PlatformStrategyInterface {
   insert(element: HTMLElement, content: string): Promise<InsertionResult>;
   restore(element: HTMLElement, text: string): Promise<InsertionResult>;
   getSelectors(): string[];
-  getButtonContainerSelector(): string | null;
   createIcon?(uiFactory: UIElementFactory): HTMLElement | null;
   cleanup?(): void;
 }

@@ -41,10 +41,7 @@ describe('ClaudeStrategy', () => {
     mockElement.classList.add('ProseMirror');
 
     mockUIFactory = {
-      createClaudeIcon: vi.fn().mockReturnValue({
-        container: document.createElement('div'),
-        icon: document.createElement('button')
-      })
+      createClaudeIcon: vi.fn().mockReturnValue(document.createElement('button'))
     } as any;
 
     vi.clearAllMocks();
@@ -97,8 +94,8 @@ describe('ClaudeStrategy', () => {
   describe('insert', () => {
     beforeEach(() => {
       // Mock DOM methods
-      vi.spyOn(mockElement, 'focus').mockImplementation(() => {});
-      vi.spyOn(mockElement, 'click').mockImplementation(() => {});
+      vi.spyOn(mockElement, 'focus').mockImplementation(() => undefined);
+      vi.spyOn(mockElement, 'click').mockImplementation(() => undefined);
       vi.spyOn(mockElement, 'dispatchEvent').mockImplementation(() => true);
       
       // Mock execCommand on document
@@ -180,8 +177,8 @@ describe('ClaudeStrategy', () => {
       proseMirrorChild.contentEditable = 'true';
       parentElement.appendChild(proseMirrorChild);
       
-      vi.spyOn(proseMirrorChild, 'focus').mockImplementation(() => {});
-      vi.spyOn(proseMirrorChild, 'click').mockImplementation(() => {});
+      vi.spyOn(proseMirrorChild, 'focus').mockImplementation(() => undefined);
+      vi.spyOn(proseMirrorChild, 'click').mockImplementation(() => undefined);
       vi.spyOn(proseMirrorChild, 'dispatchEvent').mockImplementation(() => true);
       
       const result = await strategy.insert(parentElement, 'test content');

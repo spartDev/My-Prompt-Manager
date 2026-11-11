@@ -56,13 +56,6 @@ describe('MistralStrategy', () => {
         '[role="textbox"]'
       ]);
     });
-
-    it('should configure button container selector', () => {
-      const containerSelector = strategy.getButtonContainerSelector();
-      expect(containerSelector).toContain('.flex.w-full.max-w-full.items-center.justify-start.gap-3');
-      expect(containerSelector).toContain('.flex.w-full.items-center.justify-start.gap-3');
-      expect(containerSelector).toContain('.flex.items-center.justify-start.gap-3');
-    });
   });
 
   describe('canHandle', () => {

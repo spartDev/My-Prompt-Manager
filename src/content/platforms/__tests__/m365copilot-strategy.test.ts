@@ -18,7 +18,6 @@ import {
   createM365CopilotElementWithConfig,
   createM365CopilotTextarea,
   createMockUIFactory,
-  M365_COPILOT_BUTTON_CONTAINER_SELECTOR,
   M365_COPILOT_CONFIG, 
   M365_COPILOT_SELECTORS,
   resetMockHostname,
@@ -77,11 +76,6 @@ describe('M365CopilotStrategy', () => {
       M365_COPILOT_SELECTORS.forEach((selector) => {
         expect(selectors).toContain(selector);
       });
-    });
-
-    it('should have correct button container selector', () => {
-      const buttonSelector = strategy.getButtonContainerSelector();
-      expect(buttonSelector).toBe(M365_COPILOT_BUTTON_CONTAINER_SELECTOR);
     });
 
     it('should initialize strategy with correct priority', () => {

@@ -46,7 +46,7 @@ document.querySelectorAll('[role="textbox"]')
 
 **What to find:**
 - CSS selector for the text input element
-- Container where the icon should be placed
+- The composer around the input element, and the elements of its Toolbar the icon can sit next to, by what they are for: a `data-testid`, a custom element, an ARIA label, a button `type`
 - Input element type (textarea, contenteditable, or custom)
 
 **Common patterns:**
@@ -75,7 +75,13 @@ export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
       'div[contenteditable="true"][role="textbox"]',
       '[role="textbox"]'                         // Generic fallback
     ],
-    buttonContainerSelector: '.toolbar-container', // Composer toolbar the icon goes in (optional; a selector list works)
+    iconPlacement: {                              // Where the icon goes (optional; see Step 9)
+      composer: 'form',                           // Found with editor.closest(): bounds the search
+      anchors: [                                  // Tried in order inside the composer; first found wins
+        { find: 'button[data-testid="voice-button"]', relation: 'before' },
+        { find: 'button[type="submit"]', relation: 'before' }
+      ]
+    },
     strategyClass: 'YourPlatformStrategy',        // Strategy class name
     hostnamePatterns: ['yourplatform', 'your-ai'], // Additional hostname patterns
     brandColors: {                                // Logo square when on: brand data, so arbitrary hex values
@@ -129,7 +135,6 @@ export class YourPlatformStrategy extends PlatformStrategy {
         'textarea[placeholder*="Enter your message"]',
         'div[contenteditable="true"][role="textbox"]'
       ],
-      buttonContainerSelector: getPlatformById('yourplatform')?.buttonContainerSelector, // From platforms.ts, never a copy
       priority: 70
     }, hostname);
   }
@@ -406,12 +411,14 @@ npm run lint:fix
 
 ### Step 9: Place the Prompts button
 
-The button that opens the Prompt selector is the same on every Platform: a pill with the extension's badge and the label "Prompts", built by the private `createPill()` of `src/content/ui/element-factory.ts` and styled by `src/content/utils/styles.ts`. It follows the extension's theme, not the Platform's. A Platform chooses where the button goes and what wraps it, never how it looks: do not copy the Platform's native button classes onto it, and add no icon or label of your own.
+The button that opens the Prompt selector is the same on every Platform: a pill with the extension's badge and the label "Prompts", built by the private `createPill()` of `src/content/ui/element-factory.ts` and styled by `src/content/utils/styles.ts`. It follows the extension's theme, not the Platform's. A Platform chooses where the button goes, never how it looks or what wraps it: do not copy the Platform's native button classes onto it, and add no icon or label of your own.
 
-- **In the Platform's action bar (recommended for a built-in Platform).** Give the Platform a `buttonContainerSelector` and, when its bar needs a wrapper around each button, a method in `UIElementFactory` that returns the pill inside that wrapper (see `createClaudeIcon()`). A method that needs no wrapper returns `this.createPill('prompt-library-integrated-icon')` (see `createChatGPTIcon()`). Keep the class `prompt-library-integrated-icon`: the injector and the e2e tests find the button by it.
+- **In the Platform's Toolbar (recommended for a built-in Platform).** Give the Platform an `iconPlacement` in `platforms.ts`: a `composer` selector, found with `editor.closest()`, and `anchors` tried in order inside it, each with a `relation` (`before`, `after`, `inside-start`, `inside-end`). The first anchor found wins; the icon gets `data-mpm-placement="toolbar"` and `data-mpm-anchor="<index>"`. Name anchors by what the elements are for (`data-testid`, custom elements, ARIA labels, `button[type="submit"]`, semantic class names such as `.input-buttons-wrapper-bottom` or Fluent's `.fai-ChatInput__actions`), never by Tailwind utility chains, hashed CSS-in-JS classes or SVG path data: the guard "Icon placement selectors" in `src/config/__tests__/platforms.test.ts` fails on those. Prefer anchors that do not depend on the language (test ids, custom elements) over ARIA labels, which follow the user's locale. If the Platform needs its own icon method in `UIElementFactory`, it returns `this.createPill('prompt-library-integrated-icon')` (see `createChatGPTIcon()`), with no wrapper. Keep the class `prompt-library-integrated-icon`: the injector and the e2e tests find the button by it.
 - **Laid over the page.** `uiFactory.createFloatingIcon()` needs nothing else. Laid over the page, the button is its badge alone, 32px wide, because the place it takes was chosen for a 32px button.
 
 When a Platform's bar has no room for the label, `fitPromptsPill()` shrinks the button to its badge on its own.
+
+Save a sanitized copy of the Platform's live composer in `tests/fixtures/composers/`, named after the Platform id, as `tests/fixtures/composers/claude.html` is (strip user content and tokens), and add `'yourplatform'` to the `it.each` list of `src/content/core/__tests__/icon-placement-chains.test.ts`, which checks that the chain resolves its first anchor on that fixture.
 
 Add a stand-in page for the Platform to `tests/e2e/fixtures/platform-pages.ts` (its input field and its action bar), so `tests/e2e/content/prompt-selector.spec.ts` and `tests/e2e/content/prompt-insertion.spec.ts` (the `//` trigger, the confirmation, Undo) run the whole flow on it. Undo goes through `restore()` of the base strategy, which replaces the whole field; override it only when the Platform's editor does not take `execCommand`.
 
@@ -500,17 +507,20 @@ window.__promptLibraryDebug?.strategies
 **Symptoms:** Icon is visible but poorly positioned
 
 **Solutions:**
-1. Update `buttonContainerSelector` in `platforms.ts`; the strategy reads it from there, so never copy it into the strategy
-2. Use multiple container selectors (comma-separated) for fallbacks
-3. When none matches, the icon is anchored inside the editor's bottom-end corner (`src/content/core/anchored-overlay.ts`) and the console warns `Toolbar not found on this Platform`; when the Platform re-renders its toolbar, `src/content/core/icon-placement.ts` places the icon again
+1. Read `data-mpm-anchor` on the icon: `0` is the anchor the chain was written for; a higher index means the Platform's composer changed and a later anchor took over
+2. Update the `iconPlacement` chain in `platforms.ts` (the one source, no strategy keeps a copy), then refresh the Platform's file in `tests/fixtures/composers/` from the live composer
+3. When no anchor is found, the icon is anchored inside the editor's bottom-end corner (`src/content/core/anchored-overlay.ts`) and the console warns `No anchor of this Platform found in its composer, the icon is anchored on the editor instead`; when the Platform re-renders its Toolbar, `src/content/core/icon-placement.ts` places the icon again
 
 **Example:**
 ```typescript
-buttonContainerSelector: [
-  '.primary-container',   // Try first
-  '.fallback-container',  // Then this
-  '.generic-container'    // Final fallback
-].join(', ')
+iconPlacement: {
+  composer: 'fieldset, input-area-v2',
+  anchors: [
+    { find: 'speech-dictation-mic-button', relation: 'after' },        // Try first
+    { find: '.input-buttons-wrapper-bottom', relation: 'inside-end' }, // Then this
+    { find: '.trailing-actions-wrapper', relation: 'inside-end' }      // Last
+  ]
+}
 ```
 
 ### Pitfall 3: Content Doesn't Insert
@@ -676,7 +686,7 @@ Use this checklist when adding a new platform:
 - [ ] **Step 7:** Tested manually in browser
 - [ ] **Step 8:** All tests pass (`npm test`)
 - [ ] **Step 8:** Linting passes (`npm run lint`)
-- [ ] **Step 9:** Created custom icon (optional)
+- [ ] **Step 9:** Placed the Prompts button: `iconPlacement` chain, composer fixture, id in `icon-placement-chains.test.ts`
 - [ ] **Step 10:** Updated documentation
 
 ## Related Documentation
