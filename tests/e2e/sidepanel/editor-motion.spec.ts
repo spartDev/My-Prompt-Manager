@@ -48,7 +48,14 @@ const holdRising = async (page: Page, at: number) => {
   }, [at, RISING] as const);
   return page.evaluate(() => {
     const top = (testId: string) => document.querySelector(`[data-testid="${testId}"]`)?.getBoundingClientRect().top;
+    const style = (testId: string) => {
+      const element = document.querySelector(`[data-testid="${testId}"]`);
+      return element ? getComputedStyle(element) : undefined;
+    };
     return {
+      // What the rise does to the Library beneath (receding) and to the scrim (appearing)
+      beneathScale: new DOMMatrix(style('editor-beneath')?.transform).a,
+      scrimOpacity: Number(style('editor-scrim')?.opacity),
       // What scrolled: the side panel's root, and the page itself
       rootScrollTop: document.getElementById('root')?.scrollTop,
       pageScrollY: window.scrollY,
@@ -85,13 +92,18 @@ test.describe('Prompt editor motion in the side panel', () => {
         expect(start.appTop).toBe(0);
         expect(start.beneathTop).toBe(0);
         expect(start.sheetTop).toBe(PANEL.height);
+        expect(start.beneathScale).toBe(1);
+        expect(start.scrimOpacity).toBe(0);
 
         // Halfway up: still nothing scrolled, the Library receding in place behind the sheet
+        // (scaled from its top, so it stays at the top) under a scrim that has appeared
         const middle = await holdRising(page, MOTION.sheetIn / 2);
         expect(middle.rootScrollTop).toBe(0);
         expect(middle.pageScrollY).toBe(0);
         expect(middle.appTop).toBe(0);
         expect(middle.beneathTop).toBe(0);
+        expect(middle.beneathScale).toBeLessThan(1);
+        expect(middle.scrimOpacity).toBeGreaterThan(0);
         expect(middle.sheetTop).toBeGreaterThan(0);
         expect(middle.sheetTop).toBeLessThan(PANEL.height);
         await page.screenshot({ path: `${SCREENSHOT_DIR}/editor-sheet-rising-${opening}-${theme}.png` });
