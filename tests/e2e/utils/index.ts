@@ -17,6 +17,7 @@ export * from '../pages';
 // Core utilities
 export * from './assertions';
 export * from './enhanced-storage';
+export * from './hover';
 export * from './navigation';
 // Storage and data management
 export * from './storage';

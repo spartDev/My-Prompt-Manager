@@ -25,6 +25,7 @@ import { CUSTOM_SITE_EXTENSION_PATH, CUSTOM_SITE_HOSTNAME, CUSTOM_SITE_URL } fro
 import { type ExtensionStorage, expect, test } from '../fixtures/extension';
 import { expectInsertionFlow, expectKeyboardInsertionFlow, insertionPill } from '../fixtures/insertion-flow';
 import { ENTER_COUNTER, enterKeys, promptRow, promptSelector } from '../fixtures/platform-pages';
+import { readWhileHovering } from '../utils/hover';
 import { createPromptSeed, seedLibrary } from '../utils/storage';
 
 test.use({ extensionPath: CUSTOM_SITE_EXTENSION_PATH });
@@ -251,8 +252,8 @@ test.describe('Content script on a custom site', () => {
       await expect(icon).toHaveAccessibleName(/^Prompts/);
       await target.screenshot({ path: `${SCREENSHOT_DIR}/icon-rest-${theme}.png`, clip: ICON_AREA, animations: 'disabled' });
 
-      await icon.hover();
-      await expect(icon).toHaveCSS('background-color', PILL[theme].hover);
+      // Read under the pointer, put back on the button when a window of another test took it (see utils/hover.ts)
+      await readWhileHovering(icon, () => icon.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe(PILL[theme].hover);
       await expect(icon).toHaveCSS('border-style', 'none');
       await target.screenshot({ path: `${SCREENSHOT_DIR}/icon-hover-${theme}.png`, clip: ICON_AREA, animations: 'disabled' });
 
