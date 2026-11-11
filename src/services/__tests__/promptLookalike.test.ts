@@ -89,6 +89,13 @@ describe('findLookalike', () => {
       }
     });
 
+    it('points out a long Prompt whose paragraphs are the same in another order: the user has written it before', () => {
+      const first = 'Context: the customer wrote about a late delivery. '.repeat(40);
+      const second = 'Answer: apologize, give the new date, offer a refund. '.repeat(40);
+
+      expect(findLookalike(`${second}${first}`, [libraryPrompt('a', 'Reply', `${first}${second}`)])?.similarity).toBeGreaterThan(0.9);
+    });
+
     it('does not take a long text for alike a much shorter Prompt it starts with', () => {
       expect(findLookalike(longest, [libraryPrompt('a', 'Start only', longest.slice(0, 2000))])).toBeNull();
     });
