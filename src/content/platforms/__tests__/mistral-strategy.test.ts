@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { editorCommand, MULTILINE_PROMPT } from '../../../test/helpers/editor-command';
 import { expectNoMarkupIn, HOSTILE_TEXTS } from '../../../test/helpers/hostile-text';
+import { readInputText } from '../../selector/inputText';
 import type { UIElementFactory } from '../../ui/element-factory';
 
 import { MistralStrategy } from '../mistral-strategy';
@@ -112,386 +114,191 @@ describe('MistralStrategy', () => {
     });
   });
 
-  describe('insert - content is delivered as given', () => {
+  describe('insert - into the ProseMirror editor', () => {
     beforeEach(() => {
-      vi.spyOn(mockElement, 'focus').mockImplementation(() => undefined);
-      vi.spyOn(mockElement, 'click').mockImplementation(() => undefined);
-      vi.spyOn(mockElement, 'dispatchEvent').mockImplementation(() => true);
+      document.body.appendChild(mockElement);
+      mockElement.innerHTML = '<p>what the field held</p>';
     });
 
-    it('should insert content exactly as given', async () => {
-      const content = '  Summarize the metadata: use <example>text</example> tags; if count=5 and onboarding = true, return data: JSON\n\n';
-      const pElement = document.createElement('p');
-      mockElement.appendChild(pElement);
+    afterEach(() => {
+      mockElement.remove();
+    });
 
-      const result = await strategy.insert(mockElement, content);
+    it('goes through the editing command, so the editor builds a paragraph per line', async () => {
+      document.execCommand = editorCommand(mockElement);
+
+      const result = await strategy.insert(mockElement, MULTILINE_PROMPT);
+
+      expect(result).toEqual({ success: true, method: 'mistral-execCommand' });
+      expect(document.execCommand).toHaveBeenCalledWith('insertText', false, MULTILINE_PROMPT);
+      expect(readInputText(mockElement)).toBe(MULTILINE_PROMPT);
+      expect(Array.from(mockElement.children).map((child) => child.textContent)).toEqual([
+        '  You are a reviewer.', 'End with a verdict.', '', 'Diff:', ''
+      ]);
+    });
+
+    it('does not write the Prompt into the first paragraph, where an editor reads line breaks as spaces', async () => {
+      document.execCommand = editorCommand(mockElement);
+      const firstParagraph = mockElement.querySelector('p');
+
+      await strategy.insert(mockElement, MULTILINE_PROMPT);
+
+      expect(firstParagraph?.isConnected).toBe(false);
+      expect(mockElement.querySelector('p')?.textContent).not.toContain('\n');
+    });
+
+    it('replaces what the field held', async () => {
+      document.execCommand = editorCommand(mockElement);
+
+      await strategy.insert(mockElement, 'new content');
+
+      expect(readInputText(mockElement)).toBe('new content');
+    });
+
+    it('finds the editor from an element inside it', async () => {
+      document.execCommand = editorCommand(mockElement);
+      const paragraph = mockElement.querySelector('p') as HTMLElement;
+
+      const result = await strategy.insert(paragraph, MULTILINE_PROMPT);
 
       expect(result.success).toBe(true);
-      expect(pElement.textContent).toBe(content);
+      expect(readInputText(mockElement)).toBe(MULTILINE_PROMPT);
     });
 
-    it('should not shorten long content', async () => {
-      const content = 'a'.repeat(60000);
-      const pElement = document.createElement('p');
-      mockElement.appendChild(pElement);
+    it('writes the lines itself, one <br> between two, when the editing command is refused', async () => {
+      document.execCommand = vi.fn().mockReturnValue(false);
 
-      await strategy.insert(mockElement, content);
+      const result = await strategy.insert(mockElement, MULTILINE_PROMPT);
 
-      expect(pElement.textContent).toBe(content);
+      expect(result).toEqual({ success: true, method: 'mistral-dom' });
+      expect(readInputText(mockElement)).toBe(MULTILINE_PROMPT);
+      expect(mockElement.querySelectorAll('br').length).toBeGreaterThan(0);
     });
 
-    it('should leave control and invisible characters as given', async () => {
+    it('tells the page of a direct write with an input event', async () => {
+      document.execCommand = vi.fn().mockReturnValue(false);
+      const heard = vi.fn();
+      mockElement.addEventListener('input', heard);
+
+      await strategy.insert(mockElement, 'test content');
+
+      expect(heard).toHaveBeenCalledTimes(1);
+      expect((heard.mock.calls[0][0] as InputEvent).inputType).toBe('insertText');
+    });
+
+    it('fails when the editor does not keep the text', async () => {
+      document.execCommand = vi.fn().mockReturnValue(false);
+      mockElement.addEventListener('input', () => {
+        mockElement.textContent = 'rewritten by the page';
+      });
+
+      const result = await strategy.insert(mockElement, MULTILINE_PROMPT);
+
+      expect(result.success).toBe(false);
+    });
+
+    it('does not shorten long content', async () => {
+      document.execCommand = editorCommand(mockElement);
+      const longContent = 'a'.repeat(60000);
+
+      const result = await strategy.insert(mockElement, longContent);
+
+      expect(result.success).toBe(true);
+      expect(readInputText(mockElement)).toBe(longContent);
+    });
+
+    it('leaves control and invisible characters as given', async () => {
+      document.execCommand = editorCommand(mockElement);
       const content = 'a\u{0}b\u{200B}c\u{200D}d';
-      const pElement = document.createElement('p');
-      mockElement.appendChild(pElement);
 
       await strategy.insert(mockElement, content);
 
-      expect(pElement.textContent).toBe(content);
+      expect(document.execCommand).toHaveBeenCalledWith('insertText', false, content);
+      expect(readInputText(mockElement)).toBe(content);
     });
 
-    it('should not refuse empty content', async () => {
-      const pElement = document.createElement('p');
-      mockElement.appendChild(pElement);
+    it('empties the field for empty content', async () => {
+      document.execCommand = editorCommand(mockElement);
 
       const result = await strategy.insert(mockElement, '');
 
       expect(result.success).toBe(true);
+      expect(readInputText(mockElement)).toBe('');
     });
   });
 
   describe.each(HOSTILE_TEXTS)('hostile-looking text %j', (text) => {
     beforeEach(() => {
-      vi.spyOn(mockElement, 'focus').mockImplementation(() => undefined);
-      vi.spyOn(mockElement, 'click').mockImplementation(() => undefined);
-      vi.spyOn(mockElement, 'dispatchEvent').mockImplementation(() => true);
+      document.body.appendChild(mockElement);
     });
 
-    it('is set as the text of the ProseMirror paragraph', async () => {
-      const pElement = document.createElement('p');
-      mockElement.appendChild(pElement);
+    afterEach(() => {
+      mockElement.remove();
+    });
 
-      const result = await strategy.insert(mockElement, text);
+    it('goes to the editing command as the same text', async () => {
+      document.execCommand = editorCommand(mockElement);
 
-      expect(result.method).toBe('mistral-prosemirror-p');
-      expect(pElement.textContent).toBe(text);
+      await strategy.insert(mockElement, text);
+
+      expect(document.execCommand).toHaveBeenCalledWith('insertText', false, text);
+      expect(readInputText(mockElement)).toBe(text);
+      // The paragraph is the stand-in editor's own structure
       expectNoMarkupIn(mockElement, ['p']);
     });
 
-    it('goes to the ProseMirror transaction as the same text', async () => {
-      const mockView = {
-        state: { tr: { insertText: vi.fn().mockReturnValue({}) }, selection: { from: 0, to: 0 } },
-        dispatch: vi.fn()
-      };
-      (mockElement as any)._pmViewDesc = { view: mockView };
+    it('is written as text when the editor is filled directly', async () => {
+      document.execCommand = vi.fn().mockReturnValue(false);
 
-      const result = await strategy.insert(mockElement, text);
+      await strategy.insert(mockElement, text);
 
-      expect(result.method).toBe('mistral-prosemirror-transaction');
-      expect(mockView.state.tr.insertText).toHaveBeenCalledWith(text, 0, 0);
+      expect(readInputText(mockElement)).toBe(text);
       expectNoMarkupIn(mockElement);
     });
 
-    it('goes to execCommand as the same text', async () => {
-      (document as any).execCommand = vi.fn().mockReturnValue(true);
-      vi.spyOn(window, 'getSelection').mockReturnValue({ removeAllRanges: vi.fn(), addRange: vi.fn() } as any);
-      vi.spyOn(document, 'createRange').mockReturnValue({ selectNodeContents: vi.fn() } as any);
+  });
 
-      const result = await strategy.insert(mockElement, text);
-
-      expect(result.method).toBe('mistral-execCommand');
-      expect((document as any).execCommand).toHaveBeenCalledWith('insertText', false, text);
-      expectNoMarkupIn(mockElement);
-    });
-
-    it('is set as the value of a textarea', async () => {
-      (document as any).execCommand = vi.fn().mockReturnValue(false);
+  describe('insert - other elements', () => {
+    it.each(HOSTILE_TEXTS)('sets hostile-looking text %j as the value of a textarea', async (text) => {
       const textarea = document.createElement('textarea');
-      document.body.appendChild(textarea);
 
-      const result = await strategy.insert(textarea, text);
+      await strategy.insert(textarea, text);
 
-      expect(result.method).toBe('mistral-textarea');
       expect(textarea.value).toBe(text);
-      expectNoMarkupIn(document.body, ['textarea']);
-
-      textarea.remove();
     });
 
-    it('is set as a text node when the editor is filled directly', async () => {
-      (document as any).execCommand = vi.fn().mockReturnValue(false);
-      const div = document.createElement('div');
-      div.contentEditable = 'true';
-
-      const result = await strategy.insert(div, text);
-
-      expect(result.method).toBe('mistral-contenteditable');
-      expect(div.textContent).toBe(text);
-      expectNoMarkupIn(div);
-    });
-  });
-
-  describe('insert - ProseMirror paragraph insertion', () => {
-    beforeEach(() => {
-      vi.spyOn(mockElement, 'focus').mockImplementation(() => {});
-      vi.spyOn(mockElement, 'click').mockImplementation(() => {});
-      vi.spyOn(mockElement, 'dispatchEvent').mockImplementation(() => true);
-    });
-
-    it('should attempt ProseMirror paragraph insertion first', async () => {
-      const pElement = document.createElement('p');
-      mockElement.appendChild(pElement);
-
-      const result = await strategy.insert(mockElement, 'test content');
-
-      expect(result.success).toBe(true);
-      expect(result.method).toBe('mistral-prosemirror-p');
-      expect(pElement.textContent).toBe('test content');
-      expect(mockElement.dispatchEvent).toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'input' })
-      );
-    });
-
-    it('should attempt ProseMirror transaction when paragraph method not available', async () => {
-      const mockView = {
-        state: {
-          tr: {
-            insertText: vi.fn().mockReturnValue({})
-          },
-          selection: { from: 0, to: 0 }
-        },
-        dispatch: vi.fn()
-      };
-
-      (mockElement as any)._pmViewDesc = { view: mockView };
-
-      const result = await strategy.insert(mockElement, 'test content');
-
-      expect(result.success).toBe(true);
-      expect(result.method).toBe('mistral-prosemirror-transaction');
-      expect(mockView.state.tr.insertText).toHaveBeenCalledWith('test content', 0, 0);
-      expect(mockView.dispatch).toHaveBeenCalled();
-    });
-  });
-
-  describe('insert - ExecCommand fallback', () => {
-    beforeEach(() => {
-      vi.spyOn(mockElement, 'focus').mockImplementation(() => {});
-      vi.spyOn(mockElement, 'click').mockImplementation(() => {});
-      vi.spyOn(mockElement, 'dispatchEvent').mockImplementation(() => true);
-
-      (document as any).execCommand = vi.fn().mockReturnValue(true);
-
-      const mockSelection = {
-        removeAllRanges: vi.fn(),
-        addRange: vi.fn()
-      };
-      vi.spyOn(window, 'getSelection').mockReturnValue(mockSelection as any);
-
-      const mockRange = {
-        selectNodeContents: vi.fn()
-      };
-      vi.spyOn(document, 'createRange').mockReturnValue(mockRange as any);
-    });
-
-    it('should fall back to execCommand when ProseMirror methods fail', async () => {
-      const result = await strategy.insert(mockElement, 'test content');
-
-      expect(result.success).toBe(true);
-      expect(result.method).toBe('mistral-execCommand');
-      expect((document as any).execCommand).toHaveBeenCalledWith('insertText', false, 'test content');
-    });
-
-    it('should wait for focus delay before execCommand', async () => {
-      vi.useFakeTimers();
-
-      const insertPromise = strategy.insert(mockElement, 'test content');
-
-      // Fast-forward time to simulate delay
-      await vi.advanceTimersToNextTimerAsync();
-
-      const result = await insertPromise;
-
-      expect(result.success).toBe(true);
-      expect(result.method).toBe('mistral-execCommand');
-
-      vi.useRealTimers();
-    });
-  });
-
-  describe('insert - DOM manipulation fallback', () => {
-    beforeEach(() => {
-      vi.spyOn(mockElement, 'focus').mockImplementation(() => {});
-      vi.spyOn(mockElement, 'dispatchEvent').mockImplementation(() => true);
-      (document as any).execCommand = vi.fn().mockReturnValue(false);
-    });
-
-    it('should handle textarea elements', async () => {
+    it('sets the value of a textarea and tells the page', async () => {
       const textarea = document.createElement('textarea');
-      vi.spyOn(textarea, 'focus').mockImplementation(() => {});
-      vi.spyOn(textarea, 'dispatchEvent').mockImplementation(() => true);
+      const heard = vi.fn();
+      textarea.addEventListener('input', heard);
+      textarea.addEventListener('change', heard);
 
-      const result = await strategy.insert(textarea, 'test content');
+      const result = await strategy.insert(textarea, MULTILINE_PROMPT);
 
-      expect(result.success).toBe(true);
-      expect(result.method).toBe('mistral-textarea');
-      expect(textarea.value).toBe('test content');
+      expect(result).toEqual({ success: true, method: 'mistral-textarea' });
+      expect(textarea.value).toBe(MULTILINE_PROMPT);
+      expect(heard).toHaveBeenCalledTimes(2);
     });
 
-    it('should handle contentEditable elements with text node insertion', async () => {
-      const div = document.createElement('div');
-      div.contentEditable = 'true';
-      vi.spyOn(div, 'focus').mockImplementation(() => {});
-      vi.spyOn(div, 'dispatchEvent').mockImplementation(() => true);
-      vi.spyOn(div, 'removeChild');
-      vi.spyOn(div, 'appendChild');
+    it('fails on an element that holds no editable text', async () => {
+      const plain = document.createElement('div');
+      plain.setAttribute('role', 'textbox');
 
-      const result = await strategy.insert(div, 'test content');
-
-      expect(result.success).toBe(true);
-      expect(result.method).toBe('mistral-contenteditable');
-      expect(div.appendChild).toHaveBeenCalledWith(expect.any(Node));
-    });
-
-    it('should clear existing content before inserting new content', async () => {
-      const div = document.createElement('div');
-      div.contentEditable = 'true';
-      div.innerHTML = 'existing content';
-      vi.spyOn(div, 'focus').mockImplementation(() => {});
-      vi.spyOn(div, 'dispatchEvent').mockImplementation(() => true);
-
-      const result = await strategy.insert(div, 'new content');
-
-      expect(result.success).toBe(true);
-      expect(result.method).toBe('mistral-contenteditable');
-      expect(div.textContent).toBe('new content');
-    });
-
-    it('should warn when element is not suitable for DOM manipulation', async () => {
-      const Logger = await import('../../utils/logger');
-      const span = document.createElement('span');
-      vi.spyOn(span, 'focus').mockImplementation(() => {});
-
-      const result = await strategy.insert(span, 'test content');
+      const result = await strategy.insert(plain, 'test content');
 
       expect(result.success).toBe(false);
-      expect(Logger.warn).toHaveBeenCalledWith(
-        '[Mistral] Element is not suitable for DOM manipulation',
-        expect.objectContaining({
-          tagName: 'SPAN',
-          contentEditable: span.contentEditable,
-          hasTextarea: false
-        })
-      );
-    });
-  });
-
-  describe('error handling', () => {
-    it('should handle errors gracefully in ProseMirror insertion', async () => {
-      const Logger = await import('../../utils/logger');
-
-      // Mock ProseMirror element to force ProseMirror insertion path
-      const pElement = document.createElement('p');
-      mockElement.appendChild(pElement);
-      vi.spyOn(pElement, 'textContent', 'set').mockImplementation(() => {
-        throw new Error('Focus failed');
-      });
-
-      await strategy.insert(mockElement, 'test content');
-
-      expect(Logger.warn).toHaveBeenCalledWith(
-        '[Mistral] ProseMirror insertion failed',
-        expect.objectContaining({
-          error: 'Focus failed'
-        })
-      );
     });
 
-    it('should handle errors gracefully in execCommand', async () => {
-      const Logger = await import('../../utils/logger');
-
-      vi.spyOn(mockElement, 'focus').mockImplementation(() => {
-        throw new Error('Focus failed');
+    it('fails without throwing when the editor throws', async () => {
+      document.body.appendChild(mockElement);
+      document.execCommand = vi.fn(() => {
+        throw new Error('editor broke');
       });
 
-      await strategy.insert(mockElement, 'test content');
+      const result = await strategy.insert(mockElement, 'test content');
 
-      expect(Logger.warn).toHaveBeenCalled();
-    });
-
-    it('should handle errors gracefully in DOM manipulation', async () => {
-      const Logger = await import('../../utils/logger');
-
-      const div = document.createElement('div');
-      div.contentEditable = 'true';
-      vi.spyOn(div, 'focus').mockImplementation(() => {
-        throw new Error('Focus failed');
-      });
-      // Ensure execCommand fails to force DOM manipulation path
-      (document as any).execCommand = vi.fn().mockReturnValue(false);
-
-      const result = await strategy.insert(div, 'test content');
-
-      expect(Logger.error).toHaveBeenCalledWith(
-        '[Mistral] DOM manipulation failed',
-        expect.any(Error),
-        expect.any(Object)
-      );
       expect(result.success).toBe(false);
-    });
-  });
-
-  describe('event handling', () => {
-    beforeEach(() => {
-      vi.spyOn(mockElement, 'focus').mockImplementation(() => {});
-      vi.spyOn(mockElement, 'click').mockImplementation(() => {});
-      vi.spyOn(mockElement, 'dispatchEvent').mockImplementation(() => true);
-    });
-
-    it('should trigger comprehensive events for ProseMirror insertion', async () => {
-      const pElement = document.createElement('p');
-      mockElement.appendChild(pElement);
-
-      await strategy.insert(mockElement, 'test content');
-
-      expect(mockElement.dispatchEvent).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'input',
-          bubbles: true
-        })
-      );
-      expect(mockElement.dispatchEvent).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'change',
-          bubbles: true
-        })
-      );
-    });
-
-    it('should trigger InputEvent with proper data for execCommand', async () => {
-      (document as any).execCommand = vi.fn().mockReturnValue(true);
-      const mockSelection = {
-        removeAllRanges: vi.fn(),
-        addRange: vi.fn()
-      };
-      vi.spyOn(window, 'getSelection').mockReturnValue(mockSelection as any);
-      const mockRange = { selectNodeContents: vi.fn() };
-      vi.spyOn(document, 'createRange').mockReturnValue(mockRange as any);
-
-      // Use fake timers to avoid timeout issues
-      vi.useFakeTimers();
-      const insertPromise = strategy.insert(mockElement, 'test content');
-      await vi.advanceTimersToNextTimerAsync();
-      await insertPromise;
-      vi.useRealTimers();
-
-      expect(mockElement.dispatchEvent).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'input',
-          bubbles: true,
-          cancelable: true
-        })
-      );
+      mockElement.remove();
     });
   });
 });

@@ -4,7 +4,9 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { editorCommand, MULTILINE_PROMPT } from '../../../test/helpers/editor-command';
 import { expectNoMarkupIn, HOSTILE_TEXTS } from '../../../test/helpers/hostile-text';
+import { readInputText } from '../../selector/inputText';
 import type { UIElementFactory } from '../../ui/element-factory';
 import { DefaultStrategy } from '../default-strategy';
 
@@ -96,11 +98,11 @@ describe('DefaultStrategy', () => {
   describe('insert', () => {
     beforeEach(() => {
       // Mock DOM methods
-      vi.spyOn(mockTextarea, 'focus').mockImplementation(() => {});
+      vi.spyOn(mockTextarea, 'focus').mockImplementation(() => undefined);
       vi.spyOn(mockTextarea, 'dispatchEvent').mockImplementation(() => true);
-      vi.spyOn(mockInput, 'focus').mockImplementation(() => {});
+      vi.spyOn(mockInput, 'focus').mockImplementation(() => undefined);
       vi.spyOn(mockInput, 'dispatchEvent').mockImplementation(() => true);
-      vi.spyOn(mockContentEditableDiv, 'focus').mockImplementation(() => {});
+      vi.spyOn(mockContentEditableDiv, 'focus').mockImplementation(() => undefined);
       vi.spyOn(mockContentEditableDiv, 'dispatchEvent').mockImplementation(() => true);
     });
 
@@ -178,7 +180,7 @@ describe('DefaultStrategy', () => {
 
     it('should handle unknown element types gracefully', async () => {
       const unknownElement = document.createElement('span');
-      vi.spyOn(unknownElement, 'focus').mockImplementation(() => {});
+      vi.spyOn(unknownElement, 'focus').mockImplementation(() => undefined);
       vi.spyOn(unknownElement, 'dispatchEvent').mockImplementation(() => true);
       
       const result = await strategy.insert(unknownElement, 'test content');
@@ -232,7 +234,7 @@ describe('DefaultStrategy', () => {
       ];
       
       for (const element of elements) {
-        vi.spyOn(element, 'focus').mockImplementation(() => {});
+        vi.spyOn(element, 'focus').mockImplementation(() => undefined);
         vi.spyOn(element, 'dispatchEvent').mockImplementation(() => true);
         
         expect(strategy.canHandle(element)).toBe(true);
@@ -276,7 +278,7 @@ describe('DefaultStrategy', () => {
     it('should handle mixed case contentEditable attribute', async () => {
       const mixedCaseDiv = document.createElement('div');
       mixedCaseDiv.contentEditable = 'true'; // Set the property directly
-      vi.spyOn(mixedCaseDiv, 'focus').mockImplementation(() => {});
+      vi.spyOn(mixedCaseDiv, 'focus').mockImplementation(() => undefined);
       vi.spyOn(mixedCaseDiv, 'dispatchEvent').mockImplementation(() => true);
       
       const result = await strategy.insert(mixedCaseDiv, 'mixed case content');
@@ -317,5 +319,69 @@ describe('DefaultStrategy', () => {
       expect(mockContentEditableDiv.textContent).toBe(text);
       expectNoMarkupIn(mockContentEditableDiv);
     });
+  });
+});
+
+describe('DefaultStrategy: a Prompt keeps its line breaks in a rich text editor', () => {
+  let editor: HTMLElement;
+
+  beforeEach(() => {
+    editor = document.createElement('div');
+    editor.className = 'ProseMirror';
+    editor.setAttribute('contenteditable', 'true');
+    editor.innerHTML = '<p>what the field held</p>';
+    document.body.appendChild(editor);
+  });
+
+  afterEach(() => {
+    editor.remove();
+  });
+
+  it('handles the editor', () => {
+    expect(new DefaultStrategy('example.com').canHandle(editor)).toBe(true);
+  });
+
+  it('goes through the editing command, so the editor builds a paragraph per line', async () => {
+    document.execCommand = editorCommand(editor);
+
+    const result = await new DefaultStrategy('example.com').insert(editor, MULTILINE_PROMPT);
+
+    expect(result.success).toBe(true);
+    expect(document.execCommand).toHaveBeenCalledWith('insertText', false, MULTILINE_PROMPT);
+    expect(readInputText(editor)).toBe(MULTILINE_PROMPT);
+    expect(Array.from(editor.children).map((child) => child.textContent)).toEqual([
+      '  You are a reviewer.', 'End with a verdict.', '', 'Diff:', ''
+    ]);
+  });
+
+  it('writes the lines itself, one <br> between two, when the editing command is refused', async () => {
+    document.execCommand = vi.fn().mockReturnValue(false);
+
+    const result = await new DefaultStrategy('example.com').insert(editor, MULTILINE_PROMPT);
+
+    expect(result.success).toBe(true);
+    expect(readInputText(editor)).toBe(MULTILINE_PROMPT);
+    expect(editor.textContent).not.toContain('\n');
+  });
+
+  it('fails when the editor does not keep the text', async () => {
+    document.execCommand = vi.fn().mockReturnValue(false);
+    editor.addEventListener('input', () => {
+      editor.textContent = 'rewritten by the page';
+    });
+
+    const result = await new DefaultStrategy('example.com').insert(editor, MULTILINE_PROMPT);
+
+    expect(result.success).toBe(false);
+  });
+
+  it.each(HOSTILE_TEXTS)('inserts hostile-looking text %j as text', async (text) => {
+    document.execCommand = editorCommand(editor);
+
+    await new DefaultStrategy('example.com').insert(editor, text);
+
+    expect(readInputText(editor)).toBe(text);
+    // The paragraph is the stand-in editor's own structure
+    expectNoMarkupIn(editor, ['p']);
   });
 });
