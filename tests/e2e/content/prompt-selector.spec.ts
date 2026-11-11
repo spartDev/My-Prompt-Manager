@@ -11,7 +11,7 @@ import type { Page } from '@playwright/test';
 
 import { DEFAULT_SETTINGS, type Prompt } from '../../../src/types';
 import { type ExtensionStorage, expect, test } from '../fixtures/extension';
-import { listedTitles, openPlatform, openPromptSelector, PLATFORM_FIELD, PLATFORM_FIXTURES, type PlatformFixture, promptRow, promptSelector, promptsButton } from '../fixtures/platform-pages';
+import { enterKeys, listedTitles, openPlatform, openPromptSelector, PLATFORM_FIELD, PLATFORM_FIXTURES, type PlatformFixture, promptRow, promptSelector, promptsButton } from '../fixtures/platform-pages';
 import { createCategorySeed, createPromptSeed, seedLibrary } from '../utils/storage';
 
 const SCREENSHOT_DIR = 'test-results/prompt-selector';
@@ -40,8 +40,6 @@ const field = (page: Page, platform: PlatformFixture) => page.locator(PLATFORM_F
 
 const fieldText = (page: Page, platform: PlatformFixture) =>
   field(page, platform).evaluate((element) => (element instanceof HTMLTextAreaElement ? element.value : (element.textContent ?? '')));
-
-const enterKeys = (page: Page) => page.evaluate(() => (window as unknown as { __enterKeys: number }).__enterKeys);
 
 const selectedTab = (page: Page) => promptSelector(page).getByRole('tab', { selected: true });
 

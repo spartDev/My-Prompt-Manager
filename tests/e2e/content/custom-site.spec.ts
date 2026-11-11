@@ -9,6 +9,9 @@
  * test-only build of tests/e2e/fixtures/custom-site-build.ts: a copy of dist/ whose manifest lists
  * the test origin in host_permissions, which Chrome grants on load. Everything else runs as built.
  *
+ * The flows of the seven Platforms run here too (My-Prompt-Manager-q9j): around an Insertion with
+ * the mouse, and the whole of it with the keyboard alone, from the Prompts button to Undo.
+ *
  * Also takes, light and dark, the custom-site screenshots el4.7 never took (test-results/custom-site/):
  * the selector with a keyboard-selected Prompt, the Variable form, the icon at rest, on hover and
  * with its focus ring.
@@ -20,8 +23,8 @@ import type { CustomSite } from '../../../src/types';
 import { DEFAULT_CATEGORY } from '../../../src/types';
 import { CUSTOM_SITE_EXTENSION_PATH, CUSTOM_SITE_HOSTNAME, CUSTOM_SITE_URL } from '../fixtures/custom-site-build';
 import { type ExtensionStorage, expect, test } from '../fixtures/extension';
-import { expectInsertionFlow } from '../fixtures/insertion-flow';
-import { promptSelector } from '../fixtures/platform-pages';
+import { expectInsertionFlow, expectKeyboardInsertionFlow, insertionPill } from '../fixtures/insertion-flow';
+import { ENTER_COUNTER, enterKeys, promptRow, promptSelector } from '../fixtures/platform-pages';
 import { createPromptSeed, seedLibrary } from '../utils/storage';
 
 test.use({ extensionPath: CUSTOM_SITE_EXTENSION_PATH });
@@ -58,7 +61,7 @@ const pageBody = (theme: 'light' | 'dark') => /* html */ `
       <h1>Team notes</h1>
       <label for="notes">Message</label>
       <textarea id="notes"></textarea>
-    </main>
+    </main>${ENTER_COUNTER}
   </body>
 </html>
 `;
@@ -168,6 +171,57 @@ test.describe('Content script on a custom site', () => {
       prompt: summarize,
       usageCount: async () => (await storage.getPrompts()).find((prompt) => prompt.id === summarize.id)?.usageCount ?? 0,
     });
+  });
+
+  // My-Prompt-Manager-q9j: the same flow as on the seven Platforms (prompt-selector.spec.ts), with no pointer
+  test('the whole flow by keyboard alone, and no Enter reaches the page', async ({ context, storage }) => {
+    await seedWithCustomSite(storage, 'light');
+    const target = await openCustomSite(context);
+    const notes = target.locator('#notes');
+    const icon = target.locator(ICON);
+    await expect(icon).toHaveCount(1);
+
+    // Tab from the top of the page: the input field, then the Prompts button, which Enter presses
+    await target.keyboard.press('Tab');
+    await expect(notes).toBeFocused();
+    await target.keyboard.press('Tab');
+    await expect(icon).toBeFocused();
+    await target.keyboard.press('Enter');
+    const selector = promptSelector(target);
+    await expect(selector).toBeVisible();
+
+    // The arrows change tab and move the selection
+    await target.keyboard.press('ArrowRight');
+    await expect(selector.getByRole('tab', { selected: true })).toHaveText('Pinned');
+    await target.keyboard.press('ArrowLeft');
+    await expect(selector.getByRole('tab', { selected: true })).toHaveText('All');
+    await target.keyboard.press('ArrowDown');
+    await expect(promptRow(target, translate.id)).toHaveAttribute('aria-selected', 'true');
+
+    // Enter opens the Variables of the selected Prompt: typed in, Tab from one to the next, Enter inserts
+    await target.keyboard.press('Enter');
+    await expect(selector.getByRole('textbox', { name: 'text', exact: true })).toBeFocused();
+    await target.keyboard.type('the release notes');
+    await target.keyboard.press('Tab');
+    await expect(selector.getByRole('textbox', { name: 'language', exact: true })).toBeFocused();
+    await target.keyboard.type('French');
+    await target.keyboard.press('Enter');
+
+    // The selector has closed, the text is in the field with the focus, and the Insertion is confirmed
+    await expect(selector).toBeHidden();
+    await expect(notes).toHaveValue('Translate the release notes into French.');
+    await expect(notes).toBeFocused();
+    await expect(insertionPill(target)).toContainText('Inserted “Translate a text”');
+    expect(await enterKeys(target)).toBe(0);
+  });
+
+  // My-Prompt-Manager-q9j: the same flow as on the seven Platforms (prompt-insertion.spec.ts), with no pointer
+  test('by keyboard alone, with Undo reached by the Tab key', async ({ context, storage }) => {
+    await seedWithCustomSite(storage, 'light');
+    const target = await openCustomSite(context);
+    await expect(target.locator(ICON)).toHaveCount(1);
+
+    await expectKeyboardInsertionFlow(target, { field: target.locator('#notes'), prompt: verbatim });
   });
 
   for (const theme of ['light', 'dark'] as const) {

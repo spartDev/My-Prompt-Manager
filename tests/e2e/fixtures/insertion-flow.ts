@@ -1,7 +1,7 @@
 import type { Locator, Page } from '@playwright/test';
 
 import { expect } from './extension';
-import { promptRow, promptSelector } from './platform-pages';
+import { enterKeys, promptRow, promptSelector } from './platform-pages';
 
 /**
  * What a user does around an Insertion since My-Prompt-Manager-q9j.3, as one flow that runs on any
@@ -136,4 +136,69 @@ export async function expectInsertionFlow(page: Page, { field, prompt, usageCoun
   await expect(insertionSweep(page)).toHaveCount(0);
   await page.waitForTimeout(400);
   expect(await usageCount()).toBe(usesBefore + 2);
+}
+
+/** More Tab presses than any of the pages needs to go from its input field to the confirmation. */
+const TAB_LIMIT = 10;
+
+/**
+ * Presses Tab until the confirmation's Undo button has the focus, as a user who has only the
+ * keyboard does: through the page's own controls, since the confirmation is last in the tab order.
+ * Returns how many presses it took. Fails when the confirmation has left meanwhile, or when Tab
+ * never gets there.
+ */
+export async function tabToUndo(page: Page): Promise<number> {
+  const undo = undoButton(page);
+  for (let presses = 1; presses <= TAB_LIMIT; presses++) {
+    await page.keyboard.press('Tab');
+    if ((await undo.count()) === 0) {
+      throw new Error(`The confirmation left before Tab reached Undo (${String(presses)} presses)`);
+    }
+    if (await undo.evaluate((button) => button.matches(':focus'))) {
+      return presses;
+    }
+  }
+  throw new Error(`Tab pressed ${String(TAB_LIMIT)} times without reaching Undo`);
+}
+
+export interface KeyboardInsertionFlow {
+  /** The input field of the page, empty, and the first control Tab reaches. */
+  field: Locator;
+  /** The first Prompt the selector lists, without Variables. */
+  prompt: { id: string; content: string };
+}
+
+/**
+ * An Insertion and its Undo with no pointer at all, on any page the content script is on and that
+ * counts its Enter keys (ENTER_COUNTER): Tab to the input field, a draft, `//`, Enter on the first
+ * Prompt, then Tab to Undo and Enter. No Enter reaches the page, which would send the message.
+ */
+export async function expectKeyboardInsertionFlow(page: Page, { field, prompt }: KeyboardInsertionFlow): Promise<void> {
+  const selector = promptSelector(page);
+  const pill = insertionPill(page);
+
+  // Tab from the top of the page reaches the input field, which holds text before the Insertion
+  await page.keyboard.press('Tab');
+  await expect(field).toBeFocused();
+  await page.keyboard.type('Keep this  text ');
+  const before = await fieldText(field);
+  expect(before).toBe('Keep this  text ');
+
+  // // then Enter: the first Prompt of the list is inserted
+  await page.keyboard.type('//');
+  await expect(selector).toBeVisible();
+  await expect(promptRow(page, prompt.id)).toHaveAttribute('aria-selected', 'true');
+  await page.keyboard.press('Enter');
+  await expect(selector).toBeHidden();
+  await expect.poll(() => fieldText(field)).toBe(prompt.content);
+  await expect(pill).toBeVisible();
+  expect(await enterKeys(page)).toBe(0);
+
+  // Undo: Tab goes on through the page's own controls to the confirmation, and Enter presses Undo
+  await tabToUndo(page);
+  await page.keyboard.press('Enter');
+  await expect(pill).toBeHidden();
+  await expect.poll(() => fieldText(field)).toBe(before);
+  await expect(field).toBeFocused();
+  expect(await enterKeys(page)).toBe(0);
 }
