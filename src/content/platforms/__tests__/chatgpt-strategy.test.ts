@@ -4,7 +4,9 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { editorCommand, MULTILINE_PROMPT } from '../../../test/helpers/editor-command';
 import { expectNoMarkupIn, HOSTILE_TEXTS } from '../../../test/helpers/hostile-text';
+import { readInputText } from '../../selector/inputText';
 import type { UIElementFactory } from '../../ui/element-factory';
 import { ChatGPTStrategy } from '../chatgpt-strategy';
 
@@ -100,7 +102,7 @@ describe('ChatGPTStrategy', () => {
   describe('insert', () => {
     beforeEach(() => {
       // Mock DOM methods
-      vi.spyOn(mockTextarea, 'focus').mockImplementation(() => {});
+      vi.spyOn(mockTextarea, 'focus').mockImplementation(() => undefined);
       vi.spyOn(mockTextarea, 'dispatchEvent').mockImplementation(() => true);
       
       // Mock the native value setter
@@ -280,5 +282,69 @@ describe('ChatGPTStrategy', () => {
 
       mockTextarea.remove();
     });
+  });
+});
+
+describe('ChatGPTStrategy: a Prompt keeps its line breaks in a rich text editor', () => {
+  let editor: HTMLElement;
+
+  beforeEach(() => {
+    editor = document.createElement('div');
+    editor.className = 'ProseMirror';
+    editor.setAttribute('contenteditable', 'true');
+    editor.innerHTML = '<p>what the field held</p>';
+    document.body.appendChild(editor);
+  });
+
+  afterEach(() => {
+    editor.remove();
+  });
+
+  it('handles the editor', () => {
+    expect(new ChatGPTStrategy('chatgpt.com').canHandle(editor)).toBe(true);
+  });
+
+  it('goes through the editing command, so the editor builds a paragraph per line', async () => {
+    document.execCommand = editorCommand(editor);
+
+    const result = await new ChatGPTStrategy('chatgpt.com').insert(editor, MULTILINE_PROMPT);
+
+    expect(result.success).toBe(true);
+    expect(document.execCommand).toHaveBeenCalledWith('insertText', false, MULTILINE_PROMPT);
+    expect(readInputText(editor)).toBe(MULTILINE_PROMPT);
+    expect(Array.from(editor.children).map((child) => child.textContent)).toEqual([
+      '  You are a reviewer.', 'End with a verdict.', '', 'Diff:', ''
+    ]);
+  });
+
+  it('writes the lines itself, one <br> between two, when the editing command is refused', async () => {
+    document.execCommand = vi.fn().mockReturnValue(false);
+
+    const result = await new ChatGPTStrategy('chatgpt.com').insert(editor, MULTILINE_PROMPT);
+
+    expect(result.success).toBe(true);
+    expect(readInputText(editor)).toBe(MULTILINE_PROMPT);
+    expect(editor.textContent).not.toContain('\n');
+  });
+
+  it('fails when the editor does not keep the text', async () => {
+    document.execCommand = vi.fn().mockReturnValue(false);
+    editor.addEventListener('input', () => {
+      editor.textContent = 'rewritten by the page';
+    });
+
+    const result = await new ChatGPTStrategy('chatgpt.com').insert(editor, MULTILINE_PROMPT);
+
+    expect(result.success).toBe(false);
+  });
+
+  it.each(HOSTILE_TEXTS)('inserts hostile-looking text %j as text', async (text) => {
+    document.execCommand = editorCommand(editor);
+
+    await new ChatGPTStrategy('chatgpt.com').insert(editor, text);
+
+    expect(readInputText(editor)).toBe(text);
+    // The paragraph is the stand-in editor's own structure
+    expectNoMarkupIn(editor, ['p']);
   });
 });

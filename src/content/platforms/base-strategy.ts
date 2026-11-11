@@ -105,42 +105,7 @@ export abstract class PlatformStrategy implements PlatformStrategyInterface {
         if (readInputText(element) === text) {
           return Promise.resolve({ success: true, method: 'restore-unchanged' });
         }
-        const selection = element.ownerDocument.getSelection();
-        if (selection) {
-          const range = element.ownerDocument.createRange();
-          range.selectNodeContents(element);
-          selection.removeAllRanges();
-          selection.addRange(range);
-        }
-        const document = element.ownerDocument;
-        const edited = typeof document.execCommand === 'function'
-          && (text === '' ? document.execCommand('delete') : document.execCommand('insertText', false, text));
-        if (edited && readInputText(element) === text) {
-          return Promise.resolve({ success: true, method: 'restore-execCommand' });
-        }
-        // No editing command, or the editor laid the text out differently: write it directly,
-        // one <br> between two lines so the breaks show whatever the field does with spaces. A
-        // last line that is empty takes a second <br>, the one that keeps it open
-        const lines = text.split('\n');
-        const content = element.ownerDocument.createDocumentFragment();
-        lines.forEach((line, index) => {
-          if (line !== '') {
-            content.append(line);
-          }
-          if (index < lines.length - 1) {
-            content.append(element.ownerDocument.createElement('br'));
-          }
-        });
-        if (lines.length > 1 && lines[lines.length - 1] === '') {
-          content.append(element.ownerDocument.createElement('br'));
-        }
-        element.replaceChildren(content);
-        element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: text }));
-        // An editor whose own handler rebuilt its content did not take the text back
-        if (readInputText(element) !== text) {
-          return Promise.resolve({ success: false, error: 'The input field did not keep the restored text' });
-        }
-        return Promise.resolve({ success: true, method: 'restore-dom' });
+        return Promise.resolve(this.replaceEditableText(element, text, 'restore'));
       }
 
       return Promise.resolve({ success: false, error: 'The input field holds no editable text' });
@@ -148,6 +113,61 @@ export abstract class PlatformStrategy implements PlatformStrategyInterface {
       this._error('Restoring the input field failed', error as Error);
       return Promise.resolve({ success: false, error: (error as Error).message });
     }
+  }
+
+  /**
+   * Makes `text` the whole content of a contenteditable input field, line breaks included: what
+   * an Insertion and Undo both do there.
+   *
+   * The text goes in through the browser's editing command, as typing would, so the Platform's
+   * editor (ProseMirror, Quill, Lexical) builds its own paragraphs from the line breaks. Text
+   * written straight into the DOM is read back by such an editor as one paragraph, each line
+   * break turned into a space. When there is no editing command, or the field does not hold
+   * `text` afterwards, the text is written directly, one <br> between two lines.
+   * @param element - The contenteditable input field
+   * @param text - The plain text the field must hold
+   * @param via - Prefix of the method named in the result ('restore', 'default'...)
+   * @returns Result of the attempt
+   * @protected
+   */
+  protected replaceEditableText(element: HTMLElement, text: string, via: string): InsertionResult {
+    const document = element.ownerDocument;
+    element.focus();
+    const selection = document.getSelection();
+    if (selection) {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+    const edited = typeof document.execCommand === 'function'
+      && (text === '' ? document.execCommand('delete') : document.execCommand('insertText', false, text));
+    if (edited && readInputText(element) === text) {
+      return { success: true, method: `${via}-execCommand` };
+    }
+    // No editing command, or the editor laid the text out differently: write it directly,
+    // one <br> between two lines so the breaks show whatever the field does with spaces. A
+    // last line that is empty takes a second <br>, the one that keeps it open
+    const lines = text.split('\n');
+    const content = document.createDocumentFragment();
+    lines.forEach((line, index) => {
+      if (line !== '') {
+        content.append(line);
+      }
+      if (index < lines.length - 1) {
+        content.append(document.createElement('br'));
+      }
+    });
+    if (lines.length > 1 && lines[lines.length - 1] === '') {
+      content.append(document.createElement('br'));
+    }
+    element.replaceChildren(content);
+    element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: text }));
+    // An editor whose own handler rebuilt its content did not take the text
+    if (readInputText(element) !== text) {
+      return { success: false, error: 'The input field did not keep the text' };
+    }
+    return { success: true, method: `${via}-dom` };
   }
 
   /**

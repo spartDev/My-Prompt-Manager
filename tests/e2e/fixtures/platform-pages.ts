@@ -24,6 +24,10 @@ import { expect } from './extension';
  *   through that strategy's execCommand path.
  * - copilot.microsoft.com: a plain <textarea>, filled through the native value setter.
  *
+ * Two more pages stand in for the editors the live ChatGPT and Mistral composers are today
+ * (seen on 2026-11-11): a ProseMirror editor, which holds one <p> per line and reads a line
+ * break written straight into its DOM as a space. See PARAGRAPH_EDITOR.
+ *
  * Every page counts the Enter keys that reach it, other than on a button, in
  * `window.__enterKeys`: the live sites send the message on Enter, so a test can prove a key
  * pressed in the Prompt selector never got that far.
@@ -182,6 +186,44 @@ const M365COPILOT_HTML = plainPage(
   '<div class="bar fai-ChatInput__actions"><button type="button">Mic</button></div>'
 );
 
+/**
+ * What a ProseMirror editor does with text it did not build itself: after each input it reads its
+ * DOM back, and a line break found inside a text node is white space, so it becomes a space.
+ * Lines typed, pasted or inserted through the browser's editing command arrive as paragraphs and
+ * are left alone. The editor starts with the empty paragraph ProseMirror keeps.
+ */
+const PARAGRAPH_EDITOR = /* html */ `
+    <script>
+      document.execCommand('defaultParagraphSeparator', false, 'p');
+      const editor = document.querySelector('.ProseMirror');
+      editor.addEventListener('input', () => {
+        const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
+        for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+          if (node.nodeValue.includes('\\n')) { node.nodeValue = node.nodeValue.replace(/\\n/g, ' '); }
+        }
+      });
+    </script>`;
+
+const paragraphEditorPage = (title: string, field: string, bar: string): string =>
+  plainPage(title, field, bar).replace('</body>', `${PARAGRAPH_EDITOR}\n  </body>`);
+
+const CHATGPT_EDITOR_HTML = paragraphEditorPage(
+  'ChatGPT',
+  '<div class="field ProseMirror" id="prompt-textarea" contenteditable="true" role="textbox" aria-label="Chat with ChatGPT"><p><br></p></div>',
+  '<div class="bar ms-auto flex items-center gap-1.5"><button type="button">Voice</button></div>'
+);
+
+const MISTRAL_EDITOR_HTML = paragraphEditorPage(
+  'Le Chat',
+  '<div class="field ProseMirror" contenteditable="true" aria-label="Ask Le Chat"><p><br></p></div>',
+  '<div class="bar flex w-full max-w-full items-center justify-start gap-3"><button type="button">Tools</button><div class="flex ms-auto"><button type="button">Send</button></div></div>'
+);
+
+/** The stand-ins for the live ProseMirror composers of ChatGPT and Mistral (see PARAGRAPH_EDITOR). */
+export type EditorFixture = 'chatgpt-editor' | 'mistral-editor';
+
+export const EDITOR_FIXTURES: readonly EditorFixture[] = ['chatgpt-editor', 'mistral-editor'];
+
 /** The input field of each stand-in page. */
 export const PLATFORM_FIELD: Record<PlatformFixture, string> = {
   chatgpt: '#prompt-textarea',
@@ -193,7 +235,9 @@ export const PLATFORM_FIELD: Record<PlatformFixture, string> = {
   m365copilot: '#m365-chat-editor-target-element',
 };
 
-const FIXTURES: Record<PlatformFixture, { url: string; html: string }> = {
+const FIXTURES: Record<PlatformFixture | EditorFixture, { url: string; html: string }> = {
+  'chatgpt-editor': { url: 'https://chatgpt.com/', html: CHATGPT_EDITOR_HTML },
+  'mistral-editor': { url: 'https://chat.mistral.ai/', html: MISTRAL_EDITOR_HTML },
   chatgpt: { url: 'https://chatgpt.com/', html: CHATGPT_REACT_HTML },
   claude: { url: 'https://claude.ai/', html: CLAUDE_EDITOR_HTML },
   mistral: { url: 'https://chat.mistral.ai/', html: MISTRAL_HTML },
@@ -214,7 +258,7 @@ const readReactScript = ({ module, file }: { module: string; file: string }): st
  */
 export async function routePlatform(
   context: BrowserContext,
-  platform: PlatformFixture,
+  platform: PlatformFixture | EditorFixture,
   options: { headers?: Record<string, string> } = {}
 ): Promise<string> {
   const { url, html } = FIXTURES[platform];
@@ -241,7 +285,7 @@ export async function routePlatform(
 /** Opens the Platform's stand-in page in a new tab. */
 export async function openPlatform(
   context: BrowserContext,
-  platform: PlatformFixture,
+  platform: PlatformFixture | EditorFixture,
   options: { headers?: Record<string, string> } = {}
 ): Promise<Page> {
   const url = await routePlatform(context, platform, options);

@@ -46,8 +46,11 @@ export class DefaultStrategy extends PlatformStrategy {
         inputElement.dispatchEvent(new Event('input', { bubbles: true }));
         inputElement.dispatchEvent(new Event('change', { bubbles: true }));
       } else if (element.contentEditable === 'true' || element.contentEditable === 'TRUE') {
-        element.textContent = content;
-        element.dispatchEvent(new Event('input', { bubbles: true }));
+        // Through the editing command, so an editor behind the field keeps the line breaks
+        const result = this.replaceEditableText(element, content, 'default');
+        if (!result.success) {
+          return Promise.resolve(result);
+        }
       }
 
       this._debug('Default insertion successful');

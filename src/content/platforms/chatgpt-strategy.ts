@@ -1,8 +1,8 @@
 /**
  * ChatGPT Platform Strategy module
  * 
- * Strategy for handling ChatGPT's React-based textarea inputs
- * Uses React-specific event triggering for proper state updates
+ * Strategy for ChatGPT's composer: a ProseMirror contenteditable on the live site, a React
+ * textarea before that and still on some pages.
  */
 
 import { getPlatformById } from '../../config/platforms';
@@ -37,19 +37,31 @@ export class ChatGPTStrategy extends PlatformStrategy {
   }
 
   /**
-   * Determines if this strategy can handle the element
-   * Only handles textarea elements on chatgpt.com
+   * Determines if this strategy can handle the element: the composer on chatgpt.com, as a
+   * textarea or as a contenteditable editor
    */
   canHandle(element: HTMLElement): boolean {
-    return this.hostname === getPlatformById('chatgpt')?.hostname && element.tagName === 'TEXTAREA';
+    if (this.hostname !== getPlatformById('chatgpt')?.hostname) {
+      return false;
+    }
+    return element.tagName === 'TEXTAREA' || ChatGPTStrategy.isEditable(element);
+  }
+
+  private static isEditable(element: HTMLElement): boolean {
+    return element.isContentEditable || element.getAttribute('contenteditable') === 'true';
   }
 
   /**
-   * Inserts content using React-compatible methods
-   * Uses native property setter to trigger React state updates
+   * Inserts content: into the editor through the browser's editing command, so its paragraphs
+   * follow the Prompt's line breaks, or into the textarea through the native value setter React
+   * listens to
    */
   insert(element: HTMLElement, content: string): Promise<InsertionResult> {
     try {
+      if (ChatGPTStrategy.isEditable(element)) {
+        return Promise.resolve(this.replaceEditableText(element, content, 'chatgpt'));
+      }
+
       const textareaElement = element as ReactTextAreaElement;
       
       // Focus the element first
