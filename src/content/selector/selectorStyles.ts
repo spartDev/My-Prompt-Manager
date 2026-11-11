@@ -507,7 +507,6 @@ export function getSelectorCSS(): string {
       gap: 8px;
       box-sizing: border-box;
       height: 34px;
-      max-width: min(420px, calc(100vw - 16px));
       padding: 0 13px;
       pointer-events: auto;
       border-radius: 999px;

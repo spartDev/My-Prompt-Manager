@@ -41,6 +41,10 @@ const MESSAGE: Record<InsertionFeedbackProps['kind'], (title: string) => string>
 /** Space between the input field and the confirmation, and the least room it needs above the field. */
 const GAP = 10;
 const ROOM = 48;
+/** The pill's widest, the space kept between it and the window's edge, and the room below which it leaves the field's right edge. */
+const WIDEST = 420;
+const MARGIN = 8;
+const NARROW = 240;
 
 /**
  * What the user sees right after an Insertion, drawn in the selector's shadow root over the page:
@@ -48,11 +52,18 @@ const ROOM = 48;
  * and offers Undo. When the Insertion failed the pill says so, with no sweep and no Undo.
  */
 export const InsertionFeedback: FC<InsertionFeedbackProps> = ({ id, kind, title, field, viewport, sweep, leaving, onUndo, onHold }) => {
-  const right = Math.max(8, viewport.width - (field.left + field.width));
+  // Its right edge on the field's, as wide as the window leaves room for on that side. A field
+  // that ends near the left of the window leaves too little: the pill then starts at the left
+  // margin, so it is never cut off by the edge of the window
+  const right = Math.max(MARGIN, viewport.width - (field.left + field.width));
+  const room = viewport.width - right - MARGIN;
+  const across: CSSProperties = room >= NARROW
+    ? { right, maxWidth: Math.min(WIDEST, room) }
+    : { left: MARGIN, maxWidth: Math.max(0, Math.min(WIDEST, viewport.width - 2 * MARGIN)) };
   // Above the field; below it when the field is at the top of the window
   const place: CSSProperties = field.top >= ROOM
-    ? { right, bottom: viewport.height - field.top + GAP }
-    : { right, top: field.top + field.height + GAP };
+    ? { ...across, bottom: viewport.height - field.top + GAP }
+    : { ...across, top: field.top + field.height + GAP };
   const inserted = kind === 'inserted';
 
   // The pill is a status, not a control: it hears the pointer and the focus through its element.

@@ -168,6 +168,27 @@ test.describe('Insertion confirmation: time and motion', () => {
     }
   });
 
+  test('the pill stays inside the window over a narrow field at the left of the page', async ({ context, storage }) => {
+    await seed(storage);
+    const page = await openPlatform(context, 'claude');
+    await page.addStyleTag({ content: 'main { margin-top: 120px; } .ProseMirror { width: 110px; }' });
+    await expect(promptsButton(page)).toHaveCount(1);
+
+    await insertByTyping(page, 'claude', 'notes');
+    const pill = insertionPill(page);
+    await pill.evaluate((element) => Promise.all(element.getAnimations().map((animation) => animation.finished)));
+
+    const box = await pill.boundingBox();
+    const viewport = page.viewportSize();
+    expect(box && viewport).toBeTruthy();
+    if (box && viewport) {
+      expect(box.x).toBeGreaterThanOrEqual(8);
+      expect(box.x + box.width).toBeLessThanOrEqual(viewport.width - 8);
+    }
+    await expect(pill).toContainText('Inserted “Meeting notes to decisions”');
+    await expect(undoButton(page)).toBeVisible();
+  });
+
   test('a Prompt of several lines is inserted, then undone back to an empty field', async ({ context, storage }) => {
     await seed(storage);
     const page = await openPlatform(context, 'copilot');

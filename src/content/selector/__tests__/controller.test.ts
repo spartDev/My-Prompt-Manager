@@ -503,6 +503,25 @@ describe('PromptSelectorController', () => {
       await vi.waitFor(() => { expect(pill()?.getAttribute('data-kind')).toBe('undoFailed'); });
     });
 
+    it('keeps its right edge on the field, no wider than the window leaves room for', async () => {
+      await inserted();
+
+      const width = document.documentElement.clientWidth || window.innerWidth;
+      expect(pill()?.style.right).toBe(`${String(width - 600)}px`);
+      expect(pill()?.style.left).toBe('');
+      expect(pill()?.style.maxWidth).toBe('420px');
+    });
+
+    it('starts at the left margin when the field ends near the left of the window', async () => {
+      // A narrow field at the left: its right edge is 150px from the left of the window
+      field.getBoundingClientRect = () => new DOMRect(10, 400, 140, 40);
+
+      await inserted();
+
+      expect(pill()?.style.left).toBe('8px');
+      expect(pill()?.style.right).toBe('');
+    });
+
     it('says so when the Insertion failed: no Undo, no sweep', async () => {
       callbacks.insert.mockResolvedValue(false);
 

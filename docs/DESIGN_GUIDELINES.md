@@ -1557,7 +1557,7 @@ transition-colors focus-interactive
 - Max height: the room left on that side; the list inside is at most 230px, the variables text 220px
 
 **Confirmation of an Insertion** (`src/content/selector/InsertionFeedback.tsx`):
-- Pill: 34px high, on `bg-inverse`, its right edge on the input field's, 10px above the field (below when the field is less than 48px from the top of the window); `role="status"`; `Inserted “title”` and an Undo button (26px high), or `Couldn't insert “title”` alone (`Couldn't undo “title”` when Undo could not put the earlier text back)
+- Pill: 34px high, on `bg-inverse`, its right edge on the input field's, 10px above the field (below when the field is less than 48px from the top of the window), at most 420px wide and never past the window: when the field leaves less than 240px on its left, the pill starts 8px from the left of the window instead; `role="status"`; `Inserted “title”` and an Undo button (26px high), or `Couldn't insert “title”` alone (`Couldn't undo “title”` when Undo could not put the earlier text back)
 - It stays 2.8s, and while it is hovered or focused; it leaves when the user types in the field or sends
 - Sweep: a violet band (`bg-inverse-mark` at 32%) across the field, once, 1.1s on the sheet curve, inside the field's own corner radius; not drawn under reduced motion
 
