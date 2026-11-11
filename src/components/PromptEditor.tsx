@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { useActionState, useDeferredValue, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useActionState, useEffect, useId, useMemo, useRef, useState } from 'react';
 
 import { formatCharacterCount } from '../constants/validation';
 import { PROMPT_LIMITS } from '../services/promptAdmission';
@@ -18,6 +18,9 @@ import { useShareCodeImport } from './editor/useShareCodeImport';
 import VariableTextarea from './editor/VariableTextarea';
 
 type EditorMode = 'write' | 'import';
+
+/** The pause in typing after which the text is compared with the Library (This looks familiar) */
+const LOOKALIKE_PAUSE_MS = 400;
 
 /** Share of a limit from which the counter shows the limit too */
 const NEAR_LIMIT = 0.9;
@@ -196,11 +199,15 @@ const PromptEditor: FC<PromptEditorProps> = ({
     setMode(next);
   };
 
-  // Compared once typing pauses: a long text against a large Library is not free
-  const deferredContent = useDeferredValue(content);
+  // Compared once typing pauses, not at each keystroke: a long text against a large Library is not free
+  const [pausedContent, setPausedContent] = useState(content);
+  useEffect(() => {
+    const timer = setTimeout(() => { setPausedContent(content); }, LOOKALIKE_PAUSE_MS);
+    return () => { clearTimeout(timer); };
+  }, [content]);
   const lookalike = useMemo(
-    () => (keepBoth ? null : findLookalike(deferredContent, library, prompt?.id)),
-    [keepBoth, deferredContent, library, prompt?.id]
+    () => (keepBoth ? null : findLookalike(pausedContent, library, prompt?.id)),
+    [keepBoth, pausedContent, library, prompt?.id]
   );
 
   const variables = extractVariables(content);
@@ -370,7 +377,7 @@ const PromptEditor: FC<PromptEditorProps> = ({
               {lookalike && (
                 <LookalikeCallout
                   lookalike={lookalike}
-                  yours={deferredContent}
+                  yours={pausedContent}
                   onKeepBoth={() => { setKeepBoth(true); }}
                   disabled={locked}
                 />
@@ -420,6 +427,12 @@ const PromptEditor: FC<PromptEditorProps> = ({
           )}
         </form>
       </div>
+
+      {/* "This looks familiar" for a screen reader, whose focus stays in the text: said once per Prompt
+          pointed out, without the percentage, which changes at each pause in typing */}
+      <p data-testid="lookalike-announcement" aria-live="polite" className="sr-only">
+        {lookalike && `This looks familiar: it is like “${lookalike.prompt.title}”, a Prompt of your Library`}
+      </p>
 
       <ConfirmDialog
         isOpen={confirming === 'discard'}

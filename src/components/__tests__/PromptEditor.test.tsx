@@ -635,6 +635,31 @@ describe('PromptEditor - a Prompt that looks familiar', () => {
     );
   });
 
+  it('compares the text once typing pauses, not at each keystroke', async () => {
+    renderEditor({ library: [summarize] });
+
+    await typeContent(SIXTY_PERCENT_LIKE);
+
+    expect(callout()).not.toBeInTheDocument();
+    expect(await screen.findByRole('region', { name: 'This looks familiar' })).toBeInTheDocument();
+  });
+
+  it('announces the Prompt it is like to a screen reader once, without the percentage that changes as the text does', async () => {
+    const { container } = renderEditor({ library: [summarize] });
+    // Present before anything is announced, as a live region must be
+    const live = container.querySelector('[data-testid="lookalike-announcement"]');
+    expect(live).toHaveAttribute('aria-live', 'polite');
+    expect(live).toBeEmptyDOMElement();
+
+    await typeContent(`${summarize.content} Extra`); // 40 of 46 characters alike: 87%
+    expect(await screen.findByRole('region', { name: 'This looks familiar' })).toHaveTextContent('87%');
+    expect(live).toHaveTextContent('This looks familiar: it is like “Summarize an article”, a Prompt of your Library');
+
+    await userEvent.paste(' x'); // 40 of 48: 83%
+    await waitFor(() => { expect(screen.getByRole('region', { name: 'This looks familiar' })).toHaveTextContent('83%'); });
+    expect(live).toHaveTextContent('This looks familiar: it is like “Summarize an article”, a Prompt of your Library');
+  });
+
   it('shows the first lines of the text typed and of the Prompt it is like', async () => {
     renderEditor({ library: [summarize] });
 
@@ -662,12 +687,13 @@ describe('PromptEditor - a Prompt that looks familiar', () => {
   });
 
   it('never points out the Prompt being edited', async () => {
-    renderEdit({ prompt: summarize, library: [summarize] });
+    const another = { ...summarize, id: 'another', title: 'Summarize again', content: `${summarize.content} Please.` };
+    renderEdit({ prompt: summarize, library: [summarize, another] });
 
     await typeContent(' Keep it short.');
 
-    expect(content()).toHaveValue(`${summarize.content} Keep it short.`);
-    expect(callout()).not.toBeInTheDocument();
+    // Its own text is the most alike, yet the one pointed out is another Prompt
+    expect(await screen.findByRole('region', { name: 'This looks familiar' })).toHaveTextContent('like “Summarize again”');
   });
 
   it('never blocks saving', async () => {
