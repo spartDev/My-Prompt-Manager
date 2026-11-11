@@ -30,6 +30,11 @@ export const SELECTOR_HOST_ID = 'mpm-prompt-selector';
 /** Events that must not travel from the selector to the Platform's own listeners. */
 const CONTAINED_EVENTS = ['keydown', 'keyup', 'keypress', 'beforeinput', 'input', 'paste', 'copy', 'cut'] as const;
 
+/** Keys that do nothing on their own: pressing one is not the user going on to something else. */
+const MODIFIER_KEYS: ReadonlySet<string> = new Set([
+  'Shift', 'Control', 'Alt', 'AltGraph', 'Meta', 'OS', 'CapsLock', 'NumLock', 'ScrollLock', 'Fn', 'FnLock', 'Hyper', 'Super', 'Symbol', 'SymbolLock'
+]);
+
 /** How far from the input field, in pixels, the Prompts button still counts as part of the input area. */
 const BUTTON_REACH = 120;
 
@@ -433,6 +438,10 @@ export class PromptSelectorController {
     let movedOn = movedOnAlready;
     const inField = (event: Event): boolean => event.composedPath().includes(target);
     const onUserAction = (event: Event): void => {
+      // Shift, Control and the like held on their own change neither the focus nor the text
+      if (event instanceof KeyboardEvent && MODIFIER_KEYS.has(event.key)) {
+        return;
+      }
       if (event.isTrusted && (event.type === 'pointerdown' || event.type === 'keydown' || inField(event))) {
         movedOn = true;
       }

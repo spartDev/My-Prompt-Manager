@@ -610,6 +610,20 @@ describe('PromptSelectorController', () => {
       expect(document.activeElement).toBe(elsewhere);
     });
 
+    it.each(['Shift', 'Control', 'Alt', 'Meta', 'CapsLock'])('still confirms, with Undo, when the user only presses %s during the Insertion', async (key) => {
+      callbacks.insert.mockImplementation(() => {
+        const pressed = new KeyboardEvent('keydown', { key, bubbles: true, composed: true });
+        Object.defineProperty(pressed, 'isTrusted', { value: true });
+        field.dispatchEvent(pressed);
+        return Promise.resolve(true);
+      });
+
+      await inserted();
+
+      expect(pill()?.getAttribute('data-kind')).toBe('inserted');
+      expect(undoButton()).not.toBeNull();
+    });
+
     it('still confirms when a script sends a key during the Insertion: only the user\'s keys count', async () => {
       callbacks.insert.mockImplementation(() => {
         field.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true, composed: true }));
