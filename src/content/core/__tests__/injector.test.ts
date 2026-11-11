@@ -346,9 +346,27 @@ describe('PromptLibraryInjector', () => {
     });
 
     describe('typing // in the input field', () => {
-      const typeSlashes = async (field: HTMLTextAreaElement): Promise<ReturnType<typeof vi.fn>> => {
+      // The fields a test adds to the page, out of it once the test is done
+      const added: HTMLTextAreaElement[] = [];
+      const addField = (): HTMLTextAreaElement => {
+        const field = document.createElement('textarea');
+        document.body.appendChild(field);
+        added.push(field);
+        return field;
+      };
+      afterEach(() => {
+        for (const field of added.splice(0)) {
+          field.remove();
+        }
+      });
+
+      /**
+       * Initializes the injector, and gives the recorder of the selector's openings with a way to
+       * type `//`. Typing is synchronous: the detection passes the injector runs on timers (on a
+       * change of the page, on a focus) cannot land between what a test sets up and the key.
+       */
+      const listen = async () => {
         await injector.initialize();
-        await new Promise(resolve => setTimeout(resolve, 50));
         const open = vi.fn().mockResolvedValue(undefined);
         (selector() as unknown as { open: typeof open }).open = open;
 
@@ -357,40 +375,39 @@ describe('PromptLibraryInjector', () => {
         const keydown = eventManagerInstance.addTrackedEventListener.mock.calls.find((call: any[]) => call[0] === document && call[1] === 'keydown');
         expect(keydown).toBeDefined();
 
-        field.value = 'Draft //';
-        field.setSelectionRange(8, 8);
-        // The event travels from the field to the document, where the injector listens
-        const heard = (event: Event) => { keydown[2](event); };
-        document.addEventListener('keydown', heard);
-        field.dispatchEvent(new KeyboardEvent('keydown', { key: '/', bubbles: true, composed: true }));
-        document.removeEventListener('keydown', heard);
-        await new Promise(resolve => setTimeout(resolve, 20));
-        return open;
+        const typeSlashes = (field: HTMLTextAreaElement): void => {
+          field.value = 'Draft //';
+          field.setSelectionRange(8, 8);
+          // The event travels from the field to the document, where the injector listens
+          const heard = (event: Event) => { keydown[2](event); };
+          document.addEventListener('keydown', heard);
+          field.dispatchEvent(new KeyboardEvent('keydown', { key: '/', bubbles: true, composed: true }));
+          document.removeEventListener('keydown', heard);
+        };
+        return { open, typeSlashes };
       };
+      // The injector reads the // on a timer of its own, set when the key is heard; a timer set
+      // after the key runs after that one
+      const handled = () => new Promise(resolve => window.setTimeout(resolve, 0));
 
       it('opens the selector over the input field the Prompts button was placed for, without the //', async () => {
-        const open = await typeSlashes(mockTextarea);
+        const { open, typeSlashes } = await listen();
 
-        expect(open).toHaveBeenCalledTimes(1);
+        typeSlashes(mockTextarea);
+
+        await vi.waitFor(() => { expect(open).toHaveBeenCalledTimes(1); });
         expect(open.mock.calls[0][0]).toBe(mockTextarea);
         expect(mockTextarea.value).toBe('Draft ');
       });
 
       it('drops the opening when the user goes on typing in the field while the selector loads', async () => {
-        const open = await typeSlashes(mockTextarea);
-        // typeSlashes resolves its opening at once; this one is still loading
+        const { open, typeSlashes } = await listen();
+        typeSlashes(mockTextarea);
+        await vi.waitFor(() => { expect(open).toHaveBeenCalledTimes(1); });
+        // The first opening resolved at once; this one is still loading
         open.mockReturnValue(new Promise(() => { /* still loading */ }));
-        mockTextarea.value = 'Draft //';
-        mockTextarea.setSelectionRange(8, 8);
-        const { EventManager } = await import('../../ui/event-manager');
-        const eventManagerInstance = (EventManager as any).mock.results.at(-1).value;
-        const keydown = eventManagerInstance.addTrackedEventListener.mock.calls.find((call: any[]) => call[0] === document && call[1] === 'keydown');
-        const heard = (event: Event) => { keydown[2](event); };
-        document.addEventListener('keydown', heard);
-        mockTextarea.dispatchEvent(new KeyboardEvent('keydown', { key: '/', bubbles: true, composed: true }));
-        document.removeEventListener('keydown', heard);
-        await new Promise(resolve => setTimeout(resolve, 20));
-        expect(open).toHaveBeenCalledTimes(2);
+        typeSlashes(mockTextarea);
+        await vi.waitFor(() => { expect(open).toHaveBeenCalledTimes(2); });
         selector().close.mockClear();
 
         // Shift alone is not typing; a letter is
@@ -424,11 +441,13 @@ describe('PromptLibraryInjector', () => {
         // And what a script sends is not the user
         mockTextarea.dispatchEvent(new Event('paste', { bubbles: true, composed: true }));
         expect(selector().close).not.toHaveBeenCalled();
+        elsewhere.remove();
       });
 
       it('leaves an open selector alone: once it shows, the keys typed are its own', async () => {
-        const open = await typeSlashes(mockTextarea);
-        expect(open).toHaveBeenCalledTimes(1);
+        const { open, typeSlashes } = await listen();
+        typeSlashes(mockTextarea);
+        await vi.waitFor(() => { expect(open).toHaveBeenCalledTimes(1); });
         selector().close.mockClear();
 
         const event = new KeyboardEvent('keydown', { key: 'a', bubbles: true, composed: true });
@@ -439,45 +458,40 @@ describe('PromptLibraryInjector', () => {
       });
 
       it('opens over the input field the Platform has just put in place of the detected one', async () => {
-        await injector.initialize();
-        await new Promise(resolve => setTimeout(resolve, 50));
+        const { open, typeSlashes } = await listen();
+        const fresh = addField();
+
         // The Platform re-rendered its composer: the detected field is out of the page, and the
         // new one has not been detected yet
-        const replaced = document.createElement('textarea');
-        (injector as any).state.currentTextarea = replaced;
-        const fresh = document.createElement('textarea');
-        document.body.appendChild(fresh);
+        (injector as any).state.currentTextarea = document.createElement('textarea');
+        typeSlashes(fresh);
 
-        const open = await typeSlashes(fresh);
-
-        expect(open).toHaveBeenCalledTimes(1);
+        await vi.waitFor(() => { expect(open).toHaveBeenCalledTimes(1); });
         expect(open.mock.calls[0][0]).toBe(fresh);
         expect(fresh.value).toBe('Draft ');
       });
 
       it('opens nothing for a // typed in another field of the page while the detected one is there', async () => {
-        await injector.initialize();
-        await new Promise(resolve => setTimeout(resolve, 50));
+        const { open, typeSlashes } = await listen();
         // A search box: the Platform's selectors name every textarea, but the input field is in the page
-        const search = document.createElement('textarea');
-        document.body.appendChild(search);
-        (injector as any).state.currentTextarea = mockTextarea;
+        const search = addField();
 
-        const open = await typeSlashes(search);
+        (injector as any).state.currentTextarea = mockTextarea;
+        typeSlashes(search);
+        await handled();
 
         expect(open).not.toHaveBeenCalled();
         expect(search.value).toBe('Draft //');
       });
 
       it('opens nothing, once the detected field is gone, for a // typed in a field the Platform does not name', async () => {
-        await injector.initialize();
-        await new Promise(resolve => setTimeout(resolve, 50));
-        const other = document.createElement('textarea');
-        document.body.appendChild(other);
+        const { open, typeSlashes } = await listen();
+        const other = addField();
         (await platformManager()).getAllSelectors.mockReturnValue(['div[contenteditable="true"]']);
-        (injector as any).state.currentTextarea = document.createElement('textarea');
 
-        const open = await typeSlashes(other);
+        (injector as any).state.currentTextarea = document.createElement('textarea');
+        typeSlashes(other);
+        await handled();
 
         expect(open).not.toHaveBeenCalled();
         expect(other.value).toBe('Draft //');
