@@ -46,7 +46,7 @@ const tooltipAlign = (index: number, count: number): string => {
 /**
  * The bar charts of the full-page Analytics view: a pill bar per entry, in the accent, sized against the
  * busiest, growing from the bottom like the hero's. Hovering a bar's column shows a muted band behind it and the
- * tooltip above it, with its label and Insertions.
+ * tooltip above it, with its label and Insertions. A list hidden on screen gives every entry to assistive technology.
  */
 const PillBarChart: FC<PillBarChartProps> = ({
   bars,
@@ -63,58 +63,66 @@ const PillBarChart: FC<PillBarChartProps> = ({
   const max = Math.max(1, ...bars.map(bar => bar.count));
 
   return (
-    <div
-      className="grid w-full gap-1"
-      role="img"
-      aria-label={summary}
-      data-testid={testId}
-      style={{ height, gridTemplateColumns: `repeat(${String(bars.length)}, minmax(0, 1fr))` }}
-    >
-      {bars.map((bar, index) => {
-        const isHovered = hovered === index;
-        const isLabelled = (bars.length - 1 - index) % labelEvery === 0;
-        return (
-          <div
-            key={bar.key}
-            aria-hidden="true"
-            data-testid="chart-bar"
-            onMouseEnter={() => { setHovered(index); }}
-            onMouseLeave={() => { setHovered(current => (current === index ? null : current)); }}
-            className={`flex min-h-0 flex-col gap-1.5 ${isHovered ? 'relative z-10' : ''}`}
-          >
+    <>
+      <div
+        className="grid w-full gap-1"
+        role="img"
+        aria-label={summary}
+        data-testid={testId}
+        style={{ height, gridTemplateColumns: `repeat(${String(bars.length)}, minmax(0, 1fr))` }}
+      >
+        {bars.map((bar, index) => {
+          const isHovered = hovered === index;
+          const isLabelled = (bars.length - 1 - index) % labelEvery === 0;
+          return (
             <div
-              data-testid="chart-band"
-              className={`flex flex-1 min-h-0 items-end justify-center rounded-[8px] pt-2 transition-colors duration-(--duration-color) ${isHovered ? 'bg-muted' : ''}`}
+              key={bar.key}
+              aria-hidden="true"
+              data-testid="chart-bar"
+              onMouseEnter={() => { setHovered(index); }}
+              onMouseLeave={() => { setHovered(current => (current === index ? null : current)); }}
+              className={`flex min-h-0 flex-col gap-1.5 ${isHovered ? 'relative z-10' : ''}`}
             >
               <div
-                data-testid="chart-pill"
-                className="relative w-full"
-                style={{
-                  maxWidth: maxBarWidth,
-                  height: `${String(Math.round((bar.count / max) * 100))}%`,
-                  minHeight: minBarHeight
-                }}
+                data-testid="chart-band"
+                className={`flex flex-1 min-h-0 items-end justify-center rounded-[8px] pt-2 transition-colors duration-(--duration-color) ${isHovered ? 'bg-muted' : ''}`}
               >
                 <div
-                  data-testid="chart-pill-fill"
-                  className="h-full rounded-full bg-accent origin-bottom animate-bar-grow"
-                  style={{ animationDelay: `${String(growDelay(index, bars.length))}ms` }}
-                />
-                {/* Outside the growing fill: Chromium can leave a child of a scaled layer unpainted */}
-                {isHovered && (
-                  <span className={`absolute bottom-[calc(100%+6px)] ${tooltipAlign(index, bars.length)}`}>
-                    <ChartTooltip label={formatTooltipLabel(bar.key)} count={bar.count} />
-                  </span>
-                )}
+                  data-testid="chart-pill"
+                  className="relative w-full"
+                  style={{
+                    maxWidth: maxBarWidth,
+                    height: `${String(Math.round((bar.count / max) * 100))}%`,
+                    minHeight: minBarHeight
+                  }}
+                >
+                  <div
+                    data-testid="chart-pill-fill"
+                    className="h-full rounded-full bg-accent origin-bottom animate-bar-grow"
+                    style={{ animationDelay: `${String(growDelay(index, bars.length))}ms` }}
+                  />
+                  {/* Outside the growing fill: Chromium can leave a child of a scaled layer unpainted */}
+                  {isHovered && (
+                    <span className={`absolute bottom-[calc(100%+6px)] ${tooltipAlign(index, bars.length)}`}>
+                      <ChartTooltip label={formatTooltipLabel(bar.key)} count={bar.count} />
+                    </span>
+                  )}
+                </div>
               </div>
+              <span className="flex h-3.5 justify-center whitespace-nowrap text-[11px] leading-3.5 font-semibold text-tertiary">
+                {isLabelled && <span data-testid="chart-axis-label">{formatLabel(bar.key)}</span>}
+              </span>
             </div>
-            <span className="flex h-3.5 justify-center whitespace-nowrap text-[11px] leading-3.5 font-semibold text-tertiary">
-              {isLabelled && <span data-testid="chart-axis-label">{formatLabel(bar.key)}</span>}
-            </span>
-          </div>
-        );
-      })}
-    </div>
+          );
+        })}
+      </div>
+      {/* The bars are hidden from assistive technology: every entry and its Insertions, in words */}
+      <ul className="sr-only">
+        {bars.map(bar => (
+          <li key={bar.key}>{`${formatTooltipLabel(bar.key)}: ${String(bar.count)} ${bar.count === 1 ? 'use' : 'uses'}`}</li>
+        ))}
+      </ul>
+    </>
   );
 };
 

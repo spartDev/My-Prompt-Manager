@@ -129,4 +129,16 @@ describe('Chart hover', () => {
 
     expect(screen.getAllByTestId('chart-axis-label').map(label => label.textContent)).toEqual(['Morning', 'Afternoon', 'Evening', 'Night']);
   });
+
+  it('DailyUseChart lists every day and its uses to assistive technology', () => {
+    render(<DailyUseChart data={DAYS} />);
+
+    expect(screen.getAllByRole('listitem').map(item => item.textContent)).toEqual(['Jan 11: 5 uses', 'Jan 12: 10 uses', 'Jan 13: 0 uses']);
+  });
+
+  it('TimeOfDayChart lists every time of day, its hours and its uses to assistive technology', () => {
+    render(<TimeOfDayChart data={TIMES.slice(0, 2)} />);
+
+    expect(screen.getAllByRole('listitem').map(item => item.textContent)).toEqual(['Morning, 6-12: 10 uses', 'Afternoon, 12-18: 20 uses']);
+  });
 });
