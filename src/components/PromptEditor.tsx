@@ -64,8 +64,10 @@ const PromptEditor: FC<PromptEditorProps> = ({
   const titleRef = useRef<HTMLInputElement>(null);
   const formId = useId();
 
-  // The title takes the keyboard as the editor opens, while the sheet is still rising
-  useEffect(() => { titleRef.current?.focus(); }, []);
+  // The title takes the keyboard as the editor opens, while the sheet is still rising. It must not
+  // scroll to the title: the sheet starts below the panel, and in the side panel (#root, overflow
+  // hidden) that scroll would drag the whole app up at the first frame and cut the rise short
+  useEffect(() => { titleRef.current?.focus({ preventScroll: true }); }, []);
 
   const [mode, setMode] = useState<EditorMode>('write');
   // The text as typed, kept as the fields' defaultValue: React 19 resets a form's uncontrolled

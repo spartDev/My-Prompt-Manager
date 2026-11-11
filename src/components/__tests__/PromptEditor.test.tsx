@@ -259,6 +259,20 @@ describe('PromptEditor - save', () => {
     expect(title()).toHaveFocus();
   });
 
+  it('gives the title the keyboard without scrolling to it: the sheet is still below the panel', () => {
+    // A focus that scrolls would scroll the side panel's root, whose overflow includes the sheet
+    // waiting below it, and the whole app would jump up at the first frame of the rise
+    const focus = vi.spyOn(HTMLElement.prototype, 'focus');
+    try {
+      renderEditor();
+
+      expect(focus.mock.contexts).toContain(title());
+      expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+    } finally {
+      focus.mockRestore();
+    }
+  });
+
   it('slides Save to the success color, with a check that pops, and presses with a spring', async () => {
     renderEditor();
     expect(save()).toHaveClass('transition-save', 'active:scale-94');
