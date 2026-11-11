@@ -474,8 +474,9 @@ export class PromptSelectorController {
     if (this.session || this.loading !== null) {
       return;
     }
-    // The user has already gone on: the focus and the caret are theirs, and Undo is stale
-    if (inserted && movedOn) {
+    // The user has already gone on: the focus and the caret are theirs, and Undo is stale. A
+    // field that is gone meanwhile is another matter: the Prompt went nowhere, and that is said
+    if (inserted && movedOn && target.isConnected) {
       return;
     }
     if (target.isConnected) {

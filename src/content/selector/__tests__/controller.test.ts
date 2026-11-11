@@ -740,6 +740,26 @@ describe('PromptSelectorController', () => {
       expect(document.activeElement).toBe(elsewhere);
     });
 
+    it('says the failure when the field is gone, even to a user who pressed a key elsewhere meanwhile', async () => {
+      const elsewhere = document.createElement('input');
+      document.body.append(elsewhere);
+      callbacks.insert.mockImplementation(async () => {
+        const key = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, composed: true });
+        Object.defineProperty(key, 'isTrusted', { value: true });
+        elsewhere.dispatchEvent(key);
+        elsewhere.focus();
+        field.remove();
+        await Promise.resolve();
+        return true;
+      });
+
+      await inserted();
+
+      expect(pill()?.textContent).toBe("Couldn't insert “Title p1”");
+      expect(undoButton()).toBeNull();
+      expect(document.activeElement).toBe(elsewhere);
+    });
+
     it('says so when the Insertion throws', async () => {
       callbacks.insert.mockRejectedValue(new Error('boom'));
 
