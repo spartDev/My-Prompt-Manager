@@ -295,6 +295,37 @@ export class PromptLibraryInjector {
   }
 
   /**
+   * The input field a `/` was typed in: the one the Prompts button was placed for, or, when the
+   * Platform has just replaced its input field and the new one is not detected yet, the element
+   * on the event's path that the Platform's selectors name.
+   */
+  private triggerField(event: Event): HTMLElement | null {
+    const path = event.composedPath();
+    const current = this.state.currentTextarea;
+    if (current?.isConnected && path.includes(current)) {
+      return current;
+    }
+    const selectors = this.platformManager.getAllSelectors();
+    for (const node of path) {
+      if (!(node instanceof HTMLElement)) {
+        continue;
+      }
+      const named = selectors.some((selector) => {
+        try {
+          return node.matches(selector);
+        } catch {
+          // A custom site's selector the browser does not parse
+          return false;
+        }
+      });
+      if (named) {
+        return node;
+      }
+    }
+    return null;
+  }
+
+  /**
    * Opens the Prompt selector when the user types `//` in the input field, at its start or after
    * a space or a line break (so the `//` of a URL opens nothing). The two characters are removed
    * first, as Backspace would, and the rest of the field is left as it is.
@@ -302,8 +333,11 @@ export class PromptLibraryInjector {
   private listenForSelectorTrigger(): void {
     let scheduled = false;
     const onSlash = (event: Event): void => {
-      const field = this.state.currentTextarea;
-      if (scheduled || !field?.isConnected || this.selector.isOpen || !event.composedPath().includes(field)) {
+      if (scheduled || this.selector.isOpen) {
+        return;
+      }
+      const field = this.triggerField(event);
+      if (!field) {
         return;
       }
       // An editor that handles typing itself sends no input event: the key is heard as well

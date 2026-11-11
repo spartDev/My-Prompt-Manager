@@ -345,6 +345,72 @@ describe('PromptLibraryInjector', () => {
       expect(chrome.runtime.sendMessage).not.toHaveBeenCalled();
     });
 
+    describe('typing // in the input field', () => {
+      const typeSlashes = async (field: HTMLTextAreaElement): Promise<ReturnType<typeof vi.fn>> => {
+        await injector.initialize();
+        await new Promise(resolve => setTimeout(resolve, 50));
+        const open = vi.fn().mockResolvedValue(undefined);
+        (selector() as unknown as { open: typeof open }).open = open;
+
+        const { EventManager } = await import('../../ui/event-manager');
+        const eventManagerInstance = (EventManager as any).mock.results.at(-1).value;
+        const keydown = eventManagerInstance.addTrackedEventListener.mock.calls.find((call: any[]) => call[0] === document && call[1] === 'keydown');
+        expect(keydown).toBeDefined();
+
+        field.value = 'Draft //';
+        field.setSelectionRange(8, 8);
+        // The event travels from the field to the document, where the injector listens
+        const heard = (event: Event) => { keydown[2](event); };
+        document.addEventListener('keydown', heard);
+        field.dispatchEvent(new KeyboardEvent('keydown', { key: '/', bubbles: true, composed: true }));
+        document.removeEventListener('keydown', heard);
+        await new Promise(resolve => setTimeout(resolve, 20));
+        return open;
+      };
+
+      it('opens the selector over the input field the Prompts button was placed for, without the //', async () => {
+        const open = await typeSlashes(mockTextarea);
+
+        expect(open).toHaveBeenCalledTimes(1);
+        expect(open.mock.calls[0][0]).toBe(mockTextarea);
+        expect(mockTextarea.value).toBe('Draft ');
+      });
+
+      it('opens over the input field the Platform has just put in place of the detected one', async () => {
+        await injector.initialize();
+        await new Promise(resolve => setTimeout(resolve, 50));
+        // The Platform re-rendered its composer: the detected field is out of the page, and the
+        // new one has not been detected yet
+        const replaced = document.createElement('textarea');
+        (injector as any).state.currentTextarea = replaced;
+        const fresh = document.createElement('textarea');
+        document.body.appendChild(fresh);
+
+        const open = await typeSlashes(fresh);
+
+        expect(open).toHaveBeenCalledTimes(1);
+        expect(open.mock.calls[0][0]).toBe(fresh);
+        expect(fresh.value).toBe('Draft ');
+      });
+
+      it('opens nothing for a // typed in a field the Platform does not name', async () => {
+        await injector.initialize();
+        await new Promise(resolve => setTimeout(resolve, 50));
+        const search = document.createElement('textarea');
+        const wrapper = document.createElement('section');
+        wrapper.appendChild(search);
+        document.body.appendChild(wrapper);
+        const manager = await platformManager();
+        manager.getAllSelectors.mockReturnValue(['div[contenteditable="true"]']);
+        (injector as any).state.currentTextarea = mockTextarea;
+
+        const open = await typeSlashes(search);
+
+        expect(open).not.toHaveBeenCalled();
+        expect(search.value).toBe('Draft //');
+      });
+    });
+
     it('Undo restores the text through the Platform, and reports no use', async () => {
       const manager = await platformManager();
       manager.restoreText = vi.fn().mockResolvedValue({ success: true, method: 'restore-value' });
