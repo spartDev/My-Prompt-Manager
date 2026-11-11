@@ -9,7 +9,6 @@ import type { UIElementFactory } from '../../ui/element-factory';
 import { CopilotStrategy } from '../copilot-strategy';
 
 import {
-  COPILOT_BUTTON_CONTAINER_SELECTOR,
   COPILOT_CONFIG, 
   COPILOT_SELECTORS,
   createCopilotTextarea,
@@ -67,11 +66,6 @@ describe('CopilotStrategy', () => {
         expect(selectors).toContain(selector);
       });
     });
-
-    it('should have correct button container selector', () => {
-      const buttonSelector = strategy.getButtonContainerSelector();
-      expect(buttonSelector).toBe(COPILOT_BUTTON_CONTAINER_SELECTOR);
-    });
   });
 
   describe('canHandle', () => {
@@ -117,7 +111,7 @@ describe('CopilotStrategy', () => {
   describe('insert', () => {
     beforeEach(() => {
       // Mock DOM methods
-      vi.spyOn(mockTextarea, 'focus').mockImplementation(() => {});
+      vi.spyOn(mockTextarea, 'focus').mockImplementation(() => undefined);
       setupDispatchEventMock(mockTextarea);
     });
 

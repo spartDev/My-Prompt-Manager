@@ -232,12 +232,6 @@ export const M365_COPILOT_SELECTORS = [
 ] as const;
 
 /**
- * Expected button container selector for M365 Copilot platform
- */
-export const M365_COPILOT_BUTTON_CONTAINER_SELECTOR =
-  '.fai-ChatInput__actions > span.___11i0s0y, .fai-ChatInput__actions';
-
-/**
  * Default hostname for M365 Copilot platform
  */
 export const M365_COPILOT_HOSTNAME = 'm365.cloud.microsoft';
@@ -249,6 +243,5 @@ export const M365_COPILOT_CONFIG = {
   name: 'm365copilot',
   priority: 80,
   hostname: M365_COPILOT_HOSTNAME,
-  selectors: M365_COPILOT_SELECTORS,
-  buttonContainerSelector: M365_COPILOT_BUTTON_CONTAINER_SELECTOR
+  selectors: M365_COPILOT_SELECTORS
 } as const;

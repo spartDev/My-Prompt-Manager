@@ -22,7 +22,6 @@ export class CopilotStrategy extends ReactPlatformStrategy {
         'textarea[placeholder*="Message"]',
         'textarea[placeholder*="Copilot"]'
       ],
-      buttonContainerSelector: platform?.buttonContainerSelector,
       priority: 80
     }, hostname);
 

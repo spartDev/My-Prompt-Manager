@@ -22,6 +22,20 @@ export type PlatformIconMethod =
   | "createGeminiIcon";
 
 /**
+ * Where the icon goes in a Platform's composer, named by what elements are for (test ids, ARIA
+ * labels, custom elements, button types), never by how they are styled.
+ */
+export interface IconPlacement {
+  /** Nearest ancestor of the editor that bounds the composer, found with editor.closest(): anchors outside it never win. */
+  composer: string;
+  /** Tried in order inside the composer; the first found wins. When none is, the icon is anchored on the editor. */
+  anchors: ReadonlyArray<{
+    find: string;
+    relation: 'before' | 'after' | 'inside-start' | 'inside-end';
+  }>;
+}
+
+/**
  * Interface for comprehensive platform configuration
  */
 export interface PlatformDefinition {
@@ -38,11 +52,10 @@ export interface PlatformDefinition {
   /** CSS selectors for finding input elements */
   selectors: string[];
   /**
-   * Where the icon goes: a CSS selector list for the composer toolbar, the first match in document
-   * order. The single source: a strategy reads it from here. When none matches, the icon is anchored
-   * on the editor instead (src/content/core/anchored-overlay.ts).
+   * Where the icon goes in the composer: see IconPlacement. The single source: no strategy keeps a
+   * copy. When no anchor is found, the icon is anchored on the editor (src/content/core/anchored-overlay.ts).
    */
-  buttonContainerSelector?: string;
+  iconPlacement?: IconPlacement;
   /** Strategy class name to use for this platform */
   strategyClass: string;
   /** Additional hostname patterns to check for platform detection */
@@ -72,8 +85,14 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
     priority: 100,
     defaultEnabled: true,
     selectors: ['div[contenteditable="true"][role="textbox"].ProseMirror'],
-    buttonContainerSelector:
-      ".relative.flex-1.flex.items-center.gap-2.shrink.min-w-0",
+    iconPlacement: {
+      composer: 'div:has([data-testid="chat-input-attach"], [data-testid="composer-dictate"])',
+      anchors: [
+        { find: '[data-testid="composer-dictate"]', relation: "before" },
+        { find: 'button[data-testid="chat-input-attach"]', relation: "after" },
+        { find: 'button[data-testid="chat-input-send"]', relation: "before" },
+      ],
+    },
     strategyClass: "ClaudeStrategy",
     hostnamePatterns: ["claude"],
     brandColors: {
@@ -91,10 +110,16 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
       'textarea[data-testid="chat-input"]',
       'textarea[placeholder*="Message"]',
     ],
-    buttonContainerSelector: [
-      'div[data-testid="composer-trailing-actions"] .ms-auto.flex.items-center', // Since #46
-      ".ms-auto.flex.items-center.gap-1\\.5", // The first layout, kept as a fallback
-    ].join(", "),
+    // No test id left in the trailing actions: the ARIA labels are English, so another locale
+    // falls to the anchor on the editor
+    iconPlacement: {
+      composer: "form, fieldset",
+      anchors: [
+        { find: 'button[aria-label*="dictate" i]', relation: "before" },
+        { find: 'button[data-testid="send-button"]', relation: "before" },
+        { find: 'button[aria-label*="voice" i]', relation: "before" },
+      ],
+    },
     strategyClass: "ChatGPTStrategy",
     hostnamePatterns: ["openai", "chatgpt"],
     brandColors: {
@@ -113,11 +138,15 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
       'textarea[placeholder*="chat"]',
       '[role="textbox"]',
     ],
-    buttonContainerSelector: [
-      ".flex.w-full.max-w-full.items-center.justify-start.gap-3", // Main chat interface
-      ".flex.w-full.items-center.justify-start.gap-3", // Compact view
-      ".flex.items-center.justify-start.gap-3", // Mobile fallback
-    ].join(", "),
+    // The mode button has no label and the submit button hides while the draft is empty: the
+    // ARIA labels are English, so another locale falls to the anchor on the editor
+    iconPlacement: {
+      composer: "form",
+      anchors: [
+        { find: 'button[aria-label*="voice" i]', relation: "before" },
+        { find: 'button[aria-label*="settings" i]', relation: "after" },
+      ],
+    },
     strategyClass: "MistralStrategy",
     hostnamePatterns: ["mistral"],
     brandColors: {
@@ -136,10 +165,16 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
       'textarea[placeholder*="Ask"]',
       'textarea[placeholder*="follow"]',
     ],
-    buttonContainerSelector: [
-      ".flex.items-center.justify-self-end.col-start-3.row-start-2", // Since #21
-      ".bg-background-50.dark\\:bg-offsetDark.flex.items-center", // The first layout, kept as a fallback
-    ].join(", "),
+    // The composer is the nearest ancestor holding the search mode toggle (a test id); the
+    // trailing buttons have English ARIA labels only
+    iconPlacement: {
+      composer: 'div:has([data-testid="ask-input-mode-toggle-indicator"])',
+      anchors: [
+        { find: 'button[aria-haspopup="menu"][aria-label*="model" i]', relation: "before" },
+        { find: 'button[aria-label*="dictation" i]', relation: "before" },
+        { find: 'button[type="submit"]', relation: "before" },
+      ],
+    },
     strategyClass: "PerplexityStrategy",
     hostnamePatterns: ["perplexity"],
     brandColors: {
@@ -159,7 +194,15 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
       '[data-placeholder*="Gemini"]',
       'div[contenteditable="true"]',
     ],
-    buttonContainerSelector: ".input-buttons-wrapper-bottom",
+    // Custom elements and named classes, which do not follow the user's language as the labels do
+    iconPlacement: {
+      composer: "fieldset, input-area-v2",
+      anchors: [
+        { find: "speech-dictation-mic-button", relation: "after" },
+        { find: ".input-buttons-wrapper-bottom", relation: "inside-end" },
+        { find: ".trailing-actions-wrapper", relation: "inside-end" },
+      ],
+    },
     strategyClass: "GeminiStrategy",
     hostnamePatterns: ["gemini"],
     brandColors: {
@@ -180,9 +223,14 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
       'textarea[placeholder*="Message"]', // Pattern match fallback
       'textarea[placeholder*="Copilot"]', // Additional pattern match
     ],
-    // Target the container with microphone button - more specific than generic .flex.gap-2
-    buttonContainerSelector:
-      ".relative.bottom-0.flex.justify-between.pb-0\\.5.pe-2\\.5.ps-1\\.5 > .flex.gap-2.items-center:last-child",
+    // Not confirmed on the live composer, which needs sign-in: see tests/fixtures/composers/copilot.html
+    iconPlacement: {
+      composer: 'form, div:has(button[data-testid="audio-call-button"])',
+      anchors: [
+        { find: 'button[data-testid="audio-call-button"]', relation: "before" },
+        { find: 'button[type="submit"]', relation: "before" },
+      ],
+    },
     strategyClass: "CopilotStrategy", // Uses dedicated CopilotStrategy for React integration
     hostnamePatterns: ["copilot.microsoft"],
     brandColors: {
@@ -205,8 +253,15 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
       'div[contenteditable="true"]', // Generic contenteditable fallback
       'textarea[placeholder*="Message"]', // Legacy textarea fallback
     ],
-    buttonContainerSelector:
-      '.fai-ChatInput__actions > span.___11i0s0y, .fai-ChatInput__actions',
+    // Fluent's component class names, not its hashed ones. Not confirmed on the live composer,
+    // which needs sign-in: see tests/fixtures/composers/m365copilot.html
+    iconPlacement: {
+      composer: ".fai-ChatInput",
+      anchors: [
+        { find: ".fai-ChatInput__actions", relation: "inside-start" },
+        { find: 'button[type="submit"]', relation: "before" },
+      ],
+    },
     strategyClass: "M365CopilotStrategy",
     hostnamePatterns: ["m365.cloud.microsoft"],
     brandColors: {

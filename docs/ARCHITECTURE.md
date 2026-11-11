@@ -117,10 +117,11 @@ export abstract class PlatformStrategy {
   abstract async insert(element: HTMLElement, content: string): Promise<InsertionResult>;
 
   getSelectors(): string[];
-  getButtonContainerSelector(): string | null;
   createIcon?(): HTMLElement;
 }
 ```
+
+Where the icon goes is not a strategy's business: `PlatformManager.getIconPlacement()` returns the active Platform's `iconPlacement` chain from `src/config/platforms.ts`, and the injector resolves it with `resolveIconPlacement()` and `placeAtAnchor()` of `src/content/core/icon-placement.ts`.
 
 **Benefits**:
 - Easy to add new platforms without modifying existing code (Open/Closed Principle)
@@ -147,7 +148,7 @@ import { ReactPlatformStrategy } from './react-platform-strategy';
 
 export class CopilotStrategy extends ReactPlatformStrategy {
   constructor(hostname?: string) {
-    super('copilot', 80, { selectors, buttonContainerSelector }, hostname);
+    super('copilot', 80, { selectors }, hostname);
 
     // Initialize native value setter cache
     ReactPlatformStrategy.initializeNativeValueSetter();
@@ -235,7 +236,14 @@ export const SUPPORTED_PLATFORMS = {
     priority: 85,
     defaultEnabled: true,
     selectors: ['div.ql-editor[contenteditable="true"]', ...],
-    buttonContainerSelector: '.input-buttons-wrapper-bottom',
+    iconPlacement: {
+      composer: 'fieldset, input-area-v2', // Found with editor.closest()
+      anchors: [                           // Tried in order inside it; the first found wins
+        { find: 'speech-dictation-mic-button', relation: 'after' },
+        { find: '.input-buttons-wrapper-bottom', relation: 'inside-end' },
+        { find: '.trailing-actions-wrapper', relation: 'inside-end' }
+      ]
+    },
     strategyClass: 'GeminiStrategy',
     hostnamePatterns: ['gemini']
   },
@@ -409,7 +417,7 @@ src/content/
 └── core/
     ├── injector.ts            # Main orchestrator
     ├── insertion-manager.ts   # Platform insertion coordinator
-    ├── icon-placement.ts      # Watches the placed icon, places it again after a Platform re-render
+    ├── icon-placement.ts      # Resolves a Platform's anchor chain; watches the placed icon, places it again after a re-render
     └── anchored-overlay.ts    # Icon anchored on an element: CSS Anchor, then Floating UI
 ```
 
@@ -535,12 +543,20 @@ export const SUPPORTED_PLATFORMS = {
       'div[contenteditable="true"]',
       '[role="textbox"]'
     ],
-    buttonContainerSelector: '.input-actions-container',
+    iconPlacement: {
+      composer: 'form',
+      anchors: [
+        { find: 'button[data-testid="voice-button"]', relation: 'before' },
+        { find: 'button[type="submit"]', relation: 'before' }
+      ]
+    },
     strategyClass: 'NewPlatformStrategy',
     hostnamePatterns: ['newplatform', 'newplatform.com']
   }
 };
 ```
+
+Anchors name what elements are for (test ids, custom elements, ARIA labels, button types, semantic class names), never utility classes, hashed classes or SVG paths; the guard "Icon placement selectors" in `src/config/__tests__/platforms.test.ts` fails on those. A new Platform also adds a sanitized copy of its composer to `tests/fixtures/composers/` and its id to the `it.each` list of `src/content/core/__tests__/icon-placement-chains.test.ts`, which checks that the chain resolves anchor 0 on it.
 
 **Priority Guidelines**:
 - Claude: 100 (highest)
@@ -607,7 +623,6 @@ export class NewPlatformStrategy extends PlatformStrategy {
         'textarea[data-testid="input"]',
         'div[contenteditable="true"]'
       ],
-      buttonContainerSelector: '.input-actions-container',
       priority: 85
     };
 
@@ -790,7 +805,6 @@ export class NewReactPlatformStrategy extends ReactPlatformStrategy {
         'textarea[data-testid="input"]',
         'textarea.react-input'
       ],
-      buttonContainerSelector: platform?.buttonContainerSelector,
       priority: 85
     }, hostname);
 

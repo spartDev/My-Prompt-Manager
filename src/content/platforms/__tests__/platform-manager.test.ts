@@ -5,6 +5,7 @@
 import type { Mock } from 'vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { getPlatformByHostname, type PlatformDefinition } from '../../../config/platforms';
 import type { InsertionResult } from '../../types/index';
 import type { UIElementFactory } from '../../ui/element-factory';
 import { PlatformStrategy } from '../base-strategy';
@@ -54,7 +55,6 @@ vi.mock('../claude-strategy', () => ({
       canHandle: vi.fn().mockReturnValue(false),
       insert: vi.fn().mockResolvedValue({ success: true, method: 'claude' }),
       getSelectors: vi.fn().mockReturnValue(['div.claude']),
-      getButtonContainerSelector: vi.fn().mockReturnValue('.claude-container'),
       createIcon: vi.fn().mockReturnValue(document.createElement('div')),
       cleanup: vi.fn()
     };
@@ -69,7 +69,6 @@ vi.mock('../chatgpt-strategy', () => ({
       canHandle: vi.fn().mockReturnValue(false),
       insert: vi.fn().mockResolvedValue({ success: true, method: 'chatgpt' }),
       getSelectors: vi.fn().mockReturnValue(['textarea.chatgpt']),
-      getButtonContainerSelector: vi.fn().mockReturnValue('.chatgpt-container'),
       createIcon: vi.fn().mockReturnValue(document.createElement('div')),
       cleanup: vi.fn()
     };
@@ -84,7 +83,6 @@ vi.mock('../perplexity-strategy', () => ({
       canHandle: vi.fn().mockReturnValue(false),
       insert: vi.fn().mockResolvedValue({ success: true, method: 'perplexity' }),
       getSelectors: vi.fn().mockReturnValue(['div.perplexity']),
-      getButtonContainerSelector: vi.fn().mockReturnValue('.perplexity-container'),
       createIcon: vi.fn().mockReturnValue(document.createElement('div')),
       cleanup: vi.fn()
     };
@@ -99,7 +97,6 @@ vi.mock('../gemini-strategy', () => ({
       canHandle: vi.fn().mockReturnValue(false),
       insert: vi.fn().mockResolvedValue({ success: true, method: 'gemini' }),
       getSelectors: vi.fn().mockReturnValue(['div.ql-editor']),
-      getButtonContainerSelector: vi.fn().mockReturnValue('.input-buttons-wrapper-bottom'),
       createIcon: vi.fn().mockReturnValue(document.createElement('div')),
       cleanup: vi.fn()
     };
@@ -114,7 +111,6 @@ vi.mock('../mistral-strategy', () => ({
       canHandle: vi.fn().mockReturnValue(false),
       insert: vi.fn().mockResolvedValue({ success: true, method: 'mistral' }),
       getSelectors: vi.fn().mockReturnValue(['div[contenteditable="true"]']),
-      getButtonContainerSelector: vi.fn().mockReturnValue('.col-span-10'),
       createIcon: vi.fn().mockReturnValue(document.createElement('div')),
       cleanup: vi.fn()
     };
@@ -129,7 +125,6 @@ vi.mock('../default-strategy', () => ({
       canHandle: vi.fn().mockReturnValue(true),
       insert: vi.fn().mockResolvedValue({ success: true, method: 'default' }),
       getSelectors: vi.fn().mockReturnValue(['textarea', 'input']),
-      getButtonContainerSelector: vi.fn().mockReturnValue(null),
       createIcon: vi.fn().mockReturnValue(null),
       cleanup: vi.fn()
     };
@@ -161,10 +156,6 @@ class TestStrategy extends PlatformStrategy {
 
   getSelectors(): string[] {
     return ['div.test'];
-  }
-
-  getButtonContainerSelector(): string | null {
-    return '.test-container';
   }
 
   createIcon(_uiFactory: UIElementFactory): HTMLElement | null {
@@ -301,7 +292,7 @@ describe('PlatformManager', () => {
     it('should not initialize strategies automatically in constructor', () => {
       const freshManager = new PlatformManager();
       expect(freshManager.getAllSelectors()).toEqual([]);
-      expect(freshManager.getButtonContainerSelector()).toBeNull();
+      expect(freshManager.getIconPlacement()).toBeUndefined();
       expect(freshManager.createIcon(mockUIFactory)).toBeNull();
     });
 
@@ -366,24 +357,23 @@ describe('PlatformManager', () => {
     });
   });
 
-  describe('getButtonContainerSelector', () => {
-    it('should return button container selector from highest priority strategy', async () => {
-      // Create a fresh manager to avoid test interference
-      const freshManager = new PlatformManager();
-      await freshManager.initializeStrategies(); // Initialize strategies for testing
-      const testStrategy = new TestStrategy();
-      vi.spyOn(testStrategy, 'getButtonContainerSelector').mockReturnValue('.test-container');
-      freshManager.registerStrategy(testStrategy);
-      
-      const selector = freshManager.getButtonContainerSelector();
-      expect(selector).toBe('.test-container');
+  describe('getIconPlacement', () => {
+    it('gives the anchor chain of the Platform the page is on', async () => {
+      const iconPlacement = { composer: 'form', anchors: [{ find: 'button[type="submit"]', relation: 'before' as const }] };
+      vi.mocked(getPlatformByHostname).mockReturnValue({ iconPlacement } as unknown as PlatformDefinition);
+      const platformManager = new PlatformManager();
+      await platformManager.initializeStrategies();
+
+      expect(platformManager.getIconPlacement()).toBe(iconPlacement);
+      vi.mocked(getPlatformByHostname).mockReturnValue(undefined);
     });
 
-    it('should return null when no strategy has button container selector', () => {
-      // Create a fresh manager to avoid interference from other tests
-      const freshManager = new PlatformManager();
-      const selector = freshManager.getButtonContainerSelector();
-      expect(selector).toBeNull();
+    it('gives none on a site that is not a built-in Platform', async () => {
+      mockLocation.hostname = 'example.com';
+      const customManager = new PlatformManager();
+      await customManager.initializeStrategies();
+
+      expect(customManager.getIconPlacement()).toBeUndefined();
     });
   });
 
@@ -548,14 +538,14 @@ describe('PlatformManager', () => {
 
       // Even with errors, the manager remains functional
       expect(errorManager.getAllSelectors()).toBeDefined();
-      expect(errorManager.getButtonContainerSelector).toBeDefined();
+      expect(errorManager.getIconPlacement).toBeDefined();
     });
   });
 
   describe('cleanup', () => {
     it('should cleanup all strategies', () => {
       const testStrategy = new TestStrategy();
-      const cleanupSpy = vi.spyOn(testStrategy, 'cleanup').mockImplementation(() => {});
+      const cleanupSpy = vi.spyOn(testStrategy, 'cleanup').mockImplementation(() => undefined);
       manager.registerStrategy(testStrategy);
 
       manager.cleanup();

@@ -8,6 +8,7 @@
  * never sees the loss.
  */
 
+import type { IconPlacement } from '../../config/platforms';
 import { debug, info } from '../utils/logger';
 
 /**
@@ -24,6 +25,9 @@ export interface PlacementRecord {
 
 /** The attribute the controller writes on the icon, read by tests and by the debug logs */
 export const PLACEMENT_ATTRIBUTE = 'data-mpm-placement';
+
+/** Which anchor of the Platform's chain the icon was placed at: 0 unless the composer changed */
+export const ANCHOR_ATTRIBUTE = 'data-mpm-anchor';
 
 export class IconPlacementController {
   /** Time given to a Platform re-render to settle before the icon is placed again */
@@ -47,12 +51,17 @@ export class IconPlacementController {
   }
 
   /** Remembers the icon just placed for this editor and watches the document for its removal. */
-  track(icon: HTMLElement, editor: HTMLElement, kind: PlacementKind): void {
+  track(icon: HTMLElement, editor: HTMLElement, kind: PlacementKind, anchorIndex?: number): void {
     this.cancelReplacement();
     this.record = { icon, editor, kind };
     icon.setAttribute(PLACEMENT_ATTRIBUTE, kind);
+    if (anchorIndex === undefined) {
+      icon.removeAttribute(ANCHOR_ATTRIBUTE);
+    } else {
+      icon.setAttribute(ANCHOR_ATTRIBUTE, String(anchorIndex));
+    }
     this.observe();
-    debug('Icon placement tracked', { kind, editorTag: editor.tagName });
+    debug('Icon placement tracked', { kind, anchorIndex, editorTag: editor.tagName });
   }
 
   /** True when the icon placed for this editor has left the document: the Platform removed it. */
@@ -116,5 +125,53 @@ export class IconPlacementController {
       window.clearTimeout(this.replaceTimer);
       this.replaceTimer = null;
     }
+  }
+}
+
+/** The anchor a placement chain resolved to, and where the icon goes against it */
+export interface PlacementResolution {
+  /** Position of the anchor in the chain: 0 is the one the chain was written for */
+  index: number;
+  anchor: HTMLElement;
+  relation: IconPlacement['anchors'][number]['relation'];
+}
+
+/**
+ * Finds where the icon goes for this editor: the first anchor of the chain found inside the
+ * editor's composer. Null when there is no chain, no composer around the editor, or no anchor in
+ * it: the icon is then anchored on the editor itself.
+ */
+export function resolveIconPlacement(editor: HTMLElement, placement: IconPlacement | undefined): PlacementResolution | null {
+  if (!placement) {
+    return null;
+  }
+  const composer = editor.closest<HTMLElement>(placement.composer);
+  if (!composer) {
+    return null;
+  }
+  for (const [index, { find, relation }] of placement.anchors.entries()) {
+    const anchor = composer.querySelector<HTMLElement>(find);
+    if (anchor) {
+      return { index, anchor, relation };
+    }
+  }
+  return null;
+}
+
+/** Puts the icon against the anchor its chain resolved to */
+export function placeAtAnchor(icon: HTMLElement, { anchor, relation }: PlacementResolution): void {
+  switch (relation) {
+    case 'before':
+      anchor.before(icon);
+      break;
+    case 'after':
+      anchor.after(icon);
+      break;
+    case 'inside-start':
+      anchor.prepend(icon);
+      break;
+    case 'inside-end':
+      anchor.append(icon);
+      break;
   }
 }

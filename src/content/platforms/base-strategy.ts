@@ -171,14 +171,6 @@ export abstract class PlatformStrategy implements PlatformStrategyInterface {
   }
 
   /**
-   * Gets the button container selector for icon placement (optional)
-   * @returns CSS selector for button container
-   */
-  getButtonContainerSelector(): string | null {
-    return this.config?.buttonContainerSelector || null;
-  }
-
-  /**
    * Creates a platform-specific icon (optional override)
    * @param uiFactory - Factory for creating UI elements
    * @returns Platform-specific icon or null to use default

@@ -1,5 +1,6 @@
 import { DEFAULT_CATEGORY, DEFAULT_SETTINGS } from '../../../src/types';
 import { expect, test } from '../fixtures/extension';
+import { openPlatform, PLATFORM_FIXTURES, promptsButton } from '../fixtures/platform-pages';
 import { createPromptSeed, seedLibrary } from '../utils/storage';
 
 const MOCK_HOST = 'https://claude.ai/';
@@ -65,4 +66,20 @@ test.describe('Content script injector', () => {
     await expect(selector).toBeVisible();
     await expect(selector.getByRole('option').first()).toContainText('Injected Prompt');
   });
+});
+
+test.describe('Prompts button placement on each Platform', () => {
+  for (const platform of PLATFORM_FIXTURES) {
+    test(`${platform}: the button sits in the composer's toolbar, at the first anchor of the Platform's chain`, async ({ context, storage }) => {
+      await seedLibrary(storage, { prompts: [], settings: { ...DEFAULT_SETTINGS, interfaceMode: 'popup' } });
+      const page = await openPlatform(context, platform);
+
+      const button = promptsButton(page);
+      await expect(button).toHaveAttribute('data-mpm-placement', 'toolbar');
+      await expect(button).toHaveAttribute('data-mpm-anchor', '0');
+      // The stand-in marks its toolbar: the button is in it, not laid over the page from <body>
+      expect(await button.evaluate((element) => element.closest('[data-e2e="toolbar"]') !== null)).toBe(true);
+      await expect(button).toHaveText('Prompts');
+    });
+  }
 });

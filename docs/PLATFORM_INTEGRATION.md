@@ -37,7 +37,13 @@ export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
       'div[contenteditable="true"]',
       '[role="textbox"]'
     ],
-    buttonContainerSelector: '.button-container', // The composer toolbar the icon goes in (a selector list works)
+    iconPlacement: {                     // Where the icon goes in the composer (see the reference below)
+      composer: 'form',                  // Found with editor.closest()
+      anchors: [                         // Tried in order inside the composer; the first found wins
+        { find: 'button[data-testid="voice-button"]', relation: 'before' },
+        { find: 'button[type="submit"]', relation: 'before' }
+      ]
+    },
     strategyClass: 'YourPlatformStrategy', // For future custom logic
     hostnamePatterns: ['yourplatform'], // For hostname matching
     brandColors: {
@@ -71,11 +77,19 @@ export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
 | `priority` | number | ✅ | Strategy selection priority (100 = highest) |
 | `defaultEnabled` | boolean | ✅ | Include in default enabled platforms for new users |
 | `selectors` | string[] | ✅ | CSS selectors for finding text input elements |
-| `buttonContainerSelector` | string | ❌ | Selector list for the composer toolbar the icon goes in, first match in document order. The one source: a strategy reads it from here (`getPlatformById(id)?.buttonContainerSelector`). When nothing matches, the icon is anchored inside the editor's bottom-end corner by `src/content/core/anchored-overlay.ts` and a warning is logged |
+| `iconPlacement` | `IconPlacement` | ❌ | Where the icon goes: `composer`, a selector found with `editor.closest()`, and `anchors`, each `{ find, relation }` with `relation` one of `before`, `after`, `inside-start`, `inside-end`, tried in order inside the composer; the first found wins. The one source: `PlatformManager.getIconPlacement()` reads it, no strategy keeps a copy. When no anchor is found, the icon is anchored inside the editor's bottom-end corner by `src/content/core/anchored-overlay.ts` and a warning is logged |
 | `strategyClass` | string | ✅ | Class name for custom strategy (future use) |
 | `hostnamePatterns` | string[] | ❌ | Additional hostname patterns for detection |
 | `brandColors` | `{ enabled: string }` | ❌ | Tailwind classes of the logo square when the site is on; the accent (`bg-accent-subtle text-accent`) when omitted. Every site shares one disabled state (`bg-muted text-tertiary`, `src/constants/brandColors.ts`), so its logo component takes `disabled` and draws in `currentColor` |
 | `iconMethod` | PlatformIconMethod | ❌ | Optional UIElementFactory method for rendering a platform-specific icon (`createFloatingIcon` is used when omitted) |
+
+#### Writing an anchor chain
+
+Name each anchor by what the element is for: a `data-testid`, a custom element (`speech-dictation-mic-button`), an ARIA label, a button `type`, a semantic class name (`.input-buttons-wrapper-bottom`, Fluent's `.fai-ChatInput__actions`). Never a Tailwind utility chain, a hashed CSS-in-JS class or SVG path data: the guard "Icon placement selectors" in `src/config/__tests__/platforms.test.ts` fails on those. Prefer anchors that do not depend on the language (test ids, custom elements) over ARIA labels, which follow the user's locale (Gemini shows French labels to a French user).
+
+The placed icon carries `data-mpm-placement="toolbar"` and `data-mpm-anchor="<index>"`: `0` means the anchor the chain was written for was found.
+
+A new Platform also saves a sanitized copy of its live composer as `tests/fixtures/composers/<id>.html` and adds its id to the `it.each` list of `src/content/core/__tests__/icon-placement-chains.test.ts`, which checks that the chain resolves anchor 0 on that fixture.
 
 ### Priority Guidelines
 
@@ -91,7 +105,7 @@ For platforms that need custom insertion logic or special handling, you'll need 
 
 #### Icon Method Reference
 
-The Prompts button looks the same on every Platform (a pill with the extension's badge and the label "Prompts"); a helper only chooses the wrapper a Platform's action bar expects. Set the `iconMethod` field to one of the UI factory helpers:
+The Prompts button looks the same on every Platform (a pill with the extension's badge and the label "Prompts"), with no wrapper; where it goes is the `iconPlacement` chain's business. Set the `iconMethod` field to one of the UI factory helpers:
 
 - `createFloatingIcon` – default floating action button (no additional config required)
 - `createAbsoluteIcon` / `createRelativeIcon` – positioning-specific variants
@@ -181,7 +195,6 @@ export class YourPlatformStrategy extends PlatformStrategy {
         'textarea[placeholder*="Enter your message"]',
         'div[contenteditable="true"][role="textbox"]'
       ],
-      buttonContainerSelector: getPlatformById('your-platform')?.buttonContainerSelector, // Read from platforms.ts, never copied
       priority: 90 // Higher = more priority (Claude: 100, ChatGPT: 90, Perplexity: 80)
     });
   }
@@ -265,7 +278,6 @@ export class YourReactPlatformStrategy extends ReactPlatformStrategy {
         'textarea[data-testid="input"]',
         'textarea.react-input'
       ],
-      buttonContainerSelector: platform?.buttonContainerSelector,
       priority: 85
     }, hostname);
 
@@ -517,9 +529,9 @@ window.__promptLibraryDebug?.testInsertion?.('test content');
 - Check strategy is registered in platform-manager.ts
 
 **Button appears in wrong location:**
-- Adjust `buttonContainerSelector` in `platforms.ts` (the strategy reads it from there)
-- A warning `Toolbar not found on this Platform` in the console means no selector matched and the icon fell back to the editor's corner
-- Check if container selector exists on page
+- Adjust the `iconPlacement` chain in `platforms.ts` (no strategy keeps a copy)
+- With debug mode on (`localStorage.setItem('prompt-library-debug', 'true')`, then reload; warnings are silent otherwise), a warning `No anchor of this Platform found in its composer, the icon is anchored on the editor instead` in the console means no anchor was found and the icon fell back to the editor's corner
+- Check that `editor.closest(composer)` finds the composer, and that an anchor exists inside it
 
 **Content doesn't insert:**
 - Verify element selector matches the input
@@ -666,7 +678,6 @@ export class GeminiStrategy extends PlatformStrategy {
         '[data-placeholder*="Gemini"]',
         'div[contenteditable="true"]'
       ],
-      buttonContainerSelector: '.input-buttons-wrapper-bottom',
       priority: 85
     }, hostname);
   }
@@ -731,7 +742,6 @@ export class CopilotStrategy extends PlatformStrategy {
         'textarea[placeholder*="Message"]', // Pattern match fallback
         'textarea[placeholder*="Copilot"]'
       ],
-      buttonContainerSelector: '.relative.bottom-0.flex.justify-between > .flex.gap-2.items-center:last-child',
       priority: 80
     }, hostname);
   }
@@ -772,9 +782,8 @@ export class CopilotStrategy extends PlatformStrategy {
 
 **Key Points:**
 - Uses standard textarea (simpler than Gemini)
-- Specific button container selector for proper icon placement
+- Icon placed before the audio call button (`button[data-testid="audio-call-button"]`), then before the submit button
 - Custom icon with Microsoft brand styling
-- Positioned before microphone button
 
 ### Example 3: Mistral LeChat
 
@@ -787,11 +796,6 @@ export class MistralStrategy extends PlatformStrategy {
         'textarea[placeholder*="chat"]',
         '[role="textbox"]'
       ],
-      buttonContainerSelector: [
-        '.flex.w-full.max-w-full.items-center.justify-start.gap-3',
-        '.flex.w-full.items-center.justify-start.gap-3',
-        '.flex.items-center.justify-start.gap-3'
-      ].join(', '),
       priority: 85
     }, hostname);
   }
@@ -841,7 +845,7 @@ export class MistralStrategy extends PlatformStrategy {
 ```
 
 **Key Points:**
-- Multiple button container selectors for responsive design
+- Icon placed before the voice button, then after the settings button (English ARIA labels: another locale falls to the anchor on the editor)
 - Longer timeout (100ms) for initialization
 - Both contenteditable and textarea support
 - Icon styled to match Mistral's Research/Think buttons
@@ -875,24 +879,28 @@ window.location.hostname
 **Symptoms:** Icon visible but poorly positioned or overlapping with other elements
 
 **Possible Causes:**
-1. Incorrect `buttonContainerSelector`
+1. An `iconPlacement` anchor that no longer matches (`data-mpm-anchor` above `0` on the icon)
 2. Platform UI changed after integration
-3. Missing or dynamic container element
+3. A composer selector that `editor.closest()` does not reach
 
 **Solutions:**
 ```typescript
-// Try multiple container selectors for fallbacks:
-buttonContainerSelector: [
-  '.primary-container',   // Most specific
-  '.fallback-container',  // Less specific
-  '.generic-container'    // Generic fallback
-].join(', ')
+// Give the chain later anchors to fall back on, each named by what the element is for:
+iconPlacement: {
+  composer: 'form, div:has(button[data-testid="audio-call-button"])',
+  anchors: [
+    { find: 'button[data-testid="audio-call-button"]', relation: 'before' }, // Written for this one
+    { find: 'button[type="submit"]', relation: 'before' }                    // Then this
+  ]
+}
 
-// When none matches, the icon is anchored inside the editor's bottom-end corner
+// When no anchor is found, the icon is anchored inside the editor's bottom-end corner
 // (src/content/core/anchored-overlay.ts) and the console shows a warning:
-// "Toolbar not found on this Platform". If the Platform re-renders its toolbar,
-// src/content/core/icon-placement.ts places the icon again on its own.
+// "No anchor of this Platform found in its composer, the icon is anchored on the editor instead".
+// If the Platform re-renders its Toolbar, src/content/core/icon-placement.ts places the icon again on its own.
 ```
+
+After fixing the chain, refresh `tests/fixtures/composers/<id>.html` from the live composer.
 
 ### Content Doesn't Insert
 

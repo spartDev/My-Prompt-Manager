@@ -27,7 +27,7 @@ describe('UIElementFactory', () => {
   const testInstanceId = 'test-instance-123';
 
   const buttons = (): [string, HTMLElement][] => [
-    ['Claude', factory.createClaudeIcon().icon],
+    ['Claude', factory.createClaudeIcon()],
     ['ChatGPT', factory.createChatGPTIcon()],
     ['Perplexity', factory.createPerplexityIcon()],
     ['Mistral', factory.createMistralIcon()],
@@ -92,17 +92,15 @@ describe('UIElementFactory', () => {
   });
 
   describe('createClaudeIcon', () => {
-    it('wraps the button the way Claude\'s action bar wraps its own', () => {
-      const { container, icon } = factory.createClaudeIcon();
+    it('is the Prompts button itself, with no wrapper copying Claude\'s classes', () => {
+      const icon = factory.createClaudeIcon();
 
-      expect(container.className).toBe('relative shrink-0');
-      expect(container.contains(icon)).toBe(true);
-      expect(icon.parentElement?.className).toBe('flex shrink-0');
-      expect(icon.parentElement?.getAttribute('data-state')).toBe('closed');
+      expect(icon.matches('button.prompt-library-pill')).toBe(true);
+      expect(icon.children).toHaveLength(2);
     });
 
     it('is found by the class the injector looks for', () => {
-      expect(factory.createClaudeIcon().icon.classList.contains('prompt-library-integrated-icon')).toBe(true);
+      expect(factory.createClaudeIcon().classList.contains('prompt-library-integrated-icon')).toBe(true);
     });
   });
 
@@ -176,14 +174,6 @@ describe('UIElementFactory', () => {
       syncPromptsPillTheme(button);
       expect(button.classList.contains('dark-theme')).toBe(false);
     });
-
-    it('finds the button inside Claude\'s wrapper', () => {
-      const { container, icon } = factory.createClaudeIcon();
-      theme.current = 'dark';
-      syncPromptsPillTheme(container);
-
-      expect(icon.classList.contains('dark-theme')).toBe(true);
-    });
   });
 
   describe('fitPromptsPill', () => {
@@ -210,17 +200,16 @@ describe('UIElementFactory', () => {
       expect(button.classList.contains('prompt-library-pill-compact')).toBe(true);
     });
 
-    it('finds Claude\'s action bar above the wrappers that grow with the button', () => {
-      const { container, icon } = factory.createClaudeIcon();
-      // The injector wraps Claude's container once more before it goes into the bar
+    it('finds the Toolbar above the wrappers that grow with the button', () => {
+      const icon = factory.createClaudeIcon();
       const wrapper = document.createElement('div');
       const bar = document.createElement('div');
       Object.defineProperty(bar, 'scrollWidth', { configurable: true, value: 500 });
       Object.defineProperty(bar, 'clientWidth', { configurable: true, value: 300 });
-      wrapper.appendChild(container);
+      wrapper.appendChild(icon);
       bar.appendChild(wrapper);
       document.body.appendChild(bar);
-      fitPromptsPill(container);
+      fitPromptsPill(icon);
 
       expect(icon.classList.contains('prompt-library-pill-compact')).toBe(true);
       bar.remove();

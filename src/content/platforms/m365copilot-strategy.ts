@@ -23,7 +23,6 @@ export class M365CopilotStrategy extends ReactPlatformStrategy {
         'div[contenteditable="true"]',
         'textarea[placeholder*="Message"]'
       ],
-      buttonContainerSelector: platform?.buttonContainerSelector,
       priority: 80
     }, hostname);
 

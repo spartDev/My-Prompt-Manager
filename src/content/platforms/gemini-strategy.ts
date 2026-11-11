@@ -75,7 +75,6 @@ export class GeminiStrategy extends PlatformStrategy {
         '[data-placeholder*="Gemini"]',
         'div[contenteditable="true"]'
       ],
-      buttonContainerSelector: getPlatformById('gemini')?.buttonContainerSelector,
       priority: GEMINI_PLATFORM_PRIORITY
     }, hostname);
   }

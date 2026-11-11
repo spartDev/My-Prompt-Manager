@@ -5,7 +5,7 @@
  * Provides isolation between strategies and handles strategy selection logic
  */
 
-import { getPlatformByHostname, SUPPORTED_PLATFORMS } from '../../config/platforms';
+import { getPlatformByHostname, type IconPlacement, SUPPORTED_PLATFORMS } from '../../config/platforms';
 import type { InsertionResult } from '../types/index';
 import type { PlatformManagerOptions } from '../types/platform';
 import type { UIElementFactory } from '../ui/element-factory';
@@ -330,33 +330,14 @@ export class PlatformManager {
   }
 
   /**
-   * Gets button container selector for the active platform
-   * @returns Button container selector or null
+   * Where the icon goes in the composer of the active Platform, from its definition
+   * @returns The anchor chain, or undefined on a custom site or a disabled one
    */
-  getButtonContainerSelector(): string | null {
-    // Return null if not initialized (disabled site) or no strategies loaded
-    if (!this.isInitialized || this.strategies.length === 0) {
-      return null;
+  getIconPlacement(): IconPlacement | undefined {
+    if (!this.isInitialized) {
+      return undefined;
     }
-    
-    // Use the highest priority strategy that has a button container selector
-    for (const strategy of this.strategies) {
-      // Safety check for strategy methods - helps with test mocking issues
-      if (typeof strategy.getButtonContainerSelector === 'function') {
-        const selector = strategy.getButtonContainerSelector();
-        if (selector) {
-          return selector;
-        }
-      } else {
-        debug('Strategy missing getButtonContainerSelector method', { 
-          strategy: strategy.name || 'unnamed',
-          type: typeof strategy,
-          methods: Object.keys(strategy)
-        });
-      }
-    }
-    
-    return null;
+    return getPlatformByHostname(this.hostname)?.iconPlacement;
   }
 
   /**

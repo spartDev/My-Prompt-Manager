@@ -27,7 +27,7 @@ vi.mock('../insertion-manager', () => ({
       insertPrompt: vi.fn().mockResolvedValue({ success: true, method: 'direct' }),
       initializeStrategies: vi.fn(),
       cleanup: vi.fn(),
-      getButtonContainerSelector: vi.fn().mockReturnValue(null),
+      getIconPlacement: vi.fn().mockReturnValue(undefined),
       getCustomSiteConfig: vi.fn().mockReturnValue(null)
     };
   })
@@ -729,7 +729,7 @@ describe('PromptLibraryInjector', () => {
           insertPrompt: vi.fn(),
           initializeStrategies: vi.fn().mockRejectedValue(new Error('Strategy init failed')),
           cleanup: vi.fn(),
-          getButtonContainerSelector: vi.fn().mockReturnValue(null),
+          getIconPlacement: vi.fn().mockReturnValue(undefined),
           getCustomSiteConfig: vi.fn().mockReturnValue(null)
         } as any;
       } as any);
@@ -750,7 +750,7 @@ describe('PromptLibraryInjector', () => {
             insertPrompt: vi.fn().mockResolvedValue({ success: true, method: 'direct' }),
             initializeStrategies: vi.fn(),
             cleanup: vi.fn(),
-            getButtonContainerSelector: vi.fn().mockReturnValue(null),
+            getIconPlacement: vi.fn().mockReturnValue(undefined),
             getCustomSiteConfig: vi.fn().mockReturnValue(null)
           } as any;
         } as any);
@@ -1490,7 +1490,7 @@ describe('PromptLibraryInjector', () => {
           insertPrompt: vi.fn().mockResolvedValue({ success: true, method: 'direct' }),
           initializeStrategies: vi.fn(),
           cleanup: vi.fn(),
-          getButtonContainerSelector: vi.fn().mockReturnValue(null),
+          getIconPlacement: vi.fn().mockReturnValue(undefined),
           getCustomSiteConfig: vi.fn().mockReturnValue(null)
         } as any;
       } as any);
@@ -1520,64 +1520,7 @@ describe('PromptLibraryInjector', () => {
             insertPrompt: vi.fn().mockResolvedValue({ success: true, method: 'direct' }),
             initializeStrategies: vi.fn(),
             cleanup: vi.fn(),
-            getButtonContainerSelector: vi.fn().mockReturnValue(null),
-            getCustomSiteConfig: vi.fn().mockReturnValue(null)
-          } as any;
-        } as any);
-      }
-    });
-  });
-
-  describe('icon injection with container selector', () => {
-    it('should inject icon into platform container when containerSelector is provided', async () => {
-      const { PlatformInsertionManager } = await import('../insertion-manager');
-      const { isSiteEnabled } = await import('../../utils/storage');
-
-      vi.mocked(isSiteEnabled).mockResolvedValue(true);
-
-      // Create a container element in the DOM
-      const container = document.createElement('div');
-      container.className = 'toolbar-container';
-      document.body.appendChild(container);
-
-      const originalImpl = vi.mocked(PlatformInsertionManager).getMockImplementation();
-      vi.mocked(PlatformInsertionManager).mockImplementation(function() {
-        return {
-          getAllSelectors: vi.fn().mockReturnValue(['textarea']),
-          createIcon: vi.fn().mockReturnValue(document.createElement('button')),
-          insertPrompt: vi.fn().mockResolvedValue({ success: true, method: 'direct' }),
-          initializeStrategies: vi.fn(),
-          cleanup: vi.fn(),
-          getButtonContainerSelector: vi.fn().mockReturnValue('.toolbar-container'),
-          getCustomSiteConfig: vi.fn().mockReturnValue(null)
-        } as any;
-      } as any);
-
-      const containerInjector = new PromptLibraryInjector();
-      await containerInjector.initialize();
-
-      // Wait for detection
-      await new Promise(resolve => setTimeout(resolve, 200));
-
-      // The icon should have been appended to the container
-      const icons = container.querySelectorAll('[data-prompt-library-icon]');
-      expect(icons.length).toBeGreaterThanOrEqual(0); // May or may not be injected depending on visibility
-
-      containerInjector.cleanup();
-      document.body.removeChild(container);
-
-      // Restore
-      if (originalImpl) {
-        vi.mocked(PlatformInsertionManager).mockImplementation(originalImpl);
-      } else {
-        vi.mocked(PlatformInsertionManager).mockImplementation(function() {
-          return {
-            getAllSelectors: vi.fn().mockReturnValue(['textarea', 'div[contenteditable="true"]']),
-            createIcon: vi.fn().mockReturnValue(document.createElement('button')),
-            insertPrompt: vi.fn().mockResolvedValue({ success: true, method: 'direct' }),
-            initializeStrategies: vi.fn(),
-            cleanup: vi.fn(),
-            getButtonContainerSelector: vi.fn().mockReturnValue(null),
+            getIconPlacement: vi.fn().mockReturnValue(undefined),
             getCustomSiteConfig: vi.fn().mockReturnValue(null)
           } as any;
         } as any);

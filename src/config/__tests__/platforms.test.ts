@@ -64,12 +64,6 @@ describe('Copilot Platform Configuration', () => {
     expect(platform?.hostname).toBe('copilot.microsoft.com');
   });
 
-  it('should have button container selector', () => {
-    expect(SUPPORTED_PLATFORMS.copilot.buttonContainerSelector).toBe(
-      '.relative.bottom-0.flex.justify-between.pb-0\\.5.pe-2\\.5.ps-1\\.5 > .flex.gap-2.items-center:last-child'
-    );
-  });
-
   it('should define iconMethod for custom Copilot icon styling', () => {
     expect(SUPPORTED_PLATFORMS.copilot.iconMethod).toBe('createCopilotIcon');
   });
@@ -193,5 +187,44 @@ describe('getLinkedPlatformHostnames', () => {
     const hostname = 'copilot.microsoft.com';
     const linked = getLinkedPlatformHostnames(hostname);
     expect(linked).toContain(hostname);
+  });
+});
+
+/**
+ * A class a Platform's build generates or rebuilds at each design pass: a Tailwind utility
+ * (flex, gap-2, ms-auto, a variant with an escaped colon or bracket) or a hashed CSS-in-JS name
+ * (Fluent's ___11i0s0y, r1alrhcs).
+ */
+const UTILITY_CLASS = /^(-?(flex|grid|block|inline|hidden|relative|absolute|fixed|sticky|shrink|grow|items|justify|self|content|place|gap|space|[mp][trblxyse]?|w|h|min|max|size|inset|top|right|bottom|left|start|end|col|row|order|bg|text|font|leading|tracking|border|rounded|shadow|opacity|z|overflow|cursor|pointer|select|transition|duration|ease)(-|$))|\\[:.[]|^_{2,}|^(?=[a-z0-9]{7,9}$)(?=.*\d)[a-z0-9]+$/;
+
+/** Every selector a Platform uses to place the icon */
+function placementSelectors(id: string): string[] {
+  const platform = SUPPORTED_PLATFORMS[id] as Record<string, unknown> & typeof SUPPORTED_PLATFORMS[string];
+  const legacy = typeof platform.buttonContainerSelector === 'string' ? [platform.buttonContainerSelector] : [];
+  const placement = platform.iconPlacement;
+  return placement ? [...legacy, placement.composer, ...placement.anchors.map((anchor) => anchor.find)] : legacy;
+}
+
+/** The class names a selector matches on, escapes kept so a variant shows */
+function classNames(selector: string): string[] {
+  return [...selector.matchAll(/\.((?:\\.|[\w-])+)/g)].map((match) => match[1]);
+}
+
+describe('Icon placement selectors', () => {
+  it.each(Object.keys(SUPPORTED_PLATFORMS))('%s places the icon by what elements are for, not by how they are styled', (id) => {
+    const selectors = placementSelectors(id);
+
+    expect(selectors.length).toBeGreaterThan(0);
+    for (const selector of selectors) {
+      expect(classNames(selector).filter((name) => UTILITY_CLASS.test(name)), selector).toEqual([]);
+      expect(selector, 'SVG path data').not.toMatch(/\bpath\b|\[d[*^$]?=/);
+    }
+  });
+
+  it('flags a utility chain, a hashed class and SVG path data', () => {
+    expect(classNames('.ms-auto.flex.items-center.gap-1\\.5').filter((name) => UTILITY_CLASS.test(name))).toHaveLength(4);
+    expect(classNames('.fai-ChatInput__actions > span.___11i0s0y').filter((name) => UTILITY_CLASS.test(name))).toEqual(['___11i0s0y']);
+    expect(classNames('.r1alrhcs').filter((name) => UTILITY_CLASS.test(name))).toEqual(['r1alrhcs']);
+    expect(classNames('.input-buttons-wrapper-bottom, .fai-ChatInput__actions').filter((name) => UTILITY_CLASS.test(name))).toEqual([]);
   });
 });

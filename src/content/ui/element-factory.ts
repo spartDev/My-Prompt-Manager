@@ -3,11 +3,10 @@
  * Creates the Prompts button that opens the Prompt selector, for each Platform.
  *
  * The button looks the same everywhere (Atelier 1C): a pill with the extension's badge and the
- * label "Prompts". What differs by Platform is the wrapper the Platform's action bar expects and
- * the classes the injector finds the button by.
+ * label "Prompts". It borrows no class from a Platform: where it goes is said by the Platform's
+ * anchor chain (src/config/platforms.ts), not by wrappers that mimic the Platform's own buttons.
  */
 
-import type { IconCreationResult } from '../types/ui';
 import { createSVGElement } from '../utils/storage';
 import { ThemeManager } from '../utils/theme-manager';
 
@@ -17,7 +16,7 @@ const BADGE_PATH = 'M5.09 8.48a1 1 0 0 0 .64-.28 1 1 0 0 0 .25-.67 1 1 0 0 0-.25
 export const PILL_CLASS = 'prompt-library-pill';
 export const PILL_COMPACT_CLASS = 'prompt-library-pill-compact';
 
-/** How many ancestors of the button are checked for the bar that overflows (Claude: four wrappers, then the bar). */
+/** How many ancestors of the button are checked for the bar that overflows: a few wrappers, then the bar. */
 export const BAR_SEARCH_DEPTH = 6;
 
 /**
@@ -30,8 +29,8 @@ export function fitPromptsPill(icon: HTMLElement): void {
     return;
   }
   pill.classList.remove(PILL_COMPACT_CLASS);
-  // The bar is not always the parent: Claude's button sits in wrappers that grow with it, so the
-  // element that runs out of room is a few levels up. Not further: a page that scrolls sideways
+  // The bar is not always the parent: an anchor can sit in wrappers that grow with the button, so
+  // the element that runs out of room is a few levels up. Not further: a page that scrolls sideways
   // for its own reasons says nothing about the bar.
   let ancestor = pill.parentElement;
   for (let level = 0; ancestor && ancestor !== document.body && level < BAR_SEARCH_DEPTH; level++) {
@@ -98,29 +97,9 @@ export class UIElementFactory {
     return pill;
   }
 
-  /** Claude: the button sits in the wrappers Claude's action bar gives each of its own buttons. */
-  createClaudeIcon(): IconCreationResult {
-    const iconContainer = document.createElement('div');
-    iconContainer.className = 'relative shrink-0';
-
-    const innerDiv = document.createElement('div');
-    const flexDiv = document.createElement('div');
-    flexDiv.className = 'flex items-center';
-
-    const shrinkDiv = document.createElement('div');
-    shrinkDiv.className = 'flex shrink-0';
-    shrinkDiv.setAttribute('data-state', 'closed');
-    shrinkDiv.style.opacity = '1';
-    shrinkDiv.style.transform = 'none';
-
-    const icon = this.createPill('prompt-library-integrated-icon');
-
-    shrinkDiv.appendChild(icon);
-    flexDiv.appendChild(shrinkDiv);
-    innerDiv.appendChild(flexDiv);
-    iconContainer.appendChild(innerDiv);
-
-    return { container: iconContainer, icon };
+  /** Claude: the button alone, placed in the composer by its anchor chain. */
+  createClaudeIcon(): HTMLElement {
+    return this.createPill('prompt-library-integrated-icon');
   }
 
   createPerplexityIcon(): HTMLElement {

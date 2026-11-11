@@ -24,11 +24,12 @@ import { createPromptSeed, seedLibrary } from '../utils/storage';
 
 const SCREENSHOT_DIR = 'test-results/icon-placement';
 const PLATFORM_URL = 'https://claude.ai/';
-/** The element the content script places: on Claude, a wrapper around the icon button */
+/** The element the content script places: the Prompts button itself */
 const ICON_ROOT = '[data-prompt-library-icon]';
 const ICON_BUTTON = '.prompt-library-integrated-icon';
 const EDITOR = '.ProseMirror';
-const TOOLBAR = '.relative.flex-1.flex.items-center.gap-2.shrink.min-w-0';
+/** The stand-in's toolbar, marked for the test: the content script finds its anchors by test id */
+const TOOLBAR = '[data-e2e="toolbar"]';
 /** INSIDE_CORNER_INSET of src/content/core/anchored-overlay.ts: the icon's distance to the editor's edges */
 const INSET = 6;
 /** Half a CSS pixel of rounding each side */
@@ -53,24 +54,25 @@ const head = () => /* html */ `
   </head>`;
 
 /**
- * Claude's composer as the strategy knows it: the editor, then a toolbar whose history button
- * carries the clock path the strategy looks for. The toolbar is rendered from a <template>, so a
- * re-render builds a fresh node without the extension's icon, as React does.
+ * Claude's composer as its anchor chain knows it (tests/fixtures/composers/claude.html): the
+ * editor, then a toolbar with the attach button, the dictation group the icon goes before, and the
+ * send button. The toolbar is rendered from a <template>, so a re-render builds a fresh node
+ * without the extension's icon, as React does.
  */
 const composerWithToolbar = (theme: Theme) => /* html */ `
 <!DOCTYPE html>
 <html lang="en" class="${theme}">
   ${head()}
   <body>
-    <fieldset class="composer">
-      <div class="${EDITOR.slice(1)}" contenteditable="true" role="textbox" aria-label="Write your prompt to Claude"></div>
+    <div class="composer">
+      <div class="${EDITOR.slice(1)}" contenteditable="true" role="textbox" data-testid="chat-input" aria-label="Write your prompt to Claude"></div>
       <div id="toolbar-slot"></div>
-    </fieldset>
+    </div>
     <template id="toolbar">
-      <div class="relative flex-1 flex items-center gap-2 shrink min-w-0">
-        <div class="flex shrink"><button type="button" aria-label="Attach"><svg width="18" height="18" viewBox="0 0 20 20"><path d="M3 3h14v14H3z" fill="currentColor"/></svg></button></div>
-        <div class="flex shrink"><button type="button" aria-label="History"><svg width="18" height="18" viewBox="0 0 20 20"><path d="M10.3857 2a8 8 0 1 0 0 16a8 8 0 0 0 0-16z" fill="currentColor"/></svg></button></div>
-        <div class="flex-row"></div>
+      <div data-e2e="toolbar">
+        <button type="button" data-testid="chat-input-attach" aria-label="Add files, connectors, and more"><svg width="18" height="18" viewBox="0 0 20 20"><path d="M3 3h14v14H3z" fill="currentColor"/></svg></button>
+        <div data-testid="composer-dictate"><button type="button" aria-label="Dictate"><svg width="18" height="18" viewBox="0 0 20 20"><circle cx="10" cy="10" r="6" fill="currentColor"/></svg></button></div>
+        <button type="button" data-testid="chat-input-send" aria-label="Send message"><svg width="18" height="18" viewBox="0 0 20 20"><path d="M10 3l6 14H4z" fill="currentColor"/></svg></button>
       </div>
     </template>
     <script>

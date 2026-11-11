@@ -30,7 +30,6 @@ export class PerplexityStrategy extends PlatformStrategy {
       selectors: [
         'div[contenteditable="true"][role="textbox"]#ask-input'
       ],
-      buttonContainerSelector: getPlatformById('perplexity')?.buttonContainerSelector,
       priority: 80
     }, hostname);
   }

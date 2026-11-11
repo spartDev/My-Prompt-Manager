@@ -406,11 +406,19 @@ gemini: {
   priority: 75,
   defaultEnabled: true,
   selectors: ['textarea[data-testid="input"]'],
-  buttonContainerSelector: '.button-container',
+  iconPlacement: {
+    composer: 'fieldset, input-area-v2',
+    anchors: [
+      { find: 'speech-dictation-mic-button', relation: 'after' },
+      { find: '.input-buttons-wrapper-bottom', relation: 'inside-end' }
+    ]
+  },
   strategyClass: 'GeminiStrategy',
   hostnamePatterns: ['gemini']
 }
 ```
+
+`iconPlacement` says where the Prompts button goes: the composer around the editor, then anchors tried in order inside it, named by what the elements are for (test ids, custom elements, ARIA labels), never by their styling classes. Add a sanitized copy of the Platform's composer to `tests/fixtures/composers/` and its id to `src/content/core/__tests__/icon-placement-chains.test.ts`, which checks that the first anchor is found.
 
 All other files (background script, content script, types) automatically pick up the changes!
 

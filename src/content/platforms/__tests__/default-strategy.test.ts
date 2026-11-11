@@ -60,10 +60,6 @@ describe('DefaultStrategy', () => {
         '[role="textbox"]'
       ]);
     });
-
-    it('should have no button container selector', () => {
-      expect(strategy.getButtonContainerSelector()).toBeNull();
-    });
   });
 
   describe('canHandle', () => {
