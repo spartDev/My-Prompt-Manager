@@ -722,6 +722,24 @@ describe('PromptSelectorController', () => {
       expect(document.activeElement).toBe(elsewhere);
     });
 
+    it('inserts but shows nothing, and leaves the focus alone, when the user tabs to another control while the selector closes', async () => {
+      const elsewhere = document.createElement('input');
+      document.body.append(elsewhere);
+      await controller.open(field, button);
+      await opened();
+
+      row('p1')?.click();
+      await vi.waitFor(() => { expect(dialog()?.getAttribute('data-closing')).toBe('true'); });
+      // Shift+Tab during the closing animation: the focus moves, with no click
+      elsewhere.focus();
+      await closed();
+      await vi.waitFor(() => { expect(callbacks.insert).toHaveBeenCalledTimes(1); });
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      expect(pill()).toBeNull();
+      expect(document.activeElement).toBe(elsewhere);
+    });
+
     it('says so when the Insertion throws', async () => {
       callbacks.insert.mockRejectedValue(new Error('boom'));
 

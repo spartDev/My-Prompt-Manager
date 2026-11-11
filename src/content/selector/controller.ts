@@ -389,6 +389,12 @@ export class PromptSelectorController {
       return;
     }
 
+    // Read before the selector leaves the page: while it is open the focus is inside its host. On
+    // another control of the page, the user took it there (Tab or Shift+Tab while it was closing)
+    const active = document.activeElement;
+    const focusLeft = active instanceof HTMLElement && active !== document.body && active !== this.host
+      && active !== session.target && !session.target.contains(active);
+
     const state = this.store.getState();
     const pending = state.pending;
     const prompt = pending ? state.library.prompts.find((candidate) => candidate.id === pending.promptId) : undefined;
@@ -404,8 +410,9 @@ export class PromptSelectorController {
       return;
     }
     if (pending && prompt && session.target.isConnected) {
-      // A click elsewhere while the selector was closing already put the focus where the user wants it
-      void this.insert(prompt, pending, session.target, !session.restoreFocus);
+      // A click elsewhere while the selector was closing, or the focus taken to another control
+      // with the keyboard, already put the focus where the user wants it
+      void this.insert(prompt, pending, session.target, !session.restoreFocus || focusLeft);
     } else if (pending && prompt) {
       // The Platform replaced its input field while the selector closed: the Prompt has nowhere to go
       this.showFeedback({ kind: 'failed', title: prompt.title, target: null, field: session.field, previous: '' });
