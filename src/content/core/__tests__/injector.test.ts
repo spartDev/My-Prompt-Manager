@@ -376,6 +376,47 @@ describe('PromptLibraryInjector', () => {
         expect(mockTextarea.value).toBe('Draft ');
       });
 
+      it('drops the opening when the user goes on typing in the field while the selector loads', async () => {
+        const open = await typeSlashes(mockTextarea);
+        // typeSlashes resolves its opening at once; this one is still loading
+        open.mockReturnValue(new Promise(() => { /* still loading */ }));
+        mockTextarea.value = 'Draft //';
+        mockTextarea.setSelectionRange(8, 8);
+        const { EventManager } = await import('../../ui/event-manager');
+        const eventManagerInstance = (EventManager as any).mock.results.at(-1).value;
+        const keydown = eventManagerInstance.addTrackedEventListener.mock.calls.find((call: any[]) => call[0] === document && call[1] === 'keydown');
+        const heard = (event: Event) => { keydown[2](event); };
+        document.addEventListener('keydown', heard);
+        mockTextarea.dispatchEvent(new KeyboardEvent('keydown', { key: '/', bubbles: true, composed: true }));
+        document.removeEventListener('keydown', heard);
+        await new Promise(resolve => setTimeout(resolve, 20));
+        expect(open).toHaveBeenCalledTimes(2);
+        selector().close.mockClear();
+
+        // Shift alone is not typing; a letter is
+        const press = (key: string) => {
+          const event = new KeyboardEvent('keydown', { key, bubbles: true, composed: true });
+          Object.defineProperty(event, 'isTrusted', { value: true });
+          mockTextarea.dispatchEvent(event);
+        };
+        press('Shift');
+        expect(selector().close).not.toHaveBeenCalled();
+        press('a');
+        expect(selector().close).toHaveBeenCalledWith(false);
+      });
+
+      it('leaves an open selector alone: once it shows, the keys typed are its own', async () => {
+        const open = await typeSlashes(mockTextarea);
+        expect(open).toHaveBeenCalledTimes(1);
+        selector().close.mockClear();
+
+        const event = new KeyboardEvent('keydown', { key: 'a', bubbles: true, composed: true });
+        Object.defineProperty(event, 'isTrusted', { value: true });
+        mockTextarea.dispatchEvent(event);
+
+        expect(selector().close).not.toHaveBeenCalled();
+      });
+
       it('opens over the input field the Platform has just put in place of the detected one', async () => {
         await injector.initialize();
         await new Promise(resolve => setTimeout(resolve, 50));

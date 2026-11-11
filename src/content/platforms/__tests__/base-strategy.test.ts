@@ -11,6 +11,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { readInputText } from '../../selector/inputText';
 import type { InsertionResult, PlatformConfig } from '../../types/index';
 import type { UIElementFactory } from '../../ui/element-factory';
 import { PlatformStrategy } from '../base-strategy';
@@ -211,16 +212,22 @@ describe('PlatformStrategy', () => {
       field.remove();
     });
 
-    it('restores several lines in a contenteditable', async () => {
+    it.each([
+      ['First line\nSecond line', 'First line<br>Second line'],
+      ['First line\n\nThird line', 'First line<br><br>Third line'],
+      ['Ends with an empty line\n', 'Ends with an empty line<br><br>'],
+      ['\nStarts with an empty line', '<br>Starts with an empty line']
+    ])('restores the lines of %j in a contenteditable as line breaks, not as newlines in one text node', async (text, html) => {
       const field = document.createElement('div');
       field.setAttribute('contenteditable', 'true');
       field.innerHTML = '<p>Inserted prompt</p>';
       document.body.append(field);
 
-      const result = await new TestStrategy().restore(field, 'First line\nSecond line');
+      const result = await new TestStrategy().restore(field, text);
 
       expect(result.success).toBe(true);
-      expect(field.textContent).toBe('First line\nSecond line');
+      expect(field.innerHTML).toBe(html);
+      expect(readInputText(field)).toBe(text);
       field.remove();
     });
 

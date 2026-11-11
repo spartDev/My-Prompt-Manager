@@ -17,7 +17,7 @@ import { ThemeManager } from '../utils/theme-manager';
 
 import { loadSelectorFont } from './font';
 import type { FieldBox } from './InsertionFeedback';
-import { focusAtEnd, readInputText } from './inputText';
+import { focusAtEnd, MODIFIER_KEYS, readInputText } from './inputText';
 import { DURATION, prefersReducedMotion } from './motion';
 import { type AnchorRect, chooseSide, computePlacement, type Side } from './position';
 import type { SelectorRoot } from './render';
@@ -29,11 +29,6 @@ export const SELECTOR_HOST_ID = 'mpm-prompt-selector';
 
 /** Events that must not travel from the selector to the Platform's own listeners. */
 const CONTAINED_EVENTS = ['keydown', 'keyup', 'keypress', 'beforeinput', 'input', 'paste', 'copy', 'cut'] as const;
-
-/** Keys that do nothing on their own: pressing one is not the user going on to something else. */
-const MODIFIER_KEYS: ReadonlySet<string> = new Set([
-  'Shift', 'Control', 'Alt', 'AltGraph', 'Meta', 'OS', 'CapsLock', 'NumLock', 'ScrollLock', 'Fn', 'FnLock', 'Hyper', 'Super', 'Symbol', 'SymbolLock'
-]);
 
 /** How far from the input field, in pixels, the Prompts button still counts as part of the input area. */
 const BUTTON_REACH = 120;

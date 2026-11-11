@@ -118,8 +118,23 @@ export abstract class PlatformStrategy implements PlatformStrategyInterface {
         if (edited && readInputText(element) === text) {
           return Promise.resolve({ success: true, method: 'restore-execCommand' });
         }
-        // No editing command, or the editor laid the text out differently: write it directly
-        element.textContent = text;
+        // No editing command, or the editor laid the text out differently: write it directly,
+        // one <br> between two lines so the breaks show whatever the field does with spaces. A
+        // last line that is empty takes a second <br>, the one that keeps it open
+        const lines = text.split('\n');
+        const content = element.ownerDocument.createDocumentFragment();
+        lines.forEach((line, index) => {
+          if (line !== '') {
+            content.append(line);
+          }
+          if (index < lines.length - 1) {
+            content.append(element.ownerDocument.createElement('br'));
+          }
+        });
+        if (lines.length > 1 && lines[lines.length - 1] === '') {
+          content.append(element.ownerDocument.createElement('br'));
+        }
+        element.replaceChildren(content);
         element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: text }));
         // An editor whose own handler rebuilt its content did not take the text back
         if (readInputText(element) !== text) {

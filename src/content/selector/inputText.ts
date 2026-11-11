@@ -10,6 +10,11 @@
  * plain text.
  */
 
+/** Keys that do nothing on their own: pressing one is not the user going on to something else. */
+export const MODIFIER_KEYS: ReadonlySet<string> = new Set([
+  'Shift', 'Control', 'Alt', 'AltGraph', 'Meta', 'OS', 'CapsLock', 'NumLock', 'ScrollLock', 'Fn', 'FnLock', 'Hyper', 'Super', 'Symbol', 'SymbolLock'
+]);
+
 /** The two characters that open the Prompt selector when typed in the input field. */
 export const SELECTOR_TRIGGER = '//';
 

@@ -10,7 +10,7 @@ import { getPlatformByHostname } from '../../config/platforms';
 import type { ElementFingerprint } from '../../types/index';
 import { PromptSelectorController } from '../selector/controller';
 import { loadSelectorFont } from '../selector/font';
-import { endsWithSelectorTrigger, removeTypedTrigger, textBeforeCaret } from '../selector/inputText';
+import { endsWithSelectorTrigger, MODIFIER_KEYS, removeTypedTrigger, textBeforeCaret } from '../selector/inputText';
 import type { SelectorLibrary } from '../selector/selectorData';
 import type { InsertionResult, Prompt } from '../types/index';
 import { BAR_SEARCH_DEPTH, fitPromptsPill, syncPromptsPillTheme, UIElementFactory } from '../ui/element-factory';
@@ -295,6 +295,24 @@ export class PromptLibraryInjector {
   }
 
   /**
+   * Opens the Prompt selector after a typed `//`. Reading the Library, and React the first time,
+   * can take a moment: a user who goes on typing in the field meanwhile wants their text, not a
+   * selector that takes the focus from under their fingers, so the opening is then dropped.
+   */
+  private openFromTyping(field: HTMLElement): void {
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.isTrusted && !MODIFIER_KEYS.has(event.key) && event.composedPath().includes(field)) {
+        debug('Typing went on while the prompt selector was loading, opening dropped');
+        this.selector.close(false);
+      }
+    };
+    const stop = (): void => { document.removeEventListener('keydown', onKeyDown, true); };
+    document.addEventListener('keydown', onKeyDown, true);
+    // Once the selector shows, its own keys are its own: the listener goes
+    this.selector.open(field, this.state.icon).then(stop, stop);
+  }
+
+  /**
    * The input field a `/` was typed in: the one the Prompts button was placed for. Only when that
    * one is out of the page (the Platform has just replaced its input field and the new one is not
    * detected yet) is it the element on the event's path that the Platform's selectors name.
@@ -363,7 +381,7 @@ export class PromptLibraryInjector {
           debug('Could not remove the typed //, the prompt selector stays closed');
           return;
         }
-        void this.selector.open(field, this.state.icon);
+        this.openFromTyping(field);
       }, 0);
     };
     this.eventManager.addTrackedEventListener(document, 'keydown', onSlash);
