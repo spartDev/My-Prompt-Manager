@@ -138,27 +138,35 @@ export async function expectInsertionFlow(page: Page, { field, prompt, usageCoun
   expect(await usageCount()).toBe(usesBefore + 2);
 }
 
-/** More Tab presses than any of the pages needs to go from its input field to the confirmation. */
-const TAB_LIMIT = 10;
+/**
+ * Takes the focus from the input field to the confirmation's Undo button as a user who has only
+ * the keyboard does: one Tab, pressed in the field while the confirmation shows, whatever the
+ * page has after the field.
+ */
+export async function tabToUndo(page: Page): Promise<void> {
+  await page.keyboard.press('Tab');
+  await expect(undoButton(page)).toBeFocused();
+}
+
+/** How many controls a real page can have after its input field: Gemini had 95 on 2026-11-11. */
+const CONTROLS_AFTER_FIELD = 30;
 
 /**
- * Presses Tab until the confirmation's Undo button has the focus, as a user who has only the
- * keyboard does: through the page's own controls, since the confirmation is last in the tab order.
- * Returns how many presses it took. Fails when the confirmation has left meanwhile, or when Tab
- * never gets there.
+ * Adds focusable controls to the page, after its input field in the tab order and before the
+ * selector's shadow host, which stays last in body.
  */
-export async function tabToUndo(page: Page): Promise<number> {
-  const undo = undoButton(page);
-  for (let presses = 1; presses <= TAB_LIMIT; presses++) {
-    await page.keyboard.press('Tab');
-    if ((await undo.count()) === 0) {
-      throw new Error(`The confirmation left before Tab reached Undo (${String(presses)} presses)`);
+async function addControlsAfterField(page: Page): Promise<void> {
+  await page.evaluate((count) => {
+    const controls = document.createElement('nav');
+    controls.id = 'controls-after-field';
+    for (let index = 1; index <= count; index++) {
+      const control = document.createElement('button');
+      control.type = 'button';
+      control.textContent = `Chat ${String(index)}`;
+      controls.append(control);
     }
-    if (await undo.evaluate((button) => button.matches(':focus'))) {
-      return presses;
-    }
-  }
-  throw new Error(`Tab pressed ${String(TAB_LIMIT)} times without reaching Undo`);
+    document.body.append(controls);
+  }, CONTROLS_AFTER_FIELD);
 }
 
 export interface KeyboardInsertionFlow {
@@ -171,11 +179,22 @@ export interface KeyboardInsertionFlow {
 /**
  * An Insertion and its Undo with no pointer at all, on any page the content script is on and that
  * counts its Enter keys (ENTER_COUNTER): Tab to the input field, a draft, `//`, Enter on the first
- * Prompt, then Tab to Undo and Enter. No Enter reaches the page, which would send the message.
+ * Prompt, then Tab to Undo and Enter. The page has 30 more controls after the field, as a real one
+ * does, and Undo is still one Tab away. No Enter reaches the page, which would send the message.
  */
 export async function expectKeyboardInsertionFlow(page: Page, { field, prompt }: KeyboardInsertionFlow): Promise<void> {
   const selector = promptSelector(page);
   const pill = insertionPill(page);
+  const insert = async (): Promise<void> => {
+    await page.keyboard.type('//');
+    await expect(selector).toBeVisible();
+    await expect(promptRow(page, prompt.id)).toHaveAttribute('aria-selected', 'true');
+    await page.keyboard.press('Enter');
+    await expect(selector).toBeHidden();
+    await expect.poll(() => fieldText(field)).toBe(prompt.content);
+    await expect(pill).toBeVisible();
+  };
+  await addControlsAfterField(page);
 
   // Tab from the top of the page reaches the input field, which holds text before the Insertion
   await page.keyboard.press('Tab');
@@ -185,20 +204,33 @@ export async function expectKeyboardInsertionFlow(page: Page, { field, prompt }:
   expect(before).toBe('Keep this  text ');
 
   // // then Enter: the first Prompt of the list is inserted
-  await page.keyboard.type('//');
-  await expect(selector).toBeVisible();
-  await expect(promptRow(page, prompt.id)).toHaveAttribute('aria-selected', 'true');
-  await page.keyboard.press('Enter');
-  await expect(selector).toBeHidden();
-  await expect.poll(() => fieldText(field)).toBe(prompt.content);
-  await expect(pill).toBeVisible();
+  await insert();
+  const shown = Date.now();
   expect(await enterKeys(page)).toBe(0);
 
-  // Undo: Tab goes on through the page's own controls to the confirmation, and Enter presses Undo
+  // Tab in the field goes straight to Undo, past the page's own controls, within the 2.8s the
+  // confirmation stays; Shift+Tab comes back to the field, and the confirmation is still there
+  await tabToUndo(page);
+  expect(Date.now() - shown).toBeLessThan(2800);
+  await page.keyboard.press('Shift+Tab');
+  await expect(field).toBeFocused();
+  await expect(pill).toBeVisible();
+
+  // Enter presses Undo: the field takes back its text and the focus
   await tabToUndo(page);
   await page.keyboard.press('Enter');
   await expect(pill).toBeHidden();
   await expect.poll(() => fieldText(field)).toBe(before);
   await expect(field).toBeFocused();
+  expect(await enterKeys(page)).toBe(0);
+
+  // Once the confirmation has left, Tab is the page's again: it goes to the control after the field
+  await insert();
+  await expect(pill).toBeHidden({ timeout: 5000 });
+  await expect(field).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(field).not.toBeFocused();
+  expect(await page.evaluate(() => document.activeElement?.id)).not.toBe('mpm-prompt-selector');
+  expect(await fieldText(field)).toBe(prompt.content);
   expect(await enterKeys(page)).toBe(0);
 }
