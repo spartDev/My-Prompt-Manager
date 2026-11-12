@@ -12,7 +12,7 @@ import { createPromptSeed, seedLibrary } from '../utils/storage';
 type DarkSnapshot = { runningTransitions?: Record<string, string[]>; error?: string };
 
 const TARGETS: Record<string, string> = {
-  search: 'input[placeholder="Search your prompts..."]',
+  search: 'input[placeholder="Search your prompts"]',
   activeTab: '[role="tab"][aria-selected="true"]',
   activeFilter: '[role="radio"][aria-checked="true"]',
 };

@@ -24,7 +24,8 @@ import { Logger, toError } from './utils';
 import { cn } from './utils/cn';
 
 /** The editor, open over the Library: writing a new Prompt, or editing one */
-type EditorState = { mode: 'add' } | { mode: 'edit'; prompt: Prompt };
+/** A new Prompt can open with a title and a Category: Create it, from a search that found nothing */
+type EditorState = { mode: 'add'; title?: string; category?: string } | { mode: 'edit'; prompt: Prompt };
 
 /** What the Notification says once the editor has closed after a save */
 interface SavedNotice {
@@ -120,6 +121,8 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   };
 
   const handleAddNew = () => { openEditor({ mode: 'add' }); };
+
+  const handleCreateFromSearch = (title: string, category?: string) => { openEditor({ mode: 'add', title, category }); };
 
   const handleEditPrompt = (prompt: Prompt) => { openEditor({ mode: 'edit', prompt }); };
 
@@ -356,6 +359,24 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
     setCurrentView(section);
   }, [currentView, refreshPrompts, refreshCategories]);
 
+  // Cmd/Ctrl+K, from any Section: back to the Library if need be, and the keyboard goes into its search
+  // field. Not while the editor or a dialog is open over the Section, nor in the element picker's Settings
+  const [focusSearch, setFocusSearch] = useState(false);
+  const handleSearchFocused = useCallback(() => { setFocusSearch(false); }, []);
+  const editorOpen = editor !== null;
+  useEffect(() => {
+    if (isPickerMode) { return; }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey || event.key.toLowerCase() !== 'k') { return; }
+      if (editorOpen || document.querySelector('[aria-modal="true"]')) { return; }
+      event.preventDefault();
+      handleSelectSection('library');
+      setFocusSearch(true);
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => { document.removeEventListener('keydown', handleKeyDown); };
+  }, [isPickerMode, editorOpen, handleSelectSection]);
+
   // Tidy up in Analytics: the Library on the Prompts to review, with no search hiding any of them
   // Review's button leaves with Analytics, so focus lands on the review filter's pill
   const { clearSearch } = searchWithDebounce;
@@ -449,6 +470,9 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
           searchWithDebounce={searchWithDebounce}
           libraryFilter={libraryFilter}
           onAddNew={handleAddNew}
+          onCreateFromSearch={handleCreateFromSearch}
+          focusSearch={focusSearch}
+          onSearchFocused={handleSearchFocused}
           onEditPrompt={handleEditPrompt}
           onTogglePin={handleTogglePin}
           onCopyPrompt={(prompt: Prompt) => { void handleCopyPrompt(prompt); }}
@@ -519,6 +543,8 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
           <PromptEditor
             key={editorKey}
             prompt={editorSheet.shown.mode === 'edit' ? editorSheet.shown.prompt : undefined}
+            initialTitle={editorSheet.shown.mode === 'add' ? editorSheet.shown.title : undefined}
+            initialCategory={editorSheet.shown.mode === 'add' ? editorSheet.shown.category : undefined}
             categories={categories}
             library={prompts}
             onSubmit={handleFormSubmit}

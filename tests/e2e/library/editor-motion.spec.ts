@@ -117,7 +117,7 @@ test.describe('Prompt editor motion', () => {
       await page.screenshot({ path: `${SCREENSHOT_DIR}/saved-${theme}.png` });
 
       // The sheet leaves and the Notification comes with it
-      const toast = page.getByRole('status');
+      const toast = page.getByTestId('toast');
       await expect(toast).toContainText('Prompt created');
       await expect.poll(() => page.evaluate(() => (window as unknown as { sheetAnimations: string[] }).sheetAnimations)).toContain('sheet-out');
       await expect(toast).toHaveCSS('animation-name', 'toast-in');
@@ -142,6 +142,6 @@ test.describe('Prompt editor motion', () => {
     await expect(sheet).toHaveCount(0);
 
     expect(Date.now() - before).toBeLessThan(MOTION.savedPause + MOTION.sheetOut);
-    await expect(page.getByRole('status')).toContainText('Prompt created');
+    await expect(page.getByTestId('toast')).toContainText('Prompt created');
   });
 });

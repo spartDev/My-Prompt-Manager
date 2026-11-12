@@ -1,6 +1,6 @@
 # Component Catalog
 
-Which component does which job in the popup and the side panel, and the conventions they share. This page does not copy Props or code: the source file is the reference. Most components declare their Props interface at the top of the file; `LibraryView`, `PromptCard`, `PromptEditor` and `SearchBar` import theirs from `src/types/components.ts`. Open them before you use or change a component.
+Which component does which job in the popup and the side panel, and the conventions they share. This page does not copy Props or code: the source file is the reference. Most components declare their Props interface at the top of the file; `LibraryView`, `PromptCard`, `PromptEditor`, `SearchBar` and `SearchEmptyState` import theirs from `src/types/components.ts`. Open them before you use or change a component.
 
 ---
 
@@ -39,7 +39,8 @@ Which component does which job in the popup and the side panel, and the conventi
 | `src/components/editor/LookalikeCallout.tsx` | "This looks familiar": the Prompt of the Library the text being written looks like (60% alike or more), with the first lines of both and Keep both. Never blocks Save |
 | `src/components/editor/VariableTextarea.tsx` | The Prompt text field: Variables highlighted by a mirror under a transparent textarea; the field grows with its text |
 | `src/components/LibraryFilterBar.tsx` | The Library filter pills (All, Pinned, Most Used, one per non-empty Category, and while one is active the Never used or Possible duplicates pill reached from Analytics, with a button back to All); the filter logic is `src/services/libraryFilter.ts` |
-| `src/components/SearchBar.tsx` | The search field; the debounce is in `useSearchWithDebounce`, not here |
+| `src/components/SearchBar.tsx` | The search field of the Library, a pill with the badge of its shortcut or a clear button. Presentation only: the debounce is in `useSearchWithDebounce`, the Cmd/Ctrl+K shortcut in `App` |
+| `src/components/SearchEmptyState.tsx` | What a search that finds nothing shows: the search, Create it (the editor opens titled with it) and, under a Library filter, Search all prompts |
 | `src/components/CategoryBadge.tsx` | A Category name on its color, with readable text contrast |
 
 ### Shared primitives
@@ -78,7 +79,7 @@ Which component does which job in the popup and the side panel, and the conventi
 - **Focus:** the focus classes of `tailwind.config.js` (`focus-primary`, `focus-input`…); see "Focus States" in DESIGN_GUIDELINES.md.
 - **Verbatim Prompt text:** a component shows a Prompt's title and content exactly as stored. React renders them as text; nothing sanitizes or rewrites them (`CONTEXT.md`, ADR-001).
 - **Forms:** submit with React 19's `useActionState`, as `src/components/PromptEditor.tsx` does (`CODING_STANDARDS.md`). Character counters read `PROMPT_LIMITS`, and storage runs Admission on save: a form never keeps its own copy of the limits or the rules.
-- **Memo:** `PromptCard` and `SearchBar` use a custom props comparison. Adding a prop to one of them means adding it to its comparison, or the component will not re-render when the prop changes.
+- **Memo:** `PromptCard` uses a custom props comparison. Adding a prop to it means adding it to its comparison, or the component will not re-render when the prop changes.
 - **Accessibility:** icon-only buttons carry an `aria-label`; dialogs use `useModalFocus` (`src/hooks/useModalFocus.ts`): focus moves in, Tab wraps inside, Escape closes and the focus returns to the opener; menus are keyboard-navigable (`Dropdown` does it for you).
 
 ## Adding a component

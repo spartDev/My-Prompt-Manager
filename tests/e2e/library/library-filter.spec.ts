@@ -100,7 +100,7 @@ test.describe('Library filter', () => {
     await noResults.getByRole('button', { name: 'Search all prompts' }).click();
 
     await expect(library.getLibraryFilterPill('All')).toHaveAttribute('aria-checked', 'true');
-    await expect(page.getByPlaceholder('Search your prompts...')).toHaveValue('blog');
+    await expect(page.getByPlaceholder('Search your prompts')).toHaveValue('blog');
     expect(await getSortedPromptTitles(page)).toEqual(['Blog outline']);
   });
 

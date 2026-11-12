@@ -90,8 +90,8 @@ describe('Color tokens', () => {
       ['warning', 'warning-subtle'],
       ['danger', 'danger-subtle'],
       ['on-inverse', 'inverse'],
+      // A search match is marked under text-primary, in a title and in a preview
       ['primary', 'highlight'],
-      ['tertiary', 'highlight'],
       // A Platform switched off: its logo square (My-Prompt-Manager-el4.5.3)
       ['tertiary', 'muted'],
       // Empty states and dashed panels

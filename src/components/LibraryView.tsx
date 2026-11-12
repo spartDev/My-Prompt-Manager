@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { DEFAULT_SETTINGS } from '../constants';
 import {
@@ -9,14 +9,17 @@ import {
   resolveLibraryFilter
 } from '../services/libraryFilter';
 import { StorageManager } from '../services/storage';
+import { MOTION } from '../theme/motion';
 import type { Prompt, Settings, SortOrder } from '../types';
 import type { LibraryViewProps } from '../types/components';
 import { Logger, toError } from '../utils';
+import { cn } from '../utils/cn';
 
 import { CheckIcon, StarIcon, UsageIcon } from './icons/UIIcons';
 import LibraryFilterBar, { reviewFilterLabel } from './LibraryFilterBar';
 import PromptCard from './PromptCard';
 import SearchBar from './SearchBar';
+import SearchEmptyState from './SearchEmptyState';
 import ViewHeader from './ViewHeader';
 
 const LibraryView: FC<LibraryViewProps> = ({
@@ -25,6 +28,9 @@ const LibraryView: FC<LibraryViewProps> = ({
   searchWithDebounce,
   libraryFilter,
   onAddNew,
+  onCreateFromSearch,
+  focusSearch,
+  onSearchFocused,
   onEditPrompt,
   onTogglePin,
   onCopyPrompt,
@@ -43,6 +49,15 @@ const LibraryView: FC<LibraryViewProps> = ({
     setFocusAll(false);
     onLibraryFilterFocused?.();
   }, [onLibraryFilterFocused]);
+
+  // The search shortcut moves the keyboard into the field, also when it has just brought the Library back
+  const searchRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (focusSearch) {
+      searchRef.current?.focus();
+      onSearchFocused?.();
+    }
+  }, [focusSearch, onSearchFocused]);
 
   // The sort is chosen in Settings. Read it once, then follow every later save: a save can
   // land after this view has mounted (or come from the other context)
@@ -103,7 +118,23 @@ const LibraryView: FC<LibraryViewProps> = ({
   const activeFilterLabel = activeFilter.kind === 'category'
     ? categories.find(category => category.id === activeFilter.categoryId)?.name ?? ''
     : reviewFilterLabel(activeFilter) ?? (activeFilter.kind === 'pinned' ? 'Pinned' : 'Most Used');
-  const isSearchActive = debouncedQuery.trim() !== '';
+  const searchedFor = debouncedQuery.trim();
+  const isSearchActive = searchedFor !== '';
+  const resultCount = finalFilteredPrompts.length;
+  const resultsLabel = resultCount === 0 ? 'No results' : `${String(resultCount)} result${resultCount !== 1 ? 's' : ''}`;
+
+  // The cards rise again when the Library filter or the Prompts listed change, not at a keystroke
+  // that lists the same ones, nor when a pin only reorders them
+  const listedKey = [
+    activeFilter.kind,
+    activeFilter.kind === 'category' ? activeFilter.categoryId : '',
+    ...finalFilteredPrompts.map(prompt => prompt.id).sort()
+  ].join('|');
+  const [rise, setRise] = useState({ listed: listedKey, again: false });
+  if (rise.listed !== listedKey) {
+    setRise({ listed: listedKey, again: !rise.again });
+  }
+  const riseClass = rise.again ? 'animate-list-rise-again' : 'animate-list-rise';
 
   const totalLabel = `${String(prompts.length)} prompt${prompts.length !== 1 ? 's' : ''}`;
   const countLabel = finalFilteredPrompts.length === prompts.length
@@ -117,7 +148,8 @@ const LibraryView: FC<LibraryViewProps> = ({
         icon="logo"
         title="My Prompt Manager"
         subtitle={loading ? undefined : countLabel}
-        subtitleLive
+        // While a search runs, the number of results is the one announcement (the status below)
+        subtitleLive={!isSearchActive}
         context={context}
       >
         <ViewHeader.Actions>
@@ -128,18 +160,14 @@ const LibraryView: FC<LibraryViewProps> = ({
         </ViewHeader.Actions>
         {/* Search and Filter */}
         <div className="space-y-4 pb-6" role="search" aria-label="Search and filter prompts">
-          <div className="relative">
+          {/* The header pads its content by 24px; the pill keeps 16px on each side */}
+          <div className="-mx-2">
             <SearchBar
               value={query}
               onChange={searchWithDebounce.setQuery}
               onClear={searchWithDebounce.clearSearch}
-              placeholder="Search your prompts..."
+              inputRef={searchRef}
             />
-            {isSearching && (
-              <div className="absolute top-1/2 right-12 transform -translate-y-1/2 z-10">
-                <div className="w-4 h-4 border-2 border-current/30 border-t-current text-accent rounded-full animate-spin" aria-hidden="true"></div>
-              </div>
-            )}
           </div>
 
           <LibraryFilterBar
@@ -155,12 +183,19 @@ const LibraryView: FC<LibraryViewProps> = ({
 
       {/* Content */}
       <main className="flex-1 overflow-auto custom-scrollbar" data-scroll-container aria-label="My Prompt Manager content">
+        {/* The one announcement of a search: the number found. It is in the document before any search,
+            empty, since a screen reader says what changes in a status it already knows */}
+        {!loading && (
+          <p role="status" aria-live="polite" aria-atomic="true" className="sr-only" data-testid="search-status">
+            {isSearchActive ? resultsLabel : ''}
+          </p>
+        )}
         {loading ? (
           <div className="flex flex-col items-center justify-center h-full space-y-4" role="status" aria-live="polite">
             <div className="w-8 h-8 border-4 border-current/30 border-t-current text-accent rounded-full animate-spin" aria-hidden="true"></div>
             <div className="text-secondary font-medium">Loading your prompts...</div>
           </div>
-        ) : finalFilteredPrompts.length === 0 ? (
+        ) : resultCount === 0 && !isSearchActive ? (
           <div className="flex items-center justify-center h-full">
             {(prompts).length === 0 ? (
               <div className="max-w-md mx-auto text-center px-6" role="region" aria-label="Empty state">
@@ -213,46 +248,62 @@ const LibraryView: FC<LibraryViewProps> = ({
                 <h2 className="text-base font-semibold text-primary mb-1">No prompts used yet</h2>
                 <p className="text-secondary text-sm">Prompts you insert into an AI chat appear here, most used first.</p>
               </div>
-            ) : (
-              <div className="max-w-sm mx-auto text-center px-6" role="region" aria-label="No search results">
-                <div className="w-14 h-14 bg-card border border-default rounded-full flex items-center justify-center mx-auto mb-3" role="img" aria-label="No results illustration">
-                  <svg className="w-7 h-7 text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                </div>
-                <h2 className="text-base font-semibold text-primary mb-1">No matches found</h2>
-                {activeFilter.kind === 'all' ? (
-                  <p className="text-secondary text-sm">Try a different search</p>
-                ) : (
-                  <>
-                    <p className="text-secondary text-sm mb-4">Nothing in {activeFilterLabel} matches your search.</p>
-                    <button
-                      type="button"
-                      onClick={() => { onLibraryFilterChange(ALL_PROMPTS); }}
-                      className="px-4 py-2 text-sm font-semibold text-accent bg-accent-subtle border border-accent rounded-lg hover:bg-accent-selected transition-colors focus-interactive"
-                    >
-                      Search all prompts
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
+            ) : null}
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-3 px-4 py-3" role="list" aria-label={`${String(finalFilteredPrompts.length)} prompt${finalFilteredPrompts.length !== 1 ? 's' : ''} found`}>
-            {finalFilteredPrompts.map((prompt: Prompt) => (
-              <PromptCard
-                key={prompt.id}
-                prompt={prompt}
-                categories={categories}
-                onEdit={onEditPrompt}
-                onTogglePin={onTogglePin}
-                onCopy={onCopyPrompt}
-                showToast={showToast}
-                searchQuery={debouncedQuery}
-              />
-            ))}
-          </div>
+          <>
+            {isSearchActive && (
+              <div className="flex items-baseline justify-between gap-3 px-[18px] pt-4 pb-2" data-testid="list-header">
+                <h2 className="min-w-0 truncate text-[13px] font-bold text-secondary">
+                  {activeFilter.kind === 'all' ? 'Results' : activeFilterLabel}
+                </h2>
+                {/* Said, with its unit, by the status above */}
+                <span className="flex-none text-xs text-tertiary" aria-hidden="true">{String(resultCount)}</span>
+              </div>
+            )}
+            {resultCount === 0 ? (
+              <div className="px-4 pb-3">
+                <SearchEmptyState
+                  query={searchedFor}
+                  // The field already shows another search, not looked up yet: this one is no longer the one to create
+                  createDisabled={isSearching}
+                  onCreate={() => {
+                    onCreateFromSearch(searchedFor, activeFilter.kind === 'category' ? activeFilterLabel : undefined);
+                  }}
+                  filterLabel={activeFilter.kind === 'all' ? undefined : activeFilterLabel}
+                  onSearchAll={activeFilter.kind === 'all' ? undefined : () => {
+                    // The button leaves with the filter: the keyboard goes to the All pill
+                    setFocusAll(true);
+                    onLibraryFilterChange(ALL_PROMPTS);
+                  }}
+                />
+              </div>
+            ) : (
+              <div
+                className={cn('grid grid-cols-1 gap-3 px-4 pb-3', !isSearchActive && 'pt-3')}
+                role="list"
+                aria-label={`${String(resultCount)} prompt${resultCount !== 1 ? 's' : ''} found`}
+              >
+                {finalFilteredPrompts.map((prompt: Prompt, index) => (
+                  <div
+                    key={prompt.id}
+                    className={cn('min-w-0', riseClass)}
+                    style={{ animationDelay: `${String(Math.min(index, MOTION.listStaggerSteps) * MOTION.listStagger)}ms` }}
+                  >
+                    <PromptCard
+                      prompt={prompt}
+                      categories={categories}
+                      onEdit={onEditPrompt}
+                      onTogglePin={onTogglePin}
+                      onCopy={onCopyPrompt}
+                      showToast={showToast}
+                      searchQuery={debouncedQuery}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </main>
     </div>

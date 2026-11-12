@@ -74,7 +74,7 @@ export const promptAssertions = {
    * Expect empty state when no prompts match
    */
   emptyState: async (page: Page): Promise<void> => {
-    await expect(page.getByText('No matches found')).toBeVisible();
+    await expect(page.getByRole('region', { name: 'No search results' })).toBeVisible();
   },
 };
 

@@ -41,7 +41,7 @@ Visual reference (both modes side by side): the palette canvas linked from beads
 | `bg-inverse` | `#1D1530` | `#4A3D6B` | Notification pill, tooltips (the chart tooltip included), the Analytics hero |
 | `bg-callout` | `#FFF8E6` | `#2B210E` | The Tidy up callout of Analytics, with `border-warning` and `text-callout` |
 | `bg-backdrop` | `#2A2140` at 45% | `#07050C` at 70% | Behind an open dialog or drawer, with `backdrop-blur-sm` |
-| `bg-highlight` | `#FEF3C7` | `#33270F` | Search match in a Prompt title or preview (`<mark className="bg-highlight text-inherit">`) |
+| `bg-highlight` | `#FDE68A` | `#5A4515` | Search match in a Prompt title or preview, under `text-primary` (`<mark className="bg-highlight text-primary">`) |
 
 Surfaces are **opaque**. `bg-backdrop` is the only translucent one: no translucent white + `backdrop-blur-sm` glass on headers or sections.
 
@@ -528,7 +528,7 @@ The spinner takes the text color of its button, so it works on any button:
 
 ### Input Fields
 
-A field on a card takes `bg-subtle`; a field placed directly on `bg-app` (the Library search) takes `bg-card`. Both take `border-input` (3:1 on every surface), `focus-input` and `placeholder:text-tertiary`.
+A field on a card takes `bg-subtle`; a field placed directly on `bg-app` takes `bg-card`. Both take `border-input` (3:1 on every surface), `focus-input` and `placeholder:text-tertiary`. The Library search is the one exception: see Search Input below.
 
 #### Text Input
 
@@ -617,34 +617,41 @@ A field on a card takes `bg-subtle`; a field placed directly on `bg-app` (the Li
 
 #### Search Input
 
-The Library search sits on `bg-app`, so it takes `bg-card`, like the cards:
+The Library search (`src/components/SearchBar.tsx`, Atelier 1C) is a pill on `bg-app`: `bg-card`, 44px high, 16px from each side of the panel. It holds a magnifier, the field, and one thing at its end: the badge of its shortcut while the field is empty (`⌘K`, `Ctrl K` off Apple devices, `aria-hidden`; the field carries `aria-keyshortcuts`), or a round button that clears it once filled.
 
 ```tsx
-<div className="relative">
-  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none z-10">
-    <svg className="h-5 w-5 text-tertiary">
-      {/* Search icon */}
-    </svg>
-  </div>
+<div className="
+  flex items-center gap-2.5 h-11 pl-3.5 pr-2
+  rounded-full bg-card
+  border-[1.5px] border-default shadow-xs
+  transition-search
+  has-[input:focus]:border-focus has-[input:focus]:shadow-search-focus
+">
+  <svg className="h-[17px] w-[17px] flex-none text-tertiary" aria-hidden="true">{/* Magnifier */}</svg>
   <input
-    type="text"
-    className="
-      w-full pl-12 pr-12 py-3
-      bg-card
-      border border-input
-      rounded-xl
-      focus-input
-      text-sm
-      text-primary
-      placeholder:text-tertiary
-      shadow-sm
-      transition-all duration-200
-    "
-    placeholder="Search prompts"
+    type="search"
+    aria-label="Search prompts"
+    className="flex-1 min-w-0 h-full p-0 bg-transparent border-0 outline-none text-[14.5px] text-primary placeholder:text-tertiary"
+    placeholder="Search your prompts"
   />
-  {/* Clear button on right if needed */}
+  {/* Empty */}
+  <span aria-hidden="true" className="h-6 px-2 rounded-full bg-subtle text-tertiary text-[11.5px] font-semibold">⌘K</span>
+  {/* Filled */}
+  <button aria-label="Clear search" className="h-7 w-7 rounded-full bg-accent-subtle text-accent animate-clear-pop focus-interactive" />
 </div>
 ```
+
+- **Focus** shows on the pill, not on the field: the border turns `border-focus` and the pill takes `shadow-search-focus`, a 4px halo of the accent at 12% (`--shadow-tint-accent`, lighter violet in dark). The two stand for the outline of the field, so neither may be removed.
+- **Exception to `border-input`:** at rest the pill takes `border-default`, 1.09:1 on `bg-app`, as the mockup draws it. The field is found by its magnifier and its placeholder (`text-tertiary`, 5.3:1 on `bg-card`), not by its border. Other fields keep `border-input`.
+- **Escape** in the field clears it when filled and keeps the keyboard there; in an empty field it lets go of the keyboard.
+
+#### Search results
+
+While a search runs, the list has a heading: `Results`, or the name of the active Library filter when it is not All, with the number found at its end. That number is the one `role="status"` of the search; the count in the header is not announced meanwhile.
+
+The first match of the search is marked in the title and in the preview of each card: `<mark className="bg-highlight text-primary rounded-[4px]">`, cut by `highlightMatch` (`src/utils/textHighlight.ts`).
+
+A search that finds nothing shows `SearchEmptyState`: a dashed block (`rounded-[18px] border-[1.5px] border-dashed border-strong`) saying `Nothing called “…” yet`, with **Create it** (`bg-accent`, opens the editor titled with the search, in the Category of the active filter if it is one) and, under a filter other than All, **Search all prompts**.
 
 ### Cards
 
@@ -1009,6 +1016,9 @@ duration or a curve: it uses a class, and a timer reads `MOTION`.
 | `animate-toast-in` | `toast-in` 450ms, ease-spring | the Notification pill, from 14px above the top center |
 | `animate-bar-grow` (`MOTION.barGrow`) | `bar-grow` 800ms, ease-spring | an Analytics bar growing from the bottom: the hero's weekday bars set `animationDelay` to `MOTION.barDelay` + index × `MOTION.barStagger` (200ms, then 60ms apart); the Daily use and Time of day pills spread the same stagger over as long as seven bars take |
 | `animate-card-rise` (`MOTION.cardRise`) | `card-rise` 500ms, ease-spring | the Top platform and Top category cards rising 12px, at 100ms and 180ms (`cardDelay`, `cardStagger`), and the Tidy up callout; in the full-page view the Platforms, Categories, Daily use and Time of day cards follow, each `cardStagger` later |
+| `animate-clear-pop` (`MOTION.clearPop`) | `pop` 350ms, ease-spring | the clear button of the Library search appearing |
+| `animate-list-rise`, `animate-list-rise-again` (`MOTION.listRise`) | `card-rise` 500ms, ease-spring | the cards of the Library rising 12px when the Library filter or the Prompts listed change, each `listStagger` (50ms) after the one before, up to `listStaggerSteps` (8). The two names share their keyframes: going from one to the other plays the rise again without mounting the cards anew. A keystroke that lists the same Prompts, or a pin that only reorders them, plays nothing |
+| `animate-empty-rise` (`MOTION.emptyRise`) | `card-rise` 350ms, ease-spring | the no-results block of a search |
 | `animate-rank-fill` (`MOTION.rankFill`) | `fill-grow` 1000ms, ease-spring | a Most used bar filling from the left, 300ms then 90ms apart (`rankDelay`, `rankStagger`); the rows of the Platforms and Categories cards too |
 | `MOTION.countUp` (a timer, `useCountUp`) | 800ms, ease-out | the Analytics total counting up from 0 with the bars |
 | `animate-toast-mark` | `pop` 450ms, ease-spring, 80ms delay | the round of the Notification |
@@ -1340,9 +1350,9 @@ All interactive elements MUST have appropriate ARIA labels:
 </button>
 
 <input
-  type="text"
+  type="search"
   aria-label="Search prompts"
-  role="searchbox"
+  aria-keyshortcuts="Meta+K"
 />
 
 <article aria-labelledby="prompt-title-123">

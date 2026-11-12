@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -62,6 +62,7 @@ const defaultProps = {
   searchWithDebounce: createMockSearchWithDebounce(),
   libraryFilter: ALL_PROMPTS,
   onAddNew: vi.fn(),
+  onCreateFromSearch: vi.fn(),
   onEditPrompt: vi.fn(),
   onTogglePin: vi.fn(),
   onCopyPrompt: vi.fn(),
@@ -79,6 +80,20 @@ const ReviewHarness = ({ prompts }: { prompts: Prompt[] }) => {
       {...defaultProps}
       prompts={prompts}
       searchWithDebounce={createMockSearchWithDebounce(prompts)}
+      libraryFilter={filter}
+      onLibraryFilterChange={setFilter}
+    />
+  );
+};
+
+/** A Library on the Work Category whose search finds nothing there, and `foundUnderAll` under All */
+const SearchAllHarness = ({ library, foundUnderAll }: { library: Prompt[]; foundUnderAll: Prompt[] }) => {
+  const [filter, setFilter] = useState<LibraryFilter>({ kind: 'category', categoryId: 'work' });
+  return (
+    <LibraryView
+      {...defaultProps}
+      prompts={library}
+      searchWithDebounce={createMockSearchWithDebounce(filter.kind === 'all' ? foundUnderAll : [], 'pinned')}
       libraryFilter={filter}
       onLibraryFilterChange={setFilter}
     />
@@ -316,11 +331,152 @@ describe('LibraryView', () => {
       expect(clearSearch).not.toHaveBeenCalled();
     });
 
+    it('moves the keyboard to All when Search all prompts leaves with its filter', async () => {
+      const user = userEvent.setup();
+      render(<SearchAllHarness library={library} foundUnderAll={[pinned]} />);
+
+      await user.click(screen.getByRole('button', { name: 'Search all prompts' }));
+
+      expect(screen.queryByRole('button', { name: 'Search all prompts' })).not.toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: 'All' })).toHaveFocus();
+    });
+
     it('does not offer to search all prompts when All finds nothing', () => {
       renderWith(ALL_PROMPTS, { searchWithDebounce: createMockSearchWithDebounce([], 'zzz') });
 
-      expect(screen.getByText('No matches found')).toBeInTheDocument();
+      expect(screen.getByRole('region', { name: /no search results/i })).toHaveTextContent('Nothing called “zzz” yet');
       expect(screen.queryByRole('button', { name: 'Search all prompts' })).not.toBeInTheDocument();
+    });
+
+    it('offers to create the Prompt a search did not find, titled with the search', async () => {
+      const user = userEvent.setup();
+      const onCreateFromSearch = vi.fn();
+      renderWith(ALL_PROMPTS, { searchWithDebounce: createMockSearchWithDebounce([], '  Weekly report '), onCreateFromSearch });
+
+      const empty = screen.getByRole('region', { name: /no search results/i });
+      expect(empty).toHaveTextContent('Nothing called “Weekly report” yet');
+      expect(empty).toHaveClass('animate-empty-rise', 'border-dashed');
+      await user.click(screen.getByRole('button', { name: 'Create it' }));
+
+      expect(onCreateFromSearch).toHaveBeenCalledWith('Weekly report', undefined);
+    });
+
+    it('offers to create the Prompt searched for in a Library that holds none', async () => {
+      const user = userEvent.setup();
+      const onCreateFromSearch = vi.fn();
+      render(<LibraryView {...defaultProps} prompts={[]} searchWithDebounce={createMockSearchWithDebounce([], 'First idea')} onCreateFromSearch={onCreateFromSearch} />);
+
+      expect(screen.queryByRole('region', { name: /empty state/i })).not.toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Create it' }));
+
+      expect(onCreateFromSearch).toHaveBeenCalledWith('First idea', undefined);
+    });
+
+    it('holds Create it back while the field shows a search not looked up yet', async () => {
+      const user = userEvent.setup();
+      const onCreateFromSearch = vi.fn();
+      // The field already reads "zzz report"; the search that found nothing is still "zzz"
+      const search = { ...createMockSearchWithDebounce([], 'zzz'), query: 'zzz report', isSearching: true };
+      renderWith(ALL_PROMPTS, { searchWithDebounce: search, onCreateFromSearch });
+
+      const create = screen.getByRole('button', { name: 'Create it' });
+      expect(create).toBeDisabled();
+      await user.click(create);
+
+      expect(onCreateFromSearch).not.toHaveBeenCalled();
+    });
+
+    it('creates it in the Category of the active Library filter', async () => {
+      const user = userEvent.setup();
+      const onCreateFromSearch = vi.fn();
+      renderWith({ kind: 'category', categoryId: 'work' }, { searchWithDebounce: createMockSearchWithDebounce([pinned], 'zzz'), onCreateFromSearch });
+
+      await user.click(screen.getByRole('button', { name: 'Create it' }));
+
+      expect(onCreateFromSearch).toHaveBeenCalledWith('zzz', 'Work');
+    });
+
+    it('heads the list of a search with Results and announces the number found', () => {
+      renderWith(ALL_PROMPTS, { searchWithDebounce: createMockSearchWithDebounce([pinned, used], 'e') });
+
+      const header = screen.getByTestId('list-header');
+      expect(header).toHaveTextContent('Results');
+      const status = screen.getByRole('status');
+      expect(status).toHaveAttribute('aria-live', 'polite');
+      expect(status).toHaveTextContent('2 results');
+      // The number shown is the same one, not said twice
+      expect(within(header).getByText('2')).toHaveAttribute('aria-hidden', 'true');
+      // The count of the header is no longer announced as well
+      expect(screen.getByText(/^2 of \d+ prompts$/)).not.toHaveAttribute('aria-live');
+    });
+
+    it('keeps the name of the active Library filter as the heading of a search', () => {
+      renderWith({ kind: 'category', categoryId: 'work' }, { searchWithDebounce: createMockSearchWithDebounce([pinned], 'pinned') });
+
+      expect(screen.getByTestId('list-header')).toHaveTextContent('Work');
+      expect(screen.getByTestId('list-header')).not.toHaveTextContent('Results');
+    });
+
+    it('announces a search that found nothing', () => {
+      renderWith(ALL_PROMPTS, { searchWithDebounce: createMockSearchWithDebounce([], 'zzz') });
+
+      expect(screen.getByRole('status')).toHaveTextContent('No results');
+    });
+
+    it('shows no list heading without a search', () => {
+      renderWith(ALL_PROMPTS);
+
+      expect(screen.queryByTestId('list-header')).not.toBeInTheDocument();
+      // The status is already there, saying nothing: its first number is then a change, which is announced
+      expect(screen.getByRole('status')).toBeEmptyDOMElement();
+    });
+
+    describe('cards rising', () => {
+      const riseOf = () => screen.getAllByTestId('prompt-card').map(card => card.parentElement?.className ?? '');
+      const withSearch = (found: Prompt[], query: string) => (
+        <LibraryView {...defaultProps} prompts={library} searchWithDebounce={createMockSearchWithDebounce(found, query)} />
+      );
+
+      it('rise one after the other, each a step later, up to a last step', () => {
+        const many = Array.from({ length: 11 }, (_, index) => ({ ...defaultPrompts[0], id: `p-${String(index)}`, title: `Prompt ${String(index)}` }));
+        render(<LibraryView {...defaultProps} prompts={many} searchWithDebounce={createMockSearchWithDebounce(many)} />);
+
+        const delays = screen.getAllByTestId('prompt-card').map(card => card.parentElement?.style.animationDelay);
+        expect(delays.slice(0, 3)).toEqual(['0ms', '50ms', '100ms']);
+        expect(delays.slice(8)).toEqual(['400ms', '400ms', '400ms']);
+        expect(riseOf().every(className => className.includes('animate-list-rise'))).toBe(true);
+      });
+
+      it('do not rise again at a keystroke that lists the same Prompts', () => {
+        const { rerender } = render(withSearch([pinned, used], 'on'));
+        const before = riseOf();
+
+        rerender(withSearch([pinned, used], 'one'));
+
+        expect(riseOf()).toEqual(before);
+      });
+
+      it('rise again when the Prompts listed change, without being mounted anew', () => {
+        const { rerender } = render(withSearch([pinned, used], 'one'));
+        const before = riseOf();
+        const card = screen.getAllByTestId('prompt-card')[0];
+
+        rerender(withSearch([pinned], 'pinned'));
+
+        expect(riseOf()[0]).not.toBe(before[0]);
+        expect(riseOf()[0]).toMatch(/animate-list-rise(-again)?/);
+        expect(screen.getAllByTestId('prompt-card')[0]).toBe(card);
+      });
+
+      it('do not rise again when a pin only reorders them', () => {
+        const { rerender } = render(<LibraryView {...defaultProps} prompts={library} searchWithDebounce={createMockSearchWithDebounce(library)} />);
+        const before = riseOf();
+
+        const reordered = [used, pinned, ...defaultPrompts];
+        rerender(<LibraryView {...defaultProps} prompts={reordered} searchWithDebounce={createMockSearchWithDebounce(reordered)} />);
+
+        expect(riseOf()).toEqual(before);
+      });
     });
 
     it('explains an empty Pinned filter', () => {

@@ -45,6 +45,16 @@
   transition: background-color 250ms, border-color 250ms, color 250ms, scale 250ms var(--ease-spring);
 }
 
+/* The pill of the Library search: its border and its halo change at their own pace */
+@utility transition-search {
+  transition: border-color 200ms, box-shadow 250ms;
+}
+
+/* The search field has its own clear button: Chrome's is not drawn */
+input[type='search']::-webkit-search-cancel-button {
+  display: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-sheet-in,
   .animate-sheet-out,
@@ -63,13 +73,18 @@
   .animate-category-pop,
   .animate-bar-grow,
   .animate-card-rise,
-  .animate-rank-fill {
+  .animate-rank-fill,
+  .animate-clear-pop,
+  .animate-list-rise,
+  .animate-list-rise-again,
+  .animate-empty-rise {
     animation-duration: 1ms;
     animation-delay: 0ms !important;
   }
 
   .transition-save,
-  .transition-chip {
+  .transition-chip,
+  .transition-search {
     transition-duration: 1ms;
   }
 }

@@ -46,6 +46,8 @@ const CheckIcon: FC = () => (
  */
 const PromptEditor: FC<PromptEditorProps> = ({
   prompt,
+  initialTitle = '',
+  initialCategory = DEFAULT_CATEGORY,
   categories,
   library = NO_PROMPTS,
   onSubmit,
@@ -73,9 +75,9 @@ const PromptEditor: FC<PromptEditorProps> = ({
   // The text as typed, kept as the fields' defaultValue: React 19 resets a form's uncontrolled
   // fields once its action completes, and the reset restores the defaultValue, so a refused save
   // keeps exactly what the user typed
-  const [title, setTitle] = useState(prompt?.title ?? '');
+  const [title, setTitle] = useState(prompt?.title ?? initialTitle);
   const [content, setContent] = useState(prompt?.content ?? '');
-  const [category, setCategory] = useState(prompt?.category ?? DEFAULT_CATEGORY);
+  const [category, setCategory] = useState(prompt?.category ?? initialCategory);
   const [saved, setSaved] = useState(false);
   const [confirming, setConfirming] = useState<'discard' | 'delete' | null>(null);
   // Keep both: no more "This looks familiar" until the editor closes
@@ -92,7 +94,8 @@ const PromptEditor: FC<PromptEditorProps> = ({
     ? title !== prompt.title || content !== prompt.content || category !== prompt.category
     : isImport
       ? shareCode.code !== ''
-      : title !== '' || content !== '' || category !== DEFAULT_CATEGORY;
+      // What the editor opened with (a title and a Category from the Library) is not a change
+      : title !== initialTitle || content !== '' || category !== initialCategory;
 
   const [errors, submitAction, isPending] = useActionState(
     async (_previous: FieldErrors | null, formData: FormData): Promise<FieldErrors | null> => {

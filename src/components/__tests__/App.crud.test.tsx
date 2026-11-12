@@ -71,7 +71,7 @@ describe('App prompt workflows', () => {
       expect(promptMock.createPrompt).toHaveBeenCalledWith('Greeting', 'Hello testers', 'Work');
     });
 
-    const created = await screen.findByRole('status');
+    const created = await screen.findByTestId('toast');
     expect(created).toHaveTextContent('Prompt created');
     expect(created).toHaveTextContent('Greeting');
 
@@ -122,7 +122,7 @@ describe('App prompt workflows', () => {
       });
     });
 
-    expect(await screen.findByRole('status')).toHaveTextContent('Prompt saved');
+    expect(await screen.findByTestId('toast')).toHaveTextContent('Prompt saved');
   });
 
   it('deletes a prompt from the edit form after confirming the dialog', async () => {
@@ -146,7 +146,7 @@ describe('App prompt workflows', () => {
       expect(storageMock.deletePrompt).toHaveBeenCalledWith(basePrompt.id);
     });
 
-    const deleted = await screen.findByRole('status');
+    const deleted = await screen.findByTestId('toast');
     expect(deleted).toHaveTextContent('Prompt deleted');
     expect(deleted).toHaveTextContent(basePrompt.title);
   });
@@ -199,7 +199,7 @@ describe('App prompt workflows', () => {
       expect(clipboardWrite).toHaveBeenCalledWith(basePrompt.content);
     });
 
-    const copied = await screen.findByRole('status');
+    const copied = await screen.findByTestId('toast');
     expect(copied).toHaveTextContent('Prompt copied');
     expect(copied).toHaveTextContent(basePrompt.title);
   });

@@ -8,7 +8,7 @@ test.describe('Popup smoke test', () => {
 
     await expect(page.getByRole('heading', { name: 'My Prompt Manager' })).toBeVisible();
     await expect(page.getByText(/create first prompt/i)).toBeVisible();
-    await expect(page.getByPlaceholder('Search your prompts...')).toBeVisible();
+    await expect(page.getByPlaceholder('Search your prompts')).toBeVisible();
   });
 });
 

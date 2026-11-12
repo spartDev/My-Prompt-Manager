@@ -34,7 +34,7 @@ export class LibraryPage extends BasePage {
    * Search for prompts using the search input
    */
   async searchPrompts(query: string): Promise<void> {
-    const searchField = this.page.getByPlaceholder('Search your prompts...');
+    const searchField = this.page.getByPlaceholder('Search your prompts');
     await searchField.fill(query);
     // Wait for search results to update
     await this.page.waitForLoadState('domcontentloaded');
@@ -69,7 +69,7 @@ export class LibraryPage extends BasePage {
    */
   async clearFilters(): Promise<void> {
     await this.selectLibraryFilter('All');
-    await this.page.getByPlaceholder('Search your prompts...').clear();
+    await this.page.getByPlaceholder('Search your prompts').clear();
   }
 
   /**
@@ -114,7 +114,7 @@ export class LibraryPage extends BasePage {
    * Expect the empty state to be visible
    */
   async expectEmptyState(): Promise<void> {
-    await expect(this.page.getByText('No matches found')).toBeVisible();
+    await expect(this.page.getByRole('region', { name: 'No search results' })).toBeVisible();
   }
 
   /**

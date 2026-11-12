@@ -131,9 +131,10 @@ test.describe('App shell and Library on the tokens', () => {
       await expect(page.getByRole('img', { name: 'My Prompt Manager icon' })).toHaveCSS('background-image', /linear-gradient/);
       await expect(page.getByTestId('new-prompt-button')).toHaveCSS('background-color', colors.accent);
 
-      const search = page.getByRole('searchbox');
+      // The pill of the search (Atelier 1C): a card on bg-app, its border the cards' until it has the focus
+      const search = page.getByTestId('search-bar');
       await expect(search).toHaveCSS('background-color', colors.card);
-      await expect(search).toHaveCSS('border-top-color', colors.input);
+      await expect(search).toHaveCSS('border-top-color', colors.border);
 
       const chosenPill = page.getByTestId('library-filter-all');
       await expect(chosenPill).toHaveCSS('background-color', colors.selected);

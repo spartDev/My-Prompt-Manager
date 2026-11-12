@@ -1,84 +1,107 @@
-import type { FC } from 'react';
-import { memo } from 'react';
+import type { FC, KeyboardEvent } from 'react';
+import { memo, useRef } from 'react';
 
 import type { SearchBarProps } from '../types/components';
+import { isApplePlatform } from '../utils/modifierKey';
 
+/**
+ * The search field of the Library (Atelier 1C): a pill holding a magnifier, the field, and either
+ * the badge of its shortcut (empty) or a round button that clears it (filled). Focus shows as an
+ * accent border and a halo around the pill, which stand for the outline of the field.
+ *
+ * Presentation only: it knows nothing of the search, and the shortcut itself is handled by the app.
+ * Escape clears a filled field and keeps the keyboard in it; in an empty field it lets go of the
+ * keyboard, and is left to the browser, which closes the popup.
+ */
 const SearchBar: FC<SearchBarProps> = ({
   value,
   onChange,
   onClear,
-  placeholder = 'Search...'
+  placeholder = 'Search your prompts',
+  inputRef
 }) => {
+  const ownRef = useRef<HTMLInputElement>(null);
+  const fieldRef = inputRef ?? ownRef;
+  const apple = isApplePlatform();
+  const filled = value !== '';
+
+  const handleClear = () => {
+    onClear();
+    fieldRef.current?.focus();
+  };
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Escape') { return; }
+    if (filled) {
+      event.preventDefault();
+      event.stopPropagation();
+      onClear();
+    } else {
+      event.currentTarget.blur();
+    }
+  };
+
   return (
-    <div className="relative">
-      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none z-10">
-        <svg
-          className="h-5 w-5 text-tertiary"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-          />
-        </svg>
-      </div>
-      
+    <div
+      data-testid="search-bar"
+      className="flex items-center gap-2.5 h-11 pl-3.5 pr-2 rounded-full bg-card border-[1.5px] border-default shadow-xs transition-search has-[input:focus]:border-focus has-[input:focus]:shadow-search-focus"
+    >
+      <svg
+        className="h-[17px] w-[17px] flex-none text-tertiary"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+      >
+        <circle cx="11" cy="11" r="6.5" />
+        <path d="m20 20-4.2-4.2" />
+      </svg>
+
       <input
-        type="text"
+        ref={fieldRef}
+        type="search"
         value={value}
-        onChange={(e) => { onChange(e.target.value); }}
+        onChange={(event) => { onChange(event.target.value); }}
+        onKeyDown={handleKeyDown}
         placeholder={placeholder}
-        className="w-full pl-12 pr-12 py-3 bg-card border border-input rounded-xl focus-input text-sm text-primary placeholder:text-tertiary shadow-sm transition-all duration-200"
+        className="flex-1 min-w-0 h-full p-0 bg-transparent border-0 outline-none text-[14.5px] text-primary placeholder:text-tertiary"
         aria-label="Search prompts"
-        role="searchbox"
+        aria-keyshortcuts={apple ? 'Meta+K' : 'Control+K'}
       />
-      
-      {value && (
+
+      {filled ? (
         <button
-          onClick={onClear}
-          className="absolute inset-y-0 right-0 pr-4 flex items-center text-tertiary hover:text-accent transition-colors focus-interactive rounded-sm"
+          type="button"
+          onClick={handleClear}
+          className="h-7 w-7 flex-none grid place-items-center rounded-full bg-accent-subtle text-accent hover:bg-accent-selected transition-colors animate-clear-pop focus-interactive"
           aria-label="Clear search"
           title="Clear search"
         >
           <svg
-            className="h-4 w-4"
+            className="h-3 w-3"
             fill="none"
             stroke="currentColor"
+            strokeWidth={2.8}
+            strokeLinecap="round"
             viewBox="0 0 24 24"
             aria-hidden="true"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M6 18L18 6M6 6l12 12"
-            />
+            <path d="M6 6l12 12M18 6 6 18" />
           </svg>
         </button>
+      ) : (
+        <span
+          data-testid="search-shortcut"
+          className="h-6 px-2 flex-none inline-flex items-center rounded-full bg-subtle text-tertiary text-[11.5px] font-semibold"
+          aria-hidden="true"
+        >
+          {apple ? '⌘K' : 'Ctrl K'}
+        </span>
       )}
     </div>
   );
 };
 
-// Custom comparison function for React.memo optimization
-// Re-render only when value, placeholder changes, or function references change
-const arePropsEqual = (prevProps: SearchBarProps, nextProps: SearchBarProps): boolean => {
-  // Check if search value changed
-  if (prevProps.value !== nextProps.value) {return false;}
-  
-  // Check if placeholder changed
-  if (prevProps.placeholder !== nextProps.placeholder) {return false;}
-  
-  // Function reference comparison - these should be stable from parent
-  if (prevProps.onChange !== nextProps.onChange) {return false;}
-  if (prevProps.onClear !== nextProps.onClear) {return false;}
-  
-  return true;
-};
-
-export default memo(SearchBar, arePropsEqual);
+export default memo(SearchBar);

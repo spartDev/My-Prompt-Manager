@@ -113,6 +113,20 @@ describe('PromptCard - Basic Rendering', () => {
     expect(screen.getByText('You are a staff engineer. Read this ticket.')).toBeInTheDocument();
   });
 
+  it('should mark only the first match of the title and of the preview', () => {
+    render(
+      <PromptCard
+        {...mockProps}
+        prompt={{ ...mockPrompt, title: 'Plan the plan', content: 'A plan for every plan' }}
+        searchQuery="PLAN"
+      />
+    );
+
+    const marks = screen.getAllByText(/^plan$/i, { selector: 'mark' });
+    expect(marks.map(mark => mark.textContent)).toEqual(['Plan', 'plan']);
+    expect(marks[0]).toHaveClass('bg-highlight', 'text-primary');
+  });
+
   it('should highlight the search query inside the content preview', () => {
     render(<PromptCard {...mockProps} prompt={{ ...mockPrompt, content: 'Score each backlog item' }} searchQuery="backlog" />);
     expect(screen.getByText('backlog', { selector: 'mark' })).toBeInTheDocument();

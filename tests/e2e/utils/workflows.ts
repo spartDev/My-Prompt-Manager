@@ -177,7 +177,7 @@ export const searchWorkflows = {
    * Search for prompts and verify results
    */
   searchAndVerify: async (page: Page, query: string, expectedCount: number): Promise<void> => {
-    const searchInput = page.getByPlaceholder('Search your prompts...');
+    const searchInput = page.getByPlaceholder('Search your prompts');
     await searchInput.fill(query);
     await page.waitForLoadState('domcontentloaded'); // Wait for search processing
     await assertions.prompts.count(page, expectedCount);
@@ -196,7 +196,7 @@ export const searchWorkflows = {
    */
   clearAllFilters: async (page: Page): Promise<void> => {
     await page.getByRole('radiogroup', { name: 'Library filter' }).getByRole('radio', { name: 'All', exact: true }).click();
-    await page.getByPlaceholder('Search your prompts...').clear();
+    await page.getByPlaceholder('Search your prompts').clear();
   },
 
   /**

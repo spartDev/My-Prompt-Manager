@@ -68,8 +68,8 @@
   /* Pinned Prompt star */
   --text-color-pin: #d97706;
 
-  /* Search match in a Prompt title or preview (warning-subtle's amber: 4.5:1 with tertiary text) */
-  --background-color-highlight: #fef3c7;
+  /* Search match in a Prompt title or preview (Atelier 1C), under text-primary: 14:1 */
+  --background-color-highlight: #fde68a;
 
   /* Idle scrollbar thumb on a transparent track: 3:1 on every surface, in both modes */
   --scrollbar-color-thumb: #8b5cf6;
@@ -112,6 +112,10 @@
   /* The chosen option's puck in a segmented control, and the knob of a switch (Atelier 1C) */
   --shadow-puck: 0 2px 6px -2px var(--shadow-tint-25);
   --shadow-knob: 0 2px 4px var(--shadow-tint-25);
+  /* The halo of the focused Library search (Atelier 1C), bg-accent at 12%: it stands for the outline,
+     with the accent border. Its color is a tint of its own, so that .dark can change it */
+  --shadow-tint-accent: rgba(109, 40, 217, 0.12);
+  --shadow-search-focus: 0 0 0 4px var(--shadow-tint-accent);
 
   /* Radius of a Settings group's card (Atelier 1C) */
   --radius-group: 20px;
@@ -145,12 +149,23 @@
   --animate-bar-grow: bar-grow 800ms var(--ease-spring) both;
   --animate-card-rise: card-rise 500ms var(--ease-spring) both;
   --animate-rank-fill: fill-grow 1000ms var(--ease-spring) both;
+  /* Library search (Atelier 1C): the clear button pops in, the listed cards rise when the list
+     changes, the no-results block rises. list-rise has a twin with the same keyframes: going from
+     one name to the other plays the rise again without mounting the cards anew */
+  --animate-clear-pop: pop 350ms var(--ease-spring) both;
+  --animate-list-rise: card-rise 500ms var(--ease-spring) both;
+  --animate-list-rise-again: card-rise-again 500ms var(--ease-spring) both;
+  --animate-empty-rise: card-rise 350ms var(--ease-spring) both;
 
   @keyframes bar-grow {
     from { transform: scaleY(0); }
     to { transform: scaleY(1); }
   }
   @keyframes card-rise {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes card-rise-again {
     from { opacity: 0; transform: translateY(12px); }
     to { opacity: 1; transform: none; }
   }
@@ -296,8 +311,9 @@
     /* Pinned Prompt star */
     --text-color-pin: #fbbf24;
 
-    /* Search match */
-    --background-color-highlight: #33270f;
+    /* Search match, under text-primary: 7.9:1 */
+    --background-color-highlight: #5a4515;
+    --shadow-tint-accent: rgba(132, 75, 242, 0.12);
 
     /* Scrollbar thumb */
     --scrollbar-color-thumb: #8b5cf6;
