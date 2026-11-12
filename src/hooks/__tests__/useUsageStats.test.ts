@@ -1,8 +1,9 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
+import { UsageTracker } from '../../services/UsageTracker';
 import { buildPrompt } from '../../test/builders';
+import { triggerChromeStorageChange } from '../../test/mocks';
 import type { Prompt, UsageEvent } from '../../types';
 import { DEFAULT_CATEGORY, USAGE_RETENTION_DAYS, USAGE_STORAGE_KEY } from '../../types';
 import { useUsageStats } from '../useUsageStats';
@@ -353,6 +354,198 @@ describe('useUsageStats', () => {
       });
 
       expect(result.current.history).toHaveLength(2);
+    });
+  });
+
+  describe('while the view stays open', () => {
+    it('reads the history again when an Insertion is stored, without going back to loading', async () => {
+      const { result } = renderHook(() => useUsageStats());
+      await waitFor(() => { expect(result.current.loading).toBe(false); });
+      expect(result.current.history).toHaveLength(0);
+
+      const history = [buildUsageEvent({ promptId: 'prompt-1' })];
+      await chrome.storage.local.set({ [USAGE_STORAGE_KEY]: history });
+      act(() => { triggerChromeStorageChange({ [USAGE_STORAGE_KEY]: { newValue: history } }); });
+
+      await waitFor(() => { expect(result.current.history).toHaveLength(1); });
+      expect(result.current.loading).toBe(false);
+      expect(result.current.stats?.totalUses).toBe(1);
+    });
+
+    it('does not put back the history a clear removed, when an older reload ends after it', async () => {
+      const old = [buildUsageEvent({ promptId: 'prompt-1' })];
+      await chrome.storage.local.set({ [USAGE_STORAGE_KEY]: old });
+      const { result } = renderHook(() => useUsageStats());
+      await waitFor(() => { expect(result.current.history).toHaveLength(1); });
+
+      // A reload reads the old history, and is held until after the clear
+      const releases: Array<(history: UsageEvent[]) => void> = [];
+      const release = (history: UsageEvent[]) => { releases.forEach(resolve => { resolve(history); }); };
+      const getHistory = vi.spyOn(UsageTracker.getInstance(), 'getHistory')
+        .mockImplementationOnce(() => new Promise<UsageEvent[]>(resolve => { releases.push(resolve); }));
+      act(() => { triggerChromeStorageChange({ [USAGE_STORAGE_KEY]: { newValue: old } }); });
+
+      await act(async () => { await result.current.clearHistory(); });
+      await waitFor(() => { expect(result.current.history).toHaveLength(0); });
+      await act(async () => { release(old); await Promise.resolve(); });
+
+      expect(result.current.history).toHaveLength(0);
+      getHistory.mockRestore();
+    });
+
+    it('still gives the Categories when a stored Insertion overtakes the first read', async () => {
+      const history = [buildUsageEvent({ promptId: 'prompt-1' })];
+      await chrome.storage.local.set({ [USAGE_STORAGE_KEY]: history });
+      // The first read is held, so the reload below is sure to start, and end, before it
+      const releases: Array<(events: UsageEvent[]) => void> = [];
+      const getHistory = vi.spyOn(UsageTracker.getInstance(), 'getHistory')
+        .mockImplementationOnce(() => new Promise<UsageEvent[]>(resolve => { releases.push(resolve); }));
+      const { result } = renderHook(() => useUsageStats());
+      await waitFor(() => { expect(releases).toHaveLength(1); });
+
+      act(() => { triggerChromeStorageChange({ [USAGE_STORAGE_KEY]: { newValue: history } }); });
+      await waitFor(() => { expect(result.current.history).toHaveLength(1); });
+      expect(result.current.categories).toHaveLength(3);
+      expect(result.current.prompts).toHaveLength(3);
+
+      // The reload ended the loading state of the read it overtook
+      expect(result.current.loading).toBe(false);
+
+      // The first read ends last: superseded, it commits nothing
+      await act(async () => { releases[0]([]); await Promise.resolve(); });
+      expect(result.current.loading).toBe(false);
+      expect(result.current.history).toHaveLength(1);
+      expect(result.current.categories).toHaveLength(3);
+      getHistory.mockRestore();
+    });
+
+    it('keeps loading until the reload that overtook the first read ends', async () => {
+      const history = [buildUsageEvent({ promptId: 'prompt-1' })];
+      await chrome.storage.local.set({ [USAGE_STORAGE_KEY]: history });
+      // Both reads are held: the first one is released first, the reload after it
+      const releases: Array<(events: UsageEvent[]) => void> = [];
+      const held = () => new Promise<UsageEvent[]>(resolve => { releases.push(resolve); });
+      const getHistory = vi.spyOn(UsageTracker.getInstance(), 'getHistory')
+        .mockImplementationOnce(held)
+        .mockImplementationOnce(held);
+      const { result } = renderHook(() => useUsageStats());
+      await waitFor(() => { expect(releases).toHaveLength(1); });
+      act(() => { triggerChromeStorageChange({ [USAGE_STORAGE_KEY]: { newValue: history } }); });
+      await waitFor(() => { expect(releases).toHaveLength(2); });
+
+      // The overtaken read ends: nothing is read yet, so the view is still loading, not empty
+      await act(async () => { releases[0]([]); await Promise.resolve(); });
+      expect(result.current.loading).toBe(true);
+      expect(result.current.stats).toBeNull();
+
+      await act(async () => { releases[1](history); await Promise.resolve(); });
+      await waitFor(() => { expect(result.current.loading).toBe(false); });
+      expect(result.current.history).toHaveLength(1);
+      expect(result.current.error).toBeNull();
+      getHistory.mockRestore();
+    });
+
+    it('shows the failure of a reload that overtook the first read, since nothing was read', async () => {
+      const releases: Array<(events: UsageEvent[]) => void> = [];
+      const getHistory = vi.spyOn(UsageTracker.getInstance(), 'getHistory')
+        .mockImplementationOnce(() => new Promise<UsageEvent[]>(resolve => { releases.push(resolve); }))
+        .mockRejectedValueOnce(new Error('Storage unavailable'));
+      const { result } = renderHook(() => useUsageStats());
+      await waitFor(() => { expect(releases).toHaveLength(1); });
+
+      act(() => { triggerChromeStorageChange({ [USAGE_STORAGE_KEY]: { newValue: [] } }); });
+      await waitFor(() => { expect(result.current.loading).toBe(false); });
+      expect(result.current.error).toBeTruthy();
+
+      await act(async () => { releases[0]([]); await Promise.resolve(); });
+      expect(result.current.error).toBeTruthy();
+      getHistory.mockRestore();
+    });
+
+    it('keeps what is shown when a reload fails after a read succeeded', async () => {
+      const history = [buildUsageEvent({ promptId: 'prompt-1' })];
+      await chrome.storage.local.set({ [USAGE_STORAGE_KEY]: history });
+      const { result } = renderHook(() => useUsageStats());
+      await waitFor(() => { expect(result.current.history).toHaveLength(1); });
+
+      const getHistory = vi.spyOn(UsageTracker.getInstance(), 'getHistory')
+        .mockRejectedValueOnce(new Error('Storage unavailable'));
+      act(() => { triggerChromeStorageChange({ [USAGE_STORAGE_KEY]: { newValue: history } }); });
+      await waitFor(() => { expect(getHistory).toHaveBeenCalledTimes(1); });
+      await act(async () => { await Promise.resolve(); });
+
+      expect(result.current.error).toBeNull();
+      expect(result.current.history).toHaveLength(1);
+      expect(result.current.loading).toBe(false);
+      getHistory.mockRestore();
+    });
+
+    it('reads the Prompts again when the use count is stored after the history', async () => {
+      const { result } = renderHook(() => useUsageStats());
+      await waitFor(() => { expect(result.current.loading).toBe(false); });
+
+      // The history change comes first and reads the Prompt before its use is counted
+      const history = [buildUsageEvent({ promptId: 'prompt-1' })];
+      await chrome.storage.local.set({ [USAGE_STORAGE_KEY]: history });
+      act(() => { triggerChromeStorageChange({ [USAGE_STORAGE_KEY]: { newValue: history } }); });
+      await waitFor(() => { expect(result.current.history).toHaveLength(1); });
+
+      const counted = mockPrompts.map(prompt => (prompt.id === 'prompt-1' ? { ...prompt, usageCount: 1 } : prompt));
+      await chrome.storage.local.set({ prompts: counted });
+      act(() => { triggerChromeStorageChange({ prompts: { newValue: counted } }); });
+
+      await waitFor(() => {
+        expect(result.current.prompts.find(prompt => prompt.id === 'prompt-1')?.usageCount).toBe(1);
+      });
+      expect(result.current.loading).toBe(false);
+    });
+
+    it('follows the changes once chrome.storage is there, when it was missing at first', async () => {
+      const storage = chrome.storage;
+      Reflect.deleteProperty(chrome, 'storage');
+      let rendered: ReturnType<typeof renderHook<ReturnType<typeof useUsageStats>, unknown>>;
+      try {
+        rendered = renderHook(() => useUsageStats());
+      } finally {
+        Object.assign(chrome, { storage });
+      }
+      const { result } = rendered;
+      // The reads waited for the storage too
+      await waitFor(() => { expect(result.current.loading).toBe(false); }, { timeout: 2000 });
+      expect(result.current.history).toHaveLength(0);
+
+      const history = [buildUsageEvent({ promptId: 'prompt-1' })];
+      await chrome.storage.local.set({ [USAGE_STORAGE_KEY]: history });
+      act(() => { triggerChromeStorageChange({ [USAGE_STORAGE_KEY]: { newValue: history } }); });
+
+      await waitFor(() => { expect(result.current.history).toHaveLength(1); });
+    });
+
+    it('clears the error of a failed first read once a reload gives the data', async () => {
+      const getHistory = vi.spyOn(UsageTracker.getInstance(), 'getHistory')
+        .mockRejectedValueOnce(new Error('Failed to load'));
+      const { result } = renderHook(() => useUsageStats());
+      await waitFor(() => { expect(result.current.error).toBeTruthy(); });
+
+      const history = [buildUsageEvent({ promptId: 'prompt-1' })];
+      await chrome.storage.local.set({ [USAGE_STORAGE_KEY]: history });
+      act(() => { triggerChromeStorageChange({ [USAGE_STORAGE_KEY]: { newValue: history } }); });
+
+      await waitFor(() => { expect(result.current.history).toHaveLength(1); });
+      expect(result.current.error).toBeNull();
+      expect(result.current.loading).toBe(false);
+      getHistory.mockRestore();
+    });
+
+    it('ignores what is stored under another key', async () => {
+      const { result } = renderHook(() => useUsageStats());
+      await waitFor(() => { expect(result.current.loading).toBe(false); });
+
+      const getHistory = vi.spyOn(UsageTracker.getInstance(), 'getHistory');
+      act(() => { triggerChromeStorageChange({ settings: { newValue: {} } }); });
+
+      expect(getHistory).not.toHaveBeenCalled();
+      getHistory.mockRestore();
     });
   });
 });

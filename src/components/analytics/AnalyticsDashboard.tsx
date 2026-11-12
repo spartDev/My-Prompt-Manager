@@ -18,6 +18,7 @@ import {
 import { MOTION } from '../../theme/motion';
 import { formatPlatformName, formatRelativeTime, Logger, toError } from '../../utils';
 import { ensureStorageAvailable } from '../../utils/chromeStorage';
+import { isStatsEmpty } from '../../utils/emptyStates';
 import ErrorBoundary from '../ErrorBoundary';
 import { BackIcon } from '../icons/UIIcons';
 import SectionHeader from '../SectionHeader';
@@ -138,7 +139,7 @@ const AnalyticsDashboard: FC<AnalyticsDashboardProps> = ({ onBack }) => {
     );
   }
 
-  const hasData = history.length > 0;
+  const hasData = !isStatsEmpty(history);
   const topPlatform = platforms.at(0);
   const topCategory = rankedCategories.at(0);
 

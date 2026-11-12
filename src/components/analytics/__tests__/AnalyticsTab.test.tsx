@@ -241,15 +241,78 @@ describe('AnalyticsTab', () => {
   });
 
   describe('Without usage', () => {
-    it('keeps the hero at 0 with flat bars, hides the usage cards and still shows Tidy up', () => {
-      mockUseUsageStats.mockReturnValue(createMockReturn({ history: [], stats: { totalUses: 0 } as UsageStats }));
+    const noUsage = (overrides: Partial<UseUsageStatsReturn> = {}) =>
+      createMockReturn({ history: [], stats: { totalUses: 0 } as UsageStats, ...overrides });
+
+    it('keeps the shape of the page as ghosts: the hero at 0 over seven dashed bars, and two tiles with no data', () => {
+      mockUseUsageStats.mockReturnValue(noUsage());
       render(<AnalyticsTab />);
 
-      expect(screen.getByTestId('stats-hero-subtitle')).toHaveTextContent('No Prompts used yet.');
-      expect(screen.getAllByTestId('stats-bar')).toHaveLength(7);
-      expect(screen.queryByRole('heading', { name: 'Top platform' })).not.toBeInTheDocument();
+      const empty = screen.getByTestId('stats-empty');
+      expect(screen.getByRole('heading', { level: 1, name: 'Analytics' })).toBeInTheDocument();
+      expect(within(empty).getByRole('heading', { level: 2, name: 'Prompts used' })).toBeInTheDocument();
+      expect(screen.getByTestId('stats-total')).toHaveTextContent('0');
+      expect(screen.getByTestId('stats-hero-subtitle')).toHaveTextContent('Your week will draw itself here.');
+      expect(screen.getAllByTestId('stats-ghost-bar')).toHaveLength(7);
+      expect(screen.queryByTestId('stats-bar')).not.toBeInTheDocument();
+      for (const day of ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']) {
+        expect(within(empty).getByText(day)).toBeInTheDocument();
+      }
+      expect(within(empty).getByRole('heading', { level: 2, name: 'Nothing to measure yet' })).toBeInTheDocument();
+      expect(empty).toHaveTextContent('Insert a prompt into an AI chat and this page fills in');
+      expect(within(empty).getByRole('heading', { name: 'Top platform' })).toBeInTheDocument();
+      expect(within(empty).getByRole('heading', { name: 'Top category' })).toBeInTheDocument();
+      expect(within(empty).getAllByText('No data yet')).toHaveLength(2);
+    });
+
+    it('hides Most used, Clear history and Full Dashboard, and still shows Tidy up', () => {
+      mockUseUsageStats.mockReturnValue(noUsage());
+      render(<AnalyticsTab context="sidepanel" onExpandDashboard={vi.fn()} />);
+
       expect(screen.queryByRole('heading', { name: 'Most used' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Clear history' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /full analytics dashboard/i })).not.toBeInTheDocument();
       expect(screen.getByTestId('tidy-up')).toBeInTheDocument();
+    });
+
+    it('goes to the Library when it holds Prompts that were never inserted', async () => {
+      const onGoToLibrary = vi.fn();
+      const onAddNew = vi.fn();
+      mockUseUsageStats.mockReturnValue(noUsage());
+      render(<AnalyticsTab prompts={PROMPTS} onGoToLibrary={onGoToLibrary} onAddNew={onAddNew} />);
+
+      expect(screen.queryByRole('button', { name: 'Write your first prompt' })).not.toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'Go to the library' }));
+
+      expect(onGoToLibrary).toHaveBeenCalledTimes(1);
+      expect(onAddNew).not.toHaveBeenCalled();
+    });
+
+    it('offers to write the first Prompt when the Library is empty too, with no Tidy up', async () => {
+      const onGoToLibrary = vi.fn();
+      const onAddNew = vi.fn();
+      mockUseUsageStats.mockReturnValue(noUsage({ prompts: [] }));
+      render(<AnalyticsTab prompts={[]} onGoToLibrary={onGoToLibrary} onAddNew={onAddNew} />);
+
+      expect(screen.queryByRole('button', { name: 'Go to the library' })).not.toBeInTheDocument();
+      expect(screen.queryByTestId('tidy-up')).not.toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'Write your first prompt' }));
+
+      expect(onAddNew).toHaveBeenCalledTimes(1);
+      expect(onGoToLibrary).not.toHaveBeenCalled();
+    });
+
+    it('gives way to the real page as soon as an Insertion is counted', () => {
+      mockUseUsageStats.mockReturnValue(noUsage());
+      const { rerender } = render(<AnalyticsTab prompts={PROMPTS} />);
+      expect(screen.getByTestId('stats-empty')).toBeInTheDocument();
+
+      mockUseUsageStats.mockReturnValue(createMockReturn({ history: [event('p1', TUE)] }));
+      rerender(<AnalyticsTab prompts={PROMPTS} />);
+
+      expect(screen.queryByTestId('stats-empty')).not.toBeInTheDocument();
+      expect(screen.getAllByTestId('stats-bar')).toHaveLength(7);
+      expect(screen.getByRole('heading', { name: 'Most used' })).toBeInTheDocument();
     });
   });
 

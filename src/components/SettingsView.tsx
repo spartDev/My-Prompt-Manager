@@ -53,9 +53,12 @@ interface SettingsViewProps {
   onToastSettingsChange: (settings: Partial<ToastSettings>) => void;
   /** Opens the storage warning with why storage refused the import */
   onStorageRefused: (reason: string) => void;
+  /** Put the keyboard on Import (the empty Library's "Import a backup" opened Settings), then call onImportFocused */
+  focusImport?: boolean;
+  onImportFocused?: () => void;
 }
 
-const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toastSettings, onToastSettingsChange, onStorageRefused }) => {
+const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toastSettings, onToastSettingsChange, onStorageRefused, focusImport = false, onImportFocused }) => {
   const [settings, setSettings] = useState<Settings>({
     enabledSites: [],
     customSites: [],
@@ -654,6 +657,8 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
             onImport={handleImportData}
             importReport={importReport}
             onDismissImportReport={dismissImportReport}
+            focusImport={focusImport}
+            onImportFocused={onImportFocused}
             onClearData={handleClearData}
             onShowToast={showToast}
           />

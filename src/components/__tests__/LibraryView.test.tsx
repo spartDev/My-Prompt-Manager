@@ -155,29 +155,104 @@ describe('LibraryView', () => {
     });
   });
 
-  describe('Empty state', () => {
-    it('shows empty state when no prompts exist', () => {
-      const props = {
-        ...defaultProps,
-        prompts: [],
-        searchWithDebounce: createMockSearchWithDebounce([])
-      };
+  describe('Empty Library', () => {
+    const emptyProps = { ...defaultProps, prompts: [], searchWithDebounce: createMockSearchWithDebounce([]) };
 
-      render(<LibraryView {...props} />);
-      expect(screen.getByRole('region', { name: /empty state/i })).toBeInTheDocument();
-      expect(screen.getByText(/you're ready to go/i)).toBeInTheDocument();
+    it('shows its empty state under the header, with a title of its own', () => {
+      render(<LibraryView {...emptyProps} />);
+
+      const empty = screen.getByTestId('library-empty');
+      expect(within(empty).getByRole('heading', { level: 2, name: 'Your library is empty' })).toBeInTheDocument();
+      expect(empty).toHaveTextContent('Add variables for the parts that change');
+      // The header stays: its title, the count and New
+      expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
+      expect(screen.getByText('0 prompts')).toBeInTheDocument();
+      expect(screen.getByTestId('new-prompt-button')).toBeInTheDocument();
     });
 
-    it('shows create first prompt button in empty state', () => {
-      const props = {
-        ...defaultProps,
-        prompts: [],
-        searchWithDebounce: createMockSearchWithDebounce([])
-      };
+    it('hides the search and the Library filters: there is nothing to search', () => {
+      render(<LibraryView {...emptyProps} />);
 
-      render(<LibraryView {...props} />);
-      // The aria-label is "Create your first prompt" but button text is "Create First Prompt"
-      expect(screen.getByRole('button', { name: /create.*first prompt/i })).toBeInTheDocument();
+      expect(screen.queryByRole('search')).not.toBeInTheDocument();
+      expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
+    });
+
+    it('opens the editor from "Write your first prompt"', async () => {
+      const onAddNew = vi.fn();
+      render(<LibraryView {...emptyProps} onAddNew={onAddNew} />);
+
+      await userEvent.click(screen.getByRole('button', { name: 'Write your first prompt' }));
+
+      expect(onAddNew).toHaveBeenCalledTimes(1);
+    });
+
+    it('offers "Import a backup" only when the app can open the import', async () => {
+      const onImportBackup = vi.fn();
+      const { rerender } = render(<LibraryView {...emptyProps} />);
+      expect(screen.queryByRole('button', { name: 'Import a backup' })).not.toBeInTheDocument();
+
+      rerender(<LibraryView {...emptyProps} onImportBackup={onImportBackup} />);
+      await userEvent.click(screen.getByRole('button', { name: 'Import a backup' }));
+
+      expect(onImportBackup).toHaveBeenCalledTimes(1);
+    });
+
+    it('offers neither a pack nor a shortcut, which the app does not have', () => {
+      render(<LibraryView {...emptyProps} onImportBackup={vi.fn()} />);
+
+      expect(screen.queryByRole('button', { name: /pack/i })).not.toBeInTheDocument();
+      expect(within(screen.getByTestId('library-empty')).getAllByRole('button')).toHaveLength(2);
+    });
+
+    it('keeps its illustration away from assistive technology', () => {
+      render(<LibraryView {...emptyProps} />);
+
+      expect(screen.getByText('{{name}}').closest('[aria-hidden="true"]')).not.toBeNull();
+    });
+
+    it('gives way to the list as soon as a Prompt exists, and comes back when the last one goes', () => {
+      const { rerender } = render(<LibraryView {...emptyProps} />);
+      expect(screen.getByTestId('library-empty')).toBeInTheDocument();
+
+      rerender(<LibraryView {...defaultProps} />);
+      expect(screen.queryByTestId('library-empty')).not.toBeInTheDocument();
+      expect(screen.getByText('Test Prompt')).toBeInTheDocument();
+      expect(screen.getByRole('search')).toBeInTheDocument();
+
+      rerender(<LibraryView {...emptyProps} />);
+      expect(screen.getByTestId('library-empty')).toBeInTheDocument();
+    });
+
+    it('clears the search and goes back to All, which nobody can see or change while it shows', () => {
+      const searchWithDebounce = createMockSearchWithDebounce([], 'stale');
+      const onLibraryFilterChange = vi.fn();
+      render(<LibraryView {...emptyProps} searchWithDebounce={searchWithDebounce} libraryFilter={{ kind: 'pinned' }} onLibraryFilterChange={onLibraryFilterChange} />);
+
+      expect(searchWithDebounce.clearSearch).toHaveBeenCalled();
+      expect(onLibraryFilterChange).toHaveBeenCalledWith(ALL_PROMPTS);
+    });
+
+    it('leaves the search and the Library filter alone when they are already at rest', () => {
+      const searchWithDebounce = createMockSearchWithDebounce([]);
+      const onLibraryFilterChange = vi.fn();
+      render(<LibraryView {...emptyProps} searchWithDebounce={searchWithDebounce} onLibraryFilterChange={onLibraryFilterChange} />);
+
+      expect(searchWithDebounce.clearSearch).not.toHaveBeenCalled();
+      expect(onLibraryFilterChange).not.toHaveBeenCalled();
+    });
+
+    it('gives the keyboard to "Write your first prompt" when the Prompt that had it was the last', () => {
+      const onLibraryFilterFocused = vi.fn();
+      render(<LibraryView {...emptyProps} focusLibraryFilter={true} onLibraryFilterFocused={onLibraryFilterFocused} />);
+
+      expect(screen.getByRole('button', { name: 'Write your first prompt' })).toHaveFocus();
+      expect(onLibraryFilterFocused).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not show while the Library loads', () => {
+      render(<LibraryView {...emptyProps} loading={true} />);
+
+      expect(screen.queryByTestId('library-empty')).not.toBeInTheDocument();
     });
   });
 
@@ -361,15 +436,11 @@ describe('LibraryView', () => {
       expect(onCreateFromSearch).toHaveBeenCalledWith('Weekly report', undefined);
     });
 
-    it('offers to create the Prompt searched for in a Library that holds none', async () => {
-      const user = userEvent.setup();
-      const onCreateFromSearch = vi.fn();
-      render(<LibraryView {...defaultProps} prompts={[]} searchWithDebounce={createMockSearchWithDebounce([], 'First idea')} onCreateFromSearch={onCreateFromSearch} />);
+    it('shows the empty Library, not a search with no result, when a search outlives the last Prompt', () => {
+      render(<LibraryView {...defaultProps} prompts={[]} searchWithDebounce={createMockSearchWithDebounce([], 'First idea')} />);
 
-      expect(screen.queryByRole('region', { name: /empty state/i })).not.toBeInTheDocument();
-      await user.click(screen.getByRole('button', { name: 'Create it' }));
-
-      expect(onCreateFromSearch).toHaveBeenCalledWith('First idea', undefined);
+      expect(screen.getByTestId('library-empty')).toBeInTheDocument();
+      expect(screen.queryByRole('region', { name: /no search results/i })).not.toBeInTheDocument();
     });
 
     it('holds Create it back while the field shows a search not looked up yet', async () => {

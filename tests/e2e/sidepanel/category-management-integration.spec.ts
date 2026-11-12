@@ -109,10 +109,9 @@ test.describe('Category Management - Integration with Prompt System', () => {
       await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
       const libraryPage = new LibraryPage(sidepanelPage);
 
-      // Categories with no prompt yet have no Library filter pill
-      await expect(libraryPage.getLibraryFilterPill('All')).toBeVisible();
-      await expect(libraryPage.getLibraryFilterPill('Coding')).toHaveCount(0);
-      await expect(libraryPage.getLibraryFilterPill('Writing')).toHaveCount(0);
+      // A Library with no Prompt has no Library filter at all
+      await expect(sidepanelPage.getByRole('heading', { name: 'Your library is empty' })).toBeVisible();
+      await expect(sidepanelPage.getByRole('radiogroup', { name: 'Library filter' })).toHaveCount(0);
 
       // Create a prompt in the "Coding" category
       await sidepanelPage.getByRole('button', { name: 'Add new prompt' }).click();

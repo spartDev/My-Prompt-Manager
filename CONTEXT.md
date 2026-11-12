@@ -14,6 +14,10 @@ _Avoid_: Template, snippet
 A user-defined label that groups Prompts. Every Prompt is in exactly one Category. Category names are unique ignoring case, and a name is compared only after it has been admitted, so names that differ only by a Hidden character or by surrounding spaces are the same name. (Pairs that already differed only by case in data saved by earlier versions are left as they are by the upgrade pass.)
 _Avoid_: Collection, tag, folder
 
+**Default Category**:
+The Category named Uncategorized, which every Library has. It is never renamed, recolored or deleted, and it takes the Prompts of a Category that is deleted. A Library whose only Category is the Default Category has no Categories of the user's own.
+_Avoid_: No category, none, unsorted
+
 **Pinned Prompt**:
 A Prompt the user has marked to always appear before unpinned Prompts in the Library, whatever the chosen sort; within the pinned and unpinned groups the chosen sort still applies. Most Used is the one exception: it ranks by use alone.
 _Avoid_: Favorite, starred prompt
@@ -112,7 +116,7 @@ The band at the top of every Section but the Library: an Eyebrow over the Sectio
 _Avoid_: Page header, title bar, view header
 
 **Eyebrow**:
-The short line above a Section header's title that gives the Section's context: the extension's version in Settings, the number of Categories in Categories, the period counted in Analytics.
+The short line above a Section header's title that gives the Section's context: the extension's version in Settings, the number of Categories in Categories ("Organize" while the Default Category is the only one), the period counted in Analytics.
 _Avoid_: Subtitle, overline, sur-titre
 
 **Settings group**:

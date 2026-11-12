@@ -1,14 +1,16 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { StorageManager } from '../services/storage';
 import { UsageTracker } from '../services/UsageTracker';
-import { type AppError, type Category, type Prompt, USAGE_RETENTION_DAYS, type UsageEvent } from '../types';
+import { type AppError, type Category, type Prompt, USAGE_RETENTION_DAYS, USAGE_STORAGE_KEY, type UsageEvent } from '../types';
 import type {
   DailyUsage,
   TimeOfDayDistribution,
   UsageStats,
   UseUsageStatsReturn
 } from '../types/hooks';
+import { Logger, toError } from '../utils';
+import { ensureStorageAvailable } from '../utils/chromeStorage';
 
 const TIME_BUCKETS = ['Night', 'Morning', 'Afternoon', 'Evening'] as const;
 
@@ -100,7 +102,15 @@ export function useUsageStats(): UseUsageStatsReturn {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<AppError | null>(null);
 
+  // Each read or clear takes the next generation; a read commits only if none started after it, so
+  // an older read that ends last cannot put back what a newer one, or a clear, replaced
+  const generationRef = useRef(0);
+  // Whether a read has given the view its data yet: a reload that fails before that is an error to
+  // show, one that fails after it leaves the data already shown
+  const hasLoadedRef = useRef(false);
+
   const refresh = useCallback(async () => {
+    const generation = ++generationRef.current;
     try {
       setLoading(true);
       setError(null);
@@ -113,13 +123,21 @@ export function useUsageStats(): UseUsageStatsReturn {
         storageManager.getCategories()
       ]);
 
+      if (generation !== generationRef.current) { return; }
       setHistory(usageHistory);
       setPrompts(allPrompts);
       setCategories(allCategories);
+      hasLoadedRef.current = true;
     } catch (err) {
-      setError(err as AppError);
+      if (generation === generationRef.current) {
+        setError(err as AppError);
+      }
     } finally {
-      setLoading(false);
+      // The loading state ends with the latest read: a read that was overtaken leaves it to the one
+      // that overtook it, or the view would show as empty what is only not read yet
+      if (generation === generationRef.current) {
+        setLoading(false);
+      }
     }
   }, []); // Singletons never change
 
@@ -128,6 +146,7 @@ export function useUsageStats(): UseUsageStatsReturn {
       setLoading(true);
       setError(null);
       await UsageTracker.getInstance().clearHistory();
+      generationRef.current++;
       setHistory([]);
     } catch (err) {
       setError(err as AppError);
@@ -154,6 +173,62 @@ export function useUsageStats(): UseUsageStatsReturn {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  // An Insertion counted while the view stays open (the side panel, beside a Platform) shows at once:
+  // the history, the Prompts and the Categories are read again, without starting the loading state,
+  // so nothing flickers. A reload that overtakes a read still loading ends that loading state itself
+  useEffect(() => {
+    let stale = false;
+    const handleStorageChange = (changes: { [key: string]: chrome.storage.StorageChange }, areaName: string) => {
+      // An Insertion writes the history and the Prompt's use count apart, in either order: reading
+      // on the history alone could keep a Prompt just inserted among the Never used
+      if (areaName !== 'local' || !(USAGE_STORAGE_KEY in changes || 'prompts' in changes)) { return; }
+      const generation = ++generationRef.current;
+      // Everything the first read gives: this reload may overtake it, and it then commits nothing
+      const storageManager = StorageManager.getInstance();
+      void Promise.all([UsageTracker.getInstance().getHistory(), storageManager.getPrompts(), storageManager.getCategories()])
+        .then(([usageHistory, allPrompts, allCategories]) => {
+          if (stale || generation !== generationRef.current) { return; }
+          setHistory(usageHistory);
+          setPrompts(allPrompts);
+          setCategories(allCategories);
+          hasLoadedRef.current = true;
+          // The view has its data: an earlier read that failed is no longer the state to show
+          setError(null);
+          // Ends the loading state of a read this reload overtook; a no-op otherwise
+          setLoading(false);
+        })
+        .catch((err: unknown) => {
+          Logger.error('Failed to reload usage history', toError(err), { component: 'useUsageStats' });
+          if (stale || generation !== generationRef.current) { return; }
+          // The read this reload overtook gave nothing: without data to keep, the failure is shown
+          if (!hasLoadedRef.current) {
+            setError(err as AppError);
+          }
+          setLoading(false);
+        });
+    };
+    // chrome.storage, or its onChanged, may be missing when analytics.html opens before the extension
+    // is ready (see useTheme): the listener is then added once the storage is there, as the reads wait
+    let subscribed: typeof chrome.storage.onChanged | undefined;
+    const subscribe = (): boolean => {
+      const storageApi = typeof chrome !== 'undefined' ? chrome.storage : undefined;
+      const onChangedApi = storageApi ? storageApi.onChanged : undefined;
+      if (stale || !onChangedApi) { return false; }
+      onChangedApi.addListener(handleStorageChange);
+      subscribed = onChangedApi;
+      return true;
+    };
+    if (!subscribe()) {
+      void ensureStorageAvailable().then(subscribe).catch((err: unknown) => {
+        Logger.error('Usage history changes are not followed', toError(err), { component: 'useUsageStats' });
+      });
+    }
+    return () => {
+      stale = true;
+      subscribed?.removeListener(handleStorageChange);
+    };
+  }, []);
 
   return {
     stats,

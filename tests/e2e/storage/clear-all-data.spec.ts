@@ -42,7 +42,7 @@ test.describe('Clear All Data', () => {
       await expect(page.getByTestId('tab-library')).toHaveAttribute('aria-selected', 'true');
       // The tabs fade their colors: wait for Settings to lose its fill so the screenshot shows Library chosen
       await expect(page.getByTestId('tab-settings')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-      await expect(page.getByRole('heading', { name: "You're ready to go" })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Your library is empty' })).toBeVisible();
       await expect(page.getByTestId('prompt-card')).toHaveCount(0);
       await page.screenshot({ path: `${SCREENSHOT_DIR}/library-after-clear-${theme}.png` });
     });

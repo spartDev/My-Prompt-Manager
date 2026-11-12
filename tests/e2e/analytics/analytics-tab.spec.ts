@@ -44,7 +44,7 @@ test.describe('Analytics Tab', () => {
   });
 
   test.describe('Without usage', () => {
-    test('keeps the hero at 0 with its bars, and offers to tidy up the Prompts never used', async ({
+    test('keeps the hero at 0 over its ghost bars, and offers to tidy up the Prompts never used', async ({
       context,
       storage,
       extensionId,
@@ -64,7 +64,8 @@ test.describe('Analytics Tab', () => {
 
       const analyticsPage = new AnalyticsPage(page);
       await analyticsAssertions.totalUses(page, 0);
-      await expect(analyticsPage.getWeekdayBars()).toHaveCount(7);
+      await expect(analyticsPage.getWeekdayBars()).toHaveCount(0);
+      await expect(page.getByTestId('stats-ghost-bar')).toHaveCount(7);
       await expect(analyticsPage.getTidyUp()).toContainText('1 prompt never used');
     });
 

@@ -132,6 +132,11 @@ describe('Color tokens', () => {
       // The Notification's round, a confirmation's and a failure's
       ['--background-color-inverse-mark', 'inverse'],
       ['--background-color-inverse-alert', 'inverse'],
+      // Empty states: the hero's 0 (46px, large text) and the tiles of the Categories illustration
+      ['--text-color-on-inverse-dim', 'inverse'],
+      ['--text-color-tile-blue', 'app'],
+      ['--text-color-tile-pink', 'app'],
+      ['--text-color-tile-violet', 'app'],
       ['--scrollbar-color-thumb', 'app'],
       ['--scrollbar-color-thumb', 'card'],
       ['--scrollbar-color-thumb', 'subtle'],
@@ -172,7 +177,8 @@ describe('Color tokens', () => {
       'bg-danger', 'bg-danger-hover', 'bg-danger-subtle', 'border-danger', 'text-danger',
       'border-focus', 'border-error', 'outline-danger',
       'text-pin', 'text-on-inverse-strong', 'text-on-inverse-mark', 'bg-inverse-mark', 'bg-inverse-alert', 'bg-inverse-action',
-      'bg-inverse-bar', 'bg-inverse-bar-hover', 'text-on-inverse-muted', 'bg-callout', 'text-callout'
+      'bg-inverse-bar', 'bg-inverse-bar-hover', 'text-on-inverse-muted', 'bg-callout', 'text-callout',
+      'border-ghost', 'border-inverse-ghost', 'text-on-inverse-dim', 'text-tile-blue', 'text-tile-pink', 'text-tile-violet'
     ];
     const css = await buildCss(classes);
 

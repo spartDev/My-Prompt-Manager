@@ -7,8 +7,10 @@ test.describe('Popup smoke test', () => {
     await page.goto(`chrome-extension://${extensionId}/src/popup.html`);
 
     await expect(page.getByRole('heading', { name: 'My Prompt Manager' })).toBeVisible();
-    await expect(page.getByText(/create first prompt/i)).toBeVisible();
-    await expect(page.getByPlaceholder('Search your prompts')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Your library is empty' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Write your first prompt' })).toBeVisible();
+    // Nothing to search yet
+    await expect(page.getByPlaceholder('Search your prompts')).toHaveCount(0);
   });
 });
 
@@ -63,9 +65,7 @@ test.describe('Prompt creation flow', () => {
 
     await page.goto(`chrome-extension://${extensionId}/src/popup.html`);
 
-    const createFirstPrompt = page.getByRole('button', { name: /create first prompt/i });
-    const addPrompt = page.getByRole('button', { name: 'Add new prompt' });
-    const promptCreationTrigger = createFirstPrompt.or(addPrompt);
+    const promptCreationTrigger = page.getByRole('button', { name: 'Write your first prompt' });
 
     await expect(promptCreationTrigger).toBeVisible();
     await promptCreationTrigger.click();

@@ -55,6 +55,8 @@ Surfaces are **opaque**. `bg-backdrop` is the only translucent one: no transluce
 | `border-input` | `#8F87A5` | `#766C8E` | Field outlines, off track of a switch, unpinned star (3:1 on every surface) |
 | `border-focus` | accent | accent | A focused field (`focus-input` applies it) |
 | `border-error` | danger | danger | A field in error |
+| `border-ghost` | `#CFC5E3` | `#4A4066` | Dashed outline of what is not there yet, in an [empty state](#empty-states): ghost cards and tiles on `bg-app` |
+| `border-inverse-ghost` | white at 26% | white at 34% | The same on `bg-inverse`: the ghost bars of the empty Analytics hero |
 
 ### Text
 
@@ -67,6 +69,8 @@ Surfaces are **opaque**. `bg-backdrop` is the only translucent one: no transluce
 | `text-on-inverse` | `#C9BFE6` | `#C9BFE6` | Message on `bg-inverse` |
 | `text-on-inverse-muted` | `#A99CC9` | `#C9BFE6` | Day labels under the Analytics bars, on `bg-inverse` (the mockup's dark `#A99CC9` is 3.8:1, so dark takes `on-inverse`) |
 | `text-callout` | `#78350F` | `#FDE68A` | Text of the Tidy up callout, on `bg-callout` |
+| `text-on-inverse-dim` | `#8F82B3` | `#B5A9D6` | The 0 of the empty Analytics hero, on `bg-inverse`. Large text only: 4.4:1 in dark |
+| `text-tile-blue` / `text-tile-pink` / `text-tile-violet` | `#2563EB` / `#DB2777` / `#9333EA` | `#3B82F6` / `#EC4899` / `#8B5CF6` | The tinted tiles of the empty Categories illustration, which draw with `currentColor` (`bg-current`, and a 13% `color-mix` behind). Decorative only |
 | `text-on-accent` | `#FFFFFF` | `#FFFFFF` | Text on `bg-accent` and `bg-danger` |
 
 ### Accent (violet)
@@ -653,6 +657,22 @@ The first match of the search is marked in the title and in the preview of each 
 
 A search that finds nothing shows `SearchEmptyState`: a dashed block (`rounded-[18px] border-[1.5px] border-dashed border-strong`) saying `Nothing called “…” yet`, with **Create it** (`bg-accent`, opens the editor titled with the search, in the Category of the active filter if it is one) and, under a filter other than All, **Search all prompts**.
 
+### Empty States
+
+A Section with nothing to list shows an empty state (Atelier 1C 5a to 5f) in place of its content. Its Section header and the tab bar stay. The conditions are the pure selectors of `src/utils/emptyStates.ts`:
+
+| Section | Empty when | Component |
+|---|---|---|
+| Library | it holds no Prompt (`isLibraryEmpty`); the search and the Library filter are not offered | `emptyStates/LibraryEmpty` |
+| Categories | the Default Category is the only one (`isCategoriesEmpty`); the Eyebrow reads "Organize" | `emptyStates/CategoriesEmpty` |
+| Analytics | no Insertion in the period counted (`isStatsEmpty`), whatever the Library holds | `analytics/StatsEmpty` |
+
+`EmptyState` is the base of the first two: an illustration drawn in HTML and CSS (`aria-hidden`), an `h2` (`text-[21px] font-extrabold tracking-[-0.03em]`), a line of explanation (`text-[13.5px] leading-normal text-secondary`, 300px at most), then the actions, centered in the room the header leaves. One main action per screen, `EMPTY_PRIMARY_BUTTON` (`bg-accent`, a 46px pill); a secondary one is `EMPTY_SECONDARY_BUTTON` (`bg-card border-[1.5px] border-strong`, a 40px pill). Under 560px of height (the popup), `short:` tightens the gaps and scales the illustration so the state fits without scrolling.
+
+The empty Categories also offers four starter Categories as 32px pills (`bg-card border-[1.5px] border-default`, a dot of the Category's color), each labelled "Create category Work" for a screen reader; their colors come from the Category palette.
+
+The empty Analytics keeps the shape of the page as ghosts: the hero with a `text-on-inverse-dim` 0 over seven `border-dashed border-inverse-ghost` pills, a `bg-card` card that says how the page fills in, with the one action, and Top platform and Top category as `border-dashed border-ghost` tiles saying "No data yet". Tidy up stays below, since it counts Prompts, not Insertions. The full-page view keeps its own rendering.
+
 ### Cards
 
 Cards are opaque `bg-card` with a `border-default` border, floating on `bg-app`. Dividers inside a card take `border-divider` (`divide-y divide-divider`).
@@ -1015,10 +1035,13 @@ duration or a curve: it uses a class, and a timer reads `MOTION`.
 | `animate-category-pop` (`MOTION.categoryPop`) | `pop` 500ms, ease-spring | a Category appearing in the list (created, or back from Undo) |
 | `animate-toast-in` | `toast-in` 450ms, ease-spring | the Notification pill, from 14px above the top center |
 | `animate-bar-grow` (`MOTION.barGrow`) | `bar-grow` 800ms, ease-spring | an Analytics bar growing from the bottom: the hero's weekday bars set `animationDelay` to `MOTION.barDelay` + index × `MOTION.barStagger` (200ms, then 60ms apart); the Daily use and Time of day pills spread the same stagger over as long as seven bars take |
-| `animate-card-rise` (`MOTION.cardRise`) | `card-rise` 500ms, ease-spring | the Top platform and Top category cards rising 12px, at 100ms and 180ms (`cardDelay`, `cardStagger`), and the Tidy up callout; in the full-page view the Platforms, Categories, Daily use and Time of day cards follow, each `cardStagger` later |
+| `animate-card-rise` (`MOTION.cardRise`) | `card-rise` 500ms, ease-spring | the blocks of an [empty state](#empty-states), `MOTION.emptyStagger` (70ms) apart; the Top platform and Top category cards rising 12px, at 100ms and 180ms (`cardDelay`, `cardStagger`), and the Tidy up callout; in the full-page view the Platforms, Categories, Daily use and Time of day cards follow, each `cardStagger` later |
 | `animate-clear-pop` (`MOTION.clearPop`) | `pop` 350ms, ease-spring | the clear button of the Library search appearing |
 | `animate-list-rise`, `animate-list-rise-again` (`MOTION.listRise`) | `card-rise` 500ms, ease-spring | the cards of the Library rising 12px when the Library filter or the Prompts listed change, each `listStagger` (50ms) after the one before, up to `listStaggerSteps` (8). The two names share their keyframes: going from one to the other plays the rise again without mounting the cards anew. A keystroke that lists the same Prompts, or a pin that only reorders them, plays nothing |
 | `animate-empty-rise` (`MOTION.emptyRise`) | `card-rise` 350ms, ease-spring | the no-results block of a search |
+| `animate-float` (`MOTION.float`) | `float` 5400ms, ease-in-out, in a loop | the Prompt card of the empty Library illustration, up 8px and back; still under reduced motion |
+| `animate-badge-pop` (`MOTION.badgePop`, `badgePopDelay`) | `pop` 500ms, ease-spring, 350ms delay | the + badge of the empty Library illustration |
+| `animate-ghost-grow` (`MOTION.ghostGrow`) | `bar-grow` 700ms, ease-spring | a ghost bar of the empty Analytics hero, from the bottom: 150ms (`ghostDelay`), then `barStagger` apart |
 | `animate-rank-fill` (`MOTION.rankFill`) | `fill-grow` 1000ms, ease-spring | a Most used bar filling from the left, 300ms then 90ms apart (`rankDelay`, `rankStagger`); the rows of the Platforms and Categories cards too |
 | `MOTION.countUp` (a timer, `useCountUp`) | 800ms, ease-out | the Analytics total counting up from 0 with the bars |
 | `animate-toast-mark` | `pop` 450ms, ease-spring, 80ms delay | the round of the Notification |

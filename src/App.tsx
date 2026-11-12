@@ -403,6 +403,22 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
     return onLibraryReviewRequested(apply);
   }, [context, handleReviewPrompts]);
 
+  // "Import a backup" of the empty Library: Settings opens with the keyboard on its Import button,
+  // where the import's report and the storage warning already show
+  const [focusImport, setFocusImport] = useState(false);
+  const handleImportFocused = useCallback(() => { setFocusImport(false); }, []);
+  const handleImportBackup = useCallback(() => {
+    handleSelectSection('settings');
+    setFocusImport(true);
+  }, [handleSelectSection]);
+
+  // "Go to the library" of the empty Analytics
+  // The button leaves with Analytics: the keyboard goes to the active Library filter, as for a review
+  const handleGoToLibrary = useCallback(() => {
+    setFocusLibraryFilter(true);
+    handleSelectSection('library');
+  }, [handleSelectSection]);
+
   const handleExpandDashboard = useCallback(() => {
     // Open full analytics dashboard in a new tab
     void chrome.tabs.create({ url: chrome.runtime.getURL('src/analytics.html') });
@@ -470,6 +486,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
           searchWithDebounce={searchWithDebounce}
           libraryFilter={libraryFilter}
           onAddNew={handleAddNew}
+          onImportBackup={handleImportBackup}
           onCreateFromSearch={handleCreateFromSearch}
           focusSearch={focusSearch}
           onSearchFocused={handleSearchFocused}
@@ -506,6 +523,8 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
           toastSettings={settings}
           onToastSettingsChange={updateSettings}
           onStorageRefused={handleImportRefused}
+          focusImport={focusImport}
+          onImportFocused={handleImportFocused}
         />
       )}
 
@@ -516,6 +535,8 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
           prompts={optimisticPrompts}
           onEditPrompt={handleEditPrompt}
           onReviewPrompts={handleReviewPrompts}
+          onGoToLibrary={handleGoToLibrary}
+          onAddNew={handleAddNew}
           takeFocus={focusAnalytics}
           onFocusTaken={handleAnalyticsFocused}
         />

@@ -16,6 +16,7 @@ import {
 } from '../../services/usageInsights';
 import type { LibraryFilter, Prompt } from '../../types';
 import { formatPlatformName } from '../../utils';
+import { isLibraryEmpty, isStatsEmpty } from '../../utils/emptyStates';
 import { TrashIcon } from '../icons/UIIcons';
 import SectionHeader from '../SectionHeader';
 import ViewHeader from '../ViewHeader';
@@ -23,6 +24,7 @@ import ViewHeader from '../ViewHeader';
 import { MOST_USED_ROWS } from './constants';
 import MostUsedCard from './MostUsedCard';
 import StatCard from './StatCard';
+import StatsEmpty from './StatsEmpty';
 import StatsHero from './StatsHero';
 import TidyUpCard from './TidyUpCard';
 
@@ -37,6 +39,10 @@ export interface AnalyticsTabProps {
   onEditPrompt?: (prompt: Prompt) => void;
   /** Opens the Library on the Prompts Tidy up offers to review */
   onReviewPrompts?: (filter: LibraryFilter) => void;
+  /** Goes to the Library, from the empty state */
+  onGoToLibrary?: () => void;
+  /** Opens the editor on a new Prompt, from the empty state of an empty Library */
+  onAddNew?: () => void;
   /** Take the keyboard (the Prompt opened from Most used has gone), then call onFocusTaken */
   takeFocus?: boolean;
   onFocusTaken?: () => void;
@@ -48,6 +54,8 @@ const AnalyticsTab: FC<AnalyticsTabProps> = ({
   prompts: livePrompts,
   onEditPrompt,
   onReviewPrompts,
+  onGoToLibrary,
+  onAddNew,
   takeFocus = false,
   onFocusTaken
 }) => {
@@ -117,7 +125,7 @@ const AnalyticsTab: FC<AnalyticsTabProps> = ({
     );
   }
 
-  const hasData = history.length > 0;
+  const hasData = !isStatsEmpty(history);
 
   return (
     <div className="h-full flex flex-col bg-app relative">
@@ -139,7 +147,8 @@ const AnalyticsTab: FC<AnalyticsTabProps> = ({
         )}
       </SectionHeader>
 
-      {/* Content (Atelier 1C): the hero, Top platform and Top category, Most used, Tidy up */}
+      {/* Content (Atelier 1C): the hero, Top platform and Top category, Most used, Tidy up; with no
+          Insertion in the period, their ghosts and Tidy up */}
       <main
         ref={mainRef}
         tabIndex={-1}
@@ -151,13 +160,24 @@ const AnalyticsTab: FC<AnalyticsTabProps> = ({
           <div className="mt-3.5 h-[220px] rounded-hero bg-muted animate-pulse" role="status" aria-label="Loading analytics" />
         ) : (
           <>
-            <StatsHero total={history.length} weekdays={weekdays} />
+            {hasData ? (
+              <>
+                <StatsHero total={history.length} weekdays={weekdays} />
 
-            {hasData && (
-              <div className="mt-2.5 grid grid-cols-2 gap-2.5">
-                <StatCard label="Top platform" name={platform ? formatPlatformName(platform.platform) : '-'} count={platform?.count ?? 0} delayIndex={0} />
-                <StatCard label="Top category" name={category?.name ?? '-'} count={category?.count ?? 0} delayIndex={1} />
-              </div>
+                <div className="mt-2.5 grid grid-cols-2 gap-2.5">
+                  <StatCard label="Top platform" name={platform ? formatPlatformName(platform.platform) : '-'} count={platform?.count ?? 0} delayIndex={0} />
+                  <StatCard label="Top category" name={category?.name ?? '-'} count={category?.count ?? 0} delayIndex={1} />
+                </div>
+              </>
+            ) : (
+              // No Insertion in the period: the page keeps its shape, as ghosts. Tidy up stays below,
+              // since it counts Prompts, not Insertions
+              <StatsEmpty
+                days={weekdays.map(weekday => weekday.day)}
+                libraryEmpty={isLibraryEmpty(prompts)}
+                onGoToLibrary={onGoToLibrary}
+                onWriteFirstPrompt={onAddNew}
+              />
             )}
 
             {ranked.length > 0 && (

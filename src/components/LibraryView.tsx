@@ -14,7 +14,9 @@ import type { Prompt, Settings, SortOrder } from '../types';
 import type { LibraryViewProps } from '../types/components';
 import { Logger, toError } from '../utils';
 import { cn } from '../utils/cn';
+import { isLibraryEmpty } from '../utils/emptyStates';
 
+import LibraryEmpty from './emptyStates/LibraryEmpty';
 import { CheckIcon, StarIcon, UsageIcon } from './icons/UIIcons';
 import LibraryFilterBar, { reviewFilterLabel } from './LibraryFilterBar';
 import PromptCard from './PromptCard';
@@ -28,6 +30,7 @@ const LibraryView: FC<LibraryViewProps> = ({
   searchWithDebounce,
   libraryFilter,
   onAddNew,
+  onImportBackup,
   onCreateFromSearch,
   focusSearch,
   onSearchFocused,
@@ -50,7 +53,30 @@ const LibraryView: FC<LibraryViewProps> = ({
     onLibraryFilterFocused?.();
   }, [onLibraryFilterFocused]);
 
-  // The search shortcut moves the keyboard into the field, also when it has just brought the Library back
+  // With no Prompt there is nothing to search, filter or list: the empty state takes the whole Section
+  const libraryEmpty = !loading && isLibraryEmpty(prompts);
+
+  // The search and the Library filter go out of sight with the last Prompt, so they go back to
+  // nothing and All: the next Prompt must not be hidden by a search or a filter nobody can see
+  const { clearSearch } = searchWithDebounce;
+  useEffect(() => {
+    if (!libraryEmpty) { return; }
+    if (query !== '') { clearSearch(); }
+    if (libraryFilter.kind !== 'all') { onLibraryFilterChange(ALL_PROMPTS); }
+  }, [libraryEmpty, query, clearSearch, libraryFilter, onLibraryFilterChange]);
+
+  // The Library filter takes the keyboard when the Prompt that had it is gone. With the last Prompt
+  // there is no filter left: the main action of the empty state takes it instead
+  const writeFirstRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (libraryEmpty && focusLibraryFilter) {
+      writeFirstRef.current?.focus();
+      onLibraryFilterFocused?.();
+    }
+  }, [libraryEmpty, focusLibraryFilter, onLibraryFilterFocused]);
+
+  // The search shortcut moves the keyboard into the field, also when it has just brought the Library
+  // back. An empty Library has no field: the shortcut then only brings the Library back
   const searchRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (focusSearch) {
@@ -159,6 +185,7 @@ const LibraryView: FC<LibraryViewProps> = ({
           )}
         </ViewHeader.Actions>
         {/* Search and Filter */}
+        {!libraryEmpty && (
         <div className="space-y-4 pb-6" role="search" aria-label="Search and filter prompts">
           {/* The header pads its content by 24px; the pill keeps 16px on each side */}
           <div className="-mx-2">
@@ -179,6 +206,7 @@ const LibraryView: FC<LibraryViewProps> = ({
             onFocusActiveDone={handleFilterFocused}
           />
         </div>
+        )}
       </ViewHeader>
 
       {/* Content */}
@@ -195,26 +223,11 @@ const LibraryView: FC<LibraryViewProps> = ({
             <div className="w-8 h-8 border-4 border-current/30 border-t-current text-accent rounded-full animate-spin" aria-hidden="true"></div>
             <div className="text-secondary font-medium">Loading your prompts...</div>
           </div>
+        ) : libraryEmpty ? (
+          <LibraryEmpty onWriteFirstPrompt={onAddNew} onImportBackup={onImportBackup} primaryButtonRef={writeFirstRef} />
         ) : resultCount === 0 && !isSearchActive ? (
           <div className="flex items-center justify-center h-full">
-            {(prompts).length === 0 ? (
-              <div className="max-w-md mx-auto text-center px-6" role="region" aria-label="Empty state">
-                <div className="w-20 h-20 bg-accent-subtle rounded-full flex items-center justify-center mx-auto mb-4" role="img" aria-label="Empty library illustration">
-                  <svg className="w-10 h-10 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                  </svg>
-                </div>
-                <h2 className="text-lg font-bold text-primary mb-2">You&apos;re ready to go</h2>
-                <p className="text-secondary mb-4 text-sm leading-relaxed">Create your first prompt to start building your personal collection of reusable content.</p>
-                <button
-                  onClick={onAddNew}
-                  className="px-6 py-2.5 bg-accent text-on-accent rounded-xl hover:bg-accent-hover transition-all duration-200 font-semibold shadow-lg hover:shadow-xl focus-primary"
-                  aria-label="Create your first prompt"
-                >
-                  Create First Prompt
-                </button>
-              </div>
-            ) : !isSearchActive && activeFilter.kind === 'pinned' ? (
+            {!isSearchActive && activeFilter.kind === 'pinned' ? (
               <div className="max-w-sm mx-auto text-center px-6" role="region" aria-label="No pinned prompts">
                 <div className="w-14 h-14 bg-accent-subtle rounded-full flex items-center justify-center mx-auto mb-3" aria-hidden="true">
                   <StarIcon className="w-7 h-7 text-accent" />

@@ -93,6 +93,16 @@
   --text-color-on-inverse-muted: #a99cc9;
   --shadow-hero: 0 22px 40px -26px rgba(29, 21, 48, 0.9);
 
+  /* Empty states (Atelier 1C 5a to 5f): the dashed outline of what is not there yet (ghost cards and
+     tiles on bg-app), the same on the Analytics hero, the hero's 0 (large text only: 3:1), and the
+     three tinted tiles of the Categories illustration, which draw with currentColor */
+  --border-color-ghost: #cfc5e3;
+  --border-color-inverse-ghost: rgba(255, 255, 255, 0.26);
+  --text-color-on-inverse-dim: #8f82b3;
+  --text-color-tile-blue: #2563eb;
+  --text-color-tile-pink: #db2777;
+  --text-color-tile-violet: #9333ea;
+
   /* Tidy up callout in Analytics (Atelier 1C): cream with brown text; its border is border-warning, its
      Review buttons bg-card with text-warning */
   --background-color-callout: #fff8e6;
@@ -156,6 +166,16 @@
   --animate-list-rise: card-rise 500ms var(--ease-spring) both;
   --animate-list-rise-again: card-rise-again 500ms var(--ease-spring) both;
   --animate-empty-rise: card-rise 350ms var(--ease-spring) both;
+  /* Empty states (Atelier 1C 5a to 5f): their blocks rise with card-rise; the Prompt card of the
+     Library illustration floats, its + badge pops after the card, the ghost bars of Analytics grow */
+  --animate-float: float 5400ms ease-in-out infinite;
+  --animate-badge-pop: pop 500ms var(--ease-spring) 350ms both;
+  --animate-ghost-grow: bar-grow 700ms var(--ease-spring) both;
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
 
   @keyframes bar-grow {
     from { transform: scaleY(0); }
@@ -333,6 +353,14 @@
     --background-color-inverse-bar-hover: #231c34;
     --text-color-on-inverse-muted: #c9bfe6;
     --shadow-hero: 0 22px 40px -26px rgba(4, 2, 10, 0.92);
+
+    /* Empty states: the tiles take lighter hues, to stand out on the dark page */
+    --border-color-ghost: #4a4066;
+    --border-color-inverse-ghost: rgba(255, 255, 255, 0.34);
+    --text-color-on-inverse-dim: #b5a9d6;
+    --text-color-tile-blue: #3b82f6;
+    --text-color-tile-pink: #ec4899;
+    --text-color-tile-violet: #8b5cf6;
 
     /* Tidy up callout */
     --background-color-callout: #2b210e;

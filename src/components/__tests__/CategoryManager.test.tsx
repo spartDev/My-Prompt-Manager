@@ -3,9 +3,11 @@ import userEvent from '@testing-library/user-event';
 import type React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
+import { PRESET_COLORS } from '../../constants/colors';
 import { buildPrompt } from '../../test/builders';
 import type { AppError, Category } from '../../types';
 import CategoryManager from '../CategoryManager';
+import { STARTER_CATEGORIES } from '../emptyStates/CategoriesEmpty';
 
 const baseCategories: Category[] = [
   { id: 'uncat', name: 'Uncategorized' },
@@ -43,9 +45,80 @@ describe('CategoryManager', () => {
   });
 
   it('uses the singular for a single category', () => {
-    renderManager({ categories: [baseCategories[0]] });
+    renderManager({ categories: [baseCategories[1]] });
 
     expect(screen.getByText('1 category')).toBeInTheDocument();
+  });
+
+  describe('with only the Default Category', () => {
+    const onlyDefault = [baseCategories[0]];
+
+    it('shows its empty state in place of the list, under "Organize"', () => {
+      renderManager({ categories: onlyDefault });
+
+      const empty = screen.getByTestId('categories-empty');
+      expect(within(empty).getByRole('heading', { level: 2, name: 'No categories yet' })).toBeInTheDocument();
+      expect(empty).toHaveTextContent('Each prompt lives in one category.');
+      expect(screen.getByRole('heading', { level: 1, name: 'Categories' })).toBeInTheDocument();
+      expect(screen.getByText('Organize')).toBeInTheDocument();
+      expect(screen.queryByText('1 category')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('category-row')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Add category' })).not.toBeInTheDocument();
+    });
+
+    it('opens the Category sheet from "Create a category"', async () => {
+      const { user } = renderManager({ categories: onlyDefault });
+
+      await user.click(screen.getByRole('button', { name: 'Create a category' }));
+
+      expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    });
+
+    it('creates a starter Category in one tap, in a color of the palette', async () => {
+      const { user, props } = renderManager({ categories: onlyDefault });
+
+      const starters = ['Work', 'Writing', 'Email', 'Research'];
+      for (const name of starters) {
+        expect(screen.getByRole('button', { name: `Create category ${name}` })).toBeInTheDocument();
+      }
+      await user.click(screen.getByRole('button', { name: 'Create category Writing' }));
+
+      expect(props.onCreateCategory).toHaveBeenCalledTimes(1);
+      expect(props.onCreateCategory).toHaveBeenCalledWith({ name: 'Writing', color: '#9333EA' }, expect.anything());
+      expect(PRESET_COLORS.map(color => color.value)).toEqual(expect.arrayContaining(STARTER_CATEGORIES.map(category => category.color)));
+    });
+
+    it('stays in place when a starter Category cannot be created', async () => {
+      const onCreateCategory = vi.fn().mockRejectedValue({ type: 'STORAGE_QUOTA_EXCEEDED', message: 'full' } satisfies AppError);
+      const { user } = renderManager({ categories: onlyDefault, onCreateCategory });
+
+      const starter = screen.getByRole('button', { name: 'Create category Work' });
+      await user.click(starter);
+
+      expect(onCreateCategory).toHaveBeenCalledTimes(1);
+      // The starter itself is what a full storage warning gives the keyboard back to
+      expect(onCreateCategory).toHaveBeenCalledWith({ name: 'Work', color: '#2563EB' }, starter);
+      expect(screen.getByTestId('categories-empty')).toBeInTheDocument();
+    });
+
+    it('gives way to the list as soon as a Category exists, and comes back when the last one is deleted', () => {
+      const { rerender, props } = renderManager({ categories: onlyDefault });
+      expect(screen.getByTestId('categories-empty')).toBeInTheDocument();
+
+      rerender(<CategoryManager {...props} categories={[baseCategories[0], baseCategories[1]]} />);
+      expect(screen.queryByTestId('categories-empty')).not.toBeInTheDocument();
+      expect(screen.getAllByTestId('category-row')).toHaveLength(2);
+      expect(screen.getByText('2 categories')).toBeInTheDocument();
+
+      rerender(<CategoryManager {...props} categories={onlyDefault} />);
+      expect(screen.getByTestId('categories-empty')).toBeInTheDocument();
+    });
+
+    it('does not show before the Categories are read', () => {
+      renderManager({ categories: [] });
+
+      expect(screen.queryByTestId('categories-empty')).not.toBeInTheDocument();
+    });
   });
 
   it('shows a Close button only in the side panel', () => {

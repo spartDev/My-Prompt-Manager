@@ -6,9 +6,11 @@ import { DEFAULT_CATEGORY_COLOR, getColorName, nextCategoryColor } from '../cons
 import { useCategorySheet } from '../hooks/useCategorySheet';
 import { type AppError, type Category, DEFAULT_CATEGORY, type Prompt } from '../types';
 import { cn, Logger, toError } from '../utils';
+import { isCategoriesEmpty } from '../utils/emptyStates';
 
 import CategorySheet from './CategorySheet';
 import ConfirmDialog from './ConfirmDialog';
+import CategoriesEmpty from './emptyStates/CategoriesEmpty';
 import SectionHeader from './SectionHeader';
 import ViewHeader from './ViewHeader';
 
@@ -52,7 +54,8 @@ const PlusIcon = (
 
 /**
  * The Categories section: the list of Categories, each one opening the Category sheet to rename,
- * recolor or delete it, and "Add category" below, which opens the sheet to create one.
+ * recolor or delete it, and "Add category" below, which opens the sheet to create one. With only
+ * the Default Category it shows its empty state instead.
  */
 const CategoryManager: FC<CategoryManagerProps> = ({
   categories,
@@ -204,6 +207,33 @@ const CategoryManager: FC<CategoryManagerProps> = ({
     ? prompts.filter(prompt => prompt.category === sheet.category?.name).length
     : 0;
 
+  // With only the Default Category, the Section shows its empty state in place of the list
+  const empty = isCategoriesEmpty(categories);
+
+  // The first Category of the user replaces the empty state by the list: what had the keyboard (Create
+  // a category, or a starter) is gone, so it goes to "Add category", once the sheet has closed (the sheet's own way back, to its
+  // opener, finds nothing)
+  const focusAddRef = useRef(false);
+  useEffect(() => {
+    if (empty) {
+      focusAddRef.current = true;
+    } else if (!sheet.isOpen && focusAddRef.current) {
+      focusAddRef.current = false;
+      addButtonRef.current?.focus();
+    }
+  }, [empty, sheet.isOpen]);
+
+  // The starter that was tapped gets the keyboard back if a full storage warning opens: the empty
+  // state, and the starter with it, is still there when a creation fails
+  const handleQuickCreate = async (category: { name: string; color: string }, starter: HTMLElement): Promise<void> => {
+    try {
+      await onCreateCategory(category, starter);
+    } catch (error) {
+      // The app has said why (a failure Notification, or the storage warning)
+      Logger.error('Failed to create starter category', toError(error), { component: 'CategoryManager' });
+    }
+  };
+
   const setRowRef = (id: string) => (element: HTMLElement | null) => {
     if (element) {
       rowRefs.current.set(id, element);
@@ -219,7 +249,7 @@ const CategoryManager: FC<CategoryManagerProps> = ({
       {/* Section header: the number of Categories is the Eyebrow */}
       <SectionHeader
         title="Categories"
-        eyebrow={`${String(categories.length)} ${categories.length === 1 ? 'category' : 'categories'}`}
+        eyebrow={empty ? 'Organize' : `${String(categories.length)} ${categories.length === 1 ? 'category' : 'categories'}`}
         eyebrowLive
       >
         {context === 'sidepanel' && (
@@ -228,7 +258,15 @@ const CategoryManager: FC<CategoryManagerProps> = ({
       </SectionHeader>
 
       {/* Content: the list card on bg-app, "Add category" below it */}
-      <div className="flex-1 overflow-auto p-4 space-y-4" data-scroll-container>
+      <div className={cn('flex-1 overflow-auto', !empty && 'p-4 space-y-4')} data-scroll-container>
+        {empty ? (
+          <CategoriesEmpty
+            onCreate={() => { sheet.openCreate(nextCategoryColor(categories)); }}
+            onQuickCreate={handleQuickCreate}
+            createButtonRef={addButtonRef}
+          />
+        ) : (
+          <>
           {/* Category List: rows split by dividers */}
           <section aria-labelledby={listTitleId} className="bg-card border border-default rounded-2xl shadow-sm overflow-hidden divide-y divide-divider">
             <h3 id={listTitleId} className="font-bold text-primary flex items-center space-x-2 p-5">
@@ -238,15 +276,7 @@ const CategoryManager: FC<CategoryManagerProps> = ({
               <span className='text-sm'>Your Categories</span>
             </h3>
 
-            {categories.length === 0 ? (
-              <div className="p-8 text-center">
-                <svg className="w-12 h-12 mx-auto text-faint mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                </svg>
-                <p className="text-tertiary text-sm">No categories yet. Create your first category below!</p>
-              </div>
-            ) : (
-              categories.map((category) => {
+            {categories.map((category) => {
                 const isDefault = category.name === DEFAULT_CATEGORY;
                 const swatchColor = category.color || '#6B7280';
                 const content = (
@@ -299,8 +329,7 @@ const CategoryManager: FC<CategoryManagerProps> = ({
                     {content}
                   </button>
                 );
-              })
-            )}
+              })}
           </section>
 
           <button
@@ -313,6 +342,8 @@ const CategoryManager: FC<CategoryManagerProps> = ({
             {PlusIcon}
             Add category
           </button>
+          </>
+        )}
       </div>
 
       {sheet.isMounted && (
