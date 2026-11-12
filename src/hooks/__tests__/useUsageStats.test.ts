@@ -372,6 +372,27 @@ describe('useUsageStats', () => {
       expect(result.current.stats?.totalUses).toBe(1);
     });
 
+    it('does not put back the history a clear removed, when an older reload ends after it', async () => {
+      const old = [buildUsageEvent({ promptId: 'prompt-1' })];
+      await chrome.storage.local.set({ [USAGE_STORAGE_KEY]: old });
+      const { result } = renderHook(() => useUsageStats());
+      await waitFor(() => { expect(result.current.history).toHaveLength(1); });
+
+      // A reload reads the old history, and is held until after the clear
+      const releases: Array<(history: UsageEvent[]) => void> = [];
+      const release = (history: UsageEvent[]) => { releases.forEach(resolve => { resolve(history); }); };
+      const getHistory = vi.spyOn(UsageTracker.getInstance(), 'getHistory')
+        .mockImplementationOnce(() => new Promise<UsageEvent[]>(resolve => { releases.push(resolve); }));
+      act(() => { triggerChromeStorageChange({ [USAGE_STORAGE_KEY]: { newValue: old } }); });
+
+      await act(async () => { await result.current.clearHistory(); });
+      await waitFor(() => { expect(result.current.history).toHaveLength(0); });
+      await act(async () => { release(old); await Promise.resolve(); });
+
+      expect(result.current.history).toHaveLength(0);
+      getHistory.mockRestore();
+    });
+
     it('ignores what is stored under another key', async () => {
       const { result } = renderHook(() => useUsageStats());
       await waitFor(() => { expect(result.current.loading).toBe(false); });

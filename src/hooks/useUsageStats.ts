@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { StorageManager } from '../services/storage';
 import { UsageTracker } from '../services/UsageTracker';
@@ -101,7 +101,12 @@ export function useUsageStats(): UseUsageStatsReturn {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<AppError | null>(null);
 
+  // Each read or clear takes the next generation; a read commits only if none started after it, so
+  // an older read that ends last cannot put back what a newer one, or a clear, replaced
+  const generationRef = useRef(0);
+
   const refresh = useCallback(async () => {
+    const generation = ++generationRef.current;
     try {
       setLoading(true);
       setError(null);
@@ -114,12 +119,16 @@ export function useUsageStats(): UseUsageStatsReturn {
         storageManager.getCategories()
       ]);
 
+      if (generation !== generationRef.current) { return; }
       setHistory(usageHistory);
       setPrompts(allPrompts);
       setCategories(allCategories);
     } catch (err) {
-      setError(err as AppError);
+      if (generation === generationRef.current) {
+        setError(err as AppError);
+      }
     } finally {
+      // The loading state ends with the latest read; a reload that overtook this one never set it
       setLoading(false);
     }
   }, []); // Singletons never change
@@ -129,6 +138,7 @@ export function useUsageStats(): UseUsageStatsReturn {
       setLoading(true);
       setError(null);
       await UsageTracker.getInstance().clearHistory();
+      generationRef.current++;
       setHistory([]);
     } catch (err) {
       setError(err as AppError);
@@ -165,9 +175,10 @@ export function useUsageStats(): UseUsageStatsReturn {
     let stale = false;
     const handleStorageChange = (changes: { [key: string]: chrome.storage.StorageChange }, areaName: string) => {
       if (areaName !== 'local' || !(USAGE_STORAGE_KEY in changes)) { return; }
+      const generation = ++generationRef.current;
       void Promise.all([UsageTracker.getInstance().getHistory(), StorageManager.getInstance().getPrompts()])
         .then(([usageHistory, allPrompts]) => {
-          if (stale) { return; }
+          if (stale || generation !== generationRef.current) { return; }
           setHistory(usageHistory);
           setPrompts(allPrompts);
         })
