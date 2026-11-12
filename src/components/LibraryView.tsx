@@ -183,6 +183,13 @@ const LibraryView: FC<LibraryViewProps> = ({
 
       {/* Content */}
       <main className="flex-1 overflow-auto custom-scrollbar" data-scroll-container aria-label="My Prompt Manager content">
+        {/* The one announcement of a search: the number found. It is in the document before any search,
+            empty, since a screen reader says what changes in a status it already knows */}
+        {!loading && (
+          <p role="status" aria-live="polite" aria-atomic="true" className="sr-only" data-testid="search-status">
+            {isSearchActive ? resultsLabel : ''}
+          </p>
+        )}
         {loading ? (
           <div className="flex flex-col items-center justify-center h-full space-y-4" role="status" aria-live="polite">
             <div className="w-8 h-8 border-4 border-current/30 border-t-current text-accent rounded-full animate-spin" aria-hidden="true"></div>
@@ -250,11 +257,8 @@ const LibraryView: FC<LibraryViewProps> = ({
                 <h2 className="min-w-0 truncate text-[13px] font-bold text-secondary">
                   {activeFilter.kind === 'all' ? 'Results' : activeFilterLabel}
                 </h2>
-                {/* The one announcement of a search: the number shown, said with its unit */}
-                <span className="flex-none text-xs text-tertiary" role="status" aria-live="polite" aria-atomic="true">
-                  <span aria-hidden="true">{String(resultCount)}</span>
-                  <span className="sr-only">{resultsLabel}</span>
-                </span>
+                {/* Said, with its unit, by the status above */}
+                <span className="flex-none text-xs text-tertiary" aria-hidden="true">{String(resultCount)}</span>
               </div>
             )}
             {resultCount === 0 ? (
@@ -267,7 +271,11 @@ const LibraryView: FC<LibraryViewProps> = ({
                     onCreateFromSearch(searchedFor, activeFilter.kind === 'category' ? activeFilterLabel : undefined);
                   }}
                   filterLabel={activeFilter.kind === 'all' ? undefined : activeFilterLabel}
-                  onSearchAll={activeFilter.kind === 'all' ? undefined : () => { onLibraryFilterChange(ALL_PROMPTS); }}
+                  onSearchAll={activeFilter.kind === 'all' ? undefined : () => {
+                    // The button leaves with the filter: the keyboard goes to the All pill
+                    setFocusAll(true);
+                    onLibraryFilterChange(ALL_PROMPTS);
+                  }}
                 />
               </div>
             ) : (

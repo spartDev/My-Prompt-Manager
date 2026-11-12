@@ -111,7 +111,7 @@ test.describe('Library search bar', () => {
 
       // The list of a search: one heading, the number found, the first match marked
       await expect(page.getByTestId('list-header')).toContainText('Results');
-      await expect(page.getByRole('status')).toHaveText(/2 results/);
+      await expect(page.getByTestId('search-status')).toHaveText('2 results');
       const mark = page.getByTestId('prompt-card').first().locator('mark').first();
       await expect(mark).toHaveText('email');
       await expect(mark).toHaveCSS('background-color', colors.highlight);

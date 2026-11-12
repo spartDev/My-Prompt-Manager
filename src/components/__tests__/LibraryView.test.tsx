@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -80,6 +80,20 @@ const ReviewHarness = ({ prompts }: { prompts: Prompt[] }) => {
       {...defaultProps}
       prompts={prompts}
       searchWithDebounce={createMockSearchWithDebounce(prompts)}
+      libraryFilter={filter}
+      onLibraryFilterChange={setFilter}
+    />
+  );
+};
+
+/** A Library on the Work Category whose search finds nothing there, and `foundUnderAll` under All */
+const SearchAllHarness = ({ library, foundUnderAll }: { library: Prompt[]; foundUnderAll: Prompt[] }) => {
+  const [filter, setFilter] = useState<LibraryFilter>({ kind: 'category', categoryId: 'work' });
+  return (
+    <LibraryView
+      {...defaultProps}
+      prompts={library}
+      searchWithDebounce={createMockSearchWithDebounce(filter.kind === 'all' ? foundUnderAll : [], 'pinned')}
       libraryFilter={filter}
       onLibraryFilterChange={setFilter}
     />
@@ -317,6 +331,16 @@ describe('LibraryView', () => {
       expect(clearSearch).not.toHaveBeenCalled();
     });
 
+    it('moves the keyboard to All when Search all prompts leaves with its filter', async () => {
+      const user = userEvent.setup();
+      render(<SearchAllHarness library={library} foundUnderAll={[pinned]} />);
+
+      await user.click(screen.getByRole('button', { name: 'Search all prompts' }));
+
+      expect(screen.queryByRole('button', { name: 'Search all prompts' })).not.toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: 'All' })).toHaveFocus();
+    });
+
     it('does not offer to search all prompts when All finds nothing', () => {
       renderWith(ALL_PROMPTS, { searchWithDebounce: createMockSearchWithDebounce([], 'zzz') });
 
@@ -378,9 +402,10 @@ describe('LibraryView', () => {
       const header = screen.getByTestId('list-header');
       expect(header).toHaveTextContent('Results');
       const status = screen.getByRole('status');
-      expect(header).toContainElement(status);
       expect(status).toHaveAttribute('aria-live', 'polite');
       expect(status).toHaveTextContent('2 results');
+      // The number shown is the same one, not said twice
+      expect(within(header).getByText('2')).toHaveAttribute('aria-hidden', 'true');
       // The count of the header is no longer announced as well
       expect(screen.getByText(/^2 of \d+ prompts$/)).not.toHaveAttribute('aria-live');
     });
@@ -402,7 +427,8 @@ describe('LibraryView', () => {
       renderWith(ALL_PROMPTS);
 
       expect(screen.queryByTestId('list-header')).not.toBeInTheDocument();
-      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+      // The status is already there, saying nothing: its first number is then a change, which is announced
+      expect(screen.getByRole('status')).toBeEmptyDOMElement();
     });
 
     describe('cards rising', () => {
