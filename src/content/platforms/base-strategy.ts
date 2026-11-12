@@ -239,10 +239,11 @@ export abstract class PlatformStrategy implements PlatformStrategyInterface {
   /**
    * Writes `text` straight into a contenteditable input field as its whole content, one <br>
    * between two lines so the breaks show whatever the field does with spaces, puts the caret
-   * after its first `caret` characters, and tells the page as typing `inserted` would.
+   * after its first `caret` characters, and tells the page as typing `inserted` would, or, with
+   * no `inserted` text, that its content was replaced.
    * @returns Failure when an editor whose own handler rebuilt its content did not keep the text
    */
-  private writeEditableText(element: HTMLElement, text: string, caret: number, inserted: string, via: string): InsertionResult {
+  private writeEditableText(element: HTMLElement, text: string, caret: number, inserted: string | null, via: string): InsertionResult {
     const document = element.ownerDocument;
     const lines = text.split('\n');
     const content = document.createDocumentFragment();
@@ -287,7 +288,10 @@ export abstract class PlatformStrategy implements PlatformStrategyInterface {
     }
     // The event carries what was inserted, not the text around it: an editor that takes the
     // data of an input event as new text would put the draft in a second time
-    element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: inserted }));
+    // A field whose whole content was replaced (Undo) is told so, with no text to insert at all
+    element.dispatchEvent(inserted === null
+      ? new InputEvent('input', { bubbles: true, inputType: 'insertReplacementText', data: null })
+      : new InputEvent('input', { bubbles: true, inputType: 'insertText', data: inserted }));
     // An editor whose own handler rebuilt its content did not take the text
     if (readInputText(element) !== text) {
       return { success: false, error: 'The input field did not keep the text' };
@@ -326,7 +330,7 @@ export abstract class PlatformStrategy implements PlatformStrategyInterface {
       return { success: true, method: `${via}-execCommand` };
     }
     // No editing command, or the editor laid the text out differently: write it directly
-    return this.writeEditableText(element, text, text.length, text, via);
+    return this.writeEditableText(element, text, text.length, null, via);
   }
 
   /**

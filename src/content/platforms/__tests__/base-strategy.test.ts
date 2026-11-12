@@ -194,6 +194,25 @@ describe('PlatformStrategy', () => {
       field.remove();
     });
 
+    it('tells the page the content of a contenteditable was replaced, with no text to insert', async () => {
+      const field = document.createElement('div');
+      field.setAttribute('contenteditable', 'true');
+      field.innerHTML = '<p>Inserted prompt</p>';
+      document.body.append(field);
+      const heard: { inputType: string; data: string | null }[] = [];
+      field.addEventListener('input', (event) => {
+        const { inputType, data } = event as InputEvent;
+        // No data is null in a browser, an empty string in the test DOM
+        heard.push({ inputType, data: data || null });
+      });
+
+      await new TestStrategy().restore(field, 'Draft');
+
+      // An editor that takes the data of an input event as new text would add the draft to the Prompt
+      expect(heard).toEqual([{ inputType: 'insertReplacementText', data: null }]);
+      field.remove();
+    });
+
     it.each([
       ['First line\nSecond line', 'First line<br>Second line'],
       ['First line\n\nThird line', 'First line<br><br>Third line'],
