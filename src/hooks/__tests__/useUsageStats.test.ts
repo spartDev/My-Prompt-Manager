@@ -394,16 +394,26 @@ describe('useUsageStats', () => {
     });
 
     it('still gives the Categories when a stored Insertion overtakes the first read', async () => {
-      const { result } = renderHook(() => useUsageStats());
-      // Before the first read ends: it is superseded, and commits nothing
       const history = [buildUsageEvent({ promptId: 'prompt-1' })];
-      await act(async () => { await chrome.storage.local.set({ [USAGE_STORAGE_KEY]: history }); });
-      act(() => { triggerChromeStorageChange({ [USAGE_STORAGE_KEY]: { newValue: history } }); });
+      await chrome.storage.local.set({ [USAGE_STORAGE_KEY]: history });
+      // The first read is held, so the reload below is sure to start, and end, before it
+      const releases: Array<(events: UsageEvent[]) => void> = [];
+      const getHistory = vi.spyOn(UsageTracker.getInstance(), 'getHistory')
+        .mockImplementationOnce(() => new Promise<UsageEvent[]>(resolve => { releases.push(resolve); }));
+      const { result } = renderHook(() => useUsageStats());
+      await waitFor(() => { expect(releases).toHaveLength(1); });
 
+      act(() => { triggerChromeStorageChange({ [USAGE_STORAGE_KEY]: { newValue: history } }); });
       await waitFor(() => { expect(result.current.history).toHaveLength(1); });
-      await waitFor(() => { expect(result.current.loading).toBe(false); });
       expect(result.current.categories).toHaveLength(3);
       expect(result.current.prompts).toHaveLength(3);
+
+      // The first read ends last: superseded, it commits nothing and ends the loading state
+      await act(async () => { releases[0]([]); await Promise.resolve(); });
+      await waitFor(() => { expect(result.current.loading).toBe(false); });
+      expect(result.current.history).toHaveLength(1);
+      expect(result.current.categories).toHaveLength(3);
+      getHistory.mockRestore();
     });
 
     it('ignores what is stored under another key', async () => {
