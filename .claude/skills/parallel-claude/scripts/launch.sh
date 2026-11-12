@@ -251,8 +251,8 @@ launch_parallel() {
     # Claim issues first: a failed claim leaves the running session alone
     print_info "Claiming issues..."
     claim_issues "${issues[@]}" || return 1
-    # From here a failed setup (worktree, tmux) gives the claims back
-    trap release_claims EXIT
+    # From here a failed setup (worktree, tmux) gives the claims back; the cache is still removed
+    trap 'release_claims; cleanup_cache' EXIT
 
     # Kill existing session
     tmux kill-session -t "$SESSION" 2>/dev/null || true
@@ -314,7 +314,7 @@ launch_parallel() {
     print_info "Attaching..."
     sleep 1
 
-    trap - EXIT
+    trap cleanup_cache EXIT
     LAUNCH_CLAIMS=()
     tmux attach-session -t "$SESSION"
 }
