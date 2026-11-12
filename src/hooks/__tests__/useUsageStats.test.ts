@@ -393,6 +393,19 @@ describe('useUsageStats', () => {
       getHistory.mockRestore();
     });
 
+    it('still gives the Categories when a stored Insertion overtakes the first read', async () => {
+      const { result } = renderHook(() => useUsageStats());
+      // Before the first read ends: it is superseded, and commits nothing
+      const history = [buildUsageEvent({ promptId: 'prompt-1' })];
+      await act(async () => { await chrome.storage.local.set({ [USAGE_STORAGE_KEY]: history }); });
+      act(() => { triggerChromeStorageChange({ [USAGE_STORAGE_KEY]: { newValue: history } }); });
+
+      await waitFor(() => { expect(result.current.history).toHaveLength(1); });
+      await waitFor(() => { expect(result.current.loading).toBe(false); });
+      expect(result.current.categories).toHaveLength(3);
+      expect(result.current.prompts).toHaveLength(3);
+    });
+
     it('ignores what is stored under another key', async () => {
       const { result } = renderHook(() => useUsageStats());
       await waitFor(() => { expect(result.current.loading).toBe(false); });

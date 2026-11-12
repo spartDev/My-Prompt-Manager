@@ -167,7 +167,8 @@ export function useUsageStats(): UseUsageStatsReturn {
   }, [refresh]);
 
   // An Insertion counted while the view stays open (the side panel, beside a Platform) shows at once:
-  // the history and the Prompts are read again, without the loading state, so nothing flickers
+  // the history, the Prompts and the Categories are read again, without the loading state, so nothing
+  // flickers
   useEffect(() => {
     // chrome.storage.onChanged may not be available in all contexts (see useTheme)
     const onChangedApi = typeof chrome !== 'undefined' ? chrome.storage.onChanged : undefined;
@@ -176,11 +177,14 @@ export function useUsageStats(): UseUsageStatsReturn {
     const handleStorageChange = (changes: { [key: string]: chrome.storage.StorageChange }, areaName: string) => {
       if (areaName !== 'local' || !(USAGE_STORAGE_KEY in changes)) { return; }
       const generation = ++generationRef.current;
-      void Promise.all([UsageTracker.getInstance().getHistory(), StorageManager.getInstance().getPrompts()])
-        .then(([usageHistory, allPrompts]) => {
+      // Everything the first read gives: this reload may overtake it, and it then commits nothing
+      const storageManager = StorageManager.getInstance();
+      void Promise.all([UsageTracker.getInstance().getHistory(), storageManager.getPrompts(), storageManager.getCategories()])
+        .then(([usageHistory, allPrompts, allCategories]) => {
           if (stale || generation !== generationRef.current) { return; }
           setHistory(usageHistory);
           setPrompts(allPrompts);
+          setCategories(allCategories);
         })
         .catch((err: unknown) => {
           Logger.error('Failed to reload usage history', toError(err), { component: 'useUsageStats' });
