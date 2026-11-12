@@ -776,8 +776,9 @@ export class MistralStrategy extends PlatformStrategy {
 
       // Fallback to textarea, where its caret is
       if (element instanceof HTMLTextAreaElement) {
-        this.insertIntoTextControl(element, content);
-        return { success: true, method: 'mistral-textarea' };
+        return this.insertIntoTextControl(element, content)
+          ? { success: true, method: 'mistral-textarea' }
+          : { success: false, error: 'The input field did not keep the text' };
       }
 
       return { success: false, error: 'Unsupported element type' };

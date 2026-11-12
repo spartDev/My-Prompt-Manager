@@ -237,14 +237,17 @@ export function removeTypedTrigger(field: HTMLElement): boolean {
  * as offsets in the value of a <textarea> or an <input>, as a range in a contenteditable. Null
  * when the field has no caret: the Prompt then goes after what the field holds.
  */
-export type InsertionPoint = { start: number; end: number } | Range | null;
+export type InsertionPoint = { start: number; end: number; direction?: 'forward' | 'backward' | 'none' } | Range | null;
 
 /** The caret or the selection of the input field now, to be put back with `selectInsertionPoint`. */
 export function insertionPointOf(field: HTMLElement): InsertionPoint {
   if (isTextControl(field)) {
     try {
-      const { selectionStart, selectionEnd } = field;
-      return selectionStart === null ? null : { start: selectionStart, end: selectionEnd ?? selectionStart };
+      const { selectionStart, selectionEnd, selectionDirection } = field;
+      // The direction too: it says at which end of a selection the caret is
+      return selectionStart === null
+        ? null
+        : { start: selectionStart, end: selectionEnd ?? selectionStart, direction: selectionDirection ?? undefined };
     } catch {
       // An <input> of a type without a text selection
       return null;
@@ -267,9 +270,9 @@ export function insertionPointOf(field: HTMLElement): InsertionPoint {
 export function selectInsertionPoint(field: HTMLElement, point: InsertionPoint): void {
   if (isTextControl(field)) {
     const end = field.value.length;
-    const { start, end: until } = point && !(point instanceof Range) ? point : { start: end, end };
+    const { start, end: until, direction } = point && !(point instanceof Range) ? point : { start: end, end, direction: undefined };
     try {
-      field.setSelectionRange(Math.min(start, end), Math.min(until, end));
+      field.setSelectionRange(Math.min(start, end), Math.min(until, end), direction);
     } catch {
       // An <input> of a type without a text selection
     }

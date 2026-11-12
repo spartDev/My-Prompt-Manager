@@ -149,6 +149,18 @@ describe.each(PLATFORMS)('$platform: an Insertion goes where the caret is', ({ s
         expect(heard).toEqual(['input', 'change']);
       });
 
+      it('fails when the page puts back the value it had: the Prompt did not arrive', async () => {
+        const held = field.value;
+        field.addEventListener('input', () => {
+          field.value = held;
+        });
+        field.setSelectionRange(7, 7);
+
+        const result = await strategy().insert(field, 'PROMPT ');
+
+        expect(result.success).toBe(false);
+      });
+
       it('Undo puts back the text the field held', async () => {
         const held = field.value;
         field.setSelectionRange(7, 15);

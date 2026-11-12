@@ -68,7 +68,10 @@ export abstract class ReactPlatformStrategy extends PlatformStrategy {
     platformName: string,
     methodName?: string
   ): Promise<InsertionResult> {
-    this.insertIntoTextControl(element, content);
+    // A page whose own handler rewrote the value did not take the text
+    if (!this.insertIntoTextControl(element, content)) {
+      return Promise.resolve({ success: false, error: 'The input field did not keep the text' });
+    }
 
     this._debug(`${platformName} insertion successful`);
 

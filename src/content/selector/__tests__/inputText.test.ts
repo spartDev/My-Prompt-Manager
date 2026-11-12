@@ -380,6 +380,17 @@ describe('insertionPointOf and selectInsertionPoint', () => {
     expect([field.selectionStart, field.selectionEnd]).toEqual([7, 15]);
   });
 
+  it('give a textarea its selection back in the direction it was made', () => {
+    const field = textarea('before selected after');
+    field.setSelectionRange(7, 15, 'backward');
+    const point = insertionPointOf(field);
+    field.setSelectionRange(0, 0);
+
+    selectInsertionPoint(field, point);
+
+    expect(field.selectionDirection).toBe('backward');
+  });
+
   it('keep the selection of a textarea inside a value that got shorter meanwhile', () => {
     const field = textarea('before selected after');
     field.setSelectionRange(7, 15);

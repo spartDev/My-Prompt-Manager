@@ -22,6 +22,7 @@ const GEMINI_PLATFORM_PRIORITY = 85;
  */
 interface QuillEditor {
   getSelection(focus?: boolean): { index: number; length: number } | null;
+  getText?(): string;
   deleteText(index: number, length: number): void;
   insertText(index: number, text: string): void;
   getLength(): number;
@@ -118,8 +119,9 @@ export class GeminiStrategy extends PlatformStrategy {
     const quillElement = this._findQuillEditor(element);
 
     // Method 1: Try Quill.js API
+    // An editor that took the text through its API and did not keep it is not written to again
     const quillResult = this._tryQuillInsertion(quillElement, content);
-    if (quillResult.success) {
+    if (quillResult.success || quillResult.error) {
       return Promise.resolve(quillResult);
     }
 
@@ -234,14 +236,23 @@ export class GeminiStrategy extends PlatformStrategy {
         // text at its end, before the line break Quill ends its own text with
         const selection = quill.getSelection(true);
         const index = selection?.index ?? Math.max(quill.getLength() - 1, 0);
-        if (selection && selection.length > 0) {
-          quill.deleteText(index, selection.length);
+        const selected = selection?.length ?? 0;
+        // What the editor must hold afterwards, when it can be read
+        const held = typeof quill.getText === 'function' ? quill.getText() : null;
+        const expected = held === null ? null : held.slice(0, index) + content + held.slice(index + selected);
+        if (selected > 0) {
+          quill.deleteText(index, selected);
         }
         quill.insertText(index, content);
         quill.setSelection(index + content.length, 0);
 
         // Trigger events for Angular change detection
         this._dispatchAngularEvents(element, content);
+
+        // A page whose own handlers changed the editor's text did not take the Prompt
+        if (expected !== null && quill.getText?.() !== expected) {
+          return { success: false, error: 'The input field did not keep the text' };
+        }
 
         this._debug('Quill API insertion successful');
         return { success: true, method: 'gemini-quill-api' };

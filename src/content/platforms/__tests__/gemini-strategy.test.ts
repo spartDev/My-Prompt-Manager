@@ -250,39 +250,61 @@ describe('GeminiStrategy', () => {
   });
 
   describe('insert - through the Quill API', () => {
-    const quillOn = (element: HTMLElement, selection: { index: number; length: number } | null) => {
+    /**
+     * A Quill editor that keeps its text and its selection, as the live one does: its text ends
+     * with a line break of its own, and an editor that is not focused has no selection.
+     */
+    const quillOn = (element: HTMLElement, held: string, selection: { index: number; length: number } | null) => {
+      const state = { text: `${held}\n`, selection };
       const quill = {
-        getSelection: vi.fn().mockReturnValue(selection),
-        getLength: vi.fn().mockReturnValue('before selected after\n'.length),
-        deleteText: vi.fn(),
-        insertText: vi.fn(),
-        setSelection: vi.fn(),
-        setText: vi.fn()
+        getSelection: () => state.selection,
+        getLength: () => state.text.length,
+        getText: () => state.text,
+        deleteText: (index: number, length: number) => {
+          state.text = state.text.slice(0, index) + state.text.slice(index + length);
+        },
+        insertText: (index: number, text: string) => {
+          state.text = state.text.slice(0, index) + text + state.text.slice(index);
+        },
+        setSelection: (index: number, length = 0) => {
+          state.selection = { index, length };
+        }
       };
       (element as HTMLElement & { __quill?: unknown }).__quill = quill;
-      return quill;
+      return state;
     };
 
     it('inserts at the caret, in place of the selected text, and leaves the caret after the Prompt', async () => {
-      const quill = quillOn(mockElement, { index: 7, length: 8 });
+      const editor = quillOn(mockElement, 'before selected after', { index: 7, length: 8 });
 
       const result = await strategy.insert(mockElement, 'PROMPT');
 
       expect(result).toEqual({ success: true, method: 'gemini-quill-api' });
-      expect(quill.deleteText).toHaveBeenCalledWith(7, 8);
-      expect(quill.insertText).toHaveBeenCalledWith(7, 'PROMPT');
-      expect(quill.setSelection).toHaveBeenCalledWith(13, 0);
-      expect(quill.setText).not.toHaveBeenCalled();
+      expect(editor.text).toBe('before PROMPT after\n');
+      expect(editor.selection).toEqual({ index: 13, length: 0 });
     });
 
     it('inserts after what the editor holds when it has no caret', async () => {
-      const quill = quillOn(mockElement, null);
+      const editor = quillOn(mockElement, 'before selected after', null);
 
-      await strategy.insert(mockElement, 'PROMPT');
+      await strategy.insert(mockElement, ' PROMPT');
 
       // Quill ends its text with a line break of its own: the Prompt goes before it
-      expect(quill.insertText).toHaveBeenCalledWith(21, 'PROMPT');
-      expect(quill.deleteText).not.toHaveBeenCalled();
+      expect(editor.text).toBe('before selected after PROMPT\n');
+    });
+
+    it('fails, and inserts nothing a second time, when the page puts the editor back as it was', async () => {
+      const editor = quillOn(mockElement, 'before after', { index: 7, length: 0 });
+      mockElement.addEventListener('input', () => {
+        editor.text = 'before after\n';
+      });
+      const execCommand = vi.fn().mockReturnValue(true);
+      document.execCommand = execCommand;
+
+      const result = await strategy.insert(mockElement, 'PROMPT ');
+
+      expect(result.success).toBe(false);
+      expect(execCommand).not.toHaveBeenCalled();
     });
   });
 

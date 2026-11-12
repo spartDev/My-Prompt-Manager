@@ -55,7 +55,10 @@ export class ChatGPTStrategy extends PlatformStrategy {
       }
 
       // Through the native value setter, which is what makes React see the change
-      this.insertIntoTextControl(element as HTMLTextAreaElement, content);
+      // A page whose own handler rewrote the value did not take the text
+      if (!this.insertIntoTextControl(element as HTMLTextAreaElement, content)) {
+        return Promise.resolve({ success: false, error: 'The input field did not keep the text' });
+      }
 
       this._debug('ChatGPT React insertion successful');
       return Promise.resolve({ success: true, method: 'chatgpt-react' });

@@ -40,7 +40,10 @@ export class DefaultStrategy extends PlatformStrategy {
 
       // Handle different element types with basic insertion
       if (element.tagName === 'TEXTAREA' || element.tagName === 'INPUT') {
-        this.insertIntoTextControl(element as HTMLInputElement | HTMLTextAreaElement, content);
+        // A page whose own handler rewrote the value did not take the text
+        if (!this.insertIntoTextControl(element as HTMLInputElement | HTMLTextAreaElement, content)) {
+          return Promise.resolve({ success: false, error: 'The input field did not keep the text' });
+        }
       } else if (element.contentEditable === 'true' || element.contentEditable === 'TRUE') {
         // Through the editing command, so an editor behind the field keeps the line breaks
         const result = this.insertEditableText(element, content, 'default');
