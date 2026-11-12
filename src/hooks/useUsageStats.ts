@@ -178,11 +178,15 @@ export function useUsageStats(): UseUsageStatsReturn {
   // so nothing flickers. A reload that overtakes a read still loading ends that loading state itself
   useEffect(() => {
     // chrome.storage.onChanged may not be available in all contexts (see useTheme)
-    const onChangedApi = typeof chrome !== 'undefined' ? chrome.storage.onChanged : undefined;
+    // and chrome.storage itself may be missing when analytics.html opens before the extension is ready
+    const storageApi = typeof chrome !== 'undefined' ? chrome.storage : undefined;
+    const onChangedApi = storageApi ? storageApi.onChanged : undefined;
     if (!onChangedApi) { return; }
     let stale = false;
     const handleStorageChange = (changes: { [key: string]: chrome.storage.StorageChange }, areaName: string) => {
-      if (areaName !== 'local' || !(USAGE_STORAGE_KEY in changes)) { return; }
+      // An Insertion writes the history and the Prompt's use count apart, in either order: reading
+      // on the history alone could keep a Prompt just inserted among the Never used
+      if (areaName !== 'local' || !(USAGE_STORAGE_KEY in changes || 'prompts' in changes)) { return; }
       const generation = ++generationRef.current;
       // Everything the first read gives: this reload may overtake it, and it then commits nothing
       const storageManager = StorageManager.getInstance();

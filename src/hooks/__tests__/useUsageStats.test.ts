@@ -480,6 +480,39 @@ describe('useUsageStats', () => {
       getHistory.mockRestore();
     });
 
+    it('reads the Prompts again when the use count is stored after the history', async () => {
+      const { result } = renderHook(() => useUsageStats());
+      await waitFor(() => { expect(result.current.loading).toBe(false); });
+
+      // The history change comes first and reads the Prompt before its use is counted
+      const history = [buildUsageEvent({ promptId: 'prompt-1' })];
+      await chrome.storage.local.set({ [USAGE_STORAGE_KEY]: history });
+      act(() => { triggerChromeStorageChange({ [USAGE_STORAGE_KEY]: { newValue: history } }); });
+      await waitFor(() => { expect(result.current.history).toHaveLength(1); });
+
+      const counted = mockPrompts.map(prompt => (prompt.id === 'prompt-1' ? { ...prompt, usageCount: 1 } : prompt));
+      await chrome.storage.local.set({ prompts: counted });
+      act(() => { triggerChromeStorageChange({ prompts: { newValue: counted } }); });
+
+      await waitFor(() => {
+        expect(result.current.prompts.find(prompt => prompt.id === 'prompt-1')?.usageCount).toBe(1);
+      });
+      expect(result.current.loading).toBe(false);
+    });
+
+    it('does not throw when chrome.storage is not there yet', () => {
+      const storage = chrome.storage;
+      Reflect.deleteProperty(chrome, 'storage');
+      try {
+        // The reads fail without storage; only the subscription is under test
+        const getHistory = vi.spyOn(UsageTracker.getInstance(), 'getHistory').mockResolvedValue([]);
+        expect(() => renderHook(() => useUsageStats()).unmount()).not.toThrow();
+        getHistory.mockRestore();
+      } finally {
+        Object.assign(chrome, { storage });
+      }
+    });
+
     it('ignores what is stored under another key', async () => {
       const { result } = renderHook(() => useUsageStats());
       await waitFor(() => { expect(result.current.loading).toBe(false); });
