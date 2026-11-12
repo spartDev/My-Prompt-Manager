@@ -17,7 +17,7 @@ import { ThemeManager } from '../utils/theme-manager';
 
 import { loadSelectorFont } from './font';
 import type { FieldBox } from './InsertionFeedback';
-import { focusAtEnd, MODIFIER_KEYS, readInputText } from './inputText';
+import { focusAtEnd, type InsertionPoint, insertionPointOf, MODIFIER_KEYS, readInputText, selectInsertionPoint } from './inputText';
 import { DURATION, prefersReducedMotion } from './motion';
 import { type AnchorRect, chooseSide, computePlacement, type Side } from './position';
 import type { SelectorRoot } from './render';
@@ -38,7 +38,8 @@ export interface SelectorCallbacks {
   loadLibrary: () => Promise<SelectorLibrary>;
   /**
    * Inserts the chosen Prompt, once the selector has closed. `content` has its Variables filled in.
-   * Resolves to whether the text arrived in the input field.
+   * It goes where the selection of `target` is, which is by then the caret the field had when the
+   * selector opened. Resolves to whether the text arrived in the input field.
    */
   insert: (prompt: Prompt, content: string, target: HTMLElement) => boolean | Promise<boolean>;
   /** Undo: puts `text` back as the whole content of the input field. Resolves to whether it did. */
@@ -53,6 +54,8 @@ interface OpenSession {
   side: Side;
   /** Whether the focus goes back to the input field once the selector has closed. */
   restoreFocus: boolean;
+  /** Where the caret of the input field was when the selector opened: where an Insertion goes. */
+  point: InsertionPoint;
   /** Where the input field was when the selector was last placed: it may be gone when the selector has closed. */
   field: FieldBox;
   teardown: () => void;
@@ -98,6 +101,11 @@ export class PromptSelectorController {
   private loading: number | null = null;
   /** The button of the opening that is loading: the latest one, if the Platform replaced it meanwhile. */
   private loadingTrigger: HTMLElement | null = null;
+  /**
+   * The elements that have held the focus. A <textarea> or an <input> nobody was in reads as if
+   * its caret were at its start: only in a field that is here is the caret the user's.
+   */
+  private readonly visited = new WeakSet<Element>();
   private readonly onThemeChange = (theme: 'light' | 'dark'): void => {
     this.host?.setAttribute('data-theme', theme);
   };
@@ -107,6 +115,15 @@ export class PromptSelectorController {
     // extension was updated or reloaded): open or not, it is dead, so it goes
     document.getElementById(SELECTOR_HOST_ID)?.remove();
     this.store.subscribe(() => { this.onStateChange(); });
+    // Kept for as long as the content script lives: the controller opens again after destroy()
+    if (document.activeElement) {
+      this.visited.add(document.activeElement);
+    }
+    document.addEventListener('focusin', (event) => {
+      if (event.target instanceof Element) {
+        this.visited.add(event.target);
+      }
+    }, true);
   }
 
   /** True from the opening until the closing animation has run. */
@@ -138,6 +155,8 @@ export class PromptSelectorController {
     const opening = ++this.openings;
     this.loading = opening;
     this.loadingTrigger = trigger;
+    // Read now: once the selector shows, the focus and the page's selection are in it
+    const point = this.insertionPoint(target);
     try {
       this.finishClose();
       // The user moved on: the confirmation of the last Insertion goes, and with it its Undo
@@ -154,7 +173,7 @@ export class PromptSelectorController {
 
       const current = this.loadingTrigger;
       const side = chooseSide(this.anchor({ target, trigger: current }), this.viewport());
-      this.session = { target, trigger: current, side, restoreFocus: true, field: boxOf(target), teardown: this.listen(target) };
+      this.session = { target, trigger: current, side, restoreFocus: true, point, field: boxOf(target), teardown: this.listen(target) };
       this.store.dispatch({ type: 'open', library });
       this.render();
       this.callbacks.onOpenChange?.(true, current);
@@ -170,6 +189,14 @@ export class PromptSelectorController {
         this.loading = null;
       }
     }
+  }
+
+  /** Where an Insertion goes in `target`: its caret or selection, or null for after what it holds. */
+  private insertionPoint(target: HTMLElement): InsertionPoint {
+    const point = insertionPointOf(target);
+    const atStart = point !== null && !(point instanceof Range) && point.start === 0 && point.end === 0;
+    // The start of a field the user was never in is no caret of theirs
+    return atStart && !this.visited.has(target) && document.activeElement !== target ? null : point;
   }
 
   /**
@@ -412,7 +439,7 @@ export class PromptSelectorController {
     if (pending && prompt && session.target.isConnected) {
       // A click elsewhere while the selector was closing, or the focus taken to another control
       // with the keyboard, already put the focus where the user wants it
-      void this.insert(prompt, pending, session.target, !session.restoreFocus || focusLeft);
+      void this.insert(prompt, pending, session.target, session.point, !session.restoreFocus || focusLeft);
     } else if (pending && prompt) {
       // The Platform replaced its input field while the selector closed: the Prompt has nowhere to go
       this.showFeedback({ kind: 'failed', title: prompt.title, target: null, field: session.field, previous: '' });
@@ -423,11 +450,12 @@ export class PromptSelectorController {
   }
 
   /**
-   * Hands the chosen Prompt back for Insertion, with its Variables filled in when the user filled
-   * some, then confirms it: the focus is in the input field with the caret at the end, and the
-   * pill offers Undo. A failed Insertion is said, with nothing to undo. Never throws.
+   * Hands the chosen Prompt back for Insertion where the caret of the input field was when the
+   * selector opened, with its Variables filled in when the user filled some, then confirms it: the
+   * focus is in the input field with the caret after the Prompt, and the pill offers Undo. A
+   * failed Insertion is said, with nothing to undo. Never throws.
    */
-  private async insert(prompt: Prompt, pending: PendingInsertion, target: HTMLElement, movedOnAlready: boolean): Promise<void> {
+  private async insert(prompt: Prompt, pending: PendingInsertion, target: HTMLElement, point: InsertionPoint, movedOnAlready: boolean): Promise<void> {
     const destructions = this.destructions;
     const previous = readInputText(target);
     // Where the field is now: the Platform may replace it while it takes the text
@@ -456,6 +484,8 @@ export class PromptSelectorController {
     try {
       // A Prompt inserted as saved arrives Verbatim; filling its Variables in is the user's own change
       const content = pending.values === null ? prompt.content : fillVariables(prompt.content, pending.values);
+      // The field takes the Prompt where its caret was when the selector opened
+      selectInsertionPoint(target, point);
       inserted = await this.callbacks.insert(prompt, content, target);
     } catch (err) {
       logError('Failed to insert the chosen prompt', err instanceof Error ? err : new Error(String(err)), { promptId: prompt.id });
@@ -481,7 +511,13 @@ export class PromptSelectorController {
     }
     if (target.isConnected) {
       if (inserted) {
-        focusAtEnd(target);
+        // The Platform left the caret right after the Prompt. A field it left without a caret
+        // takes it after its last character
+        if (insertionPointOf(target) === null) {
+          focusAtEnd(target);
+        } else {
+          target.focus({ preventScroll: true });
+        }
       } else if (!movedOn) {
         // A failure is still said to a user who has gone on, but the focus stays where they put it
         target.focus({ preventScroll: true });

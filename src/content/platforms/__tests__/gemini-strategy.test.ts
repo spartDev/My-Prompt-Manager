@@ -4,7 +4,9 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { editorCommand } from '../../../test/helpers/editor-command';
 import { expectNoMarkupIn, HOSTILE_TEXTS } from '../../../test/helpers/hostile-text';
+import { readInputText } from '../../selector/inputText';
 import type { UIElementFactory } from '../../ui/element-factory';
 import { GeminiStrategy } from '../gemini-strategy';
 
@@ -143,7 +145,7 @@ describe('GeminiStrategy', () => {
       const result = await strategy.insert(mockElement, content);
 
       expect(result.success).toBe(true);
-      expect(mockElement.textContent).toBe(content);
+      expect(readInputText(mockElement)).toBe(content);
     });
 
     it('should not shorten long content', async () => {
@@ -162,13 +164,12 @@ describe('GeminiStrategy', () => {
       expect(mockElement.textContent).toBe(content);
     });
 
-    it('should try DOM manipulation for contenteditable elements', async () => {
-      const content = 'Test prompt';
-
-      const result = await strategy.insert(mockElement, content);
+    it('should write the text itself when there is no editing command', async () => {
+      const result = await strategy.insert(mockElement, 'Test prompt');
 
       expect(result.success).toBe(true);
-      expect(result.method).toBe('gemini-dom-manipulation');
+      expect(result.method).toBe('gemini-dom');
+      expect(mockElement.textContent).toBe('Test prompt');
     });
 
     it('should dispatch input and change events after insertion', async () => {
@@ -186,16 +187,6 @@ describe('GeminiStrategy', () => {
       mockElement.removeEventListener('change', changeSpy);
     });
 
-    it('should create paragraph with text node for Quill structure', async () => {
-      const content = 'Test prompt';
-
-      await strategy.insert(mockElement, content);
-
-      const paragraph = mockElement.querySelector('p');
-      expect(paragraph).toBeTruthy();
-      expect(paragraph?.textContent).toBe(content);
-    });
-
     it('should return error if all insertion methods fail', async () => {
       const nonEditableElement = document.createElement('div');
       nonEditableElement.contentEditable = 'false';
@@ -208,35 +199,90 @@ describe('GeminiStrategy', () => {
   });
 
   describe.each(HOSTILE_TEXTS)('hostile-looking text %j', (text) => {
+    beforeEach(() => {
+      document.body.appendChild(mockElement);
+      document.getSelection()?.removeAllRanges();
+    });
+
+    afterEach(() => {
+      mockElement.remove();
+    });
+
     it('goes to the Quill API as the same text', async () => {
-      const setText = vi.fn();
-      (mockElement as HTMLElement & { __quill?: unknown }).__quill = { setText };
+      const insertText = vi.fn();
+      (mockElement as HTMLElement & { __quill?: unknown }).__quill = {
+        getSelection: () => ({ index: 0, length: 0 }),
+        getLength: () => 1,
+        deleteText: vi.fn(),
+        insertText,
+        setSelection: vi.fn()
+      };
 
       const result = await strategy.insert(mockElement, text);
 
       expect(result.method).toBe('gemini-quill-api');
-      expect(setText).toHaveBeenCalledWith(text);
+      expect(insertText).toHaveBeenCalledWith(0, text);
       expectNoMarkupIn(mockElement);
     });
 
     it('goes to execCommand as the same text', async () => {
-      const execCommandSpy = vi.spyOn(document, 'execCommand').mockReturnValue(true);
+      const execCommand = editorCommand(mockElement);
+      document.execCommand = execCommand;
 
       const result = await strategy.insert(mockElement, text);
 
       expect(result.method).toBe('gemini-execCommand');
-      expect(execCommandSpy).toHaveBeenCalledWith('insertText', false, text);
-      expectNoMarkupIn(mockElement);
+      expect(execCommand).toHaveBeenCalledWith('insertText', false, text);
+      expect(readInputText(mockElement)).toBe(text);
+      // The paragraph is the stand-in editor's own structure
+      expectNoMarkupIn(mockElement, ['p']);
     });
 
-    it('is set as a text node when the editor is filled directly', async () => {
-      vi.spyOn(document, 'execCommand').mockReturnValue(false);
+    it('is written as text when the editor is filled directly', async () => {
+      document.execCommand = vi.fn().mockReturnValue(false);
 
       const result = await strategy.insert(mockElement, text);
 
-      expect(result.method).toBe('gemini-dom-manipulation');
+      expect(result.method).toBe('gemini-dom');
       expect(mockElement.textContent).toBe(text);
-      expectNoMarkupIn(mockElement, ['p']);
+      expectNoMarkupIn(mockElement);
+    });
+  });
+
+  describe('insert - through the Quill API', () => {
+    const quillOn = (element: HTMLElement, selection: { index: number; length: number } | null) => {
+      const quill = {
+        getSelection: vi.fn().mockReturnValue(selection),
+        getLength: vi.fn().mockReturnValue('before selected after\n'.length),
+        deleteText: vi.fn(),
+        insertText: vi.fn(),
+        setSelection: vi.fn(),
+        setText: vi.fn()
+      };
+      (element as HTMLElement & { __quill?: unknown }).__quill = quill;
+      return quill;
+    };
+
+    it('inserts at the caret, in place of the selected text, and leaves the caret after the Prompt', async () => {
+      const quill = quillOn(mockElement, { index: 7, length: 8 });
+
+      const result = await strategy.insert(mockElement, 'PROMPT');
+
+      expect(result).toEqual({ success: true, method: 'gemini-quill-api' });
+      expect(quill.deleteText).toHaveBeenCalledWith(7, 8);
+      expect(quill.insertText).toHaveBeenCalledWith(7, 'PROMPT');
+      expect(quill.setSelection).toHaveBeenCalledWith(13, 0);
+      expect(quill.setText).not.toHaveBeenCalled();
+    });
+
+    it('inserts after what the editor holds when it has no caret', async () => {
+      const quill = quillOn(mockElement, null);
+
+      await strategy.insert(mockElement, 'PROMPT');
+
+      // Quill ends its text with a line break of its own: the Prompt goes before it
+      expect(quill.insertText).toHaveBeenCalledWith(21, 'PROMPT');
+      expect(quill.deleteText).not.toHaveBeenCalled();
     });
   });
 
@@ -399,7 +445,6 @@ describe('GeminiStrategy', () => {
       expect(inputEvent.bubbles).toBe(true);
       expect(inputEvent.data).toBe('Test content');
 
-      mockElement.removeEventListener('input', () => {});
     });
   });
 
@@ -426,12 +471,12 @@ describe('GeminiStrategy', () => {
       // First insertion - editor will be cached
       const result1 = await strategy.insert(quillElement, 'Test 1');
       expect(result1.success).toBe(true);
-      expect(result1.method).toBe('gemini-dom-manipulation');
+      expect(result1.method).toBe('gemini-dom');
 
       // Second insertion - uses cached editor (no DOM query)
       const result2 = await strategy.insert(quillElement, 'Test 2');
       expect(result2.success).toBe(true);
-      expect(result2.method).toBe('gemini-dom-manipulation');
+      expect(result2.method).toBe('gemini-dom');
 
       // Third insertion - verify cache still works
       const result3 = await strategy.insert(quillElement, 'Test 3');

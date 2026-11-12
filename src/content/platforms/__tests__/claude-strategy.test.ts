@@ -4,7 +4,9 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { editorCommand } from '../../../test/helpers/editor-command';
 import { expectNoMarkupIn, HOSTILE_TEXTS } from '../../../test/helpers/hostile-text';
+import { readInputText } from '../../selector/inputText';
 import type { UIElementFactory } from '../../ui/element-factory';
 import { ClaudeStrategy } from '../claude-strategy';
 
@@ -96,23 +98,13 @@ describe('ClaudeStrategy', () => {
       // Mock DOM methods
       vi.spyOn(mockElement, 'focus').mockImplementation(() => undefined);
       vi.spyOn(mockElement, 'click').mockImplementation(() => undefined);
-      vi.spyOn(mockElement, 'dispatchEvent').mockImplementation(() => true);
-      
-      // Mock execCommand on document
-      (document as any).execCommand = vi.fn().mockReturnValue(true);
-      
-      // Mock window.getSelection
-      const mockSelection = {
-        removeAllRanges: vi.fn(),
-        addRange: vi.fn()
-      };
-      vi.spyOn(window, 'getSelection').mockReturnValue(mockSelection as any);
-      
-      // Mock document.createRange
-      const mockRange = {
-        selectNodeContents: vi.fn()
-      };
-      vi.spyOn(document, 'createRange').mockReturnValue(mockRange as any);
+      document.body.appendChild(mockElement);
+      document.getSelection()?.removeAllRanges();
+      document.execCommand = editorCommand(mockElement);
+    });
+
+    afterEach(() => {
+      mockElement.remove();
     });
 
     it('should attempt ProseMirror transaction first', async () => {
@@ -139,20 +131,34 @@ describe('ClaudeStrategy', () => {
 
     it('should fall back to execCommand when ProseMirror transaction fails', async () => {
       const result = await strategy.insert(mockElement, 'test content');
-      
+
       expect(result.success).toBe(true);
-      expect(result.method).toBe('execCommand');
-      expect((document as any).execCommand).toHaveBeenCalledWith('insertText', false, 'test content');
+      expect(result.method).toBe('claude-execCommand');
+      expect(document.execCommand).toHaveBeenCalledWith('insertText', false, 'test content');
+      expect(readInputText(mockElement)).toBe('test content');
     });
 
-    it('should fall back to DOM manipulation when execCommand fails', async () => {
-      (document as any).execCommand = vi.fn().mockReturnValue(false);
-      
+    it('should write the text itself when execCommand fails', async () => {
+      document.execCommand = vi.fn().mockReturnValue(false);
+
       const result = await strategy.insert(mockElement, 'test content');
-      
+
       expect(result.success).toBe(true);
-      expect(result.method).toBe('dom-manipulation');
+      expect(result.method).toBe('claude-dom');
       expect(mockElement.textContent).toBe('test content');
+    });
+
+    it('fails, and writes nothing over the field, when the editor keeps neither', async () => {
+      document.execCommand = vi.fn().mockReturnValue(false);
+      mockElement.textContent = 'what the field held';
+      mockElement.addEventListener('input', () => {
+        mockElement.textContent = 'what the field held';
+      });
+
+      const result = await strategy.insert(mockElement, 'test content');
+
+      expect(result.success).toBe(false);
+      expect(mockElement.textContent).toBe('what the field held');
     });
 
     it('should handle errors gracefully', async () => {
@@ -176,25 +182,24 @@ describe('ClaudeStrategy', () => {
       proseMirrorChild.classList.add('ProseMirror');
       proseMirrorChild.contentEditable = 'true';
       parentElement.appendChild(proseMirrorChild);
-      
-      vi.spyOn(proseMirrorChild, 'focus').mockImplementation(() => undefined);
-      vi.spyOn(proseMirrorChild, 'click').mockImplementation(() => undefined);
-      vi.spyOn(proseMirrorChild, 'dispatchEvent').mockImplementation(() => true);
-      
+      document.body.appendChild(parentElement);
+      document.execCommand = editorCommand(proseMirrorChild);
+
       const result = await strategy.insert(parentElement, 'test content');
-      
+
       expect(result.success).toBe(true);
+      expect(readInputText(proseMirrorChild)).toBe('test content');
+      parentElement.remove();
     });
 
     it('should trigger Claude-specific events', async () => {
+      const heard: string[] = [];
+      mockElement.addEventListener('input', () => heard.push('input'));
+      mockElement.addEventListener('compositionend', () => heard.push('compositionend'));
+
       await strategy.insert(mockElement, 'test content');
-      
-      expect(mockElement.dispatchEvent).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'input',
-          bubbles: true
-        })
-      );
+
+      expect(heard).toEqual(['input', 'compositionend']);
     });
   });
 
@@ -202,9 +207,12 @@ describe('ClaudeStrategy', () => {
     beforeEach(() => {
       vi.spyOn(mockElement, 'focus').mockImplementation(() => undefined);
       vi.spyOn(mockElement, 'click').mockImplementation(() => undefined);
-      vi.spyOn(mockElement, 'dispatchEvent').mockImplementation(() => true);
-      vi.spyOn(window, 'getSelection').mockReturnValue({ removeAllRanges: vi.fn(), addRange: vi.fn() } as any);
-      vi.spyOn(document, 'createRange').mockReturnValue({ selectNodeContents: vi.fn() } as any);
+      document.body.appendChild(mockElement);
+      document.getSelection()?.removeAllRanges();
+    });
+
+    afterEach(() => {
+      mockElement.remove();
     });
 
     it('goes to the ProseMirror transaction as the same text', async () => {
@@ -222,21 +230,23 @@ describe('ClaudeStrategy', () => {
     });
 
     it('goes to execCommand as the same text', async () => {
-      (document as any).execCommand = vi.fn().mockReturnValue(true);
+      document.execCommand = editorCommand(mockElement);
 
       const result = await strategy.insert(mockElement, text);
 
-      expect(result.method).toBe('execCommand');
-      expect((document as any).execCommand).toHaveBeenCalledWith('insertText', false, text);
-      expectNoMarkupIn(mockElement);
+      expect(result.method).toBe('claude-execCommand');
+      expect(document.execCommand).toHaveBeenCalledWith('insertText', false, text);
+      expect(readInputText(mockElement)).toBe(text);
+      // The paragraph is the stand-in editor's own structure
+      expectNoMarkupIn(mockElement, ['p']);
     });
 
     it('is set as the text of the editor when it is filled directly', async () => {
-      (document as any).execCommand = vi.fn().mockReturnValue(false);
+      document.execCommand = vi.fn().mockReturnValue(false);
 
       const result = await strategy.insert(mockElement, text);
 
-      expect(result.method).toBe('dom-manipulation');
+      expect(result.method).toBe('claude-dom');
       expect(mockElement.textContent).toBe(text);
       expectNoMarkupIn(mockElement);
     });

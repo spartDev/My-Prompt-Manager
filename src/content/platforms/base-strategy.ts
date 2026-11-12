@@ -5,7 +5,7 @@
  * Each platform must implement all abstract methods to ensure consistent behavior.
  */
 
-import { readInputText } from '../selector/inputText';
+import { readInputText, textAround } from '../selector/inputText';
 import type { InsertionResult, PlatformConfig, PlatformStrategyInterface } from '../types/index';
 import type { UIElementFactory } from '../ui/element-factory';
 import { debug, error as logError, warn  } from '../utils/logger';
@@ -113,6 +113,180 @@ export abstract class PlatformStrategy implements PlatformStrategyInterface {
       this._error('Restoring the input field failed', error as Error);
       return Promise.resolve({ success: false, error: (error as Error).message });
     }
+  }
+
+  /**
+   * Puts `text` in a <textarea> or an <input> where its caret is, in place of the text selected
+   * there: what an Insertion does. The text before and after stays, and the caret ends right
+   * after `text`. A field that has no caret (an <input> of a type without a text selection)
+   * takes the text at its end. The value goes through the native setter, so a framework that
+   * tracks it on the element (React) sees the change, and the page is told as typing would.
+   * @param element - The input field
+   * @param text - The text to insert, exactly as given
+   * @returns Whether the field holds the text afterwards: a page whose own handler rewrote the value did not take it
+   * @protected
+   */
+  protected insertIntoTextControl(element: HTMLTextAreaElement | HTMLInputElement, text: string): boolean {
+    const prototype = element instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+    const native = Object.getOwnPropertyDescriptor(prototype, 'value') as
+      | { get?: (this: HTMLElement) => string; set?: (this: HTMLElement, value: string) => void }
+      | undefined;
+    const held = element.value;
+    let start = held.length;
+    let end = held.length;
+    try {
+      start = element.selectionStart ?? held.length;
+      end = element.selectionEnd ?? start;
+    } catch {
+      // An <input> of a type without a text selection: the text goes at the end
+    }
+    const expected = held.slice(0, start) + text + held.slice(end);
+
+    element.focus();
+    if (native?.set) {
+      native.set.call(element, expected);
+    } else {
+      element.value = expected;
+    }
+    try {
+      element.setSelectionRange(start + text.length, start + text.length);
+    } catch {
+      // No text selection on this type of <input>
+    }
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+    return (native?.get ? native.get.call(element) : element.value) === expected;
+  }
+
+  /**
+   * The caret or the selection of a contenteditable input field, where an Insertion goes. A field
+   * the selection is not in takes the caret at its end, so the text goes after what it holds.
+   * @param element - The contenteditable input field
+   * @returns The range, which is the document's selection when there is one
+   * @protected
+   */
+  protected insertionRange(element: HTMLElement): Range {
+    const document = element.ownerDocument;
+    const selection = document.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      const current = selection.getRangeAt(0);
+      if (element.contains(current.startContainer) && element.contains(current.endContainer)) {
+        return current;
+      }
+    }
+    const atEnd = document.createRange();
+    atEnd.selectNodeContents(element);
+    atEnd.collapse(false);
+    selection?.removeAllRanges();
+    selection?.addRange(atEnd);
+    return atEnd;
+  }
+
+  /**
+   * Puts `text` in a contenteditable input field where its caret is, in place of what is selected
+   * there: what an Insertion does. The text before and after stays, and the caret ends right
+   * after `text`. A field with no caret in it takes the text at its end.
+   *
+   * The text goes in through the browser's editing command, as typing would, so the Platform's
+   * editor (ProseMirror, Quill, Lexical) builds its own paragraphs from the line breaks. When
+   * there is no editing command, or the field does not read as expected afterwards, the whole
+   * text of the field is written directly, one <br> between two lines.
+   * @param element - The contenteditable input field
+   * @param text - The text to insert, exactly as given
+   * @param via - Prefix of the method named in the result ('default', 'chatgpt'...)
+   * @returns Result of the attempt
+   * @protected
+   */
+  protected insertEditableText(element: HTMLElement, text: string, via: string): InsertionResult {
+    const document = element.ownerDocument;
+    element.focus();
+    const range = this.insertionRange(element);
+    const around = textAround(element, range);
+    if (text === '' && range.collapsed) {
+      return { success: true, method: `${via}-unchanged` };
+    }
+    const edited = typeof document.execCommand === 'function'
+      && (text === '' ? document.execCommand('delete') : document.execCommand('insertText', false, text));
+    if (!around) {
+      // What the field held around the caret could not be read: the editing command is trusted,
+      // and nothing is written over text that cannot be checked
+      return edited
+        ? { success: true, method: `${via}-execCommand` }
+        : { success: false, error: 'The input field did not take the text' };
+    }
+    const { before, after } = around;
+    if (edited && PlatformStrategy.holdsInsertion(readInputText(element), before, text, after)) {
+      return { success: true, method: `${via}-execCommand` };
+    }
+    // No editing command, or the editor laid the text out differently: write the whole text
+    // directly, the text around the caret included
+    return this.writeEditableText(element, before + text + after, before.length + text.length, via);
+  }
+
+  /**
+   * Whether `held` is `before`, `text` and `after` in a row. `text` must be there character for
+   * character (Verbatim). Around it, a space and a non-breaking space are the same: the browser
+   * turns one into the other at the edges of what is typed, as it does while the user types.
+   */
+  private static holdsInsertion(held: string, before: string, text: string, after: string): boolean {
+    const spaces = (value: string): string => value.replace(/\u00a0/g, ' ');
+    return held.length === before.length + text.length + after.length
+      && spaces(held.slice(0, before.length)) === spaces(before)
+      && held.slice(before.length, before.length + text.length) === text
+      && spaces(held.slice(before.length + text.length)) === spaces(after);
+  }
+
+  /**
+   * Writes `text` straight into a contenteditable input field as its whole content, one <br>
+   * between two lines so the breaks show whatever the field does with spaces, puts the caret
+   * after its first `caret` characters, and tells the page as typing would.
+   * @returns Failure when an editor whose own handler rebuilt its content did not keep the text
+   */
+  private writeEditableText(element: HTMLElement, text: string, caret: number, via: string): InsertionResult {
+    const document = element.ownerDocument;
+    const lines = text.split('\n');
+    const content = document.createDocumentFragment();
+    let remaining = caret;
+    let caretNode: Node | null = null;
+    let caretOffset = 0;
+    lines.forEach((line, index) => {
+      if (caretNode === null && remaining <= line.length) {
+        // The line is cut where the caret goes: the caret sits at the end of its first part
+        const head = document.createTextNode(line.slice(0, remaining));
+        content.append(head, line.slice(remaining));
+        caretNode = head;
+        caretOffset = remaining;
+      } else if (line !== '') {
+        content.append(line);
+      }
+      remaining -= line.length + 1;
+      if (index < lines.length - 1) {
+        content.append(document.createElement('br'));
+      }
+    });
+    // A last line that is empty takes a second <br>, the one that keeps it open
+    if (lines.length > 1 && lines[lines.length - 1] === '') {
+      content.append(document.createElement('br'));
+    }
+    element.replaceChildren(content);
+    element.normalize();
+    if (caretNode !== null) {
+      const placed: Node = caretNode;
+      const selection = document.getSelection();
+      if (placed.isConnected) {
+        selection?.collapse(placed, caretOffset);
+      } else {
+        // An empty first part was dropped by normalize(): the caret goes to the end of the field
+        selection?.selectAllChildren(element);
+        selection?.collapseToEnd();
+      }
+    }
+    element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: text }));
+    // An editor whose own handler rebuilt its content did not take the text
+    if (readInputText(element) !== text) {
+      return { success: false, error: 'The input field did not keep the text' };
+    }
+    return { success: true, method: `${via}-dom` };
   }
 
   /**

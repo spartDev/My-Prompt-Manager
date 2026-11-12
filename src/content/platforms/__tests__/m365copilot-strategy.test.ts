@@ -8,7 +8,9 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { editorCommand } from '../../../test/helpers/editor-command';
 import { expectNoMarkupIn, HOSTILE_TEXTS } from '../../../test/helpers/hostile-text';
+import { readInputText } from '../../selector/inputText';
 import type { UIElementFactory } from '../../ui/element-factory';
 import { M365CopilotStrategy } from '../m365copilot-strategy';
 
@@ -200,20 +202,15 @@ describe('M365CopilotStrategy', () => {
 
     it('should dispatch input and change events for React compatibility', async () => {
       // Arrange
-      const content = 'Test content';
-      const dispatchSpy = setupDispatchEventMock(mockTextarea);
+      const heard: string[] = [];
+      mockTextarea.addEventListener('input', (event) => heard.push(`input bubbles=${String(event.bubbles)}`));
+      mockTextarea.addEventListener('change', (event) => heard.push(`change bubbles=${String(event.bubbles)}`));
 
       // Act
-      await strategy.insert(mockTextarea, content);
+      await strategy.insert(mockTextarea, 'Test content');
 
       // Assert
-      expect(dispatchSpy).toHaveBeenCalledTimes(2);
-      expect(dispatchSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'input', bubbles: true })
-      );
-      expect(dispatchSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'change', bubbles: true })
-      );
+      expect(heard).toEqual(['input bubbles=true', 'change bubbles=true']);
     });
 
     it('should successfully insert content even with React optimizations', async () => {
@@ -246,121 +243,62 @@ describe('M365CopilotStrategy', () => {
   });
 
   describe('insert - ContentEditable Elements (Lexical)', () => {
+    beforeEach(() => {
+      document.body.appendChild(mockLexicalEditor);
+      document.getSelection()?.removeAllRanges();
+    });
+
     it('should insert content into Lexical editor using execCommand', async () => {
       // Arrange
-      const content = 'Test prompt content';
-      setupExecCommandMock(true);
-      setupGetSelectionMock(true);
+      const execCommand = editorCommand(mockLexicalEditor);
+      document.execCommand = execCommand;
 
       // Act
-      const result = await strategy.insert(mockLexicalEditor, content);
+      const result = await strategy.insert(mockLexicalEditor, 'Test prompt content');
 
       // Assert
       expect(result.success).toBe(true);
       expect(result.method).toBe('m365copilot-contenteditable-execCommand');
+      expect(execCommand).toHaveBeenCalledWith('insertText', false, 'Test prompt content');
+      expect(readInputText(mockLexicalEditor)).toBe('Test prompt content');
     });
 
     it('should focus editor before inserting content', async () => {
       // Arrange
-      const content = 'Test content';
-      setupExecCommandMock(true);
-      setupGetSelectionMock(true);
+      document.execCommand = editorCommand(mockLexicalEditor);
 
       // Act
-      await strategy.insert(mockLexicalEditor, content);
+      await strategy.insert(mockLexicalEditor, 'Test content');
 
       // Assert
       expect(mockLexicalEditor.focus).toHaveBeenCalled();
     });
 
-    it('should select all existing content before replacement', async () => {
-      // Arrange
-      const content = 'New content';
-      setupExecCommandMock(true);
-      const getSelectionSpy = setupGetSelectionMock(true);
-      const mockSelection = window.getSelection();
-
-      // Act
-      await strategy.insert(mockLexicalEditor, content);
-
-      // Assert
-      expect(getSelectionSpy).toHaveBeenCalled();
-      expect(mockSelection?.removeAllRanges).toHaveBeenCalled();
-      expect(mockSelection?.addRange).toHaveBeenCalled();
-    });
-
-    it('should use execCommand insertText with content', async () => {
-      // Arrange
-      const content = 'Test prompt';
-      const execCommandSpy = setupExecCommandMock(true);
-      setupGetSelectionMock(true);
-
-      // Act
-      await strategy.insert(mockLexicalEditor, content);
-
-      // Assert
-      expect(execCommandSpy).toHaveBeenCalledWith('insertText', false, content);
-    });
-
     it('should dispatch input and change events after execCommand insertion', async () => {
       // Arrange
-      const content = 'Test content';
-      setupExecCommandMock(true);
-      setupGetSelectionMock(true);
-      const dispatchSpy = setupDispatchEventMock(mockLexicalEditor);
+      document.execCommand = editorCommand(mockLexicalEditor);
+      const heard: string[] = [];
+      mockLexicalEditor.addEventListener('input', () => heard.push('input'));
+      mockLexicalEditor.addEventListener('change', () => heard.push('change'));
 
       // Act
-      await strategy.insert(mockLexicalEditor, content);
+      await strategy.insert(mockLexicalEditor, 'Test content');
 
       // Assert
-      expect(dispatchSpy).toHaveBeenCalledTimes(2);
-      expect(dispatchSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'input', bubbles: true })
-      );
-      expect(dispatchSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'change', bubbles: true })
-      );
+      expect(heard).toEqual(['input', 'change']);
     });
 
-    it('should fallback to DOM manipulation when execCommand fails', async () => {
+    it('should write the text itself when execCommand fails', async () => {
       // Arrange
-      const content = 'Test content';
-      setupExecCommandMock(false); // execCommand fails
-      setupGetSelectionMock(true);
+      document.execCommand = vi.fn().mockReturnValue(false);
 
       // Act
-      const result = await strategy.insert(mockLexicalEditor, content);
+      const result = await strategy.insert(mockLexicalEditor, 'Fallback content');
 
       // Assert
       expect(result.success).toBe(true);
       expect(result.method).toBe('m365copilot-contenteditable-dom');
-    });
-
-    it('should create text node and insert via DOM when execCommand fails', async () => {
-      // Arrange
-      const content = 'Fallback content';
-      setupExecCommandMock(false);
-      setupGetSelectionMock(true);
-      const createTextNodeSpy = vi.spyOn(document, 'createTextNode');
-
-      // Act
-      await strategy.insert(mockLexicalEditor, content);
-
-      // Assert
-      expect(createTextNodeSpy).toHaveBeenCalledWith(content);
-    });
-
-    it('should return error when selection is unavailable', async () => {
-      // Arrange
-      const content = 'Test content';
-      setupGetSelectionMock(false); // No selection available
-
-      // Act
-      const result = await strategy.insert(mockLexicalEditor, content);
-
-      // Assert
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Could not get selection');
+      expect(readInputText(mockLexicalEditor)).toBe('Fallback content');
     });
   });
 
@@ -481,18 +419,16 @@ describe('M365CopilotStrategy', () => {
 
     it('should handle exceptions during contenteditable insertion', async () => {
       // Arrange
-      const content = 'Test content';
-      setupGetSelectionMock(true);
-      vi.spyOn(window, 'getSelection').mockImplementation(() => {
-        throw new Error('Selection failed');
+      document.execCommand = vi.fn(() => {
+        throw new Error('Editing command failed');
       });
 
       // Act
-      const result = await strategy.insert(mockLexicalEditor, content);
+      const result = await strategy.insert(mockLexicalEditor, 'Test content');
 
       // Assert
       expect(result.success).toBe(false);
-      expect(result.error).toContain('Selection failed');
+      expect(result.error).toContain('Editing command failed');
     });
   });
 
@@ -512,33 +448,35 @@ describe('M365CopilotStrategy', () => {
 
     it('goes to execCommand as the same text', async () => {
       // Arrange
-      const execCommandSpy = setupExecCommandMock(true);
-      setupGetSelectionMock(true);
+      document.body.appendChild(mockLexicalEditor);
+      document.getSelection()?.removeAllRanges();
+      const execCommand = editorCommand(mockLexicalEditor);
+      document.execCommand = execCommand;
 
       // Act
       const result = await strategy.insert(mockLexicalEditor, text);
 
       // Assert
       expect(result.method).toBe('m365copilot-contenteditable-execCommand');
-      expect(execCommandSpy).toHaveBeenCalledWith('insertText', false, text);
-      expectNoMarkupIn(mockLexicalEditor);
+      expect(execCommand).toHaveBeenCalledWith('insertText', false, text);
+      expect(readInputText(mockLexicalEditor)).toBe(text);
+      // The paragraph is the stand-in editor's own structure
+      expectNoMarkupIn(mockLexicalEditor, ['p']);
     });
 
-    it('is inserted as a text node when execCommand fails', async () => {
+    it('is written as text when execCommand fails', async () => {
       // Arrange
-      setupExecCommandMock(false);
-      setupGetSelectionMock(true);
-      const range = window.getSelection()?.getRangeAt(0);
+      document.body.appendChild(mockLexicalEditor);
+      document.getSelection()?.removeAllRanges();
+      document.execCommand = vi.fn().mockReturnValue(false);
 
       // Act
       const result = await strategy.insert(mockLexicalEditor, text);
 
       // Assert
       expect(result.method).toBe('m365copilot-contenteditable-dom');
-      expect(range?.insertNode).toHaveBeenCalledTimes(1);
-      const inserted = vi.mocked(range?.insertNode as (node: Node) => void).mock.calls[0][0];
-      expect(inserted.nodeType).toBe(Node.TEXT_NODE);
-      expect(inserted.textContent).toBe(text);
+      expect(mockLexicalEditor.textContent).toBe(text);
+      expectNoMarkupIn(mockLexicalEditor);
     });
   });
 
@@ -590,74 +528,6 @@ describe('M365CopilotStrategy', () => {
       // Assert
       expect(result.success).toBe(true);
       expect(mockTextarea.value).toBe(whitespaceContent);
-    });
-  });
-
-  describe('Content Replacement Behavior', () => {
-    it('should replace existing content in Lexical editor, not append', async () => {
-      // Arrange
-      const existingContent = 'Existing text';
-      const newContent = 'New prompt';
-      mockLexicalEditor.textContent = existingContent;
-
-      // Setup mocks
-      setupExecCommandMock(true);
-      const mockRange = {
-        selectNodeContents: vi.fn(),
-        deleteContents: vi.fn(),
-        insertNode: vi.fn(),
-        setStartAfter: vi.fn(),
-        setEndAfter: vi.fn()
-      };
-      const mockSelection = {
-        removeAllRanges: vi.fn(),
-        addRange: vi.fn(),
-        getRangeAt: vi.fn().mockReturnValue(mockRange)
-      };
-      vi.spyOn(document, 'createRange').mockReturnValue(mockRange as any);
-      vi.spyOn(window, 'getSelection').mockReturnValue(mockSelection as any);
-
-      // Act
-      await strategy.insert(mockLexicalEditor, newContent);
-
-      // Assert - Should select all content before insertion (replacement behavior)
-      expect(mockRange.selectNodeContents).toHaveBeenCalledWith(mockLexicalEditor);
-      expect(mockSelection.removeAllRanges).toHaveBeenCalled();
-      expect(mockSelection.addRange).toHaveBeenCalledWith(mockRange);
-    });
-
-    it('should replace content in textarea, not append', async () => {
-      // Arrange
-      const existingContent = 'Old content';
-      const newContent = 'New content';
-      mockTextarea.value = existingContent;
-
-      // Act
-      await strategy.insert(mockTextarea, newContent);
-
-      // Assert
-      expect(mockTextarea.value).toBe(newContent);
-      expect(mockTextarea.value).not.toContain(existingContent);
-    });
-  });
-
-  describe('Performance Optimizations', () => {
-    it('should handle multiple insertions efficiently', async () => {
-      // Arrange
-      const newTextarea = createM365CopilotTextarea();
-
-      // Act - Multiple insertions (test observable behavior, not caching)
-      const result1 = await strategy.insert(newTextarea, 'First');
-      const result2 = await strategy.insert(newTextarea, 'Second');
-      const result3 = await strategy.insert(newTextarea, 'Third');
-
-      // Assert - All insertions should succeed
-      expect(result1.success).toBe(true);
-      expect(result2.success).toBe(true);
-      expect(result3.success).toBe(true);
-      expect(newTextarea.value).toBe('Third'); // Last value wins (replacement behavior)
-
-      cleanupElement(newTextarea);
     });
   });
 
@@ -762,173 +632,6 @@ describe('M365CopilotStrategy', () => {
 
       // Assert
       expect(events).toEqual(['input', 'change']);
-    });
-  });
-
-  describe('Helper Methods - _prepareSelection', () => {
-    it('should return selection object when available', () => {
-      // Arrange
-      setupGetSelectionMock(true);
-
-      // Act
-      const selection = strategy['_prepareSelection'](mockLexicalEditor);
-
-      // Assert
-      expect(selection).toBeDefined();
-      expect(selection).not.toBeNull();
-    });
-
-    it('should return null when selection is unavailable', () => {
-      // Arrange
-      setupGetSelectionMock(false);
-
-      // Act
-      const selection = strategy['_prepareSelection'](mockLexicalEditor);
-
-      // Assert
-      expect(selection).toBeNull();
-    });
-
-    it('should select all content in the element', () => {
-      // Arrange
-      const getSelectionSpy = setupGetSelectionMock(true);
-      const mockSelection = window.getSelection();
-
-      // Act
-      strategy['_prepareSelection'](mockLexicalEditor);
-
-      // Assert
-      expect(getSelectionSpy).toHaveBeenCalled();
-      expect(mockSelection?.removeAllRanges).toHaveBeenCalled();
-      expect(mockSelection?.addRange).toHaveBeenCalled();
-    });
-  });
-
-  describe('Helper Methods - _tryExecCommandInsertion', () => {
-    it('should return success when execCommand works', () => {
-      // Arrange
-      setupExecCommandMock(true);
-      setupGetSelectionMock(true);
-      const mockSelection = window.getSelection();
-      expect(mockSelection).toBeDefined();
-
-      // Act
-      const result = strategy['_tryExecCommandInsertion'](mockLexicalEditor, 'test content', mockSelection as Selection);
-
-      // Assert
-      expect(result.success).toBe(true);
-      expect(result.method).toBe('m365copilot-contenteditable-execCommand');
-    });
-
-    it('should return failure when execCommand fails', () => {
-      // Arrange
-      setupExecCommandMock(false);
-      setupGetSelectionMock(true);
-      const mockSelection = window.getSelection();
-      expect(mockSelection).toBeDefined();
-
-      // Act
-      const result = strategy['_tryExecCommandInsertion'](mockLexicalEditor, 'test content', mockSelection as Selection);
-
-      // Assert
-      expect(result.success).toBe(false);
-    });
-
-    it('should call execCommand with correct parameters', () => {
-      // Arrange
-      const execCommandSpy = setupExecCommandMock(true);
-      setupGetSelectionMock(true);
-      const mockSelection = window.getSelection();
-      expect(mockSelection).toBeDefined();
-      const content = 'Test prompt content';
-
-      // Act
-      strategy['_tryExecCommandInsertion'](mockLexicalEditor, content, mockSelection as Selection);
-
-      // Assert
-      expect(execCommandSpy).toHaveBeenCalledWith('insertText', false, content);
-    });
-
-    it('should dispatch events when successful', () => {
-      // Arrange
-      setupExecCommandMock(true);
-      setupGetSelectionMock(true);
-      const mockSelection = window.getSelection();
-      expect(mockSelection).toBeDefined();
-      const dispatchSpy = setupDispatchEventMock(mockLexicalEditor);
-
-      // Act
-      strategy['_tryExecCommandInsertion'](mockLexicalEditor, 'test', mockSelection as Selection);
-
-      // Assert
-      expect(dispatchSpy).toHaveBeenCalledTimes(2);
-    });
-
-    it('should not dispatch events when execCommand fails', () => {
-      // Arrange
-      setupExecCommandMock(false);
-      setupGetSelectionMock(true);
-      const mockSelection = window.getSelection();
-      expect(mockSelection).toBeDefined();
-      const dispatchSpy = setupDispatchEventMock(mockLexicalEditor);
-
-      // Act
-      strategy['_tryExecCommandInsertion'](mockLexicalEditor, 'test', mockSelection as Selection);
-
-      // Assert
-      expect(dispatchSpy).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('Helper Methods - _tryDOMInsertion', () => {
-    it('should successfully insert content using DOM manipulation', () => {
-      // Arrange
-      setupGetSelectionMock(true);
-      const mockSelection = window.getSelection();
-      expect(mockSelection).toBeDefined();
-      const content = 'DOM inserted content';
-
-      // Act
-      const result = strategy['_tryDOMInsertion'](mockLexicalEditor, content, mockSelection as Selection);
-
-      // Assert
-      expect(result.success).toBe(true);
-      expect(result.method).toBe('m365copilot-contenteditable-dom');
-    });
-
-    it('should create text node with correct content', () => {
-      // Arrange
-      setupGetSelectionMock(true);
-      const mockSelection = window.getSelection();
-      expect(mockSelection).toBeDefined();
-      const content = 'Test content';
-      const createTextNodeSpy = vi.spyOn(document, 'createTextNode');
-
-      // Act
-      strategy['_tryDOMInsertion'](mockLexicalEditor, content, mockSelection as Selection);
-
-      // Assert
-      expect(createTextNodeSpy).toHaveBeenCalledWith(content);
-    });
-
-    it('should dispatch events after DOM insertion', () => {
-      // Arrange
-      setupGetSelectionMock(true);
-      const mockSelection = window.getSelection();
-      expect(mockSelection).toBeDefined();
-      const dispatchSpy = setupDispatchEventMock(mockLexicalEditor);
-
-      // Act
-      strategy['_tryDOMInsertion'](mockLexicalEditor, 'test', mockSelection as Selection);
-
-      // Assert
-      expect(dispatchSpy).toHaveBeenCalledTimes(2);
-      expect(dispatchSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'input', bubbles: true })
-      );
-      expect(dispatchSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'change', bubbles: true })
-      );
     });
   });
 });

@@ -110,7 +110,9 @@ describe('MistralStrategy', () => {
   describe('insert - into the ProseMirror editor', () => {
     beforeEach(() => {
       document.body.appendChild(mockElement);
-      mockElement.innerHTML = '<p>what the field held</p>';
+      // An empty editor, with no caret in it
+      mockElement.innerHTML = '<p><br></p>';
+      document.getSelection()?.removeAllRanges();
     });
 
     afterEach(() => {
@@ -138,14 +140,6 @@ describe('MistralStrategy', () => {
 
       expect(firstParagraph?.isConnected).toBe(false);
       expect(mockElement.querySelector('p')?.textContent).not.toContain('\n');
-    });
-
-    it('replaces what the field held', async () => {
-      document.execCommand = editorCommand(mockElement);
-
-      await strategy.insert(mockElement, 'new content');
-
-      expect(readInputText(mockElement)).toBe('new content');
     });
 
     it('finds the editor from an element inside it', async () => {
@@ -210,13 +204,14 @@ describe('MistralStrategy', () => {
       expect(readInputText(mockElement)).toBe(content);
     });
 
-    it('empties the field for empty content', async () => {
+    it('leaves the field as it is for empty content', async () => {
       document.execCommand = editorCommand(mockElement);
+      mockElement.innerHTML = '<p>what the field held</p>';
 
       const result = await strategy.insert(mockElement, '');
 
       expect(result.success).toBe(true);
-      expect(readInputText(mockElement)).toBe('');
+      expect(readInputText(mockElement)).toBe('what the field held');
     });
   });
 

@@ -25,7 +25,6 @@ vi.mock('../../utils/logger', () => ({
 class TestReactStrategy extends ReactPlatformStrategy {
   constructor(name = 'test-react', priority = 50, config?: PlatformConfig, hostname?: string) {
     super(name, priority, config, hostname);
-    TestReactStrategy.initializeNativeValueSetter();
   }
 
   canHandle(element: HTMLElement): boolean {
@@ -108,18 +107,6 @@ describe('ReactPlatformStrategy', () => {
       const customStrategy = new TestReactStrategy('test', 50, undefined, 'custom.example.com');
       expect(customStrategy).toBeDefined();
       // Hostname is protected, but we can verify the strategy was created successfully
-    });
-
-    it('should cache native value setter on initialization', async () => {
-      // Create a new strategy to trigger initialization
-      const newStrategy = new TestReactStrategy();
-      expect(newStrategy).toBeDefined();
-
-      // The native setter should be cached (we can't directly test the private static,
-      // but we can verify insertion works, which depends on it)
-      const textarea = document.createElement('textarea');
-      const result = newStrategy.insert(textarea, 'test');
-      await expect(result).resolves.toMatchObject({ success: true });
     });
   });
 
@@ -337,7 +324,6 @@ describe('ReactPlatformStrategy', () => {
       class CustomReactStrategy extends ReactPlatformStrategy {
         constructor() {
           super('custom-react', 60);
-          CustomReactStrategy.initializeNativeValueSetter();
         }
 
         canHandle(element: HTMLElement): boolean {
