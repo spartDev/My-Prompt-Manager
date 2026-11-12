@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { editorCommand, MULTILINE_PROMPT } from '../../../test/helpers/editor-command';
 import { expectNoMarkupIn, HOSTILE_TEXTS } from '../../../test/helpers/hostile-text';
-import { readInputText, textBeforeCaret } from '../../selector/inputText';
+import { readInputText, textAround, textBeforeCaret } from '../../selector/inputText';
 import type { UIElementFactory } from '../../ui/element-factory';
 import { DefaultStrategy } from '../default-strategy';
 
@@ -482,6 +482,18 @@ describe('DefaultStrategy: an Insertion goes where the caret is', () => {
       expect(result.success).toBe(true);
       expect(readInputText(field)).toBe('before one\ntwo after');
       expect(textBeforeCaret(field)).toBe('before one\ntwo ');
+    });
+
+    it('leaves the caret at the start of the line after a Prompt that ends with a line break, when it writes the text itself', async () => {
+      document.execCommand = vi.fn().mockReturnValue(false);
+      select(7);
+
+      await new DefaultStrategy('example.com').insert(field, 'PROMPT\n');
+
+      expect(readInputText(field)).toBe('before PROMPT\nafter');
+      const caret = document.getSelection()?.getRangeAt(0) as Range;
+      expect(caret.collapsed).toBe(true);
+      expect(textAround(field, caret)).toEqual({ before: 'before PROMPT\n', after: 'after' });
     });
 
     it('fails, and writes nothing over the field, when the page does not keep the text', async () => {

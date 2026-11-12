@@ -244,18 +244,24 @@ const MISTRAL_EDITOR_HTML = paragraphEditorPage(
  * What Perplexity's Lexical composer does with what an Insertion can send it (seen on the live
  * site on 2026-11-11). The editor keeps its own text and draws it: one <span> per line that has
  * text, one <br> between two lines, and a last <br> that keeps an empty last line open.
- * - A paste goes over the selection the editor knows of. It learns of a selection from the
- *   `selectionchange` event, and only one that runs from the start of its paragraph to its end
- *   covers the line breaks that end the field; any other paste lands after the text.
- * - Text from the editing command arrives with its line breaks dropped.
- * - An `input` event that carries text inserts that text again, after what the field holds.
+ * - A paste goes where the selection the editor knows of is, in place of what is selected, and
+ *   leaves the caret after the pasted text. The editor learns of a selection from the
+ *   `selectionchange` event; one over the editor itself, not from the start of its paragraph to
+ *   its end, leaves out the line breaks that end the field.
+ * - Typed text goes where that selection is too. Text from the editing command arrives with its
+ *   line breaks dropped.
+ * - An `input` event that carries text inserts that text again, after what the field holds. One
+ *   that carries none follows a change the browser made to the DOM itself (the editing command
+ *   deleting text): the editor takes its text from what its paragraph then shows.
  * - A Backspace key removes the last character.
  */
 const LEXICAL_EDITOR = /* html */ `
     <script>
       const editor = document.querySelector('#ask-input');
       let text = '';
-      let allSelected = false;
+      // The selection the editor knows of, as offsets in its text
+      let known = { start: 0, end: 0 };
+      const lengthOf = (node) => (node.nodeName === 'BR' ? 1 : node.textContent.length);
       const draw = () => {
         const paragraph = document.createElement('p');
         if (text === '') {
@@ -273,41 +279,110 @@ const LEXICAL_EDITOR = /* html */ `
           if (lines.length > 1 && lines[lines.length - 1] === '') { paragraph.append(document.createElement('br')); }
         }
         editor.replaceChildren(paragraph);
-        allSelected = false;
+      };
+      /** The offset in the text of a point of the editor's DOM. */
+      const offsetOf = (container, offset) => {
+        const paragraph = editor.querySelector('p');
+        const nodes = Array.from(paragraph.childNodes);
+        if (container === editor) { return offset === 0 ? 0 : text.replace(/\\n+$/, '').length; }
+        let position = 0;
+        if (container === paragraph) {
+          for (let index = 0; index < offset && index < nodes.length; index++) { position += lengthOf(nodes[index]); }
+          return Math.min(position, text.length);
+        }
+        const span = container.nodeType === Node.TEXT_NODE ? container.parentNode : container;
+        for (const node of nodes) {
+          if (node === span) {
+            return position + (container.nodeType === Node.TEXT_NODE ? offset : offset === 0 ? 0 : lengthOf(node));
+          }
+          position += lengthOf(node);
+        }
+        return text.length;
+      };
+      /** Puts the caret after the first characters of the text, in the DOM just drawn. */
+      const caretTo = (position) => {
+        const paragraph = editor.querySelector('p');
+        const nodes = Array.from(paragraph.childNodes);
+        let remaining = position;
+        let index = 0;
+        for (const node of nodes) {
+          if (node.nodeName !== 'BR' && remaining <= lengthOf(node)) {
+            document.getSelection().collapse(node.firstChild, remaining);
+            known = { start: position, end: position };
+            return;
+          }
+          if (remaining === 0) { break; }
+          remaining -= lengthOf(node);
+          index += 1;
+        }
+        document.getSelection().collapse(paragraph, Math.min(index, nodes.length));
+        known = { start: position, end: position };
+      };
+      /** Text arrives where the known selection is, in place of what is selected. */
+      const write = (written) => {
+        text = text.slice(0, known.start) + written + text.slice(known.end);
+        const caret = known.start + written.length;
+        draw();
+        caretTo(caret);
       };
       document.addEventListener('selectionchange', () => {
         const selection = document.getSelection();
-        const paragraph = editor.querySelector('p');
         const range = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
-        allSelected = range !== null && paragraph !== null
-          && range.startContainer === paragraph && range.startOffset === 0
-          && range.endContainer === paragraph && range.endOffset === paragraph.childNodes.length;
+        if (range && editor.contains(range.startContainer) && editor.contains(range.endContainer)) {
+          known = { start: offsetOf(range.startContainer, range.startOffset), end: offsetOf(range.endContainer, range.endOffset) };
+        }
       });
       editor.addEventListener('paste', (event) => {
         event.preventDefault();
-        const pasted = event.clipboardData.getData('text/plain');
-        text = allSelected ? pasted : text + pasted;
-        draw();
+        write(event.clipboardData.getData('text/plain'));
       });
       editor.addEventListener('beforeinput', (event) => {
         event.preventDefault();
         if (event.inputType === 'insertText' && event.data) {
-          const typed = event.data.replace(/\\n/g, '');
-          text = allSelected ? typed : text + typed;
-          draw();
+          write(event.data.replace(/\\n/g, ''));
+        } else if (event.inputType.startsWith('delete')) {
+          // What is deleted is what the event says, a selection made a moment ago included
+          const selection = document.getSelection();
+          const range = event.getTargetRanges()[0] ?? (selection.rangeCount > 0 ? selection.getRangeAt(0) : null);
+          if (range && editor.contains(range.startContainer)) {
+            known = { start: offsetOf(range.startContainer, range.startOffset), end: offsetOf(range.endContainer, range.endOffset) };
+          }
+          write('');
         }
       });
       editor.addEventListener('input', (event) => {
         if (typeof event.data === 'string' && event.data !== '') {
           text += event.data;
           draw();
+          caretTo(text.length);
+          return;
         }
+        // The browser changed the DOM itself (the editing command deleted text): the editor takes
+        // its text from what its paragraph now shows, as Lexical does
+        const paragraph = editor.querySelector('p');
+        const nodes = paragraph ? Array.from(paragraph.childNodes) : [];
+        const lines = [''];
+        nodes.forEach((node, index) => {
+          if (node.nodeName === 'BR') {
+            if (index < nodes.length - 1) { lines.push(''); }
+          } else {
+            lines[lines.length - 1] += node.textContent;
+          }
+        });
+        const selection = document.getSelection();
+        const caret = paragraph && selection.rangeCount > 0 && editor.contains(selection.focusNode)
+          ? offsetOf(selection.focusNode, selection.focusOffset)
+          : null;
+        text = lines.join('\\n');
+        draw();
+        caretTo(caret === null ? text.length : Math.min(caret, text.length));
       });
       editor.addEventListener('keydown', (event) => {
         if (event.key === 'Backspace') {
           event.preventDefault();
           text = text.slice(0, -1);
           draw();
+          caretTo(text.length);
         }
       });
       draw();
@@ -328,8 +403,14 @@ export type EditorFixture = 'chatgpt-editor' | 'mistral-editor' | 'perplexity-ed
 
 export const EDITOR_FIXTURES: readonly EditorFixture[] = ['chatgpt-editor', 'mistral-editor'];
 
+/** Every stand-in page: the seven Platforms, then the rich text editors three of them have live. */
+export const ALL_FIXTURES: readonly (PlatformFixture | EditorFixture)[] = [...PLATFORM_FIXTURES, ...EDITOR_FIXTURES, 'perplexity-editor'];
+
 /** The input field of each stand-in page. */
-export const PLATFORM_FIELD: Record<PlatformFixture, string> = {
+export const PLATFORM_FIELD: Record<PlatformFixture | EditorFixture, string> = {
+  'chatgpt-editor': '#prompt-textarea',
+  'mistral-editor': '.field',
+  'perplexity-editor': '#ask-input',
   chatgpt: '#prompt-textarea',
   claude: '.ProseMirror',
   mistral: '.field',

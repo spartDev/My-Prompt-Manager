@@ -98,11 +98,13 @@ export class PerplexityStrategy extends PlatformStrategy {
       return this.insertEditableText(element, text, via);
     }
 
-    let around: { before: string; after: string } | null = null;
+    // What the field must hold once the paste is laid out, or null when the text around the
+    // caret could not be read
+    const expected: { text: string | null } = { text: null };
     const taken = await this._paste(element, text, (selection) => {
-      const range = PerplexityStrategy._caretRange(element, selection);
-      around = textAround(element, range);
-    }, () => (around ? around.before + text + around.after : null));
+      const around = textAround(element, PerplexityStrategy._caretRange(element, selection));
+      expected.text = around ? around.before + text + around.after : null;
+    }, () => expected.text);
     if (!taken) {
       // Nothing on the page took the paste: this is no rich text editor
       return this.insertEditableText(element, text, via);
@@ -111,8 +113,7 @@ export class PerplexityStrategy extends PlatformStrategy {
     // The editor took the paste. Writing the text again by another path is what put the Prompt in
     // twice, so a field that reads differently is a failure, not a reason to write once more.
     // When what the field held around the caret could not be read, the paste is trusted
-    const expected = (around as { before: string; after: string } | null);
-    if (expected === null || PerplexityStrategy._sameText(readInputText(element), expected.before + text + expected.after)) {
+    if (expected.text === null || PerplexityStrategy._sameText(readInputText(element), expected.text)) {
       this._debug('Paste insertion successful');
       return { success: true, method: `${via}-paste` };
     }

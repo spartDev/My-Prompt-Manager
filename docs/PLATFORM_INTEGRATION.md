@@ -160,7 +160,6 @@ Is the platform using React for input management?
 │   │
 │   └─ Benefits:
 │       • ✅ Automatic React event handling
-│       • ✅ Native value setter caching (~90% faster)
 │       • ✅ Built-in content type check
 │       • ✅ Consistent error handling
 │
@@ -207,39 +206,26 @@ export class YourPlatformStrategy extends PlatformStrategy {
   }
 
   /**
-   * Inserts content into the target element
+   * Inserts content where the caret of the input field is, in place of the text selected there.
+   * The base strategy does it for both kinds of field: never set the whole value or clear the
+   * field here, or the user loses the text around the caret.
    */
   async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
     try {
-      // Focus the element
-      element.focus();
-      element.click();
-      
-      // Method 1: Try for textarea elements
-      if (element.tagName === 'TEXTAREA') {
-        (element as HTMLTextAreaElement).value = content;
-        element.dispatchEvent(new Event('input', { bubbles: true }));
-        return { success: true, method: 'textarea' };
+      // A <textarea> or an <input>: through the native value setter, then input and change
+      if (element instanceof HTMLTextAreaElement || element instanceof HTMLInputElement) {
+        return this.insertIntoTextControl(element, content)
+          ? { success: true, method: 'your-platform-textarea' }
+          : { success: false, error: 'The input field did not keep the text' };
       }
-      
-      // Method 2: Try for contenteditable elements  
-      if (element.contentEditable === 'true') {
-        element.textContent = content;
-        
-        // Trigger events the platform expects
-        const inputEvent = new InputEvent('input', {
-          bubbles: true,
-          cancelable: true,
-          inputType: 'insertText',
-          data: content
-        });
-        element.dispatchEvent(inputEvent);
-        
-        return { success: true, method: 'contenteditable' };
+
+      // A contenteditable editor: through the browser's editing command, as typing would
+      if (element.isContentEditable || element.getAttribute('contenteditable') === 'true') {
+        return this.insertEditableText(element, content, 'your-platform');
       }
-      
+
       return { success: false, error: 'Unsupported element type' };
-      
+
     } catch (error) {
       this._error('Insertion failed', error as Error);
       return { success: false, error: (error as Error).message };
@@ -280,9 +266,6 @@ export class YourReactPlatformStrategy extends ReactPlatformStrategy {
       ],
       priority: 85
     }, hostname);
-
-    // REQUIRED: Initialize React native value setter cache
-    ReactPlatformStrategy.initializeNativeValueSetter();
   }
 
   /**
@@ -296,7 +279,7 @@ export class YourReactPlatformStrategy extends ReactPlatformStrategy {
   }
 
   /**
-   * Inserts content using React-compatible methods
+   * Inserts content where the caret of the textarea is, using React-compatible methods
    */
   async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
     try {
@@ -309,7 +292,8 @@ export class YourReactPlatformStrategy extends ReactPlatformStrategy {
         });
       }
 
-      // Insert the content exactly as given, using base class React-compatible method
+      // Insert the content exactly as given, where the caret is, in place of the text
+      // selected there, using base class React-compatible method
       return await this.insertIntoReactTextarea(
         element as HTMLTextAreaElement,
         content,
@@ -346,15 +330,13 @@ export class YourReactPlatformStrategy extends ReactPlatformStrategy {
 **✨ Key Benefits of ReactPlatformStrategy**:
 1. **Automatic React Compatibility**: No need to manually handle React's value setter
 2. **Built-in Content Type Check**: `validateContent()` confirms the content is a string
-3. **Performance**: Native setter caching provides ~90% performance improvement
-4. **Consistent Error Handling**: Try-catch patterns are standardized
-5. **Security**: Content is set as the textarea `value`, never parsed as markup
+3. **Consistent Error Handling**: Try-catch patterns are standardized
+4. **Security**: Content goes into the textarea `value`, never parsed as markup
 
 **⚠️ Important**:
-- **Must call** `ReactPlatformStrategy.initializeNativeValueSetter()` in constructor
 - **Always await** `Promise.resolve()` returns for proper error handling
 - **Use** `this.validateContent()` for the content type check
-- **Use** `this.insertIntoReactTextarea()` for insertion
+- **Use** `this.insertIntoReactTextarea()` for insertion: it puts the content where the caret is, through the base strategy's `insertIntoTextControl()`. Never assign the whole `value` of the textarea
 - **Insert the content exactly as given**: Prompts are Verbatim. Never sanitize, trim or shorten the content in a strategy; it was admitted once, when the Prompt was saved (see `docs/ARCHITECTURE.md`, Security Architecture)
 
 ---
@@ -411,17 +393,19 @@ window.__promptLibraryDebug?.activeStrategy
 
 ## Platform Strategy Patterns
 
+**The rule every pattern follows:** an Insertion puts the Prompt where the caret of the input field is, in place of the text selected there. The text before and after stays, and a field with no caret takes the Prompt at its end (see `CONTEXT.md`, Insertion). A strategy never sets the whole value of the field and never clears it: it calls `insertIntoTextControl()` for a `<textarea>` or an `<input>`, `insertEditableText()` for a contenteditable editor, or `insertIntoReactTextarea()` in a `ReactPlatformStrategy`. The selector controller selects the caret again right before it calls the strategy, so a strategy inserts at the field's current selection and does not look for the caret itself. Only `restore()`, which Undo calls, replaces the whole field. When you add a Platform, add it to `PLATFORMS` in `src/content/platforms/__tests__/caret-insertion.test.ts` and to the stand-in pages that `tests/e2e/content/caret-insertion.spec.ts` runs on (`tests/e2e/fixtures/platform-pages.ts`).
+
 ### Pattern 1: Simple Textarea Platform
 
 For platforms with standard textarea inputs:
 
 ```typescript
 async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
-  if (element.tagName === 'TEXTAREA') {
-    (element as HTMLTextAreaElement).value = content;
-    element.dispatchEvent(new Event('input', { bubbles: true }));
-    element.dispatchEvent(new Event('change', { bubbles: true }));
-    return { success: true, method: 'textarea' };
+  if (element instanceof HTMLTextAreaElement) {
+    // At the caret, through the native value setter, then input and change
+    return this.insertIntoTextControl(element, content)
+      ? { success: true, method: 'textarea' }
+      : { success: false, error: 'The input field did not keep the text' };
   }
   return { success: false };
 }
@@ -433,23 +417,12 @@ For platforms with rich text editors:
 
 ```typescript
 async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
-  if (element.contentEditable === 'true') {
-    // Method 1: Try execCommand (most compatible)
-    element.focus();
-    const selection = window.getSelection();
-    if (selection) {
-      selection.selectAllChildren(element);
-    }
-    
-    const success = document.execCommand('insertText', false, content);
-    if (success) {
-      element.dispatchEvent(new InputEvent('input', {
-        bubbles: true,
-        inputType: 'insertText',
-        data: content
-      }));
-      return { success: true, method: 'execCommand' };
-    }
+  if (element.isContentEditable || element.getAttribute('contenteditable') === 'true') {
+    // At the caret, through execCommand('insertText') as typing would; when the editor
+    // does not take it, the base strategy writes the text directly, the text around
+    // the caret included. The method in the result is 'your-platform-execCommand'
+    // or 'your-platform-dom'
+    return this.insertEditableText(element, content, 'your-platform');
   }
   return { success: false };
 }
@@ -461,24 +434,19 @@ For platforms that need multiple fallback approaches:
 
 ```typescript
 async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
-  // Method 1: Try execCommand
-  const execResult = await this._tryExecCommand(element, content);
-  if (execResult.success) return execResult;
-  
-  // Method 2: Try DOM manipulation
-  const domResult = this._tryDOMManipulation(element, content);
-  if (domResult.success) return domResult;
-  
-  // Method 3: Try direct property assignment
-  return this._tryDirectAssignment(element, content);
+  // Method 1: Try the editor's own API (see GeminiStrategy and its Quill instance)
+  const apiResult = this._tryEditorApi(element, content);
+  if (apiResult.success) return apiResult;
+
+  // Method 2: the browser's editing command, then the base strategy's direct write
+  return this.insertEditableText(element, content, 'your-platform');
 }
 
-private async _tryExecCommand(element: HTMLElement, content: string): Promise<InsertionResult> {
+private _tryEditorApi(element: HTMLElement, content: string): InsertionResult {
+  // Insert at the editor's own selection, in place of what is selected there.
+  // Never replace the whole text of the editor.
   // Implementation...
-}
-
-private _tryDOMManipulation(element: HTMLElement, content: string): InsertionResult {
-  // Implementation...
+  return { success: false };
 }
 ```
 
@@ -518,6 +486,8 @@ window.__promptLibraryDebug?.testInsertion?.('test content');
 - [ ] Clicking button opens prompt selector
 - [ ] Selecting prompt inserts content
 - [ ] Content appears in the input field
+- [ ] With a draft in the input field and the caret in the middle of it, the Prompt goes where the caret is and the text before and after it stays
+- [ ] Undo puts the draft back
 - [ ] Platform recognizes the inserted content
 - [ ] No console errors
 
@@ -535,7 +505,7 @@ window.__promptLibraryDebug?.testInsertion?.('test content');
 
 **Content doesn't insert:**
 - Verify element selector matches the input
-- Try different insertion methods (execCommand, DOM, direct)
+- Check the strategy calls the base helper that matches the field (`insertIntoTextControl()` for a textarea, `insertEditableText()` for a contenteditable)
 - Check what events the platform expects
 - Use browser inspector to understand input structure
 
@@ -557,7 +527,7 @@ selectors: [
 
 ### 2. Event Triggering
 
-Trigger comprehensive events for maximum compatibility:
+The base helpers already dispatch the events typing would send (`input` and `change` for a textarea, `input` for a contenteditable). When a Platform expects more, trigger them after the helper returned:
 
 ```typescript
 private _triggerEvents(element: HTMLElement, content: string): void {
@@ -584,9 +554,12 @@ Always include comprehensive error handling:
 ```typescript
 async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
   try {
-    // Insertion logic...
-    this._debug('Insertion successful');
-    return { success: true, method: 'your-method' };
+    // At the caret, through a base helper
+    const result = this.insertEditableText(element, content, 'your-platform');
+    if (result.success) {
+      this._debug('Insertion successful');
+    }
+    return result;
   } catch (error) {
     this._error('Insertion failed', error as Error);
     return { success: false, error: (error as Error).message };
@@ -605,7 +578,8 @@ async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
   element.click();
   await new Promise(resolve => setTimeout(resolve, 50));
 
-  // Proceed with insertion...
+  // Proceed with insertion, at the selection the field has now
+  return this.insertEditableText(element, content, 'your-platform');
 }
 ```
 
@@ -692,23 +666,10 @@ export class GeminiStrategy extends PlatformStrategy {
       await new Promise(resolve => setTimeout(resolve, 50));
 
       // Gemini uses Quill editor with contenteditable
-      if (element.contentEditable === 'true') {
-        // Clear existing content
-        element.textContent = '';
-
-        // Insert using execCommand for Quill compatibility
-        const inserted = document.execCommand('insertText', false, content);
-
-        if (inserted) {
-          element.dispatchEvent(new InputEvent('input', {
-            bubbles: true,
-            cancelable: true,
-            inputType: 'insertText',
-            data: content
-          }));
-
-          return { success: true, method: 'gemini-execCommand' };
-        }
+      if (element.isContentEditable || element.getAttribute('contenteditable') === 'true') {
+        // Where the caret is, through execCommand for Quill compatibility.
+        // The method in the result is 'gemini-execCommand' or 'gemini-dom'
+        return this.insertEditableText(element, content, 'gemini');
       }
 
       return { success: false, error: 'Unsupported element type' };
@@ -726,7 +687,8 @@ export class GeminiStrategy extends PlatformStrategy {
 
 **Key Points:**
 - Gemini uses Quill editor (`.ql-editor` class)
-- Requires `execCommand` for proper Quill integration
+- Requires `execCommand` for proper Quill integration; `insertEditableText()` calls it at the caret
+- The real `GeminiStrategy` first tries the Quill instance's own API, at Quill's selection
 - Material Design 3 icon styling
 - Multiple selector fallbacks for robustness
 
@@ -757,14 +719,11 @@ export class CopilotStrategy extends PlatformStrategy {
       await new Promise(resolve => setTimeout(resolve, 50));
 
       // Copilot uses standard textarea
-      if (element.tagName === 'TEXTAREA') {
-        (element as HTMLTextAreaElement).value = content;
-
-        // Trigger comprehensive events
-        element.dispatchEvent(new Event('input', { bubbles: true }));
-        element.dispatchEvent(new Event('change', { bubbles: true }));
-
-        return { success: true, method: 'copilot-textarea' };
+      if (element instanceof HTMLTextAreaElement) {
+        // Where the caret is, through the native value setter; dispatches input and change
+        return this.insertIntoTextControl(element, content)
+          ? { success: true, method: 'copilot-textarea' }
+          : { success: false, error: 'The input field did not keep the text' };
       }
 
       return { success: false, error: 'Unsupported element type' };
@@ -810,24 +769,14 @@ export class MistralStrategy extends PlatformStrategy {
       await new Promise(resolve => setTimeout(resolve, 100));
 
       // Try contenteditable first (primary method)
-      if (element.contentEditable === 'true') {
-        element.textContent = '';
-        const inserted = document.execCommand('insertText', false, content);
-
-        if (inserted) {
-          element.dispatchEvent(new InputEvent('input', {
-            bubbles: true,
-            inputType: 'insertText',
-            data: content
-          }));
-          return { success: true, method: 'mistral-execCommand' };
-        }
+      if (element.isContentEditable || element.getAttribute('contenteditable') === 'true') {
+        // Where the caret is, so ProseMirror builds its paragraphs from the line breaks
+        return this.insertEditableText(element, content, 'mistral');
       }
 
-      // Fallback to textarea
-      if (element.tagName === 'TEXTAREA') {
-        (element as HTMLTextAreaElement).value = content;
-        element.dispatchEvent(new Event('input', { bubbles: true }));
+      // Fallback to textarea, where its caret is
+      if (element instanceof HTMLTextAreaElement) {
+        this.insertIntoTextControl(element, content);
         return { success: true, method: 'mistral-textarea' };
       }
 
@@ -914,18 +863,18 @@ After fixing the chain, refresh `tests/fixtures/composers/<id>.html` from the li
 
 **Solutions:**
 ```typescript
-// Try multiple insertion methods:
+// Call the base helper that matches the field. Both insert where the caret is:
 async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
-  // Method 1: execCommand (most compatible)
-  const execResult = await this._tryExecCommand(element, content);
-  if (execResult.success) return execResult;
+  // A <textarea> or an <input>: native value setter, then input and change
+  if (element instanceof HTMLTextAreaElement || element instanceof HTMLInputElement) {
+    return this.insertIntoTextControl(element, content)
+      ? { success: true, method: 'your-platform-textarea' }
+      : { success: false, error: 'The input field did not keep the text' };
+  }
 
-  // Method 2: Direct assignment
-  const directResult = this._tryDirectAssignment(element, content);
-  if (directResult.success) return directResult;
-
-  // Method 3: DOM manipulation
-  return this._tryDOMManipulation(element, content);
+  // A contenteditable: execCommand('insertText') first, then a direct write of the
+  // field's text when the editor did not take it. result.method says which one ran
+  return this.insertEditableText(element, content, 'your-platform');
 }
 
 // Trigger comprehensive events:
@@ -948,18 +897,11 @@ private _triggerEvents(element: HTMLElement): void {
 
 **Solutions:**
 ```typescript
-// For React-based platforms, trigger React's internal events:
-private _setReactValue(element: HTMLTextAreaElement, value: string): void {
-  const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-    window.HTMLTextAreaElement.prototype,
-    'value'
-  )?.set;
-
-  if (nativeInputValueSetter) {
-    nativeInputValueSetter.call(element, value);
-    element.dispatchEvent(new Event('input', { bubbles: true }));
-  }
-}
+// For React-based platforms, the value must go through the native value setter, or React
+// does not see the change. insertIntoTextControl() does it, where the caret is, then
+// dispatches input and change. Do not write your own setter that assigns the whole value:
+const kept = this.insertIntoTextControl(element as HTMLTextAreaElement, content);
+// kept is false when the page's own handler rewrote the value
 
 // Add composition events for IME compatibility:
 element.dispatchEvent(new CompositionEvent('compositionstart'));
@@ -1004,12 +946,30 @@ describe('insert', () => {
     const result = await strategy.insert(textarea, 'Test');
 
     expect(result.success).toBe(true);
+    expect(textarea.value).toBe('Test');
 
     document.body.removeChild(textarea); // ← Clean up
   });
+
+  it('keeps the text before and after the caret', async () => {
+    const textarea = document.createElement('textarea');
+    document.body.appendChild(textarea);
+    textarea.value = 'before after';
+    textarea.setSelectionRange(7, 7); // ← The caret, between "before " and "after"
+
+    const result = await strategy.insert(textarea, 'PROMPT ');
+
+    expect(result.success).toBe(true);
+    expect(textarea.value).toBe('before PROMPT after');
+
+    document.body.removeChild(textarea);
+  });
 });
 
-// 3. Strategy not properly mocked:
+// 3. Platform missing from the caret tests - add it to PLATFORMS in
+// src/content/platforms/__tests__/caret-insertion.test.ts
+
+// 4. Strategy not properly mocked:
 vi.mock('../../config/platforms', () => ({
   getPlatformById: vi.fn((id) => {
     if (id === 'yourplatform') {

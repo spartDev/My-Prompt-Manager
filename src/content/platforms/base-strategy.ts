@@ -247,15 +247,24 @@ export abstract class PlatformStrategy implements PlatformStrategyInterface {
     const lines = text.split('\n');
     const content = document.createDocumentFragment();
     let remaining = caret;
-    let caretNode: Node | null = null;
-    let caretOffset = 0;
+    // Where the caret goes: in a text node, or before the child of the field at an index
+    let caretIn: { node: Node; offset: number } | null = null;
+    let caretBefore: number | null = null;
     lines.forEach((line, index) => {
-      if (caretNode === null && remaining <= line.length) {
-        // The line is cut where the caret goes: the caret sits at the end of its first part
-        const head = document.createTextNode(line.slice(0, remaining));
-        content.append(head, line.slice(remaining));
-        caretNode = head;
-        caretOffset = remaining;
+      if (caretIn === null && caretBefore === null && remaining <= line.length) {
+        // The line is cut where the caret goes: the caret sits at the end of its first part,
+        // or before the line when it has no first part
+        const head = line.slice(0, remaining);
+        if (head === '') {
+          caretBefore = content.childNodes.length;
+        } else {
+          const node = document.createTextNode(head);
+          content.append(node);
+          caretIn = { node, offset: head.length };
+        }
+        if (line.length > remaining) {
+          content.append(line.slice(remaining));
+        }
       } else if (line !== '') {
         content.append(line);
       }
@@ -269,17 +278,12 @@ export abstract class PlatformStrategy implements PlatformStrategyInterface {
       content.append(document.createElement('br'));
     }
     element.replaceChildren(content);
-    element.normalize();
-    if (caretNode !== null) {
-      const placed: Node = caretNode;
-      const selection = document.getSelection();
-      if (placed.isConnected) {
-        selection?.collapse(placed, caretOffset);
-      } else {
-        // An empty first part was dropped by normalize(): the caret goes to the end of the field
-        selection?.selectAllChildren(element);
-        selection?.collapseToEnd();
-      }
+    const selection = document.getSelection();
+    const placed = caretIn as { node: Node; offset: number } | null;
+    if (placed) {
+      selection?.collapse(placed.node, placed.offset);
+    } else {
+      selection?.collapse(element, caretBefore ?? element.childNodes.length);
     }
     element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: text }));
     // An editor whose own handler rebuilt its content did not take the text
@@ -319,29 +323,8 @@ export abstract class PlatformStrategy implements PlatformStrategyInterface {
     if (edited && readInputText(element) === text) {
       return { success: true, method: `${via}-execCommand` };
     }
-    // No editing command, or the editor laid the text out differently: write it directly,
-    // one <br> between two lines so the breaks show whatever the field does with spaces. A
-    // last line that is empty takes a second <br>, the one that keeps it open
-    const lines = text.split('\n');
-    const content = document.createDocumentFragment();
-    lines.forEach((line, index) => {
-      if (line !== '') {
-        content.append(line);
-      }
-      if (index < lines.length - 1) {
-        content.append(document.createElement('br'));
-      }
-    });
-    if (lines.length > 1 && lines[lines.length - 1] === '') {
-      content.append(document.createElement('br'));
-    }
-    element.replaceChildren(content);
-    element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: text }));
-    // An editor whose own handler rebuilt its content did not take the text
-    if (readInputText(element) !== text) {
-      return { success: false, error: 'The input field did not keep the text' };
-    }
-    return { success: true, method: `${via}-dom` };
+    // No editing command, or the editor laid the text out differently: write it directly
+    return this.writeEditableText(element, text, text.length, via);
   }
 
   /**

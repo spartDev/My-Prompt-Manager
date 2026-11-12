@@ -444,7 +444,11 @@ export class PromptSelectorController {
       // The Platform replaced its input field while the selector closed: the Prompt has nowhere to go
       this.showFeedback({ kind: 'failed', title: prompt.title, target: null, field: session.field, previous: '' });
     } else if (session.restoreFocus && session.target.isConnected) {
+      // The caret comes back with the focus: a contenteditable focused again takes it at its start
       session.target.focus({ preventScroll: true });
+      if (session.point !== null) {
+        selectInsertionPoint(session.target, session.point);
+      }
     }
     this.render();
   }

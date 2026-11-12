@@ -114,12 +114,21 @@ export abstract class PlatformStrategy {
   }
 
   abstract canHandle(element: HTMLElement): boolean;
-  abstract async insert(element: HTMLElement, content: string): Promise<InsertionResult>;
+  // Puts the content where the caret of the field is, in place of the text selected there
+  abstract insert(element: HTMLElement, content: string): Promise<InsertionResult>;
+  // Undo: puts back the whole text the field held
+  restore(element: HTMLElement, text: string): Promise<InsertionResult>;
 
   getSelectors(): string[];
   createIcon?(): HTMLElement;
+
+  // Shared by the strategies: insertion at the caret, for each kind of input field
+  protected insertIntoTextControl(element: HTMLTextAreaElement | HTMLInputElement, text: string): boolean;
+  protected insertEditableText(element: HTMLElement, text: string, via: string): InsertionResult;
 }
 ```
+
+An Insertion goes where the caret is (see `CONTEXT.md`, Insertion). The focus is in the Prompt selector while the user chooses, so `PromptSelectorController` reads the caret of the field when the selector opens (`insertionPointOf()` in `src/content/selector/inputText.ts`) and selects it again right before it calls the strategy (`selectInsertionPoint()`). A strategy therefore inserts at the field's current selection, and never sets the whole value of the field: `insertIntoTextControl()` does it for a `<textarea>` or an `<input>`, `insertEditableText()` for a contenteditable editor, through the browser's editing command. Only `restore()` replaces everything the field holds.
 
 Where the icon goes is not a strategy's business: `PlatformManager.getIconPlacement()` returns the active Platform's `iconPlacement` chain from `src/config/platforms.ts`, and the injector resolves it with `resolveIconPlacement()` and `placeAtAnchor()` of `src/content/core/icon-placement.ts`.
 
@@ -136,9 +145,8 @@ Where the icon goes is not a strategy's business: `PlatformManager.getIconPlacem
 
 **Implementation**: `ReactPlatformStrategy` extends `PlatformStrategy` and provides:
 
-1. **Native Value Setter Caching**: Caches React's native HTMLTextAreaElement value setter for 90% performance improvement
-2. **Content Type Check**: `validateContent()` confirms the content is a string; the content itself is never changed (see [Security Architecture](#security-architecture))
-3. **React-Compatible Insertion**: Handles React's synthetic events and state updates
+1. **Content Type Check**: `validateContent()` confirms the content is a string; the content itself is never changed (see [Security Architecture](#security-architecture))
+2. **React-Compatible Insertion**: where the caret is, through the native value setter (the base strategy's `insertIntoTextControl()`), which is what makes React see the change, then the `input` and `change` events
 
 **Example**:
 
@@ -149,9 +157,6 @@ import { ReactPlatformStrategy } from './react-platform-strategy';
 export class CopilotStrategy extends ReactPlatformStrategy {
   constructor(hostname?: string) {
     super('copilot', 80, { selectors }, hostname);
-
-    // Initialize native value setter cache
-    ReactPlatformStrategy.initializeNativeValueSetter();
   }
 
   async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
@@ -173,7 +178,6 @@ export class CopilotStrategy extends ReactPlatformStrategy {
 ```
 
 **Shared Methods**:
-- `initializeNativeValueSetter()`: Static initialization method
 - `validateContent(content)`: Type check only (the content must be a string); content is never trimmed, shortened or sanitized
 - `insertIntoReactTextarea(element, content, platformName, methodName?)`: React-compatible textarea insertion
 
@@ -393,7 +397,7 @@ src/content/
 │   └── event-manager.ts       # Event listener cleanup
 ├── selector/                   # Prompt selector, in a shadow root (ADR-002)
 │   ├── controller.ts          # Shadow host, open/close, placement, insertion hand-off, confirmation and Undo
-│   ├── inputText.ts           # Plain text of the input field, the // trigger, caret at the end, pure DOM
+│   ├── inputText.ts           # Plain text of the input field, the // trigger, where an Insertion goes (the caret), pure DOM
 │   ├── InsertionFeedback.tsx  # Pill ('Inserted "title"' + Undo, or "Couldn't insert") and sweep over the field
 │   ├── selectorMachine.ts     # State machine (closed, list, variables, closing), pure
 │   ├── selectorKeys.ts        # Keyboard rules: (state, key) -> state, pure
@@ -475,19 +479,19 @@ strategy.insert(element, content)
     │
     ├─► Content is inserted exactly as stored (Verbatim, no sanitizing)
     │
-    ├─► Platform-specific insertion logic
+    ├─► Platform-specific insertion logic, where the caret of the field is
     │   │
-    │   ├─► Tier 1: Native API (e.g., Quill.js)
+    │   ├─► Tier 1: Native API (e.g., Quill.js), at the editor's selection
     │   │       Success → Dispatch events → Return
     │   │       Failure → ▼
     │   │
-    │   ├─► Tier 2: execCommand fallback
+    │   ├─► Tier 2: execCommand('insertText') at the caret, or the value of a textarea
     │   │       Success → Dispatch events → Return
     │   │       Failure → ▼
     │   │
-    │   └─► Tier 3: DOM manipulation (last resort)
+    │   └─► Tier 3: the field's text written directly, the text around the caret included
     │           Success → Dispatch events → Return
-    │           Failure → Return error
+    │           Failure → Return error (nothing is written over what the field holds)
     │
     ▼
 InsertionResult { success, method, error? }
@@ -583,7 +587,6 @@ Is the platform's input field powered by React?
 │   │
 │   └─ Benefits:
 │       • Automatic React event handling
-│       • Native value setter caching (~90% faster)
 │       • Built-in content type check
 │
 └─ NO → Use PlatformStrategy
@@ -650,17 +653,15 @@ export class NewPlatformStrategy extends PlatformStrategy {
   async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
     // Content is Verbatim: insert it exactly as given. Do not sanitize, trim or
     // shorten it here; it was admitted once, when the Prompt was saved.
+    // It goes where the caret of the field is, in place of the text selected there: never set
+    // the whole value of the field or clear it, or the user loses the text around the caret.
     try {
-      // Tier 1: Native API (if available)
+      // Tier 1: Native API (if available), at the editor's own selection
       const apiResult = this._tryNativeAPI(element, content);
       if (apiResult.success) return apiResult;
 
-      // Tier 2: execCommand fallback
-      const execResult = await this._tryExecCommand(element, content);
-      if (execResult.success) return execResult;
-
-      // Tier 3: DOM manipulation (last resort)
-      return this._tryDOMManipulation(element, content);
+      // Tier 2: the base strategy's insertion at the caret, for each kind of field
+      return this._insertAtCaret(element, content);
 
     } catch (err) {
       logError('NewPlatform insertion failed', err as Error, {
@@ -680,8 +681,9 @@ export class NewPlatformStrategy extends PlatformStrategy {
     // Example: Check for custom editor instance
     const editor = (element as any).__customEditor;
 
-    if (editor && typeof editor.setText === 'function') {
-      editor.setText(content);
+    if (editor && typeof editor.insertText === 'function') {
+      // At the editor's selection: an API that sets the whole text (setText) is for Undo only
+      editor.insertText(content);
       this._dispatchEvents(element, content);
       info('NewPlatform native API insertion successful');
       return { success: true, method: 'newplatform-native-api' };
@@ -691,67 +693,25 @@ export class NewPlatformStrategy extends PlatformStrategy {
   }
 
   /**
-   * Tier 2: execCommand fallback for contenteditable
+   * Tier 2: the base strategy's helpers. Both insert at the caret, keep the text before and
+   * after it, and leave the caret right after the content.
    */
-  private async _tryExecCommand(
-    element: HTMLElement,
-    content: string
-  ): Promise<InsertionResult> {
-    if (element.contentEditable === 'true') {
-      element.focus();
-
-      // Select all existing content
-      const selection = window.getSelection();
-      if (selection) {
-        const range = document.createRange();
-        range.selectNodeContents(element);
-        selection.removeAllRanges();
-        selection.addRange(range);
-      }
-
-      // Use insertText (NOT insertHTML for security)
-      const inserted = document.execCommand('insertText', false, content);
-
-      if (inserted) {
-        this._dispatchEvents(element, content);
-        info('NewPlatform execCommand insertion successful');
-        return { success: true, method: 'newplatform-execCommand' };
-      }
+  private _insertAtCaret(element: HTMLElement, content: string): InsertionResult {
+    if (element instanceof HTMLTextAreaElement || element instanceof HTMLInputElement) {
+      // Through the native value setter, with 'input' and 'change' dispatched
+      return this.insertIntoTextControl(element, content)
+        ? { success: true, method: 'newplatform-input' }
+        : { success: false, error: 'The input field did not keep the text' };
     }
 
-    return { success: false };
-  }
-
-  /**
-   * Tier 3: DOM manipulation fallback
-   */
-  private _tryDOMManipulation(
-    element: HTMLElement,
-    content: string
-  ): InsertionResult {
-    if (element.tagName === 'TEXTAREA' || element.tagName === 'INPUT') {
-      // Standard input elements
-      (element as HTMLInputElement).value = content;
-      this._dispatchEvents(element, content);
-      info('NewPlatform DOM manipulation (input) successful');
-      return { success: true, method: 'newplatform-dom-input' };
-
-    } else if (element.contentEditable === 'true') {
-      // ContentEditable elements - use text nodes (security)
-      element.focus();
-
-      // Clear safely
-      while (element.firstChild) {
-        element.removeChild(element.firstChild);
+    if (element.isContentEditable || element.getAttribute('contenteditable') === 'true') {
+      // Through execCommand('insertText') (NOT insertHTML, for security); when it is refused,
+      // the text is written as text nodes, with the text around the caret
+      const result = this.insertEditableText(element, content, 'newplatform');
+      if (result.success) {
+        this._dispatchEvents(element, content);
       }
-
-      // Insert as text node (prevents XSS)
-      const textNode = document.createTextNode(content);
-      element.appendChild(textNode);
-
-      this._dispatchEvents(element, content);
-      info('NewPlatform DOM manipulation (contenteditable) successful');
-      return { success: true, method: 'newplatform-dom-contenteditable' };
+      return result;
     }
 
     return {
@@ -807,9 +767,6 @@ export class NewReactPlatformStrategy extends ReactPlatformStrategy {
       ],
       priority: 85
     }, hostname);
-
-    // Initialize React native value setter cache (REQUIRED)
-    ReactPlatformStrategy.initializeNativeValueSetter();
   }
 
   /**
@@ -871,15 +828,13 @@ export class NewReactPlatformStrategy extends ReactPlatformStrategy {
 ```
 
 **Key Points for React Platforms**:
-1. **Must call** `ReactPlatformStrategy.initializeNativeValueSetter()` in constructor
-2. **Use** `validateContent()` for the content type check, then insert the content exactly as given (never sanitize, trim or shorten it)
-3. **Use** `insertIntoReactTextarea()` for insertion (handles all React events)
-4. **Handle errors** with try-catch and proper async/await
-5. **Custom logging**: Pass platform name to `insertIntoReactTextarea()` for branded logs
+1. **Use** `validateContent()` for the content type check, then insert the content exactly as given (never sanitize, trim or shorten it)
+2. **Use** `insertIntoReactTextarea()` for insertion (handles all React events)
+3. **Handle errors** with try-catch and proper async/await
+4. **Custom logging**: Pass platform name to `insertIntoReactTextarea()` for branded logs
 
 **What You Get for Free**:
 - ✅ React event handling (input, change)
-- ✅ Native value setter caching (~90% performance boost)
 - ✅ Content type check
 - ✅ Consistent error handling
 - ✅ Security: content is set as the textarea `value`, never parsed as markup
@@ -1439,7 +1394,7 @@ On extension update (`chrome.runtime.onInstalled`, reason `update`) and at every
 
 - **Reading**: the content script reads Prompts through the shared `readPrompts()` (`getPrompts()` in `src/content/utils/storage.ts`). Reading never writes. Entries that are not Prompts at all are skipped, but no Prompt is changed, truncated or dropped because of what its text says.
 - **Prompt selector**: its React components (`src/content/selector/`) render title, Category and Prompt text as text nodes, never as markup, and pass the Prompt id through unchanged.
-- **Insertion**: strategies only set text, through `value`, `textContent` or text nodes, `document.execCommand('insertText')`, or the editor's own text API (ProseMirror `insertText`, Quill `setText`). Nothing is parsed as markup.
+- **Insertion**: strategies only set text, through `value`, `textContent` or text nodes, `document.execCommand('insertText')`, or the editor's own text API (ProseMirror `insertText`, Quill `insertText`). Nothing is parsed as markup.
 - **No HTML sink**: the only `innerHTML` assignment in the extension source sets a static help banner in the element picker, with no interpolated text.
 
 ### Where DOMPurify is still used

@@ -80,8 +80,7 @@ export class M365CopilotStrategy extends ReactPlatformStrategy {
   }
 
   /**
-   * Inserts content into contenteditable elements (Lexical editor)
-   * Clears existing content before inserting to replace rather than append
+   * Inserts content into contenteditable elements (Lexical editor), where the caret is
    * @private
    */
   private _insertIntoContentEditable(element: HTMLElement, content: string): Promise<InsertionResult> {

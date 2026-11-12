@@ -476,6 +476,21 @@ describe('PromptSelectorController', () => {
       expect(atInsertion).toEqual({ start: 7, end: 12 });
     });
 
+    it('gives the caret back with the focus when the selector closes without an Insertion', async () => {
+      const text = editor.firstChild as Text;
+      document.getSelection()?.collapse(text, 7);
+
+      await controller.open(editor, button);
+      await opened();
+      // The focus is in the selector by now: the page's selection has left the editor
+      document.getSelection()?.removeAllRanges();
+      press('Escape');
+      await closed();
+
+      expect(selectionInEditor()).toEqual({ start: 7, end: 7 });
+      expect(callbacks.insert).not.toHaveBeenCalled();
+    });
+
     it('leaves the caret where the Platform put it, right after the Prompt', async () => {
       field.value = 'before after';
       field.focus();

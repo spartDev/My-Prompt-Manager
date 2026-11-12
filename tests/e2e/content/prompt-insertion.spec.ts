@@ -265,7 +265,7 @@ test.describe('Insertion on a React-controlled field', () => {
 
     await promptRow(page, 'review').click();
     await expect(insertionPill(page)).toBeVisible();
-    await expect(state).toHaveText(review.content);
+    await expect(state).toHaveText(`Hello ${review.content}`, { useInnerText: false });
 
     await undoButton(page).click();
     await expect(field(page, 'chatgpt')).toHaveValue('Hello ');

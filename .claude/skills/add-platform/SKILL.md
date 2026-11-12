@@ -148,51 +148,28 @@ export class YourPlatformStrategy extends PlatformStrategy {
   }
 
   /**
-   * Inserts content using platform-compatible methods
+   * Inserts content where the caret of the input field is, in place of the text selected there
+   * (CONTEXT.md, Insertion). The base strategy does it for both kinds of field: never set the
+   * whole value or clear the field here, or the user loses the text around the caret.
    */
-  async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
+  insert(element: HTMLElement, content: string): Promise<InsertionResult> {
     try {
-      // Focus the element first
-      element.focus();
-      element.click();
-
-      // Wait for platform initialization
-      await new Promise(resolve => setTimeout(resolve, 50));
-
-      // Method 1: Try for textarea elements
-      if (element.tagName === 'TEXTAREA') {
-        (element as HTMLTextAreaElement).value = content;
-        element.dispatchEvent(new Event('input', { bubbles: true }));
-        element.dispatchEvent(new Event('change', { bubbles: true }));
-        return { success: true, method: 'yourplatform-textarea' };
+      // A <textarea> or an <input>: through the native value setter, with the page told
+      if (element instanceof HTMLTextAreaElement || element instanceof HTMLInputElement) {
+        return Promise.resolve(this.insertIntoTextControl(element, content)
+          ? { success: true, method: 'yourplatform-textarea' }
+          : { success: false, error: 'The input field did not keep the text' });
       }
 
-      // Method 2: Try for contenteditable elements
-      if (element.contentEditable === 'true') {
-        // Clear existing content
-        element.textContent = '';
-
-        // Insert new content
-        const inserted = document.execCommand('insertText', false, content);
-
-        if (inserted) {
-          // Trigger platform events
-          element.dispatchEvent(new InputEvent('input', {
-            bubbles: true,
-            cancelable: true,
-            inputType: 'insertText',
-            data: content
-          }));
-
-          return { success: true, method: 'yourplatform-execCommand' };
-        }
+      // A contenteditable editor: through the browser's editing command, as typing would
+      if (element.isContentEditable || element.getAttribute('contenteditable') === 'true') {
+        return Promise.resolve(this.insertEditableText(element, content, 'yourplatform'));
       }
 
-      return { success: false, error: 'Unsupported element type' };
-
+      return Promise.resolve({ success: false, error: 'Unsupported element type' });
     } catch (error) {
       this._error('Insertion failed', error as Error);
-      return { success: false, error: (error as Error).message };
+      return Promise.resolve({ success: false, error: (error as Error).message });
     }
   }
 
@@ -420,7 +397,7 @@ When a Platform's bar has no room for the label, `fitPromptsPill()` shrinks the 
 
 Save a sanitized copy of the Platform's live composer in `tests/fixtures/composers/`, named after the Platform id, as `tests/fixtures/composers/claude.html` is (strip user content and tokens), and add `'yourplatform'` to the `it.each` list of `src/content/core/__tests__/icon-placement-chains.test.ts`, which checks that the chain resolves its first anchor on that fixture.
 
-Add a stand-in page for the Platform to `tests/e2e/fixtures/platform-pages.ts` (its input field and its action bar), so `tests/e2e/content/prompt-selector.spec.ts` and `tests/e2e/content/prompt-insertion.spec.ts` (the `//` trigger, the confirmation, Undo) run the whole flow on it. Undo goes through `restore()` of the base strategy, which replaces the whole field; override it only when the Platform's editor does not take `execCommand`.
+Add a stand-in page for the Platform to `tests/e2e/fixtures/platform-pages.ts` (its input field and its action bar), so `tests/e2e/content/prompt-selector.spec.ts` and `tests/e2e/content/prompt-insertion.spec.ts` (the `//` trigger, the confirmation, Undo) run the whole flow on it. An Insertion goes where the caret is: add the Platform to `PLATFORMS` in `src/content/platforms/__tests__/caret-insertion.test.ts` and its stand-in page to `PLATFORM_FIXTURES`, which `tests/e2e/content/caret-insertion.spec.ts` runs on, to prove the text before and after the caret stays. Undo goes through `restore()` of the base strategy, which replaces the whole field; override it only when the Platform's editor does not take `execCommand`.
 
 #### The Platform's icon in Settings (React component)
 
