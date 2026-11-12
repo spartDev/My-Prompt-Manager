@@ -62,6 +62,7 @@ const defaultProps = {
   searchWithDebounce: createMockSearchWithDebounce(),
   libraryFilter: ALL_PROMPTS,
   onAddNew: vi.fn(),
+  onCreateFromSearch: vi.fn(),
   onEditPrompt: vi.fn(),
   onTogglePin: vi.fn(),
   onCopyPrompt: vi.fn(),
@@ -319,8 +320,112 @@ describe('LibraryView', () => {
     it('does not offer to search all prompts when All finds nothing', () => {
       renderWith(ALL_PROMPTS, { searchWithDebounce: createMockSearchWithDebounce([], 'zzz') });
 
-      expect(screen.getByText('No matches found')).toBeInTheDocument();
+      expect(screen.getByRole('region', { name: /no search results/i })).toHaveTextContent('Nothing called “zzz” yet');
       expect(screen.queryByRole('button', { name: 'Search all prompts' })).not.toBeInTheDocument();
+    });
+
+    it('offers to create the Prompt a search did not find, titled with the search', async () => {
+      const user = userEvent.setup();
+      const onCreateFromSearch = vi.fn();
+      renderWith(ALL_PROMPTS, { searchWithDebounce: createMockSearchWithDebounce([], '  Weekly report '), onCreateFromSearch });
+
+      const empty = screen.getByRole('region', { name: /no search results/i });
+      expect(empty).toHaveTextContent('Nothing called “Weekly report” yet');
+      expect(empty).toHaveClass('animate-empty-rise', 'border-dashed');
+      await user.click(screen.getByRole('button', { name: 'Create it' }));
+
+      expect(onCreateFromSearch).toHaveBeenCalledWith('Weekly report', undefined);
+    });
+
+    it('creates it in the Category of the active Library filter', async () => {
+      const user = userEvent.setup();
+      const onCreateFromSearch = vi.fn();
+      renderWith({ kind: 'category', categoryId: 'work' }, { searchWithDebounce: createMockSearchWithDebounce([pinned], 'zzz'), onCreateFromSearch });
+
+      await user.click(screen.getByRole('button', { name: 'Create it' }));
+
+      expect(onCreateFromSearch).toHaveBeenCalledWith('zzz', 'Work');
+    });
+
+    it('heads the list of a search with Results and announces the number found', () => {
+      renderWith(ALL_PROMPTS, { searchWithDebounce: createMockSearchWithDebounce([pinned, used], 'e') });
+
+      const header = screen.getByTestId('list-header');
+      expect(header).toHaveTextContent('Results');
+      const status = screen.getByRole('status');
+      expect(header).toContainElement(status);
+      expect(status).toHaveAttribute('aria-live', 'polite');
+      expect(status).toHaveTextContent('2 results');
+      // The count of the header is no longer announced as well
+      expect(screen.getByText(/^2 of \d+ prompts$/)).not.toHaveAttribute('aria-live');
+    });
+
+    it('keeps the name of the active Library filter as the heading of a search', () => {
+      renderWith({ kind: 'category', categoryId: 'work' }, { searchWithDebounce: createMockSearchWithDebounce([pinned], 'pinned') });
+
+      expect(screen.getByTestId('list-header')).toHaveTextContent('Work');
+      expect(screen.getByTestId('list-header')).not.toHaveTextContent('Results');
+    });
+
+    it('announces a search that found nothing', () => {
+      renderWith(ALL_PROMPTS, { searchWithDebounce: createMockSearchWithDebounce([], 'zzz') });
+
+      expect(screen.getByRole('status')).toHaveTextContent('No results');
+    });
+
+    it('shows no list heading without a search', () => {
+      renderWith(ALL_PROMPTS);
+
+      expect(screen.queryByTestId('list-header')).not.toBeInTheDocument();
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    });
+
+    describe('cards rising', () => {
+      const riseOf = () => screen.getAllByTestId('prompt-card').map(card => card.parentElement?.className ?? '');
+      const withSearch = (found: Prompt[], query: string) => (
+        <LibraryView {...defaultProps} prompts={library} searchWithDebounce={createMockSearchWithDebounce(found, query)} />
+      );
+
+      it('rise one after the other, each a step later, up to a last step', () => {
+        const many = Array.from({ length: 11 }, (_, index) => ({ ...defaultPrompts[0], id: `p-${String(index)}`, title: `Prompt ${String(index)}` }));
+        render(<LibraryView {...defaultProps} prompts={many} searchWithDebounce={createMockSearchWithDebounce(many)} />);
+
+        const delays = screen.getAllByTestId('prompt-card').map(card => card.parentElement?.style.animationDelay);
+        expect(delays.slice(0, 3)).toEqual(['0ms', '50ms', '100ms']);
+        expect(delays.slice(8)).toEqual(['400ms', '400ms', '400ms']);
+        expect(riseOf().every(className => className.includes('animate-list-rise'))).toBe(true);
+      });
+
+      it('do not rise again at a keystroke that lists the same Prompts', () => {
+        const { rerender } = render(withSearch([pinned, used], 'on'));
+        const before = riseOf();
+
+        rerender(withSearch([pinned, used], 'one'));
+
+        expect(riseOf()).toEqual(before);
+      });
+
+      it('rise again when the Prompts listed change, without being mounted anew', () => {
+        const { rerender } = render(withSearch([pinned, used], 'one'));
+        const before = riseOf();
+        const card = screen.getAllByTestId('prompt-card')[0];
+
+        rerender(withSearch([pinned], 'pinned'));
+
+        expect(riseOf()[0]).not.toBe(before[0]);
+        expect(riseOf()[0]).toMatch(/animate-list-rise(-again)?/);
+        expect(screen.getAllByTestId('prompt-card')[0]).toBe(card);
+      });
+
+      it('do not rise again when a pin only reorders them', () => {
+        const { rerender } = render(<LibraryView {...defaultProps} prompts={library} searchWithDebounce={createMockSearchWithDebounce(library)} />);
+        const before = riseOf();
+
+        const reordered = [used, pinned, ...defaultPrompts];
+        rerender(<LibraryView {...defaultProps} prompts={reordered} searchWithDebounce={createMockSearchWithDebounce(reordered)} />);
+
+        expect(riseOf()).toEqual(before);
+      });
     });
 
     it('explains an empty Pinned filter', () => {

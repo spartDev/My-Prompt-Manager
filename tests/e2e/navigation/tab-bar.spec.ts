@@ -135,7 +135,7 @@ test.describe('Bottom tab bar navigation', () => {
     await tabNavigation.switchTo(page, 'analytics');
     await tabNavigation.switchTo(page, 'library');
 
-    await expect(page.getByPlaceholder('Search your prompts...')).toHaveValue('Meeting');
+    await expect(page.getByPlaceholder('Search your prompts')).toHaveValue('Meeting');
     await libraryPage.expectPromptCount(1);
     await libraryPage.expectPromptVisible('Meeting Notes Template');
   });

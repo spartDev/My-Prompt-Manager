@@ -38,7 +38,11 @@ describe('motion tokens', () => {
     ['category-pop', `pop ${MOTION.categoryPop}ms var(--ease-spring) both`],
     ['bar-grow', `bar-grow ${MOTION.barGrow}ms var(--ease-spring) both`],
     ['card-rise', `card-rise ${MOTION.cardRise}ms var(--ease-spring) both`],
-    ['rank-fill', `fill-grow ${MOTION.rankFill}ms var(--ease-spring) both`]
+    ['rank-fill', `fill-grow ${MOTION.rankFill}ms var(--ease-spring) both`],
+    ['clear-pop', `pop ${MOTION.clearPop}ms var(--ease-spring) both`],
+    ['list-rise', `card-rise ${MOTION.listRise}ms var(--ease-spring) both`],
+    ['list-rise-again', `card-rise-again ${MOTION.listRise}ms var(--ease-spring) both`],
+    ['empty-rise', `card-rise ${MOTION.emptyRise}ms var(--ease-spring) both`]
   ])('animate-%s runs for the duration motion.ts gives', (name, animation) => {
     expect(tokens).toContain(`--animate-${name}: ${animation};`);
   });

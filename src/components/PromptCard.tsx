@@ -5,6 +5,7 @@ import { encode } from '../services/promptEncoder';
 import type { PromptCardProps } from '../types/components';
 import { Logger, toError } from '../utils';
 import { extractVariables } from '../utils/promptVariables';
+import { highlightMatch } from '../utils/textHighlight';
 import { cutWithoutSplittingPairs } from '../utils/truncate';
 
 import CategoryBadge from './CategoryBadge';
@@ -34,48 +35,20 @@ const previewOf = (content: string): string =>
   content.length <= PREVIEW_MAX_LENGTH ? content : `${cutWithoutSplittingPairs(content, PREVIEW_MAX_LENGTH)}…`;
 
 /**
- * Highlights matching text in a string based on a search query.
- * Pure function hoisted to module scope to avoid recreation on every render.
- *
- * The text is shown exactly as stored: React renders every part below as a text node, so markup
- * in a title is displayed, never interpreted, and nothing needs to be rewritten first.
+ * A title or a preview with the first match of the search marked.
+ * The text is shown exactly as stored: React renders every segment as a text node, so markup in a
+ * title is displayed, never interpreted, and nothing needs to be rewritten first.
  */
-const highlightText = (text: string, query: string, promptId: string): ReactNode => {
-  const searchTerm = query.trim().toLowerCase();
-  if (searchTerm === '') {return text;}
-
-  const lowerText = text.toLowerCase();
-  // Lowercasing can change the length (an 'İ' becomes two code units), which would put a match at the wrong
-  // position of the stored text: show the title as it is, unmarked
-  if (lowerText.length !== text.length) {return text;}
-
-  const parts: ReactNode[] = [];
-  let lastIndex = 0;
-  let index = lowerText.indexOf(searchTerm);
-
-  while (index !== -1) {
-    // Add text before the match
-    if (index > lastIndex) {
-      parts.push(text.substring(lastIndex, index));
-    }
-
-    // Add highlighted match - using stable key with prompt ID and match position
-    parts.push(
-      <mark key={`highlight-${promptId}-${String(index)}-${searchTerm}`} className="bg-highlight text-inherit px-1 rounded-sm">
-        {text.substring(index, index + searchTerm.length)}
-      </mark>
-    );
-
-    lastIndex = index + searchTerm.length;
-    index = lowerText.indexOf(searchTerm, lastIndex);
-  }
-
-  // Add remaining text
-  if (lastIndex < text.length) {
-    parts.push(text.substring(lastIndex));
-  }
-
-  return parts;
+const highlightText = (text: string, query: string): ReactNode => {
+  const { before, match, after } = highlightMatch(text, query);
+  if (match === '') {return text;}
+  return (
+    <>
+      {before}
+      <mark className="bg-highlight text-primary rounded-[4px]">{match}</mark>
+      {after}
+    </>
+  );
 };
 
 const PromptCard: FC<PromptCardProps> = ({
@@ -153,7 +126,7 @@ const PromptCard: FC<PromptCardProps> = ({
             aria-label={`Edit ${prompt.title}`}
             title={prompt.title}
           >
-            {highlightText(prompt.title, searchQuery, prompt.id)}
+            {highlightText(prompt.title, searchQuery)}
           </button>
         </h3>
 
@@ -174,7 +147,7 @@ const PromptCard: FC<PromptCardProps> = ({
 
       {/* Content preview (2 lines) */}
       <p className="mt-1.5 text-sm leading-relaxed text-tertiary line-clamp-2 break-words">
-        {highlightText(previewOf(prompt.content), searchQuery, prompt.id)}
+        {highlightText(previewOf(prompt.content), searchQuery)}
       </p>
 
       {/* Footer: category, usage and round actions */}

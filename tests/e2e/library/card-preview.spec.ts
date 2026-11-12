@@ -69,7 +69,7 @@ test.describe('Library card preview prefix', () => {
     await expect(previewOf(page, 'Short Prompt')).toHaveText('Summarise this text in three bullet points.');
 
     // Filtering uses the full content: a term only in the cut-off tail still finds the prompt
-    await page.getByPlaceholder('Search your prompts...').fill('tail-only-needle');
+    await page.getByPlaceholder('Search your prompts').fill('tail-only-needle');
     await expect(page.getByTestId('prompt-card')).toHaveCount(1);
     await expect(page.getByTestId('prompt-card')).toContainText('Huge Spec Review');
   });

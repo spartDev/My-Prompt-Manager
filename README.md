@@ -258,7 +258,8 @@ The extension automatically detects your system theme preference. You can also t
 - `Esc` - Close prompt selector
 - `Tab` - Navigate through prompts
 - `Enter` - Select highlighted prompt
-- `Ctrl+K` / `Cmd+K` - Focus search (in popup)
+- `Ctrl+K` / `Cmd+K` - Go to the Library search, from any section of the popup or side panel
+- `Esc` in the search field - Clear the search
 
 ## 🧪 Testing
 

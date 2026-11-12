@@ -54,7 +54,15 @@ export const MOTION = {
   /** Analytics: a Most used bar filling from the left; the first starts after rankDelay, each next one rankStagger later */
   rankFill: 1000,
   rankDelay: 300,
-  rankStagger: 90
+  rankStagger: 90,
+  /** Library search: the clear button popping in */
+  clearPop: 350,
+  /** Library: the listed cards rising when the list changes, each listStagger after the one before, up to listStaggerSteps */
+  listRise: 500,
+  listStagger: 50,
+  listStaggerSteps: 8,
+  /** Library search: the no-results block rising */
+  emptyRise: 350
 } as const;
 
 const REDUCED_MOTION = '(prefers-reduced-motion: reduce)';

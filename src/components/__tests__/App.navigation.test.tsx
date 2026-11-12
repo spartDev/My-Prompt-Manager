@@ -1,4 +1,4 @@
-import { render, screen, waitFor, waitForElementToBeRemoved } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, waitForElementToBeRemoved } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -151,6 +151,95 @@ describe('App tab bar navigation', () => {
     await user.click(screen.getByRole('tab', { name: 'Library' }));
 
     expect(await screen.findByPlaceholderText(/search your prompts/i)).toHaveValue('email');
+  });
+
+  it.each([
+    ['Cmd+K', { metaKey: true }],
+    ['Ctrl+K', { ctrlKey: true }]
+  ])('comes back to the Library and puts the keyboard in the search field on %s, from another Section', async (_name, modifier) => {
+    const user = userEvent.setup();
+    await renderApp();
+    await user.click(screen.getByRole('tab', { name: 'Settings' }));
+    await screen.findByRole('heading', { name: 'Settings', level: 1 });
+
+    const passedOn = fireEvent.keyDown(document.body, { key: 'k', ...modifier });
+
+    expect(passedOn).toBe(false);
+    expect(screen.getByRole('tab', { name: 'Library' })).toHaveAttribute('aria-selected', 'true');
+    await waitFor(() => { expect(screen.getByRole('searchbox', { name: 'Search prompts' })).toHaveFocus(); });
+  });
+
+  it.each(['Categories', 'Analytics'])('reaches the search field with Cmd+K from %s', async (tab) => {
+    const user = userEvent.setup();
+    await renderApp();
+    await user.click(screen.getByRole('tab', { name: tab }));
+    await screen.findByRole('heading', { name: tab, level: 1 });
+
+    fireEvent.keyDown(document.body, { key: 'K', metaKey: true });
+
+    await waitFor(() => { expect(screen.getByRole('searchbox', { name: 'Search prompts' })).toHaveFocus(); });
+  });
+
+  it('puts the keyboard in the search field on Cmd+K from the Library itself, each time', async () => {
+    await renderApp();
+    const field = screen.getByRole('searchbox', { name: 'Search prompts' });
+
+    fireEvent.keyDown(document.body, { key: 'k', metaKey: true });
+    await waitFor(() => { expect(field).toHaveFocus(); });
+    field.blur();
+    fireEvent.keyDown(document.body, { key: 'k', metaKey: true });
+
+    await waitFor(() => { expect(field).toHaveFocus(); });
+  });
+
+  it('leaves Cmd+K alone while the editor is open', async () => {
+    const user = userEvent.setup();
+    await renderApp();
+    await user.click(screen.getByRole('button', { name: /add new prompt/i }));
+    const title = await screen.findByLabelText(/title/i);
+
+    const passedOn = fireEvent.keyDown(title, { key: 'k', metaKey: true });
+
+    expect(passedOn).toBe(true);
+    expect(title).toHaveFocus();
+  });
+
+  it('opens the editor on a new Prompt titled with a search that found nothing', async () => {
+    const user = userEvent.setup();
+    await renderApp();
+
+    await user.type(screen.getByRole('searchbox', { name: 'Search prompts' }), 'Quarterly review');
+    const empty = await screen.findByRole('region', { name: /no search results/i });
+    expect(empty).toHaveTextContent('Nothing called “Quarterly review” yet');
+    await user.click(screen.getByRole('button', { name: 'Create it' }));
+
+    await screen.findByTestId('editor-sheet');
+    expect(screen.getByLabelText(/title/i)).toHaveValue('Quarterly review');
+    expect(screen.getByRole('heading', { name: /new prompt/i })).toBeInTheDocument();
+    // The title it opened with is not a change to discard
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('button', { name: 'Discard' })).not.toBeInTheDocument();
+  });
+
+  it('lists the same Prompts in the same order for a same search', async () => {
+    const user = userEvent.setup();
+    getMockStorageManager().getPrompts.mockResolvedValue([
+      { id: 'a', title: 'Zeta email', content: 'x', category: 'Work', createdAt: 1, updatedAt: 5 },
+      { id: 'b', title: 'Alpha', content: 'send an EMAIL', category: 'Work', createdAt: 2, updatedAt: 9 },
+      { id: 'c', title: 'Beta', content: 'x', category: 'Email drafts', createdAt: 3, updatedAt: 7 },
+      { id: 'd', title: 'Pinned email', content: 'x', category: 'Work', createdAt: 4, updatedAt: 1, pinned: true },
+      { id: 'e', title: 'Unrelated', content: 'nothing', category: 'Work', createdAt: 5, updatedAt: 8 }
+    ]);
+    await renderApp();
+
+    await user.type(screen.getByRole('searchbox', { name: 'Search prompts' }), ' Email ');
+
+    // Title, content and Category name are searched, ignoring case and the spaces around; the
+    // Pinned Prompt comes first, then the sort of Settings (last updated first)
+    await waitFor(() => {
+      expect(screen.getAllByRole('heading', { level: 3 }).map(heading => heading.getAttribute('aria-label')))
+        .toEqual(['Pinned email', 'Alpha', 'Beta', 'Zeta email']);
+    });
   });
 
   it('refreshes prompts and categories when leaving Settings', async () => {

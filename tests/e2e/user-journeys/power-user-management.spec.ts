@@ -252,7 +252,7 @@ test.describe('Power User Prompt Management', () => {
     await expect(sidepanelPage.getByRole('heading', { name: 'My Prompt Manager' })).toBeVisible();
     const libraryPage = new LibraryPage(sidepanelPage);
 
-    const searchInput = sidepanelPage.getByPlaceholder('Search your prompts...');
+    const searchInput = sidepanelPage.getByPlaceholder('Search your prompts');
 
     // Test search with keyword "review"
     await searchInput.fill('review');

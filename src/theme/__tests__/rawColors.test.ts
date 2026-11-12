@@ -21,6 +21,7 @@ const MIGRATED = [
   'components/LibraryView.tsx',
   'components/LibraryFilterBar.tsx',
   'components/SearchBar.tsx',
+  'components/SearchEmptyState.tsx',
   'components/PromptCard.tsx',
   // My-Prompt-Manager-el4.4: forms, dialogs and toasts
   'components/PromptEditor.tsx',
