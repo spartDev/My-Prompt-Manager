@@ -408,11 +408,75 @@ describe('useUsageStats', () => {
       expect(result.current.categories).toHaveLength(3);
       expect(result.current.prompts).toHaveLength(3);
 
-      // The first read ends last: superseded, it commits nothing and ends the loading state
+      // The reload ended the loading state of the read it overtook
+      expect(result.current.loading).toBe(false);
+
+      // The first read ends last: superseded, it commits nothing
       await act(async () => { releases[0]([]); await Promise.resolve(); });
-      await waitFor(() => { expect(result.current.loading).toBe(false); });
+      expect(result.current.loading).toBe(false);
       expect(result.current.history).toHaveLength(1);
       expect(result.current.categories).toHaveLength(3);
+      getHistory.mockRestore();
+    });
+
+    it('keeps loading until the reload that overtook the first read ends', async () => {
+      const history = [buildUsageEvent({ promptId: 'prompt-1' })];
+      await chrome.storage.local.set({ [USAGE_STORAGE_KEY]: history });
+      // Both reads are held: the first one is released first, the reload after it
+      const releases: Array<(events: UsageEvent[]) => void> = [];
+      const held = () => new Promise<UsageEvent[]>(resolve => { releases.push(resolve); });
+      const getHistory = vi.spyOn(UsageTracker.getInstance(), 'getHistory')
+        .mockImplementationOnce(held)
+        .mockImplementationOnce(held);
+      const { result } = renderHook(() => useUsageStats());
+      await waitFor(() => { expect(releases).toHaveLength(1); });
+      act(() => { triggerChromeStorageChange({ [USAGE_STORAGE_KEY]: { newValue: history } }); });
+      await waitFor(() => { expect(releases).toHaveLength(2); });
+
+      // The overtaken read ends: nothing is read yet, so the view is still loading, not empty
+      await act(async () => { releases[0]([]); await Promise.resolve(); });
+      expect(result.current.loading).toBe(true);
+      expect(result.current.stats).toBeNull();
+
+      await act(async () => { releases[1](history); await Promise.resolve(); });
+      await waitFor(() => { expect(result.current.loading).toBe(false); });
+      expect(result.current.history).toHaveLength(1);
+      expect(result.current.error).toBeNull();
+      getHistory.mockRestore();
+    });
+
+    it('shows the failure of a reload that overtook the first read, since nothing was read', async () => {
+      const releases: Array<(events: UsageEvent[]) => void> = [];
+      const getHistory = vi.spyOn(UsageTracker.getInstance(), 'getHistory')
+        .mockImplementationOnce(() => new Promise<UsageEvent[]>(resolve => { releases.push(resolve); }))
+        .mockRejectedValueOnce(new Error('Storage unavailable'));
+      const { result } = renderHook(() => useUsageStats());
+      await waitFor(() => { expect(releases).toHaveLength(1); });
+
+      act(() => { triggerChromeStorageChange({ [USAGE_STORAGE_KEY]: { newValue: [] } }); });
+      await waitFor(() => { expect(result.current.loading).toBe(false); });
+      expect(result.current.error).toBeTruthy();
+
+      await act(async () => { releases[0]([]); await Promise.resolve(); });
+      expect(result.current.error).toBeTruthy();
+      getHistory.mockRestore();
+    });
+
+    it('keeps what is shown when a reload fails after a read succeeded', async () => {
+      const history = [buildUsageEvent({ promptId: 'prompt-1' })];
+      await chrome.storage.local.set({ [USAGE_STORAGE_KEY]: history });
+      const { result } = renderHook(() => useUsageStats());
+      await waitFor(() => { expect(result.current.history).toHaveLength(1); });
+
+      const getHistory = vi.spyOn(UsageTracker.getInstance(), 'getHistory')
+        .mockRejectedValueOnce(new Error('Storage unavailable'));
+      act(() => { triggerChromeStorageChange({ [USAGE_STORAGE_KEY]: { newValue: history } }); });
+      await waitFor(() => { expect(getHistory).toHaveBeenCalledTimes(1); });
+      await act(async () => { await Promise.resolve(); });
+
+      expect(result.current.error).toBeNull();
+      expect(result.current.history).toHaveLength(1);
+      expect(result.current.loading).toBe(false);
       getHistory.mockRestore();
     });
 

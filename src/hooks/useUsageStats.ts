@@ -104,6 +104,9 @@ export function useUsageStats(): UseUsageStatsReturn {
   // Each read or clear takes the next generation; a read commits only if none started after it, so
   // an older read that ends last cannot put back what a newer one, or a clear, replaced
   const generationRef = useRef(0);
+  // Whether a read has given the view its data yet: a reload that fails before that is an error to
+  // show, one that fails after it leaves the data already shown
+  const hasLoadedRef = useRef(false);
 
   const refresh = useCallback(async () => {
     const generation = ++generationRef.current;
@@ -123,13 +126,17 @@ export function useUsageStats(): UseUsageStatsReturn {
       setHistory(usageHistory);
       setPrompts(allPrompts);
       setCategories(allCategories);
+      hasLoadedRef.current = true;
     } catch (err) {
       if (generation === generationRef.current) {
         setError(err as AppError);
       }
     } finally {
-      // The loading state ends with the latest read; a reload that overtook this one never set it
-      setLoading(false);
+      // The loading state ends with the latest read: a read that was overtaken leaves it to the one
+      // that overtook it, or the view would show as empty what is only not read yet
+      if (generation === generationRef.current) {
+        setLoading(false);
+      }
     }
   }, []); // Singletons never change
 
@@ -167,8 +174,8 @@ export function useUsageStats(): UseUsageStatsReturn {
   }, [refresh]);
 
   // An Insertion counted while the view stays open (the side panel, beside a Platform) shows at once:
-  // the history, the Prompts and the Categories are read again, without the loading state, so nothing
-  // flickers
+  // the history, the Prompts and the Categories are read again, without starting the loading state,
+  // so nothing flickers. A reload that overtakes a read still loading ends that loading state itself
   useEffect(() => {
     // chrome.storage.onChanged may not be available in all contexts (see useTheme)
     const onChangedApi = typeof chrome !== 'undefined' ? chrome.storage.onChanged : undefined;
@@ -185,9 +192,18 @@ export function useUsageStats(): UseUsageStatsReturn {
           setHistory(usageHistory);
           setPrompts(allPrompts);
           setCategories(allCategories);
+          hasLoadedRef.current = true;
+          // Ends the loading state of a read this reload overtook; a no-op otherwise
+          setLoading(false);
         })
         .catch((err: unknown) => {
           Logger.error('Failed to reload usage history', toError(err), { component: 'useUsageStats' });
+          if (stale || generation !== generationRef.current) { return; }
+          // The read this reload overtook gave nothing: without data to keep, the failure is shown
+          if (!hasLoadedRef.current) {
+            setError(err as AppError);
+          }
+          setLoading(false);
         });
     };
     onChangedApi.addListener(handleStorageChange);
