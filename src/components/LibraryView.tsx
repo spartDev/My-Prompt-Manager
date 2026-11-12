@@ -56,6 +56,15 @@ const LibraryView: FC<LibraryViewProps> = ({
   // With no Prompt there is nothing to search, filter or list: the empty state takes the whole Section
   const libraryEmpty = !loading && isLibraryEmpty(prompts);
 
+  // The search and the Library filter go out of sight with the last Prompt, so they go back to
+  // nothing and All: the next Prompt must not be hidden by a search or a filter nobody can see
+  const { clearSearch } = searchWithDebounce;
+  useEffect(() => {
+    if (!libraryEmpty) { return; }
+    if (query !== '') { clearSearch(); }
+    if (libraryFilter.kind !== 'all') { onLibraryFilterChange(ALL_PROMPTS); }
+  }, [libraryEmpty, query, clearSearch, libraryFilter, onLibraryFilterChange]);
+
   // The search shortcut moves the keyboard into the field, also when it has just brought the Library
   // back. An empty Library has no field: the shortcut then only brings the Library back
   const searchRef = useRef<HTMLInputElement>(null);

@@ -223,6 +223,24 @@ describe('LibraryView', () => {
       expect(screen.getByTestId('library-empty')).toBeInTheDocument();
     });
 
+    it('clears the search and goes back to All, which nobody can see or change while it shows', () => {
+      const searchWithDebounce = createMockSearchWithDebounce([], 'stale');
+      const onLibraryFilterChange = vi.fn();
+      render(<LibraryView {...emptyProps} searchWithDebounce={searchWithDebounce} libraryFilter={{ kind: 'pinned' }} onLibraryFilterChange={onLibraryFilterChange} />);
+
+      expect(searchWithDebounce.clearSearch).toHaveBeenCalled();
+      expect(onLibraryFilterChange).toHaveBeenCalledWith(ALL_PROMPTS);
+    });
+
+    it('leaves the search and the Library filter alone when they are already at rest', () => {
+      const searchWithDebounce = createMockSearchWithDebounce([]);
+      const onLibraryFilterChange = vi.fn();
+      render(<LibraryView {...emptyProps} searchWithDebounce={searchWithDebounce} onLibraryFilterChange={onLibraryFilterChange} />);
+
+      expect(searchWithDebounce.clearSearch).not.toHaveBeenCalled();
+      expect(onLibraryFilterChange).not.toHaveBeenCalled();
+    });
+
     it('does not show while the Library loads', () => {
       render(<LibraryView {...emptyProps} loading={true} />);
 
