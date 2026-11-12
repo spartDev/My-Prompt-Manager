@@ -1,4 +1,4 @@
-import { type FC, useCallback, useId, useRef, useState } from 'react';
+import { type FC, useCallback, useEffect, useId, useRef, useState } from 'react';
 
 import type { Category, Prompt } from '../../types';
 import type {} from '../../types/file-system-access-api';
@@ -39,6 +39,9 @@ interface DataStorageSectionProps {
   /** The last import's report, shown under Import until dismissed; null when there is none */
   importReport?: ImportReport | null;
   onDismissImportReport?: () => void;
+  /** Bring Import into view and give it the keyboard, then call onImportFocused */
+  focusImport?: boolean;
+  onImportFocused?: () => void;
   onClearData: () => Promise<void>;
   onShowToast: ShowToast;
 }
@@ -51,6 +54,8 @@ const DataStorageSection: FC<DataStorageSectionProps> = ({
   onImport,
   importReport = null,
   onDismissImportReport,
+  focusImport = false,
+  onImportFocused,
   onClearData,
   onShowToast
 }) => {
@@ -58,6 +63,13 @@ const DataStorageSection: FC<DataStorageSectionProps> = ({
   const [clearing, setClearing] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const importButtonRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!focusImport) {return;}
+    importButtonRef.current?.scrollIntoView({ block: 'center' });
+    importButtonRef.current?.focus({ preventScroll: true });
+    onImportFocused?.();
+  }, [focusImport, onImportFocused]);
   const exportHintId = useId();
 
   const handleExport = useCallback(async () => {
@@ -241,6 +253,7 @@ const DataStorageSection: FC<DataStorageSectionProps> = ({
             Export
           </button>
           <button
+            ref={importButtonRef}
             type="button"
             onClick={handleImportClick}
             aria-disabled={importing}

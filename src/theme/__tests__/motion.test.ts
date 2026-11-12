@@ -42,7 +42,10 @@ describe('motion tokens', () => {
     ['clear-pop', `pop ${MOTION.clearPop}ms var(--ease-spring) both`],
     ['list-rise', `card-rise ${MOTION.listRise}ms var(--ease-spring) both`],
     ['list-rise-again', `card-rise-again ${MOTION.listRise}ms var(--ease-spring) both`],
-    ['empty-rise', `card-rise ${MOTION.emptyRise}ms var(--ease-spring) both`]
+    ['empty-rise', `card-rise ${MOTION.emptyRise}ms var(--ease-spring) both`],
+    ['float', `float ${MOTION.float}ms ease-in-out infinite`],
+    ['badge-pop', `pop ${MOTION.badgePop}ms var(--ease-spring) ${MOTION.badgePopDelay}ms both`],
+    ['ghost-grow', `bar-grow ${MOTION.ghostGrow}ms var(--ease-spring) both`]
   ])('animate-%s runs for the duration motion.ts gives', (name, animation) => {
     expect(tokens).toContain(`--animate-${name}: ${animation};`);
   });
@@ -100,6 +103,15 @@ describe('motion tokens', () => {
       expect(reduced).toContain(`.animate-${name}`);
     }
     expect(reduced).toMatch(/animation-duration: 1ms;\s*animation-delay: 0ms !important;/);
+  });
+
+  it('makes the empty states near instant under reduced motion, and stops the loop', () => {
+    const popupCss = readFileSync(path.resolve(__dirname, '../../popup.css'), 'utf8');
+    const reduced = popupCss.slice(popupCss.indexOf('@media (prefers-reduced-motion: reduce)'));
+    for (const name of ['card-rise', 'badge-pop', 'ghost-grow']) {
+      expect(reduced).toContain(`.animate-${name}`);
+    }
+    expect(reduced).toMatch(/\.animate-float\s*\{\s*animation: none;/);
   });
 
   it('makes the Save pause the 620ms of the mockup', () => {

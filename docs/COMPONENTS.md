@@ -40,6 +40,7 @@ Which component does which job in the popup and the side panel, and the conventi
 | `src/components/editor/VariableTextarea.tsx` | The Prompt text field: Variables highlighted by a mirror under a transparent textarea; the field grows with its text |
 | `src/components/LibraryFilterBar.tsx` | The Library filter pills (All, Pinned, Most Used, one per non-empty Category, and while one is active the Never used or Possible duplicates pill reached from Analytics, with a button back to All); the filter logic is `src/services/libraryFilter.ts` |
 | `src/components/SearchBar.tsx` | The search field of the Library, a pill with the badge of its shortcut or a clear button. Presentation only: the debounce is in `useSearchWithDebounce`, the Cmd/Ctrl+K shortcut in `App` |
+| `src/components/emptyStates/EmptyState.tsx` | The base of an empty state: illustration, title, explanation, actions. `LibraryEmpty` (no Prompt) and `CategoriesEmpty` (only the Default Category, with the starter Categories) build on it; `analytics/StatsEmpty.tsx` (no Insertion in the period) has its own shape. The conditions are the selectors of `src/utils/emptyStates.ts` |
 | `src/components/SearchEmptyState.tsx` | What a search that finds nothing shows: the search, Create it (the editor opens titled with it) and, under a Library filter, Search all prompts |
 | `src/components/CategoryBadge.tsx` | A Category name on its color, with readable text contrast |
 

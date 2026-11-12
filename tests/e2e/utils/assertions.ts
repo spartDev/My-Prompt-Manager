@@ -352,11 +352,11 @@ export const analyticsAssertions = {
   },
 
   /**
-   * Expect the Analytics tab without usage: the hero says so, and the usage cards are gone
+   * Expect the Analytics tab without usage: the page as ghosts, with no data in its tiles and no Most used
    */
   tabEmptyState: async (page: Page): Promise<void> => {
-    await expect(page.getByTestId('stats-hero-subtitle')).toHaveText('No Prompts used yet.');
-    await expect(page.getByRole('heading', { name: 'Top platform' })).toBeHidden();
+    await expect(page.getByTestId('stats-hero-subtitle')).toHaveText('Your week will draw itself here.');
+    await expect(page.getByTestId('stats-empty').getByText('No data yet')).toHaveCount(2);
     await expect(page.getByRole('region', { name: 'Most used' })).toBeHidden();
   },
 

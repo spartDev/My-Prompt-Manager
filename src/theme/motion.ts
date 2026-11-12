@@ -62,7 +62,17 @@ export const MOTION = {
   listStagger: 50,
   listStaggerSteps: 8,
   /** Library search: the no-results block rising */
-  emptyRise: 350
+  emptyRise: 350,
+  /** Empty states: their blocks rise with cardRise, each emptyStagger after the one before */
+  emptyStagger: 70,
+  /** Empty Library: the Prompt card of the illustration floating up and back, in a loop */
+  float: 5400,
+  /** Empty Library: the + badge popping, badgePopDelay after the illustration */
+  badgePop: 500,
+  badgePopDelay: 350,
+  /** Empty Analytics: a ghost bar growing from the bottom; the first starts after ghostDelay, each next one barStagger later */
+  ghostGrow: 700,
+  ghostDelay: 150
 } as const;
 
 const REDUCED_MOTION = '(prefers-reduced-motion: reduce)';

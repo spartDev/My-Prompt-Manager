@@ -37,17 +37,11 @@ test.describe('Usage Counter & Smart Sorting - Edge Cases', () => {
           await page.waitForLoadState('domcontentloaded');
 
           // Verify empty state message is displayed first
-          await expect(page.getByText(/You're ready to go/i)).toBeVisible();
-          await expect(page.getByRole('button', { name: /Create your first prompt/i })).toBeVisible();
+          await expect(page.getByRole('heading', { name: 'Your library is empty' })).toBeVisible();
+          await expect(page.getByRole('button', { name: 'Write your first prompt' })).toBeVisible();
 
-          // Verify the Library filter still renders: only the fixed pills, no Category holds a Prompt
-          const libraryPage = new LibraryPage(page);
-          await expect(page.getByRole('radiogroup', { name: 'Library filter' }).getByRole('radio')).toHaveText(['All', 'Pinned', 'Most Used']);
-
-          // Choose "Most Used" to ensure no crashes occur: the empty library keeps its own empty state
-          await libraryPage.selectLibraryFilter('Most Used');
-          await expect(page.getByText(/You're ready to go/i)).toBeVisible();
-          await libraryPage.selectLibraryFilter('All');
+          // An empty Library has nothing to filter: the Library filter is not offered
+          await expect(page.getByRole('radiogroup', { name: 'Library filter' })).toHaveCount(0);
 
           // Verify the sort setting renders and works
           await tabNavigation.switchTo(page, 'settings');
@@ -66,7 +60,7 @@ test.describe('Usage Counter & Smart Sorting - Edge Cases', () => {
 
           // Verify empty state message is still visible back in the Library
           await tabNavigation.switchTo(page, 'library');
-          await expect(page.getByText(/You're ready to go/i)).toBeVisible();
+          await expect(page.getByRole('heading', { name: 'Your library is empty' })).toBeVisible();
         });
 
         // Scenario 5.2: Single Prompt Library

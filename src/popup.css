@@ -34,6 +34,10 @@
   }
 }
 
+/* The popup is 500px high, the mockups 580px: an empty state tightens there so that it fits without
+   scrolling (short:gap-3). The side panel is taller and keeps the mockup's spacing */
+@custom-variant short (@media (max-height: 560px));
+
 /* Motion (Atelier 1C). The keyframes, easings and animate-* classes are tokens in theme/tokens.css;
    these are the transitions of the editor's controls. Under prefers-reduced-motion everything
    is near instant, and the timers of theme/motion.ts wait for nothing. */
@@ -77,9 +81,16 @@ input[type='search']::-webkit-search-cancel-button {
   .animate-clear-pop,
   .animate-list-rise,
   .animate-list-rise-again,
-  .animate-empty-rise {
+  .animate-empty-rise,
+  .animate-badge-pop,
+  .animate-ghost-grow {
     animation-duration: 1ms;
     animation-delay: 0ms !important;
+  }
+
+  /* A loop has no near-instant form: the card of the Library illustration stays still */
+  .animate-float {
+    animation: none;
   }
 
   .transition-save,

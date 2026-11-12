@@ -286,7 +286,7 @@ test.describe('Category Management - Core CRUD Operations', () => {
         await nextFrame();
         await nextFrame();
         const closing = sheet()?.classList.contains('animate-category-sheet-out') ?? false;
-        [...document.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent?.trim() === 'Add category')?.click();
+        [...document.querySelectorAll<HTMLButtonElement>('button')].find(button => /^(Add category|Create a category)$/.test(button.textContent?.trim() ?? ''))?.click();
         return closing;
       });
       expect(reopenedDuringExit, 'the first sheet was still playing its exit').toBe(true);

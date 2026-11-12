@@ -20,6 +20,8 @@ test.describe('Category Manager - UI/UX Tests', () => {
   test.describe('Navigation & Display', () => {
     test('should open category manager from main library view', async ({ context, storage, extensionId }) => {
       await seedLibrary(storage, {
+        // A Category of the user's own: with the Default Category alone, the Section shows its empty state
+        categories: [createCategorySeed({ name: 'Work', color: '#2563EB' })],
         settings: {
           ...DEFAULT_SETTINGS,
           interfaceMode: 'sidepanel',
@@ -113,28 +115,7 @@ test.describe('Category Manager - UI/UX Tests', () => {
       await expect(sidepanelPage.getByTestId('category-row')).toHaveText([/Uncategorized/, /Work/, /Personal/, /Research/]);
     });
 
-    test('should display singular category count correctly', async ({ context, storage, extensionId }) => {
-      // Start with only the default category
-      await seedLibrary(storage, {
-        settings: {
-          ...DEFAULT_SETTINGS,
-          interfaceMode: 'sidepanel',
-        },
-      });
-
-      const sidepanelPage = await context.newPage();
-      await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
-
-      // Open category manager
-      await sidepanelPage.getByTestId('tab-categories').click();
-
-      // Verify singular form is used
-      await expect(sidepanelPage.getByText('1 category', { exact: true }).first()).toBeVisible();
-      // Check that the counter doesn't show plural form
-      await expect(sidepanelPage.locator('span').filter({ hasText: /^\d+ categories$/ })).toBeHidden();
-    });
-
-    test('should show only the default Category, with Add category ready, when no custom categories exist', async ({ context, storage, extensionId }) => {
+    test('should show the empty state, with Create a category ready, when no custom categories exist', async ({ context, storage, extensionId }) => {
       // Start with clean state (only default category exists)
       await seedLibrary(storage, {
         settings: {
@@ -149,16 +130,15 @@ test.describe('Category Manager - UI/UX Tests', () => {
       // Open category manager
       await sidepanelPage.getByTestId('tab-categories').click();
 
-      // Verify count shows 1 for the default category
-      await expect(sidepanelPage.getByText('1 category', { exact: true }).first()).toBeVisible();
+      // The Default Category alone is no Category of the user's own: the Eyebrow no longer counts
+      await expect(sidepanelPage.getByText('Organize', { exact: true })).toBeVisible();
+      await expect(sidepanelPage.getByRole('heading', { level: 2, name: 'No categories yet' })).toBeVisible();
 
-      // Verify only "Uncategorized" is shown
-      await expect(sidepanelPage.getByTestId('category-row')).toHaveCount(1);
-      await expect(sidepanelPage.getByText('Uncategorized')).toBeVisible();
-      await expect(sidepanelPage.getByText('Default')).toBeVisible();
+      // Its row is not listed
+      await expect(sidepanelPage.getByTestId('category-row')).toHaveCount(0);
 
-      // "Add category" is there to create the first custom one
-      await expect(sidepanelPage.getByRole('button', { name: 'Add category', exact: true })).toBeEnabled();
+      // "Create a category" is there to create the first custom one
+      await expect(sidepanelPage.getByRole('button', { name: 'Create a category', exact: true })).toBeEnabled();
     });
 
     test('should update category count dynamically when categories are added/removed', async ({ context, extensionId }) => {

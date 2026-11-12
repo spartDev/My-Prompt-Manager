@@ -32,15 +32,14 @@ test.describe('User Journey: New User Setup & First Prompt Creation', () => {
     const promptFormPage = new PromptFormPage(sidepanelPage);
 
     // Verify fresh state - should see empty state
-    await expect(sidepanelPage.getByText('You\'re ready to go')).toBeVisible();
-    await expect(sidepanelPage.getByText('Create your first prompt to start building')).toBeVisible();
+    await expect(sidepanelPage.getByRole('heading', { name: 'Your library is empty' })).toBeVisible();
+    await expect(sidepanelPage.getByRole('button', { name: 'Write your first prompt' })).toBeVisible();
 
     // Step 2: User creates their first custom category
     await categoryManagerPage.openFromLibrary();
 
-    // Should see default category only
+    // Only the Default Category: the Section shows its empty state
     await categoryManagerPage.expectCategoryCount(1);
-    await categoryManagerPage.expectCategoryExists('Uncategorized');
 
     // Create first custom category: "Work"
     await categoryManagerPage.createCategory('Work');

@@ -67,6 +67,8 @@ export interface LibraryViewProps {
   searchWithDebounce: UseSearchWithDebounceReturn;
   libraryFilter: LibraryFilter;
   onAddNew: () => void;
+  /** Opens Settings on its Backup import, from the empty Library */
+  onImportBackup?: () => void;
   /** Opens the editor on a new Prompt titled with a search that found nothing, in the Category of the active Library filter if it is one */
   onCreateFromSearch: (title: string, category?: string) => void;
   /** Move the keyboard into the search field (the search shortcut), then call onSearchFocused */

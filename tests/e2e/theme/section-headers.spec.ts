@@ -27,6 +27,8 @@ const SECTIONS = [
 const openPopup = async (page: Page, storage: ExtensionStorage, extensionId: string, theme: 'light' | 'dark') => {
   await seedLibrary(storage, {
     prompts: [createPromptSeed({ id: 'prompt-1', title: 'Résumé', content: 'Résume la transcription ci-dessous.' })],
+    // A Category of the user's own, so that the Eyebrow of Categories counts them
+    categories: [{ id: 'work', name: 'Work', color: '#2563EB' }],
     settings: { theme }
   });
   await page.setViewportSize({ width: 400, height: 600 });

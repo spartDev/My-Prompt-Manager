@@ -222,14 +222,14 @@ test.describe('Analytics on the tokens', () => {
       await expect(page.getByRole('button', { name: 'Clear history' })).toBeFocused();
     });
 
-    test(`with no usage yet, the hero shows no Prompts used and Tidy up still shows (${theme})`, async ({ page, storage, extensionId }) => {
+    test(`with no usage yet, the page shows as ghosts and Tidy up still shows (${theme})`, async ({ page, storage, extensionId }) => {
       await page.emulateMedia({ reducedMotion: 'reduce' });
       await openAnalyticsTab(page, storage, extensionId, theme, { withUsage: false });
 
       await expect(page.getByTestId('stats-hero')).toHaveCSS('background-color', colors.inverse);
       await expect(page.getByTestId('stats-total')).toHaveText('0');
-      await expect(page.getByTestId('stats-hero-subtitle')).toHaveText('No Prompts used yet.');
-      await expect(page.getByTestId('stats-bar')).toHaveCount(7);
+      await expect(page.getByTestId('stats-hero-subtitle')).toHaveText('Your week will draw itself here.');
+      await expect(page.getByTestId('stats-ghost-bar')).toHaveCount(7);
       await expect(page.getByRole('region', { name: 'Most used' })).toBeHidden();
       await expect(page.getByTestId('tidy-up')).toHaveCSS('background-color', colors.callout);
 

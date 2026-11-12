@@ -83,7 +83,12 @@ const MIGRATED = [
   'content/selector/PickerList.tsx',
   'content/selector/PickerFill.tsx',
   // My-Prompt-Manager-q9j.3: confirmation of an Insertion
-  'content/selector/InsertionFeedback.tsx'
+  'content/selector/InsertionFeedback.tsx',
+  // My-Prompt-Manager-qrr: the empty states of the Library, Categories and Analytics
+  'components/emptyStates/EmptyState.tsx',
+  'components/emptyStates/LibraryEmpty.tsx',
+  'components/emptyStates/CategoriesEmpty.tsx',
+  'components/analytics/StatsEmpty.tsx'
 ];
 
 // Agent guidance that prescribes classes follows the same rule, or it steers UI work off the tokens

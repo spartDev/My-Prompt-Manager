@@ -52,8 +52,8 @@ describe('App prompt workflows', () => {
       expect(storageMock.getPrompts).toHaveBeenCalled();
     });
 
-    const emptyState = await screen.findByRole('region', { name: /empty state/i });
-    const addButton = await within(emptyState).findByRole('button', { name: /create your first prompt/i });
+    const emptyState = await screen.findByTestId('library-empty');
+    const addButton = await within(emptyState).findByRole('button', { name: /write your first prompt/i });
     await userEvent.click(addButton);
 
     const titleInput = await screen.findByLabelText(/title/i);
@@ -217,8 +217,8 @@ describe('App prompt workflows', () => {
 
     await renderApp();
 
-    const emptyState = await screen.findByRole('region', { name: /empty state/i });
-    const createButton = await within(emptyState).findByRole('button', { name: /create your first prompt/i });
+    const emptyState = await screen.findByTestId('library-empty');
+    const createButton = await within(emptyState).findByRole('button', { name: /write your first prompt/i });
     await userEvent.click(createButton);
 
     await userEvent.type(screen.getByLabelText('Content'), 'Some content');
@@ -244,8 +244,8 @@ describe('App prompt workflows', () => {
 
     await renderApp();
 
-    const emptyState = await screen.findByRole('region', { name: /empty state/i });
-    await userEvent.click(await within(emptyState).findByRole('button', { name: /create your first prompt/i }));
+    const emptyState = await screen.findByTestId('library-empty');
+    await userEvent.click(await within(emptyState).findByRole('button', { name: /write your first prompt/i }));
     await userEvent.type(screen.getByLabelText('Content'), 'Some content');
     await userEvent.click(await screen.findByRole('button', { name: 'Save' }));
 

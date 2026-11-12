@@ -81,10 +81,18 @@ export class CategoryManagerPage extends BasePage {
   }
 
   /**
-   * The dashed "Add category" button below the list, which opens the sheet to create a Category
+   * The button that opens the sheet to create a Category: the dashed "Add category" below the list,
+   * or "Create a category" of the empty state, shown while the Default Category is the only one
    */
   getAddCategoryButton(): Locator {
-    return this.page.getByRole('button', { name: 'Add category', exact: true });
+    return this.page.getByRole('button', { name: /^(Add category|Create a category)$/ });
+  }
+
+  /**
+   * The empty state of the Section, shown while the Default Category is the only one
+   */
+  getEmptyState(): Locator {
+    return this.page.getByTestId('categories-empty');
   }
 
   // The Category sheet
@@ -366,6 +374,12 @@ export class CategoryManagerPage extends BasePage {
    * Expect a specific number of categories
    */
   async expectCategoryCount(count: number): Promise<void> {
+    // One Category is the Default Category alone: the Section shows its empty state, under "Organize"
+    if (count === 1) {
+      await expect(this.getEmptyState()).toBeVisible();
+      await expect(this.page.getByText('Organize', { exact: true })).toBeVisible();
+      return;
+    }
     const text = count === 1 ? '1 category' : `${String(count)} categories`;
     await expect(this.page.getByText(text, { exact: true }).first()).toBeVisible();
   }
