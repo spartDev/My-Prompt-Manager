@@ -2,11 +2,12 @@ import type { FC } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import manifest from '../../manifest.json';
-import { getDefaultEnabledPlatforms, getLinkedPlatformHostnames } from '../config/platforms';
+import { getLinkedPlatformHostnames } from '../config/platforms';
 import { NATURAL_SORT_DIRECTION } from '../constants';
 import { AdmissionRefusedError } from '../services/promptAdmission';
+import { defaultSiteSettings, parseSiteSettings, SITE_SETTINGS_KEY, type SiteSettings } from '../services/siteSettings';
 import { StorageManager } from '../services/storage';
-import type { AppError, Category, CustomSite as ImportedCustomSite, Prompt, SortOrder, Settings as UserSettings } from '../types';
+import type { AppError, Category, CustomSite, Prompt, SortOrder, Settings as UserSettings } from '../types';
 import { DEFAULT_SETTINGS } from '../types';
 import type { ShowToast, ToastSettings } from '../types/hooks';
 import { formatCount, Logger, toError } from '../utils';
@@ -23,28 +24,7 @@ import SiteIntegrationSection from './settings/SiteIntegrationSection';
 import type { SiteConfig } from './settings/SupportedSitesList';
 import ViewHeader from './ViewHeader';
 
-interface CustomSite {
-  hostname: string;
-  displayName: string;
-  icon?: string;
-  enabled: boolean;
-  dateAdded: number;
-  positioning?: {
-    mode: 'custom';
-    selector: string;
-    placement: 'before' | 'after' | 'inside-start' | 'inside-end';
-    offset?: { x: number; y: number };
-    zIndex?: number;
-    description?: string;
-  };
-}
-
-interface Settings {
-  enabledSites: string[];
-  customSites: CustomSite[];
-  debugMode: boolean;
-  floatingFallback: boolean;
-}
+type Settings = SiteSettings;
 
 interface SettingsViewProps {
   context?: 'popup' | 'sidepanel';
@@ -62,8 +42,7 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
   const [settings, setSettings] = useState<Settings>({
     enabledSites: [],
     customSites: [],
-    debugMode: false,
-    floatingFallback: true
+    debugMode: false
   });
 
   const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
@@ -119,24 +98,15 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
     }
   }), []);
 
-  const defaultSettings: Settings = useMemo(() => ({
-    enabledSites: getDefaultEnabledPlatforms(),
-    customSites: [],
-    debugMode: false,
-    floatingFallback: true
-  }), []);
+  const defaultSettings: Settings = useMemo(() => defaultSiteSettings(), []);
 
   // Load settings. The site settings and the Library are read apart: a Library that fails to load
   // leaves the site settings as storage has them, so the defaults are never saved over them.
   const loadSettings = useCallback(async () => {
     try {
       // Load extension settings
-      const result = await chrome.storage.local.get(['promptLibrarySettings', 'interfaceMode', 'settings']);
-      const savedSettings = result.promptLibrarySettings as Partial<Settings> | undefined;
-      const loadedSettings: Settings = {
-        ...defaultSettings,
-        ...(savedSettings ?? {})
-      };
+      const result = await chrome.storage.local.get([SITE_SETTINGS_KEY, 'interfaceMode', 'settings']);
+      const loadedSettings = parseSiteSettings(result[SITE_SETTINGS_KEY]);
       // The first load is what storage and the tabs already have: opening Settings changes nothing.
       // A later load (after an import, Clear All Data or a reset) is still sent if it differs.
       storedSettings.current ??= loadedSettings;
@@ -577,8 +547,8 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
   );
 
   const handleAddCustomSiteCallback = useCallback(
-    (siteData: Omit<ImportedCustomSite, 'dateAdded'> & { positioning?: ImportedCustomSite['positioning'] }) => {
-      void handleAddCustomSite(siteData as Omit<CustomSite, 'dateAdded'>);
+    (siteData: Omit<CustomSite, 'dateAdded'>) => {
+      void handleAddCustomSite(siteData);
     },
     [handleAddCustomSite]
   );

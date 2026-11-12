@@ -75,6 +75,57 @@ describe('ContentScriptInjector integration', () => {
     expect(chromeMock.scripting.executeScript).not.toHaveBeenCalled();
   });
 
+  describe('on a Custom site', () => {
+    const openCustomSite = (customSites: unknown[]) => {
+      const chromeMock = getChromeMock() as any;
+      chromeMock.storage.local.get.mockResolvedValue({
+        promptLibrarySettings: { enabledSites: [], customSites }
+      });
+      chromeMock.tabs.get.mockResolvedValue({
+        id: 4,
+        url: 'https://chat.example.com/thread',
+        status: 'complete'
+      } as chrome.tabs.Tab);
+      chromeMock.permissions.contains.mockResolvedValue(true);
+      chromeMock.scripting.executeScript
+        .mockResolvedValueOnce([{ result: true }])
+        .mockResolvedValueOnce([{ result: { isInjected: false, orphanedElements: 0 } }])
+        .mockResolvedValueOnce([]);
+      return chromeMock;
+    };
+    const injectedFiles = (chromeMock: any): unknown[] =>
+      chromeMock.scripting.executeScript.mock.calls.filter(([options]: [{ files?: string[] }]) => options.files);
+
+    it('injects the content script when the Custom site is on', async () => {
+      const chromeMock = openCustomSite([
+        { hostname: 'chat.example.com', displayName: 'Example chat', enabled: true, dateAdded: 1 }
+      ]);
+
+      await new ContentScriptInjector().injectIfNeeded(4);
+
+      expect(injectedFiles(chromeMock)).toHaveLength(1);
+    });
+
+    it('injects nothing when the Custom site is off', async () => {
+      const chromeMock = openCustomSite([
+        { hostname: 'chat.example.com', displayName: 'Example chat', enabled: false, dateAdded: 1 }
+      ]);
+
+      await new ContentScriptInjector().injectIfNeeded(4);
+
+      expect(injectedFiles(chromeMock)).toHaveLength(0);
+    });
+
+    it('injects nothing when the stored entry of the Custom site is malformed', async () => {
+      // No display name and no date: the content script would find the site turned off
+      const chromeMock = openCustomSite([{ hostname: 'chat.example.com', enabled: true }]);
+
+      await new ContentScriptInjector().injectIfNeeded(4);
+
+      expect(injectedFiles(chromeMock)).toHaveLength(0);
+    });
+  });
+
   it('clears tracking state during cleanup', () => {
     const injector = new ContentScriptInjector();
     (injector as any).injectedTabs.add(3);

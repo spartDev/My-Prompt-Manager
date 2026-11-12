@@ -4,9 +4,11 @@
  */
 
 import {
-  getAllHostnamePatterns,
-  getDefaultEnabledPlatforms,
-} from "../config/platforms";
+  enabledCustomSite,
+  enabledHostnames,
+  isHostnameEnabled,
+  readSiteSettings,
+} from "../services/siteSettings";
 import { StorageManager } from "../services/storage";
 import { UsageTracker } from "../services/UsageTracker";
 import type { ElementFingerprint, PlatformType } from "../types";
@@ -73,19 +75,8 @@ export class ContentScriptInjector {
           const hostname = url.hostname;
 
           // For custom sites, always verify actual injection state
-          const settings = await chrome.storage.local.get([
-            "promptLibrarySettings",
-          ]);
-          const promptLibrarySettings = settings.promptLibrarySettings as
-            | {
-                customSites?: Array<{ hostname: string; enabled: boolean }>;
-              }
-            | undefined;
-
-          const customSites = promptLibrarySettings?.customSites || [];
-          const isCustomSite = customSites.some(
-            (site) => site.hostname === hostname && site.enabled,
-          );
+          const isCustomSite =
+            enabledCustomSite(await readSiteSettings(), hostname) !== null;
 
           if (isCustomSite) {
             // For custom sites, verify the content script is actually there
@@ -166,39 +157,7 @@ export class ContentScriptInjector {
         return false;
       }
 
-      const settings = await chrome.storage.local.get([
-        "promptLibrarySettings",
-      ]);
-      const promptLibrarySettings = settings.promptLibrarySettings as
-        | {
-            enabledSites?: string[];
-            customSites?: Array<{ hostname: string; enabled: boolean }>;
-          }
-        | undefined;
-
-      if (!promptLibrarySettings) {
-        return getDefaultEnabledPlatforms().includes(hostname);
-      }
-
-      // Get enabled sites and custom sites from settings
-      const enabledSites =
-        promptLibrarySettings.enabledSites || getDefaultEnabledPlatforms();
-      const customSites = promptLibrarySettings.customSites || [];
-
-      // Check default enabled sites
-      if (enabledSites.includes(hostname)) {
-        return true;
-      }
-
-      // Check custom sites
-      const customSite = customSites.find(
-        (site) => site.hostname === hostname && site.enabled,
-      );
-      if (customSite) {
-        return true;
-      }
-
-      return false;
+      return isHostnameEnabled(await readSiteSettings(), hostname);
     } catch (error) {
       Logger.error("Error checking site enablement", toError(error), {
         component: "ContentScriptInjector",
@@ -670,7 +629,6 @@ interface BackgroundMessage {
     | "OPEN_PICKER_WINDOW"
     | "GET_INTERFACE_MODE"
     | "REQUEST_INJECTION"
-    | "SETTINGS_UPDATED"
     | "REQUEST_PERMISSION"
     | "PROMPT_USAGE_INCREMENT";
   data?: {
@@ -681,7 +639,6 @@ interface BackgroundMessage {
     hostname?: string;
     tabId?: number;
     origins?: string[];
-    settings?: unknown;
     promptId?: string;
   };
 }
@@ -717,10 +674,6 @@ chrome.runtime.onMessage.addListener(
 
       case "REQUEST_INJECTION":
         void handleRequestInjection(message.data?.tabId, sendResponse);
-        break;
-
-      case "SETTINGS_UPDATED":
-        void handleSettingsUpdated(message.data?.settings, sendResponse);
         break;
 
       case "REQUEST_PERMISSION":
@@ -773,66 +726,6 @@ async function handleRequestInjection(
       tabId: targetTabId,
     });
     sendResponse({ success: false, error: getErrorMessage(error) });
-  }
-}
-
-/**
- * Handle settings updates that might affect injection
- */
-async function handleSettingsUpdated(
-  _settings: unknown,
-  sendResponse: (response?: { success: boolean }) => void,
-) {
-  try {
-    const tabs = await chrome.tabs.query({});
-
-    // Filter tabs that might need injection to avoid unnecessary checks
-    const relevantTabs = tabs.filter((tab) => {
-      if (!tab.id || !tab.url) {
-        return false;
-      }
-
-      try {
-        const url = new URL(tab.url);
-        const hostname = url.hostname;
-
-        // Quick hostname check - only process tabs that could potentially need injection
-        return (
-          getDefaultEnabledPlatforms().includes(hostname) ||
-          getAllHostnamePatterns().some((pattern) => hostname.includes(pattern))
-        );
-      } catch {
-        return false; // Invalid URL
-      }
-    });
-
-    // Process relevant tabs concurrently for better performance
-    await Promise.all(
-      relevantTabs.map(async (tab) => {
-        try {
-          if (tab.id && tab.url) {
-            const isInjected = await injector.isContentScriptInjected(tab.id);
-            if (!isInjected) {
-              await injector.injectIfNeeded(tab.id);
-            }
-          }
-        } catch (error) {
-          // Log error but don't fail the entire operation for individual tab failures
-          Logger.error(
-            "Failed to process tab during settings update",
-            toError(error),
-            { component: "Background", tabId: tab.id, url: tab.url },
-          );
-        }
-      }),
-    );
-
-    sendResponse({ success: true });
-  } catch (error) {
-    Logger.error("Settings update handling failed", toError(error), {
-      component: "Background",
-    });
-    sendResponse({ success: false });
   }
 }
 
@@ -926,21 +819,7 @@ async function handlePromptUsageIncrement(
  */
 async function handleExtensionUpdate(): Promise<void> {
   try {
-    const settings = await chrome.storage.local.get(["promptLibrarySettings"]);
-    const promptLibrarySettings = settings.promptLibrarySettings as
-      | {
-          enabledSites?: string[];
-          customSites?: Array<{ hostname: string; enabled: boolean }>;
-        }
-      | undefined;
-    const enabledSites =
-      promptLibrarySettings?.enabledSites || getDefaultEnabledPlatforms();
-    const customSites = promptLibrarySettings?.customSites || [];
-
-    const allEnabledHosts = [
-      ...enabledSites,
-      ...customSites.filter((s) => s.enabled).map((s) => s.hostname),
-    ];
+    const allEnabledHosts = enabledHostnames(await readSiteSettings());
 
     // Get all tabs and identify those that need re-injection
     const tabs = await chrome.tabs.query({});

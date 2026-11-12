@@ -523,7 +523,7 @@ describe('SettingsView', () => {
     // Verify other reset values
     expect(promptLibrarySettings.customSites).toEqual([]);
     expect(promptLibrarySettings.debugMode).toBe(false);
-    expect(promptLibrarySettings.floatingFallback).toBe(true);
+    expect(promptLibrarySettings).not.toHaveProperty('floatingFallback');
     expect(interfaceMode).toBe('popup');
 
     expect(storageMock.updateSettings).toHaveBeenCalledWith({
@@ -862,8 +862,7 @@ describe('SettingsView', () => {
       promptLibrarySettings: {
         enabledSites: ['chatgpt.com'],
         customSites: [],
-        debugMode: false,
-        floatingFallback: true
+        debugMode: false
       },
       interfaceMode: 'popup',
       settings: DEFAULT_SETTINGS
@@ -913,8 +912,7 @@ describe('SettingsView', () => {
       promptLibrarySettings: {
         enabledSites: [],
         customSites: [],
-        debugMode: false,
-        floatingFallback: true
+        debugMode: false
       },
       interfaceMode: 'popup',
       settings: DEFAULT_SETTINGS
@@ -1002,8 +1000,7 @@ describe('SettingsView', () => {
       promptLibrarySettings: {
         enabledSites: ['chatgpt.com'],
         customSites: [],
-        debugMode: false,
-        floatingFallback: true
+        debugMode: false
       },
       interfaceMode: 'popup',
       settings: DEFAULT_SETTINGS
@@ -1044,8 +1041,7 @@ describe('SettingsView', () => {
       promptLibrarySettings: {
         enabledSites: ['chatgpt.com'],
         customSites: [],
-        debugMode: true,
-        floatingFallback: true
+        debugMode: true
       },
       interfaceMode: 'popup',
       settings: DEFAULT_SETTINGS
@@ -1360,8 +1356,7 @@ describe('SettingsView', () => {
             dateAdded: Date.now()
           }
         ],
-        debugMode: false,
-        floatingFallback: true
+        debugMode: false
       },
       interfaceMode: 'popup',
       settings: DEFAULT_SETTINGS
@@ -1410,8 +1405,7 @@ describe('SettingsView', () => {
             dateAdded: Date.now()
           }
         ],
-        debugMode: false,
-        floatingFallback: true
+        debugMode: false
       },
       interfaceMode: 'popup',
       settings: DEFAULT_SETTINGS
