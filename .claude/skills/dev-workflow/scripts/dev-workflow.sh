@@ -159,16 +159,37 @@ $(sed "s|<branch>|$branch_name|g" "$REPO_DIR/.claude/skills/parallel-claude/agen
 PROMPT
 }
 
-# Release the issues a failed launch claimed, so it leaves the backlog as it found it.
+# Issues this launch took over, one "id|previous assignee|previous status" each,
+# so a launch that fails puts every one back as it found it.
+LAUNCH_CLAIMS=()
+
+# Give back what this launch claimed: unclaim the issues nobody held, and hand
+# an issue taken from another assignee (a claim.pools alias) back to it.
 release_claims() {
-    local held
-    for held in "$@"; do
-        if bd unclaim "$held" >/dev/null; then
-            print_info "Released $held"
+    local entry id before status
+    for entry in ${LAUNCH_CLAIMS[@]+"${LAUNCH_CLAIMS[@]}"}; do
+        IFS='|' read -r id before status <<< "$entry"
+        if [ -z "$before" ]; then
+            if bd unclaim "$id" >/dev/null; then
+                print_info "Released $id"
+            else
+                print_warning "Could not release $id: run bd unclaim $id"
+            fi
+        elif bd update "$id" --assignee "$before" --status "$status" >/dev/null; then
+            print_info "Gave $id back to $before"
         else
-            print_warning "Could not release $held: run bd unclaim $held"
+            print_warning "Could not give $id back: run bd update $id --assignee $before --status $status"
         fi
     done
+    LAUNCH_CLAIMS=()
+}
+
+# Read an issue's assignee and status as "assignee|status"; fails when bd show
+# fails or prints nothing.
+read_owner() {
+    local json
+    json=$(bd show "$1" --json 2>/dev/null) && [ -n "$json" ] \
+        && printf '%s' "$json" | jq -er 'if type == "array" then .[0] else . end | "\(.assignee // "")|\(.status // "")"'
 }
 
 # Claim the issues under a lock shared by every worktree of this repository
@@ -189,26 +210,26 @@ claim_issues() {
     return "$rc"
 }
 
-# Claim every issue before anything is stopped or created. When a claim fails,
-# or an issue's current assignee cannot be read, release what this run claimed
-# (only issues nobody held before) and stop.
+# Claim every issue before anything is stopped or created, recording each one
+# whose assignee the claim changed. When an issue cannot be read or claimed,
+# give back what this run claimed and stop.
 claim_issues_locked() {
-    local -a claimed=()
-    local issue json assignee
+    local issue before after
+    LAUNCH_CLAIMS=()
     for issue in "$@"; do
-        if ! json=$(bd show "$issue" --json 2>/dev/null) || [ -z "$json" ] \
-            || ! assignee=$(printf '%s' "$json" | jq -er 'if type == "array" then .[0] else . end | .assignee // ""'); then
+        if ! before=$(read_owner "$issue"); then
             print_error "Could not read the assignee of $issue. Nothing was launched."
-            release_claims ${claimed[@]+"${claimed[@]}"}
+            release_claims
             return 1
         fi
         if ! bd update "$issue" --claim; then
             print_error "Could not claim $issue: it may be claimed by someone else. Nothing was launched."
-            release_claims ${claimed[@]+"${claimed[@]}"}
+            release_claims
             return 1
         fi
-        if [ -z "$assignee" ]; then
-            claimed+=("$issue")
+        after=$(read_owner "$issue") || after=""
+        if [ -z "${before%%|*}" ] || { [ -n "$after" ] && [ "${after%%|*}" != "${before%%|*}" ]; }; then
+            LAUNCH_CLAIMS+=("$issue|$before")
         fi
     done
 }
@@ -236,6 +257,8 @@ launch_parallel() {
     # Claim all issues first: a failed claim leaves the running session alone
     print_info "Claiming issues..."
     claim_issues "${issues[@]}" || return 1
+    # From here a failed setup (worktree, tmux) gives the claims back
+    trap release_claims EXIT
     echo ""
 
     # Kill existing session
@@ -307,6 +330,8 @@ launch_parallel() {
     print_info "Attaching to session..."
     sleep 1
 
+    trap - EXIT
+    LAUNCH_CLAIMS=()
     tmux attach-session -t "$SESSION"
 }
 
