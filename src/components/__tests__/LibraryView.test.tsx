@@ -156,11 +156,14 @@ describe('LibraryView', () => {
   });
 
   describe('New button', () => {
-    it('ends the search row, out of the header', () => {
+    it('ends the search row, out of the header bar and of the search landmark', () => {
       render(<LibraryView {...defaultProps} context="sidepanel" />);
 
       const newButton = screen.getByRole('button', { name: 'Add new prompt' });
-      expect(screen.getByRole('search')).toContainElement(newButton);
+      const search = screen.getByRole('search', { name: 'Search prompts' });
+      expect(search).toContainElement(screen.getByRole('searchbox'));
+      expect(search).not.toContainElement(newButton);
+      expect(search.parentElement).toContainElement(newButton);
       expect(screen.getByRole('heading', { level: 1 }).closest('div.p-6')).not.toContainElement(newButton);
     });
 

@@ -186,11 +186,13 @@ const LibraryView: FC<LibraryViewProps> = ({
         </ViewHeader.Actions>
         {/* Search and Filter */}
         {!libraryEmpty && (
-        <div className="space-y-4 pb-6" role="search" aria-label="Search and filter prompts">
+        <div className="space-y-4 pb-6">
           {/* The header pads its content by 24px; the row keeps 16px on each side. New ends it: an
-              empty Library, which has no search, offers its own way to write the first Prompt */}
+              empty Library, which has no search, offers its own way to write the first Prompt. The
+              search landmark holds the field alone: New creates, and the Library filter is a group
+              with a name of its own */}
           <div className="-mx-2 flex items-center gap-2">
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0" role="search" aria-label="Search prompts">
               <SearchBar
                 value={query}
                 onChange={searchWithDebounce.setQuery}
