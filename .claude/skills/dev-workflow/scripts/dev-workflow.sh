@@ -203,7 +203,8 @@ claim_issues() {
         print_error "Another launch is claiming tickets (lock $lock). Wait for it, or remove the lock if no launch is running."
         return 1
     fi
-    trap 'rmdir "$lock" 2>/dev/null; exit 130' INT TERM
+    # Interrupted mid-batch: give back what this run claimed, then free the lock
+    trap 'release_claims; rmdir "$lock" 2>/dev/null; exit 130' INT TERM
     claim_issues_locked "$@" || rc=$?
     trap - INT TERM
     rmdir "$lock" 2>/dev/null || true
