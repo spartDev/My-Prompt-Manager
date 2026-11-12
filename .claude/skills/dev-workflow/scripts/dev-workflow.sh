@@ -214,6 +214,9 @@ claim_issues() {
 # Claim every issue before anything is stopped or created, recording each one
 # whose assignee the claim changed. When an issue cannot be read or claimed,
 # give back what this run claimed and stop.
+drop_last_claim() {
+    unset "LAUNCH_CLAIMS[$((${#LAUNCH_CLAIMS[@]} - 1))]"
+}
 claim_issues_locked() {
     local issue before after
     LAUNCH_CLAIMS=()
@@ -223,14 +226,17 @@ claim_issues_locked() {
             release_claims
             return 1
         fi
+        # Recorded before the claim, so an interruption mid-claim still gives it back
+        LAUNCH_CLAIMS+=("$issue|$before")
         if ! bd update "$issue" --claim; then
+            drop_last_claim
             print_error "Could not claim $issue: it may be claimed by someone else. Nothing was launched."
             release_claims
             return 1
         fi
         after=$(read_owner "$issue") || after=""
-        if [ -z "${before%%|*}" ] || { [ -n "$after" ] && [ "${after%%|*}" != "${before%%|*}" ]; }; then
-            LAUNCH_CLAIMS+=("$issue|$before")
+        if [ -n "${before%%|*}" ] && { [ -z "$after" ] || [ "${after%%|*}" = "${before%%|*}" ]; }; then
+            drop_last_claim
         fi
     done
 }
