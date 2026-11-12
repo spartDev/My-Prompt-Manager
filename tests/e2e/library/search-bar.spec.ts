@@ -49,7 +49,10 @@ const open = async (page: Page, storage: ExtensionStorage, extensionId: string, 
 
 /** A screenshot once the pop and the rises have ended, so the proof shows the settled screen */
 const capture = async (page: Page, name: string) => {
-  await page.waitForFunction(() => document.getAnimations().every(animation => animation.playState !== 'running'));
+  // Only the pop and the rises: the header line follows the scroll with an animation that never ends
+  await page.waitForFunction(() => document.getAnimations().every(animation =>
+    !(animation instanceof CSSAnimation) || !['pop', 'card-rise', 'card-rise-again'].includes(animation.animationName) || animation.playState !== 'running'
+  ));
   await page.screenshot({ path: `${SCREENSHOT_DIR}/${name}.png` });
 };
 
