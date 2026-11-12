@@ -63,6 +63,7 @@ check_dependencies() {
     command -v tmux &> /dev/null || missing+=("tmux")
     command -v claude &> /dev/null || missing+=("claude")
     command -v bd &> /dev/null || missing+=("bd (beads)")
+    command -v jq &> /dev/null || missing+=("jq")
     command -v gh &> /dev/null || missing+=("gh (GitHub CLI)")
 
     if [ ${#missing[@]} -gt 0 ]; then
@@ -157,24 +158,34 @@ $(sed "s|<branch>|$branch_name|g" "$REPO_DIR/.claude/skills/parallel-claude/agen
 PROMPT
 }
 
-# Claim every issue before anything is stopped or created. When one claim fails,
-# release the issues this run claimed (only those nobody held before), so a
-# failed launch leaves the backlog as it found it.
+# Release the issues a failed launch claimed, so it leaves the backlog as it found it.
+release_claims() {
+    local held
+    for held in "$@"; do
+        if bd unclaim "$held" >/dev/null; then
+            print_info "Released $held"
+        else
+            print_warning "Could not release $held: run bd unclaim $held"
+        fi
+    done
+}
+
+# Claim every issue before anything is stopped or created. When a claim fails,
+# or an issue's current assignee cannot be read, release what this run claimed
+# (only issues nobody held before) and stop.
 claim_issues() {
     local -a claimed=()
-    local issue assignee
+    local issue json assignee
     for issue in "$@"; do
-        assignee=$(bd show "$issue" --json 2>/dev/null | jq -r 'if type == "array" then .[0] else . end | .assignee // ""')
+        if ! json=$(bd show "$issue" --json 2>/dev/null) || [ -z "$json" ] \
+            || ! assignee=$(printf '%s' "$json" | jq -er 'if type == "array" then .[0] else . end | .assignee // ""'); then
+            print_error "Could not read the assignee of $issue. Nothing was launched."
+            release_claims ${claimed[@]+"${claimed[@]}"}
+            return 1
+        fi
         if ! bd update "$issue" --claim; then
             print_error "Could not claim $issue: it may be claimed by someone else. Nothing was launched."
-            local held
-            for held in ${claimed[@]+"${claimed[@]}"}; do
-                if bd unclaim "$held" >/dev/null; then
-                    print_info "Released $held"
-                else
-                    print_warning "Could not release $held: run bd unclaim $held"
-                fi
-            done
+            release_claims ${claimed[@]+"${claimed[@]}"}
             return 1
         fi
         if [ -z "$assignee" ]; then
