@@ -25,23 +25,11 @@ Format output as table:
 
 ### Step 2: Analyze & Recommend Groupings
 
-Evaluate tasks for parallelization:
-
-**Good candidates:**
-- Different files/modules (no merge conflicts)
-- No dependencies between them
-- Similar priority
-
-**Bad candidates:**
-- Same files (merge conflicts!)
-- One depends on another
-- Integration + unit tests on same code
-
-**Hard limit:** Max 4 tasks per group
+Group the ready tickets as step 4 of the `triage-beads` skill does: tickets that share a file or a dependency run one after another, and groups that share no file can run in parallel. Propose launch sets of at most 4 tickets, each taken from a different parallel group.
 
 ### Step 3: Present Options with AskUserQuestion
 
-**CRITICAL**: Present pre-analyzed groupings, not individual tasks.
+Present the launch sets you analyzed, not individual tasks.
 
 ```json
 {

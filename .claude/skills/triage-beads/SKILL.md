@@ -18,7 +18,7 @@ bd list --status=open,in_progress,blocked,deferred --json --limit 0 > <scratch>/
 jq -c '.[] | {id, p: .priority, t: .issue_type, s: .status, title, d: (.description // "" | .[0:200])}' <scratch>/backlog.json
 ```
 
-`--limit 0` lifts `bd list`'s default cap of 50 rows, which would drop tickets without saying so. The listing came to 3.9 KB for 11 tickets on 2026-11-05; when it passes 8 KB, cut `d` to 100 characters rather than paging through it. Every later step reads the saved snapshot, so the ranking and the groups describe the same backlog.
+`--limit 0` lifts `bd list`'s default cap of 50 rows, which would drop tickets without saying so. When the listing passes 8 KB, cut `d` to 100 characters rather than paging through it. Every later step reads the saved snapshot, so the ranking and the groups describe the same backlog.
 
 Done when every live ticket is one line of that output, read once.
 
