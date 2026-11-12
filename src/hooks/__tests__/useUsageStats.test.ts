@@ -500,17 +500,41 @@ describe('useUsageStats', () => {
       expect(result.current.loading).toBe(false);
     });
 
-    it('does not throw when chrome.storage is not there yet', () => {
+    it('follows the changes once chrome.storage is there, when it was missing at first', async () => {
       const storage = chrome.storage;
       Reflect.deleteProperty(chrome, 'storage');
+      let rendered: ReturnType<typeof renderHook<ReturnType<typeof useUsageStats>, unknown>>;
       try {
-        // The reads fail without storage; only the subscription is under test
-        const getHistory = vi.spyOn(UsageTracker.getInstance(), 'getHistory').mockResolvedValue([]);
-        expect(() => renderHook(() => useUsageStats()).unmount()).not.toThrow();
-        getHistory.mockRestore();
+        rendered = renderHook(() => useUsageStats());
       } finally {
         Object.assign(chrome, { storage });
       }
+      const { result } = rendered;
+      // The reads waited for the storage too
+      await waitFor(() => { expect(result.current.loading).toBe(false); }, { timeout: 2000 });
+      expect(result.current.history).toHaveLength(0);
+
+      const history = [buildUsageEvent({ promptId: 'prompt-1' })];
+      await chrome.storage.local.set({ [USAGE_STORAGE_KEY]: history });
+      act(() => { triggerChromeStorageChange({ [USAGE_STORAGE_KEY]: { newValue: history } }); });
+
+      await waitFor(() => { expect(result.current.history).toHaveLength(1); });
+    });
+
+    it('clears the error of a failed first read once a reload gives the data', async () => {
+      const getHistory = vi.spyOn(UsageTracker.getInstance(), 'getHistory')
+        .mockRejectedValueOnce(new Error('Failed to load'));
+      const { result } = renderHook(() => useUsageStats());
+      await waitFor(() => { expect(result.current.error).toBeTruthy(); });
+
+      const history = [buildUsageEvent({ promptId: 'prompt-1' })];
+      await chrome.storage.local.set({ [USAGE_STORAGE_KEY]: history });
+      act(() => { triggerChromeStorageChange({ [USAGE_STORAGE_KEY]: { newValue: history } }); });
+
+      await waitFor(() => { expect(result.current.history).toHaveLength(1); });
+      expect(result.current.error).toBeNull();
+      expect(result.current.loading).toBe(false);
+      getHistory.mockRestore();
     });
 
     it('ignores what is stored under another key', async () => {

@@ -10,6 +10,7 @@ import type {
   UseUsageStatsReturn
 } from '../types/hooks';
 import { Logger, toError } from '../utils';
+import { ensureStorageAvailable } from '../utils/chromeStorage';
 
 const TIME_BUCKETS = ['Night', 'Morning', 'Afternoon', 'Evening'] as const;
 
@@ -177,11 +178,6 @@ export function useUsageStats(): UseUsageStatsReturn {
   // the history, the Prompts and the Categories are read again, without starting the loading state,
   // so nothing flickers. A reload that overtakes a read still loading ends that loading state itself
   useEffect(() => {
-    // chrome.storage.onChanged may not be available in all contexts (see useTheme)
-    // and chrome.storage itself may be missing when analytics.html opens before the extension is ready
-    const storageApi = typeof chrome !== 'undefined' ? chrome.storage : undefined;
-    const onChangedApi = storageApi ? storageApi.onChanged : undefined;
-    if (!onChangedApi) { return; }
     let stale = false;
     const handleStorageChange = (changes: { [key: string]: chrome.storage.StorageChange }, areaName: string) => {
       // An Insertion writes the history and the Prompt's use count apart, in either order: reading
@@ -197,6 +193,8 @@ export function useUsageStats(): UseUsageStatsReturn {
           setPrompts(allPrompts);
           setCategories(allCategories);
           hasLoadedRef.current = true;
+          // The view has its data: an earlier read that failed is no longer the state to show
+          setError(null);
           // Ends the loading state of a read this reload overtook; a no-op otherwise
           setLoading(false);
         })
@@ -210,10 +208,25 @@ export function useUsageStats(): UseUsageStatsReturn {
           setLoading(false);
         });
     };
-    onChangedApi.addListener(handleStorageChange);
+    // chrome.storage, or its onChanged, may be missing when analytics.html opens before the extension
+    // is ready (see useTheme): the listener is then added once the storage is there, as the reads wait
+    let subscribed: typeof chrome.storage.onChanged | undefined;
+    const subscribe = (): boolean => {
+      const storageApi = typeof chrome !== 'undefined' ? chrome.storage : undefined;
+      const onChangedApi = storageApi ? storageApi.onChanged : undefined;
+      if (stale || !onChangedApi) { return false; }
+      onChangedApi.addListener(handleStorageChange);
+      subscribed = onChangedApi;
+      return true;
+    };
+    if (!subscribe()) {
+      void ensureStorageAvailable().then(subscribe).catch((err: unknown) => {
+        Logger.error('Usage history changes are not followed', toError(err), { component: 'useUsageStats' });
+      });
+    }
     return () => {
       stale = true;
-      onChangedApi.removeListener(handleStorageChange);
+      subscribed?.removeListener(handleStorageChange);
     };
   }, []);
 
