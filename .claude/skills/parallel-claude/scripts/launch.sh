@@ -79,7 +79,7 @@ get_branch_prefix() {
     case "$1" in
         bug) echo "fix" ;;
         feature) echo "feat" ;;
-        refactor) echo "refactor" ;;
+        chore) echo "chore" ;;
         *) echo "task" ;;
     esac
 }
@@ -169,8 +169,9 @@ launch_parallel() {
     # Claim issues
     print_info "Claiming issues..."
     for issue in "${issues[@]}"; do
-        if ! bd update "$issue" --status in_progress 2>/dev/null; then
-            print_warning "Could not claim $issue (may already be in progress)"
+        if ! bd update "$issue" --claim; then
+            print_error "Could not claim $issue: it may be claimed by someone else. Nothing was launched."
+            return 1
         fi
     done
 

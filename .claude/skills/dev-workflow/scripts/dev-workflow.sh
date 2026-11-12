@@ -94,7 +94,7 @@ get_branch_prefix() {
     case "$issue_type" in
         bug) echo "fix" ;;
         feature) echo "feat" ;;
-        refactor) echo "refactor" ;;
+        chore) echo "chore" ;;
         task) echo "task" ;;
         *) echo "fix" ;;
     esac
@@ -183,7 +183,10 @@ launch_parallel() {
     # Claim all issues first
     print_info "Claiming issues..."
     for issue in "${issues[@]}"; do
-        bd update "$issue" --status in_progress 2>/dev/null || true
+        if ! bd update "$issue" --claim; then
+            print_error "Could not claim $issue: it may be claimed by someone else. Nothing was launched."
+            return 1
+        fi
     done
     echo ""
 
@@ -454,7 +457,7 @@ interactive_mode() {
             print_info "Starting Claude to help plan your work..."
             print_info "Describe your feature/bugfix/refactor and Claude will create beads tasks."
             echo ""
-            claude "Help me plan and break down my work into beads tasks. Ask me what I want to build or fix, then create appropriate beads issues with 'bd create'. Use types: feature, task, bug, or refactor. Set appropriate priorities (0=critical, 2=medium, 4=backlog)."
+            claude "Help me plan and break down my work into beads tasks. Ask me what I want to build or fix, then create appropriate beads issues with 'bd create'. Give each issue a --description and --acceptance criteria. Use types: feature, task, bug, or chore. Set appropriate priorities (0=critical, 2=medium, 4=backlog)."
             ;;
         2)
             echo ""
@@ -492,7 +495,7 @@ main() {
             print_phase "Planning Mode"
             echo ""
             print_info "Starting Claude to help plan your work..."
-            claude "Help me plan and break down my work into beads tasks. Ask me what I want to build or fix, then create appropriate beads issues with 'bd create'. Use types: feature, task, bug, or refactor."
+            claude "Help me plan and break down my work into beads tasks. Ask me what I want to build or fix, then create appropriate beads issues with 'bd create'. Give each issue a --description and --acceptance criteria. Use types: feature, task, bug, or chore."
             ;;
         select)
             print_header
