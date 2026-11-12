@@ -105,11 +105,13 @@ test.describe('Empty states', () => {
       await expect(page.getByTestId('library-empty')).toHaveCount(0);
       await expect(page.getByRole('search')).toBeVisible();
 
-      // The last Prompt goes: the empty state is back, with no reload
-      await storage.seedPrompts([]);
-      await page.getByTestId('tab-settings').click();
-      await page.getByTestId('tab-library').click();
+      // The last Prompt is deleted from the editor: the empty state is back, with no reload, and the
+      // keyboard goes to its main action, the Library filter being gone
+      await page.getByRole('button', { name: 'Edit First prompt' }).click();
+      await page.getByRole('button', { name: 'Delete prompt' }).click();
+      await page.getByRole('dialog', { name: 'Delete Prompt' }).getByRole('button', { name: 'Delete' }).click();
       await expect(page.getByTestId('library-empty')).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Write your first prompt' })).toBeFocused();
     });
 
     test(`"Import a backup" opens Settings with the keyboard on Import (${theme})`, async ({ page, storage, extensionId }) => {
@@ -232,9 +234,8 @@ test.describe('Empty states', () => {
       await page.getByTestId('tab-analytics').click();
       await expect(page.getByTestId('stats-empty')).toBeVisible();
 
+      // Stored while Analytics stays open, as from a Platform beside the side panel: it shows at once
       await seedUsageHistory(storage, [createUsageEventSeed({ promptId: 'used', timestamp: Date.now() - 60_000, platform: 'claude' })]);
-      await page.getByTestId('tab-library').click();
-      await page.getByTestId('tab-analytics').click();
 
       await expect(page.getByTestId('stats-empty')).toHaveCount(0);
       await expect(page.getByTestId('stats-total')).toHaveText('1');

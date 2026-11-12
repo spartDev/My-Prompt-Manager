@@ -241,6 +241,14 @@ describe('LibraryView', () => {
       expect(onLibraryFilterChange).not.toHaveBeenCalled();
     });
 
+    it('gives the keyboard to "Write your first prompt" when the Prompt that had it was the last', () => {
+      const onLibraryFilterFocused = vi.fn();
+      render(<LibraryView {...emptyProps} focusLibraryFilter={true} onLibraryFilterFocused={onLibraryFilterFocused} />);
+
+      expect(screen.getByRole('button', { name: 'Write your first prompt' })).toHaveFocus();
+      expect(onLibraryFilterFocused).toHaveBeenCalledTimes(1);
+    });
+
     it('does not show while the Library loads', () => {
       render(<LibraryView {...emptyProps} loading={true} />);
 

@@ -1,4 +1,4 @@
-import type { FC } from 'react';
+import type { FC, Ref } from 'react';
 
 import EmptyState, { EMPTY_PRIMARY_BUTTON, EMPTY_SECONDARY_BUTTON } from './EmptyState';
 
@@ -7,6 +7,8 @@ export interface LibraryEmptyProps {
   onWriteFirstPrompt: () => void;
   /** Opens Settings on its Backup import; the button is left out when the Library cannot offer it */
   onImportBackup?: () => void;
+  /** The main action: it takes the keyboard when the last Prompt is deleted from the editor */
+  primaryButtonRef?: Ref<HTMLButtonElement>;
 }
 
 const PlusIcon = (
@@ -50,7 +52,7 @@ const LibraryIllustration: FC = () => (
  * The Library with no Prompt (Atelier 1C 5a): write the first one, or restore a Backup. It leaves as
  * soon as a Prompt exists.
  */
-const LibraryEmpty: FC<LibraryEmptyProps> = ({ onWriteFirstPrompt, onImportBackup }) => (
+const LibraryEmpty: FC<LibraryEmptyProps> = ({ onWriteFirstPrompt, onImportBackup, primaryButtonRef }) => (
   <EmptyState
     data-testid="library-empty"
     illustration={<LibraryIllustration />}
@@ -58,7 +60,7 @@ const LibraryEmpty: FC<LibraryEmptyProps> = ({ onWriteFirstPrompt, onImportBacku
     description="Save the prompts you keep retyping. Add variables for the parts that change, and fill them in when you insert one."
   >
     <div className="flex w-full flex-col items-center gap-2">
-      <button type="button" onClick={onWriteFirstPrompt} className={EMPTY_PRIMARY_BUTTON}>
+      <button ref={primaryButtonRef} type="button" onClick={onWriteFirstPrompt} className={EMPTY_PRIMARY_BUTTON}>
         Write your first prompt
       </button>
       {onImportBackup && (

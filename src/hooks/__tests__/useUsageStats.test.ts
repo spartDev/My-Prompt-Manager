@@ -1,8 +1,9 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
+import { UsageTracker } from '../../services/UsageTracker';
 import { buildPrompt } from '../../test/builders';
+import { triggerChromeStorageChange } from '../../test/mocks';
 import type { Prompt, UsageEvent } from '../../types';
 import { DEFAULT_CATEGORY, USAGE_RETENTION_DAYS, USAGE_STORAGE_KEY } from '../../types';
 import { useUsageStats } from '../useUsageStats';
@@ -353,6 +354,33 @@ describe('useUsageStats', () => {
       });
 
       expect(result.current.history).toHaveLength(2);
+    });
+  });
+
+  describe('while the view stays open', () => {
+    it('reads the history again when an Insertion is stored, without going back to loading', async () => {
+      const { result } = renderHook(() => useUsageStats());
+      await waitFor(() => { expect(result.current.loading).toBe(false); });
+      expect(result.current.history).toHaveLength(0);
+
+      const history = [buildUsageEvent({ promptId: 'prompt-1' })];
+      await chrome.storage.local.set({ [USAGE_STORAGE_KEY]: history });
+      act(() => { triggerChromeStorageChange({ [USAGE_STORAGE_KEY]: { newValue: history } }); });
+
+      await waitFor(() => { expect(result.current.history).toHaveLength(1); });
+      expect(result.current.loading).toBe(false);
+      expect(result.current.stats?.totalUses).toBe(1);
+    });
+
+    it('ignores what is stored under another key', async () => {
+      const { result } = renderHook(() => useUsageStats());
+      await waitFor(() => { expect(result.current.loading).toBe(false); });
+
+      const getHistory = vi.spyOn(UsageTracker.getInstance(), 'getHistory');
+      act(() => { triggerChromeStorageChange({ settings: { newValue: {} } }); });
+
+      expect(getHistory).not.toHaveBeenCalled();
+      getHistory.mockRestore();
     });
   });
 });

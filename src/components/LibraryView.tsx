@@ -65,6 +65,16 @@ const LibraryView: FC<LibraryViewProps> = ({
     if (libraryFilter.kind !== 'all') { onLibraryFilterChange(ALL_PROMPTS); }
   }, [libraryEmpty, query, clearSearch, libraryFilter, onLibraryFilterChange]);
 
+  // The Library filter takes the keyboard when the Prompt that had it is gone. With the last Prompt
+  // there is no filter left: the main action of the empty state takes it instead
+  const writeFirstRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (libraryEmpty && focusLibraryFilter) {
+      writeFirstRef.current?.focus();
+      onLibraryFilterFocused?.();
+    }
+  }, [libraryEmpty, focusLibraryFilter, onLibraryFilterFocused]);
+
   // The search shortcut moves the keyboard into the field, also when it has just brought the Library
   // back. An empty Library has no field: the shortcut then only brings the Library back
   const searchRef = useRef<HTMLInputElement>(null);
@@ -214,7 +224,7 @@ const LibraryView: FC<LibraryViewProps> = ({
             <div className="text-secondary font-medium">Loading your prompts...</div>
           </div>
         ) : libraryEmpty ? (
-          <LibraryEmpty onWriteFirstPrompt={onAddNew} onImportBackup={onImportBackup} />
+          <LibraryEmpty onWriteFirstPrompt={onAddNew} onImportBackup={onImportBackup} primaryButtonRef={writeFirstRef} />
         ) : resultCount === 0 && !isSearchActive ? (
           <div className="flex items-center justify-center h-full">
             {!isSearchActive && activeFilter.kind === 'pinned' ? (

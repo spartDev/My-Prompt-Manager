@@ -2,13 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { StorageManager } from '../services/storage';
 import { UsageTracker } from '../services/UsageTracker';
-import { type AppError, type Category, type Prompt, USAGE_RETENTION_DAYS, type UsageEvent } from '../types';
+import { type AppError, type Category, type Prompt, USAGE_RETENTION_DAYS, USAGE_STORAGE_KEY, type UsageEvent } from '../types';
 import type {
   DailyUsage,
   TimeOfDayDistribution,
   UsageStats,
   UseUsageStatsReturn
 } from '../types/hooks';
+import { Logger, toError } from '../utils';
 
 const TIME_BUCKETS = ['Night', 'Morning', 'Afternoon', 'Evening'] as const;
 
@@ -154,6 +155,32 @@ export function useUsageStats(): UseUsageStatsReturn {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  // An Insertion counted while the view stays open (the side panel, beside a Platform) shows at once:
+  // the history and the Prompts are read again, without the loading state, so nothing flickers
+  useEffect(() => {
+    // chrome.storage.onChanged may not be available in all contexts (see useTheme)
+    const onChangedApi = typeof chrome !== 'undefined' ? chrome.storage.onChanged : undefined;
+    if (!onChangedApi) { return; }
+    let stale = false;
+    const handleStorageChange = (changes: { [key: string]: chrome.storage.StorageChange }, areaName: string) => {
+      if (areaName !== 'local' || !(USAGE_STORAGE_KEY in changes)) { return; }
+      void Promise.all([UsageTracker.getInstance().getHistory(), StorageManager.getInstance().getPrompts()])
+        .then(([usageHistory, allPrompts]) => {
+          if (stale) { return; }
+          setHistory(usageHistory);
+          setPrompts(allPrompts);
+        })
+        .catch((err: unknown) => {
+          Logger.error('Failed to reload usage history', toError(err), { component: 'useUsageStats' });
+        });
+    };
+    onChangedApi.addListener(handleStorageChange);
+    return () => {
+      stale = true;
+      onChangedApi.removeListener(handleStorageChange);
+    };
+  }, []);
 
   return {
     stats,
