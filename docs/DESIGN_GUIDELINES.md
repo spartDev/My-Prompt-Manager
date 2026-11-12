@@ -1565,6 +1565,7 @@ transition-colors focus-interactive
 **Confirmation of an Insertion** (`src/content/selector/InsertionFeedback.tsx`):
 - Pill: 34px high, on `bg-inverse`, its right edge on the input field's, 10px above the field (below when the field is less than 48px from the top of the window), at most 420px wide and never past the window: when the field leaves less than 240px on its left, the pill starts 8px from the left of the window instead; `role="status"`; `Inserted “title”` and an Undo button (26px high), or `Couldn't insert “title”` alone (`Couldn't undo “title”` when Undo could not put the earlier text back)
 - It stays 2.8s, and while it is hovered or focused; it leaves when the user types in the field or sends
+- Keyboard: while the pill offers Undo, Tab in the input field moves the focus to Undo (the pill is last in the page's tab order, 96 Tab presses away on Gemini), Enter or Space presses it, and Shift+Tab on Undo returns to the field; neither Tab reaches the page. Tab with Ctrl, Alt or Cmd, Shift+Tab in the field, and Tab once the pill is leaving are the page's own
 - Sweep: a violet band (`bg-inverse-mark` at 32%) across the field, once, 1.1s on the sheet curve, inside the field's own corner radius; not drawn under reduced motion
 
 **Prompts button** (`src/content/utils/styles.ts`):

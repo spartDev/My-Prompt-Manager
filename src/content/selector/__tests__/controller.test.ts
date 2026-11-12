@@ -875,6 +875,84 @@ describe('PromptSelectorController', () => {
       }
     });
 
+    describe('Undo by keyboard', () => {
+      it('Tab in the input field takes the focus to Undo, and the page does not get the key', async () => {
+        await inserted();
+        const onPage = vi.fn();
+        field.addEventListener('keydown', onPage);
+
+        const tab = press('Tab', field);
+
+        expect(shadow()?.activeElement).toBe(undoButton());
+        expect(tab.defaultPrevented).toBe(true);
+        expect(onPage).not.toHaveBeenCalled();
+      });
+
+      it.each([
+        ['Shift+Tab', { shiftKey: true }],
+        ['Ctrl+Tab', { ctrlKey: true }],
+        ['Alt+Tab', { altKey: true }],
+        ['Cmd+Tab', { metaKey: true }],
+        ['Tab while a character is composed', { isComposing: true }]
+      ])('%s in the input field is left to the page', async (_what, init) => {
+        await inserted();
+        const tab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, composed: true, cancelable: true, ...init });
+
+        field.dispatchEvent(tab);
+
+        expect(tab.defaultPrevented).toBe(false);
+        expect(document.activeElement).toBe(field);
+      });
+
+      it('Tab elsewhere in the page is left to the page', async () => {
+        await inserted();
+        button.focus();
+
+        const tab = press('Tab', button);
+
+        expect(tab.defaultPrevented).toBe(false);
+        expect(document.activeElement).toBe(button);
+      });
+
+      it('Tab is left to the page when the confirmation offers no Undo', async () => {
+        callbacks.insert.mockResolvedValue(false);
+        await inserted();
+        expect(pill()?.getAttribute('data-kind')).toBe('failed');
+
+        const tab = press('Tab', field);
+
+        expect(tab.defaultPrevented).toBe(false);
+      });
+
+      it('Tab is left to the page once the confirmation leaves', async () => {
+        await inserted();
+        // Typing in the field makes the confirmation leave: it fades out, then is gone
+        field.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true }));
+        await vi.waitFor(() => { expect(pill()?.getAttribute('data-leaving')).toBe('true'); });
+
+        const fading = press('Tab', field);
+        await vi.waitFor(() => { expect(pill()).toBeNull(); });
+        const gone = press('Tab', field);
+
+        expect(fading.defaultPrevented).toBe(false);
+        expect(gone.defaultPrevented).toBe(false);
+        expect(document.activeElement).toBe(field);
+      });
+
+      it('Shift+Tab on Undo takes the focus back to the input field', async () => {
+        await inserted();
+        press('Tab', field);
+        expect(shadow()?.activeElement).toBe(undoButton());
+
+        const back = new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, composed: true, cancelable: true });
+        undoButton()?.dispatchEvent(back);
+
+        expect(document.activeElement).toBe(field);
+        expect(back.defaultPrevented).toBe(true);
+        expect(pill()).not.toBeNull();
+      });
+    });
+
     it('goes when the selector opens again, and with it its Undo', async () => {
       await inserted();
 

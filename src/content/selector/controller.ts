@@ -540,6 +540,22 @@ export class PromptSelectorController {
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.key === 'Enter' && !event.isComposing && inField(event)) {
         leave();
+        return;
+      }
+      // Undo is last in the page's tab order (the shadow host is at the end of body), too far to
+      // reach in time on a real page: Tab in the input field goes straight to it, and Shift+Tab
+      // on it comes back to the field. Neither key reaches the page
+      const undo = this.host?.shadowRoot?.querySelector<HTMLElement>('.mpm-inserted-undo');
+      if (event.key !== 'Tab' || event.ctrlKey || event.altKey || event.metaKey || event.isComposing || !undo || !target?.isConnected) {
+        return;
+      }
+      const goesTo = event.shiftKey
+        ? (event.composedPath().includes(undo) ? target : null)
+        : (inField(event) ? undo : null);
+      if (goesTo) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        goesTo.focus({ preventScroll: true });
       }
     };
 

@@ -79,7 +79,7 @@ Where the icon goes when a Platform's Toolbar is not found, or where a custom si
 _Avoid_: Floating icon (the custom-site icon's look, not its placement), absolute fallback
 
 **Insertion**:
-Putting a Prompt's content into a Platform's input field. A Prompt's content arrives exactly as saved (see Verbatim). It replaces what the field held. An Insertion can be undone right after, from the confirmation shown above the field: Undo puts back the text the field held, as plain text, and the use of the Prompt stays counted. An Insertion that fails is said, and counts no use.
+Putting a Prompt's content into a Platform's input field. A Prompt's content arrives exactly as saved (see Verbatim). It replaces what the field held. An Insertion can be undone right after, from the confirmation shown above the field: Undo puts back the text the field held, as plain text, and the use of the Prompt stays counted. With the keyboard, Tab pressed in the input field while the confirmation shows goes to Undo, wherever the confirmation is in the page's tab order. An Insertion that fails is said, and counts no use.
 
 ### Navigation
 
