@@ -81,6 +81,7 @@ get_branch_prefix() {
         bug) echo "fix" ;;
         feature) echo "feat" ;;
         chore) echo "chore" ;;
+        refactor) echo "refactor" ;;
         *) echo "task" ;;
     esac
 }
@@ -155,10 +156,28 @@ release_claims() {
     done
 }
 
+# Claim the issues under a lock shared by every worktree of this repository
+# (mkdir: flock is not on macOS), so a second launch reads the assignees only
+# once this one has claimed or rolled back, and a rollback can never release
+# an issue another launch has just re-claimed.
+claim_issues() {
+    local lock rc=0
+    lock="$(git -C "$REPO_DIR" rev-parse --path-format=absolute --git-common-dir)/claude-parallel-claim.lock"
+    if ! mkdir "$lock" 2>/dev/null; then
+        print_error "Another launch is claiming tickets (lock $lock). Wait for it, or remove the lock if no launch is running."
+        return 1
+    fi
+    trap 'rmdir "$lock" 2>/dev/null; exit 130' INT TERM
+    claim_issues_locked "$@" || rc=$?
+    trap - INT TERM
+    rmdir "$lock" 2>/dev/null || true
+    return "$rc"
+}
+
 # Claim every issue before anything is stopped or created. When a claim fails,
 # or an issue's current assignee cannot be read, release what this run claimed
 # (only issues nobody held before) and stop.
-claim_issues() {
+claim_issues_locked() {
     local -a claimed=()
     local issue json assignee
     for issue in "$@"; do
