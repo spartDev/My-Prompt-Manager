@@ -17,6 +17,7 @@ import { DEFAULT_SETTINGS, type Prompt } from '../../../src/types';
 import { type ExtensionStorage, expect, test } from '../fixtures/extension';
 import { expectInsertionFlow, expectKeyboardInsertionFlow, fieldText, insertionPill, insertionSweep, tabToUndo, undoButton } from '../fixtures/insertion-flow';
 import { openPlatform, PLATFORM_FIELD, PLATFORM_FIXTURES, type PlatformFixture, promptRow, promptSelector, promptsButton } from '../fixtures/platform-pages';
+import { holdHover } from '../utils/hover';
 import { createCategorySeed, createPromptSeed, seedLibrary } from '../utils/storage';
 
 const SCREENSHOT_DIR = 'test-results/prompt-insertion';
@@ -108,8 +109,7 @@ test.describe('Insertion confirmation: time and motion', () => {
 
     // Hovered, it stays; it leaves 2.8s after the pointer has gone
     await insertByTyping(page, 'claude', 'review', ' //');
-    await pill.hover();
-    await page.waitForTimeout(3600);
+    await holdHover(pill, 3600);
     await expect(pill).toBeVisible();
     await page.mouse.move(5, 5);
     await expect(pill).toBeHidden({ timeout: 5000 });
