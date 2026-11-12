@@ -213,6 +213,28 @@ describe('PlatformStrategy', () => {
       field.remove();
     });
 
+    it('puts the draft back once in an editor that inserts the text an input event carries', async () => {
+      const field = document.createElement('div');
+      field.setAttribute('contenteditable', 'true');
+      field.innerHTML = '<p>Inserted prompt</p>';
+      document.body.append(field);
+      // The editing command is refused, and the editor adds the data of an input event to what
+      // it holds, as Perplexity's Lexical composer does
+      document.execCommand = vi.fn().mockReturnValue(false);
+      field.addEventListener('input', (event) => {
+        const { data } = event as InputEvent;
+        if (typeof data === 'string' && data !== '') {
+          field.append(data);
+        }
+      });
+
+      const result = await new TestStrategy().restore(field, 'My draft\nsecond line');
+
+      expect(result).toEqual({ success: true, method: 'restore-dom' });
+      expect(readInputText(field)).toBe('My draft\nsecond line');
+      field.remove();
+    });
+
     it.each([
       ['First line\nSecond line', 'First line<br>Second line'],
       ['First line\n\nThird line', 'First line<br><br>Third line'],
