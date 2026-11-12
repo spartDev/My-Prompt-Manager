@@ -78,7 +78,9 @@ test.describe('Library search bar', () => {
       expect(box?.width).toBe(400 - 32);
       // rounded-full: a radius larger than any pill, so its ends are half circles
       expect(parseFloat(await pill.evaluate(element => getComputedStyle(element).borderTopLeftRadius))).toBeGreaterThanOrEqual(999);
-      await expect(pill).toHaveCSS('border-top-width', '1.5px');
+      // 1.5px as written; Chrome draws and reports whole device pixels, so 1px on a screen of density 1
+      await expect(pill).toHaveCSS('border-top-width', /^1(\.5)?px$/);
+      await expect(pill).toHaveClass(/border-\[1\.5px\]/);
       await expect(field).toHaveAttribute('type', 'search');
       await expect(field).toHaveAttribute('placeholder', 'Search your prompts');
       await expect(field).toHaveCSS('font-size', '14.5px');
