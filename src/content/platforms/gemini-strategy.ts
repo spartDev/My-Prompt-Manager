@@ -21,7 +21,9 @@ const GEMINI_PLATFORM_PRIORITY = 85;
  * Gemini uses Quill.js for rich text editing
  */
 interface QuillEditor {
-  setText(text: string): void;
+  getSelection(focus?: boolean): { index: number; length: number } | null;
+  getText?(): string;
+  deleteText(index: number, length: number): void;
   insertText(index: number, text: string): void;
   getLength(): number;
   setSelection(index: number, length?: number): void;
@@ -39,10 +41,11 @@ interface QuillElement extends HTMLElement {
 /**
  * GeminiStrategy handles content insertion for Google Gemini's Quill.js-based editor
  *
- * Insertion Strategy:
+ * Insertion Strategy, where the caret is:
  * 1. Quill.js API (primary) - Direct Quill instance manipulation
- * 2. execCommand (secondary) - contenteditable fallback
- * 3. DOM manipulation (tertiary) - Direct text node insertion
+ * 2. The browser's editing command (secondary), as typing would; when it is refused, the text
+ *    is written directly, with the text around the caret. When the editor keeps neither, the
+ *    Insertion fails: nothing is written over what the field holds
  *
  * Performance Optimization:
  * - Caches Quill editor references using WeakMap for automatic garbage collection
@@ -111,24 +114,19 @@ export class GeminiStrategy extends PlatformStrategy {
    * Inserts content using Gemini-specific methods
    * Tries Quill.js API, then execCommand, then DOM manipulation
    */
-  async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
+  insert(element: HTMLElement, content: string): Promise<InsertionResult> {
     // Find the Quill editor element
     const quillElement = this._findQuillEditor(element);
 
     // Method 1: Try Quill.js API
+    // An editor that took the text through its API and did not keep it is not written to again
     const quillResult = this._tryQuillInsertion(quillElement, content);
-    if (quillResult.success) {
-      return quillResult;
+    if (quillResult.success || quillResult.error) {
+      return Promise.resolve(quillResult);
     }
 
-    // Method 2: Try execCommand for contenteditable
-    const execCommandResult = await this._tryExecCommand(quillElement, content);
-    if (execCommandResult.success) {
-      return execCommandResult;
-    }
-
-    // Method 3: Direct DOM manipulation
-    return this._tryDOMManipulation(quillElement, content);
+    // Method 2: the editing command, as typing would
+    return this._tryExecCommand(quillElement, content);
   }
 
   /**
@@ -233,12 +231,28 @@ export class GeminiStrategy extends PlatformStrategy {
       // Try to find Quill instance on the element
       const quill = quillElement.__quill || quillElement.quill;
 
-      if (quill && typeof quill.setText === 'function') {
-        // Use Quill API to set text
-        quill.setText(content);
+      if (quill && typeof quill.insertText === 'function' && typeof quill.getSelection === 'function') {
+        // Where the caret is, in place of what is selected. An editor with no caret takes the
+        // text at its end, before the line break Quill ends its own text with
+        const selection = quill.getSelection(true);
+        const index = selection?.index ?? Math.max(quill.getLength() - 1, 0);
+        const selected = selection?.length ?? 0;
+        // What the editor must hold afterwards, when it can be read
+        const held = typeof quill.getText === 'function' ? quill.getText() : null;
+        const expected = held === null ? null : held.slice(0, index) + content + held.slice(index + selected);
+        if (selected > 0) {
+          quill.deleteText(index, selected);
+        }
+        quill.insertText(index, content);
+        quill.setSelection(index + content.length, 0);
 
         // Trigger events for Angular change detection
-        this._dispatchAngularEvents(element, content, 'basic');
+        this._dispatchAngularEvents(element, content);
+
+        // A page whose own handlers changed the editor's text did not take the Prompt
+        if (expected !== null && quill.getText?.() !== expected) {
+          return { success: false, error: 'The input field did not keep the text' };
+        }
 
         this._debug('Quill API insertion successful');
         return { success: true, method: 'gemini-quill-api' };
@@ -273,31 +287,27 @@ export class GeminiStrategy extends PlatformStrategy {
         // Wait for focus to settle
         await new Promise(resolve => setTimeout(resolve, GEMINI_FOCUS_DELAY_MS));
 
-        // Select all existing content
-        const selection = window.getSelection();
-        if (selection) {
-          const range = document.createRange();
-          range.selectNodeContents(element);
-          selection.removeAllRanges();
-          selection.addRange(range);
-        }
-
-        // Insert new content using execCommand
-        const inserted = document.execCommand('insertText', false, content);
-
-        if (inserted) {
+        const result = this.insertEditableText(element, content, 'gemini');
+        if (result.success) {
           // Trigger Angular-compatible events
-          this._dispatchAngularEvents(element, content, 'basic');
-
-          this._debug('execCommand insertion successful');
-          return { success: true, method: 'gemini-execCommand' };
+          this._dispatchAngularEvents(element, content);
+          this._debug('Insertion successful', { method: result.method });
         }
+        return result;
       } catch (error) {
-        this._warn('execCommand failed', error instanceof Error ? error : { error: String(error) });
+        this._error('All insertion methods failed', error as Error);
       }
+    } else {
+      this._warn('Element is not contenteditable', {
+        tagName: element.tagName,
+        contentEditable: element.contentEditable
+      });
     }
 
-    return { success: false };
+    return {
+      success: false,
+      error: 'All insertion methods failed for Gemini'
+    };
   }
 
   /**
@@ -305,14 +315,9 @@ export class GeminiStrategy extends PlatformStrategy {
    * This triggers zone.js change detection for proper UI updates
    * @param element - Target element
    * @param content - Inserted content
-   * @param eventType - Type of insertion ('basic' | 'comprehensive')
    * @private
    */
-  private _dispatchAngularEvents(
-    element: HTMLElement,
-    content: string,
-    eventType: 'basic' | 'comprehensive' = 'basic'
-  ): void {
+  private _dispatchAngularEvents(element: HTMLElement, content: string): void {
     // Always dispatch input event with proper InputEvent interface
     const inputEvent = new InputEvent('input', {
       bubbles: true,
@@ -325,60 +330,8 @@ export class GeminiStrategy extends PlatformStrategy {
     // Always dispatch change event
     element.dispatchEvent(new Event('change', { bubbles: true }));
 
-    if (eventType === 'comprehensive') {
-      // Additional events for DOM manipulation fallback
-      element.dispatchEvent(new Event('blur', { bubbles: true }));
-      element.dispatchEvent(new Event('focus', { bubbles: true }));
-    } else {
-      // Quill-specific events
-      element.dispatchEvent(new Event('text-change', { bubbles: true }));
-      element.dispatchEvent(new Event('compositionend', { bubbles: true }));
-    }
-  }
-
-  /**
-   * Attempts insertion using direct DOM manipulation
-   * @param element - Target element
-   * @param content - Content to insert
-   * @returns Result of insertion attempt
-   * @private
-   */
-  private _tryDOMManipulation(element: HTMLElement, content: string): InsertionResult {
-    try {
-      // For contenteditable elements, use text nodes for security
-      if (element.contentEditable === 'true') {
-        element.focus();
-
-        // Clear existing content safely
-        while (element.firstChild) {
-          element.removeChild(element.firstChild);
-        }
-
-        // Create a paragraph with text node (Quill structure)
-        const paragraph = document.createElement('p');
-        const textNode = document.createTextNode(content);
-        paragraph.appendChild(textNode);
-        element.appendChild(paragraph);
-
-        // Dispatch comprehensive event set for Angular
-        this._dispatchAngularEvents(element, content, 'comprehensive');
-
-        this._debug('DOM manipulation successful');
-        return { success: true, method: 'gemini-dom-manipulation' };
-      }
-
-      this._warn('Element is not contenteditable', {
-        tagName: element.tagName,
-        contentEditable: element.contentEditable
-      });
-
-    } catch (error) {
-      this._error('All insertion methods failed', error as Error);
-    }
-
-    return {
-      success: false,
-      error: 'All insertion methods failed for Gemini'
-    };
+    // Quill-specific events
+    element.dispatchEvent(new Event('text-change', { bubbles: true }));
+    element.dispatchEvent(new Event('compositionend', { bubbles: true }));
   }
 }

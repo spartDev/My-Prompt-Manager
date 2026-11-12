@@ -16,6 +16,7 @@ import { DEFAULT_CATEGORY } from '../../constants';
 import { StorageManager } from '../../services/storage';
 import { PromptLibraryInjector } from '../core/injector';
 import { SELECTOR_HOST_ID } from '../selector/controller';
+import { readInputText } from '../selector/inputText';
 import { getPrompts } from '../utils/storage';
 
 vi.mock('../utils/logger', () => ({
@@ -119,8 +120,9 @@ describe('Prompt text reaches the chat exactly as saved', () => {
     input = editor;
     await openSelectorAndChoose(editor, saved.id);
 
+    // Read as the field's plain text: a line break of the Prompt is a <br> in the editor
     await vi.waitFor(() => {
-      expect(editor.textContent).toBe(HEADLINE);
+      expect(readInputText(editor)).toBe(HEADLINE);
     });
   });
 

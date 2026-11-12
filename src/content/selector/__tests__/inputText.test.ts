@@ -1,10 +1,21 @@
 /**
- * The plain text of an input field and the `//` that opens the Prompt selector.
+ * The plain text of an input field, the `//` that opens the Prompt selector, and where an
+ * Insertion goes in the field.
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { endsWithSelectorTrigger, focusAtEnd, plainTextOf, readInputText, removeTypedTrigger, textBeforeCaret } from '../inputText';
+import {
+  endsWithSelectorTrigger,
+  focusAtEnd,
+  insertionPointOf,
+  plainTextOf,
+  readInputText,
+  removeTypedTrigger,
+  selectInsertionPoint,
+  textAround,
+  textBeforeCaret
+} from '../inputText';
 
 const editable = (html: string): HTMLDivElement => {
   const field = document.createElement('div');
@@ -303,5 +314,128 @@ describe('focusAtEnd', () => {
     expect(selection?.isCollapsed).toBe(true);
     expect(field.contains(selection?.focusNode ?? null)).toBe(true);
     expect(textBeforeCaret(field)).toBe('First\nSecond');
+  });
+});
+
+describe('textAround', () => {
+  /** A range in `field`, from a point to another (the same one for a caret). */
+  const rangeIn = (start: Node, startOffset: number, end = start, endOffset = startOffset): Range => {
+    const range = document.createRange();
+    range.setStart(start, startOffset);
+    range.setEnd(end, endOffset);
+    return range;
+  };
+
+  it('reads the text before and after a caret inside a line', () => {
+    const field = editable('before after');
+
+    expect(textAround(field, rangeIn(field.firstChild as Text, 7))).toEqual({ before: 'before ', after: 'after' });
+  });
+
+  it('leaves the selected text out', () => {
+    const field = editable('before selected after');
+    const text = field.firstChild as Text;
+
+    expect(textAround(field, rangeIn(text, 7, text, 15))).toEqual({ before: 'before ', after: ' after' });
+  });
+
+  it('counts the line break before a caret that sits right after a <br>', () => {
+    const field = editable('one<br>two');
+
+    // Read on its own, the text up to the caret would end with a <br> that reads as no line
+    expect(textAround(field, rangeIn(field, 2))).toEqual({ before: 'one\n', after: 'two' });
+  });
+
+  it('tells the end of a paragraph from the start of the next one', () => {
+    const field = editable('<p>one</p><p>two</p>');
+    const [first, second] = Array.from(field.querySelectorAll('p'));
+
+    expect(textAround(field, rangeIn(first.firstChild as Text, 3))).toEqual({ before: 'one', after: '\ntwo' });
+    expect(textAround(field, rangeIn(second.firstChild as Text, 0))).toEqual({ before: 'one\n', after: 'two' });
+  });
+
+  it('reads a caret on an empty line between two paragraphs', () => {
+    const field = editable('<p>one</p><p><br></p><p>two</p>');
+    const empty = field.querySelectorAll('p')[1];
+
+    expect(textAround(field, rangeIn(empty, 0))).toEqual({ before: 'one\n', after: '\ntwo' });
+  });
+
+  it('reads a caret at the end of the field', () => {
+    const field = editable('<p>one</p><p>two</p>');
+
+    expect(textAround(field, rangeIn(field, 2))).toEqual({ before: 'one\ntwo', after: '' });
+  });
+});
+
+describe('insertionPointOf and selectInsertionPoint', () => {
+  it('give a textarea its selection back', () => {
+    const field = textarea('before selected after');
+    field.setSelectionRange(7, 15);
+    const point = insertionPointOf(field);
+    field.setSelectionRange(0, 0);
+
+    selectInsertionPoint(field, point);
+
+    expect([field.selectionStart, field.selectionEnd]).toEqual([7, 15]);
+  });
+
+  it('give a textarea its selection back in the direction it was made', () => {
+    const field = textarea('before selected after');
+    field.setSelectionRange(7, 15, 'backward');
+    const point = insertionPointOf(field);
+    field.setSelectionRange(0, 0);
+
+    selectInsertionPoint(field, point);
+
+    expect(field.selectionDirection).toBe('backward');
+  });
+
+  it('keep the selection of a textarea inside a value that got shorter meanwhile', () => {
+    const field = textarea('before selected after');
+    field.setSelectionRange(7, 15);
+    const point = insertionPointOf(field);
+    field.value = 'short';
+
+    selectInsertionPoint(field, point);
+
+    expect([field.selectionStart, field.selectionEnd]).toEqual([5, 5]);
+  });
+
+  it('give a contenteditable its selection back once the page\'s selection has gone elsewhere', () => {
+    const field = editable('before selected after');
+    const text = field.firstChild as Text;
+    document.getSelection()?.setBaseAndExtent(text, 7, text, 15);
+    const point = insertionPointOf(field);
+    document.getSelection()?.removeAllRanges();
+
+    selectInsertionPoint(field, point);
+
+    expect(document.getSelection()?.toString()).toBe('selected');
+  });
+
+  it('read no point in a contenteditable the selection is not in, and then select its end', () => {
+    const field = editable('draft');
+    const other = editable('elsewhere');
+    document.getSelection()?.collapse(other.firstChild, 3);
+
+    const point = insertionPointOf(field);
+    selectInsertionPoint(field, point);
+
+    expect(point).toBeNull();
+    expect(textBeforeCaret(field)).toBe('draft');
+  });
+
+  it('select the end of the field when the Platform has removed what the point was in', () => {
+    const field = editable('<p>before after</p>');
+    document.getSelection()?.collapse(field.querySelector('p')?.firstChild as Text, 7);
+    const point = insertionPointOf(field);
+    const elsewhere = document.createElement('div');
+    elsewhere.append(field.querySelector('p') as HTMLElement);
+    field.innerHTML = '<p>rebuilt</p>';
+
+    selectInsertionPoint(field, point);
+
+    expect(textBeforeCaret(field)).toBe('rebuilt');
   });
 });

@@ -24,9 +24,6 @@ export class CopilotStrategy extends ReactPlatformStrategy {
       ],
       priority: 80
     }, hostname);
-
-    // Initialize React native value setter cache
-    ReactPlatformStrategy.initializeNativeValueSetter();
   }
 
   /**

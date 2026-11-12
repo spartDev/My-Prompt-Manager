@@ -54,10 +54,40 @@ test.describe('A Prompt keeps its line breaks in a rich text editor', () => {
       expect(editor.blocks).toEqual(['P', 'P', 'P', 'P', 'P']);
       expect(editor.rawLineBreak).toBe(false);
 
-      // A second Insertion replaces the five paragraphs, it does not add to them
+      // A second Insertion goes where the first left the caret, on the empty last line: the
+      // paragraphs before it stay as they are
       await choosePrompt(page, ONE_LINE.id);
 
-      await expect.poll(async () => (await page.evaluate(readEditor)).lines).toEqual([ONE_LINE.content]);
+      await expect.poll(async () => (await page.evaluate(readEditor)).lines).toEqual([
+        '  You are a senior engineer reviewing a pull request.',
+        'End with a one-line verdict.',
+        '',
+        'Diff:',
+        ONE_LINE.content,
+      ]);
+    });
+
+    test(`${fixture}: a Prompt of several lines inserted inside a line keeps the text around it`, async ({ context, storage }) => {
+      await seedLibrary(storage, {
+        prompts: [REVIEW].map((sample) => createPromptSeed({ category: DEFAULT_CATEGORY, ...sample })),
+      });
+      const page = await openPlatform(context, fixture);
+      await page.locator('.ProseMirror').click();
+      await page.keyboard.type('before after');
+      for (let index = 0; index < 'after'.length; index++) {
+        await page.keyboard.press('ArrowLeft');
+      }
+
+      await choosePrompt(page, REVIEW.id);
+
+      await expect.poll(async () => (await page.evaluate(readEditor)).lines).toEqual([
+        'before   You are a senior engineer reviewing a pull request.',
+        'End with a one-line verdict.',
+        '',
+        'Diff:',
+        'after',
+      ]);
+      expect((await page.evaluate(readEditor)).rawLineBreak).toBe(false);
     });
   }
 });

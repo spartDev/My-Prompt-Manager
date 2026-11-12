@@ -11,13 +11,6 @@ import type { UIElementFactory } from '../ui/element-factory';
 
 import { PlatformStrategy } from './base-strategy';
 
-// Extended HTMLTextAreaElement interface for React property setter
-interface ReactTextAreaElement extends HTMLTextAreaElement {
-  _valueTracker?: {
-    setValue: (value: string) => void;
-  };
-}
-
 export class ChatGPTStrategy extends PlatformStrategy {
   constructor(hostname?: string) {
     super('chatgpt', 90, {
@@ -51,39 +44,22 @@ export class ChatGPTStrategy extends PlatformStrategy {
   }
 
   /**
-   * Inserts content: into the editor through the browser's editing command, so its paragraphs
-   * follow the Prompt's line breaks, or into the textarea through the native value setter React
-   * listens to
+   * Inserts content where the caret is: into the editor through the browser's editing command,
+   * so its paragraphs follow the Prompt's line breaks, or into the textarea through the native
+   * value setter React listens to
    */
   insert(element: HTMLElement, content: string): Promise<InsertionResult> {
     try {
       if (ChatGPTStrategy.isEditable(element)) {
-        return Promise.resolve(this.replaceEditableText(element, content, 'chatgpt'));
+        return Promise.resolve(this.insertEditableText(element, content, 'chatgpt'));
       }
 
-      const textareaElement = element as ReactTextAreaElement;
-      
-      // Focus the element first
-      textareaElement.focus();
-      
-      // Set the value directly
-      textareaElement.value = content;
-      
-      // Trigger React events for ChatGPT - this is crucial for React state updates
-      const descriptor = Object.getOwnPropertyDescriptor(
-        window.HTMLTextAreaElement.prototype,
-        'value'
-      );
-      const nativeInputValueSetter = descriptor?.set?.bind(textareaElement) as ((value: string) => void) | undefined;
-      
-      if (nativeInputValueSetter) {
-        nativeInputValueSetter(content);
+      // Through the native value setter, which is what makes React see the change
+      // A page whose own handler rewrote the value did not take the text
+      if (!this.insertIntoTextControl(element as HTMLTextAreaElement, content)) {
+        return Promise.resolve({ success: false, error: 'The input field did not keep the text' });
       }
-      
-      // Dispatch events that React expects
-      textareaElement.dispatchEvent(new Event('input', { bubbles: true }));
-      textareaElement.dispatchEvent(new Event('change', { bubbles: true }));
-      
+
       this._debug('ChatGPT React insertion successful');
       return Promise.resolve({ success: true, method: 'chatgpt-react' });
     } catch (error) {

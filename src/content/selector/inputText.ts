@@ -3,7 +3,8 @@
  *
  * Plain TypeScript, loaded with the content script (ADR-002): it reads what the field holds
  * (so an Insertion can be undone), tells whether the user just typed `//` where it opens the
- * selector, removes those two characters, and puts the caret at the end of the field.
+ * selector, removes those two characters, remembers where the caret is (so an Insertion goes
+ * there once the selector has closed), and puts the caret at the end of the field.
  *
  * An input field is a <textarea>, an <input>, or a contenteditable element. The text of a
  * contenteditable is read block by block: one line per paragraph, so rich content comes back as
@@ -118,6 +119,29 @@ export function textBeforeCaret(field: HTMLElement): string | null {
 }
 
 /**
+ * The plain text a contenteditable field holds before and after `range`, a caret or a selection in
+ * it: what an Insertion there must leave as it is. Null when it cannot be told from the markup.
+ *
+ * Both are measured from the end of the field. The text up to a point cannot be read on its own:
+ * a <br> that ends it reads as the break that keeps a line open, not as a line.
+ */
+export function textAround(field: HTMLElement, range: Range): { before: string; after: string } | null {
+  const whole = plainTextOf(field);
+  const textFrom = (container: Node, offset: number): string => {
+    const rest = field.ownerDocument.createRange();
+    rest.selectNodeContents(field);
+    rest.setStart(container, offset);
+    return plainTextOf(rest.cloneContents());
+  };
+  const fromStart = textFrom(range.startContainer, range.startOffset);
+  const after = textFrom(range.endContainer, range.endOffset);
+  if (!whole.endsWith(fromStart) || !fromStart.endsWith(after)) {
+    return null;
+  }
+  return { before: whole.slice(0, whole.length - fromStart.length), after };
+}
+
+/**
  * Whether the text before the caret ends with a `//` that opens the Prompt selector: at the very
  * start of the field, or right after a space or a line break. The `//` of `https://` opens nothing.
  */
@@ -206,6 +230,68 @@ export function removeTypedTrigger(field: HTMLElement): boolean {
   selection.collapse(node, start);
   field.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'deleteContentBackward' }));
   return removed();
+}
+
+/**
+ * Where an Insertion puts the Prompt in an input field: the caret or the selection the field had,
+ * as offsets in the value of a <textarea> or an <input>, as a range in a contenteditable. Null
+ * when the field has no caret: the Prompt then goes after what the field holds.
+ */
+export type InsertionPoint = { start: number; end: number; direction?: 'forward' | 'backward' | 'none' } | Range | null;
+
+/** The caret or the selection of the input field now, to be put back with `selectInsertionPoint`. */
+export function insertionPointOf(field: HTMLElement): InsertionPoint {
+  if (isTextControl(field)) {
+    try {
+      const { selectionStart, selectionEnd, selectionDirection } = field;
+      // The direction too: it says at which end of a selection the caret is
+      return selectionStart === null
+        ? null
+        : { start: selectionStart, end: selectionEnd ?? selectionStart, direction: selectionDirection ?? undefined };
+    } catch {
+      // An <input> of a type without a text selection
+      return null;
+    }
+  }
+  const selection = field.ownerDocument.getSelection();
+  if (!selection || selection.rangeCount === 0) {
+    return null;
+  }
+  const range = selection.getRangeAt(0);
+  // A copy: the page's selection moves on (into the Prompt selector), the copy stays in the field
+  return field.contains(range.startContainer) && field.contains(range.endContainer) ? range.cloneRange() : null;
+}
+
+/**
+ * Makes `point` the caret or the selection of the input field again, without moving the focus.
+ * With no point, or one the Platform has since removed from the field, the caret goes after the
+ * last character of the field.
+ */
+export function selectInsertionPoint(field: HTMLElement, point: InsertionPoint): void {
+  if (isTextControl(field)) {
+    const end = field.value.length;
+    const { start, end: until, direction } = point && !(point instanceof Range) ? point : { start: end, end, direction: undefined };
+    try {
+      field.setSelectionRange(Math.min(start, end), Math.min(until, end), direction);
+    } catch {
+      // An <input> of a type without a text selection
+    }
+    return;
+  }
+  const selection = field.ownerDocument.getSelection();
+  if (!selection) {
+    return;
+  }
+  let range: Range;
+  if (point instanceof Range && field.contains(point.startContainer) && field.contains(point.endContainer)) {
+    range = point;
+  } else {
+    range = field.ownerDocument.createRange();
+    range.selectNodeContents(field);
+    range.collapse(false);
+  }
+  selection.removeAllRanges();
+  selection.addRange(range);
 }
 
 /** Puts the focus in the input field, with the caret after its last character. */

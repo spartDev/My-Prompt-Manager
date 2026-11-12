@@ -6,7 +6,8 @@ import { enterKeys, promptRow, promptSelector } from './platform-pages';
 /**
  * What a user does around an Insertion since My-Prompt-Manager-q9j.3, as one flow that runs on any
  * page the content script is on (a Platform's stand-in page or a custom site): open the Prompt
- * selector by typing `//`, insert, undo, and be told when the Prompt could not be inserted.
+ * selector by typing `//`, insert, undo, and be told when the Prompt could not be inserted. Since
+ * My-Prompt-Manager-7k4 the Prompt goes where the caret is, and the text around it stays.
  */
 
 const host = (page: Page) => page.locator('#mpm-prompt-selector');
@@ -51,7 +52,7 @@ export interface InsertionFlow {
 
 /**
  * Runs the whole flow and asserts each step. The field must be empty and the Prompt selector
- * closed when it starts; it ends with a failed Insertion, so the field has been replaced.
+ * closed when it starts; it ends with a failed Insertion, so the page has replaced the field.
  */
 export async function expectInsertionFlow(page: Page, { field, prompt, usageCount }: InsertionFlow): Promise<void> {
   const selector = promptSelector(page);
@@ -83,10 +84,11 @@ export async function expectInsertionFlow(page: Page, { field, prompt, usageCoun
   await expect.poll(() => fieldText(field)).toBe(draft);
   await promptRow(page, prompt.id).click();
 
-  // The selector closes first, then the text arrives, the focus is in the field with the caret
-  // at the end, and the confirmation names the Prompt and offers Undo
+  // The selector closes first, then the text arrives after the draft, where the caret was. The
+  // focus is in the field with the caret after the Prompt, and the confirmation names the Prompt
+  // and offers Undo
   await expect(selector).toBeHidden();
-  await expect.poll(() => fieldText(field)).toBe(prompt.content);
+  await expect.poll(() => fieldText(field)).toBe(draft + prompt.content);
   await expect(pill).toBeVisible();
   await expect(pill).toHaveAttribute('data-kind', 'inserted');
   await expect(pill).toContainText(`Inserted “${prompt.title}”`);
@@ -110,10 +112,10 @@ export async function expectInsertionFlow(page: Page, { field, prompt, usageCoun
   await expect(selector).toBeVisible();
   await promptRow(page, prompt.id).click();
   await expect(pill).toBeVisible();
-  await expect.poll(() => fieldText(field)).toBe(prompt.content);
+  await expect.poll(() => fieldText(field)).toBe(draft + prompt.content);
   await page.keyboard.type('!');
   await expect(pill).toBeHidden();
-  expect(await fieldText(field)).toBe(`${prompt.content}!`);
+  expect(await fieldText(field)).toBe(`${draft}${prompt.content}!`);
   await expect.poll(usageCount).toBe(usesBefore + 2);
 
   // A failed Insertion: the page replaces its input field while the selector closes (a Platform
@@ -185,13 +187,14 @@ export interface KeyboardInsertionFlow {
 export async function expectKeyboardInsertionFlow(page: Page, { field, prompt }: KeyboardInsertionFlow): Promise<void> {
   const selector = promptSelector(page);
   const pill = insertionPill(page);
+  const draft = 'Keep this  text ';
   const insert = async (): Promise<void> => {
     await page.keyboard.type('//');
     await expect(selector).toBeVisible();
     await expect(promptRow(page, prompt.id)).toHaveAttribute('aria-selected', 'true');
     await page.keyboard.press('Enter');
     await expect(selector).toBeHidden();
-    await expect.poll(() => fieldText(field)).toBe(prompt.content);
+    await expect.poll(() => fieldText(field)).toBe(draft + prompt.content);
     await expect(pill).toBeVisible();
   };
   await addControlsAfterField(page);
@@ -199,9 +202,9 @@ export async function expectKeyboardInsertionFlow(page: Page, { field, prompt }:
   // Tab from the top of the page reaches the input field, which holds text before the Insertion
   await page.keyboard.press('Tab');
   await expect(field).toBeFocused();
-  await page.keyboard.type('Keep this  text ');
+  await page.keyboard.type(draft);
   const before = await fieldText(field);
-  expect(before).toBe('Keep this  text ');
+  expect(before).toBe(draft);
 
   // // then Enter: the first Prompt of the list is inserted
   await insert();
@@ -231,6 +234,6 @@ export async function expectKeyboardInsertionFlow(page: Page, { field, prompt }:
   await page.keyboard.press('Tab');
   await expect(field).not.toBeFocused();
   expect(await page.evaluate(() => document.activeElement?.id)).not.toBe('mpm-prompt-selector');
-  expect(await fieldText(field)).toBe(prompt.content);
+  expect(await fieldText(field)).toBe(draft + prompt.content);
   expect(await enterKeys(page)).toBe(0);
 }

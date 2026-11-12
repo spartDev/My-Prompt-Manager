@@ -44,25 +44,24 @@ export class MistralStrategy extends PlatformStrategy {
   }
 
   /**
-   * Inserts content into Mistral's ProseMirror editor through the browser's editing command, so
-   * its paragraphs follow the Prompt's line breaks; a textarea takes it as its value.
+   * Inserts content where the caret is: into Mistral's ProseMirror editor through the browser's
+   * editing command, so its paragraphs follow the Prompt's line breaks, or into a textarea's value.
    */
   insert(element: HTMLElement, content: string): Promise<InsertionResult> {
     const target = this._findProseMirrorElement(element);
     try {
       if (target.tagName === 'TEXTAREA') {
-        const textarea = target as HTMLTextAreaElement;
-        textarea.value = content;
-        textarea.dispatchEvent(new Event('input', { bubbles: true }));
-        textarea.dispatchEvent(new Event('change', { bubbles: true }));
-        textarea.focus();
+        // A page whose own handler rewrote the value did not take the text
+        if (!this.insertIntoTextControl(target as HTMLTextAreaElement, content)) {
+          return Promise.resolve({ success: false, error: 'The input field did not keep the text' });
+        }
 
         this._debug('Textarea manipulation successful');
         return Promise.resolve({ success: true, method: 'mistral-textarea' });
       }
 
       if (target.isContentEditable || target.getAttribute('contenteditable') === 'true') {
-        return Promise.resolve(this.replaceEditableText(target, content, 'mistral'));
+        return Promise.resolve(this.insertEditableText(target, content, 'mistral'));
       }
 
       this._warn('Element is not suitable for insertion', {

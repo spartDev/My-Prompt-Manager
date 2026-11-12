@@ -104,15 +104,6 @@ describe('ChatGPTStrategy', () => {
       // Mock DOM methods
       vi.spyOn(mockTextarea, 'focus').mockImplementation(() => undefined);
       vi.spyOn(mockTextarea, 'dispatchEvent').mockImplementation(() => true);
-      
-      // Mock the native value setter
-      const mockSetter = vi.fn();
-      vi.spyOn(Object, 'getOwnPropertyDescriptor').mockReturnValue({
-        set: mockSetter,
-        get: vi.fn(),
-        enumerable: true,
-        configurable: true
-      });
     });
 
     it('should insert content using React-compatible methods', async () => {
@@ -292,8 +283,10 @@ describe('ChatGPTStrategy: a Prompt keeps its line breaks in a rich text editor'
     editor = document.createElement('div');
     editor.className = 'ProseMirror';
     editor.setAttribute('contenteditable', 'true');
-    editor.innerHTML = '<p>what the field held</p>';
+    // An empty editor, with no caret in it
+    editor.innerHTML = '<p><br></p>';
     document.body.appendChild(editor);
+    document.getSelection()?.removeAllRanges();
   });
 
   afterEach(() => {

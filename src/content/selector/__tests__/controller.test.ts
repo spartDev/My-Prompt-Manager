@@ -439,6 +439,128 @@ describe('PromptSelectorController', () => {
     expect(controller.isOpen).toBe(false);
   });
 
+  describe('where the Prompt goes', () => {
+    let editor: HTMLElement;
+
+    beforeEach(() => {
+      editor = document.createElement('div');
+      editor.setAttribute('contenteditable', 'true');
+      editor.textContent = 'before after';
+      editor.getBoundingClientRect = () => new DOMRect(100, 400, 500, 60);
+      document.body.append(editor);
+    });
+
+    /** The selection of the page, when it is in the editor. */
+    const selectionInEditor = (): { start: number; end: number } | null => {
+      const selection = document.getSelection();
+      const range = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+      return range && editor.contains(range.startContainer) ? { start: range.startOffset, end: range.endOffset } : null;
+    };
+
+    it('hands the editor over with the selection it had when the selector opened', async () => {
+      const text = editor.firstChild as Text;
+      document.getSelection()?.setBaseAndExtent(text, 7, text, 12);
+      let atInsertion: { start: number; end: number } | null = null;
+      callbacks.insert.mockImplementation(() => {
+        atInsertion = selectionInEditor();
+        return Promise.resolve(true);
+      });
+
+      await controller.open(editor, button);
+      await opened();
+      // The focus is in the selector by now: the page's selection has left the editor
+      document.getSelection()?.removeAllRanges();
+      row('p1')?.click();
+      await vi.waitFor(() => { expect(pill()).not.toBeNull(); });
+
+      expect(atInsertion).toEqual({ start: 7, end: 12 });
+    });
+
+    it('gives the caret back with the focus when the selector closes without an Insertion', async () => {
+      const text = editor.firstChild as Text;
+      document.getSelection()?.collapse(text, 7);
+
+      await controller.open(editor, button);
+      await opened();
+      // The focus is in the selector by now: the page's selection has left the editor
+      document.getSelection()?.removeAllRanges();
+      press('Escape');
+      await closed();
+
+      expect(selectionInEditor()).toEqual({ start: 7, end: 7 });
+      expect(callbacks.insert).not.toHaveBeenCalled();
+    });
+
+    it('leaves the caret where the Platform put it, right after the Prompt', async () => {
+      field.value = 'before after';
+      field.focus();
+      field.setSelectionRange(7, 7);
+      callbacks.insert.mockImplementation((_prompt: unknown, content: string) => {
+        const caret = field.selectionStart;
+        field.value = field.value.slice(0, caret) + content + field.value.slice(field.selectionEnd);
+        field.setSelectionRange(caret + content.length, caret + content.length);
+        return Promise.resolve(true);
+      });
+
+      await inserted();
+
+      expect(field.value).toBe('before Content p1after');
+      expect(document.activeElement).toBe(field);
+      expect([field.selectionStart, field.selectionEnd]).toEqual([17, 17]);
+    });
+
+    it('puts the caret at the end of an editor the Insertion left without one', async () => {
+      callbacks.insert.mockImplementation((_prompt: unknown, content: string) => {
+        editor.textContent = content;
+        document.getSelection()?.removeAllRanges();
+        return Promise.resolve(true);
+      });
+
+      await controller.open(editor, button);
+      await opened();
+      row('p1')?.click();
+      await vi.waitFor(() => { expect(pill()).not.toBeNull(); });
+
+      expect(selectionInEditor()).toEqual({ start: 1, end: 1 });
+    });
+
+    it('a textarea the user was never in takes the Prompt after what it holds', async () => {
+      // A draft the Platform put back: the caret of a field nobody was in reads as its start
+      const restored = document.createElement('textarea');
+      restored.getBoundingClientRect = () => new DOMRect(100, 400, 500, 60);
+      document.body.append(restored);
+      restored.value = 'draft';
+      restored.setSelectionRange(0, 0);
+      let atInsertion: number | null = null;
+      callbacks.insert.mockImplementation(() => {
+        atInsertion = restored.selectionStart;
+        return Promise.resolve(true);
+      });
+
+      await controller.open(restored, button);
+      await opened();
+      row('p1')?.click();
+      await vi.waitFor(() => { expect(pill()).not.toBeNull(); });
+
+      expect(atInsertion).toBe(5);
+    });
+
+    it('a textarea the user put the caret at the start of takes the Prompt there', async () => {
+      field.value = 'draft';
+      field.focus();
+      field.setSelectionRange(0, 0);
+      let atInsertion: number | null = null;
+      callbacks.insert.mockImplementation(() => {
+        atInsertion = field.selectionStart;
+        return Promise.resolve(true);
+      });
+
+      await inserted();
+
+      expect(atInsertion).toBe(0);
+    });
+  });
+
   describe('after an Insertion', () => {
     it('confirms it: the pill names the Prompt and offers Undo, the sweep covers the field, the caret is at the end', async () => {
       field.value = 'Draft';

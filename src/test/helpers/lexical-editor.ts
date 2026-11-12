@@ -1,10 +1,13 @@
+import { textAround } from '../../content/selector/inputText';
+
 /**
  * Makes `editor` behave as Perplexity's Lexical composer does with what an Insertion can send it
  * (seen on the live site on 2026-11-11):
  *
- * - a paste replaces what is selected, the whole field here, by the pasted lines: one <span> per
- *   line that has text, one <br> between two lines, and a last <br> that keeps an empty last line
- *   open; the paste event is cancelled;
+ * - a paste puts the pasted lines where the selection is, in place of what is selected, and leaves
+ *   the caret after them. The field is then laid out again: one <span> per line that has text,
+ *   one <br> between two lines, and a last <br> that keeps an empty last line open; the paste
+ *   event is cancelled;
  * - an `input` event that carries text inserts that text again, at the end: the double write;
  * - a Backspace key removes the last character;
  * - the editing command inserts text with its line breaks dropped.
@@ -52,11 +55,40 @@ export function actAsLexicalEditor(editor: HTMLElement): (command: string, showU
     return lines.join('\n');
   };
 
+  /** Puts the caret after the first `position` characters of the text the editor holds. */
+  const caretTo = (position: number): void => {
+    const paragraph = editor.querySelector('p') as HTMLElement;
+    let remaining = position;
+    let index = 0;
+    for (const node of Array.from(paragraph.childNodes)) {
+      const length = node.nodeName === 'BR' ? 1 : (node.textContent ?? '').length;
+      if (node.nodeName !== 'BR' && remaining <= length) {
+        document.getSelection()?.collapse(node.firstChild, remaining);
+        return;
+      }
+      if (remaining === 0) {
+        break;
+      }
+      remaining -= length;
+      index++;
+    }
+    document.getSelection()?.collapse(paragraph, Math.min(index, paragraph.childNodes.length));
+  };
+
   layOut('');
 
   editor.addEventListener('paste', (event) => {
     event.preventDefault();
-    layOut((event as ClipboardEvent).clipboardData?.getData('text/plain') ?? '');
+    const pasted = (event as ClipboardEvent).clipboardData?.getData('text/plain') ?? '';
+    const selection = document.getSelection();
+    const range = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+    const around = range && editor.contains(range.startContainer) && editor.contains(range.endContainer)
+      ? textAround(editor, range)
+      : null;
+    // A paste with no selection in the editor goes after what it holds
+    const before = around ? around.before : held();
+    layOut(before + pasted + (around ? around.after : ''));
+    caretTo(before.length + pasted.length);
   });
 
   editor.addEventListener('input', (event) => {

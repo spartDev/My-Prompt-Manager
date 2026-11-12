@@ -1,9 +1,9 @@
 /**
  * Perplexity Platform Strategy module
  *
- * Perplexity's composer is a Lexical editor. Text reaches it as a paste over everything it holds:
- * Lexical then lays the lines out itself, one <br> between two. What was tried on the live site
- * and is not used there (2026-11-11):
+ * Perplexity's composer is a Lexical editor. Text reaches it as a paste: where the caret is for
+ * an Insertion, over everything it holds for Undo. Lexical then lays the lines out itself, one
+ * <br> between two. What was tried on the live site and is not used there (2026-11-11):
  * - execCommand('insertText') drops every line break;
  * - an `input` event carrying the text makes Lexical insert it a second time;
  * - execCommand('selectAll') and a range over the editor leave out the line breaks that end the
@@ -12,7 +12,7 @@
  */
 
 import { getPlatformById } from '../../config/platforms';
-import { readInputText } from '../selector/inputText';
+import { readInputText, textAround } from '../selector/inputText';
 import type { InsertionResult } from '../types/index';
 import type { UIElementFactory } from '../ui/element-factory';
 
@@ -43,12 +43,12 @@ export class PerplexityStrategy extends PlatformStrategy {
   }
 
   /**
-   * Makes `content` the whole text of the composer, once: as a paste into the editor, or through
-   * the editing command when nothing on the page takes the paste.
+   * Puts `content` in the composer where its caret is, once: as a paste into the editor, or
+   * through the editing command when nothing on the page takes the paste.
    */
   async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
     try {
-      return await this._replaceText(element, content, 'perplexity');
+      return await this._insertText(element, content, 'perplexity');
     } catch (error) {
       this._error('Perplexity insertion failed', error as Error);
       return { success: false, error: (error as Error).message };
@@ -77,19 +77,71 @@ export class PerplexityStrategy extends PlatformStrategy {
     return element.isContentEditable || element.getAttribute('contenteditable') === 'true';
   }
 
-  private async _replaceText(element: HTMLElement, text: string, via: string): Promise<InsertionResult> {
+  /**
+   * An Insertion: `text` goes where the caret is, in place of what is selected, and the text
+   * before and after stays. A field with no caret in it takes the text at its end.
+   */
+  private async _insertText(element: HTMLElement, text: string, via: string): Promise<InsertionResult> {
     if (element instanceof HTMLTextAreaElement || element instanceof HTMLInputElement) {
-      element.focus();
-      element.value = text;
-      element.dispatchEvent(new Event('input', { bubbles: true }));
-      element.dispatchEvent(new Event('change', { bubbles: true }));
       // A page whose own handler rewrote the value did not take the text
-      if (element.value !== text) {
-        return { success: false, error: 'The input field did not keep the text' };
-      }
-      return { success: true, method: `${via}-value` };
+      return this.insertIntoTextControl(element, text)
+        ? { success: true, method: `${via}-value` }
+        : { success: false, error: 'The input field did not keep the text' };
     }
 
+    if (!PerplexityStrategy._isEditable(element)) {
+      return { success: false, error: 'The input field holds no editable text' };
+    }
+
+    // A paste of nothing is no paste, and nothing is what there is to insert
+    if (text === '') {
+      return this.insertEditableText(element, text, via);
+    }
+
+    // What the field must hold once the paste is laid out, or null when the text around the
+    // caret could not be read
+    const expected: { text: string | null } = { text: null };
+    const taken = await this._paste(element, text, (selection) => {
+      const around = textAround(element, PerplexityStrategy._caretRange(element, selection));
+      expected.text = around ? around.before + text + around.after : null;
+    }, () => expected.text);
+    if (!taken) {
+      // Nothing on the page took the paste: this is no rich text editor
+      return this.insertEditableText(element, text, via);
+    }
+
+    // The editor took the paste. Writing the text again by another path is what put the Prompt in
+    // twice, so a field that reads differently is a failure, not a reason to write once more.
+    // When what the field held around the caret could not be read, the paste is trusted
+    if (expected.text === null || PerplexityStrategy._sameText(readInputText(element), expected.text)) {
+      this._debug('Paste insertion successful');
+      return { success: true, method: `${via}-paste` };
+    }
+    return { success: false, error: 'The input field did not keep the text' };
+  }
+
+  /**
+   * The caret or the selection of the editor, where an Insertion goes. An editor the selection
+   * is not in takes the caret at the end of its last block, where the editor itself has a caret.
+   */
+  private static _caretRange(element: HTMLElement, selection: Selection): Range {
+    if (selection.rangeCount > 0) {
+      const current = selection.getRangeAt(0);
+      if (element.contains(current.startContainer) && element.contains(current.endContainer)) {
+        return current;
+      }
+    }
+    const last = element.lastElementChild ?? element;
+    const atEnd = element.ownerDocument.createRange();
+    atEnd.setStart(last, last.childNodes.length);
+    atEnd.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(atEnd);
+    return atEnd;
+  }
+
+  /** Undo: `text` becomes the whole text of the composer. */
+  private async _replaceText(element: HTMLElement, text: string, via: string): Promise<InsertionResult> {
     if (!PerplexityStrategy._isEditable(element)) {
       return { success: false, error: 'The input field holds no editable text' };
     }
@@ -97,7 +149,8 @@ export class PerplexityStrategy extends PlatformStrategy {
     // A paste of nothing is no paste: to empty the field, one character goes over everything,
     // then a Backspace takes it away
     const emptying = text === '';
-    if (!(await this._pasteOverAll(element, emptying ? ERASED_CHARACTER : text))) {
+    const pasted = emptying ? ERASED_CHARACTER : text;
+    if (!(await this._paste(element, pasted, (selection) => { PerplexityStrategy._selectAll(element, selection); }, () => pasted))) {
       // Nothing on the page took the paste: this is no rich text editor
       return this.replaceEditableText(element, text, via);
     }
@@ -118,15 +171,33 @@ export class PerplexityStrategy extends PlatformStrategy {
   }
 
   /**
-   * Selects everything the editor holds and pastes `text` over it. Returns whether the page took
+   * Selects everything the editor holds: from the start of the first block to the end of the last
+   * one, so the selection takes the line breaks that end the field.
+   */
+  private static _selectAll(element: HTMLElement, selection: Selection): void {
+    const first = element.firstElementChild ?? element;
+    const last = element.lastElementChild ?? element;
+    const range = element.ownerDocument.createRange();
+    range.setStart(first, 0);
+    range.setEnd(last, last.childNodes.length);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
+
+  /**
+   * Pastes `text` in the editor where `select` puts the selection. Returns whether the page took
    * the paste: an editor that handles a paste cancels the event.
    *
-   * The selection runs from the start of the first block to the end of the last one, so it takes
-   * the line breaks that end the field. The editor learns of it from the `selectionchange` event,
-   * which comes after the selection is set: a paste sent before it lands at the editor's old
-   * caret, after the draft.
+   * The editor learns of a selection from the `selectionchange` event, which comes after the
+   * selection is set: a paste sent before it lands at the editor's old caret. `expected` is the
+   * text the editor must hold once it has laid the paste out, or null when it cannot be told.
    */
-  private async _pasteOverAll(element: HTMLElement, text: string): Promise<boolean> {
+  private async _paste(
+    element: HTMLElement,
+    text: string,
+    select: (selection: Selection) => void,
+    expected: () => string | null
+  ): Promise<boolean> {
     const document = element.ownerDocument;
     const selection = document.getSelection();
     if (!selection || typeof DataTransfer !== 'function' || typeof ClipboardEvent !== 'function') {
@@ -142,20 +213,15 @@ export class PerplexityStrategy extends PlatformStrategy {
       document.addEventListener('selectionchange', done);
       setTimeout(done, EDITOR_SETTLE_MS);
     });
-    const first = element.firstElementChild ?? element;
-    const last = element.lastElementChild ?? element;
-    const range = document.createRange();
-    range.setStart(first, 0);
-    range.setEnd(last, last.childNodes.length);
-    selection.removeAllRanges();
-    selection.addRange(range);
+    select(selection);
     await selectionHeard;
 
     const clipboardData = new DataTransfer();
     clipboardData.setData('text/plain', text);
     const taken = !element.dispatchEvent(new ClipboardEvent('paste', { clipboardData, bubbles: true, cancelable: true }));
-    if (taken) {
-      await this._settled(element, text);
+    const settledText = expected();
+    if (taken && settledText !== null) {
+      await this._settled(element, settledText);
     }
     return taken;
   }

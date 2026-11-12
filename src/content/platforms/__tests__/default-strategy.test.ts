@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { editorCommand, MULTILINE_PROMPT } from '../../../test/helpers/editor-command';
 import { expectNoMarkupIn, HOSTILE_TEXTS } from '../../../test/helpers/hostile-text';
-import { readInputText } from '../../selector/inputText';
+import { readInputText, textAround, textBeforeCaret } from '../../selector/inputText';
 import type { UIElementFactory } from '../../ui/element-factory';
 import { DefaultStrategy } from '../default-strategy';
 
@@ -325,8 +325,10 @@ describe('DefaultStrategy: a Prompt keeps its line breaks in a rich text editor'
     editor = document.createElement('div');
     editor.className = 'ProseMirror';
     editor.setAttribute('contenteditable', 'true');
-    editor.innerHTML = '<p>what the field held</p>';
+    // An empty editor, with no caret in it
+    editor.innerHTML = '<p><br></p>';
     document.body.appendChild(editor);
+    document.getSelection()?.removeAllRanges();
   });
 
   afterEach(() => {
@@ -379,5 +381,143 @@ describe('DefaultStrategy: a Prompt keeps its line breaks in a rich text editor'
     expect(readInputText(editor)).toBe(text);
     // The paragraph is the stand-in editor's own structure
     expectNoMarkupIn(editor, ['p']);
+  });
+});
+
+describe('DefaultStrategy: an Insertion goes where the caret is', () => {
+  let textarea: HTMLTextAreaElement;
+
+  beforeEach(() => {
+    textarea = document.createElement('textarea');
+    document.body.appendChild(textarea);
+  });
+
+  afterEach(() => {
+    textarea.remove();
+  });
+
+  it('keeps the text before and after the caret of a textarea, and leaves the caret after the Prompt', async () => {
+    textarea.value = 'before after';
+    textarea.setSelectionRange(7, 7);
+
+    const result = await new DefaultStrategy('example.com').insert(textarea, 'PROMPT ');
+
+    expect(result.success).toBe(true);
+    expect(textarea.value).toBe('before PROMPT after');
+    expect([textarea.selectionStart, textarea.selectionEnd]).toEqual([14, 14]);
+  });
+
+  it('replaces the text selected in a textarea', async () => {
+    textarea.value = 'before selected after';
+    textarea.setSelectionRange(7, 15);
+
+    await new DefaultStrategy('example.com').insert(textarea, 'PROMPT');
+
+    expect(textarea.value).toBe('before PROMPT after');
+    expect([textarea.selectionStart, textarea.selectionEnd]).toEqual([13, 13]);
+  });
+
+  describe('in a contenteditable', () => {
+    let field: HTMLElement;
+
+    /** Puts the caret, or a selection, in the only text node of the field. */
+    const select = (start: number, end = start): void => {
+      const text = field.firstChild as Text;
+      const range = document.createRange();
+      range.setStart(text, start);
+      range.setEnd(text, end);
+      const selection = document.getSelection() as Selection;
+      selection.removeAllRanges();
+      selection.addRange(range);
+    };
+
+    beforeEach(() => {
+      field = document.createElement('div');
+      field.setAttribute('contenteditable', 'true');
+      field.textContent = 'before after';
+      document.body.appendChild(field);
+      document.getSelection()?.removeAllRanges();
+    });
+
+    afterEach(() => {
+      field.remove();
+    });
+
+    it('keeps the text before and after the caret, through the editing command', async () => {
+      document.execCommand = editorCommand(field);
+      select(7);
+
+      const result = await new DefaultStrategy('example.com').insert(field, 'PROMPT ');
+
+      expect(result.success).toBe(true);
+      expect(document.execCommand).toHaveBeenCalledWith('insertText', false, 'PROMPT ');
+      expect(readInputText(field)).toBe('before PROMPT after');
+      expect(textBeforeCaret(field)).toBe('before PROMPT ');
+    });
+
+    it('replaces the selected text', async () => {
+      document.execCommand = editorCommand(field);
+      select(7, 12);
+
+      await new DefaultStrategy('example.com').insert(field, 'PROMPT');
+
+      expect(readInputText(field)).toBe('before PROMPT');
+    });
+
+    it('goes after what the field holds when the caret is not in the field', async () => {
+      document.execCommand = editorCommand(field);
+
+      const result = await new DefaultStrategy('example.com').insert(field, ' PROMPT');
+
+      expect(result.success).toBe(true);
+      expect(readInputText(field)).toBe('before after PROMPT');
+    });
+
+    it('writes the text itself around the caret, line breaks included, when the editing command is refused', async () => {
+      document.execCommand = vi.fn().mockReturnValue(false);
+      select(7);
+
+      const result = await new DefaultStrategy('example.com').insert(field, 'one\ntwo ');
+
+      expect(result.success).toBe(true);
+      expect(readInputText(field)).toBe('before one\ntwo after');
+      expect(textBeforeCaret(field)).toBe('before one\ntwo ');
+    });
+
+    it('leaves the caret at the start of the line after a Prompt that ends with a line break, when it writes the text itself', async () => {
+      document.execCommand = vi.fn().mockReturnValue(false);
+      select(7);
+
+      await new DefaultStrategy('example.com').insert(field, 'PROMPT\n');
+
+      expect(readInputText(field)).toBe('before PROMPT\nafter');
+      const caret = document.getSelection()?.getRangeAt(0) as Range;
+      expect(caret.collapsed).toBe(true);
+      expect(textAround(field, caret)).toEqual({ before: 'before PROMPT\n', after: 'after' });
+    });
+
+    it('tells the page of the Prompt alone when it writes the text itself, not of the text around it', async () => {
+      document.execCommand = vi.fn().mockReturnValue(false);
+      select(7);
+      const heard: (string | null)[] = [];
+      field.addEventListener('input', (event) => heard.push((event as InputEvent).data));
+
+      await new DefaultStrategy('example.com').insert(field, 'PROMPT ');
+
+      // An editor that takes the data of an input event as new text would insert the draft again
+      expect(heard).toEqual(['PROMPT ']);
+    });
+
+    it('fails, and writes nothing over the field, when the page does not keep the text', async () => {
+      document.execCommand = vi.fn().mockReturnValue(false);
+      select(7);
+      field.addEventListener('input', () => {
+        field.textContent = 'rewritten by the page';
+      });
+
+      const result = await new DefaultStrategy('example.com').insert(field, 'PROMPT ');
+
+      expect(result.success).toBe(false);
+    });
   });
 });

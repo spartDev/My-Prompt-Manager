@@ -64,6 +64,8 @@ test.describe('Insertion is verbatim', () => {
     const reactState = page.locator('#composer-state');
 
     for (const sample of samples) {
+      // An empty field each time, as after a message is sent: the Prompt is then all it holds
+      await textarea.fill('');
       await choosePrompt(page, sample.id, { insertAsIs: hasVariables(sample.content) });
       await expect.poll(() => textarea.inputValue(), { message: `${sample.id}: textarea value` }).toBe(sample.content);
       await expect.poll(() => reactState.textContent(), { message: `${sample.id}: React state` }).toBe(sample.content);
@@ -84,6 +86,8 @@ test.describe('Insertion is verbatim', () => {
     const editor = page.locator('.ProseMirror');
 
     for (const sample of SAMPLES) {
+      // An empty field each time, as after a message is sent: the Prompt is then all it holds
+      await editor.evaluate((element) => { element.replaceChildren(); });
       await choosePrompt(page, sample.id, { insertAsIs: hasVariables(sample.content) });
       await expect.poll(() => editor.textContent(), { message: `${sample.id}: editor text` }).toBe(sample.content);
       expect(await editor.evaluate((element) => element.childElementCount), `${sample.id}: elements made from the text`).toBe(0);

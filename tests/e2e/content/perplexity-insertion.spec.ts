@@ -43,17 +43,17 @@ test.describe('On Perplexity a Prompt is inserted once, with its line breaks', (
     });
   });
 
-  test('the Prompt is in the field once, line for line, and the next Insertion replaces it', async ({ context }) => {
+  test('the Prompt is in the field once, line for line, and the next Insertion goes after it', async ({ context }) => {
     const page = await openPlatform(context, 'perplexity-editor');
 
     await choosePrompt(page, REVIEW.id);
 
     await expect.poll(() => page.evaluate(readEditor), { message: 'the Prompt, once' }).toBe(REVIEW.content);
 
-    // The line break that ends the Prompt does not stay under the next one
+    // The next one goes where the first left the caret, on the empty last line, once too
     await choosePrompt(page, ONE_LINE.id);
 
-    await expect.poll(() => page.evaluate(readEditor)).toBe(ONE_LINE.content);
+    await expect.poll(() => page.evaluate(readEditor)).toBe(REVIEW.content + ONE_LINE.content);
     expect(await enterKeys(page)).toBe(0);
   });
 
@@ -77,7 +77,7 @@ test.describe('On Perplexity a Prompt is inserted once, with its line breaks', (
     await expect.poll(() => page.evaluate(readEditor)).toBe('my draft\nsecond line');
 
     await choosePrompt(page, ONE_LINE.id);
-    await expect.poll(() => page.evaluate(readEditor)).toBe(ONE_LINE.content);
+    await expect.poll(() => page.evaluate(readEditor)).toBe(`my draft\nsecond line${ONE_LINE.content}`);
     await undoButton(page).click();
 
     await expect.poll(() => page.evaluate(readEditor), { message: 'the draft, line for line' }).toBe('my draft\nsecond line');

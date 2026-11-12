@@ -65,23 +65,20 @@ export class ClaudeStrategy extends PlatformStrategy {
   }
 
   /**
-   * Inserts content using Claude-specific methods
-   * Tries ProseMirror transaction API, then execCommand, then DOM manipulation
+   * Inserts content where the caret is, using Claude-specific methods: the ProseMirror
+   * transaction API when the editor's view can be reached, then the browser's editing command.
+   * When neither takes the text, the Insertion fails: nothing is written over what the field holds.
    */
-  async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
+  insert(element: HTMLElement, content: string): Promise<InsertionResult> {
     // Try to find ProseMirror element
     const proseMirrorElement = this._findProseMirrorElement(element);
     
     // Method 1: Try ProseMirror transaction API
     const transactionResult = this._tryProseMirrorTransaction(proseMirrorElement, content);
-    if (transactionResult.success) {return transactionResult;}
+    if (transactionResult.success) {return Promise.resolve(transactionResult);}
     
-    // Method 2: Try execCommand for contentEditable
-    const execCommandResult = await this._tryExecCommand(proseMirrorElement, element, content);
-    if (execCommandResult.success) {return execCommandResult;}
-    
-    // Method 3: Direct DOM manipulation
-    return this._tryDOMManipulation(element, content);
+    // Method 2: the editing command, as typing would
+    return this._tryExecCommand(proseMirrorElement, element, content);
   }
 
   /**
@@ -166,7 +163,7 @@ export class ClaudeStrategy extends PlatformStrategy {
   }
 
   /**
-   * Attempts insertion using execCommand
+   * Attempts insertion at the caret through the browser's editing command
    * @param proseMirrorElement - ProseMirror element
    * @param element - Original element
    * @param content - Content to insert
@@ -174,86 +171,43 @@ export class ClaudeStrategy extends PlatformStrategy {
    * @private
    */
   private async _tryExecCommand(proseMirrorElement: HTMLElement, element: HTMLElement, content: string): Promise<InsertionResult> {
-    if (proseMirrorElement.contentEditable === 'true' || element.contentEditable === 'true') {
-      try {
-        const targetEl = proseMirrorElement.contentEditable === 'true' ? proseMirrorElement : element;
-        targetEl.focus();
-        
-        // For Claude, we need to ensure the editor is ready
-        targetEl.click();
-        
-        // Wait a tiny bit for focus
-        await new Promise(resolve => setTimeout(resolve, 50));
-        
-        // Clear existing content if it's placeholder text
-        const selection = window.getSelection();
-        if (selection) {
-          const range = document.createRange();
-          range.selectNodeContents(targetEl);
-          selection.removeAllRanges();
-          selection.addRange(range);
-        }
-        
-        // Insert new content using execCommand
-        const inserted = document.execCommand('insertText', false, content);
-        
-        if (inserted) {
-          // Trigger Claude-specific events
-          const inputEvent = new InputEvent('input', {
-            bubbles: true,
-            cancelable: true,
-            inputType: 'insertText',
-            data: content
-          });
-          targetEl.dispatchEvent(inputEvent);
-          targetEl.dispatchEvent(new Event('compositionend', { bubbles: true }));
-          
-          // For Claude, also trigger these events on the parent contenteditable if different
-          if (targetEl !== element) {
-            element.dispatchEvent(inputEvent);
-            element.dispatchEvent(new Event('compositionend', { bubbles: true }));
-          }
-          
-          return { success: true, method: 'execCommand' };
-        }
-      } catch (error) {
-        this._warn('execCommand failed', error instanceof Error ? error : { error: String(error) });
-      }
+    const targetEl = [proseMirrorElement, element].find(ClaudeStrategy._isEditable);
+    if (!targetEl) {
+      return { success: false, error: 'The input field holds no editable text' };
     }
-    
-    return { success: false };
-  }
-
-  /**
-   * Attempts insertion using direct DOM manipulation
-   * @param element - Target element
-   * @param content - Content to insert
-   * @returns Result of insertion attempt
-   * @private
-   */
-  private _tryDOMManipulation(element: HTMLElement, content: string): InsertionResult {
     try {
-      element.focus();
-      element.textContent = content;
-      
-      // Create and dispatch a comprehensive set of events
-      const inputEvent = new InputEvent('input', {
-        bubbles: true,
-        cancelable: true,
-        inputType: 'insertText',
-        data: content
-      });
-      element.dispatchEvent(inputEvent);
-      
-      // Additional events that Claude might listen to
-      element.dispatchEvent(new Event('change', { bubbles: true }));
-      element.dispatchEvent(new Event('blur', { bubbles: true }));
-      element.dispatchEvent(new Event('focus', { bubbles: true }));
-      
-      return { success: true, method: 'dom-manipulation' };
+      targetEl.focus();
+
+      // For Claude, we need to ensure the editor is ready
+      targetEl.click();
+
+      // Wait a tiny bit for focus
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      const result = this.insertEditableText(targetEl, content, 'claude');
+      if (!result.success) {
+        return result;
+      }
+
+      // Trigger Claude-specific events. A direct write has already told the page of its input
+      const inputEvent = result.method === 'claude-execCommand'
+        ? new InputEvent('input', { bubbles: true, cancelable: true, inputType: 'insertText', data: content })
+        : null;
+      // For Claude, also trigger these events on the parent contenteditable if different
+      for (const heardBy of targetEl === element ? [targetEl] : [targetEl, element]) {
+        if (inputEvent) {
+          heardBy.dispatchEvent(inputEvent);
+        }
+        heardBy.dispatchEvent(new Event('compositionend', { bubbles: true }));
+      }
+      return result;
     } catch (error) {
       this._error('All insertion methods failed', error as Error);
       return { success: false, error: (error as Error).message };
     }
+  }
+
+  private static _isEditable(element: HTMLElement): boolean {
+    return element.isContentEditable || element.contentEditable === 'true' || element.getAttribute('contenteditable') === 'true';
   }
 }

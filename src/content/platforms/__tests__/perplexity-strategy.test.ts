@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { editorCommand, MULTILINE_PROMPT } from '../../../test/helpers/editor-command';
 import { expectNoMarkupIn, HOSTILE_TEXTS } from '../../../test/helpers/hostile-text';
 import { actAsLexicalEditor } from '../../../test/helpers/lexical-editor';
-import { readInputText } from '../../selector/inputText';
+import { readInputText, textBeforeCaret } from '../../selector/inputText';
 import type { UIElementFactory } from '../../ui/element-factory';
 import { PerplexityStrategy } from '../perplexity-strategy';
 
@@ -148,29 +148,56 @@ describe('PerplexityStrategy', () => {
       expect(editor.querySelectorAll('br')).toHaveLength(5);
     });
 
-    it('replaces what the field held, the line breaks that ended it included', async () => {
-      await strategy.insert(editor, 'draft\n\n\n');
+    it('pastes where the caret is: the text before and after stays, and the caret ends after the Prompt', async () => {
+      await strategy.insert(editor, 'before after');
+      document.getSelection()?.collapse(editor.querySelector('span')?.firstChild as Text, 7);
 
-      await strategy.insert(editor, 'one line');
+      const result = await strategy.insert(editor, 'one\n\ntwo ');
 
-      expect(readInputText(editor)).toBe('one line');
-      expect(editor.querySelectorAll('br')).toHaveLength(0);
+      expect(result).toEqual({ success: true, method: 'perplexity-paste' });
+      expect(readInputText(editor)).toBe('before one\n\ntwo after');
+      expect(textBeforeCaret(editor)).toBe('before one\n\ntwo ');
     });
 
-    it('selects from the start of the first block to the end of the last one before pasting', async () => {
-      await strategy.insert(editor, 'draft\n\n');
-      const paragraph = editor.querySelector('p') as HTMLElement;
-      let selected: { start: Node; startOffset: number; end: Node; endOffset: number } | undefined;
+    it('pastes over the selected text', async () => {
+      await strategy.insert(editor, 'before selected after');
+      const text = editor.querySelector('span')?.firstChild as Text;
+      document.getSelection()?.setBaseAndExtent(text, 7, text, 15);
+
+      await strategy.insert(editor, 'PROMPT');
+
+      expect(readInputText(editor)).toBe('before PROMPT after');
+    });
+
+    it('pastes after what the field holds when the caret is not in the field', async () => {
+      await strategy.insert(editor, 'draft');
+      document.getSelection()?.removeAllRanges();
+      let caret: { container: Node; offset: number } | undefined;
       editor.addEventListener('paste', () => {
         const range = document.getSelection()?.getRangeAt(0);
-        if (range) {
-          selected = { start: range.startContainer, startOffset: range.startOffset, end: range.endContainer, endOffset: range.endOffset };
+        if (range?.collapsed) {
+          caret = { container: range.startContainer, offset: range.startOffset };
         }
       }, { capture: true });
+      const paragraph = editor.querySelector('p') as HTMLElement;
 
-      await strategy.insert(editor, 'one line');
+      await strategy.insert(editor, ' PROMPT');
 
-      expect(selected).toEqual({ start: paragraph, startOffset: 0, end: paragraph, endOffset: 4 });
+      expect(readInputText(editor)).toBe('draft PROMPT');
+      // Inside the last block, where the editor has a caret
+      expect(caret).toEqual({ container: paragraph, offset: 1 });
+    });
+
+    it('changes nothing for empty content', async () => {
+      await strategy.insert(editor, 'draft');
+      const pasted = vi.fn();
+      editor.addEventListener('paste', pasted);
+
+      const result = await strategy.insert(editor, '');
+
+      expect(result.success).toBe(true);
+      expect(readInputText(editor)).toBe('draft');
+      expect(pasted).not.toHaveBeenCalled();
     });
 
     it('fails, and writes nothing more, when the editor took the paste but holds another text', async () => {
@@ -183,16 +210,6 @@ describe('PerplexityStrategy', () => {
       expect(result.success).toBe(false);
       expect(editor.textContent).toBe('one line!');
       expect(document.execCommand).not.toHaveBeenCalledWith('insertText', false, expect.anything());
-    });
-
-    it('empties the field with one pasted character and a Backspace, not with the delete command', async () => {
-      await strategy.insert(editor, MULTILINE_PROMPT);
-
-      const result = await strategy.insert(editor, '');
-
-      expect(result.success).toBe(true);
-      expect(readInputText(editor)).toBe('');
-      expect(document.execCommand).not.toHaveBeenCalledWith('delete');
     });
 
     it('takes a non-breaking space the editor shows for a space of the Prompt as the same text', async () => {
@@ -242,6 +259,31 @@ describe('PerplexityStrategy', () => {
 
     afterEach(() => {
       editor.remove();
+    });
+
+    it('replaces what the field holds, the line breaks that end it included', async () => {
+      await strategy.insert(editor, 'draft\n\n\n');
+
+      await strategy.restore(editor, 'one line');
+
+      expect(readInputText(editor)).toBe('one line');
+      expect(editor.querySelectorAll('br')).toHaveLength(0);
+    });
+
+    it('selects from the start of the first block to the end of the last one before pasting', async () => {
+      await strategy.insert(editor, 'draft\n\n');
+      const paragraph = editor.querySelector('p') as HTMLElement;
+      let selected: { start: Node; startOffset: number; end: Node; endOffset: number } | undefined;
+      editor.addEventListener('paste', () => {
+        const range = document.getSelection()?.getRangeAt(0);
+        if (range) {
+          selected = { start: range.startContainer, startOffset: range.startOffset, end: range.endContainer, endOffset: range.endOffset };
+        }
+      }, { capture: true });
+
+      await strategy.restore(editor, 'one line');
+
+      expect(selected).toEqual({ start: paragraph, startOffset: 0, end: paragraph, endOffset: 4 });
     });
 
     it('puts a draft of several lines back, line for line', async () => {
