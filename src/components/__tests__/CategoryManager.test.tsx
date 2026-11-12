@@ -92,9 +92,12 @@ describe('CategoryManager', () => {
       const onCreateCategory = vi.fn().mockRejectedValue({ type: 'STORAGE_QUOTA_EXCEEDED', message: 'full' } satisfies AppError);
       const { user } = renderManager({ categories: onlyDefault, onCreateCategory });
 
-      await user.click(screen.getByRole('button', { name: 'Create category Work' }));
+      const starter = screen.getByRole('button', { name: 'Create category Work' });
+      await user.click(starter);
 
       expect(onCreateCategory).toHaveBeenCalledTimes(1);
+      // The starter itself is what a full storage warning gives the keyboard back to
+      expect(onCreateCategory).toHaveBeenCalledWith({ name: 'Work', color: '#2563EB' }, starter);
       expect(screen.getByTestId('categories-empty')).toBeInTheDocument();
     });
 

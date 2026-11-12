@@ -16,7 +16,8 @@ export interface CategoriesEmptyProps {
   /** Opens the Category sheet to create one */
   onCreate: () => void;
   /** Creates a starter Category at once; the Notification that confirms it is the caller's */
-  onQuickCreate: (category: { name: string; color: string }) => Promise<void>;
+  /** `starter` is the button that was tapped */
+  onQuickCreate: (category: { name: string; color: string }, starter: HTMLElement) => Promise<void>;
   /** The main action: it takes the keyboard when the last Category of the user is deleted */
   createButtonRef?: Ref<HTMLButtonElement>;
 }
@@ -59,11 +60,11 @@ const CategoriesEmpty: FC<CategoriesEmptyProps> = ({ onCreate, onQuickCreate, cr
   // One creation at a time: a second tap would create a second Category before the list takes over
   const [creating, setCreating] = useState(false);
 
-  const quickCreate = async (category: { name: string; color: string }): Promise<void> => {
+  const quickCreate = async (category: { name: string; color: string }, starter: HTMLElement): Promise<void> => {
     if (creating) {return;}
     setCreating(true);
     try {
-      await onQuickCreate(category);
+      await onQuickCreate(category, starter);
     } finally {
       setCreating(false);
     }
@@ -88,7 +89,7 @@ const CategoriesEmpty: FC<CategoriesEmptyProps> = ({ onCreate, onQuickCreate, cr
                 type="button"
                 aria-label={`Create category ${category.name}`}
                 aria-disabled={creating}
-                onClick={() => { void quickCreate(category); }}
+                onClick={event => { void quickCreate(category, event.currentTarget); }}
                 className="flex h-8 items-center gap-1.5 pl-2.5 pr-[13px] rounded-full bg-card border-[1.5px] border-default text-primary text-[12.5px] font-bold hover:border-accent active:scale-92 transition-chip focus-interactive aria-disabled:opacity-50"
               >
                 {/* A Category color is user data, not a token */}

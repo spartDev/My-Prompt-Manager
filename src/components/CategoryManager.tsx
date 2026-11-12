@@ -223,9 +223,11 @@ const CategoryManager: FC<CategoryManagerProps> = ({
     }
   }, [empty, sheet.isOpen]);
 
-  const handleQuickCreate = async (category: { name: string; color: string }): Promise<void> => {
+  // The starter that was tapped gets the keyboard back if a full storage warning opens: the empty
+  // state, and the starter with it, is still there when a creation fails
+  const handleQuickCreate = async (category: { name: string; color: string }, starter: HTMLElement): Promise<void> => {
     try {
-      await onCreateCategory(category, addButtonRef.current);
+      await onCreateCategory(category, starter);
     } catch (error) {
       // The app has said why (a failure Notification, or the storage warning)
       Logger.error('Failed to create starter category', toError(error), { component: 'CategoryManager' });

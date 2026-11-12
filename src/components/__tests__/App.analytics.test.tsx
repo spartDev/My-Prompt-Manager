@@ -148,6 +148,22 @@ describe('App analytics integration', () => {
     });
   });
 
+  describe('Analytics with no Insertion', () => {
+    it('gives the keyboard to the active Library filter when "Go to the library" leaves with Analytics', async () => {
+      const user = userEvent.setup();
+      const now = Date.now();
+      const idle = { id: 'p1', title: 'Never inserted', content: 'One', category: 'Work', createdAt: now, updatedAt: now, usageCount: 0 };
+      getMockStorageManager().getPrompts.mockResolvedValue([idle]);
+      mockUseUsageStats.mockReturnValue({ ...createMockReturn(), history: [], prompts: [idle] });
+      await renderApp();
+
+      await user.click(screen.getByRole('tab', { name: 'Analytics' }));
+      await user.click(await screen.findByRole('button', { name: 'Go to the library' }));
+
+      await waitFor(() => { expect(screen.getByRole('radio', { name: 'All' })).toHaveFocus(); });
+    });
+  });
+
   describe('Analytics navigation', () => {
     it('navigates to analytics view when the Analytics tab is clicked', async () => {
       const user = userEvent.setup();

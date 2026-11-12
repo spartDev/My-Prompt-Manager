@@ -413,7 +413,11 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   }, [handleSelectSection]);
 
   // "Go to the library" of the empty Analytics
-  const handleGoToLibrary = useCallback(() => { handleSelectSection('library'); }, [handleSelectSection]);
+  // The button leaves with Analytics: the keyboard goes to the active Library filter, as for a review
+  const handleGoToLibrary = useCallback(() => {
+    setFocusLibraryFilter(true);
+    handleSelectSection('library');
+  }, [handleSelectSection]);
 
   const handleExpandDashboard = useCallback(() => {
     // Open full analytics dashboard in a new tab
