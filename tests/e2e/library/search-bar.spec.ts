@@ -71,11 +71,17 @@ test.describe('Library search bar', () => {
       const badge = page.getByTestId('search-shortcut');
       const clear = page.getByRole('button', { name: 'Clear search' });
 
-      // Anatomy: a 44px pill, 16px from each side, the field in 14.5px
+      // Anatomy: a 44px pill and the round New button after it, 8px apart, the row 16px from each side;
+      // the field in 14.5px
       const box = await pill.boundingBox();
       expect(box?.height).toBe(44);
       expect(box?.x).toBe(16);
-      expect(box?.width).toBe(400 - 32);
+      expect(box?.width).toBe(400 - 32 - 8 - 44);
+      const newButton = page.getByRole('button', { name: 'Add new prompt' });
+      const newBox = await newButton.boundingBox();
+      expect(newBox).toEqual({ x: 400 - 16 - 44, y: box?.y, width: 44, height: 44 });
+      await expect(newButton).toHaveCSS('background-color', colors.accent);
+      await expect(newButton).toHaveCSS('color', 'rgb(255, 255, 255)');
       // rounded-full: a radius larger than any pill, so its ends are half circles
       expect(parseFloat(await pill.evaluate(element => getComputedStyle(element).borderTopLeftRadius))).toBeGreaterThanOrEqual(999);
       // 1.5px as written; Chrome draws and reports whole device pixels, so 1px on a screen of density 1

@@ -33,8 +33,8 @@ export const promptWorkflows = {
    * Complete workflow to create a new prompt
    */
   create: async (page: Page, promptData: PromptData): Promise<void> => {
-    // Click add new prompt
-    await page.getByRole('button', { name: 'Add new prompt' }).click();
+    // New beside the search, or the one action of an empty Library, which has no New button
+    await page.getByRole('button', { name: /^(Add new prompt|Write your first prompt)$/ }).click();
     await assertions.navigation.promptFormCreate(page);
 
     // Fill form

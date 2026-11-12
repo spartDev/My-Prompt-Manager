@@ -73,17 +73,18 @@ export class LibraryPage extends BasePage {
   }
 
   /**
-   * Get the header "New" button (opens the Add Prompt form)
+   * Get the "New" button beside the search (opens the Add Prompt form). An empty Library has none
    */
   getNewPromptButton(): Locator {
     return this.page.getByTestId('new-prompt-button');
   }
 
   /**
-   * Click the header "New" button
+   * Open the editor on a new Prompt: New beside the search, or "Write your first prompt" in an
+   * empty Library, which has no New button
    */
   async clickAddNewPrompt(): Promise<void> {
-    await this.getNewPromptButton().click();
+    await this.page.getByRole('button', { name: /^(Add new prompt|Write your first prompt)$/ }).click();
   }
 
   /**

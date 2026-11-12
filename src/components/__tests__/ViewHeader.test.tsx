@@ -688,50 +688,6 @@ describe('ViewHeader', () => {
       });
     });
 
-    describe('ViewHeader.NewButton', () => {
-      it('renders a labelled "New" button', () => {
-        render(
-          <ViewHeader title="Test">
-            <ViewHeader.Actions>
-              <ViewHeader.NewButton onClick={vi.fn()} />
-            </ViewHeader.Actions>
-          </ViewHeader>
-        );
-
-        const button = screen.getByRole('button', { name: /add new prompt/i });
-        expect(button).toHaveTextContent('New');
-        expect(button.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
-      });
-
-      it('calls onClick when clicked', async () => {
-        const user = userEvent.setup();
-        const onNew = vi.fn();
-
-        render(
-          <ViewHeader title="Test">
-            <ViewHeader.Actions>
-              <ViewHeader.NewButton onClick={onNew} />
-            </ViewHeader.Actions>
-          </ViewHeader>
-        );
-
-        await user.click(screen.getByRole('button', { name: /add new prompt/i }));
-        expect(onNew).toHaveBeenCalledTimes(1);
-      });
-
-      it('supports disabled state', () => {
-        render(
-          <ViewHeader title="Test">
-            <ViewHeader.Actions>
-              <ViewHeader.NewButton onClick={vi.fn()} disabled />
-            </ViewHeader.Actions>
-          </ViewHeader>
-        );
-
-        expect(screen.getByRole('button', { name: /add new prompt/i })).toBeDisabled();
-      });
-    });
-
     describe('subtitleLive', () => {
       it('announces subtitle changes politely when enabled', () => {
         render(<ViewHeader title="Test" subtitle="3 prompts" subtitleLive />);

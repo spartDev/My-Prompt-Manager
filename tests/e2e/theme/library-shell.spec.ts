@@ -125,6 +125,40 @@ test.describe('App shell and Library on the tokens', () => {
       await expect(page.getByRole('navigation', { name: 'Main navigation' })).toHaveCSS('border-top-color', colors.strong);
     });
 
+    test(`in a narrow side panel New ends the search row and the title keeps one line (${theme})`, async ({ page, storage, extensionId }) => {
+      await openLibrary(page, storage, extensionId, { theme, surface: 'sidepanel' });
+      // The narrowest a Chrome side panel gets
+      await page.setViewportSize({ width: 360, height: 800 });
+
+      const title = page.getByRole('heading', { level: 1, name: 'My Prompt Manager' });
+      const lineHeight = parseFloat(await title.evaluate(element => getComputedStyle(element).lineHeight));
+      expect((await title.boundingBox())?.height, 'the title is on one line').toBe(lineHeight);
+
+      // New is in the row of the search, far from the close button
+      const newButton = page.getByRole('button', { name: 'Add new prompt' });
+      const search = page.getByTestId('search-bar');
+      const close = page.getByRole('button', { name: 'Close side panel' });
+      const [newBox, searchBox, closeBox] = await Promise.all([newButton.boundingBox(), search.boundingBox(), close.boundingBox()]);
+      expect(newBox?.y).toBe(searchBox?.y);
+      expect(newBox?.x).toBe(360 - 16 - 44);
+      expect((newBox?.y ?? 0) - ((closeBox?.y ?? 0) + (closeBox?.height ?? 0))).toBeGreaterThanOrEqual(16);
+
+      // Keyboard: the field, then New, then the Library filter
+      await page.getByRole('searchbox', { name: 'Search prompts' }).focus();
+      await page.keyboard.press('Tab');
+      await expect(newButton).toBeFocused();
+      await page.keyboard.press('Tab');
+      await expect(page.getByTestId('library-filter-all')).toBeFocused();
+      // The cards have risen: the proof shows the settled screen
+      await page.waitForFunction(() => document.getAnimations().every(animation =>
+        !(animation instanceof CSSAnimation) || !animation.animationName.startsWith('card-rise') || animation.playState !== 'running'
+      ));
+      await page.screenshot({ path: `${SCREENSHOT_DIR}/new-button-sidepanel-360-${theme}.png` });
+
+      await newButton.click();
+      await expect(page.getByRole('heading', { name: 'New prompt', exact: true })).toBeVisible();
+    });
+
     test(`search, pills, tabs and cards take the ${theme} colors of the reference canvas`, async ({ page, storage, extensionId }) => {
       await openLibrary(page, storage, extensionId, { theme });
 

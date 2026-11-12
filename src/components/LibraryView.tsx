@@ -19,6 +19,7 @@ import { isLibraryEmpty } from '../utils/emptyStates';
 import LibraryEmpty from './emptyStates/LibraryEmpty';
 import { CheckIcon, StarIcon, UsageIcon } from './icons/UIIcons';
 import LibraryFilterBar, { reviewFilterLabel } from './LibraryFilterBar';
+import NewPromptButton from './NewPromptButton';
 import PromptCard from './PromptCard';
 import SearchBar from './SearchBar';
 import SearchEmptyState from './SearchEmptyState';
@@ -179,7 +180,6 @@ const LibraryView: FC<LibraryViewProps> = ({
         context={context}
       >
         <ViewHeader.Actions>
-          <ViewHeader.NewButton onClick={onAddNew} disabled={loading} />
           {context === 'sidepanel' && (
             <ViewHeader.CloseButton onClick={() => { window.close(); }} context="sidepanel" />
           )}
@@ -187,14 +187,18 @@ const LibraryView: FC<LibraryViewProps> = ({
         {/* Search and Filter */}
         {!libraryEmpty && (
         <div className="space-y-4 pb-6" role="search" aria-label="Search and filter prompts">
-          {/* The header pads its content by 24px; the pill keeps 16px on each side */}
-          <div className="-mx-2">
-            <SearchBar
-              value={query}
-              onChange={searchWithDebounce.setQuery}
-              onClear={searchWithDebounce.clearSearch}
-              inputRef={searchRef}
-            />
+          {/* The header pads its content by 24px; the row keeps 16px on each side. New ends it: an
+              empty Library, which has no search, offers its own way to write the first Prompt */}
+          <div className="-mx-2 flex items-center gap-2">
+            <div className="flex-1 min-w-0">
+              <SearchBar
+                value={query}
+                onChange={searchWithDebounce.setQuery}
+                onClear={searchWithDebounce.clearSearch}
+                inputRef={searchRef}
+              />
+            </div>
+            <NewPromptButton onClick={onAddNew} disabled={loading} />
           </div>
 
           <LibraryFilterBar

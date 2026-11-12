@@ -113,8 +113,8 @@ test.describe('Category Management - Integration with Prompt System', () => {
       await expect(sidepanelPage.getByRole('heading', { name: 'Your library is empty' })).toBeVisible();
       await expect(sidepanelPage.getByRole('radiogroup', { name: 'Library filter' })).toHaveCount(0);
 
-      // Create a prompt in the "Coding" category
-      await sidepanelPage.getByRole('button', { name: 'Add new prompt' }).click();
+      // Create a prompt in the "Coding" category: an empty Library offers it from its empty state
+      await sidepanelPage.getByRole('button', { name: 'Write your first prompt' }).click();
       await expect(sidepanelPage.getByRole('heading', { name: 'New prompt', exact: true })).toBeVisible();
 
       await sidepanelPage.getByLabel('Title', { exact: true }).fill('Debug Function');
@@ -260,7 +260,7 @@ test.describe('Category Management - Integration with Prompt System', () => {
       await sidepanelPage.goto(`chrome-extension://${extensionId}/src/sidepanel.html`, { waitUntil: 'domcontentloaded' });
 
       // Try to create a prompt
-      await sidepanelPage.getByRole('button', { name: 'Add new prompt' }).click();
+      await sidepanelPage.getByRole('button', { name: 'Write your first prompt' }).click();
       await sidepanelPage.getByLabel('Title', { exact: true }).fill('Test Prompt');
       await sidepanelPage.getByLabel('Content', { exact: true }).fill('Test content');
 

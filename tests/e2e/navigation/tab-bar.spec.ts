@@ -50,7 +50,7 @@ test.describe('Bottom tab bar navigation', () => {
       await expect(tabNavigation.getTab(page, section)).toHaveAttribute('aria-selected', 'false');
     }
 
-    // Library header shows the prompt count and the New button
+    // The Library shows the prompt count in its header and the New button beside the search
     await expect(page.getByText('2 prompts', { exact: true })).toBeVisible();
     await expect(page.getByTestId('new-prompt-button')).toBeVisible();
   });

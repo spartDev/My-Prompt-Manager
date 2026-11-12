@@ -271,7 +271,8 @@ export const modalNavigation = {
    * Open prompt form (create mode)
    */
   openPromptForm: async (page: Page): Promise<void> => {
-    await page.getByRole('button', { name: 'Add new prompt' }).click();
+    // New beside the search, or the one action of an empty Library, which has no New button
+    await page.getByRole('button', { name: /^(Add new prompt|Write your first prompt)$/ }).click();
     await expect(page.getByRole('heading', { name: 'New prompt', exact: true })).toBeVisible();
   },
 

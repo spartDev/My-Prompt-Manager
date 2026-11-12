@@ -211,24 +211,6 @@ interface SettingsButtonProps {
 }
 
 /**
- * Props for the NewButton subcomponent.
- */
-interface NewButtonProps {
-  /**
-   * Callback fired when the new button is clicked.
-   * @example
-   * onClick={() => setView('add')}
-   */
-  onClick: () => void;
-
-  /**
-   * Whether the button is disabled.
-   * @default false
-   */
-  disabled?: boolean;
-}
-
-/**
  * Props for the CloseButton subcomponent.
  */
 interface CloseButtonProps {
@@ -355,34 +337,6 @@ const SettingsButton: FC<SettingsButtonProps> = ({ onClick, disabled = false }) 
 };
 
 /**
- * New button subcomponent.
- * Displays the primary "New" action with a plus icon.
- *
- * @example
- * <ViewHeader.NewButton onClick={() => setView('add')} />
- *
- * @example
- * <ViewHeader.NewButton onClick={handleAddNew} disabled={isLoading} />
- */
-const NewButton: FC<NewButtonProps> = ({ onClick, disabled = false }) => {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className="flex items-center gap-1 px-3 py-2 text-sm font-semibold text-on-accent bg-accent hover:bg-accent-hover rounded-lg shadow-sm transition-colors focus-primary disabled:opacity-50 disabled:cursor-not-allowed"
-      title="Add new prompt"
-      aria-label="Add new prompt"
-      data-testid="new-prompt-button"
-    >
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" aria-hidden="true">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14m7-7H5" />
-      </svg>
-      <span>New</span>
-    </button>
-  );
-};
-
-/**
  * Close button subcomponent.
  * Displays an X icon button for closing the view.
  * The aria-label and title adapt based on context (popup vs sidepanel).
@@ -444,12 +398,6 @@ interface ViewHeaderComponent extends FC<ViewHeaderProps> {
    * @see {@link SettingsButton}
    */
   SettingsButton: FC<SettingsButtonProps>;
-
-  /**
-   * New button subcomponent.
-   * @see {@link NewButton}
-   */
-  NewButton: FC<NewButtonProps>;
 
   /**
    * Close button subcomponent.
@@ -641,7 +589,6 @@ const ViewHeaderFC: FC<ViewHeaderProps> = ({
  * - `ViewHeader.Actions` - Container for custom action buttons
  * - `ViewHeader.BackButton` - Standardized back navigation button
  * - `ViewHeader.SettingsButton` - Settings gear icon button
- * - `ViewHeader.NewButton` - Primary "New" action button
  * - `ViewHeader.CloseButton` - Close button with context-aware labels
  *
  * @example
@@ -700,7 +647,6 @@ const ViewHeader = ViewHeaderFC as ViewHeaderComponent;
 ViewHeader.Actions = Actions;
 ViewHeader.BackButton = BackButton;
 ViewHeader.SettingsButton = SettingsButton;
-ViewHeader.NewButton = NewButton;
 ViewHeader.CloseButton = CloseButton;
 
 export default ViewHeader;
