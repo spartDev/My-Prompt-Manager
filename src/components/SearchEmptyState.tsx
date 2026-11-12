@@ -7,7 +7,7 @@ import type { SearchEmptyStateProps } from '../types/components';
  * editor on a new Prompt titled with it. Under a Library filter other than All it also says where
  * the search looked, and offers to search the whole Library.
  */
-const SearchEmptyState: FC<SearchEmptyStateProps> = ({ query, onCreate, filterLabel, onSearchAll }) => (
+const SearchEmptyState: FC<SearchEmptyStateProps> = ({ query, onCreate, createDisabled = false, filterLabel, onSearchAll }) => (
   <div
     role="region"
     aria-label="No search results"
@@ -21,6 +21,7 @@ const SearchEmptyState: FC<SearchEmptyStateProps> = ({ query, onCreate, filterLa
       <button
         type="button"
         onClick={onCreate}
+        disabled={createDisabled}
         className="h-[34px] px-3.5 rounded-full bg-accent text-on-accent text-[13px] font-bold hover:bg-accent-hover transition-colors focus-primary"
       >
         Create it

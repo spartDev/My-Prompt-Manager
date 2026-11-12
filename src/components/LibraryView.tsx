@@ -41,7 +41,7 @@ const LibraryView: FC<LibraryViewProps> = ({
   loading,
   context = 'popup'
 }) => {
-  const { query, debouncedQuery, filteredPrompts } = searchWithDebounce;
+  const { query, debouncedQuery, filteredPrompts, isSearching } = searchWithDebounce;
   const [sortOrder, setSortOrder] = useState<SortOrder>(DEFAULT_SETTINGS.sortOrder);
   // "Show all prompts" leaves with its empty state, so focus goes to the All pill
   const [focusAll, setFocusAll] = useState(false);
@@ -188,7 +188,7 @@ const LibraryView: FC<LibraryViewProps> = ({
             <div className="w-8 h-8 border-4 border-current/30 border-t-current text-accent rounded-full animate-spin" aria-hidden="true"></div>
             <div className="text-secondary font-medium">Loading your prompts...</div>
           </div>
-        ) : resultCount === 0 && (!isSearchActive || prompts.length === 0) ? (
+        ) : resultCount === 0 && !isSearchActive ? (
           <div className="flex items-center justify-center h-full">
             {(prompts).length === 0 ? (
               <div className="max-w-md mx-auto text-center px-6" role="region" aria-label="Empty state">
@@ -261,6 +261,8 @@ const LibraryView: FC<LibraryViewProps> = ({
               <div className="px-4 pb-3">
                 <SearchEmptyState
                   query={searchedFor}
+                  // The field already shows another search, not looked up yet: this one is no longer the one to create
+                  createDisabled={isSearching}
                   onCreate={() => {
                     onCreateFromSearch(searchedFor, activeFilter.kind === 'category' ? activeFilterLabel : undefined);
                   }}

@@ -33,6 +33,8 @@ export interface SearchEmptyStateProps {
   query: string;
   /** Opens the editor on a new Prompt titled with the search */
   onCreate: () => void;
+  /** Create it waits: the field holds a newer search than `query`, still to be looked up */
+  createDisabled?: boolean;
   /** The active Library filter, when it is not All: the search looked only inside it */
   filterLabel?: string;
   /** Searches the whole Library instead; given with filterLabel */

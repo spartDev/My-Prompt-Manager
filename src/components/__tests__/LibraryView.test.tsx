@@ -337,6 +337,31 @@ describe('LibraryView', () => {
       expect(onCreateFromSearch).toHaveBeenCalledWith('Weekly report', undefined);
     });
 
+    it('offers to create the Prompt searched for in a Library that holds none', async () => {
+      const user = userEvent.setup();
+      const onCreateFromSearch = vi.fn();
+      render(<LibraryView {...defaultProps} prompts={[]} searchWithDebounce={createMockSearchWithDebounce([], 'First idea')} onCreateFromSearch={onCreateFromSearch} />);
+
+      expect(screen.queryByRole('region', { name: /empty state/i })).not.toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Create it' }));
+
+      expect(onCreateFromSearch).toHaveBeenCalledWith('First idea', undefined);
+    });
+
+    it('holds Create it back while the field shows a search not looked up yet', async () => {
+      const user = userEvent.setup();
+      const onCreateFromSearch = vi.fn();
+      // The field already reads "zzz report"; the search that found nothing is still "zzz"
+      const search = { ...createMockSearchWithDebounce([], 'zzz'), query: 'zzz report', isSearching: true };
+      renderWith(ALL_PROMPTS, { searchWithDebounce: search, onCreateFromSearch });
+
+      const create = screen.getByRole('button', { name: 'Create it' });
+      expect(create).toBeDisabled();
+      await user.click(create);
+
+      expect(onCreateFromSearch).not.toHaveBeenCalled();
+    });
+
     it('creates it in the Category of the active Library filter', async () => {
       const user = userEvent.setup();
       const onCreateFromSearch = vi.fn();
