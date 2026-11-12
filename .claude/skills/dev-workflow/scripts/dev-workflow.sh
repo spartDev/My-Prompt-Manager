@@ -235,7 +235,8 @@ claim_issues_locked() {
             return 1
         fi
         after=$(read_owner "$issue") || after=""
-        if [ -n "${before%%|*}" ] && { [ -z "$after" ] || [ "${after%%|*}" = "${before%%|*}" ]; }; then
+        # Dropped only when a read proves the owner unchanged; an unread owner keeps the record
+        if [ -n "${before%%|*}" ] && [ -n "$after" ] && [ "${after%%|*}" = "${before%%|*}" ]; then
             drop_last_claim
         fi
     done
