@@ -50,16 +50,15 @@ Ask clarifying questions:
 Create beads tasks for each discrete piece of work:
 
 ```bash
-# Create tasks in parallel for efficiency
-bd create --title="Implement X component" --type=feature --priority=2
-bd create --title="Add tests for X" --type=task --priority=2
-bd create --title="Update documentation for X" --type=task --priority=3
+# Every ticket carries its acceptance criteria
+bd create --title="Implement X component" --description="why it exists, what to do" --acceptance="how to prove it" --type=feature --priority=2
+bd create --title="Update documentation for X" --description="…" --acceptance="…" --type=task --priority=3
 ```
 
 **Task creation guidelines:**
 - Each task should be independently completable
 - Tasks touching different files are ideal for parallelization
-- Use appropriate types: `feature`, `task`, `bug`, `refactor`
+- Use appropriate types: `feature`, `task`, `bug`, `chore`
 - Priority: 0=critical, 1=high, 2=medium, 3=low, 4=backlog
 
 ### Step 1.3: Set Dependencies (if any)
@@ -109,21 +108,14 @@ bd show def | grep -A5 "Dependencies"
 
 ## Phase 3: Parallel Execution
 
-### Step 3.1: Claim Tasks
-
-```bash
-bd update abc --status in_progress
-bd update def --status in_progress
-```
-
-### Step 3.2: Launch Parallel Instances
+### Step 3.1: Launch Parallel Instances
 
 ```bash
 .claude/skills/dev-workflow/scripts/dev-workflow.sh select abc def ghi
 ```
 
 This will:
-1. Create git worktrees (`~/.claude-worktrees/<repo>/fix-<id>`)
+1. Claim each ticket, and create git worktrees (`~/.claude-worktrees/<repo>/fix-<id>`)
 2. Launch tmux session `claude-parallel`
 3. Start Claude in each pane with task-specific prompts
 
@@ -224,11 +216,6 @@ When `/dev-workflow` is invoked:
 - Resolve manually in the conflicting worktree
 - Consider sequential execution for tightly coupled changes
 
-## Best Practices
+## After the run
 
-1. **Plan before parallelizing** - Clear task boundaries prevent conflicts
-2. **Max 4 instances** - More becomes hard to monitor and review
-3. **Independent tasks only** - No dependencies between parallel tasks
-4. **Different files** - Avoid parallel work on same files
-5. **Review all PRs** - Don't auto-merge, review each PR carefully
-6. **Cleanup promptly** - Don't leave worktrees lingering
+Review each PR yourself rather than auto-merging, and clean up the worktrees once they are merged.

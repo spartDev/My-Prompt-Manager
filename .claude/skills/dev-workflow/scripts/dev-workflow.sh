@@ -63,6 +63,7 @@ check_dependencies() {
     command -v tmux &> /dev/null || missing+=("tmux")
     command -v claude &> /dev/null || missing+=("claude")
     command -v bd &> /dev/null || missing+=("bd (beads)")
+    command -v jq &> /dev/null || missing+=("jq")
     command -v gh &> /dev/null || missing+=("gh (GitHub CLI)")
 
     if [ ${#missing[@]} -gt 0 ]; then
@@ -94,6 +95,7 @@ get_branch_prefix() {
     case "$issue_type" in
         bug) echo "fix" ;;
         feature) echo "feat" ;;
+        chore) echo "chore" ;;
         refactor) echo "refactor" ;;
         task) echo "task" ;;
         *) echo "fix" ;;
@@ -157,6 +159,89 @@ $(sed "s|<branch>|$branch_name|g" "$REPO_DIR/.claude/skills/parallel-claude/agen
 PROMPT
 }
 
+# Issues this launch took over, one "id|previous assignee|previous status" each,
+# so a launch that fails puts every one back as it found it.
+LAUNCH_CLAIMS=()
+
+# Give back what this launch claimed: unclaim the issues nobody held, and hand
+# an issue taken from another assignee (a claim.pools alias) back to it.
+release_claims() {
+    local entry id before status
+    for entry in ${LAUNCH_CLAIMS[@]+"${LAUNCH_CLAIMS[@]}"}; do
+        IFS='|' read -r id before status <<< "$entry"
+        if [ -z "$before" ]; then
+            if bd unclaim "$id" >/dev/null; then
+                print_info "Released $id"
+            else
+                print_warning "Could not release $id: run bd unclaim $id"
+            fi
+        elif bd update "$id" --assignee "$before" --status "$status" >/dev/null; then
+            print_info "Gave $id back to $before"
+        else
+            print_warning "Could not give $id back: run bd update $id --assignee $before --status $status"
+        fi
+    done
+    LAUNCH_CLAIMS=()
+}
+
+# Read an issue's assignee and status as "assignee|status"; fails when bd show
+# fails or prints nothing.
+read_owner() {
+    local json
+    json=$(bd show "$1" --json 2>/dev/null) && [ -n "$json" ] \
+        && printf '%s' "$json" | jq -er 'if type == "array" then .[0] else . end | "\(.assignee // "")|\(.status // "")"'
+}
+
+# Claim the issues under a lock shared by every worktree of this repository
+# (mkdir: flock is not on macOS), so a second launch reads the assignees only
+# once this one has claimed or rolled back, and a rollback can never release
+# an issue another launch has just re-claimed.
+claim_issues() {
+    local lock rc=0
+    lock="$(git -C "$REPO_DIR" rev-parse --path-format=absolute --git-common-dir)/claude-parallel-claim.lock"
+    if ! mkdir "$lock" 2>/dev/null; then
+        print_error "Another launch is claiming tickets (lock $lock). Wait for it, or remove the lock if no launch is running."
+        return 1
+    fi
+    # Interrupted mid-batch: give back what this run claimed, then free the lock
+    trap 'release_claims; rmdir "$lock" 2>/dev/null; exit 130' INT TERM
+    claim_issues_locked "$@" || rc=$?
+    trap - INT TERM
+    rmdir "$lock" 2>/dev/null || true
+    return "$rc"
+}
+
+# Claim every issue before anything is stopped or created, recording each one
+# whose assignee the claim changed. When an issue cannot be read or claimed,
+# give back what this run claimed and stop.
+drop_last_claim() {
+    unset "LAUNCH_CLAIMS[$((${#LAUNCH_CLAIMS[@]} - 1))]"
+}
+claim_issues_locked() {
+    local issue before after
+    LAUNCH_CLAIMS=()
+    for issue in "$@"; do
+        if ! before=$(read_owner "$issue"); then
+            print_error "Could not read the assignee of $issue. Nothing was launched."
+            release_claims
+            return 1
+        fi
+        # Recorded before the claim, so an interruption mid-claim still gives it back
+        LAUNCH_CLAIMS+=("$issue|$before")
+        if ! bd update "$issue" --claim; then
+            drop_last_claim
+            print_error "Could not claim $issue: it may be claimed by someone else. Nothing was launched."
+            release_claims
+            return 1
+        fi
+        after=$(read_owner "$issue") || after=""
+        # Dropped only when a read proves the owner unchanged; an unread owner keeps the record
+        if [ -n "${before%%|*}" ] && [ -n "$after" ] && [ "${after%%|*}" = "${before%%|*}" ]; then
+            drop_last_claim
+        fi
+    done
+}
+
 # Launch tmux session with parallel Claude instances
 launch_parallel() {
     local -a issues=("$@")
@@ -174,18 +259,18 @@ launch_parallel() {
         count=$MAX_PARALLEL
     fi
 
-    # Kill existing session
-    tmux kill-session -t "$SESSION" 2>/dev/null || true
-
     print_phase "Launching $count parallel Claude instances"
     echo ""
 
-    # Claim all issues first
+    # Claim all issues first: a failed claim leaves the running session alone
     print_info "Claiming issues..."
-    for issue in "${issues[@]}"; do
-        bd update "$issue" --status in_progress 2>/dev/null || true
-    done
+    claim_issues "${issues[@]}" || return 1
+    # From here a failed setup (worktree, tmux) gives the claims back
+    trap release_claims EXIT
     echo ""
+
+    # Kill existing session
+    tmux kill-session -t "$SESSION" 2>/dev/null || true
 
     # Create worktrees
     print_info "Creating worktrees..."
@@ -253,6 +338,8 @@ launch_parallel() {
     print_info "Attaching to session..."
     sleep 1
 
+    trap - EXIT
+    LAUNCH_CLAIMS=()
     tmux attach-session -t "$SESSION"
 }
 
@@ -454,7 +541,7 @@ interactive_mode() {
             print_info "Starting Claude to help plan your work..."
             print_info "Describe your feature/bugfix/refactor and Claude will create beads tasks."
             echo ""
-            claude "Help me plan and break down my work into beads tasks. Ask me what I want to build or fix, then create appropriate beads issues with 'bd create'. Use types: feature, task, bug, or refactor. Set appropriate priorities (0=critical, 2=medium, 4=backlog)."
+            claude "Help me plan and break down my work into beads tasks. Ask me what I want to build or fix, then create appropriate beads issues with 'bd create'. Give each issue a --description and --acceptance criteria. Use types: feature, task, bug, or chore. Set appropriate priorities (0=critical, 2=medium, 4=backlog)."
             ;;
         2)
             echo ""
@@ -492,7 +579,7 @@ main() {
             print_phase "Planning Mode"
             echo ""
             print_info "Starting Claude to help plan your work..."
-            claude "Help me plan and break down my work into beads tasks. Ask me what I want to build or fix, then create appropriate beads issues with 'bd create'. Use types: feature, task, bug, or refactor."
+            claude "Help me plan and break down my work into beads tasks. Ask me what I want to build or fix, then create appropriate beads issues with 'bd create'. Give each issue a --description and --acceptance criteria. Use types: feature, task, bug, or chore."
             ;;
         select)
             print_header

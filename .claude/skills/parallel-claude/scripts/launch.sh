@@ -46,6 +46,7 @@ check_dependencies() {
     command -v tmux &>/dev/null || missing+=("tmux")
     command -v claude &>/dev/null || missing+=("claude")
     command -v bd &>/dev/null || missing+=("bd (beads)")
+    command -v jq &>/dev/null || missing+=("jq")
 
     if [ ${#missing[@]} -gt 0 ]; then
         print_error "Missing: ${missing[*]}"
@@ -79,6 +80,7 @@ get_branch_prefix() {
     case "$1" in
         bug) echo "fix" ;;
         feature) echo "feat" ;;
+        chore) echo "chore" ;;
         refactor) echo "refactor" ;;
         *) echo "task" ;;
     esac
@@ -142,6 +144,89 @@ $(sed "s|<branch>|$branch|g" "$REPO_DIR/.claude/skills/parallel-claude/agent-bri
 PROMPT
 }
 
+# Issues this launch took over, one "id|previous assignee|previous status" each,
+# so a launch that fails puts every one back as it found it.
+LAUNCH_CLAIMS=()
+
+# Give back what this launch claimed: unclaim the issues nobody held, and hand
+# an issue taken from another assignee (a claim.pools alias) back to it.
+release_claims() {
+    local entry id before status
+    for entry in ${LAUNCH_CLAIMS[@]+"${LAUNCH_CLAIMS[@]}"}; do
+        IFS='|' read -r id before status <<< "$entry"
+        if [ -z "$before" ]; then
+            if bd unclaim "$id" >/dev/null; then
+                print_info "Released $id"
+            else
+                print_warning "Could not release $id: run bd unclaim $id"
+            fi
+        elif bd update "$id" --assignee "$before" --status "$status" >/dev/null; then
+            print_info "Gave $id back to $before"
+        else
+            print_warning "Could not give $id back: run bd update $id --assignee $before --status $status"
+        fi
+    done
+    LAUNCH_CLAIMS=()
+}
+
+# Read an issue's assignee and status as "assignee|status"; fails when bd show
+# fails or prints nothing.
+read_owner() {
+    local json
+    json=$(bd show "$1" --json 2>/dev/null) && [ -n "$json" ] \
+        && printf '%s' "$json" | jq -er 'if type == "array" then .[0] else . end | "\(.assignee // "")|\(.status // "")"'
+}
+
+# Claim the issues under a lock shared by every worktree of this repository
+# (mkdir: flock is not on macOS), so a second launch reads the assignees only
+# once this one has claimed or rolled back, and a rollback can never release
+# an issue another launch has just re-claimed.
+claim_issues() {
+    local lock rc=0
+    lock="$(git -C "$REPO_DIR" rev-parse --path-format=absolute --git-common-dir)/claude-parallel-claim.lock"
+    if ! mkdir "$lock" 2>/dev/null; then
+        print_error "Another launch is claiming tickets (lock $lock). Wait for it, or remove the lock if no launch is running."
+        return 1
+    fi
+    # Interrupted mid-batch: give back what this run claimed, then free the lock
+    trap 'release_claims; rmdir "$lock" 2>/dev/null; exit 130' INT TERM
+    claim_issues_locked "$@" || rc=$?
+    trap - INT TERM
+    rmdir "$lock" 2>/dev/null || true
+    return "$rc"
+}
+
+# Claim every issue before anything is stopped or created, recording each one
+# whose assignee the claim changed. When an issue cannot be read or claimed,
+# give back what this run claimed and stop.
+drop_last_claim() {
+    unset "LAUNCH_CLAIMS[$((${#LAUNCH_CLAIMS[@]} - 1))]"
+}
+claim_issues_locked() {
+    local issue before after
+    LAUNCH_CLAIMS=()
+    for issue in "$@"; do
+        if ! before=$(read_owner "$issue"); then
+            print_error "Could not read the assignee of $issue. Nothing was launched."
+            release_claims
+            return 1
+        fi
+        # Recorded before the claim, so an interruption mid-claim still gives it back
+        LAUNCH_CLAIMS+=("$issue|$before")
+        if ! bd update "$issue" --claim; then
+            drop_last_claim
+            print_error "Could not claim $issue: it may be claimed by someone else. Nothing was launched."
+            release_claims
+            return 1
+        fi
+        after=$(read_owner "$issue") || after=""
+        # Dropped only when a read proves the owner unchanged; an unread owner keeps the record
+        if [ -n "${before%%|*}" ] && [ -n "$after" ] && [ "${after%%|*}" = "${before%%|*}" ]; then
+            drop_last_claim
+        fi
+    done
+}
+
 launch_parallel() {
     local -a issues=("$@")
     local count=${#issues[@]}
@@ -160,19 +245,17 @@ launch_parallel() {
         count=$MAX_PARALLEL
     fi
 
-    # Kill existing session
-    tmux kill-session -t "$SESSION" 2>/dev/null || true
-
     print_info "Launching $count parallel instances..."
     echo ""
 
-    # Claim issues
+    # Claim issues first: a failed claim leaves the running session alone
     print_info "Claiming issues..."
-    for issue in "${issues[@]}"; do
-        if ! bd update "$issue" --status in_progress 2>/dev/null; then
-            print_warning "Could not claim $issue (may already be in progress)"
-        fi
-    done
+    claim_issues "${issues[@]}" || return 1
+    # From here a failed setup (worktree, tmux) gives the claims back; the cache is still removed
+    trap 'release_claims; cleanup_cache' EXIT
+
+    # Kill existing session
+    tmux kill-session -t "$SESSION" 2>/dev/null || true
 
     # Create worktrees
     echo ""
@@ -231,6 +314,8 @@ launch_parallel() {
     print_info "Attaching..."
     sleep 1
 
+    trap cleanup_cache EXIT
+    LAUNCH_CLAIMS=()
     tmux attach-session -t "$SESSION"
 }
 

@@ -1,22 +1,15 @@
 ---
-name: Platform Integration Workflow
-description: Guide for adding new AI platform support (e.g., Gemini, Mistral, Anthropic) to the Chrome extension with strategy pattern and testing requirements
+name: add-platform
+description: Add a new built-in AI chat Platform (e.g. Gemini, Mistral, Meta AI) to the extension, from its config entry and strategy to the Prompts button placement and its tests. Use when asked to add, support or integrate a new AI platform or site, or about extending platform support.
 ---
 
 # Platform Integration Workflow
 
 This skill guides you through adding support for new AI platforms (like Gemini, Mistral.ai, Meta AI, etc.) to the My Prompt Manager Chrome extension.
 
-## When to Use This Skill
-
-- User asks to add support for a new AI platform or website
-- User mentions "add platform", "support [platform name]", "integrate with [AI]"
-- User wants the prompt library icon to appear on a new AI chat interface
-- User asks about platform compatibility or extending platform support
-
 ## Overview
 
-Adding a new platform requires a **10-step workflow** using the centralized configuration system introduced in v1.3+. The process takes approximately 15-30 minutes for basic support.
+Adding a new platform is a **10-step workflow** built on the centralized configuration in `src/config/platforms.ts`.
 
 **Architecture Pattern:** Strategy Pattern + Centralized Configuration
 - Each platform has a strategy class extending `PlatformStrategy`
@@ -94,8 +87,8 @@ export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
 > ℹ️ If you omit `brandColors`, the logo square falls back to the accent (`bg-accent-subtle text-accent`). Switched off, every site shows the same disabled state (`bg-muted text-tertiary`, `src/constants/brandColors.ts`): give the logo component a `disabled` prop that draws it in `currentColor` (see `src/components/icons/SiteIcons.tsx`).
 
 **Priority Guidelines:**
-- 100: Premium platforms (Claude, ChatGPT)
-- 80-90: Major platforms (Perplexity, Mistral, Gemini)
+- 100: Claude
+- 80-90: Major platforms (ChatGPT 90; Mistral, Gemini 85; Perplexity, Copilot 80)
 - 60-79: Secondary platforms (new additions)
 - < 60: Experimental/beta platforms
 
@@ -204,47 +197,23 @@ export { YourPlatformStrategy } from './yourplatform-strategy';
 
 **File:** `src/content/platforms/platform-manager.ts`
 
-**Action:** Import and register in the constructor:
+**Action:** Import it and add it to `STRATEGY_CONSTRUCTORS`, under the `strategyClass` name you gave it in `platforms.ts`. The manager builds its registry from that map and the platform config, and adds `DefaultStrategy` as the fallback itself:
 
 ```typescript
-// Add import at top
 import { YourPlatformStrategy } from './yourplatform-strategy';
 
-// In the constructor, add to the strategies array:
-constructor(options: PlatformManagerOptions = {}) {
-  this.strategies = [
-    new ClaudeStrategy(),
-    new ChatGPTStrategy(),
-    new PerplexityStrategy(),
-    new MistralStrategy(),
-    new GeminiStrategy(),
-    new YourPlatformStrategy(), // Add your strategy here
-    new DefaultStrategy()       // IMPORTANT: Keep DefaultStrategy last
-  ];
-  // ... rest of constructor
-}
+const STRATEGY_CONSTRUCTORS: Record<string, new (hostname?: string) => PlatformStrategy> = {
+  // ... existing strategies ...
+  'YourPlatformStrategy': YourPlatformStrategy,
+  'DefaultStrategy': DefaultStrategy
+};
 ```
 
-### Step 5: Update Manifest Permissions (if needed)
+### Step 5: Update Manifest Permissions
 
 **File:** `manifest.json`
 
-**Action:** If the platform hostname is not already covered by `<all_urls>`, add it to content_scripts matches:
-
-```json
-{
-  "content_scripts": [
-    {
-      "matches": [
-        "https://*.your-ai-platform.com/*"
-      ],
-      "js": ["src/content/index.ts"]
-    }
-  ]
-}
-```
-
-**Note:** The extension uses `<all_urls>` host_permissions, so this step is usually not needed.
+**Action:** A built-in Platform is listed by origin in two places: add `https://your-ai-platform.com/*` to both `host_permissions` and the `matches` of the `content_scripts` entry. Without them the content script never runs on the Platform.
 
 ### Step 6: Create Unit Tests
 
@@ -376,15 +345,7 @@ npm test -- yourplatform-strategy.test.ts
 npm run test:coverage
 ```
 
-**CRITICAL:** Both tests and linting MUST pass before proceeding:
-
-```bash
-# Run linting
-npm run lint
-
-# Fix linting issues automatically
-npm run lint:fix
-```
+Before moving on, `npm test && npm run lint && npm run lint:changed && npm run typecheck` passes (`npm run lint:fix` fixes what it can).
 
 ### Step 9: Place the Prompts button
 
@@ -658,11 +619,10 @@ Use this checklist when adding a new platform:
 - [ ] **Step 2.1:** Added the Platform's row in Settings (optional)
 - [ ] **Step 3:** Created strategy class in `src/content/platforms/`
 - [ ] **Step 4:** Registered strategy in `platform-manager.ts` and `index.ts`
-- [ ] **Step 5:** Updated manifest permissions (if needed)
+- [ ] **Step 5:** Added the origin to `host_permissions` and `content_scripts` matches
 - [ ] **Step 6:** Created unit tests
 - [ ] **Step 7:** Tested manually in browser
-- [ ] **Step 8:** All tests pass (`npm test`)
-- [ ] **Step 8:** Linting passes (`npm run lint`)
+- [ ] **Step 8:** `npm test && npm run lint && npm run lint:changed && npm run typecheck` passes
 - [ ] **Step 9:** Placed the Prompts button: `iconPlacement` chain, composer fixture, id in `icon-placement-chains.test.ts`
 - [ ] **Step 10:** Updated documentation
 
@@ -682,13 +642,8 @@ Your platform integration is complete when:
 3. Clicking icon opens the prompt selector
 4. Selected prompts insert correctly into the input field
 5. Platform recognizes the inserted content (submit button enabled)
-6. All automated tests pass
-7. ESLint shows no errors or warnings
+6. `npm test && npm run lint && npm run lint:changed && npm run typecheck` passes
+7. Biome reports no warning in the files you changed
 8. Works in both light and dark mode
 9. No console errors or warnings
 10. Code follows existing patterns and style
-
----
-
-**Last Updated:** 2025-11-10
-**Skill Version:** 1.1.0
