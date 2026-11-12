@@ -496,6 +496,18 @@ describe('DefaultStrategy: an Insertion goes where the caret is', () => {
       expect(textAround(field, caret)).toEqual({ before: 'before PROMPT\n', after: 'after' });
     });
 
+    it('tells the page of the Prompt alone when it writes the text itself, not of the text around it', async () => {
+      document.execCommand = vi.fn().mockReturnValue(false);
+      select(7);
+      const heard: (string | null)[] = [];
+      field.addEventListener('input', (event) => heard.push((event as InputEvent).data));
+
+      await new DefaultStrategy('example.com').insert(field, 'PROMPT ');
+
+      // An editor that takes the data of an input event as new text would insert the draft again
+      expect(heard).toEqual(['PROMPT ']);
+    });
+
     it('fails, and writes nothing over the field, when the page does not keep the text', async () => {
       document.execCommand = vi.fn().mockReturnValue(false);
       select(7);

@@ -220,7 +220,7 @@ export abstract class PlatformStrategy implements PlatformStrategyInterface {
     }
     // No editing command, or the editor laid the text out differently: write the whole text
     // directly, the text around the caret included
-    return this.writeEditableText(element, before + text + after, before.length + text.length, via);
+    return this.writeEditableText(element, before + text + after, before.length + text.length, text, via);
   }
 
   /**
@@ -239,10 +239,10 @@ export abstract class PlatformStrategy implements PlatformStrategyInterface {
   /**
    * Writes `text` straight into a contenteditable input field as its whole content, one <br>
    * between two lines so the breaks show whatever the field does with spaces, puts the caret
-   * after its first `caret` characters, and tells the page as typing would.
+   * after its first `caret` characters, and tells the page as typing `inserted` would.
    * @returns Failure when an editor whose own handler rebuilt its content did not keep the text
    */
-  private writeEditableText(element: HTMLElement, text: string, caret: number, via: string): InsertionResult {
+  private writeEditableText(element: HTMLElement, text: string, caret: number, inserted: string, via: string): InsertionResult {
     const document = element.ownerDocument;
     const lines = text.split('\n');
     const content = document.createDocumentFragment();
@@ -285,7 +285,9 @@ export abstract class PlatformStrategy implements PlatformStrategyInterface {
     } else {
       selection?.collapse(element, caretBefore ?? element.childNodes.length);
     }
-    element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: text }));
+    // The event carries what was inserted, not the text around it: an editor that takes the
+    // data of an input event as new text would put the draft in a second time
+    element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: inserted }));
     // An editor whose own handler rebuilt its content did not take the text
     if (readInputText(element) !== text) {
       return { success: false, error: 'The input field did not keep the text' };
@@ -324,7 +326,7 @@ export abstract class PlatformStrategy implements PlatformStrategyInterface {
       return { success: true, method: `${via}-execCommand` };
     }
     // No editing command, or the editor laid the text out differently: write it directly
-    return this.writeEditableText(element, text, text.length, via);
+    return this.writeEditableText(element, text, text.length, text, via);
   }
 
   /**
