@@ -2,6 +2,8 @@ import type { FC } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { DEFAULT_SETTINGS } from '../constants';
+// PROTOTYPE: placements of the New button, see src/prototype
+import { NewAsFirstRow, NewBesideSearch, NewFloating, useNewButtonVariant } from '../prototype/newButtonPlacement.prototype';
 import {
   ALL_PROMPTS,
   applyLibraryFilter,
@@ -45,6 +47,7 @@ const LibraryView: FC<LibraryViewProps> = ({
   context = 'popup'
 }) => {
   const { query, debouncedQuery, filteredPrompts, isSearching } = searchWithDebounce;
+  const newVariant = useNewButtonVariant();
   const [sortOrder, setSortOrder] = useState<SortOrder>(DEFAULT_SETTINGS.sortOrder);
   // "Show all prompts" leaves with its empty state, so focus goes to the All pill
   const [focusAll, setFocusAll] = useState(false);
@@ -168,7 +171,7 @@ const LibraryView: FC<LibraryViewProps> = ({
     : `${String(finalFilteredPrompts.length)} of ${totalLabel}`;
 
   return (
-    <div className="h-full flex flex-col bg-app">
+    <div className="h-full flex flex-col bg-app relative">
       {/* Header with Search and Filter */}
       <ViewHeader
         icon="logo"
@@ -179,7 +182,7 @@ const LibraryView: FC<LibraryViewProps> = ({
         context={context}
       >
         <ViewHeader.Actions>
-          <ViewHeader.NewButton onClick={onAddNew} disabled={loading} />
+          {newVariant === 'A' && <ViewHeader.NewButton onClick={onAddNew} disabled={loading} />}
           {context === 'sidepanel' && (
             <ViewHeader.CloseButton onClick={() => { window.close(); }} context="sidepanel" />
           )}
@@ -188,13 +191,16 @@ const LibraryView: FC<LibraryViewProps> = ({
         {!libraryEmpty && (
         <div className="space-y-4 pb-6" role="search" aria-label="Search and filter prompts">
           {/* The header pads its content by 24px; the pill keeps 16px on each side */}
-          <div className="-mx-2">
+          <div className="-mx-2 flex items-center gap-2">
+            <div className="flex-1 min-w-0">
             <SearchBar
               value={query}
               onChange={searchWithDebounce.setQuery}
               onClear={searchWithDebounce.clearSearch}
               inputRef={searchRef}
             />
+            </div>
+            {newVariant === 'B' && <NewBesideSearch onClick={onAddNew} disabled={loading} />}
           </div>
 
           <LibraryFilterBar
@@ -293,10 +299,13 @@ const LibraryView: FC<LibraryViewProps> = ({
               </div>
             ) : (
               <div
-                className={cn('grid grid-cols-1 gap-3 px-4 pb-3', !isSearchActive && 'pt-3')}
+                className={cn('grid grid-cols-1 gap-3 px-4 pb-3', !isSearchActive && 'pt-3', newVariant === 'C' && 'pb-20')}
                 role="list"
                 aria-label={`${String(resultCount)} prompt${resultCount !== 1 ? 's' : ''} found`}
               >
+                {newVariant === 'E' && !isSearchActive && (
+                  <div role="listitem"><NewAsFirstRow onClick={onAddNew} /></div>
+                )}
                 {finalFilteredPrompts.map((prompt: Prompt, index) => (
                   <div
                     key={prompt.id}
@@ -319,6 +328,7 @@ const LibraryView: FC<LibraryViewProps> = ({
           </>
         )}
       </main>
+      {newVariant === 'C' && !libraryEmpty && <NewFloating onClick={onAddNew} disabled={loading} />}
     </div>
   );
 };

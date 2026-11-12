@@ -543,7 +543,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
       )}
       </div>
 
-      <TabBar activeSection={currentView} onSelect={handleSelectSection} inert={categorySheetOpen} />
+      <TabBar activeSection={currentView} onSelect={handleSelectSection} inert={categorySheetOpen} onNew={handleAddNew} />
       </div>
 
       {editorSheet.shown && (

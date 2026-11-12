@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "prototype-new-button",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite", "--config", "vite.prototype.config.ts"],
+      "port": 5183
+    }
+  ]
+}

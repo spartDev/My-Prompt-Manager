@@ -1,5 +1,8 @@
 import type { FC, KeyboardEvent } from 'react';
-import { useRef } from 'react';
+import { Fragment, useRef } from 'react';
+
+// PROTOTYPE: placements of the New button, see src/prototype
+import { NewInTabBar, useNewButtonVariant } from '../prototype/newButtonPlacement.prototype';
 
 import { AnalyticsTabIcon, CategoriesTabIcon, LibraryTabIcon, SettingsTabIcon } from './icons/TabBarIcons';
 
@@ -22,13 +25,16 @@ export interface TabBarProps {
   onSelect: (section: Section) => void;
   /** Behind a modal sheet: out of reach, assistive technology included, until it closes */
   inert?: boolean;
+  /** PROTOTYPE (variant D): opens the editor on a new Prompt */
+  onNew?: () => void;
 }
 
 /**
  * iOS-style bottom tab bar switching between the four Sections.
  * Implements the WAI-ARIA tabs pattern: roving tabindex and arrow-key navigation.
  */
-const TabBar: FC<TabBarProps> = ({ activeSection, onSelect, inert = false }) => {
+const TabBar: FC<TabBarProps> = ({ activeSection, onSelect, inert = false, onNew }) => {
+  const newInBar = useNewButtonVariant() === 'D' && onNew !== undefined;
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLButtonElement>, index: number) => {
@@ -50,12 +56,13 @@ const TabBar: FC<TabBarProps> = ({ activeSection, onSelect, inert = false }) => 
       aria-label="Main navigation"
       inert={inert}
     >
-      <div className="grid grid-cols-4 gap-1" role="tablist" aria-label="Sections">
+      <div className={`grid gap-1 ${newInBar ? 'grid-cols-5' : 'grid-cols-4'}`} role="tablist" aria-label="Sections">
         {TABS.map(({ section, label, icon: Icon }, index) => {
           const isActive = section === activeSection;
           return (
+            <Fragment key={section}>
+            {newInBar && index === 2 && <NewInTabBar onClick={onNew} />}
             <button
-              key={section}
               ref={(el) => { tabRefs.current[index] = el; }}
               type="button"
               role="tab"
@@ -73,6 +80,7 @@ const TabBar: FC<TabBarProps> = ({ activeSection, onSelect, inert = false }) => 
               <Icon className="w-6 h-6" />
               <span>{label}</span>
             </button>
+            </Fragment>
           );
         })}
       </div>

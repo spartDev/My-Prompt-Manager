@@ -9,6 +9,7 @@
   },
   "scripts": {
     "dev": "vite",
+    "prototype:new-button": "vite --config vite.prototype.config.ts --open /src/prototype/new-button.html",
     "build": "vite build",
     "postbuild": "npm run check:custom-site-chunks",
     "check:custom-site-chunks": "node scripts/custom-site-chunks.mjs",
