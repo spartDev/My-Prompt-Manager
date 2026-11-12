@@ -142,6 +142,32 @@ $(sed "s|<branch>|$branch|g" "$REPO_DIR/.claude/skills/parallel-claude/agent-bri
 PROMPT
 }
 
+# Claim every issue before anything is stopped or created. When one claim fails,
+# release the issues this run claimed (only those nobody held before), so a
+# failed launch leaves the backlog as it found it.
+claim_issues() {
+    local -a claimed=()
+    local issue assignee
+    for issue in "$@"; do
+        assignee=$(bd show "$issue" --json 2>/dev/null | jq -r 'if type == "array" then .[0] else . end | .assignee // ""')
+        if ! bd update "$issue" --claim; then
+            print_error "Could not claim $issue: it may be claimed by someone else. Nothing was launched."
+            local held
+            for held in ${claimed[@]+"${claimed[@]}"}; do
+                if bd unclaim "$held" >/dev/null; then
+                    print_info "Released $held"
+                else
+                    print_warning "Could not release $held: run bd unclaim $held"
+                fi
+            done
+            return 1
+        fi
+        if [ -z "$assignee" ]; then
+            claimed+=("$issue")
+        fi
+    done
+}
+
 launch_parallel() {
     local -a issues=("$@")
     local count=${#issues[@]}
@@ -160,20 +186,15 @@ launch_parallel() {
         count=$MAX_PARALLEL
     fi
 
-    # Kill existing session
-    tmux kill-session -t "$SESSION" 2>/dev/null || true
-
     print_info "Launching $count parallel instances..."
     echo ""
 
-    # Claim issues
+    # Claim issues first: a failed claim leaves the running session alone
     print_info "Claiming issues..."
-    for issue in "${issues[@]}"; do
-        if ! bd update "$issue" --claim; then
-            print_error "Could not claim $issue: it may be claimed by someone else. Nothing was launched."
-            return 1
-        fi
-    done
+    claim_issues "${issues[@]}" || return 1
+
+    # Kill existing session
+    tmux kill-session -t "$SESSION" 2>/dev/null || true
 
     # Create worktrees
     echo ""
