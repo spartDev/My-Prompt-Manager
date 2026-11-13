@@ -65,8 +65,8 @@ test.describe('Empty states', () => {
       await expect(title).toHaveCSS('font-size', '21px');
       await expect(empty.getByText('Save the prompts you keep retyping.')).toHaveCSS('color', colors.secondary);
 
-      // The header stays, without the search or the Library filter; the tab bar stays
-      await expect(page.getByTestId('new-prompt-button')).toBeVisible();
+      // The header stays, without the search, its New button or the Library filter; the tab bar stays
+      await expect(page.getByRole('button', { name: 'Add new prompt' })).toHaveCount(0);
       await expect(page.getByText('0 prompts', { exact: true })).toBeVisible();
       await expect(page.getByRole('search')).toHaveCount(0);
       await expect(page.getByTestId('tab-library')).toBeVisible();
@@ -85,10 +85,8 @@ test.describe('Empty states', () => {
       await expect(importBackup).toBeInViewport({ ratio: 1 });
       await page.screenshot({ path: `${SCREENSHOT_DIR}/library-${theme}.png` });
 
-      // Keyboard, in the order read: New, then the two actions
-      await page.getByTestId('new-prompt-button').focus();
-      await page.keyboard.press('Tab');
-      await expect(write).toBeFocused();
+      // Keyboard, in the order read: the two actions
+      await write.focus();
       await page.keyboard.press('Tab');
       await expect(importBackup).toBeFocused();
     });

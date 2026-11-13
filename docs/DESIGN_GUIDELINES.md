@@ -621,7 +621,7 @@ A field on a card takes `bg-subtle`; a field placed directly on `bg-app` takes `
 
 #### Search Input
 
-The Library search (`src/components/SearchBar.tsx`, Atelier 1C) is a pill on `bg-app`: `bg-card`, 44px high, 16px from each side of the panel. It holds a magnifier, the field, and one thing at its end: the badge of its shortcut while the field is empty (`⌘K`, `Ctrl K` off Apple devices, `aria-hidden`; the field carries `aria-keyshortcuts`), or a round button that clears it once filled.
+The Library search (`src/components/SearchBar.tsx`, Atelier 1C) is a pill on `bg-app`: `bg-card`, 44px high. Its row, the pill then the New button, keeps 16px from each side of the panel. It holds a magnifier, the field, and one thing at its end: the badge of its shortcut while the field is empty (`⌘K`, `Ctrl K` off Apple devices, `aria-hidden`; the field carries `aria-keyshortcuts`), or a round button that clears it once filled.
 
 ```tsx
 <div className="
@@ -648,6 +648,7 @@ The Library search (`src/components/SearchBar.tsx`, Atelier 1C) is a pill on `bg
 - **Focus** shows on the pill, not on the field: the border turns `border-focus` and the pill takes `shadow-search-focus`, a 4px halo of the accent at 12% (`--shadow-tint-accent`, lighter violet in dark). The two stand for the outline of the field, so neither may be removed.
 - **Exception to `border-input`:** at rest the pill takes `border-default`, 1.09:1 on `bg-app`, as the mockup draws it. The field is found by its magnifier and its placeholder (`text-tertiary`, 5.3:1 on `bg-card`), not by its border. Other fields keep `border-input`.
 - **Escape** in the field clears it when filled and keeps the keyboard there; in an empty field it lets go of the keyboard.
+- **New** ends the row of the pill, 8px after it (`src/components/NewPromptButton.tsx`): a round button as high as the pill, `size-11 rounded-full bg-accent hover:bg-accent-hover text-on-accent shadow-sm focus-primary`, a 20px plus, named "Add new prompt". It is the main action of the Library and opens the editor on a new Prompt. It is not in the Section header, where it sat against the close button of the side panel and broke the title onto two lines. The keyboard reaches the field, then New, then the Library filter. The `role="search"` landmark ("Search prompts") wraps the pill alone: New creates a Prompt, so it stays outside it, and the Library filter is a `radiogroup` with its own name.
 
 #### Search results
 
@@ -663,7 +664,7 @@ A Section with nothing to list shows an empty state (Atelier 1C 5a to 5f) in pla
 
 | Section | Empty when | Component |
 |---|---|---|
-| Library | it holds no Prompt (`isLibraryEmpty`); the search and the Library filter are not offered | `emptyStates/LibraryEmpty` |
+| Library | it holds no Prompt (`isLibraryEmpty`); the search, its New button and the Library filter are not offered: "Write your first prompt" is the one way to add a Prompt | `emptyStates/LibraryEmpty` |
 | Categories | the Default Category is the only one (`isCategoriesEmpty`); the Eyebrow reads "Organize" | `emptyStates/CategoriesEmpty` |
 | Analytics | no Insertion in the period counted (`isStatsEmpty`), whatever the Library holds | `analytics/StatsEmpty` |
 

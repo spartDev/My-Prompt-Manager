@@ -155,6 +155,43 @@ describe('LibraryView', () => {
     });
   });
 
+  describe('New button', () => {
+    it('ends the search row, out of the header bar and of the search landmark', () => {
+      render(<LibraryView {...defaultProps} context="sidepanel" />);
+
+      const newButton = screen.getByRole('button', { name: 'Add new prompt' });
+      const search = screen.getByRole('search', { name: 'Search prompts' });
+      expect(search).toContainElement(screen.getByRole('searchbox'));
+      expect(search).not.toContainElement(newButton);
+      expect(search.parentElement).toContainElement(newButton);
+      expect(screen.getByRole('heading', { level: 1 }).closest('div.p-6')).not.toContainElement(newButton);
+    });
+
+    it('comes after the search field and before the Library filter', () => {
+      render(<LibraryView {...defaultProps} />);
+
+      const newButton = screen.getByRole('button', { name: 'Add new prompt' });
+      const after = Node.DOCUMENT_POSITION_FOLLOWING;
+      expect(screen.getByRole('searchbox').compareDocumentPosition(newButton) & after).toBeTruthy();
+      expect(newButton.compareDocumentPosition(screen.getByRole('radiogroup', { name: 'Library filter' })) & after).toBeTruthy();
+    });
+
+    it('opens the editor on a new Prompt', async () => {
+      const onAddNew = vi.fn();
+      render(<LibraryView {...defaultProps} onAddNew={onAddNew} />);
+
+      await userEvent.click(screen.getByRole('button', { name: 'Add new prompt' }));
+
+      expect(onAddNew).toHaveBeenCalledTimes(1);
+    });
+
+    it('waits while the Library loads', () => {
+      render(<LibraryView {...defaultProps} loading />);
+
+      expect(screen.getByRole('button', { name: 'Add new prompt' })).toBeDisabled();
+    });
+  });
+
   describe('Empty Library', () => {
     const emptyProps = { ...defaultProps, prompts: [], searchWithDebounce: createMockSearchWithDebounce([]) };
 
@@ -164,10 +201,15 @@ describe('LibraryView', () => {
       const empty = screen.getByTestId('library-empty');
       expect(within(empty).getByRole('heading', { level: 2, name: 'Your library is empty' })).toBeInTheDocument();
       expect(empty).toHaveTextContent('Add variables for the parts that change');
-      // The header stays: its title, the count and New
+      // The header stays: its title and the count
       expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
       expect(screen.getByText('0 prompts')).toBeInTheDocument();
-      expect(screen.getByTestId('new-prompt-button')).toBeInTheDocument();
+    });
+
+    it('has no New button: "Write your first prompt" is the one way in', () => {
+      render(<LibraryView {...emptyProps} context="sidepanel" />);
+
+      expect(screen.queryByRole('button', { name: 'Add new prompt' })).not.toBeInTheDocument();
     });
 
     it('hides the search and the Library filters: there is nothing to search', () => {
@@ -268,32 +310,6 @@ describe('LibraryView', () => {
     it('renders prompts when they exist', () => {
       render(<LibraryView {...defaultProps} />);
       expect(screen.getByText('Test Prompt')).toBeInTheDocument();
-    });
-  });
-
-  describe('New button', () => {
-    it('renders exactly one "New" button in the header', () => {
-      render(<LibraryView {...defaultProps} />);
-      const buttons = screen.getAllByRole('button', { name: /add new prompt/i });
-      expect(buttons).toHaveLength(1);
-      expect(buttons[0]).toHaveTextContent('New');
-      expect(screen.getByRole('banner')).toContainElement(buttons[0]);
-    });
-
-    it('calls onAddNew when clicked', async () => {
-      const user = userEvent.setup();
-      const onAddNew = vi.fn();
-
-      render(<LibraryView {...defaultProps} onAddNew={onAddNew} />);
-
-      await user.click(screen.getByRole('button', { name: /add new prompt/i }));
-
-      expect(onAddNew).toHaveBeenCalledTimes(1);
-    });
-
-    it('is disabled when loading', () => {
-      render(<LibraryView {...defaultProps} loading={true} />);
-      expect(screen.getByRole('button', { name: /add new prompt/i })).toBeDisabled();
     });
   });
 

@@ -39,6 +39,7 @@ Which component does which job in the popup and the side panel, and the conventi
 | `src/components/editor/LookalikeCallout.tsx` | "This looks familiar": the Prompt of the Library the text being written looks like (60% alike or more), with the first lines of both and Keep both. Never blocks Save |
 | `src/components/editor/VariableTextarea.tsx` | The Prompt text field: Variables highlighted by a mirror under a transparent textarea; the field grows with its text |
 | `src/components/LibraryFilterBar.tsx` | The Library filter pills (All, Pinned, Most Used, one per non-empty Category, and while one is active the Never used or Possible duplicates pill reached from Analytics, with a button back to All); the filter logic is `src/services/libraryFilter.ts` |
+| `src/components/NewPromptButton.tsx` | The main action of the Library: the round button that ends the search row and opens the editor on a new Prompt. Not shown in an empty Library, whose empty state offers to write the first Prompt |
 | `src/components/SearchBar.tsx` | The search field of the Library, a pill with the badge of its shortcut or a clear button. Presentation only: the debounce is in `useSearchWithDebounce`, the Cmd/Ctrl+K shortcut in `App` |
 | `src/components/emptyStates/EmptyState.tsx` | The base of an empty state: illustration, title, explanation, actions. `LibraryEmpty` (no Prompt) and `CategoriesEmpty` (only the Default Category, with the starter Categories) build on it; `analytics/StatsEmpty.tsx` (no Insertion in the period) has its own shape. The conditions are the selectors of `src/utils/emptyStates.ts` |
 | `src/components/SearchEmptyState.tsx` | What a search that finds nothing shows: the search, Create it (the editor opens titled with it) and, under a Library filter, Search all prompts |
@@ -48,7 +49,7 @@ Which component does which job in the popup and the side panel, and the conventi
 
 | Component | Job |
 |-----------|-----|
-| `src/components/ViewHeader.tsx` | The header of every view. Compound component: `ViewHeader.Actions`, `ViewHeader.BackButton`, `ViewHeader.SettingsButton`, `ViewHeader.NewButton`, `ViewHeader.CloseButton` |
+| `src/components/ViewHeader.tsx` | The header of every view. Compound component: `ViewHeader.Actions`, `ViewHeader.BackButton`, `ViewHeader.SettingsButton`, `ViewHeader.CloseButton` |
 | `src/components/Dropdown.tsx` | Every menu and popover: a list of items, or custom content that reads the controls through `useDropdown()`. Positioning and closing come from `useEnhancedFloatingPosition` and `useDropdownClose` |
 | `src/components/ConfirmDialog.tsx` | Confirmation modal; its `variant` sets the confirm button's color |
 | `src/components/ToastContainer.tsx` | Renders the one Notification of `useToast`, as the top-center pill |
