@@ -3,6 +3,7 @@
  * Provides structured logging with debug mode support and user notifications
  */
 
+import { readSiteSettings } from '../../services/siteSettings';
 import type { DebugInfo, NotificationType } from '../types/index';
 
 let _lastNotification: string | null = null;
@@ -59,9 +60,7 @@ export function isDebugMode(): boolean {
 async function updateDebugModeCache(): Promise<void> {
   try {
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-      const result = await chrome.storage.local.get(['promptLibrarySettings']);
-      const settings = result.promptLibrarySettings as { debugMode?: boolean } | undefined;
-      _debugModeCache = settings?.debugMode ?? false;
+      _debugModeCache = (await readSiteSettings()).debugMode;
       _debugModeCacheTime = Date.now();
     }
   } catch {

@@ -7,11 +7,11 @@
  */
 
 import type { IconPlacement } from '../../config/platforms';
+import type { CustomSite } from '../../types/index';
 import { PlatformManager } from '../platforms/platform-manager';
 import type { InsertionResult } from '../types/index';
 import type { UIElementFactory } from '../ui/element-factory';
 import { debug, warn } from '../utils/logger';
-import type { CustomSite } from '../utils/storage';
 
 export class PlatformInsertionManager {
   private options: Required<Record<string, unknown>>;

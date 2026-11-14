@@ -3,8 +3,13 @@
  * Handles Chrome storage operations, data validation, and prompt list item creation
  */
 
-import { getDefaultEnabledPlatforms } from "../../config/platforms";
 import { readPrompts } from "../../services/promptAdmission";
+import {
+  defaultSiteSettings,
+  isHostnameEnabled,
+  readSiteSettings,
+  type SiteSettings,
+} from "../../services/siteSettings";
 import type { SelectorCategory } from "../selector/selectorData";
 import type { Prompt } from "../types/index";
 
@@ -12,182 +17,35 @@ import { DOMUtils } from "./dom";
 import { debug, error as logError, warn } from "./logger";
 
 /**
- * Interface for extension settings
+ * The Site settings as storage has them, validated. A store that cannot be read gives the
+ * defaults, so the content script still starts.
  */
-export interface ExtensionSettings {
-  enabledSites: string[];
-  customSites: CustomSite[];
-  debugMode: boolean;
-  floatingFallback: boolean;
-}
-
-/**
- * Interface for custom site configuration
- */
-export interface CustomSite {
-  hostname: string;
-  displayName: string;
-  icon?: string;
-  enabled: boolean;
-  dateAdded: number;
-  positioning?: {
-    mode: "custom";
-    selector: string;
-    placement: "before" | "after" | "inside-start" | "inside-end";
-    offset?: {
-      x: number;
-      y: number;
-    };
-    zIndex?: number;
-    description?: string;
-  };
-}
-
-/**
- * Get extension settings with validation and defaults
- */
-export function getSettings(): Promise<ExtensionSettings> {
-  return new Promise((resolve) => {
-    try {
-      chrome.storage.local.get(["promptLibrarySettings"], (result) => {
-        if (chrome.runtime.lastError) {
-          const storageError = new Error(
-            `Chrome storage error: ${chrome.runtime.lastError.message ?? "Unknown error"}`,
-          );
-          logError("Failed to retrieve settings from storage", storageError);
-          resolve(getDefaultSettings()); // Graceful fallback to defaults
-          return;
-        }
-
-        const validatedSettings = validateSettingsData(
-          result.promptLibrarySettings,
-        );
-
-        debug("Retrieved and validated settings from storage", {
-          enabledSitesCount: validatedSettings.enabledSites.length,
-          customSitesCount: validatedSettings.customSites.length,
-          debugMode: validatedSettings.debugMode,
-        });
-
-        resolve(validatedSettings);
-      });
-    } catch (err) {
-      logError(
-        "Unexpected error accessing chrome storage for settings",
-        err as Error,
-      );
-      resolve(getDefaultSettings()); // Graceful fallback
-    }
-  });
-}
-
-/**
- * Get default extension settings
- */
-export function getDefaultSettings(): ExtensionSettings {
-  return {
-    enabledSites: getDefaultEnabledPlatforms(),
-    customSites: [],
-    debugMode: false,
-    floatingFallback: true,
-  };
-}
-
-/**
- * Validate settings data structure
- */
-export function validateSettingsData(settings: unknown): ExtensionSettings {
-  const defaults = getDefaultSettings();
-
-  // Handle null, undefined, or non-object values
-  if (!settings || typeof settings !== "object" || Array.isArray(settings)) {
-    if (settings !== undefined && settings !== null) {
-      warn("Invalid settings data structure, using defaults");
-    }
-    return defaults;
-  }
-
-  // Cast to record type for property access
-  const settingsObj = settings as Record<string, unknown>;
-
+export async function getSettings(): Promise<SiteSettings> {
   try {
-    const validatedSettings: ExtensionSettings = {
-      enabledSites: Array.isArray(settingsObj.enabledSites)
-        ? ((settingsObj.enabledSites as unknown[]).filter(
-            (site) => typeof site === "string" && site.length > 0,
-          ) as string[])
-        : defaults.enabledSites,
-      customSites: Array.isArray(settingsObj.customSites)
-        ? (settingsObj.customSites as unknown[]).filter((site) =>
-            validateCustomSite(site),
-          )
-        : defaults.customSites,
-      debugMode:
-        typeof settingsObj.debugMode === "boolean"
-          ? settingsObj.debugMode
-          : defaults.debugMode,
-      floatingFallback:
-        typeof settingsObj.floatingFallback === "boolean"
-          ? settingsObj.floatingFallback
-          : defaults.floatingFallback,
-    };
+    const settings = await readSiteSettings();
 
-    return validatedSettings;
+    debug("Retrieved and validated settings from storage", {
+      enabledSitesCount: settings.enabledSites.length,
+      customSitesCount: settings.customSites.length,
+      debugMode: settings.debugMode,
+    });
+
+    return settings;
   } catch (err) {
-    logError("Failed to validate settings data", err as Error, { settings });
-    return defaults;
+    logError("Failed to retrieve settings from storage", err as Error);
+    return defaultSiteSettings();
   }
 }
 
 /**
- * Validate custom site data structure
- */
-export function validateCustomSite(site: unknown): site is CustomSite {
-  if (!site || typeof site !== "object") {
-    return false;
-  }
-
-  const siteObj = site as Record<string, unknown>;
-
-  return (
-    typeof siteObj.hostname === "string" &&
-    typeof siteObj.displayName === "string" &&
-    typeof siteObj.enabled === "boolean" &&
-    typeof siteObj.dateAdded === "number" &&
-    siteObj.hostname.length > 0 &&
-    siteObj.displayName.length > 0
-  );
-}
-
-/**
- * Check if the current site is enabled
+ * Whether the extension works on a hostname, read from storage. A store that cannot be read
+ * gives no: the Prompts button never shows on a site the user may have turned off.
  */
 export async function isSiteEnabled(hostname: string): Promise<boolean> {
   try {
-    const settings = await getSettings();
-
-    // Check if site is in enabled sites list
-    if (settings.enabledSites.includes(hostname)) {
-      return true;
-    }
-
-    // Check if site is an enabled custom site
-    const customSite = settings.customSites.find(
-      (site) => site.hostname === hostname,
-    );
-    if (customSite && customSite.enabled) {
-      return true;
-    }
-
-    return false;
+    return isHostnameEnabled(await readSiteSettings(), hostname);
   } catch (err) {
     logError("Failed to check if site is enabled", err as Error, { hostname });
-    debug("ERROR in isSiteEnabled - defaulting to DISABLED", {
-      hostname,
-      error: err,
-    });
-    // Default to DISABLED on error to prevent unwanted icon appearance
-    // This is safer than defaulting to enabled for security/privacy
     return false;
   }
 }

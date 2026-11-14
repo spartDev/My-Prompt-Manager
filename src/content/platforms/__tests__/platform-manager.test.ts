@@ -26,14 +26,12 @@ vi.mock('../../utils/storage', () => ({
   getSettings: vi.fn().mockResolvedValue({
     enabledSites: ['example.com'],
     customSites: [],
-    debugMode: false,
-    floatingFallback: true
+    debugMode: false
   }),
   getDefaultSettings: vi.fn().mockReturnValue({
     enabledSites: ['example.com'],
     customSites: [],
-    debugMode: false,
-    floatingFallback: true
+    debugMode: false
   })
 }));
 

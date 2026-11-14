@@ -1,12 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 
+import { readSiteSettings } from '../services/siteSettings';
 import { StorageManager } from '../services/storage';
-import type { CustomSite } from '../types';
 import { Logger, toError } from '../utils';
-
-interface PromptLibrarySettings {
-  customSites?: CustomSite[];
-}
 
 export type Theme = 'light' | 'dark' | 'system';
 
@@ -40,12 +36,10 @@ async function notifyContentScriptsOfThemeChange(newTheme: Theme): Promise<void>
     'https://m365.cloud.microsoft/*'
   ];
 
-  const result: { promptLibrarySettings?: PromptLibrarySettings } =
-    await chrome.storage.local.get(['promptLibrarySettings']);
-  const customSites: CustomSite[] = result.promptLibrarySettings?.customSites ?? [];
+  const { customSites } = await readSiteSettings();
   const customUrls = customSites
-    .filter((site: CustomSite) => site.enabled)
-    .map((site: CustomSite) => `https://${site.hostname}/*`);
+    .filter((site) => site.enabled)
+    .map((site) => `https://${site.hostname}/*`);
 
   const allUrls = [...builtInUrls, ...customUrls];
   const tabs = await chrome.tabs.query({ url: allUrls });
