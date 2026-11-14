@@ -42,18 +42,6 @@ const renderSettings = async (showToastMock = vi.fn(), onStorageRefusedMock = vi
 const STORAGE_REFUSAL = 'Storage quota exceeded. Please delete old prompts to free up space.';
 const storageRefusal = () => Object.assign(new Error(STORAGE_REFUSAL), { type: 'STORAGE_QUOTA_EXCEEDED' });
 
-// Helper to find the reset call among multiple storage.local.set calls
-const findResetCall = (calls: Array<any>) =>
-  calls.find(call =>
-    call[0]?.promptLibrarySettings?.enabledSites &&
-    call[0]?.interfaceMode
-  );
-
-// Helper to assert that a priority group contains all expected sites
-const assertPriorityGroup = (sites: string[], group: string[]) => {
-  group.forEach(site => expect(sites).toContain(site));
-};
-
 describe('SettingsView', () => {
   beforeEach(() => {
     // Ensure window.alert exists for spying
@@ -493,38 +481,15 @@ describe('SettingsView', () => {
     await userEvent.click(confirmButton);
 
     await waitFor(() => {
-      expect(chromeMock.storage.local.set).toHaveBeenCalled();
+      expect(chromeMock.storage.local.set).toHaveBeenCalledWith({ interfaceMode: 'popup' });
     });
 
-    // The component makes multiple chrome.storage.local.set calls during its lifecycle.
-    // Use helper to find the reset call with the specific signature.
-    const calls = (chromeMock.storage.local.set as Mock).mock.calls;
-    const resetCall = findResetCall(calls);
-
-    expect(resetCall).toBeDefined();
-    // TypeScript doesn't narrow types after toBeDefined(), so we assert the type
-    const { promptLibrarySettings, interfaceMode } = (resetCall as typeof calls[0])[0];
-
-    // Verify enabledSites contains all default platforms sorted by priority
-    // Claude (100), ChatGPT (90), Mistral (85), Gemini (85), Perplexity (80), Copilot (80), M365Copilot (80)
-    expect(promptLibrarySettings.enabledSites).toHaveLength(7);
-
-    // Priority groups (equal priorities may have non-deterministic order)
-    expect(promptLibrarySettings.enabledSites[0]).toBe('claude.ai'); // Priority 100
-    expect(promptLibrarySettings.enabledSites[1]).toBe('chatgpt.com'); // Priority 90
-
-    // Use helper to assert priority groups contain expected sites
-    const p85 = promptLibrarySettings.enabledSites.slice(2, 4); // Priority 85
-    assertPriorityGroup(p85, ['chat.mistral.ai', 'gemini.google.com']);
-
-    const p80 = promptLibrarySettings.enabledSites.slice(4, 7); // Priority 80
-    assertPriorityGroup(p80, ['www.perplexity.ai', 'copilot.microsoft.com', 'm365.cloud.microsoft']);
-
-    // Verify other reset values
-    expect(promptLibrarySettings.customSites).toEqual([]);
-    expect(promptLibrarySettings.debugMode).toBe(false);
-    expect(promptLibrarySettings).not.toHaveProperty('floatingFallback');
-    expect(interfaceMode).toBe('popup');
+    // Nothing stored is what the defaults mean: the Site settings are removed, never written as a copy
+    expect(vi.mocked(chrome.storage.local.remove)).toHaveBeenCalledWith('promptLibrarySettings');
+    const siteSettingsWrites = (chromeMock.storage.local.set as Mock).mock.calls.filter(
+      ([items]) => (items as Record<string, unknown>).promptLibrarySettings !== undefined
+    );
+    expect(siteSettingsWrites).toEqual([]);
 
     expect(storageMock.updateSettings).toHaveBeenCalledWith({
       ...DEFAULT_SETTINGS,
@@ -558,16 +523,17 @@ describe('SettingsView', () => {
     expect(select).toHaveValue('title');
   });
 
-  // My-Prompt-Manager-see: loading the site settings is not a change, so opening Settings saves nothing
-  describe('site settings persistence', () => {
-    const PAST_THE_DEBOUNCE_MS = 400;
-    const waitPastTheDebounce = () => act(async () => {
-      await new Promise(resolve => { setTimeout(resolve, PAST_THE_DEBOUNCE_MS); });
-    });
+  // My-Prompt-Manager-76r.2: a save is one change, which the Site settings module applies to what storage
+  // holds. Settings shows the result; what the module does with storage is tested in siteSettings.test.ts
+  describe('the Site settings', () => {
     const siteSettingsWrites = () =>
       (getChromeMockFunctions().storage.local.set as Mock).mock.calls.filter(
         ([items]) => (items as Record<string, unknown>).promptLibrarySettings !== undefined
       );
+    // Lets what a load or a change left pending settle
+    const waitPastTheDebounce = () => act(async () => {
+      await new Promise(resolve => { setTimeout(resolve, 50); });
+    });
 
     beforeEach(() => {
       const chromeMock = getChromeMockFunctions();
@@ -575,111 +541,153 @@ describe('SettingsView', () => {
       (chromeMock.tabs.sendMessage as Mock).mockResolvedValue(undefined);
     });
 
-    it('opening Settings neither saves the site settings nor sends them to the tabs', async () => {
+    // My-Prompt-Manager-see: loading the Site settings is not a change
+    it('opening Settings neither saves the Site settings nor sends them to the tabs', async () => {
       const chromeMock = getChromeMockFunctions();
-      // A save that never ends keeps the interface mode locked, so a save on open would show
-      (chromeMock.storage.local.set as Mock).mockImplementation((items: Record<string, unknown>) =>
-        items.promptLibrarySettings === undefined ? Promise.resolve() : new Promise<void>(() => undefined)
-      );
 
       await renderSettings();
       await screen.findByRole('switch', { name: 'ChatGPT' });
       await waitPastTheDebounce();
 
       expect(siteSettingsWrites()).toHaveLength(0);
+      expect(vi.mocked(chrome.storage.local.remove)).not.toHaveBeenCalled();
       expect(chromeMock.tabs.sendMessage).not.toHaveBeenCalled();
       expect(screen.getByRole('radio', { name: 'Side panel' })).toBeEnabled();
     });
 
-    // My-Prompt-Manager-ds8: React re-renders on its own scheduler, not on setTimeout, so with only the
-    // timers faked the debounce timer of the first render, which holds the empty settings Settings starts
-    // with, fires after the load and before the re-render that would have cleared it
-    describe('with fake timers', () => {
-      const SAVE_DEBOUNCE_MS = 150;
-      const fakeTheTimers = () => vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-      // Lets promise callbacks run, and not the re-render React schedules
-      const flushPromises = async () => {
-        for (let tick = 0; tick < 5; tick++) {
-          // eslint-disable-next-line no-await-in-loop -- each tick lets the next callback run
-          await Promise.resolve();
-        }
-      };
-
-      afterEach(() => {
-        vi.useRealTimers();
-      });
-
-      it('saves nothing when the debounce timer of the first render fires after the load', async () => {
-        const chromeMock = getChromeMockFunctions();
-        fakeTheTimers();
-
-        renderSettingsView();
-        await flushPromises();
-        // The load has read the site settings and gone on to the Prompts: only the re-render is left
-        expect(getMockStorageManager().getPrompts).toHaveBeenCalled();
-        vi.advanceTimersByTime(PAST_THE_DEBOUNCE_MS);
-        await flushPromises();
-
-        expect(siteSettingsWrites()).toEqual([]);
-        expect(chromeMock.tabs.sendMessage).not.toHaveBeenCalled();
-      });
-
-      it('saves a site setting the user changes 150 ms after the change', async () => {
-        await renderSettings();
-        const claude = await screen.findByRole('switch', { name: 'Claude' });
-        await waitPastTheDebounce();
-        fakeTheTimers();
-
-        act(() => { claude.click(); });
-        vi.advanceTimersByTime(SAVE_DEBOUNCE_MS - 1);
-        expect(siteSettingsWrites()).toHaveLength(0);
-        vi.advanceTimersByTime(1);
-        await flushPromises();
-
-        expect(siteSettingsWrites()).toHaveLength(1);
-      });
-    });
-
-    it('saves a site setting the user changes once, and sends it to the tabs', async () => {
+    it('saves a switch the user flips at once, shows it and sends it to the tabs', async () => {
       const chromeMock = getChromeMockFunctions();
 
       await renderSettings();
-      await waitPastTheDebounce();
-      await userEvent.click(await screen.findByRole('switch', { name: 'Claude' }));
-      await waitPastTheDebounce();
+      const claude = await screen.findByRole('switch', { name: 'Claude' });
+      expect(claude).toHaveAttribute('aria-checked', 'false');
+      await userEvent.click(claude);
 
+      await waitFor(() => {
+        expect(claude).toHaveAttribute('aria-checked', 'true');
+      });
       const writes = siteSettingsWrites();
       expect(writes).toHaveLength(1);
       const saved = (writes[0][0] as { promptLibrarySettings: { enabledSites: string[] } }).promptLibrarySettings;
-      expect(saved.enabledSites).toEqual(expect.arrayContaining(['chatgpt.com', 'claude.ai']));
+      expect(saved.enabledSites).toEqual(['chatgpt.com', 'claude.ai']);
       expect(chromeMock.tabs.sendMessage).toHaveBeenCalledTimes(1);
       expect(chromeMock.tabs.sendMessage).toHaveBeenCalledWith(7, { action: 'settingsUpdated', settings: saved });
     });
 
-    // Review round 1 (Codex): a load that fails shows the default settings, and a change to them is still saved
-    it('saves a site setting the user changes after the settings failed to load', async () => {
+    it('puts the switch back and says so when the save fails', async () => {
       const chromeMock = getChromeMockFunctions();
+      const showToastMock = vi.fn();
+      (chromeMock.storage.local.set as Mock).mockRejectedValue(new Error('quota'));
+
+      await renderSettings(showToastMock);
+      const claude = await screen.findByRole('switch', { name: 'Claude' });
+      await userEvent.click(claude);
+
+      await waitFor(() => {
+        expect(showToastMock).toHaveBeenCalledWith("Couldn't save the setting", 'error');
+      });
+      expect(claude).toHaveAttribute('aria-checked', 'false');
+      expect(screen.getByRole('switch', { name: 'ChatGPT' })).toHaveAttribute('aria-checked', 'true');
+      expect(chromeMock.tabs.sendMessage).not.toHaveBeenCalled();
+    });
+
+    // A load that fails shows the defaults. A change is applied to what storage holds, never to the defaults
+    // shown: while storage cannot be read, it is refused and nothing is written
+    it('refuses a change, and writes nothing, while storage cannot be read', async () => {
+      const chromeMock = getChromeMockFunctions();
+      const showToastMock = vi.fn();
       (chromeMock.storage.local.get as Mock).mockRejectedValue(new Error('storage unavailable'));
 
-      await renderSettings();
-      await waitPastTheDebounce();
+      await renderSettings(showToastMock);
+      // The defaults are shown: Claude is on, where storage may have had it off
+      const claude = await screen.findByRole('switch', { name: 'Claude' });
+      expect(claude).toHaveAttribute('aria-checked', 'true');
+      await userEvent.click(claude);
+
+      await waitFor(() => {
+        expect(showToastMock).toHaveBeenCalledWith("Couldn't save the setting", 'error');
+      });
       expect(siteSettingsWrites()).toHaveLength(0);
+      expect(chromeMock.tabs.sendMessage).not.toHaveBeenCalled();
+      expect(claude).toHaveAttribute('aria-checked', 'true');
+    });
 
-      // The defaults are shown: Claude is on, where storage would have had it off
-      const claudeSwitch = await screen.findByRole('switch', { name: 'Claude' });
-      expect(claudeSwitch).toHaveAttribute('aria-checked', 'true');
-      await userEvent.click(claudeSwitch);
-      await waitPastTheDebounce();
+    // Review round 1 (Codex): what a storage event showed is newer than a read or a change that was
+    // under way when it arrived
+    describe('when another surface changes the Site settings meanwhile', () => {
+      const FROM_THE_OTHER_SURFACE = { enabledSites: ['claude.ai'], customSites: [] };
+      const theOtherSurfaceSaves = () => act(() => {
+        triggerChromeStorageChange({
+          promptLibrarySettings: { oldValue: { enabledSites: ['chatgpt.com'], customSites: [] }, newValue: FROM_THE_OTHER_SURFACE }
+        });
+      });
 
-      const writes = siteSettingsWrites();
-      expect(writes).toHaveLength(1);
-      const saved = (writes[0][0] as { promptLibrarySettings: { enabledSites: string[] } }).promptLibrarySettings;
-      expect(saved.enabledSites).not.toContain('claude.ai');
-      expect(chromeMock.tabs.sendMessage).toHaveBeenCalledWith(7, { action: 'settingsUpdated', settings: saved });
+      it('keeps them over a load that was reading the older ones', async () => {
+        const get = getChromeMockFunctions().storage.local.get as Mock;
+        const stored = { promptLibrarySettings: { enabledSites: ['chatgpt.com'], customSites: [] }, interfaceMode: 'popup', settings: DEFAULT_SETTINGS };
+        let finishTheRead!: () => void;
+        get.mockImplementationOnce(() => new Promise(resolve => { finishTheRead = () => { resolve(stored); }; }));
+        get.mockResolvedValue(stored);
+
+        renderSettingsView();
+        await waitFor(() => { expect(get).toHaveBeenCalled(); });
+        theOtherSurfaceSaves();
+        await act(async () => { finishTheRead(); });
+
+        expect(await screen.findByRole('switch', { name: 'Claude' })).toHaveAttribute('aria-checked', 'true');
+        expect(screen.getByRole('switch', { name: 'ChatGPT' })).toHaveAttribute('aria-checked', 'false');
+      });
+
+      it('keeps them over the answer of a change that was still telling the tabs', async () => {
+        const chromeMock = getChromeMockFunctions();
+        // Every listing of the tabs waits, the one the change makes among them
+        const pendingListings: Array<() => void> = [];
+        const finishTellingTheTabs = () => { pendingListings.splice(0).forEach(finish => { finish(); }); };
+        (chromeMock.tabs.query as Mock).mockImplementation(() => new Promise(resolve => { pendingListings.push(() => { resolve([]); }); }));
+
+        await renderSettings();
+        // This surface turns Gemini on: saved, and the tabs are being told
+        await userEvent.click(await screen.findByRole('switch', { name: 'Google Gemini' }));
+        await waitFor(() => { expect(chromeMock.tabs.query).toHaveBeenCalled(); });
+        expect(siteSettingsWrites()).toHaveLength(1);
+        theOtherSurfaceSaves();
+        await act(async () => {
+          finishTellingTheTabs();
+          // Long enough for the change to answer
+          await new Promise(resolve => { setTimeout(resolve, 20); });
+        });
+
+        expect(screen.getByRole('switch', { name: 'Claude' })).toHaveAttribute('aria-checked', 'true');
+        expect(screen.getByRole('switch', { name: 'Google Gemini' })).toHaveAttribute('aria-checked', 'false');
+        expect(screen.getByRole('switch', { name: 'ChatGPT' })).toHaveAttribute('aria-checked', 'false');
+      });
+    });
+
+    it('follows the Site settings when another surface changes them', async () => {
+      await renderSettings();
+      const claude = await screen.findByRole('switch', { name: 'Claude' });
+      expect(claude).toHaveAttribute('aria-checked', 'false');
+
+      act(() => {
+        triggerChromeStorageChange({
+          promptLibrarySettings: {
+            oldValue: { enabledSites: ['chatgpt.com'], customSites: [] },
+            newValue: {
+              enabledSites: ['claude.ai'],
+              customSites: [{ hostname: 'my-ai.example.com', displayName: 'My AI', enabled: true, dateAdded: 1 }]
+            }
+          }
+        });
+      });
+
+      expect(claude).toHaveAttribute('aria-checked', 'true');
+      expect(screen.getByRole('switch', { name: 'ChatGPT' })).toHaveAttribute('aria-checked', 'false');
+      expect(screen.getByRole('switch', { name: 'My AI' })).toHaveAttribute('aria-checked', 'true');
+      expect(siteSettingsWrites()).toHaveLength(0);
     });
 
     // My-Prompt-Manager-3v1: the site settings loaded, so a failed Prompts read must not replace them with the defaults
-    it('keeps the stored site settings when the Prompts fail to load, and saves nothing', async () => {
+    it('keeps the stored Site settings when the Prompts fail to load, and saves nothing', async () => {
       const chromeMock = getChromeMockFunctions();
       (chromeMock.storage.local.get as Mock).mockResolvedValue({
         promptLibrarySettings: {
@@ -692,9 +700,6 @@ describe('SettingsView', () => {
       getMockStorageManager().getPrompts.mockRejectedValue(new Error('locked'));
 
       await renderSettings();
-      // Updates made inside an async act flush when it ends: the first wait lets the load finish,
-      // the second lets a save armed by it run
-      await waitPastTheDebounce();
       await waitPastTheDebounce();
 
       expect(siteSettingsWrites()).toHaveLength(0);
@@ -716,11 +721,12 @@ describe('SettingsView', () => {
         settings: DEFAULT_SETTINGS
       };
       const readsTheSiteSettings = (keys: unknown) => Array.isArray(keys) && keys.includes('promptLibrarySettings');
+      const readsTheInterfaceMode = (keys: unknown) => Array.isArray(keys) && keys.includes('interfaceMode');
       const siteSettingsReads = () =>
         (getChromeMockFunctions().storage.local.get as Mock).mock.calls.filter(([keys]) => readsTheSiteSettings(keys));
 
-      // Opens Settings on the stored site settings; from then on they cannot be read, while the other reads
-      // (the Library, which an import reads and writes) still work
+      // Opens Settings on the stored Site settings; from then on neither they nor the interface mode can be
+      // read, while the other reads (the Library, which an import reads and writes) still work
       const openSettingsThenFailSiteSettingsReads = async () => {
         const get = getChromeMockFunctions().storage.local.get as Mock;
         get.mockResolvedValue(STORED_WITH_A_CUSTOM_SITE);
@@ -728,22 +734,21 @@ describe('SettingsView', () => {
         await screen.findByRole('switch', { name: 'My AI' });
         await waitPastTheDebounce();
         get.mockImplementation((keys: unknown) =>
-          readsTheSiteSettings(keys) ? Promise.reject(new Error('storage unavailable')) : Promise.resolve(STORED_WITH_A_CUSTOM_SITE)
+          readsTheSiteSettings(keys) || readsTheInterfaceMode(keys)
+            ? Promise.reject(new Error('storage unavailable'))
+            : Promise.resolve(STORED_WITH_A_CUSTOM_SITE)
         );
       };
       const waitForTheFailedLoad = async () => {
         await waitFor(() => {
           expect(siteSettingsReads()).toHaveLength(2);
         });
-        // Updates made inside an async act flush when it ends: the first wait lets the load finish,
-        // the second lets a save armed by it run
-        await waitPastTheDebounce();
         await waitPastTheDebounce();
       };
 
       // My-Prompt-Manager-4ax: an import leaves the site settings as they were, so the settings shown are still
       // what storage has, and the defaults must not be saved over them
-      it('keeps the stored site settings when the load after an import fails, and saves nothing', async () => {
+      it('keeps the stored Site settings when the load after an import fails, and saves nothing', async () => {
         const chromeMock = getChromeMockFunctions();
         await openSettingsThenFailSiteSettingsReads();
 
@@ -762,9 +767,8 @@ describe('SettingsView', () => {
         expect(screen.getByRole('radio', { name: 'Side panel' })).toBeChecked();
       });
 
-      // Review round 1 (Codex): Clear All Data and a reset leave the default site settings in storage. When the
-      // load after them fails, Settings shows the defaults, not the settings from before, which a change the
-      // user makes would save back; and the save that follows sends the defaults to the tabs
+      // Clear All Data and a reset leave no Site settings stored: the defaults. When the load after them fails,
+      // Settings shows the defaults, not the settings from before, and the tabs are sent the defaults
       // Clear All Data leaves no interface mode, which reads as the default; a reset writes the popup window
       it.each([
         ['Clear All Data', 'Side panel', async () => {
@@ -775,7 +779,7 @@ describe('SettingsView', () => {
           await userEvent.click(await screen.findByRole('button', { name: /reset to defaults/i }));
           await userEvent.click(await screen.findByRole('button', { name: /yes, reset settings/i }));
         }]
-      ])('shows the default site settings when the load after %s fails, and sends them to the tabs', async (_action, interfaceModeShown, runAction) => {
+      ])('shows the default Site settings when the load after %s fails, and sends them to the tabs', async (_action, interfaceModeShown, runAction) => {
         const chromeMock = getChromeMockFunctions();
         await openSettingsThenFailSiteSettingsReads();
 
@@ -852,8 +856,7 @@ describe('SettingsView', () => {
     expect(screen.getByText(/^My Prompt Manager \d/)).toBeInTheDocument();
   });
 
-  it('toggles a supported site and triggers debounced save', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
+  it('turns a Platform off and saves it', async () => {
     const chromeMock = getChromeMockFunctions();
     const storageMock = getMockStorageManager();
 
@@ -884,11 +887,6 @@ describe('SettingsView', () => {
       expect(chatgptToggle).toHaveAttribute('aria-checked', 'false');
     });
 
-    // Advance past the 150ms debounce to trigger the save
-    await act(async () => {
-      vi.advanceTimersByTime(200);
-    });
-
     // Verify that chrome.storage.local.set was called with the updated settings
     await waitFor(() => {
       const setCalls = (chromeMock.storage.local.set as Mock).mock.calls;
@@ -899,11 +897,9 @@ describe('SettingsView', () => {
       expect(saveCall).toBeDefined();
     });
 
-    vi.useRealTimers();
   });
 
   it('enables a site that was previously disabled', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
     const chromeMock = getChromeMockFunctions();
     const storageMock = getMockStorageManager();
 
@@ -932,11 +928,6 @@ describe('SettingsView', () => {
       expect(claudeToggle).toHaveAttribute('aria-checked', 'true');
     });
 
-    // Advance past debounce
-    await act(async () => {
-      vi.advanceTimersByTime(200);
-    });
-
     await waitFor(() => {
       const setCalls = (chromeMock.storage.local.set as Mock).mock.calls;
       const saveCall = setCalls.find(
@@ -945,7 +936,6 @@ describe('SettingsView', () => {
       expect(saveCall).toBeDefined();
     });
 
-    vi.useRealTimers();
   });
 
   it('saves settings and notifies content scripts in open tabs', async () => {
@@ -970,11 +960,6 @@ describe('SettingsView', () => {
     const chatgptToggle = screen.getByRole('switch', { name: 'ChatGPT' });
     await userEvent.click(chatgptToggle);
 
-    // Advance past debounce
-    await act(async () => {
-      vi.advanceTimersByTime(200);
-    });
-
     // Wait for save to complete and tabs to be queried
     await waitFor(() => {
       expect(chromeMock.tabs.query).toHaveBeenCalledWith({});
@@ -992,7 +977,7 @@ describe('SettingsView', () => {
     vi.useRealTimers();
   });
 
-  it('toggles debug mode on and sets localStorage', async () => {
+  it('turns debug mode on and saves it', async () => {
     const chromeMock = getChromeMockFunctions();
     const storageMock = getMockStorageManager();
 
@@ -1017,11 +1002,6 @@ describe('SettingsView', () => {
 
     await userEvent.click(debugToggle);
 
-    // Verify localStorage was set
-    await waitFor(() => {
-      expect(localStorage.setItem).toHaveBeenCalledWith('prompt-library-debug', 'true');
-    });
-
     // Verify settings saved with debugMode: true
     await waitFor(() => {
       const setCalls = (chromeMock.storage.local.set as Mock).mock.calls;
@@ -1032,7 +1012,7 @@ describe('SettingsView', () => {
     });
   });
 
-  it('toggles debug mode off and removes localStorage', async () => {
+  it('turns debug mode off and saves it', async () => {
     const chromeMock = getChromeMockFunctions();
     const storageMock = getMockStorageManager();
 
@@ -1056,10 +1036,6 @@ describe('SettingsView', () => {
     expect(debugToggle).toHaveAttribute('aria-checked', 'true');
 
     await userEvent.click(debugToggle);
-
-    await waitFor(() => {
-      expect(localStorage.removeItem).toHaveBeenCalledWith('prompt-library-debug');
-    });
 
     await waitFor(() => {
       const setCalls = (chromeMock.storage.local.set as Mock).mock.calls;
@@ -1451,11 +1427,6 @@ describe('SettingsView', () => {
     // Toggle a site to trigger debounced save
     const chatgptToggle = screen.getByRole('switch', { name: 'ChatGPT' });
     await userEvent.click(chatgptToggle);
-
-    // Advance past debounce
-    await act(async () => {
-      vi.advanceTimersByTime(200);
-    });
 
     // The component should still be functional (no crash)
     await waitFor(() => {

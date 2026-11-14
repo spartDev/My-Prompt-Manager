@@ -1,17 +1,22 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { getDefaultEnabledPlatforms } from '../../config/platforms';
+import { getDefaultEnabledPlatforms, getLinkedPlatformHostnames } from '../../config/platforms';
 import { getChromeMock } from '../../test/mocks';
 import type { CustomSite } from '../../types';
 import {
+  applySiteSettingsChange,
+  changeSiteSettings,
   defaultSiteSettings,
   enabledCustomSite,
   enabledHostnames,
   isHostnameEnabled,
+  onSiteSettingsChanged,
   parseSiteSettings,
   readSiteSettings,
-  SITE_SETTINGS_KEY
+  SITE_SETTINGS_KEY,
+  type SiteSettings
 } from '../siteSettings';
+import { StorageManager } from '../storage';
 
 const customSite = (overrides: Partial<CustomSite> = {}): CustomSite => ({
   hostname: 'chat.example.com',
@@ -167,5 +172,269 @@ describe('readSiteSettings', () => {
     vi.mocked(getChromeMock().storage.local.get).mockRejectedValueOnce(new Error('storage unavailable'));
 
     await expect(readSiteSettings()).rejects.toThrow('storage unavailable');
+  });
+});
+
+describe('applySiteSettingsChange', () => {
+  const settings: SiteSettings = {
+    enabledSites: ['claude.ai', 'chatgpt.com'],
+    customSites: [customSite({ hostname: 'on.example.com' })],
+    debugMode: false
+  };
+
+  it('turns a Platform off and leaves the others', () => {
+    const after = applySiteSettingsChange(settings, { type: 'setPlatformEnabled', hostname: 'claude.ai', enabled: false }, 0);
+
+    expect(after.enabledSites).toEqual(['chatgpt.com']);
+  });
+
+  it('turns a Platform on once, however many times it is asked', () => {
+    const on = applySiteSettingsChange(settings, { type: 'setPlatformEnabled', hostname: 'gemini.google.com', enabled: true }, 0);
+    const again = applySiteSettingsChange(on, { type: 'setPlatformEnabled', hostname: 'gemini.google.com', enabled: true }, 0);
+
+    expect(on.enabledSites).toEqual(['claude.ai', 'chatgpt.com', 'gemini.google.com']);
+    expect(again).toEqual(on);
+  });
+
+  it('turns the Platforms linked to a Platform on and off with it', () => {
+    const linked = getLinkedPlatformHostnames('copilot.microsoft.com');
+    expect(linked.length).toBeGreaterThan(1);
+
+    const on = applySiteSettingsChange(settings, { type: 'setPlatformEnabled', hostname: 'copilot.microsoft.com', enabled: true }, 0);
+    const off = applySiteSettingsChange(on, { type: 'setPlatformEnabled', hostname: 'copilot.microsoft.com', enabled: false }, 0);
+
+    expect(on.enabledSites).toEqual(['claude.ai', 'chatgpt.com', ...linked]);
+    expect(off.enabledSites).toEqual(['claude.ai', 'chatgpt.com']);
+  });
+
+  it('adds a Custom site, dated now', () => {
+    const { dateAdded: _dateAdded, ...site } = customSite({ hostname: 'new.example.com' });
+
+    const after = applySiteSettingsChange(settings, { type: 'addCustomSite', site }, 42);
+
+    expect(after.customSites).toEqual([settings.customSites[0], { ...site, dateAdded: 42 }]);
+  });
+
+  it('replaces the Custom site of the same hostname when one is added again', () => {
+    const { dateAdded: _dateAdded, ...site } = customSite({ hostname: 'on.example.com', displayName: 'Renamed' });
+
+    const after = applySiteSettingsChange(settings, { type: 'addCustomSite', site }, 42);
+
+    expect(after.customSites).toEqual([{ ...site, dateAdded: 42 }]);
+  });
+
+  it('turns a Custom site off, and removes one', () => {
+    const off = applySiteSettingsChange(settings, { type: 'setCustomSiteEnabled', hostname: 'on.example.com', enabled: false }, 0);
+    const removed = applySiteSettingsChange(settings, { type: 'removeCustomSite', hostname: 'on.example.com' }, 0);
+
+    expect(off.customSites).toEqual([{ ...settings.customSites[0], enabled: false }]);
+    expect(removed.customSites).toEqual([]);
+  });
+
+  it('sets the debug switch and touches nothing else', () => {
+    expect(applySiteSettingsChange(settings, { type: 'setDebugMode', enabled: true }, 0)).toEqual({ ...settings, debugMode: true });
+  });
+
+  it('resets to the defaults', () => {
+    expect(applySiteSettingsChange(settings, { type: 'reset' }, 0)).toEqual(defaultSiteSettings());
+  });
+
+  it('leaves the settings it was given as they were', () => {
+    const before = structuredClone(settings);
+
+    applySiteSettingsChange(settings, { type: 'setPlatformEnabled', hostname: 'claude.ai', enabled: false }, 0);
+    applySiteSettingsChange(settings, { type: 'removeCustomSite', hostname: 'on.example.com' }, 0);
+
+    expect(settings).toEqual(before);
+  });
+});
+
+describe('changeSiteSettings', () => {
+  // The in-memory storage of the test setup, kept to put back after a read made to fail
+  const readStorage = vi.mocked(chrome.storage.local.get).getMockImplementation() as never;
+  const stored = async (): Promise<unknown> => (await chrome.storage.local.get([SITE_SETTINGS_KEY]))[SITE_SETTINGS_KEY];
+  const store = (settings: unknown) => chrome.storage.local.set({ [SITE_SETTINGS_KEY]: settings });
+  const openTabs = (tabs: Array<Partial<chrome.tabs.Tab>>) => {
+    vi.mocked(chrome.tabs.query).mockImplementation((async (query: chrome.tabs.QueryInfo) =>
+      tabs.filter((tab) => query.url === undefined || (tab.url ?? '').includes(String(query.url).replace(/^\*:\/\/|\/\*$/g, '')))
+    ) as never);
+  };
+  const sent = () => vi.mocked(chrome.tabs.sendMessage).mock.calls.map(([tabId, message]) => ({ tabId, message }));
+
+  it('applies the change to what storage holds and resolves with the result', async () => {
+    await store({ enabledSites: ['claude.ai', 'chatgpt.com'], customSites: [], debugMode: true });
+
+    const settings = await changeSiteSettings({ type: 'setPlatformEnabled', hostname: 'claude.ai', enabled: false });
+
+    expect(settings).toEqual({ enabledSites: ['chatgpt.com'], customSites: [], debugMode: true });
+    expect(await stored()).toEqual(settings);
+  });
+
+  it('starts from the default Platforms when nothing is stored', async () => {
+    const [first, ...others] = getDefaultEnabledPlatforms();
+
+    await changeSiteSettings({ type: 'setPlatformEnabled', hostname: first, enabled: false });
+
+    expect(await stored()).toEqual({ enabledSites: others.filter((site) => !getLinkedPlatformHostnames(first).includes(site)), customSites: [], debugMode: false });
+  });
+
+  it('loses neither change when two surfaces change the Site settings at once', async () => {
+    await store({ enabledSites: ['claude.ai', 'chatgpt.com'], customSites: [], debugMode: false });
+    const { dateAdded: _dateAdded, ...site } = customSite();
+
+    await Promise.all([
+      changeSiteSettings({ type: 'setPlatformEnabled', hostname: 'claude.ai', enabled: false }),
+      changeSiteSettings({ type: 'addCustomSite', site }),
+      changeSiteSettings({ type: 'setDebugMode', enabled: true })
+    ]);
+
+    expect(await stored()).toMatchObject({ enabledSites: ['chatgpt.com'], customSites: [site], debugMode: true });
+  });
+
+  it('refuses the change and leaves storage untouched when storage cannot be read', async () => {
+    const before = { enabledSites: ['claude.ai'], customSites: [], debugMode: false };
+    await store(before);
+    vi.mocked(chrome.storage.local.set).mockClear();
+    vi.mocked(chrome.storage.local.get).mockRejectedValueOnce(new Error('storage unavailable'));
+
+    await expect(changeSiteSettings({ type: 'setPlatformEnabled', hostname: 'chatgpt.com', enabled: true })).rejects.toThrow('storage unavailable');
+
+    expect(chrome.storage.local.set).not.toHaveBeenCalled();
+    expect(chrome.tabs.sendMessage).not.toHaveBeenCalled();
+    expect(await stored()).toEqual(before);
+  });
+
+  it('rejects and sends nothing when storage refuses the write', async () => {
+    await store({ enabledSites: ['claude.ai'], customSites: [], debugMode: false });
+    vi.mocked(chrome.storage.local.set).mockRejectedValueOnce(new Error('quota'));
+
+    await expect(changeSiteSettings({ type: 'setDebugMode', enabled: true })).rejects.toThrow('quota');
+
+    expect(chrome.tabs.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('writes nothing and sends nothing for a change that changes nothing', async () => {
+    await store({ enabledSites: ['claude.ai'], customSites: [], debugMode: false });
+    vi.mocked(chrome.storage.local.set).mockClear();
+    openTabs([{ id: 1, url: 'https://claude.ai/chat' }]);
+
+    await changeSiteSettings({ type: 'setPlatformEnabled', hostname: 'claude.ai', enabled: true });
+
+    expect(chrome.storage.local.set).not.toHaveBeenCalled();
+    expect(chrome.tabs.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('sends the new Site settings to every web tab, and to no other', async () => {
+    await store({ enabledSites: ['claude.ai'], customSites: [], debugMode: false });
+    openTabs([
+      { id: 1, url: 'https://claude.ai/chat' },
+      { id: 2, url: 'http://localhost:3000/' },
+      { id: 3, url: 'chrome://extensions' },
+      { url: 'https://no-id.example.com/' }
+    ]);
+
+    const settings = await changeSiteSettings({ type: 'setDebugMode', enabled: true });
+
+    expect(sent()).toEqual([
+      { tabId: 1, message: { action: 'settingsUpdated', settings } },
+      { tabId: 2, message: { action: 'settingsUpdated', settings } }
+    ]);
+  });
+
+  it.each([
+    ['added', { type: 'addCustomSite', site: { hostname: 'chat.example.com', displayName: 'Example chat', enabled: true } }],
+    ['turned off', { type: 'setCustomSiteEnabled', hostname: 'chat.example.com', enabled: false }],
+    ['removed', { type: 'removeCustomSite', hostname: 'chat.example.com' }]
+  ] as const)('asks the tabs of a Custom site to start over when it is %s', async (label, change) => {
+    await store({ enabledSites: [], customSites: label === 'added' ? [] : [customSite()], debugMode: false });
+    openTabs([{ id: 1, url: 'https://claude.ai/chat' }, { id: 2, url: 'https://chat.example.com/thread' }]);
+
+    await changeSiteSettings(change);
+
+    expect(sent().filter(({ message }) => (message as { action: string }).action === 'reinitialize')).toEqual([
+      { tabId: 2, message: { action: 'reinitialize', reason: 'custom_site_added' } }
+    ]);
+  });
+
+  it('keeps the change when a tab does not answer or the tabs cannot be listed', async () => {
+    await store({ enabledSites: ['claude.ai'], customSites: [], debugMode: false });
+    openTabs([{ id: 1, url: 'https://claude.ai/chat' }]);
+    vi.mocked(chrome.tabs.sendMessage).mockRejectedValue(new Error('no receiver'));
+
+    await expect(changeSiteSettings({ type: 'setDebugMode', enabled: true })).resolves.toMatchObject({ debugMode: true });
+
+    vi.mocked(chrome.tabs.query).mockRejectedValue(new Error('tabs unavailable'));
+
+    await expect(changeSiteSettings({ type: 'setDebugMode', enabled: false })).resolves.toMatchObject({ debugMode: false });
+    expect(await stored()).toMatchObject({ debugMode: false });
+  });
+
+  describe('reset', () => {
+    it('leaves nothing stored, resolves with the defaults and sends them to the tabs', async () => {
+      await store({ enabledSites: [], customSites: [customSite()], debugMode: true });
+      openTabs([{ id: 1, url: 'https://claude.ai/chat' }]);
+
+      const settings = await changeSiteSettings({ type: 'reset' });
+
+      expect(settings).toEqual(defaultSiteSettings());
+      expect(await chrome.storage.local.get(null)).not.toHaveProperty(SITE_SETTINGS_KEY);
+      expect(sent()).toEqual([{ tabId: 1, message: { action: 'settingsUpdated', settings } }]);
+    });
+
+    it('works on a store that cannot be read, since it reads nothing', async () => {
+      await store({ enabledSites: [], customSites: [customSite()], debugMode: true });
+      vi.mocked(chrome.storage.local.get).mockRejectedValueOnce(new Error('storage unavailable'));
+
+      await expect(changeSiteSettings({ type: 'reset' })).resolves.toEqual(defaultSiteSettings());
+
+      vi.mocked(chrome.storage.local.get).mockReset().mockImplementation(readStorage);
+      expect(await chrome.storage.local.get(null)).not.toHaveProperty(SITE_SETTINGS_KEY);
+    });
+
+    it('removes a stored copy of the defaults, which would miss a Platform added later', async () => {
+      await store(defaultSiteSettings());
+
+      await changeSiteSettings({ type: 'reset' });
+
+      expect(await chrome.storage.local.get(null)).not.toHaveProperty(SITE_SETTINGS_KEY);
+    });
+  });
+
+  it('does not write the Site settings back after Clear All Data asked for while the change was reading them', async () => {
+    await store({ enabledSites: ['claude.ai'], customSites: [customSite()], debugMode: false });
+    // The change has read the Site settings and is paused before it writes, as in another surface
+    const get = vi.mocked(chrome.storage.local.get);
+    const readNow = get.getMockImplementation() as unknown as (keys: unknown) => Promise<Record<string, unknown>>;
+    let resume!: () => void;
+    const paused = new Promise<void>((resolve) => { resume = resolve; });
+    get.mockImplementationOnce((async (keys: unknown) => {
+      const result = await readNow(keys);
+      await paused;
+      return result;
+    }) as never);
+
+    const changed = changeSiteSettings({ type: 'setCustomSiteEnabled', hostname: 'chat.example.com', enabled: false });
+    const cleared = StorageManager.getInstance().clearAllData();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    resume();
+    await Promise.all([changed, cleared]);
+
+    // Clear All Data waited for the change to finish, then cleared what it wrote
+    expect(await chrome.storage.local.get(null)).toEqual({});
+  });
+});
+
+describe('onSiteSettingsChanged', () => {
+  it('follows every change of the stored Site settings, and stops when asked', async () => {
+    const seen: SiteSettings[] = [];
+    const stop = onSiteSettingsChanged((settings) => seen.push(settings));
+
+    const changed = await changeSiteSettings({ type: 'setDebugMode', enabled: true });
+    await chrome.storage.local.set({ prompts: [] });
+    await chrome.storage.local.clear();
+    stop();
+    await changeSiteSettings({ type: 'setDebugMode', enabled: true });
+
+    expect(seen).toEqual([changed, defaultSiteSettings()]);
   });
 });
