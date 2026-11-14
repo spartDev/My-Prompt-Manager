@@ -7,7 +7,8 @@
  */
 
 import { getPlatformByHostname } from '../../config/platforms';
-import type { ElementFingerprint } from '../../types/index';
+import type { SiteSettings } from '../../services/siteSettings';
+import type { CustomSite } from '../../types/index';
 import { PromptSelectorController } from '../selector/controller';
 import { loadSelectorFont } from '../selector/font';
 import { endsWithSelectorTrigger, MODIFIER_KEYS, removeTypedTrigger, textBeforeCaret } from '../selector/inputText';
@@ -18,7 +19,7 @@ import { EventManager } from '../ui/event-manager';
 import { DOMUtils } from '../utils/dom';
 import { getElementFingerprintGenerator } from '../utils/element-fingerprint';
 import { debug, error, info, isDebugMode, refreshDebugMode, warn } from '../utils/logger';
-import { type CustomSite, type ExtensionSettings, getCategories, getPrompts, getSettings, isSiteEnabled } from '../utils/storage';
+import { getCategories, getPrompts, getSettings, isSiteEnabled } from '../utils/storage';
 import { injectCSS } from '../utils/styles';
 import { ThemeManager } from '../utils/theme-manager';
 
@@ -36,7 +37,7 @@ export interface InjectorState {
   spaMonitoringInterval: NodeJS.Timeout | null;
   hostname: string;
   instanceId: string;
-  settings: ExtensionSettings | null;
+  settings: SiteSettings | null;
 }
 
 export interface CustomSelectorRetry {
@@ -411,7 +412,7 @@ export class PromptLibraryInjector {
       debug('Received message', { action: message.action });
 
       if (message.action === 'settingsUpdated' && message.settings) {
-        this.handleSettingsUpdate(message.settings as ExtensionSettings).catch((err: unknown) => {
+        this.handleSettingsUpdate(message.settings as SiteSettings).catch((err: unknown) => {
           error('Failed to handle settings update', err as Error);
         });
         sendResponse({ success: true });
@@ -436,7 +437,7 @@ export class PromptLibraryInjector {
   /**
    * Handle settings update from popup
    */
-  private async handleSettingsUpdate(newSettings: ExtensionSettings): Promise<void> {
+  private async handleSettingsUpdate(newSettings: SiteSettings): Promise<void> {
     try {
       debug('Received settings update', { hostname: this.state.hostname });
 
@@ -992,7 +993,7 @@ export class PromptLibraryInjector {
       if (!injected) {
         let customPositioned = false;
 
-        const positioning = customConfig?.positioning as (NonNullable<typeof customConfig>['positioning'] & { fingerprint?: ElementFingerprint; anchorId?: string }) | undefined;
+        const positioning = customConfig?.positioning;
         if (positioning) {
           try {
             let referenceElement: HTMLElement | null = null;

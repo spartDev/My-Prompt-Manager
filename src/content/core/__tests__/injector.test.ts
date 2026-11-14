@@ -83,14 +83,12 @@ vi.mock('../../utils/storage', () => ({
   getSettings: vi.fn().mockResolvedValue({
     enabledSites: ['test.com', 'localhost'],
     customSites: [],
-    debugMode: false,
-    floatingFallback: true
+    debugMode: false
   }),
   getDefaultSettings: vi.fn().mockReturnValue({
     enabledSites: ['test.com', 'localhost'],
     customSites: [],
-    debugMode: false,
-    floatingFallback: true
+    debugMode: false
   })
 }));
 
@@ -713,8 +711,7 @@ describe('PromptLibraryInjector', () => {
       vi.mocked(getSettings).mockResolvedValue({
         enabledSites: [],
         customSites: [],
-        debugMode: false,
-        floatingFallback: true
+        debugMode: false
       });
 
       const disabledInjector = new PromptLibraryInjector();
@@ -787,7 +784,7 @@ describe('PromptLibraryInjector', () => {
 
       const sendResponse = vi.fn();
       const result = messageCallback(
-        { action: 'settingsUpdated', settings: { enabledSites: ['localhost'], customSites: [], debugMode: false, floatingFallback: true } },
+        { action: 'settingsUpdated', settings: { enabledSites: ['localhost'], customSites: [], debugMode: false } },
         {},
         sendResponse
       );
@@ -919,7 +916,7 @@ describe('PromptLibraryInjector', () => {
 
       const sendResponse = vi.fn();
       messageCallback(
-        { action: 'settingsUpdated', settings: { enabledSites: [], customSites: [], debugMode: false, floatingFallback: true } },
+        { action: 'settingsUpdated', settings: { enabledSites: [], customSites: [], debugMode: false } },
         {},
         sendResponse
       );
@@ -939,8 +936,7 @@ describe('PromptLibraryInjector', () => {
       vi.mocked(getSettings).mockResolvedValue({
         enabledSites: [],
         customSites: [],
-        debugMode: false,
-        floatingFallback: true
+        debugMode: false
       });
 
       const disabledInjector = new PromptLibraryInjector();
@@ -956,7 +952,7 @@ describe('PromptLibraryInjector', () => {
 
       const sendResponse = vi.fn();
       msgCallback(
-        { action: 'settingsUpdated', settings: { enabledSites: ['localhost'], customSites: [], debugMode: false, floatingFallback: true } },
+        { action: 'settingsUpdated', settings: { enabledSites: ['localhost'], customSites: [], debugMode: false } },
         {},
         sendResponse
       );
@@ -1299,7 +1295,7 @@ describe('PromptLibraryInjector', () => {
 
       const sendResponse = vi.fn();
       messageCallback(
-        { action: 'settingsUpdated', settings: { enabledSites: [], customSites: [], debugMode: false, floatingFallback: true } },
+        { action: 'settingsUpdated', settings: { enabledSites: [], customSites: [], debugMode: false } },
         {},
         sendResponse
       );
@@ -1336,7 +1332,7 @@ describe('PromptLibraryInjector', () => {
 
       const sendResponse = vi.fn();
       messageCallback(
-        { action: 'settingsUpdated', settings: { enabledSites: ['localhost'], customSites: [], debugMode: true, floatingFallback: true } },
+        { action: 'settingsUpdated', settings: { enabledSites: ['localhost'], customSites: [], debugMode: true } },
         {},
         sendResponse
       );
@@ -1471,7 +1467,7 @@ describe('PromptLibraryInjector', () => {
 
       const sendResponse = vi.fn();
       messageCallback(
-        { action: 'settingsUpdated', settings: { enabledSites: ['localhost'], customSites: [], debugMode: false, floatingFallback: true } },
+        { action: 'settingsUpdated', settings: { enabledSites: ['localhost'], customSites: [], debugMode: false } },
         {},
         sendResponse
       );

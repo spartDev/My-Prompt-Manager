@@ -157,16 +157,12 @@ chrome.action.onClicked.addListener((tab) => {
 });
 ```
 
-#### 3. Settings Update Handler
+#### 3. Site settings
 
-```typescript
-// Re-evaluate injection when settings change
-chrome.runtime.onMessage.addListener((message) => {
-  if (message.type === 'SETTINGS_UPDATED') {
-    // Re-scan all tabs for injection eligibility
-  }
-});
-```
+The service worker decides whether a tab gets the content script from the Site settings, read with
+`readSiteSettings()` and `isHostnameEnabled()` of `src/services/siteSettings.ts`, the same rule the
+content script applies when it starts. A change of the Site settings reaches the open tabs as a
+`settingsUpdated` message from Settings; the service worker takes no message for it.
 
 ### Content Script Adaptation
 
