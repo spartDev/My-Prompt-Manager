@@ -927,6 +927,22 @@ describe('PromptLibraryInjector', () => {
       expect(refreshDebugMode).toHaveBeenCalled();
     });
 
+    // PR #567, review round 2 (Codex): two surfaces can send their settings close together
+    it('handles settings updates one at a time, so the last one applies what storage holds', async () => {
+      const { isSiteEnabled } = await import('../../utils/storage');
+      // The first update reads slowly and finds the site off; the second finds it on again, as stored
+      vi.mocked(isSiteEnabled)
+        .mockImplementationOnce(() => new Promise(resolve => { setTimeout(() => { resolve(false); }, 40); }))
+        .mockResolvedValue(true);
+      const update = { action: 'settingsUpdated', settings: { enabledSites: [], customSites: [], debugMode: false } };
+
+      messageCallback(update, {}, vi.fn());
+      messageCallback(update, {}, vi.fn());
+      await new Promise(resolve => setTimeout(resolve, 150));
+
+      expect((injector as any).state.isSiteEnabled).toBe(true);
+    });
+
     it('should handle site being re-enabled via settings update', async () => {
       const { isSiteEnabled, getSettings } = await import('../../utils/storage');
       const { injectCSS } = await import('../../utils/styles');

@@ -412,9 +412,14 @@ export class PromptLibraryInjector {
       debug('Received message', { action: message.action });
 
       if (message.action === 'settingsUpdated' && message.settings) {
-        this.handleSettingsUpdate(message.settings as SiteSettings).catch((err: unknown) => {
-          error('Failed to handle settings update', err as Error);
-        });
+        // One at a time, in the order received: each reads from storage whether the site is on, so
+        // the last one applies what storage holds, whatever order two surfaces' messages came in
+        const settings = message.settings as SiteSettings;
+        this.settingsUpdates = this.settingsUpdates
+          .then(() => this.handleSettingsUpdate(settings))
+          .catch((err: unknown) => {
+            error('Failed to handle settings update', err as Error);
+          });
         sendResponse({ success: true });
       } else if (message.action === 'reinitialize' && message.reason) {
         this.handleReinitialize(message.reason as string).catch((err: unknown) => {
@@ -433,6 +438,9 @@ export class PromptLibraryInjector {
 
     debug('Message listener setup completed');
   }
+
+  /** The settings updates being handled, each after the one before it */
+  private settingsUpdates: Promise<void> = Promise.resolve();
 
   /**
    * Handle settings update from popup
