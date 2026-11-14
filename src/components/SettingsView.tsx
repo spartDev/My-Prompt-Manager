@@ -2,10 +2,17 @@ import type { FC } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import manifest from '../../manifest.json';
-import { getLinkedPlatformHostnames } from '../config/platforms';
 import { NATURAL_SORT_DIRECTION } from '../constants';
 import { AdmissionRefusedError } from '../services/promptAdmission';
-import { defaultSiteSettings, parseSiteSettings, SITE_SETTINGS_KEY, type SiteSettings } from '../services/siteSettings';
+import {
+  changeSiteSettings,
+  defaultSiteSettings,
+  onSiteSettingsChanged,
+  readSiteSettings,
+  type SiteSettings,
+  type SiteSettingsChange, 
+  sendSiteSettingsToTabs
+} from '../services/siteSettings';
 import { StorageManager } from '../services/storage';
 import type { AppError, Category, CustomSite, Prompt, SortOrder, Settings as UserSettings } from '../types';
 import { DEFAULT_SETTINGS } from '../types';
@@ -66,10 +73,6 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
 
   const storageManager = useMemo(() => StorageManager.getInstance(), []);
 
-  // The site settings as storage and the tabs have them, null until Settings has loaded them.
-  // Only settings that differ from them are saved and sent to the tabs.
-  const storedSettings = useRef<Settings | null>(null);
-
   // The Platforms, in the order the AI sites group lists them
   const siteConfigs: Record<string, SiteConfig> = useMemo(() => ({
     'claude.ai': {
@@ -98,19 +101,28 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
     }
   }), []);
 
-  const defaultSettings: Settings = useMemo(() => defaultSiteSettings(), []);
+  // Whether Settings has shown Site settings yet: only its first read falls back to the defaults
+  const siteSettingsShown = useRef(false);
 
-  // Load settings. The site settings and the Library are read apart: a Library that fails to load
-  // leaves the site settings as storage has them, so the defaults are never saved over them.
+  // Load settings. The Site settings and the Library are read apart, so a Library that fails to load
+  // leaves the Site settings shown as storage has them.
   const loadSettings = useCallback(async () => {
     try {
-      // Load extension settings
-      const result = await chrome.storage.local.get([SITE_SETTINGS_KEY, 'interfaceMode', 'settings']);
-      const loadedSettings = parseSiteSettings(result[SITE_SETTINGS_KEY]);
-      // The first load is what storage and the tabs already have: opening Settings changes nothing.
-      // A later load (after an import, Clear All Data or a reset) is still sent if it differs.
-      storedSettings.current ??= loadedSettings;
-      setSettings(loadedSettings);
+      setSettings(await readSiteSettings());
+      siteSettingsShown.current = true;
+    } catch (error) {
+      Logger.error('Failed to load the Site settings', toError(error), { component: 'SettingsView', operation: 'loadSiteSettings' });
+      // A first read that fails shows the defaults. Shown, never saved: a change is applied to what
+      // storage holds, and is refused while storage cannot be read. A later read that fails keeps
+      // what is shown.
+      if (!siteSettingsShown.current) {
+        setSettings(defaultSiteSettings());
+        siteSettingsShown.current = true;
+      }
+    }
+
+    try {
+      const result = await chrome.storage.local.get(['interfaceMode', 'settings']);
 
       // Load interface mode
       const savedInterfaceMode = result.interfaceMode as 'popup' | 'sidepanel' | undefined;
@@ -123,15 +135,6 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
       }
     } catch (error) {
       Logger.error('Failed to load settings', toError(error));
-      // A first load that fails shows the defaults. Shown, not saved: only a change the user makes to
-      // them is saved. A later load that fails keeps the settings shown, which are what storage has: an
-      // import leaves the site settings as they were, and the defaults would be saved over them
-      // (My-Prompt-Manager-4ax); Clear All Data and a reset show the defaults they leave before reloading
-      if (storedSettings.current === null) {
-        storedSettings.current = defaultSettings;
-        setSettings(defaultSettings);
-        setInterfaceMode(DEFAULT_SETTINGS.interfaceMode as 'popup' | 'sidepanel');
-      }
     }
 
     try {
@@ -149,10 +152,10 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
     } finally {
       setLoading(false);
     }
-  }, [defaultSettings, storageManager]);
+  }, [storageManager]);
 
   // The storage bar shows what Chrome stores and follows every write, whoever makes it: the default
-  // Category written on load, the site settings saved after it, an import, Clear All Data, another
+  // Category written on load, a change of the Site settings, an import, Clear All Data, another
   // surface. The last reading asked for wins, so an older reply never overwrites a newer one.
   const usageReading = useRef(0);
   useEffect(() => {
@@ -182,69 +185,30 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
     void loadSettings();
   }, [loadSettings]);
 
+  // The Site settings follow storage, whoever changes them: this surface, the other one, Clear All Data
+  useEffect(() => onSiteSettingsChanged(setSettings), []);
+
   /**
-   * Persists settings to chrome.storage.local and notifies all content scripts of changes.
-   * Broadcasts a 'settingsUpdated' message to all HTTP/HTTPS tabs so they can update their behavior.
-   * @param newSettings - The complete settings object to save
+   * Makes one change to the Site settings. The module applies it to what storage holds, saves it and
+   * tells the tabs; Settings shows the result. A change that fails leaves the switch where storage has
+   * it and says so.
    */
-  const saveSettings = useCallback(async (newSettings: Settings) => {
+  const changeSettings = useCallback(async (change: SiteSettingsChange) => {
     setSaving(true);
     try {
-      await chrome.storage.local.set({
-        promptLibrarySettings: newSettings
-      });
-      storedSettings.current = newSettings;
-
-      // Notify content scripts of changes in parallel
-      const tabs = await chrome.tabs.query({});
-      const httpTabs = tabs.filter(
-        (tab): tab is chrome.tabs.Tab & { id: number } =>
-          tab.id !== undefined && tab.url !== undefined &&
-          (tab.url.startsWith('http://') || tab.url.startsWith('https://'))
-      );
-
-      await Promise.allSettled(
-        httpTabs.map(tab => chrome.tabs.sendMessage(tab.id, {
-          action: 'settingsUpdated',
-          settings: newSettings
-        }))
-      );
+      setSettings(await changeSiteSettings(change));
     } catch (error) {
-      Logger.error('Failed to save settings', toError(error));
+      Logger.error('Failed to save the Site settings', toError(error), { component: 'SettingsView', operation: 'changeSiteSettings', change: change.type });
+      showToast("Couldn't save the setting", 'error');
+      try {
+        setSettings(await readSiteSettings());
+      } catch {
+        // Storage cannot be read either: what is shown stays
+      }
     } finally {
       setSaving(false);
     }
-  }, []);
-
-  // Debounced persistence: save settings after user stops making changes
-  useEffect(() => {
-    // Nothing to save before the settings are loaded. A timer armed then would hold the empty settings
-    // Settings starts with: firing after the load and before its re-render, it would save them and
-    // disable every Platform (My-Prompt-Manager-ds8)
-    if (storedSettings.current === null) {
-      return;
-    }
-
-    // Debounce: wait 150ms after last change before saving
-    const timeoutId = setTimeout(() => {
-      // Nothing to save when storage already has them
-      if (JSON.stringify(settings) === JSON.stringify(storedSettings.current)) {
-        return;
-      }
-      saveSettings(settings).catch((err: unknown) => {
-        Logger.error('Failed to save settings', toError(err), {
-          component: 'SettingsView',
-          operation: 'persist'
-        });
-      });
-    }, 150);
-
-    // Cleanup: cancel pending save if settings change again
-    return () => {
-      clearTimeout(timeoutId);
-    };
-  }, [settings, saveSettings]);
-
+  }, [showToast]);
 
   // Handle Library sort change: each sort is saved with its one direction
   const handleSortOrderChange = useCallback((sortOrder: SortOrder) => {
@@ -275,133 +239,25 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
     }
   }, []);
 
-  // Handle site toggle
-  const handleSiteToggle = (hostname: string, enabled: boolean) => {
-    // Get all hostnames to toggle (includes linked platforms from configuration)
-    const hostnamesToToggle = getLinkedPlatformHostnames(hostname);
+  const handleSiteToggle = useCallback((hostname: string, enabled: boolean) => {
+    void changeSettings({ type: 'setPlatformEnabled', hostname, enabled });
+  }, [changeSettings]);
 
-    // Use functional setState to avoid stale closure reads during rapid clicks
-    setSettings(prev => {
-      let newEnabledSites: string[];
+  const handleCustomSiteToggleCallback = useCallback((hostname: string, enabled: boolean) => {
+    void changeSettings({ type: 'setCustomSiteEnabled', hostname, enabled });
+  }, [changeSettings]);
 
-      if (enabled) {
-        // Add all linked hostnames, avoiding duplicates
-        newEnabledSites = [...prev.enabledSites];
-        for (const site of hostnamesToToggle) {
-          if (!newEnabledSites.includes(site)) {
-            newEnabledSites.push(site);
-          }
-        }
-      } else {
-        // Remove all linked hostnames
-        newEnabledSites = prev.enabledSites.filter(
-          site => !hostnamesToToggle.includes(site)
-        );
-      }
+  const handleRemoveCustomSiteCallback = useCallback((hostname: string) => {
+    void changeSettings({ type: 'removeCustomSite', hostname });
+  }, [changeSettings]);
 
-      return {
-        ...prev,
-        enabledSites: newEnabledSites
-      };
-    });
-    // Persistence now handled by debounced useEffect
-  };
+  const handleAddCustomSiteCallback = useCallback((site: Omit<CustomSite, 'dateAdded'>) => {
+    void changeSettings({ type: 'addCustomSite', site });
+  }, [changeSettings]);
 
-  /**
-   * Notifies all tabs matching a hostname to reinitialize their content scripts.
-   * Called after adding, removing, or modifying a custom site configuration.
-   * @param hostname - The hostname of the custom site that changed
-   */
-  const notifyCustomSiteChange = useCallback(async (hostname: string) => {
-    try {
-      // Since we're using universal content script, just notify existing tabs
-      const tabs = await chrome.tabs.query({ url: `*://${hostname}/*` });
-      const tabsWithIds = tabs.filter(
-        (tab): tab is chrome.tabs.Tab & { id: number } => tab.id !== undefined
-      );
-
-      // Notify all tabs in parallel
-      await Promise.allSettled(
-        tabsWithIds.map(tab => chrome.tabs.sendMessage(tab.id, {
-          action: 'reinitialize',
-          reason: 'custom_site_added'
-        }))
-      );
-    } catch (error) {
-      Logger.error('Failed to notify custom site change', toError(error));
-    }
-  }, []);
-
-  // Handle custom site toggle
-  const handleCustomSiteToggle = useCallback(async (hostname: string, enabled: boolean) => {
-    const newCustomSites = settings.customSites.map(site =>
-      site.hostname === hostname ? { ...site, enabled } : site
-    );
-
-    const newSettings = {
-      ...settings,
-      customSites: newCustomSites
-    };
-
-    setSettings(newSettings);
-    await saveSettings(newSettings);
-
-    // Notify tabs about the change
-    await notifyCustomSiteChange(hostname);
-  }, [settings, saveSettings, notifyCustomSiteChange]);
-
-  // Handle remove custom site
-  const handleRemoveCustomSite = useCallback(async (hostname: string) => {
-    const newCustomSites = settings.customSites.filter(site => site.hostname !== hostname);
-
-    const newSettings = {
-      ...settings,
-      customSites: newCustomSites
-    };
-
-    setSettings(newSettings);
-    await saveSettings(newSettings);
-
-    // Notify tabs about the removal
-    await notifyCustomSiteChange(hostname);
-  }, [settings, saveSettings, notifyCustomSiteChange]);
-
-  // Handle add custom site
-  const handleAddCustomSite = useCallback(async (siteData: Omit<CustomSite, 'dateAdded'>) => {
-    const newSite: CustomSite = {
-      ...siteData,
-      dateAdded: Date.now()
-    };
-
-    const newSettings = {
-      ...settings,
-      customSites: [...settings.customSites, newSite]
-    };
-
-    setSettings(newSettings);
-    await saveSettings(newSettings);
-
-    // Notify any open tabs to reinitialize
-    await notifyCustomSiteChange(newSite.hostname);
-  }, [settings, saveSettings, notifyCustomSiteChange]);
-
-  // Handle debug mode toggle
-  const handleDebugModeChange = useCallback(async (enabled: boolean) => {
-    const newSettings = {
-      ...settings,
-      debugMode: enabled
-    };
-
-    setSettings(newSettings);
-    await saveSettings(newSettings);
-
-    // Update localStorage for immediate effect
-    if (enabled) {
-      localStorage.setItem('prompt-library-debug', 'true');
-    } else {
-      localStorage.removeItem('prompt-library-debug');
-    }
-  }, [settings, saveSettings]);
+  const handleDebugModeChangeCallback = useCallback((enabled: boolean) => {
+    void changeSettings({ type: 'setDebugMode', enabled });
+  }, [changeSettings]);
 
   // Handle import data
   const handleImportData = async (data: { prompts: Prompt[]; categories: Category[] }) => {
@@ -476,19 +332,15 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
 
   const dismissImportReport = useCallback(() => { setImportReport(null); }, []);
 
-  // Clear All Data and a reset leave the default site settings in storage. Shown before the reload, they
-  // stay shown when it fails, rather than the settings from before, which a change the user makes would
-  // save back. When they differ from the stored settings, the save that follows sends them to the tabs.
-  const showDefaultSiteSettings = (interfaceModeInStorage: 'popup' | 'sidepanel') => {
-    setSettings(defaultSettings);
-    setInterfaceMode(interfaceModeInStorage);
-  };
-
-  // Handle clear data
+  // Clear All Data leaves no Site settings stored: the defaults. The tabs are told too, since a
+  // Platform the user had turned off is on again.
   const handleClearData = async () => {
     try {
       await storageManager.clearAllData();
-      showDefaultSiteSettings(DEFAULT_SETTINGS.interfaceMode as 'popup' | 'sidepanel');
+      // Shown before the reload, so they stay shown when it fails
+      setSettings(defaultSiteSettings());
+      setInterfaceMode(DEFAULT_SETTINGS.interfaceMode as 'popup' | 'sidepanel');
+      await sendSiteSettingsToTabs(defaultSiteSettings());
       await loadSettings();
       showToast('All data cleared', 'success');
     } catch (error) {
@@ -500,11 +352,10 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
   // Handle reset settings
   const handleResetSettings = async () => {
     try {
-      await chrome.storage.local.set({
-        promptLibrarySettings: defaultSettings,
-        interfaceMode: 'popup'
-      });
-      
+      setSettings(await changeSiteSettings({ type: 'reset' }));
+      await chrome.storage.local.set({ interfaceMode: 'popup' });
+      setInterfaceMode('popup');
+
       if (userSettings) {
         const defaultUserSettings: UserSettings = {
           ...userSettings,
@@ -515,7 +366,6 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
         await storageManager.updateSettings(defaultUserSettings);
       }
 
-      showDefaultSiteSettings('popup');
       await loadSettings();
       showToast('Settings reset', 'success', { sub: 'Back to defaults' });
     } catch (error) {
@@ -532,27 +382,6 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
     [handleInterfaceModeChange]
   );
 
-  const handleCustomSiteToggleCallback = useCallback(
-    (hostname: string, enabled: boolean) => {
-      void handleCustomSiteToggle(hostname, enabled);
-    },
-    [handleCustomSiteToggle]
-  );
-
-  const handleRemoveCustomSiteCallback = useCallback(
-    (hostname: string) => {
-      void handleRemoveCustomSite(hostname);
-    },
-    [handleRemoveCustomSite]
-  );
-
-  const handleAddCustomSiteCallback = useCallback(
-    (siteData: Omit<CustomSite, 'dateAdded'>) => {
-      void handleAddCustomSite(siteData);
-    },
-    [handleAddCustomSite]
-  );
-
   // Turning Notifications on shows one at once, as a preview of what comes back
   const handleNotificationsChange = useCallback(
     (enabled: boolean) => {
@@ -562,13 +391,6 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
       }
     },
     [onToastSettingsChange, showToast]
-  );
-
-  const handleDebugModeChangeCallback = useCallback(
-    (enabled: boolean) => {
-      void handleDebugModeChange(enabled);
-    },
-    [handleDebugModeChange]
   );
 
   if (loading) {

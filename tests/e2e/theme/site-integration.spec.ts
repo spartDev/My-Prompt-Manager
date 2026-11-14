@@ -109,6 +109,34 @@ test.describe('Site integration Settings on the tokens', () => {
   for (const theme of ['light', 'dark'] as const) {
     const colors = EXPECTED[theme];
 
+    // My-Prompt-Manager-76r.2: a switch is one change, saved at once; a save storage refuses is said
+    test(`a Platform switch is saved at once, and one that cannot be saved goes back and says so (${theme})`, async ({ page, storage, extensionId }) => {
+      const section = await openSiteIntegration(page, storage, extensionId, theme);
+      const claude = section.getByRole('switch', { name: 'Claude', exact: true });
+      const chatgpt = section.getByRole('switch', { name: 'ChatGPT', exact: true });
+
+      await claude.click();
+      await expect(claude).toBeChecked();
+      await expect.poll(async () => (await storage.get<{ promptLibrarySettings: SiteSettings }>('promptLibrarySettings')).promptLibrarySettings.enabledSites)
+        .toEqual(['chatgpt.com', 'claude.ai']);
+
+      // Storage refuses every write from now on, as it does when the quota is reached
+      await page.evaluate(() => {
+        chrome.storage.local.set = () => Promise.reject(new Error('QUOTA_BYTES quota exceeded'));
+      });
+      await chatgpt.click();
+
+      const notification = page.getByRole('alert').filter({ hasText: "Couldn't save the setting" });
+      await expect(notification).toBeVisible();
+      await expect(chatgpt).toBeChecked();
+      expect((await storage.get<{ promptLibrarySettings: SiteSettings }>('promptLibrarySettings')).promptLibrarySettings.enabledSites)
+        .toEqual(['chatgpt.com', 'claude.ai']);
+      // The screenshot waits for the Notification to finish coming in, with the pointer off the switch
+      await page.mouse.move(0, 0);
+      await notification.evaluate((element) => Promise.all(element.getAnimations({ subtree: true }).map((animation) => animation.finished)));
+      await page.screenshot({ path: `${SCREENSHOT_DIR}/save-failed-${theme}.png` });
+    });
+
     test(`the Platforms are rows of one card on bg-app, one switched off shows its logo greyed and dimmed (${theme})`, async ({ page, storage, extensionId }) => {
       const section = await openSiteIntegration(page, storage, extensionId, theme);
 
