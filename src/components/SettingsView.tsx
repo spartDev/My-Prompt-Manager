@@ -104,11 +104,21 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
   // Whether Settings has shown Site settings yet: only its first read falls back to the defaults
   const siteSettingsShown = useRef(false);
 
+  // Counts the changes of the stored Site settings Settings has been told of. A read or a change that
+  // was under way when one arrived holds older Site settings than the ones now shown, and is not shown.
+  const siteSettingsRevision = useRef(0);
+  const showSiteSettingsSince = useCallback((revision: number, siteSettings: SiteSettings) => {
+    if (siteSettingsRevision.current === revision) {
+      setSettings(siteSettings);
+    }
+  }, []);
+
   // Load settings. The Site settings and the Library are read apart, so a Library that fails to load
   // leaves the Site settings shown as storage has them.
   const loadSettings = useCallback(async () => {
+    const revision = siteSettingsRevision.current;
     try {
-      setSettings(await readSiteSettings());
+      showSiteSettingsSince(revision, await readSiteSettings());
       siteSettingsShown.current = true;
     } catch (error) {
       Logger.error('Failed to load the Site settings', toError(error), { component: 'SettingsView', operation: 'loadSiteSettings' });
@@ -152,7 +162,7 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
     } finally {
       setLoading(false);
     }
-  }, [storageManager]);
+  }, [storageManager, showSiteSettingsSince]);
 
   // The storage bar shows what Chrome stores and follows every write, whoever makes it: the default
   // Category written on load, a change of the Site settings, an import, Clear All Data, another
@@ -186,7 +196,11 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
   }, [loadSettings]);
 
   // The Site settings follow storage, whoever changes them: this surface, the other one, Clear All Data
-  useEffect(() => onSiteSettingsChanged(setSettings), []);
+  useEffect(() => onSiteSettingsChanged((siteSettings) => {
+    siteSettingsRevision.current += 1;
+    siteSettingsShown.current = true;
+    setSettings(siteSettings);
+  }), []);
 
   /**
    * Makes one change to the Site settings. The module applies it to what storage holds, saves it and
@@ -195,20 +209,25 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
    */
   const changeSettings = useCallback(async (change: SiteSettingsChange) => {
     setSaving(true);
+    const revision = siteSettingsRevision.current;
     try {
-      setSettings(await changeSiteSettings(change));
+      // The module tells the tabs before it answers. What storage held after the write has already
+      // been shown, from storage: this change, or a later one from another surface, which this
+      // older answer must not replace
+      showSiteSettingsSince(revision, await changeSiteSettings(change));
     } catch (error) {
       Logger.error('Failed to save the Site settings', toError(error), { component: 'SettingsView', operation: 'changeSiteSettings', change: change.type });
       showToast("Couldn't save the setting", 'error');
       try {
-        setSettings(await readSiteSettings());
+        const revisionAtRead = siteSettingsRevision.current;
+        showSiteSettingsSince(revisionAtRead, await readSiteSettings());
       } catch {
         // Storage cannot be read either: what is shown stays
       }
     } finally {
       setSaving(false);
     }
-  }, [showToast]);
+  }, [showToast, showSiteSettingsSince]);
 
   // Handle Library sort change: each sort is saved with its one direction
   const handleSortOrderChange = useCallback((sortOrder: SortOrder) => {
@@ -352,7 +371,8 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
   // Handle reset settings
   const handleResetSettings = async () => {
     try {
-      setSettings(await changeSiteSettings({ type: 'reset' }));
+      const revision = siteSettingsRevision.current;
+      showSiteSettingsSince(revision, await changeSiteSettings({ type: 'reset' }));
       await chrome.storage.local.set({ interfaceMode: 'popup' });
       setInterfaceMode('popup');
 

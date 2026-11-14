@@ -612,6 +612,57 @@ describe('SettingsView', () => {
       expect(claude).toHaveAttribute('aria-checked', 'true');
     });
 
+    // Review round 1 (Codex): what a storage event showed is newer than a read or a change that was
+    // under way when it arrived
+    describe('when another surface changes the Site settings meanwhile', () => {
+      const FROM_THE_OTHER_SURFACE = { enabledSites: ['claude.ai'], customSites: [] };
+      const theOtherSurfaceSaves = () => act(() => {
+        triggerChromeStorageChange({
+          promptLibrarySettings: { oldValue: { enabledSites: ['chatgpt.com'], customSites: [] }, newValue: FROM_THE_OTHER_SURFACE }
+        });
+      });
+
+      it('keeps them over a load that was reading the older ones', async () => {
+        const get = getChromeMockFunctions().storage.local.get as Mock;
+        const stored = { promptLibrarySettings: { enabledSites: ['chatgpt.com'], customSites: [] }, interfaceMode: 'popup', settings: DEFAULT_SETTINGS };
+        let finishTheRead!: () => void;
+        get.mockImplementationOnce(() => new Promise(resolve => { finishTheRead = () => { resolve(stored); }; }));
+        get.mockResolvedValue(stored);
+
+        renderSettingsView();
+        await waitFor(() => { expect(get).toHaveBeenCalled(); });
+        theOtherSurfaceSaves();
+        await act(async () => { finishTheRead(); });
+
+        expect(await screen.findByRole('switch', { name: 'Claude' })).toHaveAttribute('aria-checked', 'true');
+        expect(screen.getByRole('switch', { name: 'ChatGPT' })).toHaveAttribute('aria-checked', 'false');
+      });
+
+      it('keeps them over the answer of a change that was still telling the tabs', async () => {
+        const chromeMock = getChromeMockFunctions();
+        // Every listing of the tabs waits, the one the change makes among them
+        const pendingListings: Array<() => void> = [];
+        const finishTellingTheTabs = () => { pendingListings.splice(0).forEach(finish => { finish(); }); };
+        (chromeMock.tabs.query as Mock).mockImplementation(() => new Promise(resolve => { pendingListings.push(() => { resolve([]); }); }));
+
+        await renderSettings();
+        // This surface turns Gemini on: saved, and the tabs are being told
+        await userEvent.click(await screen.findByRole('switch', { name: 'Google Gemini' }));
+        await waitFor(() => { expect(chromeMock.tabs.query).toHaveBeenCalled(); });
+        expect(siteSettingsWrites()).toHaveLength(1);
+        theOtherSurfaceSaves();
+        await act(async () => {
+          finishTellingTheTabs();
+          // Long enough for the change to answer
+          await new Promise(resolve => { setTimeout(resolve, 20); });
+        });
+
+        expect(screen.getByRole('switch', { name: 'Claude' })).toHaveAttribute('aria-checked', 'true');
+        expect(screen.getByRole('switch', { name: 'Google Gemini' })).toHaveAttribute('aria-checked', 'false');
+        expect(screen.getByRole('switch', { name: 'ChatGPT' })).toHaveAttribute('aria-checked', 'false');
+      });
+    });
+
     it('follows the Site settings when another surface changes them', async () => {
       await renderSettings();
       const claude = await screen.findByRole('switch', { name: 'Claude' });
