@@ -232,11 +232,13 @@ export function addressAsPrinted(requested: string): string {
  * message's.
  */
 export function redactUrls(message: string, requested = ''): string {
+  // As capture passes it to page.goto, untrimmed: new URL() keeps and encodes what trim() would drop (a no-break space)
+  const printed = addressAsPrinted(requested);
   const typed = requested.trim();
-  const printed = addressAsPrinted(typed);
   const forms = new Set<string>();
   if (printed.includes(':')) {
     forms.add(printed);
+    forms.add(addressAsPrinted(typed));
     forms.add(typed);
     try {
       forms.add(new URL(printed).toString());

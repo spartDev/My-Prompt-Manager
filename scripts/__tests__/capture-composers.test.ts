@@ -310,8 +310,9 @@ describe('redactUrls', () => {
     ['localhost:8080/a?q=my SECRET', 'Navigation to "http://localhost:8080/a?q=my%20SECRET" is interrupted by another navigation to "http://localhost:8080/login"', 'Navigation to "http://localhost:8080/a" is interrupted by another navigation to "http://localhost:8080/login"'],
     ['localhost:9/My Docs/c?q=my SECRET', 'net::ERR_UNSAFE_PORT at http://localhost:9/My Docs/c?q=my%20SECRET', 'net::ERR_UNSAFE_PORT at http://localhost:9/My%20Docs/c'],
     ['localhost.localdomain:9/My Docs/c?t=SECRET', 'net::ERR_UNSAFE_PORT at http://localhost.localdomain:9/My Docs/c?t=SECRET', 'net::ERR_UNSAFE_PORT at http://localhost.localdomain:9/My%20Docs/c'],
-    ['127.0.0.10:9/My Docs/c?t=SECRET', 'net::ERR_UNSAFE_PORT at http://127.0.0.10:9/My Docs/c?t=SECRET', 'net::ERR_UNSAFE_PORT at http://127.0.0.10:9/My%20Docs/c']
-  ])('writes the requested %j as page.goto prints it', (requested, message, written) => {
+    ['127.0.0.10:9/My Docs/c?t=SECRET', 'net::ERR_UNSAFE_PORT at http://127.0.0.10:9/My Docs/c?t=SECRET', 'net::ERR_UNSAFE_PORT at http://127.0.0.10:9/My%20Docs/c'],
+    ['localhost:1/a b?t=SECRET\u00a0', 'net::ERR_UNSAFE_PORT at http://localhost:1/a b?t=SECRET%C2%A0', 'net::ERR_UNSAFE_PORT at http://localhost:1/a%20b']
+  ])('writes the requested %j as page.goto prints it, untrimmed', (requested, message, written) => {
     expect(redactUrls(message, requested)).toBe(written);
   });
 
