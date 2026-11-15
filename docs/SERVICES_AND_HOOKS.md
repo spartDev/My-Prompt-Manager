@@ -33,6 +33,7 @@ Other keys of `chrome.storage.local` belong to the code that owns them, which wr
 | `iconPlacementRepairs` | `src/services/iconPlacementRepairs.ts`; written by the service worker only |
 | `interfaceMode` | `src/components/SettingsView.tsx` |
 | `grantedPermissions` | `src/background/background.ts` |
+| `whatsNew` (the Release of the first install, the Last seen Release) | `src/whatsNew/storage.ts`, the only reader and writer; the service worker records the first install, `markReleaseSeen` is the only writer of the Last seen Release and writes nothing in Debug mode. Outside the Site settings, so a reset of the settings leaves it |
 
 ---
 
@@ -137,6 +138,7 @@ A refusal keeps its type through `StorageManager` and `PromptManager`, so a call
 | `src/hooks/useDuplicateGroups.ts` | The Duplicate pairs of the Library, looked for after the first paint; null while looking or when the finder gives up (over 1,000 Prompts, timeout) | Analytics Tidy up |
 | `src/hooks/useRadioGroup.ts` | Keyboard behavior of a WAI-ARIA radio group: one tab stop, arrows, Home and End move focus and selection, `locked` ignores input. `src/components/__tests__/radioGroups.test.ts` fails when a component renders `role="radio"` without it | `LibraryFilterBar`, `AppearanceSection`, `InterfaceModeSelector` |
 | `src/hooks/useAnimatedPresence.ts` | Keeps a panel in the document for its exit animation (`MOTION.sheetOut`): `shown` is what to render, `exiting` says to play the exit; reopening while leaving cancels the unmount, and the timer is cleared on unmount. Instant under `prefers-reduced-motion` | `App` (the editor sheet) |
+| `src/hooks/useWhatsNew.ts` | Whether What's new shows at this opening and with which Release notes (`decideWhatsNew` of `src/whatsNew/decide.ts` over the manifest version, the `whatsNew` record and Debug mode, read once); `close()` hides the notes and marks the Release as seen without waiting for storage. Debug mode stays inside: nothing it returns names it | None yet: `App` takes it with the What's new sheet |
 | `src/hooks/useModalFocus.ts` | Keyboard behavior of a modal dialog: focus moves in, Tab and Shift+Tab wrap inside (onto the panel when every control is disabled), Escape closes, the focus returns to the opener. Beneath a confirmation (`isOpen` false while the panel stays in the document, `inert`) it pauses, keeps its opener, and resumes where the confirmation leaves the focus | `ConfirmDialog`, `AnalyticsTab`, `StorageWarning`, `ConfigurationPreview`, `CategorySheet` |
 
 Components read the theme through `useThemeContext()` of `src/contexts/ThemeContext.tsx`, never `useTheme()` directly: `ThemeProvider` calls `useTheme` once, so every component sees the same theme.

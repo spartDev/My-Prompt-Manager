@@ -20,6 +20,7 @@ import { StorageManager } from "../services/storage";
 import { UsageTracker } from "../services/UsageTracker";
 import type { ElementFingerprint, PlatformType } from "../types";
 import { getErrorMessage, Logger, toError } from "../utils";
+import { recordInstall } from "../whatsNew/storage";
 
 // Track active element picker sessions
 const activePickerSessions = new Map<
@@ -1337,11 +1338,34 @@ chrome.runtime.onConnect.addListener((port) => {
   }
 });
 
+/** Records the Release of a first install, so What's new never shows on it (CONTEXT.md, Releases) */
+async function recordFirstInstall(): Promise<void> {
+  const version = chrome.runtime.getManifest().version;
+  try {
+    await recordInstall(version);
+    Logger.info("Recorded the Release of the first install", {
+      component: "Background",
+      version,
+    });
+  } catch (error) {
+    Logger.error(
+      "Could not record the Release of the first install",
+      toError(error),
+      { component: "Background", version },
+    );
+  }
+}
+
 // Initialize interface mode on extension startup and handle updates
 chrome.runtime.onInstalled.addListener((details) => {
   // Clean stored data of Hidden characters after an update, alongside (not before) the rest
   if (details.reason === "update") {
     void upgradeStoredData();
+  }
+
+  // An update leaves the What's new record alone: only a first install is recorded
+  if (details.reason === "install") {
+    void recordFirstInstall();
   }
 
   void (async () => {
