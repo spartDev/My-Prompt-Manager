@@ -758,6 +758,22 @@ A row is a button only where pressing it does something: Most used rows open the
 
 The full-page view keeps its content to a 1100px column (`lg:px-[max(2rem,calc(50vw-550px))]` on the header and on the scroll container). Under `lg` it is one column in the tab's order; from `lg` up Most used sits at the left of Top platform, Top category and Tidy up, and from `md` up the last four cards pair up. Cards are 10px apart (`mt-2.5`, `gap-x-2.5`).
 
+<!-- What's new tiles (My-Prompt-Manager-d1g.6) -->
+#### What's new tiles
+
+The tiles of the What's new sheet (Atelier 1C 'Whats new'), in a `grid grid-cols-2 gap-2`, drawn by `src/components/whatsNew/`:
+
+| Piece | Classes |
+|---|---|
+| Tile | `flex flex-col gap-2 p-[13px] rounded-tile bg-subtle text-left animate-tile-rise`, its delay `MOTION.tileDelay + position × MOTION.tileStagger` (180ms, 250ms, 320ms…) |
+| Feature tile that opens something | a `<button>`, plus `transition-tile hover:bg-accent-selected active:scale-[.97] focus-primary` |
+| Hero | full width (`col-span-2`): the example in `text-sm leading-[1.7] text-primary`, each Variable a `px-[9px] py-px rounded-full bg-accent-selected text-accent font-bold` pill; the title `text-[15px] font-bold`; the description `text-[12.5px] leading-[1.4] text-secondary` |
+| Feature icon square | `min-w-8 h-8 rounded-tile-icon bg-card text-accent shadow-tile-icon`, a 17px glyph; the title `text-[13.5px] leading-[1.2] font-bold`, the description `text-xs leading-[1.4] text-secondary` |
+| Fixed pill (Critical fix) | `px-2 py-0.5 rounded-full bg-success-subtle text-success text-[11px] font-bold`, in place of the icon square |
+
+Their tokens: `--radius-tile` (18px), `--radius-tile-icon` (11px), `--shadow-tile-icon` (`0 4px 10px -6px`, on `--shadow-tint-40`), `--animate-tile-rise` (the `card-rise` keyframes over 550ms on `--ease-rise`), and the `transition-tile` utility of `popup.css` (scale 300ms on the spring, fill 200ms). Under reduced motion the tiles rise together, near instant. A plain tile (a Feature without destination, a Critical fix) has no hover and no press: it does nothing.
+<!-- end What's new tiles -->
+
 ### Badges & Pills
 
 #### Category Badge

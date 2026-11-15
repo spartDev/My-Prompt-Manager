@@ -118,3 +118,24 @@ describe('motion tokens', () => {
     expect(MOTION.savedPause).toBe(620);
   });
 });
+
+// --- What's new tiles (My-Prompt-Manager-d1g.6) ---
+describe("What's new tiles motion", () => {
+  it('a tile rises 12px with a fade over 550ms, on its softer spring, first at 180ms then 70ms apart', () => {
+    expect([MOTION.tileRise, MOTION.tileDelay, MOTION.tileStagger]).toEqual([550, 180, 70]);
+    expect(EASE.rise).toBe('cubic-bezier(0.34, 1.3, 0.64, 1)');
+    expect(tokens).toContain(`--ease-rise: ${EASE.rise};`);
+    expect(tokens).toContain(`--animate-tile-rise: card-rise ${MOTION.tileRise}ms var(--ease-rise) both;`);
+    expect(tokens).toMatch(/@keyframes card-rise \{\s*from \{ opacity: 0; transform: translateY\(12px\); \}/);
+  });
+
+  it('a pressed tile springs over 300ms, and both are near instant, with no cascade, under reduced motion', () => {
+    const popupCss = readFileSync(path.resolve(__dirname, '../../popup.css'), 'utf8');
+    expect(MOTION.tilePress).toBe(300);
+    expect(popupCss).toMatch(new RegExp(`@utility transition-tile \\{\\s*transition:\\s*scale ${MOTION.tilePress}ms var\\(--ease-spring\\),\\s*background-color 200ms;`));
+    const reduced = popupCss.slice(popupCss.lastIndexOf('@media (prefers-reduced-motion: reduce)'));
+    expect(reduced).toMatch(/\.animate-tile-rise \{\s*animation-duration: 1ms;\s*animation-delay: 0ms !important;/);
+    expect(reduced).toMatch(/\.transition-tile \{\s*transition-duration: 1ms;/);
+  });
+});
+// --- end What's new tiles ---

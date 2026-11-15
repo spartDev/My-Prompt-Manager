@@ -259,3 +259,25 @@ body {
     border-top-color: transparent;
   }
 }
+
+/* --- What's new tiles (My-Prompt-Manager-d1g.6) ---
+   A Feature tile springs when pressed (scale) and changes its fill on hover. Its rise is
+   animate-tile-rise in theme/tokens.css; under reduced motion both are near instant and the tiles
+   rise together, with no cascade */
+@utility transition-tile {
+  transition:
+    scale 300ms var(--ease-spring),
+    background-color 200ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-tile-rise {
+    animation-duration: 1ms;
+    animation-delay: 0ms !important;
+  }
+
+  .transition-tile {
+    transition-duration: 1ms;
+  }
+}
+/* --- end What's new tiles --- */
