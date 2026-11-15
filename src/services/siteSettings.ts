@@ -49,9 +49,15 @@ export function defaultSiteSettings(): SiteSettings {
 
 /**
  * The Platforms of the releases that stored the list of the Platforms that were on, up to the one
- * that stores the Platform choices. A Platform of this list missing from a stored list was turned
- * off by the user; one that is not in this list did not exist when the list was written, so it
- * takes its default. Frozen: a Platform added later is never added here.
+ * that stores the Platform choices. A Platform of this list missing from a stored list is off; one
+ * that is not in this list did not exist when the list was written, so it takes its default.
+ * Frozen: a Platform added later is never added here.
+ *
+ * A stored list does not say which release wrote it. Mistral (v1.4.0), Gemini (v1.6.0) and Copilot
+ * (v1.8.0) were added while the list was stored, so for a list written before them, one missing
+ * from it may never have been turned off; it was off for that user all the same, and stays off
+ * rather than turning on a Platform the user may have turned off. Only M365 Copilot (v1.8.1) is
+ * told apart: it is switched with Copilot, so it follows Copilot.
  */
 export const PLATFORMS_OF_THE_ENABLED_LIST: readonly string[] = Object.freeze([
   'claude.ai',
@@ -67,7 +73,9 @@ export const PLATFORMS_OF_THE_ENABLED_LIST: readonly string[] = Object.freeze([
 function choicesOfEnabledList(enabledSites: readonly string[]): Record<string, boolean> {
   const choices: Record<string, boolean> = {};
   for (const hostname of PLATFORMS_OF_THE_ENABLED_LIST) {
-    choices[hostname] = enabledSites.includes(hostname);
+    // A Platform is switched with the Platforms linked to it, so one that is on turns them on: a list
+    // with Copilot and without M365 Copilot was written before M365 Copilot existed
+    choices[hostname] = getLinkedPlatformHostnames(hostname).some((linked) => enabledSites.includes(linked));
   }
   // A hostname on the list that is no Platform of those releases stays on, as it was
   for (const hostname of enabledSites) {
@@ -80,7 +88,8 @@ function choicesOfEnabledList(enabledSites: readonly string[]): Record<string, b
 function parsePlatformChoices(stored: Record<string, unknown>): Record<string, boolean> {
   const choices: Record<string, boolean> = {};
   for (const [hostname, enabled] of Object.entries(stored)) {
-    if (hostname.length > 0 && typeof enabled === 'boolean') {
+    // `__proto__` would set the prototype of the choices, not a choice
+    if (hostname.length > 0 && hostname !== '__proto__' && typeof enabled === 'boolean') {
       choices[hostname] = enabled;
     }
   }
@@ -151,7 +160,10 @@ export function enabledCustomSite(settings: SiteSettings, hostname: string): Cus
  * Platform is by default. A hostname that is no Platform and that the user never turned on is off.
  */
 export function isPlatformEnabled(settings: SiteSettings, hostname: string): boolean {
-  return settings.platformChoices[hostname] ?? getPlatformByHostname(hostname)?.defaultEnabled ?? false;
+  // Own entries only: a hostname such as `constructor` must not read what every object inherits
+  return Object.hasOwn(settings.platformChoices, hostname)
+    ? settings.platformChoices[hostname]
+    : getPlatformByHostname(hostname)?.defaultEnabled ?? false;
 }
 
 /**

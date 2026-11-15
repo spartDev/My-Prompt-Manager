@@ -64,6 +64,13 @@ describe('parseSiteSettings', () => {
       );
     });
 
+    it('turns M365 Copilot on with Copilot, for a list written before M365 Copilot existed', () => {
+      const settings = parseSiteSettings({ enabledSites: ['claude.ai', 'copilot.microsoft.com'] });
+
+      expect(isPlatformEnabled(settings, 'm365.cloud.microsoft')).toBe(true);
+      expect(enabledPlatforms(settings)).toEqual(['claude.ai', 'copilot.microsoft.com', 'm365.cloud.microsoft']);
+    });
+
     it('gives every Platform of that release off for an empty list', () => {
       expect(enabledPlatforms(parseSiteSettings({ enabledSites: [] }))).toEqual([]);
     });
@@ -142,9 +149,13 @@ describe('isPlatformEnabled', () => {
     }
   });
 
-  it('is off for a hostname that is no Platform and that the user never turned on', () => {
-    expect(isPlatformEnabled(defaultSiteSettings(), 'news.example.com')).toBe(false);
-  });
+  it.each(['news.example.com', 'constructor', '__proto__', 'toString'])(
+    'is off for %s, a hostname that is no Platform and that the user never turned on',
+    (hostname) => {
+      expect(isPlatformEnabled(defaultSiteSettings(), hostname)).toBe(false);
+      expect(isHostnameEnabled(defaultSiteSettings(), hostname)).toBe(false);
+    }
+  );
 });
 
 describe('PLATFORMS_OF_THE_ENABLED_LIST', () => {
