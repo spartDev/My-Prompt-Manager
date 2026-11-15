@@ -244,7 +244,7 @@ describe('parseCaptureArgs', () => {
 });
 
 describe('redactUrls', () => {
-  // What Playwright prints: page.goto writes the address as new URL() normalizes it
+  // The address as new URL() writes it: the form of the browser's own addresses, and of the requested one once parsed
   const printed = (requested: string): string => new URL(requested.trim()).toString();
 
   it.each([
@@ -287,6 +287,28 @@ describe('redactUrls', () => {
     const redacted = redactUrls(message, requested);
 
     expect(redacted).toBe('page.goto: Navigation to "<stand-in>" is interrupted by another navigation to "<stand-in>"');
+  });
+
+  it.each([
+    ['file:///Users/alice/My Docs/claude.html', 'net::ERR_FILE_NOT_FOUND at file:///Users/alice/My Docs/claude.html', 'net::ERR_FILE_NOT_FOUND at file://<stand-in>/claude.html'],
+    ['https://chat.example/c?t=SECRET', 'net::ERR_CONNECTION_REFUSED at https://chat.example/c?t=SECRET', 'net::ERR_CONNECTION_REFUSED at https://chat.example/c'],
+    ['localhost:8080/claude.html?token=SECRET', 'net::ERR_CONNECTION_REFUSED at http://localhost:8080/claude.html?token=SECRET', 'net::ERR_CONNECTION_REFUSED at http://localhost:8080/claude.html']
+  ])('writes the requested %j as Playwright prints it, as passed', (requested, message, written) => {
+    expect(redactUrls(message, requested)).toBe(written);
+  });
+
+  it('replaces the requested address only whole, never inside a longer one', () => {
+    expect(redactUrls('Navigation to "http://localhost:8080" is interrupted by another navigation to "http://localhost:8080/login?next=SECRET"', 'http://localhost:8080'))
+      .toBe('Navigation to "http://localhost:8080/" is interrupted by another navigation to "http://localhost:8080/login"');
+    expect(redactUrls('to "https://chat.example/" then "https://chat.example:8443/login?t=SECRET"', 'https://chat.example'))
+      .toBe('to "https://chat.example/" then "https://chat.example:8443/login"');
+    expect(redactUrls('at "http://alice:SECRETPW@host/p"', 'http://a')).toBe('at "http://host/p"');
+  });
+
+  it('gives back the punctuation and the parentheses the message opened', () => {
+    expect(redactUrls('failed ((https://a.example/b?x=1))')).toBe('failed ((https://a.example/b))');
+    expect(redactUrls('failed (https://a.example/b?x=1).')).toBe('failed (https://a.example/b).');
+    expect(redactUrls('failed (https://a.example/b?x=1), fixture kept')).toBe('failed (https://a.example/b), fixture kept');
   });
 
   it('leaves a message alone when the requested value is no address', () => {

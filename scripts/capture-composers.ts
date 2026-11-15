@@ -184,12 +184,37 @@ export function headerUrl(url: string): string {
   }
 }
 
+/** What may stand right before or after an address in a message: a space, a quote, a bracket, a parenthesis, or punctuation that ends a sentence */
+const BEFORE_ADDRESS = '(?<=^|[\\s"\'(<])';
+const AFTER_ADDRESS = '(?=$|[\\s"\'<>)]|[.,;:](?:$|\\s))';
+
+const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** An address as headerUrl writes it, with the trailing punctuation and closing parentheses that are the message's given back */
+function redactAddress(match: string, opened: number): string {
+  let url = match;
+  let open = opened;
+  for (;;) {
+    if (/[.,;:]$/.test(url)) {
+      url = url.slice(0, -1);
+    } else if (open > 0 && url.endsWith(')') && url.split(')').length > url.split('(').length) {
+      url = url.slice(0, -1);
+      open--;
+    } else {
+      break;
+    }
+  }
+  return `${headerUrl(url)}${match.slice(url.length)}`;
+}
+
 /**
- * A message with every address in it as headerUrl writes it. The requested address is replaced
- * first, as typed and as `new URL()` normalizes it (Playwright prints it normalized: a space as
- * %20, a slash after the host), whatever its scheme. Then any http(s) or file address, which ends
- * at a space, a double quote or an angle bracket; a closing parenthesis at its end stays the
- * message's when the message opened one before it (`(https://a/b)`).
+ * A message with every address in it as headerUrl writes it. Playwright prints the requested
+ * address as it was passed (`net::ERR_… at <url>`), so it is replaced first, as typed and as
+ * `new URL()` writes it, whatever its scheme and whatever it holds (a space in a file path), but
+ * only as a whole address, never inside a longer one. Then any other http(s) or file address (the
+ * browser's own, in "interrupted by another navigation to"), up to a space, a double quote or an
+ * angle bracket; trailing punctuation, and a closing parenthesis the message opened, stay the
+ * message's.
  */
 export function redactUrls(message: string, requested = ''): string {
   const typed = requested.trim();
@@ -205,15 +230,14 @@ export function redactUrls(message: string, requested = ''): string {
   let redacted = message;
   // Longest first, so a form that holds another is replaced whole
   for (const form of [...forms].sort((a, b) => b.length - a.length)) {
-    redacted = redacted.split(form).join(headerUrl(typed));
+    redacted = redacted.replace(new RegExp(`${BEFORE_ADDRESS}${escapeRegExp(form)}${AFTER_ADDRESS}`, 'g'), () => headerUrl(typed));
   }
   return redacted.replace(/\b(?:https?|file):\/\/[^\s"<>]+/gi, (match: string, offset: number, whole: string) => {
     const before = whole.slice(0, offset);
-    const opened = before.split('(').length - before.split(')').length;
-    const url = opened > 0 && match.endsWith(')') && match.split(')').length > match.split('(').length ? match.slice(0, -1) : match;
-    return `${headerUrl(url)}${match.slice(url.length)}`;
+    return redactAddress(match, before.split('(').length - before.split(')').length);
   });
 }
+
 
 export type CaptureResult =
   | { id: string; outcome: 'captured'; composerFound: boolean; file: string }
