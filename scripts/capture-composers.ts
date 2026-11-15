@@ -191,8 +191,10 @@ export type CaptureResult =
 
 /**
  * The exit code of a capture run: non-zero when a requested Platform was not captured (signed
- * out, a selector that drifted, a page that failed), even when others were and their chains pass,
- * so a stale fixture never passes for a fresh one; else the chain tests' code when they ran.
+ * out, a selector that drifted, a page that failed), or was captured from an ancestor of its
+ * editor because its chain's composer selector found nothing, even when others were and their
+ * chains pass, so a stale fixture or a drifted chain never passes, with or without --no-test;
+ * else the chain tests' code when they ran.
  *
  * @param testsStatus - The chain tests' exit code; undefined when they did not run
  */
@@ -200,7 +202,7 @@ export function captureExitCode(results: readonly CaptureResult[], testsStatus?:
   if (testsStatus !== undefined && testsStatus !== 0) {
     return testsStatus ?? 1;
   }
-  return results.length > 0 && results.every((result) => result.outcome === 'captured') ? 0 : 1;
+  return results.length > 0 && results.every((result) => result.outcome === 'captured' && result.composerFound) ? 0 : 1;
 }
 
 /** Tried after a Platform's own selectors, in this order */
@@ -242,9 +244,11 @@ export async function capture(page: Page, id: string, platform: PlatformDefiniti
       return null;
     }
   };
-  if (!(await findEditor())) {
+  const firstEditor = await findEditor();
+  if (!firstEditor) {
     return { id, outcome: 'no-editor', url };
   }
+  await firstEditor.dispose();
   await page.waitForTimeout(options.settle);
   // Found again once the toolbar has rendered: the page may have replaced the editor meanwhile
   const editorHandle = await findEditor();
@@ -272,6 +276,7 @@ export async function capture(page: Page, id: string, platform: PlatformDefiniti
     },
     { composerSelector: platform.iconPlacement?.composer ?? '', marker: EDITOR_MARKER, depth: FALLBACK_DEPTH }
   );
+  await editorHandle.dispose();
 
   const { document } = new JSDOM('<!doctype html><body></body>').window;
   document.body.innerHTML = live.html;
@@ -332,11 +337,11 @@ async function main(): Promise<number> {
 
   for (const result of results) {
     if (result.outcome === 'no-editor') {
-      process.stdout.write(`  ${result.id}: no editor at ${result.url} (signed out?), fixture kept as it was\n`);
+      process.stdout.write(`  ${result.id}: no editor at ${headerUrl(result.url)} (signed out?), fixture kept as it was\n`);
     } else if (result.outcome === 'error') {
-      process.stdout.write(`  ${result.id}: capture failed at ${result.url} (${result.message}), fixture kept as it was\n`);
+      process.stdout.write(`  ${result.id}: capture failed at ${headerUrl(result.url)} (${result.message}), fixture kept as it was\n`);
     } else if (!result.composerFound) {
-      process.stdout.write(`  ${result.id}: CHAIN COMPOSER NOT FOUND, an ancestor of the editor written to ${shown(result.file)}\n`);
+      process.stdout.write(`  ${result.id}: CHAIN COMPOSER NOT FOUND, an ancestor of the editor written to ${shown(result.file)}: the run fails\n`);
     } else {
       process.stdout.write(`  ${result.id}: written to ${shown(result.file)}\n`);
     }

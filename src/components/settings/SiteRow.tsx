@@ -39,7 +39,7 @@ const PlacementNotice: FC<{ name: string } & NonNullable<SiteRowProps['placement
   return (
     <div data-testid="site-placement" data-status={status} className="mt-2 ml-[42px]">
       <div
-        className={`flex items-center gap-3 rounded-xl py-1.5 pr-1.5 pl-3 ${fallback ? 'border border-warning bg-warning-subtle' : 'bg-subtle'}`}
+        className={`flex items-center gap-3 rounded-lg py-1.5 pr-1.5 pl-3 ${fallback ? 'border border-warning bg-warning-subtle' : 'bg-subtle'}`}
       >
         <p className={`flex-1 min-w-0 text-[12px] ${fallback ? 'text-warning' : 'text-secondary'}`}>
           {fallback

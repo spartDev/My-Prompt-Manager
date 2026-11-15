@@ -152,15 +152,17 @@ export function changeIconPlacementRepairs(change: IconPlacementRepairChange): P
   });
 }
 
-/** The repair of a Platform row: its own hostname's, else one of its linked Platforms' */
+/**
+ * The repair a Platform row shows, of its own hostname or of its linked Platforms' (Copilot and
+ * M365 Copilot share a row). The Anchored overlay comes first, wherever it is: it is the one that
+ * asks the user to place the icon. Else the first override, by the order of the hostnames.
+ */
 export function repairForHostnames(repairs: IconPlacementRepairs, hostnames: readonly string[]): { hostname: string; status: RepairStatus } | null {
-  for (const hostname of hostnames) {
+  const found = hostnames.flatMap((hostname) => {
     const status = repairs[hostname]?.status;
-    if (status) {
-      return { hostname, status };
-    }
-  }
-  return null;
+    return status ? [{ hostname, status }] : [];
+  });
+  return found.find(({ status }) => status === 'overlay') ?? found[0] ?? null;
 }
 
 /**

@@ -21,16 +21,63 @@ import { UsageTracker } from "../services/UsageTracker";
 import type { ElementFingerprint, PlatformType } from "../types";
 import { getErrorMessage, Logger, toError } from "../utils";
 
-// Track active element picker sessions
-const activePickerSessions = new Map<
-  number,
-  {
-    tabId: number;
-    windowId: number;
-    /** Set when the pick repairs the icon placement of this built-in Platform (Settings, "Place the icon") */
-    repairHostname?: string;
+/** An Element picker open in a tab, from START_ELEMENT_PICKER until the pick or its cancel */
+interface PickerSession {
+  tabId: number;
+  windowId: number;
+  /** Set when the pick repairs the icon placement of this built-in Platform (Settings, "Place the icon") */
+  repairHostname?: string;
+}
+
+const PICKER_SESSION_KEY_PREFIX = "pickerSession:";
+const pickerSessionKey = (tabId: number): string => `${PICKER_SESSION_KEY_PREFIX}${tabId}`;
+
+function isPickerSession(value: unknown): value is PickerSession {
+  if (typeof value !== "object" || value === null) {
+    return false;
   }
->();
+  const session = value as Record<string, unknown>;
+  return typeof session.tabId === "number"
+    && typeof session.windowId === "number"
+    && (session.repairHostname === undefined || typeof session.repairHostname === "string");
+}
+
+/**
+ * The open picker sessions, in chrome.storage.session under one key per tab, not in memory: Chrome
+ * stops the service worker after about 30 s with no event, and hovering the page sends none, so a
+ * session held in memory would be gone by the time the user clicks, and the pick lost.
+ */
+const pickerSessions = {
+  async get(tabId: number): Promise<PickerSession | undefined> {
+    const key = pickerSessionKey(tabId);
+    const stored: unknown = (await chrome.storage.session.get(key))[key];
+    return isPickerSession(stored) ? stored : undefined;
+  },
+  set(session: PickerSession): Promise<void> {
+    return chrome.storage.session.set({ [pickerSessionKey(session.tabId)]: session });
+  },
+  delete(tabId: number): Promise<void> {
+    return chrome.storage.session.remove(pickerSessionKey(tabId));
+  },
+  async tabIds(): Promise<number[]> {
+    const stored = await chrome.storage.session.get(null);
+    return Object.keys(stored)
+      .filter((key) => key.startsWith(PICKER_SESSION_KEY_PREFIX))
+      .map((key) => Number(key.slice(PICKER_SESSION_KEY_PREFIX.length)))
+      .filter((tabId) => Number.isInteger(tabId));
+  },
+};
+
+/** Forgets a tab's picker session, as its tab closes */
+function forgetPickerSession(tabId: number): void {
+  pickerSessions.delete(tabId).catch((error: unknown) => {
+    Logger.warn("Could not forget the picker session of a closed tab", {
+      component: "Background",
+      tabId,
+      error: getErrorMessage(error),
+    });
+  });
+}
 
 const storageManager = StorageManager.getInstance();
 
@@ -589,9 +636,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 // Clean up when tab is closed
 chrome.tabs.onRemoved.addListener((tabId) => {
   injector.cleanup(tabId);
-  if (activePickerSessions.has(tabId)) {
-    activePickerSessions.delete(tabId);
-  }
+  forgetPickerSession(tabId);
 });
 
 // Inject when extension icon is clicked (activeTab permission)
@@ -1123,7 +1168,7 @@ async function handleStartElementPicker(
     }
 
     // Store picker session
-    activePickerSessions.set(targetTabId, {
+    await pickerSessions.set({
       tabId: targetTabId,
       windowId: sender.tab?.windowId || 0,
       ...(repairHostname !== undefined ? { repairHostname } : {}),
@@ -1212,18 +1257,18 @@ async function handleElementSelected(
   try {
     const tabId = sender.tab?.id;
 
-    if (!tabId || !activePickerSessions.has(tabId)) {
+    const session = tabId ? await pickerSessions.get(tabId) : undefined;
+    if (!tabId || !session) {
       sendResponse({ success: false, error: "No active picker session" });
       return;
     }
 
-    const session = activePickerSessions.get(tabId);
     // Remove session
-    activePickerSessions.delete(tabId);
+    await pickerSessions.delete(tabId);
 
     // A pick for a built-in Platform's icon is its override, stored here: the popup that asked
     // for it has closed by now. The content script places the icon there when storage changes.
-    if (session?.repairHostname) {
+    if (session.repairHostname) {
       const positioning = overrideFromPick(data);
       if (!positioning || repairablePlatformHostname(sender.tab?.url) !== session.repairHostname) {
         sendResponse({ success: false, error: "The pick names no element of this platform" });
@@ -1278,9 +1323,11 @@ async function handleStopElementPicker(
   _sender: chrome.runtime.MessageSender,
   sendResponse: (response?: { success: boolean; error?: string }) => void,
 ) {
+  let tabIds: number[] = [];
   try {
     // Clear all active sessions
-    for (const [tabId] of activePickerSessions) {
+    tabIds = await pickerSessions.tabIds();
+    for (const tabId of tabIds) {
       await chrome.tabs
         .sendMessage(tabId, {
           type: "DEACTIVATE_ELEMENT_PICKER",
@@ -1291,23 +1338,18 @@ async function handleStopElementPicker(
         });
     }
 
-    activePickerSessions.clear();
+    if (tabIds.length > 0) {
+      await chrome.storage.session.remove(tabIds.map(pickerSessionKey));
+    }
     sendResponse({ success: true });
   } catch (error) {
     Logger.error("Error stopping element picker", toError(error), {
       component: "Background",
-      activeSessionCount: activePickerSessions.size,
+      activeSessionCount: tabIds.length,
     });
     sendResponse({ success: false, error: getErrorMessage(error) });
   }
 }
-
-// Clean up on tab close
-chrome.tabs.onRemoved.addListener((tabId) => {
-  if (activePickerSessions.has(tabId)) {
-    activePickerSessions.delete(tabId);
-  }
-});
 
 // Clean up on window close
 chrome.windows.onRemoved.addListener((windowId) => {

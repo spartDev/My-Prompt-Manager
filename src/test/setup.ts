@@ -2,33 +2,35 @@ import '@testing-library/jest-dom';
 import { beforeEach, vi } from 'vitest';
 
 const globalForSetup = globalThis as { chrome?: unknown };
+/** An event whose listeners are never called: modules that register one at import load before the mock below exists */
+const noEvent = () => ({ addListener: () => undefined, removeListener: () => undefined });
 if (!globalForSetup.chrome) {
   globalForSetup.chrome = {
     tabs: {
-      onUpdated: { addListener() {}, removeListener() {} },
-      onActivated: { addListener() {}, removeListener() {} },
-      onRemoved: { addListener() {}, removeListener() {} },
-      onCreated: { addListener() {}, removeListener() {} }
+      onUpdated: noEvent(),
+      onActivated: noEvent(),
+      onRemoved: noEvent(),
+      onCreated: noEvent()
     },
     windows: {
-      onRemoved: { addListener() {}, removeListener() {} },
-      onCreated: { addListener() {}, removeListener() {} },
-      onFocusChanged: { addListener() {}, removeListener() {} }
+      onRemoved: noEvent(),
+      onCreated: noEvent(),
+      onFocusChanged: noEvent()
     },
     runtime: {
-      onMessage: { addListener() {}, removeListener() {} },
-      onConnect: { addListener() {}, removeListener() {} },
-      onInstalled: { addListener() {}, removeListener() {} },
-      onStartup: { addListener() {}, removeListener() {} }
+      onMessage: noEvent(),
+      onConnect: noEvent(),
+      onInstalled: noEvent(),
+      onStartup: noEvent()
     },
     permissions: {
-      onRemoved: { addListener() {}, removeListener() {} }
+      onRemoved: noEvent()
     },
     action: {
-      onClicked: { addListener() {}, removeListener() {} }
+      onClicked: noEvent()
     },
     scripting: {},
-    storage: { onChanged: { addListener() {}, removeListener() {} } }
+    storage: { onChanged: noEvent() }
   } as unknown;
 }
 
@@ -215,6 +217,17 @@ const storageLocalGetBytesInUse = vi.fn((keys?: string | string[] | null) =>
 );
 const storageLocalRemove = vi.fn(fakeLocalRemove);
 
+/** chrome.storage.session: in memory, emptied before each test, as a browser restart empties it */
+let sessionStorageArea = new InMemoryStorage();
+const fakeSessionGet = (keys?: StorageKeys) => sessionStorageArea.get(keys ?? null);
+const fakeSessionSet = (items: Record<string, unknown>) => sessionStorageArea.set(items);
+const fakeSessionRemove = (keys: string | string[]) => sessionStorageArea.remove(keys);
+const fakeSessionClear = () => sessionStorageArea.clear();
+const storageSessionGet = vi.fn(fakeSessionGet);
+const storageSessionSet = vi.fn(fakeSessionSet);
+const storageSessionRemove = vi.fn(fakeSessionRemove);
+const storageSessionClear = vi.fn(fakeSessionClear);
+
 const baseStorageManager = originalStorageGetInstance();
 const basePromptManager = originalPromptGetInstance();
 
@@ -297,6 +310,12 @@ const mockChrome = {
       getBytesInUse: storageLocalGetBytesInUse,
       remove: storageLocalRemove,
       QUOTA_BYTES: 5242880
+    },
+    session: {
+      get: storageSessionGet,
+      set: storageSessionSet,
+      remove: storageSessionRemove,
+      clear: storageSessionClear
     },
     onChanged: {
       addListener: vi.fn((listener: StorageChangeListener) => {
@@ -518,6 +537,13 @@ const resetChromeMocks = (): void => {
     testStorage.getBytesInUse(keys)
   );
   storageLocalRemove.mockReset().mockImplementation(fakeLocalRemove);
+  sessionStorageArea = new InMemoryStorage();
+  mockChrome.storage.session = {
+    get: storageSessionGet.mockReset().mockImplementation(fakeSessionGet),
+    set: storageSessionSet.mockReset().mockImplementation(fakeSessionSet),
+    remove: storageSessionRemove.mockReset().mockImplementation(fakeSessionRemove),
+    clear: storageSessionClear.mockReset().mockImplementation(fakeSessionClear)
+  };
 
   mockChrome.runtime.lastError = null;
   (mockChrome.runtime.sendMessage as any).mockResolvedValue(undefined);

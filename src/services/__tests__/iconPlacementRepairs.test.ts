@@ -40,6 +40,13 @@ describe('applyIconPlacementRepairChange: the override lifecycle', () => {
       .toEqual({ 'claude.ai': { status: 'overlay', override: PICK } });
   });
 
+  it('drops an override picked while no status was stored once the Toolbar is reported', () => {
+    const picked = applyIconPlacementRepairChange({}, { type: 'setOverride', hostname: 'claude.ai', positioning: PICK });
+    expect(picked).toEqual({ 'claude.ai': { override: PICK } });
+
+    expect(applyIconPlacementRepairChange(picked, { type: 'reportPlacement', hostname: 'claude.ai', placement: 'toolbar' })).toEqual({});
+  });
+
   it('leaves the other Platforms alone', () => {
     const repairs = { 'claude.ai': { status: 'overlay' as const }, 'chatgpt.com': { status: 'override' as const, override: PICK } };
 
@@ -151,5 +158,14 @@ describe('repairForHostnames', () => {
 
     expect(repairForHostnames(repairs, ['copilot.microsoft.com', 'm365.cloud.microsoft'])).toEqual({ hostname: 'm365.cloud.microsoft', status: 'overlay' });
     expect(repairForHostnames(repairs, ['claude.ai'])).toBeNull();
+  });
+
+  it('shows the Anchored overlay of a linked Platform over the override of the first', () => {
+    const repairs = {
+      'copilot.microsoft.com': { status: 'override' as const, override: PICK },
+      'm365.cloud.microsoft': { status: 'overlay' as const }
+    };
+
+    expect(repairForHostnames(repairs, ['copilot.microsoft.com', 'm365.cloud.microsoft'])).toEqual({ hostname: 'm365.cloud.microsoft', status: 'overlay' });
   });
 });

@@ -149,6 +149,42 @@ describe('SiteIntegrationSection - a Platform whose icon fell to the Anchored ov
     });
   });
 
+  it.each([
+    { interfaceMode: 'popup' as const, closes: true },
+    { interfaceMode: 'sidepanel' as const, closes: false }
+  ])('closes the popup once the Element picker is open, so it does not cover the page ($interfaceMode)', async ({ interfaceMode, closes }) => {
+    const user = userEvent.setup();
+    const close = vi.spyOn(window, 'close').mockImplementation(() => undefined);
+    await storeRepairs({ 'claude.ai': { status: 'overlay' } });
+    (chrome.tabs.query as unknown as Mock).mockImplementation(async (query: { url?: string }) =>
+      query.url === 'https://claude.ai/*' ? [{ id: 9, active: true }] : []);
+    render(<SiteIntegrationSection {...defaultProps} interfaceMode={interfaceMode} enabledSites={['claude.ai']} />);
+
+    await user.click(await screen.findByRole('button', { name: 'Place the icon' }));
+
+    await waitFor(() => { expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'START_ELEMENT_PICKER' })); });
+    // The answer to START_ELEMENT_PICKER settles before the popup closes, or does not
+    await act(async () => { await new Promise((resolve) => { setTimeout(resolve, 0); }); });
+    expect(close).toHaveBeenCalledTimes(closes ? 1 : 0);
+    close.mockRestore();
+  });
+
+  it('keeps the popup open with the reason when the Element picker could not open', async () => {
+    const user = userEvent.setup();
+    const close = vi.spyOn(window, 'close').mockImplementation(() => undefined);
+    await storeRepairs({ 'claude.ai': { status: 'overlay' } });
+    (chrome.tabs.query as unknown as Mock).mockImplementation(async (query: { url?: string }) =>
+      query.url === 'https://claude.ai/*' ? [{ id: 9, active: true }] : []);
+    (chrome.runtime.sendMessage as unknown as Mock).mockResolvedValue({ success: false, error: 'The tab is not on this platform' });
+    render(<SiteIntegrationSection {...defaultProps} interfaceMode="popup" enabledSites={['claude.ai']} />);
+
+    await user.click(await screen.findByRole('button', { name: 'Place the icon' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not open the element picker');
+    expect(close).not.toHaveBeenCalled();
+    close.mockRestore();
+  });
+
   it('says where to go when no tab is on the Platform', async () => {
     const user = userEvent.setup();
     await storeRepairs({ 'claude.ai': { status: 'overlay' } });

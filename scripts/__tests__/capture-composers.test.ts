@@ -260,6 +260,14 @@ describe('captureExitCode', () => {
     expect(captureExitCode([captured('claude'), signedOut], testsStatus)).toBe(1);
   });
 
+  it.each([
+    ['with the chain tests passing', 0],
+    ['with --no-test', undefined]
+  ])('fails when a Platform was captured from an ancestor of its editor, its chain\'s composer not found, %s', (_case, testsStatus) => {
+    const ancestor: CaptureResult = { id: 'claude', outcome: 'captured', composerFound: false, file: '/fx/claude.html' };
+    expect(captureExitCode([ancestor, captured('chatgpt')], testsStatus)).toBe(1);
+  });
+
   it('fails when a capture failed', () => {
     expect(captureExitCode([captured('claude'), failed], 0)).toBe(1);
   });
