@@ -8,8 +8,9 @@
  *
  * Proof screenshots, after the entry animation has ended (motion left on, as the other proof specs):
  * whats-new-{popup,sidepanel}-{light,dark}.png and library-after-close-{popup,sidepanel}-{light,dark}.png.
- * They go to test-results/whats-new/; scripts/pr-assets.sh whats-new test-results/whats-new/*.png
- * pushes them for a pull request.
+ * They go to test-results/whats-new/; scripts/pr-assets.sh <topic> test-results/whats-new/*.png
+ * pushes them for a pull request. Give each pull request its own topic (whats-new-<pr number>):
+ * pr-assets/whats-new already holds the images of #575, which a second push there would replace.
  *
  * A sheet with only Critical fixes is not shot: the registry has no such Release, and making one
  * would take a change to product code.
