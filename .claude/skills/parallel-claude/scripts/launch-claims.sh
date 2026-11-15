@@ -176,7 +176,10 @@ take_claim_lock() {
     # Named before it is taken, so an interrupt while it is taken still frees it
     LAUNCH_REAP="$LAUNCH_LOCK.reap"
     link_lock "$LAUNCH_REAP" || return 1
-    remove_dead_lock "$LAUNCH_LOCK" "$holder" "claim lock"
+    # Read again under the removal lock: the pid may name a new launch by now
+    if [ "$(dead_holder "$LAUNCH_LOCK")" = "$holder" ]; then
+        remove_dead_lock "$LAUNCH_LOCK" "$holder" "claim lock"
+    fi
     free_reap_lock
     link_lock "$LAUNCH_LOCK"
 }
