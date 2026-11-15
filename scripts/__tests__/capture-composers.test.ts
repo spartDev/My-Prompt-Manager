@@ -302,7 +302,7 @@ describe('redactUrls', () => {
   });
 
   it.each([
-    // Messages as page.goto printed them (playwright-core 1.65, headless Chromium)
+    // Each address in the form page.goto prints it in its errors (checked on playwright-core 1.65, headless Chromium)
     ['file:///Users/alice/My Docs/claude.html', 'net::ERR_FILE_NOT_FOUND at file:///Users/alice/My%20Docs/claude.html', 'net::ERR_FILE_NOT_FOUND at file://<stand-in>/claude.html'],
     ['https://chat.example/c?t=SECRET', 'net::ERR_CONNECTION_REFUSED at https://chat.example/c?t=SECRET', 'net::ERR_CONNECTION_REFUSED at https://chat.example/c'],
     ['localhost:8080/claude.html?token=SECRET', 'net::ERR_CONNECTION_REFUSED at http://localhost:8080/claude.html?token=SECRET', 'net::ERR_CONNECTION_REFUSED at http://localhost:8080/claude.html'],
