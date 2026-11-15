@@ -160,19 +160,27 @@ export const rulesFor = (platform: PlatformDefinition) => {
 };
 
 /**
- * The address a fixture's header names: a local stand-in file only by its name, not its home path;
- * a web address only by its protocol, host and path, so no user name, password, query or fragment
- * is committed
+ * The address a fixture's header names, from the parsed address, never the raw string: a local
+ * stand-in file only by its name, not its home path; a web address only by its protocol, host and
+ * path, so no user name, password, query or fragment is committed; anything else (data:, mailto:,
+ * an address that does not parse) only as `<stand-in>`
  */
 export function headerUrl(url: string): string {
-  if (url.startsWith('file:')) {
-    return `file://<stand-in>/${url.split(/[/\\]/).pop() ?? ''}`;
-  }
+  let parsed: URL;
   try {
-    const { protocol, host, pathname } = new URL(url);
-    return `${protocol}//${host}${pathname}`;
+    parsed = new URL(url.trim());
   } catch {
     return '<stand-in>';
+  }
+  const { protocol, host, pathname } = parsed;
+  switch (protocol) {
+    case 'file:':
+      return `file://<stand-in>/${pathname.split('/').pop() ?? ''}`;
+    case 'http:':
+    case 'https:':
+      return `${protocol}//${host}${pathname}`;
+    default:
+      return '<stand-in>';
   }
 }
 

@@ -292,6 +292,20 @@ describe('headerUrl', () => {
   it('names an address it cannot parse as a stand-in, not as it is', () => {
     expect(headerUrl('not a url?token=abc')).toBe('<stand-in>');
   });
+
+  it.each([
+    ['an upper-case scheme', 'FILE:///Users/alice/stand-ins/claude.html'],
+    ['a leading space', '  file:///Users/alice/stand-ins/claude.html']
+  ])('names a local file with %s without its home path', (_case, url) => {
+    expect(headerUrl(url)).toBe('file://<stand-in>/claude.html');
+  });
+
+  it('names an address of any other scheme as a stand-in, not its content', () => {
+    const mailto = 'mailto' + ':' + 'someone' + '@' + 'example.test';
+
+    expect(headerUrl('data:text/html,<p>alice</p>')).toBe('<stand-in>');
+    expect(headerUrl(mailto)).toBe('<stand-in>');
+  });
 });
 
 describe('composerFixturePath', () => {
