@@ -2,7 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SITE_SETTINGS_KEY } from '../../services/siteSettings';
-import { decideWhatsNew } from '../../whatsNew/decide';
+import { decideWhatsNew, isFirstInstall } from '../../whatsNew/decide';
 import { readWhatsNewRecord, WHATS_NEW_KEY } from '../../whatsNew/storage';
 import type { ReleaseNotes } from '../../whatsNew/types';
 
@@ -50,7 +50,7 @@ const storedRecord = async (): Promise<unknown> => (await chrome.storage.local.g
 describe('useWhatsNew', () => {
   beforeEach(async () => {
     setManifestVersion('2.0.0');
-    await chrome.storage.local.set({ [WHATS_NEW_KEY]: { lastSeenVersion: '1.9.0' } });
+    await chrome.storage.local.set({ [WHATS_NEW_KEY]: { installedVersion: '1.9.0', lastSeenVersion: '1.9.0' } });
   });
 
   it('starts loading, then gives the notes of a new Release that has them', async () => {
@@ -74,6 +74,38 @@ describe('useWhatsNew', () => {
     expect(result.current.notes).toBeNull();
   });
 
+  describe('an opening before the service worker recorded the install', () => {
+    it('shows nothing on an empty record, and writes no Last seen Release', async () => {
+      await chrome.storage.local.remove(WHATS_NEW_KEY);
+
+      const { result } = await openExtension();
+
+      expect(result.current.notes).toBeNull();
+      expect(await storedRecord()).toBeUndefined();
+    });
+
+    it('shows the notes on an empty record in Debug mode', async () => {
+      await chrome.storage.local.remove(WHATS_NEW_KEY);
+      await setDebugMode(true);
+
+      const { result } = await openExtension();
+
+      expect(result.current.notes).toBe(V2_0);
+    });
+
+    it('shows the notes at the next opening, once the update recorded an older Release of install', async () => {
+      await chrome.storage.local.remove(WHATS_NEW_KEY);
+      const first = await openExtension();
+      expect(first.result.current.notes).toBeNull();
+      first.unmount();
+
+      await chrome.storage.local.set({ [WHATS_NEW_KEY]: { installedVersion: '1.9.0' } });
+      const second = await openExtension();
+
+      expect(second.result.current.notes).toBe(V2_0);
+    });
+  });
+
   it('close() hides the notes at once and marks the Release as seen', async () => {
     const { result } = await openExtension();
     expect(result.current.notes).toBe(V2_0);
@@ -91,7 +123,7 @@ describe('useWhatsNew', () => {
     }
     expect(chrome.storage.local.get).toHaveBeenCalledWith([WHATS_NEW_KEY]);
     await waitFor(async () => {
-      expect(await storedRecord()).toEqual({ lastSeenVersion: '2.0.0' });
+      expect(await storedRecord()).toEqual({ installedVersion: '1.9.0', lastSeenVersion: '2.0.0' });
     });
   });
 
@@ -101,7 +133,7 @@ describe('useWhatsNew', () => {
       first.result.current.close();
     });
     await waitFor(async () => {
-      expect(await storedRecord()).toEqual({ lastSeenVersion: '2.0.0' });
+      expect(await storedRecord()).toEqual({ installedVersion: '1.9.0', lastSeenVersion: '2.0.0' });
     });
     first.unmount();
 
@@ -118,17 +150,17 @@ describe('useWhatsNew', () => {
     const second = await openExtension();
 
     expect(second.result.current.notes).toBe(V2_0);
-    expect(await storedRecord()).toEqual({ lastSeenVersion: '1.9.0' });
+    expect(await storedRecord()).toEqual({ installedVersion: '1.9.0', lastSeenVersion: '1.9.0' });
   });
 
   it('leaves the Last seen Release unchanged through a Debug session, and the normal decision is the one before', async () => {
-    await chrome.storage.local.set({ [WHATS_NEW_KEY]: { lastSeenVersion: '2.0.0' } });
+    await chrome.storage.local.set({ [WHATS_NEW_KEY]: { installedVersion: '1.9.0', lastSeenVersion: '2.0.0' } });
     const before = await readWhatsNewRecord();
     const decisionBefore = decideWhatsNew({
       currentVersion: '2.0.0',
       lastSeenVersion: before.lastSeenVersion,
       releaseNotes: REGISTRY,
-      isFirstInstall: before.installedVersion === '2.0.0',
+      isFirstInstall: isFirstInstall(before.installedVersion, '2.0.0'),
       debugMode: false
     });
     const normalBefore = await openExtension();
@@ -215,7 +247,7 @@ describe('useWhatsNew', () => {
     const rawRecord = async (): Promise<string | undefined> => JSON.stringify(await storedRecord());
 
     it('shows the notes when the installed Release is the Last seen Release', async () => {
-      await chrome.storage.local.set({ [WHATS_NEW_KEY]: { lastSeenVersion: '2.0.0' } });
+      await chrome.storage.local.set({ [WHATS_NEW_KEY]: { installedVersion: '1.9.0', lastSeenVersion: '2.0.0' } });
       await setDebugMode(true);
 
       for (let opening = 0; opening < 3; opening++) {
@@ -272,7 +304,7 @@ describe('useWhatsNew', () => {
 
     it('turned off, gives back the normal decision with the Last seen Release as it was', async () => {
       // Seen 2.0.0: the normal decision shows nothing, Debug mode shows the notes, off again shows nothing
-      await chrome.storage.local.set({ [WHATS_NEW_KEY]: { lastSeenVersion: '2.0.0' } });
+      await chrome.storage.local.set({ [WHATS_NEW_KEY]: { installedVersion: '1.9.0', lastSeenVersion: '2.0.0' } });
       await setDebugMode(true);
       const debugOpening = await openExtension();
       expect(debugOpening.result.current.notes).toBe(V2_0);
@@ -284,7 +316,7 @@ describe('useWhatsNew', () => {
       await setDebugMode(false);
       const normalOpening = await openExtension();
       expect(normalOpening.result.current.notes).toBeNull();
-      expect(await storedRecord()).toEqual({ lastSeenVersion: '2.0.0' });
+      expect(await storedRecord()).toEqual({ installedVersion: '1.9.0', lastSeenVersion: '2.0.0' });
     });
 
     it('turned off after closing an unseen Release in Debug mode, still shows it, as the normal rule says', async () => {
@@ -299,11 +331,11 @@ describe('useWhatsNew', () => {
       await setDebugMode(false);
       const normalOpening = await openExtension();
       expect(normalOpening.result.current.notes).toBe(V2_0);
-      expect(await storedRecord()).toEqual({ lastSeenVersion: '1.9.0' });
+      expect(await storedRecord()).toEqual({ installedVersion: '1.9.0', lastSeenVersion: '1.9.0' });
     });
 
     it('is read only from the stored Site settings: the localStorage debug flag does not turn it on', async () => {
-      await chrome.storage.local.set({ [WHATS_NEW_KEY]: { lastSeenVersion: '2.0.0' } });
+      await chrome.storage.local.set({ [WHATS_NEW_KEY]: { installedVersion: '1.9.0', lastSeenVersion: '2.0.0' } });
       await setDebugMode(false);
       localStorage.setItem('prompt-library-debug', 'true');
       try {

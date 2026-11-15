@@ -20,7 +20,7 @@ import { StorageManager } from "../services/storage";
 import { UsageTracker } from "../services/UsageTracker";
 import type { ElementFingerprint, PlatformType } from "../types";
 import { getErrorMessage, Logger, toError } from "../utils";
-import { recordInstall } from "../whatsNew/storage";
+import { recordInstall, recordUpdateFrom } from "../whatsNew/storage";
 
 // Track active element picker sessions
 const activePickerSessions = new Map<
@@ -1356,6 +1356,28 @@ async function recordFirstInstall(): Promise<void> {
   }
 }
 
+/**
+ * Records the Release an update came from, when the What's new record has no Release of install
+ * (an install older than What's new), so What's new shows after that update (CONTEXT.md, Releases)
+ */
+async function recordUpdateOrigin(previousVersion: string | undefined): Promise<void> {
+  try {
+    const recorded = await recordUpdateFrom(previousVersion);
+    if (recorded) {
+      Logger.info("Recorded the Release the update came from", {
+        component: "Background",
+        previousVersion,
+      });
+    }
+  } catch (error) {
+    Logger.error(
+      "Could not record the Release the update came from",
+      toError(error),
+      { component: "Background", previousVersion },
+    );
+  }
+}
+
 // Initialize interface mode on extension startup and handle updates
 chrome.runtime.onInstalled.addListener((details) => {
   // Clean stored data of Hidden characters after an update, alongside (not before) the rest
@@ -1363,9 +1385,13 @@ chrome.runtime.onInstalled.addListener((details) => {
     void upgradeStoredData();
   }
 
-  // An update leaves the What's new record alone: only a first install is recorded
+  // A first install records its Release; an update records where it came from, only when the
+  // What's new record has no Release of install yet
   if (details.reason === "install") {
     void recordFirstInstall();
+  }
+  if (details.reason === "update") {
+    void recordUpdateOrigin(details.previousVersion);
   }
 
   void (async () => {

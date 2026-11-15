@@ -49,13 +49,39 @@ describe("background: the What's new record on install and update", () => {
     });
   });
 
-  it('writes nothing to whatsNew on an update', async () => {
+  it('records installedVersion = previousVersion on an update when the record has none, keeping the Last seen Release', async () => {
     setManifestVersion('2.0.0');
     await chrome.storage.local.set({ [WHATS_NEW_KEY]: { lastSeenVersion: '1.9.0' } });
-    vi.mocked(chrome.storage.local.set).mockClear();
     const { onInstalled } = await loadBackground();
 
     onInstalled({ reason: 'update', previousVersion: '1.9.0' });
+
+    await vi.waitFor(async () => {
+      expect(await storedRecord()).toEqual({ installedVersion: '1.9.0', lastSeenVersion: '1.9.0' });
+    });
+  });
+
+  it('records installedVersion = previousVersion on an update when there is no record', async () => {
+    setManifestVersion('2.0.0');
+    const { onInstalled } = await loadBackground();
+
+    onInstalled({ reason: 'update', previousVersion: '1.9.0' });
+
+    await vi.waitFor(async () => {
+      expect(await storedRecord()).toEqual({ installedVersion: '1.9.0' });
+    });
+  });
+
+  it.each([
+    ['an existing Release of install', { installedVersion: '1.8.0', lastSeenVersion: '1.9.0' }, '1.9.0'],
+    ['an empty previousVersion', { lastSeenVersion: '1.9.0' }, '']
+  ])('writes nothing to whatsNew on an update with %s', async (_label, record, previousVersion) => {
+    setManifestVersion('2.0.0');
+    await chrome.storage.local.set({ [WHATS_NEW_KEY]: record });
+    vi.mocked(chrome.storage.local.set).mockClear();
+    const { onInstalled } = await loadBackground();
+
+    onInstalled({ reason: 'update', previousVersion });
 
     // Let the update's other work (interface mode, upgrade pass, re-injection) run
     await vi.waitFor(() => {
@@ -66,7 +92,25 @@ describe("background: the What's new record on install and update", () => {
       .mocked(chrome.storage.local.set)
       .mock.calls.filter(([items]) => WHATS_NEW_KEY in (items as Record<string, unknown>));
     expect(whatsNewWrites).toEqual([]);
-    expect(await storedRecord()).toEqual({ lastSeenVersion: '1.9.0' });
+    expect(await storedRecord()).toEqual(record);
+  });
+
+  it('logs a failed record of an update instead of throwing', async () => {
+    setManifestVersion('2.0.0');
+    vi.mocked(chrome.storage.local.set).mockRejectedValue(new Error('QUOTA_BYTES quota exceeded'));
+    const { onInstalled, Logger } = await loadBackground();
+
+    expect(() => {
+      onInstalled({ reason: 'update', previousVersion: '1.9.0' });
+    }).not.toThrow();
+
+    await vi.waitFor(() => {
+      expect(Logger.error).toHaveBeenCalledWith(
+        'Could not record the Release the update came from',
+        expect.any(Error),
+        expect.objectContaining({ component: 'Background', previousVersion: '1.9.0' })
+      );
+    });
   });
 
   it('logs a failed record instead of throwing', async () => {

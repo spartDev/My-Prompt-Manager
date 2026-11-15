@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { readSiteSettings } from '../services/siteSettings';
 import { Logger, toError } from '../utils';
-import { decideWhatsNew } from '../whatsNew/decide';
+import { decideWhatsNew, isFirstInstall } from '../whatsNew/decide';
 import { RELEASE_NOTES } from '../whatsNew/releaseNotes';
 import { markReleaseSeen, readWhatsNewRecord } from '../whatsNew/storage';
 import type { ReleaseNotes } from '../whatsNew/types';
@@ -49,7 +49,7 @@ export const useWhatsNew = (registry: readonly ReleaseNotes[] = RELEASE_NOTES): 
             currentVersion,
             lastSeenVersion: record.lastSeenVersion,
             releaseNotes: registry,
-            isFirstInstall: record.installedVersion === currentVersion,
+            isFirstInstall: isFirstInstall(record.installedVersion, currentVersion),
             debugMode: siteSettings.debugMode
           })
         );

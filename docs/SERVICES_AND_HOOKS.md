@@ -33,7 +33,7 @@ Other keys of `chrome.storage.local` belong to the code that owns them, which wr
 | `iconPlacementRepairs` | `src/services/iconPlacementRepairs.ts`; written by the service worker only |
 | `interfaceMode` | `src/components/SettingsView.tsx` |
 | `grantedPermissions` | `src/background/background.ts` |
-| `whatsNew` (the Release of the first install, the Last seen Release) | `src/whatsNew/storage.ts`, the only reader and writer; the service worker records the first install, `markReleaseSeen` is the only writer of the Last seen Release and writes nothing in Debug mode. Outside the Site settings, so Reset settings leaves it; Clear All Data and the error screen's Reset Data keep it too (`clearStorageKeepingWhatsNew`), so What's new does not come back for a seen Release nor show after a first install |
+| `whatsNew` (`installedVersion`: the Release of install; `lastSeenVersion`: the Last seen Release) | `src/whatsNew/storage.ts`, the only reader and writer. The service worker records the Release of a first install (`recordInstall`) and, on an update, the Release the update came from when the record has none yet, as for an install older than What's new (`recordUpdateFrom`). A record with no `installedVersion` counts as a first install (`isFirstInstall` of `src/whatsNew/decide.ts`): a popup opened before the service worker's write shows nothing, and What's new shows at a later opening after an update. `markReleaseSeen` is the only writer of the Last seen Release and writes nothing in Debug mode. Outside the Site settings, so Reset settings leaves it; Clear All Data and the error screen's Reset Data keep it too (`clearStorageKeepingWhatsNew`), so What's new does not come back for a seen Release nor show after a first install |
 
 ---
 

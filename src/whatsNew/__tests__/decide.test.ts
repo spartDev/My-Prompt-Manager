@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { decideWhatsNew, type WhatsNewInputs } from '../decide';
+import { decideWhatsNew, isFirstInstall, type WhatsNewInputs } from '../decide';
 import type { ReleaseNotes } from '../types';
 
 const notes = (version: string): ReleaseNotes => ({
@@ -150,5 +150,30 @@ describe('decideWhatsNew: Debug mode', () => {
         debugMode: true
       })
     ).toBeNull();
+  });
+});
+
+describe('isFirstInstall', () => {
+  it('is true when the Release of install is the installed Release', () => {
+    expect(isFirstInstall('2.0.0', '2.0.0')).toBe(true);
+  });
+
+  it('is true when the record holds no Release of install yet', () => {
+    expect(isFirstInstall(undefined, '2.0.0')).toBe(true);
+  });
+
+  it('is false when the Release of install is another Release', () => {
+    expect(isFirstInstall('1.9.0', '2.0.0')).toBe(false);
+  });
+
+  it('with no Release of install, normal mode shows nothing and Debug mode shows the notes', () => {
+    const inputs = {
+      currentVersion: '2.0.0',
+      lastSeenVersion: undefined,
+      releaseNotes: REGISTRY,
+      isFirstInstall: isFirstInstall(undefined, '2.0.0')
+    };
+    expect(decideWhatsNew({ ...inputs, debugMode: false })).toBeNull();
+    expect(decideWhatsNew({ ...inputs, debugMode: true })).toBe(V2_0);
   });
 });

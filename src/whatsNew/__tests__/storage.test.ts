@@ -7,6 +7,7 @@ import {
   parseWhatsNewRecord,
   readWhatsNewRecord,
   recordInstall,
+  recordUpdateFrom,
   WHATS_NEW_KEY
 } from '../storage';
 
@@ -100,6 +101,46 @@ describe('What\'s new record: recordInstall', () => {
     await Promise.all([recordInstall('2.0.0'), markReleaseSeen('2.0.0', { debugMode: false })]);
 
     expect(await stored()).toEqual({ installedVersion: '2.0.0', lastSeenVersion: '2.0.0' });
+  });
+});
+
+describe("What's new record: recordUpdateFrom", () => {
+  it('writes installedVersion = the previous version when the record is absent', async () => {
+    await expect(recordUpdateFrom('1.9.0')).resolves.toBe(true);
+
+    expect(await stored()).toEqual({ installedVersion: '1.9.0' });
+  });
+
+  it('keeps an existing installedVersion', async () => {
+    await chrome.storage.local.set({ [WHATS_NEW_KEY]: { installedVersion: '1.8.0' } });
+
+    await expect(recordUpdateFrom('1.9.0')).resolves.toBe(false);
+
+    expect(await stored()).toEqual({ installedVersion: '1.8.0' });
+  });
+
+  it('keeps lastSeenVersion when it writes installedVersion', async () => {
+    await chrome.storage.local.set({ [WHATS_NEW_KEY]: { lastSeenVersion: '1.9.0' } });
+
+    await recordUpdateFrom('1.9.0');
+
+    expect(await stored()).toEqual({ installedVersion: '1.9.0', lastSeenVersion: '1.9.0' });
+  });
+
+  it.each([
+    ['missing', undefined],
+    ['empty', '']
+  ])('writes nothing when the previous version is %s', async (_label, previousVersion) => {
+    await expect(recordUpdateFrom(previousVersion)).resolves.toBe(false);
+
+    expect(chrome.storage.local.set).not.toHaveBeenCalled();
+    expect(await stored()).toBeUndefined();
+  });
+
+  it('serializes with a concurrent close so neither field is lost', async () => {
+    await Promise.all([recordUpdateFrom('1.9.0'), markReleaseSeen('2.0.0', { debugMode: false })]);
+
+    expect(await stored()).toEqual({ installedVersion: '1.9.0', lastSeenVersion: '2.0.0' });
   });
 });
 

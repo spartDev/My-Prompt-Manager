@@ -1,6 +1,6 @@
 /**
- * The What's new record: the Release the extension was first installed at, and the Last seen
- * Release. One `chrome.storage.local` key, apart from the Site settings, so Reset settings leaves
+ * The What's new record: the Release of install (that of a first install, or the one an update
+ * from an install older than What's new came from), and the Last seen Release. One `chrome.storage.local` key, apart from the Site settings, so Reset settings leaves
  * it; Clear All Data and the Reset Data of the error screen keep it too
  * (`clearStorageKeepingWhatsNew`). This module is its only reader and writer.
  * Terms: CONTEXT.md, section "Releases".
@@ -12,7 +12,10 @@ import { AsyncMutex } from '../utils/asyncMutex';
 export const WHATS_NEW_KEY = 'whatsNew';
 
 export interface WhatsNewRecord {
-  /** The Release of the first install; absent for an install older than What's new */
+  /**
+   * The Release of install: the one of a first install, or for an install older than What's new,
+   * the Release it was updated from. Absent until the service worker records one.
+   */
   readonly installedVersion?: string;
   /** The Last seen Release */
   readonly lastSeenVersion?: string;
@@ -77,6 +80,28 @@ const writeField = (field: keyof WhatsNewRecord, version: string): Promise<void>
 
 /** Records the Release of a first install. The service worker calls it on `onInstalled` 'install'. */
 export const recordInstall = (version: string): Promise<void> => writeField('installedVersion', version);
+
+/**
+ * Records the Release an update came from as the Release of install, when the record has none:
+ * an install older than What's new has no record, and its update must still show What's new. An
+ * existing Release of install and the Last seen Release are kept. Writes nothing without a
+ * previous version. The service worker calls it on `onInstalled` 'update'.
+ *
+ * @returns Whether it wrote the Release of install
+ */
+export const recordUpdateFrom = (previousVersion: string | undefined): Promise<boolean> => {
+  if (!isVersion(previousVersion)) {
+    return Promise.resolve(false);
+  }
+  return withWhatsNewLock(async () => {
+    const record = await readWhatsNewRecord();
+    if (record.installedVersion !== undefined) {
+      return false;
+    }
+    await chrome.storage.local.set({ [WHATS_NEW_KEY]: { ...record, installedVersion: previousVersion } });
+    return true;
+  });
+};
 
 /**
  * Marks a Release as the Last seen Release: the only writer of `lastSeenVersion`. In Debug mode

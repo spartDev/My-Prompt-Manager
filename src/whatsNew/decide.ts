@@ -9,10 +9,22 @@ export interface WhatsNewInputs {
   readonly lastSeenVersion: string | undefined;
   /** Every Release that has Release notes */
   readonly releaseNotes: readonly ReleaseNotes[];
-  /** The installed Release is the one the extension was first installed at */
+  /** The installed Release is the one the extension was first installed at (`isFirstInstall`) */
   readonly isFirstInstall: boolean;
   readonly debugMode: boolean;
 }
+
+/**
+ * Whether an opening counts as one after a first install. A record with no Release of install
+ * counts as one too: on a first install the popup can open before the service worker recorded it,
+ * and showing nothing then is the safe failure (an update records where it came from, so What's
+ * new shows at a later opening). Pure.
+ *
+ * @param installedVersion - The Release of install the What's new record holds, if any
+ * @param currentVersion - The installed Release, the manifest version
+ */
+export const isFirstInstall = (installedVersion: string | undefined, currentVersion: string): boolean =>
+  installedVersion === undefined || installedVersion === currentVersion;
 
 /** The Release notes of a version, when that Release has at least one item. */
 const notesOf = (registry: readonly ReleaseNotes[], version: string): ReleaseNotes | undefined =>

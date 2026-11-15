@@ -28,7 +28,7 @@ const WHATS_NEW = /what.s new/i;
 /** An opening of the popup after the update from 1.9.0 to 2.0.0, whose Release notes ship */
 const updateTo2_0 = async (): Promise<void> => {
   vi.mocked(chrome.runtime.getManifest).mockReturnValue({ version: '2.0.0' } as chrome.runtime.Manifest);
-  await chrome.storage.local.set({ [WHATS_NEW_KEY]: { lastSeenVersion: '1.9.0' } });
+  await chrome.storage.local.set({ [WHATS_NEW_KEY]: { installedVersion: '1.9.0', lastSeenVersion: '1.9.0' } });
 };
 
 /** Renders the popup and waits for What's new over the Library */
@@ -362,7 +362,7 @@ describe("App: What's new", () => {
   });
 
   it('is not shown when there are no Release notes to show (the Release already seen)', async () => {
-    await chrome.storage.local.set({ [WHATS_NEW_KEY]: { lastSeenVersion: '2.0.0' } });
+    await chrome.storage.local.set({ [WHATS_NEW_KEY]: { installedVersion: '1.9.0', lastSeenVersion: '2.0.0' } });
     render(<App />);
 
     await screen.findByRole('heading', { name: /my prompt manager/i });
