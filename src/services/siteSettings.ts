@@ -81,7 +81,7 @@ function choicesOfEnabledList(enabledSites: readonly string[], mayPredateM365: b
   }
   // M365 Copilot is switched with Copilot, so a list with Copilot and without M365 Copilot was
   // written before M365 Copilot existed. Frozen like the list: a later link changes nothing here
-  if (mayPredateM365 && enabledSites.includes('copilot.microsoft.com')) {
+  if (mayPredateM365 && enabledSites.some((hostname) => hostname === 'copilot.microsoft.com')) {
     choices['m365.cloud.microsoft'] = true;
   }
   // A hostname on the list that is no Platform of those releases stays on, as it was

@@ -893,7 +893,7 @@ describe('SettingsView', () => {
       const setCalls = (chromeMock.storage.local.set as Mock).mock.calls;
       const saveCall = setCalls.find((call: any[]) => {
         return call[0]?.promptLibrarySettings !== undefined
-          && !enabledPlatforms(parseSiteSettings(call[0].promptLibrarySettings)).includes('chatgpt.com');
+          && !enabledPlatforms(parseSiteSettings(call[0].promptLibrarySettings)).some((hostname) => hostname === 'chatgpt.com');
       });
       expect(saveCall).toBeDefined();
     });
@@ -933,7 +933,7 @@ describe('SettingsView', () => {
       const setCalls = (chromeMock.storage.local.set as Mock).mock.calls;
       const saveCall = setCalls.find(
         (call: any[]) => call[0]?.promptLibrarySettings !== undefined
-          && enabledPlatforms(parseSiteSettings(call[0].promptLibrarySettings)).includes('claude.ai')
+          && enabledPlatforms(parseSiteSettings(call[0].promptLibrarySettings)).some((hostname) => hostname === 'claude.ai')
       );
       expect(saveCall).toBeDefined();
     });
