@@ -181,7 +181,9 @@ for tool in claude gh; do printf '#!/usr/bin/env bash\nexit 0\n' > "$BIN/$tool";
 # sends TERM to the launcher once it is created; with term-at-lock-refused,
 # the one refused the claim lock sends TERM. With dir-at-lock, an older
 # launcher takes its directory lock just before the claim lock is made and
-# frees it (rmdir, which fails on a directory not empty) just after.
+# frees it (rmdir, which fails on a directory not empty) just after. With
+# alive-at-reap, the one that creates the removal lock makes the ps stub
+# report every process alive from then on, as when a dead pid is reused.
 REAL_MKDIR=$(command -v mkdir)
 for tool in perl ln mkdir; do
     real=$(command -v "$tool")
@@ -196,6 +198,9 @@ fi
 $real "\$@"
 rc=\$?
 [ -n "\$older" ] && rmdir "\$LOCK" 2>/dev/null
+if [ "\$rc" -eq 0 ] && [ -n "\${LOCK:-}" ] && [ "\$last" = "\$LOCK.reap" ] && [ -e "\$STATE/alive-at-reap" ]; then
+    touch "\$STATE/all-alive"
+fi
 if [ "\$rc" -ne 0 ] && [ -n "\${LOCK:-}" ] && [ "\$last" = "\$LOCK" ] && [ -e "\$STATE/term-at-lock-refused" ]; then
     kill -TERM "\$PPID"
 fi
@@ -208,6 +213,14 @@ fi
 exit "\$rc"
 STUB
 done
+# ps: the real one, unless the fault alive-at-reap has fired
+cat > "$BIN/ps" <<STUB
+#!/bin/sh
+[ -n "\${STATE:-}" ] && [ -e "\$STATE/all-alive" ] && exit 0
+exec $(command -v ps) "\$@"
+STUB
+chmod +x "$BIN/ps"
+
 # The launchers run under the bash that runs this test: /bin/bash 3.2 on macOS
 # when started as /bin/bash test-launch-claims.sh
 ln -s "$BASH" "$BIN/bash"
@@ -306,7 +319,11 @@ expect_untouched C
 expect_no_lock
 
 setup "a second claim waits for the lock" A='|open' B='|open'
-with_claims 'claim_issues A || exit 9; (claim_issues B) && exit 8; finish_launch'
+# The second claim runs in its own process, with its own pid, as a launcher does
+with_claims 'claim_issues A || exit 9
+    REPO_DIR="$REPO_DIR" bash -c "print_info() { :; }; print_warning() { :; }; print_error() { :; }
+        source \"\$1\"; claim_issues B" _ "$1" && exit 8
+    finish_launch'
 expect_eq "exit code" 0 $?
 expect_owner B '|open'
 expect_untouched B
@@ -328,6 +345,33 @@ expect_eq "exit code" 0 $?
 expect_owner A 'me|in_progress'
 if grep -q "Removed the claim lock of launch $dead" "$STATE/out"; then pass; else fail "no warning about the stale lock"; fi
 expect_no_lock
+
+setup "a lock naming this launch's own pid is stale" A='|open'
+with_claims 'ln -s "$$" "$LOCK"; claim_issues A || exit 9; finish_launch'
+expect_eq "exit code" 0 $?
+expect_owner A 'me|in_progress'
+expect_no_lock
+
+setup "a stale lock whose pid runs again by the removal is kept" A='|open'
+dead=$(dead_pid)
+ln -s "$dead" "$LOCK"
+touch "$STATE/alive-at-reap"
+with_claims 'claim_issues A'
+expect_eq "exit code" 1 $?
+expect_owner A '|open'
+expect_untouched A
+expect_eq "lock holder" "$dead" "$(readlink "$LOCK")"
+if [ -L "$LOCK.reap" ] || [ -e "$LOCK.reap" ]; then fail "the removal lock is still there"; else pass; fi
+rm -f "$LOCK"
+
+setup "a lock that cannot be created is said so" A='|open'
+chmod a-w "$(dirname "$LOCK")"
+with_claims 'claim_issues A'
+rc=$?
+chmod u+w "$(dirname "$LOCK")"
+expect_eq "exit code" 1 "$rc"
+expect_owner A '|open'
+if grep -q "Could not create the claim lock $LOCK" "$STATE/out"; then pass; else fail "the error does not say the lock could not be created"; fi
 
 setup "the lock of a launch that runs is kept" A='|open'
 ln -s "$$" "$LOCK"

@@ -144,12 +144,16 @@ link_lock() {
     perl -e 'symlink($ARGV[0], $ARGV[1]) or exit 1' "$$" "$1" 2>/dev/null
 }
 
-# The pid a lock names when that process no longer runs; fails otherwise.
+# The pid a lock names when that process no longer runs; fails otherwise. A
+# lock this shell has not taken yet that names its own pid is stale too: a
+# killed launch whose pid this one has been given.
 dead_holder() {
     local holder
     holder=$(readlink "$1" 2>/dev/null) || return 1
     case "$holder" in ""|*[!0-9]*) return 1 ;; esac
-    pid_alive "$holder" && return 1
+    if [ "$holder" != "$$" ] && pid_alive "$holder"; then
+        return 1
+    fi
     echo "$holder"
 }
 
@@ -205,7 +209,9 @@ claim_issues() {
         free_reap_lock
         holder=$(readlink "$lock" 2>/dev/null) || holder="unknown"
         # A claim lock that is not stale is the cause, whatever .reap holds
-        if ! dead_holder "$lock" >/dev/null \
+        if [ ! -L "$lock" ] && [ ! -e "$lock" ]; then
+            print_error "Could not create the claim lock $lock. Nothing was launched."
+        elif ! dead_holder "$lock" >/dev/null \
             || { [ ! -L "$lock.reap" ] && [ ! -e "$lock.reap" ]; }; then
             print_error "Another launch is claiming tickets (lock $lock, held by $holder). Wait for it, or remove the lock if no launch is running."
         else
