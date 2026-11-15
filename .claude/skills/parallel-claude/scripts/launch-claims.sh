@@ -18,8 +18,12 @@
 # Tickets this launch took over, one "id|previous assignee|previous status"
 # each, so a launch that fails puts every one back as it found it.
 LAUNCH_CLAIMS=()
-# The claim lock while this launch holds it.
+# The claim lock this launch takes or holds: a symlink whose target is the pid
+# of its holder, so it is created with its holder in one step.
 LAUNCH_LOCK=""
+# The lock that guards the removal of a stale claim lock, a symlink to its
+# holder's pid like the claim lock, while this launch takes or holds it.
+LAUNCH_REAP=""
 # The tmux session this launch started, stopped before its claims are given back.
 LAUNCH_SESSION=""
 
@@ -87,12 +91,23 @@ claim_issues_locked() {
     done
 }
 
-# Free the claim lock if this launch holds it.
+# Free the claim lock if this launch holds it: only a lock whose holder is
+# this shell is removed, so an interrupt before the lock is taken leaves the
+# lock of another launch alone.
 free_claim_lock() {
-    if [ -n "$LAUNCH_LOCK" ]; then
-        rmdir "$LAUNCH_LOCK" 2>/dev/null || true
-        LAUNCH_LOCK=""
+    if [ -n "$LAUNCH_LOCK" ] && [ "$(readlink "$LAUNCH_LOCK" 2>/dev/null)" = "$$" ]; then
+        rm -f "$LAUNCH_LOCK"
     fi
+    LAUNCH_LOCK=""
+    free_reap_lock
+}
+
+# Free the removal lock if this launch holds it.
+free_reap_lock() {
+    if [ -n "$LAUNCH_REAP" ] && [ "$(readlink "$LAUNCH_REAP" 2>/dev/null)" = "$$" ]; then
+        rm -f "$LAUNCH_REAP"
+    fi
+    LAUNCH_REAP=""
 }
 
 # Roll a launch back: stop the tmux session it started, so no pane keeps
@@ -115,20 +130,121 @@ finish_launch() {
     free_claim_lock
 }
 
-# Take the lock (mkdir: flock is not on macOS) and claim the tickets. On
-# success the lock stays held, so a second launch reads the assignees only once
-# this one has set up or rolled back, and a rollback can never release a ticket
-# another launch has just claimed. On failure nothing is held.
-claim_issues() {
-    local lock
-    lock="$(git -C "$REPO_DIR" rev-parse --path-format=absolute --git-common-dir)/claude-parallel-claim.lock"
-    if ! mkdir "$lock" 2>/dev/null; then
-        print_error "Another launch is claiming tickets (lock $lock). Wait for it, or remove the lock if no launch is running."
+# Whether a process may run: only "No such process" (ESRCH) from kill -0
+# counts as gone, so another user's process (EPERM) or any other answer counts
+# as alive. Only processes of this host and pid namespace are seen: a
+# repository shared with a container or another machine must not run
+# launches from both sides.
+pid_alive() {
+    local err
+    err=$(LC_ALL=C kill -0 "$1" 2>&1) && return 0
+    case "$err" in
+        *"No such process"*) return 1 ;;
+    esac
+    return 0
+}
+
+# Create a lock for this shell: a symlink to this pid, made in one step.
+# perl's symlink() fails on any existing path, the directory lock of an older
+# launcher included; ln -s would put the link inside that directory instead.
+link_lock() {
+    perl -e 'symlink($ARGV[0], $ARGV[1]) or exit 1' "$$" "$1" 2>/dev/null
+}
+
+# The pid a lock names when that process no longer runs; fails otherwise. A
+# lock this shell has not taken yet that names its own pid is stale too: a
+# killed launch whose pid this one has been given.
+dead_holder() {
+    local holder
+    holder=$(readlink "$1" 2>/dev/null) || return 1
+    case "$holder" in ""|*[!0-9]*) return 1 ;; esac
+    if [ "$holder" != "$$" ] && pid_alive "$holder"; then
         return 1
     fi
+    echo "$holder"
+}
+
+# Remove a lock still held by the dead pid read before, and say so.
+remove_dead_lock() { # <lock> <pid> <what>
+    if [ "$(readlink "$1" 2>/dev/null)" = "$2" ]; then
+        rm -f "$1"
+        print_warning "Removed the $3 of launch $2, which no longer runs"
+    fi
+}
+# A pid reused by another process since its launch died reads as alive: the
+# lock then stays, and the error names its holder so it can be removed by hand.
+
+# Take the claim lock; a lock whose holder no longer runs (a launch killed
+# with SIGKILL) is removed first. The removal happens under a second lock and
+# only while the holder read is still the one in place, so two launches that
+# find the same stale lock never remove the lock one of them has just taken.
+# A removal lock left by a launch killed while removing is removed only once
+# the claim lock is held, which keeps every other launch away from it; a
+# launch that finds the claim lock stale beside it stops and names it.
+take_claim_lock() {
+    local holder
+    if link_lock "$LAUNCH_LOCK"; then
+        clear_dead_reap_lock
+        return 0
+    fi
+    holder=$(dead_holder "$LAUNCH_LOCK") || return 1
+    # Named before it is taken, so an interrupt while it is taken still frees it
+    LAUNCH_REAP="$LAUNCH_LOCK.reap"
+    link_lock "$LAUNCH_REAP" || return 1
+    # Read again under the removal lock: the pid may name a new launch by now
+    if [ "$(dead_holder "$LAUNCH_LOCK")" = "$holder" ]; then
+        remove_dead_lock "$LAUNCH_LOCK" "$holder" "claim lock"
+    fi
+    free_reap_lock
+    link_lock "$LAUNCH_LOCK"
+}
+
+# With the claim lock held, remove a removal lock whose launch no longer runs.
+clear_dead_reap_lock() {
+    local reaper
+    if reaper=$(dead_holder "$LAUNCH_LOCK.reap"); then
+        remove_dead_lock "$LAUNCH_LOCK.reap" "$reaper" "removal lock"
+    fi
+}
+
+# Take the lock (flock is not on macOS) and claim the tickets. On success the
+# lock stays held, so a second launch reads the assignees only once this one
+# has set up or rolled back, and a rollback can never release a ticket another
+# launch has just claimed. On failure nothing is held.
+claim_issues() {
+    local lock holder reaper
+    lock="$(git -C "$REPO_DIR" rev-parse --path-format=absolute --git-common-dir)/claude-parallel-claim.lock"
+    if ! command -v perl >/dev/null; then
+        print_error "perl is needed to take the claim lock. Nothing was launched."
+        return 1
+    fi
+    # Interrupted from here to finish_launch: roll back, then stop. Set before
+    # the lock is taken, so no interrupt falls between the lock and its trap.
     LAUNCH_LOCK="$lock"
-    # Interrupted from here to finish_launch: roll back, then stop
     trap 'abort_launch; exit 130' INT TERM
+    # A lock freed between the attempt and now is tried once more
+    if ! take_claim_lock \
+        && { [ -L "$lock" ] || [ -e "$lock" ] || ! take_claim_lock; }; then
+        trap - INT TERM
+        LAUNCH_LOCK=""
+        free_reap_lock
+        holder=$(readlink "$lock" 2>/dev/null) || holder="unknown"
+        # A claim lock that is not stale is the cause, whatever .reap holds
+        if [ ! -L "$lock" ] && [ ! -e "$lock" ]; then
+            print_error "Could not take the claim lock $lock: another launch held it and has just freed it, or its directory cannot be written. Nothing was launched; launch again."
+        elif ! dead_holder "$lock" >/dev/null \
+            || { [ ! -L "$lock.reap" ] && [ ! -e "$lock.reap" ]; }; then
+            print_error "Another launch is claiming tickets (lock $lock, held by $holder). Wait for it, or remove the lock if no launch is running."
+        else
+            if reaper=$(dead_holder "$lock.reap"); then
+                print_error "The removal lock $lock.reap was left by launch $reaper, which no longer runs. Remove it, then launch again."
+            else
+                reaper=$(readlink "$lock.reap" 2>/dev/null) || reaper="unknown"
+                print_error "Another launch is removing a stale claim lock ($lock.reap, held by $reaper). Wait for it, or remove $lock.reap if no launch is running."
+            fi
+        fi
+        return 1
+    fi
     if ! claim_issues_locked "$@"; then
         trap - INT TERM
         free_claim_lock

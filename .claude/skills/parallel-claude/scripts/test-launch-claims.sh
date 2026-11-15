@@ -36,8 +36,10 @@ expect_eq() { # <what> <expected> <actual>
 expect_owner() { # <id> <assignee|status>
     expect_eq "$1 owner" "$2" "$(cat "$STATE/issues/$1")"
 }
+# The locks are symlinks to a pid, which -e alone does not see
 expect_no_lock() {
-    if [ -e "$LOCK" ]; then fail "the claim lock is still there"; else pass; fi
+    if [ -L "$LOCK" ] || [ -e "$LOCK" ]; then fail "the claim lock is still there"; else pass; fi
+    if [ -L "$LOCK.reap" ] || [ -e "$LOCK.reap" ]; then fail "the removal lock is still there"; else pass; fi
 }
 # No write to the ticket but claim attempts: no "update <id> --assignee/--status", no "unclaim <id>"
 expect_untouched() { # <id>
@@ -58,7 +60,8 @@ mkdir -p "$BIN"
 # bd: one file per ticket holding "assignee|status". The actor is "me"; a claim
 # takes a ticket nobody holds, one of mine, or one of the pool alias "pool".
 # Faults, one file each in $STATE: fail-claim-<id>, fail-read-after-claim-<id>,
-# term-after-claim-<id> (sends TERM to the launcher once the claim is made).
+# term-after-claim-<id> and int-after-claim-<id> (send TERM or INT to the
+# launcher once the claim is made).
 cat > "$BIN/bd" <<'STUB'
 #!/usr/bin/env bash
 echo "bd $*" >> "$STATE/calls"
@@ -85,6 +88,7 @@ case "$cmd" in
             echo "me|in_progress" > "$file"
             touch "$STATE/claimed-$id"
             [ -e "$STATE/term-after-claim-$id" ] && kill -TERM "$PPID"
+            [ -e "$STATE/int-after-claim-$id" ] && kill -INT "$PPID"
             exit 0
         fi
         while [ $# -gt 0 ]; do
@@ -108,9 +112,10 @@ STUB
 # -P. A pane opens only in a directory that exists, taken from -c or from the
 # "cd '<dir>'" its command starts with; each one is appended to $STATE/pane-dirs.
 # A -t target must be the session or a pane already open. Faults:
-# fail-new-session, fail-split-<n> (the n-th split fails), int-at-new-session
-# (sends INT to the launcher). new-session records whether the claim lock is
-# held at that point.
+# fail-new-session, fail-split-<n> (the n-th split fails), noop-split-<n> (the
+# n-th split succeeds without opening a pane), int-at-new-session (sends INT to
+# the launcher). new-session records whether the claim lock is held at that
+# point.
 cat > "$BIN/tmux" <<'STUB'
 #!/usr/bin/env bash
 echo "tmux $1" >> "$STATE/calls"
@@ -141,7 +146,7 @@ open_pane() {
 }
 case "$sub" in
     new-session)
-        if [ -d "$LOCK" ]; then echo held > "$STATE/lock-at-setup"; else echo free > "$STATE/lock-at-setup"; fi
+        if [ -L "$LOCK" ]; then echo held > "$STATE/lock-at-setup"; else echo free > "$STATE/lock-at-setup"; fi
         [ -e "$STATE/int-at-new-session" ] && kill -INT "$PPID"
         [ -e "$STATE/fail-new-session" ] && exit 1
         open_pane
@@ -150,6 +155,7 @@ case "$sub" in
         n=$(( $(cat "$STATE/splits" 2>/dev/null || echo 0) + 1 ))
         echo "$n" > "$STATE/splits"
         [ -e "$STATE/fail-split-$n" ] && exit 1
+        [ -e "$STATE/noop-split-$n" ] && exit 0
         case "$target" in
             claude-parallel) ;;
             %*) [ "${target#%}" -le "$(cat "$STATE/panes")" ] || { echo "tmux: no pane $target" >> "$STATE/calls"; exit 1; } ;;
@@ -169,6 +175,71 @@ esac
 STUB
 
 for tool in claude gh; do printf '#!/usr/bin/env bash\nexit 0\n' > "$BIN/$tool"; done
+
+# perl, ln and mkdir: the real commands, but with the fault term-at-lock (or
+# term-at-reap), the one that creates the claim lock (or the removal lock)
+# sends TERM to the launcher once it is created; with term-at-lock-refused,
+# the one refused the claim lock sends TERM. With dir-at-lock, an older
+# launcher takes its directory lock just before the claim lock is made and
+# frees it (rmdir, which fails on a directory not empty) just after, once.
+# With held-at-lock, another launch holds the claim lock during the attempt
+# and frees it just after, once. With
+# alive-at-reap, the one that creates the removal lock makes kill -0 report
+# every process alive from then on (see kill_stub), as when a dead pid is
+# reused. With
+# fail-lock, perl and ln fail to create the claim lock, as on a read-only
+# git directory.
+REAL_MKDIR=$(command -v mkdir)
+for tool in perl ln mkdir; do
+    real=$(command -v "$tool")
+    cat > "$BIN/$tool" <<STUB
+#!/bin/sh
+for last in "\$@"; do :; done
+older=""
+if [ "$tool" != mkdir ] && [ -n "\${LOCK:-}" ] && [ "\$last" = "\$LOCK" ] && [ -e "\$STATE/fail-lock" ]; then
+    exit 1
+fi
+if [ "$tool" != mkdir ] && [ -n "\${LOCK:-}" ] && [ "\$last" = "\$LOCK" ] && [ -e "\$STATE/dir-at-lock" ]; then
+    older=1
+    rm -f "\$STATE/dir-at-lock"
+    $REAL_MKDIR "\$LOCK" 2>/dev/null || older=""
+fi
+held=""
+if [ "$tool" != mkdir ] && [ -n "\${LOCK:-}" ] && [ "\$last" = "\$LOCK" ] && [ -e "\$STATE/held-at-lock" ]; then
+    rm -f "\$STATE/held-at-lock"
+    $(command -v ln) -s "\$\$" "\$LOCK" && held=1
+fi
+$real "\$@"
+rc=\$?
+[ -n "\$held" ] && rm -f "\$LOCK"
+[ -n "\$older" ] && rmdir "\$LOCK" 2>/dev/null
+if [ "\$rc" -eq 0 ] && [ -n "\${LOCK:-}" ] && [ "\$last" = "\$LOCK.reap" ] && [ -e "\$STATE/alive-at-reap" ]; then
+    touch "\$STATE/all-alive"
+fi
+if [ "\$rc" -ne 0 ] && [ -n "\${LOCK:-}" ] && [ "\$last" = "\$LOCK" ] && [ -e "\$STATE/term-at-lock-refused" ]; then
+    kill -TERM "\$PPID"
+fi
+if [ "\$rc" -eq 0 ] && [ -n "\${LOCK:-}" ]; then
+    if { [ "\$last" = "\$LOCK" ] && [ -e "\$STATE/term-at-lock" ]; } \\
+        || { [ "\$last" = "\$LOCK.reap" ] && [ -e "\$STATE/term-at-reap" ]; }; then
+        kill -TERM "\$PPID"
+    fi
+fi
+exit "\$rc"
+STUB
+done
+# ps: lists no process, so a holder only ps could see is not taken for alive
+printf '#!/bin/sh\nexit 1\n' > "$BIN/ps"
+chmod +x "$BIN/ps"
+
+# kill, a function that wins over the builtin in a with_claims snippet:
+# every process is alive once the fault alive-at-reap has fired
+# shellcheck disable=SC2016
+kill_stub='kill() { if [ -e "$STATE/all-alive" ]; then return 0; fi; builtin kill "$@"; }'
+
+# The launchers run under the bash that runs this test: /bin/bash 3.2 on macOS
+# when started as /bin/bash test-launch-claims.sh
+ln -s "$BASH" "$BIN/bash"
 chmod +x "$BIN"/*
 export PATH="$BIN:$PATH"
 
@@ -190,6 +261,15 @@ setup() {
     : > "$STATE/calls"
     local spec
     for spec in "$@"; do echo "${spec#*=}" > "$STATE/issues/${spec%%=*}"; done
+}
+
+# The pid of a process that has just ended, fresh for each case
+dead_pid() {
+    local pid
+    sleep 0 &
+    pid=$!
+    wait "$pid"
+    echo "$pid"
 }
 
 # Run a snippet with launch-claims.sh sourced, as a launcher would
@@ -218,7 +298,7 @@ echo "launch-claims.sh"
 setup "plain claim of A B C" A='|open' B='|open' C='|open'
 with_claims '
     claim_issues A B C || exit 9
-    [ -d "$LOCK" ] || exit 8             # held until setup ends
+    [ -L "$LOCK" ] || exit 8             # held until setup ends
     [ ${#LAUNCH_CLAIMS[@]} -eq 3 ] || exit 7
     finish_launch
     [ ${#LAUNCH_CLAIMS[@]} -eq 0 ] || exit 6'
@@ -255,11 +335,169 @@ expect_untouched C
 expect_no_lock
 
 setup "a second claim waits for the lock" A='|open' B='|open'
-with_claims 'claim_issues A || exit 9; (claim_issues B) && exit 8; finish_launch'
+# The second claim runs in its own process, with its own pid, as a launcher does
+with_claims 'claim_issues A || exit 9
+    REPO_DIR="$REPO_DIR" bash -c "print_info() { :; }; print_warning() { :; }; print_error() { :; }
+        source \"\$1\"; claim_issues B" _ "$1" && exit 8
+    finish_launch'
 expect_eq "exit code" 0 $?
 expect_owner B '|open'
 expect_untouched B
 expect_no_lock
+
+setup "TERM as the lock is taken" A='|open'
+touch "$STATE/term-at-lock"
+with_claims 'claim_issues A; echo "not stopped"'
+expect_eq "exit code" 130 $?
+expect_owner A '|open'
+expect_untouched A
+expect_no_lock
+
+setup "the lock of a launch that no longer runs is removed" A='|open'
+dead=$(dead_pid)
+ln -s "$dead" "$LOCK"
+with_claims 'claim_issues A || exit 9; finish_launch'
+expect_eq "exit code" 0 $?
+expect_owner A 'me|in_progress'
+if grep -q "Removed the claim lock of launch $dead" "$STATE/out"; then pass; else fail "no warning about the stale lock"; fi
+expect_no_lock
+
+setup "a lock naming this launch's own pid is stale" A='|open'
+with_claims 'ln -s "$$" "$LOCK"; claim_issues A || exit 9; finish_launch'
+expect_eq "exit code" 0 $?
+expect_owner A 'me|in_progress'
+expect_no_lock
+
+setup "a stale lock whose pid runs again by the removal is kept" A='|open'
+dead=$(dead_pid)
+ln -s "$dead" "$LOCK"
+touch "$STATE/alive-at-reap"
+with_claims "$kill_stub"'
+claim_issues A'
+expect_eq "exit code" 1 $?
+expect_owner A '|open'
+expect_untouched A
+expect_eq "lock holder" "$dead" "$(readlink "$LOCK")"
+if [ -L "$LOCK.reap" ] || [ -e "$LOCK.reap" ]; then fail "the removal lock is still there"; else pass; fi
+rm -f "$LOCK"
+
+setup "a lock that cannot be created is said so" A='|open'
+touch "$STATE/fail-lock"
+with_claims 'claim_issues A'
+expect_eq "exit code" 1 $?
+expect_owner A '|open'
+if grep -q "Could not take the claim lock $LOCK: another launch held it and has just freed it, or its directory cannot be written" "$STATE/out"; then pass; else fail "the error does not say the lock could not be taken"; fi
+
+setup "the lock of another user's launch is kept" A='|open'
+# pid 1 runs as root: kill -0 answers EPERM, and the ps stub lists nothing
+ln -s 1 "$LOCK"
+with_claims 'claim_issues A'
+expect_eq "exit code" 1 $?
+expect_owner A '|open'
+expect_eq "lock holder" 1 "$(readlink "$LOCK")"
+rm -f "$LOCK"
+
+setup "the lock of a launch that runs is kept" A='|open'
+ln -s "$$" "$LOCK"
+with_claims 'claim_issues A'
+expect_eq "exit code" 1 $?
+expect_owner A '|open'
+expect_untouched A
+expect_eq "lock holder" "$$" "$(readlink "$LOCK")"
+rm -f "$LOCK"
+
+setup "a stale lock another launch is removing is left to it" A='|open'
+dead=$(dead_pid)
+ln -s "$dead" "$LOCK"
+ln -s "$$" "$LOCK.reap"
+with_claims 'claim_issues A'
+expect_eq "exit code" 1 $?
+expect_owner A '|open'
+expect_eq "lock holder" "$dead" "$(readlink "$LOCK")"
+expect_eq "removal lock holder" "$$" "$(readlink "$LOCK.reap")"
+rm -f "$LOCK" "$LOCK.reap"
+
+setup "a removal lock of a launch that no longer runs stops the launch" A='|open'
+dead=$(dead_pid)
+ln -s "$dead" "$LOCK"
+ln -s "$dead" "$LOCK.reap"
+with_claims 'claim_issues A'
+expect_eq "exit code" 1 $?
+expect_owner A '|open'
+expect_untouched A
+expect_eq "lock holder" "$dead" "$(readlink "$LOCK")"
+expect_eq "removal lock holder" "$dead" "$(readlink "$LOCK.reap")"
+if grep -q "removal lock $LOCK.reap was left by launch $dead, which no longer runs" "$STATE/out"; then pass; else fail "the error does not name the dead removal lock"; fi
+rm -f "$LOCK" "$LOCK.reap"
+
+setup "a removal lock left beside a free claim lock is removed" A='|open'
+dead=$(dead_pid)
+ln -s "$dead" "$LOCK.reap"
+with_claims 'claim_issues A || exit 9; finish_launch'
+expect_eq "exit code" 0 $?
+expect_owner A 'me|in_progress'
+if grep -q "Removed the removal lock of launch $dead" "$STATE/out"; then pass; else fail "no warning about the stale removal lock"; fi
+expect_no_lock
+
+setup "a live removal lock beside a free claim lock is kept" A='|open'
+ln -s "$$" "$LOCK.reap"
+with_claims 'claim_issues A || exit 9; finish_launch'
+expect_eq "exit code" 0 $?
+expect_eq "removal lock holder" "$$" "$(readlink "$LOCK.reap")"
+rm -f "$LOCK.reap"
+
+setup "TERM as the removal lock is taken" A='|open'
+dead=$(dead_pid)
+ln -s "$dead" "$LOCK"
+touch "$STATE/term-at-reap"
+with_claims 'claim_issues A; echo "not stopped"'
+expect_eq "exit code" 130 $?
+expect_owner A '|open'
+expect_untouched A
+if [ -L "$LOCK.reap" ] || [ -e "$LOCK.reap" ]; then fail "the removal lock is still there"; else pass; fi
+expect_eq "lock holder" "$dead" "$(readlink "$LOCK")"
+rm -f "$LOCK"
+
+setup "TERM while another launch holds the lock leaves its lock" A='|open'
+ln -s "$$" "$LOCK"
+touch "$STATE/term-at-lock-refused"
+with_claims 'claim_issues A; echo "not stopped"'
+expect_eq "exit code" 130 $?
+expect_owner A '|open'
+expect_untouched A
+expect_eq "lock holder" "$$" "$(readlink "$LOCK")"
+rm -f "$LOCK"
+
+setup "a live lock is named before a stale removal lock" A='|open'
+ln -s "$$" "$LOCK"
+ln -s "$(dead_pid)" "$LOCK.reap"
+with_claims 'claim_issues A'
+expect_eq "exit code" 1 $?
+if grep -q "Another launch is claiming tickets (lock $LOCK, held by $$)" "$STATE/out"; then pass; else fail "the error does not name the live holder"; fi
+rm -f "$LOCK" "$LOCK.reap"
+
+setup "a lock freed by another launch during the attempt is taken" A='|open'
+touch "$STATE/held-at-lock"
+with_claims 'claim_issues A || exit 9; finish_launch'
+expect_eq "exit code" 0 $?
+expect_owner A 'me|in_progress'
+if grep -q "Could not take the claim lock" "$STATE/out"; then fail "the lost race reads as a lock that cannot be created"; else pass; fi
+expect_no_lock
+
+setup "an older launcher's lock taken and freed while the lock is made" A='|open'
+touch "$STATE/dir-at-lock"
+with_claims 'claim_issues A || exit 9; finish_launch'
+expect_eq "exit code" 0 $?
+expect_owner A 'me|in_progress'
+expect_no_lock
+
+setup "the lock directory of an older launcher is kept" A='|open'
+mkdir "$LOCK"
+with_claims 'claim_issues A'
+expect_eq "exit code" 1 $?
+expect_owner A '|open'
+expect_eq "lock directory content" "" "$(ls -A "$LOCK")"
+rmdir "$LOCK"
 
 setup "ticket already mine but open goes back to open" A='me|open'
 with_claims 'claim_issues A || exit 9; abort_launch'
@@ -329,6 +567,30 @@ for launcher in "${LAUNCHERS[@]}"; do
     expect_owner B '|open'
     expect_no_lock
 
+    # Before the launcher sets its EXIT trap: only the INT trap of claim_issues rolls back
+    setup "$name: INT right after claiming A" A='|open' B='|open'
+    touch "$STATE/int-after-claim-A"
+    launch "$launcher" A B
+    expect_eq "exit code" 130 $?
+    expect_owner A '|open'
+    expect_owner B '|open'
+    expect_untouched B
+    if [ -f "$STATE/panes" ]; then fail "the session still runs"; else pass; fi
+    expect_no_lock
+
+    setup "$name: a split returns without a pane" A='|open' B='|open'
+    touch "$STATE/noop-split-1"
+    launch "$launcher" A B
+    rc=$?
+    if [ "$rc" -ne 0 ]; then pass; else fail "the launch succeeded"; fi
+    expect_owner A '|open'
+    expect_owner B '|open'
+    if grep -q "The session has 1 panes for 2 tickets" "$STATE/out"; then pass; else fail "the pane count was not checked"; fi
+    if [ -f "$STATE/panes" ]; then fail "the session still runs"; else pass; fi
+    expect_no_lock
+
+    # dev-workflow.sh dies on this INT and its EXIT trap rolls back, with or
+    # without the INT trap; the case above is the one that needs it
     setup "$name: INT during setup" A='|open' B='me|open'
     touch "$STATE/int-at-new-session"
     launch "$launcher" A B
@@ -339,13 +601,14 @@ for launcher in "${LAUNCHERS[@]}"; do
     expect_no_lock
 
     setup "$name: a launch under way keeps the lock" A='|open'
-    mkdir "$LOCK"
+    ln -s "$$" "$LOCK"
     launch "$launcher" A
     rc=$?
     if [ "$rc" -ne 0 ]; then pass; else fail "the launch succeeded"; fi
     expect_owner A '|open'
     expect_untouched A
-    rmdir "$LOCK"
+    expect_eq "lock holder" "$$" "$(readlink "$LOCK")"
+    rm -f "$LOCK"
 done
 
 # --- One copy of the claim code ------------------------------------------------
