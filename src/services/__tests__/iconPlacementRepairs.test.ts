@@ -264,6 +264,15 @@ describe('the placements of several tabs of a Platform', () => {
     expect((await readIconPlacementRepairs())['claude.ai']?.status).toBe('overlay');
   });
 
+  it('keeps the pick for the next tab when a tab it never counted is replaced', async () => {
+    await pickInTab1();
+    await forgetIconPlacementTab(1);
+
+    await moveIconPlacementTab(5, 6, 'claude.ai');
+
+    expect((await readIconPlacementRepairs())['claude.ai']).toEqual({ status: 'override', override: PICK });
+  });
+
   it('moves a replaced tab\'s placement on the Platform named only', async () => {
     await pickInTab1();
 
