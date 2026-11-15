@@ -703,14 +703,14 @@ const pickerWindow = {
   async update(change: Partial<PickerWindow>): Promise<void> {
     await changePickerWindow(() => change);
   },
-  /**
-   * Forgets the picker window if it is this one, in one change: a window opened since keeps its
-   * record. True when it was this one.
-   */
   /** Forgets the tab it picks in if it is this one: a picker window opened since for another tab keeps its own */
   async forgetTabIf(tabId: number): Promise<void> {
     await changePickerWindow((current) => (current.originalTabId === tabId ? { originalTabId: null } : null));
   },
+  /**
+   * Forgets the picker window if it is this one, in one change: a window opened since keeps its
+   * record. True when it was this one.
+   */
   async forgetIf(windowId: number): Promise<boolean> {
     let matched = false;
     await changePickerWindow((current) => {
@@ -790,8 +790,16 @@ chrome.runtime.onMessage.addListener(
         void handleElementSelected(message.data, sender, sendResponse);
         break;
 
-      case "STOP_ELEMENT_PICKER":
       case "PICKER_CANCELLED":
+        // From the picker in a tab (Escape, or its page unloading): only that tab's pick ends
+        if (sender.tab?.id !== undefined) {
+          void handlePickerCancelled(sender.tab.id, sendResponse);
+          break;
+        }
+        void handleStopElementPicker(undefined, sender, sendResponse);
+        break;
+
+      case "STOP_ELEMENT_PICKER":
         void handleStopElementPicker(undefined, sender, sendResponse);
         break;
 
@@ -1380,6 +1388,26 @@ async function handleElementSelected(
     Logger.error("Error handling element selection", toError(error), {
       component: "Background",
       senderTabId: sender.tab?.id,
+    });
+    sendResponse({ success: false, error: getErrorMessage(error) });
+  }
+}
+
+/**
+ * The picker of one tab was cancelled there (Escape, or its page unloading): its session is
+ * forgotten; the picks open in other tabs go on
+ */
+async function handlePickerCancelled(
+  tabId: number,
+  sendResponse: (response?: { success: boolean; error?: string }) => void,
+) {
+  try {
+    await pickerSessions.delete(tabId);
+    sendResponse({ success: true });
+  } catch (error) {
+    Logger.error("Error cancelling element picker", toError(error), {
+      component: "Background",
+      tabId,
     });
     sendResponse({ success: false, error: getErrorMessage(error) });
   }

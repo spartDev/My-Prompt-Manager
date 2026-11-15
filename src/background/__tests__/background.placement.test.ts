@@ -239,3 +239,26 @@ describe('background: a picker that could not be activated leaves no session', (
     });
   });
 });
+
+describe('background: a pick cancelled in one tab', () => {
+  const OTHER_TAB = { id: 8, windowId: 3, url: 'https://claude.ai/chat/1', active: false } as chrome.tabs.Tab;
+
+  it('ends only that tab\'s pick: a pick open in another tab goes on', async () => {
+    Object.assign(getChromeMock().tabs, {
+      get: vi.fn(async (tabId: number) => (tabId === OTHER_TAB.id ? OTHER_TAB : CLAUDE_TAB)),
+      update: vi.fn().mockResolvedValue(CLAUDE_TAB)
+    });
+    const listener = await startServiceWorker();
+    await send(listener, { type: 'START_ELEMENT_PICKER', data: { tabId: CLAUDE_TAB.id, repairHostname: 'claude.ai' } });
+    await send(listener, { type: 'START_ELEMENT_PICKER', data: { tabId: OTHER_TAB.id, repairHostname: 'claude.ai' } });
+    vi.mocked(chrome.tabs.sendMessage).mockClear();
+
+    // The other tab reloads: its picker sends PICKER_CANCELLED as its page unloads
+    expect(await send(listener, { type: 'PICKER_CANCELLED' }, { tab: OTHER_TAB })).toEqual({ success: true });
+
+    expect(Object.keys(await chrome.storage.session.get(null))).toEqual([`pickerSession:${CLAUDE_TAB.id}`]);
+    expect(chrome.tabs.sendMessage).not.toHaveBeenCalledWith(CLAUDE_TAB.id, expect.objectContaining({ type: 'DEACTIVATE_ELEMENT_PICKER' }));
+    expect(await send(listener, { type: 'ELEMENT_SELECTED', data: { selector: SEND_BUTTON } }, { tab: CLAUDE_TAB })).toEqual({ success: true });
+  });
+});
+

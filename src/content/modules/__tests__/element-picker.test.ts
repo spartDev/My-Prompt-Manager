@@ -42,4 +42,14 @@ describe('ElementPicker: the page unloading', () => {
 
     expect(chrome.runtime.sendMessage).not.toHaveBeenCalledWith({ type: 'PICKER_CANCELLED' });
   });
+
+  it('goes on through an in-page address change', () => {
+    const picker = newPicker();
+    picker.activate();
+
+    window.history.pushState(null, '', '#/chat/2');
+
+    expect(chrome.runtime.sendMessage).not.toHaveBeenCalledWith({ type: 'PICKER_CANCELLED' });
+    expect(document.getElementById('mpm-element-picker-overlay')).not.toBeNull();
+  });
 });

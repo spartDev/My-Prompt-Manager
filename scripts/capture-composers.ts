@@ -185,14 +185,21 @@ export function headerUrl(url: string): string {
 }
 
 /**
- * A message with the addresses in it as headerUrl writes them. Playwright's navigation errors
- * name the address they failed at verbatim, so the requested one is replaced as written first,
- * whatever it holds (a space, a parenthesis, a quote); any other address up to a space or a
- * double quote.
+ * A message with every address in it as headerUrl writes it. Playwright's navigation errors name
+ * the address they failed at, normalized as `new URL()` writes it (a space as %20, a slash after
+ * the host), so an address ends at a space, a double quote or an angle bracket, and a closing parenthesis
+ * it does not open is the message's (`(https://a/b)`).
  */
-export const redactUrls = (message: string, requested: string): string =>
-  (requested ? message.split(requested).join(headerUrl(requested)) : message)
-    .replace(/\b(?:https?|file):\/\/[^\s"]+/gi, (url) => (url.includes('<stand-in>') ? url : headerUrl(url)));
+export const redactUrls = (message: string): string =>
+  message.replace(/\b(?:https?|file):\/\/[^\s"<>]+/gi, (match) => {
+    let url = match;
+    let tail = '';
+    while (url.endsWith(')') && url.split(')').length > url.split('(').length) {
+      url = url.slice(0, -1);
+      tail = `)${tail}`;
+    }
+    return `${headerUrl(url)}${tail}`;
+  });
 
 export type CaptureResult =
   | { id: string; outcome: 'captured'; composerFound: boolean; file: string }
@@ -349,7 +356,7 @@ async function main(): Promise<number> {
     if (result.outcome === 'no-editor') {
       process.stdout.write(`  ${result.id}: no editor at ${headerUrl(result.url)} (signed out?), fixture kept as it was\n`);
     } else if (result.outcome === 'error') {
-      process.stdout.write(`  ${result.id}: capture failed at ${headerUrl(result.url)} (${redactUrls(result.message, result.url)}), fixture kept as it was\n`);
+      process.stdout.write(`  ${result.id}: capture failed at ${headerUrl(result.url)} (${redactUrls(result.message)}), fixture kept as it was\n`);
     } else if (!result.composerFound) {
       process.stdout.write(`  ${result.id}: CHAIN COMPOSER NOT FOUND, an ancestor of the editor written to ${shown(result.file)}: the run fails\n`);
     } else {

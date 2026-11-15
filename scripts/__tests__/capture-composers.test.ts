@@ -244,26 +244,36 @@ describe('parseCaptureArgs', () => {
 });
 
 describe('redactUrls', () => {
-  it('writes the requested address in a navigation error as the fixture header does, whatever it holds', () => {
-    const cases: Array<[string, string]> = [
-      ['https://user:pw@chat.example.com/c/1?token=abc#x', 'https://chat.example.com/c/1'],
-      ['https://x.example/c?token=a(b)SECRET', 'https://x.example/c'],
-      ["https://x.example/c?q=it'sSECRET", 'https://x.example/c'],
-      ['https://user:p(w)SECRET@x.example/c', 'https://x.example/c'],
-      ['file:///Users/alice/My Docs/claude.html', 'file://<stand-in>/claude.html'],
-      ['http://localhost:5173/a b?t=SECRET', 'http://localhost:5173/a%20b']
-    ];
-    for (const [requested, written] of cases) {
-      const redacted = redactUrls(`page.goto: net::ERR_CONNECTION_REFUSED at ${requested}`, requested);
-      expect(redacted).toBe(`page.goto: net::ERR_CONNECTION_REFUSED at ${written}`);
-      expect(redacted).not.toMatch(/SECRET|alice|token/);
-    }
+  // What Playwright prints: page.goto writes the address as new URL() normalizes it
+  const printed = (requested: string): string => new URL(requested.trim()).toString();
+
+  it.each([
+    ['https://user:pw@chat.example.com/c/1?token=abc#x', 'https://chat.example.com/c/1'],
+    ['https://x.example/c?token=a(b)SECRET', 'https://x.example/c'],
+    ["https://x.example/c?q=it'sSECRET", 'https://x.example/c'],
+    ['https://user:p(w)SECRET@x.example/c', 'https://x.example/c'],
+    ['https://x.example?t=SECRET', 'https://x.example/'],
+    ["https://x.example/it's?t=SECRET", "https://x.example/it's"],
+    [' https://x.example/c?t=SECRET', 'https://x.example/c'],
+    ['file:///Users/alice/My Docs/claude.html', 'file://<stand-in>/claude.html'],
+    ['http://localhost:5173/a b?t=SECRET', 'http://localhost:5173/a%20b']
+  ])('writes %j in a navigation error as the fixture header does', (requested, written) => {
+    const redacted = redactUrls(`page.goto: net::ERR_CONNECTION_REFUSED at ${printed(requested)}`);
+
+    expect(redacted).toBe(`page.goto: net::ERR_CONNECTION_REFUSED at ${written}`);
+    expect(redacted).not.toMatch(/SECRET|alice|token|pw/);
   });
 
-  it('redacts another address in the message too, and leaves a message with none as it is', () => {
-    expect(redactUrls('redirected to https://login.example.com/sso?ticket=SECRET', 'https://x.example/'))
-      .toBe('redirected to https://login.example.com/sso');
-    expect(redactUrls('Timeout 30000ms exceeded.', 'https://x.example/')).toBe('Timeout 30000ms exceeded.');
+  it('redacts both addresses of an interrupted navigation, in their quotes', () => {
+    const message = `page.goto: Navigation to "${printed('https://x.example/c?t=SECRET')}" is interrupted by another navigation to "${printed('https://login.example.com/sso?ticket=SECRET')}"`;
+
+    expect(redactUrls(message)).toBe('page.goto: Navigation to "https://x.example/c" is interrupted by another navigation to "https://login.example.com/sso"');
+  });
+
+  it('leaves the parenthesis or bracket around an address, and a message with no address, as they are', () => {
+    expect(redactUrls('failed (https://a.example/b?x=1)')).toBe('failed (https://a.example/b)');
+    expect(redactUrls('see <https://a.example/b?x=1>.')).toBe('see <https://a.example/b>.');
+    expect(redactUrls('Timeout 30000ms exceeded.')).toBe('Timeout 30000ms exceeded.');
   });
 });
 
