@@ -183,7 +183,9 @@ for tool in claude gh; do printf '#!/usr/bin/env bash\nexit 0\n' > "$BIN/$tool";
 # launcher takes its directory lock just before the claim lock is made and
 # frees it (rmdir, which fails on a directory not empty) just after. With
 # alive-at-reap, the one that creates the removal lock makes the ps stub
-# report every process alive from then on, as when a dead pid is reused.
+# report every process alive from then on, as when a dead pid is reused. With
+# fail-lock, perl and ln fail to create the claim lock, as on a read-only
+# git directory.
 REAL_MKDIR=$(command -v mkdir)
 for tool in perl ln mkdir; do
     real=$(command -v "$tool")
@@ -191,6 +193,9 @@ for tool in perl ln mkdir; do
 #!/bin/sh
 for last in "\$@"; do :; done
 older=""
+if [ "$tool" != mkdir ] && [ -n "\${LOCK:-}" ] && [ "\$last" = "\$LOCK" ] && [ -e "\$STATE/fail-lock" ]; then
+    exit 1
+fi
 if [ "$tool" != mkdir ] && [ -n "\${LOCK:-}" ] && [ "\$last" = "\$LOCK" ] && [ -e "\$STATE/dir-at-lock" ]; then
     older=1
     $REAL_MKDIR "\$LOCK" 2>/dev/null || older=""
@@ -365,11 +370,9 @@ if [ -L "$LOCK.reap" ] || [ -e "$LOCK.reap" ]; then fail "the removal lock is st
 rm -f "$LOCK"
 
 setup "a lock that cannot be created is said so" A='|open'
-chmod a-w "$(dirname "$LOCK")"
+touch "$STATE/fail-lock"
 with_claims 'claim_issues A'
-rc=$?
-chmod u+w "$(dirname "$LOCK")"
-expect_eq "exit code" 1 "$rc"
+expect_eq "exit code" 1 $?
 expect_owner A '|open'
 if grep -q "Could not create the claim lock $LOCK" "$STATE/out"; then pass; else fail "the error does not say the lock could not be created"; fi
 
