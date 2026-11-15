@@ -99,25 +99,39 @@ export class PlacementRepair {
 
   /**
    * Tells the service worker how the icon was placed, when storage says otherwise. A placement in
-   * the Toolbar drops the override at once here, the stored one with the service worker's write.
+   * the Toolbar drops the override at once here, and is always sent while one is held: storage may
+   * hold an override with no status (a pick that came after the chain resolved), which only the
+   * service worker's write removes.
    */
   report(placement: PlacementReport): void {
-    if (placement === 'toolbar' && this.override) {
+    const dropsOverride = placement === 'toolbar' && this.override !== null;
+    if (dropsOverride) {
       info('The anchor chain of this Platform resolves again, the element picked for the icon is dropped', {
         hostname: this.hostname
       });
       this.override = null;
     }
-    if (placement === this.stored) {
+    if (placement === this.stored && !dropsOverride) {
       return;
     }
     this.stored = placement;
     debug('Icon placement reported', { hostname: this.hostname, placement });
-    chrome.runtime.sendMessage({ type: PLACEMENT_REPORT_MESSAGE, data: { placement } }).catch((err: unknown) => {
-      // The service worker may be restarting: the next placement reports again
-      this.stored = null;
-      debug('Icon placement report not delivered', { error: String(err) });
-    });
+    const notSaved = (reason: string) => {
+      // The next placement reports again, whatever it is
+      if (this.stored === placement) {
+        this.stored = null;
+      }
+      debug('Icon placement report not saved', { placement, reason });
+    };
+    chrome.runtime.sendMessage({ type: PLACEMENT_REPORT_MESSAGE, data: { placement } })
+      .then((response: { success?: boolean; error?: string } | undefined) => {
+        if (!response?.success) {
+          notSaved(response?.error ?? 'no answer');
+        }
+      }, (err: unknown) => {
+        // The service worker may be restarting
+        notSaved(String(err));
+      });
   }
 
   private readonly handleStorageChange = (changes: Record<string, chrome.storage.StorageChange>, areaName: string): void => {

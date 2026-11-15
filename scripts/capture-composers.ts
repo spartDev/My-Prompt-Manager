@@ -12,8 +12,10 @@
  *   npm run composers:capture -- --url claude=http://127.0.0.1:8080/claude.html --out /tmp/fx --headless --channel chromium
  *                                                        capture a stand-in page instead of the live site
  *
- * Review `git diff tests/fixtures/composers` before committing: the sanitizer removes text,
- * links and classes, but an ARIA label can still name the user's workspace.
+ * The sanitizer keeps an allowlist: contenteditable, role, type, test ids, and the attributes and
+ * class names the Platform's selectors read, a valued one only where its value meets the selector's
+ * condition; text, links and any other attribute (an ARIA label naming the user's workspace) go.
+ * Still review `git diff tests/fixtures/composers` before committing.
  */
 
 import { spawnSync } from 'node:child_process';
@@ -27,6 +29,7 @@ import { type BrowserContext, chromium, type Page } from 'playwright';
 
 import { type PlatformDefinition, SUPPORTED_PLATFORMS } from '../src/config/platforms';
 
+import { CAPTURED_DIR_ENV, CAPTURED_IDS_ENV } from './composers/fixtures';
 import { composerFixture, EDITOR_MARKER, sanitizeComposer, sanitizeRulesOf } from './composers/sanitize';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -155,14 +158,21 @@ const GENERIC_EDITORS = ['[contenteditable="true"][role="textbox"]', '[contented
 /** Ancestors of the editor captured when the chain's composer selector finds nothing */
 const FALLBACK_DEPTH = 5;
 
-async function capture(page: Page, id: string, platform: PlatformDefinition, options: CaptureOptions): Promise<CaptureResult> {
+export async function capture(page: Page, id: string, platform: PlatformDefinition, options: CaptureOptions): Promise<CaptureResult> {
   const url = urlOf(id, platform, options);
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   // The config's selectors first; the strategies find some editors by other means (ChatGPT's and
   // Perplexity's are contenteditable, their selectors name textareas), so then any editable element
   const editorSelectors = [...platform.selectors, ...GENERIC_EDITORS];
   try {
-    await page.waitForSelector(editorSelectors.join(', '), { state: 'visible', timeout: options.timeout });
+    // Any visible match: waitForSelector would wait on the first match only, and a hidden textarea
+    // earlier in the page (a search field) would then hide the editor
+    await page.waitForFunction(
+      (selectors) => selectors.some((selector) =>
+        Array.from(document.querySelectorAll(selector)).some((candidate) => candidate.getClientRects().length > 0)),
+      editorSelectors,
+      { timeout: options.timeout, polling: 250 }
+    );
   } catch {
     return { id, outcome: 'no-editor', url };
   }
@@ -265,15 +275,15 @@ async function main(): Promise<number> {
   }
   process.stdout.write('Review the diff for anything that names you (an ARIA label can) before committing.\n');
 
-  const captured = results.some((result) => result.outcome === 'captured');
-  if (!options.runTests || !captured) {
-    return captured ? 0 : 1;
+  const captured = results.filter((result) => result.outcome === 'captured').map((result) => result.id);
+  if (!options.runTests || captured.length === 0) {
+    return captured.length > 0 ? 0 : 1;
   }
   // The chains, run on what was just captured: a test that fails names the Platform whose chain no longer resolves
   const tests = spawnSync('npx', ['vitest', 'run', CHAINS_TEST], {
     cwd: ROOT,
     stdio: 'inherit',
-    env: { ...process.env, COMPOSER_FIXTURES: options.out }
+    env: { ...process.env, [CAPTURED_DIR_ENV]: options.out, [CAPTURED_IDS_ENV]: captured.join(',') }
   });
   return tests.status ?? 1;
 }

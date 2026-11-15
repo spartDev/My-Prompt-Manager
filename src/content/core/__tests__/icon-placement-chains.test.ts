@@ -2,25 +2,23 @@
  * The anchor chain of each built-in Platform, run on a sanitized copy of its live composer
  * (tests/fixtures/composers/<platform>.html). A Platform that changes its composer fails here once
  * the fixture is captured again with `npm run composers:capture`, which runs this file on what it
- * captured (COMPOSER_FIXTURES, its --out folder) and falls back to the committed fixture for a
- * Platform it did not capture.
+ * captured this run (scripts/composers/fixtures.ts); every other Platform is read from the
+ * committed fixtures.
  */
 
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { composerFixturePath } from '../../../../scripts/composers/fixtures';
 import { SUPPORTED_PLATFORMS } from '../../../config/platforms';
 import { resolveIconPlacement } from '../icon-placement';
 
 const FIXTURES = resolve(__dirname, '../../../../tests/fixtures/composers');
 
-/** The fixture of a Platform: the one just captured, if any, else the committed one */
-function fixtureOf(platformId: string): string {
-  const captured = process.env.COMPOSER_FIXTURES && resolve(process.env.COMPOSER_FIXTURES, `${platformId}.html`);
-  return captured && existsSync(captured) ? captured : resolve(FIXTURES, `${platformId}.html`);
-}
+/** The fixture of a Platform: the one the capture wrote this run, if any, else the committed one */
+const fixtureOf = (platformId: string): string => composerFixturePath(platformId, FIXTURES, process.env);
 
 /** Where a chain led on a composer: the anchor it reached, or the Anchored overlay */
 function describeResolution(index: number | undefined, chainLength: number): string {
@@ -63,7 +61,9 @@ describe('icon placement chains on the live composers', () => {
 
     const resolution = resolveIconPlacement(editor, SUPPORTED_PLATFORMS.claude.iconPlacement);
 
-    expect(resolution?.anchor.closest('div:has([data-testid="chat-input"])')).not.toBeNull();
+    const composer = editor.closest(SUPPORTED_PLATFORMS.claude.iconPlacement?.composer ?? ':not(*)');
+    expect(composer).not.toBeNull();
+    expect(composer?.contains(resolution?.anchor ?? null)).toBe(true);
     expect(messageBar.contains(resolution?.anchor ?? null)).toBe(false);
   });
 

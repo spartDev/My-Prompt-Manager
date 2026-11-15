@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { SUPPORTED_PLATFORMS } from '../../src/config/platforms';
 import { resolveIconPlacement } from '../../src/content/core/icon-placement';
 import { parseCaptureArgs, rulesFor } from '../capture-composers';
+import { composerFixturePath } from '../composers/fixtures';
 import { classNamesOf, composerFixture, EDITOR_MARKER, sanitizeComposer, sanitizeRulesOf, serializeComposer } from '../composers/sanitize';
 
 const FIXTURES = path.resolve(__dirname, '../../tests/fixtures/composers');
@@ -184,5 +185,20 @@ describe('parseCaptureArgs', () => {
     [['--fast'], 'Unknown option --fast']
   ])('refuses %j', (argv, message) => {
     expect(() => parseCaptureArgs(argv, {})).toThrow(message);
+  });
+});
+
+describe('composerFixturePath', () => {
+  const committed = '/repo/tests/fixtures/composers';
+
+  it('reads the committed fixtures outside a capture', () => {
+    expect(composerFixturePath('claude', committed, {})).toBe('/repo/tests/fixtures/composers/claude.html');
+  });
+
+  it('reads what this run captured, and the committed fixture for any other Platform, even with an older file in the folder', () => {
+    const env = { COMPOSER_FIXTURES: '/tmp/fx', COMPOSER_CAPTURED: 'chatgpt' };
+
+    expect(composerFixturePath('chatgpt', committed, env)).toBe('/tmp/fx/chatgpt.html');
+    expect(composerFixturePath('claude', committed, env)).toBe('/repo/tests/fixtures/composers/claude.html');
   });
 });

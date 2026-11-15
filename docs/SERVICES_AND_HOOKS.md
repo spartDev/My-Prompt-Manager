@@ -62,8 +62,8 @@ Helpers the services lean on: `src/utils/asyncMutex.ts` (locks), `src/utils/stor
 `AsyncMutex` queues operations per key. `StorageManager` creates it with a `scope`, so `withLock(key, operation)` runs `navigator.locks.request('StorageManager:' + key, operation)`: the popup, the side panel and the service worker (same extension origin) exclude each other on the Prompts, Categories and settings keys. The operation's result or error comes back unchanged and the lock is released either way. Where the Web Locks API is missing, or refuses the request without running the operation (it throws, or rejects with a `SecurityError` in an opaque origin), the in-memory queue is used (tests, old browsers).
 
 - Nested keys are taken in the fixed order CATEGORIES → PROMPTS → SETTINGS, and nothing under a lock awaits another context.
-- The Site settings have a lock of their own, in `src/services/siteSettings.ts` (`withSiteSettingsLock`, scope `SiteSettings`), shared across contexts the same way. `clearAllData()` takes it last, after SETTINGS, so a change of the Site settings waiting in another context cannot write them back after the clear. Nothing else takes it together with another lock.
-- Clear All Data takes all three, so a write from another context lands wholly before or after it.
+- The Site settings have a lock of their own, in `src/services/siteSettings.ts` (`withSiteSettingsLock`, scope `SiteSettings`), and so do the icon placement repairs, in `src/services/iconPlacementRepairs.ts` (`withIconPlacementRepairsLock`, scope `IconPlacementRepairs`), both shared across contexts the same way. `clearAllData()` takes them after SETTINGS, the Site settings lock first and the icon placement repairs lock last, so a change waiting in another context cannot write either back after the clear. Nothing else takes them together with another lock.
+- Clear All Data takes all five, so a write from another context lands wholly before or after it.
 - Reads take no lock, except reading the Categories, which takes CATEGORIES only to write a missing default Category.
 - Settings writes take only the SETTINGS key, so a toggle never waits on a Prompt write.
 - `UsageTracker` keeps a plain in-memory `AsyncMutex`.
@@ -144,6 +144,6 @@ Components read the theme through `useThemeContext()` of `src/contexts/ThemeCont
 ## Adding a service or hook
 
 1. Write the Prompts, the Categories and the settings only through `StorageManager`; a new route that brings Prompt text into the Library goes through an Admission route. Another key belongs to the one module that owns it: add it to the table of owners above.
-2. Take locks in the order CATEGORIES → PROMPTS → SETTINGS (then the Site settings lock, which only `clearAllData()` nests), and await nothing from another context under a lock.
+2. Take locks in the order CATEGORIES → PROMPTS → SETTINGS (then the Site settings lock, then the icon placement repairs lock, which only `clearAllData()` nests), and await nothing from another context under a lock.
 3. Test it in the `__tests__/` folder next to it ([TESTING.md](./TESTING.md)).
 4. Add a row to the table of this page: one line on its job, no signature.
