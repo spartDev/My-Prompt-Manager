@@ -36,6 +36,7 @@ export const getChromeMockFunctions = () => {
         get: chromeApi.storage.local.get,
         set: chromeApi.storage.local.set,
         clear: chromeApi.storage.local.clear,
+        remove: chromeApi.storage.local.remove,
         getBytesInUse: chromeApi.storage.local.getBytesInUse,
       }
     },

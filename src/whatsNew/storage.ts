@@ -59,15 +59,16 @@ export function withWhatsNewLock<T>(operation: () => Promise<T>): Promise<T> {
 /**
  * Empties `chrome.storage.local` but for the What's new record, which Clear All Data and the Reset
  * Data of the error screen leave, so What's new does not come back for a seen Release nor show on
- * a first install. The stored value is read raw and written back as it was. Rejects, before
- * clearing anything, when storage cannot be read. Takes no lock: the caller holds
+ * a first install. Every other key is removed in one call; the record itself is never removed nor
+ * rewritten, so no reader sees it missing and no failed write can lose it. Rejects, before
+ * removing anything, when storage cannot be read. Takes no lock: the caller holds
  * `withWhatsNewLock`.
  */
 export async function clearStorageKeepingWhatsNew(): Promise<void> {
-  const kept: unknown = (await chrome.storage.local.get(WHATS_NEW_KEY))[WHATS_NEW_KEY];
-  await chrome.storage.local.clear();
-  if (kept !== undefined) {
-    await chrome.storage.local.set({ [WHATS_NEW_KEY]: kept });
+  const stored = await chrome.storage.local.get(null);
+  const others = Object.keys(stored).filter((key) => key !== WHATS_NEW_KEY);
+  if (others.length > 0) {
+    await chrome.storage.local.remove(others);
   }
 }
 

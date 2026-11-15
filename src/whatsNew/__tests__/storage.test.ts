@@ -187,7 +187,29 @@ describe("What's new record: kept across Clear All Data and Reset settings", () 
     vi.mocked(chrome.storage.local.get).mockRejectedValueOnce(new Error('storage unavailable'));
 
     await expect(StorageManager.getInstance().clearAllData()).rejects.toThrow();
+    expect(chrome.storage.local.remove).not.toHaveBeenCalled();
     expect(chrome.storage.local.clear).not.toHaveBeenCalled();
+    expect(await stored()).toEqual(RECORD);
+  });
+
+  it('Clear all data never takes the record out of storage: it removes the other keys, never clears nor rewrites', async () => {
+    await chrome.storage.local.set({ ...OTHER_KEYS, [WHATS_NEW_KEY]: RECORD });
+    vi.mocked(chrome.storage.local.set).mockClear();
+
+    await StorageManager.getInstance().clearAllData();
+
+    expect(chrome.storage.local.clear).not.toHaveBeenCalled();
+    expect(chrome.storage.local.set).not.toHaveBeenCalled();
+    expect(chrome.storage.local.remove).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(chrome.storage.local.remove).mock.calls[0]?.[0]).not.toContain(WHATS_NEW_KEY);
+  });
+
+  it('a failed removal leaves the record in storage', async () => {
+    await chrome.storage.local.set({ ...OTHER_KEYS, [WHATS_NEW_KEY]: RECORD });
+    vi.mocked(chrome.storage.local.remove).mockRejectedValueOnce(new Error('storage unavailable'));
+
+    await expect(StorageManager.getInstance().clearAllData()).rejects.toThrow();
+    expect(await stored()).toEqual(RECORD);
   });
 
   it('a Release marked seen while Clear all data runs is not lost', async () => {

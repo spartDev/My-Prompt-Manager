@@ -445,8 +445,10 @@ describe('SettingsView', () => {
       expect(showToastMock).toHaveBeenCalledWith('All data cleared', 'success');
     });
     expect(storageMock.clearAllData).toHaveBeenCalledTimes(1);
-    // The one clear is StorageManager's: a direct clear would skip the locks another context's write holds
-    expect(chromeMock.storage.local.clear).toHaveBeenCalledTimes(1);
+    // The one removal is StorageManager's (every key but the What's new record): a direct clear
+    // would skip the locks another context's write holds
+    expect(chromeMock.storage.local.remove).toHaveBeenCalledTimes(1);
+    expect(chromeMock.storage.local.clear).not.toHaveBeenCalled();
   });
 
   it('resets settings to defaults after confirmation', async () => {
@@ -1065,7 +1067,7 @@ describe('SettingsView', () => {
     await userEvent.click(confirmClearButton);
 
     await waitFor(() => {
-      expect(chromeMock.storage.local.clear).toHaveBeenCalled();
+      expect(chromeMock.storage.local.remove).toHaveBeenCalled();
     });
 
     expect(showToastMock).toHaveBeenCalledWith('All data cleared', 'success');
