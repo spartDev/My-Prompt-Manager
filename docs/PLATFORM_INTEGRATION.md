@@ -850,7 +850,9 @@ iconPlacement: {
 // If the Platform re-renders its Toolbar, src/content/core/icon-placement.ts places the icon again on its own.
 ```
 
-After fixing the chain, refresh `tests/fixtures/composers/<id>.html` from the live composer.
+After fixing the chain, refresh `tests/fixtures/composers/<id>.html` from the live composer with `npm run composers:capture -- --only <id>` (sign in once with `--login`), which runs the chain tests on what it captured.
+
+Until a release fixes the chain, a user can repair it: the Platform's row in Settings says its toolbar changed and offers **Place the icon**, which opens the Element picker on the Platform's tab. The pick is stored under `iconPlacementRepairs` (`src/services/iconPlacementRepairs.ts`) and the icon goes before the picked element; it is dropped on its own once the chain finds its anchor again.
 
 ### Content Doesn't Insert
 

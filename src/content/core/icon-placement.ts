@@ -13,9 +13,10 @@ import { debug, info } from '../utils/logger';
 
 /**
  * How the icon was placed: in the Platform's toolbar, as an anchored overlay on the editor
- * because the toolbar was not found, or where a custom site's positioning says.
+ * because the toolbar was not found, at the element the user picked for the Platform while its
+ * toolbar is not found (an override), or where a custom site's positioning says.
  */
-export type PlacementKind = 'toolbar' | 'overlay' | 'custom';
+export type PlacementKind = 'toolbar' | 'overlay' | 'override' | 'custom';
 
 export interface PlacementRecord {
   icon: HTMLElement;

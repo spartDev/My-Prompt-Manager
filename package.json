@@ -25,6 +25,7 @@
     "prepare": "node scripts/prepare.mjs",
     "test:e2e": "playwright test",
     "test:e2e:linux": "scripts/test-e2e-linux.sh",
+    "composers:capture": "tsx scripts/capture-composers.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tests/e2e/tsconfig.json && tsc --noEmit -p tsconfig.node.json"
   },
   "devDependencies": {

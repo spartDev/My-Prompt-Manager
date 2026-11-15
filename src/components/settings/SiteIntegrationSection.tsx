@@ -1,6 +1,7 @@
 import { type FC, useCallback, useReducer } from 'react';
 
 import { useClipboard } from '../../hooks/useClipboard';
+import { useIconPlacementRepairs } from '../../hooks/useIconPlacementRepairs';
 import { usePickerWindow } from '../../hooks/usePickerWindow';
 import { useSitePermissions } from '../../hooks/useSitePermissions';
 import { ConfigurationEncoder, ConfigurationEncoderError } from '../../services/configurationEncoder';
@@ -195,6 +196,7 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
     customSites,
   });
   const { requestSitePermission } = useSitePermissions();
+  const { repairs: placementRepairs, placeError, placeIcon } = useIconPlacementRepairs();
 
   const notify = useCallback(
     (message: string, type: ToastType = 'info', sub?: string) => {
@@ -415,6 +417,9 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
           enabledSites={enabledSites}
           onSiteToggle={onSiteToggle}
           saving={saving}
+          placementRepairs={placementRepairs}
+          onPlaceIcon={(hostname) => { void placeIcon(hostname); }}
+          placeError={placeError}
         />
 
         <CustomSitesList

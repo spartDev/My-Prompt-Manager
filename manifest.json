@@ -52,6 +52,7 @@
         "assets/rolldown-runtime-*.js",
         "assets/promptAdmission-*.js",
         "assets/siteSettings-*.js",
+        "assets/iconPlacementRepairs-*.js",
         "assets/promptVariables-*.js",
         "assets/floating-ui.dom-*.js",
         "assets/categoryChip-*.js",

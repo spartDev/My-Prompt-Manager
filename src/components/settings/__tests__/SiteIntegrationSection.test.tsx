@@ -1,8 +1,9 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Mock } from 'vitest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { ICON_PLACEMENT_REPAIRS_KEY } from '../../../services/iconPlacementRepairs';
 import type { CustomSite } from '../../../types';
 import SiteIntegrationSection from '../SiteIntegrationSection';
 
@@ -110,5 +111,76 @@ describe('SiteIntegrationSection - AI sites group', () => {
       expect(getAddButton()).toBeDisabled();
     });
     expect(getAddButton()).toHaveTextContent('Current site (example.com) is already integrated');
+  });
+});
+
+describe('SiteIntegrationSection - a Platform whose icon fell to the Anchored overlay', () => {
+  const PICK = { mode: 'custom' as const, placement: 'before' as const, selector: '#send' };
+  const storeRepairs = (repairs: unknown) => chrome.storage.local.set({ [ICON_PLACEMENT_REPAIRS_KEY]: repairs });
+
+  beforeEach(async () => {
+    await chrome.storage.local.clear();
+    (chrome.tabs.query as unknown as Mock).mockResolvedValue([]);
+    (chrome.runtime.sendMessage as unknown as Mock).mockResolvedValue({ success: true });
+  });
+
+  it('shows nothing under a Platform whose icon is in its toolbar', async () => {
+    render(<SiteIntegrationSection {...defaultProps} enabledSites={['claude.ai']} />);
+
+    await waitFor(() => { expect(getAddButton()).toBeEnabled(); });
+    expect(screen.queryByTestId('site-placement')).not.toBeInTheDocument();
+  });
+
+  it('says the toolbar changed and offers Place the icon, which opens the Element picker on the Platform\'s tab', async () => {
+    const user = userEvent.setup();
+    await storeRepairs({ 'claude.ai': { status: 'overlay' } });
+    (chrome.tabs.query as unknown as Mock).mockImplementation(async (query: { url?: string }) =>
+      query.url === 'https://claude.ai/*' ? [{ id: 7, active: false }, { id: 9, active: true }] : []);
+    render(<SiteIntegrationSection {...defaultProps} enabledSites={['claude.ai']} />);
+
+    const notice = await screen.findByTestId('site-placement');
+    expect(notice).toHaveAttribute('data-status', 'overlay');
+    expect(notice).toHaveTextContent("Claude.ai's toolbar changed");
+    await user.click(screen.getByRole('button', { name: 'Place the icon' }));
+
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+      type: 'START_ELEMENT_PICKER',
+      data: { tabId: 9, repairHostname: 'claude.ai' }
+    });
+  });
+
+  it('says where to go when no tab is on the Platform', async () => {
+    const user = userEvent.setup();
+    await storeRepairs({ 'claude.ai': { status: 'overlay' } });
+    render(<SiteIntegrationSection {...defaultProps} enabledSites={['claude.ai']} />);
+
+    await user.click(await screen.findByRole('button', { name: 'Place the icon' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Open claude.ai in a tab, then place the icon.');
+    expect(chrome.runtime.sendMessage).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'START_ELEMENT_PICKER' }));
+  });
+
+  it('follows storage: the picked element, then the toolbar found again', async () => {
+    await storeRepairs({ 'claude.ai': { status: 'overlay' } });
+    render(<SiteIntegrationSection {...defaultProps} enabledSites={['claude.ai']} />);
+    expect(await screen.findByRole('button', { name: 'Place the icon' })).toBeInTheDocument();
+
+    await act(async () => { await storeRepairs({ 'claude.ai': { status: 'override', override: PICK } }); });
+    expect(screen.getByTestId('site-placement')).toHaveTextContent('The icon sits where you placed it');
+    expect(screen.getByRole('button', { name: 'Place again' })).toBeInTheDocument();
+
+    await act(async () => { await storeRepairs({}); });
+    expect(screen.queryByTestId('site-placement')).not.toBeInTheDocument();
+  });
+
+  it('shows a linked Platform\'s fallback on the row whose switch covers it, and hides it while the site is off', async () => {
+    await storeRepairs({ 'm365.cloud.microsoft': { status: 'overlay' } });
+    const siteConfigs = { 'copilot.microsoft.com': { name: 'Microsoft Copilot', icon: () => <span>C</span> } };
+    const { rerender } = render(<SiteIntegrationSection {...defaultProps} siteConfigs={siteConfigs} enabledSites={['copilot.microsoft.com']} />);
+
+    expect(await screen.findByTestId('site-placement')).toBeInTheDocument();
+
+    rerender(<SiteIntegrationSection {...defaultProps} siteConfigs={siteConfigs} enabledSites={[]} />);
+    expect(screen.queryByTestId('site-placement')).not.toBeInTheDocument();
   });
 });

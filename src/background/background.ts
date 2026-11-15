@@ -4,6 +4,12 @@
  */
 
 import {
+  changeIconPlacementRepairs,
+  overrideFromPick,
+  type PlacementReport,
+  repairablePlatformHostname,
+} from "../services/iconPlacementRepairs";
+import {
   enabledCustomSite,
   enabledHostnames,
   isHostnameEnabled,
@@ -17,7 +23,12 @@ import { getErrorMessage, Logger, toError } from "../utils";
 // Track active element picker sessions
 const activePickerSessions = new Map<
   number,
-  { tabId: number; windowId: number }
+  {
+    tabId: number;
+    windowId: number;
+    /** Set when the pick repairs the icon placement of this built-in Platform (Settings, "Place the icon") */
+    repairHostname?: string;
+  }
 >();
 
 const storageManager = StorageManager.getInstance();
@@ -630,8 +641,13 @@ interface BackgroundMessage {
     | "GET_INTERFACE_MODE"
     | "REQUEST_INJECTION"
     | "REQUEST_PERMISSION"
-    | "PROMPT_USAGE_INCREMENT";
+    | "PROMPT_USAGE_INCREMENT"
+    | "ICON_PLACEMENT_REPORTED";
   data?: {
+    /** START_ELEMENT_PICKER: the built-in Platform the pick places the icon for */
+    repairHostname?: string;
+    /** ICON_PLACEMENT_REPORTED: how the content script placed the icon */
+    placement?: PlacementReport;
     fingerprint?: ElementFingerprint; // Element fingerprint for robust identification
     selector?: string;
     elementType?: string;
@@ -652,6 +668,7 @@ chrome.runtime.onMessage.addListener(
           message.data?.tabId,
           sender,
           sendResponse,
+          message.data?.repairHostname,
         );
         break;
 
@@ -684,6 +701,10 @@ chrome.runtime.onMessage.addListener(
         void handlePromptUsageIncrement(message.data, sendResponse);
         break;
 
+      case "ICON_PLACEMENT_REPORTED":
+        void handleIconPlacementReported(message.data?.placement, sender, sendResponse);
+        break;
+
       default:
         break;
     }
@@ -692,6 +713,33 @@ chrome.runtime.onMessage.addListener(
     return true;
   },
 );
+
+/**
+ * A content script placed the icon on a built-in Platform: kept for Settings, which offers to
+ * place the icon while it is on the Anchored overlay. The hostname is the sender tab's, never one
+ * the message names.
+ */
+async function handleIconPlacementReported(
+  placement: PlacementReport | undefined,
+  sender: chrome.runtime.MessageSender,
+  sendResponse: (response?: { success: boolean; error?: string }) => void,
+) {
+  const hostname = repairablePlatformHostname(sender.tab?.url);
+  if (!hostname || (placement !== "toolbar" && placement !== "overlay" && placement !== "override")) {
+    sendResponse({ success: false, error: "Not a placement report of a built-in platform" });
+    return;
+  }
+  try {
+    await changeIconPlacementRepairs({ type: "reportPlacement", hostname, placement });
+    sendResponse({ success: true });
+  } catch (error) {
+    Logger.error("Failed to record the icon placement", toError(error), {
+      component: "Background",
+      hostname,
+    });
+    sendResponse({ success: false, error: getErrorMessage(error) });
+  }
+}
 
 /**
  * Handle manual injection requests from popup/side panel
@@ -1024,6 +1072,7 @@ async function handleStartElementPicker(
     error?: string;
     tabId?: number;
   }) => void,
+  repairHostname?: string,
 ) {
   try {
     // Determine which tab to activate picker on
@@ -1066,10 +1115,17 @@ async function handleStartElementPicker(
       return;
     }
 
+    // A repair is kept only for the built-in Platform the tab is on
+    if (repairHostname !== undefined && repairablePlatformHostname(tab.url) !== repairHostname) {
+      sendResponse({ success: false, error: "The tab is not on this platform" });
+      return;
+    }
+
     // Store picker session
     activePickerSessions.set(targetTabId, {
       tabId: targetTabId,
       windowId: sender.tab?.windowId || 0,
+      ...(repairHostname !== undefined ? { repairHostname } : {}),
     });
 
     // Switch to the target tab
@@ -1160,8 +1216,23 @@ async function handleElementSelected(
       return;
     }
 
+    const session = activePickerSessions.get(tabId);
     // Remove session
     activePickerSessions.delete(tabId);
+
+    // A pick for a built-in Platform's icon is its override, stored here: the popup that asked
+    // for it has closed by now. The content script places the icon there when storage changes.
+    if (session?.repairHostname) {
+      const positioning = overrideFromPick(data);
+      if (!positioning || repairablePlatformHostname(sender.tab?.url) !== session.repairHostname) {
+        sendResponse({ success: false, error: "The pick names no element of this platform" });
+        return;
+      }
+      await changeIconPlacementRepairs({ type: "setOverride", hostname: session.repairHostname, positioning });
+      originalTabId = null;
+      sendResponse({ success: true });
+      return;
+    }
 
     // Forward selected element data to all popup instances and the picker window
     void chrome.runtime.sendMessage({

@@ -1,8 +1,10 @@
 import { type FC, type ReactNode, useId } from 'react';
 
 import { getBrandColors } from '../../constants/brandColors';
+import type { RepairStatus } from '../../services/iconPlacementRepairs';
 import { Dropdown, type DropdownItem } from '../Dropdown';
 
+import { ROW_BUTTON_CLASSES } from './rowStyles';
 import SettingsRow from './SettingsRow';
 import Switch from './Switch';
 
@@ -19,7 +21,39 @@ interface SiteRowProps {
   onExport?: (hostname: string) => Promise<void> | void;
   exporting?: boolean;
   saving?: boolean;
+  /** A built-in Platform whose Toolbar was not found: how the icon is placed instead, and the way to place it */
+  placement?: {
+    status: RepairStatus;
+    onPlace: () => void;
+    /** Why the Element picker could not open */
+    error?: string;
+  };
 }
+
+/**
+ * Under a Platform row, when its icon is not in its Toolbar: on the Anchored overlay, a warning
+ * that offers to place the icon; at the element the user picked, a line that offers to pick again.
+ */
+const PlacementNotice: FC<{ name: string } & NonNullable<SiteRowProps['placement']>> = ({ name, status, onPlace, error }) => {
+  const fallback = status === 'overlay';
+  return (
+    <div data-testid="site-placement" data-status={status} className="mt-2 ml-[42px]">
+      <div
+        className={`flex items-center gap-3 rounded-xl py-1.5 pr-1.5 pl-3 ${fallback ? 'border border-warning bg-warning-subtle' : 'bg-subtle'}`}
+      >
+        <p className={`flex-1 min-w-0 text-[12px] ${fallback ? 'text-warning' : 'text-secondary'}`}>
+          {fallback
+            ? `${name}'s toolbar changed: the icon sits in the corner of the input field.`
+            : 'The icon sits where you placed it, until an update finds the toolbar again.'}
+        </p>
+        <button type="button" onClick={onPlace} className={ROW_BUTTON_CLASSES}>
+          {fallback ? 'Place the icon' : 'Place again'}
+        </button>
+      </div>
+      {error && <p role="alert" className="mt-1 pl-1 text-[11.5px] text-danger">{error}</p>}
+    </div>
+  );
+};
 
 /**
  * One site in the AI sites group: its logo, name and domain, and the switch that turns the extension on
@@ -35,7 +69,8 @@ const SiteRow: FC<SiteRowProps> = ({
   onRemove,
   onExport,
   exporting = false,
-  saving = false
+  saving = false,
+  placement
 }) => {
   const labelId = useId();
   const brandColors = getBrandColors(hostname);
@@ -109,7 +144,9 @@ const SiteRow: FC<SiteRowProps> = ({
           />
         </div>
       }
-    />
+    >
+      {isEnabled && placement && <PlacementNotice name={name} {...placement} />}
+    </SettingsRow>
   );
 };
 
