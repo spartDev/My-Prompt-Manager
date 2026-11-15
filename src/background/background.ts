@@ -30,6 +30,8 @@ interface PickerSession {
   repairHostname?: string;
   /** The START_ELEMENT_PICKER that stored it: a stop removes a session only as it saw it, never a newer start's */
   attempt?: string;
+  /** When its activation was sent, in the order of all activations: a cancel removes it if sent no later than the one cancelled */
+  activation?: number;
 }
 
 const PICKER_SESSION_KEY_PREFIX = "pickerSession:";
@@ -43,7 +45,8 @@ function isPickerSession(value: unknown): value is PickerSession {
   return typeof session.tabId === "number"
     && typeof session.windowId === "number"
     && (session.repairHostname === undefined || typeof session.repairHostname === "string")
-    && (session.attempt === undefined || typeof session.attempt === "string");
+    && (session.attempt === undefined || typeof session.attempt === "string")
+    && (session.activation === undefined || typeof session.activation === "number");
 }
 
 // The changes of picker sessions run one after the other, so a change that reads then writes is one step
@@ -73,9 +76,11 @@ async function readPickerSessions(): Promise<Map<number, PickerSession>> {
  */
 interface PickerStart {
   stopped: boolean;
+  /** Names its activation in the page, and its session */
+  attempt: string;
   /** The tab it activates the picker in, once known: a cancel there stops it too */
   tabId?: number;
-  /** The order its activation was sent in, among all starts; 0 until then */
+  /** When its activation was sent, in the order of all activations; 0 until then */
   activation: number;
 }
 const pickerStarts = new Set<PickerStart>();
@@ -87,6 +92,15 @@ const pickerStarts = new Set<PickerStart>();
  * so the session stored always names the activation the page holds.
  */
 let pickerActivationsSent = 0;
+
+/**
+ * The stamp of an activation sent now: above every one sent before, including those of a session
+ * stored before the service worker restarted, since it follows the clock
+ */
+function nextPickerActivation(): number {
+  pickerActivationsSent = Math.max(Date.now(), pickerActivationsSent + 1);
+  return pickerActivationsSent;
+}
 const pickerActivationsAnswered = new Map<number, number>();
 
 /**
@@ -132,13 +146,22 @@ const pickerSessions = {
     return changePickerSessions(() => chrome.storage.session.remove(pickerSessionKey(tabId)));
   },
   /**
-   * Removes the tab's session if it is the one of this start, read and removed in one step; with
-   * no start named, whichever it is
+   * Removes the tab's session as its picker is cancelled, read and removed in one step. The page
+   * held no picker at the cancel, so the session goes if it is the cancelled start's, or of an
+   * activation sent no later than the cancelled one (`activation`, known while that start is in
+   * flight); a session of a later activation is kept, its picker is the one the page holds now.
+   * With no start named, the session goes whichever it is.
    */
-  deleteIfAttempt(tabId: number, attempt: string | undefined): Promise<void> {
+  cancel(tabId: number, attempt: string | undefined, activation: number | undefined): Promise<void> {
     return changePickerSessions(async () => {
       const session = await pickerSessions.get(tabId);
-      if (session && (attempt === undefined || session.attempt === attempt)) {
+      if (!session) {
+        return;
+      }
+      const cancelled = attempt === undefined
+        || session.attempt === attempt
+        || (activation !== undefined && (session.activation ?? 0) <= activation);
+      if (cancelled) {
         await chrome.storage.session.remove(pickerSessionKey(tabId));
       }
     });
@@ -1320,10 +1343,10 @@ async function handleStartElementPicker(
   }) => void,
   repairHostname?: string,
 ) {
-  const start: PickerStart = { stopped: false, activation: 0 };
-  pickerStarts.add(start);
   // Names this start's activation in the page, and its session
   const attempt = crypto.randomUUID();
+  const start: PickerStart = { stopped: false, attempt, activation: 0 };
+  pickerStarts.add(start);
   try {
     // Determine which tab to activate picker on
     let targetTabId: number | null = null;
@@ -1425,7 +1448,7 @@ async function handleStartElementPicker(
     }
 
     // Now send the message to activate element picker
-    start.activation = ++pickerActivationsSent;
+    start.activation = nextPickerActivation();
     try {
       await chrome.tabs.sendMessage(targetTabId, {
         type: "ACTIVATE_ELEMENT_PICKER",
@@ -1457,6 +1480,7 @@ async function handleStartElementPicker(
         windowId: sender.tab?.windowId || 0,
         ...(repairHostname !== undefined ? { repairHostname } : {}),
         attempt,
+        activation: start.activation,
       }, start);
     } catch (error) {
       // A picker with no session would take a pick nobody keeps
@@ -1561,15 +1585,19 @@ async function handlePickerCancelled(
   // A start in flight in the tab would bring the picker back after the cancel: it stores nothing,
   // and ends its picker by its attempt. A start whose tab is not known yet is not one of them:
   // every caller names the tab.
+  let cancelledActivation: number | undefined;
   for (const start of pickerStarts) {
     if (start.tabId === tabId) {
       start.stopped = true;
+      if (start.attempt === attempt) {
+        cancelledActivation = start.activation;
+      }
     }
   }
   try {
-    // Only the session of the start cancelled: a later start may have stored its own since, and its
-    // picker is the one the page holds
-    await pickerSessions.deleteIfAttempt(tabId, attempt);
+    // Not the session of a later start: it may have stored its own since, and its picker is the
+    // one the page holds
+    await pickerSessions.cancel(tabId, attempt, cancelledActivation);
     sendResponse({ success: true });
   } catch (error) {
     Logger.error("Error cancelling element picker", toError(error), {

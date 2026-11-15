@@ -659,4 +659,118 @@ describe('background: a pick cancelled in one tab', () => {
 
     expect(await chrome.storage.session.get(null)).toEqual({});
   });
+
+  /** The ACTIVATE messages sent to the tab, each answered only when the test says */
+  const holdTabActivations = () => {
+    const held: Array<{ attempt?: string; answer: () => void }> = [];
+    vi.mocked(chrome.tabs.sendMessage).mockImplementation((_tabId: number, message: unknown) => {
+      const { type, attempt } = message as { type?: string; attempt?: string };
+      return type === 'ACTIVATE_ELEMENT_PICKER'
+        ? new Promise((resolve) => { held.push({ attempt, answer: () => { resolve(undefined); } }); })
+        : Promise.resolve(undefined);
+    });
+    return held;
+  };
+  const startOnTab = (listener: MessageListener) =>
+    send(listener, { type: 'START_ELEMENT_PICKER', data: { tabId: CLAUDE_TAB.id, repairHostname: 'claude.ai' } });
+
+  it('forgets an earlier session when the page cancels the picker of a start still in flight', async () => {
+    const listener = await startServiceWorker();
+    expect(await startOnTab(listener)).toEqual({ success: true, tabId: CLAUDE_TAB.id });
+    const held = holdTabActivations();
+    const later = startOnTab(listener);
+    await vi.waitFor(() => { expect(held).toHaveLength(1); });
+
+    // The page received the later activation, then the user pressed Escape: the cancel names the later start
+    expect(await send(listener, { type: 'PICKER_CANCELLED', attempt: held[0]?.attempt }, { tab: CLAUDE_TAB })).toEqual({ success: true });
+    held[0]?.answer();
+
+    expect(await later).toEqual({ success: false, error: 'The element picker was stopped' });
+    expect(await chrome.storage.session.get(null)).toEqual({});
+  });
+
+  it('keeps the session of a start activated after the start whose picker the page cancelled', async () => {
+    const listener = await startServiceWorker();
+    // The first activation is answered only when the test says; the later ones at once
+    let answerFirst: () => void = () => undefined;
+    const activations: Array<string | undefined> = [];
+    vi.mocked(chrome.tabs.sendMessage).mockImplementation((_tabId: number, message: unknown) => {
+      const { type, attempt } = message as { type?: string; attempt?: string };
+      if (type !== 'ACTIVATE_ELEMENT_PICKER') {
+        return Promise.resolve(undefined);
+      }
+      activations.push(attempt);
+      return activations.length === 1
+        ? new Promise((resolve) => { answerFirst = () => { resolve(undefined); }; })
+        : Promise.resolve(undefined);
+    });
+    const first = startOnTab(listener);
+    await vi.waitFor(() => { expect(activations).toHaveLength(1); });
+    // The page cancelled the first picker (Escape), then received the activation of a later start,
+    // which the service worker stored before it handled the cancel
+    expect(await startOnTab(listener)).toEqual({ success: true, tabId: CLAUDE_TAB.id });
+
+    expect(await send(listener, { type: 'PICKER_CANCELLED', attempt: activations[0] }, { tab: CLAUDE_TAB })).toEqual({ success: true });
+    answerFirst();
+
+    expect(await first).toMatchObject({ success: false });
+    const key = `pickerSession:${CLAUDE_TAB.id}`;
+    expect((await chrome.storage.session.get(key))[key]).toMatchObject({ attempt: activations[1] });
+  });
+
+  // Guards the cancel's step: its read and its removal are one step, so a start cannot store in between
+  it('keeps the session of a start that stores while a cancel reads the session (one step)', async () => {
+    const listener = await startServiceWorker();
+    await startOnTab(listener);
+    const key = `pickerSession:${CLAUDE_TAB.id}`;
+    const earlier = ((await chrome.storage.session.get(key))[key] as { attempt?: string }).attempt;
+    // The cancel's read of the session answers only once a new start asked to store its own
+    let releaseRead: () => void = () => undefined;
+    let held = false;
+    const realGet = vi.mocked(chrome.storage.session.get).getMockImplementation() as (keys?: unknown) => Promise<Record<string, unknown>>;
+    vi.mocked(chrome.storage.session.get).mockImplementation(((keys?: unknown) => {
+      const result = realGet(keys);
+      if (held || keys !== key) {
+        return result;
+      }
+      held = true;
+      return new Promise((resolve) => { releaseRead = () => { resolve(result); }; });
+    }) as never);
+    let activations = 0;
+    vi.mocked(chrome.tabs.sendMessage).mockImplementation(async (_tabId: number, message: unknown) => {
+      if ((message as { type?: string }).type === 'ACTIVATE_ELEMENT_PICKER') {
+        activations += 1;
+      }
+      return undefined;
+    });
+
+    const cancelled = send(listener, { type: 'PICKER_CANCELLED', attempt: earlier }, { tab: CLAUDE_TAB });
+    await vi.waitFor(() => { expect(held).toBe(true); });
+    const restarted = startOnTab(listener);
+    await vi.waitFor(() => { expect(activations).toBe(1); });
+    await new Promise((resolve) => { setTimeout(resolve, 10); });
+    releaseRead();
+
+    expect(await cancelled).toEqual({ success: true });
+    expect(await restarted).toEqual({ success: true, tabId: CLAUDE_TAB.id });
+    expect(await send(listener, { type: 'ELEMENT_SELECTED', data: { selector: SEND_BUTTON } }, { tab: CLAUDE_TAB })).toEqual({ success: true });
+  });
+
+  it('stops a start that has not activated yet in that tab: it sends no activation', async () => {
+    const listener = await startServiceWorker();
+    vi.mocked(chrome.tabs.sendMessage).mockResolvedValue(undefined);
+    // The content script is being injected when the user presses Escape on the picker of the tab
+    let finishInjection: () => void = () => undefined;
+    vi.mocked(chrome.scripting.executeScript).mockImplementationOnce(() =>
+      new Promise((resolve) => { finishInjection = () => { resolve([{ result: true }] as never); }; }));
+
+    const started = startOnTab(listener);
+    await vi.waitFor(() => { expect(chrome.scripting.executeScript).toHaveBeenCalled(); });
+    expect(await send(listener, { type: 'PICKER_CANCELLED', attempt: 'an-earlier-start' }, { tab: CLAUDE_TAB })).toEqual({ success: true });
+    finishInjection();
+
+    expect(await started).toEqual({ success: false, error: 'The element picker was stopped' });
+    expect(chrome.tabs.sendMessage).not.toHaveBeenCalledWith(CLAUDE_TAB.id, expect.objectContaining({ type: 'ACTIVATE_ELEMENT_PICKER' }));
+    expect(await chrome.storage.session.get(null)).toEqual({});
+  });
 });
