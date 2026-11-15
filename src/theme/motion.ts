@@ -72,7 +72,18 @@ export const MOTION = {
   badgePopDelay: 350,
   /** Empty Analytics: a ghost bar growing from the bottom; the first starts after ghostDelay, each next one barStagger later */
   ghostGrow: 700,
-  ghostDelay: 150
+  ghostDelay: 150,
+
+  // --- What's new sheet (My-Prompt-Manager-d1g.5) ---
+  /** What's new: the sheet rising from the bottom, on the Section curve (EASE.section) */
+  whatsNewSheetIn: 600,
+  /** What's new: the sheet leaving to the bottom; whoever renders it unmounts it after (useAnimatedPresence) */
+  whatsNewSheetOut: 340,
+  /** What's new: its backdrop fading in */
+  whatsNewBackdropIn: 300,
+  /** What's new: its backdrop fading out, with the sheet */
+  whatsNewBackdropOut: 340
+  // --- end What's new sheet ---
 } as const;
 
 const REDUCED_MOTION = '(prefers-reduced-motion: reduce)';
