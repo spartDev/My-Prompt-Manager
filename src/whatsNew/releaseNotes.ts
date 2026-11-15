@@ -4,7 +4,107 @@ import type { ExampleSegment, ReleaseNotes } from './types';
  * Every Release that has Release notes, one entry per Release.
  * Adding a Release is adding an entry here.
  */
-export const RELEASE_NOTES: readonly ReleaseNotes[] = [];
+export const RELEASE_NOTES: readonly ReleaseNotes[] = [
+  {
+    version: '2.0.0',
+    items: [
+      {
+        kind: 'feature',
+        title: 'Fill-in variables',
+        description:
+          'Mark the parts of a Prompt that change as Variables, then fill them in before you insert it.',
+        icon: 'variables',
+        destination: 'prompt-editor-new',
+        example: 'Write a launch email for {{audience}} in a {{tone}} voice.'
+      },
+      {
+        kind: 'feature',
+        title: 'Search with ⌘K',
+        description: 'Press ⌘K, or Ctrl+K, in the Library to jump straight to the search field.',
+        icon: 'search',
+        destination: 'library-search'
+      },
+      {
+        kind: 'feature',
+        title: 'Type // on a Platform',
+        description: 'Type // in the chat box of a Platform to pick a Prompt without leaving the keyboard.',
+        icon: 'slash'
+      },
+      {
+        kind: 'feature',
+        title: 'Pinned prompts',
+        description: 'Star the Prompts you use most and find them together under the Pinned filter.',
+        icon: 'pin',
+        destination: 'library'
+      },
+      {
+        kind: 'feature',
+        title: 'This looks familiar',
+        description: 'While you write a Prompt, the editor points out the one in your Library that looks alike.',
+        icon: 'lookalike',
+        destination: 'prompt-editor-new'
+      },
+      {
+        kind: 'feature',
+        title: 'Tidy up',
+        description: 'Analytics lists the Prompts you never used and the possible duplicates, ready to review.',
+        icon: 'broom',
+        destination: 'analytics'
+      },
+      {
+        kind: 'feature',
+        title: 'New category while you write',
+        description: 'Create a Category from the editor without leaving the Prompt you are writing.',
+        icon: 'category',
+        destination: 'prompt-editor-new'
+      },
+      {
+        kind: 'feature',
+        title: 'Undo a Category deletion',
+        description: 'Undo in the notification brings a deleted Category back with all its Prompts.',
+        icon: 'undo',
+        destination: 'categories'
+      },
+      {
+        kind: 'feature',
+        title: 'Fix the icon yourself',
+        description: "When a Platform's toolbar changes, place the Prompts icon again yourself from Settings.",
+        icon: 'wrench',
+        destination: 'settings'
+      },
+      {
+        kind: 'critical-fix',
+        title: 'Prompts arrive as written',
+        description: 'A Prompt reaches the Platform exactly as you wrote it, line breaks included, and only once.'
+      },
+      {
+        kind: 'critical-fix',
+        title: 'The icon stays put',
+        description: 'The Prompts icon comes back when a Platform redraws its toolbar, instead of disappearing.'
+      },
+      {
+        kind: 'critical-fix',
+        title: 'Your site settings are safe',
+        description: 'A failed load no longer replaces your site settings with the defaults.'
+      },
+      {
+        kind: 'critical-fix',
+        title: 'No empty backups',
+        description: 'An export never saves an empty Library when your Prompts could not be read.'
+      },
+      {
+        kind: 'critical-fix',
+        title: 'Saving always works',
+        description: 'Storage limits are measured right, and a failed save tells you why without locking the Library.'
+      },
+      {
+        kind: 'critical-fix',
+        title: 'No lost changes',
+        description: 'Changes made at the same moment, or during an update, are kept instead of overwriting each other.'
+      }
+    ]
+  }
+];
 
 const versionParts = (version: string): number[] =>
   version.split('.').map((part) => {
