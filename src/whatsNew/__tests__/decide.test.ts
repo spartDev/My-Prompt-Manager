@@ -51,9 +51,11 @@ const CASES: ReadonlyArray<{ name: string; inputs: Omit<WhatsNewInputs, 'debugMo
 ];
 
 describe('decideWhatsNew: normal mode', () => {
-  it.each(CASES)('$name', ({ inputs, normal }) => {
-    expect(decideWhatsNew({ ...inputs, debugMode: false })).toBe(normal);
-  });
+  for (const { name, inputs, normal } of CASES) {
+    it(name, () => {
+      expect(decideWhatsNew({ ...inputs, debugMode: false })).toBe(normal);
+    });
+  }
 
   it('shows nothing for a new Release absent from the registry', () => {
     expect(
@@ -93,11 +95,14 @@ describe('decideWhatsNew: normal mode', () => {
 });
 
 describe('decideWhatsNew: Debug mode', () => {
-  it.each(CASES)('debug: $name', ({ inputs }) => {
-    const shown = decideWhatsNew({ ...inputs, debugMode: true });
-    expect(shown).not.toBeNull();
-    expect(shown?.items.length).toBeGreaterThan(0);
-  });
+  // Each title names the normal-mode case; in Debug mode every one of them shows notes
+  for (const { name, inputs } of CASES) {
+    it(`debug: shows notes in the case "${name}"`, () => {
+      const shown = decideWhatsNew({ ...inputs, debugMode: true });
+      expect(shown).not.toBeNull();
+      expect(shown?.items.length).toBeGreaterThan(0);
+    });
+  }
 
   it('debug: shows the installed Release\'s notes when it has them, whatever the record says', () => {
     for (const { inputs } of CASES.filter(({ inputs }) => inputs.currentVersion !== '2.0.1')) {
