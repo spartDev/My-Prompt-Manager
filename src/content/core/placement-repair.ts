@@ -37,6 +37,8 @@ export class PlacementRepair {
   private placed: PlacementReport | null = null;
   /** Whether storage holds a repair for this Platform: until it does, a Toolbar needs no report */
   private hasRepair = false;
+  /** How many changes of the repairs this page followed */
+  private changes = 0;
   private listening = false;
   private readonly hostname: string;
   private readonly onOverrideChange: () => void;
@@ -55,18 +57,26 @@ export class PlacementRepair {
     return this.override;
   }
 
-  /** Reads this Platform's repair and follows its changes */
+  /**
+   * Reads this Platform's repair and follows its changes. It listens before it reads: a repair stored
+   * by another tab during the read reaches it by its storage event, which the read does not undo.
+   */
   async load(): Promise<void> {
-    const repair = (await readIconPlacementRepairs())[this.hostname];
-    this.override = repair?.override ?? null;
     // The first placement of the page is reported, but a Toolbar only while the Platform has a repair
-    this.hasRepair = repair !== undefined;
     this.sent = null;
     if (!this.listening) {
       chrome.storage.onChanged.addListener(this.handleStorageChange);
       window.addEventListener('pageshow', this.handlePageShow);
+      document.addEventListener('prerenderingchange', this.handlePrerenderingChange);
       this.listening = true;
     }
+    const changesBefore = this.changes;
+    const repair = (await readIconPlacementRepairs())[this.hostname];
+    if (this.changes !== changesBefore) {
+      return;
+    }
+    this.override = repair?.override ?? null;
+    this.hasRepair = repair !== undefined;
   }
 
   /** Stops following storage */
@@ -74,6 +84,7 @@ export class PlacementRepair {
     if (this.listening) {
       chrome.storage.onChanged.removeListener(this.handleStorageChange);
       window.removeEventListener('pageshow', this.handlePageShow);
+      document.removeEventListener('prerenderingchange', this.handlePrerenderingChange);
       this.listening = false;
     }
   }
@@ -158,6 +169,7 @@ export class PlacementRepair {
     if (areaName !== 'local' || !(ICON_PLACEMENT_REPAIRS_KEY in changes)) {
       return;
     }
+    this.changes++;
     const repair = parseIconPlacementRepairs(changes[ICON_PLACEMENT_REPAIRS_KEY]?.newValue)[this.hostname];
     // The service worker no longer counts this tab off the Toolbar (the repair was dropped, as by Clear
     // All Data), or an override waits for a status: this tab's placement is sent again
@@ -198,14 +210,25 @@ export class PlacementRepair {
    * tab's placement is sent.
    */
   private readonly handlePageShow = (event: PageTransitionEvent): void => {
-    if (!event.persisted) {
-      return;
+    if (event.persisted) {
+      this.sendAgain('back/forward cache restore');
     }
+  };
+
+  /**
+   * A prerendered page the user navigated to: its reports were refused while it was not yet the
+   * tab's page, so its placement is sent again, on the repair read again.
+   */
+  private readonly handlePrerenderingChange = (): void => {
+    this.sendAgain('prerendered page activated');
+  };
+
+  private sendAgain(reason: string): void {
     readIconPlacementRepairs().then((repairs) => {
       this.sent = null;
       this.follow(repairs[this.hostname]);
     }, (err: unknown) => {
-      debug('Icon placement repair not read after a back/forward cache restore', { reason: String(err) });
+      debug('Icon placement repair not read again', { reason, error: String(err) });
     });
-  };
+  }
 }

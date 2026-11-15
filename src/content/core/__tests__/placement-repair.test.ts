@@ -165,6 +165,35 @@ describe('PlacementRepair.report', () => {
     expect(sent()).toEqual(['toolbar']);
   });
 
+  it('follows a repair stored by another tab while it reads storage', async () => {
+    vi.mocked(chrome.storage.onChanged.addListener).mockClear();
+    let answer: (value: unknown) => void = () => undefined;
+    vi.mocked(chrome.storage.local.get).mockImplementationOnce((() => new Promise((resolve) => { answer = resolve; })) as never);
+    const loading = repair.load();
+
+    // Another tab reports the overlay before the read answers, with what storage held before
+    storageChange({ 'claude.ai': { status: 'overlay' } });
+    answer({});
+    await loading;
+    repair.report('toolbar');
+
+    expect(sent()).toEqual(['toolbar']);
+  });
+
+  it('sends its placement again when the prerendered page it is in becomes the tab\'s page', async () => {
+    vi.mocked(chrome.runtime.sendMessage).mockResolvedValue({ success: false, error: 'Not a placement report of a built-in platform', permanent: true } as never);
+    await chrome.storage.local.set({ [ICON_PLACEMENT_REPAIRS_KEY]: { 'claude.ai': { status: 'override', override: PICK } } });
+    await repair.load();
+    repair.report('override');
+    await flush();
+
+    vi.mocked(chrome.runtime.sendMessage).mockResolvedValue({ success: true } as never);
+    document.dispatchEvent(new Event('prerenderingchange'));
+    await flush();
+
+    expect(sent()).toEqual(['override', 'override']);
+  });
+
   it('sends the first placement again after the repair is loaded again', async () => {
     await chrome.storage.local.set({ [ICON_PLACEMENT_REPAIRS_KEY]: { 'claude.ai': { status: 'override', override: PICK } } });
     await repair.load();
