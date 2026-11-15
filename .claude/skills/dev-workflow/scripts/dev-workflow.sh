@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2155  # Allow declare and assign on same line
 # Dev Workflow Orchestrator
 # Full development cycle: Plan → Create Tasks → Select → Execute in Parallel → PR → Cleanup
 #
@@ -111,7 +112,7 @@ create_worktree() {
     local worktree_path="$BASE_DIR/$branch_name"
 
     if [ -d "$worktree_path" ]; then
-        print_warning "Worktree exists: $branch_name"
+        print_warning "Worktree exists: $branch_name" >&2
         echo "$branch_name"
         return 0
     fi
@@ -119,11 +120,11 @@ create_worktree() {
     mkdir -p "$BASE_DIR"
 
     if git -C "$REPO_DIR" worktree add "$worktree_path" -b "$branch_name" 2>/dev/null; then
-        print_status "Created worktree: $branch_name (new branch)"
+        print_status "Created worktree: $branch_name (new branch)" >&2
     elif git -C "$REPO_DIR" worktree add "$worktree_path" "$branch_name" 2>/dev/null; then
-        print_status "Created worktree: $branch_name (existing branch)"
+        print_status "Created worktree: $branch_name (existing branch)" >&2
     else
-        print_error "Failed to create worktree for $issue_id"
+        print_error "Failed to create worktree for $issue_id" >&2
         return 1
     fi
 
@@ -159,88 +160,9 @@ $(sed "s|<branch>|$branch_name|g" "$REPO_DIR/.claude/skills/parallel-claude/agen
 PROMPT
 }
 
-# Issues this launch took over, one "id|previous assignee|previous status" each,
-# so a launch that fails puts every one back as it found it.
-LAUNCH_CLAIMS=()
-
-# Give back what this launch claimed: unclaim the issues nobody held, and hand
-# an issue taken from another assignee (a claim.pools alias) back to it.
-release_claims() {
-    local entry id before status
-    for entry in ${LAUNCH_CLAIMS[@]+"${LAUNCH_CLAIMS[@]}"}; do
-        IFS='|' read -r id before status <<< "$entry"
-        if [ -z "$before" ]; then
-            if bd unclaim "$id" >/dev/null; then
-                print_info "Released $id"
-            else
-                print_warning "Could not release $id: run bd unclaim $id"
-            fi
-        elif bd update "$id" --assignee "$before" --status "$status" >/dev/null; then
-            print_info "Gave $id back to $before"
-        else
-            print_warning "Could not give $id back: run bd update $id --assignee $before --status $status"
-        fi
-    done
-    LAUNCH_CLAIMS=()
-}
-
-# Read an issue's assignee and status as "assignee|status"; fails when bd show
-# fails or prints nothing.
-read_owner() {
-    local json
-    json=$(bd show "$1" --json 2>/dev/null) && [ -n "$json" ] \
-        && printf '%s' "$json" | jq -er 'if type == "array" then .[0] else . end | "\(.assignee // "")|\(.status // "")"'
-}
-
-# Claim the issues under a lock shared by every worktree of this repository
-# (mkdir: flock is not on macOS), so a second launch reads the assignees only
-# once this one has claimed or rolled back, and a rollback can never release
-# an issue another launch has just re-claimed.
-claim_issues() {
-    local lock rc=0
-    lock="$(git -C "$REPO_DIR" rev-parse --path-format=absolute --git-common-dir)/claude-parallel-claim.lock"
-    if ! mkdir "$lock" 2>/dev/null; then
-        print_error "Another launch is claiming tickets (lock $lock). Wait for it, or remove the lock if no launch is running."
-        return 1
-    fi
-    # Interrupted mid-batch: give back what this run claimed, then free the lock
-    trap 'release_claims; rmdir "$lock" 2>/dev/null; exit 130' INT TERM
-    claim_issues_locked "$@" || rc=$?
-    trap - INT TERM
-    rmdir "$lock" 2>/dev/null || true
-    return "$rc"
-}
-
-# Claim every issue before anything is stopped or created, recording each one
-# whose assignee the claim changed. When an issue cannot be read or claimed,
-# give back what this run claimed and stop.
-drop_last_claim() {
-    unset "LAUNCH_CLAIMS[$((${#LAUNCH_CLAIMS[@]} - 1))]"
-}
-claim_issues_locked() {
-    local issue before after
-    LAUNCH_CLAIMS=()
-    for issue in "$@"; do
-        if ! before=$(read_owner "$issue"); then
-            print_error "Could not read the assignee of $issue. Nothing was launched."
-            release_claims
-            return 1
-        fi
-        # Recorded before the claim, so an interruption mid-claim still gives it back
-        LAUNCH_CLAIMS+=("$issue|$before")
-        if ! bd update "$issue" --claim; then
-            drop_last_claim
-            print_error "Could not claim $issue: it may be claimed by someone else. Nothing was launched."
-            release_claims
-            return 1
-        fi
-        after=$(read_owner "$issue") || after=""
-        # Dropped only when a read proves the owner unchanged; an unread owner keeps the record
-        if [ -n "${before%%|*}" ] && [ -n "$after" ] && [ "${after%%|*}" = "${before%%|*}" ]; then
-            drop_last_claim
-        fi
-    done
-}
+# Ticket claims, shared with the parallel-claude launcher: claim_issues, abort_launch, finish_launch
+# shellcheck source-path=SCRIPTDIR source=../../parallel-claude/scripts/launch-claims.sh
+source "$(dirname "${BASH_SOURCE[0]}")/../../parallel-claude/scripts/launch-claims.sh"
 
 # Launch tmux session with parallel Claude instances
 launch_parallel() {
@@ -265,8 +187,9 @@ launch_parallel() {
     # Claim all issues first: a failed claim leaves the running session alone
     print_info "Claiming issues..."
     claim_issues "${issues[@]}" || return 1
-    # From here a failed setup (worktree, tmux) gives the claims back
-    trap release_claims EXIT
+    # From here to finish_launch the claim lock is held, and a failed setup
+    # (worktree, tmux) stops the session it started and gives the claims back
+    trap abort_launch EXIT
     echo ""
 
     # Kill existing session
@@ -275,8 +198,9 @@ launch_parallel() {
     # Create worktrees
     print_info "Creating worktrees..."
     local -a branches=()
+    local branch
     for issue in "${issues[@]}"; do
-        local branch=$(create_worktree "$issue")
+        branch=$(create_worktree "$issue") || exit 1
         branches+=("$branch")
     done
     echo ""
@@ -292,8 +216,12 @@ launch_parallel() {
     # Escape single quotes in prompt for shell
     first_prompt="${first_prompt//\'/\'\\\'\'}"
 
-    tmux new-session -d -s "$SESSION" -c "$first_path" \
-        "echo -e '${GREEN}[$first_priority]${NC} $first_title ($first_issue)'; echo ''; echo 'Starting Claude...'; sleep 1; claude --dangerously-skip-permissions '$first_prompt'; exec bash"
+    LAUNCH_SESSION="$SESSION"
+    if ! tmux new-session -d -s "$SESSION" -c "$first_path" \
+        "echo -e '${GREEN}[$first_priority]${NC} $first_title ($first_issue)'; echo ''; echo 'Starting Claude...'; sleep 1; claude --dangerously-skip-permissions '$first_prompt'; exec bash"; then
+        print_error "Could not start the tmux session for $first_issue. Nothing was launched."
+        exit 1
+    fi
 
     # Add additional panes
     for ((i=1; i<count; i++)); do
@@ -307,26 +235,32 @@ launch_parallel() {
         # Escape single quotes
         prompt="${prompt//\'/\'\\\'\'}"
 
-        # Layout logic
-        if [ "$count" -le 2 ]; then
-            tmux split-window -h -t "$SESSION" -c "$path" \
-                "echo -e '${GREEN}[$priority]${NC} $title ($issue)'; echo ''; echo 'Starting Claude...'; sleep 1; claude --dangerously-skip-permissions '$prompt'; exec bash"
-        elif [ "$count" -le 4 ]; then
-            if [ "$i" -eq 1 ]; then
-                tmux split-window -h -t "$SESSION" -c "$path" \
-                    "echo -e '${GREEN}[$priority]${NC} $title ($issue)'; echo ''; echo 'Starting Claude...'; sleep 1; claude --dangerously-skip-permissions '$prompt'; exec bash"
-            elif [ "$i" -eq 2 ]; then
-                tmux split-window -v -t "$SESSION:0.0" -c "$path" \
-                    "echo -e '${GREEN}[$priority]${NC} $title ($issue)'; echo ''; echo 'Starting Claude...'; sleep 1; claude --dangerously-skip-permissions '$prompt'; exec bash"
-            elif [ "$i" -eq 3 ]; then
-                tmux split-window -v -t "$SESSION:0.1" -c "$path" \
-                    "echo -e '${GREEN}[$priority]${NC} $title ($issue)'; echo ''; echo 'Starting Claude...'; sleep 1; claude --dangerously-skip-permissions '$prompt'; exec bash"
-            fi
+        # Layout: side by side, then the 3rd and 4th under the first two
+        local split=(-h -t "$SESSION")
+        if [ "$i" -eq 2 ]; then
+            split=(-v -t "$SESSION:0.0")
+        elif [ "$i" -eq 3 ]; then
+            split=(-v -t "$SESSION:0.1")
+        fi
+        if ! tmux split-window "${split[@]}" -c "$path" \
+            "echo -e '${GREEN}[$priority]${NC} $title ($issue)'; echo ''; echo 'Starting Claude...'; sleep 1; claude --dangerously-skip-permissions '$prompt'; exec bash"; then
+            print_error "Could not open the pane for $issue. Nothing was launched."
+            exit 1
         fi
     done
 
     # Balance layout
     tmux select-layout -t "$SESSION" tiled
+
+    # Every ticket kept claimed has its pane, or the launch fails
+    local panes
+    panes=$(tmux list-panes -t "$SESSION" | wc -l | tr -d ' ')
+    if [ "$panes" != "$count" ]; then
+        print_error "The session has $panes panes for $count tickets. Nothing was launched."
+        exit 1
+    fi
+    finish_launch
+    trap - EXIT
 
     print_status "Launched $count Claude instances"
     echo ""
@@ -338,8 +272,6 @@ launch_parallel() {
     print_info "Attaching to session..."
     sleep 1
 
-    trap - EXIT
-    LAUNCH_CLAIMS=()
     tmux attach-session -t "$SESSION"
 }
 
