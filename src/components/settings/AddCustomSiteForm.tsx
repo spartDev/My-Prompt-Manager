@@ -1,5 +1,6 @@
 import { type FC, useCallback, useEffect, useState } from 'react';
 
+import { getPlatformByHostname } from '../../config/platforms';
 import { useSitePermissions } from '../../hooks/useSitePermissions';
 import type { CustomSite, ElementFingerprint } from '../../types';
 
@@ -115,7 +116,7 @@ const AddCustomSiteForm: FC<AddCustomSiteFormProps> = ({
       const hostname = url.hostname;
 
       // Check if already exists
-      if (Object.keys(siteConfigs).includes(hostname) || customSites.some((s) => s.hostname === hostname)) {
+      if (getPlatformByHostname(hostname) || Object.keys(siteConfigs).includes(hostname) || customSites.some((s) => s.hostname === hostname)) {
         setUrlError('This site is already added');
         return;
       }

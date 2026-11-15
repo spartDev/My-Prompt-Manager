@@ -5,7 +5,7 @@
  * line: once from the editing command, its line breaks dropped, and once more from the `input`
  * event the Insertion sent with the text (My-Prompt-Manager-e66). These run the real content
  * script on a stand-in that treats a paste, the editing command, an `input` event and a Backspace
- * as the live editor does (fixtures/platform-pages.ts, LEXICAL_EDITOR).
+ * as the live editor does (fixtures/platform-pages.ts, lexicalEditor).
  */
 import { DEFAULT_CATEGORY } from '../../../src/types';
 import { expect, test } from '../fixtures/extension';

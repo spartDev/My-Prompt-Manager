@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -9,6 +12,7 @@ import {
   getPlatformById,
   getPlatformsByPriority,
   isHostnameSupported,
+  platformHostnames,
   SUPPORTED_PLATFORMS
 } from '../platforms';
 
@@ -149,18 +153,19 @@ describe('Platform Linking Configuration', () => {
 });
 
 describe('getLinkedPlatformHostnames', () => {
-  it('should return both copilot hostnames when given copilot.microsoft.com', () => {
-    const linked = getLinkedPlatformHostnames('copilot.microsoft.com');
-    expect(linked).toContain('copilot.microsoft.com');
-    expect(linked).toContain('m365.cloud.microsoft');
-    expect(linked).toHaveLength(2);
+  it('should return every Copilot host when given copilot.microsoft.com', () => {
+    expect(getLinkedPlatformHostnames('copilot.microsoft.com'))
+      .toEqual(['copilot.microsoft.com', 'm365.cloud.microsoft', 'copilot.cloud.microsoft']);
   });
 
-  it('should return both copilot hostnames when given m365.cloud.microsoft', () => {
-    const linked = getLinkedPlatformHostnames('m365.cloud.microsoft');
-    expect(linked).toContain('copilot.microsoft.com');
-    expect(linked).toContain('m365.cloud.microsoft');
-    expect(linked).toHaveLength(2);
+  it('should return every Copilot host when given m365.cloud.microsoft', () => {
+    expect(getLinkedPlatformHostnames('m365.cloud.microsoft'))
+      .toEqual(['m365.cloud.microsoft', 'copilot.cloud.microsoft', 'copilot.microsoft.com']);
+  });
+
+  it('should return the host first, then the other hosts of its Platform, then the linked ones, given copilot.cloud.microsoft', () => {
+    expect(getLinkedPlatformHostnames('copilot.cloud.microsoft'))
+      .toEqual(['copilot.cloud.microsoft', 'm365.cloud.microsoft', 'copilot.microsoft.com']);
   });
 
   it('should return just the hostname for non-linked platforms', () => {
@@ -226,5 +231,35 @@ describe('Icon placement selectors', () => {
     expect(classNames('.fai-ChatInput__actions > span.___11i0s0y').filter((name) => UTILITY_CLASS.test(name))).toEqual(['___11i0s0y']);
     expect(classNames('.r1alrhcs').filter((name) => UTILITY_CLASS.test(name))).toEqual(['r1alrhcs']);
     expect(classNames('.input-buttons-wrapper-bottom, .fai-ChatInput__actions').filter((name) => UTILITY_CLASS.test(name))).toEqual([]);
+  });
+});
+
+describe('the other hosts of a Platform', () => {
+  it('finds Microsoft 365 Copilot at copilot.cloud.microsoft, where a work account is redirected', () => {
+    expect(getPlatformByHostname('copilot.cloud.microsoft')?.id).toBe('m365copilot');
+    expect(getPlatformByHostname('m365.cloud.microsoft')?.id).toBe('m365copilot');
+    expect(isHostnameSupported('copilot.cloud.microsoft')).toBe(true);
+    expect(getAllSupportedHostnames()).toContain('copilot.cloud.microsoft');
+  });
+
+  it('keeps copilot.microsoft.com on Copilot, for an account that stays there', () => {
+    expect(getPlatformByHostname('copilot.microsoft.com')?.id).toBe('copilot');
+  });
+
+  it('gives no Platform two of the same host', () => {
+    const hosts = getAllSupportedHostnames();
+    expect(new Set(hosts).size).toBe(hosts.length);
+  });
+});
+
+describe('manifest.json', () => {
+  const manifest = JSON.parse(readFileSync(resolve(__dirname, '../../../manifest.json'), 'utf8')) as {
+    host_permissions: string[];
+    content_scripts: Array<{ matches: string[] }>;
+  };
+
+  it.each(Object.values(SUPPORTED_PLATFORMS).flatMap(platformHostnames))('runs the content script on %s, and holds its host permission', (hostname) => {
+    expect(manifest.host_permissions).toContain(`https://${hostname}/*`);
+    expect(manifest.content_scripts[0].matches).toContain(`https://${hostname}/*`);
   });
 });

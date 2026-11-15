@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
+import { getAllSupportedHostnames } from '../config/platforms';
 import { readSiteSettings } from '../services/siteSettings';
 import { StorageManager } from '../services/storage';
 import { Logger, toError } from '../utils';
@@ -25,16 +26,8 @@ const THEME_STORAGE_KEY = 'prompt-library-theme';
 async function notifyContentScriptsOfThemeChange(newTheme: Theme): Promise<void> {
   if (typeof chrome === 'undefined') { return; }
 
-  // Built-in platform URLs from manifest.json content_scripts.matches
-  const builtInUrls = [
-    'https://claude.ai/*',
-    'https://chatgpt.com/*',
-    'https://gemini.google.com/*',
-    'https://www.perplexity.ai/*',
-    'https://chat.mistral.ai/*',
-    'https://copilot.microsoft.com/*',
-    'https://m365.cloud.microsoft/*'
-  ];
+  // Every host of every Platform, as manifest.json content_scripts.matches lists them
+  const builtInUrls = getAllSupportedHostnames().map((hostname) => `https://${hostname}/*`);
 
   const { customSites } = await readSiteSettings();
   const customUrls = customSites

@@ -53,6 +53,39 @@ describe('icon placement chains on the live composers', () => {
     expect(resolution?.index, `${platformId}: ${describeResolution(resolution?.index, placement?.anchors.length ?? 0)}`).toBe(0);
   });
 
+  it('m365copilot still finds the Fluent actions of the composer m365.cloud.microsoft served before its redirect', () => {
+    // Reconstructed on 2026-11-11 from the attributes the injector relied on before Phase 2
+    document.body.innerHTML = `
+      <div class="fai-ChatInput">
+        <span id="m365-chat-editor-target-element" data-lexical-editor="true" contenteditable="true" role="combobox"><p><br></p></span>
+        <div class="fai-ChatInput__actions"><span><button type="button"></button><button type="submit"></button></span></div>
+      </div>`;
+    const editor = document.getElementById('m365-chat-editor-target-element') as HTMLElement;
+
+    const resolution = resolveIconPlacement(editor, SUPPORTED_PLATFORMS.m365copilot.iconPlacement);
+
+    expect(resolution?.anchor).toBe(document.querySelector('.fai-ChatInput__actions'));
+  });
+
+  it('m365copilot places the icon right after the plus menu of copilot.cloud.microsoft', () => {
+    const editor = loadComposer('m365copilot');
+
+    const resolution = resolveIconPlacement(editor, SUPPORTED_PLATFORMS.m365copilot.iconPlacement);
+
+    expect(resolution?.anchor).toBe(document.querySelector('[data-testid="PlusMenuButton"]'));
+    expect(SUPPORTED_PLATFORMS.m365copilot.iconPlacement?.anchors[0].relation).toBe('after');
+  });
+
+  it('m365copilot falls to the dictation button of copilot.cloud.microsoft when the plus menu loses its test id', () => {
+    document.body.innerHTML = readFileSync(fixtureOf('m365copilot'), 'utf8').replace(' data-testid="PlusMenuButton"', '');
+    const editor = document.querySelector<HTMLElement>('[contenteditable="true"]') as HTMLElement;
+
+    const resolution = resolveIconPlacement(editor, SUPPORTED_PLATFORMS.m365copilot.iconPlacement);
+
+    expect(resolution?.index).toBe(1);
+    expect(resolution?.anchor.getAttribute('aria-label')).toBe('dictation');
+  });
+
   it('never takes an anchor outside the composer, such as a message action bar above it', () => {
     const editor = loadComposer('claude');
     const messageBar = document.createElement('div');

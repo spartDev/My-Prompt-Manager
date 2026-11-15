@@ -1,19 +1,36 @@
 <!--
-  Microsoft 365 Copilot composer: NOT CAPTURED. Reconstructed on 2026-11-11 from the attributes the
-  injector relied on before Phase 2 (the Lexical editor span, the Fluent ChatInput component
-  classes), because m365.cloud.microsoft asked for sign-in. Replace it with a capture of the live
-  composer (My-Prompt-Manager-tuh.3).
-  Re-sanitized on 2026-11-15 by scripts/composers/sanitize.ts: text, links, media and SVG content
-  removed; of the attributes, only contenteditable, role and type of the web platform's values, and
-  what the Platform's selectors read, with the selector's value; wrappers with no attribute and one
-  child folded into that child.
+  Microsoft 365 Copilot composer at copilot.cloud.microsoft/chat: NOT CAPTURED. Written by hand on
+  2026-11-15 (ticket My-Prompt-Manager-axv) from what was read on the live page, signed in with a
+  work account, where m365.cloud.microsoft/chat and copilot.microsoft.com redirect such an account:
+  the Lexical editor (data-lexical-editor, role="textbox", aria-label "Message Copilot"), the
+  composer's test ids (PlusMenuButton, grounding-menu, peek-pivot-files, bebop-lite-content-below)
+  and its buttons by ARIA label ("Add and manage sources", "Start dictation", "Open prompt gallery",
+  five with none). Which element carries which test id, and how they nest, was not read: the
+  nesting below is a guess. The capture needs a profile signed in with a work account; replace
+  this file with a capture of the live composer (npm run composers:capture -- --login once, then
+  npm run composers:capture -- --only m365copilot).
+  The Fluent composer of m365.cloud.microsoft that this file held before is checked in
+  src/content/core/__tests__/icon-placement-chains.test.ts.
+  Sanitized as scripts/composers/sanitize.ts writes a capture: of the attributes, only
+  contenteditable, role and type of the web platform's values, and what the Platform's selectors
+  read, with the selector's value (so the label "Start dictation" reads "dictation").
 -->
-<div class="fai-ChatInput">
-  <span id="m365-chat-editor-target-element" data-lexical-editor="true" contenteditable="true" role="combobox"><p><br></p></span>
-  <div class="fai-ChatInput__actions">
-    <span>
+<div>
+  <div contenteditable="true" data-lexical-editor="true" role="textbox"><p><br></p></div>
+  <div></div>
+  <div>
+    <div>
+      <button type="button" data-testid="PlusMenuButton"></button>
       <button type="button"></button>
-      <button type="submit"></button>
-    </span>
+      <button type="button"></button>
+      <button type="button"></button>
+    </div>
+    <div>
+      <button type="button"></button>
+      <button type="button"></button>
+      <button type="button" aria-label="dictation"></button>
+      <button type="button"></button>
+      <button type="button"></button>
+    </div>
   </div>
 </div>

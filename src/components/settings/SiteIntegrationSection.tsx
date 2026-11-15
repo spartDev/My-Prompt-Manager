@@ -1,5 +1,6 @@
 import { type FC, useCallback, useReducer } from 'react';
 
+import { getPlatformByHostname } from '../../config/platforms';
 import { useClipboard } from '../../hooks/useClipboard';
 import { useIconPlacementRepairs } from '../../hooks/useIconPlacementRepairs';
 import { usePickerWindow } from '../../hooks/usePickerWindow';
@@ -280,7 +281,8 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
       const decodedConfig = await ConfigurationEncoder.decode(importState.code.trim());
       const validation = ConfigurationEncoder.validate(decodedConfig);
       const existingCustomSite = customSites.find((site) => site.hostname === validation.sanitizedConfig.hostname);
-      const isBuiltIn = Object.prototype.hasOwnProperty.call(siteConfigs, validation.sanitizedConfig.hostname);
+      const isBuiltIn = getPlatformByHostname(validation.sanitizedConfig.hostname) !== undefined
+        || Object.prototype.hasOwnProperty.call(siteConfigs, validation.sanitizedConfig.hostname);
 
       if (isBuiltIn) {
         const message = 'This hostname already has a built-in integration and cannot be imported as custom.';

@@ -49,7 +49,7 @@ Transform your AI interactions with a powerful personal prompt library that inte
 | Mistral LeChat | ✅ Fully Supported | chat.mistral.ai | 85 |
 | Perplexity | ✅ Fully Supported | www.perplexity.ai | 80 |
 | Microsoft Copilot | ✅ Fully Supported | copilot.microsoft.com | 80 |
-| Microsoft 365 Copilot | ✅ Fully Supported | m365.cloud.microsoft | 80 |
+| Microsoft 365 Copilot | ✅ Fully Supported | m365.cloud.microsoft, copilot.cloud.microsoft | 80 |
 | Custom Sites | ✅ Configurable | User-defined | Variable |
 
 See our [Platform Integration Guide](docs/PLATFORM_INTEGRATION.md) to add your own platforms.
@@ -199,9 +199,10 @@ src/content/
 │   ├── chatgpt-strategy.ts    # ChatGPT implementation
 │   ├── gemini-strategy.ts     # Google Gemini implementation
 │   ├── mistral-strategy.ts    # Mistral LeChat implementation
+│   ├── lexical-strategy.ts    # Lexical editors (Perplexity, M365 Copilot), as a paste
 │   ├── perplexity-strategy.ts # Perplexity implementation
 │   ├── copilot-strategy.ts    # Microsoft Copilot implementation
-│   ├── m365copilot-strategy.ts # M365 Copilot implementation
+│   ├── m365copilot-strategy.ts # M365 Copilot implementation (extends Lexical)
 │   ├── react-platform-strategy.ts # React-based platforms
 │   ├── default-strategy.ts    # Default fallback strategy
 │   └── platform-manager.ts    # Strategy coordinator

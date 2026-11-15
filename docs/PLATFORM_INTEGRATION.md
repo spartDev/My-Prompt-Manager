@@ -72,7 +72,8 @@ export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `id` | string | ✅ | Unique platform identifier (lowercase, no spaces) |
-| `hostname` | string | ✅ | Exact hostname (e.g., 'claude.ai') |
+| `hostname` | string | ✅ | Exact hostname (e.g., 'claude.ai'): the one the Platform's row in Settings and its Platform choice go by |
+| `otherHostnames` | string[] | ❌ | Other hosts the same Platform is served on, such as the host a sign-in redirects to (M365 Copilot: `copilot.cloud.microsoft`). Each needs its origin in `host_permissions` and the content script `matches` of `manifest.json` (the test `manifest.json` in `src/config/__tests__/platforms.test.ts` fails otherwise), and its hostname in `ADDED_AFTER_THE_PLATFORM_CHOICES` of `src/services/__tests__/siteSettings.test.ts`. Without a choice of its own, a host follows the Platform choice of its Platform |
 | `displayName` | string | ✅ | Human-readable name shown in UI |
 | `priority` | number | ✅ | Strategy selection priority (100 = highest) |
 | `defaultEnabled` | boolean | ✅ | On for every user who never switched it, existing users included (the Site settings store the user's Platform choices) |
@@ -128,9 +129,10 @@ src/
 │   ├── claude-strategy.ts          # Claude.ai implementation
 │   ├── chatgpt-strategy.ts         # ChatGPT implementation
 │   ├── mistral-strategy.ts         # Mistral LeChat implementation
+│   ├── lexical-strategy.ts         # Insertion and Undo of a Lexical editor, as a paste
 │   ├── perplexity-strategy.ts      # Perplexity implementation
 │   ├── copilot-strategy.ts         # Microsoft Copilot (extends React)
-│   ├── m365copilot-strategy.ts     # M365 Copilot (extends React)
+│   ├── m365copilot-strategy.ts     # M365 Copilot (extends Lexical)
 │   ├── your-platform-strategy.ts   # Your custom strategy
 │   └── platform-manager.ts         # Registers and manages strategies
 └── background/background.ts        # Uses centralized config
@@ -156,7 +158,6 @@ Is the platform using React for input management?
 │   │
 │   ├─ Examples:
 │   │   • Microsoft Copilot (copilot.microsoft.com)
-│   │   • M365 Copilot (m365.cloud.microsoft)
 │   │
 │   └─ Benefits:
 │       • ✅ Automatic React event handling

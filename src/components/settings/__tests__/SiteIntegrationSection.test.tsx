@@ -51,11 +51,13 @@ describe('SiteIntegrationSection - AI sites group', () => {
     expect(screen.getByTestId('site-logo')).toHaveClass('grayscale', 'opacity-50', 'duration-(--duration-dim)');
   });
 
-  it('shows the linked M365 Copilot domain on the Copilot row, which one switch turns on', () => {
+  it('shows the linked M365 Copilot domains on the Copilot row, which one switch turns on', () => {
     const siteConfigs = { 'copilot.microsoft.com': { name: 'Microsoft Copilot', icon: () => <span>C</span> } };
     render(<SiteIntegrationSection {...defaultProps} siteConfigs={siteConfigs} />);
 
-    expect(screen.getByText('copilot.microsoft.com · m365.cloud.microsoft')).toBeInTheDocument();
+    const domains = screen.getByText('copilot.microsoft.com · m365.cloud.microsoft · copilot.cloud.microsoft');
+    // Cut to the row's width in the popup: whole on hover
+    expect(domains).toHaveAttribute('title', 'copilot.microsoft.com · m365.cloud.microsoft · copilot.cloud.microsoft');
     expect(screen.getAllByRole('switch')).toHaveLength(1);
   });
 

@@ -92,9 +92,10 @@ src/content/platforms/
 ├── chatgpt-strategy.ts         # ChatGPT implementation
 ├── gemini-strategy.ts          # Google Gemini implementation
 ├── mistral-strategy.ts         # Mistral.ai implementation
+├── lexical-strategy.ts         # Insertion and Undo of a Lexical editor (Perplexity, M365 Copilot), as a paste
 ├── perplexity-strategy.ts      # Perplexity implementation
 ├── copilot-strategy.ts         # Microsoft Copilot (extends React)
-├── m365copilot-strategy.ts     # M365 Copilot (extends React)
+├── m365copilot-strategy.ts     # M365 Copilot (extends Lexical)
 ├── default-strategy.ts         # Fallback for unknown sites
 └── platform-manager.ts         # Strategy orchestration
 ```
@@ -141,7 +142,7 @@ Where the icon goes is not a strategy's business: `PlatformManager.getIconPlacem
 
 **Purpose**: Provide shared functionality for React-based AI platforms
 
-**When to Use**: Platforms that use React for their input controls (e.g., Microsoft Copilot, M365 Copilot)
+**When to Use**: Platforms that use React for their input controls (e.g., Microsoft Copilot)
 
 **Implementation**: `ReactPlatformStrategy` extends `PlatformStrategy` and provides:
 
@@ -413,6 +414,7 @@ src/content/
 │   ├── chatgpt-strategy.ts    # ChatGPT
 │   ├── gemini-strategy.ts     # Google Gemini
 │   ├── mistral-strategy.ts    # Mistral.ai
+│   ├── lexical-strategy.ts    # Lexical editors, as a paste
 │   ├── perplexity-strategy.ts # Perplexity
 │   ├── default-strategy.ts    # Fallback
 │   └── platform-manager.ts    # Orchestration
@@ -582,7 +584,6 @@ Is the platform's input field powered by React?
 │   │
 │   └─ Examples:
 │       • Microsoft Copilot (copilot.microsoft.com)
-│       • M365 Copilot (m365.cloud.microsoft)
 │       • Any platform with React-managed textarea/input
 │   │
 │   └─ Benefits:

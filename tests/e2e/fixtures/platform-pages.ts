@@ -20,7 +20,7 @@ import { expect } from './extension';
  * - claude.ai: a contenteditable editor without an editor library, so Insertion goes
  *   through the Claude strategy's execCommand('insertText'). It is styled
  *   `white-space: pre-wrap`, as ProseMirror is, so spaces stay as typed.
- * - chat.mistral.ai, gemini.google.com, www.perplexity.ai, m365.cloud.microsoft: a contenteditable
+ * - chat.mistral.ai, gemini.google.com, www.perplexity.ai, copilot.cloud.microsoft: a contenteditable
  *   without an editor library, with the attributes each strategy selects on, so Insertion goes
  *   through that strategy's execCommand path.
  * - copilot.microsoft.com: a plain <textarea>, filled through the native value setter.
@@ -30,7 +30,13 @@ import { expect } from './extension';
  * break written straight into its DOM as a space. See PARAGRAPH_EDITOR.
  *
  * One more stands in for Perplexity's live composer, a Lexical editor that takes text as a paste
- * and inserts a second time the text an `input` event carries. See LEXICAL_EDITOR.
+ * and inserts a second time the text an `input` event carries (seen on 2026-11-11). See
+ * lexicalEditor. Another runs the same stand-in at copilot.cloud.microsoft, whose composer is a
+ * Lexical editor too: that it behaves as Perplexity's does was not seen on the live page, only its
+ * attributes were read (2026-11-15), so the live check of ticket My-Prompt-Manager-axv proves it.
+ *
+ * And one keeps the Fluent composer m365.cloud.microsoft served before it redirected a work account
+ * to copilot.cloud.microsoft, so the content script is proven to run on that host still.
  *
  * Every page counts the Enter keys that reach it, other than on a button, in
  * `window.__enterKeys`: the live sites send the message on Enter, so a test can prove a key
@@ -199,11 +205,24 @@ const COPILOT_HTML = plainPage(
   '<div class="bar" data-e2e="toolbar"><div><button type="button" data-testid="audio-call-button" aria-label="Talk to Copilot">Mic</button></div></div>'
 );
 
-const M365COPILOT_HTML = plainPage(
+/** The Fluent composer m365.cloud.microsoft served before its redirect (reconstructed on 2026-11-11) */
+const M365COPILOT_FLUENT_HTML = plainPage(
   'Microsoft 365 Copilot',
   '<span class="field" id="m365-chat-editor-target-element" data-lexical-editor="true" contenteditable="true" role="combobox" aria-label="Message Copilot"></span>',
   '<div class="bar fai-ChatInput__actions" data-e2e="toolbar"><button type="button">Mic</button></div>',
   'div class="fai-ChatInput"'
+);
+
+/**
+ * Microsoft 365 Copilot where m365.cloud.microsoft and copilot.microsoft.com send a work account,
+ * copilot.cloud.microsoft (seen on 2026-11-15): its editor, without the editor library, and its
+ * toolbar, with the plus menu the chain anchors on first.
+ */
+const M365COPILOT_HTML = plainPage(
+  'Microsoft 365 Copilot',
+  '<div class="field" data-lexical-editor="true" contenteditable="true" role="textbox" aria-label="Message Copilot"></div>',
+  '<div class="bar" data-e2e="toolbar"><button type="button" data-testid="PlusMenuButton" aria-label="Add">+</button><button type="button" aria-label="Start dictation">Mic</button></div>',
+  'div'
 );
 
 /**
@@ -255,9 +274,9 @@ const MISTRAL_EDITOR_HTML = paragraphEditorPage(
  *   deleting text): the editor takes its text from what its paragraph then shows.
  * - A Backspace key removes the last character.
  */
-const LEXICAL_EDITOR = /* html */ `
+const lexicalEditor = (field: string): string => /* html */ `
     <script>
-      const editor = document.querySelector('#ask-input');
+      const editor = document.querySelector(${JSON.stringify(field)});
       let text = '';
       // The selection the editor knows of, as offsets in its text
       let known = { start: 0, end: 0 };
@@ -393,44 +412,61 @@ const PERPLEXITY_EDITOR_HTML = plainPage(
   '<div class="field" id="ask-input" data-lexical-editor="true" contenteditable="true" role="textbox" aria-label="Ask anything"></div>',
   '<div class="bar" data-e2e="toolbar"><div data-testid="ask-input-mode-toggle-indicator"></div><button type="button" aria-haspopup="menu" aria-label="Model">Model</button><button type="button" aria-label="Dictation">Mic</button></div>',
   'div'
-).replace('</body>', `${LEXICAL_EDITOR}\n  </body>`);
+).replace('</body>', `${lexicalEditor('#ask-input')}\n  </body>`);
+
+/**
+ * Microsoft 365 Copilot where a work account lands, copilot.cloud.microsoft (attributes read on the
+ * live page on 2026-11-15, ticket My-Prompt-Manager-axv): a Lexical editor with no id, and a
+ * toolbar holding the plus menu (data-testid="PlusMenuButton") and the dictation button. The
+ * editor's behaviour is Perplexity's (lexicalEditor), assumed, not seen there.
+ */
+const M365COPILOT_EDITOR_HTML = plainPage(
+  'Microsoft 365 Copilot',
+  '<div class="field" data-lexical-editor="true" contenteditable="true" role="textbox" aria-label="Message Copilot"></div>',
+  '<div class="bar" data-e2e="toolbar"><button type="button" data-testid="PlusMenuButton" aria-label="Add">+</button><button type="button" aria-label="Add and manage sources">Sources</button><button type="button" aria-label="Start dictation">Mic</button></div>',
+  'div'
+).replace('</body>', `${lexicalEditor('[data-lexical-editor]')}\n  </body>`);
 
 /**
  * The stand-ins for the live composers that are rich text editors: ProseMirror on ChatGPT and
- * Mistral (see PARAGRAPH_EDITOR), Lexical on Perplexity (see LEXICAL_EDITOR).
+ * Mistral (see PARAGRAPH_EDITOR), Lexical on Perplexity and on Microsoft 365 Copilot (see lexicalEditor).
  */
-export type EditorFixture = 'chatgpt-editor' | 'mistral-editor' | 'perplexity-editor';
+export type EditorFixture = 'chatgpt-editor' | 'mistral-editor' | 'perplexity-editor' | 'm365copilot-editor' | 'm365copilot-fluent';
 
 export const EDITOR_FIXTURES: readonly EditorFixture[] = ['chatgpt-editor', 'mistral-editor'];
 
-/** Every stand-in page: the seven Platforms, then the rich text editors three of them have live. */
-export const ALL_FIXTURES: readonly (PlatformFixture | EditorFixture)[] = [...PLATFORM_FIXTURES, ...EDITOR_FIXTURES, 'perplexity-editor'];
+/** Every stand-in page: the seven Platforms, the rich text editors four of them have live, and the composer M365 Copilot had at m365.cloud.microsoft. */
+export const ALL_FIXTURES: readonly (PlatformFixture | EditorFixture)[] = [...PLATFORM_FIXTURES, ...EDITOR_FIXTURES, 'perplexity-editor', 'm365copilot-editor', 'm365copilot-fluent'];
 
 /** The input field of each stand-in page. */
 export const PLATFORM_FIELD: Record<PlatformFixture | EditorFixture, string> = {
   'chatgpt-editor': '#prompt-textarea',
   'mistral-editor': '.field',
   'perplexity-editor': '#ask-input',
+  'm365copilot-editor': '[data-lexical-editor]',
+  'm365copilot-fluent': '#m365-chat-editor-target-element',
   chatgpt: '#prompt-textarea',
   claude: '.ProseMirror',
   mistral: '.field',
   gemini: '.ql-editor',
   perplexity: '#ask-input',
   copilot: '#userInput',
-  m365copilot: '#m365-chat-editor-target-element',
+  m365copilot: '[data-lexical-editor]',
 };
 
 const FIXTURES: Record<PlatformFixture | EditorFixture, { url: string; html: string }> = {
   'chatgpt-editor': { url: 'https://chatgpt.com/', html: CHATGPT_EDITOR_HTML },
   'mistral-editor': { url: 'https://chat.mistral.ai/', html: MISTRAL_EDITOR_HTML },
   'perplexity-editor': { url: 'https://www.perplexity.ai/', html: PERPLEXITY_EDITOR_HTML },
+  'm365copilot-editor': { url: 'https://copilot.cloud.microsoft/', html: M365COPILOT_EDITOR_HTML },
+  'm365copilot-fluent': { url: 'https://m365.cloud.microsoft/', html: M365COPILOT_FLUENT_HTML },
   chatgpt: { url: 'https://chatgpt.com/', html: CHATGPT_REACT_HTML },
   claude: { url: 'https://claude.ai/', html: CLAUDE_EDITOR_HTML },
   mistral: { url: 'https://chat.mistral.ai/', html: MISTRAL_HTML },
   gemini: { url: 'https://gemini.google.com/', html: GEMINI_HTML },
   perplexity: { url: 'https://www.perplexity.ai/', html: PERPLEXITY_HTML },
   copilot: { url: 'https://copilot.microsoft.com/', html: COPILOT_HTML },
-  m365copilot: { url: 'https://m365.cloud.microsoft/', html: M365COPILOT_HTML },
+  m365copilot: { url: 'https://copilot.cloud.microsoft/', html: M365COPILOT_HTML },
 };
 
 const readReactScript = ({ module, file }: { module: string; file: string }): string => {

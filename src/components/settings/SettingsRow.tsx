@@ -32,7 +32,8 @@ const SettingsRow: FC<SettingsRowProps> = ({ label, labelId, labelFor, detail, l
           ) : (
             <span id={labelId} className={labelClasses}>{label}</span>
           )}
-          {detail && <span className="block text-[11.5px] text-tertiary truncate">{detail}</span>}
+          {/* A line too long for the row is cut; as text, it shows whole on hover */}
+          {detail && <span className="block text-[11.5px] text-tertiary truncate" title={typeof detail === 'string' ? detail : undefined}>{detail}</span>}
         </div>
         {control}
       </div>

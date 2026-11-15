@@ -88,6 +88,8 @@ export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
 
 > ℹ️ `defaultEnabled: true` turns the new Platform on for every user on update, a user who switched other Platforms included: the Site settings store the user's Platform choices, and a Platform without one takes its default (`src/services/siteSettings.ts`). Never add the new hostname to `PLATFORMS_OF_THE_ENABLED_LIST` there: that frozen list says which Platforms an older store could hold, and a Platform on it that an older store left out is read as turned off. The test `PLATFORMS_OF_THE_ENABLED_LIST` in `src/services/__tests__/siteSettings.test.ts` fails once you add the Platform: add its hostname to `ADDED_AFTER_THE_PLATFORM_CHOICES` in that test. A new Platform linked to an existing one (`linkedPlatforms`) has no row of its own: without a choice it follows the choice the user made for its partner, and its `defaultEnabled` only applies when there is none.
 
+> ℹ️ A Platform that moved to, or is also served on, another host (a sign-in that redirects, as Microsoft 365 Copilot to `copilot.cloud.microsoft`) is not a new Platform: add the host to its `otherHostnames`, its origin to `host_permissions` and the content script `matches` of `manifest.json` (the test `manifest.json` in `src/config/__tests__/platforms.test.ts` checks both), and its hostname to `ADDED_AFTER_THE_PLATFORM_CHOICES`. Without a choice of its own, the host follows the Platform choice of its Platform; the Platform's row in Settings lists it under its name.
+
 **Priority Guidelines:**
 - 100: Claude
 - 80-90: Major platforms (ChatGPT 90; Mistral, Gemini 85; Perplexity, Copilot 80)
