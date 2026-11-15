@@ -215,6 +215,16 @@ export async function readSiteSettings(): Promise<SiteSettings> {
   return parseSiteSettings(result[SITE_SETTINGS_KEY]);
 }
 
+/**
+ * What storage holds for the Site settings: the Site settings, and beside them the list of the
+ * Platforms that are on, which no reader of this release uses (the Platform choices win) but which
+ * a release before the Platform choices reads, so a rollback to it keeps the Platforms the user
+ * turned off off. Can go once no rollback to v1.9.0 or earlier is possible.
+ */
+function storedShape(settings: SiteSettings): SiteSettings & { enabledSites: string[] } {
+  return { ...settings, enabledSites: enabledPlatforms(settings) };
+}
+
 /** One change the user makes to the Site settings */
 export type SiteSettingsChange =
   /** Turn a Platform on or off, with the Platforms linked to it */
@@ -345,7 +355,7 @@ export async function changeSiteSettings(change: SiteSettingsChange): Promise<Si
     const after = applySiteSettingsChange(before, change, Date.now());
     const changed = JSON.stringify(after) !== JSON.stringify(before);
     if (changed) {
-      await chrome.storage.local.set({ [SITE_SETTINGS_KEY]: after });
+      await chrome.storage.local.set({ [SITE_SETTINGS_KEY]: storedShape(after) });
     }
     return { settings: after, changed };
   });
@@ -374,7 +384,7 @@ export function upgradeStoredSiteSettings(): Promise<boolean> {
     if (!isEnabledListStore(stored)) {
       return false;
     }
-    await chrome.storage.local.set({ [SITE_SETTINGS_KEY]: parseSiteSettings(stored) });
+    await chrome.storage.local.set({ [SITE_SETTINGS_KEY]: storedShape(parseSiteSettings(stored)) });
     return true;
   });
 }

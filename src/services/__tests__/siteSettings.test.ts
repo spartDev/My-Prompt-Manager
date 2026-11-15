@@ -364,13 +364,27 @@ describe('changeSiteSettings', () => {
     const settings = await changeSiteSettings({ type: 'setPlatformEnabled', hostname: 'claude.ai', enabled: false });
 
     expect(settings).toEqual({ platformChoices: { 'gemini.google.com': false, 'claude.ai': false }, customSites: [], debugMode: true });
-    expect(await stored()).toEqual(settings);
+    expect(parseSiteSettings(await stored())).toEqual(settings);
   });
 
   it('starts from no choice when nothing is stored, and stores only the choice made', async () => {
     await changeSiteSettings({ type: 'setPlatformEnabled', hostname: 'chatgpt.com', enabled: false });
 
-    expect(await stored()).toEqual({ platformChoices: { 'chatgpt.com': false }, customSites: [], debugMode: false });
+    expect(await stored()).toEqual({
+      platformChoices: { 'chatgpt.com': false },
+      customSites: [],
+      debugMode: false,
+      enabledSites: getDefaultEnabledPlatforms().filter((hostname) => hostname !== 'chatgpt.com')
+    });
+  });
+
+  it('stores beside the Platform choices the list of the Platforms that are on, which a rollback to an earlier release reads', async () => {
+    await store({ enabledSites: ['claude.ai', 'chatgpt.com'], customSites: [], debugMode: false });
+
+    await changeSiteSettings({ type: 'setPlatformEnabled', hostname: 'gemini.google.com', enabled: true });
+
+    // An earlier release reads only this list: the Platforms the user turned off stay off there
+    expect(await stored()).toMatchObject({ enabledSites: ['claude.ai', 'chatgpt.com', 'gemini.google.com'] });
   });
 
   it('writes a store of an earlier release, the list of the Platforms that were on, as Platform choices on its next change', async () => {
@@ -379,7 +393,7 @@ describe('changeSiteSettings', () => {
     await changeSiteSettings({ type: 'setPlatformEnabled', hostname: 'claude.ai', enabled: false });
 
     const after = parseSiteSettings(await stored());
-    expect(await stored()).not.toHaveProperty('enabledSites');
+    expect(await stored()).toHaveProperty('platformChoices');
     expect(enabledPlatforms(after)).toEqual(['chatgpt.com']);
   });
 

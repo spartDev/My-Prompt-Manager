@@ -124,7 +124,9 @@ describe('upgradeStoredSiteSettings', () => {
         getAllSupportedHostnames().map((hostname) => [hostname, hostname === 'claude.ai' || hostname === 'gemini.google.com'])
       ),
       customSites: [customSite],
-      debugMode: true
+      debugMode: true,
+      // For a rollback to an earlier release, which reads only this list
+      enabledSites: ['claude.ai', 'gemini.google.com']
     });
   });
 
@@ -177,6 +179,6 @@ describe('upgradeStoredSiteSettings', () => {
     const settings = await readSiteSettings();
     expect(enabledPlatforms(settings)).toEqual(['claude.ai', 'chatgpt.com']);
     expect(settings.debugMode).toBe(true);
-    expect(await stored()).not.toHaveProperty('enabledSites');
+    expect(await stored()).toHaveProperty('platformChoices');
   });
 });

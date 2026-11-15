@@ -572,7 +572,7 @@ describe('SettingsView', () => {
       const saved = (writes[0][0] as { promptLibrarySettings: unknown }).promptLibrarySettings;
       expect(enabledPlatforms(parseSiteSettings(saved))).toEqual(['claude.ai', 'chatgpt.com']);
       expect(chromeMock.tabs.sendMessage).toHaveBeenCalledTimes(1);
-      expect(chromeMock.tabs.sendMessage).toHaveBeenCalledWith(7, { action: 'settingsUpdated', settings: saved });
+      expect(chromeMock.tabs.sendMessage).toHaveBeenCalledWith(7, { action: 'settingsUpdated', settings: parseSiteSettings(saved) });
     });
 
     it('puts the switch back and says so when the save fails', async () => {
