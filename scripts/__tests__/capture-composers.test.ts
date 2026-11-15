@@ -249,6 +249,20 @@ describe('headerUrl', () => {
     expect(headerUrl('http://127.0.0.1:8080/claude.html')).toBe('http://127.0.0.1:8080/claude.html');
     expect(headerUrl('https://claude.ai/new')).toBe('https://claude.ai/new');
   });
+
+  it('names a web address by its protocol, host and path only: no user name, password, query or fragment', () => {
+    const url = new URL('https://chat.example.com/c/123');
+    url.username = 'alice';
+    url.password = 'x';
+    url.search = '?token=abc';
+    url.hash = '#x';
+
+    expect(headerUrl(url.href)).toBe('https://chat.example.com/c/123');
+  });
+
+  it('names an address it cannot parse as a stand-in, not as it is', () => {
+    expect(headerUrl('not a url?token=abc')).toBe('<stand-in>');
+  });
 });
 
 describe('composerFixturePath', () => {

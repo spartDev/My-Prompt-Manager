@@ -159,9 +159,22 @@ export const rulesFor = (platform: PlatformDefinition) => {
   ]);
 };
 
-/** The address a fixture's header names: a local stand-in file only by its name, not its home path */
-export const headerUrl = (url: string): string =>
-  (url.startsWith('file:') ? `file://<stand-in>/${url.split(/[/\\]/).pop() ?? ''}` : url);
+/**
+ * The address a fixture's header names: a local stand-in file only by its name, not its home path;
+ * a web address only by its protocol, host and path, so no user name, password, query or fragment
+ * is committed
+ */
+export function headerUrl(url: string): string {
+  if (url.startsWith('file:')) {
+    return `file://<stand-in>/${url.split(/[/\\]/).pop() ?? ''}`;
+  }
+  try {
+    const { protocol, host, pathname } = new URL(url);
+    return `${protocol}//${host}${pathname}`;
+  } catch {
+    return '<stand-in>';
+  }
+}
 
 type CaptureResult =
   | { id: string; outcome: 'captured'; composerFound: boolean; file: string }
