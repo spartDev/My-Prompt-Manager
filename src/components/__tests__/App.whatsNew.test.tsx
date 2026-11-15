@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, waitForElementToBeRemoved, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, waitForElementToBeRemoved, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -93,7 +93,9 @@ describe("App: What's new", () => {
       ['the backdrop', () => { fireEvent.click(screen.getByTestId('whats-new-backdrop')); }],
       ['Escape', () => { fireEvent.keyDown(document.body, { key: 'Escape' }); }],
       ['Enter', () => { fireEvent.keyDown(document.body, { key: 'Enter' }); }],
-      ['a tile', () => { fireEvent.click(screen.getByRole('button', { name: /^Pinned prompts/ })); }]
+      ['a tile', () => { fireEvent.click(screen.getByRole('button', { name: /^Pinned prompts/ })); }],
+      // Tile 3 of the 2.0.0 notes: Pinned prompts, which opens the Library
+      ['a digit key', () => { fireEvent.keyDown(document.body, { key: '3' }); }]
     ])('on %s', async (_means, closeIt) => {
       const sheet = await openWithWhatsNew();
       vi.mocked(markReleaseSeen).mockClear();
@@ -156,8 +158,13 @@ describe("App: What's new", () => {
       await waitFor(() => { expect(screen.getByRole('searchbox', { name: 'Search prompts' })).toHaveFocus(); });
     });
 
-    it('prompt-editor-new: the editor on a new Prompt', async () => {
-      await openTile(/^Fill-in variables/);
+    // Three Feature tiles of 2.0.0 open the editor: each one is clicked
+    it.each([
+      [/^Fill-in variables/],
+      [/^This looks familiar/],
+      [/^New category while you write/]
+    ])('prompt-editor-new: %s opens the editor on a new Prompt', async (title) => {
+      await openTile(title);
 
       expect(screen.getByTestId('editor-sheet')).toBeInTheDocument();
       expect(screen.getByLabelText(/title/i)).toHaveValue('');
@@ -192,8 +199,16 @@ describe("App: What's new", () => {
         expect(screen.getByRole('tab', { name: 'Library' })).toHaveAttribute('aria-selected', 'true');
         expect(screen.queryByTestId('editor-sheet')).not.toBeInTheDocument();
       }],
+      ['4', 'the editor on a new Prompt (This looks familiar)', async () => {
+        expect(await screen.findByTestId('editor-sheet')).toBeInTheDocument();
+        expect(screen.getByLabelText(/title/i)).toHaveValue('');
+      }],
       ['5', 'the Analytics Section (Tidy up)', async () => {
         expect(await screen.findByRole('heading', { name: 'Analytics', level: 1 })).toBeInTheDocument();
+      }],
+      ['6', 'the editor on a new Prompt (New category while you write)', async () => {
+        expect(await screen.findByTestId('editor-sheet')).toBeInTheDocument();
+        expect(screen.getByLabelText(/title/i)).toHaveValue('');
       }],
       ['7', 'the Categories Section (Undo a Category deletion)', async () => {
         expect(await screen.findByRole('heading', { name: 'Categories', level: 1 })).toBeInTheDocument();
@@ -301,6 +316,38 @@ describe("App: What's new", () => {
         expect(tile.textContent).toMatch(/^Fixed: /);
       }
     });
+  });
+
+  it('a Critical fix tile triggers nothing: the sheet stays open, nothing is marked seen, nothing opens', async () => {
+    const user = userEvent.setup();
+    const sheet = await openWithWhatsNew();
+    vi.mocked(markReleaseSeen).mockClear();
+
+    await user.click(within(sheet).getByText('Prompts arrive as written'));
+
+    expect(sheet).toBeInTheDocument();
+    expect(sheet).toHaveClass('animate-whats-new-sheet-in');
+    expect(markReleaseSeen).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('editor-sheet')).not.toBeInTheDocument();
+    expect(await storedLastSeen()).toBe('1.9.0');
+  });
+
+  it('closed with Got it, is not shown at the next opening of the popup', async () => {
+    const user = userEvent.setup();
+    const sheet = await openWithWhatsNew();
+    await user.click(screen.getByRole('button', { name: 'Got it' }));
+    await waitForElementToBeRemoved(sheet);
+    await waitFor(async () => { expect(await storedLastSeen()).toBe('2.0.0'); });
+    cleanup();
+    vi.mocked(readWhatsNewRecord).mockClear();
+
+    // The popup opens again over the same storage
+    render(<App />);
+    await screen.findByRole('heading', { name: /my prompt manager/i });
+    await waitFor(() => { expect(readWhatsNewRecord).toHaveBeenCalled(); });
+    await act(async () => { await new Promise((resolve) => { setTimeout(resolve, 20); }); });
+
+    expect(screen.queryByRole('dialog', { name: WHATS_NEW })).not.toBeInTheDocument();
   });
 
   it('is not shown in picker mode, where the record is not even read', async () => {
