@@ -605,8 +605,8 @@ describe('background: a pick cancelled in one tab', () => {
 
     // The user presses Escape on the picker of the first tab before the new start activates there
     expect(await send(listener, { type: 'PICKER_CANCELLED' }, { tab: CLAUDE_TAB })).toEqual({ success: true });
-    answers.get(CLAUDE_TAB.id)?.();
-    answers.get(OTHER_TAB.id)?.();
+    answers.get(CLAUDE_TAB.id as number)?.();
+    answers.get(OTHER_TAB.id as number)?.();
 
     expect(await restarted).toEqual({ success: false, error: 'The element picker was stopped' });
     expect(await otherStart).toEqual({ success: true, tabId: OTHER_TAB.id });
