@@ -78,7 +78,7 @@ export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
 | `priority` | number | ✅ | Strategy selection priority (100 = highest) |
 | `defaultEnabled` | boolean | ✅ | On for every user who never switched it, existing users included (the Site settings store the user's Platform choices) |
 | `selectors` | string[] | ✅ | CSS selectors for finding text input elements |
-| `iconPlacement` | `IconPlacement` | ❌ | Where the icon goes: `composer`, a selector found with `editor.closest()`, and `anchors`, each `{ find, relation }` with `relation` one of `before`, `after`, `inside-start`, `inside-end`, tried in order inside the composer; the first found wins. The one source: `PlatformManager.getIconPlacement()` reads it, no strategy keeps a copy. When no anchor is found, the icon is anchored inside the editor's bottom-end corner by `src/content/core/anchored-overlay.ts` and a warning is logged |
+| `iconPlacement` | `IconPlacement` | ❌ | Where the icon goes: `composer`, a selector found with `editor.closest()`, and `anchors`, each `{ find, relation }` with `relation` one of `before`, `after`, `inside-start`, `inside-end`, tried in order inside the composer; the first found wins. The one source: `PlatformManager.getIconPlacement()` reads it, no strategy keeps a copy. When no anchor is found, the icon is anchored inside the editor's bottom-end corner by `src/content/core/anchored-overlay.ts`, and goes into the toolbar once the Platform renders it (`IconPlacementController.awaitToolbar`: a toolbar may render after its editor). Still not found after `IconPlacementController.TOOLBAR_GRACE_MS`, a warning is logged and the overlay is reported, so Settings offers to place the icon |
 | `strategyClass` | string | ✅ | Class name for custom strategy (future use) |
 | `hostnamePatterns` | string[] | ❌ | Additional hostname patterns for detection |
 | `brandColors` | `{ enabled: string }` | ❌ | Tailwind classes of the logo square when the site is on; the accent (`bg-accent-subtle text-accent`) when omitted. Every site shares one disabled state (`bg-muted text-tertiary`, `src/constants/brandColors.ts`), so its logo component takes `disabled` and draws in `currentColor` |
@@ -503,7 +503,7 @@ window.__promptLibraryDebug?.testInsertion?.('test content');
 
 **Button appears in wrong location:**
 - Adjust the `iconPlacement` chain in `platforms.ts` (no strategy keeps a copy)
-- With debug mode on (`localStorage.setItem('prompt-library-debug', 'true')`, then reload; warnings are silent otherwise), a warning `No anchor of this Platform found in its composer, the icon is anchored on the editor instead` in the console means no anchor was found and the icon fell back to the editor's corner
+- With debug mode on (`localStorage.setItem('prompt-library-debug', 'true')`, then reload; warnings are silent otherwise), a warning `No anchor of this Platform found in its composer, the icon is anchored on the editor instead` in the console means no anchor was found and the icon fell back to the editor's corner. It comes 5 seconds after the icon was placed on the editor (`IconPlacementController.TOOLBAR_GRACE_MS`), not at once: until then the icon waits there for a toolbar the Platform renders after it
 - Check that `editor.closest(composer)` finds the composer, and that an anchor exists inside it
 
 **Content doesn't insert:**
@@ -848,7 +848,8 @@ iconPlacement: {
 }
 
 // When no anchor is found, the icon is anchored inside the editor's bottom-end corner
-// (src/content/core/anchored-overlay.ts) and the console shows a warning:
+// (src/content/core/anchored-overlay.ts), and goes into the toolbar once the Platform renders it.
+// Still not found 5 seconds after that placement (IconPlacementController.TOOLBAR_GRACE_MS), the console shows a warning:
 // "No anchor of this Platform found in its composer, the icon is anchored on the editor instead".
 // If the Platform re-renders its Toolbar, src/content/core/icon-placement.ts places the icon again on its own.
 ```

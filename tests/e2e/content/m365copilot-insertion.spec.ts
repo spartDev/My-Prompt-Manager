@@ -43,11 +43,14 @@ test.describe('Microsoft 365 Copilot at copilot.cloud.microsoft', () => {
     });
   });
 
-  test('the Prompts button sits in the toolbar, right after the plus menu', async ({ context }) => {
+  test('the Prompts button goes into the toolbar rendered after the editor, right after the plus menu', async ({ context }) => {
     const page = await openPlatform(context, 'm365copilot-editor');
 
+    // The stand-in renders its toolbar after its editor, as the live page does, once the button
+    // shows: the button waits on the editor, then moves into the toolbar
     const button = promptsButton(page);
     await expect(button).toHaveAttribute('data-mpm-placement', 'toolbar');
+    expect(await page.evaluate(() => (window as Window & { __placementBeforeToolbar?: string | null }).__placementBeforeToolbar)).toBe('overlay');
     await expect(button).toHaveAttribute('data-mpm-anchor', '0');
     expect(await button.evaluate((element) => element.previousElementSibling?.getAttribute('data-testid'))).toBe('PlusMenuButton');
   });

@@ -5,7 +5,9 @@
  * remembers which icon belongs to which editor, watches the document for the Platform removing
  * that icon when it re-renders its composer, and asks the injector to place it again. The editor
  * itself usually survives such a re-render, so a detection pass that only compares editors
- * never sees the loss.
+ * never sees the loss. While the icon is away from its toolbar (on the Anchored overlay, or at the
+ * element the user picked), it also waits for the toolbar, which a Platform may render after its
+ * editor, and asks for the icon to be placed again once the toolbar shows (awaitToolbar).
  */
 
 import type { IconPlacement } from '../../config/platforms';
@@ -34,13 +36,33 @@ export class IconPlacementController {
   /** Time given to a Platform re-render to settle before the icon is placed again */
   static readonly REPLACE_DELAY_MS = 100;
 
+  /**
+   * Time a Platform is given to render its toolbar after its editor before the icon left on the
+   * Anchored overlay is taken as a sign the toolbar changed. Copilot at copilot.cloud.microsoft
+   * renders its editor first, its toolbar buttons later (live check, 2026-11-15)
+   */
+  static readonly TOOLBAR_GRACE_MS = 5000;
+
+  /**
+   * How often, at most, the toolbar is looked for once the grace period is over, or while the icon
+   * is at the element the user picked: the Platform may still bring it back, but a long streamed
+   * answer changes the page many times a second
+   */
+  static readonly SLOW_TOOLBAR_CHECK_MS = 1000;
+
   private record: PlacementRecord | null = null;
   private observer: MutationObserver | null = null;
   private replaceTimer: number | null = null;
+  /** While the icon waits on the overlay or at a pick: whether the toolbar is now found */
+  private toolbarFound: (() => boolean) | null = null;
+  private toolbarTimer: number | null = null;
+  private graceTimer: number | null = null;
   private readonly onLost: (editor: HTMLElement) => void;
 
   /**
-   * @param onLost - Called once, with the editor, when the Platform removed the icon placed for it
+   * @param onLost - Called once, with the editor, when the Platform removed the icon placed for
+   *   it, or when the toolbar the icon waited for (awaitToolbar) is found: either way the icon is
+   *   placed again for that editor
    */
   constructor(onLost: (editor: HTMLElement) => void) {
     this.onLost = onLost;
@@ -54,6 +76,7 @@ export class IconPlacementController {
   /** Remembers the icon just placed for this editor and watches the document for its removal. */
   track(icon: HTMLElement, editor: HTMLElement, kind: PlacementKind, anchorIndex?: number): void {
     this.cancelReplacement();
+    this.stopAwaitingToolbar();
     this.record = { icon, editor, kind };
     icon.setAttribute(PLACEMENT_ATTRIBUTE, kind);
     if (anchorIndex === undefined) {
@@ -63,6 +86,52 @@ export class IconPlacementController {
     }
     this.observe();
     debug('Icon placement tracked', { kind, anchorIndex, editorTag: editor.tagName });
+  }
+
+  /**
+   * Called right after an icon is tracked away from its toolbar (on the Anchored overlay, or at
+   * the element the user picked): on each settled batch of DOM changes `found` is read, and once
+   * it is true the icon is placed again, at its anchor. `onKept` runs once, after
+   * TOOLBAR_GRACE_MS, if the toolbar has not been found by then: only then does the overlay say the
+   * Platform changed its toolbar, a toolbar rendered after its editor does not. The toolbar is
+   * still looked for after that, less often, until the icon is placed again or reset. `found` is
+   * the whole chain: a later anchor that shows only at times (a send button while the field holds
+   * text) moves the icon there too, and drops the user's pick, as an injection at that moment
+   * would. The grace
+   * period starts again with each placement of the icon: a Platform that replaced its editor more
+   * often than that, with its toolbar really changed, would not be reported (the overlay icon is in
+   * the body, so a re-render of the composer alone does not place it again).
+   */
+  awaitToolbar(found: () => boolean, onKept?: () => void): void {
+    const record = this.record;
+    if (!record) {
+      return;
+    }
+    this.toolbarFound = found;
+    if (onKept) {
+      const endOfGrace = (): void => {
+        this.graceTimer = null;
+        // An editor that left the page says nothing of the toolbar: the detection pass takes over
+        if (this.record !== record || !record.editor.isConnected) {
+          return;
+        }
+        // The icon is out of the page for a moment: lost, it is placed again with a grace period
+        // of its own; back, this one ends then
+        if (!record.icon.isConnected) {
+          this.graceTimer = window.setTimeout(endOfGrace, IconPlacementController.REPLACE_DELAY_MS);
+          return;
+        }
+        if (found()) {
+          this.moveIntoToolbar(record);
+          return;
+        }
+        onKept();
+      };
+      this.graceTimer = window.setTimeout(endOfGrace, IconPlacementController.TOOLBAR_GRACE_MS);
+    }
+    // A toolbar rendered while the icon was being placed (Floating UI loading) made no change
+    // this controller saw: it is looked for once now
+    this.checkToolbar(record);
   }
 
   /** True when the icon placed for this editor has left the document: the Platform removed it. */
@@ -79,6 +148,7 @@ export class IconPlacementController {
   reset(): void {
     this.cancelReplacement();
     this.record = null;
+    this.stopAwaitingToolbar();
     if (this.observer) {
       this.observer.disconnect();
       this.observer = null;
@@ -98,19 +168,30 @@ export class IconPlacementController {
   /**
    * Runs on every batch of DOM changes: one property read while the icon is in place. When the
    * icon is gone, one re-placement is scheduled; the record is dropped when it fires, so a
-   * placement that fails does not schedule another on the next change.
+   * placement that fails does not schedule another on the next change. While the icon waits for
+   * its toolbar, the toolbar is looked for once the changes settle.
    */
   private check(): void {
     const record = this.record;
-    if (!record || record.icon.isConnected || this.replaceTimer !== null) {
+    if (!record || this.replaceTimer !== null) {
+      return;
+    }
+    if (record.icon.isConnected) {
+      this.checkToolbar(record);
       return;
     }
     this.replaceTimer = window.setTimeout(() => {
       this.replaceTimer = null;
       const lost = this.record;
       if (!lost || lost.icon.isConnected) {
+        // Back in the page: the wait for the toolbar, if any, goes on, from a look at the page as
+        // it now is (the changes of the last moment were not looked at)
+        if (lost) {
+          this.checkToolbar(lost);
+        }
         return;
       }
+      this.stopAwaitingToolbar();
       this.record = null;
       info('Library icon removed by the Platform, placing it again', {
         kind: lost.kind,
@@ -119,6 +200,45 @@ export class IconPlacementController {
       });
       this.onLost(lost.editor);
     }, IconPlacementController.REPLACE_DELAY_MS);
+  }
+
+  /**
+   * Looks for the toolbar the icon waits for, once the batch of changes that may hold it settles:
+   * soon during the grace period, when a toolbar rendered after its editor is expected, then at
+   * most every SLOW_TOOLBAR_CHECK_MS
+   */
+  private checkToolbar(record: PlacementRecord): void {
+    if (this.toolbarFound === null || this.toolbarTimer !== null) {
+      return;
+    }
+    const delay = this.graceTimer === null ? IconPlacementController.SLOW_TOOLBAR_CHECK_MS : IconPlacementController.REPLACE_DELAY_MS;
+    this.toolbarTimer = window.setTimeout(() => {
+      this.toolbarTimer = null;
+      const found = this.toolbarFound;
+      if (this.record !== record || found === null || !record.icon.isConnected || !record.editor.isConnected || !found()) {
+        return;
+      }
+      this.moveIntoToolbar(record);
+    }, delay);
+  }
+
+  /** The toolbar the icon waited for is found: the icon is placed again, into it */
+  private moveIntoToolbar(record: PlacementRecord): void {
+    this.stopAwaitingToolbar();
+    this.record = null;
+    info('The Platform rendered its toolbar, the icon goes into it', { kind: record.kind });
+    this.onLost(record.editor);
+  }
+
+  private stopAwaitingToolbar(): void {
+    this.toolbarFound = null;
+    for (const timer of [this.toolbarTimer, this.graceTimer]) {
+      if (timer !== null) {
+        window.clearTimeout(timer);
+      }
+    }
+    this.toolbarTimer = null;
+    this.graceTimer = null;
   }
 
   private cancelReplacement(): void {

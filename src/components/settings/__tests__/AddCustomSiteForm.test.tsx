@@ -374,6 +374,17 @@ describe('AddCustomSiteForm', () => {
       });
     });
 
+    it('refuses a host of a Platform that has no row of its own, such as copilot.cloud.microsoft', async () => {
+      renderForm({ siteConfigs: {} });
+
+      await userEvent.type(screen.getByLabelText('Website URL *'), 'https://copilot.cloud.microsoft/chat');
+      fireEvent.click(screen.getByRole('button', { name: /add site/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText('This site is already added')).toBeInTheDocument();
+      });
+    });
+
     it('shows error when site already exists in customSites', async () => {
       const existingSite: CustomSite = {
         hostname: 'mysite.com',

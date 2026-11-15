@@ -6,7 +6,7 @@
  * all the modular components.
  */
 
-import { getPlatformByHostname } from '../../config/platforms';
+import { getPlatformByHostname, type IconPlacement } from '../../config/platforms';
 import type { SiteSettings } from '../../services/siteSettings';
 import type { CustomSite } from '../../types/index';
 import { PromptSelectorController } from '../selector/controller';
@@ -374,26 +374,29 @@ export class PromptLibraryInjector {
    * first, as Backspace would, and the rest of the field is left as it is.
    */
   private listenForSelectorTrigger(): void {
-    let scheduled = false;
     const onSlash = (event: Event): void => {
-      if (scheduled || this.selector.isOpen) {
+      if (this.selector.isOpen) {
         return;
       }
       const field = this.triggerField(event);
       if (!field) {
         return;
       }
-      // An editor that handles typing itself sends no input event: the key is heard as well
+      // An editor that handles typing itself sends no input event: the key is heard as well, and so
+      // is the beforeinput event, which an editor that cancels it to write the character itself
+      // (Lexical) still lets reach the page
       const typedSlash = event instanceof KeyboardEvent
         ? event.key === '/' && !event.isComposing && !event.ctrlKey && !event.metaKey && !event.altKey
         : event instanceof InputEvent && event.data === '/' && !event.isComposing;
       if (!typedSlash) {
         return;
       }
-      scheduled = true;
-      // Once the Platform has handled the character itself: its editor is then up to date
+      // Once the Platform has handled the character itself: its editor is then up to date. Each
+      // event the slash sends reads the field again. The key of the second slash can be heard
+      // before its character is written, and an editor that cancels beforeinput sends no input
+      // event after it: only the read set by its beforeinput sees the //. A read that comes
+      // after the // was taken out, or after the selector opened, does nothing
       window.setTimeout(() => {
-        scheduled = false;
         const before = field.isConnected ? textBeforeCaret(field) : null;
         if (before === null || !endsWithSelectorTrigger(before) || this.selector.isOpen) {
           return;
@@ -408,6 +411,7 @@ export class PromptLibraryInjector {
       }, 0);
     };
     this.eventManager.addTrackedEventListener(document, 'keydown', onSlash);
+    this.eventManager.addTrackedEventListener(document, 'beforeinput', onSlash);
     this.eventManager.addTrackedEventListener(document, 'input', onSlash);
   }
 
@@ -1003,6 +1007,8 @@ export class PromptLibraryInjector {
         this.placement.track(icon, textarea, 'toolbar', resolution.index);
         this.repair.report('toolbar');
       } else if (iconPlacement && this.placeAtOverride(icon, textarea)) {
+        // A toolbar rendered after its editor: once it shows, the icon goes into it
+        this.placement.awaitToolbar(() => resolveIconPlacement(textarea, iconPlacement) !== null);
         return;
       }
 
@@ -1180,7 +1186,7 @@ export class PromptLibraryInjector {
         }
 
         // No toolbar and no custom positioning: the icon is anchored on the editor itself
-        await this.placeOnEditor(icon, textarea, iconPlacement !== undefined);
+        await this.placeOnEditor(icon, textarea, iconPlacement);
       }
 
       debug('Icon injection completed', { 
@@ -1195,16 +1201,14 @@ export class PromptLibraryInjector {
 
   /**
    * Places the icon on the editor when the Platform's toolbar was not found: anchored inside its
-   * bottom-end corner, following scroll and resize. On a built-in Platform, an anchor chain that
-   * found nothing is the sign its UI changed, so it is logged as a warning.
+   * bottom-end corner, following scroll and resize. On a built-in Platform (`iconPlacement`, the
+   * chain that found nothing) the icon waits there for the toolbar, which a Platform may render
+   * after its editor, and goes into it once it shows. Still not found after the grace period of
+   * IconPlacementController, the toolbar is taken as changed: that is logged as a warning and
+   * reported, so Settings offers to place the icon.
    */
-  private async placeOnEditor(icon: HTMLElement, textarea: HTMLElement, hasAnchorChain: boolean): Promise<void> {
-    if (hasAnchorChain) {
-      warn('No anchor of this Platform found in its composer, the icon is anchored on the editor instead', {
-        hostname: this.state.hostname
-      });
-      this.repair.report('overlay');
-    } else {
+  private async placeOnEditor(icon: HTMLElement, textarea: HTMLElement, iconPlacement: IconPlacement | undefined): Promise<void> {
+    if (!iconPlacement) {
       debug('No anchor chain for this site, the icon is anchored on the editor');
     }
 
@@ -1223,6 +1227,22 @@ export class PromptLibraryInjector {
       this.placeStatically(icon, textarea);
     }
     this.placement.track(icon, textarea, 'overlay');
+    if (iconPlacement) {
+      // The element the user picked may render late too: once it shows, the icon goes there
+      const pickShows = (): boolean => {
+        const anchor = this.repair.findAnchor();
+        return anchor !== null && anchor !== icon && !icon.contains(anchor);
+      };
+      this.placement.awaitToolbar(
+        () => resolveIconPlacement(textarea, iconPlacement) !== null || pickShows(),
+        () => {
+          warn('No anchor of this Platform found in its composer, the icon is anchored on the editor instead', {
+            hostname: this.state.hostname
+          });
+          this.repair.report('overlay');
+        }
+      );
+    }
     debug('Icon anchored on the editor', { method: method ?? 'static' });
   }
 

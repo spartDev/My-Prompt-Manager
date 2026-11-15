@@ -262,15 +262,19 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
       'div[contenteditable="true"]', // Generic contenteditable fallback
       'textarea[placeholder*="Message"]', // Legacy textarea fallback
     ],
-    // copilot.cloud.microsoft first: its test ids, read on the live composer signed in, then its
-    // English ARIA label. Then Fluent's component class names of m365.cloud.microsoft, not its
-    // hashed ones. Neither is captured, since both need sign-in: see
-    // tests/fixtures/composers/m365copilot.html
+    // copilot.cloud.microsoft first: the composer is the div two levels above the editor, which
+    // holds it in a span beside an empty span (or the editor alone, as a capture folds a wrapper
+    // that holds one element), then the plus menu and the dictation button (nesting read on the live
+    // page signed in, 2026-11-15, ticket My-Prompt-Manager-axv). The plus menu is found by its
+    // test id, which does not follow the user's language; its toolbar renders after the editor,
+    // so the icon waits for it (IconPlacementController.awaitToolbar). Then Fluent's component
+    // class names of m365.cloud.microsoft, not its hashed ones, on the composer that holds its
+    // actions or its send button (an inner .fai-ChatInput holding neither is not the composer). Neither is captured, since both need sign-in: see
+    // tests/fixtures/composers/m365copilot.html.
     iconPlacement: {
-      composer: '.fai-ChatInput, div:has([data-testid="PlusMenuButton"]), div:has(button[aria-label*="dictation" i])',
+      composer: 'div:has(> span > [data-lexical-editor]):has([data-testid="PlusMenuButton"]), div:has(> [data-lexical-editor]):has([data-testid="PlusMenuButton"]), .fai-ChatInput:has(.fai-ChatInput__actions, button[type="submit"])',
       anchors: [
         { find: '[data-testid="PlusMenuButton"]', relation: "after" },
-        { find: 'button[aria-label*="dictation" i]', relation: "before" },
         { find: ".fai-ChatInput__actions", relation: "inside-start" },
         { find: 'button[type="submit"]', relation: "before" },
       ],

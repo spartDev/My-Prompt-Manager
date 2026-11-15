@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import type { Mock } from 'vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { ConfigurationEncoder } from '../../../services/configurationEncoder';
 import { ICON_PLACEMENT_REPAIRS_KEY } from '../../../services/iconPlacementRepairs';
 import type { CustomSite } from '../../../types';
 import SiteIntegrationSection from '../SiteIntegrationSection';
@@ -242,5 +243,31 @@ describe('SiteIntegrationSection - a Platform whose icon fell to the Anchored ov
 
     rerender(<SiteIntegrationSection {...defaultProps} siteConfigs={siteConfigs} enabledPlatforms={[]} />);
     expect(screen.queryByTestId('site-placement')).not.toBeInTheDocument();
+  });
+});
+
+describe('SiteIntegrationSection - importing a configuration', () => {
+  beforeEach(() => {
+    (chrome.tabs.query as unknown as Mock).mockResolvedValue([]);
+  });
+
+  it('refuses a configuration for a host of a Platform that has no row of its own, such as copilot.cloud.microsoft', async () => {
+    const user = userEvent.setup();
+    const onShowToast = vi.fn();
+    const code = await ConfigurationEncoder.encode({
+      hostname: 'copilot.cloud.microsoft',
+      displayName: 'Copilot at work',
+      enabled: true,
+      dateAdded: Date.now()
+    });
+    render(<SiteIntegrationSection {...defaultProps} onShowToast={onShowToast} />);
+
+    await user.click(getAddButton());
+    await user.click(screen.getByText('Import Configuration'));
+    await user.type(screen.getByLabelText('Encoded configuration string'), code);
+    await user.click(screen.getByRole('button', { name: 'Preview Configuration' }));
+
+    expect(await screen.findByText('This hostname already has a built-in integration and cannot be imported as custom.')).toBeInTheDocument();
+    expect(onShowToast).toHaveBeenCalled();
   });
 });

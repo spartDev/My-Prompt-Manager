@@ -367,6 +367,13 @@ describe("useTheme", () => {
           theme: "dark",
         });
       });
+      // Every host of every Platform, copilot.cloud.microsoft where M365 Copilot sends a work account included
+      const queried = vi.mocked(chrome.tabs.query).mock.calls.map(([query]) => query.url).find(Array.isArray) as string[];
+      expect(queried).toEqual(expect.arrayContaining([
+        "https://claude.ai/*",
+        "https://m365.cloud.microsoft/*",
+        "https://copilot.cloud.microsoft/*",
+      ]));
     });
 
     it("should handle tabs without content script gracefully", async () => {
@@ -780,7 +787,7 @@ describe("useTheme", () => {
       // Arrange
       const consoleErrorSpy = vi
         .spyOn(console, "error")
-        .mockImplementation(() => {});
+        .mockImplementation(() => { /* keeps the expected error out of the output */ });
       const getSpy = vi.spyOn(chrome.storage.local, "get");
       getSpy.mockRejectedValueOnce(new Error("Storage read error"));
 
@@ -803,7 +810,7 @@ describe("useTheme", () => {
       // Arrange
       const consoleErrorSpy = vi
         .spyOn(console, "error")
-        .mockImplementation(() => {});
+        .mockImplementation(() => { /* keeps the expected error out of the output */ });
       await chrome.storage.local.set({
         settings: {
           ...DEFAULT_SETTINGS,

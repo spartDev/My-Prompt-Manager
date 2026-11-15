@@ -398,6 +398,33 @@ describe('PromptLibraryInjector', () => {
         expect(mockTextarea.value).toBe('Draft ');
       });
 
+      it('opens when the key of the second slash is heard before its character is written, in an editor that cancels beforeinput', async () => {
+        const { open } = await listen();
+        const eventManagerInstance = (await import('../../ui/event-manager') as any).EventManager.mock.results.at(-1).value;
+        const listener = (type: string) => eventManagerInstance.addTrackedEventListener.mock.calls.find((call: any[]) => call[0] === document && call[1] === type)?.[2];
+        const hear = (type: string, event: Event) => {
+          const heard = (received: Event) => { listener(type)?.(received); };
+          document.addEventListener(type, heard);
+          mockTextarea.dispatchEvent(event);
+          document.removeEventListener(type, heard);
+        };
+
+        // The first slash is written; the key of the second is heard, and the read it set runs
+        // before the editor writes the second slash
+        mockTextarea.value = 'Draft /';
+        mockTextarea.setSelectionRange(7, 7);
+        hear('keydown', new KeyboardEvent('keydown', { key: '/', bubbles: true, composed: true }));
+        await handled();
+        expect(open).not.toHaveBeenCalled();
+        // Lexical cancels the beforeinput and writes the slash itself: no input event follows
+        mockTextarea.value = 'Draft //';
+        mockTextarea.setSelectionRange(8, 8);
+        hear('beforeinput', new InputEvent('beforeinput', { data: '/', inputType: 'insertText', bubbles: true, composed: true }));
+
+        await vi.waitFor(() => { expect(open).toHaveBeenCalledTimes(1); });
+        expect(mockTextarea.value).toBe('Draft ');
+      });
+
       it('drops the opening when the user goes on typing in the field while the selector loads', async () => {
         const { open, typeSlashes } = await listen();
         typeSlashes(mockTextarea);

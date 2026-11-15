@@ -423,7 +423,7 @@ src/content/
 └── core/
     ├── injector.ts            # Main orchestrator
     ├── insertion-manager.ts   # Platform insertion coordinator
-    ├── icon-placement.ts      # Resolves a Platform's anchor chain; watches the placed icon, places it again after a re-render
+    ├── icon-placement.ts      # Resolves a Platform's anchor chain; watches the placed icon, places it again after a re-render or once a late toolbar renders
     └── anchored-overlay.ts    # Icon anchored on an element: CSS Anchor, then Floating UI
 ```
 
@@ -432,7 +432,7 @@ src/content/
 | Component | Responsibility | Pattern |
 |-----------|---------------|---------|
 | `PromptLibraryInjector` | Detect inputs, inject icons, manage lifecycle | Orchestrator |
-| `IconPlacementController` | Remember which icon was placed for which editor, ask for a new placement when the Platform removes it | Controller |
+| `IconPlacementController` | Remember which icon was placed for which editor, ask for a new placement when the Platform removes it, or when the toolbar it waited for renders (the overlay is reported only after a grace period) | Controller |
 | `AnchoredOverlay` | Keep the icon on its reference element when no toolbar holds it: CSS Anchor Positioning, then Floating UI | Strategy |
 | `PlatformInsertionManager` | Coordinate strategy selection and insertion | Mediator |
 | `PlatformManager` | Manage strategy registry and instantiation | Factory |

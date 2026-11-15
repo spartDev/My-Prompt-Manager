@@ -214,16 +214,44 @@ const M365COPILOT_FLUENT_HTML = plainPage(
 );
 
 /**
- * Microsoft 365 Copilot where m365.cloud.microsoft and copilot.microsoft.com send a work account,
- * copilot.cloud.microsoft (seen on 2026-11-15): its editor, without the editor library, and its
- * toolbar, with the plus menu the chain anchors on first.
+ * The composer of Microsoft 365 Copilot where m365.cloud.microsoft and copilot.microsoft.com send a
+ * work account, copilot.cloud.microsoft, as read on the live page on 2026-11-15 (ticket
+ * My-Prompt-Manager-axv): the editor, a span in a span, in the composer div, which also holds the
+ * plus menu in a div beside an svg, and the dictation button in a span. No send button while the
+ * field is empty. The plus menu's div is the bar a test finds the Prompts button in.
  */
-const M365COPILOT_HTML = plainPage(
-  'Microsoft 365 Copilot',
-  '<div class="field" data-lexical-editor="true" contenteditable="true" role="textbox" aria-label="Message Copilot"></div>',
-  '<div class="bar" data-e2e="toolbar"><button type="button" data-testid="PlusMenuButton" aria-label="Add">+</button><button type="button" aria-label="Start dictation">Mic</button></div>',
-  'div'
-);
+const M365COPILOT_FIELD =
+  '<span><span class="field" data-lexical-editor="true" contenteditable="true" role="textbox" aria-label="Message Copilot"></span><span></span></span>';
+const M365COPILOT_BAR =
+  '<div class="bar" data-e2e="toolbar"><svg width="0" height="0"></svg><div><button type="button" data-testid="PlusMenuButton" aria-label="Add and manage sources">+</button></div></div>' +
+  '<span><button type="button" aria-label="Start dictation">Mic</button></span>';
+
+/** Its editor without the editor library, its toolbar on the page from the start */
+const M365COPILOT_HTML = plainPage('Microsoft 365 Copilot', M365COPILOT_FIELD, M365COPILOT_BAR, 'div');
+
+/**
+ * The live page renders the plus menu and the dictation button after the editor (live check,
+ * 2026-11-15): this stand-in takes them out before the content script runs, and puts them back a
+ * moment after the Prompts button shows, noting in `window.__placementBeforeToolbar` where the
+ * button was until then.
+ */
+const LATE_TOOLBAR = /* html */ `
+    <script>
+      const composer = document.querySelector('[data-lexical-editor]').parentElement.parentElement;
+      const late = Array.from(composer.children).slice(1);
+      for (const element of late) { element.remove(); }
+      const render = () => {
+        window.__placementBeforeToolbar = document.querySelector('[data-mpm-placement]')?.getAttribute('data-mpm-placement') ?? null;
+        composer.append(...late);
+      };
+      const waitForButton = new MutationObserver(() => {
+        if (document.querySelector('[data-mpm-placement]')) {
+          waitForButton.disconnect();
+          window.setTimeout(render, 500);
+        }
+      });
+      waitForButton.observe(document.body, { childList: true, subtree: true, attributes: true });
+    </script>`;
 
 /**
  * What a ProseMirror editor does with text it did not build itself: after each input it reads its
@@ -267,8 +295,8 @@ const MISTRAL_EDITOR_HTML = paragraphEditorPage(
  *   leaves the caret after the pasted text. The editor learns of a selection from the
  *   `selectionchange` event; one over the editor itself, not from the start of its paragraph to
  *   its end, leaves out the line breaks that end the field.
- * - Typed text goes where that selection is too. Text from the editing command arrives with its
- *   line breaks dropped.
+ * - Typed text, and a deletion, go where the beforeinput event says: Lexical reads the selection
+ *   then. Text from the editing command arrives with its line breaks dropped.
  * - An `input` event that carries text inserts that text again, after what the field holds. One
  *   that carries none follows a change the browser made to the DOM itself (the editing command
  *   deleting text): the editor takes its text from what its paragraph then shows.
@@ -357,15 +385,17 @@ const lexicalEditor = (field: string): string => /* html */ `
       });
       editor.addEventListener('beforeinput', (event) => {
         event.preventDefault();
+        // What is typed or deleted goes where the event says, as Lexical reads the selection on a
+        // beforeinput: the selectionchange of a caret moved a moment ago (an arrow key) may not
+        // have come yet, the browser sends it later
+        const selection = document.getSelection();
+        const range = event.getTargetRanges()[0] ?? (selection.rangeCount > 0 ? selection.getRangeAt(0) : null);
+        if (range && editor.contains(range.startContainer) && editor.contains(range.endContainer)) {
+          known = { start: offsetOf(range.startContainer, range.startOffset), end: offsetOf(range.endContainer, range.endOffset) };
+        }
         if (event.inputType === 'insertText' && event.data) {
           write(event.data.replace(/\\n/g, ''));
         } else if (event.inputType.startsWith('delete')) {
-          // What is deleted is what the event says, a selection made a moment ago included
-          const selection = document.getSelection();
-          const range = event.getTargetRanges()[0] ?? (selection.rangeCount > 0 ? selection.getRangeAt(0) : null);
-          if (range && editor.contains(range.startContainer)) {
-            known = { start: offsetOf(range.startContainer, range.startOffset), end: offsetOf(range.endContainer, range.endOffset) };
-          }
           write('');
         }
       });
@@ -415,17 +445,12 @@ const PERPLEXITY_EDITOR_HTML = plainPage(
 ).replace('</body>', `${lexicalEditor('#ask-input')}\n  </body>`);
 
 /**
- * Microsoft 365 Copilot where a work account lands, copilot.cloud.microsoft (attributes read on the
- * live page on 2026-11-15, ticket My-Prompt-Manager-axv): a Lexical editor with no id, and a
- * toolbar holding the plus menu (data-testid="PlusMenuButton") and the dictation button. The
- * editor's behaviour is Perplexity's (lexicalEditor), assumed, not seen there.
+ * Microsoft 365 Copilot where a work account lands, copilot.cloud.microsoft: its composer
+ * (M365COPILOT_FIELD), its toolbar rendered after the editor and the Prompts button (LATE_TOOLBAR), and an editor that
+ * behaves as Perplexity's Lexical editor does (lexicalEditor), assumed, not seen there.
  */
-const M365COPILOT_EDITOR_HTML = plainPage(
-  'Microsoft 365 Copilot',
-  '<div class="field" data-lexical-editor="true" contenteditable="true" role="textbox" aria-label="Message Copilot"></div>',
-  '<div class="bar" data-e2e="toolbar"><button type="button" data-testid="PlusMenuButton" aria-label="Add">+</button><button type="button" aria-label="Add and manage sources">Sources</button><button type="button" aria-label="Start dictation">Mic</button></div>',
-  'div'
-).replace('</body>', `${lexicalEditor('[data-lexical-editor]')}\n  </body>`);
+const M365COPILOT_EDITOR_HTML = plainPage('Microsoft 365 Copilot', M365COPILOT_FIELD, M365COPILOT_BAR, 'div')
+  .replace('</body>', `${lexicalEditor('[data-lexical-editor]')}${LATE_TOOLBAR}\n  </body>`);
 
 /**
  * The stand-ins for the live composers that are rich text editors: ProseMirror on ChatGPT and
