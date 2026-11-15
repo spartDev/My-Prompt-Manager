@@ -8,10 +8,9 @@
  *
  * Proof screenshots, after the entry animation has ended (motion left on, as the other proof specs):
  * whats-new-{popup,sidepanel}-{light,dark}.png and library-after-close-{popup,sidepanel}-{light,dark}.png.
- * They go to test-results/whats-new/; with WHATS_NEW_SCREENSHOTS=1 they go to the committed
- * docs/screenshots/whats-new/ instead. To regenerate those:
- *
- *   WHATS_NEW_SCREENSHOTS=1 CI=1 npx playwright test tests/e2e/whats-new
+ * They go to test-results/whats-new/; scripts/pr-assets.sh <topic> test-results/whats-new/*.png
+ * pushes them for a pull request. Give each pull request its own topic (whats-new-<pr number>):
+ * pr-assets/whats-new already holds the images of #575, which a second push there would replace.
  *
  * A sheet with only Critical fixes is not shot: the registry has no such Release, and making one
  * would take a change to product code.
@@ -24,12 +23,12 @@ import { RELEASE_NOTES } from '../../../src/whatsNew/releaseNotes';
 import { type ExtensionStorage, expect, test } from '../fixtures/extension';
 import { createPromptSeed, seedLibrary } from '../utils/storage';
 
-const SCREENSHOT_DIR = process.env.WHATS_NEW_SCREENSHOTS === '1' ? 'docs/screenshots/whats-new' : 'test-results/whats-new';
+const SCREENSHOT_DIR = 'test-results/whats-new';
 
-/** The popup is 400 x 500; the side panel is as wide as the user makes it, 360 here */
 /** The notes Debug mode shows on 1.9.0: the newest Release that has some */
 const notes200 = RELEASE_NOTES.find((notes) => notes.version === '2.0.0') ?? { items: [] };
 
+/** The popup is 400 x 500; the side panel is as wide as the user makes it, 360 here */
 const SURFACES = {
   popup: { width: 400, height: 500 },
   sidepanel: { width: 360, height: 720 }
