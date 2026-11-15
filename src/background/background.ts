@@ -680,6 +680,7 @@ interface PickerWindow {
 
 const PICKER_WINDOW_KEY = "pickerWindow";
 const NO_PICKER_WINDOW: PickerWindow = { windowId: null, originalTabId: null };
+let pickerWindowUpdates: Promise<void> = Promise.resolve();
 
 /**
  * The picker window, in chrome.storage.session like the picker sessions, so that after a service
@@ -698,13 +699,18 @@ const pickerWindow = {
       originalTabId: typeof originalTabId === "number" ? originalTabId : null,
     };
   },
-  async update(change: Partial<PickerWindow>): Promise<void> {
-    const next = { ...(await pickerWindow.read()), ...change };
-    if (next.windowId === null && next.originalTabId === null) {
-      await chrome.storage.session.remove(PICKER_WINDOW_KEY);
-      return;
-    }
-    await chrome.storage.session.set({ [PICKER_WINDOW_KEY]: next });
+  /** Changes some of its fields; the changes run one after the other, so none is lost or undone */
+  update(change: Partial<PickerWindow>): Promise<void> {
+    const run = pickerWindowUpdates.then(async () => {
+      const next = { ...(await pickerWindow.read()), ...change };
+      if (next.windowId === null && next.originalTabId === null) {
+        await chrome.storage.session.remove(PICKER_WINDOW_KEY);
+        return;
+      }
+      await chrome.storage.session.set({ [PICKER_WINDOW_KEY]: next });
+    });
+    pickerWindowUpdates = run.catch(() => undefined);
+    return run;
   },
 };
 
@@ -1326,18 +1332,18 @@ async function handleElementSelected(
     });
 
     // If we have a picker window, focus it
-    let { windowId } = await pickerWindow.read();
+    const { windowId } = await pickerWindow.read();
     if (windowId) {
       try {
         await chrome.windows.update(windowId, { focused: true });
       } catch {
         // Window might be closed, ignore
-        windowId = null;
+        await pickerWindow.update({ windowId: null });
       }
     }
 
-    // Clear the original tab reference
-    await pickerWindow.update({ windowId, originalTabId: null });
+    // Clear the original tab reference; the window id is left as windows.onRemoved may have cleared it meanwhile
+    await pickerWindow.update({ originalTabId: null });
 
     sendResponse({ success: true });
   } catch (error) {

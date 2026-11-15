@@ -160,4 +160,24 @@ describe('background: the picker window of a Custom site, across a service worke
       expect(await chrome.storage.session.get(null)).toEqual({});
     });
   });
+
+  it('does not write back the picker window when it closes while a pick brings it to the front', async () => {
+    await openPicker();
+    const listener = await startServiceWorker();
+    const onWindowRemoved = vi.mocked(getChromeMock().windows.onRemoved.addListener).mock.calls.at(-1)?.[0];
+    vi.mocked(chrome.windows.update).mockImplementationOnce(async () => {
+      // The user closes the picker window as it comes to the front, and its closing is handled first
+      onWindowRemoved?.(PICKER_WINDOW_ID);
+      await vi.waitFor(async () => {
+        expect(await chrome.storage.session.get('pickerWindow')).toEqual({});
+      });
+      return { id: PICKER_WINDOW_ID } as chrome.windows.Window;
+    });
+
+    await send(listener, { type: 'ELEMENT_SELECTED', data: { selector: '#send' } }, { tab: PAGE_TAB });
+
+    await vi.waitFor(async () => {
+      expect(await chrome.storage.session.get(null)).toEqual({});
+    });
+  });
 });
