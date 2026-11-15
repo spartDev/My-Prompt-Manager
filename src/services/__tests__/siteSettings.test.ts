@@ -71,6 +71,17 @@ describe('parseSiteSettings', () => {
       expect(enabledPlatforms(settings)).toEqual(['claude.ai', 'copilot.microsoft.com', 'm365.cloud.microsoft']);
     });
 
+    it('takes M365 Copilot from a list an earlier release changed after a rollback, which lists it as it is', () => {
+      const settings = parseSiteSettings({
+        platformChoices: { 'claude.ai': true },
+        enabledSites: ['copilot.microsoft.com'],
+        enabledSitesWritten: ['claude.ai', 'copilot.microsoft.com']
+      });
+
+      expect(settings.platformChoices['m365.cloud.microsoft']).toBe(false);
+      expect(settings.platformChoices['claude.ai']).toBe(false);
+    });
+
     it('gives every Platform of that release off for an empty list', () => {
       expect(enabledPlatforms(parseSiteSettings({ enabledSites: [] }))).toEqual([]);
     });

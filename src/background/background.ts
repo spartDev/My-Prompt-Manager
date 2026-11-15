@@ -960,8 +960,8 @@ async function upgradeStoredData(): Promise<void> {
 }
 
 /**
- * Write the Site settings an earlier release stored as the list of the Platforms that were on back
- * as the Platform choices, on extension update and again at every browser startup, like the pass
+ * Write the Site settings an earlier release stored as the list of the Platforms that were on, or
+ * whose list it changed after a rollback, back as the Platform choices, on extension update and again at every browser startup, like the pass
  * above. Until it runs, every reader already reads the list as those choices: it only spares later
  * releases from reading the old shape. A failure is logged here and never reaches the caller.
  */

@@ -69,15 +69,19 @@ export const PLATFORMS_OF_THE_ENABLED_LIST: readonly string[] = Object.freeze([
   'm365.cloud.microsoft'
 ]);
 
-/** The Platform choices a stored list of the Platforms that were on stands for */
-function choicesOfEnabledList(enabledSites: readonly string[]): Record<string, boolean> {
+/**
+ * The Platform choices a stored list of the Platforms that were on stands for. `mayPredateM365` for
+ * a list a release before the Platform choices wrote, which may be older than M365 Copilot; not for
+ * one it changed after a rollback, which lists M365 Copilot as it is.
+ */
+function choicesOfEnabledList(enabledSites: readonly string[], mayPredateM365: boolean): Record<string, boolean> {
   const choices: Record<string, boolean> = {};
   for (const hostname of PLATFORMS_OF_THE_ENABLED_LIST) {
     choices[hostname] = enabledSites.includes(hostname);
   }
   // M365 Copilot is switched with Copilot, so a list with Copilot and without M365 Copilot was
   // written before M365 Copilot existed. Frozen like the list: a later link changes nothing here
-  if (enabledSites.includes('copilot.microsoft.com')) {
+  if (mayPredateM365 && enabledSites.includes('copilot.microsoft.com')) {
     choices['m365.cloud.microsoft'] = true;
   }
   // A hostname on the list that is no Platform of those releases stays on, as it was
@@ -171,10 +175,10 @@ export function parseSiteSettings(stored: unknown): SiteSettings {
     // a Platform it did not know keeps its choice
     const rewritten = listRewrittenByEarlierRelease(stored);
     if (rewritten !== null) {
-      platformChoices = { ...platformChoices, ...choicesOfEnabledList(rewritten) };
+      platformChoices = { ...platformChoices, ...choicesOfEnabledList(rewritten, false) };
     }
   } else if (isEnabledListStore(stored)) {
-    platformChoices = choicesOfEnabledList(hostnamesOf(stored.enabledSites) ?? []);
+    platformChoices = choicesOfEnabledList(hostnamesOf(stored.enabledSites) ?? [], true);
   }
 
   return {
