@@ -259,3 +259,25 @@ body {
     border-top-color: transparent;
   }
 }
+
+/* --- What's new sheet (My-Prompt-Manager-d1g.5) ---
+   Got it presses on a spring (the mockup's transform .3s ease-spring) and darkens on hover. Under
+   prefers-reduced-motion the sheet, its backdrop and the press are near instant */
+@utility transition-got-it {
+  transition: background-color 200ms, scale 300ms var(--ease-spring);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-whats-new-sheet-in,
+  .animate-whats-new-sheet-out,
+  .animate-whats-new-backdrop-in,
+  .animate-whats-new-backdrop-out {
+    animation-duration: 1ms;
+    animation-delay: 0ms !important;
+  }
+
+  .transition-got-it {
+    transition-duration: 1ms;
+  }
+}
+/* --- end What's new sheet --- */
