@@ -481,8 +481,8 @@ for launcher in "${LAUNCHERS[@]}"; do
     if [ -f "$STATE/panes" ]; then fail "the session still runs"; else pass; fi
     expect_no_lock
 
-    # dev-workflow.sh, run by /bin/bash 3.2, dies on this INT and its EXIT trap
-    # rolls back; the case above is the one that needs the INT trap
+    # dev-workflow.sh dies on this INT and its EXIT trap rolls back, with or
+    # without the INT trap; the case above is the one that needs it
     setup "$name: INT during setup" A='|open' B='me|open'
     touch "$STATE/int-at-new-session"
     launch "$launcher" A B
