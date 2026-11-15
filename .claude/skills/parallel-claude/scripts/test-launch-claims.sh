@@ -220,6 +220,15 @@ setup() {
     for spec in "$@"; do echo "${spec#*=}" > "$STATE/issues/${spec%%=*}"; done
 }
 
+# The pid of a process that has just ended, fresh for each case
+dead_pid() {
+    local pid
+    sleep 0 &
+    pid=$!
+    wait "$pid"
+    echo "$pid"
+}
+
 # Run a snippet with launch-claims.sh sourced, as a launcher would
 with_claims() {
     (cd "$REPO" && REPO_DIR="$REPO" bash -c '
@@ -298,9 +307,7 @@ expect_untouched A
 expect_no_lock
 
 setup "the lock of a launch that no longer runs is removed" A='|open'
-sleep 0 &
-dead=$!
-wait "$dead"
+dead=$(dead_pid)
 ln -s "$dead" "$LOCK"
 with_claims 'claim_issues A || exit 9; finish_launch'
 expect_eq "exit code" 0 $?
@@ -318,6 +325,7 @@ expect_eq "lock holder" "$$" "$(readlink "$LOCK")"
 rm -f "$LOCK"
 
 setup "a stale lock another launch is removing is left to it" A='|open'
+dead=$(dead_pid)
 ln -s "$dead" "$LOCK"
 ln -s "$$" "$LOCK.reap"
 with_claims 'claim_issues A'
@@ -327,16 +335,21 @@ expect_eq "lock holder" "$dead" "$(readlink "$LOCK")"
 expect_eq "removal lock holder" "$$" "$(readlink "$LOCK.reap")"
 rm -f "$LOCK" "$LOCK.reap"
 
-setup "a removal lock of a launch that no longer runs is removed" A='|open'
+setup "a removal lock of a launch that no longer runs stops the launch" A='|open'
+dead=$(dead_pid)
 ln -s "$dead" "$LOCK"
 ln -s "$dead" "$LOCK.reap"
-with_claims 'claim_issues A || exit 9; finish_launch'
-expect_eq "exit code" 0 $?
-expect_owner A 'me|in_progress'
-if grep -q "Removed the removal lock of launch $dead" "$STATE/out"; then pass; else fail "no warning about the stale removal lock"; fi
-expect_no_lock
+with_claims 'claim_issues A'
+expect_eq "exit code" 1 $?
+expect_owner A '|open'
+expect_untouched A
+expect_eq "lock holder" "$dead" "$(readlink "$LOCK")"
+expect_eq "removal lock holder" "$dead" "$(readlink "$LOCK.reap")"
+if grep -q "remove $LOCK.reap if no launch is running" "$STATE/out"; then pass; else fail "the error does not name the removal lock"; fi
+rm -f "$LOCK" "$LOCK.reap"
 
 setup "TERM as the removal lock is taken" A='|open'
+dead=$(dead_pid)
 ln -s "$dead" "$LOCK"
 touch "$STATE/term-at-reap"
 with_claims 'claim_issues A; echo "not stopped"'

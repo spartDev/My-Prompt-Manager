@@ -162,23 +162,22 @@ remove_dead_lock() { # <lock> <pid> <what>
         print_warning "Removed the $3 of launch $2, which no longer runs"
     fi
 }
+# A pid reused by another process since its launch died reads as alive: the
+# lock then stays, and the error names its holder so it can be removed by hand.
 
 # Take the claim lock; a lock whose holder no longer runs (a launch killed
 # with SIGKILL) is removed first. The removal happens under a second lock and
 # only while the holder read is still the one in place, so two launches that
 # find the same stale lock never remove the lock one of them has just taken.
-# A removal lock left by a launch killed while removing is removed in turn.
+# A removal lock left by a launch killed while removing is not removed: nothing
+# would guard that removal, so the launch stops and names it.
 take_claim_lock() {
-    local holder reaper
+    local holder
     link_lock "$LAUNCH_LOCK" && return 0
     holder=$(dead_holder "$LAUNCH_LOCK") || return 1
     # Named before it is taken, so an interrupt while it is taken still frees it
     LAUNCH_REAP="$LAUNCH_LOCK.reap"
-    if ! link_lock "$LAUNCH_REAP"; then
-        reaper=$(dead_holder "$LAUNCH_REAP") || return 1
-        remove_dead_lock "$LAUNCH_REAP" "$reaper" "removal lock"
-        link_lock "$LAUNCH_REAP" || return 1
-    fi
+    link_lock "$LAUNCH_REAP" || return 1
     remove_dead_lock "$LAUNCH_LOCK" "$holder" "claim lock"
     free_reap_lock
     link_lock "$LAUNCH_LOCK"
@@ -189,7 +188,7 @@ take_claim_lock() {
 # has set up or rolled back, and a rollback can never release a ticket another
 # launch has just claimed. On failure nothing is held.
 claim_issues() {
-    local lock holder
+    local lock holder reaper
     lock="$(git -C "$REPO_DIR" rev-parse --path-format=absolute --git-common-dir)/claude-parallel-claim.lock"
     # Interrupted from here to finish_launch: roll back, then stop. Set before
     # the lock is taken, so no interrupt falls between the lock and its trap.
@@ -201,7 +200,8 @@ claim_issues() {
         free_reap_lock
         holder=$(readlink "$lock" 2>/dev/null) || holder="unknown"
         if [ -L "$lock.reap" ] || [ -e "$lock.reap" ]; then
-            print_error "Another launch is removing a stale claim lock ($lock.reap). Wait for it, or remove $lock.reap if no launch is running."
+            reaper=$(readlink "$lock.reap" 2>/dev/null) || reaper="unknown"
+            print_error "Another launch is removing a stale claim lock ($lock.reap, held by $reaper). Wait for it, or remove $lock.reap if no launch is running."
         else
             print_error "Another launch is claiming tickets (lock $lock, held by $holder). Wait for it, or remove the lock if no launch is running."
         fi
