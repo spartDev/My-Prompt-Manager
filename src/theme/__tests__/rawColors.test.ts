@@ -93,7 +93,9 @@ const MIGRATED = [
   // My-Prompt-Manager-d1g.6: What's new tiles
   'components/whatsNew/WhatsNewTile.tsx',
   'components/whatsNew/WhatsNewGrid.tsx',
-  'components/icons/WhatsNewIcons.tsx'
+  'components/icons/WhatsNewIcons.tsx',
+  // My-Prompt-Manager-d1g.5: the What's new sheet
+  'components/whatsNew/WhatsNewSheet.tsx'
 ];
 
 // Agent guidance that prescribes classes follows the same rule, or it steers UI work off the tokens

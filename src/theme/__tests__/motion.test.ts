@@ -133,7 +133,10 @@ describe("What's new tiles motion", () => {
     const popupCss = readFileSync(path.resolve(__dirname, '../../popup.css'), 'utf8');
     expect(MOTION.tilePress).toBe(300);
     expect(popupCss).toMatch(new RegExp(`@utility transition-tile \\{\\s*transition:\\s*scale ${MOTION.tilePress}ms var\\(--ease-spring\\),\\s*background-color 200ms;`));
-    const reduced = popupCss.slice(popupCss.lastIndexOf('@media (prefers-reduced-motion: reduce)'));
+    // The reduced-motion rules of the tiles' own block, wherever other blocks sit around it
+    const block = popupCss.slice(popupCss.indexOf("/* --- What's new tiles"), popupCss.indexOf("/* --- end What's new tiles --- */"));
+    const reduced = block.slice(block.indexOf('@media (prefers-reduced-motion: reduce)'));
+    expect(reduced).not.toBe('');
     expect(reduced).toMatch(/\.animate-tile-rise \{\s*animation-duration: 1ms;\s*animation-delay: 0ms !important;/);
     expect(reduced).toMatch(/\.transition-tile \{\s*transition-duration: 1ms;/);
   });

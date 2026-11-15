@@ -1158,6 +1158,25 @@ run together. While a create, save or deletion runs, the name is read-only and t
 The sheet sits at `z-40`, under the Notification (`z-50`), so a Notification's Undo stays within
 reach; its backdrop has no blur, so what is behind it (the edited row's border) stays sharp.
 
+#### What's new sheet
+
+The What's new sheet (`src/components/whatsNew/WhatsNewSheet.tsx`) rises from the bottom over
+`bg-backdrop` (no blur), like the Category sheet, on the timing of its mockup:
+
+| Token | Value | Use |
+|---|---|---|
+| `animate-whats-new-sheet-in` (`MOTION.whatsNewSheetIn`) | `sheet-in` 600ms, `ease-section` (`cubic-bezier(0.32, 0.72, 0, 1)`) | the sheet rising from `translateY(100%)` |
+| `animate-whats-new-sheet-out` (`MOTION.whatsNewSheetOut`) | `sheet-out` 340ms, `ease-sheet-out` | the sheet leaving; its caller unmounts it after (`useAnimatedPresence`) |
+| `animate-whats-new-backdrop-in` / `-out` (`MOTION.whatsNewBackdropIn` / `whatsNewBackdropOut`) | `backdrop-in` 300ms / `backdrop-out` 340ms, ease | its backdrop |
+| `transition-got-it` (`src/popup.css`) | background 200ms, scale 300ms ease-spring | Got it, with `hover:bg-accent-hover` and `active:scale-96` |
+| `rounded-t-sheet` (`--radius-sheet`) | 26px | the sheet's top corners |
+| `shadow-sheet` (`--shadow-tint-sheet`) | `0 -20px 50px -20px`, violet at 0.45 in light, black at 0.72 in dark | the shadow the sheet casts upwards |
+| `bg-handle` | `border-strong` (`#DCD4EA` / `#41375A`) | the handle, 38 by 5px, decorative |
+
+The sheet is `bg-card` and the footer above Got it has a `border-divider` rule. Under
+`prefers-reduced-motion`, `src/popup.css` makes all of them last 1ms, and the caller's timer waits
+for nothing (`motionDuration`).
+
 #### Modal Fade In
 
 ```css
