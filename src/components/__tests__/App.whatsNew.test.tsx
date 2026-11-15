@@ -171,6 +171,29 @@ describe("App: What's new", () => {
       expect(screen.queryByRole('button', { name: /delete/i })).not.toBeInTheDocument();
     });
 
+    it('prompt-editor-new: an editor already open keeps its draft', async () => {
+      // The decision lands only once the user has opened the editor and typed a title
+      let decide: () => void = () => undefined;
+      const stored = readWhatsNewRecord();
+      vi.mocked(readWhatsNewRecord).mockImplementationOnce(
+        () => new Promise((resolve) => { decide = () => { resolve(stored); }; })
+      );
+      const user = userEvent.setup();
+      render(<App />);
+      await user.click(await screen.findByRole('button', { name: /add new prompt/i }));
+      const editorSheet = await screen.findByTestId('editor-sheet');
+      await user.type(within(editorSheet).getByLabelText(/title/i), 'My draft');
+
+      act(() => { decide(); });
+      const sheet = await screen.findByRole('dialog', { name: WHATS_NEW });
+      fireEvent.click(within(sheet).getByRole('button', { name: /^Fill-in variables/ }));
+      await waitForElementToBeRemoved(sheet);
+
+      // The same editor, its draft kept
+      expect(screen.getByTestId('editor-sheet')).toBe(editorSheet);
+      expect(within(editorSheet).getByLabelText(/title/i)).toHaveValue('My draft');
+    });
+
     it.each([
       [/^Undo a Category deletion/, 'Categories'],
       [/^Tidy up/, 'Analytics'],
@@ -246,7 +269,8 @@ describe("App: What's new", () => {
       const user = userEvent.setup();
       const sheet = await openWithWhatsNew();
       vi.mocked(markReleaseSeen).mockClear();
-      // From Got it, Tab wraps to the first tile: the hero
+      // From Got it, Tab wraps to the scrolling body, then the first tile: the hero
+      await user.tab();
       await user.tab();
       expect(screen.getByRole('button', { name: /^Fill-in variables/ })).toHaveFocus();
 
@@ -278,18 +302,19 @@ describe("App: What's new", () => {
       expect(document.activeElement).toBe(document.body);
     });
 
-    it('keeps the keyboard inside while open: Tab and Shift+Tab cycle through the 8 Feature tiles and Got it only', async () => {
+    it('keeps the keyboard inside while open: Tab and Shift+Tab cycle through the scrolling body, the 8 Feature tiles and Got it only', async () => {
       const user = userEvent.setup();
       const sheet = await openWithWhatsNew();
       const gotIt = screen.getByRole('button', { name: 'Got it' });
+      const body = within(sheet).getByTestId('whats-new-body');
       const visited: (string | null)[] = [];
 
-      for (let step = 0; step < 9; step++) {
+      for (let step = 0; step < 10; step++) {
         await user.tab();
         expect(sheet).toContainElement(document.activeElement as HTMLElement);
-        visited.push(document.activeElement?.getAttribute('data-whats-new-tile-index') ?? null);
+        visited.push(document.activeElement === body ? 'body' : (document.activeElement?.getAttribute('data-whats-new-tile-index') ?? null));
       }
-      expect(visited).toEqual(['1', '2', '3', '4', '5', '6', '7', '8', null]);
+      expect(visited).toEqual(['body', '1', '2', '3', '4', '5', '6', '7', '8', null]);
       expect(gotIt).toHaveFocus();
 
       await user.tab({ shift: true });

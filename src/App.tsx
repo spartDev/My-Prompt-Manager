@@ -391,7 +391,10 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
         goToLibrarySearch();
         return;
       case 'prompt-editor-new':
-        openEditor({ mode: 'add' });
+        // An editor already open keeps its draft: a new one would remount it (editorKey)
+        if (editor === null) {
+          openEditor({ mode: 'add' });
+        }
         return;
       case 'library':
       case 'categories':

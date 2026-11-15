@@ -199,6 +199,8 @@ describe("What's new: keyboard, focus, screen readers and reduced motion", () =>
   describe('AC2: Enter opens a focused Feature tile, and closes everywhere else', () => {
     it('Enter on a focused Feature tile opens it and does not also close-without-opening', async () => {
       const { onOpen, onClose, user } = renderSheet();
+      // From Got it: the scrolling body, the hero, then Search
+      await user.tab();
       await user.tab();
       await user.tab();
       expect(screen.getByRole('button', { name: /^Search/ })).toHaveFocus();
@@ -244,18 +246,50 @@ describe("What's new: keyboard, focus, screen readers and reduced motion", () =>
   });
 
   describe('AC3: the keyboard stays in the sheet', () => {
-    it('Tab goes from Got it through every Feature tile and back to Got it, never to a plain tile', async () => {
+    /** What has the keyboard: the scrolling body, a tile by its number, or Got it */
+    const focused = (): string => {
+      const active = document.activeElement;
+      if (active === screen.getByTestId('whats-new-body')) {return 'body';}
+      return active?.getAttribute('data-whats-new-tile-index') ?? active?.textContent ?? '';
+    };
+
+    it('Tab goes from Got it through the scrolling body and every Feature tile and back to Got it, never to a plain tile', async () => {
       const { user } = renderSheet();
       const dialog = screen.getByRole('dialog');
+      expect(screen.getByRole('button', { name: 'Got it' })).toHaveFocus();
       const visited: string[] = [];
 
-      for (let step = 0; step < 4; step++) {
+      for (let step = 0; step < 5; step++) {
         await user.tab();
         expect(dialog).toContainElement(document.activeElement as HTMLElement);
-        visited.push(document.activeElement?.getAttribute('data-whats-new-tile-index') ?? document.activeElement?.textContent ?? '');
+        visited.push(focused());
       }
 
-      expect(visited).toEqual(['1', '2', '3', 'Got it']);
+      expect(visited).toEqual(['body', '1', '2', '3', 'Got it']);
+    });
+
+    it('with only Critical fixes, the scrolling body takes the keyboard, so it scrolls; Tab and Shift+Tab stay between it and Got it', async () => {
+      const { user } = renderSheet({ items: [fix('A'), fix('B'), fix('C')] });
+      const dialog = screen.getByRole('dialog');
+      expect(screen.getByRole('button', { name: 'Got it' })).toHaveFocus();
+      const visited: string[] = [];
+
+      for (const shift of [false, false, true, true]) {
+        await user.tab({ shift });
+        expect(dialog).toContainElement(document.activeElement as HTMLElement);
+        visited.push(focused());
+      }
+
+      expect(visited).toEqual(['body', 'Got it', 'body', 'Got it']);
+    });
+
+    it('the scrolling body is a region named by the title, with a visible focus ring for the keyboard', () => {
+      renderSheet();
+
+      const body = screen.getByTestId('whats-new-body');
+      expect(body).toHaveAttribute('tabindex', '0');
+      expect(within(screen.getByRole('dialog')).getByRole('region', { name: /What.s new/ })).toBe(body);
+      expect(body).toHaveClass('focus-visible:outline-2', 'focus-visible:outline-accent');
     });
   });
 

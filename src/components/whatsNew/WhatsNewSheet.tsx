@@ -38,7 +38,8 @@ const TEXT_FIELD = 'input, textarea, select, [contenteditable]:not([contentedita
  * What's new (Atelier 1C): the bottom sheet that rises over the Library and lists the Release notes
  * of a Release. A backdrop, the sheet with its handle, the pill "New in {version}", the title, a
  * scrolling body for the tile grid and a footer with Got it. It keeps the keyboard while open
- * (useModalFocus): the focus starts on Got it, Tab stays inside, and it returns to the opener on close.
+ * (useModalFocus): the focus starts on Got it, Tab stays inside (the scrolling body, its Feature tiles,
+ * Got it), and it returns to the opener on close.
  * Escape, Enter outside a tile, the backdrop and Got it close it; the digits 1 to 9 press the Feature
  * tile of that number, which closes it and opens the tile's destination. It knows nothing of Debug mode or
  * of storage: the caller decides what closing means.
@@ -119,7 +120,16 @@ const WhatsNewSheet: FC<WhatsNewSheetProps> = ({ version, children, open, onClos
         {/* Handle: decoration only */}
         <span aria-hidden="true" className="mt-2 mb-0.5 h-[5px] w-[38px] flex-none self-center rounded-[3px] bg-handle" />
 
-        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pt-2 pb-3">
+        {/* The scrolling body takes the keyboard itself, so notes with no tile to focus (only
+            Critical fixes) still scroll with the arrow keys; named by the title, not an anonymous group */}
+        <div
+          role="region"
+          aria-labelledby={titleId}
+          // biome-ignore lint/a11y/noNoninteractiveTabindex: a scrolling region must take the keyboard to scroll when nothing inside it can (WCAG 2.1.1)
+          tabIndex={0}
+          data-testid="whats-new-body"
+          className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pt-2 pb-3 focus:outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+        >
           <div className="flex flex-col gap-1.5">
             {/* An information pill, not a chosen item: bg-accent-subtle, the dark mockup's own fill */}
             <span className="inline-flex h-6 items-center self-start rounded-full bg-accent-subtle px-2.5 text-xs font-bold text-accent">

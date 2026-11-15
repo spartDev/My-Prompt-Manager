@@ -188,12 +188,14 @@ describe('WhatsNewSheet', () => {
       expect(screen.getByRole('button', { name: 'Got it' })).toHaveFocus();
     });
 
-    it('Tab and Shift+Tab cycle through the tiles and Got it without leaving the sheet', async () => {
+    it('Tab and Shift+Tab cycle through the scrolling body, the tiles and Got it without leaving the sheet', async () => {
       const { user } = renderSheet();
       const gotIt = screen.getByRole('button', { name: 'Got it' });
       const variables = screen.getByRole('button', { name: 'Variables' });
       const search = screen.getByRole('button', { name: 'Search' });
 
+      await user.tab();
+      expect(screen.getByTestId('whats-new-body')).toHaveFocus();
       await user.tab();
       expect(variables).toHaveFocus();
       await user.tab();
@@ -202,6 +204,7 @@ describe('WhatsNewSheet', () => {
       expect(gotIt).toHaveFocus();
       await user.tab({ shift: true });
       expect(search).toHaveFocus();
+      await user.tab({ shift: true });
       await user.tab({ shift: true });
       await user.tab({ shift: true });
       expect(gotIt).toHaveFocus();

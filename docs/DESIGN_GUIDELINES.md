@@ -1445,7 +1445,7 @@ All interactive elements MUST have appropriate ARIA labels:
 | `1`…`9` | Presses the Feature tile of that number, as a click would: What's new closes and the tile's destination opens. The Feature tiles that open something are numbered from 1 in display order, the hero first (`data-whats-new-tile-index`, announced through `aria-keyshortcuts`); a Critical fix and a Feature without destination have no number. A number beyond the count does nothing, and so does a digit typed with Cmd, Ctrl or Alt or in a text field |
 | `Enter` | On a focused Feature tile, opens it (the button's own activation); anywhere else, Got it included, closes |
 | `Escape` | Closes |
-| `Tab` / `Shift+Tab` | Cycle through the Feature tiles and Got it, inside the sheet. The focus starts on Got it and goes back where it was on close, unless the destination takes it: the editor's title field, the Library's search field |
+| `Tab` / `Shift+Tab` | Cycle through the scrolling body, the Feature tiles and Got it, inside the sheet. The body takes the keyboard itself (`tabIndex={0}`, a region named by the title, an inset `focus-visible` outline in `outline-accent`), so notes with no tile to focus, only Critical fixes, still scroll with the arrow keys. The focus starts on Got it and goes back where it was on close, unless the destination takes it: the editor's title field, the Library's search field |
 
 **Example:**
 ```tsx
