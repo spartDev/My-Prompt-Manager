@@ -26,6 +26,7 @@ import { ThemeManager } from '../utils/theme-manager';
 import { AnchoredOverlay, INSIDE_CORNER_INSET } from './anchored-overlay';
 import { IconPlacementController, placeAtAnchor, resolveIconPlacement } from './icon-placement';
 import { PlatformInsertionManager } from './insertion-manager';
+import { PlacementRepair } from './placement-repair';
 
 export interface InjectorState {
   icon: HTMLElement | null;
@@ -75,6 +76,8 @@ export class PromptLibraryInjector {
   private readonly overlay: AnchoredOverlay;
   /** Watches the placed icon and asks for a new placement when the Platform removes it */
   private readonly placement: IconPlacementController;
+  /** The element the user picked for a built-in Platform whose toolbar is not found, and the placement reports */
+  private readonly repair: PlacementRepair;
   private iconCleanups: Map<HTMLElement, () => void>;
   /**
    * Themes the Prompts button when the extension's theme is read or changes. The theme manager
@@ -145,6 +148,9 @@ export class PromptLibraryInjector {
     this.overlay = new AnchoredOverlay();
     this.placement = new IconPlacementController((editor) => {
       this.handleIconLost(editor);
+    });
+    this.repair = new PlacementRepair(hostname, () => {
+      this.handleOverrideChange();
     });
 
     // Icon cleanup tracking (prevents MutationObserver memory leaks)
@@ -221,6 +227,10 @@ export class PromptLibraryInjector {
       // Initialize platform strategies for enabled sites only
       debug('Initializing platform strategies for enabled site');
       await this.platformManager.initializeStrategies();
+      // A built-in Platform may have an element the user picked for the icon while its toolbar is not found
+      if (this.platformManager.getIconPlacement()) {
+        await this.repair.load();
+      }
 
       // Setup SPA monitoring for dynamic navigation detection
       this.setupSPAMonitoring();
@@ -992,6 +1002,9 @@ export class PromptLibraryInjector {
       if (resolution) {
         placeAtAnchor(icon, resolution);
         this.placement.track(icon, textarea, 'toolbar', resolution.index);
+        this.repair.report('toolbar');
+      } else if (iconPlacement && this.placeAtOverride(icon, textarea)) {
+        return;
       }
 
       // Check if we have custom positioning configuration (declare outside if block for scope)
@@ -1191,6 +1204,7 @@ export class PromptLibraryInjector {
       warn('No anchor of this Platform found in its composer, the icon is anchored on the editor instead', {
         hostname: this.state.hostname
       });
+      this.repair.report('overlay');
     } else {
       debug('No anchor chain for this site, the icon is anchored on the editor');
     }
@@ -1211,6 +1225,39 @@ export class PromptLibraryInjector {
     }
     this.placement.track(icon, textarea, 'overlay');
     debug('Icon anchored on the editor', { method: method ?? 'static' });
+  }
+
+  /**
+   * Places the icon at the element the user picked for this Platform in Settings, when its
+   * toolbar is not found. False when there is no such element, or it is not on the page: the icon
+   * then goes on the Anchored overlay, and Settings keeps offering to place it.
+   */
+  private placeAtOverride(icon: HTMLElement, textarea: HTMLElement): boolean {
+    const positioning = this.repair.positioning;
+    if (!positioning) {
+      return false;
+    }
+    const anchor = this.repair.findAnchor();
+    if (!anchor || anchor === icon || icon.contains(anchor)) {
+      debug('The element picked for the icon is not on the page');
+      return false;
+    }
+    placeAtAnchor(icon, { index: -1, anchor, relation: positioning.placement });
+    this.placement.track(icon, textarea, 'override');
+    this.repair.report('override');
+    debug('Icon placed at the element picked for this Platform', { relation: positioning.placement });
+    return true;
+  }
+
+  /** The user picked an element for this Platform, or the pick was dropped: the icon is placed again */
+  private handleOverrideChange(): void {
+    const editor = this.state.currentTextarea;
+    if (!this.state.isSiteEnabled || !editor?.isConnected) {
+      return;
+    }
+    this.injectIcon(editor).catch((err: unknown) => {
+      error('Icon placement after a new pick failed', err instanceof Error ? err : new Error(String(err)));
+    });
   }
 
   /**
@@ -1763,6 +1810,8 @@ export class PromptLibraryInjector {
 
     // Clear caches
     this.selectorCache.clear();
+
+    this.repair.dispose();
 
     // Reset state
     this.state.isInitialized = false;

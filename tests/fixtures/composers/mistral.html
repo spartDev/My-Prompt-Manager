@@ -1,19 +1,21 @@
 <!--
-  Mistral Le Chat composer, captured from chat.mistral.ai/chat on 2026-11-11, signed out. The
-  submit button is hidden while the draft is empty; the mode button ("Fast") has no label.
-  Sanitized: text, classes (but the editor's), generated ids, styles and SVG content removed;
-  wrappers with no attribute and one child folded into that child.
+  Mistral Le Chat composer, captured from chat.mistral.ai/chat on 2026-11-11, signed out. The submit
+  button is hidden while the draft is empty; the mode button ("Fast") has no label.
+  Re-sanitized on 2026-11-15 by scripts/composers/sanitize.ts: text, links, media and SVG content
+  removed; of the attributes, only contenteditable, role and type of the web platform's values, and
+  what the Platform's selectors read, with the selector's value; wrappers with no attribute and one
+  child folded into that child.
 -->
 <form>
   <div>
-    <button aria-label="Open settings menu" type="button"></button>
+    <button aria-label="settings" type="button"></button>
     <div>
-      <button type="submit" hidden></button>
-      <div class="ProseMirror" contenteditable="true" translate="no"><p data-placeholder="Ask"><br></p></div>
+      <button type="submit"></button>
+      <div class="ProseMirror" contenteditable="true"><p><br></p></div>
     </div>
     <div>
       <button type="button"></button>
-      <button aria-label="Voice Mode" type="button"></button>
+      <button aria-label="voice" type="button"></button>
     </div>
   </div>
 </form>

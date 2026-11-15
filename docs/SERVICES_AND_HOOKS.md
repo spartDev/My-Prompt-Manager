@@ -30,6 +30,7 @@ Other keys of `chrome.storage.local` belong to the code that owns them, which wr
 | `usageHistory` | `src/services/UsageTracker.ts` |
 | `toast_settings` | `src/hooks/useToast.ts` |
 | `promptLibrarySettings` (the Site settings) | `src/services/siteSettings.ts`, the only reader and the only writer |
+| `iconPlacementRepairs` | `src/services/iconPlacementRepairs.ts`; written by the service worker only |
 | `interfaceMode` | `src/components/SettingsView.tsx` |
 | `grantedPermissions` | `src/background/background.ts` |
 
@@ -42,6 +43,7 @@ Other keys of `chrome.storage.local` belong to the code that owns them, which wr
 | `src/services/storage.ts` | `StorageManager`, a singleton: the only writer of the Prompts, the Categories and the settings, and the read API the popup and side panel use for them (direct readers too: the content script in `src/content/utils/storage.ts` and `src/content/utils/theme-manager.ts`, and `SettingsView`'s `loadSettings`); Backup import and export, storage use, the upgrade pass. Prompt text goes through Admission inside its writing methods |
 | `src/services/promptAdmission.ts` | Admission: the one place Prompt text is checked, the one reader of stored Prompts, the limits (`PROMPT_LIMITS`). Pure, no `chrome.*`; shared by the popup, the service worker and the content script |
 | `src/services/siteSettings.ts` | The Site settings, for the popup, the service worker and the content script (no `StorageManager`, no React). Reading: their one shape (`SiteSettings`, with the `CustomSite` of `src/types/index.ts`), the defaults, the validated read (`parseSiteSettings`, and `readSiteSettings` over `chrome.storage.local`, which rejects when storage cannot be read), and the one rule for whether the extension works on a hostname (`isHostnameEnabled`, `enabledCustomSite`, `enabledHostnames`). A Custom site entry with no hostname, display name, switch or date is left out. Saving: `changeSiteSettings(change)` applies one change (a Platform with its linked Platforms, a Custom site added, removed or switched, the debug switch, a reset) to what storage holds, under its own lock, then sends `settingsUpdated` to the web tabs and `reinitialize` to the tabs of a changed Custom site. It rejects, with storage untouched, when storage cannot be read or written; a change that changes nothing writes and sends nothing; a reset removes the key. `onSiteSettingsChanged` follows the key in `chrome.storage.onChanged`. `SettingsView` shows what these return and never saves a copy of its own |
+| `src/services/iconPlacementRepairs.ts` | Icon placement repairs of the built-in Platforms (design §6), apart from the Site settings: how each content script last placed the icon when not in the Toolbar (`overlay`, `override`) and the element the user picked in Settings (an override, the shape of a Custom site's positioning). `applyIconPlacementRepairChange` is the lifecycle, pure: a report of the Anchored overlay records it, a pick stores the override, a report of the Toolbar drops the Platform's entry, override included. `changeIconPlacementRepairs` applies a change under its own lock; the service worker calls it on `ICON_PLACEMENT_REPORTED` (hostname of the sender tab, built-in Platforms only) and on a pick started with `repairHostname`. No `StorageManager`, no React: the content script reads it |
 | `src/services/promptManager.ts` | `PromptManager`, a singleton over `StorageManager`: creating and updating Prompts, search with highlights, sorting, statistics, duplicate detection, title generation |
 | `src/services/SearchIndex.ts` | The inverted index behind `PromptManager`'s search |
 | `src/services/SimilarityAlgorithms.ts` | The string similarity behind duplicate detection and `promptLookalike.ts` |
@@ -60,8 +62,8 @@ Helpers the services lean on: `src/utils/asyncMutex.ts` (locks), `src/utils/stor
 `AsyncMutex` queues operations per key. `StorageManager` creates it with a `scope`, so `withLock(key, operation)` runs `navigator.locks.request('StorageManager:' + key, operation)`: the popup, the side panel and the service worker (same extension origin) exclude each other on the Prompts, Categories and settings keys. The operation's result or error comes back unchanged and the lock is released either way. Where the Web Locks API is missing, or refuses the request without running the operation (it throws, or rejects with a `SecurityError` in an opaque origin), the in-memory queue is used (tests, old browsers).
 
 - Nested keys are taken in the fixed order CATEGORIES → PROMPTS → SETTINGS, and nothing under a lock awaits another context.
-- The Site settings have a lock of their own, in `src/services/siteSettings.ts` (`withSiteSettingsLock`, scope `SiteSettings`), shared across contexts the same way. `clearAllData()` takes it last, after SETTINGS, so a change of the Site settings waiting in another context cannot write them back after the clear. Nothing else takes it together with another lock.
-- Clear All Data takes all three, so a write from another context lands wholly before or after it.
+- The Site settings have a lock of their own, in `src/services/siteSettings.ts` (`withSiteSettingsLock`, scope `SiteSettings`), and so do the icon placement repairs, in `src/services/iconPlacementRepairs.ts` (`withIconPlacementRepairsLock`, scope `IconPlacementRepairs`), both shared across contexts the same way. `clearAllData()` takes them after SETTINGS, the Site settings lock first and the icon placement repairs lock last, so a change waiting in another context cannot write either back after the clear. Nothing else takes them together with another lock.
+- Clear All Data takes all five, so a write from another context lands wholly before or after it.
 - Reads take no lock, except reading the Categories, which takes CATEGORIES only to write a missing default Category.
 - Settings writes take only the SETTINGS key, so a toggle never waits on a Prompt write.
 - `UsageTracker` keeps a plain in-memory `AsyncMutex`.
@@ -127,6 +129,7 @@ A refusal keeps its type through `StorageManager` and `PromptManager`, so a call
 | `src/hooks/useEnhancedFloatingPosition.ts` | Keep a menu in the viewport (flip, shift) | `Dropdown` |
 | `src/hooks/useSitePermissions.ts` | Check and request host permissions for a site | site integration Settings, `usePickerWindow` |
 | `src/hooks/usePickerWindow.ts` | The element picker flow for a custom site | `SiteIntegrationSection` |
+| `src/hooks/useIconPlacementRepairs.ts` | The icon placement repairs, kept up to date from storage, and `placeIcon`: the Element picker on a tab of the Platform, the pick kept by the service worker | `SiteIntegrationSection` (Place the icon) |
 | `src/hooks/useUsageStats.ts` | Usage history, Prompts and Categories, loaded once, with the Insertions per day and per time of day for the charts | Analytics, its full-page view |
 | `src/hooks/useNow.ts` | The current time, refreshed at an interval, for relative dates | Full-page Analytics view |
 | `src/hooks/useCountUp.ts` | A number counting up from 0 with an ease-out (`MOTION.countUp`); the value at once under reduced motion | Analytics hero |
@@ -141,6 +144,6 @@ Components read the theme through `useThemeContext()` of `src/contexts/ThemeCont
 ## Adding a service or hook
 
 1. Write the Prompts, the Categories and the settings only through `StorageManager`; a new route that brings Prompt text into the Library goes through an Admission route. Another key belongs to the one module that owns it: add it to the table of owners above.
-2. Take locks in the order CATEGORIES → PROMPTS → SETTINGS (then the Site settings lock, which only `clearAllData()` nests), and await nothing from another context under a lock.
+2. Take locks in the order CATEGORIES → PROMPTS → SETTINGS (then the Site settings lock, then the icon placement repairs lock, which only `clearAllData()` nests), and await nothing from another context under a lock.
 3. Test it in the `__tests__/` folder next to it ([TESTING.md](./TESTING.md)).
 4. Add a row to the table of this page: one line on its job, no signature.

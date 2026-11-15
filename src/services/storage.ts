@@ -20,7 +20,7 @@ import {
   storageWarningLevel,
   storedSize
 } from '../utils/storageQuota';
-
+import { withIconPlacementRepairsLock } from './iconPlacementRepairs';
 import {
   AdmissionRefusedError,
   admit,
@@ -79,7 +79,8 @@ export class StorageManager {
   // Locks for the Prompts, Categories and settings keys, shared with the other contexts (popup, side
   // panel, service worker) through the Web Locks API, so a read-then-write from one context cannot
   // overwrite a write made in between from another, nor write back after Clear All Data.
-  // Lock order: CATEGORIES -> PROMPTS -> SETTINGS, then the Site settings lock (clearAllData only).
+  // Lock order: CATEGORIES -> PROMPTS -> SETTINGS, then the Site settings lock, then the icon
+  // placement repairs lock (both clearAllData only).
   private readonly mutex = new AsyncMutex({ scope: 'StorageManager' });
 
   private constructor() {}
@@ -707,15 +708,18 @@ export class StorageManager {
     return this.mutex.withLock(this.STORAGE_KEYS.CATEGORIES, () =>
       this.mutex.withLock(this.STORAGE_KEYS.PROMPTS, () =>
         this.mutex.withLock(this.STORAGE_KEYS.SETTINGS, () =>
-          // Last, after SETTINGS: a change of the Site settings waiting in another context is
-          // applied to the cleared store and cannot write the old ones back
-          withSiteSettingsLock(async () => {
-            try {
-              await chrome.storage.local.clear();
-            } catch (error) {
-              throw this.handleStorageError(error);
-            }
-          })
+          // Last, after SETTINGS: a change of the Site settings, or an icon placement repair,
+          // waiting in another context is applied to the cleared store and cannot write the old
+          // ones back
+          withSiteSettingsLock(() =>
+            withIconPlacementRepairsLock(async () => {
+              try {
+                await chrome.storage.local.clear();
+              } catch (error) {
+                throw this.handleStorageError(error);
+              }
+            })
+          )
         )
       )
     );

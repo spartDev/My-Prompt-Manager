@@ -560,7 +560,7 @@ export const SUPPORTED_PLATFORMS = {
 };
 ```
 
-Anchors name what elements are for (test ids, custom elements, ARIA labels, button types, semantic class names), never utility classes, hashed classes or SVG paths; the guard "Icon placement selectors" in `src/config/__tests__/platforms.test.ts` fails on those. A new Platform also adds a sanitized copy of its composer to `tests/fixtures/composers/` and its id to the `it.each` list of `src/content/core/__tests__/icon-placement-chains.test.ts`, which checks that the chain resolves anchor 0 on it.
+Anchors name what elements are for (test ids, custom elements, ARIA labels, button types, semantic class names), never utility classes, hashed classes or SVG paths; the guard "Icon placement selectors" in `src/config/__tests__/platforms.test.ts` fails on those. A new Platform also adds a sanitized copy of its composer to `tests/fixtures/composers/` and its id to the `it.each` list of `src/content/core/__tests__/icon-placement-chains.test.ts`, which checks that the chain resolves anchor 0 on it. `npm run composers:capture` refreshes those fixtures from the live Platforms in a signed-in Chrome profile and runs that test on what it captured; it is run before each release.
 
 **Priority Guidelines**:
 - Claude: 100 (highest)

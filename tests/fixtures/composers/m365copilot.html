@@ -3,15 +3,17 @@
   injector relied on before Phase 2 (the Lexical editor span, the Fluent ChatInput component
   classes), because m365.cloud.microsoft asked for sign-in. Replace it with a capture of the live
   composer (My-Prompt-Manager-tuh.3).
+  Re-sanitized on 2026-11-15 by scripts/composers/sanitize.ts: text, links, media and SVG content
+  removed; of the attributes, only contenteditable, role and type of the web platform's values, and
+  what the Platform's selectors read, with the selector's value; wrappers with no attribute and one
+  child folded into that child.
 -->
 <div class="fai-ChatInput">
-  <div class="fai-ChatInput__inputWrapper">
-    <span id="m365-chat-editor-target-element" data-lexical-editor="true" contenteditable="true" role="combobox"><p><br></p></span>
-  </div>
+  <span id="m365-chat-editor-target-element" data-lexical-editor="true" contenteditable="true" role="combobox"><p><br></p></span>
   <div class="fai-ChatInput__actions">
     <span>
-      <button type="button" aria-label="Add content"></button>
-      <button type="submit" aria-label="Send"></button>
+      <button type="button"></button>
+      <button type="submit"></button>
     </span>
   </div>
 </div>
