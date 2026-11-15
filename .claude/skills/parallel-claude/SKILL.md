@@ -63,6 +63,8 @@ Once user selects, launch directly (script claims issues automatically):
 .claude/skills/parallel-claude/scripts/launch.sh abc def
 ```
 
+Both launchers, this one and `dev-workflow.sh`, claim through `scripts/launch-claims.sh`: every ticket is claimed under a lock in the git common dir, held until the worktrees and every tmux pane are up. A failed setup or an INT/TERM stops the tmux session it started and puts each ticket back with its previous assignee and status. `scripts/test-launch-claims.sh` checks this against a stub `bd` and `tmux`, and `npm test` runs it.
+
 ## Coordinating
 
 Each instance's brief ends with `agent-brief.md`, the rules for an agent working beside others: its own scratch directory, `${TMPDIR:-/tmp}/my-prompt-manager-scratch/<branch>/`, then push and one hand-back with the PR URL and head SHA. Append it, with `<branch>` filled in, to any brief you write yourself for a parallel subagent. CI is yours: one background `gh pr checks <number> --watch` per handed-back PR.

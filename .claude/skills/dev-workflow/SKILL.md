@@ -119,6 +119,8 @@ This will:
 2. Launch tmux session `claude-parallel`
 3. Start Claude in each pane with task-specific prompts
 
+A failed step (worktree, tmux pane) or an INT/TERM stops the session and gives every claim back; the claim code is `.claude/skills/parallel-claude/scripts/launch-claims.sh`, shared with the parallel-claude launcher.
+
 ### The brief each instance receives
 
 `generate_prompt` in `scripts/dev-workflow.sh` writes it: the ticket's `bd show`, the steps to implement, commit and push, then `.claude/skills/parallel-claude/agent-brief.md` with the instance's branch filled in. That file is the single source of the rules for any agent working beside others, a tmux instance or a subagent you brief yourself: its own scratch directory named after its branch, one hand-back with the PR URL and head SHA, CI left to the coordinator.
