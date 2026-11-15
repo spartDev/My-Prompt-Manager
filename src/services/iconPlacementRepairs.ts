@@ -259,25 +259,21 @@ export function forgetIconPlacementTab(tabId: number, keepHostname: string | nul
 }
 
 /**
- * Moves the placements of a tab to the id Chrome gave it when it swapped its page (a prerender, a
- * discard): it is the same tab, and still needs what it needed. A placement the new id already
- * reported is its own, and kept.
+ * Moves a tab's placement on a Platform to the id Chrome gave the tab when it swapped its page (a
+ * prerender, a discard), when the new page is on that Platform: it is the same tab, and still needs
+ * what it needed. A placement the new id already reported is its own, and kept.
  */
-export function moveIconPlacementTab(fromTabId: number, toTabId: number): Promise<void> {
+export function moveIconPlacementTab(fromTabId: number, toTabId: number, hostname: string): Promise<void> {
   return withIconPlacementRepairsLock(async () => {
     const tabs = parsePlacementTabs((await chrome.storage.session.get(ICON_PLACEMENT_TABS_KEY))[ICON_PLACEMENT_TABS_KEY]);
-    let changed = false;
-    for (const byTab of Object.values(tabs)) {
-      const placement = byTab[String(fromTabId)];
-      if (placement) {
-        delete byTab[String(fromTabId)];
-        byTab[String(toTabId)] ??= placement;
-        changed = true;
-      }
+    const byTab = tabs[hostname];
+    const placement = byTab?.[String(fromTabId)];
+    if (!byTab || !placement) {
+      return;
     }
-    if (changed) {
-      await chrome.storage.session.set({ [ICON_PLACEMENT_TABS_KEY]: tabs });
-    }
+    delete byTab[String(fromTabId)];
+    byTab[String(toTabId)] ??= placement;
+    await chrome.storage.session.set({ [ICON_PLACEMENT_TABS_KEY]: tabs });
   });
 }
 

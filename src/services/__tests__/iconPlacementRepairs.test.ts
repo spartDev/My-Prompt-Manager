@@ -7,6 +7,7 @@ import {
   forgetIconPlacementTab,
   ICON_PLACEMENT_REPAIRS_KEY,
   type IconPlacementRepairs,
+  moveIconPlacementTab,
   overrideFromPick,
   parseIconPlacementRepairs,
   readIconPlacementRepairs,
@@ -215,6 +216,37 @@ describe('the placements of several tabs of a Platform', () => {
     // Clear All Data empties the repairs, not the tabs' placements
     await chrome.storage.local.clear();
 
+    await report(2, 'toolbar');
+
+    expect(await readIconPlacementRepairs()).toEqual({});
+  });
+
+  it('keeps the pick stored with no status when a tab closes, for the Toolbar reports to drop', async () => {
+    await report(2, 'toolbar');
+    await report(3, 'toolbar');
+    await changeIconPlacementRepairs({ type: 'setOverride', hostname: 'claude.ai', positioning: PICK });
+
+    await forgetIconPlacementTab(3);
+
+    expect((await readIconPlacementRepairs())['claude.ai']).toEqual({ override: PICK });
+  });
+
+  it('moves the placement of a replaced tab to its new id, unless the new id reported its own', async () => {
+    await pickInTab1();
+    await report(9, 'toolbar');
+
+    await moveIconPlacementTab(1, 9, 'claude.ai');
+    await report(2, 'toolbar');
+
+    // Tab 9's own Toolbar stands: no tab needs the pick any more
+    expect(await readIconPlacementRepairs()).toEqual({});
+  });
+
+  it('moves a replaced tab\'s placement on the Platform named only', async () => {
+    await pickInTab1();
+
+    await moveIconPlacementTab(1, 9, 'chatgpt.com');
+    await forgetIconPlacementTab(1);
     await report(2, 'toolbar');
 
     expect(await readIconPlacementRepairs()).toEqual({});

@@ -130,8 +130,51 @@ describe('PlacementRepair.report', () => {
 
     // The service worker forgot the tab when it left the Platform; its icon, in the Toolbar, is not placed again
     pageShow(true);
+    await flush();
 
     expect(sent()).toEqual(['toolbar', 'toolbar']);
+  });
+
+  it('reads the repair again when the page comes back from the back/forward cache', async () => {
+    const onOverrideChange = vi.fn();
+    repair = new PlacementRepair('claude.ai', onOverrideChange);
+    await chrome.storage.local.set({ [ICON_PLACEMENT_REPAIRS_KEY]: { 'claude.ai': { status: 'override', override: PICK } } });
+    await repair.load();
+    repair.report('override');
+    await flush();
+
+    // While the page was frozen, the pick was dropped, with no storage event to the page
+    vi.mocked(chrome.storage.local.get).mockResolvedValueOnce({} as never);
+    pageShow(true);
+    await flush();
+
+    expect(repair.positioning).toBeNull();
+    expect(onOverrideChange).toHaveBeenCalledTimes(1);
+    expect(sent()).toEqual(['override']);
+  });
+
+  it('counts a Toolbar from a back/forward cache restore once a repair was stored meanwhile', async () => {
+    await repair.load();
+    repair.report('toolbar');
+
+    // Stored while the page was frozen, with no storage event to the page
+    vi.mocked(chrome.storage.local.get).mockResolvedValueOnce({ [ICON_PLACEMENT_REPAIRS_KEY]: { 'claude.ai': { status: 'override', override: PICK } } } as never);
+    pageShow(true);
+    await flush();
+
+    expect(sent()).toEqual(['toolbar']);
+  });
+
+  it('sends the first placement again after the repair is loaded again', async () => {
+    await chrome.storage.local.set({ [ICON_PLACEMENT_REPAIRS_KEY]: { 'claude.ai': { status: 'override', override: PICK } } });
+    await repair.load();
+    repair.report('override');
+    await flush();
+
+    await repair.load();
+    repair.report('override');
+
+    expect(sent()).toEqual(['override', 'override']);
   });
 
   it('sends its Toolbar, placed before the Platform had a repair, once the repair is stored', async () => {

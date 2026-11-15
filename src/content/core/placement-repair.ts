@@ -18,6 +18,7 @@ import {
   ICON_PLACEMENT_REPAIRS_KEY,
   type PlacementReport,
   type PlacementReportResponse,
+  type PlatformPlacementRepair,
   parseIconPlacementRepairs,
   readIconPlacementRepairs
 } from '../../services/iconPlacementRepairs';
@@ -42,7 +43,7 @@ export class PlacementRepair {
 
   /**
    * @param onOverrideChange - Called when the user picks a new element for this Platform, or the
-   *   override is dropped elsewhere, so the icon is placed again
+   *   override is dropped elsewhere, while the icon is off the Toolbar, so it is placed again
    */
   constructor(hostname: string, onOverrideChange: () => void) {
     this.hostname = hostname;
@@ -158,21 +159,31 @@ export class PlacementRepair {
       return;
     }
     const repair = parseIconPlacementRepairs(changes[ICON_PLACEMENT_REPAIRS_KEY]?.newValue)[this.hostname];
-    this.hasRepair = repair !== undefined;
     // The service worker no longer counts this tab off the Toolbar (the repair was dropped, as by Clear
     // All Data), or an override waits for a status: this tab's placement is sent again
     if ((!repair && this.sent !== 'toolbar') || (repair && !repair.status)) {
       this.sent = null;
     }
-    // A tab that has not sent its placement yet sends it now: a Toolbar from before the repair included
-    this.reportPlaced();
+    this.follow(repair);
+  };
+
+  /**
+   * Takes the Platform's repair as storage holds it now. A tab whose icon is off the Toolbar, or not
+   * yet placed, places it again when the pick changed, and that placement is sent; any other tab sends
+   * its placement, when not yet sent: a Toolbar from before the repair included.
+   */
+  private follow(repair: PlatformPlacementRepair | undefined): void {
+    this.hasRepair = repair !== undefined;
     const override = repair?.override ?? null;
-    if (JSON.stringify(override) === JSON.stringify(this.override)) {
+    const changed = JSON.stringify(override) !== JSON.stringify(this.override);
+    this.override = override;
+    if (changed && this.placed !== 'toolbar') {
+      this.onOverrideChange();
       return;
     }
-    this.override = override;
-    this.onOverrideChange();
-  };
+    // In the Toolbar the chain comes before any pick: the placement stands
+    this.reportPlaced();
+  }
 
   /** Sends how the icon was last placed, when it was placed and not yet sent */
   private reportPlaced(): void {
@@ -181,12 +192,20 @@ export class PlacementRepair {
     }
   }
 
-  /** Back from the back/forward cache: the service worker forgot this tab when it left the Platform */
+  /**
+   * Back from the back/forward cache: the service worker forgot this tab when it left the Platform,
+   * and storage may have changed while the page was frozen. The repair is read again, then this
+   * tab's placement is sent.
+   */
   private readonly handlePageShow = (event: PageTransitionEvent): void => {
     if (!event.persisted) {
       return;
     }
-    this.sent = null;
-    this.reportPlaced();
+    readIconPlacementRepairs().then((repairs) => {
+      this.sent = null;
+      this.follow(repairs[this.hostname]);
+    }, (err: unknown) => {
+      debug('Icon placement repair not read after a back/forward cache restore', { reason: String(err) });
+    });
   };
 }

@@ -152,6 +152,7 @@ describe('background: the icon placement of each tab of a Platform', () => {
     await pickInClaudeTab(listener);
 
     // The tab's page is swapped: it still needs the pick under its new id, then closes under it
+    vi.mocked(chrome.tabs.get).mockResolvedValue({ ...CLAUDE_TAB, id: 42 } as never);
     tabEvent('onReplaced', 42, CLAUDE_TAB.id);
     await new Promise((resolve) => { setTimeout(resolve, 20); });
     await report(listener, OTHER_CLAUDE_TAB, 'toolbar');
@@ -159,6 +160,18 @@ describe('background: the icon placement of each tab of a Platform', () => {
 
     tabEvent('onRemoved', 42, {});
     await new Promise((resolve) => { setTimeout(resolve, 20); });
+    expect(await storedRepairs()).toEqual({});
+  });
+
+  it('forgets a replaced tab whose new page is not on the Platform', async () => {
+    const listener = await startServiceWorker();
+    await report(listener, OTHER_CLAUDE_TAB, 'toolbar');
+    await pickInClaudeTab(listener);
+
+    vi.mocked(chrome.tabs.get).mockResolvedValue({ ...CLAUDE_TAB, id: 42, url: 'https://example.com/' } as never);
+    tabEvent('onReplaced', 42, CLAUDE_TAB.id);
+    await new Promise((resolve) => { setTimeout(resolve, 20); });
+
     expect(await storedRepairs()).toEqual({});
   });
 
