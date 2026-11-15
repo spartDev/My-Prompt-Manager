@@ -10,7 +10,11 @@
  * every opening and leaves the record as it was. The registry has Release notes for 2.0.0 only, so
  * the update that shows What's new runs on dist-e2e-whats-new/, the same build with its manifest
  * version set to 2.0.0 (fixtures/whats-new-build.ts): the sheet shows, a close writes the Last seen
- * Release, and the next opening shows nothing.
+ * Release, and the next opening shows nothing; a first install of 2.0.0 shows nothing.
+ *
+ * On 1.9.0 the "nothing shows" checks hold for any record, since that Release has no notes: there they
+ * only prove the record is left as it was. The rules themselves are proven on 2.0.0 and by the hook
+ * and App tests (src/hooks/__tests__/useWhatsNew.test.ts, src/components/__tests__/App.whatsNew.test.tsx).
  */
 
 import { readFileSync } from 'node:fs';
@@ -79,7 +83,7 @@ test.describe("What's new in the real extension", () => {
     expect(await storedRecord(storage)).toEqual(record);
   });
 
-  test('first install: the service worker records the installed Release, and the popup shows nothing', async ({ context, extensionId }) => {
+  test('first install: the service worker records the installed Release', async ({ context, extensionId }) => {
     // No storage fixture here: storage is as the first install left it, nothing seeded or cleared
     const worker = context.serviceWorkers().find((candidate) => candidate.url().startsWith(`chrome-extension://${extensionId}/`));
     expect(worker).toBeDefined();
@@ -133,10 +137,10 @@ test.describe("What's new in the real extension", () => {
 });
 
 /**
- * The storage of the 2.0.0 build, once its service worker has recorded the first install Chrome
- * gives it on load. Waiting for that write first means it cannot land over the seed of the test
+ * The storage of the 2.0.0 build as its first install left it: Chrome installs the copy when it
+ * loads it, and the service worker records `installedVersion: 2.0.0`. Nothing is cleared or seeded
  */
-const storageAfterInstall = async (context: BrowserContext, extensionId: string): Promise<ExtensionStorage> => {
+const storageOfFirstInstall = async (context: BrowserContext, extensionId: string): Promise<ExtensionStorage> => {
   const worker = context.serviceWorkers().find((candidate) => candidate.url().startsWith(`chrome-extension://${extensionId}/`));
   if (worker === undefined) {
     throw new Error('The service worker of the 2.0.0 build is not running');
@@ -145,12 +149,34 @@ const storageAfterInstall = async (context: BrowserContext, extensionId: string)
   await expect
     .poll(async () => storedRecord(storage))
     .toEqual({ installedVersion: WHATS_NEW_UPDATE_VERSION });
+  return storage;
+};
+
+/**
+ * The storage of the 2.0.0 build, emptied once its service worker has recorded the first install.
+ * Waiting for that write first means it cannot land over the seed of the test
+ */
+const storageAfterInstall = async (context: BrowserContext, extensionId: string): Promise<ExtensionStorage> => {
+  const storage = await storageOfFirstInstall(context, extensionId);
   await storage.reset();
   return storage;
 };
 
 test.describe(`What's new after the update to ${WHATS_NEW_UPDATE_VERSION}, a Release that has Release notes`, () => {
   test.use({ extensionPath: WHATS_NEW_UPDATE_EXTENSION_PATH });
+
+  test('first install: a Release that has Release notes shows nothing, and the record stays as the service worker wrote it', async ({ context, extensionId }) => {
+    // No storage fixture and no seed: storage is as the first install of 2.0.0 left it
+    const storage = await storageOfFirstInstall(context, extensionId);
+
+    const popup = await openPopup(context, extensionId);
+    await expect(popup.getByRole('heading', { name: /my prompt manager/i })).toBeVisible();
+    await popup.waitForTimeout(DECISION_SETTLE_MS);
+    await expect(popup.getByRole('dialog', { name: WHATS_NEW })).toHaveCount(0);
+    await popup.close();
+
+    expect(await storedRecord(storage)).toEqual({ installedVersion: WHATS_NEW_UPDATE_VERSION });
+  });
 
   /** An update from 1.9.0: installed then, never closed What's new since */
   const UPDATED_FROM_1_9 = { installedVersion: '1.9.0' };

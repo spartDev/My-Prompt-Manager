@@ -8,7 +8,7 @@
  */
 import path from 'node:path';
 
-import { copyDistWithManifest } from './custom-site-build';
+import { copyDistWithManifest } from './dist-copy';
 
 /** The Release the copy is installed at: the one the registry has Release notes for */
 export const WHATS_NEW_UPDATE_VERSION = '2.0.0';

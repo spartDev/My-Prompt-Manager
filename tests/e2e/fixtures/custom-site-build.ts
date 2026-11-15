@@ -13,33 +13,15 @@
  * after it (the Settings form, the background injector, the content script and the chunks it
  * imports) runs as built. Only that one manifest field differs from dist/.
  */
-import fs from 'node:fs';
 import path from 'node:path';
+
+import { copyDistWithManifest } from './dist-copy';
 
 /** A page that is none of the built-in Platforms; the specs serve it with page.route, nothing goes to the network */
 export const CUSTOM_SITE_HOSTNAME = 'custom-site.example';
 export const CUSTOM_SITE_URL = `https://${CUSTOM_SITE_HOSTNAME}/`;
 
 export const CUSTOM_SITE_EXTENSION_PATH = path.resolve(process.cwd(), 'dist-e2e-custom-site');
-
-/** A manifest as the test builds edit it: only the fields they touch are typed */
-export interface TestBuildManifest {
-  version: string;
-  host_permissions?: string[];
-}
-
-/**
- * Copies the build in `dist` to `target`, replacing what was there, and rewrites the copy's
- * manifest with `edit`. Everything else runs as built. Shared by every test-only build.
- */
-export function copyDistWithManifest(dist: string, target: string, edit: (manifest: TestBuildManifest) => TestBuildManifest): void {
-  fs.rmSync(target, { recursive: true, force: true });
-  fs.cpSync(dist, target, { recursive: true });
-
-  const manifestPath = path.join(target, 'manifest.json');
-  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8')) as TestBuildManifest;
-  fs.writeFileSync(manifestPath, JSON.stringify(edit(manifest), null, 2));
-}
 
 /** Copies the build in `dist` to CUSTOM_SITE_EXTENSION_PATH and grants the test origin there */
 export function buildCustomSiteExtension(dist: string): void {
