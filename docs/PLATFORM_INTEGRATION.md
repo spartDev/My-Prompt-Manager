@@ -16,7 +16,7 @@ This guide explains how to add support for new LLM platforms (like Gemini, Mistr
 
 ## 🚀 Quick Start (New Method)
 
-Adding a new platform is now incredibly simple! You only need to update **one file**.
+Adding a new platform mostly takes **one file**, `src/config/platforms.ts`. One test must follow: add the new hostname to `ADDED_AFTER_THE_PLATFORM_CHOICES` in `src/services/__tests__/siteSettings.test.ts` (never to `PLATFORMS_OF_THE_ENABLED_LIST` in `src/services/siteSettings.ts`, which is frozen), or that test fails. The `add-platform` skill (`.claude/skills/add-platform/SKILL.md`) lists every step.
 
 ### Step 1: Add Platform Configuration
 
