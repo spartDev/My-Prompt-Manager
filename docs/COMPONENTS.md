@@ -61,7 +61,11 @@ Which component does which job in the popup and the side panel, and the conventi
 
 | Component | Job |
 |-----------|-----|
+| `src/components/whatsNew/WhatsNewHost.tsx` | What's new in `App`, over the Library of the popup and the side panel (not in picker mode): the sheet and its grid while `useWhatsNew` gives Release notes, then their exit (`useAnimatedPresence`, `MOTION.whatsNewSheetOut`). Every close (Got it, backdrop, Escape, Enter, a tile) calls the hook's `close()` at once, once even for two closing events in one task, so the Release is marked seen before the exit ends. A tile closes, then calls `onOpen(destination, item)`: `App` maps `library`, `categories`, `analytics`, `settings` to that Section, `library-search` to the Library with the keyboard in its search field (as Cmd/Ctrl+K), `prompt-editor-new` to the editor on a new Prompt. Knows nothing of Debug mode |
 | `src/components/whatsNew/WhatsNewSheet.tsx` | The What's new bottom sheet: backdrop, handle, the pill "New in {version}", the title, a scrolling body for the tile grid (its `children`) and Got it. Rises with `animate-whats-new-sheet-in`; while `open` is false it plays its exit, inert, and its caller unmounts it after `MOTION.whatsNewSheetOut` (`useAnimatedPresence`). Its keyboard is `useModalFocus` (focus on Got it at open); `onClose` says how it closed (`got-it`, `backdrop`, `escape`, `enter`). Enter on a tile button keeps the tile's own activation. It knows nothing of Debug mode or storage |
+| `src/components/whatsNew/WhatsNewGrid.tsx` | The two-column grid of a Release's notes (`items`, `onOpen(destination, item)`): the hero (the first Feature, full width), the other Features, then the Critical fixes; no hero without a Feature; with an odd number of tiles under the hero, the last spans both columns. `placeTiles` computes that order. The Feature tiles that open something carry `data-whats-new-tile-index`, from 1 for the hero, in display order, for the number keys of the sheet |
+| `src/components/whatsNew/WhatsNewTile.tsx` | One tile: the hero (example sentence, each `{{word}}` a pill, then title and description), a Feature (icon square, title, description) or a Critical fix (the Fixed pill in place of the icon). A Feature with a destination is a `<button>` named by its title and description; a Feature without one and a Critical fix are plain tiles that take no focus. Each rises `MOTION.tileStagger` after the one before, all at once under reduced motion |
+| `src/components/icons/WhatsNewIcons.tsx` | `WhatsNewIconGlyph`: one glyph per key of the closed set `WhatsNewIcon` (`src/whatsNew/types.ts`), `search` as its ⌘K key chip, hidden from screen readers |
 
 ### Settings
 
@@ -79,16 +83,6 @@ Which component does which job in the popup and the side panel, and the conventi
 ### Analytics charts
 
 `DailyUseChart` and `TimeOfDayChart` (`src/components/analytics/charts/`) are the two charts of the full-page view, both drawn by `PillBarChart`: plain elements, no chart library. A pill bar per entry in the accent (`bg-accent`), sized against the busiest and growing from the bottom like the hero's, axis labels in `text-tertiary` (Daily use names every seventh day back from today), a muted band and a `ChartTooltip` in the hero's dark pill on hover, data from `useUsageStats`, and an `aria-label` that says what the bars show. Everything else on both surfaces is plain elements too: the weekday bars of `StatsHero`, and the ranked rows of `MostUsedCard` and `RankedRows` (`RankRowContent`), computed by `src/services/usageInsights.ts`. The row counts are in `src/components/analytics/constants.ts`: 3 Most used rows in the tab, 10 in the full-page view, 6 per Platforms or Categories card.
-
-<!-- What's new tiles (My-Prompt-Manager-d1g.6) -->
-### What's new tiles
-
-| Component | Job |
-|-----------|-----|
-| `src/components/whatsNew/WhatsNewGrid.tsx` | The two-column grid of a Release's notes (`items`, `onOpen(destination, item)`): the hero (the first Feature, full width), the other Features, then the Critical fixes; no hero without a Feature; with an odd number of tiles under the hero, the last spans both columns. `placeTiles` computes that order. The Feature tiles that open something carry `data-whats-new-tile-index`, from 1 for the hero, in display order, for the number keys of the sheet |
-| `src/components/whatsNew/WhatsNewTile.tsx` | One tile: the hero (example sentence, each `{{word}}` a pill, then title and description), a Feature (icon square, title, description) or a Critical fix (the Fixed pill in place of the icon). A Feature with a destination is a `<button>` named by its title and description; a Feature without one and a Critical fix are plain tiles that take no focus. Each rises `MOTION.tileStagger` after the one before, all at once under reduced motion |
-| `src/components/icons/WhatsNewIcons.tsx` | `WhatsNewIconGlyph`: one glyph per key of the closed set `WhatsNewIcon` (`src/whatsNew/types.ts`), `search` as its ⌘K key chip, hidden from screen readers |
-<!-- end What's new tiles -->
 
 ---
 
