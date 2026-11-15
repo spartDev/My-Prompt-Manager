@@ -66,6 +66,16 @@ async function readPickerSessions(): Promise<Map<number, PickerSession>> {
 }
 
 /**
+ * A START_ELEMENT_PICKER not yet stored. A stop that runs meanwhile finds no session to end, so it
+ * marks the starts in flight instead, and each one it marked stores nothing and deactivates its
+ * picker. Held in memory: a service worker restart ends the starts in flight with it.
+ */
+interface PickerStart {
+  stopped: boolean;
+}
+const pickerStarts = new Set<PickerStart>();
+
+/**
  * The open picker sessions, in chrome.storage.session under one key per tab, not in memory: Chrome
  * stops the service worker after about 30 s with no event, and hovering the page sends none, so a
  * session held in memory would be gone by the time the user clicks, and the pick lost. Every
@@ -77,9 +87,18 @@ const pickerSessions = {
     const stored: unknown = (await chrome.storage.session.get(key))[key];
     return isPickerSession(stored) ? stored : undefined;
   },
-  /** Stores the session of a picker now active in its tab */
-  set(session: PickerSession): Promise<void> {
-    return changePickerSessions(() => chrome.storage.session.set({ [pickerSessionKey(session.tabId)]: session }));
+  /**
+   * Stores the session of a picker now active in its tab, unless a stop marked its start: false
+   * then. Checked in the step, so a stop either marked it first or reads the session it stored.
+   */
+  set(session: PickerSession, start: PickerStart): Promise<boolean> {
+    return changePickerSessions(async () => {
+      if (start.stopped) {
+        return false;
+      }
+      await chrome.storage.session.set({ [pickerSessionKey(session.tabId)]: session });
+      return true;
+    });
   },
   /** Takes the tab's session for a pick: read and removed in one step */
   take(tabId: number): Promise<PickerSession | undefined> {
@@ -1224,6 +1243,14 @@ async function handleOpenPickerWindow(
   }
 }
 
+/** The answer to a start a stop ended while it activated */
+const PICKER_STOPPED = "The element picker was stopped";
+
+/** Ends the picker of a tab; a tab that closed has none to end */
+function deactivatePicker(tabId: number): Promise<unknown> {
+  return chrome.tabs.sendMessage(tabId, { type: "DEACTIVATE_ELEMENT_PICKER", source: "background" }).catch(() => undefined);
+}
+
 /**
  * Start element picker mode
  */
@@ -1237,6 +1264,8 @@ async function handleStartElementPicker(
   }) => void,
   repairHostname?: string,
 ) {
+  const start: PickerStart = { stopped: false };
+  pickerStarts.add(start);
   try {
     // Determine which tab to activate picker on
     let targetTabId: number | null = null;
@@ -1350,17 +1379,24 @@ async function handleStartElementPicker(
 
     // Stored once the picker is active, never before: a start that fails leaves nothing behind,
     // and of two starts on one tab, the last one active is the one kept
+    let stored: boolean;
     try {
-      await pickerSessions.set({
+      stored = await pickerSessions.set({
         tabId: targetTabId,
         windowId: sender.tab?.windowId || 0,
         ...(repairHostname !== undefined ? { repairHostname } : {}),
         attempt: crypto.randomUUID(),
-      });
+      }, start);
     } catch (error) {
       // A picker with no session would take a pick nobody keeps
-      await chrome.tabs.sendMessage(targetTabId, { type: "DEACTIVATE_ELEMENT_PICKER", source: "background" }).catch(() => undefined);
+      await deactivatePicker(targetTabId);
       throw error;
+    }
+    if (!stored) {
+      // Stopped while it activated: the stop could not reach this picker, so it ends here
+      await deactivatePicker(targetTabId);
+      sendResponse({ success: false, error: PICKER_STOPPED });
+      return;
     }
     sendResponse({ success: true, tabId: targetTabId });
   } catch (error) {
@@ -1370,6 +1406,8 @@ async function handleStartElementPicker(
       senderTabId: sender.tab?.id,
     });
     sendResponse({ success: false, error: getErrorMessage(error) });
+  } finally {
+    pickerStarts.delete(start);
   }
 }
 
@@ -1467,6 +1505,10 @@ async function handleStopElementPicker(
   sendResponse: (response?: { success: boolean; error?: string }) => void,
 ) {
   let sessions: Map<number, PickerSession> = new Map();
+  // The starts in flight have no session yet: marked now, before the snapshot, they store none
+  for (const start of pickerStarts) {
+    start.stopped = true;
+  }
   try {
     // Clear all active sessions: those held now, unless a start replaced one meanwhile
     sessions = await pickerSessions.snapshot();
