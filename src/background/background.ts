@@ -140,8 +140,8 @@ const pickerSessions = {
       } catch (error) {
         start.storing = false;
         // The page took this start's activation after the older session's, so that session has
-        // no picker left: it goes too. Should this removal fail as well, after the write, the
-        // older session stays until the next start, stop or pick in the tab (two storage failures)
+        // no picker left: it goes too. Should this removal fail as well, after the write (two
+        // storage failures), the older session stays until something else in the tab removes it
         const older = await pickerSessions.get(session.tabId).catch(() => undefined);
         if (older && (older.activation ?? 0) < start.activation) {
           await chrome.storage.session.remove(pickerSessionKey(session.tabId)).catch(() => undefined);
