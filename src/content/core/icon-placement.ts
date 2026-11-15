@@ -7,7 +7,8 @@
  * itself usually survives such a re-render, so a detection pass that only compares editors
  * never sees the loss. While the icon is away from its toolbar (on the Anchored overlay, or at the
  * element the user picked), it also waits for the toolbar, which a Platform may render after its
- * editor, and asks for the icon to be placed again once the toolbar shows (awaitToolbar).
+ * editor, and asks for the icon to be placed again if the toolbar shows within a grace period
+ * (awaitToolbar).
  */
 
 import type { IconPlacement } from '../../config/platforms';

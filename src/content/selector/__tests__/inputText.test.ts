@@ -184,6 +184,55 @@ describe('removeTypedTrigger', () => {
     refused.mockRestore();
   });
 
+  describe('with the editing command of a browser', () => {
+    /**
+     * The browser's commands, which the test DOM lacks: `modify` extends the selection back by one
+     * character of its text node, `delete` takes the selected text out.
+     */
+    const browserCommands = () => {
+      const selection = document.getSelection() as Selection;
+      const commandable = selection as unknown as { modify?: (alter: string, direction: string, granularity: string) => void };
+      commandable.modify = () => {
+        selection.extend(selection.focusNode as Node, selection.focusOffset - 1);
+      };
+      const execCommand = vi.spyOn(document, 'execCommand').mockImplementation((command: string) => {
+        if (command !== 'delete') {
+          return false;
+        }
+        selection.getRangeAt(0).deleteContents();
+        return true;
+      });
+      return () => {
+        delete commandable.modify;
+        execCommand.mockRestore();
+      };
+    };
+
+    it('removes a // followed by a character the user does not see, and that character with it', () => {
+      const field = editable('<p>Hi //\uFEFF</p>');
+      const text = field.querySelector('p')?.firstChild as Text;
+      document.getSelection()?.collapse(text, text.length);
+      const restore = browserCommands();
+
+      expect(removeTypedTrigger(field)).toBe(true);
+
+      expect(field.textContent).toBe('Hi ');
+      restore();
+    });
+
+    it('removes a // with a zero-width space between its slashes', () => {
+      const field = editable('<p>Hi /\u200B/ there</p>');
+      const text = field.querySelector('p')?.firstChild as Text;
+      document.getSelection()?.collapse(text, 6);
+      const restore = browserCommands();
+
+      expect(removeTypedTrigger(field)).toBe(true);
+
+      expect(field.textContent).toBe('Hi  there');
+      restore();
+    });
+  });
+
   it('removes a // typed on a new line of a contenteditable, after a <br>', () => {
     const field = editable('First line<br>//');
     document.getSelection()?.collapse(field.lastChild, 2);
@@ -290,6 +339,21 @@ describe('removeTypedTrigger', () => {
     expect(textBeforeCaret(field)).toBe('//');
     expect(removeTypedTrigger(field)).toBe(false);
     expect(field.textContent).toBe('//');
+    refused.mockRestore();
+  });
+
+  it.each([
+    ['between its slashes', 'Hi /\u200B/'],
+    ['after its slashes', 'Hi //\uFEFF'],
+  ])('without the editing command, leaves a // with an unseen character %s as it was', (_where, text) => {
+    const field = editable('<p></p>');
+    const node = document.createTextNode(text);
+    field.querySelector('p')?.append(node);
+    document.getSelection()?.collapse(node, text.length);
+    const refused = vi.spyOn(document, 'execCommand').mockReturnValue(false);
+
+    expect(removeTypedTrigger(field)).toBe(false);
+    expect(node.nodeValue).toBe(text);
     refused.mockRestore();
   });
 

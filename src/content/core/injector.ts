@@ -1009,7 +1009,7 @@ export class PromptLibraryInjector {
         this.placement.track(icon, textarea, 'toolbar', resolution.index);
         this.repair.report('toolbar');
       } else if (iconPlacement && this.placeAtOverride(icon, textarea)) {
-        // A toolbar rendered after its editor: once it shows, the icon goes into it
+        // A toolbar rendered after its editor: if it shows within the grace period, the icon goes into it
         this.placement.awaitToolbar(() => resolveIconPlacement(textarea, iconPlacement) !== null);
         return;
       }
@@ -1205,8 +1205,8 @@ export class PromptLibraryInjector {
    * Places the icon on the editor when the Platform's toolbar was not found: anchored inside its
    * bottom-end corner, following scroll and resize. On a built-in Platform (`iconPlacement`, the
    * chain that found nothing) the icon waits there for the toolbar, which a Platform may render
-   * after its editor, and goes into it once it shows. Still not found after the grace period of
-   * IconPlacementController, the toolbar is taken as changed: that is logged as a warning and
+   * after its editor, and goes into it if it shows within the grace period. Still not found after
+   * the grace period of IconPlacementController, the toolbar is taken as changed: that is logged as a warning and
    * reported, so Settings offers to place the icon.
    */
   private async placeOnEditor(icon: HTMLElement, textarea: HTMLElement, iconPlacement: IconPlacement | undefined): Promise<void> {
@@ -1230,7 +1230,8 @@ export class PromptLibraryInjector {
     }
     this.placement.track(icon, textarea, 'overlay');
     if (iconPlacement) {
-      // The element the user picked may render late too: once it shows, the icon goes there
+      // The element the user picked may render late too: if it shows within the grace period, the
+      // icon goes there
       const pickShows = (): boolean => {
         const anchor = this.repair.findAnchor();
         return anchor !== null && anchor !== icon && !icon.contains(anchor);

@@ -166,7 +166,9 @@ export function endsWithSelectorTrigger(before: string): boolean {
  * Removes the `//` just typed before the caret, as two presses of Backspace would: the rest of the
  * field is not rewritten, and the Platform's editor hears of it through its usual input events.
  * When the editing command is missing or refused, the two characters are taken out of their text
- * node. Returns whether they are gone: the selector does not open over a `//` it could not remove.
+ * node (only a // with no character the user does not see between or after its slashes:
+ * otherwise the selector stays closed and the field as it was). Returns whether they are gone: the selector
+ * does not open over a `//` it could not remove.
  */
 export function removeTypedTrigger(field: HTMLElement): boolean {
   const before = textBeforeCaret(field);
@@ -224,6 +226,9 @@ export function removeTypedTrigger(field: HTMLElement): boolean {
       selection.modify('extend', 'backward', 'character');
     }
     if (visible(selection.toString()) === SELECTOR_TRIGGER && document.execCommand('delete')) {
+      // Chrome deletes on the page at once and sends no beforeinput for the editing command, so
+      // the editor hears only input. An editor that puts its own DOM back later (from a mutation
+      // observer, after this read) is not seen here: the live check covers Copilot
       return removed();
     }
     if (!selection.isCollapsed) {
