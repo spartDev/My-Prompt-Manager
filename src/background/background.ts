@@ -27,6 +27,8 @@ interface PickerSession {
   windowId: number;
   /** Set when the pick repairs the icon placement of this built-in Platform (Settings, "Place the icon") */
   repairHostname?: string;
+  /** The START_ELEMENT_PICKER that stored it: a start that fails forgets its own session, never a newer one */
+  attempt?: string;
 }
 
 const PICKER_SESSION_KEY_PREFIX = "pickerSession:";
@@ -39,7 +41,16 @@ function isPickerSession(value: unknown): value is PickerSession {
   const session = value as Record<string, unknown>;
   return typeof session.tabId === "number"
     && typeof session.windowId === "number"
-    && (session.repairHostname === undefined || typeof session.repairHostname === "string");
+    && (session.repairHostname === undefined || typeof session.repairHostname === "string")
+    && (session.attempt === undefined || typeof session.attempt === "string");
+}
+
+// The writes of picker sessions run one after the other, so a forget that compares and removes is one step
+let pickerSessionWrites: Promise<void> = Promise.resolve();
+function writePickerSessions(write: () => Promise<void>): Promise<void> {
+  const run = pickerSessionWrites.then(write);
+  pickerSessionWrites = run.catch(() => undefined);
+  return run;
 }
 
 /**
@@ -54,10 +65,18 @@ const pickerSessions = {
     return isPickerSession(stored) ? stored : undefined;
   },
   set(session: PickerSession): Promise<void> {
-    return chrome.storage.session.set({ [pickerSessionKey(session.tabId)]: session });
+    return writePickerSessions(() => chrome.storage.session.set({ [pickerSessionKey(session.tabId)]: session }));
   },
   delete(tabId: number): Promise<void> {
-    return chrome.storage.session.remove(pickerSessionKey(tabId));
+    return writePickerSessions(() => chrome.storage.session.remove(pickerSessionKey(tabId)));
+  },
+  /** Forgets the tab's session only if this start stored it: a start since keeps its own */
+  forgetAttempt(tabId: number, attempt: string): Promise<void> {
+    return writePickerSessions(async () => {
+      if ((await pickerSessions.get(tabId))?.attempt === attempt) {
+        await chrome.storage.session.remove(pickerSessionKey(tabId));
+      }
+    });
   },
   async tabIds(): Promise<number[]> {
     const stored = await chrome.storage.session.get(null);
@@ -68,7 +87,7 @@ const pickerSessions = {
   },
 };
 
-/** Forgets a tab's picker session: its tab closed, or the picker could not be activated in it */
+/** Forgets a tab's picker session, as its tab closes */
 function forgetPickerSession(tabId: number): void {
   pickerSessions.delete(tabId).catch((error: unknown) => {
     Logger.warn("Could not forget a picker session", {
@@ -1195,6 +1214,7 @@ async function handleStartElementPicker(
 ) {
   // The tab whose session was stored, until the picker is active in it: any failure in between forgets it
   let pendingTabId: number | null = null;
+  const attempt = crypto.randomUUID();
   try {
     // Determine which tab to activate picker on
     let targetTabId: number | null = null;
@@ -1248,6 +1268,7 @@ async function handleStartElementPicker(
       tabId: targetTabId,
       windowId: sender.tab?.windowId || 0,
       ...(repairHostname !== undefined ? { repairHostname } : {}),
+      attempt,
     });
 
     // Switch to the target tab
@@ -1322,7 +1343,10 @@ async function handleStartElementPicker(
     sendResponse({ success: false, error: getErrorMessage(error) });
   } finally {
     if (pendingTabId !== null) {
-      forgetPickerSession(pendingTabId);
+      const tabId = pendingTabId;
+      pickerSessions.forgetAttempt(tabId, attempt).catch((error: unknown) => {
+        Logger.warn("Could not forget a picker session", { component: "Background", tabId, error: getErrorMessage(error) });
+      });
     }
   }
 }
@@ -1437,7 +1461,7 @@ async function handleStopElementPicker(
     }
 
     if (tabIds.length > 0) {
-      await chrome.storage.session.remove(tabIds.map(pickerSessionKey));
+      await writePickerSessions(() => chrome.storage.session.remove(tabIds.map(pickerSessionKey)));
     }
     sendResponse({ success: true });
   } catch (error) {

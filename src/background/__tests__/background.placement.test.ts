@@ -238,6 +238,24 @@ describe('background: a picker that could not be activated leaves no session', (
       expect(await chrome.storage.session.get(null)).toEqual({});
     });
   });
+
+  it('keeps the session of a newer start when an older start on the same tab fails after it', async () => {
+    const listener = await startServiceWorker();
+    let failFirst: (error: Error) => void = () => undefined;
+    vi.mocked(chrome.tabs.sendMessage)
+      .mockImplementationOnce(() => new Promise((_resolve, reject) => { failFirst = reject; }))
+      .mockResolvedValueOnce(undefined);
+
+    const first = send(listener, { type: 'START_ELEMENT_PICKER', data: { tabId: CLAUDE_TAB.id, repairHostname: 'claude.ai' } });
+    await vi.waitFor(() => { expect(chrome.tabs.sendMessage).toHaveBeenCalledTimes(1); });
+    expect(await send(listener, { type: 'START_ELEMENT_PICKER', data: { tabId: CLAUDE_TAB.id, repairHostname: 'claude.ai' } }))
+      .toEqual({ success: true, tabId: CLAUDE_TAB.id });
+    failFirst(new Error('Could not establish connection'));
+    expect(await first).toMatchObject({ success: false });
+    await new Promise((resolve) => { setTimeout(resolve, 20); });
+
+    expect(await send(listener, { type: 'ELEMENT_SELECTED', data: { selector: SEND_BUTTON } }, { tab: CLAUDE_TAB })).toEqual({ success: true });
+  });
 });
 
 describe('background: a pick cancelled in one tab', () => {
