@@ -44,6 +44,16 @@ test.describe('composers:capture in a browser', () => {
     expect(fixture).not.toContain('Search history');
   });
 
+  test('says there is no editor when the only editor is visibility:hidden', async ({ page }) => {
+    await page.route('https://capture.test/**', (route) => route.fulfill({
+      contentType: 'text/html',
+      body: `<!doctype html><body><div style="visibility:hidden">${CLAUDE_COMPOSER}</div></body>`
+    }));
+    const options = parseCaptureArgs(['--url', `claude=${STAND_IN}`, '--out', out, '--settle', '0', '--timeout', '1000']);
+
+    expect(await capture(page, 'claude', SUPPORTED_PLATFORMS.claude, options)).toEqual({ id: 'claude', outcome: 'no-editor', url: STAND_IN });
+  });
+
   test('says there is no editor when the page has none visible', async ({ page }) => {
     await page.route('https://capture.test/**', (route) => route.fulfill({
       contentType: 'text/html',

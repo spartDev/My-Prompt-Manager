@@ -26,6 +26,12 @@ export const ICON_PLACEMENT_REPAIRS_KEY = 'iconPlacementRepairs';
 /** How a content script placed the icon on a built-in Platform */
 export type PlacementReport = 'toolbar' | 'overlay' | 'override';
 
+/**
+ * The service worker's answer to a placement report. `permanent` marks a report it will refuse
+ * whenever it is sent (not a built-in Platform's tab), so the content script does not send it again.
+ */
+export type PlacementReportResponse = { success: true } | { success: false; error: string; permanent?: boolean };
+
 /** What Settings shows for a Platform: absent while the icon is in its Toolbar */
 export type RepairStatus = Exclude<PlacementReport, 'toolbar'>;
 

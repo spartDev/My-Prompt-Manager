@@ -4,12 +4,16 @@
  * storage, finds the element it names, and tells the service worker how the icon was placed.
  *
  * A report is sent only when it differs from what storage holds, so a Platform whose chain
- * resolves costs one storage read per page load and no message.
+ * resolves costs one storage read per page load and no message. Two exceptions: a Toolbar report
+ * is always sent while an override is held, since only the service worker's write drops it; and a
+ * report the service worker did not save is sent again on the next placement, unless it refused it
+ * for good.
  */
 
 import {
   ICON_PLACEMENT_REPAIRS_KEY,
   type PlacementReport,
+  type PlacementReportResponse,
   parseIconPlacementRepairs,
   readIconPlacementRepairs
 } from '../../services/iconPlacementRepairs';
@@ -124,10 +128,16 @@ export class PlacementRepair {
       debug('Icon placement report not saved', { placement, reason });
     };
     chrome.runtime.sendMessage({ type: PLACEMENT_REPORT_MESSAGE, data: { placement } })
-      .then((response: { success?: boolean; error?: string } | undefined) => {
-        if (!response?.success) {
-          notSaved(response?.error ?? 'no answer');
+      .then((response: PlacementReportResponse | undefined) => {
+        if (response?.success) {
+          return;
         }
+        if (response?.permanent) {
+          // Refused whenever it is sent: sending it again would only be refused again
+          debug('Icon placement report refused', { placement, reason: response.error });
+          return;
+        }
+        notSaved(response?.error ?? 'no answer');
       }, (err: unknown) => {
         // The service worker may be restarting
         notSaved(String(err));

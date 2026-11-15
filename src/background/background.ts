@@ -7,6 +7,7 @@ import {
   changeIconPlacementRepairs,
   overrideFromPick,
   type PlacementReport,
+  type PlacementReportResponse,
   repairablePlatformHostname,
 } from "../services/iconPlacementRepairs";
 import {
@@ -722,11 +723,11 @@ chrome.runtime.onMessage.addListener(
 async function handleIconPlacementReported(
   placement: PlacementReport | undefined,
   sender: chrome.runtime.MessageSender,
-  sendResponse: (response?: { success: boolean; error?: string }) => void,
+  sendResponse: (response: PlacementReportResponse) => void,
 ) {
   const hostname = repairablePlatformHostname(sender.tab?.url);
   if (!hostname || (placement !== "toolbar" && placement !== "overlay" && placement !== "override")) {
-    sendResponse({ success: false, error: "Not a placement report of a built-in platform" });
+    sendResponse({ success: false, error: "Not a placement report of a built-in platform", permanent: true });
     return;
   }
   try {

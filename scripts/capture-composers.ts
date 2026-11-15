@@ -164,35 +164,45 @@ export async function capture(page: Page, id: string, platform: PlatformDefiniti
   // The config's selectors first; the strategies find some editors by other means (ChatGPT's and
   // Perplexity's are contenteditable, their selectors name textareas), so then any editable element
   const editorSelectors = [...platform.selectors, ...GENERIC_EDITORS];
-  try {
-    // Any visible match: waitForSelector would wait on the first match only, and a hidden textarea
-    // earlier in the page (a search field) would then hide the editor
-    await page.waitForFunction(
-      (selectors) => selectors.some((selector) =>
-        Array.from(document.querySelectorAll(selector)).some((candidate) => candidate.getClientRects().length > 0)),
-      editorSelectors,
-      { timeout: options.timeout, polling: 250 }
-    );
-  } catch {
+  // The first visible editor, by the selectors' order. Any visible match: waitForSelector would wait
+  // on the first match only, and a hidden textarea earlier in the page (a search field) would then
+  // hide the editor. Visible means rendered and not visibility:hidden, display:none included.
+  const findEditor = async () => {
+    try {
+      const handle = await page.waitForFunction(
+        (selectors) => {
+          for (const selector of selectors) {
+            const editor = Array.from(document.querySelectorAll<HTMLElement>(selector))
+              .find((candidate) => candidate.checkVisibility({ visibilityProperty: true }));
+            if (editor) {
+              return editor;
+            }
+          }
+          return false;
+        },
+        editorSelectors,
+        { timeout: options.timeout, polling: 250 }
+      );
+      return handle.asElement();
+    } catch {
+      return null;
+    }
+  };
+  if (!(await findEditor())) {
     return { id, outcome: 'no-editor', url };
   }
   await page.waitForTimeout(options.settle);
+  // Found again once the toolbar has rendered: the page may have replaced the editor meanwhile
+  const editorHandle = await findEditor();
+  if (!editorHandle) {
+    return { id, outcome: 'no-editor', url };
+  }
 
-  // In the page: the first visible editor, its composer (or an ancestor when the selector finds
-  // none), marked so the sanitizer keeps the editor's classes. One flat function: it is sent as
-  // source, so it calls nothing of this file.
-  const live = await page.evaluate(
-    ({ editorSelectors, composerSelector, marker, depth }) => {
-      let editor: HTMLElement | undefined;
-      for (const selector of editorSelectors) {
-        editor = Array.from(document.querySelectorAll<HTMLElement>(selector)).find((candidate) => candidate.getClientRects().length > 0);
-        if (editor) {
-          break;
-        }
-      }
-      if (!editor) {
-        return null;
-      }
+  // In the page: the editor's composer (or an ancestor when the selector finds none), the editor
+  // marked so the sanitizer keeps its classes. One flat function: it is sent as source, so it calls
+  // nothing of this file.
+  const live = await editorHandle.evaluate(
+    (editor, { composerSelector, marker, depth }) => {
       let composer = composerSelector ? editor.closest(composerSelector) : null;
       const composerFound = composer !== null;
       if (!composer) {
@@ -206,11 +216,8 @@ export async function capture(page: Page, id: string, platform: PlatformDefiniti
       editor.removeAttribute(marker);
       return { html, composerFound };
     },
-    { editorSelectors, composerSelector: platform.iconPlacement?.composer ?? '', marker: EDITOR_MARKER, depth: FALLBACK_DEPTH }
+    { composerSelector: platform.iconPlacement?.composer ?? '', marker: EDITOR_MARKER, depth: FALLBACK_DEPTH }
   );
-  if (!live) {
-    return { id, outcome: 'no-editor', url };
-  }
 
   const { document } = new JSDOM('<!doctype html><body></body>').window;
   document.body.innerHTML = live.html;

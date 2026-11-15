@@ -1,7 +1,7 @@
 /**
  * The placement reports a content script sends the service worker (src/content/core/placement-repair.ts):
  * only when storage says otherwise, but always when an override must be dropped, and again after a
- * report the service worker did not save.
+ * report the service worker did not save, unless it refused it for good.
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -60,6 +60,17 @@ describe('PlacementRepair.report', () => {
     repair.report('overlay');
 
     expect(sent()).toEqual(['overlay', 'overlay']);
+  });
+
+  it('does not send a report again that the service worker refuses for good', async () => {
+    await repair.load();
+    vi.mocked(chrome.runtime.sendMessage).mockResolvedValue({ success: false, error: 'Not a placement report of a built-in platform', permanent: true } as never);
+
+    repair.report('overlay');
+    await flush();
+    repair.report('overlay');
+
+    expect(sent()).toEqual(['overlay']);
   });
 
   it('sends a report again when the service worker did not answer', async () => {
