@@ -4,13 +4,14 @@
  * storage, finds the element it names, and tells the service worker how the icon was placed.
  *
  * The service worker keeps how each tab last placed the icon, so a Toolbar in one tab does not drop
- * a repair another tab needs. A report is sent when it differs from the last one this tab delivered,
- * so a Platform whose chain resolves and that has no repair costs one storage read per page load and
- * no message. The tab's placement is sent again, whatever it is: at the first placement of a page
- * load while the Platform has a repair; after a report the service worker did not save, unless it
- * refused it for good; when storage drops the Platform's repair, or holds an override with no status
- * (a pick stored after the chain resolved); and when the page comes back from the back/forward cache,
- * since the service worker forgot the tab when it left.
+ * a repair another tab needs. The tab's placement is sent when it differs from the last one sent; a
+ * Toolbar is not sent while the Platform has no repair, so a Platform whose chain resolves costs one
+ * storage read per page load and no message. It is sent again, whatever it is: once the Platform has
+ * a repair, so every open tab is counted, those whose icon was in the Toolbar before the repair
+ * included; after a report the service worker did not save, unless it refused it for good; when
+ * storage drops the repair while this tab was off the Toolbar (as by Clear All Data), or holds an
+ * override with no status (a pick stored after the chain resolved); and when the page comes back from
+ * the back/forward cache, since the service worker forgot the tab when it left.
  */
 
 import {
@@ -29,8 +30,12 @@ export const PLACEMENT_REPORT_MESSAGE = 'ICON_PLACEMENT_REPORTED';
 
 export class PlacementRepair {
   private override: CustomSitePositioning | null = null;
-  /** The placement the service worker holds for this tab; null when it may hold none, or another */
-  private sent: PlacementReport | null = 'toolbar';
+  /** The placement last sent for this tab; null when the service worker may hold none, or another */
+  private sent: PlacementReport | null = null;
+  /** How the icon was last placed in this tab, sent or not; null before its first placement */
+  private placed: PlacementReport | null = null;
+  /** Whether storage holds a repair for this Platform: until it does, a Toolbar needs no report */
+  private hasRepair = false;
   private listening = false;
   private readonly hostname: string;
   private readonly onOverrideChange: () => void;
@@ -53,9 +58,9 @@ export class PlacementRepair {
   async load(): Promise<void> {
     const repair = (await readIconPlacementRepairs())[this.hostname];
     this.override = repair?.override ?? null;
-    // With a repair, the first placement is reported whatever it is: the service worker counts this tab.
-    // Without one, a Toolbar needs no report: the service worker counts no tab's Toolbar for nothing.
-    this.sent = repair ? null : 'toolbar';
+    // The first placement of the page is reported, but a Toolbar only while the Platform has a repair
+    this.hasRepair = repair !== undefined;
+    this.sent = null;
     if (!this.listening) {
       chrome.storage.onChanged.addListener(this.handleStorageChange);
       window.addEventListener('pageshow', this.handlePageShow);
@@ -115,7 +120,8 @@ export class PlacementRepair {
    * before the override, so it is not used while the Toolbar is found.
    */
   report(placement: PlacementReport): void {
-    if (placement === this.sent) {
+    this.placed = placement;
+    if (placement === this.sent || (placement === 'toolbar' && !this.hasRepair)) {
       return;
     }
     if (placement === 'toolbar' && this.override !== null) {
@@ -152,11 +158,14 @@ export class PlacementRepair {
       return;
     }
     const repair = parseIconPlacementRepairs(changes[ICON_PLACEMENT_REPAIRS_KEY]?.newValue)[this.hostname];
+    this.hasRepair = repair !== undefined;
     // The service worker no longer counts this tab off the Toolbar (the repair was dropped, as by Clear
-    // All Data), or an override waits for a status: the next placement says how this tab placed the icon
+    // All Data), or an override waits for a status: this tab's placement is sent again
     if ((!repair && this.sent !== 'toolbar') || (repair && !repair.status)) {
       this.sent = null;
     }
+    // A tab that has not sent its placement yet sends it now: a Toolbar from before the repair included
+    this.reportPlaced();
     const override = repair?.override ?? null;
     if (JSON.stringify(override) === JSON.stringify(this.override)) {
       return;
@@ -165,12 +174,19 @@ export class PlacementRepair {
     this.onOverrideChange();
   };
 
+  /** Sends how the icon was last placed, when it was placed and not yet sent */
+  private reportPlaced(): void {
+    if (this.placed) {
+      this.report(this.placed);
+    }
+  }
+
   /** Back from the back/forward cache: the service worker forgot this tab when it left the Platform */
   private readonly handlePageShow = (event: PageTransitionEvent): void => {
     if (!event.persisted) {
       return;
     }
     this.sent = null;
-    this.onOverrideChange();
+    this.reportPlaced();
   };
 }

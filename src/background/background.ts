@@ -6,6 +6,7 @@
 import {
   changeIconPlacementRepairs,
   forgetIconPlacementTab,
+  moveIconPlacementTab,
   overrideFromPick,
   type PlacementReport,
   type PlacementReportResponse,
@@ -777,9 +778,11 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   forgetPlacementTab(tabId, null);
 });
 
-// A tab whose page Chrome swapped (a prerender, a discard) gets a new id: the old one is gone
-chrome.tabs.onReplaced.addListener((_addedTabId, removedTabId) => {
-  forgetPlacementTab(removedTabId, null);
+// A tab whose page Chrome swapped (a prerender, a discard) gets a new id: its placement goes with it
+chrome.tabs.onReplaced.addListener((addedTabId, removedTabId) => {
+  moveIconPlacementTab(removedTabId, addedTabId).catch((error: unknown) => {
+    Logger.warn("Could not move the icon placement of a replaced tab", { component: "Background", addedTabId, removedTabId, error: getErrorMessage(error) });
+  });
 });
 
 // A tab that leaves a Platform no longer keeps its icon placement repair

@@ -146,15 +146,19 @@ describe('background: the icon placement of each tab of a Platform', () => {
     expect(await storedRepairs()).toEqual({});
   });
 
-  it('forgets a tab whose page Chrome replaced, under its old id', async () => {
+  it('keeps the placement of a tab whose page Chrome replaced, under its new id', async () => {
     const listener = await startServiceWorker();
     await report(listener, OTHER_CLAUDE_TAB, 'toolbar');
     await pickInClaudeTab(listener);
 
-    // The tab's page is swapped: the new id reports again itself
+    // The tab's page is swapped: it still needs the pick under its new id, then closes under it
     tabEvent('onReplaced', 42, CLAUDE_TAB.id);
     await new Promise((resolve) => { setTimeout(resolve, 20); });
+    await report(listener, OTHER_CLAUDE_TAB, 'toolbar');
+    expect(await storedRepairs()).toMatchObject({ 'claude.ai': { status: 'override' } });
 
+    tabEvent('onRemoved', 42, {});
+    await new Promise((resolve) => { setTimeout(resolve, 20); });
     expect(await storedRepairs()).toEqual({});
   });
 

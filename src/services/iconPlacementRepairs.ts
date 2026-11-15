@@ -258,6 +258,29 @@ export function forgetIconPlacementTab(tabId: number, keepHostname: string | nul
   });
 }
 
+/**
+ * Moves the placements of a tab to the id Chrome gave it when it swapped its page (a prerender, a
+ * discard): it is the same tab, and still needs what it needed. A placement the new id already
+ * reported is its own, and kept.
+ */
+export function moveIconPlacementTab(fromTabId: number, toTabId: number): Promise<void> {
+  return withIconPlacementRepairsLock(async () => {
+    const tabs = parsePlacementTabs((await chrome.storage.session.get(ICON_PLACEMENT_TABS_KEY))[ICON_PLACEMENT_TABS_KEY]);
+    let changed = false;
+    for (const byTab of Object.values(tabs)) {
+      const placement = byTab[String(fromTabId)];
+      if (placement) {
+        delete byTab[String(fromTabId)];
+        byTab[String(toTabId)] ??= placement;
+        changed = true;
+      }
+    }
+    if (changed) {
+      await chrome.storage.session.set({ [ICON_PLACEMENT_TABS_KEY]: tabs });
+    }
+  });
+}
+
 /** Applies a change to what storage holds, under the lock; writes only when something changed */
 export function changeIconPlacementRepairs(change: IconPlacementRepairChange): Promise<IconPlacementRepairs> {
   return withIconPlacementRepairsLock(async () => {

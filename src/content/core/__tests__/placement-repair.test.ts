@@ -4,7 +4,7 @@
  * not save (unless it refused it for good), and again when the service worker may have forgotten it.
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ICON_PLACEMENT_REPAIRS_KEY } from '../../../services/iconPlacementRepairs';
 import { PLACEMENT_REPORT_MESSAGE, PlacementRepair } from '../placement-repair';
@@ -26,6 +26,11 @@ describe('PlacementRepair.report', () => {
     vi.mocked(chrome.runtime.sendMessage).mockReset();
     vi.mocked(chrome.runtime.sendMessage).mockResolvedValue({ success: true } as never);
     repair = new PlacementRepair('claude.ai', vi.fn());
+  });
+
+  afterEach(() => {
+    // Its pageshow listener would answer the next test's events
+    repair.dispose();
   });
 
   it('sends nothing when storage already says the icon is in the toolbar', async () => {
@@ -114,23 +119,33 @@ describe('PlacementRepair.report', () => {
   const pageShow = (persisted: boolean) => window.dispatchEvent(Object.assign(new Event('pageshow'), { persisted }));
 
   it('sends its placement again when the page comes back from the back/forward cache', async () => {
-    const onOverrideChange = vi.fn();
-    repair = new PlacementRepair('claude.ai', onOverrideChange);
+    await chrome.storage.local.set({ [ICON_PLACEMENT_REPAIRS_KEY]: { 'claude.ai': { status: 'override', override: PICK } } });
     await repair.load();
-    repair.report('overlay');
+    repair.report('toolbar');
     await flush();
 
     pageShow(false);
-    repair.report('overlay');
-    expect(onOverrideChange).not.toHaveBeenCalled();
+    await flush();
+    expect(sent()).toEqual(['toolbar']);
 
+    // The service worker forgot the tab when it left the Platform; its icon, in the Toolbar, is not placed again
     pageShow(true);
-    repair.report('overlay');
-    repair.dispose();
 
-    // The service worker forgot the tab when it left the Platform; the icon is placed again
-    expect(onOverrideChange).toHaveBeenCalledTimes(1);
-    expect(sent()).toEqual(['overlay', 'overlay']);
+    expect(sent()).toEqual(['toolbar', 'toolbar']);
+  });
+
+  it('sends its Toolbar, placed before the Platform had a repair, once the repair is stored', async () => {
+    vi.mocked(chrome.storage.onChanged.addListener).mockClear();
+    await repair.load();
+    repair.report('toolbar');
+    expect(sent()).toEqual([]);
+
+    // Another tab of the Platform reports the overlay: this tab is counted with its Toolbar, once
+    storageChange({ 'claude.ai': { status: 'overlay' } });
+    await flush();
+    storageChange({ 'claude.ai': { status: 'override', override: PICK } });
+
+    expect(sent()).toEqual(['toolbar']);
   });
 
   it('sends the first placement of the page when the Platform has a repair, though storage says the same', async () => {
