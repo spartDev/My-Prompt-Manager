@@ -128,8 +128,8 @@ export async function readIconPlacementRepairs(): Promise<IconPlacementRepairs> 
   }
 }
 
-// Shared with the other contexts through the Web Locks API. Clear All Data takes it last, after
-// the Site settings lock (StorageManager.clearAllData), so a repair waiting in the service worker
+// Shared with the other contexts through the Web Locks API. Clear All Data takes it after the
+// Site settings lock and before the What's new lock (StorageManager.clearAllData), so a repair waiting in the service worker
 // is written to the cleared store, or before the clear and cleared with it, never back over it.
 const repairsLock = new AsyncMutex({ scope: 'IconPlacementRepairs' });
 

@@ -20,6 +20,7 @@ import {
   storageWarningLevel,
   storedSize
 } from '../utils/storageQuota';
+import { clearStorageKeepingWhatsNew, withWhatsNewLock } from '../whatsNew/storage';
 import { withIconPlacementRepairsLock } from './iconPlacementRepairs';
 import {
   AdmissionRefusedError,
@@ -80,7 +81,7 @@ export class StorageManager {
   // panel, service worker) through the Web Locks API, so a read-then-write from one context cannot
   // overwrite a write made in between from another, nor write back after Clear All Data.
   // Lock order: CATEGORIES -> PROMPTS -> SETTINGS, then the Site settings lock, then the icon
-  // placement repairs lock (both clearAllData only).
+  // placement repairs lock, then the What's new lock (all three clearAllData only).
   private readonly mutex = new AsyncMutex({ scope: 'StorageManager' });
 
   private constructor() {}
@@ -700,25 +701,28 @@ export class StorageManager {
   }
 
   /**
-   * Clear All Data: empties chrome.storage under every lock, in the documented order, so a locked
-   * write from another context lands either before the clear (and is cleared) or after it (on an
-   * empty store), never in the middle of it.
+   * Clear All Data: empties chrome.storage but for the What's new record (the Release of the first
+   * install and the Last seen Release, kept so What's new does not come back), under every lock,
+   * in the documented order, so a locked write from another context lands either before the clear
+   * (and is cleared) or after it (on an emptied store), never in the middle of it.
    */
   clearAllData(): Promise<void> {
     return this.mutex.withLock(this.STORAGE_KEYS.CATEGORIES, () =>
       this.mutex.withLock(this.STORAGE_KEYS.PROMPTS, () =>
         this.mutex.withLock(this.STORAGE_KEYS.SETTINGS, () =>
-          // Last, after SETTINGS: a change of the Site settings, or an icon placement repair,
-          // waiting in another context is applied to the cleared store and cannot write the old
-          // ones back
+          // Last, after SETTINGS: a change of the Site settings, an icon placement repair, or a
+          // write of the What's new record, waiting in another context is applied to the cleared
+          // store and cannot write the old ones back
           withSiteSettingsLock(() =>
-            withIconPlacementRepairsLock(async () => {
-              try {
-                await chrome.storage.local.clear();
-              } catch (error) {
-                throw this.handleStorageError(error);
-              }
-            })
+            withIconPlacementRepairsLock(() =>
+              withWhatsNewLock(async () => {
+                try {
+                  await clearStorageKeepingWhatsNew();
+                } catch (error) {
+                  throw this.handleStorageError(error);
+                }
+              })
+            )
           )
         )
       )
