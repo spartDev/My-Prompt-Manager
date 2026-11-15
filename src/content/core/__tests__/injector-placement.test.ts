@@ -190,7 +190,7 @@ describe('icon placement in the composer', () => {
     page = document.createElement('main');
     page.innerHTML = readFileSync(resolve(__dirname, '../../../../tests/fixtures/composers/claude.html'), 'utf8');
     document.body.appendChild(page);
-    editor = page.querySelector<HTMLElement>('[data-testid="chat-input"]') as HTMLElement;
+    editor = page.querySelector<HTMLElement>('.ProseMirror[contenteditable="true"]') as HTMLElement;
     injector = new PromptLibraryInjector();
     internals().state.isSiteEnabled = true;
     internals().state.currentTextarea = editor;

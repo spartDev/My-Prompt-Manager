@@ -12,9 +12,10 @@
  *   npm run composers:capture -- --url claude=http://127.0.0.1:8080/claude.html --out /tmp/fx --headless --channel chromium
  *                                                        capture a stand-in page instead of the live site
  *
- * The sanitizer keeps an allowlist: contenteditable, role, type, test ids, and the attributes and
- * class names the Platform's selectors read, a valued one only where its value meets the selector's
- * condition; text, links and any other attribute (an ARIA label naming the user's workspace) go.
+ * The sanitizer keeps an allowlist: contenteditable, role and type with a value the web platform
+ * defines, and the attributes and class names the Platform's selectors read, written with the
+ * selector's value, never the page's; text, links and any other attribute (an ARIA label naming
+ * the user's workspace) go.
  * Still review `git diff tests/fixtures/composers` before committing.
  */
 
@@ -142,11 +143,25 @@ export function parseCaptureArgs(argv: readonly string[], env: NodeJS.ProcessEnv
 const urlOf = (id: string, platform: PlatformDefinition, options: CaptureOptions): string =>
   options.urls[id] ?? `https://${platform.hostname}${START_PATHS[id] ?? '/'}`;
 
+/**
+ * The class selectors the platform strategies find editors by, beyond the config's
+ * (claude-strategy, mistral-strategy, gemini-strategy): the editor keeps those class names
+ */
+const STRATEGY_EDITOR_SELECTORS = ['.ProseMirror[contenteditable="true"]', 'rich-textarea .ql-editor'];
+
 /** What a Platform's fixture keeps: what its editor selectors and its anchor chain read */
 export const rulesFor = (platform: PlatformDefinition) => {
   const chain = platform.iconPlacement;
-  return sanitizeRulesOf([...platform.selectors, ...(chain ? [chain.composer, ...chain.anchors.map(({ find }) => find)] : [])]);
+  return sanitizeRulesOf([
+    ...platform.selectors,
+    ...STRATEGY_EDITOR_SELECTORS,
+    ...(chain ? [chain.composer, ...chain.anchors.map(({ find }) => find)] : [])
+  ]);
 };
+
+/** The address a fixture's header names: a local stand-in file only by its name, not its home path */
+export const headerUrl = (url: string): string =>
+  (url.startsWith('file:') ? `file://<stand-in>/${url.split(/[/\\]/).pop() ?? ''}` : url);
 
 type CaptureResult =
   | { id: string; outcome: 'captured'; composerFound: boolean; file: string }
@@ -166,14 +181,17 @@ export async function capture(page: Page, id: string, platform: PlatformDefiniti
   const editorSelectors = [...platform.selectors, ...GENERIC_EDITORS];
   // The first visible editor, by the selectors' order. Any visible match: waitForSelector would wait
   // on the first match only, and a hidden textarea earlier in the page (a search field) would then
-  // hide the editor. Visible means rendered and not visibility:hidden, display:none included.
+  // hide the editor. Visible means rendered, not visibility:hidden, and of nonzero width and height.
   const findEditor = async () => {
     try {
       const handle = await page.waitForFunction(
         (selectors) => {
           for (const selector of selectors) {
             const editor = Array.from(document.querySelectorAll<HTMLElement>(selector))
-              .find((candidate) => candidate.checkVisibility({ visibilityProperty: true }));
+              .find((candidate) => {
+                const box = candidate.getBoundingClientRect();
+                return box.width > 0 && box.height > 0 && candidate.checkVisibility({ visibilityProperty: true });
+              });
             if (editor) {
               return editor;
             }
@@ -229,7 +247,7 @@ export async function capture(page: Page, id: string, platform: PlatformDefiniti
   const file = path.join(options.out, `${id}.html`);
   writeFileSync(file, composerFixture(root, {
     platformName: platform.displayName,
-    url,
+    url: headerUrl(url),
     date: new Date().toISOString().slice(0, 10),
     composerFound: live.composerFound
   }));

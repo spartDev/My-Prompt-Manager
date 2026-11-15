@@ -1,41 +1,43 @@
 <!--
   Claude composer, captured from claude.ai/new on 2026-11-11, signed in.
-  Sanitized: text, classes (but the editor's), generated ids, styles and SVG content removed;
-  wrappers with no attribute and one child folded into that child. Attributes kept as they are live.
+  Re-sanitized on 2026-11-15 by scripts/composers/sanitize.ts: text, links, media and SVG content
+  removed; of the attributes, only contenteditable, role and type of the web platform's values, and
+  what the Platform's selectors read, with the selector's value; wrappers with no attribute and one
+  child folded into that child.
 -->
 <div>
   <div>
     <div>
-      <div contenteditable="true" role="textbox" data-testid="chat-input" aria-label="Write your prompt to Claude" translate="no" class="tiptap ProseMirror"><p data-placeholder="Ask"><br></p></div>
+      <div contenteditable="true" role="textbox" class="ProseMirror"><p><br></p></div>
       <span role="status"></span>
     </div>
     <div>
-      <button type="button" aria-label="Add files, connectors, and more" data-testid="chat-input-attach" aria-haspopup="menu" aria-expanded="false"></button>
+      <button type="button" data-testid="chat-input-attach"></button>
       <div>
         <div data-testid="composer-dictate">
-          <div role="group" aria-label="Dictate">
-            <button type="button" aria-label="Dictate"></button>
-            <button type="button" aria-label="Microphone" aria-haspopup="menu" aria-expanded="false"></button>
+          <div role="group">
+            <button type="button"></button>
+            <button type="button"></button>
           </div>
         </div>
         <div>
-          <div><span><button type="button" aria-label="Send message" data-testid="chat-input-send"></button></span></div>
-          <button type="button" aria-label="Use voice mode"></button>
+          <button type="button" data-testid="chat-input-send"></button>
+          <button type="button"></button>
         </div>
       </div>
     </div>
   </div>
   <div>
     <div>
-      <button type="button" aria-haspopup="menu" aria-expanded="false"></button>
+      <button type="button"></button>
       <span role="status"></span>
     </div>
     <div>
-      <span><button type="button" aria-label="Model: Opus 5.5 Medium" data-testid="model-selector-dropdown" aria-haspopup="menu" aria-expanded="false"></button></span>
+      <button type="button"></button>
       <div>
         <button type="button"></button>
         <button type="button"></button>
-        <span><button type="button" aria-haspopup="menu" aria-expanded="false"></button></span>
+        <button type="button"></button>
       </div>
     </div>
   </div>

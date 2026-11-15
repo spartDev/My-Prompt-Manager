@@ -1,10 +1,11 @@
 /**
  * Turns a Platform's live composer into a fixture of tests/fixtures/composers: the structure, and
- * of the attributes only an allowlist: what an element is (contenteditable, role, type), its test
- * ids, and what the Platform's own selectors read (sanitizeRulesOf). Text, comments, links, media
- * and SVG content go, and so does any attribute nobody reads. An attribute a selector reads by its
- * value gets a value written from the selector, never the page's, so a fixture holds nothing the
- * user wrote and nothing that names them (data-user-id, `placeholder="Message Alice"`), and any
+ * of the attributes only an allowlist: what an element is (contenteditable, role, type), with a
+ * value the web platform defines, and what the Platform's own selectors read (sanitizeRulesOf),
+ * test ids and class names included. Text, comments, links, media and SVG content go, and so does
+ * any attribute nobody reads. An attribute a selector reads by its value gets a value written from
+ * the selector, never the page's, so a fixture holds nothing the user wrote and nothing that names
+ * them (data-user-id, `placeholder="Message Alice"`, `data-testid="user-menu-alice"`), and any
  * value still kept that looks like an address or an e-mail is dropped as well.
  *
  * DOM code with no Node or browser global, so `npm run composers:capture` runs it on jsdom and
@@ -23,10 +24,44 @@ const FOLDED_TAGS = new Set(['div', 'span']);
 const VOID_ELEMENTS = new Set(['area', 'br', 'col', 'embed', 'hr', 'img', 'input', 'source', 'track', 'wbr']);
 
 /**
- * Attributes kept with any value: what an element is (contenteditable, role, type) and the test
- * ids a Platform writes for its own tests. None carries what the user wrote or who they are.
+ * What an element is, kept only with a value of the web platform's own: a page cannot put a name
+ * in them. Test ids are not among them: those a chain needs are named by its selectors, and so
+ * written from them, like any attribute a selector reads.
  */
-const STRUCTURAL_ATTRIBUTES = new Set(['contenteditable', 'role', 'type', 'data-testid']);
+const ENUMERATED_ATTRIBUTES: Readonly<Record<string, ReadonlySet<string>>> = {
+  contenteditable: new Set(['', 'true', 'false', 'plaintext-only']),
+  // WAI-ARIA 1.2 roles
+  role: new Set([
+    'alert', 'alertdialog', 'application', 'article', 'banner', 'blockquote', 'button', 'caption', 'cell', 'checkbox',
+    'code', 'columnheader', 'combobox', 'complementary', 'contentinfo', 'definition', 'deletion', 'dialog', 'directory',
+    'document', 'emphasis', 'feed', 'figure', 'form', 'generic', 'grid', 'gridcell', 'group', 'heading', 'img', 'insertion',
+    'link', 'list', 'listbox', 'listitem', 'log', 'main', 'marquee', 'math', 'menu', 'menubar', 'menuitem', 'menuitemcheckbox',
+    'menuitemradio', 'meter', 'navigation', 'none', 'note', 'option', 'paragraph', 'presentation', 'progressbar', 'radio',
+    'radiogroup', 'region', 'row', 'rowgroup', 'rowheader', 'scrollbar', 'search', 'searchbox', 'separator', 'slider',
+    'spinbutton', 'status', 'strong', 'subscript', 'superscript', 'switch', 'tab', 'table', 'tablist', 'tabpanel', 'term',
+    'textbox', 'time', 'timer', 'toolbar', 'tree', 'treegrid', 'treeitem'
+  ]),
+  // The types of a button and of an input
+  type: new Set([
+    'button', 'submit', 'reset', 'text', 'search', 'email', 'url', 'tel', 'password', 'number', 'checkbox', 'radio', 'file',
+    'hidden', 'image', 'range', 'color', 'date', 'datetime-local', 'month', 'week', 'time'
+  ])
+};
+
+/** The value kept for an enumerated attribute: its tokens the web platform defines, or null */
+function enumeratedValue(name: string, value: string): string | null {
+  const allowed = ENUMERATED_ATTRIBUTES[name];
+  const normalized = value.trim().toLowerCase();
+  if (allowed.has(normalized)) {
+    return normalized;
+  }
+  // A role may list fallbacks: `role="switch checkbox"`
+  if (name === 'role') {
+    const tokens = normalized.split(/\s+/).filter((token) => allowed.has(token));
+    return tokens.length > 0 ? tokens.join(' ') : null;
+  }
+  return null;
+}
 
 /** A value that may carry an address or an e-mail, whatever attribute it is in */
 const looksPersonal = (value: string): boolean => /https?:|@|\/\//i.test(value);
@@ -117,22 +152,25 @@ function selectorValue(actual: string, conditions: readonly ValueCondition[]): s
   if (met.length === 0) {
     return null;
   }
-  const candidates = [...met.map(({ value }) => value), met.map(({ value }) => value).join(' ')];
+  // Joined, a prefix goes first and a suffix last: `^="Send"` and `$="message"` give "Send message"
+  const order = (operator: string) => (operator === '^=' ? 0 : operator === '$=' ? 2 : 1);
+  const joined = [...met].sort((a, b) => order(a.operator) - order(b.operator)).map(({ value }) => value).join(' ');
+  const candidates = [...met.map(({ value }) => value), joined];
   return candidates.find((candidate) => met.every((condition) => meets(candidate, condition))) ?? null;
 }
 
-function sanitizeAttributes(element: Element, isEditor: boolean, rules: SanitizeRules): void {
+function sanitizeAttributes(element: Element, rules: SanitizeRules): void {
   for (const { name, value } of Array.from(element.attributes)) {
     const lower = name.toLowerCase();
     if (lower === EDITOR_MARKER) {
       continue;
     }
     let kept: string | null;
-    if (STRUCTURAL_ATTRIBUTES.has(lower)) {
-      kept = value;
+    if (lower in ENUMERATED_ATTRIBUTES) {
+      kept = enumeratedValue(lower, value);
     } else if (lower === 'class') {
-      // The editor keeps its classes: some Platforms find it by them (.ProseMirror)
-      kept = value.split(/\s+/).filter((token) => token && !looksPersonal(token) && (isEditor || rules.classes.has(token))).join(' ') || null;
+      // Only the class names a selector names (.ProseMirror, .fai-ChatInput): every other is a look
+      kept = value.split(/\s+/).filter((token) => rules.classes.has(token)).join(' ') || null;
     } else {
       const rule = rules.attributes.get(lower);
       kept = rule ? selectorValue(value, rule.conditions) ?? (rule.bare ? '' : null) : null;
@@ -159,7 +197,7 @@ function strip(node: Node, isInsideSvg: boolean, rules: SanitizeRules): void {
       element.remove();
       continue;
     }
-    sanitizeAttributes(element, element.hasAttribute(EDITOR_MARKER), rules);
+    sanitizeAttributes(element, rules);
     strip(element, tag === 'svg', rules);
   }
 }
@@ -179,11 +217,11 @@ function fold(element: Element, isRoot: boolean): void {
  * Sanitizes a composer in place: the root (the element the chain's composer selector found) is
  * kept as it is, even when it could fold, so the selector still finds it.
  *
- * @param rules - What the Platform's selectors read (sanitizeRulesOf); with none, only the
- *   structural attributes stay
+ * @param rules - What the Platform's selectors read (sanitizeRulesOf); with none, only
+ *   contenteditable, role and type stay
  */
 export function sanitizeComposer(root: Element, rules: SanitizeRules = sanitizeRulesOf([])): void {
-  sanitizeAttributes(root, root.hasAttribute(EDITOR_MARKER), rules);
+  sanitizeAttributes(root, rules);
   strip(root, root.tagName.toLowerCase() === 'svg', rules);
   fold(root, true);
 }
@@ -238,8 +276,8 @@ export function composerFixture(root: Element, header: FixtureHeader): string {
   return [
     '<!--',
     `  ${header.platformName} composer, captured from ${header.url} on ${header.date} by npm run composers:capture.${origin}`,
-    '  Sanitized: text, links, media and SVG content removed; of the attributes, only contenteditable, role,',
-    '  type, test ids and what the Platform\'s selectors read are kept, the last with the selector\'s value;',
+    '  Sanitized: text, links, media and SVG content removed; of the attributes, only contenteditable, role',
+    '  and type of the web platform\'s values, and what the Platform\'s selectors read, with the selector\'s value;',
     '  wrappers with no attribute and one child folded into that child.',
     '-->',
     serializeComposer(root),

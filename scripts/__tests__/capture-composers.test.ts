@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { SUPPORTED_PLATFORMS } from '../../src/config/platforms';
 import { resolveIconPlacement } from '../../src/content/core/icon-placement';
-import { parseCaptureArgs, rulesFor } from '../capture-composers';
+import { headerUrl, parseCaptureArgs, rulesFor } from '../capture-composers';
 import { composerFixturePath } from '../composers/fixtures';
 import { classNamesOf, composerFixture, EDITOR_MARKER, sanitizeComposer, sanitizeRulesOf, serializeComposer } from '../composers/sanitize';
 
@@ -41,7 +41,7 @@ describe('sanitizeComposer', () => {
     expect(serializeComposer(composer)).toBe([
       '<form>',
       '  <div contenteditable="true" role="textbox" class="ProseMirror"><p></p></div>',
-      '  <div data-testid="composer-trailing-actions">',
+      '  <div>',
       '    <button type="button" aria-label="dictate">',
       '      <svg></svg>',
       '    </button>',
@@ -86,15 +86,36 @@ describe('sanitizeComposer', () => {
   });
 
   it.each([
-    ['an e-mail in a test id', '<div><button data-testid="alice@example.com"></button></div>', []],
-    ['an address in a test id', '<div><button data-testid="https://example.com/u/alice"></button></div>', []],
-    ['an e-mail in the editor\'s classes', `<div><div ${EDITOR_MARKER} contenteditable="true" class="ProseMirror alice@example.com"></div></div>`, []]
-  ] as const)('drops %s', (_case, html, selectors) => {
+    ['an e-mail', '<div><button data-testid="alice@example.com"></button></div>', ['[data-testid*="@"]']],
+    ['an address', '<div><button data-testid="https://example.com/u/alice"></button></div>', ['[data-testid^="https:"]']]
+  ] as const)('drops a kept value that looks like %s, even one a selector writes', (_case, html, selectors) => {
     const composer = composerOf(html);
 
     sanitizeComposer(composer, sanitizeRulesOf(selectors));
 
-    expect(serializeComposer(composer)).not.toMatch(/alice|example/);
+    expect(serializeComposer(composer)).toBe('<div>\n  <button></button>\n</div>');
+  });
+
+  it.each([
+    ['a test id no selector names', '<div><b data-testid="user-menu-alice-smith"></b></div>', '<div>\n  <b></b>\n</div>'],
+    ['a role that is not an ARIA role', '<div><b role="alice"></b><b role="switch alice"></b></div>', '<div>\n  <b></b>\n  <b role="switch"></b>\n</div>'],
+    ['a type that is no button or input type', '<div><button type="alice"></button></div>', '<div>\n  <button></button>\n</div>'],
+    ['a contenteditable that is not true, false or plaintext-only', '<div><b contenteditable="alice"></b></div>', '<div>\n  <b></b>\n</div>'],
+    ['an editor class no selector names', `<div><div ${EDITOR_MARKER} contenteditable="true" class="ProseMirror user-alice-smith"></div></div>`, '<div>\n  <div contenteditable="true" class="ProseMirror"></div>\n</div>']
+  ] as const)('drops %s', (_case, html, expected) => {
+    const composer = composerOf(html);
+
+    sanitizeComposer(composer, rulesFor(SUPPORTED_PLATFORMS.claude));
+
+    expect(serializeComposer(composer)).toBe(expected);
+  });
+
+  it('joins a prefix first and a suffix last when no one value meets every condition', () => {
+    const composer = composerOf('<div><button aria-label="Send the message"></button></div>');
+
+    sanitizeComposer(composer, sanitizeRulesOf(['[aria-label$="message"]', '[aria-label^="Send"]']));
+
+    expect(serializeComposer(composer)).toBe('<div>\n  <button aria-label="Send message"></button>\n</div>');
   });
 
   it('keeps an attribute a selector names both bare and with a value, whatever its value', () => {
@@ -138,22 +159,19 @@ describe('sanitizeComposer', () => {
 
     sanitizeComposer(composer, sanitizeRulesOf(['button[aria-label="Send"]']));
 
-    expect(serializeComposer(composer)).toBe([
-      '<div>',
-      '  <div data-testid="toolbar">',
-      '    <button aria-label="Send"></button>',
-      '  </div>',
-      '</div>'
-    ].join('\n'));
+    // The test id no selector names is dropped, its wrapper folded; the composer, as bare, stays
+    expect(serializeComposer(composer)).toBe('<div>\n  <button aria-label="Send"></button>\n</div>');
   });
 
-  it.each(Object.keys(SUPPORTED_PLATFORMS))('leaves the %s fixture as it is: its chain resolves just the same once sanitized again', (platformId) => {
+  it.each(Object.keys(SUPPORTED_PLATFORMS))('the committed %s fixture is what the sanitizer writes: sanitized again, it is unchanged and its chain resolves', (platformId) => {
     // Parsed, not cut with a pattern: the header comment is a node the composer is not part of
     const composer = composerOf(readFileSync(path.join(FIXTURES, `${platformId}.html`), 'utf8'));
+    const committed = serializeComposer(composer);
     const editor = composer.querySelector('[contenteditable="true"], textarea') as HTMLElement;
     editor.setAttribute(EDITOR_MARKER, '');
 
     sanitizeComposer(composer, rulesFor(SUPPORTED_PLATFORMS[platformId]));
+    expect(serializeComposer(composer).replace(/\n\s*/g, '')).toBe(committed.replace(/\n\s*/g, ''));
     const fixture = composerFixture(composer, { platformName: 'X', url: 'https://x/', date: '2026-11-15', composerFound: true });
     document.body.innerHTML = fixture;
     const captured = document.querySelector<HTMLElement>('[contenteditable="true"], textarea') as HTMLElement;
@@ -222,6 +240,14 @@ describe('parseCaptureArgs', () => {
     [['--fast'], 'Unknown option --fast']
   ])('refuses %j', (argv, message) => {
     expect(() => parseCaptureArgs(argv, {})).toThrow(message);
+  });
+});
+
+describe('headerUrl', () => {
+  it('names a local stand-in file without its home path, and a web address as it is', () => {
+    expect(headerUrl('file:///Users/alice/stand-ins/claude.html')).toBe('file://<stand-in>/claude.html');
+    expect(headerUrl('http://127.0.0.1:8080/claude.html')).toBe('http://127.0.0.1:8080/claude.html');
+    expect(headerUrl('https://claude.ai/new')).toBe('https://claude.ai/new');
   });
 });
 

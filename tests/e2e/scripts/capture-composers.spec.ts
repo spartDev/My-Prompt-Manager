@@ -39,7 +39,7 @@ test.describe('composers:capture in a browser', () => {
 
     expect(result).toMatchObject({ id: 'claude', outcome: 'captured', composerFound: true });
     const fixture = readFileSync(path.join(out, 'claude.html'), 'utf8');
-    expect(fixture).toContain('data-testid="chat-input"');
+    expect(fixture).toContain('class="ProseMirror"');
     expect(fixture).toContain('data-testid="composer-dictate"');
     expect(fixture).not.toContain('Search history');
   });
@@ -48,6 +48,16 @@ test.describe('composers:capture in a browser', () => {
     await page.route('https://capture.test/**', (route) => route.fulfill({
       contentType: 'text/html',
       body: `<!doctype html><body><div style="visibility:hidden">${CLAUDE_COMPOSER}</div></body>`
+    }));
+    const options = parseCaptureArgs(['--url', `claude=${STAND_IN}`, '--out', out, '--settle', '0', '--timeout', '1000']);
+
+    expect(await capture(page, 'claude', SUPPORTED_PLATFORMS.claude, options)).toEqual({ id: 'claude', outcome: 'no-editor', url: STAND_IN });
+  });
+
+  test('says there is no editor when the only editor has no size', async ({ page }) => {
+    await page.route('https://capture.test/**', (route) => route.fulfill({
+      contentType: 'text/html',
+      body: `<!doctype html><body><style>.ProseMirror { width: 0; height: 0; padding: 0; border: 0; overflow: hidden; }</style>${CLAUDE_COMPOSER}</body>`
     }));
     const options = parseCaptureArgs(['--url', `claude=${STAND_IN}`, '--out', out, '--settle', '0', '--timeout', '1000']);
 
