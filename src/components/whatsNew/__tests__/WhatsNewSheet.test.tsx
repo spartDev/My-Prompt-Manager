@@ -74,6 +74,14 @@ describe('WhatsNewSheet', () => {
       expect(screen.getByText('New in 2.0.0')).toBeInTheDocument();
     });
 
+    it('draws the version pill as information (bg-accent-subtle, the dark mockup #2F2350), not as a chosen item', () => {
+      renderSheet();
+
+      const pill = screen.getByText('New in 2.0.0');
+      expect(pill).toHaveClass('rounded-full', 'bg-accent-subtle', 'text-accent', 'font-bold');
+      expect(pill).not.toHaveClass('bg-accent-selected');
+    });
+
     it('renders the grid inside the scrolling body, between the title and the footer', () => {
       renderSheet();
 

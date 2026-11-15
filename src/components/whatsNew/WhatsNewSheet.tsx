@@ -103,7 +103,8 @@ const WhatsNewSheet: FC<WhatsNewSheetProps> = ({ version, children, open, onClos
 
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pt-2 pb-3">
           <div className="flex flex-col gap-1.5">
-            <span className="inline-flex h-6 items-center self-start rounded-full bg-accent-selected px-2.5 text-xs font-bold text-accent">
+            {/* An information pill, not a chosen item: bg-accent-subtle, the dark mockup's own fill */}
+            <span className="inline-flex h-6 items-center self-start rounded-full bg-accent-subtle px-2.5 text-xs font-bold text-accent">
               New in {version}
             </span>
             <h2 id={titleId} className="text-2xl leading-[1.1] font-extrabold tracking-[-0.03em] text-primary">
