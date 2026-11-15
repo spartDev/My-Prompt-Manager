@@ -33,6 +33,17 @@ describe('ElementPicker: the page unloading', () => {
     expect(document.getElementById('mpm-element-picker-overlay')).toBeNull();
   });
 
+  it('names the start whose picker it cancels, on page unload and on Escape', () => {
+    const picker = newPicker();
+    picker.activate('first');
+    window.dispatchEvent(new Event('pagehide'));
+    picker.activate('second');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+
+    expect(chrome.runtime.sendMessage).toHaveBeenNthCalledWith(1, { type: 'PICKER_CANCELLED', attempt: 'first' });
+    expect(chrome.runtime.sendMessage).toHaveBeenNthCalledWith(2, { type: 'PICKER_CANCELLED', attempt: 'second' });
+  });
+
   it('sends nothing once the picker is closed', () => {
     const picker = newPicker();
     picker.activate();

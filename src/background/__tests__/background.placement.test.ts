@@ -11,7 +11,7 @@ vi.mock('../../utils/logger', () => ({
 }));
 
 type MessageListener = (
-  message: { type: string; data?: Record<string, unknown> },
+  message: { type: string; attempt?: string; data?: Record<string, unknown> },
   sender: chrome.runtime.MessageSender,
   sendResponse: (response?: unknown) => void
 ) => boolean | undefined;
@@ -36,7 +36,7 @@ async function startServiceWorker(): Promise<MessageListener> {
 }
 
 /** Sends a message to the service worker and waits for its answer */
-function send(listener: MessageListener, message: { type: string; data?: Record<string, unknown> }, sender: chrome.runtime.MessageSender = {}): Promise<unknown> {
+function send(listener: MessageListener, message: { type: string; attempt?: string; data?: Record<string, unknown> }, sender: chrome.runtime.MessageSender = {}): Promise<unknown> {
   return new Promise((resolve) => {
     listener(message, sender, resolve);
   });
@@ -568,6 +568,13 @@ describe('background: a picker that could not be activated leaves no session', (
 describe('background: a pick cancelled in one tab', () => {
   const OTHER_TAB = { id: 8, windowId: 3, url: 'https://claude.ai/chat/1', active: false } as chrome.tabs.Tab;
 
+  beforeEach(() => {
+    Object.assign(getChromeMock().tabs, {
+      get: vi.fn().mockResolvedValue(CLAUDE_TAB),
+      update: vi.fn().mockResolvedValue(CLAUDE_TAB)
+    });
+  });
+
   it('ends only that tab\'s pick: a pick open in another tab goes on', async () => {
     Object.assign(getChromeMock().tabs, {
       get: vi.fn(async (tabId: number) => (tabId === OTHER_TAB.id ? OTHER_TAB : CLAUDE_TAB)),
@@ -610,7 +617,46 @@ describe('background: a pick cancelled in one tab', () => {
 
     expect(await restarted).toEqual({ success: false, error: 'The element picker was stopped' });
     expect(await otherStart).toEqual({ success: true, tabId: OTHER_TAB.id });
-    expect(chrome.tabs.sendMessage).toHaveBeenLastCalledWith(CLAUDE_TAB.id, expect.objectContaining({ type: 'DEACTIVATE_ELEMENT_PICKER' }));
+    // It ends its own activation, by its attempt
+    const restartActivation = vi.mocked(chrome.tabs.sendMessage).mock.calls
+      .filter(([tabId, message]) => tabId === CLAUDE_TAB.id && (message as { type?: string }).type === 'ACTIVATE_ELEMENT_PICKER')
+      .at(-1)?.[1] as { attempt?: string } | undefined;
+    expect(restartActivation?.attempt).toEqual(expect.any(String));
+    expect(chrome.tabs.sendMessage).toHaveBeenLastCalledWith(CLAUDE_TAB.id, { type: 'DEACTIVATE_ELEMENT_PICKER', source: 'background', attempt: restartActivation?.attempt });
     expect(Object.keys(await chrome.storage.session.get(null))).toEqual([`pickerSession:${OTHER_TAB.id}`]);
+  });
+
+  it('keeps the session of a later start when the cancel of an earlier picker comes after it was stored', async () => {
+    const listener = await startServiceWorker();
+    await send(listener, { type: 'START_ELEMENT_PICKER', data: { tabId: CLAUDE_TAB.id, repairHostname: 'claude.ai' } });
+    const activations = () => vi.mocked(chrome.tabs.sendMessage).mock.calls
+      .map(([, message]) => message as { type?: string; attempt?: string })
+      .filter((message) => message.type === 'ACTIVATE_ELEMENT_PICKER');
+    const earlier = activations()[0]?.attempt;
+    expect(await send(listener, { type: 'START_ELEMENT_PICKER', data: { tabId: CLAUDE_TAB.id, repairHostname: 'claude.ai' } }))
+      .toEqual({ success: true, tabId: CLAUDE_TAB.id });
+    const later = activations()[1]?.attempt;
+    vi.mocked(chrome.tabs.sendMessage).mockClear();
+
+    // The page sent the cancel of the earlier picker (Escape) before the later activation reached it,
+    // and the service worker handles it last
+    expect(await send(listener, { type: 'PICKER_CANCELLED', attempt: earlier }, { tab: CLAUDE_TAB })).toEqual({ success: true });
+
+    const key = `pickerSession:${CLAUDE_TAB.id}`;
+    expect((await chrome.storage.session.get(key))[key]).toMatchObject({ attempt: later });
+    expect(chrome.tabs.sendMessage).not.toHaveBeenCalled();
+    expect(await send(listener, { type: 'ELEMENT_SELECTED', data: { selector: SEND_BUTTON } }, { tab: CLAUDE_TAB })).toEqual({ success: true });
+  });
+
+  it('forgets the session of the start whose picker the page cancelled', async () => {
+    const listener = await startServiceWorker();
+    await send(listener, { type: 'START_ELEMENT_PICKER', data: { tabId: CLAUDE_TAB.id, repairHostname: 'claude.ai' } });
+    const activation = vi.mocked(chrome.tabs.sendMessage).mock.calls
+      .map(([, message]) => message as { type?: string; attempt?: string })
+      .find((message) => message.type === 'ACTIVATE_ELEMENT_PICKER');
+
+    expect(await send(listener, { type: 'PICKER_CANCELLED', attempt: activation?.attempt }, { tab: CLAUDE_TAB })).toEqual({ success: true });
+
+    expect(await chrome.storage.session.get(null)).toEqual({});
   });
 });

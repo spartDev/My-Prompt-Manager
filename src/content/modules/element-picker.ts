@@ -533,7 +533,7 @@ export class ElementPicker {
     // The page unloads (a reload, a navigation): the pick can no longer come, so the service
     // worker forgets the session, as for Escape
     const boundHandlePageHide: EventListener = () => {
-      void chrome.runtime.sendMessage({ type: 'PICKER_CANCELLED' }).catch(() => undefined);
+      void chrome.runtime.sendMessage({ type: 'PICKER_CANCELLED', attempt: this.attempt }).catch(() => undefined);
       this.deactivate();
     };
     const boundHandleMessage: RuntimeMessageListener = (message, sender, sendResponse) => {
@@ -699,7 +699,8 @@ export class ElementPicker {
       event.preventDefault();
       event.stopPropagation();
       
-      void chrome.runtime.sendMessage({ type: 'PICKER_CANCELLED' });
+      // Names the start whose picker it cancels: the service worker may have stored a later one's since
+      void chrome.runtime.sendMessage({ type: 'PICKER_CANCELLED', attempt: this.attempt });
       this.deactivate();
     }
   }

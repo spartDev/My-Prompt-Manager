@@ -131,6 +131,18 @@ const pickerSessions = {
   delete(tabId: number): Promise<void> {
     return changePickerSessions(() => chrome.storage.session.remove(pickerSessionKey(tabId)));
   },
+  /**
+   * Removes the tab's session if it is the one of this start, read and removed in one step; with
+   * no start named, whichever it is
+   */
+  deleteIfAttempt(tabId: number, attempt: string | undefined): Promise<void> {
+    return changePickerSessions(async () => {
+      const session = await pickerSessions.get(tabId);
+      if (session && (attempt === undefined || session.attempt === attempt)) {
+        await chrome.storage.session.remove(pickerSessionKey(tabId));
+      }
+    });
+  },
   /** The sessions held now, to stop them */
   snapshot(): Promise<Map<number, PickerSession>> {
     return changePickerSessions(readPickerSessions);
@@ -835,6 +847,8 @@ interface BackgroundMessage {
     | "REQUEST_PERMISSION"
     | "PROMPT_USAGE_INCREMENT"
     | "ICON_PLACEMENT_REPORTED";
+  /** PICKER_CANCELLED: the start whose picker the page cancelled */
+  attempt?: string;
   data?: {
     /** START_ELEMENT_PICKER: the built-in Platform the pick places the icon for */
     repairHostname?: string;
@@ -875,7 +889,7 @@ chrome.runtime.onMessage.addListener(
       case "PICKER_CANCELLED":
         // From the picker in a tab (Escape, or its page unloading): only that tab's pick ends
         if (sender.tab?.id !== undefined) {
-          void handlePickerCancelled(sender.tab.id, sendResponse);
+          void handlePickerCancelled(sender.tab.id, message.attempt, sendResponse);
           break;
         }
         void handleStopElementPicker(undefined, sender, sendResponse);
@@ -1541,16 +1555,21 @@ async function handleElementSelected(
  */
 async function handlePickerCancelled(
   tabId: number,
+  attempt: string | undefined,
   sendResponse: (response?: { success: boolean; error?: string }) => void,
 ) {
-  // A start in flight in the tab would bring the picker back after the cancel: it stores nothing
+  // A start in flight in the tab would bring the picker back after the cancel: it stores nothing,
+  // and ends its picker by its attempt. A start whose tab is not known yet is not one of them:
+  // every caller names the tab.
   for (const start of pickerStarts) {
     if (start.tabId === tabId) {
       start.stopped = true;
     }
   }
   try {
-    await pickerSessions.delete(tabId);
+    // Only the session of the start cancelled: a later start may have stored its own since, and its
+    // picker is the one the page holds
+    await pickerSessions.deleteIfAttempt(tabId, attempt);
     sendResponse({ success: true });
   } catch (error) {
     Logger.error("Error cancelling element picker", toError(error), {
