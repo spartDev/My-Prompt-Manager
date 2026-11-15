@@ -14,22 +14,12 @@ export interface UseIconPlacementRepairsReturn {
   /** The hostname whose pick could not start, with why, until the next attempt */
   placeError: { hostname: string; message: string } | null;
   /**
-   * Opens the Element picker on a tab of this Platform, to place the icon there. The service
-   * worker keeps the pick, so the popup may close: see `closeOnPick`.
+   * Opens the Element picker on a tab of this Platform, to place the icon there. In the action
+   * popup, the popup then closes: the service worker keeps the pick.
    */
   placeIcon: (hostname: string) => Promise<void>;
 }
 
-export interface UseIconPlacementRepairsOptions {
-  /**
-   * Closes the popup once the Element picker is open: true in popup mode, where the popup would
-   * otherwise stay open over the Platform's tab when that tab is already in front, hiding part of
-   * the page and taking the user's first click. Only the action popup closes, the one page of this
-   * mode that is in no tab: never popup.html opened in a tab, nor the picker window, whose closing
-   * cancels the pick. False in the side panel, which stays open beside the page.
-   */
-  closeOnPick?: boolean;
-}
 
 /** The tab to pick in: the active one when it is on this Platform, else the first tab that is */
 async function findPlatformTab(hostname: string): Promise<chrome.tabs.Tab | undefined> {
@@ -37,8 +27,23 @@ async function findPlatformTab(hostname: string): Promise<chrome.tabs.Tab | unde
   return tabs.find((tab) => tab.active) ?? tabs[0];
 }
 
+/**
+ * True in the action popup, the page that would stay open over the Platform's tab when that tab is
+ * already in front, hiding part of the page and taking the user's first click. Told by the page
+ * itself, not by the interface mode setting, which can change while a surface is open: popup.html,
+ * not the picker window (popup.html?picker=true, whose closing cancels the pick), and in no tab
+ * (popup.html opened in a tab is a tab). The side panel is sidepanel.html.
+ */
+async function isActionPopup(): Promise<boolean> {
+  const { pathname, search } = window.location;
+  if (!pathname.endsWith('/popup.html') || new URLSearchParams(search).get('picker') === 'true') {
+    return false;
+  }
+  return (await chrome.tabs.getCurrent()) === undefined;
+}
+
 /** The icon placement repairs of the built-in Platforms (src/services/iconPlacementRepairs.ts), kept up to date */
-export function useIconPlacementRepairs({ closeOnPick = false }: UseIconPlacementRepairsOptions = {}): UseIconPlacementRepairsReturn {
+export function useIconPlacementRepairs(): UseIconPlacementRepairsReturn {
   const [repairs, setRepairs] = useState<IconPlacementRepairs>({});
   const [placeError, setPlaceError] = useState<{ hostname: string; message: string } | null>(null);
 
@@ -76,14 +81,14 @@ export function useIconPlacementRepairs({ closeOnPick = false }: UseIconPlacemen
       if (!response?.success) {
         throw new Error(response?.error || 'Failed to start element picker');
       }
-      if (closeOnPick && !(await chrome.tabs.getCurrent())) {
+      if (await isActionPopup()) {
         window.close();
       }
     } catch (error) {
       Logger.error('Failed to start placing the icon', toError(error), { component: 'useIconPlacementRepairs', hostname });
       setPlaceError({ hostname, message: 'Could not open the element picker. Reload the page, then try again.' });
     }
-  }, [closeOnPick]);
+  }, []);
 
   return { repairs, placeError, placeIcon };
 }

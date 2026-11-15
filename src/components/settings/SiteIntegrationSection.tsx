@@ -196,9 +196,7 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
     customSites,
   });
   const { requestSitePermission } = useSitePermissions();
-  const { repairs: placementRepairs, placeError, placeIcon } = useIconPlacementRepairs({
-    closeOnPick: interfaceMode === 'popup' && !pickerWindowState.isPickerWindow
-  });
+  const { repairs: placementRepairs, placeError, placeIcon } = useIconPlacementRepairs();
 
   const notify = useCallback(
     (message: string, type: ToastType = 'info', sub?: string) => {
