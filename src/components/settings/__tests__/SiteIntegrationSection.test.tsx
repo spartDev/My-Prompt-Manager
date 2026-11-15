@@ -150,11 +150,13 @@ describe('SiteIntegrationSection - a Platform whose icon fell to the Anchored ov
   });
 
   it.each([
-    { interfaceMode: 'popup' as const, closes: true },
-    { interfaceMode: 'sidepanel' as const, closes: false }
-  ])('closes the popup once the Element picker is open, so it does not cover the page ($interfaceMode)', async ({ interfaceMode, closes }) => {
+    { where: 'the action popup', interfaceMode: 'popup' as const, currentTab: undefined, closes: true },
+    { where: 'popup.html in a tab', interfaceMode: 'popup' as const, currentTab: { id: 4 }, closes: false },
+    { where: 'the side panel', interfaceMode: 'sidepanel' as const, currentTab: undefined, closes: false }
+  ])('closes the popup once the Element picker is open, so it does not cover the page: $where', async ({ interfaceMode, currentTab, closes }) => {
     const user = userEvent.setup();
     const close = vi.spyOn(window, 'close').mockImplementation(() => undefined);
+    (chrome.tabs.getCurrent as unknown as Mock).mockResolvedValue(currentTab);
     await storeRepairs({ 'claude.ai': { status: 'overlay' } });
     (chrome.tabs.query as unknown as Mock).mockImplementation(async (query: { url?: string }) =>
       query.url === 'https://claude.ai/*' ? [{ id: 9, active: true }] : []);

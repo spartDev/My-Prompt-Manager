@@ -22,10 +22,11 @@ export interface UseIconPlacementRepairsReturn {
 
 export interface UseIconPlacementRepairsOptions {
   /**
-   * Closes this window once the Element picker is open: true in the popup, which would otherwise
-   * stay open over the Platform's tab when that tab is already in front, hiding part of the page
-   * and taking the user's first click. False in the side panel and the picker window, which stay
-   * open beside the page (closing the picker window cancels the pick).
+   * Closes the popup once the Element picker is open: true in popup mode, where the popup would
+   * otherwise stay open over the Platform's tab when that tab is already in front, hiding part of
+   * the page and taking the user's first click. Only the action popup closes, the one page of this
+   * mode that is in no tab: never popup.html opened in a tab, nor the picker window, whose closing
+   * cancels the pick. False in the side panel, which stays open beside the page.
    */
   closeOnPick?: boolean;
 }
@@ -75,7 +76,7 @@ export function useIconPlacementRepairs({ closeOnPick = false }: UseIconPlacemen
       if (!response?.success) {
         throw new Error(response?.error || 'Failed to start element picker');
       }
-      if (closeOnPick) {
+      if (closeOnPick && !(await chrome.tabs.getCurrent())) {
         window.close();
       }
     } catch (error) {
