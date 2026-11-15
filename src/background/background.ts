@@ -84,7 +84,8 @@ interface PickerStart {
   activation: number;
   /**
    * Set while its store step writes its session, past the stop check: a cancel does not count it
-   * among the starts it stops, since it ends no picker of its own
+   * among the starts it stops, since it will keep its picker once the write succeeds. Should the
+   * write fail, the step itself removes the older session (see pickerSessions.set).
    */
   storing?: boolean;
 }
@@ -138,8 +139,9 @@ const pickerSessions = {
         await chrome.storage.session.set({ [pickerSessionKey(session.tabId)]: session });
       } catch (error) {
         start.storing = false;
-        // The page holds this start's picker, which it now ends: an older session's picker was
-        // taken over by it, so that session goes too
+        // The page took this start's activation after the older session's, so that session has
+        // no picker left: it goes too. Should this removal fail as well, after the write, the
+        // older session stays until the next start, stop or pick in the tab (two storage failures)
         const older = await pickerSessions.get(session.tabId).catch(() => undefined);
         if (older && (older.activation ?? 0) < start.activation) {
           await chrome.storage.session.remove(pickerSessionKey(session.tabId)).catch(() => undefined);
@@ -1599,8 +1601,8 @@ async function handlePickerCancelled(
   attempt: string | undefined,
   sendResponse: (response?: { success: boolean; error?: string }) => void,
 ) {
-  // A start in flight in the tab would bring the picker back after the cancel: it stores nothing,
-  // and ends its picker by its attempt. A start whose tab is not known yet is not one of them:
+  // A start in flight in the tab would bring the picker back after the cancel: marked, it stores
+  // nothing and ends its picker by its attempt, unless its store step already passed the stop check. A start whose tab is not known yet is not one of them:
   // every caller names the tab.
   // The latest activation sent among the starts it stops: each of them ends its own picker, so a
   // session of an activation sent no later has no picker left either
@@ -1608,7 +1610,7 @@ async function handlePickerCancelled(
   for (const start of pickerStarts) {
     if (start.tabId === tabId) {
       start.stopped = true;
-      // One storing its session ends no picker of its own: it is not counted
+      // One writing its session keeps its picker if the write succeeds: it is not counted
       if (start.activation > 0 && !start.storing) {
         latestStopped = Math.max(latestStopped ?? 0, start.activation);
       }
