@@ -461,6 +461,8 @@ localStorage.setItem('prompt-library-debug', 'true');
 // Then reload the page
 ```
 
+The Debug mode switch in Settings → Advanced turns on the same logging on every Platform, and also shows What's new at every opening of the popup and side panel. The localStorage flag does not: the popup reads Debug mode only from the stored Site settings.
+
 ### Debug Interface
 
 Access the debug interface:

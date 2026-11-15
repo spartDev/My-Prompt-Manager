@@ -209,4 +209,109 @@ describe('useWhatsNew', () => {
 
     expect(Object.keys(result.current).sort()).toEqual(['close', 'loading', 'notes']);
   });
+
+  describe("debug mode shows What's new at every opening", () => {
+    /** The stored What's new record exactly as storage holds it, serialized */
+    const rawRecord = async (): Promise<string | undefined> => JSON.stringify(await storedRecord());
+
+    it('shows the notes when the installed Release is the Last seen Release', async () => {
+      await chrome.storage.local.set({ [WHATS_NEW_KEY]: { lastSeenVersion: '2.0.0' } });
+      await setDebugMode(true);
+
+      for (let opening = 0; opening < 3; opening++) {
+        const { result, unmount } = await openExtension();
+        expect(result.current.notes).toBe(V2_0);
+        unmount();
+      }
+    });
+
+    it('shows the notes on a first install', async () => {
+      await chrome.storage.local.set({ [WHATS_NEW_KEY]: { installedVersion: '2.0.0' } });
+      await setDebugMode(true);
+
+      for (let opening = 0; opening < 3; opening++) {
+        const { result, unmount } = await openExtension();
+        expect(result.current.notes).toBe(V2_0);
+        unmount();
+      }
+    });
+
+    it("closing leaves the stored What's new record byte-identical", async () => {
+      await chrome.storage.local.set({ [WHATS_NEW_KEY]: { installedVersion: '1.9.0', lastSeenVersion: '1.9.0' } });
+      await setDebugMode(true);
+      const before = await rawRecord();
+
+      for (let opening = 0; opening < 3; opening++) {
+        const { result, unmount } = await openExtension();
+        expect(result.current.notes).toBe(V2_0);
+        act(() => {
+          result.current.close();
+        });
+        expect(result.current.notes).toBeNull();
+        unmount();
+      }
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      expect(await rawRecord()).toBe(before);
+      expect(before).toBe('{"installedVersion":"1.9.0","lastSeenVersion":"1.9.0"}');
+    });
+
+    it('closing leaves an absent record absent', async () => {
+      await chrome.storage.local.remove(WHATS_NEW_KEY);
+      await setDebugMode(true);
+
+      const { result } = await openExtension();
+      expect(result.current.notes).toBe(V2_0);
+      act(() => {
+        result.current.close();
+      });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      expect(await storedRecord()).toBeUndefined();
+    });
+
+    it('turned off, gives back the normal decision with the Last seen Release as it was', async () => {
+      // Seen 2.0.0: the normal decision shows nothing, Debug mode shows the notes, off again shows nothing
+      await chrome.storage.local.set({ [WHATS_NEW_KEY]: { lastSeenVersion: '2.0.0' } });
+      await setDebugMode(true);
+      const debugOpening = await openExtension();
+      expect(debugOpening.result.current.notes).toBe(V2_0);
+      act(() => {
+        debugOpening.result.current.close();
+      });
+      debugOpening.unmount();
+
+      await setDebugMode(false);
+      const normalOpening = await openExtension();
+      expect(normalOpening.result.current.notes).toBeNull();
+      expect(await storedRecord()).toEqual({ lastSeenVersion: '2.0.0' });
+    });
+
+    it('turned off after closing an unseen Release in Debug mode, still shows it, as the normal rule says', async () => {
+      // Last seen 1.9.0: a close in Debug mode does not mark 2.0.0 as seen
+      await setDebugMode(true);
+      const debugOpening = await openExtension();
+      act(() => {
+        debugOpening.result.current.close();
+      });
+      debugOpening.unmount();
+
+      await setDebugMode(false);
+      const normalOpening = await openExtension();
+      expect(normalOpening.result.current.notes).toBe(V2_0);
+      expect(await storedRecord()).toEqual({ lastSeenVersion: '1.9.0' });
+    });
+
+    it('is read only from the stored Site settings: the localStorage debug flag does not turn it on', async () => {
+      await chrome.storage.local.set({ [WHATS_NEW_KEY]: { lastSeenVersion: '2.0.0' } });
+      await setDebugMode(false);
+      localStorage.setItem('prompt-library-debug', 'true');
+      try {
+        const { result } = await openExtension();
+        expect(result.current.notes).toBeNull();
+      } finally {
+        localStorage.removeItem('prompt-library-debug');
+      }
+    });
+  });
 });
