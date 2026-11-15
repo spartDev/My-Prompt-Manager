@@ -228,7 +228,7 @@ claim_issues() {
         holder=$(readlink "$lock" 2>/dev/null) || holder="unknown"
         # A claim lock that is not stale is the cause, whatever .reap holds
         if [ ! -L "$lock" ] && [ ! -e "$lock" ]; then
-            print_error "Could not create the claim lock $lock. Nothing was launched."
+            print_error "Could not take the claim lock $lock: another launch held it and has just freed it, or its directory cannot be written. Nothing was launched; launch again."
         elif ! dead_holder "$lock" >/dev/null \
             || { [ ! -L "$lock.reap" ] && [ ! -e "$lock.reap" ]; }; then
             print_error "Another launch is claiming tickets (lock $lock, held by $holder). Wait for it, or remove the lock if no launch is running."

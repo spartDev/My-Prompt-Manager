@@ -383,7 +383,7 @@ touch "$STATE/fail-lock"
 with_claims 'claim_issues A'
 expect_eq "exit code" 1 $?
 expect_owner A '|open'
-if grep -q "Could not create the claim lock $LOCK" "$STATE/out"; then pass; else fail "the error does not say the lock could not be created"; fi
+if grep -q "Could not take the claim lock $LOCK: another launch held it and has just freed it, or its directory cannot be written" "$STATE/out"; then pass; else fail "the error does not say the lock could not be taken"; fi
 
 setup "the lock of a launch that runs is kept" A='|open'
 ln -s "$$" "$LOCK"
@@ -469,7 +469,7 @@ touch "$STATE/held-at-lock"
 with_claims 'claim_issues A || exit 9; finish_launch'
 expect_eq "exit code" 0 $?
 expect_owner A 'me|in_progress'
-if grep -q "Could not create the claim lock" "$STATE/out"; then fail "the lost race reads as a lock that cannot be created"; else pass; fi
+if grep -q "Could not take the claim lock" "$STATE/out"; then fail "the lost race reads as a lock that cannot be created"; else pass; fi
 expect_no_lock
 
 setup "an older launcher's lock taken and freed while the lock is made" A='|open'
