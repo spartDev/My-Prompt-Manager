@@ -180,9 +180,10 @@ for tool in claude gh; do printf '#!/usr/bin/env bash\nexit 0\n' > "$BIN/$tool";
 # term-at-reap), the one that creates the claim lock (or the removal lock)
 # sends TERM to the launcher once it is created.
 for tool in ln mkdir; do
+    real=$(command -v "$tool")
     cat > "$BIN/$tool" <<STUB
 #!/bin/sh
-/bin/$tool "\$@"
+$real "\$@"
 rc=\$?
 for last in "\$@"; do :; done
 if [ "\$rc" -eq 0 ] && [ -n "\${LOCK:-}" ]; then
@@ -345,7 +346,7 @@ expect_owner A '|open'
 expect_untouched A
 expect_eq "lock holder" "$dead" "$(readlink "$LOCK")"
 expect_eq "removal lock holder" "$dead" "$(readlink "$LOCK.reap")"
-if grep -q "remove $LOCK.reap if no launch is running" "$STATE/out"; then pass; else fail "the error does not name the removal lock"; fi
+if grep -q "removal lock $LOCK.reap was left by launch $dead, which no longer runs" "$STATE/out"; then pass; else fail "the error does not name the dead removal lock"; fi
 rm -f "$LOCK" "$LOCK.reap"
 
 setup "TERM as the removal lock is taken" A='|open'

@@ -131,6 +131,8 @@ finish_launch() {
 }
 
 # Whether a process runs; kill -0 fails on another user's process, ps does not.
+# Only processes of this host and pid namespace are seen: a repository shared
+# with a container or another machine must not run launches from both sides.
 pid_alive() {
     kill -0 "$1" 2>/dev/null || ps -p "$1" >/dev/null 2>&1
 }
@@ -200,8 +202,12 @@ claim_issues() {
         free_reap_lock
         holder=$(readlink "$lock" 2>/dev/null) || holder="unknown"
         if [ -L "$lock.reap" ] || [ -e "$lock.reap" ]; then
-            reaper=$(readlink "$lock.reap" 2>/dev/null) || reaper="unknown"
-            print_error "Another launch is removing a stale claim lock ($lock.reap, held by $reaper). Wait for it, or remove $lock.reap if no launch is running."
+            if reaper=$(dead_holder "$lock.reap"); then
+                print_error "The removal lock $lock.reap was left by launch $reaper, which no longer runs. Remove it, then launch again."
+            else
+                reaper=$(readlink "$lock.reap" 2>/dev/null) || reaper="unknown"
+                print_error "Another launch is removing a stale claim lock ($lock.reap, held by $reaper). Wait for it, or remove $lock.reap if no launch is running."
+            fi
         else
             print_error "Another launch is claiming tickets (lock $lock, held by $holder). Wait for it, or remove the lock if no launch is running."
         fi
