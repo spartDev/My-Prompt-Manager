@@ -21,6 +21,7 @@ import { StorageManager } from "../services/storage";
 import { UsageTracker } from "../services/UsageTracker";
 import type { ElementFingerprint, PlatformType } from "../types";
 import { getErrorMessage, Logger, toError } from "../utils";
+import { recordInstall, recordUpdateFrom } from "../whatsNew/storage";
 
 // Track active element picker sessions
 const activePickerSessions = new Map<
@@ -1358,12 +1359,61 @@ chrome.runtime.onConnect.addListener((port) => {
   }
 });
 
+/** Records the Release of a first install, so What's new never shows on it (CONTEXT.md, Releases) */
+async function recordFirstInstall(): Promise<void> {
+  const version = chrome.runtime.getManifest().version;
+  try {
+    await recordInstall(version);
+    Logger.info("Recorded the Release of the first install", {
+      component: "Background",
+      version,
+    });
+  } catch (error) {
+    Logger.error(
+      "Could not record the Release of the first install",
+      toError(error),
+      { component: "Background", version },
+    );
+  }
+}
+
+/**
+ * Records the Release an update came from, when the What's new record has no Release of install
+ * (an install older than What's new), so What's new shows after that update (CONTEXT.md, Releases)
+ */
+async function recordUpdateOrigin(previousVersion: string | undefined): Promise<void> {
+  try {
+    const recorded = await recordUpdateFrom(previousVersion);
+    if (recorded) {
+      Logger.info("Recorded the Release the update came from", {
+        component: "Background",
+        previousVersion,
+      });
+    }
+  } catch (error) {
+    Logger.error(
+      "Could not record the Release the update came from",
+      toError(error),
+      { component: "Background", previousVersion },
+    );
+  }
+}
+
 // Initialize interface mode on extension startup and handle updates
 chrome.runtime.onInstalled.addListener((details) => {
   // Clean stored data of Hidden characters after an update, alongside (not before) the rest
   if (details.reason === "update") {
     void upgradeStoredData();
     void upgradeSiteSettings();
+  }
+
+  // A first install records its Release; an update records where it came from, only when the
+  // What's new record has no Release of install yet
+  if (details.reason === "install") {
+    void recordFirstInstall();
+  }
+  if (details.reason === "update") {
+    void recordUpdateOrigin(details.previousVersion);
   }
 
   void (async () => {

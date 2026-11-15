@@ -14,6 +14,7 @@ Which component does which job in the popup and the side panel, and the conventi
 | `src/components/settings/` | The sections and cards of the Settings view |
 | `src/components/analytics/` | The Analytics section, its full-page view and that view's two charts (`charts/`) |
 | `src/components/icons/` | Inline SVG icons, one file per area |
+| `src/components/whatsNew/` | What's new: the sheet that lists the Release notes of a Release after an update |
 
 ## Which component for which job
 
@@ -56,6 +57,16 @@ Which component does which job in the popup and the side panel, and the conventi
 | `src/components/StorageWarning.tsx` | "Storage Limit Reached": App opens it when storage refuses a save (`STORAGE_QUOTA_EXCEEDED`); usage is shown through `describeStorageUsage`, like the Settings storage bar |
 | `src/components/ErrorBoundary.tsx` | Catches a render error and shows a fallback instead of a blank popup |
 
+### What's new
+
+| Component | Job |
+|-----------|-----|
+| `src/components/whatsNew/WhatsNewHost.tsx` | What's new in `App`, over the Library of the popup and the side panel (not in picker mode): the sheet and its grid while `useWhatsNew` gives Release notes, then their exit (`useAnimatedPresence`, `MOTION.whatsNewSheetOut`). Every close (Got it, backdrop, Escape, Enter, a tile) calls the hook's `close()` at once, once even for two closing events in one task, so the Release is marked seen before the exit ends. A tile closes, then calls `onOpen(destination, item)`: `App` maps `library`, `categories`, `analytics`, `settings` to that Section, `library-search` to the Library with the keyboard in its search field (as Cmd/Ctrl+K), `prompt-editor-new` to the editor on a new Prompt. Knows nothing of Debug mode |
+| `src/components/whatsNew/WhatsNewSheet.tsx` | The What's new bottom sheet: backdrop, handle, the pill "New in {version}", the title, a scrolling body for the tile grid (its `children`), itself a tab stop, the region "Release notes", so it scrolls with the keyboard when no tile takes focus, and Got it. Rises with `animate-whats-new-sheet-in`; while `open` is false it plays its exit, inert, and its caller unmounts it after `MOTION.whatsNewSheetOut` (`useAnimatedPresence`). Its keyboard is `useModalFocus` (focus on Got it at open); `onClose` says how it closed (`got-it`, `backdrop`, `escape`, `enter`). Enter on a tile button keeps the tile's own activation. The digits 1 to 9 click the tile carrying that `data-whats-new-tile-index` (not with Cmd, Ctrl or Alt, nor in a text field), so a number key behaves as a click and the sheet stays unaware of destinations. It knows nothing of Debug mode or storage |
+| `src/components/whatsNew/WhatsNewGrid.tsx` | The two-column grid of a Release's notes (`items`, `onOpen(destination, item)`): the hero (the first Feature, full width), the other Features, then the Critical fixes; no hero without a Feature; with an odd number of tiles under the hero, the last spans both columns. `placeTiles` computes that order. The Feature tiles that open something carry `data-whats-new-tile-index`, from 1 for the hero, in display order, for the number keys of the sheet |
+| `src/components/whatsNew/WhatsNewTile.tsx` | One tile: the hero (example sentence, each `{{word}}` a pill, then title and description), a Feature (icon square, title, description) or a Critical fix (the Fixed pill in place of the icon). A Feature with a destination is a `<button>` named by its title and description, described by the hero's example, with its number key in `aria-keyshortcuts`; a Feature without one and a Critical fix are plain tiles that take no focus, a Critical fix read "Fixed: {title}". Each rises `MOTION.tileStagger` after the one before, all at once under reduced motion |
+| `src/components/icons/WhatsNewIcons.tsx` | `WhatsNewIconGlyph`: one glyph per key of the closed set `WhatsNewIcon` (`src/whatsNew/types.ts`), `search` as its ⌘K key chip, hidden from screen readers |
+
 ### Settings
 
 | Component | Job |
@@ -64,7 +75,7 @@ Which component does which job in the popup and the side panel, and the conventi
 | `src/components/settings/SettingsRow.tsx` | One setting in a group: label (and grey detail) at the left, control at the right, an optional status or confirmation under it |
 | `src/components/settings/SegmentedControl.tsx` | A choice among two or three options (theme, popup or side panel): a radio group with a sliding puck |
 | `src/components/settings/Switch.tsx` | The switch for every boolean setting, named by its row's label |
-| `src/components/settings/AppearanceSection.tsx`, `LibrarySection.tsx`, `NotificationSection.tsx`, `HelpSection.tsx`, `AdvancedSection.tsx` | One Settings group each (Advanced holds the reset) |
+| `src/components/settings/AppearanceSection.tsx`, `LibrarySection.tsx`, `NotificationSection.tsx`, `HelpSection.tsx`, `AdvancedSection.tsx` | One Settings group each (Advanced holds Debug mode, whose hint says What's new shows at every opening, and the reset) |
 | `src/components/settings/DataStorageSection.tsx` | The Your data group: storage use, Backup export (`handleExport` builds and writes the file; off while the Library cannot be read, so no empty Backup is saved), the restore file picker, Clear All Data |
 | `src/components/settings/SiteIntegrationSection.tsx` | Platforms and custom sites: lists, add flow, element picker, import and export of a site configuration |
 | `src/components/settings/SiteRow.tsx` | One Platform or custom site: logo, name, domain and switch; a custom site's Export and Remove in its ⋯ menu |

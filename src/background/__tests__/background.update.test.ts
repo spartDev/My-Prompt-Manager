@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getChromeMock } from '../../test/mocks';
+import { WHATS_NEW_KEY } from '../../whatsNew/storage';
 
 vi.mock('../../utils/logger', () => ({
   info: vi.fn(),
@@ -148,7 +149,12 @@ describe('background: stored data on browser startup', () => {
   const dirtyCategory = { id: 'c1', name: 'Wo\u{200B}rk' };
 
   it('cleans at the next browser startup the Hidden characters that a failed update pass left', async () => {
-    await chrome.storage.local.set({ prompts: [dirtyPrompt], categories: [dirtyCategory] });
+    // A recorded Release of install: the update writes nothing to What's new, so the one failed write is the cleaning's
+    await chrome.storage.local.set({
+      prompts: [dirtyPrompt],
+      categories: [dirtyCategory],
+      [WHATS_NEW_KEY]: { installedVersion: '1.0.0' }
+    });
     vi.mocked(chrome.storage.local.set).mockClear();
     vi.mocked(chrome.storage.local.set).mockRejectedValueOnce(new Error('QUOTA_EXCEEDED'));
     const { onInstalled, onStartup, Logger } = await loadBackground();

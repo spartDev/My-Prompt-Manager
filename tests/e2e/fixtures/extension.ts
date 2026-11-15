@@ -153,7 +153,8 @@ const waitForBackgroundTarget = async (context: BrowserContext): Promise<Backgro
   );
 };
 
-const createStorageController = (target: BackgroundTarget): ExtensionStorage => {
+/** Reads and writes `chrome.storage.local` through the extension's background; the `storage` fixture is one, cleared before and after the test */
+export const createStorageController = (target: BackgroundTarget): ExtensionStorage => {
   const wrapChromeCall = <T, Arg>(fn: (arg: Arg) => Promise<T>, arg: Arg): Promise<T> => {
     // Page and Worker share this evaluate signature, but TypeScript cannot call it on their union, and
     // Playwright types the function's argument as Unboxed<Arg>, which a generic Arg cannot be shown to match

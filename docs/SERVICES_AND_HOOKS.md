@@ -21,7 +21,7 @@ chrome.storage.local
 
 The popup, the side panel and the service worker each have their own `StorageManager` instance, and share the stored data. The content script reads Prompts with `readPrompts()` of `promptAdmission.ts`, and never writes them.
 
-One exception: the reset action of `src/components/ErrorBoundary.tsx` calls `chrome.storage.local.clear()` directly, outside `StorageManager` and its locks, so it is not serialized with other writes. `clearAllData()` of `StorageManager` is the serialized way to clear.
+One exception: the Reset Data action of `src/components/ErrorBoundary.tsx` clears storage directly with `clearStorageKeepingWhatsNew()` of `src/whatsNew/storage.ts`, under the What's new lock only, outside `StorageManager` and its locks, so it is not serialized with other writes; when the What's new record cannot be kept it falls back to `chrome.storage.local.clear()`. `clearAllData()` of `StorageManager` is the serialized way to clear. Both keep the `whatsNew` record and empty every other key: they remove the other keys in one call, so the record never leaves storage, even for a moment. The one exception is the Reset Data fallback: when the other keys cannot be removed, its `chrome.storage.local.clear()` removes the `whatsNew` record too.
 
 Other keys of `chrome.storage.local` belong to the code that owns them, which writes them directly:
 
@@ -33,6 +33,7 @@ Other keys of `chrome.storage.local` belong to the code that owns them, which wr
 | `iconPlacementRepairs` | `src/services/iconPlacementRepairs.ts`; written by the service worker only |
 | `interfaceMode` | `src/components/SettingsView.tsx` |
 | `grantedPermissions` | `src/background/background.ts` |
+| `whatsNew` (`installedVersion`: the Release of install; `lastSeenVersion`: the Last seen Release) | `src/whatsNew/storage.ts`, the only reader and writer. The service worker records the Release of a first install (`recordInstall`) and, on an update, the Release the update came from when the record has none yet, as for an install older than What's new (`recordUpdateFrom`). A record with no `installedVersion` counts as a first install (`isFirstInstall` of `src/whatsNew/decide.ts`): a popup opened before the service worker's write shows nothing, and What's new shows at a later opening after an update. `markReleaseSeen` is the only writer of the Last seen Release and writes nothing in Debug mode. Outside the Site settings, so Reset settings leaves it; Clear All Data and the error screen's Reset Data keep it too (`clearStorageKeepingWhatsNew`), so What's new does not come back for a seen Release nor show after a first install |
 
 ---
 
@@ -62,8 +63,8 @@ Helpers the services lean on: `src/utils/asyncMutex.ts` (locks), `src/utils/stor
 `AsyncMutex` queues operations per key. `StorageManager` creates it with a `scope`, so `withLock(key, operation)` runs `navigator.locks.request('StorageManager:' + key, operation)`: the popup, the side panel and the service worker (same extension origin) exclude each other on the Prompts, Categories and settings keys. The operation's result or error comes back unchanged and the lock is released either way. Where the Web Locks API is missing, or refuses the request without running the operation (it throws, or rejects with a `SecurityError` in an opaque origin), the in-memory queue is used (tests, old browsers).
 
 - Nested keys are taken in the fixed order CATEGORIES → PROMPTS → SETTINGS, and nothing under a lock awaits another context.
-- The Site settings have a lock of their own, in `src/services/siteSettings.ts` (`withSiteSettingsLock`, scope `SiteSettings`), and so do the icon placement repairs, in `src/services/iconPlacementRepairs.ts` (`withIconPlacementRepairsLock`, scope `IconPlacementRepairs`), both shared across contexts the same way. `clearAllData()` takes them after SETTINGS, the Site settings lock first and the icon placement repairs lock last, so a change waiting in another context cannot write either back after the clear. Nothing else takes them together with another lock.
-- Clear All Data takes all five, so a write from another context lands wholly before or after it.
+- The Site settings have a lock of their own, in `src/services/siteSettings.ts` (`withSiteSettingsLock`, scope `SiteSettings`), and so do the icon placement repairs, in `src/services/iconPlacementRepairs.ts` (`withIconPlacementRepairsLock`, scope `IconPlacementRepairs`), and so does the What's new record, in `src/whatsNew/storage.ts` (`withWhatsNewLock`, scope `WhatsNew`), all shared across contexts the same way. `clearAllData()` takes them after SETTINGS, the Site settings lock first, then the icon placement repairs lock, the What's new lock last (innermost), so a change waiting in another context cannot write any of them back after the clear. Nothing else takes them together with another lock.
+- Clear All Data takes all six, so a write from another context lands wholly before or after it.
 - Reads take no lock, except reading the Categories, which takes CATEGORIES only to write a missing default Category.
 - Settings writes take only the SETTINGS key, so a toggle never waits on a Prompt write.
 - `UsageTracker` keeps a plain in-memory `AsyncMutex`.
@@ -137,6 +138,7 @@ A refusal keeps its type through `StorageManager` and `PromptManager`, so a call
 | `src/hooks/useDuplicateGroups.ts` | The Duplicate pairs of the Library, looked for after the first paint; null while looking or when the finder gives up (over 1,000 Prompts, timeout) | Analytics Tidy up |
 | `src/hooks/useRadioGroup.ts` | Keyboard behavior of a WAI-ARIA radio group: one tab stop, arrows, Home and End move focus and selection, `locked` ignores input. `src/components/__tests__/radioGroups.test.ts` fails when a component renders `role="radio"` without it | `LibraryFilterBar`, `AppearanceSection`, `InterfaceModeSelector` |
 | `src/hooks/useAnimatedPresence.ts` | Keeps a panel in the document for its exit animation (`MOTION.sheetOut`): `shown` is what to render, `exiting` says to play the exit; reopening while leaving cancels the unmount, and the timer is cleared on unmount. Instant under `prefers-reduced-motion` | `App` (the editor sheet) |
+| `src/hooks/useWhatsNew.ts` | Whether What's new shows at this opening and with which Release notes (`decideWhatsNew` of `src/whatsNew/decide.ts` over the manifest version, the `whatsNew` record and Debug mode, read once); `close()` hides the notes and marks the Release as seen without waiting for storage. Debug mode stays inside: nothing it returns names it | `src/components/whatsNew/WhatsNewHost.tsx`, which `App` renders over the Library (not in picker mode) |
 | `src/hooks/useModalFocus.ts` | Keyboard behavior of a modal dialog: focus moves in, Tab and Shift+Tab wrap inside (onto the panel when every control is disabled), Escape closes, the focus returns to the opener. Beneath a confirmation (`isOpen` false while the panel stays in the document, `inert`) it pauses, keeps its opener, and resumes where the confirmation leaves the focus | `ConfirmDialog`, `AnalyticsTab`, `StorageWarning`, `ConfigurationPreview`, `CategorySheet` |
 
 Components read the theme through `useThemeContext()` of `src/contexts/ThemeContext.tsx`, never `useTheme()` directly: `ThemeProvider` calls `useTheme` once, so every component sees the same theme.
@@ -144,6 +146,6 @@ Components read the theme through `useThemeContext()` of `src/contexts/ThemeCont
 ## Adding a service or hook
 
 1. Write the Prompts, the Categories and the settings only through `StorageManager`; a new route that brings Prompt text into the Library goes through an Admission route. Another key belongs to the one module that owns it: add it to the table of owners above.
-2. Take locks in the order CATEGORIES → PROMPTS → SETTINGS (then the Site settings lock, then the icon placement repairs lock, which only `clearAllData()` nests), and await nothing from another context under a lock.
+2. Take locks in the order CATEGORIES → PROMPTS → SETTINGS (then the Site settings lock, then the icon placement repairs lock, then the What's new lock, which only `clearAllData()` nests), and await nothing from another context under a lock.
 3. Test it in the `__tests__/` folder next to it ([TESTING.md](./TESTING.md)).
 4. Add a row to the table of this page: one line on its job, no signature.

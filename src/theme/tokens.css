@@ -264,6 +264,33 @@
     from { opacity: 0; position: relative; left: -26px; }
     to { position: relative; left: 0; }
   }
+
+  /* --- What's new tiles (My-Prompt-Manager-d1g.6; Atelier 1C 'Whats new') ---
+     The tiles of the What's new grid: their radius, the radius and the shadow of a Feature's icon
+     square, and the rise of each tile, on the card-rise keyframes with a softer spring. Each tile
+     sets its own stagger delay from MOTION (tileDelay, tileStagger) */
+  --radius-tile: 18px;
+  --radius-tile-icon: 11px;
+  --shadow-tint-40: rgba(45, 25, 90, 0.4);
+  --shadow-tile-icon: 0 4px 10px -6px var(--shadow-tint-40);
+  --ease-rise: cubic-bezier(0.34, 1.3, 0.64, 1);
+  --animate-tile-rise: card-rise 550ms var(--ease-rise) both;
+  /* --- end What's new tiles --- */
+
+  /* --- What's new sheet (My-Prompt-Manager-d1g.5) ---
+     The bottom sheet of What's new (Atelier 1C): 26px top corners, a soft shadow cast upwards, a
+     handle drawn in the strong border color (the mockup's #DDD5EC light, #41375A dark). It rises
+     on the Section curve, the mockup's cubic-bezier(.32,.72,0,1), and leaves like the editor; its
+     backdrop is bg-backdrop. Durations are MOTION.whatsNew* in motion.ts */
+  --radius-sheet: 26px;
+  --background-color-handle: var(--border-color-strong);
+  --shadow-tint-sheet: rgba(45, 25, 90, 0.45);
+  --shadow-sheet: 0 -20px 50px -20px var(--shadow-tint-sheet);
+  --animate-whats-new-sheet-in: sheet-in 600ms var(--ease-section) both;
+  --animate-whats-new-sheet-out: sheet-out 340ms var(--ease-sheet-out) both;
+  --animate-whats-new-backdrop-in: backdrop-in 300ms ease both;
+  --animate-whats-new-backdrop-out: backdrop-out 340ms ease both;
+  /* --- end What's new sheet --- */
 }
 
 /* Reduced motion: every motion token becomes near instant, so a component that reads them needs no
@@ -370,5 +397,13 @@
     --shadow-tint-5: rgba(0, 0, 0, 0.08);
     --shadow-tint-10: rgba(0, 0, 0, 0.16);
     --shadow-tint-25: rgba(0, 0, 0, 0.4);
+
+    /* --- What's new tiles (My-Prompt-Manager-d1g.6): the icon square's shadow, black at alpha x 1.6 --- */
+    --shadow-tint-40: rgba(0, 0, 0, 0.64);
+    /* --- end What's new tiles --- */
+
+    /* --- What's new sheet (My-Prompt-Manager-d1g.5): its upward shadow, black at 0.45 x 1.6 --- */
+    --shadow-tint-sheet: rgba(0, 0, 0, 0.72);
+    /* --- end What's new sheet --- */
   }
 }

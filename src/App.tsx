@@ -9,6 +9,7 @@ import SettingsView from './components/SettingsView';
 import StorageWarning from './components/StorageWarning';
 import TabBar, { SECTION_ORDER, type Section } from './components/TabBar';
 import ToastContainer from './components/ToastContainer';
+import WhatsNewHost from './components/whatsNew/WhatsNewHost';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { useAnimatedPresence } from './hooks/useAnimatedPresence';
 import { useCategories } from './hooks/useCategories';
@@ -22,6 +23,7 @@ import { MOTION } from './theme/motion';
 import type { AppError, Category, DeletedCategory, LibraryFilter, Prompt } from './types';
 import { Logger, toError } from './utils';
 import { cn } from './utils/cn';
+import type { WhatsNewDestination } from './whatsNew/types';
 
 /** The editor, open over the Library: writing a new Prompt, or editing one */
 /** A new Prompt can open with a title and a Category: Create it, from a search that found nothing */
@@ -363,6 +365,12 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   // field. Not while the editor or a dialog is open over the Section, nor in the element picker's Settings
   const [focusSearch, setFocusSearch] = useState(false);
   const handleSearchFocused = useCallback(() => { setFocusSearch(false); }, []);
+  // Back to the Library if need be, with the keyboard in its search field: Cmd/Ctrl+K, and the
+  // search tile of What's new
+  const goToLibrarySearch = useCallback(() => {
+    handleSelectSection('library');
+    setFocusSearch(true);
+  }, [handleSelectSection]);
   const editorOpen = editor !== null;
   useEffect(() => {
     if (isPickerMode) { return; }
@@ -370,12 +378,31 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
       if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey || event.key.toLowerCase() !== 'k') { return; }
       if (editorOpen || document.querySelector('[aria-modal="true"]')) { return; }
       event.preventDefault();
-      handleSelectSection('library');
-      setFocusSearch(true);
+      goToLibrarySearch();
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => { document.removeEventListener('keydown', handleKeyDown); };
-  }, [isPickerMode, editorOpen, handleSelectSection]);
+  }, [isPickerMode, editorOpen, goToLibrarySearch]);
+
+  // A Feature tile of What's new, once the sheet has started to leave: where the Feature lives
+  const handleWhatsNewOpen = (destination: WhatsNewDestination) => {
+    switch (destination) {
+      case 'library-search':
+        goToLibrarySearch();
+        return;
+      case 'prompt-editor-new':
+        // An editor already open keeps its draft: a new one would remount it (editorKey)
+        if (editor === null) {
+          openEditor({ mode: 'add' });
+        }
+        return;
+      case 'library':
+      case 'categories':
+      case 'analytics':
+      case 'settings':
+        handleSelectSection(destination);
+    }
+  };
 
   // Tidy up in Analytics: the Library on the Prompts to review, with no search hiding any of them
   // Review's button leaves with Analytics, so focus lands on the review filter's pill
@@ -579,6 +606,10 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
       {storageRefusal !== null && (
         <StorageWarning reason={storageRefusal} onClose={handleCloseStorageWarning} />
       )}
+
+      {/* What's new, over the Library at the opening that follows an update; never over the
+          element picker's Settings */}
+      {!isPickerMode && <WhatsNewHost onOpen={handleWhatsNewOpen} />}
 
       <ToastContainer toast={toast} onDismiss={hideToast} onPause={pauseToast} onResume={resumeToast} />
       </div>

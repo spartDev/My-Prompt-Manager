@@ -13,8 +13,9 @@
  * after it (the Settings form, the background injector, the content script and the chunks it
  * imports) runs as built. Only that one manifest field differs from dist/.
  */
-import fs from 'node:fs';
 import path from 'node:path';
+
+import { copyDistWithManifest } from './dist-copy';
 
 /** A page that is none of the built-in Platforms; the specs serve it with page.route, nothing goes to the network */
 export const CUSTOM_SITE_HOSTNAME = 'custom-site.example';
@@ -24,11 +25,8 @@ export const CUSTOM_SITE_EXTENSION_PATH = path.resolve(process.cwd(), 'dist-e2e-
 
 /** Copies the build in `dist` to CUSTOM_SITE_EXTENSION_PATH and grants the test origin there */
 export function buildCustomSiteExtension(dist: string): void {
-  fs.rmSync(CUSTOM_SITE_EXTENSION_PATH, { recursive: true, force: true });
-  fs.cpSync(dist, CUSTOM_SITE_EXTENSION_PATH, { recursive: true });
-
-  const manifestPath = path.join(CUSTOM_SITE_EXTENSION_PATH, 'manifest.json');
-  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8')) as { host_permissions?: string[] };
-  manifest.host_permissions = [...(manifest.host_permissions ?? []), `https://${CUSTOM_SITE_HOSTNAME}/*`];
-  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+  copyDistWithManifest(dist, CUSTOM_SITE_EXTENSION_PATH, (manifest) => ({
+    ...manifest,
+    host_permissions: [...(manifest.host_permissions ?? []), `https://${CUSTOM_SITE_HOSTNAME}/*`]
+  }));
 }

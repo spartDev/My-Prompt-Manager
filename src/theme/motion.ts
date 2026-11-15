@@ -10,7 +10,11 @@ export const EASE = {
   sheetOut: 'cubic-bezier(0.5, 0, 0.75, 0)',
   spring: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
   /** Arriving on a Section from the tab bar */
-  section: 'cubic-bezier(0.32, 0.72, 0, 1)'
+  section: 'cubic-bezier(0.32, 0.72, 0, 1)',
+  // --- What's new tiles (My-Prompt-Manager-d1g.6) ---
+  /** What's new: a tile rising into the grid, a softer spring than `spring` */
+  rise: 'cubic-bezier(0.34, 1.3, 0.64, 1)'
+  // --- end What's new tiles ---
 } as const;
 
 /** Durations and delays, in milliseconds */
@@ -72,7 +76,26 @@ export const MOTION = {
   badgePopDelay: 350,
   /** Empty Analytics: a ghost bar growing from the bottom; the first starts after ghostDelay, each next one barStagger later */
   ghostGrow: 700,
-  ghostDelay: 150
+  ghostDelay: 150,
+  // --- What's new tiles (My-Prompt-Manager-d1g.6) ---
+  /** What's new: a tile rising 12px with a fade; the first starts after tileDelay, each next one tileStagger later */
+  tileRise: 550,
+  tileDelay: 180,
+  tileStagger: 70,
+  /** What's new: a pressed Feature tile shrinking to 97% and springing back */
+  tilePress: 300,
+  // --- end What's new tiles ---
+
+  // --- What's new sheet (My-Prompt-Manager-d1g.5) ---
+  /** What's new: the sheet rising from the bottom, on the Section curve (EASE.section) */
+  whatsNewSheetIn: 600,
+  /** What's new: the sheet leaving to the bottom; whoever renders it unmounts it after (useAnimatedPresence) */
+  whatsNewSheetOut: 340,
+  /** What's new: its backdrop fading in */
+  whatsNewBackdropIn: 300,
+  /** What's new: its backdrop fading out, with the sheet */
+  whatsNewBackdropOut: 340
+  // --- end What's new sheet ---
 } as const;
 
 const REDUCED_MOTION = '(prefers-reduced-motion: reduce)';

@@ -47,14 +47,19 @@ describe('StorageManager across contexts', () => {
     });
   };
 
-  /** Makes the next chrome.storage clear slow; resolves when it starts, so the other context can act while it runs. */
+  /**
+   * Makes the next removal of keys slow (Clear All Data removes every key but the What's new
+   * record); resolves when it starts, so the other context can act while it runs.
+   */
   const slowClear = (): Promise<void> => {
-    const clear = vi.mocked(chrome.storage.local.clear).getMockImplementation() as unknown as () => Promise<void>;
+    const remove = vi.mocked(chrome.storage.local.remove).getMockImplementation() as unknown as (
+      keys: string | string[]
+    ) => Promise<void>;
     return new Promise((started) => {
-      vi.mocked(chrome.storage.local.clear).mockImplementationOnce(async () => {
+      vi.mocked(chrome.storage.local.remove).mockImplementationOnce(async (keys) => {
         started();
         await new Promise((resolve) => setTimeout(resolve, 20));
-        return clear();
+        return remove(keys as string | string[]);
       });
     });
   };
