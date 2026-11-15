@@ -400,6 +400,48 @@ describe('background: a picker that could not be activated leaves no session', (
     expect(await chrome.storage.session.get(null)).toEqual({});
   });
 
+  it('forgets the older session whose picker it took over when its session cannot be stored', async () => {
+    const listener = await startServiceWorker();
+    expect(await startOn(listener)).toEqual({ success: true, tabId: CLAUDE_TAB.id });
+    vi.mocked(chrome.storage.session.set).mockRejectedValueOnce(new Error('Session storage quota exceeded'));
+
+    // The page takes the later activation over the older picker, then the later start ends it
+    expect(await startOn(listener)).toEqual({ success: false, error: 'Session storage quota exceeded' });
+
+    expect(pickerMessages().at(-1)).toMatchObject({ type: 'DEACTIVATE_ELEMENT_PICKER', attempt: pickerMessages().at(-2)?.attempt });
+    expect(await chrome.storage.session.get(null)).toEqual({});
+  });
+
+  it('counts a start whose session write failed among those a cancel stops', async () => {
+    const listener = await startServiceWorker();
+    expect(await startOn(listener)).toEqual({ success: true, tabId: CLAUDE_TAB.id });
+    const key = `pickerSession:${CLAUDE_TAB.id}`;
+    const older = (await chrome.storage.session.get(key))[key];
+    // The later start's write fails, and its removal of the older session too; its deactivation waits
+    vi.mocked(chrome.storage.session.set).mockRejectedValueOnce(new Error('Session storage quota exceeded'));
+    vi.mocked(chrome.storage.session.remove).mockRejectedValueOnce(new Error('Session storage quota exceeded'));
+    let releaseDeactivate: () => void = () => undefined;
+    let deactivating = false;
+    vi.mocked(chrome.tabs.sendMessage).mockImplementation((_tabId: number, message: unknown) => {
+      if ((message as { type?: string }).type !== 'DEACTIVATE_ELEMENT_PICKER') {
+        return Promise.resolve(undefined);
+      }
+      deactivating = true;
+      return new Promise((resolve) => { releaseDeactivate = () => { resolve(undefined); }; });
+    });
+
+    const later = startOn(listener);
+    await vi.waitFor(() => { expect(deactivating).toBe(true); });
+    expect((await chrome.storage.session.get(key))[key]).toEqual(older);
+    // The page cancels the later picker (Escape) while that start ends it
+    const attempt = pickerMessages().filter(({ type }) => type === 'ACTIVATE_ELEMENT_PICKER').at(-1)?.attempt;
+    expect(await send(listener, { type: 'PICKER_CANCELLED', attempt }, { tab: CLAUDE_TAB })).toEqual({ success: true });
+    releaseDeactivate();
+
+    expect(await later).toMatchObject({ success: false });
+    expect(await chrome.storage.session.get(null)).toEqual({});
+  });
+
   /** The ACTIVATE and DEACTIVATE messages sent to the tab, in order */
   const pickerMessages = () => vi.mocked(chrome.tabs.sendMessage).mock.calls
     .map(([, message]) => message as { type?: string; attempt?: string })

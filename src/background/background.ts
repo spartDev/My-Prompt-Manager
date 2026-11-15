@@ -82,7 +82,10 @@ interface PickerStart {
   tabId?: number;
   /** When its activation was sent, in the order of all activations; 0 until then */
   activation: number;
-  /** Set once its store step passed the stop check: a stop or cancel no longer reaches it, its session is kept */
+  /**
+   * Set while its store step writes its session, past the stop check: a cancel does not count it
+   * among the starts it stops, since it ends no picker of its own
+   */
   storing?: boolean;
 }
 const pickerStarts = new Set<PickerStart>();
@@ -131,7 +134,18 @@ const pickerSessions = {
         return "superseded";
       }
       start.storing = true;
-      await chrome.storage.session.set({ [pickerSessionKey(session.tabId)]: session });
+      try {
+        await chrome.storage.session.set({ [pickerSessionKey(session.tabId)]: session });
+      } catch (error) {
+        start.storing = false;
+        // The page holds this start's picker, which it now ends: an older session's picker was
+        // taken over by it, so that session goes too
+        const older = await pickerSessions.get(session.tabId).catch(() => undefined);
+        if (older && (older.activation ?? 0) < start.activation) {
+          await chrome.storage.session.remove(pickerSessionKey(session.tabId)).catch(() => undefined);
+        }
+        throw error;
+      }
       return "stored";
     });
   },
@@ -1594,7 +1608,7 @@ async function handlePickerCancelled(
   for (const start of pickerStarts) {
     if (start.tabId === tabId) {
       start.stopped = true;
-      // One storing its session already ends no picker: its session and its picker are kept
+      // One storing its session ends no picker of its own: it is not counted
       if (start.activation > 0 && !start.storing) {
         latestStopped = Math.max(latestStopped ?? 0, start.activation);
       }
