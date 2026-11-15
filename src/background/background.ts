@@ -672,9 +672,41 @@ void (async () => {
   }
 })();
 
-// Track the picker window
-let pickerWindowId: number | null = null;
-let originalTabId: number | null = null;
+/** The picker window of the Custom site flow, and the tab it picks in */
+interface PickerWindow {
+  windowId: number | null;
+  originalTabId: number | null;
+}
+
+const PICKER_WINDOW_KEY = "pickerWindow";
+const NO_PICKER_WINDOW: PickerWindow = { windowId: null, originalTabId: null };
+
+/**
+ * The picker window, in chrome.storage.session like the picker sessions, so that after a service
+ * worker restart a pick still brings the window back to the front, and closing it still stops the
+ * picker.
+ */
+const pickerWindow = {
+  async read(): Promise<PickerWindow> {
+    const stored: unknown = (await chrome.storage.session.get(PICKER_WINDOW_KEY))[PICKER_WINDOW_KEY];
+    if (typeof stored !== "object" || stored === null) {
+      return NO_PICKER_WINDOW;
+    }
+    const { windowId, originalTabId } = stored as Record<string, unknown>;
+    return {
+      windowId: typeof windowId === "number" ? windowId : null,
+      originalTabId: typeof originalTabId === "number" ? originalTabId : null,
+    };
+  },
+  async update(change: Partial<PickerWindow>): Promise<void> {
+    const next = { ...(await pickerWindow.read()), ...change };
+    if (next.windowId === null && next.originalTabId === null) {
+      await chrome.storage.session.remove(PICKER_WINDOW_KEY);
+      return;
+    }
+    await chrome.storage.session.set({ [PICKER_WINDOW_KEY]: next });
+  },
+};
 
 // Message types for element picker and injection
 interface BackgroundMessage {
@@ -1043,6 +1075,7 @@ async function handleOpenPickerWindow(
 ) {
   try {
     // Store the original tab that we're picking from
+    let originalTabId: number | null = null;
     let originalUrl = "";
     let originalHostname = "";
 
@@ -1096,12 +1129,12 @@ async function handleOpenPickerWindow(
       top: 100,
     });
 
-    pickerWindowId = window?.id ?? null;
+    await pickerWindow.update({ windowId: window?.id ?? null, originalTabId });
     sendResponse({ success: true });
   } catch (error) {
     Logger.error("Error opening picker window", toError(error), {
       component: "Background",
-      originalTabId,
+      targetTabId,
     });
     sendResponse({ success: false, error: getErrorMessage(error) });
   }
@@ -1124,13 +1157,13 @@ async function handleStartElementPicker(
     // Determine which tab to activate picker on
     let targetTabId: number | null = null;
 
-    // First priority: Use the explicitly passed tab ID (from picker window)
+    // First priority: the explicitly passed tab ID (from picker window); second, the original
+    // tab stored as the picker window opened, if any
+    const storedTabId = passedTabId ? null : (await pickerWindow.read()).originalTabId;
     if (passedTabId) {
       targetTabId = passedTabId;
-    }
-    // Second priority: Use the original tab stored (from picker window), if any
-    else if (originalTabId) {
-      targetTabId = originalTabId;
+    } else if (storedTabId) {
+      targetTabId = storedTabId;
     } else {
       // Otherwise, get the active tab (but not the popup itself)
       const tabs = await chrome.tabs.query({
@@ -1275,7 +1308,7 @@ async function handleElementSelected(
         return;
       }
       await changeIconPlacementRepairs({ type: "setOverride", hostname: session.repairHostname, positioning });
-      originalTabId = null;
+      await pickerWindow.update({ originalTabId: null });
       sendResponse({ success: true });
       return;
     }
@@ -1293,17 +1326,18 @@ async function handleElementSelected(
     });
 
     // If we have a picker window, focus it
-    if (pickerWindowId) {
+    let { windowId } = await pickerWindow.read();
+    if (windowId) {
       try {
-        await chrome.windows.update(pickerWindowId, { focused: true });
+        await chrome.windows.update(windowId, { focused: true });
       } catch {
         // Window might be closed, ignore
-        pickerWindowId = null;
+        windowId = null;
       }
     }
 
     // Clear the original tab reference
-    originalTabId = null;
+    await pickerWindow.update({ windowId, originalTabId: null });
 
     sendResponse({ success: true });
   } catch (error) {
@@ -1353,16 +1387,24 @@ async function handleStopElementPicker(
 
 // Clean up on window close
 chrome.windows.onRemoved.addListener((windowId) => {
-  if (pickerWindowId === windowId) {
-    pickerWindowId = null;
-    originalTabId = null;
+  void (async () => {
+    if ((await pickerWindow.read()).windowId !== windowId) {
+      return;
+    }
+    await pickerWindow.update(NO_PICKER_WINDOW);
     // Stop any active picker sessions
-    void handleStopElementPicker(
+    await handleStopElementPicker(
       undefined,
       { tab: undefined } as chrome.runtime.MessageSender,
       () => undefined,
     );
-  }
+  })().catch((error: unknown) => {
+    Logger.warn("Could not stop the picker as its window closed", {
+      component: "Background",
+      windowId,
+      error: getErrorMessage(error),
+    });
+  });
 });
 
 // Handle connection for keeping popup alive

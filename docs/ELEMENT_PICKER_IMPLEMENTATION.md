@@ -25,7 +25,7 @@ Instead of trying to keep the popup open (which Chrome doesn't allow), we open t
 ### 3. **Key Components**
 
 #### Background Script (`src/background/background.ts`)
-- Manages picker sessions and window tracking: a session is kept in `chrome.storage.session` under `pickerSession:<tabId>`, so a pick survives the service worker stopping while the user hovers the page
+- Manages picker sessions and window tracking: a session is kept in `chrome.storage.session` under `pickerSession:<tabId>`, and the picker window and its tab under `pickerWindow`, so a pick, and the picker window closing, survive the service worker stopping while the user hovers the page
 - Coordinates messages between popup window and content scripts
 - Handles window lifecycle (creation, focus management, cleanup)
 - Tracks original tab ID for element selection

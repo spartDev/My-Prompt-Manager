@@ -115,3 +115,49 @@ describe('background: placing the icon of a built-in Platform', () => {
     expect(response).not.toHaveProperty('permanent');
   });
 });
+
+describe('background: the picker window of a Custom site, across a service worker restart', () => {
+  const PAGE_TAB = { id: 11, windowId: 3, url: 'https://example.com/chat', active: true } as chrome.tabs.Tab;
+  const PICKER_WINDOW_ID = 42;
+
+  beforeEach(() => {
+    const chromeMock = getChromeMock();
+    Object.assign(chromeMock.tabs, {
+      get: vi.fn().mockResolvedValue(PAGE_TAB),
+      update: vi.fn().mockResolvedValue(PAGE_TAB)
+    });
+    Object.assign(chromeMock.windows, { create: vi.fn().mockResolvedValue({ id: PICKER_WINDOW_ID }) });
+  });
+
+  /** Opens the picker window, then the Element picker from it, as the Custom site flow does */
+  const openPicker = async (): Promise<void> => {
+    const listener = await startServiceWorker();
+    expect(await send(listener, { type: 'OPEN_PICKER_WINDOW', data: { tabId: PAGE_TAB.id } })).toEqual({ success: true });
+    expect(await send(listener, { type: 'START_ELEMENT_PICKER', data: { tabId: PAGE_TAB.id } }, { tab: { id: 99, windowId: PICKER_WINDOW_ID } as chrome.tabs.Tab }))
+      .toEqual({ success: true, tabId: PAGE_TAB.id });
+  };
+
+  it('brings the picker window back to the front after a pick made once the service worker restarted', async () => {
+    await openPicker();
+    vi.mocked(chrome.windows.update).mockClear();
+
+    const afterRestart = await startServiceWorker();
+    expect(await send(afterRestart, { type: 'ELEMENT_SELECTED', data: { selector: '#send' } }, { tab: PAGE_TAB })).toEqual({ success: true });
+
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'ELEMENT_PICKER_RESULT' }));
+    expect(chrome.windows.update).toHaveBeenCalledWith(PICKER_WINDOW_ID, { focused: true });
+  });
+
+  it('stops the picker on the page when the picker window closes after a service worker restart', async () => {
+    await openPicker();
+
+    await startServiceWorker();
+    const onWindowRemoved = vi.mocked(getChromeMock().windows.onRemoved.addListener).mock.calls.at(-1)?.[0];
+    onWindowRemoved?.(PICKER_WINDOW_ID);
+
+    await vi.waitFor(async () => {
+      expect(chrome.tabs.sendMessage).toHaveBeenCalledWith(PAGE_TAB.id, { type: 'DEACTIVATE_ELEMENT_PICKER', source: 'background' });
+      expect(await chrome.storage.session.get(null)).toEqual({});
+    });
+  });
+});
