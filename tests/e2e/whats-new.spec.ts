@@ -59,8 +59,33 @@ const expectLibraryWithoutWhatsNew = async (page: Page): Promise<void> => {
 const storedRecord = async (storage: ExtensionStorage): Promise<unknown> =>
   (await storage.get<Record<string, unknown>>(WHATS_NEW_KEY))[WHATS_NEW_KEY];
 
+/**
+ * The storage of a build as its first install left it: Chrome installs the copy when it loads it,
+ * and the service worker records `installedVersion` = the build's version. Nothing is cleared or seeded
+ */
+const storageOfFirstInstall = async (context: BrowserContext, extensionId: string, version: string): Promise<ExtensionStorage> => {
+  const worker = context.serviceWorkers().find((candidate) => candidate.url().startsWith(`chrome-extension://${extensionId}/`));
+  if (worker === undefined) {
+    throw new Error(`The service worker of the ${version} build is not running`);
+  }
+  const storage = createStorageController(worker);
+  await expect.poll(async () => storedRecord(storage)).toEqual({ installedVersion: version });
+  return storage;
+};
+
+/**
+ * The storage of a build, emptied once its service worker has recorded the first install.
+ * Waiting for that write first means it cannot land over the seed of the test: the seed is the last write
+ */
+const storageAfterInstall = async (context: BrowserContext, extensionId: string, version: string): Promise<ExtensionStorage> => {
+  const storage = await storageOfFirstInstall(context, extensionId, version);
+  await storage.reset();
+  return storage;
+};
+
 test.describe("What's new in the real extension", () => {
-  test(`update case: an update from 1.8.0 to ${INSTALLED}, a Release without notes, shows nothing and writes no Last seen Release`, async ({ context, storage, extensionId }) => {
+  test(`update case: an update from 1.8.0 to ${INSTALLED}, a Release without notes, shows nothing and writes no Last seen Release`, async ({ context, extensionId }) => {
+    const storage = await storageAfterInstall(context, extensionId, INSTALLED);
     await seedPopup(storage, { [WHATS_NEW_KEY]: { installedVersion: '1.8.0' } });
 
     for (let opening = 0; opening < 2; opening++) {
@@ -72,7 +97,8 @@ test.describe("What's new in the real extension", () => {
     expect(await storedRecord(storage)).toEqual({ installedVersion: '1.8.0' });
   });
 
-  test('reopen after a close: with the installed Release as the Last seen Release, nothing shows and the record stays', async ({ context, storage, extensionId }) => {
+  test('reopen after a close: with the installed Release as the Last seen Release, nothing shows and the record stays', async ({ context, extensionId }) => {
+    const storage = await storageAfterInstall(context, extensionId, INSTALLED);
     const record = { installedVersion: '1.8.0', lastSeenVersion: INSTALLED };
     await seedPopup(storage, { [WHATS_NEW_KEY]: record });
 
@@ -100,7 +126,8 @@ test.describe("What's new in the real extension", () => {
     expect(await readRecord()).toEqual({ installedVersion: INSTALLED });
   });
 
-  test("Debug mode: What's new shows at each of two openings, closing leaves the record as it was, and Debug mode off gives the normal decision back", async ({ context, storage, extensionId }) => {
+  test("Debug mode: What's new shows at each of two openings, closing leaves the record as it was, and Debug mode off gives the normal decision back", async ({ context, extensionId }) => {
+    const storage = await storageAfterInstall(context, extensionId, INSTALLED);
     // A first install, which normal mode never shows: Debug mode shows it anyway
     const record = { installedVersion: INSTALLED };
     await seedPopup(storage, { [WHATS_NEW_KEY]: record, [SITE_SETTINGS_KEY]: { enabledSites: [], customSites: [], debugMode: true } });
@@ -136,38 +163,12 @@ test.describe("What's new in the real extension", () => {
   });
 });
 
-/**
- * The storage of the 2.0.0 build as its first install left it: Chrome installs the copy when it
- * loads it, and the service worker records `installedVersion: 2.0.0`. Nothing is cleared or seeded
- */
-const storageOfFirstInstall = async (context: BrowserContext, extensionId: string): Promise<ExtensionStorage> => {
-  const worker = context.serviceWorkers().find((candidate) => candidate.url().startsWith(`chrome-extension://${extensionId}/`));
-  if (worker === undefined) {
-    throw new Error('The service worker of the 2.0.0 build is not running');
-  }
-  const storage = createStorageController(worker);
-  await expect
-    .poll(async () => storedRecord(storage))
-    .toEqual({ installedVersion: WHATS_NEW_UPDATE_VERSION });
-  return storage;
-};
-
-/**
- * The storage of the 2.0.0 build, emptied once its service worker has recorded the first install.
- * Waiting for that write first means it cannot land over the seed of the test
- */
-const storageAfterInstall = async (context: BrowserContext, extensionId: string): Promise<ExtensionStorage> => {
-  const storage = await storageOfFirstInstall(context, extensionId);
-  await storage.reset();
-  return storage;
-};
-
 test.describe(`What's new after the update to ${WHATS_NEW_UPDATE_VERSION}, a Release that has Release notes`, () => {
   test.use({ extensionPath: WHATS_NEW_UPDATE_EXTENSION_PATH });
 
   test('first install: a Release that has Release notes shows nothing, and the record stays as the service worker wrote it', async ({ context, extensionId }) => {
     // No storage fixture and no seed: storage is as the first install of 2.0.0 left it
-    const storage = await storageOfFirstInstall(context, extensionId);
+    const storage = await storageOfFirstInstall(context, extensionId, WHATS_NEW_UPDATE_VERSION);
 
     const popup = await openPopup(context, extensionId);
     await expect(popup.getByRole('heading', { name: /my prompt manager/i })).toBeVisible();
@@ -182,7 +183,7 @@ test.describe(`What's new after the update to ${WHATS_NEW_UPDATE_VERSION}, a Rel
   const UPDATED_FROM_1_9 = { installedVersion: '1.9.0' };
 
   test('update case: the sheet shows, Got it writes the Last seen Release, and the next opening shows nothing', async ({ context, extensionId }) => {
-    const storage = await storageAfterInstall(context, extensionId);
+    const storage = await storageAfterInstall(context, extensionId, WHATS_NEW_UPDATE_VERSION);
     await seedPopup(storage, { [WHATS_NEW_KEY]: UPDATED_FROM_1_9 });
 
     const first = await openPopup(context, extensionId);
@@ -206,7 +207,7 @@ test.describe(`What's new after the update to ${WHATS_NEW_UPDATE_VERSION}, a Rel
   });
 
   test('update case, closed without an action: the popup closed while the sheet shows, the next opening shows it again', async ({ context, extensionId }) => {
-    const storage = await storageAfterInstall(context, extensionId);
+    const storage = await storageAfterInstall(context, extensionId, WHATS_NEW_UPDATE_VERSION);
     await seedPopup(storage, { [WHATS_NEW_KEY]: UPDATED_FROM_1_9 });
 
     const first = await openPopup(context, extensionId);
@@ -221,7 +222,7 @@ test.describe(`What's new after the update to ${WHATS_NEW_UPDATE_VERSION}, a Rel
 
   for (const close of ['Escape', 'the backdrop'] as const) {
     test(`update case: a close by ${close} writes the Last seen Release too, and the next opening shows nothing`, async ({ context, extensionId }) => {
-      const storage = await storageAfterInstall(context, extensionId);
+      const storage = await storageAfterInstall(context, extensionId, WHATS_NEW_UPDATE_VERSION);
       await seedPopup(storage, { [WHATS_NEW_KEY]: UPDATED_FROM_1_9 });
 
       const first = await openPopup(context, extensionId);
