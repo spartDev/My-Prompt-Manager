@@ -289,6 +289,47 @@ describe('background: a picker that could not be activated leaves no session', (
     expect(await storedRepairs()).toEqual({ 'claude.ai': { override: { mode: 'custom', placement: 'before', selector: SEND_BUTTON } } });
   });
 
+  it('leaves no session when two starts on one tab both fail', async () => {
+    const listener = await startServiceWorker();
+    const answer = holdActivations();
+
+    const older = startOn(listener);
+    const newer = startOn(listener);
+    await answer(0, false);
+    await answer(1, false);
+
+    expect(await older).toMatchObject({ success: false });
+    expect(await newer).toMatchObject({ success: false });
+    await new Promise((resolve) => { setTimeout(resolve, 20); });
+    expect(await chrome.storage.session.get(null)).toEqual({});
+  });
+
+  it('keeps the session of a start that lands while a pick takes its own (one step)', async () => {
+    const listener = await startServiceWorker();
+    await startOn(listener);
+    // The pick's removal of its session waits until a new start was sent
+    let releaseRemove: () => void = () => undefined;
+    let held = false;
+    const realRemove = vi.mocked(chrome.storage.session.remove).getMockImplementation() as (keys: string | string[]) => Promise<void>;
+    vi.mocked(chrome.storage.session.remove).mockImplementation(((keys: string | string[]) => {
+      if (held) {
+        return realRemove(keys);
+      }
+      held = true;
+      return new Promise<void>((resolve) => { releaseRemove = () => { void realRemove(keys).then(resolve); }; });
+    }) as never);
+
+    const picked = send(listener, { type: 'ELEMENT_SELECTED', data: { selector: SEND_BUTTON } }, { tab: CLAUDE_TAB });
+    await vi.waitFor(() => { expect(held).toBe(true); });
+    const restarted = startOn(listener);
+    await new Promise((resolve) => { setTimeout(resolve, 10); });
+    releaseRemove();
+
+    expect(await picked).toEqual({ success: true });
+    expect(await restarted).toEqual({ success: true, tabId: CLAUDE_TAB.id });
+    expect(await send(listener, { type: 'ELEMENT_SELECTED', data: { selector: SEND_BUTTON } }, { tab: CLAUDE_TAB })).toEqual({ success: true });
+  });
+
   it('keeps the session of a start that lands while the stop deactivates the pickers', async () => {
     const listener = await startServiceWorker();
     await startOn(listener);
@@ -307,7 +348,8 @@ describe('background: a picker that could not be activated leaves no session', (
     expect(await send(listener, { type: 'ELEMENT_SELECTED', data: { selector: SEND_BUTTON } }, { tab: CLAUDE_TAB })).toEqual({ success: true });
   });
 
-  it('keeps the session of a start that lands while the stop reads what to remove', async () => {
+  // Guards the chain of session changes: the stop's read and its removal are one step
+  it('keeps the session of a start that lands while the stop reads what to remove (one step)', async () => {
     const listener = await startServiceWorker();
     await startOn(listener);
     // The stop reads the sessions to remove; that read answers only once a new start was sent

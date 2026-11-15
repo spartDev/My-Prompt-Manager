@@ -27,7 +27,7 @@ interface PickerSession {
   windowId: number;
   /** Set when the pick repairs the icon placement of this built-in Platform (Settings, "Place the icon") */
   repairHostname?: string;
-  /** The START_ELEMENT_PICKER that stored it: a start that fails forgets its own session, never a newer one */
+  /** The START_ELEMENT_PICKER that stored it: a stop removes a session only as it saw it, never a newer start's */
   attempt?: string;
 }
 
@@ -77,29 +77,9 @@ const pickerSessions = {
     const stored: unknown = (await chrome.storage.session.get(key))[key];
     return isPickerSession(stored) ? stored : undefined;
   },
-  /** Stores a start's session; returns the one it replaces, so a start that fails can put it back */
-  start(session: PickerSession): Promise<PickerSession | undefined> {
-    return changePickerSessions(async () => {
-      const replaced = await pickerSessions.get(session.tabId);
-      await chrome.storage.session.set({ [pickerSessionKey(session.tabId)]: session });
-      return replaced;
-    });
-  },
-  /**
-   * A start failed: its session goes, and the one it replaced comes back (a picker still active in
-   * the tab keeps its pick). Nothing changes if a later start or a pick changed the tab's session since.
-   */
-  failed(tabId: number, attempt: string, replaced: PickerSession | undefined): Promise<void> {
-    return changePickerSessions(async () => {
-      if ((await pickerSessions.get(tabId))?.attempt !== attempt) {
-        return;
-      }
-      if (replaced) {
-        await chrome.storage.session.set({ [pickerSessionKey(tabId)]: replaced });
-      } else {
-        await chrome.storage.session.remove(pickerSessionKey(tabId));
-      }
-    });
+  /** Stores the session of a picker now active in its tab */
+  set(session: PickerSession): Promise<void> {
+    return changePickerSessions(() => chrome.storage.session.set({ [pickerSessionKey(session.tabId)]: session }));
   },
   /** Takes the tab's session for a pick: read and removed in one step */
   take(tabId: number): Promise<PickerSession | undefined> {
@@ -1257,10 +1237,6 @@ async function handleStartElementPicker(
   }) => void,
   repairHostname?: string,
 ) {
-  // The tab whose session was stored, until the picker is active in it: any failure in between forgets it
-  let pendingTabId: number | null = null;
-  let replaced: PickerSession | undefined;
-  const attempt = crypto.randomUUID();
   try {
     // Determine which tab to activate picker on
     let targetTabId: number | null = null;
@@ -1308,14 +1284,6 @@ async function handleStartElementPicker(
       return;
     }
 
-    // Store picker session
-    pendingTabId = targetTabId;
-    replaced = await pickerSessions.start({
-      tabId: targetTabId,
-      windowId: sender.tab?.windowId || 0,
-      ...(repairHostname !== undefined ? { repairHostname } : {}),
-      attempt,
-    });
 
     // Switch to the target tab
     await chrome.tabs.update(targetTabId, { active: true });
@@ -1367,8 +1335,6 @@ async function handleStartElementPicker(
         type: "ACTIVATE_ELEMENT_PICKER",
         source: "background",
       });
-      pendingTabId = null;
-      sendResponse({ success: true, tabId: targetTabId });
     } catch (messageError) {
       Logger.error("Failed to activate element picker", toError(messageError), {
         component: "Background",
@@ -1379,7 +1345,24 @@ async function handleStartElementPicker(
         error:
           "Failed to activate element picker. Please refresh the page and try again.",
       });
+      return;
     }
+
+    // Stored once the picker is active, never before: a start that fails leaves nothing behind,
+    // and of two starts on one tab, the last one active is the one kept
+    try {
+      await pickerSessions.set({
+        tabId: targetTabId,
+        windowId: sender.tab?.windowId || 0,
+        ...(repairHostname !== undefined ? { repairHostname } : {}),
+        attempt: crypto.randomUUID(),
+      });
+    } catch (error) {
+      // A picker with no session would take a pick nobody keeps
+      await chrome.tabs.sendMessage(targetTabId, { type: "DEACTIVATE_ELEMENT_PICKER", source: "background" }).catch(() => undefined);
+      throw error;
+    }
+    sendResponse({ success: true, tabId: targetTabId });
   } catch (error) {
     Logger.error("Error starting element picker", toError(error), {
       component: "Background",
@@ -1387,13 +1370,6 @@ async function handleStartElementPicker(
       senderTabId: sender.tab?.id,
     });
     sendResponse({ success: false, error: getErrorMessage(error) });
-  } finally {
-    if (pendingTabId !== null) {
-      const tabId = pendingTabId;
-      await pickerSessions.failed(tabId, attempt, replaced).catch((error: unknown) => {
-        Logger.warn("Could not forget a picker session", { component: "Background", tabId, error: getErrorMessage(error) });
-      });
-    }
   }
 }
 
