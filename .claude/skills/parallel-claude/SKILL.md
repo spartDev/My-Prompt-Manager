@@ -63,7 +63,7 @@ Once user selects, launch directly (script claims issues automatically):
 .claude/skills/parallel-claude/scripts/launch.sh abc def
 ```
 
-Both launchers, this one and `dev-workflow.sh`, claim through `scripts/launch-claims.sh`: every ticket is claimed under a lock in the git common dir, held until the worktrees and every tmux pane are up. A failed setup or an INT/TERM stops the tmux session it started and puts each ticket back with its previous assignee and status. `scripts/test-launch-claims.sh` checks this against a stub `bd` and `tmux`, and `npm test` runs it.
+Both launchers, this one and `dev-workflow.sh`, claim through `scripts/launch-claims.sh`: every ticket is claimed under a lock in the git common dir (`claude-parallel-claim.lock`, a symlink to the pid of the launch that holds it), held until the worktrees and every tmux pane are up. A lock whose launch no longer runs, killed with SIGKILL say, is removed by the next launch. A failed setup or an INT/TERM stops the tmux session it started and puts each ticket back with its previous assignee and status. `scripts/test-launch-claims.sh` checks this against a stub `bd` and `tmux`, and `npm test` runs it.
 
 ## Coordinating
 

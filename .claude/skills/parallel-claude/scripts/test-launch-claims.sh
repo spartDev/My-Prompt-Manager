@@ -58,7 +58,8 @@ mkdir -p "$BIN"
 # bd: one file per ticket holding "assignee|status". The actor is "me"; a claim
 # takes a ticket nobody holds, one of mine, or one of the pool alias "pool".
 # Faults, one file each in $STATE: fail-claim-<id>, fail-read-after-claim-<id>,
-# term-after-claim-<id> (sends TERM to the launcher once the claim is made).
+# term-after-claim-<id> and int-after-claim-<id> (send TERM or INT to the
+# launcher once the claim is made).
 cat > "$BIN/bd" <<'STUB'
 #!/usr/bin/env bash
 echo "bd $*" >> "$STATE/calls"
@@ -85,6 +86,7 @@ case "$cmd" in
             echo "me|in_progress" > "$file"
             touch "$STATE/claimed-$id"
             [ -e "$STATE/term-after-claim-$id" ] && kill -TERM "$PPID"
+            [ -e "$STATE/int-after-claim-$id" ] && kill -INT "$PPID"
             exit 0
         fi
         while [ $# -gt 0 ]; do
@@ -108,9 +110,10 @@ STUB
 # -P. A pane opens only in a directory that exists, taken from -c or from the
 # "cd '<dir>'" its command starts with; each one is appended to $STATE/pane-dirs.
 # A -t target must be the session or a pane already open. Faults:
-# fail-new-session, fail-split-<n> (the n-th split fails), int-at-new-session
-# (sends INT to the launcher). new-session records whether the claim lock is
-# held at that point.
+# fail-new-session, fail-split-<n> (the n-th split fails), noop-split-<n> (the
+# n-th split succeeds without opening a pane), int-at-new-session (sends INT to
+# the launcher). new-session records whether the claim lock is held at that
+# point.
 cat > "$BIN/tmux" <<'STUB'
 #!/usr/bin/env bash
 echo "tmux $1" >> "$STATE/calls"
@@ -141,7 +144,7 @@ open_pane() {
 }
 case "$sub" in
     new-session)
-        if [ -d "$LOCK" ]; then echo held > "$STATE/lock-at-setup"; else echo free > "$STATE/lock-at-setup"; fi
+        if [ -L "$LOCK" ]; then echo held > "$STATE/lock-at-setup"; else echo free > "$STATE/lock-at-setup"; fi
         [ -e "$STATE/int-at-new-session" ] && kill -INT "$PPID"
         [ -e "$STATE/fail-new-session" ] && exit 1
         open_pane
@@ -150,6 +153,7 @@ case "$sub" in
         n=$(( $(cat "$STATE/splits" 2>/dev/null || echo 0) + 1 ))
         echo "$n" > "$STATE/splits"
         [ -e "$STATE/fail-split-$n" ] && exit 1
+        [ -e "$STATE/noop-split-$n" ] && exit 0
         case "$target" in
             claude-parallel) ;;
             %*) [ "${target#%}" -le "$(cat "$STATE/panes")" ] || { echo "tmux: no pane $target" >> "$STATE/calls"; exit 1; } ;;
@@ -169,6 +173,24 @@ esac
 STUB
 
 for tool in claude gh; do printf '#!/usr/bin/env bash\nexit 0\n' > "$BIN/$tool"; done
+
+# ln and mkdir: the real commands, but with the fault term-at-lock, the one
+# that creates the claim lock sends TERM to the launcher once it is created.
+for tool in ln mkdir; do
+    cat > "$BIN/$tool" <<STUB
+#!/bin/sh
+/bin/$tool "\$@"
+rc=\$?
+for last in "\$@"; do :; done
+if [ "\$rc" -eq 0 ] && [ -n "\${LOCK:-}" ] && [ "\$last" = "\$LOCK" ] && [ -e "\$STATE/term-at-lock" ]; then
+    kill -TERM "\$PPID"
+fi
+exit "\$rc"
+STUB
+done
+# The launchers run under the bash that runs this test: /bin/bash 3.2 on macOS
+# when started as /bin/bash test-launch-claims.sh
+ln -s "$BASH" "$BIN/bash"
 chmod +x "$BIN"/*
 export PATH="$BIN:$PATH"
 
@@ -218,7 +240,7 @@ echo "launch-claims.sh"
 setup "plain claim of A B C" A='|open' B='|open' C='|open'
 with_claims '
     claim_issues A B C || exit 9
-    [ -d "$LOCK" ] || exit 8             # held until setup ends
+    [ -L "$LOCK" ] || exit 8             # held until setup ends
     [ ${#LAUNCH_CLAIMS[@]} -eq 3 ] || exit 7
     finish_launch
     [ ${#LAUNCH_CLAIMS[@]} -eq 0 ] || exit 6'
@@ -260,6 +282,52 @@ expect_eq "exit code" 0 $?
 expect_owner B '|open'
 expect_untouched B
 expect_no_lock
+
+setup "TERM as the lock is taken" A='|open'
+touch "$STATE/term-at-lock"
+with_claims 'claim_issues A; echo "not stopped"'
+expect_eq "exit code" 130 $?
+expect_owner A '|open'
+expect_untouched A
+expect_no_lock
+
+setup "the lock of a launch that no longer runs is removed" A='|open'
+sleep 0 &
+dead=$!
+wait "$dead"
+ln -s "$dead" "$LOCK"
+with_claims 'claim_issues A || exit 9; finish_launch'
+expect_eq "exit code" 0 $?
+expect_owner A 'me|in_progress'
+if grep -q "Removed the claim lock of launch $dead" "$STATE/out"; then pass; else fail "no warning about the stale lock"; fi
+expect_no_lock
+
+setup "the lock of a launch that runs is kept" A='|open'
+ln -s "$$" "$LOCK"
+with_claims 'claim_issues A'
+expect_eq "exit code" 1 $?
+expect_owner A '|open'
+expect_untouched A
+expect_eq "lock holder" "$$" "$(readlink "$LOCK")"
+rm -f "$LOCK"
+
+setup "a stale lock another launch is removing is left to it" A='|open'
+ln -s "$dead" "$LOCK"
+mkdir "$LOCK.reap"
+with_claims 'claim_issues A'
+expect_eq "exit code" 1 $?
+expect_owner A '|open'
+expect_eq "lock holder" "$dead" "$(readlink "$LOCK")"
+if [ -d "$LOCK.reap" ]; then pass; else fail "the removal lock of the other launch is gone"; fi
+rm -f "$LOCK"; rmdir "$LOCK.reap"
+
+setup "the lock directory of an older launcher is kept" A='|open'
+mkdir "$LOCK"
+with_claims 'claim_issues A'
+expect_eq "exit code" 1 $?
+expect_owner A '|open'
+expect_eq "lock directory content" "" "$(ls -A "$LOCK")"
+rmdir "$LOCK"
 
 setup "ticket already mine but open goes back to open" A='me|open'
 with_claims 'claim_issues A || exit 9; abort_launch'
@@ -329,6 +397,28 @@ for launcher in "${LAUNCHERS[@]}"; do
     expect_owner B '|open'
     expect_no_lock
 
+    # Before the launcher sets its EXIT trap: only the INT trap of claim_issues rolls back
+    setup "$name: INT right after claiming A" A='|open' B='|open'
+    touch "$STATE/int-after-claim-A"
+    launch "$launcher" A B
+    expect_eq "exit code" 130 $?
+    expect_owner A '|open'
+    expect_owner B '|open'
+    expect_untouched B
+    if [ -f "$STATE/panes" ]; then fail "the session still runs"; else pass; fi
+    expect_no_lock
+
+    setup "$name: a split returns without a pane" A='|open' B='|open'
+    touch "$STATE/noop-split-1"
+    launch "$launcher" A B
+    rc=$?
+    if [ "$rc" -ne 0 ]; then pass; else fail "the launch succeeded"; fi
+    expect_owner A '|open'
+    expect_owner B '|open'
+    if grep -q "The session has 1 panes for 2 tickets" "$STATE/out"; then pass; else fail "the pane count was not checked"; fi
+    if [ -f "$STATE/panes" ]; then fail "the session still runs"; else pass; fi
+    expect_no_lock
+
     setup "$name: INT during setup" A='|open' B='me|open'
     touch "$STATE/int-at-new-session"
     launch "$launcher" A B
@@ -339,13 +429,14 @@ for launcher in "${LAUNCHERS[@]}"; do
     expect_no_lock
 
     setup "$name: a launch under way keeps the lock" A='|open'
-    mkdir "$LOCK"
+    ln -s "$$" "$LOCK"
     launch "$launcher" A
     rc=$?
     if [ "$rc" -ne 0 ]; then pass; else fail "the launch succeeded"; fi
     expect_owner A '|open'
     expect_untouched A
-    rmdir "$LOCK"
+    expect_eq "lock holder" "$$" "$(readlink "$LOCK")"
+    rm -f "$LOCK"
 done
 
 # --- One copy of the claim code ------------------------------------------------

@@ -18,8 +18,11 @@
 # Tickets this launch took over, one "id|previous assignee|previous status"
 # each, so a launch that fails puts every one back as it found it.
 LAUNCH_CLAIMS=()
-# The claim lock while this launch holds it.
+# The claim lock this launch takes or holds: a symlink whose target is the pid
+# of its holder, so it is created with its holder in one step.
 LAUNCH_LOCK=""
+# The lock that guards the removal of a stale claim lock, while this launch holds it.
+LAUNCH_REAP=""
 # The tmux session this launch started, stopped before its claims are given back.
 LAUNCH_SESSION=""
 
@@ -87,11 +90,17 @@ claim_issues_locked() {
     done
 }
 
-# Free the claim lock if this launch holds it.
+# Free the claim lock if this launch holds it: only a lock whose holder is
+# this shell is removed, so an interrupt before the lock is taken leaves the
+# lock of another launch alone.
 free_claim_lock() {
-    if [ -n "$LAUNCH_LOCK" ]; then
-        rmdir "$LAUNCH_LOCK" 2>/dev/null || true
-        LAUNCH_LOCK=""
+    if [ -n "$LAUNCH_LOCK" ] && [ "$(readlink "$LAUNCH_LOCK" 2>/dev/null)" = "$$" ]; then
+        rm -f "$LAUNCH_LOCK"
+    fi
+    LAUNCH_LOCK=""
+    if [ -n "$LAUNCH_REAP" ]; then
+        rmdir "$LAUNCH_REAP" 2>/dev/null || true
+        LAUNCH_REAP=""
     fi
 }
 
@@ -115,20 +124,65 @@ finish_launch() {
     free_claim_lock
 }
 
-# Take the lock (mkdir: flock is not on macOS) and claim the tickets. On
-# success the lock stays held, so a second launch reads the assignees only once
-# this one has set up or rolled back, and a rollback can never release a ticket
-# another launch has just claimed. On failure nothing is held.
+# Whether a process runs; kill -0 fails on another user's process, ps does not.
+pid_alive() {
+    kill -0 "$1" 2>/dev/null || ps -p "$1" >/dev/null 2>&1
+}
+
+# Create the claim lock for this shell. ln -s makes the link and its target,
+# this pid, in one step; when the path is a directory (the lock of an older
+# launcher), ln puts the link inside it instead, which is taken back.
+link_claim_lock() {
+    if ln -s "$$" "$LAUNCH_LOCK" 2>/dev/null; then
+        [ "$(readlink "$LAUNCH_LOCK" 2>/dev/null)" = "$$" ] && return 0
+        rm -f "$LAUNCH_LOCK/$$"
+    fi
+    return 1
+}
+
+# Take the claim lock; a lock whose holder no longer runs (a launch killed
+# with SIGKILL) is removed first. The removal happens under a second lock and
+# only while the holder read is still the one in place, so two launches that
+# find the same stale lock never remove the lock one of them has just taken.
+take_claim_lock() {
+    local holder
+    link_claim_lock && return 0
+    holder=$(readlink "$LAUNCH_LOCK" 2>/dev/null) || holder=""
+    case "$holder" in ""|*[!0-9]*) return 1 ;; esac
+    pid_alive "$holder" && return 1
+    mkdir "$LAUNCH_LOCK.reap" 2>/dev/null || return 1
+    LAUNCH_REAP="$LAUNCH_LOCK.reap"
+    if [ "$(readlink "$LAUNCH_LOCK" 2>/dev/null)" = "$holder" ]; then
+        rm -f "$LAUNCH_LOCK"
+        print_warning "Removed the claim lock of launch $holder, which no longer runs"
+    fi
+    rmdir "$LAUNCH_REAP" 2>/dev/null || true
+    LAUNCH_REAP=""
+    link_claim_lock
+}
+
+# Take the lock (flock is not on macOS) and claim the tickets. On success the
+# lock stays held, so a second launch reads the assignees only once this one
+# has set up or rolled back, and a rollback can never release a ticket another
+# launch has just claimed. On failure nothing is held.
 claim_issues() {
-    local lock
+    local lock holder
     lock="$(git -C "$REPO_DIR" rev-parse --path-format=absolute --git-common-dir)/claude-parallel-claim.lock"
-    if ! mkdir "$lock" 2>/dev/null; then
-        print_error "Another launch is claiming tickets (lock $lock). Wait for it, or remove the lock if no launch is running."
+    # Interrupted from here to finish_launch: roll back, then stop. Set before
+    # the lock is taken, so no interrupt falls between the lock and its trap.
+    LAUNCH_LOCK="$lock"
+    trap 'abort_launch; exit 130' INT TERM
+    if ! take_claim_lock; then
+        trap - INT TERM
+        LAUNCH_LOCK=""
+        holder=$(readlink "$lock" 2>/dev/null) || holder="unknown"
+        if [ -d "$lock.reap" ]; then
+            print_error "Another launch is removing a stale claim lock ($lock.reap). Wait for it, or remove $lock.reap if no launch is running."
+        else
+            print_error "Another launch is claiming tickets (lock $lock, held by $holder). Wait for it, or remove the lock if no launch is running."
+        fi
         return 1
     fi
-    LAUNCH_LOCK="$lock"
-    # Interrupted from here to finish_launch: roll back, then stop
-    trap 'abort_launch; exit 130' INT TERM
     if ! claim_issues_locked "$@"; then
         trap - INT TERM
         free_claim_lock
