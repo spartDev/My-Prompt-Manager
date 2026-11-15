@@ -135,6 +135,36 @@ _Avoid_: Section, panel
 A brief message at the top of the popup or side panel that confirms an action or reports its failure, then disappears on its own, though not while the pointer or the focus is on it. One that confirms a deletion can offer to undo it while it shows. Only one shows at a time: a new one replaces it. The user turns all of them on or off in Settings, failures included.
 _Avoid_: Toast, alert, snackbar
 
+### Releases
+
+**Release**:
+A version of the extension the user installs, named by its version number (2.0.0). Installing a newer Release over an older one is an update; installing the extension where it was not is a first install.
+_Avoid_: Build, deploy
+
+**Release notes**:
+What a Release brings that the user should know about: its Features and its Critical fixes, nothing else. A Release may have none.
+_Avoid_: Changelog (the changelog lists every change, technical ones included)
+
+**Feature**:
+In Release notes, something the user can do that they could not do before. A refactoring, an invisible technical change or a small visual adjustment is not one.
+_Avoid_: Improvement, enhancement
+
+**Critical fix**:
+In Release notes, a repair of data loss or corruption, of a security flaw, or of a main function the user could not use. A small bug, a wording mistake or a rare case without consequence is not one.
+_Avoid_: Bug fix, hotfix
+
+**What's new**:
+The sheet that rises over the Library at the first opening after an update to a Release that has Release notes, and lists them. Never shown on a first install. Closing it, by any means, marks the Release as seen.
+_Avoid_: Changelog, release popup, splash
+
+**Last seen Release**:
+The Release whose What's new the user last closed. What's new shows again only for a Release that has Release notes and is not the Last seen Release.
+_Avoid_: Last version, seen flag
+
+**Debug mode**:
+The Advanced setting, off by default, that turns on detailed logging on Platforms and shows What's new at every opening without changing the Last seen Release.
+_Avoid_: Dev mode, test mode
+
 ## Relationships
 
 - A Library holds many Prompts and many Categories.
