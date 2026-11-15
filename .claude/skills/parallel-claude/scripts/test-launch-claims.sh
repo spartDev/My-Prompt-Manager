@@ -181,7 +181,9 @@ for tool in claude gh; do printf '#!/usr/bin/env bash\nexit 0\n' > "$BIN/$tool";
 # sends TERM to the launcher once it is created; with term-at-lock-refused,
 # the one refused the claim lock sends TERM. With dir-at-lock, an older
 # launcher takes its directory lock just before the claim lock is made and
-# frees it (rmdir, which fails on a directory not empty) just after, once. With
+# frees it (rmdir, which fails on a directory not empty) just after, once.
+# With held-at-lock, another launch holds the claim lock during the attempt
+# and frees it just after, once. With
 # alive-at-reap, the one that creates the removal lock makes the ps stub
 # report every process alive from then on, as when a dead pid is reused. With
 # fail-lock, perl and ln fail to create the claim lock, as on a read-only
@@ -201,8 +203,14 @@ if [ "$tool" != mkdir ] && [ -n "\${LOCK:-}" ] && [ "\$last" = "\$LOCK" ] && [ -
     rm -f "\$STATE/dir-at-lock"
     $REAL_MKDIR "\$LOCK" 2>/dev/null || older=""
 fi
+held=""
+if [ "$tool" != mkdir ] && [ -n "\${LOCK:-}" ] && [ "\$last" = "\$LOCK" ] && [ -e "\$STATE/held-at-lock" ]; then
+    rm -f "\$STATE/held-at-lock"
+    $(command -v ln) -s "\$\$" "\$LOCK" && held=1
+fi
 $real "\$@"
 rc=\$?
+[ -n "\$held" ] && rm -f "\$LOCK"
 [ -n "\$older" ] && rmdir "\$LOCK" 2>/dev/null
 if [ "\$rc" -eq 0 ] && [ -n "\${LOCK:-}" ] && [ "\$last" = "\$LOCK.reap" ] && [ -e "\$STATE/alive-at-reap" ]; then
     touch "\$STATE/all-alive"
@@ -455,6 +463,14 @@ with_claims 'claim_issues A'
 expect_eq "exit code" 1 $?
 if grep -q "Another launch is claiming tickets (lock $LOCK, held by $$)" "$STATE/out"; then pass; else fail "the error does not name the live holder"; fi
 rm -f "$LOCK" "$LOCK.reap"
+
+setup "a lock freed by another launch during the attempt is taken" A='|open'
+touch "$STATE/held-at-lock"
+with_claims 'claim_issues A || exit 9; finish_launch'
+expect_eq "exit code" 0 $?
+expect_owner A 'me|in_progress'
+if grep -q "Could not create the claim lock" "$STATE/out"; then fail "the lost race reads as a lock that cannot be created"; else pass; fi
+expect_no_lock
 
 setup "an older launcher's lock taken and freed while the lock is made" A='|open'
 touch "$STATE/dir-at-lock"
