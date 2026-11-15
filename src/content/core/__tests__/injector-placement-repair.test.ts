@@ -246,4 +246,26 @@ describe('icon placement override on a built-in Platform', () => {
       override: { mode: 'custom', placement: 'before', selector: PICKED }
     });
   });
+
+  it('keeps a pick made in another tab when its icon is in this tab\'s toolbar', async () => {
+    // This tab finds the toolbar; another tab of the Platform, on another variant of its UI, does not
+    await internals().injectIcon(editor);
+    await changeIconPlacementRepairs({ type: 'reportPlacement', hostname: 'claude.ai', placement: 'overlay' });
+    await settle();
+
+    // The user picks an element in that other tab, and the service worker stores it
+    await changeIconPlacementRepairs({
+      type: 'setOverride',
+      hostname: 'claude.ai',
+      positioning: { mode: 'custom', placement: 'before', selector: PICKED }
+    });
+    await settle();
+
+    expect(icon().getAttribute('data-mpm-placement')).toBe('toolbar');
+    expect(reports).toEqual([]);
+    expect(await stored()).toEqual({
+      status: 'overlay',
+      override: { mode: 'custom', placement: 'before', selector: PICKED }
+    });
+  });
 });

@@ -1254,6 +1254,12 @@ export class PromptLibraryInjector {
     if (!this.state.isSiteEnabled || !editor?.isConnected) {
       return;
     }
+    // The chain resolves in this tab, so the pick is not for this page: placing again would only
+    // report the Toolbar, which drops the pick just made in a tab where the chain finds nothing
+    const current = this.placement.current;
+    if (current?.kind === 'toolbar' && current.icon.isConnected) {
+      return;
+    }
     this.injectIcon(editor).catch((err: unknown) => {
       error('Icon placement after a new pick failed', err instanceof Error ? err : new Error(String(err)));
     });
